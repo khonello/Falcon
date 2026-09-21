@@ -51,6 +51,8 @@ class Scheduler:
     async def start(self) -> None:
         self.every("audit.retention", 24 * 3600, self.engine.audit.run_retention)
         self.every("sessions.expire", 5.0, self._expire_sessions)
+        self.every("control.polled", float(self.engine.settings.control_poll_seconds), self._evaluate_polled)
+        self.every("alerts.deliver", 30.0, self._deliver_alerts)
         for name, seconds, job in self._periodic:
             self._tasks[name] = asyncio.create_task(self._run_periodic(name, seconds, job))
         log.info("scheduler started with %d periodic jobs", len(self._periodic))
@@ -85,3 +87,13 @@ class Scheduler:
         from engine.hierarchy import traversal
 
         await traversal.expire_due_sessions(self.engine)
+
+    async def _evaluate_polled(self) -> None:
+        from engine.control import events
+
+        await events.evaluate_polled(self.engine)
+
+    async def _deliver_alerts(self) -> None:
+        from engine.hierarchy import alerts
+
+        await alerts.deliver_due(self.engine)

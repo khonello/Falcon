@@ -146,6 +146,10 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
         "violation_id": violation_id, "path": entry["path"], "tag": tag,
         "message": f"'{entry['filename']}' is a {tag} file and is not permitted on this PC. It is being ignored "
                    f"by the system until you remove it."})
+    from engine.control import events
+
+    await events.on_signal(engine, pc["id"], "resource.violation",
+                           {"violation_id": violation_id, "path": entry["path"], "tag": tag})
 
 
 async def ignored_files(engine: Engine, pc_id: int) -> set[int]:

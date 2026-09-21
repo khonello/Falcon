@@ -55,6 +55,10 @@ class Transfer:
 _transfers: dict[str, Transfer] = {}
 
 
+def reset_state() -> None:
+    _transfers.clear()
+
+
 def modified_name(path: str) -> str:
     """report.xlsx -> report-modified.xlsx. Keeps the client's own separators: these are the
     worker PC's paths, never the Engine host's."""
@@ -177,6 +181,10 @@ async def _fail_destination(engine: Engine, flow: dict[str, Any], dest: dict[str
                "reason": reason, "suggestion": flowdefs.suggestion_for(reason), "report_id": report_id}
     await engine.push_to_account(flow["created_by_account_id"], "flow.failed", payload)
     await engine.push_to_account(dest["owner_account_id"], "flow.failed", payload)
+    from engine.control import events
+
+    await events.on_signal(engine, dest["destination_pc_id"] or flow["source_pc_id"], "flow.failed",
+                           {"flow_id": flow["id"], "destination_id": dest["id"], "reason": reason})
 
 
 # --- handlers (worker clients report in) --------------------------------------------------------

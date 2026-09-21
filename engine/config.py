@@ -25,6 +25,10 @@ class Settings:
     # Traversal Time Limit (Hierarchy -> Session Blocking): fixed, extendable on request.
     traversal_limit_minutes: int = 30
     traversal_extension_minutes: int = 15
+    # Update escalation threshold (open item 10.4): count-based, tunable.
+    update_escalation_failures: int = 3
+    # Polled/evaluated Events (thresholds, idle, time) are checked on this interval.
+    control_poll_seconds: int = 15
     # Local LLM sidecar (spec 7.2.1). Never an external API.
     llm_endpoint: str = "http://127.0.0.1:11434"
     llm_model: str = "qwen3:0.6b"
@@ -51,6 +55,10 @@ class Settings:
             traversal_extension_minutes=int(
                 os.environ.get("FALCON_TRAVERSAL_EXTENSION_MINUTES", cls.traversal_extension_minutes)
             ),
+            update_escalation_failures=int(
+                os.environ.get("FALCON_UPDATE_ESCALATION_FAILURES", cls.update_escalation_failures)
+            ),
+            control_poll_seconds=int(os.environ.get("FALCON_CONTROL_POLL_SECONDS", cls.control_poll_seconds)),
             llm_endpoint=os.environ.get("FALCON_LLM_ENDPOINT", cls.llm_endpoint),
             llm_model=os.environ.get("FALCON_LLM_MODEL", cls.llm_model),
             debug=_flag("FALCON_DEBUG"),

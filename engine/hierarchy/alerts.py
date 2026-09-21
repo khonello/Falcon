@@ -71,6 +71,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await deliver(ctx.engine, {"id": alert_id, "alert_type": alert_type, "audience": audience, "body": body,
                                    "department_id": department_id, "recipient_account_ids": account_ids,
                                    "action_link": payload.get("action_link")})
+        await ctx.engine.db.alerts.mark_delivered(alert_id)
     return {"alert_id": alert_id, "deliver_at": deliver_at.isoformat() if deliver_at else None}
 
 
@@ -90,6 +91,19 @@ async def deliver(engine: Any, alert: dict[str, Any]) -> None:
         return i.account_id in (alert.get("recipient_account_ids") or [])
 
     await engine.broadcast("alert.delivered", payload, predicate=wants)
+
+
+async def deliver_due(engine: Any) -> int:
+    """Scheduler job: deliver scheduled alerts whose time has come, exactly once."""
+    if not engine.db.connected:
+        return 0
+    n = 0
+    for alert in await engine.db.alerts.due_undelivered():
+        await deliver(engine, alert)
+        await engine.db.alerts.mark_delivered(alert["id"])
+        await engine.audit.record(None, "alert.delivered", target_type="system_alerts", target_id=alert["id"])
+        n += 1
+    return n
 
 
 @handler("alerts.list")

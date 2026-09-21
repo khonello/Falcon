@@ -54,6 +54,10 @@ BASELINE_CEILING: dict[str, bool] = {
 _pending_offers: dict[int, dict[str, Any]] = {}
 
 
+def reset_state() -> None:
+    _pending_offers.clear()
+
+
 def effective_scope(ceiling: dict[str, bool], narrowing: dict[str, Any] | None) -> dict[str, bool]:
     """Intersect: the requester can only remove from the ceiling, never add to it."""
     scope = dict(ceiling)

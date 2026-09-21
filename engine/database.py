@@ -888,17 +888,45 @@ class ControlRepo(_Repo):
 
     async def create_action(self, created_by: int, action_kind: str, timeout_seconds: int, *,
                             builtin_type: str | None = None, custom_script: str | None = None,
-                            custom_script_language: str | None = None) -> int:
+                            custom_script_language: str | None = None, name: str | None = None,
+                            description: str | None = None, params: dict[str, Any] | None = None,
+                            timing: dict[str, Any] | None = None) -> int:
         return await self._val(
             "INSERT INTO actions (created_by_account_id, action_kind, builtin_type, custom_script, "
-            "custom_script_language, timeout_seconds) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-            created_by, action_kind, builtin_type, custom_script, custom_script_language, timeout_seconds)
+            "custom_script_language, timeout_seconds, name, description, params, timing) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
+            created_by, action_kind, builtin_type, custom_script, custom_script_language, timeout_seconds,
+            name, description, params, timing)
 
     async def update_action(self, action_id: int, *, timeout_seconds: int | None = None,
-                            custom_script: str | None = None) -> None:
+                            custom_script: str | None = None, name: str | None = None,
+                            description: str | None = None, params: dict[str, Any] | None = None,
+                            timing: dict[str, Any] | None = None) -> None:
         await self._exec(
             "UPDATE actions SET timeout_seconds = COALESCE($2, timeout_seconds), "
-            "custom_script = COALESCE($3, custom_script) WHERE id = $1", action_id, timeout_seconds, custom_script)
+            "custom_script = COALESCE($3, custom_script), name = COALESCE($4, name), "
+            "description = COALESCE($5, description), params = COALESCE($6, params), "
+            "timing = COALESCE($7, timing) WHERE id = $1",
+            action_id, timeout_seconds, custom_script, name, description, params, timing)
+
+    async def actions_in_department(self, department_id: int) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT a.* FROM actions a JOIN accounts c ON c.id = a.created_by_account_id "
+            "WHERE a.archived_at IS NULL AND c.department_id = $1 ORDER BY a.action_kind, a.id", department_id)
+
+    async def events_in_department(self, department_id: int, *, enabled_only: bool = False) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT e.* FROM event_definitions e JOIN accounts c ON c.id = e.created_by_account_id "
+            "WHERE c.department_id = $1 AND (NOT $2 OR e.enabled) ORDER BY e.id", department_id, enabled_only)
+
+    async def last_executions_for_action(self, action_id: int, limit: int = 5) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT * FROM action_executions WHERE action_id = $1 ORDER BY started_at DESC LIMIT $2", action_id, limit)
+
+    async def pending_executions(self) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT e.*, a.timeout_seconds FROM action_executions e JOIN actions a ON a.id = e.action_id "
+            "WHERE e.status = 'pending'")
 
     async def archive_action(self, action_id: int) -> None:
         await self._exec("UPDATE actions SET archived_at = now() WHERE id = $1", action_id)
@@ -1008,17 +1036,24 @@ class UpdatesRepo(_Repo):
             "UPDATE pc_version_status SET target_version_id = $2 WHERE pc_id = ANY($1::int[])",
             pc_ids, target_version_id)
 
-    async def record_attempt(self, pc_id: int, version_id: int, succeeded: bool) -> dict[str, Any]:
-        """Upsert a PC's status after an update attempt; failure count resets on success."""
+    async def record_attempt(self, pc_id: int, version_id: int, succeeded: bool,
+                             running_version_id: int | None = None) -> dict[str, Any]:
+        """Upsert a PC's status after an update attempt; failure count resets on success.
+        `running_version_id` (what the PC is actually on) is needed for a failed first report,
+        since a status row must always carry a current version."""
         return _row(await self.pool.fetchrow(
             "INSERT INTO pc_version_status (pc_id, current_version_id, target_version_id, last_attempt_at, "
-            "attempt_failure_count) VALUES ($1, $2::int, CASE WHEN $3::boolean THEN NULL ELSE $2::int END, now(), CASE WHEN $3::boolean THEN 0 ELSE 1 END) "
+            "attempt_failure_count) VALUES ($1, CASE WHEN $3::boolean THEN $2::int ELSE COALESCE($4::int, $2::int) END, "
+            "CASE WHEN $3::boolean THEN NULL ELSE $2::int END, now(), CASE WHEN $3::boolean THEN 0 ELSE 1 END) "
             "ON CONFLICT (pc_id) DO UPDATE SET "
             " current_version_id = CASE WHEN $3::boolean THEN $2::int ELSE pc_version_status.current_version_id END, "
             " target_version_id = CASE WHEN $3::boolean THEN NULL ELSE $2::int END, last_attempt_at = now(), "
             " attempt_failure_count = CASE WHEN $3::boolean THEN 0 ELSE pc_version_status.attempt_failure_count + 1 END, "
             " escalated_at = CASE WHEN $3::boolean THEN NULL ELSE pc_version_status.escalated_at END RETURNING *",
-            pc_id, version_id, succeeded)) or {}
+            pc_id, version_id, succeeded, running_version_id)) or {}
+
+    async def status_for_pc(self, pc_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM pc_version_status WHERE pc_id = $1", pc_id)
 
     async def mark_escalated(self, pc_id: int) -> None:
         await self._exec("UPDATE pc_version_status SET escalated_at = now() WHERE pc_id = $1", pc_id)
@@ -1062,6 +1097,13 @@ class AlertsRepo(_Repo):
 
     async def pending(self) -> list[dict[str, Any]]:
         return await self._fetch("SELECT * FROM system_alerts WHERE deliver_at > now() ORDER BY deliver_at")
+
+    async def due_undelivered(self) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT * FROM system_alerts WHERE deliver_at <= now() AND delivered_at IS NULL ORDER BY deliver_at")
+
+    async def mark_delivered(self, alert_id: int) -> None:
+        await self._exec("UPDATE system_alerts SET delivered_at = now() WHERE id = $1", alert_id)
 
 
 # ============================================================================================

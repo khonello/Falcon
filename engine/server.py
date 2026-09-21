@@ -47,6 +47,7 @@ class Engine:
         self._server: asyncio.base_events.Server | None = None
 
         # Every consumer of file events subscribes to the one index -- no per-combo detection.
+        from engine.control import events as control_events
         from engine.flow import sync as flow_sync
         from engine.resource import resource as resource_tiers
         from engine.task import expectation
@@ -54,6 +55,16 @@ class Engine:
         expectation.install(self)
         flow_sync.install(self)
         resource_tiers.install(self)
+        control_events.install(self)
+
+        # In-memory registries (offers, transfers, live outputs, polled state) belong to one
+        # Engine process; a fresh Engine starts clean.
+        from engine.control import executions as control_executions
+        from engine.hierarchy import assisted_access
+
+        for mod in (control_events, control_executions, flow_sync, assisted_access):
+            mod.reset_state()
+        self._conn_tasks: set[asyncio.Task[Any]] = set()
 
     # --- lifecycle ------------------------------------------------------------------------------
 
@@ -67,6 +78,11 @@ class Engine:
         rearmed = await tasks.reschedule_all(self)
         if rearmed:
             log.info("re-armed deadlines for %d open tasks", rearmed)
+        from engine.control import executions
+
+        guards = await executions.resume_guards(self)
+        if guards:
+            log.info("re-armed timeout guards for %d pending executions", guards)
         self._server = await asyncio.start_server(
             self._on_connection, self.settings.host, self.settings.port, ssl=self._ssl_context(),
             limit=4 * 1024 * 1024,
@@ -78,6 +94,11 @@ class Engine:
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
+        # Let every connection finish its disconnect handling before the pool goes away.
+        for conn in list(self.connections):
+            conn.writer.close()
+        if self._conn_tasks:
+            await asyncio.wait(self._conn_tasks, timeout=5)
         await self.scheduler.stop()
         await self.db.close()
 
@@ -97,6 +118,10 @@ class Engine:
     # --- connections ----------------------------------------------------------------------------
 
     async def _on_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        task = asyncio.current_task()
+        if task is not None:
+            self._conn_tasks.add(task)
+            task.add_done_callback(self._conn_tasks.discard)
         await Connection(self, reader, writer).serve()
 
     async def on_connected(self, conn: Connection) -> None:

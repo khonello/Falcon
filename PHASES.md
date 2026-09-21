@@ -51,7 +51,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Hierarchy: report routing (additive), routed pane, mark addressed → Super-User-only View, targeted `report.new` pushes
 - [x] Hierarchy: assisted access (availability, request/offer/accept/decline/close, ceiling-only narrowing, report emitted)
 - [x] Hierarchy: alerts (role-gated audiences, immediate push), departments, account+PC provisioning with client_id, offboarding ends sessions
-- [ ] Hierarchy: scheduled/recurring alert delivery via the Scheduler
+- [x] Hierarchy: scheduled alert delivery via the Scheduler (exactly once); recurrence stored, expansion deferred
 - [x] Global File Index: real upsert/search/collision/hash queries; event normalisation; tier-scoped search handler
 - [x] Task: propose (graph + collisions), create (explicit-None rule, collision refusal, scope), list/get/start/verify, stack evaluation per intent, expectation signals from the index stream + program signals, soft/final deadlines as scheduled Events (re-armed on start)
 - [x] Task: Ollama-style local LLM client (stdlib HTTP, None-on-failure, backoff); `llm_available` surfaced to the client
@@ -59,10 +59,10 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Flow: create/edit with consent (by authority; owner asked, flow paused until answered), pre-flight collision (confirm or change path), overlap-aware cycle prevention, resource-folder exclusion; propagation relayed via flow.read → flow.content → flow.apply with per-destination stage chains; write attribution vs external edits → `-modified` + re-sync; branch-scoped failure with reactive suggestion + report; resume/pause/delete/history
 - [x] Resource: tags derived from tier folders, admin/restricted tracked by hash system-wide, violations logged + surfaced to the user + reported, only that file ignored (Flow skips it), resolve lifts it; explicit tagging (admin tier Super User only)
 - [x] Assistance: tier-scoped search; pings between direct vertical pairs with pulsing status push; channel opens on response (sender speaks first), Engine-enforced turn lock, superior-only close; listeners per-adder, live silent pushes, listener_report
-- [ ] Control: event matching (`condition_spec` shape), polled evaluation, execution lifecycle, terminate, dashboard query
-- [ ] Custom Actions: Engine-side validation on create
-- [ ] Updates: approval gate, rollout, status ingestion, escalation threshold (open item 10.4), health view
-- [ ] Audit retention job wired to real purge
+- [x] Control: `condition_spec` shape defined; native signals (worker relay, file-index stream, task/flow/resource internal) matched with pc scope + filters; polled thresholds/idle/time via worker metrics + Scheduler; actions dispatched independently with immediate/delayed timing; execution lifecycle with streamed output, timeout guard, manual terminate by id; dashboard snapshot + live `action.status`/`event.fired` pushes
+- [x] Custom Actions: Admin-only, Engine-side validation on create/update (stdlib + Windows-native)
+- [x] Updates: approval hard gate, department rollout push, attempt reports (running version on first failure), count-based escalation threshold (`FALCON_UPDATE_ESCALATION_FAILURES`, default 3) → Admin notice + update_status report, aggregate health, Super User prompt
+- [x] Audit retention job wired to real purge (daily); scheduled alert delivery (30s); polled events (15s)
 - [~] Engine test suite against a real local Postgres (Windows) — DB fixture + migration tests in place; grows with each repo
 - [ ] Linux check: Engine + Postgres inside WSL, same suite green — the deployment shape (Engine on Linux, clients on Windows)
 
