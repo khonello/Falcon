@@ -116,13 +116,15 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
 
 
 async def _check_destination_write(engine: Engine, dest: dict[str, Any], event: dict[str, Any], rel: str) -> None:
-    last = await engine.db.flows.last_sync(dest["id"])
-    if last is not None and last["written_by"] == "flow_sync" and last["content_hash"] == event.get("hash"):
+    own = await engine.db.flows.last_flow_write_at(dest["id"], event["path"])
+    if own is None:
+        return  # this file was never written by the flow: pre-existing content, handled at pre-flight
+    if own["content_hash"] == event.get("hash"):
         return  # our own write landing -- not a conflict
-    if last is None:
-        return  # nothing synced here yet; content predating the flow was handled at pre-flight
-    # External modification: preserve it, then re-sync a fresh copy from source.
-    await engine.db.flows.log_sync(dest["id"], event.get("hash") or "", "external", None, conflict_resolved=True)
+    # External modification of a file the flow owns: preserve it, then re-sync from its source.
+    source_rel = own.get("source_relative_path") or rel
+    await engine.db.flows.log_sync(dest["id"], event.get("hash") or "", "external", None, conflict_resolved=True,
+                                   source_relative_path=source_rel, written_path=event["path"])
     await engine.audit.record(None, "flow.conflict", target_type="flow_destinations", target_id=dest["id"],
                               detail={"path": event["path"], "hash": event.get("hash")})
     await engine.push_to_pc(dest["destination_pc_id"], "flow.resolve_conflict", {
@@ -130,7 +132,7 @@ async def _check_destination_write(engine: Engine, dest: dict[str, Any], event: 
         "rename_to": modified_name(event["path"])})
     flow = await engine.db.flows.get(dest["flow_id"])
     if flow is not None:
-        await propagate(engine, flow["id"], join_client_path(flow["source_path"], rel), rel, None,
+        await propagate(engine, flow["id"], join_client_path(flow["source_path"], source_rel), source_rel, None,
                         only_destination=dest["id"])
 
 
@@ -229,7 +231,9 @@ async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     status = str_field(payload, "status", choices=("success", "failed"))
     if status == "success":
         written = payload.get("written_hash") or transfer.hash or ""
-        await ctx.engine.db.flows.log_sync(dest_id, written, "flow_sync", None)
+        await ctx.engine.db.flows.log_sync(dest_id, written, "flow_sync", None,
+                                           source_relative_path=transfer.relative_path,
+                                           written_path=payload.get("written_path"))
         await ctx.engine.audit.record(ctx, "flow.synced", target_type="flow_destinations", target_id=dest_id,
                                       detail={"flow_id": flow["id"], "relative_path": transfer.relative_path})
         await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.synced",

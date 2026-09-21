@@ -87,7 +87,7 @@ async def test_propagation_attribution_conflict_and_failure(engine, org, connect
     assert [s["stage_type"] for s in apply2.payload["stages"]] == ["transformation", "categorization"]
     # 3. W1 succeeds; W2 fails in its Categorization stage -> only W2's branch pauses.
     await w1.ok("flow.sync_result", {"transfer_id": read.payload["transfer_id"], "destination_id": d1["id"],
-                                     "status": "success", "written_hash": "h1-pdf"})
+                                     "status": "success", "written_hash": "h1-pdf", "written_path": "C:/in/docs/report.pdf"})
     await w2.ok("flow.sync_result", {"transfer_id": read.payload["transfer_id"], "destination_id": d2["id"],
                                      "status": "failed", "failure": {"stage_type": "categorization", "kind": "place_failed"}})
     failed = next(p for p in await a1.drain_pushes() if p.type == "flow.failed")
@@ -106,8 +106,9 @@ async def test_propagation_attribution_conflict_and_failure(engine, org, connect
     await w1.ok("index.event", {"event": {"op": "modify", "path": "C:/in/docs/report.pdf", "hash": "external"}})
     resolve = next(p for p in await w1.drain_pushes() if p.type == "flow.resolve_conflict")
     assert resolve.payload["rename_to"] == "C:/in/docs/report-modified.pdf"
+    # ...and the re-sync reads the ORIGINAL source file (the transformation produced the .pdf).
     reread = next(p for p in await a1.drain_pushes() if p.type == "flow.read")
-    assert reread.payload["path"].replace("\\", "/") == "C:/out/docs/report.pdf"
+    assert reread.payload["path"].replace("\\", "/") == "C:/out/docs/report.docx"
     hist = (await a1.ok("flow.history", {"flow_id": flow["id"]}))["history"]
     assert [h["written_by"] for h in hist] == ["external", "flow_sync"]
 

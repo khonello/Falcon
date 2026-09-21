@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-Design docs, a working **Engine** (Phase 1 done), and the **Operator Client TUI** (Phase 2 done bar a human interactive pass). Next: Phase 3, the Worker Client. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
+Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), and the **Worker Client** service + narrow TUI (Phase 3) — each done bar a human interactive pass. Next: Phase 4, full integration scenarios. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).
@@ -34,7 +34,8 @@ python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --plaintext  
 python -m operator_client --connect --script "tree; tasks"                              # scripted, no TUI
 
 environ-worker\Scripts\Activate.ps1
-pip install -e ".[worker]"                 # Worker Client
+pip install -e ".[worker]"                 # Worker Client (psutil, prompt_toolkit, watchdog)
+python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --plaintext --watch C:\path	o\docs [--ui]
 ```
 
 Engine settings are `FALCON_*` env vars (see `.env.example`, `engine/config.py`). Without `FALCON_DATABASE_URL` the Engine runs with no database (scaffold only). Without `FALCON_DEV_PLAINTEXT` it refuses to start unless TLS cert/key are set.
@@ -58,7 +59,8 @@ engine/            the Engine (Python, asyncio, asyncpg)
   migrations/      SQL, applied by Database.migrate()
 common/            code bundled by more than one package (custom_actions validator) — stdlib only
 operator_client/   core/ (connection, state, config, deadlines — no UI deps) + tui/ (shell registry, commands/, app)
-worker_client/     placeholder — Phase 3 (headless service; narrow UI as TUI first)
+worker_client/     service (connect/reconnect, push dispatch), watcher (watchdog + polling + idle sweep), executor
+                   (Script Execution Model), flowsync, signals, lockout, updater, ui (narrow Worker TUI), config, idle
 tests/             protocol, socket smoke, units, migrations, repos, per-combo end-to-end (conftest: DB-backed Engine + `connect(client_id)`)
 ```
 
@@ -66,6 +68,8 @@ Conventions in the scaffold:
 - Handlers: `@handler("area.op") async def fn(ctx: Context, payload: dict) -> dict`; check roles with `engine.permissions` (`require_role`, `require_department_scope`), parse fields with `int_field`/`str_field`, raise `ProtocolError(ErrorCode.X)` for typed errors, return JSON-safe dicts via `engine.serialize.row/rows`.
 - All SQL lives in `engine/database.py` repos — never in handlers. In-memory registries expose `reset_state()` and are cleared in `Engine.__init__`.
 - Operator Client: commands are `@command("name", "sub", usage, help)` in `operator_client/tui/commands/`, take `(ctx, args)` and return text; they must not import prompt_toolkit (only `tui/app.py` does) so `run_script` and the tests work from `environ-engine`. `ClientState.on_push` is the single place pushes update indicators/session.
+- `common/` is bundled by every package and must stay stdlib-only: `connection.EngineConnection` (pushes are queued and handled by a consumer task — never handle a push inline in a read loop, a handler that awaits a request would deadlock), `cli` (grammar/registry), `render`, `custom_actions`.
+- Worker Client: every Action, built-in or Custom, runs as a detached subprocess through `executor.py`; report before marking `completed`. Dev processes: kill stale `environ-*` python processes before restarting the Engine — a second Engine cannot bind 7400 and the old one keeps serving old code.
 - Message types are `<area>.<op>`; only `auth.*` and `system.*` are accepted before the handshake.
 - Anything reacting to file activity subscribes via `engine.file_index.subscribe(...)` — never its own detection.
 - Reports are raised only through `engine.hierarchy.reports.emit()`; audit only through `engine.audit.record()`.

@@ -118,8 +118,8 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
     a1 = _cfg(engine, tmp_path, "cid-a1")
     out = await run_script(a1, [
         "connect",
-        f"flow create src={org['a1_pc']}:C:/out dest={org['w1_pc']}:C:/in@1 dest={org['w2_pc']}:C:/in@2 "
-        "stage=transformation:to=pdf stage=branch@0 stage=categorization@1:by=extension",
+        (f"flow create src={org['a1_pc']}:C:/out dest={org['w1_pc']}:C:/in@1 dest={org['w2_pc']}:C:/in@2 "
+         "stage=transformation:to=pdf stage=branch@0 stage=categorization@1:by=extension"),
         "flows",
         f"flow create src={org['a1_pc']}:C:/out2 dest={org['a2_pc']}:C:/from-fin",
         "action add control notify message=hello timeout=5",

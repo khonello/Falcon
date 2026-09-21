@@ -156,8 +156,10 @@ async def execution_result(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     reported = str_field(payload, "status", choices=("success", "failed", "timeout", "terminated"))
     status = "terminated" if reported in ("timeout", "terminated") else reported
     reason = {"timeout": "timeout", "terminated": "manual"}.get(reported)
+    exit_code = payload.get("exit_code")
     await ctx.engine.db.control.finish_execution(execution_id, status, terminated_reason=reason,
-                                                 output_log_path=payload.get("output_log_path"))
+                                                 output_log_path=payload.get("output_log_path"),
+                                                 exit_code=int(exit_code) if exit_code is not None else None)
     ctx.engine.scheduler.cancel(f"execution.{execution_id}.guard")
     if payload.get("output"):
         _outputs.setdefault(execution_id, deque(maxlen=OUTPUT_CHUNKS_KEPT)).append(str(payload["output"]))

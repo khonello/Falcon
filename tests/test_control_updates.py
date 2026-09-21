@@ -169,8 +169,9 @@ async def test_update_gate_rollout_escalation_and_health(engine, org, connect):
     assert {t["pc_id"] for t in roll["targeted"]} == {org["a1_pc"], org["w1_pc"], org["w2_pc"]}
     assert "update.available" in w1.push_types(await w1.drain_pushes())
     assert await a1.err("updates.rollout_department", {"department_id": org["hr"]}) == "forbidden"
-    # Every PC confirms 1.0.0 (a failed first report must say what it is running).
-    assert await w2.err("updates.report_status", {"version": "1.0.0", "succeeded": False}) == "invalid"
+    # A failed first report from a fresh install leaves the PC "never confirmed" (still behind).
+    r0 = await w2.ok("updates.report_status", {"version": "1.0.0", "succeeded": False})
+    assert r0["current_version_id"] is None and r0["failures"] == 1
     for c in (w1, w2, a1, a2, su):
         await c.ok("updates.report_status", {"version": "1.0.0", "succeeded": True})
     health = await su.ok("updates.rollout_health")

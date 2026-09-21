@@ -671,16 +671,25 @@ class FlowsRepo(_Repo):
             "UPDATE flow_destinations SET pre_flight_check_status = $2 WHERE id = $1", destination_id, status)
 
     async def log_sync(self, destination_id: int, content_hash: str, written_by: str,
-                       written_by_account_id: int | None, conflict_resolved: bool = False) -> int:
+                       written_by_account_id: int | None, conflict_resolved: bool = False, *,
+                       source_relative_path: str | None = None, written_path: str | None = None) -> int:
         return await self._val(
             "INSERT INTO flow_sync_log (flow_destination_id, content_hash, written_by, written_by_account_id, "
-            "conflict_resolved) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            destination_id, content_hash, written_by, written_by_account_id, conflict_resolved)
+            "conflict_resolved, source_relative_path, written_path) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+            destination_id, content_hash, written_by, written_by_account_id, conflict_resolved,
+            source_relative_path, written_path)
 
     async def last_sync(self, destination_id: int) -> dict[str, Any] | None:
         return await self._one(
-            "SELECT * FROM flow_sync_log WHERE flow_destination_id = $1 ORDER BY occurred_at DESC LIMIT 1",
+            "SELECT * FROM flow_sync_log WHERE flow_destination_id = $1 ORDER BY occurred_at DESC, id DESC LIMIT 1",
             destination_id)
+
+    async def last_flow_write_at(self, destination_id: int, written_path: str) -> dict[str, Any] | None:
+        """The flow's own most recent write to this destination path (slash/case-agnostic)."""
+        return await self._one(
+            "SELECT * FROM flow_sync_log WHERE flow_destination_id = $1 AND written_by = 'flow_sync' "
+            "AND lower(replace(written_path, '\\', '/')) = lower(replace($2, '\\', '/')) "
+            "ORDER BY occurred_at DESC, id DESC LIMIT 1", destination_id, written_path)
 
     async def history(self, flow_id: int, limit: int = 200) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -947,11 +956,12 @@ class ControlRepo(_Repo):
             "VALUES ($1, $2, $3) RETURNING id", action_id, event_id, pc_id)
 
     async def finish_execution(self, execution_id: int, status: str, *, terminated_reason: str | None = None,
-                               output_log_path: str | None = None) -> None:
+                               output_log_path: str | None = None, exit_code: int | None = None) -> None:
         await self._exec(
             "UPDATE action_executions SET status = $2, terminated_reason = $3, "
-            "output_log_path = COALESCE($4, output_log_path), ended_at = now() WHERE id = $1 AND status = 'pending'",
-            execution_id, status, terminated_reason, output_log_path)
+            "output_log_path = COALESCE($4, output_log_path), exit_code = $5, ended_at = now() "
+            "WHERE id = $1 AND status = 'pending'",
+            execution_id, status, terminated_reason, output_log_path, exit_code)
 
     async def execution(self, execution_id: int) -> dict[str, Any] | None:
         return await self._one("SELECT * FROM action_executions WHERE id = $1", execution_id)
@@ -1043,7 +1053,7 @@ class UpdatesRepo(_Repo):
         since a status row must always carry a current version."""
         return _row(await self.pool.fetchrow(
             "INSERT INTO pc_version_status (pc_id, current_version_id, target_version_id, last_attempt_at, "
-            "attempt_failure_count) VALUES ($1, CASE WHEN $3::boolean THEN $2::int ELSE COALESCE($4::int, $2::int) END, "
+            "attempt_failure_count) VALUES ($1, CASE WHEN $3::boolean THEN $2::int ELSE $4::int END, "
             "CASE WHEN $3::boolean THEN NULL ELSE $2::int END, now(), CASE WHEN $3::boolean THEN 0 ELSE 1 END) "
             "ON CONFLICT (pc_id) DO UPDATE SET "
             " current_version_id = CASE WHEN $3::boolean THEN $2::int ELSE pc_version_status.current_version_id END, "

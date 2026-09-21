@@ -91,16 +91,21 @@ layer the GUI will reuse unchanged.
 
 ## Phase 3 — Worker Client (headless service, env: `environ-worker`)
 
-- [ ] `worker_client/core/`: persistent authenticated connection, reconnect, local cached
-      state (deadlines, session) under an ACL-restricted path
-- [ ] File event reporting (native OS events) + idle-time full sweep with instant cancel on input
-- [ ] Session blocking: local input restriction; overlay as a TUI/console surface first
-- [ ] Notifications: grace warnings, deadline pulses, ping alerts (TUI/console first)
-- [ ] Action execution: detached subprocess, per-execution log tailing, timeout, terminate by id
-- [ ] Custom Action re-validation on arrival
-- [ ] Program-target expectation signals (active/idle, RSS, open files)
-- [ ] Narrow Client TUI: task view/start/monitor, assistance search/ping
-- [ ] Update retry on idle + status reporting
+- [x] `worker_client/service.py`: connect-forever with backoff, handshake, native session claim, push dispatch, reconnect (verified live), notifiers for the UI
+- [x] `worker_client/config.py`: JSON under `%PROGRAMDATA%/Falcon` (or `FALCON_WORKER_CONFIG`), watched roots, cadences, cache
+- [x] File events: `watchdog` native adapter (verified live) with mtime/size polling fallback; sha256 hashes off-loop; idle-time full sweep in batches that stops when input resumes (`worker_client/idle.py`: GetLastInputInfo on Windows)
+- [x] Session blocking: `Lockout` state + notifier surface (+ optional `LockWorkStation`); overlay exe deferred to Phase 6
+- [x] Notifications: `session.blocked/released`, deadlines, pings, alerts, violations, offers printed live in the narrow UI; Dialog exe deferred to Phase 6
+- [x] Action execution: detached `create_subprocess_exec` against the bundled interpreter, per-execution log tailed by size growth and streamed, timeout → `timeout`, terminate by execution id → `terminated`, non-zero exit → `failed`; built-ins run through the same path (psutil-based monitoring, file ops, notify, screenshot via PowerShell; power actions gated by `--allow-power`)
+- [x] Custom Action re-validation on arrival (shared `common.custom_actions`)
+- [x] Flow on this PC: `flow.read` relay, `flow.apply` through Transformation (registered converters; unsupported → predefined suggestion) and Categorization stages, `-modified` conflict preservation; verified between two workers end to end
+- [x] Program-target expectation signals (running/active/rss/open files/present) + `control.metrics`
+- [x] Narrow Client TUI (`worker_client/ui.py`): status with BLOCKED surface, tasks/task/start, search, ping/pings/respond/msg/channel, alerts, violations, sweep — no verify, no Admin surface
+- [x] Update attempts: pending version from `update.available`, retry when idle, pluggable `update_command` (no packaging pipeline yet → honest failure + escalation); never-confirmed PCs representable (migration 007)
+- [x] Shared code moved to `common/`: `EngineConnection` (pushes now queued off the read loop — fixes a deadlock when a push handler awaits a request), CLI grammar/registry/renderers
+- [x] Engine fixes found by the worker: `exit_code` stored (005), per-file write attribution via `source_relative_path`/`written_path` (006)
+- [x] 7 worker tests (real subprocesses, real temp dirs, two workers relaying a flow); 87 total green; verified live with the dev Engine + Operator TUI
+- [ ] Interactive pass by a human (`python -m worker_client --ui`)
 
 ---
 

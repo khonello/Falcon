@@ -102,14 +102,11 @@ async def report_status(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     v = await db.updates.version_by_string(version)
     if v is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, f"unknown version {version}")
-    running_id = None
-    if not succeeded and await db.updates.status_for_pc(ident.pc_id) is None:
-        running = str_field(payload, "running", required=False)
-        rv = await db.updates.version_by_string(running) if running else None
-        if rv is None:
-            raise ProtocolError(ErrorCode.INVALID, "first report of a failed attempt must include 'running'")
-        running_id = rv["id"]
-    st = await db.updates.record_attempt(ident.pc_id, v["id"], succeeded, running_id)
+    # `running` (what the PC is actually on) is recorded when it is an approved version; an
+    # unknown build (a fresh install) leaves current_version_id NULL = never confirmed, behind.
+    running = str_field(payload, "running", required=False)
+    rv = await db.updates.version_by_string(running) if running else None
+    st = await db.updates.record_attempt(ident.pc_id, v["id"], succeeded, rv["id"] if rv else None)
     await ctx.engine.audit.record(ctx, "update.attempt", target_type="pc_version_status", target_id=ident.pc_id,
                                   detail={"version": version, "succeeded": succeeded,
                                           "failures": st["attempt_failure_count"]})

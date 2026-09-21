@@ -23,7 +23,7 @@ class Indicator:
     task_completed, unaddressed_ping, blocked, flow_failed, violation, offer)."""
     kind: str
     text: str
-    at: datetime = field(default_factory=datetime.now)
+    at: datetime = field(default_factory=lambda: datetime.now().astimezone())
     key: str | None = None  # dedup key, e.g. "ping" or f"task:{id}"
 
 
@@ -94,7 +94,7 @@ class ClientState:
 
     async def on_push(self, type_: str, payload: dict[str, Any]) -> None:
         """Keep the persistent surfaces current. Returns nothing; UIs subscribe for redraws."""
-        self.recent_pushes.append((datetime.now(), type_, payload))
+        self.recent_pushes.append((datetime.now().astimezone(), type_, payload))
         del self.recent_pushes[:-200]
         if type_ == "session.blocked":
             if payload.get("pc_id") == self.pc_id and payload.get("occupant_account_id") != self.account_id:
