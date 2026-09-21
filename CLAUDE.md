@@ -4,9 +4,53 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-**Design-only, pre-code.** The repo currently contains eight Markdown design documents and no source, build config, tests, or commits. There are no build/lint/test commands yet. When implementation begins, add the real commands here (the spec calls for Python + PostgreSQL via Docker Compose for the Engine, PySide6/QML for GUIs).
+Design docs plus an Engine **scaffold** (Phase 1a). Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
-The user's machine has an OpenAI Codex config (`~/.codex/`). It is unrelated to this project — ignore it and do not offer to import it.
+Rules from the user:
+- **Never use Docker.** PostgreSQL 18 is installed locally; point `FALCON_DATABASE_URL` at it.
+- The user creates the virtual environment (`.venv/`) themselves; work from it, don't recreate it.
+- The user's machine has an OpenAI Codex config (`~/.codex/`). It is unrelated to this project — ignore it and do not offer to import it.
+
+## Commands
+
+```powershell
+.venv\Scripts\Activate.ps1                 # user-created venv
+pip install -e ".[engine,dev]"             # add ,gui for PySide6/qasync (clients only)
+pytest                                     # all tests (asyncio_mode=auto)
+pytest tests/test_engine_smoke.py -k handshake   # one test
+ruff check .
+$env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   # local dev run
+```
+
+Engine settings are `FALCON_*` env vars (see `.env.example`, `engine/config.py`). Without `FALCON_DATABASE_URL` the Engine runs with no database (scaffold only). Without `FALCON_DEV_PLAINTEXT` it refuses to start unless TLS cert/key are set.
+
+## Code layout
+
+```
+protocol/          NDJSON wire protocol shared by all three packages (stdlib only)
+engine/            the Engine (Python, asyncio, asyncpg)
+  server.py        Engine class; imports every combo package so handlers register
+  connection.py    per-connection loop: challenge → gated dispatch → response/push
+  dispatch.py      @handler("area.op") registry, Context, Identity, stub()
+  auth.py          handshake shape; verify() stubbed to accept until Phase 5
+  database.py      asyncpg pool + one Repo class per schema section (all queries live here)
+  audit.py         AuditTrail.record() — the only audit write path
+  file_index.py    Global File Index: ingest + subscribe() fan-out to Task/Flow/Resource
+  scheduler.py     periodic/one-shot jobs on the loop (deadlines, session expiry, retention)
+  llm.py           LocalLLM narrow-question interface (yes_no / choose / extract)
+  hierarchy/ task/ flow/ resource/ control/   one package per combo
+  updates.py       update/deployment model
+  migrations/      SQL, applied by Database.migrate()
+operator_client/   placeholder — Phase 2
+worker_agent/      placeholder — Phase 3
+tests/             protocol round-trips, socket-level Engine smoke, pure-logic units
+```
+
+Conventions in the scaffold:
+- Handlers: `@handler("area.op") async def fn(ctx: Context, payload: dict) -> dict`; raise `ProtocolError(ErrorCode.X)` for typed errors; `return stub("area.op", payload)` marks unimplemented logic.
+- Message types are `<area>.<op>`; only `auth.*` and `system.*` are accepted before the handshake.
+- Anything reacting to file activity subscribes via `engine.file_index.subscribe(...)` — never its own detection.
+- Reports are raised only through `engine.hierarchy.reports.emit()`; audit only through `engine.audit.record()`.
 
 ## Predecessor project (last resort only)
 

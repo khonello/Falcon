@@ -1,0 +1,47 @@
+"""Engine settings, read from FALCON_* environment variables (see .env.example)."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in _TRUTHY
+
+
+@dataclass(frozen=True)
+class Settings:
+    host: str = "0.0.0.0"
+    port: int = 7400
+    database_url: str | None = None
+    tls_cert: Path | None = None
+    tls_key: Path | None = None
+    # Retention is flat 90 days system-wide for v1 (hierarchy-system-design.md → Audit & Logging).
+    audit_retention_days: int = 90
+    debug: bool = False
+
+    # Development-only. Both are hard, visible skips — never a quietly-always-true check (spec §8.1).
+    dev_bypass_auth: bool = False
+    dev_plaintext: bool = False
+
+    @classmethod
+    def from_env(cls) -> "Settings":
+        cert = os.environ.get("FALCON_TLS_CERT")
+        key = os.environ.get("FALCON_TLS_KEY")
+        return cls(
+            host=os.environ.get("FALCON_ENGINE_HOST", cls.host),
+            port=int(os.environ.get("FALCON_ENGINE_PORT", cls.port)),
+            database_url=os.environ.get("FALCON_DATABASE_URL") or None,
+            tls_cert=Path(cert) if cert else None,
+            tls_key=Path(key) if key else None,
+            audit_retention_days=int(
+                os.environ.get("FALCON_AUDIT_RETENTION_DAYS", cls.audit_retention_days)
+            ),
+            debug=_flag("FALCON_DEBUG"),
+            dev_bypass_auth=_flag("FALCON_DEV_BYPASS_AUTH"),
+            dev_plaintext=_flag("FALCON_DEV_PLAINTEXT"),
+        )

@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "falcon"
+version = "0.0.1"
+description = "Hierarchy-based management, automation, and monitoring system (Engine, Operator Client, Worker Agent)"
+requires-python = ">=3.10"
+dependencies = [
+    "asyncpg>=0.29",
+]
+
+[project.optional-dependencies]
+# Engine host only
+engine = [
+    "psutil>=5.9",
+]
+# Operator Client + Worker Agent helper exes (Qt). Not needed to run the Engine.
+gui = [
+    "PySide6>=6.6",
+    "qasync>=0.27",
+]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["protocol*", "engine*", "operator_client*", "worker_agent*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
