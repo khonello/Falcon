@@ -64,7 +64,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Updates: approval hard gate, department rollout push, attempt reports (running version on first failure), count-based escalation threshold (`FALCON_UPDATE_ESCALATION_FAILURES`, default 3) → Admin notice + update_status report, aggregate health, Super User prompt
 - [x] Audit retention job wired to real purge (daily); scheduled alert delivery (30s); polled events (15s)
 - [x] Engine test suite against a real local Postgres (Windows): 71 tests — protocol, socket smoke, units, migrations, repos, and end-to-end per combo
-- [ ] Linux check: Engine + Postgres inside WSL, same suite green — the deployment shape (Engine on Linux, clients on Windows)
+- [x] Linux check: Ubuntu 24.04 (WSL), Python 3.12, PostgreSQL 16, venv `~/environ-engine-wsl` — 72/72 tests, LLM benchmark 13/13 (llama.cpp built from source)
 
 ---
 
@@ -112,7 +112,7 @@ layer the GUI will reuse unchanged.
 - [ ] Engine + Operator Client + Worker Client end-to-end scenarios (the three from Hierarchy → Example Scenarios)
 - [ ] Cross-combo flows: Task → Flow, Task → Events, Resource → Events, Events → Control
 - [ ] Network-drop mid-traversal expires via the same deadline path
-- [ ] Engine running on Linux (WSL) with Windows clients connecting over TCP
+- [x] Engine running on Linux (WSL) with a Windows client over TCP: handshake, tree, traversal, task.propose via the Linux-hosted model, session end — verified 2026-09-21
 
 ---
 

@@ -126,3 +126,15 @@ Dashboard refresh mechanism (poll vs. push), Report-routing configuration UI, in
 ## Local LLM (Task)
 
 In-process llama.cpp by default (`llama-cpp-python`, CPU wheel), model file at `models/Qwen3-0.6B-Q8_0.gguf` (git-ignored; download from `huggingface.co/Qwen/Qwen3-0.6B-GGUF`). Sidecar alternatives via `FALCON_LLM_BACKEND=openai|ollama` — see `.env.example`. **A 0.6B model answers YES to every yes/no question and "one" to every count** — so `engine/task/llm_graph.py` asks it only list-picks and verbatim-checked extractions; presence, counting, file names, deadline phrases and multi-task splits are found mechanically. Keep it that way: any new question to the model must be a pick-from-list or an extraction validated against the text. Re-run `scripts/llm_benchmark.py` (must stay 13/13) after touching the graph or prompts.
+
+## Linux / WSL
+
+Verified deployment shape: Engine + PostgreSQL inside WSL (`Ubuntu-Preview`, Python 3.12, PostgreSQL 16), clients on Windows over TCP. The WSL venv is `~/environ-engine-wsl` (Linux home, not `/mnt/c` — the repo itself is used from `/mnt/c/.../Falcon`). Run there with:
+
+```bash
+cd /mnt/c/Users/Khonello/Documents/Developer/Languages/Multi/Falcon
+FALCON_TEST_DATABASE_URL=postgresql://falcon:falcon@127.0.0.1:5432/falcon_test ~/environ-engine-wsl/bin/python -m pytest -q -p no:cacheprovider
+~/environ-engine-wsl/bin/python scripts/llm_benchmark.py
+```
+
+`-p no:cacheprovider` avoids writing `.pytest_cache` through the mount. A from-source llama.cpp build can flip a near-tie list-pick versus the Windows wheel — that is why intent cues are settled mechanically before the model is asked; keep the benchmark green on both.

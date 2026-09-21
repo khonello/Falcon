@@ -151,6 +151,27 @@ def program_candidates(text: str, file_names: list[str]) -> list[str]:
     return out
 
 
+INSTALL_CUES = re.compile(r"\b(?:install|installed|set up|setup|available|is there|present)\b", re.IGNORECASE)
+CLOSE_CUES = re.compile(r"\b(?:close|closed|quit|exit|shut down|shutdown|stop|not (?:be )?running|kill)\b",
+                        re.IGNORECASE)
+
+
+def program_intent_cue(text: str, program: str) -> str | None:
+    """The clause around the program name usually says what happens with it; 'use' is the
+    default the model is asked about, so only the unambiguous verbs are settled here."""
+    idx = text.lower().find(program.lower())
+    if idx < 0:
+        return None
+    before = CLAUSE_SPLIT.split(text[:idx])[-1][-60:]
+    after = CLAUSE_SPLIT.split(text[idx + len(program):])[0][:60]
+    clause = before + program + after
+    if CLOSE_CUES.search(before) or CLOSE_CUES.search(after[:20]):
+        return "closed_not_running"
+    if INSTALL_CUES.search(clause):
+        return "installed_available"
+    return None
+
+
 def mentions_use_on_file(text: str) -> bool:
     return re.search(r"\b(?:use|using|open)\b", text, re.IGNORECASE) is not None
 
@@ -208,12 +229,14 @@ async def _program_branch(llm: LocalLLM, text: str, out: ProposedStructure,
         name = candidates[0] if len(candidates) == 1 else None
     if not name:
         return  # no program target -- silence here is fine; the file branch carries the task
-    q = f"What should happen with the program {name}?"
-    choice = await llm.choose(q, text, list(PROGRAM_INTENT_OPTIONS))
-    if choice is None:
-        _unclear(out, f"{q} {' / '.join(PROGRAM_INTENT_OPTIONS)}")
-        return
-    intent = PROGRAM_INTENT_OPTIONS[choice]
+    intent = program_intent_cue(text, name)
+    if intent is None:
+        q = f"What should happen with the program {name}?"
+        choice = await llm.choose(q, text, list(PROGRAM_INTENT_OPTIONS))
+        if choice is None:
+            _unclear(out, f"{q} {' / '.join(PROGRAM_INTENT_OPTIONS)}")
+            return
+        intent = PROGRAM_INTENT_OPTIONS[choice]
     if intent == "used" and file_item is not None and mentions_use_on_file(text):
         intent = "used_with_file"  # "use X to update Y" ties the program to the file
     if intent == "used_with_file":

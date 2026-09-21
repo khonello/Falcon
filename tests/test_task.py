@@ -92,6 +92,9 @@ def test_graph_mechanical_helpers():
     assert llm_graph.program_candidates("Install 7-Zip so it's available by Friday", []) == ["7-Zip"]
     assert llm_graph.program_candidates("Close Outlook today", []) == ["Outlook"]
     assert llm_graph.program_candidates("Put the Q3 report in Shared/Minutes", []) == []
+    assert llm_graph.program_intent_cue("Install 7-Zip so it is available", "7-Zip") == "installed_available"
+    assert llm_graph.program_intent_cue("Close Outlook before you leave", "Outlook") == "closed_not_running"
+    assert llm_graph.program_intent_cue("Use Excel to update budget.xlsx", "Excel") is None
 
 
 # --- lifecycle ----------------------------------------------------------------------------------
