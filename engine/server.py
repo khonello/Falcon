@@ -94,10 +94,23 @@ class Engine:
     async def _on_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         await Connection(self, reader, writer).serve()
 
+    async def on_connected(self, conn: Connection) -> None:
+        """After a successful handshake: a Worker or Admin occupies its own PC natively."""
+        from engine.hierarchy import traversal
+
+        await traversal.claim_native_session(self, conn.ctx)
+
     async def on_disconnect(self, conn: Connection) -> None:
         """A dropped connection mid-traversal is NOT special-cased: the Engine-side session
-        deadline keeps running and releases the block when it fires (spec 7.1)."""
+        deadline keeps running and releases the block when it fires (spec 7.1). Only the
+        client's own *native* session ends here."""
         if conn.ctx.identity.account_id is not None:
+            from engine.hierarchy import traversal
+
+            await traversal.release_native_session(self, conn.ctx)
+            from engine.hierarchy import assisted_access
+
+            await assisted_access.clear_offers_for(self, conn.ctx.identity.account_id)
             await self.audit.record(conn.ctx, "auth.disconnected")
 
     async def broadcast(self, type_: str, payload: dict[str, Any] | None = None, *,
@@ -105,6 +118,20 @@ class Engine:
         for conn in list(self.connections):
             if conn.authenticated and (predicate is None or predicate(conn)):
                 await conn.push(type_, payload)
+
+    async def push_to_account(self, account_id: int | None, type_: str,
+                              payload: dict[str, Any] | None = None) -> None:
+        if account_id is not None:
+            await self.broadcast(type_, payload, predicate=lambda c: c.ctx.identity.account_id == account_id)
+
+    async def push_to_pc(self, pc_id: int | None, type_: str, payload: dict[str, Any] | None = None) -> None:
+        if pc_id is not None:
+            await self.broadcast(type_, payload, predicate=lambda c: c.ctx.identity.pc_id == pc_id)
+
+    async def push_to_role(self, role: str, type_: str, payload: dict[str, Any] | None = None, *,
+                           department_id: int | None = None) -> None:
+        await self.broadcast(type_, payload, predicate=lambda c: c.ctx.identity.role == role
+                             and (department_id is None or c.ctx.identity.department_id == department_id))
 
     # --- helpers --------------------------------------------------------------------------------
 

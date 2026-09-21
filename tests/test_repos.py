@@ -12,29 +12,15 @@ from datetime import timedelta
 import pytest
 
 from engine.database import Conflict, Database, _now
-from tests.conftest import requires_db
+from tests.conftest import requires_db, seed_org
 
 pytestmark = requires_db
 
 
 async def seed(db: Database) -> dict[str, int]:
-    """Super User; Finance (Admin A1 + Workers W1, W2); HR (Admin A2)."""
-    acc = db.accounts
-    su = await acc.create("super_user", None, None)
-    fin = await acc.create_department("Finance", su)
-    hr = await acc.create_department("HR", su)
-    su_pc = await acc.create_pc("SU-PC", None, "super_user_workstation", "cid-su")
-    a1_pc = await acc.create_pc("FIN-ADM", fin, "admin_workstation", "cid-a1")
-    w1_pc = await acc.create_pc("FIN-01", fin, "client_pc", "cid-w1")
-    w2_pc = await acc.create_pc("FIN-02", fin, "client_pc", "cid-w2")
-    a2_pc = await acc.create_pc("HR-ADM", hr, "admin_workstation", "cid-a2")
-    await db.pool.execute("UPDATE accounts SET bound_pc_id = $1 WHERE id = $2", su_pc, su)
-    a1 = await acc.create("admin", fin, a1_pc)
-    w1 = await acc.create("worker", fin, w1_pc)
-    w2 = await acc.create("worker", fin, w2_pc)
-    a2 = await acc.create("admin", hr, a2_pc)
-    return {"su": su, "fin": fin, "hr": hr, "a1": a1, "w1": w1, "w2": w2, "a2": a2,
-            "su_pc": su_pc, "a1_pc": a1_pc, "w1_pc": w1_pc, "w2_pc": w2_pc, "a2_pc": a2_pc}
+    return await seed_org(db)
+
+
 
 
 # --- identity -----------------------------------------------------------------------------------

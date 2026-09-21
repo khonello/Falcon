@@ -22,6 +22,9 @@ class Settings:
     tls_key: Path | None = None
     # Retention is flat 90 days system-wide for v1 (hierarchy-system-design.md → Audit & Logging).
     audit_retention_days: int = 90
+    # Traversal Time Limit (Hierarchy -> Session Blocking): fixed, extendable on request.
+    traversal_limit_minutes: int = 30
+    traversal_extension_minutes: int = 15
     debug: bool = False
 
     # Development-only. Both are hard, visible skips — never a quietly-always-true check (spec §8.1).
@@ -40,6 +43,10 @@ class Settings:
             tls_key=Path(key) if key else None,
             audit_retention_days=int(
                 os.environ.get("FALCON_AUDIT_RETENTION_DAYS", cls.audit_retention_days)
+            ),
+            traversal_limit_minutes=int(os.environ.get("FALCON_TRAVERSAL_LIMIT_MINUTES", cls.traversal_limit_minutes)),
+            traversal_extension_minutes=int(
+                os.environ.get("FALCON_TRAVERSAL_EXTENSION_MINUTES", cls.traversal_extension_minutes)
             ),
             debug=_flag("FALCON_DEBUG"),
             dev_bypass_auth=_flag("FALCON_DEV_BYPASS_AUTH"),

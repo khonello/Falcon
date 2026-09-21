@@ -85,6 +85,7 @@ async def auth_respond(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ctx.identity = await load_identity(ctx, client_id, payload.get("hostname"))
     conn.authenticated = True
     await ctx.engine.audit.record(ctx, "auth.connected", target_type="client", target_id=client_id)
+    await ctx.engine.on_connected(conn)
     ident = ctx.identity
     return {"authenticated": True, "client_id": client_id, "account_id": ident.account_id,
             "role": ident.role, "pc_id": ident.pc_id, "department_id": ident.department_id}
