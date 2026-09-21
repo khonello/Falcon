@@ -23,12 +23,12 @@ UX-enforced level *before* human passes and packaging — you cannot judge how t
 through a UI that does not reflect it. Each phase leaves its area at a usable level rather than
 perfect; the UI keeps improving alongside later phases.
 
-Order: **5 auth (switchable off for dev)** → **7 UI/UX to acceptable** → **8 human passes (GUI
+Order: **5 auth ✅** → **7 UI/UX to acceptable** → **8 human passes (GUI
 first)** → **9 packaging + deployment** → **10 hardening + ops**. UI refinement continues through 8–10.
 
 | # | Gap | Why it blocks a sale | Phase |
 |---|-----|----------------------|-------|
-| 1 | `auth.verify` accepts anyone with a client_id; no master secret, no derived keys, no TLS (dev plaintext only) | Anyone on the network can connect as the Super User | **Phase 5** (auth) — now, kept switchable off in dev |
+| 1 | ~~`auth.verify` accepts anyone with a client_id; no master secret, no derived keys, no TLS~~ | done in Phase 5: master secret, derived keys at provisioning, real challenge/response, TLS with pinned cert, rekey; `DEV_*` switches stay for local work | **Phase 5** ✅ |
 | 2 | Only Claude has exercised the GUI / TUI / worker UI | Behaviour gaps a human notices; judged through the GUI once it reflects intended use | **Phase 8** (human passes, GUI first) |
 | 3 | Runs from source in venvs: no bundled interpreter, no installers, no frozen Worker exes, no service install, no update pipeline (`update_command` is an empty hook), no CI | Nothing can be installed on a customer PC; packaging usually forces real changes (paths, permissions) | **Phase 9** (packaging + deployment) |
 | 4 | Worker Overlay/Dialog exes do not exist (the blocked-state surface is a text UI); no remote mouse/keyboard during traversal | The Client-PC experience in the Hierarchy doc is not what a worker sees | **Phase 9** (with the frozen toolchain) |
@@ -155,15 +155,17 @@ layer the GUI will reuse unchanged.
 
 ---
 
-## Phase 5 — Authentication (shape present since Phase 1; the logic is what is missing) — NOW
+## Phase 5 — Authentication ✅
 
-- [ ] Master secret generated on the Engine host (never transmitted); derived key `HMAC(master_secret, client_id)` per provisioned client
-- [ ] Provisioning: `hierarchy.account_create` / `python -m engine bootstrap` issue the derived key once, to be written to an ACL-restricted path on the client (install-package input)
-- [ ] Real `auth.verify`: nonce challenge → client HMAC response → constant-time compare; replace the `"stub"` HMAC in `common/connection.py`
-- [ ] Identity binding: reject (not just flag) a client_id from an unexpected hostname where the design says so; keep the deviation audit entry
-- [ ] TLS: self-signed Engine cert generation, pinned cert shipped in each client install, `--ca` honoured by both clients; fail loudly on mismatch
-- [ ] Rotation/revocation: offboarding an account invalidates its key; re-provisioning issues a new one
-- [ ] Real auth is the default but **stays switchable off** (`FALCON_DEV_BYPASS_AUTH` / `FALCON_DEV_PLAINTEXT`, logged loudly) so local GUI/TUI work and the dev DB are not disrupted while it lands; tests cover both the real path (provisioned keys against the test DB) and the bypass
+- [x] Master secret generated on the Engine host on first start (`engine/master_secret.py`, `FALCON_SECRET_PATH`, owner-only file, never transmitted); derived key `HMAC-SHA256(master_secret, "<client_id>:<key_generation>")` per provisioned client — the Engine stores no per-client keys
+- [x] Provisioning returns the key once: `python -m engine bootstrap`, `hierarchy.account_create`, `hierarchy.pc_register` (`client_key` hex alongside `client_id`); clients keep it in their config (`--client-key` / `key=` / GUI field, remembered)
+- [x] Real `auth.verify`: per-connection single-use nonce → client `HMAC(derived_key, nonce)` → constant-time compare; failures audited as `auth.failed` with a uniform "authentication failed" to the client; `common/connection.py` no longer sends `"stub"`
+- [x] Identity binding: unknown or offboarded client_id refused (offboarding = revocation); hostname mismatch stays a *deviation* (logged + surfaced, connection proceeds) exactly as the Hierarchy design specifies — not a refusal
+- [x] TLS: `python -m engine gencert <names> [dir]` (self-signed, SANs for the DNS names / IPs clients use, EC P-256, 10 years); clients pin it with `--ca`; unpinned → `SSLCertVerificationError`, plaintext client → handshake fails; Engine refuses to start without cert unless `FALCON_DEV_PLAINTEXT`
+- [x] Rotation: `hierarchy.pc_rekey {pc_id}` (Super User anywhere, Admin in own department) bumps `pcs.key_generation` (migration 008), drops that PC's live connection, returns the new key once
+- [x] Dev switches kept and loud: `FALCON_DEV_BYPASS_AUTH` (no challenge; identity still from the provisioned id) and `FALCON_DEV_PLAINTEXT`
+- [x] Tests run the real handshake everywhere (`TEST_MASTER_SECRET` + `key_for()` in conftest); `tests/test_auth.py` covers derivation, secret file, wrong/unknown/offboarded, provisioning + rekey, bypass, TLS pinned/unpinned/plaintext — 105 total green; verified live: Engine with TLS, TUI + GUI + Worker connecting with keys and the pinned cert, wrong key and unpinned cert refused loudly
+- [ ] Left for Phase 9 (packaging): writing the key to an ACL-restricted path inside the install package, and the cert bundle
 ---
 
 ## Phase 6 — GUI (PySide6 / QML / qasync) — pulled ahead of Phase 5 by agreement (TUI phases done)

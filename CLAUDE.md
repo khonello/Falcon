@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`), and the **Operator Client GUI** (Phase 6, pulled ahead: PySide6/QML on the same core layer, `python -m operator_client --gui`). **The order from here is fixed and sequential** (see "Where things stand" in `PHASES.md`): Phase 5 authentication (real by default, switchable off in dev so it does not disrupt local work) → Phase 7 UI/UX to an acceptable, UX-enforced level (the GUI is the primary product surface; the TUI was for integration testing) → Phase 8 human passes, GUI first → Phase 9 packaging/deployment (incl. frozen Worker Overlay/Dialog exes) → Phase 10 hardening. Each phase leaves its area usable, not perfect; UI refinement continues through 8–10. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
+Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`), and the **Operator Client GUI** (Phase 6, pulled ahead: PySide6/QML on the same core layer, `python -m operator_client --gui`). **The order from here is fixed and sequential** (see "Where things stand" in `PHASES.md`): Phase 5 authentication (done: real by default, `DEV_*` switches stay for local work) → Phase 7 UI/UX to an acceptable, UX-enforced level (the GUI is the primary product surface; the TUI was for integration testing) → Phase 8 human passes, GUI first → Phase 9 packaging/deployment (incl. frozen Worker Overlay/Dialog exes) → Phase 10 hardening. Each phase leaves its area usable, not perfect; UI refinement continues through 8–10. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).
@@ -25,14 +25,17 @@ pytest                                     # all tests (asyncio_mode=auto)
 pytest tests/test_engine_smoke.py -k handshake   # one test
 ruff check .
 $env:FALCON_TEST_DATABASE_URL="postgresql://falcon:falcon@localhost:5432/falcon_test"; pytest   # incl. DB tests (skipped without it)
-$env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   # local dev run
+python -m engine gencert 127.0.0.1,localhost,<hostname> data   # once: self-signed cert -> data/engine.crt + .key
+$env:FALCON_TLS_CERT="data/engine.crt"; $env:FALCON_TLS_KEY="data/engine.key"; python -m engine   # real auth + TLS
+$env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   # dev switches: no TLS, no handshake (loud)
 
 environ-operator\Scripts\Activate.ps1
 pip install -e ".[tui,gui]"                # Operator Client TUI + GUI (PySide6, qasync)
-python -m engine bootstrap SU-PC           # (from environ-engine, once, empty DB) -> prints the Super User client_id
-python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --plaintext        # interactive TUI
-python -m operator_client --connect --script "tree; tasks"                              # scripted, no TUI
-python -m operator_client --gui --engine 127.0.0.1:7400 --client-id <id> --plaintext  # QML GUI
+python -m engine bootstrap SU-PC           # (from environ-engine, once, empty DB) -> prints the Super User client_id + client_key ONCE
+python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # interactive TUI (TLS)
+python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --plaintext           # against a DEV_PLAINTEXT Engine
+python -m operator_client --connect --script "tree; tasks"                              # scripted, no TUI (remembered settings)
+python -m operator_client --gui --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # QML GUI
 ```
 
 GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`pip install -e ".[engine,dev,gui]"`); they skip otherwise. Set `QT_QPA_FONTDIR=C:\Windows\Fonts` when rendering offscreen screenshots (Qt ships no fonts).
@@ -43,7 +46,7 @@ pip install -e ".[worker]"                 # Worker Client (psutil, prompt_toolk
 python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt --watch C:\docs [--ui]
 ```
 
-Engine settings are `FALCON_*` env vars (see `.env.example`, `engine/config.py`). Without `FALCON_DATABASE_URL` the Engine runs with no database (scaffold only). Without `FALCON_DEV_PLAINTEXT` it refuses to start unless TLS cert/key are set.
+Engine settings are `FALCON_*` env vars (see `.env.example`, `engine/config.py`). Without `FALCON_DATABASE_URL` the Engine runs with no database (scaffold only). Without `FALCON_DEV_PLAINTEXT` it refuses to start unless TLS cert/key are set. The master secret lives at `FALCON_SECRET_PATH` (default `data/master.secret`, created on first start, git-ignored); every client key is `HMAC(master_secret, "<client_id>:<key_generation>")` and is printed once at provisioning (`bootstrap`, `hierarchy.account_create`, `hierarchy.pc_register`, `hierarchy.pc_rekey`). Clients that were provisioned before Phase 5 have no key on record — derive theirs from the secret with `engine.auth.derive_client_key`.
 
 ## Code layout
 
@@ -53,7 +56,7 @@ engine/            the Engine (Python, asyncio, asyncpg)
   server.py        Engine class; imports every combo package so handlers register
   connection.py    per-connection loop: challenge → gated dispatch → response/push
   dispatch.py      @handler("area.op") registry, Context, Identity, stub()
-  auth.py          handshake shape; verify() stubbed to accept until Phase 5
+  auth.py          nonce challenge / HMAC response, key derivation, auth.failed audit; master_secret.py, tls.py (gencert)
   database.py      asyncpg pool + one Repo class per schema section (all queries live here)
   audit.py         AuditTrail.record() — the only audit write path
   file_index.py    Global File Index: ingest + subscribe() fan-out to Task/Flow/Resource
@@ -78,7 +81,7 @@ Conventions in the scaffold:
 - GUI: QML never talks to the socket — everything goes through `falcon.call(type, payload, function(ok, result))` on `FalconBridge`, which returns typed errors as `(false, {code, message})`, never exceptions; state-changing replies (traverse/end/extend/claim) update `ClientState` inside `bridge.request`. Views refresh on `connected` and on relevant `pushReceived` types; keep `Component.onCompleted` guarded by `falcon.isConnected`. `main.qml` sets a dark palette (Fusion honours it) — don't hardcode control colours. Views carry `objectName`s so tests can `findChild` them; read `property var` values with `.toVariant()`.
 - `common/` is bundled by every package and must stay stdlib-only: `connection.EngineConnection` (pushes are queued and handled by a consumer task — never handle a push inline in a read loop, a handler that awaits a request would deadlock), `cli` (grammar/registry), `render`, `custom_actions`.
 - Worker Client: every Action, built-in or Custom, runs as a detached subprocess through `executor.py`; report before marking `completed`. Dev processes: kill stale `environ-*` python processes before restarting the Engine — a second Engine cannot bind 7400 and the old one keeps serving old code.
-- Message types are `<area>.<op>`; only `auth.*` and `system.*` are accepted before the handshake.
+- Message types are `<area>.<op>`; only `auth.*` and `system.*` are accepted before the handshake. Tests run the REAL handshake: `tests/conftest.py` fixes `TEST_MASTER_SECRET` and `key_for(client_id)` gives the key a test client presents (pass it as `derived_key=` / `client_key=`); only `FALCON_DEV_BYPASS_AUTH` skips it, and only `tests/test_auth.py` exercises TLS (everything else stays plaintext for speed). A hostname mismatch at connect is a *deviation* (logged + surfaced), not a refusal — the design says so.
 - Anything reacting to file activity subscribes via `engine.file_index.subscribe(...)` — never its own detection.
 - Reports are raised only through `engine.hierarchy.reports.emit()`; audit only through `engine.audit.record()`.
 
@@ -120,7 +123,7 @@ Three deployable packages; only the Engine holds a database.
 
 Transport: TCP + TLS (self-signed pinned cert, hostname identity, fail loudly), JSON messages. Auth: master secret → per-client `HMAC(master_secret, client_id)` derived key → nonce challenge-response per session.
 
-Build order: Engine → Operator Client (TUI) → Worker Client → full integration → real auth logic last → GUI. Auth message fields are scaffolded from the first pass with the Engine check stubbed to accept; a `DEV_BYPASS_AUTH` flag (off by default, logged loudly) skips the handshake entirely rather than silently passing validation.
+Build order was: Engine → Operator Client (TUI) → Worker Client → full integration → GUI → real auth (done). `DEV_BYPASS_AUTH` (off by default, logged loudly) skips the handshake entirely rather than silently passing validation.
 
 ## Invariants to preserve when implementing
 
