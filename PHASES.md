@@ -40,7 +40,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] `engine/control/` — actions, events (type→mechanism map), executions, custom_actions (validator)
 - [x] `engine/updates.py`
 - [x] Tests: protocol round-trips, socket-level smoke (handshake, dispatch of every type, bypass flag), pure-logic units
-- [x] Venvs created (`environ-operator`, `environ-worker`); Engine + dev deps installed in `environ-operator`; ruff clean; 21 tests green
+- [x] Venvs created (`environ-engine`, `environ-operator`, `environ-worker`); Engine + dev deps installed in `environ-engine`; ruff clean; 21 tests green
 
 ### 1b. Implementation (real logic, module by module)
 
@@ -61,7 +61,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Custom Actions: Engine-side validation on create
 - [ ] Updates: approval gate, rollout, status ingestion, escalation threshold (open item 10.4), health view
 - [ ] Audit retention job wired to real purge
-- [ ] Engine test suite against a real local Postgres
+- [ ] Engine test suite against a real local Postgres (Windows)
+- [ ] Linux check: Engine + Postgres inside WSL, same suite green — the deployment shape (Engine on Linux, clients on Windows)
 
 ---
 
@@ -109,6 +110,7 @@ layer the GUI will reuse unchanged.
 - [ ] Engine + Operator Client + Worker Client end-to-end scenarios (the three from Hierarchy → Example Scenarios)
 - [ ] Cross-combo flows: Task → Flow, Task → Events, Resource → Events, Events → Control
 - [ ] Network-drop mid-traversal expires via the same deadline path
+- [ ] Engine running on Linux (WSL) with Windows clients connecting over TCP
 
 ---
 

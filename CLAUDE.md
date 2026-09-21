@@ -8,7 +8,8 @@ Design docs plus an Engine **scaffold** (Phase 1a). Progress is tracked in `PHAS
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally; point `FALCON_DATABASE_URL` at it.
-- The user creates virtual environments themselves — `environ-operator/` (Engine + Operator Client + tests) and `environ-worker/` (Worker Client), both git-ignored. Work from them; don't create or recreate venvs.
+- The user creates virtual environments themselves, one per package, all git-ignored: `environ-engine/` (Engine + tests), `environ-operator/` (Operator Client), `environ-worker/` (Worker Client). Work from them; don't create or recreate venvs.
+- **The Engine deploys on Linux** (as the predecessor did); development happens on Windows. Keep `engine/` free of Windows-only imports, path assumptions, or event-loop-policy calls. Linux-specific work (Postgres + Engine on Linux/WSL) is a deliberate later step, not something to sneak in now.
 - **TUI before GUI.** The built system is exercised through `prompt_toolkit` TUIs first; the QML GUI comes later on the same connection/state layer. Don't start GUI work until the TUI phases are done.
 - Package naming: `<role>_client` — `operator_client` (Super User + Admin, one codebase) and `worker_client`. "Operator" is deliberately not "admin": it covers both roles and avoids colliding with the `admin` role/tier literals. Older text saying "Worker Agent" means `worker_client`.
 - The user's machine has an OpenAI Codex config (`~/.codex/`). It is unrelated to this project — ignore it and do not offer to import it.
@@ -18,12 +19,15 @@ Rules from the user:
 The pyenv-win shim on PATH (`python.bat`) corrupts inline `python -c "..."`; use the venv's `python.exe` directly or run scripts from files.
 
 ```powershell
-environ-operator\Scripts\Activate.ps1
-pip install -e ".[engine,dev]"             # Engine + tests; add ,tui for the operator TUI
+environ-engine\Scripts\Activate.ps1
+pip install -e ".[engine,dev]"             # Engine + tests
 pytest                                     # all tests (asyncio_mode=auto)
 pytest tests/test_engine_smoke.py -k handshake   # one test
 ruff check .
 $env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   # local dev run
+
+environ-operator\Scripts\Activate.ps1
+pip install -e ".[tui]"                    # Operator Client TUI
 
 environ-worker\Scripts\Activate.ps1
 pip install -e ".[worker]"                 # Worker Client
