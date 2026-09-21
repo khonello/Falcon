@@ -14,7 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QSize, QTimer, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -48,7 +48,40 @@ def create(config: LocalConfig, *, auto_connect: bool = False) -> tuple[QGuiAppl
     engine.load(QUrl.fromLocalFile(str(QML_DIR / "main.qml")))
     if not engine.rootObjects():
         raise SystemExit("failed to load QML (see errors above)")
+    win = engine.rootObjects()[0]
+    QTimer.singleShot(0, lambda: fit_to_screen(win))   # after the native window exists (frame margins known)
     return app, engine, bridge
+
+
+def fit_to_screen(win) -> QSize:
+    """Full screen without resizing: pin min == max size to the screen's available work area
+    (minus the native frame) and place the window at its top-left. Equal min/max sizes make the
+    Windows frame non-resizable and drop the maximize button; minimize/close stay."""
+    _drop_resize_frame(win)
+    screen = win.screen()
+    avail = screen.availableGeometry()
+    fm = win.frameMargins()
+    size = QSize(avail.width() - fm.left() - fm.right(), avail.height() - fm.top() - fm.bottom())
+    win.setMinimumSize(size)
+    win.setMaximumSize(size)
+    win.setPosition(avail.x() + fm.left(), avail.y() + fm.top())
+    return size
+
+
+def _drop_resize_frame(win) -> None:
+    """Windows keeps the thick (resize) frame even for a fixed-size window; strip it so the edges
+    show no resize cursor. Operator Client is Windows-only; a no-op elsewhere."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    hwnd = int(win.winId())
+    GWL_STYLE, WS_THICKFRAME, WS_MAXIMIZEBOX = -16, 0x00040000, 0x00010000
+    style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+    user32.SetWindowLongW(hwnd, GWL_STYLE, style & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX)
+    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_FRAMECHANGED = 0x0002, 0x0001, 0x0004, 0x0020
+    user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
 
 
 def run(config: LocalConfig, *, auto_connect: bool = False) -> None:

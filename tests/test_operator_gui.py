@@ -14,11 +14,11 @@ import pytest
 pytest.importorskip("PySide6")
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-from PySide6.QtCore import Q_ARG, QMetaObject, QObject
+from PySide6.QtCore import Q_ARG, QMetaObject, QObject, Qt
 from PySide6.QtQml import QJSValue
 
 from operator_client.core import LocalConfig
-from operator_client.gui.app import create
+from operator_client.gui.app import create, fit_to_screen
 from tests.conftest import requires_db
 
 
@@ -35,6 +35,14 @@ def gui(tmp_path: Path):
 def test_qml_loads_and_starts_on_connect_view(gui):
     win, _, bridge = gui
     assert win.title() == "Falcon Operator Client"
+    # full screen without resize: pinned to the work area, min == max, minimize + close only
+    size = fit_to_screen(win)
+    avail = win.screen().availableGeometry()
+    assert win.minimumSize() == win.maximumSize() == size
+    assert size.width() <= avail.width() and size.height() <= avail.height() and size.width() > 0
+    flags = int(win.flags())
+    assert flags & int(Qt.WindowMinimizeButtonHint) and flags & int(Qt.WindowCloseButtonHint)
+    assert not flags & int(Qt.WindowMaximizeButtonHint)
     assert win.findChild(QObject, "connectView") is not None
     assert not bridge.isConnected and bridge.sessionText == "no session"
     assert bridge.defaultHost == "127.0.0.1" and bridge.defaultPlaintext is True

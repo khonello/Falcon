@@ -4,8 +4,11 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     id: root
+    // Opens full screen: app.fit_to_screen() pins the window to the screen's work area as a fixed
+    // size once the native frame exists. Title bar offers minimize and close only; no resize frame.
     width: 1280
     height: 820
+    flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint | Qt.CustomizeWindowHint
     visible: true
     title: "Falcon Operator Client" + (falcon.isConnected ? "  —  " + falcon.roleLabel + " @ " + falcon.engineAddress : "")
     color: "#1e1f22"
