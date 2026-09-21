@@ -37,13 +37,21 @@ CATEGORIES = (
 
 
 async def emit(engine: Engine, category: str, *, source_table: str, source_id: int,
-               department_id: int | None, summary: str) -> int:
-    """Write once; visibility is decided at read time from `report_routing_config`."""
+               summary: str) -> int:
+    """Write once; visibility is decided at read time from `report_routing_config`. The push
+    goes to every Super User connection and to Admins of departments the category routes to."""
     assert category in CATEGORIES, category
-    report_id = await engine.db.reports.write(category, source_table, source_id, department_id, summary)
+    if not engine.db.connected:
+        log.info("REPORT (no db) %s: %s", category, summary)
+        return 0
+    report_id = await engine.db.reports.write(category, source_table, source_id)
     log.info("REPORT %s #%s: %s", category, report_id, summary)
-    await engine.broadcast("report.new", {"id": report_id, "category": category})
-    return report_id or 0
+    routed = set(await engine.db.reports.departments_for_category(category))
+    await engine.broadcast(
+        "report.new", {"id": report_id, "category": category, "summary": summary},
+        predicate=lambda c: c.ctx.identity.role == "super_user"
+        or (c.ctx.identity.role == "admin" and c.ctx.identity.department_id in routed))
+    return report_id
 
 
 @handler("reports.list")

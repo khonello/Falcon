@@ -45,13 +45,13 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ### 1b. Implementation (real logic, module by module)
 
 - [x] `engine/migrations/001_initial.sql` from `database-schema.md` + migration runner (`Database.migrate`, `schema_migrations`), JSONB codec; 8 constraint tests green on `falcon_test`
-- [ ] Repositories in `database.py` (real queries; polymorphic-ref validation; no hard deletes)
+- [x] Repositories in `database.py` — real asyncpg queries for every schema section; polymorphic-ref validation; only delete is audit purge; `Unavailable`/`Conflict`/`NotFound` mapped to typed protocol errors; 14 repo tests
 - [ ] Hierarchy: traversal + session blocking against `sessions` (partial unique index path), time limit + extension, expiry
 - [ ] Hierarchy: display names query rule (+ the non-propagation test), composed fallback
 - [ ] Hierarchy: report routing read/write, addressed views (Super User only)
 - [ ] Hierarchy: assisted access state machine, availability query, scope intersection
 - [ ] Hierarchy: alerts + scheduling, accounts/departments/PCs, offboarding
-- [ ] Global File Index: real upsert/search/collision/hash queries
+- [x] Global File Index: real upsert/search/collision/hash queries; event normalisation; tier-scoped search handler
 - [ ] Task: create/assign/start/verify/close, deadline Events, stack evaluation, expectation signals
 - [ ] Task: LLM client against a local model (Ollama sidecar vs in-process — open item 10.3), graph benchmarked on real descriptions
 - [ ] Flow: create with consent / collision / cycle checks, propagate, conflict rename, branch-scoped failure + resume

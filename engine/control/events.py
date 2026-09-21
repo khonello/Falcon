@@ -56,7 +56,7 @@ async def on_signal(engine: Engine, pc_id: int, event_type: str, data: dict[str,
     Resource violation, Task target appeared). Matches definitions, fires attached Actions."""
     from engine.control import executions
 
-    for definition in await engine.db.control.event_definitions(kind=event_type) or []:
+    for definition in await engine.db.control.event_definitions(event_type=event_type) or []:
         if not _matches(definition, pc_id, data):
             continue
         await engine.audit.record(None, "event.fired", target_type="event", target_id=definition["id"],

@@ -49,13 +49,27 @@ def verify(master_secret: bytes | None, client_id: str, nonce: str, presented_hm
     return True
 
 
-async def load_identity(ctx: Context, client_id: str) -> Identity:
-    """Resolve a provisioned client_id to account/role/PC. SCAFFOLD: echoes the claim.
+async def load_identity(ctx: Context, client_id: str, announced_hostname: str | None) -> Identity:
+    """Resolve a provisioned client_id to the account bound to that PC.
 
-    Real: look up the account bound to this client, compare the announced PC against
-    `accounts.bound_pc_id`, and write a `deviation_log` row on mismatch (database-schema.md 1).
+    The client also announces its hostname; a mismatch against the provisioned PC is a
+    deviation ('account_bound_to_one_pc'): logged and surfaced, the connection still proceeds
+    as the provisioned identity (never silently tolerated, never silently corrected).
+
+    Without a database (scaffold/protocol tests) the identity is just the claimed client_id.
     """
-    return Identity(client_id=client_id)
+    if not ctx.engine.db.connected:
+        return Identity(client_id=client_id)
+    account = await ctx.engine.db.accounts.by_client_id(client_id)
+    if account is None:
+        raise ProtocolError(ErrorCode.UNAUTHENTICATED, "client_id is not provisioned")
+    if announced_hostname and account["hostname"] and announced_hostname != account["hostname"]:
+        await ctx.engine.audit.deviation(
+            "account_bound_to_one_pc", surfaced_to_account_id=account["id"],
+            observed_account_id=account["id"], observed_pc_id=account["bound_pc_id"],
+            detail={"expected_hostname": account["hostname"], "announced_hostname": announced_hostname})
+    return Identity(account_id=account["id"], role=account["role"], pc_id=account["bound_pc_id"],
+                    department_id=account["department_id"], client_id=client_id)
 
 
 @handler("auth.respond")
@@ -68,7 +82,9 @@ async def auth_respond(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         nonce, conn.pending_nonce = conn.pending_nonce, None
         if not verify(ctx.engine.master_secret, client_id, nonce, str(payload.get("hmac", ""))):
             raise ProtocolError(ErrorCode.UNAUTHENTICATED, "challenge failed")
-    ctx.identity = await load_identity(ctx, client_id)
+    ctx.identity = await load_identity(ctx, client_id, payload.get("hostname"))
     conn.authenticated = True
     await ctx.engine.audit.record(ctx, "auth.connected", target_type="client", target_id=client_id)
-    return {"authenticated": True, "client_id": client_id}
+    ident = ctx.identity
+    return {"authenticated": True, "client_id": client_id, "account_id": ident.account_id,
+            "role": ident.role, "pc_id": ident.pc_id, "department_id": ident.department_id}

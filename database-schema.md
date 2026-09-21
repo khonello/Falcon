@@ -454,3 +454,4 @@ Columns/tables the design documents require but v1 of this schema did not model.
 | `system_alerts` table | Hierarchy → System Alerts & Announcements: type, audience (admin_only / department / all_users / specific_users), body, action link, `deliver_at`, optional `recurrence` (JSON). Delivery events go to `audit_log`. |
 
 Postgres adaptations applied uniformly: identity columns for PKs, `TIMESTAMPTZ` for every timestamp, `JSONB` for every serialized-JSON column, and a `schema_migrations` bookkeeping table.
+| `actions.archived_at` TIMESTAMPTZ (migration 002) | "No hard deletes": `event_definitions` has `enabled`, `flows` has `'inactive'`, `accounts` has `'offboarded'` — `actions` had no soft-delete marker, so deleting a Custom Action would have been the only hard delete outside audit retention. |

@@ -35,6 +35,7 @@ class Identity:
     account_id: int | None = None
     role: str | None = None  # 'super_user' | 'admin' | 'worker'
     pc_id: int | None = None
+    department_id: int | None = None
     client_id: str | None = None
 
 

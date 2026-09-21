@@ -12,6 +12,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from engine import auth
+from engine.database import Conflict, NotFound, Unavailable
 from engine.dispatch import Context, dispatch
 from protocol import (
     Envelope,
@@ -112,6 +113,12 @@ class Connection:
             await self.send(response(env.id, result))
         except ProtocolError as exc:
             await self.send(error_response(env.id, exc.code, exc.message))
+        except Unavailable as exc:
+            await self.send(error_response(env.id, ErrorCode.UNAVAILABLE, str(exc)))
+        except NotFound as exc:
+            await self.send(error_response(env.id, ErrorCode.NOT_FOUND, str(exc)))
+        except Conflict as exc:
+            await self.send(error_response(env.id, ErrorCode.CONFLICT, str(exc)))
         except Exception:
             log.exception("handler %s failed", env.type)
             await self.send(error_response(env.id, ErrorCode.INTERNAL))

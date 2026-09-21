@@ -41,6 +41,7 @@ class ErrorCode(str, Enum):
     TIMEOUT = "timeout"            # distinct from INTERNAL per spec §7.3
     INTERNAL = "internal"
     NOT_IMPLEMENTED = "not_implemented"
+    UNAVAILABLE = "unavailable"        # a required backend (database, LLM) is not connected
 
 
 class ProtocolError(Exception):
