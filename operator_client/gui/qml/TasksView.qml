@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "."
 
 // Tasks: list / detail with the verification stack, and the propose -> review -> create editor.
 // The proposal is never committed on its own: the operator reviews items, flags and the deadline.
@@ -35,11 +36,11 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             RowLayout {
-                Label { text: "Tasks"; font.pixelSize: 18; color: "white" }
+                Label { text: "Tasks"; font.pixelSize: Theme.fontLarge; color: Theme.text }
                 CheckBox { id: showAll; text: "include completed"; onToggled: view.refresh() }
                 Item { Layout.fillWidth: true }
-                Button { text: "New task"; onClicked: editor.visible = !editor.visible }
-                Button { text: "Refresh"; onClicked: view.refresh() }
+                Btn { text: "New task"; onClicked: editor.visible = !editor.visible }
+                Btn { text: "Refresh"; onClicked: view.refresh() }
             }
             DataTable {
                 Layout.fillWidth: true
@@ -54,22 +55,22 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: "#26282c"; radius: 6
+                color: Theme.surface; radius: Theme.radius; border.width: 1; border.color: Theme.border
                 visible: !!view.task
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 10; spacing: 6
                     RowLayout {
-                        Label { text: view.task ? "Task " + view.task.id + " — " + view.task.status + " (" + view.task.verification_mode + ")" : ""; color: "white"; font.bold: true }
+                        Label { text: view.task ? "Task " + view.task.id + " — " + view.task.status + " (" + view.task.verification_mode + ")" : ""; color: Theme.text; font.bold: true }
                         Item { Layout.fillWidth: true }
-                        Button { text: "Start (assignee)"; onClicked: falcon.call("task.start", {task_id: view.task.id}, view.after) }
-                        Button { text: "Verify complete"; onClicked: falcon.call("task.verify", {task_id: view.task.id, outcome: "complete"}, view.after) }
-                        Button { text: "Incomplete"; onClicked: falcon.call("task.verify", {task_id: view.task.id, outcome: "incomplete"}, view.after) }
-                        Button { text: "Re-evaluate stack"; onClicked: falcon.call("task.stack", {task_id: view.task.id}, function(ok, r) { view.after(ok, r); if (ok) view.open(view.task.id) }) }
+                        Btn { text: "Start (assignee)"; onClicked: falcon.call("task.start", {task_id: view.task.id}, view.after) }
+                        Btn { text: "Verify complete"; onClicked: falcon.call("task.verify", {task_id: view.task.id, outcome: "complete"}, view.after) }
+                        Btn { text: "Incomplete"; onClicked: falcon.call("task.verify", {task_id: view.task.id, outcome: "incomplete"}, view.after) }
+                        Btn { text: "Re-evaluate stack"; onClicked: falcon.call("task.stack", {task_id: view.task.id}, function(ok, r) { view.after(ok, r); if (ok) view.open(view.task.id) }) }
                     }
-                    Label { text: view.task ? view.task.description_raw : ""; color: "#ddd"; wrapMode: Text.Wrap; Layout.fillWidth: true }
-                    Label { color: "#aaa"; text: view.task ? ("assigned by " + view.task.assigner_name + " to " + view.task.assignee_name
+                    Label { text: view.task ? view.task.description_raw : ""; color: Theme.textDim; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                    Label { color: Theme.textFaint; text: view.task ? ("assigned by " + view.task.assigner_name + " to " + view.task.assignee_name
                                                               + "  ·  soft " + (view.task.soft_deadline_at || "-") + "  ·  final " + (view.task.final_deadline_at || "-")) : "" }
-                    Label { text: "verification stack"; color: "#9aa" }
+                    Eyebrow { label: "verification stack" }
                     DataTable {
                         Layout.fillWidth: true; Layout.fillHeight: true
                         rows: view.task ? view.task.items : []
@@ -87,27 +88,27 @@ Item {
             id: editor
             Layout.preferredWidth: 420
             Layout.fillHeight: true
-            color: "#26282c"; radius: 6
+            color: Theme.surface; radius: Theme.radius; border.width: 1; border.color: Theme.border
             visible: false
             ColumnLayout {
                 anchors.fill: parent; anchors.margins: 12; spacing: 6
-                Label { text: "New task"; font.pixelSize: 16; color: "white" }
+                Label { text: "New task"; font.pixelSize: Theme.fontMedium; color: Theme.text }
                 RowLayout {
-                    Label { text: "assignee account"; color: "#ccc" }
-                    TextField { id: assignee; Layout.preferredWidth: 80; validator: IntValidator { bottom: 1 } }
+                    Eyebrow { label: "assignee account" }
+                    Field { id: assignee; Layout.preferredWidth: 80; validator: IntValidator { bottom: 1 } }
                 }
                 TextArea { id: desc; Layout.fillWidth: true; Layout.preferredHeight: 90; placeholderText: "describe the task in plain language"; wrapMode: TextEdit.Wrap }
                 RowLayout {
-                    Button { text: "Propose (local LLM)"; enabled: assignee.text.length > 0 && desc.text.length > 0
+                    Btn { text: "Propose (local LLM)"; enabled: assignee.text.length > 0 && desc.text.length > 0
                              onClicked: falcon.call("task.propose", {description: desc.text, assignee_account_id: parseInt(assignee.text)}, view.onProposal) }
-                    Label { text: view.proposal && !view.proposal.llm_available ? "LLM unavailable — manual" : ""; color: "#ff9f43" }
+                    Label { text: view.proposal && !view.proposal.llm_available ? "LLM unavailable — manual" : ""; color: Theme.warn }
                 }
                 Label { text: view.proposal && view.proposal.flags.length ? "needs your decision: " + view.proposal.flags.map(view.flagText).join("; ") : ""
-                        color: "#ffd166"; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text.length > 0 }
+                        color: Theme.warn; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text.length > 0 }
                 Label { text: view.proposal && view.proposal.collisions.length ? "name collisions: " + view.proposal.collisions.map(function(c) { return c.name + " exists at " + c.existing.map(function(e) { return e.path }).join(", ") }).join("; ") : ""
-                        color: "#ff8a80"; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text.length > 0 }
+                        color: Theme.danger; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text.length > 0 }
 
-                Label { text: "verification items (" + view.items.length + ")"; color: "#9aa" }
+                Label { text: "verification items (" + view.items.length + ")"; color: Theme.textDim }
                 DataTable {
                     id: itemTable
                     Layout.fillWidth: true; Layout.preferredHeight: 150
@@ -117,30 +118,30 @@ Item {
                     emptyText: "(empty — create with 'no verification' or add items)"
                 }
                 RowLayout {
-                    ComboBox { id: newType; model: ["file", "program"]; Layout.preferredWidth: 90 }
-                    ComboBox { id: newIntent; Layout.preferredWidth: 150
+                    Picker { id: newType; model: ["file", "program"]; Layout.preferredWidth: 90 }
+                    Picker { id: newIntent; Layout.preferredWidth: 150
                                model: newType.currentText === "file" ? ["create", "update", "exists"] : ["used", "used_with_file", "installed_available", "closed_not_running"] }
-                    TextField { id: newName; Layout.fillWidth: true; placeholderText: "name" }
-                    Button { text: "+"; enabled: newName.text.length > 0
+                    Field { id: newName; Layout.fillWidth: true; placeholderText: "name" }
+                    Btn { text: "+"; enabled: newName.text.length > 0
                              onClicked: { var a = view.items.slice(); a.push({target_type: newType.currentText, intent: newIntent.currentText, name: newName.text, path: null,
                                                                              linked_item_index: null, file_index_id: null, populated_by: "manual"}); view.items = a; newName.text = "" } }
-                    Button { text: "−"; enabled: itemTable.selectedIndex >= 0
+                    Btn { text: "−"; enabled: itemTable.selectedIndex >= 0
                              onClicked: { var a = view.items.slice(); a.splice(itemTable.selectedIndex, 1); view.items = a; itemTable.selectedIndex = -1 } }
                 }
                 GridLayout {
                     columns: 3; Layout.fillWidth: true
-                    Label { text: "soft deadline"; color: "#ccc" }
-                    TextField { id: soft; Layout.fillWidth: true; placeholderText: "friday 5pm / ISO"; onEditingFinished: softResolved.text = text ? (falcon.resolveDeadline(text) || "?") : "" }
-                    Label { id: softResolved; color: "#9aa"; Layout.preferredWidth: 130 }
-                    Label { text: "final deadline"; color: "#ccc" }
-                    TextField { id: final; Layout.fillWidth: true; placeholderText: "tomorrow 3pm / ISO"; onEditingFinished: finalResolved.text = text ? (falcon.resolveDeadline(text) || "?") : "" }
-                    Label { id: finalResolved; color: "#9aa"; Layout.preferredWidth: 130 }
+                    Eyebrow { label: "soft deadline" }
+                    Field { id: soft; Layout.fillWidth: true; placeholderText: "friday 5pm / ISO"; onEditingFinished: softResolved.text = text ? (falcon.resolveDeadline(text) || "?") : "" }
+                    Label { id: softResolved; color: Theme.textDim; Layout.preferredWidth: 130 }
+                    Eyebrow { label: "final deadline" }
+                    Field { id: final; Layout.fillWidth: true; placeholderText: "tomorrow 3pm / ISO"; onEditingFinished: finalResolved.text = text ? (falcon.resolveDeadline(text) || "?") : "" }
+                    Label { id: finalResolved; color: Theme.textDim; Layout.preferredWidth: 130 }
                 }
                 RowLayout {
-                    Button { text: "Create"; enabled: view.items.length > 0 && assignee.text.length > 0 && desc.text.length > 0; onClicked: view.create(false) }
-                    Button { text: "Create with no verification"; enabled: assignee.text.length > 0 && desc.text.length > 0; onClicked: view.create(true) }
+                    Btn { text: "Create"; enabled: view.items.length > 0 && assignee.text.length > 0 && desc.text.length > 0; onClicked: view.create(false) }
+                    Btn { text: "Create with no verification"; enabled: assignee.text.length > 0 && desc.text.length > 0; onClicked: view.create(true) }
                     Item { Layout.fillWidth: true }
-                    Button { text: "Close"; flat: true; onClicked: editor.visible = false }
+                    Btn { text: "Close"; flat: true; onClicked: editor.visible = false }
                 }
                 Item { Layout.fillHeight: true }
             }

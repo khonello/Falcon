@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -28,11 +27,12 @@ QML_DIR = Path(__file__).parent / "qml"
 
 
 def application() -> QGuiApplication:
-    os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Fusion")
+    # Material dark, chosen in exactly one place before any QML loads (ui-reference.md): it takes
+    # accent/background as attached properties, so the whole console is themed from Theme.qml.
     app = QGuiApplication.instance() or QGuiApplication(sys.argv)
     app.setApplicationName("Falcon Operator Client")
     app.setOrganizationName("Falcon")
-    QQuickStyle.setStyle("Fusion")
+    QQuickStyle.setStyle("Material")
     return app
 
 

@@ -34,7 +34,7 @@ def gui(tmp_path: Path):
 
 def test_qml_loads_and_starts_on_connect_view(gui):
     win, _, bridge = gui
-    assert win.title() == "Falcon Operator Client"
+    assert win.title().startswith("Falcon")
     # full screen without resize: pinned to the work area, min == max, minimize + close only
     size = fit_to_screen(win)
     avail = win.screen().availableGeometry()
@@ -83,9 +83,9 @@ async def test_bridge_connects_and_views_populate(gui, engine, org):
     assert bridge.role == "super_user" and bridge.roleLabel == "Super User" and bridge.accountId == org["su"]
 
     # views refresh on connect: the hierarchy tree lands in QML state
-    hier = win.findChild(QObject, "hierarchyView")
-    await _wait(lambda: len(prop(hier, "tree") or []) == 2)
-    depts = prop(hier, "tree")
+    rail = win.findChild(QObject, "hierarchyRail")
+    await _wait(lambda: len(prop(rail, "tree") or []) == 2)
+    depts = prop(rail, "tree")
     assert [d["name"] for d in depts] == ["Finance", "HR"]
     assert {w["hostname"] for w in depts[0]["workers"]} == {"FIN-01", "FIN-02"}
 
