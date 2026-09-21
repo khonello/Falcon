@@ -25,6 +25,9 @@ class Settings:
     # Traversal Time Limit (Hierarchy -> Session Blocking): fixed, extendable on request.
     traversal_limit_minutes: int = 30
     traversal_extension_minutes: int = 15
+    # Local LLM sidecar (spec 7.2.1). Never an external API.
+    llm_endpoint: str = "http://127.0.0.1:11434"
+    llm_model: str = "qwen3:0.6b"
     debug: bool = False
 
     # Development-only. Both are hard, visible skips — never a quietly-always-true check (spec §8.1).
@@ -48,6 +51,8 @@ class Settings:
             traversal_extension_minutes=int(
                 os.environ.get("FALCON_TRAVERSAL_EXTENSION_MINUTES", cls.traversal_extension_minutes)
             ),
+            llm_endpoint=os.environ.get("FALCON_LLM_ENDPOINT", cls.llm_endpoint),
+            llm_model=os.environ.get("FALCON_LLM_MODEL", cls.llm_model),
             debug=_flag("FALCON_DEBUG"),
             dev_bypass_auth=_flag("FALCON_DEV_BYPASS_AUTH"),
             dev_plaintext=_flag("FALCON_DEV_PLAINTEXT"),

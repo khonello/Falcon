@@ -53,8 +53,9 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Hierarchy: alerts (role-gated audiences, immediate push), departments, account+PC provisioning with client_id, offboarding ends sessions
 - [ ] Hierarchy: scheduled/recurring alert delivery via the Scheduler
 - [x] Global File Index: real upsert/search/collision/hash queries; event normalisation; tier-scoped search handler
-- [ ] Task: create/assign/start/verify/close, deadline Events, stack evaluation, expectation signals
-- [ ] Task: LLM client against a local model (Ollama sidecar vs in-process — open item 10.3), graph benchmarked on real descriptions
+- [x] Task: propose (graph + collisions), create (explicit-None rule, collision refusal, scope), list/get/start/verify, stack evaluation per intent, expectation signals from the index stream + program signals, soft/final deadlines as scheduled Events (re-armed on start)
+- [x] Task: Ollama-style local LLM client (stdlib HTTP, None-on-failure, backoff); `llm_available` surfaced to the client
+- [ ] Task: benchmark the decision graph against real descriptions with a local model (pick Qwen3 size empirically)
 - [ ] Flow: create with consent / collision / cycle checks, propagate, conflict rename, branch-scoped failure + resume
 - [ ] Resource: violation detection from index events, ignore-that-file, user notification, report
 - [ ] Assistance: ping status push, channel open/turn-lock/close, listeners (scoped query)

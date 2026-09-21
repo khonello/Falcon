@@ -39,7 +39,7 @@ class Engine:
         self.audit = AuditTrail(self.db, settings.audit_retention_days)
         self.file_index = FileIndex(self.db)
         self.scheduler = Scheduler(self)
-        self.llm = LocalLLM()
+        self.llm = LocalLLM(settings.llm_endpoint, settings.llm_model)
         self.connections: set[Connection] = set()
         # Generated once on the Engine host, never transmitted (spec 8.2). SCAFFOLD: None until
         # provisioning tooling exists; `auth.verify` does not read it yet.
@@ -62,6 +62,11 @@ class Engine:
         await self.db.connect()
         await self.db.migrate()
         await self.scheduler.start()
+        from engine.task import tasks
+
+        rearmed = await tasks.reschedule_all(self)
+        if rearmed:
+            log.info("re-armed deadlines for %d open tasks", rearmed)
         self._server = await asyncio.start_server(
             self._on_connection, self.settings.host, self.settings.port, ssl=self._ssl_context(),
             limit=4 * 1024 * 1024,

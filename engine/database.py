@@ -457,8 +457,12 @@ class TasksRepo(_Repo):
             item.get("proposed_filename"), item.get("proposed_path"), linked_id,
             item.get("program_name"), item.get("populated_by", "llm"))
 
+    _TASK_COLS = ("t.*, a.bound_pc_id AS assignee_pc_id, a.department_id AS assignee_department_id, "
+                  "a.role AS assignee_role")
+    _TASK_FROM = "FROM tasks t JOIN accounts a ON a.id = t.assignee_account_id"
+
     async def get(self, task_id: int) -> dict[str, Any] | None:
-        task = await self._one("SELECT * FROM tasks WHERE id = $1", task_id)
+        task = await self._one(f"SELECT {self._TASK_COLS} {self._TASK_FROM} WHERE t.id = $1", task_id)
         if task is None:
             return None
         task["items"] = await self.items(task_id)
@@ -468,16 +472,47 @@ class TasksRepo(_Repo):
 
     async def items(self, task_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT * FROM verification_items WHERE task_id = $1 ORDER BY sequence", task_id)
+            "SELECT v.*, f.path AS file_path, f.content_hash AS file_hash, f.last_seen_at AS file_last_seen_at "
+            "FROM verification_items v LEFT JOIN file_index f ON f.id = v.file_index_id "
+            "WHERE v.task_id = $1 ORDER BY v.sequence", task_id)
+
+    async def item(self, item_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM verification_items WHERE id = $1", item_id)
 
     async def list_for(self, account_id: int, *, include_completed: bool = False) -> list[dict[str, Any]]:
         """Tasks the account assigned or is assigned."""
         return await self._fetch(
-            "SELECT * FROM tasks WHERE (assigner_account_id = $1 OR assignee_account_id = $1) "
-            "AND ($2 OR status <> 'completed') ORDER BY created_at DESC", account_id, include_completed)
+            f"SELECT {self._TASK_COLS} {self._TASK_FROM} "
+            "WHERE (t.assigner_account_id = $1 OR t.assignee_account_id = $1) "
+            "AND ($2 OR t.status <> 'completed') ORDER BY t.created_at DESC", account_id, include_completed)
+
+    async def list_department(self, department_id: int, *, include_completed: bool = False) -> list[dict[str, Any]]:
+        return await self._fetch(
+            f"SELECT {self._TASK_COLS} {self._TASK_FROM} WHERE a.department_id = $1 "
+            "AND ($2 OR t.status <> 'completed') ORDER BY t.created_at DESC", department_id, include_completed)
 
     async def active(self) -> list[dict[str, Any]]:
-        return await self._fetch("SELECT * FROM tasks WHERE status <> 'completed'")
+        return await self._fetch(f"SELECT {self._TASK_COLS} {self._TASK_FROM} WHERE t.status <> 'completed'")
+
+    async def list_all(self, *, include_completed: bool = False) -> list[dict[str, Any]]:
+        return await self._fetch(
+            f"SELECT {self._TASK_COLS} {self._TASK_FROM} WHERE ($1 OR t.status <> 'completed') "
+            "ORDER BY t.created_at DESC", include_completed)
+
+    async def active_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
+        """Open tasks whose assignee is bound to this PC, with their items -- what a file event
+        or program signal from that PC can be matched against."""
+        tasks = await self._fetch(
+            f"SELECT {self._TASK_COLS} {self._TASK_FROM} WHERE a.bound_pc_id = $1 AND t.status <> 'completed'",
+            pc_id)
+        for t in tasks:
+            t["items"] = await self.items(t["id"])
+        return tasks
+
+    async def latest_signal(self, item_id: int, signal_type: str) -> dict[str, Any] | None:
+        return await self._one(
+            "SELECT * FROM expectations WHERE verification_item_id = $1 AND signal_type = $2 "
+            "ORDER BY observed_at DESC LIMIT 1", item_id, signal_type)
 
     async def mark_started(self, task_id: int) -> None:
         await self._exec(
