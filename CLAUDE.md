@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`), and the **Operator Client GUI** (Phase 6, pulled ahead: PySide6/QML on the same core layer, `python -m operator_client --gui`). Next: Phase 5, real authentication; then the Worker Overlay/Dialog exes. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
+Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`), and the **Operator Client GUI** (Phase 6, pulled ahead: PySide6/QML on the same core layer, `python -m operator_client --gui`). **The order from here is fixed and sequential** (see "Where things stand" in `PHASES.md`): Phase 5 authentication → Phase 7 human passes → Phase 8 packaging/deployment (incl. Worker Overlay/Dialog exes) → Phase 9 hardening → Phase 10 UI rebuild. Do not start UI polish before Phases 5–9 are signed off. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).

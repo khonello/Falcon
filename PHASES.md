@@ -7,6 +7,32 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ---
 
+## Where things stand (2026-09-21) and the road to shippable
+
+**Real, not scaffolding.** Engine: 93 message handlers, none stubbed, 157 SQL statements across 7
+migrations (~7k lines). Worker Client: native file events + polling fallback, idle detection,
+detached subprocess execution for 17 built-ins and Custom Actions (double validation), flow relay
+(~1.6k lines). Operator Client: 88 TUI commands + the QML GUI on one shared core layer (~3.6k
+lines). 93 tests green including 7 socket-level integration scenarios; live runs of Engine +
+Worker + TUI + GUI; Linux/WSL Engine check. It went fast because the docs were specific and
+everything was built through the TUI + tests, not through a UI.
+
+**Not done — do not sell without these.** Worked one after the other, in this order; each is its
+own phase section below. UI investment waits until Phases 5–9 are signed off, because each of them
+can force behaviour changes that a rebuilt UI would have to absorb.
+
+| # | Gap | Why it blocks a sale | Phase |
+|---|-----|----------------------|-------|
+| 1 | `auth.verify` accepts anyone with a client_id; no master secret, no derived keys, no TLS (dev plaintext only) | Anyone on the network can connect as the Super User | **Phase 5** (auth) — next |
+| 2 | Only Claude has exercised the TUI / GUI / worker UI | Behaviour gaps a human notices are cheapest to fix before the UI is rebuilt on top | **Phase 7** (human passes) |
+| 3 | Runs from source in venvs: no bundled interpreter, no installers, no frozen Worker exes, no service install, no update pipeline (`update_command` is an empty hook), no CI | Nothing can be installed on a customer PC; packaging usually forces real changes (paths, permissions) | **Phase 8** (packaging + deployment) |
+| 4 | Worker Overlay/Dialog exes do not exist (the blocked-state surface is a text UI); no remote mouse/keyboard during traversal | The Client-PC experience in the Hierarchy doc is not what a worker sees | **Phase 8** (with the frozen toolchain) |
+| 5 | Not hardened: no load/scale run (many departments/PCs), no security review of unsandboxed Custom Actions, no log rotation / service wrappers, Linux Engine verified but never deployed | Unknown behaviour under real load; ops story missing | **Phase 9** (hardening + ops) |
+| 6 | LLM is a 0.6B model doing list-picks and verbatim extractions only (13/13 on the benchmark) | Fine as a "proposal assistant"; must not be pitched as AI understanding tasks without a bigger model behind the same graph | note for sales; revisit model size in Phase 9 |
+| 7 | GUI is functional but plain: tables and buttons, no node graph for Flows, no interaction design | Not near what a private company will pay for | **Phase 10** (UI rebuild) — the QML is a thin layer over `FalconBridge`, so this does not touch the ~12k lines beneath |
+
+---
+
 ## Phase 0 — Architecture ✅
 
 - [x] Hierarchy System Design
@@ -124,13 +150,15 @@ layer the GUI will reuse unchanged.
 
 ---
 
-## Phase 5 — Authentication (last, but shape present since 1a)
+## Phase 5 — Authentication (shape present since Phase 1; the logic is what is missing) — NEXT
 
-- [ ] Master secret generation + provisioning tool (derived keys to ACL-restricted path)
-- [ ] Real `auth.verify` (HMAC compare), identity binding, bound-PC deviation check
-- [ ] TLS cert generation/pinning per client install package
-- [ ] Remove reliance on `DEV_BYPASS_AUTH` / `DEV_PLAINTEXT` in every test path
-
+- [ ] Master secret generated on the Engine host (never transmitted); derived key `HMAC(master_secret, client_id)` per provisioned client
+- [ ] Provisioning: `hierarchy.account_create` / `python -m engine bootstrap` issue the derived key once, to be written to an ACL-restricted path on the client (install-package input)
+- [ ] Real `auth.verify`: nonce challenge → client HMAC response → constant-time compare; replace the `"stub"` HMAC in `common/connection.py`
+- [ ] Identity binding: reject (not just flag) a client_id from an unexpected hostname where the design says so; keep the deviation audit entry
+- [ ] TLS: self-signed Engine cert generation, pinned cert shipped in each client install, `--ca` honoured by both clients; fail loudly on mismatch
+- [ ] Rotation/revocation: offboarding an account invalidates its key; re-provisioning issues a new one
+- [ ] Remove reliance on `DEV_BYPASS_AUTH` / `DEV_PLAINTEXT` in every test path (tests provision real keys against the test DB); the flags stay as loud dev switches only
 ---
 
 ## Phase 6 — GUI (PySide6 / QML / qasync) — pulled ahead of Phase 5 by agreement (TUI phases done)
@@ -144,6 +172,49 @@ layer the GUI will reuse unchanged.
 - [ ] Worker Client Overlay exe + Dialog exe (QML, frozen with the same toolchain)
 - [ ] Window prefs / layout persistence (`LocalConfig.prefs` is there; nothing written yet)
 - [ ] Remote mouse/keyboard during traversal (needs an input channel; deferred from Phase 4)
+
+---
+
+## Phase 7 — Human interactive passes (after Phase 5)
+
+- [ ] Operator TUI pass (`python -m operator_client ...` from `environ-operator`): Hierarchy scenarios 1–3, a Task from propose to verify, a Flow between two PCs, an Action + Event, a Ping → channel
+- [ ] Worker narrow UI pass (`python -m worker_client --ui`): blocked/released, assigned task, alert, violation
+- [ ] Operator GUI pass (`--gui`): the same walks; note behaviour gaps only — visual polish belongs to Phase 10
+- [ ] Every gap found becomes an item here with its fix; full suite re-run after
+
+---
+
+## Phase 8 — Packaging and deployment (after Phase 7)
+
+- [ ] Worker Client: bundled pinned interpreter + frozen service (spec 4.3), installed as a Windows service; the install package carries the derived key + pinned cert from Phase 5
+- [ ] Worker Overlay exe + Dialog exe (QML, frozen with the same toolchain); the blocked-state surface and notifications move from the text UI to them
+- [ ] Remote mouse/keyboard during traversal (input channel Engine ↔ Worker; deferred from Phase 4)
+- [ ] Operator Client installer (TUI + GUI in one package)
+- [ ] Engine on Linux: install script / systemd unit, config file, PostgreSQL setup, log rotation
+- [ ] Update pipeline: a real `update_command` (download → verify → swap → restart → `updates.report_status`); approval → rollout → escalation exercised end to end with real packages
+- [ ] CI: lint + full suite on push (Windows clients, Linux Engine), artifact build, signing
+
+---
+
+## Phase 9 — Hardening and operations (after Phase 8)
+
+- [ ] Load/scale run: many departments and PCs, sustained file activity, deadlines and pushes under load; fix what breaks
+- [ ] Security review of Custom Actions (unsandboxed by design): who can author, what is audited, kill switch
+- [ ] Failure drills: Engine restart mid-session, DB outage, worker offline for days, clock skew
+- [ ] Ops: health endpoint, PostgreSQL backup/restore, audit retention verified, runbook
+- [ ] Revisit LLM model size behind the same question graph (benchmark must stay green); decide what sales may claim
+- [ ] Decide the deferred items below that hardening forces (dashboard refresh, escalation threshold)
+
+---
+
+## Phase 10 — UI rebuild (after Phase 9 is signed off)
+
+- [ ] Interaction design for the Operator GUI: information architecture, navigation, states (blocked, banner, restricted view)
+- [ ] Node-graph editor for Flows (Source → stages → Destinations) with consent/collision/cycle feedback inline
+- [ ] Hierarchy as a live tree/graph with session state; Task editor as a guided review of the proposal; Automation dashboard as a real dashboard
+- [ ] Worker Overlay/Dialog visual design
+- [ ] Window prefs / layout persistence (`LocalConfig.prefs`)
+- [ ] Constraint: keep the QML a thin layer over `FalconBridge` — no business logic moves into the UI
 
 ---
 
