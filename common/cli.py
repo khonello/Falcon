@@ -75,7 +75,9 @@ class Args:
 def parse(line: str) -> tuple[list[str], Args]:
     """-> (command words consumed by lookup, Args). Splitting of words vs args happens in
     `Registry.resolve`; here we just tokenise and separate key=value options."""
-    tokens = shlex.split(line, posix=True)
+    # POSIX splitting gives us quotes, but it also treats backslashes as escapes -- fatal for
+    # Windows paths (C:\Users\...). Double them first so they survive verbatim.
+    tokens = shlex.split(line.replace("\\", "\\\\"), posix=True)
     positional: list[str] = []
     options: dict[str, str] = {}
     repeated: dict[str, list[str]] = {}

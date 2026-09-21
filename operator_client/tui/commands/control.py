@@ -4,6 +4,7 @@ here before sending), events, manual runs, executions, terminate, and the dashbo
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from common.custom_actions import validate
 from operator_client.tui.render import bullet, kv, table
@@ -63,10 +64,19 @@ async def action_rm(ctx: ShellContext, args: Args) -> str:
     return f"action {res['action_id']} archived"
 
 
-@command("action", "run", "<action_id> <pc_id>", "Run an action now on a PC")
+@command("action", "run", "<action_id> <pc_id> | <action_id> dept=<department_id>",
+         "Run an action now on one PC, or on every PC in a department")
 async def action_run(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("control.action_run", {"action_id": args.get_int(0, "action_id"), "pc_id": args.get_int(1, "pc_id")})
-    return f"execution {res['execution_id']}" if res.get("execution_id") else "scheduled (delayed action)"
+    payload: dict[str, Any] = {"action_id": args.get_int(0, "action_id")}
+    if args.opt("dept"):
+        payload["department_id"] = args.opt_int("dept")
+    else:
+        payload["pc_id"] = args.get_int(1, "pc_id")
+    res = await ctx.call("control.action_run", payload)
+    rows_ = res.get("executions") or []
+    if len(rows_) == 1:
+        return f"execution {rows_[0]['execution_id']}" if rows_[0]["execution_id"] else "scheduled (delayed action)"
+    return "started on " + ", ".join(f"{e['hostname']} (exec {e['execution_id'] or 'delayed'})" for e in rows_)
 
 
 @command("events", help_="Event definitions with their attached actions")

@@ -53,9 +53,11 @@ class Engine:
         from engine.resource import resource as resource_tiers
         from engine.task import expectation
 
+        # Order matters: Resource compliance must judge a file BEFORE Flow decides to move it,
+        # so a violating file is already "ignored" when Flow looks.
+        resource_tiers.install(self)
         expectation.install(self)
         flow_sync.install(self)
-        resource_tiers.install(self)
         control_events.install(self)
 
         # In-memory registries (offers, transfers, live outputs, polled state) belong to one

@@ -165,16 +165,33 @@ async def action_delete(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 
 @handler("control.action_run")
 async def action_run(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Run an Action now on a target PC, outside any Event. {"action_id", "pc_id"}"""
+    """Run an Action now, outside any Event. {"action_id", "pc_id"} for one PC, or
+    {"action_id", "department_id"} for every PC in a department (a department-wide policy
+    update, Hierarchy scenario 2) -- each PC is its own independent execution."""
     ident = require_role(ctx, "super_user", "admin")
     action_id = int_field(payload, "action_id")
-    pc_id = int_field(payload, "pc_id")
     action = await load_action_in_scope(ctx, action_id)
-    pc = await ctx.engine.db.accounts.pc(pc_id)
-    if pc is None:
-        raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
-    require_department_scope(ident, pc["department_id"])
+    db = ctx.engine.db
+    pc_id = int_field(payload, "pc_id", required=False)
+    department_id = int_field(payload, "department_id", required=False)
+    if pc_id is None and department_id is None:
+        raise ProtocolError(ErrorCode.INVALID, "pc_id or department_id required")
+    if pc_id is not None:
+        pc = await db.accounts.pc(pc_id)
+        if pc is None:
+            raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
+        require_department_scope(ident, pc["department_id"])
+        targets = [pc]
+    else:
+        require_department_scope(ident, department_id)
+        targets = await db.accounts.pcs_in_department(department_id)
     from engine.control import executions
 
-    execution_id = await executions.start(ctx.engine, action, None, pc_id, actor=ctx)
-    return {"execution_id": execution_id}
+    executions_started = []
+    for pc in targets:
+        execution_id = await executions.start(ctx.engine, action, None, pc["id"], actor=ctx)
+        executions_started.append({"pc_id": pc["id"], "hostname": pc["hostname"], "execution_id": execution_id})
+    await ctx.engine.audit.record(ctx, "action.run", target_type="actions", target_id=action_id,
+                                  detail={"pcs": [e["pc_id"] for e in executions_started], "department_id": department_id})
+    return {"execution_id": executions_started[0]["execution_id"] if len(executions_started) == 1 else None,
+            "executions": executions_started}

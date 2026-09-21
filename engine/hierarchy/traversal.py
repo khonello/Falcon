@@ -111,9 +111,11 @@ async def end_session(engine: Engine, session: dict[str, Any], reason: str, *,
     """End a session and tell everyone affected: the occupant, and the PC being released."""
     if not await engine.db.sessions.end(session["id"], reason):
         return
+    duration = int((_now() - session["entered_at"]).total_seconds())
     await engine.audit.record(actor, "session.ended", target_type="session", target_id=session["id"],
-                              detail={"pc_id": session["pc_id"], "reason": reason,
-                                      "occupant_account_id": session["occupant_account_id"]})
+                              detail={"pc_id": session["pc_id"], "reason": reason, "occupied_via": session["occupied_via"],
+                                      "occupant_account_id": session["occupant_account_id"],
+                                      "duration_seconds": duration})
     payload = {"session_id": session["id"], "pc_id": session["pc_id"], "reason": reason}
     await engine.push_to_account(session["occupant_account_id"], "session.ended", payload)
     if session["occupied_via"] != "native":

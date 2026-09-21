@@ -138,24 +138,35 @@ class EngineConnection:
 
     async def close(self) -> None:
         self._closed = True
-        if self._writer is not None:
-            self._writer.close()
-            try:
-                await self._writer.wait_closed()
-            except (ConnectionError, OSError):
-                pass
+        log.debug("close: cancelling tasks")
+        # Stop the reader BEFORE closing the transport: on Windows' Proactor loop, closing a
+        # StreamWriter while a readuntil() is pending can leave wait_closed() waiting forever.
         for task in (self._reader_task, self._push_task):
             if task is None:
                 continue
+            if log.isEnabledFor(logging.DEBUG):
+                frames = task.get_stack(limit=6)
+                log.debug("close: task %s at %s", task.get_name(),
+                          " <- ".join(f"{f.f_code.co_name}:{f.f_lineno}" for f in reversed(frames)))
             task.cancel()
             try:
-                await task
+                await asyncio.wait_for(task, 5)
             except asyncio.CancelledError:
                 pass  # expected: we cancelled it
+            except asyncio.TimeoutError:
+                log.warning("connection task %s did not stop within 5s; abandoning it", task.get_name())
             except Exception as exc:  # noqa: BLE001
                 log.debug("connection task ended with %s", exc)
         self._push_task = None
         self._reader_task = None
+        log.debug("close: closing transport")
+        if self._writer is not None:
+            self._writer.close()
+            try:
+                await asyncio.wait_for(self._writer.wait_closed(), 3)
+            except (ConnectionError, OSError, asyncio.TimeoutError):
+                pass
+        log.debug("close: done")
         self._writer = None
         self._reader = None
 

@@ -9,8 +9,8 @@ from operator_client.tui.shell import Args, ShellContext, command
 @command("violations", usage="[all]", help_="Resource violations you can see (`all` includes resolved)")
 async def violations(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("resource.violations", {"include_resolved": args.flag("all")})
-    return table(res["violations"], ["id", "hostname", "path", "expected_tag", "detected_via", "detected_at",
-                                     "resolved_at", "report_id"], width=50)
+    return table(res["violations"], ["id", "hostname", "filename", "expected_tag", "detected_via", "detected_at",
+                                     "resolved_at", "report_id", "path"], width=70)
 
 
 @command("violation", "resolve", "<violation_id>", "Mark a violation rectified; the file stops being ignored")

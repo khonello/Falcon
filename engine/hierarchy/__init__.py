@@ -9,12 +9,14 @@ renders what the Engine's permission/session state says.
     reports          -- Report Routing (additive to Super User's always-on visibility)
     alerts           -- System Alerts & Announcements
     accounts         -- Department creation/assignment, offboarding
+    auditing         -- reading the audit trail and deviations, role-scoped
 """
 
 from engine.hierarchy import (  # noqa: F401
     accounts,
     alerts,
     assisted_access,
+    auditing,
     display_names,
     reports,
     traversal,

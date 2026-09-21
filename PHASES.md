@@ -111,10 +111,16 @@ layer the GUI will reuse unchanged.
 
 ## Phase 4 — Full Integration
 
-- [ ] Engine + Operator Client + Worker Client end-to-end scenarios (the three from Hierarchy → Example Scenarios)
-- [ ] Cross-combo flows: Task → Flow, Task → Events, Resource → Events, Events → Control
-- [ ] Network-drop mid-traversal expires via the same deadline path
-- [x] Engine running on Linux (WSL) with a Windows client over TCP: handshake, tree, traversal, task.propose via the Linux-hosted model, session end — verified 2026-09-21
+- [x] Scenario 1 (Super User audits a department): tree → traverse into an Admin workstation with the red banner and no Conditional Rendering → `audit actor=<admin>` review (itself audited) → end; the `session.ended` audit entry carries who/where/`duration_seconds`
+- [x] Scenario 2 (Admin manages a Client PC): traverse (worker blocked, then released) → department-wide policy update as one Custom Action run on every PC independently (`control.action_run department_id=`), each audited
+- [x] Scenario 3 (Client receives an alert): department alert with action link reaches the worker live and in `alerts`; the worker UI has no control surface at all
+- [x] Task → Global File Index → Flow → Events → Control: a Create-intent target appears wherever the worker saves it, binds by identity, flows to a second PC, fires `task.target_appeared`, whose Action runs on the assignee's PC; only manual verification completes
+- [x] Resource → Events → Control + Flow: a restricted hash on a worker PC is a violation → report, event, action on that PC; Flow moves everything except that one file; resolve lifts the ignore
+- [x] Events → Control on a Flow failure: unsupported Transformation pauses the branch, routes a report to the department, fires the event; edit + resume + trigger recovers
+- [x] Network drop mid-traversal with real clients: the worker stays blocked after the Admin's connection drops; the same deadline releases it (`network_drop_deadline_expired`)
+- [x] Engine on Linux (WSL) with a Windows client over TCP (Phase 1)
+- [x] Found and fixed by integration: Resource compliance now runs before Flow on file events (Flow could copy a file a moment before it became a violation); `common.cli` keeps backslashes (Windows paths were mangled); `EngineConnection.close()` cancels the reader before closing the transport and bounds every await (a Windows Proactor hang); `audit.recent`/`audit.deviations` handlers + TUI `audit`/`deviations`
+- [ ] Deferred to Phase 6: remote mouse/keyboard control during traversal (scenario 2 step 4) needs an input channel no phase has built; the Overlay/Dialog exes
 
 ---
 

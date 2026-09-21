@@ -130,7 +130,8 @@ async def alerts(ctx: UIContext, args: Args) -> str:
 
 @command("violations", help_="Resource violations surfaced to you (files being ignored until you fix them)")
 async def violations(ctx: UIContext, args: Args) -> str:
-    return table((await ctx.call("resource.violations"))["violations"], ["id", "path", "expected_tag", "detected_at"], width=60)
+    return table((await ctx.call("resource.violations"))["violations"],
+                 ["id", "filename", "expected_tag", "detected_at", "path"], width=70)
 
 
 @command("violation", "resolve", "<violation_id>", "I removed the file -- stop ignoring it")

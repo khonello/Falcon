@@ -55,3 +55,16 @@ async def alert(ctx: ShellContext, args: Args) -> str:
     return f"alert {res['alert_id']} " + (f"scheduled for {res['deliver_at']}" if res["deliver_at"] else "delivered")
 
 
+
+
+@command("audit", usage="[n] [actor=<account_id>] [prefix=<action.>]", help_="Recent audit entries you may see")
+async def audit(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("audit.recent", {"limit": int(args.positional[0]) if args.positional else 50,
+                                          "actor_account_id": args.opt_int("actor"), "prefix": args.opt("prefix")})
+    return table(res["entries"], ["occurred_at", "actor_name", "action_type", "target_type", "target_id", "detail"], width=60)
+
+
+@command("deviations", help_="System expectation deviations (unresolved)")
+async def deviations(ctx: ShellContext, args: Args) -> str:
+    return table((await ctx.call("audit.deviations"))["deviations"],
+                 ["id", "expectation", "observed_account_id", "observed_pc_id", "detail", "detected_at"], width=50)

@@ -35,6 +35,7 @@ worker = [
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
+    "pytest-timeout>=2.3",
     "ruff>=0.4",
     "watchdog>=4.0",
 ]
@@ -45,6 +46,7 @@ include = ["protocol*", "common*", "engine*", "operator_client*", "worker_client
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+timeout = 180                       # a hung test fails with a stack dump instead of freezing the run
 filterwarnings = [
     # Windows Proactor transports finalised after the per-test loop closes -- harmless.
     "ignore::pytest.PytestUnraisableExceptionWarning",

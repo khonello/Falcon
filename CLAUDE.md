@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), and the **Worker Client** service + narrow TUI (Phase 3) — each done bar a human interactive pass. Next: Phase 4, full integration scenarios. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
+Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), and **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`). Next: Phase 5, real authentication. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).
@@ -61,7 +61,8 @@ common/            code bundled by more than one package (custom_actions validat
 operator_client/   core/ (connection, state, config, deadlines — no UI deps) + tui/ (shell registry, commands/, app)
 worker_client/     service (connect/reconnect, push dispatch), watcher (watchdog + polling + idle sweep), executor
                    (Script Execution Model), flowsync, signals, lockout, updater, ui (narrow Worker TUI), config, idle
-tests/             protocol, socket smoke, units, migrations, repos, per-combo end-to-end (conftest: DB-backed Engine + `connect(client_id)`)
+tests/             protocol, socket smoke, units, migrations, repos, per-combo end-to-end, operator/worker clients,
+                   integration scenarios (conftest: DB-backed Engine + `connect(client_id)`; pytest-timeout 180s)
 ```
 
 Conventions in the scaffold:

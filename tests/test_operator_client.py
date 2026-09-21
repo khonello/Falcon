@@ -24,6 +24,8 @@ def test_arg_grammar():
     # Windows paths and `x=1` in prose stay positional (keys must be lowercase identifiers).
     _, a2 = parse("task propose 3 write C:/out/x.txt where x=1 wins")
     assert "C:/out/x.txt" in a2.positional and "x" not in a2.options
+    _, a3 = parse(r'action custom p python C:\Users\me\policy.py path="C:\Temp\my dir\f.txt"')
+    assert a3.positional[4] == r"C:\Users\me\policy.py" and a3.opt("path") == r"C:\Temp\my dir\f.txt"
 
 
 async def test_connection_handshake_call_and_push(engine, org):
