@@ -34,7 +34,7 @@ first)** → **9 packaging + deployment** → **10 hardening + ops**. UI refinem
 | 4 | Worker Overlay/Dialog exes do not exist (the blocked-state surface is a text UI); no remote mouse/keyboard during traversal | The Client-PC experience in the Hierarchy doc is not what a worker sees | **Phase 9** (with the frozen toolchain) |
 | 5 | Not hardened: no load/scale run (many departments/PCs), no security review of unsandboxed Custom Actions, no log rotation / service wrappers, Linux Engine verified but never deployed | Unknown behaviour under real load; ops story missing | **Phase 10** (hardening + ops) |
 | 6 | LLM is a 0.6B model doing list-picks and verbatim extractions only (13/13 on the benchmark) | Fine as a "proposal assistant"; must not be pitched as AI understanding tasks without a bigger model behind the same graph | note for sales; revisit model size in Phase 10 |
-| 7 | GUI is functional but plain: tables and buttons, no node graph for Flows, no interaction design | Not near what a private company will pay for; blocks judging real use | **Phase 7** (UI/UX to acceptable) — the QML is a thin layer over `FalconBridge`, so this does not touch the ~12k lines beneath |
+| 7 | GUI is only *functional* — wired and correct, but generic; only the tabs are acceptable | Not near what a private company will pay for | **Phase 7** — PAUSED, blocked on a proper design meeting `design-brief.md` |
 
 ---
 
@@ -182,34 +182,35 @@ layer the GUI will reuse unchanged.
 
 ---
 
-## Phase 7 — UI/UX to an acceptable level (after Phase 5) — the GUI is the primary surface
+## Phase 7 — UI/UX to an acceptable level — PAUSED (blocked on design)
 
-Goal: a UI that enforces how the software is meant to be used, so it can be judged and then
-polished. Acceptable means: proper use of space, custom components that fit our needs (not stock
-tables and buttons), clear states, and navigation that matches the roles. Not final polish.
+The GUI is the primary product surface. A **functional** GUI exists (commit cb855ae): every screen is
+wired to the Engine and behaves correctly, on a single visual language (Theme singleton, Material
+dark, header tabs, hierarchy left rail, banner, pinned feed, footer; the Hierarchy page is built
+around the session as a control). **But it is not designed to an acceptable standard** — of what has
+been built, only the top-level tab navigation is judged acceptable; everything else is functional,
+not acceptable.
 
-**Baseline and finish.** The predecessor's console (`github.com/khonello/SystemMonitoring`,
-`admin/qml/` and `client/ui/`) is the *baseline* — what the user calls acceptable, and even that was
-not fine-tuned. Finished means fine-tuned: components customised to what this system needs, not
-generic ones in the right colours. **The system does not adapt to the UI; the UI is moulded to what
-the system wants.** Distilled into `ui-reference.md` — start there, then go past it.
+**UI work is paused here and does not resume until a design meeting "acceptable" exists and is
+approved — ideally from a proper designer.** The standard, the baseline/acceptable/finished
+definitions, and the concept-by-concept expectations are written in `design-brief.md` (self-contained;
+it deliberately does not reference any other project). Other phases may proceed while the UI is
+frozen at its current functional state.
 
-- [ ] Port the reference design system: `Theme.qml` singleton (tokens from `ui-reference.md`), Material dark + `SmallScale` set once in `gui/app.py`; replace the hand-built Fusion palette
-- [ ] Shell to the reference skeleton: header (identity, primary tabs, connection), hierarchy **left rail** as the always-visible context, content + pinned feed panel, footer with the pulsing link dot; RED BANNER / BLOCKED as the full-width banner
-- [ ] Component set ported and extended: `Section`, `SegmentedControl`, `StatePill`, `StatTile`, `DataList`, plus a table/tree, forms and dialogs in the same tokens
-- [ ] Beyond the baseline — Falcon-specific controls, judged against the design docs: session control (occupant, deadline, extend/end), traversal changing the shell, flow as a graph, proposal as a review with decisions, violation with its tier, indicators that pulse until addressed
+Where the code stands (so a future session can pick up or discard it):
+- Design system: `operator_client/gui/qml/Theme.qml` (+ `qmldir`), components `Section`,
+  `SegmentedControl`, `StatePill`, `StatTile`, `Banner`, `Btn`, `Field`, `Picker`, `Eyebrow`,
+  `DataTable`; style set to Material dark in `gui/app.py`.
+- Shell `main.qml`; `HierarchyRail.qml`; pages `HierarchyView` (rebuilt as a session control),
+  `ConnectView`, plus `Tasks/Flows/Control/Assistance/Reports` moved onto the tokens.
+- All wired through `FalconBridge`; 105 tests green including `tests/test_operator_gui.py`.
 
-- [ ] Interaction design first: information architecture, navigation per role (Super User vs Admin), the persistent status surface, states (blocked, red banner, restricted view, disconnected), and the work-first layout of each screen — written down before QML changes
-- [ ] Shared component set: panels, list/tree/table with selection and inline actions, forms/dialogs, badges/indicators, empty/loading/error states, feed; consistent spacing and type scale
-- [ ] Hierarchy: live tree with session state and one-click traverse/end/extend; account detail in place; assisted access as a guided flow
-- [ ] Flows: node-graph editor (Source → stages → Destinations) with consent / collision / cycle feedback inline; status and history beside it
-- [ ] Tasks: guided review of the LLM proposal (items, flags, collisions, split, deadline) → create; task detail with the stack and signals
-- [ ] Automation: dashboard as a real dashboard (automations, live runs, recent output); action/event editors as forms, custom-script editor with validation feedback
-- [ ] Assistance & Resources: ping inbox → channel as a conversation; search/tag/violations as workbenches
-- [ ] Reports & Administration: routing, alerts, updates, audit, provisioning as their own screens
-- [ ] Worker-facing: Overlay (blocked) and Dialog (notifications) designed here as QML, frozen later in Phase 9
+When resumed, build to `design-brief.md`, not to the current screens. The remaining named work:
+- [ ] Design (by a designer) reaching "acceptable", then approved — the gate for everything below
+- [ ] Fine-tune each surface to its concept (per `design-brief.md`): traversal/session, task proposal review, **flow as a graph**, resource tiers/violations, assistance channels, automation dashboard, reports/routing/alerts/updates, indicators
+- [ ] Worker Overlay + Dialog designs
 - [ ] Window prefs / layout persistence (`LocalConfig.prefs`)
-- [ ] Constraint: the QML stays a thin layer over `FalconBridge` — no business logic in the UI; every screen still driven by `falcon.call`
+- [ ] Constraint held throughout: QML stays a thin layer over `FalconBridge`; no logic in the UI
 
 ---
 
