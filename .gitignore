@@ -30,3 +30,6 @@ logs/
 
 # Local LLM weights (download separately; see .env.example)
 models/
+
+# Engine host state: master secret (never commit), TLS material
+data/

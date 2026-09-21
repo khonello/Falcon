@@ -16,9 +16,23 @@ from typing import Any
 
 import pytest
 
+from engine import auth as engine_auth
 from engine.config import Settings
 from engine.database import Database
 from engine.server import Engine
+
+# Fixed for tests so keys are reproducible: key_for("cid-a1") is what that client's install
+# package would carry. Never used outside the test suite.
+TEST_MASTER_SECRET = bytes(range(32))
+
+
+def key_for(client_id: str, key_generation: int = 1) -> str:
+    """The hex client key a test client presents (what provisioning would have issued)."""
+    return engine_auth.derive_client_key(TEST_MASTER_SECRET, client_id, key_generation).hex()
+
+
+def answer(client_id: str, nonce: str, key_generation: int = 1) -> str:
+    return engine_auth.expected_response(bytes.fromhex(key_for(client_id, key_generation)), nonce)
 from protocol import Envelope, Kind, decode, encode, request
 
 TEST_DB_URL = os.environ.get("FALCON_TEST_DATABASE_URL")
@@ -103,9 +117,12 @@ class Client:
 
 @pytest.fixture
 async def engine() -> Engine:
-    """An Engine listening on loopback (plaintext, auth stubbed) against a fresh test DB."""
+    """An Engine listening on loopback against a fresh test DB. Plaintext (TLS is covered by
+    tests/test_auth.py), but the auth handshake is REAL: clients answer the nonce with the key
+    derived from TEST_MASTER_SECRET (see `key_for`)."""
     assert TEST_DB_URL
-    eng = Engine(Settings(host="127.0.0.1", port=0, database_url=TEST_DB_URL, dev_plaintext=True))
+    eng = Engine(Settings(host="127.0.0.1", port=0, database_url=TEST_DB_URL, dev_plaintext=True,
+                          master_secret=TEST_MASTER_SECRET))
     await eng.db.connect()
     await _wipe_and_migrate(eng.db)
     await eng.db.close()
@@ -126,7 +143,8 @@ async def connect(engine: Engine):
         c = Client(reader, writer)
         challenge = await c.recv()
         assert challenge.type == "auth.challenge"
-        await c.ok("auth.respond", {"client_id": client_id, "hmac": "stub", "hostname": hostname})
+        await c.ok("auth.respond", {"client_id": client_id, "hmac": answer(client_id, challenge.payload["nonce"]),
+                                    "hostname": hostname})
         clients.append(c)
         return c
 

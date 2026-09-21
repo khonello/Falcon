@@ -40,7 +40,7 @@ GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`
 ```powershell
 environ-worker\Scripts\Activate.ps1
 pip install -e ".[worker]"                 # Worker Client (psutil, prompt_toolkit, watchdog)
-python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --plaintext --watch C:\path	o\docs [--ui]
+python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt --watch C:\docs [--ui]
 ```
 
 Engine settings are `FALCON_*` env vars (see `.env.example`, `engine/config.py`). Without `FALCON_DATABASE_URL` the Engine runs with no database (scaffold only). Without `FALCON_DEV_PLAINTEXT` it refuses to start unless TLS cert/key are set.

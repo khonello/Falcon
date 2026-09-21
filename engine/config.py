@@ -20,6 +20,9 @@ class Settings:
     database_url: str | None = None
     tls_cert: Path | None = None
     tls_key: Path | None = None
+    # Master secret (spec 8.2): a file on the Engine host, created on first start. Tests inject one.
+    secret_path: Path = Path("data/master.secret")
+    master_secret: bytes | None = None
     # Retention is flat 90 days system-wide for v1 (hierarchy-system-design.md → Audit & Logging).
     audit_retention_days: int = 90
     # Traversal Time Limit (Hierarchy -> Session Blocking): fixed, extendable on request.
@@ -51,6 +54,7 @@ class Settings:
             database_url=os.environ.get("FALCON_DATABASE_URL") or None,
             tls_cert=Path(cert) if cert else None,
             tls_key=Path(key) if key else None,
+            secret_path=Path(os.environ.get("FALCON_SECRET_PATH", str(cls.secret_path))),
             audit_retention_days=int(
                 os.environ.get("FALCON_AUDIT_RETENTION_DAYS", cls.audit_retention_days)
             ),

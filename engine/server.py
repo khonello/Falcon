@@ -42,9 +42,8 @@ class Engine:
         self.llm = LocalLLM(settings.llm_backend, model_path=settings.llm_model_path,
                             endpoint=settings.llm_endpoint, model=settings.llm_model)
         self.connections: set[Connection] = set()
-        # Generated once on the Engine host, never transmitted (spec 8.2). SCAFFOLD: None until
-        # provisioning tooling exists; `auth.verify` does not read it yet.
-        self.master_secret: bytes | None = None
+        # Generated once on the Engine host, never transmitted (spec 8.2). Loaded in start().
+        self.master_secret: bytes | None = settings.master_secret
         self._server: asyncio.base_events.Server | None = None
 
         # Every consumer of file events subscribes to the one index -- no per-combo detection.
@@ -73,6 +72,10 @@ class Engine:
 
     async def start(self) -> None:
         self._announce_dev_flags()
+        if self.master_secret is None:
+            from engine.master_secret import load_or_create
+
+            self.master_secret = load_or_create(self.settings.secret_path)
         await self.db.connect()
         await self.db.migrate()
         await self.scheduler.start()
@@ -113,6 +116,13 @@ class Engine:
             await self._server.serve_forever()
         finally:
             await self.stop()
+
+    def client_key(self, client_id: str, key_generation: int = 1) -> str:
+        """The derived key (hex) an install package receives for this client_id -- shown once."""
+        from engine.auth import derive_client_key
+
+        assert self.master_secret is not None, "master secret not loaded"
+        return derive_client_key(self.master_secret, client_id, key_generation).hex()
 
     @property
     def port(self) -> int:

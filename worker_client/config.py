@@ -38,8 +38,9 @@ class WorkerConfig:
     engine_host: str = "127.0.0.1"
     engine_port: int = 7400
     client_id: str = ""
+    client_key: str = ""          # hex, issued once at provisioning with the client_id
     tls: bool = True
-    ca_cert: str | None = None
+    ca_cert: str | None = None    # the Engine's pinned certificate (from the install package)
     watch_roots: list[str] = field(default_factory=default_roots)
     poll_seconds: float = 5.0            # polling fallback interval for file changes
     metrics_seconds: float = 15.0        # control.metrics cadence
@@ -58,7 +59,7 @@ class WorkerConfig:
             data = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return cfg
-        for key in ("engine_host", "engine_port", "client_id", "tls", "ca_cert", "watch_roots", "poll_seconds",
+        for key in ("engine_host", "engine_port", "client_id", "client_key", "tls", "ca_cert", "watch_roots", "poll_seconds",
                     "metrics_seconds", "idle_sweep_after_seconds", "hash_limit_bytes", "lock_workstation_on_block",
                     "update_command", "cache"):
             if key in data:

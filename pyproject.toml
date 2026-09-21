@@ -16,6 +16,8 @@ engine = [
     "psutil>=5.9",
     # In-process local LLM (Task). CPU wheels: --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
     "llama-cpp-python>=0.3",
+    # Self-signed Engine certificate generation (python -m engine gencert)
+    "cryptography>=42",
 ]
 # Operator Client TUI -- built and used first, to test the system
 tui = [

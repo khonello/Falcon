@@ -26,8 +26,9 @@ class LocalConfig:
     engine_host: str = "127.0.0.1"
     engine_port: int = 7400
     client_id: str = ""
+    client_key: str = ""          # hex, issued once at provisioning with the client_id
     tls: bool = True
-    ca_cert: str | None = None
+    ca_cert: str | None = None    # the Engine's pinned certificate (from the install package)
     prefs: dict[str, Any] = field(default_factory=dict)      # UI preferences
     cache: dict[str, Any] = field(default_factory=dict)      # cached lists (departments, ...)
     path: Path = field(default_factory=default_path, repr=False, compare=False)
@@ -40,7 +41,7 @@ class LocalConfig:
             data = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return cfg
-        for key in ("engine_host", "engine_port", "client_id", "tls", "ca_cert", "prefs", "cache"):
+        for key in ("engine_host", "engine_port", "client_id", "client_key", "tls", "ca_cert", "prefs", "cache"):
             if key in data:
                 setattr(cfg, key, data[key])
         return cfg

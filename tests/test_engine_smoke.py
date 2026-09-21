@@ -9,6 +9,7 @@ from engine.config import Settings
 from engine.dispatch import registered_types
 from engine.server import Engine
 from protocol import Kind, decode, encode, request
+from tests.conftest import TEST_MASTER_SECRET, answer
 
 
 class Client:
@@ -35,7 +36,8 @@ class Client:
 @pytest.fixture
 async def engine(monkeypatch):
     monkeypatch.setenv("FALCON_TLS_CERT", "")
-    settings = Settings(host="127.0.0.1", port=0, database_url=None, dev_plaintext=True)
+    settings = Settings(host="127.0.0.1", port=0, database_url=None, dev_plaintext=True,
+                        master_secret=TEST_MASTER_SECRET)
     eng = Engine(settings)
     await eng.start()
     yield eng
@@ -59,13 +61,24 @@ async def test_challenge_then_handshake(client):
     refused = await client.call("hierarchy.tree")
     assert refused.ok is False and refused.error["code"] == "unauthenticated"
 
-    ok = await client.call("auth.respond", {"client_id": "test-client", "hmac": "stub"})
+    # A wrong answer is refused; the nonce is single-use, so the next attempt needs a new connection.
+    bad = await client.call("auth.respond", {"client_id": "test-client", "hmac": "stub"})
+    assert bad.ok is False and bad.error["code"] == "unauthenticated"
+    again = await client.call("auth.respond", {"client_id": "test-client",
+                                               "hmac": answer("test-client", challenge.payload["nonce"])})
+    assert again.ok is False  # challenge already consumed
+
+
+async def test_handshake_with_the_right_key(client):
+    challenge = await client.recv()
+    ok = await client.call("auth.respond", {"client_id": "test-client",
+                                            "hmac": answer("test-client", challenge.payload["nonce"])})
     assert ok.ok is True and ok.result["authenticated"] is True
 
 
 async def test_every_registered_type_dispatches(client):
-    await client.recv()  # challenge
-    await client.call("auth.respond", {"client_id": "t"})
+    challenge = await client.recv()
+    await client.call("auth.respond", {"client_id": "t", "hmac": answer("t", challenge.payload["nonce"])})
     for message_type in registered_types():
         if message_type == "auth.respond":
             continue
@@ -77,8 +90,8 @@ async def test_every_registered_type_dispatches(client):
 
 
 async def test_unknown_type_and_bad_json(client):
-    await client.recv()
-    await client.call("auth.respond", {"client_id": "t"})
+    challenge = await client.recv()
+    await client.call("auth.respond", {"client_id": "t", "hmac": answer("t", challenge.payload["nonce"])})
     resp = await client.call("nope.nothing")
     assert resp.ok is False and resp.error["code"] == "unknown_type"
 

@@ -19,7 +19,7 @@ from PySide6.QtQml import QJSValue
 
 from operator_client.core import LocalConfig
 from operator_client.gui.app import create, fit_to_screen
-from tests.conftest import requires_db
+from tests.conftest import key_for, requires_db
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ async def test_bridge_connects_and_views_populate(gui, engine, org):
     seen: list[tuple[str, object]] = []
     bridge.pushReceived.connect(lambda t, p: seen.append((t, p)))
     bridge.hostname = "SU-PC"
-    bridge.connectTo("127.0.0.1", engine.port, "cid-su", True)
+    bridge.connectTo("127.0.0.1", engine.port, "cid-su", key_for("cid-su"), True, "")
     await _wait(lambda: bridge.isConnected)
     assert bridge.role == "super_user" and bridge.roleLabel == "Super User" and bridge.accountId == org["su"]
 

@@ -20,6 +20,8 @@ async def connect(ctx: ShellContext, args: Args) -> str:
             cfg.engine_port = int(port)
     if args.opt("client"):
         cfg.client_id = str(args.opt("client"))
+    if args.opt("key"):
+        cfg.client_key = str(args.opt("key"))
     if args.flag("plaintext"):
         cfg.tls = False
     if args.opt("ca"):
@@ -29,7 +31,7 @@ async def connect(ctx: ShellContext, args: Args) -> str:
     if ctx.conn is not None:
         await ctx.conn.close()
     conn = EngineConnection(cfg.engine_host, cfg.engine_port, client_id=cfg.client_id, tls=cfg.tls,
-                            ca_cert=cfg.ca_cert)
+                            ca_cert=cfg.ca_cert, derived_key=cfg.client_key or None)
     conn.on_push(ctx.state.on_push)
     extra = ctx.scratch.get("push_printer")
     if extra:

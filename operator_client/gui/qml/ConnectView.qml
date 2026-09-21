@@ -18,6 +18,10 @@ Item {
             TextField { id: port; Layout.fillWidth: true; text: String(falcon.defaultPort); validator: IntValidator { bottom: 1; top: 65535 } }
             Label { text: "Client id"; color: "#ccc" }
             TextField { id: clientId; Layout.fillWidth: true; text: falcon.defaultClientId; placeholderText: "issued at provisioning" }
+            Label { text: "Client key"; color: "#ccc" }
+            TextField { id: clientKey; Layout.fillWidth: true; text: falcon.defaultClientKey; placeholderText: "issued with the client id (hex)"; echoMode: TextInput.Password }
+            Label { text: "Engine certificate"; color: "#ccc" }
+            TextField { id: caCert; Layout.fillWidth: true; text: falcon.defaultCaCert; placeholderText: "path to the pinned engine.crt"; enabled: !plaintext.checked }
             Label { text: ""; }
             CheckBox { id: plaintext; text: "plaintext (development only)"; checked: falcon.defaultPlaintext }
         }
@@ -25,7 +29,7 @@ Item {
             Layout.alignment: Qt.AlignRight
             text: "Connect"
             enabled: clientId.text.length > 0
-            onClicked: falcon.connectTo(host.text, parseInt(port.text), clientId.text, plaintext.checked)
+            onClicked: falcon.connectTo(host.text, parseInt(port.text), clientId.text, clientKey.text, plaintext.checked, caCert.text)
         }
         Label { id: err; color: "#ff8a80"; wrapMode: Text.Wrap; Layout.fillWidth: true
                 Connections { target: falcon; function onConnectionFailed(m) { err.text = m } function onConnected() { err.text = "" } } }

@@ -72,7 +72,9 @@ async def account_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
         account_id = await db.accounts.create(role, department_id, pc_id)
     await ctx.engine.audit.record(ctx, "account.created", target_type="accounts", target_id=account_id,
                                   detail={"role": role, "department_id": department_id, "pc_id": pc_id})
-    return {"account_id": account_id, "pc_id": pc_id, "client_id": client_id, "role": role}
+    # client_id + client_key go into the install package; the Engine keeps neither key nor copy.
+    return {"account_id": account_id, "pc_id": pc_id, "client_id": client_id,
+            "client_key": ctx.engine.client_key(client_id), "role": role}
 
 
 @handler("hierarchy.account_offboard")
@@ -121,6 +123,31 @@ async def pc_register(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     department_id = int_field(payload, "department_id", required=pc_type != "super_user_workstation")
     if department_id is not None:
         require_department_scope(ident, department_id)
-    pc_id = await ctx.engine.db.accounts.create_pc(hostname, department_id, pc_type, secrets.token_urlsafe(16))
+    client_id = secrets.token_urlsafe(16)
+    pc_id = await ctx.engine.db.accounts.create_pc(hostname, department_id, pc_type, client_id)
     await ctx.engine.audit.record(ctx, "pc.registered", target_type="pcs", target_id=pc_id)
-    return {"pc_id": pc_id}
+    return {"pc_id": pc_id, "client_id": client_id, "client_key": ctx.engine.client_key(client_id)}
+
+
+@handler("hierarchy.pc_rekey")
+async def pc_rekey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"pc_id": int} -- rotate a PC's client key (lost/compromised install package). The old key
+    stops verifying immediately and any live connection from that PC is dropped; the new key is
+    returned once for a fresh install package. Super User anywhere; Admin within their department."""
+    ident = require_role(ctx, "super_user", "admin")
+    pc_id = int_field(payload, "pc_id")
+    pc = await ctx.engine.db.accounts.pc(pc_id)
+    if pc is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
+    if pc["department_id"] is not None:
+        require_department_scope(ident, pc["department_id"])
+    elif ident.role != "super_user":
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only the Super User can rekey an undeparted PC")
+    generation = await ctx.engine.db.accounts.rekey_pc(pc_id)
+    await ctx.engine.audit.record(ctx, "pc.rekeyed", target_type="pcs", target_id=pc_id,
+                                  detail={"key_generation": generation})
+    for conn in list(ctx.engine.connections):
+        if conn.ctx.identity is not None and conn.ctx.identity.pc_id == pc_id and conn is not ctx.connection:
+            conn.writer.close()
+    return {"pc_id": pc_id, "client_id": pc["client_id"], "key_generation": generation,
+            "client_key": ctx.engine.client_key(pc["client_id"], generation)}

@@ -131,19 +131,31 @@ class FalconBridge(QObject):
     def defaultPlaintext(self) -> bool:
         return not self.config.tls
 
+    @Property(str, constant=True)
+    def defaultClientKey(self) -> str:
+        return self.config.client_key
+
+    @Property(str, constant=True)
+    def defaultCaCert(self) -> str:
+        return self.config.ca_cert or ""
+
     # --- connection -----------------------------------------------------------------------------
 
-    @Slot(str, int, str, bool)
-    def connectTo(self, host: str, port: int, client_id: str, plaintext: bool) -> None:
-        asyncio.ensure_future(self._connect(host, port, client_id, plaintext))
+    @Slot(str, int, str, str, bool, str)
+    def connectTo(self, host: str, port: int, client_id: str, client_key: str, plaintext: bool,
+                  ca_cert: str = "") -> None:
+        asyncio.ensure_future(self._connect(host, port, client_id, client_key, plaintext, ca_cert))
 
-    async def _connect(self, host: str, port: int, client_id: str, plaintext: bool) -> None:
+    async def _connect(self, host: str, port: int, client_id: str, client_key: str, plaintext: bool,
+                       ca_cert: str = "") -> None:
         cfg = self.config
         cfg.engine_host, cfg.engine_port, cfg.client_id, cfg.tls = host or cfg.engine_host, int(port), client_id, not plaintext
+        cfg.client_key = client_key or ""
+        cfg.ca_cert = ca_cert or None
         if self.conn is not None:
             await self.conn.close()
         conn = EngineConnection(cfg.engine_host, cfg.engine_port, client_id=cfg.client_id, tls=cfg.tls,
-                                ca_cert=cfg.ca_cert, hostname=self.hostname)
+                                ca_cert=cfg.ca_cert, derived_key=cfg.client_key or None, hostname=self.hostname)
         conn.on_push(self.state.on_push)
         conn.on_push(self._on_push)
         conn.on_disconnect = self._on_disconnect

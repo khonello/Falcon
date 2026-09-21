@@ -10,7 +10,7 @@ import pytest
 
 from operator_client.core import ClientState, EngineConnection, EngineError, LocalConfig
 from operator_client.tui.shell import ShellContext, parse, run_line, run_script
-from tests.conftest import requires_db
+from tests.conftest import key_for, requires_db
 
 pytestmark = requires_db
 
@@ -30,7 +30,7 @@ def test_arg_grammar():
 
 async def test_connection_handshake_call_and_push(engine, org):
     state = ClientState()
-    conn = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, hostname="FIN-ADM")
+    conn = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"), hostname="FIN-ADM")
     conn.on_push(state.on_push)
     ident = await conn.connect()
     assert ident.role == "admin" and ident.account_id == org["a1"]
@@ -40,7 +40,7 @@ async def test_connection_handshake_call_and_push(engine, org):
         await conn.call("hierarchy.traverse", {"pc_id": org["a2_pc"]})
     assert exc.value.code == "forbidden"
     # A push reaches the state: a Super User forces into A1's workstation.
-    su = EngineConnection("127.0.0.1", engine.port, client_id="cid-su", tls=False)
+    su = EngineConnection("127.0.0.1", engine.port, client_id="cid-su", tls=False, derived_key=key_for("cid-su"))
     await su.connect()
     await su.call("hierarchy.traverse", {"pc_id": org["a1_pc"], "force": True})
     await asyncio.sleep(0.2)
@@ -61,7 +61,7 @@ async def test_local_config_roundtrip(tmp_path: Path):
 
 
 def _cfg(engine, tmp_path: Path, client_id: str) -> LocalConfig:
-    return LocalConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, tls=False,
+    return LocalConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
                        path=tmp_path / f"{client_id}.json")
 
 
@@ -166,7 +166,7 @@ async def test_push_updates_state_and_indicators(engine, org, tmp_path: Path):
 
     await run_line(ctx, "connect")
     assert state.connected and state.role == "worker" and state.session["occupied_via"] == "native"
-    admin = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False)
+    admin = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"))
     await admin.connect()
     await admin.call("hierarchy.traverse", {"pc_id": org["w1_pc"], "force": True})
     await admin.call("assistance.ping", {"to_account_id": org["w1"]})

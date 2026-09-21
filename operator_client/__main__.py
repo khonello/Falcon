@@ -15,6 +15,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="operator_client", description="Falcon Operator Client")
     ap.add_argument("--engine", help="host:port of the Engine (remembered)")
     ap.add_argument("--client-id", help="this client's provisioned id (remembered)")
+    ap.add_argument("--client-key", help="this client's provisioned key, hex (remembered)")
     ap.add_argument("--plaintext", action="store_true", help="no TLS (development only)")
     ap.add_argument("--ca", help="pinned Engine certificate (PEM)")
     ap.add_argument("--config", help="config file path (default: per-user app config)")
@@ -34,6 +35,8 @@ def main() -> None:
         connect_args.append(args.engine)
     if args.client_id:
         connect_args.append(f"client={args.client_id}")
+    if args.client_key:
+        connect_args.append(f"key={args.client_key}")
     if args.plaintext:
         connect_args.append("plaintext")
     if args.ca:
@@ -48,6 +51,8 @@ def main() -> None:
             cfg.engine_host, cfg.engine_port = (host or args.engine), int(port) if port.isdigit() else cfg.engine_port
         if args.client_id:
             cfg.client_id = args.client_id
+        if args.client_key:
+            cfg.client_key = args.client_key
         if args.plaintext:
             cfg.tls = False
         if args.ca:

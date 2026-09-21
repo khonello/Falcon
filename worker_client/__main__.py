@@ -44,6 +44,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="worker_client", description="Falcon Worker Client")
     ap.add_argument("--engine", help="host:port of the Engine (remembered)")
     ap.add_argument("--client-id", help="this PC's provisioned client id (remembered)")
+    ap.add_argument("--client-key", help="this PC's provisioned client key, hex (remembered)")
     ap.add_argument("--plaintext", action="store_true", help="no TLS (development only)")
     ap.add_argument("--ca", help="pinned Engine certificate (PEM)")
     ap.add_argument("--config", help="config file path (default: %PROGRAMDATA%/Falcon/worker.json)")
@@ -63,6 +64,8 @@ def main() -> None:
             cfg.engine_port = int(port)
     if args.client_id:
         cfg.client_id = args.client_id
+    if args.client_key:
+        cfg.client_key = args.client_key
     if args.plaintext:
         cfg.tls = False
     if args.ca:

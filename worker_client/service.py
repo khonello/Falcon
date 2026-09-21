@@ -86,7 +86,8 @@ class WorkerService:
         delay = 1.0
         while True:
             conn = EngineConnection(self.config.engine_host, self.config.engine_port, client_id=self.config.client_id,
-                                    tls=self.config.tls, ca_cert=self.config.ca_cert)
+                                    tls=self.config.tls, ca_cert=self.config.ca_cert,
+                                    derived_key=self.config.client_key or None)
             conn.on_push(self._on_push)
             conn.on_disconnect = self._on_disconnect
             try:

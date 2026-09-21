@@ -178,7 +178,7 @@ class _Repo:
 class AccountsRepo(_Repo):
     _ACCOUNT_COLS = ("a.id, a.role, a.department_id, a.bound_pc_id, a.self_display_name, "
                      "a.status, a.assistance_available, a.created_at, "
-                     "p.hostname, p.pc_type, p.client_id, d.name AS department_name")
+                     "p.hostname, p.pc_type, p.client_id, p.key_generation, d.name AS department_name")
     _ACCOUNT_FROM = ("FROM accounts a LEFT JOIN pcs p ON p.id = a.bound_pc_id "
                      "LEFT JOIN departments d ON d.id = a.department_id")
 
@@ -231,9 +231,14 @@ class AccountsRepo(_Repo):
             "INSERT INTO pcs (hostname, department_id, pc_type, client_id) VALUES ($1, $2, $3, $4) RETURNING id",
             hostname, department_id, pc_type, client_id)
 
+    async def rekey_pc(self, pc_id: int) -> int:
+        """Bump the key generation: every previously issued key for this PC stops verifying."""
+        return await self._val(
+            "UPDATE pcs SET key_generation = key_generation + 1 WHERE id = $1 RETURNING key_generation", pc_id)
+
     async def pc(self, pc_id: int) -> dict[str, Any] | None:
         return await self._one(
-            "SELECT p.id, p.hostname, p.department_id, p.pc_type, p.client_id, a.id AS bound_account_id, "
+            "SELECT p.id, p.hostname, p.department_id, p.pc_type, p.client_id, p.key_generation, a.id AS bound_account_id, "
             "a.role AS bound_role FROM pcs p LEFT JOIN accounts a ON a.bound_pc_id = p.id AND a.status = 'active' "
             "WHERE p.id = $1", pc_id)
 

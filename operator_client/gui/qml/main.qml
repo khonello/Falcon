@@ -41,7 +41,7 @@ ApplicationWindow {
 
     Component.onCompleted: {
         if (autoConnect && falcon.defaultClientId.length > 0)
-            falcon.connectTo(falcon.defaultHost, falcon.defaultPort, falcon.defaultClientId, falcon.defaultPlaintext)
+            falcon.connectTo(falcon.defaultHost, falcon.defaultPort, falcon.defaultClientId, falcon.defaultClientKey, falcon.defaultPlaintext, falcon.defaultCaCert)
     }
 
     // --- persistent status surface: identity, session, RED BANNER, BLOCKED, pulsing indicators

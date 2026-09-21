@@ -60,14 +60,15 @@ class Identity:
 
 class EngineConnection:
     def __init__(self, host: str, port: int, *, client_id: str, tls: bool = True,
-                 ca_cert: str | Path | None = None, derived_key: bytes | None = None,
+                 ca_cert: str | Path | None = None, derived_key: bytes | str | None = None,
                  hostname: str | None = None, request_timeout: float = 30.0) -> None:
         self.host = host
         self.port = port
         self.client_id = client_id
         self.tls = tls
         self.ca_cert = Path(ca_cert) if ca_cert else None
-        self.derived_key = derived_key
+        # The provisioned client key (hex from the install package, or raw bytes).
+        self.derived_key = bytes.fromhex(derived_key) if isinstance(derived_key, str) and derived_key else (derived_key or None)
         self.hostname = hostname or socket.gethostname()
         self.request_timeout = request_timeout
         self.identity: Identity | None = None
@@ -182,8 +183,10 @@ class EngineConnection:
         return ctx
 
     def _answer(self, nonce: str) -> str:
+        """HMAC(derived_key, nonce). Without a key or a nonce (Engine in DEV_BYPASS_AUTH) the field is
+        still present so the message shape never changes; a real Engine rejects it."""
         if self.derived_key is None or not nonce:
-            return "stub"  # Phase 5 fills in the derived key; the field is always present
+            return ""
         return hmac.new(self.derived_key, nonce.encode("utf-8"), hashlib.sha256).hexdigest()
 
     async def _read_loop(self) -> None:

@@ -12,7 +12,7 @@ import asyncio
 from pathlib import Path
 
 from common.connection import EngineConnection
-from tests.conftest import requires_db
+from tests.conftest import key_for, requires_db
 from worker_client.config import WorkerConfig
 from worker_client.service import WorkerService
 from worker_client.ui import UIContext, run_line
@@ -21,7 +21,7 @@ pytestmark = requires_db
 
 
 def _cfg(engine, tmp_path: Path, client_id: str, roots: list[str]) -> WorkerConfig:
-    return WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, tls=False,
+    return WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
                         watch_roots=roots, poll_seconds=0.3, metrics_seconds=0.5, idle_sweep_after_seconds=999999,
                         path=tmp_path / f"{client_id}.json")
 
@@ -35,7 +35,7 @@ async def _start(engine, tmp_path: Path, client_id: str, roots: list[str]) -> Wo
 
 
 async def _admin(engine) -> EngineConnection:
-    a = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False)
+    a = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"))
     await a.connect()
     return a
 
@@ -249,7 +249,7 @@ async def test_session_blocking_surface_and_worker_ui(engine, org, tmp_path: Pat
 async def test_program_signals_and_update_attempt(engine, org, tmp_path: Path):
     svc = await _start(engine, tmp_path, "cid-w1", [])
     admin = await _admin(engine)
-    su = EngineConnection("127.0.0.1", engine.port, client_id="cid-su", tls=False)
+    su = EngineConnection("127.0.0.1", engine.port, client_id="cid-su", tls=False, derived_key=key_for("cid-su"))
     await su.connect()
     try:
         # A program item for the interpreter running these tests: present + running.

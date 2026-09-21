@@ -17,7 +17,7 @@ from engine.database import _now
 from engine.hierarchy import traversal
 from operator_client.core import LocalConfig
 from operator_client.tui.shell import run_script
-from tests.conftest import requires_db
+from tests.conftest import key_for, requires_db
 from worker_client.config import WorkerConfig
 from worker_client.service import WorkerService
 from worker_client.ui import UIContext
@@ -29,12 +29,12 @@ pytestmark = requires_db
 # --- harness ------------------------------------------------------------------------------------
 
 def _op(engine, tmp_path: Path, client_id: str) -> LocalConfig:
-    return LocalConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, tls=False,
+    return LocalConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
                        path=tmp_path / f"op-{client_id}.json")
 
 
 async def _worker(engine, tmp_path: Path, client_id: str, roots: list[str]) -> WorkerService:
-    cfg = WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, tls=False,
+    cfg = WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
                        watch_roots=roots, poll_seconds=0.3, metrics_seconds=0.5, idle_sweep_after_seconds=999999,
                        path=tmp_path / f"w-{client_id}.json")
     svc = WorkerService(cfg, native_watch=False)
@@ -225,7 +225,7 @@ async def test_chain_resource_violation_fires_event_and_flow_ignores_the_file(en
         assert await _wait(tagged)
         # Automation: on a violation, snapshot the system (an action on the offending PC); and a
         # flow out of the worker's docs.
-        su = EngineConnection("127.0.0.1", engine.port, client_id="cid-su", tls=False)
+        su = EngineConnection("127.0.0.1", engine.port, client_id="cid-su", tls=False, derived_key=key_for("cid-su"))
         await su.connect()
         setup = await run_script(_op(engine, tmp_path, "cid-a1"), [
             "connect", "action add monitoring process_list timeout=20", "event add resource.violation actions=1",
@@ -302,7 +302,7 @@ async def test_chain_flow_failure_is_reported_routed_and_fires_an_action(engine,
 async def test_network_drop_mid_traversal_with_real_clients(engine, org, tmp_path: Path):
     w1 = await _worker(engine, tmp_path, "cid-w1", [])
     try:
-        admin = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False)
+        admin = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"))
         await admin.connect()
         res = await admin.call("hierarchy.traverse", {"pc_id": org["w1_pc"], "force": True})
         sid = res["session"]["session_id"]
