@@ -23,19 +23,24 @@ class ScriptedLLM(LocalLLM):
     """Deterministic stand-in: answers by keyword so the decision graph can be exercised."""
 
     def __init__(self, answers: dict[str, object]) -> None:
-        super().__init__()
+        super().__init__("ollama")
         self.answers = answers
+        self.asked: list[str] = []
 
-    async def _ask(self, prompt: str) -> str | None:  # unused
-        return None
+    @property
+    def available(self) -> bool:
+        return True
 
     async def yes_no(self, question: str, text: str) -> bool | None:
+        self.asked.append(question)
         return self.answers.get(question)  # type: ignore[return-value]
 
     async def choose(self, question: str, text: str, options: list[str]) -> str | None:
+        self.asked.append(question)
         return self.answers.get(question)  # type: ignore[return-value]
 
     async def extract(self, what: str, text: str) -> str | None:
+        self.asked.append(what)
         return self.answers.get(what)  # type: ignore[return-value]
 
 
@@ -43,41 +48,50 @@ class ScriptedLLM(LocalLLM):
 
 async def test_graph_populates_a_clean_structure():
     llm = ScriptedLLM({
-        "Does the input mention a file target?": True,
-        "the file name mentioned": "budget.xlsx",
-        "Does the file already exist, or does it need creating?": "exists",
-        "Is the file being changed, or does it just need to be present?": "changing",
-        "Does the input mention a program target?": True,
-        "the program name mentioned": "Excel",
-        "Is its use tied to a specific file (e.g. 'use X to update Y')?": True,
-        "Does the input mention a deadline?": True,
-        "One date/time mentioned, or more than one?": "one",
-        "the deadline date/time": "Friday",
-        "Does the input describe more than one distinct piece of work?": False,
+        "the name of the software program or application mentioned": "Excel",
+        "What should happen with the program Excel?": "use it",
     })
     s = await llm_graph.populate(llm, "Use Excel to update budget.xlsx by Friday")
     assert [(i.target_type, i.intent, i.name) for i in s.items] == [("file", "update", "budget.xlsx"),
                                                                      ("program", "used_with_file", "Excel")]
-    assert s.items[1].linked_item_index == 0 and s.final_deadline == "Friday" and not s.needs_assigner()
+    assert s.items[1].linked_item_index == 0 and s.final_deadline == "by Friday" and not s.needs_assigner()
+    # The model asked only what the graph could not settle mechanically.
+    assert set(llm.asked) == {"the name of the software program or application mentioned",
+                              "What should happen with the program Excel?"}
 
 
 async def test_graph_flags_instead_of_guessing():
     llm = ScriptedLLM({
-        "Does the input mention a file target?": False,
-        "Does the input mention a program target?": True,
-        "the program name mentioned": "Excel",
-        "Is its use tied to a specific file (e.g. 'use X to update Y')?": True,  # contradiction: no file
-        "Does the input mention a deadline?": True,
-        "One date/time mentioned, or more than one?": "more",                    # ambiguous
-        "Does the input describe more than one distinct piece of work?": True,   # split
+        "the name of the software program or application mentioned": "Excel",
+        "What should happen with the program Excel?": "use it on the file",
     })
     s = await llm_graph.populate(llm, "Use Excel by Monday or Wednesday, and also tidy the archive")
     kinds = sorted(f["kind"] for f in s.flags)
     assert kinds == ["ambiguous_deadline", "contradiction", "no_target"]
-    assert s.proposed_split and s.needs_assigner()
-    # An unreachable model answers None everywhere -> every root is 'unclear', nothing assumed.
-    s2 = await llm_graph.populate(ScriptedLLM({}), "anything")
-    assert s2.items == [] and {f["kind"] for f in s2.flags} == {"unclear", "no_target"}
+    # A hallucinated program name (not in the text) is rejected, never accepted.
+    s2 = await llm_graph.populate(ScriptedLLM({"the name of the software program or application mentioned": "Word"}),
+                                  "tidy the archive")
+    assert s2.items == [] and {f["kind"] for f in s2.flags} == {"no_target"}
+    # Two file targets joined by "and also" -> a concrete split proposal, never a silent merge.
+    s3 = await llm_graph.populate(ScriptedLLM({}), "Update payroll.xlsx and also zip the logs into logs.zip")
+    assert [(i.intent, i.name) for i in s3.items] == [("update", "payroll.xlsx"), ("create", "logs.zip")]
+    assert s3.proposed_split and [p["targets"] for p in s3.proposed_split] == [["payroll.xlsx"], ["logs.zip"]]
+
+
+def test_graph_mechanical_helpers():
+    assert llm_graph.find_file_names("send sales-q3.xlsx and notes.md; not v1.2 or 3.14") == ["sales-q3.xlsx", "notes.md"]
+    assert llm_graph.find_path("Write the minutes into meeting-notes.docx in the Shared/Minutes folder",
+                               "meeting-notes.docx") == "Shared/Minutes"
+    assert llm_graph.find_deadlines("finish by 3pm tomorrow") == ["by 3pm tomorrow"]
+    assert llm_graph.find_deadlines("Close Outlook before you leave today") == ["today"]
+    assert llm_graph.find_deadlines("the usual Friday things") == []
+    assert llm_graph.file_intent_cue("Update payroll.xlsx and also archive invoices into a.zip", "a.zip") == "create"
+    assert llm_graph.file_intent_cue("Update payroll.xlsx and also archive invoices into a.zip", "payroll.xlsx") == "update"
+    assert llm_graph.file_intent_cue("Make sure onboarding.pdf is present on your machine", "onboarding.pdf") == "exists"
+    assert llm_graph.file_intent_cue("Look at data.csv", "data.csv") is None
+    assert llm_graph.program_candidates("Install 7-Zip so it's available by Friday", []) == ["7-Zip"]
+    assert llm_graph.program_candidates("Close Outlook today", []) == ["Outlook"]
+    assert llm_graph.program_candidates("Put the Q3 report in Shared/Minutes", []) == []
 
 
 # --- lifecycle ----------------------------------------------------------------------------------
@@ -88,15 +102,7 @@ async def _index(engine, pc_id: int, path: str, name: str, h: str = "h") -> int:
 
 async def test_propose_reports_collisions_and_llm_state(engine, org, connect):
     a1 = await connect("cid-a1")
-    engine.llm = ScriptedLLM({
-        "Does the input mention a file target?": True,
-        "the file name mentioned": "report.docx",
-        "Does the file already exist, or does it need creating?": "not yet",
-        "Is a folder/path mentioned?": False,
-        "Does the input mention a program target?": False,
-        "Does the input mention a deadline?": False,
-        "Does the input describe more than one distinct piece of work?": False,
-    })
+    engine.llm = ScriptedLLM({})
     await _index(engine, org["w1_pc"], "C:/docs/report.docx", "report.docx")
     res = await a1.ok("task.propose", {"description": "write report.docx", "assignee_account_id": org["w1"]})
     assert res["items"][0]["intent"] == "create" and res["collisions"][0]["name"] == "report.docx"

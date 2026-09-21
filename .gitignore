@@ -27,3 +27,6 @@ Thumbs.db
 # Runtime output
 logs/
 *.log
+
+# Local LLM weights (download separately; see .env.example)
+models/

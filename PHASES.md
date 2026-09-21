@@ -55,7 +55,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Global File Index: real upsert/search/collision/hash queries; event normalisation; tier-scoped search handler
 - [x] Task: propose (graph + collisions), create (explicit-None rule, collision refusal, scope), list/get/start/verify, stack evaluation per intent, expectation signals from the index stream + program signals, soft/final deadlines as scheduled Events (re-armed on start)
 - [x] Task: Ollama-style local LLM client (stdlib HTTP, None-on-failure, backoff); `llm_available` surfaced to the client
-- [ ] Task: benchmark the decision graph against real descriptions with a local model (pick Qwen3 size empirically)
+- [x] Task: decision graph benchmarked with Qwen3-0.6B (Q8 GGUF, in-process llama.cpp): 13/13 realistic cases, ~2 calls/description, ~1s/call on CPU; graph restructured around what a 0.6B model does reliably (list picks + verbatim extraction; presence/count questions answered mechanically). Open item 10.3 decided: in-process default, sidecar optional
 - [x] Flow: create/edit with consent (by authority; owner asked, flow paused until answered), pre-flight collision (confirm or change path), overlap-aware cycle prevention, resource-folder exclusion; propagation relayed via flow.read → flow.content → flow.apply with per-destination stage chains; write attribution vs external edits → `-modified` + re-sync; branch-scoped failure with reactive suggestion + report; resume/pause/delete/history
 - [x] Resource: tags derived from tier folders, admin/restricted tracked by hash system-wide, violations logged + surfaced to the user + reported, only that file ignored (Flow skips it), resolve lifts it; explicit tagging (admin tier Super User only)
 - [x] Assistance: tier-scoped search; pings between direct vertical pairs with pulsing status push; channel opens on response (sender speaks first), Engine-enforced turn lock, superior-only close; listeners per-adder, live silent pushes, listener_report
@@ -138,7 +138,7 @@ layer the GUI will reuse unchanged.
 
 - Dashboard refresh mechanism (poll vs push)
 - Report routing configuration UI
-- LLM hosting: in-process vs sidecar
+- ~~LLM hosting: in-process vs sidecar~~ — decided: in-process llama.cpp by default (`FALCON_LLM_BACKEND=llamacpp`), `openai`/`ollama` sidecars available
 - Update escalation threshold: count vs time, and value
 - CI/CD, packaging, artifact signing
 - JSON shapes: `condition_spec`, Flow-stage `config`, Assisted Access `access_ceiling` / `access_narrowing`

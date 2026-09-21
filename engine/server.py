@@ -39,7 +39,8 @@ class Engine:
         self.audit = AuditTrail(self.db, settings.audit_retention_days)
         self.file_index = FileIndex(self.db)
         self.scheduler = Scheduler(self)
-        self.llm = LocalLLM(settings.llm_endpoint, settings.llm_model)
+        self.llm = LocalLLM(settings.llm_backend, model_path=settings.llm_model_path,
+                            endpoint=settings.llm_endpoint, model=settings.llm_model)
         self.connections: set[Connection] = set()
         # Generated once on the Engine host, never transmitted (spec 8.2). SCAFFOLD: None until
         # provisioning tooling exists; `auth.verify` does not read it yet.
@@ -89,6 +90,7 @@ class Engine:
         )
         addrs = ", ".join(str(s.getsockname()) for s in self._server.sockets or [])
         log.info("Engine listening on %s (%d message types)", addrs, len(registered_types()))
+        log.info("local LLM: %s -- %s", self.llm.describe(), "available" if self.llm.available else "NOT available")
 
     async def stop(self) -> None:
         if self._server is not None:

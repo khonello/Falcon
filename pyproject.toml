@@ -14,6 +14,8 @@ dependencies = []
 engine = [
     "asyncpg>=0.29",
     "psutil>=5.9",
+    # In-process local LLM (Task). CPU wheels: --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+    "llama-cpp-python>=0.3",
 ]
 # Operator Client TUI -- built and used first, to test the system
 tui = [

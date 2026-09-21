@@ -29,7 +29,10 @@ class Settings:
     update_escalation_failures: int = 3
     # Polled/evaluated Events (thresholds, idle, time) are checked on this interval.
     control_poll_seconds: int = 15
-    # Local LLM sidecar (spec 7.2.1). Never an external API.
+    # Local LLM (spec 7.2.1). Never an external API. In-process llama.cpp by default (open
+    # item 10.3); 'openai' / 'ollama' select a local sidecar process instead.
+    llm_backend: str = "llamacpp"
+    llm_model_path: str | None = "models/Qwen3-0.6B-Q8_0.gguf"
     llm_endpoint: str = "http://127.0.0.1:11434"
     llm_model: str = "qwen3:0.6b"
     debug: bool = False
@@ -59,6 +62,8 @@ class Settings:
                 os.environ.get("FALCON_UPDATE_ESCALATION_FAILURES", cls.update_escalation_failures)
             ),
             control_poll_seconds=int(os.environ.get("FALCON_CONTROL_POLL_SECONDS", cls.control_poll_seconds)),
+            llm_backend=os.environ.get("FALCON_LLM_BACKEND", cls.llm_backend),
+            llm_model_path=os.environ.get("FALCON_LLM_MODEL_PATH", cls.llm_model_path) or None,
             llm_endpoint=os.environ.get("FALCON_LLM_ENDPOINT", cls.llm_endpoint),
             llm_model=os.environ.get("FALCON_LLM_MODEL", cls.llm_model),
             debug=_flag("FALCON_DEBUG"),
