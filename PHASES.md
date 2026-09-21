@@ -63,7 +63,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Custom Actions: Admin-only, Engine-side validation on create/update (stdlib + Windows-native)
 - [x] Updates: approval hard gate, department rollout push, attempt reports (running version on first failure), count-based escalation threshold (`FALCON_UPDATE_ESCALATION_FAILURES`, default 3) → Admin notice + update_status report, aggregate health, Super User prompt
 - [x] Audit retention job wired to real purge (daily); scheduled alert delivery (30s); polled events (15s)
-- [~] Engine test suite against a real local Postgres (Windows) — DB fixture + migration tests in place; grows with each repo
+- [x] Engine test suite against a real local Postgres (Windows): 71 tests — protocol, socket smoke, units, migrations, repos, and end-to-end per combo
 - [ ] Linux check: Engine + Postgres inside WSL, same suite green — the deployment shape (Engine on Linux, clients on Windows)
 
 ---

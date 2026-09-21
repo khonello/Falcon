@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-Design docs plus an Engine **scaffold** (Phase 1a). Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
+Design docs plus a working **Engine** (Phase 1 done bar the LLM benchmark and the WSL check). Next: Phase 2, the Operator Client TUI. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).
@@ -55,11 +55,12 @@ engine/            the Engine (Python, asyncio, asyncpg)
   migrations/      SQL, applied by Database.migrate()
 operator_client/   placeholder — Phase 2 (tui/ first, gui/ later, shared connection/state layer)
 worker_client/     placeholder — Phase 3 (headless service; narrow UI as TUI first)
-tests/             protocol round-trips, socket-level Engine smoke, pure-logic units
+tests/             protocol, socket smoke, units, migrations, repos, per-combo end-to-end (conftest: DB-backed Engine + `connect(client_id)`)
 ```
 
 Conventions in the scaffold:
-- Handlers: `@handler("area.op") async def fn(ctx: Context, payload: dict) -> dict`; raise `ProtocolError(ErrorCode.X)` for typed errors; `return stub("area.op", payload)` marks unimplemented logic.
+- Handlers: `@handler("area.op") async def fn(ctx: Context, payload: dict) -> dict`; check roles with `engine.permissions` (`require_role`, `require_department_scope`), parse fields with `int_field`/`str_field`, raise `ProtocolError(ErrorCode.X)` for typed errors, return JSON-safe dicts via `engine.serialize.row/rows`.
+- All SQL lives in `engine/database.py` repos — never in handlers. In-memory registries expose `reset_state()` and are cleared in `Engine.__init__`.
 - Message types are `<area>.<op>`; only `auth.*` and `system.*` are accepted before the handshake.
 - Anything reacting to file activity subscribes via `engine.file_index.subscribe(...)` — never its own detection.
 - Reports are raised only through `engine.hierarchy.reports.emit()`; audit only through `engine.audit.record()`.
