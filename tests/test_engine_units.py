@@ -33,14 +33,15 @@ def test_modified_name():
 
 
 def test_access_tags():
-    assert tag_allowed_on("admin", "super_user_workstation", None)
-    assert not tag_allowed_on("admin", "admin_workstation", 1)
-    assert tag_allowed_on("restricted", "admin_workstation", 1)
-    assert not tag_allowed_on("restricted", "client_pc", 1)
-    assert tag_allowed_on("worker-dept-3", "client_pc", 3)
-    assert not tag_allowed_on("worker-dept-3", "client_pc", 4)
-    assert allowed_tags_for("worker", 2) == ["common", "worker-dept-2"]
-    assert "admin" in allowed_tags_for("super_user", None)
+    assert tag_allowed_on("admin", None, "super_user_workstation", None)
+    assert not tag_allowed_on("admin", None, "admin_workstation", 1)
+    assert tag_allowed_on("restricted", None, "admin_workstation", 1)
+    assert not tag_allowed_on("restricted", None, "client_pc", 1)
+    assert tag_allowed_on("worker_dept", 3, "client_pc", 3)
+    assert not tag_allowed_on("worker_dept", 3, "client_pc", 4)
+    assert not tag_allowed_on("worker_dept", None, "client_pc", 3)
+    assert allowed_tags_for("worker", 2) == [("common", None), ("worker_dept", 2)]
+    assert ("admin", None) in allowed_tags_for("super_user", None)
 
 
 def test_message_channel_turns():

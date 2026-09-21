@@ -440,3 +440,17 @@ Implements **System Expectations & Deviation Handling** as its own first-class t
 - **No table in this schema performs a hard DELETE except the `audit_log` retention job.** Every other "removal" in the design (offboarding, resource violations, deviation) is a status/flag change, consistent with the system-wide preference for preserving history over erasing it.
 - **Every polymorphic reference** (`reports.source_table`/`source_id`, `audit_log.target_type`/`target_id`) is a deliberate tradeoff — it avoids one join table per source type, at the cost of the database not being able to enforce referential integrity on these columns itself. This must be enforced in the Engine's data-access layer instead. Flagged explicitly so it isn't mistaken for an oversight during code review.
 - **This schema does not yet model:** the exact serialized shape of `condition_spec` (Events), `config` (Flow stages), `access_ceiling`/`access_narrowing` (Assisted Access) — these are JSON blobs whose internal shape is an implementation-phase decision, not a v1 schema-design decision, since the *external* behavior they drive is already fully specified in the design documents.
+
+---
+
+## 13. Additions Made During Implementation
+
+Columns/tables the design documents require but v1 of this schema did not model. Each is in `engine/migrations/001_initial.sql` under the same section number.
+
+| Addition | Why |
+|---|---|
+| `pcs.client_id` TEXT UNIQUE | Implementation Spec §8.2 issues each client a derived key for its `client_id`; the Identity Model binds one account to one PC, so the credential identity belongs on `pcs`. Needed for `auth.respond` to resolve a connection to an account. |
+| `accounts.assistance_available` BOOLEAN | Hierarchy → Cross-Department Assisted Access → Two Entry Paths: "opted in as reachable for assistance" needs a persisted flag for the availability query. |
+| `system_alerts` table | Hierarchy → System Alerts & Announcements: type, audience (admin_only / department / all_users / specific_users), body, action link, `deliver_at`, optional `recurrence` (JSON). Delivery events go to `audit_log`. |
+
+Postgres adaptations applied uniformly: identity columns for PKs, `TIMESTAMPTZ` for every timestamp, `JSONB` for every serialized-JSON column, and a `schema_migrations` bookkeeping table.

@@ -7,7 +7,7 @@ this one index. Populated by:
     instant user input resumes (the throttling is client-side; the Engine just ingests batches).
 
 Tracks: name, location, content hash, and a Resource access tag
-(`admin` | `restricted` | `worker-dept-<id>` | `common`).
+(`admin` | `restricted` | `worker_dept` + scope department | `common`).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-ACCESS_TAGS = ("admin", "restricted", "common")  # plus dynamic "worker-dept-<id>"
+ACCESS_TAGS = ("admin", "restricted", "worker_dept", "common")  # file_index.resource_tag
 
 
 class FileIndex:
@@ -51,7 +51,7 @@ class FileIndex:
 
     # --- consumer queries -----------------------------------------------------------------------
 
-    async def search(self, query: str, *, allowed_tags: list[str]) -> list[dict[str, Any]]:
+    async def search(self, query: str, *, allowed_tags: list[tuple[str, int | None]]) -> list[dict[str, Any]]:
         """Assistance search / Task target search, scoped to the caller's access tier."""
         return await self.db.file_index.search(query, allowed_tags=allowed_tags) or []
 

@@ -1,2 +1,0 @@
--- Migrations are applied in name order by Database.migrate() and tracked in schema_migrations.
--- 001_initial.sql: to be written from database-schema.md (Phase 1, Engine implementation).

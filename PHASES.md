@@ -44,7 +44,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ### 1b. Implementation (real logic, module by module)
 
-- [ ] `engine/migrations/001_initial.sql` from `database-schema.md` + migration runner
+- [x] `engine/migrations/001_initial.sql` from `database-schema.md` + migration runner (`Database.migrate`, `schema_migrations`), JSONB codec; 8 constraint tests green on `falcon_test`
 - [ ] Repositories in `database.py` (real queries; polymorphic-ref validation; no hard deletes)
 - [ ] Hierarchy: traversal + session blocking against `sessions` (partial unique index path), time limit + extension, expiry
 - [ ] Hierarchy: display names query rule (+ the non-propagation test), composed fallback
@@ -61,7 +61,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Custom Actions: Engine-side validation on create
 - [ ] Updates: approval gate, rollout, status ingestion, escalation threshold (open item 10.4), health view
 - [ ] Audit retention job wired to real purge
-- [ ] Engine test suite against a real local Postgres (Windows)
+- [~] Engine test suite against a real local Postgres (Windows) — DB fixture + migration tests in place; grows with each repo
 - [ ] Linux check: Engine + Postgres inside WSL, same suite green — the deployment shape (Engine on Linux, clients on Windows)
 
 ---

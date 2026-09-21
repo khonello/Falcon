@@ -44,7 +44,7 @@ class Database:
             return
         import asyncpg  # imported lazily so the protocol/test path has no hard dependency
 
-        self.pool = await asyncpg.create_pool(self.url, min_size=1, max_size=4)
+        self.pool = await asyncpg.create_pool(self.url, min_size=1, max_size=4, init=_init_connection)
         log.info("database connected")
 
     async def close(self) -> None:
@@ -52,12 +52,56 @@ class Database:
             await self.pool.close()
             self.pool = None
 
-    async def migrate(self) -> None:
-        """Apply `engine/migrations/*.sql` in name order, tracked in `schema_migrations`."""
+    # --- migrations -----------------------------------------------------------------------------
+
+    @staticmethod
+    def migration_files() -> list[Path]:
+        return sorted(p for p in MIGRATIONS_DIR.glob("*.sql") if p.name[:3].isdigit())
+
+    async def applied_migrations(self) -> list[str]:
+        assert self.pool is not None
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS schema_migrations ("
+                " name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
+            )
+            rows = await conn.fetch("SELECT name FROM schema_migrations ORDER BY name")
+        return [r["name"] for r in rows]
+
+    async def migrate(self) -> list[str]:
+        """Apply `engine/migrations/NNN_*.sql` in name order, each in its own transaction,
+        recording every applied file in `schema_migrations`. Returns the names applied now."""
         if self.pool is None:
-            return
-        # SCAFFOLD: migration runner to be written alongside 001_initial.sql.
-        log.info("migrate: no-op (scaffold)")
+            return []
+        applied = set(await self.applied_migrations())
+        newly: list[str] = []
+        for path in self.migration_files():
+            if path.name in applied:
+                continue
+            sql = path.read_text(encoding="utf-8")
+            async with self.pool.acquire() as conn, conn.transaction():
+                # Files may carry their own BEGIN/COMMIT for psql use; strip them so the
+                # runner's transaction is the only one.
+                await conn.execute(_strip_txn_wrappers(sql))
+                await conn.execute("INSERT INTO schema_migrations (name) VALUES ($1)", path.name)
+            log.info("migration applied: %s", path.name)
+            newly.append(path.name)
+        if not newly:
+            log.info("migrations: up to date (%d applied)", len(applied))
+        return newly
+
+
+async def _init_connection(conn: Any) -> None:
+    """JSONB columns round-trip as Python objects."""
+    import json
+
+    await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
+
+
+def _strip_txn_wrappers(sql: str) -> str:
+    lines = sql.splitlines()
+    kept = [ln for ln in lines if ln.strip().upper() not in ("BEGIN;", "COMMIT;")]
+    return "\n".join(kept)
 
 
 class _Repo:
@@ -100,7 +144,7 @@ class SessionsRepo(_Repo):
 class FileIndexRepo(_Repo):
     async def upsert(self, pc_id: int, path: str, name: str, content_hash: str | None,
                      access_tag: str | None) -> None: ...
-    async def search(self, query: str, *, allowed_tags: list[str]) -> list[dict[str, Any]]: ...
+    async def search(self, query: str, *, allowed_tags: list[tuple[str, int | None]]) -> list[dict[str, Any]]: ...
     async def by_name(self, name: str) -> list[dict[str, Any]]: ...
     async def by_hash(self, content_hash: str) -> list[dict[str, Any]]: ...
 

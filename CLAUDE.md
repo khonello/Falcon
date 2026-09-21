@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Design docs plus an Engine **scaffold** (Phase 1a). Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
-- **Never use Docker.** PostgreSQL 18 is installed locally; point `FALCON_DATABASE_URL` at it.
+- **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).
 - The user creates virtual environments themselves, one per package, all git-ignored: `environ-engine/` (Engine + tests), `environ-operator/` (Operator Client), `environ-worker/` (Worker Client). Work from them; don't create or recreate venvs.
 - **The Engine deploys on Linux** (as the predecessor did); development happens on Windows. Keep `engine/` free of Windows-only imports, path assumptions, or event-loop-policy calls. Linux-specific work (Postgres + Engine on Linux/WSL) is a deliberate later step, not something to sneak in now.
 - **TUI before GUI.** The built system is exercised through `prompt_toolkit` TUIs first; the QML GUI comes later on the same connection/state layer. Don't start GUI work until the TUI phases are done.
@@ -24,6 +24,7 @@ pip install -e ".[engine,dev]"             # Engine + tests
 pytest                                     # all tests (asyncio_mode=auto)
 pytest tests/test_engine_smoke.py -k handshake   # one test
 ruff check .
+$env:FALCON_TEST_DATABASE_URL="postgresql://falcon:falcon@localhost:5432/falcon_test"; pytest   # incl. DB tests (skipped without it)
 $env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   # local dev run
 
 environ-operator\Scripts\Activate.ps1

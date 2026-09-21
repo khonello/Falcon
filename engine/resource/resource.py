@@ -32,29 +32,36 @@ TIER_FOLDERS = {
 }
 
 
-def tag_allowed_on(tag: str, pc_type: str, pc_department_id: int | None) -> bool:
-    """Access Control Rules table, as a predicate."""
+TAGS = ("admin", "restricted", "worker_dept", "common")  # file_index.resource_tag
+
+
+def tag_allowed_on(tag: str, tag_scope_department_id: int | None,
+                   pc_type: str, pc_department_id: int | None) -> bool:
+    """Access Control Rules table, as a predicate. `tag_scope_department_id` is
+    `file_index.resource_tag_scope_department_id`, meaningful only for 'worker_dept'."""
     if tag == "common":
         return True
     if tag == "admin":
         return pc_type == "super_user_workstation"
     if tag == "restricted":
         return pc_type in ("super_user_workstation", "admin_workstation")
-    if tag.startswith("worker-dept-"):
-        dept = int(tag.rsplit("-", 1)[1])
-        return pc_type in ("admin_workstation", "client_pc") and pc_department_id == dept
+    if tag == "worker_dept":
+        return (pc_type in ("admin_workstation", "client_pc")
+                and tag_scope_department_id is not None
+                and pc_department_id == tag_scope_department_id)
     return False
 
 
-def allowed_tags_for(role: str, department_id: int | None) -> list[str]:
-    """What a caller may see in Assistance search / Task target search."""
-    tags = ["common"]
+def allowed_tags_for(role: str, department_id: int | None) -> list[tuple[str, int | None]]:
+    """What a caller may see in Assistance search / Task target search, as
+    (tag, scope_department_id) pairs matching the file_index columns."""
+    tags: list[tuple[str, int | None]] = [("common", None)]
     if role in ("admin", "super_user"):
-        tags.append("restricted")
+        tags.append(("restricted", None))
     if role == "super_user":
-        tags.append("admin")
+        tags.append(("admin", None))
     if department_id is not None:
-        tags.append(f"worker-dept-{department_id}")
+        tags.append(("worker_dept", department_id))
     return tags
 
 
