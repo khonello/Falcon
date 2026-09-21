@@ -1,5 +1,5 @@
 """Entry point: `python -m operator_client [--engine host:port] [--client-id ID] [--plaintext]
-[--script "cmd; cmd"]`. Without --script, starts the interactive TUI."""
+[--script "cmd; cmd"] [--gui]`. Without --script, starts the interactive TUI (or the QML GUI with --gui)."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ def main() -> None:
     ap.add_argument("--config", help="config file path (default: per-user app config)")
     ap.add_argument("--connect", action="store_true", help="connect immediately with the remembered settings")
     ap.add_argument("--script", help="run these ';'-separated commands and exit (no TUI)")
+    ap.add_argument("--gui", action="store_true", help="start the QML GUI instead of the TUI")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING,
@@ -40,6 +41,23 @@ def main() -> None:
     initial: list[str] = []
     if args.connect or args.engine or args.client_id or args.script:
         initial.append("connect " + " ".join(connect_args))
+
+    if args.gui:
+        if args.engine:
+            host, _, port = args.engine.rpartition(":")
+            cfg.engine_host, cfg.engine_port = (host or args.engine), int(port) if port.isdigit() else cfg.engine_port
+        if args.client_id:
+            cfg.client_id = args.client_id
+        if args.plaintext:
+            cfg.tls = False
+        if args.ca:
+            cfg.ca_cert = args.ca
+        try:
+            from operator_client.gui.app import run as run_gui
+        except ImportError:
+            sys.exit("PySide6/qasync are not installed: pip install -e '.[gui]'  (environ-operator)")
+        run_gui(cfg, auto_connect=bool(initial))
+        return
 
     if args.script:
         from operator_client.tui.shell import run_script

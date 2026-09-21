@@ -133,12 +133,16 @@ layer the GUI will reuse unchanged.
 
 ---
 
-## Phase 6 — GUI (PySide6 / QML / qasync) — only after the TUI phases are done
+## Phase 6 — GUI (PySide6 / QML / qasync) — pulled ahead of Phase 5 by agreement (TUI phases done)
 
-- [ ] `operator_client/gui/` on the same `operator_client/core/` layer as the TUI
-- [ ] Views mirroring the TUI feature set (Hierarchy, Task, Flow, Resource/Assistance, Control, Updates)
+- [x] `operator_client/gui/` on the same `operator_client/core/` layer as the TUI: `bridge.py` (`FalconBridge` QObject exposed to QML as `falcon` — state properties, `connectTo`/`disconnect`, one generic `call(type, payload, callback)`, `resolveDeadline`/`readFile`/`validateScript`/`pretty` helpers), `app.py` (qasync loop set *before* the QML loads so `Component.onCompleted` calls are scheduled on it), `python -m operator_client --gui`
+- [x] Persistent status surface on every screen (`StatusBar.qml`): role, account/pc/dept, session, pulsing indicators, RED BANNER (Super User inside another view), BLOCKED marker; live push feed (`PushFeed.qml`)
+- [x] Views mirroring the TUI feature set: Hierarchy (tree + sessions, traverse/block-or-end/end/extend, display + self names, assisted access), Tasks (list/detail/stack, propose → review items/flags/collisions/split → create, start/verify), Flows (list/status/history, consent/pause/resume/delete/trigger, builder with stages + destinations), Automation (dashboard, action library + built-in/custom creation with local script validation, run on pc/department, events, executions + terminate), Assistance (pings → channels with turn-taking, listeners, file search + tagging, violations), Reports (reports + routing, alerts, updates rollout, audit + deviations, department/account provisioning)
+- [x] Verified offscreen against the dev Engine (every view screenshotted with real data; traverse shows the banner) and live (`--gui` window on the qasync loop); 3 GUI tests (`tests/test_operator_gui.py`, skipped without PySide6) — 97 total green
+- [ ] Interactive pass by a human (`python -m operator_client --gui ...` from `environ-operator`)
 - [ ] Worker Client Overlay exe + Dialog exe (QML, frozen with the same toolchain)
-- [ ] Window prefs / layout persistence
+- [ ] Window prefs / layout persistence (`LocalConfig.prefs` is there; nothing written yet)
+- [ ] Remote mouse/keyboard during traversal (needs an input channel; deferred from Phase 4)
 
 ---
 

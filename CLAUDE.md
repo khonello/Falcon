@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), and **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`). Next: Phase 5, real authentication. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
+Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`), and the **Operator Client GUI** (Phase 6, pulled ahead: PySide6/QML on the same core layer, `python -m operator_client --gui`). Next: Phase 5, real authentication; then the Worker Overlay/Dialog exes. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).
 - The user creates virtual environments themselves, one per package, all git-ignored: `environ-engine/` (Engine + tests), `environ-operator/` (Operator Client), `environ-worker/` (Worker Client). Work from them; don't create or recreate venvs.
 - **The Engine deploys on Linux** (as the predecessor did); development happens on Windows. Keep `engine/` free of Windows-only imports, path assumptions, or event-loop-policy calls. Linux-specific work (Postgres + Engine on Linux/WSL) is a deliberate later step, not something to sneak in now.
-- **TUI before GUI.** The built system is exercised through `prompt_toolkit` TUIs first; the QML GUI comes later on the same connection/state layer. Don't start GUI work until the TUI phases are done.
+- **TUI before GUI** (done: the TUI phases are complete and the GUI now exists on the same connection/state layer). Any new feature still lands as an Engine handler + TUI command first, then a GUI view — the TUI is the scripted test surface (`--script`).
 - Package naming: `<role>_client` — `operator_client` (Super User + Admin, one codebase) and `worker_client`. "Operator" is deliberately not "admin": it covers both roles and avoids colliding with the `admin` role/tier literals. Older text saying "Worker Agent" means `worker_client`.
 - The user's machine has an OpenAI Codex config (`~/.codex/`). It is unrelated to this project — ignore it and do not offer to import it.
 
@@ -28,11 +28,16 @@ $env:FALCON_TEST_DATABASE_URL="postgresql://falcon:falcon@localhost:5432/falcon_
 $env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   # local dev run
 
 environ-operator\Scripts\Activate.ps1
-pip install -e ".[tui]"                    # Operator Client TUI
+pip install -e ".[tui,gui]"                # Operator Client TUI + GUI (PySide6, qasync)
 python -m engine bootstrap SU-PC           # (from environ-engine, once, empty DB) -> prints the Super User client_id
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --plaintext        # interactive TUI
 python -m operator_client --connect --script "tree; tasks"                              # scripted, no TUI
+python -m operator_client --gui --engine 127.0.0.1:7400 --client-id <id> --plaintext  # QML GUI
+```
 
+GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`pip install -e ".[engine,dev,gui]"`); they skip otherwise. Set `QT_QPA_FONTDIR=C:\Windows\Fonts` when rendering offscreen screenshots (Qt ships no fonts).
+
+```powershell
 environ-worker\Scripts\Activate.ps1
 pip install -e ".[worker]"                 # Worker Client (psutil, prompt_toolkit, watchdog)
 python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --plaintext --watch C:\path	o\docs [--ui]
@@ -59,6 +64,7 @@ engine/            the Engine (Python, asyncio, asyncpg)
   migrations/      SQL, applied by Database.migrate()
 common/            code bundled by more than one package (custom_actions validator) — stdlib only
 operator_client/   core/ (connection, state, config, deadlines — no UI deps) + tui/ (shell registry, commands/, app)
+                   + gui/ (bridge.py FalconBridge → QML as `falcon`; app.py qasync loop; qml/ one file per view)
 worker_client/     service (connect/reconnect, push dispatch), watcher (watchdog + polling + idle sweep), executor
                    (Script Execution Model), flowsync, signals, lockout, updater, ui (narrow Worker TUI), config, idle
 tests/             protocol, socket smoke, units, migrations, repos, per-combo end-to-end, operator/worker clients,
@@ -69,6 +75,7 @@ Conventions in the scaffold:
 - Handlers: `@handler("area.op") async def fn(ctx: Context, payload: dict) -> dict`; check roles with `engine.permissions` (`require_role`, `require_department_scope`), parse fields with `int_field`/`str_field`, raise `ProtocolError(ErrorCode.X)` for typed errors, return JSON-safe dicts via `engine.serialize.row/rows`.
 - All SQL lives in `engine/database.py` repos — never in handlers. In-memory registries expose `reset_state()` and are cleared in `Engine.__init__`.
 - Operator Client: commands are `@command("name", "sub", usage, help)` in `operator_client/tui/commands/`, take `(ctx, args)` and return text; they must not import prompt_toolkit (only `tui/app.py` does) so `run_script` and the tests work from `environ-engine`. `ClientState.on_push` is the single place pushes update indicators/session.
+- GUI: QML never talks to the socket — everything goes through `falcon.call(type, payload, function(ok, result))` on `FalconBridge`, which returns typed errors as `(false, {code, message})`, never exceptions; state-changing replies (traverse/end/extend/claim) update `ClientState` inside `bridge.request`. Views refresh on `connected` and on relevant `pushReceived` types; keep `Component.onCompleted` guarded by `falcon.isConnected`. `main.qml` sets a dark palette (Fusion honours it) — don't hardcode control colours. Views carry `objectName`s so tests can `findChild` them; read `property var` values with `.toVariant()`.
 - `common/` is bundled by every package and must stay stdlib-only: `connection.EngineConnection` (pushes are queued and handled by a consumer task — never handle a push inline in a read loop, a handler that awaits a request would deadlock), `cli` (grammar/registry), `render`, `custom_actions`.
 - Worker Client: every Action, built-in or Custom, runs as a detached subprocess through `executor.py`; report before marking `completed`. Dev processes: kill stale `environ-*` python processes before restarting the Engine — a second Engine cannot bind 7400 and the old one keeps serving old code.
 - Message types are `<area>.<op>`; only `auth.*` and `system.*` are accepted before the handshake.
