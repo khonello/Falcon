@@ -21,10 +21,14 @@ def test_relationship_and_depth():
 
 
 def test_cycle_prevention():
-    edges = [("A", "B"), ("B", "C")]
-    assert has_cycle(edges, ("C", "A"))
-    assert not has_cycle(edges, ("C", "D"))
-    assert has_cycle([], ("A", "A"))
+    edges = [("1:C:/a", "2:C:/b"), ("2:C:/b", "3:C:/c")]
+    assert has_cycle(edges, [("3:C:/c", "1:C:/a")])
+    assert not has_cycle(edges, [("3:C:/c", "4:C:/d")])
+    assert has_cycle([], [("1:C:/a", "1:C:/a")])
+    # A sub-folder of the source on the same PC is a loop; same path on another PC is not.
+    assert has_cycle([], [("1:C:/a", "1:C:/a/sub")])
+    assert has_cycle(edges, [("3:C:/c/deeper", "1:C:/a/inner")])
+    assert not has_cycle([], [("1:C:/a", "2:C:/a")])
 
 
 def test_modified_name():

@@ -56,7 +56,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Task: propose (graph + collisions), create (explicit-None rule, collision refusal, scope), list/get/start/verify, stack evaluation per intent, expectation signals from the index stream + program signals, soft/final deadlines as scheduled Events (re-armed on start)
 - [x] Task: Ollama-style local LLM client (stdlib HTTP, None-on-failure, backoff); `llm_available` surfaced to the client
 - [ ] Task: benchmark the decision graph against real descriptions with a local model (pick Qwen3 size empirically)
-- [ ] Flow: create with consent / collision / cycle checks, propagate, conflict rename, branch-scoped failure + resume
+- [x] Flow: create/edit with consent (by authority; owner asked, flow paused until answered), pre-flight collision (confirm or change path), overlap-aware cycle prevention, resource-folder exclusion; propagation relayed via flow.read → flow.content → flow.apply with per-destination stage chains; write attribution vs external edits → `-modified` + re-sync; branch-scoped failure with reactive suggestion + report; resume/pause/delete/history
 - [ ] Resource: violation detection from index events, ignore-that-file, user notification, report
 - [ ] Assistance: ping status push, channel open/turn-lock/close, listeners (scoped query)
 - [ ] Control: event matching (`condition_spec` shape), polled evaluation, execution lifecycle, terminate, dashboard query

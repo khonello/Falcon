@@ -455,3 +455,4 @@ Columns/tables the design documents require but v1 of this schema did not model.
 
 Postgres adaptations applied uniformly: identity columns for PKs, `TIMESTAMPTZ` for every timestamp, `JSONB` for every serialized-JSON column, and a `schema_migrations` bookkeeping table.
 | `actions.archived_at` TIMESTAMPTZ (migration 002) | "No hard deletes": `event_definitions` has `enabled`, `flows` has `'inactive'`, `accounts` has `'offboarded'` — `actions` had no soft-delete marker, so deleting a Custom Action would have been the only hard delete outside audit retention. |
+| `flow_destinations.paused_reason` TEXT, `flow_destinations.removed_at` TIMESTAMPTZ (migration 003) | Failure Handling pauses "only the specific flow or branch" — a per-destination pause needs a column; editing a flow's destinations must not hard-delete rows that `flow_sync_log` references. |

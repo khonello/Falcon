@@ -403,6 +403,13 @@ class FileIndexRepo(_Repo):
     async def by_hash(self, content_hash: str) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._COLS} FROM file_index WHERE content_hash = $1", content_hash)
 
+    async def under_path(self, pc_id: int, directory: str, *, limit: int = 20) -> list[dict[str, Any]]:
+        """Indexed entries below a directory on a PC (case-insensitive, slash-agnostic)."""
+        prefix = directory.replace("\\", "/").rstrip("/").lower() + "/"
+        return await self._fetch(
+            f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 "
+            "AND starts_with(lower(replace(path, '\\', '/')), $2) ORDER BY path LIMIT $3", pc_id, prefix, limit)
+
     async def tagged(self, tags: tuple[str, ...] = ("admin", "restricted")) -> list[dict[str, Any]]:
         return await self._fetch(
             f"SELECT {self._COLS} FROM file_index WHERE resource_tag = ANY($1::text[]) AND content_hash IS NOT NULL",
@@ -582,33 +589,69 @@ class FlowsRepo(_Repo):
             return None
         flow["stages"] = await self._fetch("SELECT * FROM flow_stages WHERE flow_id = $1 ORDER BY id", flow_id)
         flow["destinations"] = await self._fetch(
-            "SELECT * FROM flow_destinations WHERE flow_id = $1 ORDER BY id", flow_id)
+            "SELECT * FROM flow_destinations WHERE flow_id = $1 AND removed_at IS NULL ORDER BY id", flow_id)
         return flow
 
+    async def destination(self, destination_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM flow_destinations WHERE id = $1", destination_id)
+
     async def list_for(self, account_id: int, *, department_id: int | None) -> list[dict[str, Any]]:
-        """Flows the account created, or whose source/destination PC sits in their department."""
+        """Flows the account created, owns a destination of, or whose endpoints sit in their department."""
         return await self._fetch(
             "SELECT DISTINCT f.* FROM flows f "
             "LEFT JOIN pcs sp ON sp.id = f.source_pc_id "
-            "LEFT JOIN flow_destinations fd ON fd.flow_id = f.id "
+            "LEFT JOIN flow_destinations fd ON fd.flow_id = f.id AND fd.removed_at IS NULL "
             "LEFT JOIN pcs dp ON dp.id = fd.destination_pc_id "
-            "WHERE f.status <> 'inactive' AND (f.created_by_account_id = $1 "
+            "WHERE f.status <> 'inactive' AND (f.created_by_account_id = $1 OR fd.owner_account_id = $1 "
             "   OR ($2::int IS NOT NULL AND (sp.department_id = $2 OR dp.department_id = $2))) "
             "ORDER BY f.id", account_id, department_id)
+
+    async def list_all(self) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM flows WHERE status <> 'inactive' ORDER BY id")
 
     async def sources_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
             "SELECT id, source_path FROM flows WHERE source_pc_id = $1 AND status = 'active'", pc_id)
+
+    async def destinations_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT d.*, f.status AS flow_status FROM flow_destinations d JOIN flows f ON f.id = d.flow_id "
+            "WHERE d.destination_pc_id = $1 AND d.removed_at IS NULL AND f.status <> 'inactive'", pc_id)
 
     async def graph_edges(self) -> list[tuple[str, str]]:
         """(source, destination) as 'pc_id:path' nodes, for cycle prevention. Remote-storage
         destinations use 'remote:path'."""
         rows = await self._fetch(
             "SELECT f.source_pc_id, f.source_path, d.destination_pc_id, d.destination_path "
-            "FROM flows f JOIN flow_destinations d ON d.flow_id = f.id WHERE f.status <> 'inactive'")
+            "FROM flows f JOIN flow_destinations d ON d.flow_id = f.id "
+            "WHERE f.status <> 'inactive' AND d.removed_at IS NULL")
         return [(f"{r['source_pc_id']}:{r['source_path']}",
                  f"{r['destination_pc_id'] if r['destination_pc_id'] is not None else 'remote'}:{r['destination_path']}")
                 for r in rows]
+
+    async def set_destination_pause(self, destination_id: int, reason: str | None) -> None:
+        await self._exec("UPDATE flow_destinations SET paused_reason = $2 WHERE id = $1", destination_id, reason)
+
+    async def replace_structure(self, flow_id: int, destinations: list[dict[str, Any]],
+                                stages: list[dict[str, Any]]) -> None:
+        """Edit: old destinations are soft-removed (sync history keeps its references), stages
+        and destinations are re-created from the new definition."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            await conn.execute(
+                "UPDATE flow_destinations SET removed_at = now() WHERE flow_id = $1 AND removed_at IS NULL", flow_id)
+            stage_ids: list[int] = []
+            for st in stages:
+                parent = stage_ids[st["parent_index"]] if st.get("parent_index") is not None else None
+                stage_ids.append(await conn.fetchval(
+                    "INSERT INTO flow_stages (flow_id, parent_stage_id, stage_type, config) "
+                    "VALUES ($1, $2, $3, $4) RETURNING id", flow_id, parent, st["stage_type"], st.get("config")))
+            for d in destinations:
+                parent = stage_ids[d["parent_index"]] if d.get("parent_index") is not None else None
+                await conn.execute(
+                    "INSERT INTO flow_destinations (flow_id, parent_stage_id, destination_pc_id, destination_path, "
+                    "owner_account_id, pre_flight_check_status) VALUES ($1, $2, $3, $4, $5, $6)",
+                    flow_id, parent, d.get("destination_pc_id"), d["destination_path"], d["owner_account_id"],
+                    d.get("pre_flight_check_status", "passed"))
 
     async def set_status(self, flow_id: int, status: str, pause_reason: str | None = None) -> None:
         await self._exec(
