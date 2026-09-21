@@ -87,7 +87,7 @@ Conventions in the scaffold:
 
 ## Predecessor project (last resort only)
 
-This system grew out of a smaller predecessor: **github.com/khonello/SystemMonitoring** (the "reference project" the spec cites for its Script Execution Model, auth scaffolding, helper-exe design, and three-pass build approach). This project is larger and several decisions have changed, so it is **not** authoritative. Consult it only when you hit an implementation challenge, approach, or code-organization question that the docs here genuinely leave unsolved — reserve it for when it is absolutely needed, not as a routine reference.
+This system grew out of a smaller predecessor: **github.com/khonello/SystemMonitoring** (the "reference project" the spec cites for its Script Execution Model, auth scaffolding, helper-exe design, and three-pass build approach). This project is larger and several decisions have changed, so it is **not** authoritative. Consult it only when you hit an implementation challenge, approach, or code-organization question that the docs here genuinely leave unsolved — reserve it for when it is absolutely needed, not as a routine reference. **One deliberate exception: its Admin desktop and Client UIs (`admin/qml/`, `client/ui/`) are the reference for Falcon's GUI look and structure** — the user calls them "acceptable"; the distilled tokens, shell skeleton and component list are in `ui-reference.md`. Phase 7 starts from that file.
 
 ## What is being built
 
