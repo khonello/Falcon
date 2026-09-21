@@ -11,4 +11,11 @@ renders what the Engine's permission/session state says.
     accounts         -- Department creation/assignment, offboarding
 """
 
-from engine.hierarchy import accounts, alerts, assisted_access, display_names, reports, traversal  # noqa: F401
+from engine.hierarchy import (  # noqa: F401
+    accounts,
+    alerts,
+    assisted_access,
+    display_names,
+    reports,
+    traversal,
+)

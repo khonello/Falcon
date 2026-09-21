@@ -12,6 +12,14 @@ import logging
 import ssl
 from typing import Any
 
+# Importing the combo packages registers their handlers.
+import engine.auth
+import engine.control
+import engine.flow
+import engine.hierarchy
+import engine.resource
+import engine.task
+import engine.updates  # noqa: F401
 from engine.audit import AuditTrail
 from engine.config import Settings
 from engine.connection import Connection
@@ -20,15 +28,6 @@ from engine.dispatch import Context, handler, registered_types
 from engine.file_index import FileIndex
 from engine.llm import LocalLLM
 from engine.scheduler import Scheduler
-
-# Importing the combo packages registers their handlers.
-import engine.auth  # noqa: F401
-import engine.control  # noqa: F401
-import engine.flow  # noqa: F401
-import engine.hierarchy  # noqa: F401
-import engine.resource  # noqa: F401
-import engine.task  # noqa: F401
-import engine.updates  # noqa: F401
 
 log = logging.getLogger(__name__)
 

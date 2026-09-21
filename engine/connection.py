@@ -13,7 +13,17 @@ from typing import TYPE_CHECKING, Any
 
 from engine import auth
 from engine.dispatch import Context, dispatch
-from protocol import Envelope, ErrorCode, Kind, ProtocolError, decode, encode, error_response, push, response
+from protocol import (
+    Envelope,
+    ErrorCode,
+    Kind,
+    ProtocolError,
+    decode,
+    encode,
+    error_response,
+    push,
+    response,
+)
 
 if TYPE_CHECKING:
     from engine.server import Engine
@@ -25,7 +35,7 @@ PRE_AUTH_PREFIXES = ("auth.", "system.")
 
 
 class Connection:
-    def __init__(self, engine: "Engine", reader: asyncio.StreamReader,
+    def __init__(self, engine: Engine, reader: asyncio.StreamReader,
                  writer: asyncio.StreamWriter) -> None:
         self.engine = engine
         self.reader = reader
@@ -102,6 +112,6 @@ class Connection:
             await self.send(response(env.id, result))
         except ProtocolError as exc:
             await self.send(error_response(env.id, exc.code, exc.message))
-        except Exception:  # noqa: BLE001 -- a handler bug must not kill the connection
+        except Exception:
             log.exception("handler %s failed", env.type)
             await self.send(error_response(env.id, ErrorCode.INTERNAL))

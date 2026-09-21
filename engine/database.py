@@ -80,7 +80,6 @@ class AccountsRepo(_Repo):
         namers' grants (non-propagation rule). Falls back to `self_display_name`, then to the
         composed fallback built from account id + hostname + department name.
         """
-        ...
 
 
 class SessionsRepo(_Repo):
@@ -90,7 +89,6 @@ class SessionsRepo(_Repo):
                    deadline_at: Any, un_evictable: bool) -> int:
         """INSERT; the partial unique index `one_active_session_per_pc` raises on an occupied PC
         and the caller translates that into block-or-end-first vs. hard refusal."""
-        ...
 
     async def end(self, session_id: int, reason: str) -> None: ...
     async def extend(self, session_id: int, new_deadline: Any) -> None: ...
@@ -138,7 +136,6 @@ class ReportsRepo(_Repo):
         """Written once; Super User always sees it; additionally visible to a department Admin
         when `report_routing_config` routes this category. `report_addressed_views` is a
         separate table and must never be written here."""
-        ...
 
     async def visible_to(self, account_id: int) -> list[dict[str, Any]]: ...
     async def routing_config(self) -> dict[str, list[int]]: ...
@@ -157,7 +154,6 @@ class AssistanceRepo(_Repo):
 
     async def listeners_added_by(self, channel_id: int, account_id: int) -> list[dict[str, Any]]:
         """Scoped to the requesting party's own additions only -- never a join across both."""
-        ...
 
 
 # --- Control, Events, Monitoring, Actions (schema 9) --------------------------------------------
@@ -178,7 +174,6 @@ class AuditRepo(_Repo):
 
     async def purge_older_than(self, days: int) -> int:
         """The ONE hard delete in the system: flat 90-day retention (v1)."""
-        ...
 
 
 # --- Update & Deployment (schema 11) ------------------------------------------------------------

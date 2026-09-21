@@ -20,11 +20,11 @@ log = logging.getLogger(__name__)
 
 
 class AuditTrail:
-    def __init__(self, db: "Database", retention_days: int) -> None:
+    def __init__(self, db: Database, retention_days: int) -> None:
         self.db = db
         self.retention_days = retention_days
 
-    async def record(self, ctx: "Context | None", action: str, *, target_type: str | None = None,
+    async def record(self, ctx: Context | None, action: str, *, target_type: str | None = None,
                      target_id: Any = None, detail: dict[str, Any] | None = None) -> None:
         entry = {
             "at": datetime.now(timezone.utc),

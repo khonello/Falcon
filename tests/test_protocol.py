@@ -1,6 +1,16 @@
 import pytest
 
-from protocol import ErrorCode, Kind, ProtocolError, decode, encode, error_response, push, request, response
+from protocol import (
+    ErrorCode,
+    Kind,
+    ProtocolError,
+    decode,
+    encode,
+    error_response,
+    push,
+    request,
+    response,
+)
 
 
 def test_request_roundtrip():

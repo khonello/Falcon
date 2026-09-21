@@ -29,7 +29,7 @@ class Settings:
     dev_plaintext: bool = False
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         cert = os.environ.get("FALCON_TLS_CERT")
         key = os.environ.get("FALCON_TLS_KEY")
         return cls(

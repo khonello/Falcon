@@ -49,7 +49,7 @@ def can_traverse_to(requester_role: str, target_pc_type: str) -> bool:
     return False
 
 
-async def expire_due_sessions(engine: "Engine") -> None:
+async def expire_due_sessions(engine: Engine) -> None:
     """Scheduler hook: end every session whose deadline has passed and release its block.
     Whether the traverser is still connected is irrelevant (spec 7.1)."""
     for session in await engine.db.sessions.list_expired() or []:

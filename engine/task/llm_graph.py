@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-async def populate(llm: "LocalLLM", description: str) -> ProposedStructure:
+async def populate(llm: LocalLLM, description: str) -> ProposedStructure:
     out = ProposedStructure()
     file_item = await _file_branch(llm, description, out)
     await _program_branch(llm, description, out, file_item)
@@ -43,7 +43,7 @@ def _unclear(out: ProposedStructure, question: str) -> None:
 
 # --- branches -----------------------------------------------------------------------------------
 
-async def _file_branch(llm: "LocalLLM", text: str, out: ProposedStructure) -> VerificationItem | None:
+async def _file_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> VerificationItem | None:
     q = "Does the input mention a file target?"
     mentions = await llm.yes_no(q, text)
     if mentions is None:
@@ -80,7 +80,7 @@ async def _file_branch(llm: "LocalLLM", text: str, out: ProposedStructure) -> Ve
     return item
 
 
-async def _program_branch(llm: "LocalLLM", text: str, out: ProposedStructure,
+async def _program_branch(llm: LocalLLM, text: str, out: ProposedStructure,
                           file_item: VerificationItem | None) -> None:
     q = "Does the input mention a program target?"
     mentions = await llm.yes_no(q, text)
@@ -111,7 +111,7 @@ async def _program_branch(llm: "LocalLLM", text: str, out: ProposedStructure,
     out.items.append(VerificationItem(target_type="program", intent=intent, name=name))
 
 
-async def _deadline_branch(llm: "LocalLLM", text: str, out: ProposedStructure) -> None:
+async def _deadline_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> None:
     q = "Does the input mention a deadline?"
     mentions = await llm.yes_no(q, text)
     if mentions is None:
@@ -126,7 +126,7 @@ async def _deadline_branch(llm: "LocalLLM", text: str, out: ProposedStructure) -
         out.flags.append({"kind": "ambiguous_deadline"})
 
 
-async def _multitask_branch(llm: "LocalLLM", text: str, out: ProposedStructure) -> None:
+async def _multitask_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> None:
     multi = await llm.yes_no("Does the input describe more than one distinct piece of work?", text)
     if multi:
         # SCAFFOLD: propose a concrete split (draft tasks sharing common fields) and surface it.

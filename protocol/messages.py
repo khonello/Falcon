@@ -79,7 +79,7 @@ class Envelope:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Envelope":
+    def from_dict(cls, d: dict[str, Any]) -> Envelope:
         try:
             kind = Kind(d["kind"])
         except (KeyError, ValueError) as exc:

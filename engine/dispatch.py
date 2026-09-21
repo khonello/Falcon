@@ -11,8 +11,9 @@ The return value becomes the response `result`. Raise `ProtocolError` for a type
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 from protocol import ErrorCode, ProtocolError
 
@@ -39,8 +40,8 @@ class Identity:
 
 @dataclass
 class Context:
-    engine: "Engine"
-    connection: "Connection"
+    engine: Engine
+    connection: Connection
     identity: Identity = field(default_factory=Identity)
     # The session the caller currently occupies (their own, or one traversed into).
     active_session_id: int | None = None

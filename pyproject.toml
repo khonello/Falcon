@@ -5,21 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "falcon"
 version = "0.0.1"
-description = "Hierarchy-based management, automation, and monitoring system (Engine, Operator Client, Worker Agent)"
+description = "Hierarchy-based management, automation, and monitoring system (Engine, Operator Client, Worker Client)"
 requires-python = ">=3.10"
-dependencies = [
-    "asyncpg>=0.29",
-]
+dependencies = []
 
 [project.optional-dependencies]
-# Engine host only
+# Engine host (environ-operator during development)
 engine = [
+    "asyncpg>=0.29",
     "psutil>=5.9",
 ]
-# Operator Client + Worker Agent helper exes (Qt). Not needed to run the Engine.
+# Operator Client TUI -- built and used first, to test the system
+tui = [
+    "prompt_toolkit>=3.0",
+]
+# Operator Client GUI + Worker Client helper exes (Qt). Later phase.
 gui = [
     "PySide6>=6.6",
     "qasync>=0.27",
+]
+# Worker Client (environ-worker)
+worker = [
+    "psutil>=5.9",
+    "prompt_toolkit>=3.0",
 ]
 dev = [
     "pytest>=8",
@@ -28,7 +36,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["protocol*", "engine*", "operator_client*", "worker_agent*"]
+include = ["protocol*", "engine*", "operator_client*", "worker_client*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -37,3 +45,4 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+extend-exclude = ["environ-*"]

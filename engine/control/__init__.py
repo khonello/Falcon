@@ -3,9 +3,9 @@
 The automation layer. Lives at the Admin interface; Super User traverses in.
 
     actions        -- the action library: Control (do), Monitoring (observe), Custom (Admin-authored)
-    events         -- Event definitions; native/pushed matched from agent signals, polled/evaluated
+    events         -- Event definitions; native/pushed matched from worker-client signals, polled/evaluated
                       checked by the Scheduler; fires attached Actions independently
-    executions     -- per-run lifecycle: dispatch to agent, timeout, manual termination, output,
+    executions     -- per-run lifecycle: dispatch to worker client, timeout, manual termination, output,
                       Dashboard operational view
     custom_actions -- validation of PowerShell/Python scripts (stdlib + Windows-native only)
 """

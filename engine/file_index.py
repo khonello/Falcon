@@ -2,9 +2,9 @@
 
 Task verification, Flow collision/cycle checks, and Resource compliance all validate against
 this one index. Populated by:
-  * event-driven baseline: agents report OS file events (create/modify/move/copy) as they occur;
-  * opportunistic full sweep: an idle agent reports a full local sweep in batches, and stops the
-    instant user input resumes (the throttling is agent-side; the Engine just ingests batches).
+  * event-driven baseline: worker clients report OS file events (create/modify/move/copy) as they occur;
+  * opportunistic full sweep: an idle worker client reports a full local sweep in batches, and stops the
+    instant user input resumes (the throttling is client-side; the Engine just ingests batches).
 
 Tracks: name, location, content hash, and a Resource access tag
 (`admin` | `restricted` | `worker-dept-<id>` | `common`).
@@ -26,7 +26,7 @@ ACCESS_TAGS = ("admin", "restricted", "common")  # plus dynamic "worker-dept-<id
 
 
 class FileIndex:
-    def __init__(self, db: "Database") -> None:
+    def __init__(self, db: Database) -> None:
         self.db = db
         # Modules interested in file events (Flow sync trigger, Resource compliance, Task
         # expectation) subscribe here rather than defining their own detection.
@@ -37,7 +37,7 @@ class FileIndex:
         self._subscribers.append(callback)
 
     async def ingest_event(self, pc_id: int, event: dict[str, Any]) -> None:
-        """One OS file event from an agent: {"op": "create|modify|move|copy|delete",
+        """One OS file event from a worker client: {"op": "create|modify|move|copy|delete",
         "path": ..., "name": ..., "hash": ..., "old_path": ...?}."""
         await self.db.file_index.upsert(pc_id, event.get("path", ""), event.get("name", ""),
                                         event.get("hash"), event.get("access_tag"))
@@ -68,7 +68,7 @@ class FileIndex:
         return await self.db.file_index.by_hash(content_hash) or []
 
 
-# --- handlers (agents report in; clients query) ------------------------------------------------
+# --- handlers (worker clients report in; operators query) ------------------------------------------------
 
 @handler("index.event")
 async def index_event(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:

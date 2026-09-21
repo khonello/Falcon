@@ -1,7 +1,7 @@
 """Events (Control -> Events, Actions + Events = Automation).
 
 Two evaluation mechanisms, chosen per event type by how it is actually detected:
-  * native/pushed  -- OS-emitted (file change, USB, login/logout, program launch). Agents relay
+  * native/pushed  -- OS-emitted (file change, USB, login/logout, program launch). Worker Clients relay
                       the signal; the Engine matches it against registered definitions.
   * polled/evaluated -- state, not occurrence (thresholds, idle duration, scheduled time).
                       Checked on an interval by the Scheduler, Engine-side.
@@ -51,8 +51,8 @@ EVENT_TYPES: dict[str, str] = {
 }
 
 
-async def on_signal(engine: "Engine", pc_id: int, event_type: str, data: dict[str, Any]) -> None:
-    """Entry point for native/pushed signals (from agents) and internal signals (Flow failure,
+async def on_signal(engine: Engine, pc_id: int, event_type: str, data: dict[str, Any]) -> None:
+    """Entry point for native/pushed signals (from worker clients) and internal signals (Flow failure,
     Resource violation, Task target appeared). Matches definitions, fires attached Actions."""
     from engine.control import executions
 
@@ -70,9 +70,9 @@ def _matches(definition: dict[str, Any], pc_id: int, data: dict[str, Any]) -> bo
     return True  # SCAFFOLD
 
 
-async def evaluate_polled(engine: "Engine") -> None:
+async def evaluate_polled(engine: Engine) -> None:
     """Scheduler job: check every polled/evaluated definition against current state."""
-    ...  # SCAFFOLD
+    # SCAFFOLD
 
 
 @handler("control.event_create")
@@ -98,7 +98,7 @@ async def event_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("control.signal")
 async def signal(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Agent relays a native OS signal: {"type": "usb.inserted", "data": {...}}"""
+    """Worker Client relays a native OS signal: {"type": "usb.inserted", "data": {...}}"""
     pc_id = ctx.identity.pc_id or int(payload.get("pc_id", 0))
     await on_signal(ctx.engine, pc_id, str(payload.get("type", "")), payload.get("data", {}))
     return {"accepted": True}

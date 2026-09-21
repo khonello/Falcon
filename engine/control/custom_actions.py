@@ -1,13 +1,13 @@
 """Custom Action validation (spec 7.3): standard library + Windows-native only, no sandboxing.
 
 Validated twice with the same rules -- by the Operator Client's bundled interpreter before
-sending, and by the Worker Agent's bundled interpreter on arrival (tampering in transit). This
+sending, and by the Worker Client's bundled interpreter on arrival (tampering in transit). This
 module is the shared implementation both bundle; the Engine also runs it on `action_create`
 so a bad script is refused at the source of truth as well.
 
 Python: `compile()` (py_compile equivalent) plus an AST walk of imports against the stdlib
 list. PowerShell: module allow-list on `Import-Module` / `using module`; syntax is checked by
-the agent's own PowerShell at execution time.
+the Worker Client's own PowerShell at execution time.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def validate_python(source: str) -> ValidationResult:
     return ValidationResult(not problems, problems)
 
 
-_PS_IMPORT = re.compile(r"^\s*(?:Import-Module|using\s+module)\s+([\w.\-]+)", re.I | re.M)
+_PS_IMPORT = re.compile(r"^\s*(?:Import-Module|using\s+module)\s+([\w.\-]+)", re.IGNORECASE | re.MULTILINE)
 
 
 def validate_powershell(source: str) -> ValidationResult:

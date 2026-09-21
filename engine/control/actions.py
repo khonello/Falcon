@@ -16,7 +16,7 @@ TIMING = ("immediate", "scheduled", "delayed", "recurring")
 STATUSES = ("pending", "success", "failed", "terminated", "timeout")
 SCRIPT_LANGUAGES = ("powershell", "python")
 
-# Built-in actions ship as (category, key) with a spec the agent knows how to execute.
+# Built-in actions ship as (category, key) with a spec the worker client knows how to execute.
 BUILTIN: dict[str, dict[str, Any]] = {
     # control
     "control.screenshot": {"category": "control", "params": []},

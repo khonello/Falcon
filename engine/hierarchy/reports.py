@@ -36,7 +36,7 @@ CATEGORIES = (
 )
 
 
-async def emit(engine: "Engine", category: str, *, source_table: str, source_id: int,
+async def emit(engine: Engine, category: str, *, source_table: str, source_id: int,
                department_id: int | None, summary: str) -> int:
     """Write once; visibility is decided at read time from `report_routing_config`."""
     assert category in CATEGORIES, category

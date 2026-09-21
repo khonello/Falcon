@@ -1,7 +1,7 @@
 """Expectation (Task -> Expectation): soft signals that work is happening. Never completion.
 
 File targets ride on the Global File Index's event stream (created / modified / activity
-frequency / directory-level activity). Program targets use agent-reported usage evidence
+frequency / directory-level activity). Program targets use client-reported usage evidence
 (active vs idle, memory footprint, open file descriptors, activity over time). Skipped
 entirely when a task's verification is an explicit None.
 """
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def install(engine: "Engine") -> None:
+def install(engine: Engine) -> None:
     """Subscribe to the Global File Index so file-target expectations update from the same
     event stream Flow and Resource use."""
     engine.file_index.subscribe(_on_file_event)
@@ -33,6 +33,6 @@ async def _on_file_event(event: dict[str, Any]) -> None:
 
 @handler("task.program_signal")
 async def program_signal(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Agent reports usage evidence for a Program target:
+    """Worker Client reports usage evidence for a Program target:
     {"task_id", "item_index", "active": bool, "rss_bytes": int, "open_files": [..]}"""
     return stub("task.program_signal", payload)

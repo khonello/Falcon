@@ -30,7 +30,7 @@ Naming convention: `snake_case` tables and columns, singular table names avoided
 | `offboarded_at` | TIMESTAMP NULLABLE | |
 | `created_at` | TIMESTAMP NOT NULL | |
 
-*Note on "account bound to a PC" enforcement: the UNIQUE constraint on `bound_pc_id` prevents two **active** accounts sharing a PC at the database level, but does not by itself catch "account used from an unbound PC" — that is a connection-time check in the Engine (a Worker Agent's connection announces its PC identity; the Engine compares it against the authenticating account's `bound_pc_id` and logs a deviation on mismatch — see `deviation_log`), not something a table constraint alone can express.*
+*Note on "account bound to a PC" enforcement: the UNIQUE constraint on `bound_pc_id` prevents two **active** accounts sharing a PC at the database level, but does not by itself catch "account used from an unbound PC" — that is a connection-time check in the Engine (a Worker Client's connection announces its PC identity; the Engine compares it against the authenticating account's `bound_pc_id` and logs a deviation on mismatch — see `deviation_log`), not something a table constraint alone can express.*
 
 ### `display_name_grants`
 Implements Display Names' **non-propagation rule**: a name set at one relationship layer is never visible or joinable at another.

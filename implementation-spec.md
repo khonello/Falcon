@@ -18,7 +18,7 @@ Organizations with a multi-tier structure (a head office overseeing departments,
 
 ### 1.3 Solution
 
-One system, three physically distinct deployable packages (**Engine**, **Operator Client**, **Worker Agent** — see Section 2), all governed by the same Hierarchy authority model, sharing one **Global File Index** and one **audit trail** with a flat 90-day retention policy for v1.
+One system, three physically distinct deployable packages (**Engine**, **Operator Client**, **Worker Client** — see Section 2), all governed by the same Hierarchy authority model, sharing one **Global File Index** and one **audit trail** with a flat 90-day retention policy for v1.
 
 ---
 
@@ -29,7 +29,7 @@ One system, three physically distinct deployable packages (**Engine**, **Operato
 An earlier consideration was a single monolithic program that adapts its interface by role. This was reconsidered in favor of a three-package physical split, modeled on a reference lab-monitoring project, because:
 
 - **Physical deployment reality:** a Super User, an Admin, and a Worker are on different physical machines. A Worker's PC should never contain the code paths for Custom Action authoring, Cross-Department Assisted Access initiation, or Report Routing configuration — these are Admin/Super-User-only capabilities. Shipping one monolithic binary everywhere means shipping capability surface to machines that should never have it, relying on conditional hiding rather than physical absence.
-- **Traversal already implies asymmetric capability, not just asymmetric UI.** Super User traversing into an Admin's session sees "exactly what that Admin sees" — this is naturally modeled as the same GUI codebase running with different permission scope, not as a different program. But a Worker's Client Agent has no equivalent to "become an Admin" — it is traversed *into*, never traverses *out*. This asymmetry maps cleanly onto two different package types, not three, and not one.
+- **Traversal already implies asymmetric capability, not just asymmetric UI.** Super User traversing into an Admin's session sees "exactly what that Admin sees" — this is naturally modeled as the same GUI codebase running with different permission scope, not as a different program. But a Worker Client has no equivalent to "become an Admin" — it is traversed *into*, never traverses *out*. This asymmetry maps cleanly onto two different package types, not three, and not one.
 
 ### 2.2 The Three Packages
 
@@ -54,7 +54,7 @@ An earlier consideration was a single monolithic program that adapts its interfa
         ▼                                                     ▼
  [ SUPER USER / ADMIN WORKSTATIONS ]                 [ WORKER / CLIENT PCS ]
 ┌───────────────────────────────┐          ┌────────────────────────────────┐
-│       Operator Client          │          │         Worker Agent            │
+│       Operator Client          │          │         Worker Client            │
 │     (Qt 6 + QML GUI, one       │          │   (headless service, Python,    │
 │   codebase for both Super      │          │   bundled runtime)               │
 │   User and Admin — permission  │          │                                  │
@@ -85,7 +85,7 @@ An earlier consideration was a single monolithic program that adapts its interfa
 
 **Operator Client** (Section 4) — one QML codebase, used by both Super User and Admin. What differs between the two is *permission scope and traversal depth*, resolved server-side by the Engine and reflected in what the client is allowed to render/do — not two separate programs. This directly implements Hierarchy's principle that Super User traversing into an Admin sees exactly what that Admin sees: it's the same client rendering the same views, gated by which session/permission context is currently active.
 
-**Worker Agent** (Section 5) — headless. A Worker does not "log into" a GUI the way an Operator does; per Hierarchy, Client is a passive information recipient with the narrow Task-interaction exception (view, start, monitor a task — never verify). This narrow surface is a small, focused UI need (task status, alerts, Assistance ping/search) — it does not require the full Operator Client codebase, and keeping it minimal is itself a security boundary: a compromised Worker PC exposes far less capability than a compromised Operator Client would.
+**Worker Client** (Section 5) — headless. A Worker does not "log into" a GUI the way an Operator does; per Hierarchy, Client is a passive information recipient with the narrow Task-interaction exception (view, start, monitor a task — never verify). This narrow surface is a small, focused UI need (task status, alerts, Assistance ping/search) — it does not require the full Operator Client codebase, and keeping it minimal is itself a security boundary: a compromised Worker PC exposes far less capability than a compromised Operator Client would.
 
 ---
 
@@ -93,12 +93,12 @@ An earlier consideration was a single monolithic program that adapts its interfa
 
 ### 3.1 Responsibilities
 
-- Accept and manage Operator Client and Worker Agent connections
+- Accept and manage Operator Client and Worker Client connections
 - Own and enforce the entire Hierarchy authority model (traversal, Session Blocking, Report Routing, Display Names, Cross-Department Assisted Access)
 - Own and run the Task, Flow, Resource, and Control/Events/Monitoring business logic
 - Own and maintain the **Global File Index** (Section 6) and the **audit trail** (Section 8.4)
 - Host or call out to the **local LLM** used for Task's natural-language verification population (Section 7.2.1) — implemented as a local, decomposed-question-graph call model, not a single all-in-one structuring call; runs on or alongside the Engine host, never an external API, given the sensitivity of what task descriptions can reference
-- Route commands and data between Operator Clients and Worker Agents
+- Route commands and data between Operator Clients and Worker Clients
 - Hold the master authentication secret; never transmits it, derives per-connection session keys (Section 8.2)
 
 ### 3.2 Concurrency Model
@@ -119,7 +119,7 @@ Threads (`asyncio.to_thread` / `run_in_executor`) are reserved for calls that ca
 
 ### 3.4 What the Engine Does Not Do
 
-The Engine does not render UI and does not directly control input on a Worker PC — it authorizes and coordinates; the actual mouse/keyboard control during a traversal session, and the actual rendering of overlays/dialogs, happens client-side (Operator Client and Worker Agent respectively), driven by Engine-issued commands and Engine-enforced permission state.
+The Engine does not render UI and does not directly control input on a Worker PC — it authorizes and coordinates; the actual mouse/keyboard control during a traversal session, and the actual rendering of overlays/dialogs, happens client-side (Operator Client and Worker Client respectively), driven by Engine-issued commands and Engine-enforced permission state.
 
 ---
 
@@ -147,16 +147,16 @@ Everything in Hierarchy that is Admin-or-above (Session Blocking initiation, Tra
 
 ---
 
-## 5. Worker Agent (Client PC)
+## 5. Worker Client (Client PC)
 
 ### 5.1 Technology
 
 Headless Python service, bundled with its own pinned embeddable Python runtime (so Custom Action re-validation/execution never depends on a system-installed interpreter — see Section 7.3). Ships two on-demand, non-persistent helper executables, built the same way as the Engine's reference design:
 
 - **Overlay exe** — renders the Session Blocking "inaccessible / traversal in progress" indicator (Hierarchy → Traversal Boundaries) and the Time-Based Restriction-style lockout surface if a Control Action or Event enforces one. Fullscreen or bannered depending on context; re-asserts topmost periodically; exits the moment the underlying session state clears.
-- **Dialog exe** — renders grace-period warnings, Deadline pulsing-status alerts, and Assistance Ping notifications. Spawned on demand via `asyncio.create_subprocess_exec`, non-blocking to the Agent's own event loop; the user's response (or timeout) is reported back the same way Custom Action output is reported (Section 7.3).
+- **Dialog exe** — renders grace-period warnings, Deadline pulsing-status alerts, and Assistance Ping notifications. Spawned on demand via `asyncio.create_subprocess_exec`, non-blocking to the Worker Client's own event loop; the user's response (or timeout) is reported back the same way Custom Action output is reported (Section 7.3).
 
-Both helper executables are QML-based (small, frozen with the same Qt toolchain as the Operator Client) rather than a second UI toolkit — kept deliberately minimal since the Worker Agent's whole design goal is a narrow, low-footprint surface.
+Both helper executables are QML-based (small, frozen with the same Qt toolchain as the Operator Client) rather than a second UI toolkit — kept deliberately minimal since the Worker Client's whole design goal is a narrow, low-footprint surface.
 
 ### 5.2 Responsibilities
 
@@ -183,8 +183,8 @@ File name, location, content hash, and (where applicable) a Resource access tag 
 
 ### 6.2 How It's Populated
 
-- **Event-driven baseline:** Worker Agents (and the Operator Client's own machine, where relevant) report OS file events (create, modify, move, copy) to the Engine as they occur — native OS signals, not polling, per the system's general preference (see also Flow's sync trigger and Resource's compliance detection, both of which reuse this exact mechanism rather than defining their own).
-- **Opportunistic full-system sweep:** when a machine is idle (no mouse/keyboard input), the Worker Agent (or Operator Client) performs a full local file-system sweep and reports the results, extending index coverage beyond what's been event-referenced so far.
+- **Event-driven baseline:** Worker Clients (and the Operator Client's own machine, where relevant) report OS file events (create, modify, move, copy) to the Engine as they occur — native OS signals, not polling, per the system's general preference (see also Flow's sync trigger and Resource's compliance detection, both of which reuse this exact mechanism rather than defining their own).
+- **Opportunistic full-system sweep:** when a machine is idle (no mouse/keyboard input), the Worker Client (or Operator Client) performs a full local file-system sweep and reports the results, extending index coverage beyond what's been event-referenced so far.
 - **Self-throttling:** the moment user input resumes, the sweep stops immediately — implemented as a cancellable background task (`asyncio.to_thread` with a cooperative cancellation check), never competing with the user for resources.
 
 ### 6.3 Consumers
@@ -201,7 +201,7 @@ File name, location, content hash, and (where applicable) a Resource access tag 
 
 Implemented entirely server-side in the Engine — the Operator Client never independently decides what it's allowed to see or do; it renders what the Engine's permission/session state says.
 
-- **Traversal & Session Blocking:** the Engine holds session-occupancy state per PC/session. A traversal request checks: is the destination idle? If not, is the requester vertical-superior (block-or-end-first, then enter) or horizontal (hard refuse)? Super User occupancy is flagged un-evictable. Traversal Time Limit is a countdown the Engine tracks per Admin-level session, pushed to the Operator Client for display and extendable on request. **This same deadline is what governs a network drop mid-traversal** — no separate disconnect-handling logic is needed: the Engine-side countdown keeps running regardless of the Worker Agent's connection state, so a dropped connection simply means the session is less likely to be extended before the deadline fires. If the connection recovers before the deadline, the traverser resumes normally; if not, the session expires and the block releases exactly as it would if the traverser had simply run out of time on purpose — an indefinite lockout is structurally impossible, since no traversal session was ever unbounded to begin with.
+- **Traversal & Session Blocking:** the Engine holds session-occupancy state per PC/session. A traversal request checks: is the destination idle? If not, is the requester vertical-superior (block-or-end-first, then enter) or horizontal (hard refuse)? Super User occupancy is flagged un-evictable. Traversal Time Limit is a countdown the Engine tracks per Admin-level session, pushed to the Operator Client for display and extendable on request. **This same deadline is what governs a network drop mid-traversal** — no separate disconnect-handling logic is needed: the Engine-side countdown keeps running regardless of the Worker Client's connection state, so a dropped connection simply means the session is less likely to be extended before the deadline fires. If the connection recovers before the deadline, the traverser resumes normally; if not, the session expires and the block releases exactly as it would if the traverser had simply run out of time on purpose — an indefinite lockout is structurally impossible, since no traversal session was ever unbounded to begin with.
 - **Display Names:** stored per-relationship-pair in the database (Super User's private label for Admin X; Admin's own self-facing name; the composed fallback built from account/PC identifiers when unset) — never resolved or joined across relationship layers, enforced by query design, not just convention.
 - **Report Routing:** every Report-category event (Resource violation, Flow failure, Listener report, Assisted Access session) is written once, always visible to Super User, and additionally flagged visible to a routed department's Admin if that category is configured as routed. The Super-User-only View (tracking what's been addressed) is a separate table, never itself insertable as a Report row — enforced at the schema/query level to prevent the infinite-regress problem discussed during design.
 - **Cross-Department Assisted Access:** implemented as its own state machine, deliberately not reusing the vertical Traversal code path — entry is consent-granted, not block-or-end-first. Matching (requester-initiated or helper-broadcast) is an Engine-side availability query against Admin sessions not currently occupying anything.
@@ -209,13 +209,13 @@ Implemented entirely server-side in the Engine — the Operator Client never ind
 ### 7.2 Task
 
 - **Verification & Intent:** the Engine calls the local LLM (see Section 7.2.1 for the call model) with the assigner's natural-language description; the resulting structured output (targets, Intent, Deadline) is returned to the Operator Client for review before being committed. The governing "propose, never silently resolve" rule is enforced by never auto-committing an LLM-populated structure without an explicit confirm action from the Operator Client.
-- **Expectation:** driven by the Worker Agent's OS-event reporting (File targets) or process/activity monitoring (Program targets — active/idle, memory footprint, open file descriptors), same reporting channel as Section 6.2.
+- **Expectation:** driven by the Worker Client's OS-event reporting (File targets) or process/activity monitoring (Program targets — active/idle, memory footprint, open file descriptors), same reporting channel as Section 6.2.
 - **Deadline:** implemented as two Engine-scheduled Events (soft, final) — see Section 7.5, Events. No separate scheduler needed; Task's Deadline is just a Control/Events/Monitoring Event with a Task-specific trigger action.
 - **No Task Directory:** confirmed architecturally — nothing in the Engine or either client needs to create or track a task-specific folder; all target tracking is by identity via the Global File Index.
 
 #### 7.2.1 LLM Call Model — Decomposed Question Graph, Not One Structuring Call
 
-**Local, not API.** Task descriptions can reference restricted files, department-sensitive projects, and other data this system is explicitly designed to keep contained (see Resource's access tiers and the whole premise of Restricted File Tracking) — sending that content to a third-party API would undermine the containment the rest of the system is built to guarantee. A local model also removes per-call cost and any dependency on external connectivity, consistent with the Worker Agent's general offline-resilience posture (Section 5.3).
+**Local, not API.** Task descriptions can reference restricted files, department-sensitive projects, and other data this system is explicitly designed to keep contained (see Resource's access tiers and the whole premise of Restricted File Tracking) — sending that content to a third-party API would undermine the containment the rest of the system is built to guarantee. A local model also removes per-call cost and any dependency on external connectivity, consistent with the Worker Client's general offline-resilience posture (Section 5.3).
 
 **Decomposed graph of narrow questions, not one open-ended structuring call.** A single "read this description and construct the whole verification structure" call asks a model to extract, structure, and self-assess confidence all at once — exactly where small/local models degrade unpredictably, and their failure mode (a confidently wrong structure) is hard to detect from the output alone. Instead, the LLM is called repeatedly with narrow, mostly yes/no or pick-from-a-finite-list questions, structured as a decision graph — each answer determines which question fires next. This plays to what small local models are reliably good at (narrow classification, not open-ended generation), and it maps naturally onto the finite lists the rest of Task's design already establishes (Intent's fixed categories, Verification's fixed item types).
 
@@ -274,13 +274,13 @@ Final selection (and exact size within the Qwen3 family) should be decided empir
 
 ### 7.3 Flow & Custom Actions — Script Execution Model
 
-Flow's sync/transformation/categorization pipeline and Control/Events/Monitoring's Custom Actions both execute scripted or process-driven work on a Worker Agent (or, for Admin-to-Admin flows, an Operator Client's own machine). The reference project's **Script Execution Model** is adopted directly for both:
+Flow's sync/transformation/categorization pipeline and Control/Events/Monitoring's Custom Actions both execute scripted or process-driven work on a Worker Client (or, for Admin-to-Admin flows, an Operator Client's own machine). The reference project's **Script Execution Model** is adopted directly for both:
 
 - Scripts (Custom Actions; Flow's Transformation stage, if implemented as a script rather than a built-in converter) are launched **detached** from the response cycle via `asyncio.create_subprocess_exec` — never `_shell`, always an explicit argv against the bundled interpreter.
 - Output is redirected to a per-execution log file keyed by a unique execution/command id; a background task tails it by polling on a fixed interval and only reading when file size has grown, avoiding wasted re-reads.
 - Every Action's fixed **timeout** (per the Control/Events/Monitoring spec) is enforced the same way the reference project caps script runtime — a script/process that overruns is terminated, reported with a distinct `"timeout"` status (not `"error"`), consistent with Task's Action status values (Success/Failed/Pending/Terminated).
 - Any running Action can also be **manually terminated** early, keyed by its execution id rather than process name, so one specific run can be stopped without ambiguity when multiple instances share an interpreter name.
-- Custom Action scripts are validated twice — once by the Operator Client's bundled interpreter before sending (`python -m py_compile` equivalent, plus an `ast`-based import check restricted to standard-library-and-Windows-available modules only, per the system's no-sandboxing-but-constrained-runtime decision), and again by the Worker Agent's own bundled interpreter on arrival, in case of tampering in transit.
+- Custom Action scripts are validated twice — once by the Operator Client's bundled interpreter before sending (`python -m py_compile` equivalent, plus an `ast`-based import check restricted to standard-library-and-Windows-available modules only, per the system's no-sandboxing-but-constrained-runtime decision), and again by the Worker Client's own bundled interpreter on arrival, in case of tampering in transit.
 
 ### 7.4 Resource & Assistance
 
@@ -291,7 +291,7 @@ Flow's sync/transformation/categorization pipeline and Control/Events/Monitoring
 
 ### 7.5 Control, Events, Monitoring & Actions
 
-- **Events:** native/pushed events are OS signals relayed by the Worker Agent (or Operator Client) to the Engine, which matches them against registered Event definitions; polled/evaluated events (thresholds, scheduled time, idle duration) are an Engine-side scheduled check, run on the Engine's asyncio loop rather than requiring the Worker Agent to self-poll for everything.
+- **Events:** native/pushed events are OS signals relayed by the Worker Client (or Operator Client) to the Engine, which matches them against registered Event definitions; polled/evaluated events (thresholds, scheduled time, idle duration) are an Engine-side scheduled check, run on the Engine's asyncio loop rather than requiring the Worker Client to self-poll for everything.
 - **Actions execute independently, no output piping (v1):** each Action attached to an Event is dispatched as its own independent task/subprocess; ordering is a display concern in the Operator Client, not a data dependency enforced by the Engine.
 - **Custom Actions:** see Section 7.3.
 - **Dashboard:** the Operator Client's "operational view" mode is a live query against the Engine's Action/Event execution log (itself part of the audit trail, Section 8.4) — refresh mechanism (poll vs. push) is deferred, per Section 9.
@@ -302,19 +302,19 @@ Flow's sync/transformation/categorization pipeline and Control/Events/Monitoring
 
 ### 8.1 Build-Order Note: Auth Is Last, Scaffolded Early, Never Optional
 
-Following the reference project's approach directly: the message shape auth will occupy (a nonce/challenge-response handshake) is scaffolded from the very first integration pass — the fields exist on every relevant message from day one, with the Engine's check on them stubbed to always accept during development. Real cryptographic logic is filled into that already-wired stub last, after Engine, Operator Client, and Worker Agent are each independently built and tested. This is a sequencing decision, not a scoping one — the system is not safe to run on a real network until this is complete, since Session Blocking, Custom Action execution, and Report visibility all currently assume the caller's identity is trustworthy.
+Following the reference project's approach directly: the message shape auth will occupy (a nonce/challenge-response handshake) is scaffolded from the very first integration pass — the fields exist on every relevant message from day one, with the Engine's check on them stubbed to always accept during development. Real cryptographic logic is filled into that already-wired stub last, after Engine, Operator Client, and Worker Client are each independently built and tested. This is a sequencing decision, not a scoping one — the system is not safe to run on a real network until this is complete, since Session Blocking, Custom Action execution, and Report visibility all currently assume the caller's identity is trustworthy.
 
 A `DEV_BYPASS_AUTH` flag, off by default, loud when active (logged prominently on Engine startup), skips the handshake **entirely** rather than silently passing its validation — a hard, visible skip rather than a quietly-always-true check, so an accidentally-left-on flag is obvious both in code and on the wire.
 
 ### 8.2 Authentication Model
 
-One **master secret**, generated once on the Engine host, never transmitted. Each Worker Agent and Operator Client is issued a **derived key** at provisioning time (`HMAC(master_secret, client_id)`), stored locally under an ACL-restricted path (equivalent to `%ProgramData%` on Windows), never in a user-writable location. Session handshake: Engine issues a nonce, the client responds with `HMAC(derived_key, nonce)`, Engine independently re-derives and compares. Compromising one machine's derived key exposes only that machine — not the master secret, not other clients' keys.
+One **master secret**, generated once on the Engine host, never transmitted. Each Worker Client and Operator Client is issued a **derived key** at provisioning time (`HMAC(master_secret, client_id)`), stored locally under an ACL-restricted path (equivalent to `%ProgramData%` on Windows), never in a user-writable location. Session handshake: Engine issues a nonce, the client responds with `HMAC(derived_key, nonce)`, Engine independently re-derives and compares. Compromising one machine's derived key exposes only that machine — not the master secret, not other clients' keys.
 
 This authenticates *who is allowed to act as which identity* (Super User, a specific Admin, a specific Worker) and is the foundation Session Blocking, Report visibility, and Resource access-tier enforcement all sit on top of — none of those are meaningful without this.
 
 ### 8.3 Transport Security
 
-TLS for all Engine ↔ Operator Client and Engine ↔ Worker Agent traffic. Self-signed, pinned certificate is sufficient (one Engine, every client already receives a provisioned install package — a full CA buys nothing at this scale). Hostname-based identity (not IP) so the Engine can move without reissuing certificates. Fails loudly: a missing/invalid certificate stops the Engine starting, or stops a client connecting — never a silent plaintext fallback.
+TLS for all Engine ↔ Operator Client and Engine ↔ Worker Client traffic. Self-signed, pinned certificate is sufficient (one Engine, every client already receives a provisioned install package — a full CA buys nothing at this scale). Hostname-based identity (not IP) so the Engine can move without reissuing certificates. Fails loudly: a missing/invalid certificate stops the Engine starting, or stops a client connecting — never a silent plaintext fallback.
 
 ### 8.4 Audit Trail
 
@@ -377,11 +377,11 @@ Adopting the reference project's three-pass approach per component, and its comp
 **Component build order:**
 1. **Engine** — built and thoroughly tested first, since every other package depends on it. Covers Hierarchy's authority model, the Global File Index, Task/Flow/Resource/Control-Events-Monitoring business logic, and the database layer.
 2. **Operator Client** — built and tested second, against the completed Engine.
-3. **Worker Agent** — built and tested third, against the completed Engine.
+3. **Worker Client** — built and tested third, against the completed Engine.
 4. **Full integration** (all three together) — built and tested last, once each component is independently verified, so integration bugs are isolated to genuine cross-component interaction rather than tangled with bugs still being worked out inside one component.
 5. **Authentication** — implemented last per Section 8.1, but its message shape is present from the Scaffold pass onward.
 
-Given the ~1 month timeline, this ordering is what makes the schedule realistic: a fully correct, independently-tested Engine means Operator Client and Worker Agent work can each proceed against a stable, trustworthy target rather than against a moving one.
+Given the ~1 month timeline, this ordering is what makes the schedule realistic: a fully correct, independently-tested Engine means Operator Client and Worker Client work can each proceed against a stable, trustworthy target rather than against a moving one.
 
 ---
 

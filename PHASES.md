@@ -40,7 +40,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] `engine/control/` — actions, events (type→mechanism map), executions, custom_actions (validator)
 - [x] `engine/updates.py`
 - [x] Tests: protocol round-trips, socket-level smoke (handshake, dispatch of every type, bypass flag), pure-logic units
-- [ ] Venv created, deps installed, test suite green
+- [x] Venvs created (`environ-operator`, `environ-worker`); Engine + dev deps installed in `environ-operator`; ruff clean; 21 tests green
 
 ### 1b. Implementation (real logic, module by module)
 
@@ -65,36 +65,48 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ---
 
-## Phase 2 — Operator Client (PySide6 / QML / qasync)
+## Phase 2 — Operator Client, TUI (`prompt_toolkit`, env: `environ-operator`)
 
-- [ ] Scaffold: connection layer, session/permission state model, view routing by role scope
-- [ ] Hierarchy views: tree, traversal + red banner, session blocked/ended transitions, display names, report routing config (open item 10.2)
-- [ ] Task views: propose → review/correct → create; stack status; manual verification
-- [ ] Flow views: builder (stages, branches), consent, status + failure suggestions
-- [ ] Resource/Assistance views: folders, search, ping indicator, message channel, listeners
-- [ ] Control views: editing mode (events/actions/custom), dashboard mode (refresh mechanism — open item 10.1)
-- [ ] Custom Action pre-send validation with bundled interpreter
-- [ ] Local config storage (last Engine address, window prefs, cached lists)
+The TUI is how the built system gets tested before any GUI work. It sits on a connection/state
+layer the GUI will reuse unchanged.
+
+- [ ] `operator_client/core/`: Engine connection (NDJSON over TLS, handshake), request/push
+      routing, session/permission state model, local config (last Engine address, cached lists)
+- [ ] `operator_client/tui/` shell: role-scoped navigation, status bar (session, deadline,
+      ping indicator), push notifications surfaced live
+- [ ] Hierarchy: tree, traverse / end / extend, red banner state, blocked/ended transitions,
+      display names, report list/mark, routing config (open item 10.2)
+- [ ] Task: propose → review/correct/resolve collision → create; list/get with stack status;
+      start (as assignee); manual verify
+- [ ] Flow: create (consent / collision / cycle feedback), edit, pause/resume, status +
+      failure suggestion, history
+- [ ] Resource/Assistance: violations, search, ping + status, message channel with turn lock,
+      listeners (own additions only)
+- [ ] Control: action library incl. Custom (pre-send validation via `custom_actions.validate`),
+      events, run/terminate, dashboard view (refresh mechanism — open item 10.1)
+- [ ] Updates: approve, rollout, health view
+- [ ] Assisted Access: request / availability / accept / close
 
 ---
 
-## Phase 3 — Worker Agent (headless Python + Overlay/Dialog exes)
+## Phase 3 — Worker Client (headless service, env: `environ-worker`)
 
-- [ ] Scaffold: persistent authenticated connection, reconnect, local cached state (deadlines, session)
+- [ ] `worker_client/core/`: persistent authenticated connection, reconnect, local cached
+      state (deadlines, session) under an ACL-restricted path
 - [ ] File event reporting (native OS events) + idle-time full sweep with instant cancel on input
-- [ ] Session blocking: overlay exe, local input restriction
-- [ ] Dialog exe: grace warnings, deadline pulses, ping alerts
+- [ ] Session blocking: local input restriction; overlay as a TUI/console surface first
+- [ ] Notifications: grace warnings, deadline pulses, ping alerts (TUI/console first)
 - [ ] Action execution: detached subprocess, per-execution log tailing, timeout, terminate by id
 - [ ] Custom Action re-validation on arrival
 - [ ] Program-target expectation signals (active/idle, RSS, open files)
-- [ ] Narrow Client UI: task view/start/monitor, assistance search/ping
+- [ ] Narrow Client TUI: task view/start/monitor, assistance search/ping
 - [ ] Update retry on idle + status reporting
 
 ---
 
 ## Phase 4 — Full Integration
 
-- [ ] Engine + Operator Client + Worker Agent end-to-end scenarios (the three from Hierarchy → Example Scenarios)
+- [ ] Engine + Operator Client + Worker Client end-to-end scenarios (the three from Hierarchy → Example Scenarios)
 - [ ] Cross-combo flows: Task → Flow, Task → Events, Resource → Events, Events → Control
 - [ ] Network-drop mid-traversal expires via the same deadline path
 
@@ -106,6 +118,15 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Real `auth.verify` (HMAC compare), identity binding, bound-PC deviation check
 - [ ] TLS cert generation/pinning per client install package
 - [ ] Remove reliance on `DEV_BYPASS_AUTH` / `DEV_PLAINTEXT` in every test path
+
+---
+
+## Phase 6 — GUI (PySide6 / QML / qasync) — only after the TUI phases are done
+
+- [ ] `operator_client/gui/` on the same `operator_client/core/` layer as the TUI
+- [ ] Views mirroring the TUI feature set (Hierarchy, Task, Flow, Resource/Assistance, Control, Updates)
+- [ ] Worker Client Overlay exe + Dialog exe (QML, frozen with the same toolchain)
+- [ ] Window prefs / layout persistence
 
 ---
 

@@ -7,7 +7,7 @@ Consumers:
   * Audit retention job (daily)
   * Flow polling fallback where native events are unavailable
 
-Native/pushed events never come through here; they arrive as agent messages and are matched
+Native/pushed events never come through here; they arrive as worker-client messages and are matched
 by `engine.control.events`.
 """
 
@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from engine.server import Engine
@@ -27,7 +28,7 @@ Job = Callable[[], Awaitable[None]]
 
 
 class Scheduler:
-    def __init__(self, engine: "Engine") -> None:
+    def __init__(self, engine: Engine) -> None:
         self.engine = engine
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._periodic: list[tuple[str, float, Job]] = []
@@ -66,7 +67,7 @@ class Scheduler:
         await asyncio.sleep(delay)
         try:
             await job()
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("scheduled job %s failed", name)
         finally:
             self._tasks.pop(name, None)
@@ -76,7 +77,7 @@ class Scheduler:
             await asyncio.sleep(seconds)
             try:
                 await job()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("periodic job %s failed", name)
 
     async def _expire_sessions(self) -> None:

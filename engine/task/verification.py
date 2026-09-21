@@ -65,7 +65,7 @@ class ProposedStructure:
         return bool(self.flags or self.proposed_split)
 
 
-async def check_create_collisions(engine: "Engine", items: list[VerificationItem],
+async def check_create_collisions(engine: Engine, items: list[VerificationItem],
                                   assignee_account_id: int) -> list[dict[str, Any]]:
     """Name-first collision check for every Create-intent File item, scoped to the assignee.
     Returns collisions to surface; may also hint that Create was really Update."""
@@ -79,7 +79,7 @@ async def check_create_collisions(engine: "Engine", items: list[VerificationItem
     return collisions
 
 
-async def evaluate_stack(engine: "Engine", task_id: int) -> list[dict[str, Any]]:
-    """Recompute pass/fail per item from the Global File Index and agent-reported program
+async def evaluate_stack(engine: Engine, task_id: int) -> list[dict[str, Any]]:
+    """Recompute pass/fail per item from the Global File Index and client-reported program
     state. Display only -- never closes a task."""
     return []  # SCAFFOLD

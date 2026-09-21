@@ -58,7 +58,7 @@ def allowed_tags_for(role: str, department_id: int | None) -> list[str]:
     return tags
 
 
-def install(engine: "Engine") -> None:
+def install(engine: Engine) -> None:
     engine.file_index.subscribe(_on_file_event)
 
 

@@ -1,7 +1,7 @@
 """Action executions (spec 7.3 Script Execution Model, Control -> Dashboard).
 
 One row per run, keyed by execution id (never process name), so a specific run can be
-terminated unambiguously. The Engine records and coordinates; the agent on the target PC
+terminated unambiguously. The Engine records and coordinates; the worker client on the target PC
 actually runs the action (detached subprocess, output to a per-execution log, tailed by
 size-growth polling) and reports back.
 
@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-async def start(engine: "Engine", action: dict[str, Any], event_id: int | None, pc_id: int) -> int:
-    """Create the execution row and push `action.execute` to the agent on `pc_id`."""
+async def start(engine: Engine, action: dict[str, Any], event_id: int | None, pc_id: int) -> int:
+    """Create the execution row and push `action.execute` to the worker client on `pc_id`."""
     execution_id = await engine.db.control.start_execution(action["id"], event_id, pc_id) or 0
     await engine.broadcast(
         "action.execute",
@@ -37,13 +37,13 @@ async def start(engine: "Engine", action: dict[str, Any], event_id: int | None, 
 
 @handler("control.execution_result")
 async def execution_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Agent reports {"execution_id", "status", "exit_code"?, "output"?, "error"?}."""
+    """Worker Client reports {"execution_id", "status", "exit_code"?, "output"?, "error"?}."""
     return stub("control.execution_result", payload)
 
 
 @handler("control.execution_output")
 async def execution_output(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Agent streams incremental output chunks for the Dashboard's live view."""
+    """Worker Client streams incremental output chunks for the Dashboard's live view."""
     return stub("control.execution_output", payload)
 
 
