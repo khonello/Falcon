@@ -1,4 +1,12 @@
-# UI reference for Phase 7 — the predecessor's console is the bar for "acceptable"
+# UI reference for Phase 7 — the predecessor's console is the *baseline*, not the finish
+
+**Baseline vs. finished.** The predecessor console is what the user calls *acceptable* — and even
+that was not fine-tuned. It is the floor Phase 7 must clear, not the target. Finished means
+**fine-tuned**: not generic components dressed in the right colours, but components designed for
+what *this* system needs — a session with a deadline, a traversal with a red banner, a flow with
+stages and consent, a proposal with flags to decide, a violation with a tier. **The system does
+not adapt to the UI; the UI is moulded to what the system wants.** When a stock control does not
+express a Falcon concept exactly, build the control that does.
 
 The user's instruction: before Phase 7, study the Admin desktop and Client UIs in
 `github.com/khonello/SystemMonitoring` (`admin/qml/`, `client/ui/`) — *the colours, the
@@ -83,6 +91,9 @@ padding 34, one easing everywhere (`OutCubic`, 140 / 240 ms).
 
 ## What this means for Falcon's Phase 7
 
+Two levels. First reach the baseline (the port below); then fine-tune every screen around the
+system's own concepts until nothing on it is a generic widget standing in for a Falcon idea.
+
 1. Port the token set into `operator_client/gui/qml/Theme.qml` (singleton) and switch the style to
    Material dark with `SmallScale`, set once in `gui/app.py`.
 2. Rebuild the shell to the same skeleton: header with identity + primary tabs (Hierarchy, Tasks,
@@ -97,3 +108,9 @@ padding 34, one easing everywhere (`OutCubic`, 140 / 240 ms).
    appear animation; frameless, stays on top, draggable dialog.
 5. Then the Falcon-specific pieces the reference does not have: the Flow node-graph editor, the
    guided Task proposal review, the automation dashboard — built from the same tokens.
+6. Fine-tune beyond the baseline, concept by concept: a *session* is a control with occupant,
+   deadline and extend/end built in; a *traversal* changes the whole shell (banner, scope,
+   restricted view); a *flow* is a graph, not a table; a *proposal* is a review with decisions to
+   make, not a form; a *violation* shows its tier and where the file is; an *indicator* pulses
+   until addressed. Every one of these is judged against the design docs, not against what Qt
+   offers by default.

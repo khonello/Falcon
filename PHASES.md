@@ -188,13 +188,16 @@ Goal: a UI that enforces how the software is meant to be used, so it can be judg
 polished. Acceptable means: proper use of space, custom components that fit our needs (not stock
 tables and buttons), clear states, and navigation that matches the roles. Not final polish.
 
-**The bar is the predecessor's console** (`github.com/khonello/SystemMonitoring`, `admin/qml/` and
-`client/ui/`): its colours, organisation, header tabs, left rail and structure are what the user
-calls acceptable. Distilled into `ui-reference.md` — start there.
+**Baseline and finish.** The predecessor's console (`github.com/khonello/SystemMonitoring`,
+`admin/qml/` and `client/ui/`) is the *baseline* — what the user calls acceptable, and even that was
+not fine-tuned. Finished means fine-tuned: components customised to what this system needs, not
+generic ones in the right colours. **The system does not adapt to the UI; the UI is moulded to what
+the system wants.** Distilled into `ui-reference.md` — start there, then go past it.
 
 - [ ] Port the reference design system: `Theme.qml` singleton (tokens from `ui-reference.md`), Material dark + `SmallScale` set once in `gui/app.py`; replace the hand-built Fusion palette
 - [ ] Shell to the reference skeleton: header (identity, primary tabs, connection), hierarchy **left rail** as the always-visible context, content + pinned feed panel, footer with the pulsing link dot; RED BANNER / BLOCKED as the full-width banner
 - [ ] Component set ported and extended: `Section`, `SegmentedControl`, `StatePill`, `StatTile`, `DataList`, plus a table/tree, forms and dialogs in the same tokens
+- [ ] Beyond the baseline — Falcon-specific controls, judged against the design docs: session control (occupant, deadline, extend/end), traversal changing the shell, flow as a graph, proposal as a review with decisions, violation with its tier, indicators that pulse until addressed
 
 - [ ] Interaction design first: information architecture, navigation per role (Super User vs Admin), the persistent status surface, states (blocked, red banner, restricted view, disconnected), and the work-first layout of each screen — written down before QML changes
 - [ ] Shared component set: panels, list/tree/table with selection and inline actions, forms/dialogs, badges/indicators, empty/loading/error states, feed; consistent spacing and type scale
