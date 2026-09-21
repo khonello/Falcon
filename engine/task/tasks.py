@@ -140,6 +140,7 @@ async def propose(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     assignee = await _assignee_for(ctx, int_field(payload, "assignee_account_id"))
     structure = await llm_graph.populate(ctx.engine.llm, description)
     collisions = await verification.check_create_collisions(ctx.engine, structure.items, assignee["bound_pc_id"])
+    await verification.bind_existing_files(ctx.engine, structure, assignee["bound_pc_id"])
     return {
         "llm_available": ctx.engine.llm.available,
         "items": [vars(i) for i in structure.items],

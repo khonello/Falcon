@@ -1,6 +1,6 @@
 """Unit tests for the pure logic already present in the scaffold."""
 
-from engine.control.custom_actions import validate
+from common.custom_actions import validate
 from engine.flow.flows import has_cycle
 from engine.flow.sync import modified_name
 from engine.hierarchy.display_names import composed_fallback

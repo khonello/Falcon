@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-Design docs plus a working **Engine** (Phase 1 done bar the LLM benchmark and the WSL check). Next: Phase 2, the Operator Client TUI. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
+Design docs, a working **Engine** (Phase 1 done), and the **Operator Client TUI** (Phase 2 done bar a human interactive pass). Next: Phase 3, the Worker Client. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
 
 Rules from the user:
 - **Never use Docker.** PostgreSQL 18 is installed locally (service `postgresql-x64-18`). Role `falcon`/`falcon`, databases `falcon` (dev) and `falcon_test` (tests wipe and re-migrate it — never point tests at `falcon`).
@@ -29,6 +29,9 @@ $env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   #
 
 environ-operator\Scripts\Activate.ps1
 pip install -e ".[tui]"                    # Operator Client TUI
+python -m engine bootstrap SU-PC           # (from environ-engine, once, empty DB) -> prints the Super User client_id
+python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --plaintext        # interactive TUI
+python -m operator_client --connect --script "tree; tasks"                              # scripted, no TUI
 
 environ-worker\Scripts\Activate.ps1
 pip install -e ".[worker]"                 # Worker Client
@@ -53,7 +56,8 @@ engine/            the Engine (Python, asyncio, asyncpg)
   hierarchy/ task/ flow/ resource/ control/   one package per combo
   updates.py       update/deployment model
   migrations/      SQL, applied by Database.migrate()
-operator_client/   placeholder — Phase 2 (tui/ first, gui/ later, shared connection/state layer)
+common/            code bundled by more than one package (custom_actions validator) — stdlib only
+operator_client/   core/ (connection, state, config, deadlines — no UI deps) + tui/ (shell registry, commands/, app)
 worker_client/     placeholder — Phase 3 (headless service; narrow UI as TUI first)
 tests/             protocol, socket smoke, units, migrations, repos, per-combo end-to-end (conftest: DB-backed Engine + `connect(client_id)`)
 ```
@@ -61,6 +65,7 @@ tests/             protocol, socket smoke, units, migrations, repos, per-combo e
 Conventions in the scaffold:
 - Handlers: `@handler("area.op") async def fn(ctx: Context, payload: dict) -> dict`; check roles with `engine.permissions` (`require_role`, `require_department_scope`), parse fields with `int_field`/`str_field`, raise `ProtocolError(ErrorCode.X)` for typed errors, return JSON-safe dicts via `engine.serialize.row/rows`.
 - All SQL lives in `engine/database.py` repos — never in handlers. In-memory registries expose `reset_state()` and are cleared in `Engine.__init__`.
+- Operator Client: commands are `@command("name", "sub", usage, help)` in `operator_client/tui/commands/`, take `(ctx, args)` and return text; they must not import prompt_toolkit (only `tui/app.py` does) so `run_script` and the tests work from `environ-engine`. `ClientState.on_push` is the single place pushes update indicators/session.
 - Message types are `<area>.<op>`; only `auth.*` and `system.*` are accepted before the handshake.
 - Anything reacting to file activity subscribes via `engine.file_index.subscribe(...)` — never its own detection.
 - Reports are raised only through `engine.hierarchy.reports.emit()`; audit only through `engine.audit.record()`.

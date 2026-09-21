@@ -73,22 +73,19 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 The TUI is how the built system gets tested before any GUI work. It sits on a connection/state
 layer the GUI will reuse unchanged.
 
-- [ ] `operator_client/core/`: Engine connection (NDJSON over TLS, handshake), request/push
-      routing, session/permission state model, local config (last Engine address, cached lists)
-- [ ] `operator_client/tui/` shell: role-scoped navigation, status bar (session, deadline,
-      ping indicator), push notifications surfaced live
-- [ ] Hierarchy: tree, traverse / end / extend, red banner state, blocked/ended transitions,
-      display names, report list/mark, routing config (open item 10.2)
-- [ ] Task: propose → review/correct/resolve collision → create; list/get with stack status;
-      start (as assignee); manual verify
-- [ ] Flow: create (consent / collision / cycle feedback), edit, pause/resume, status +
-      failure suggestion, history
-- [ ] Resource/Assistance: violations, search, ping + status, message channel with turn lock,
-      listeners (own additions only)
-- [ ] Control: action library incl. Custom (pre-send validation via `custom_actions.validate`),
-      events, run/terminate, dashboard view (refresh mechanism — open item 10.1)
-- [ ] Updates: approve, rollout, health view
-- [ ] Assisted Access: request / availability / accept / close
+- [x] `operator_client/core/`: `EngineConnection` (NDJSON over TCP/TLS, handshake with the final auth shape, request futures, push subscribers, retry), `ClientState` (identity, session, red banner, blocked state, pulsing indicators from pushes), `LocalConfig` (JSON), `deadlines.resolve_phrase`
+- [x] `operator_client/tui/` shell: command registry + `key=value` grammar, `run_line`/`run_script` (UI-free), prompt_toolkit app with completion, bottom toolbar (role, session, SUPER USER banner, BLOCKED, pulsing indicators), live push printing
+- [x] Hierarchy: `tree`, `traverse`/`end`/`extend`/`session`/`claim`, `name set|self`, `names`, `dept add`, `account add|offboard`, `pc add`
+- [x] Task: `task propose` (flags, collisions, split, deadline phrase → local time), `task item add|rm|file`, `task create [none]`, `tasks`, `task <id>`, `task stack|start|verify`
+- [x] Flow: `flow create` (stages/branches by index, consent/collision feedback), `flow consent|edit|pause|resume|delete|history|trigger`, `flows`, `flow <id>`
+- [x] Resource/Assistance: `violations`, `violation resolve`, `tag`, `search`, `ping`/`pings`/`respond`, `msg`/`channel`/`channels`, `close channel`, `listen`/`listeners`
+- [x] Control: `actions`, `action add|custom|rm|run` (Custom validated locally via `common.custom_actions` before sending), `events`, `event add|enable|disable|actions`, `dashboard`, `exec`, `terminate`, `validate`
+- [x] Updates: `updates`, `update approve|rollout|prompt`
+- [x] Assisted Access: `assist available|helpers|request|accept|decline|close|status`
+- [x] Reports/alerts: `reports`, `report mark`, `routing`, `routing set`, `addressed`, `alerts`, `alert`
+- [x] `python -m engine bootstrap <hostname>` provisions the first Super User on an empty database
+- [x] Verified live: Engine on the dev DB, Super User builds departments/accounts, Admin proposes with the real local LLM, edits, creates, traverses; 8 client tests in the suite (80 total)
+- [ ] Interactive session pass by a human (the prompt_toolkit loop itself is not exercised by tests)
 
 ---
 

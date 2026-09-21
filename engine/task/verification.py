@@ -128,6 +128,24 @@ async def check_create_collisions(engine: Engine, items: list[VerificationItem],
     return collisions
 
 
+async def bind_existing_files(engine: Engine, structure: ProposedStructure, assignee_pc_id: int | None) -> None:
+    """Update/Exists items must point at a file in the Global File Index on the assignee's PC
+    (Task -> Target selection constraints). Exactly one match binds it; otherwise the assigner
+    picks from the candidates (or the index) -- never guessed."""
+    pc_ids = [assignee_pc_id] if assignee_pc_id is not None else None
+    for idx, item in enumerate(structure.items):
+        if item.target_type != "file" or item.intent not in ("update", "exists"):
+            continue
+        matches = await engine.file_index.name_collisions(item.name, pc_ids=pc_ids)
+        if len(matches) == 1:
+            item.file_index_id = matches[0]["id"]
+            continue
+        structure.flags.append({"kind": "file_not_indexed", "item_index": idx, "name": item.name,
+                                "candidates": [{"file_index_id": m["id"], "path": m["path"]} for m in matches],
+                                "ask": (f"{item.name} is not indexed on the assignee's PC -- pick a file"
+                                        if not matches else f"several files named {item.name} -- pick one")})
+
+
 # --- stack evaluation ---------------------------------------------------------------------------
 
 async def evaluate_item(engine: Engine, task: dict[str, Any], item: dict[str, Any]) -> str:

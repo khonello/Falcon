@@ -38,7 +38,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["protocol*", "engine*", "operator_client*", "worker_client*"]
+include = ["protocol*", "common*", "engine*", "operator_client*", "worker_client*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
