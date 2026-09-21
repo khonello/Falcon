@@ -76,6 +76,7 @@ class Database:
         self.audit = AuditRepo(self)
         self.updates = UpdatesRepo(self)
         self.alerts = AlertsRepo(self)
+        self.resource = ResourceRepo(self)
 
     @property
     def connected(self) -> bool:
@@ -402,6 +403,11 @@ class FileIndexRepo(_Repo):
 
     async def by_hash(self, content_hash: str) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._COLS} FROM file_index WHERE content_hash = $1", content_hash)
+
+    async def set_tag(self, file_index_id: int, resource_tag: str | None, scope_department_id: int | None) -> None:
+        await self._exec(
+            "UPDATE file_index SET resource_tag = $2, resource_tag_scope_department_id = $3 WHERE id = $1",
+            file_index_id, resource_tag, scope_department_id)
 
     async def under_path(self, pc_id: int, directory: str, *, limit: int = 20) -> list[dict[str, Any]]:
         """Indexed entries below a directory on a PC (case-insensitive, slash-agnostic)."""
@@ -771,10 +777,11 @@ class AssistanceRepo(_Repo):
             "UPDATE pings SET addressed_at = now() WHERE receiver_account_id = $1 AND sender_account_id = $2 "
             "AND addressed_at IS NULL", receiver_account_id, sender_account_id)
 
-    async def open_channel(self, ping_id: int, initiator_account_id: int, superior_account_id: int) -> int:
+    async def open_channel(self, ping_id: int, initiator_account_id: int, superior_account_id: int,
+                           first_turn: str = "sender") -> int:
         return await self._val(
             "INSERT INTO message_channels (opened_via_ping_id, initiator_account_id, superior_account_id, turn) "
-            "VALUES ($1, $2, $3, 'sender') RETURNING id", ping_id, initiator_account_id, superior_account_id)
+            "VALUES ($1, $2, $3, $4) RETURNING id", ping_id, initiator_account_id, superior_account_id, first_turn)
 
     async def channel(self, channel_id: int) -> dict[str, Any] | None:
         return await self._one("SELECT * FROM message_channels WHERE id = $1", channel_id)
@@ -1055,3 +1062,48 @@ class AlertsRepo(_Repo):
 
     async def pending(self) -> list[dict[str, Any]]:
         return await self._fetch("SELECT * FROM system_alerts WHERE deliver_at > now() ORDER BY deliver_at")
+
+
+# ============================================================================================
+# 6. Resource
+# ============================================================================================
+
+class ResourceRepo(_Repo):
+    async def record_violation(self, file_index_id: int, expected_tag: str, found_on_pc_id: int,
+                               detected_via: str, surfaced_to_account_id: int) -> int:
+        return await self._val(
+            "INSERT INTO resource_violations (file_index_id, expected_tag, found_on_pc_id, detected_via, "
+            "surfaced_to_account_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            file_index_id, expected_tag, found_on_pc_id, detected_via, surfaced_to_account_id)
+
+    async def attach_report(self, violation_id: int, report_id: int) -> None:
+        await self._exec("UPDATE resource_violations SET report_id = $2 WHERE id = $1", violation_id, report_id)
+
+    async def open_violation_for_file(self, file_index_id: int) -> dict[str, Any] | None:
+        return await self._one(
+            "SELECT * FROM resource_violations WHERE file_index_id = $1 AND resolved_at IS NULL", file_index_id)
+
+    async def violation(self, violation_id: int) -> dict[str, Any] | None:
+        return await self._one(
+            "SELECT v.*, f.path, f.filename, p.department_id FROM resource_violations v "
+            "JOIN file_index f ON f.id = v.file_index_id JOIN pcs p ON p.id = v.found_on_pc_id WHERE v.id = $1",
+            violation_id)
+
+    async def list_violations(self, *, department_id: int | None = None, account_id: int | None = None,
+                              unresolved_only: bool = True) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT v.*, f.path, f.filename, p.hostname, p.department_id FROM resource_violations v "
+            "JOIN file_index f ON f.id = v.file_index_id JOIN pcs p ON p.id = v.found_on_pc_id "
+            "WHERE ($1::int IS NULL OR p.department_id = $1) AND ($2::int IS NULL OR v.surfaced_to_account_id = $2) "
+            "AND (NOT $3 OR v.resolved_at IS NULL) ORDER BY v.detected_at DESC",
+            department_id, account_id, unresolved_only)
+
+    async def resolve(self, violation_id: int) -> None:
+        await self._exec("UPDATE resource_violations SET resolved_at = now() WHERE id = $1 AND resolved_at IS NULL",
+                         violation_id)
+
+    async def ignored_file_ids(self, pc_id: int) -> set[int]:
+        """Files on a PC currently ignored by the system: unresolved violations."""
+        rows = await self._fetch(
+            "SELECT file_index_id FROM resource_violations WHERE found_on_pc_id = $1 AND resolved_at IS NULL", pc_id)
+        return {r["file_index_id"] for r in rows}

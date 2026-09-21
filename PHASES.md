@@ -57,8 +57,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Task: Ollama-style local LLM client (stdlib HTTP, None-on-failure, backoff); `llm_available` surfaced to the client
 - [ ] Task: benchmark the decision graph against real descriptions with a local model (pick Qwen3 size empirically)
 - [x] Flow: create/edit with consent (by authority; owner asked, flow paused until answered), pre-flight collision (confirm or change path), overlap-aware cycle prevention, resource-folder exclusion; propagation relayed via flow.read → flow.content → flow.apply with per-destination stage chains; write attribution vs external edits → `-modified` + re-sync; branch-scoped failure with reactive suggestion + report; resume/pause/delete/history
-- [ ] Resource: violation detection from index events, ignore-that-file, user notification, report
-- [ ] Assistance: ping status push, channel open/turn-lock/close, listeners (scoped query)
+- [x] Resource: tags derived from tier folders, admin/restricted tracked by hash system-wide, violations logged + surfaced to the user + reported, only that file ignored (Flow skips it), resolve lifts it; explicit tagging (admin tier Super User only)
+- [x] Assistance: tier-scoped search; pings between direct vertical pairs with pulsing status push; channel opens on response (sender speaks first), Engine-enforced turn lock, superior-only close; listeners per-adder, live silent pushes, listener_report
 - [ ] Control: event matching (`condition_spec` shape), polled evaluation, execution lifecycle, terminate, dashboard query
 - [ ] Custom Actions: Engine-side validation on create
 - [ ] Updates: approval gate, rollout, status ingestion, escalation threshold (open item 10.4), health view

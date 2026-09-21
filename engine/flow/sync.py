@@ -94,6 +94,10 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
     if not engine.db.connected or event["op"] == "delete":
         return
     pc_id = event["pc_id"]
+    # A file under an unresolved Resource violation is ignored by the system (Resource ->
+    # Compliance): Flow never moves it.
+    if event.get("file_index_id") in await engine.db.resource.ignored_file_ids(pc_id):
+        return
     # Source side: does this event fall under an active flow's source directory?
     for src in await engine.db.flows.sources_for_pc(pc_id):
         rel = relative_under(event["path"], src["source_path"])

@@ -5,7 +5,7 @@ from engine.flow.flows import has_cycle
 from engine.flow.sync import modified_name
 from engine.hierarchy.display_names import composed_fallback
 from engine.hierarchy.traversal import can_traverse_to, relationship
-from engine.resource.assistance import next_turn
+from engine.resource.assistance import superior_of, turn_of
 from engine.resource.resource import allowed_tags_for, tag_allowed_on
 from engine.task.verification import VerificationItem
 
@@ -48,11 +48,19 @@ def test_access_tags():
     assert ("admin", None) in allowed_tags_for("super_user", None)
 
 
-def test_message_channel_turns():
-    sup, sub = 10, 20
-    assert next_turn(None, sup, sub) == sub
-    assert next_turn(sub, sup, sub) == sup
-    assert next_turn(sup, sup, sub) == sub
+def test_message_channel_turns_and_superior():
+    admin = {"id": 10, "role": "admin", "department_id": 1}
+    worker = {"id": 20, "role": "worker", "department_id": 1}
+    other_worker = {"id": 21, "role": "worker", "department_id": 2}
+    su = {"id": 1, "role": "super_user", "department_id": None}
+    assert superior_of(worker, admin)["id"] == 10 and superior_of(admin, worker)["id"] == 10
+    assert superior_of(other_worker, admin) is None            # not their department
+    assert superior_of(admin, su)["id"] == 1 and superior_of(worker, su) is None
+    assert superior_of(admin, {"id": 11, "role": "admin", "department_id": 2}) is None
+    chan = {"initiator_account_id": 20, "superior_account_id": 10, "turn": "sender", "_other": 20}
+    assert turn_of(chan) == 20
+    chan["turn"] = "superior"
+    assert turn_of(chan) == 10
 
 
 def test_verification_item_validation():
