@@ -205,8 +205,15 @@ Where the code stands (so a future session can pick up or discard it):
   `ConnectView`, plus `Tasks/Flows/Control/Assistance/Reports` moved onto the tokens.
 - All wired through `FalconBridge`; 105 tests green including `tests/test_operator_gui.py`.
 
-When resumed, build to `design-brief.md`, not to the current screens. The remaining named work:
-- [ ] Design (by a designer) reaching "acceptable", then approved — the gate for everything below
+**23 Sep 2026 — the design now exists and the rebuild has started.** A full design was made, reviewed
+screen by screen, and published to a canvas (45 boards); the generator for it is committed in `design/`
+and `design/HANDOFF.md` is the snapshot to resume from. The QML kit and the Hierarchy screen are rebuilt
+on it for both roles; the other views are still the pre-kit ones, mounted hidden so their tests pass.
+
+When resumed, build to `design-brief.md` and the canvas, not to the old screens. The remaining named work:
+- [x] Design reaching "acceptable", then approved — canvas <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw>
+- [ ] Port the Super User dashboards (`D01`–`D03`) into QML as its home
+- [ ] Port the Admin views one at a time against their boards, deleting each legacy view as it lands
 - [ ] Fine-tune each surface to its concept (per `design-brief.md`): traversal/session, task proposal review, **flow as a graph**, resource tiers/violations, assistance channels, automation dashboard, reports/routing/alerts/updates, indicators
 - [ ] Worker Overlay + Dialog designs
 - [ ] Window prefs / layout persistence (`LocalConfig.prefs`)

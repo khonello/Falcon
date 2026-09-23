@@ -33,3 +33,7 @@ models/
 
 # Engine host state: master secret (never commit), TLS material
 data/
+
+# design boards are generated output
+design/boards/
+design/shots/
