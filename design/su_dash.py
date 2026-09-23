@@ -141,7 +141,8 @@ def org_map(w=600, h=300, focus=None):
 
 def arcs(w=440, h=150):
     """Cross-department assistance: who helped whom, and how often. Thickness is the count."""
-    xs = {"Operations": 80, "Finance": 220, "Logistics": 360}
+    names = ["Operations", "Finance", "Logistics"]
+    xs = {n: (w * (i + 1)) / (len(names) + 1) for i, n in enumerate(names)}
     base = h - 34
     out = []
     for a, b, n in [("Operations", "Finance", 2), ("Finance", "Logistics", 1)]:
@@ -179,7 +180,7 @@ def routing(w=440, h=190):
     return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" aria-label="Report routing">{"".join(out)}</svg>'
 
 
-def day_timeline(w=600, h=250):
+def day_timeline(w=600, h=250, lane_h=22):
     """A day on every PC: who held each session, and for how long. One lane per PC, 08:00 to 18:00."""
     lanes = [("Kojo", [("native", 8.2, 12.0), ("native", 13.0, 17.4)]),
              ("Efua", [("quiet", 8.0, 18.0)]),
@@ -192,7 +193,7 @@ def day_timeline(w=600, h=250):
     t0, t1 = 8.0, 18.0
     label_w = 62
     plot = w - label_w - 8
-    lane_h, gap = 22, 10
+    gap = 10
     out = []
     for hour in range(8, 19, 2):
         x = label_w + ((hour - t0) / (t1 - t0)) * plot

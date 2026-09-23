@@ -32,6 +32,8 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 | `mood.py` | the component mood board (M01–M15): every component in three or four approaches |
 | `su_mood.py` | the Super User mood board (S01–S04): shape, figures, authority, descent |
 | `su_dash.py` | the Super User dashboards (D01–D04): the charts, and the descent into one department |
+| `charts.py`, `charts2.py` | the chart mood boards (C01–C10): **one chart type per board, four ways to draw it** |
+| `layouts.py` | the layout-structure boards (L01–L06): the same content in three, four and five panels |
 | `shot_gui.py` | renders the **real QML app** offscreen with a stubbed bridge (it answers the same handlers the views call), for before/after screenshots |
 
 `boards/` is generated output and is not committed.
