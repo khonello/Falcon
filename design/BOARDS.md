@@ -11,6 +11,7 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `C01`–`C10` | **Charts.** One chart type per board, four ways to draw it. Pick one per slot. |
 | `L01`–`L06` | **Layouts.** Ways of arranging a page's slots. Pick one per page. |
 | `X01`–`X02` | **Behaviour.** How a slot is chosen, and what happens when a chart is clicked. |
+| `P01`–`P04` | **The pages, composed.** The density system, and the three pages built from it. **Start here — these supersede `L01`–`L06` as the proposal.** |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
 | everything else | The Admin screens, the worker surfaces, the language, the dialogs. |
@@ -70,6 +71,34 @@ What actually happened today.
 |---|---|
 | `X01` | A slot can be drawn several ways. The control lives in the slot's own header, and the choice is remembered per slot. One choice, set once — not a button met on every panel every day. |
 | `X02` | The pages are visual and nearly wordless. Clicking a chart (or one mark in it) settles the chart to one side and brings text beside it: one sentence, then facts one line each, then at most one action. The chart never leaves the screen — the text is an extension of it. |
+
+## Panel density — how a page explains itself
+
+A page of mute charts makes you click to learn anything. Instead the layout carries the explanation:
+a page runs from shape to words across its reading order, diagonally — picture at the top left,
+sentences at the bottom right. To make that a system rather than one nice arrangement, a panel has a
+**density**, and a layout is a sequence of densities.
+
+| | Density | What it holds |
+|---|---|---|
+| 1 | **Figure** | a number and a word — no chart, no sentence |
+| 2 | **Chart** | a shape and its legend — no sentence |
+| 3 | **Chart, told** | a shape, and the one sentence it is making |
+| 4 | **Reading** | a sentence, facts one line each, one small mark, at most one action |
+
+`P01` is the vocabulary; `P02`–`P04` are the three pages composed from it.
+
+**Clicking is not gone.** The page answers the *page-level* question without it; a click still answers
+the *item-level* one (`X02`) — "why is LOG-02 failing" cannot be pre-written for every bar.
+
+**Where the sentences come from** is the part of this that can go wrong, so it is a rule:
+a sentence is *generated* from a condition, never written; one template per condition, filled from the
+same data the chart drew; when no condition matches it states the plain fact ("All 14 PCs are on 1.4.2.")
+and never manufactures an insight; twelve words or fewer; and it says what the chart says, not what
+someone should feel about it.
+
+**Layout is editorial, not a preference.** One layout per page, chosen once. Per-viewer rearranging would
+mean no two people see the same system and "the top right panel" stops being a thing you can say aloud.
 
 ## The test a chart has to pass
 

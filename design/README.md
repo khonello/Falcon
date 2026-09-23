@@ -37,6 +37,7 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 | `layouts.py` | the layout-structure boards (L01–L06): the same content in three, four and five panels |
 | `index_board.py` | `INDEX` — the contents page: which board is what, and which page's slot it fills |
 | `interaction.py` | `X01`–`X02` — how a slot is chosen, and what happens when a chart is clicked |
+| `pages.py` | `P01`–`P04` — the four panel densities, and the three pages composed from them |
 | `shot_gui.py` | renders the **real QML app** offscreen with a stubbed bridge (it answers the same handlers the views call), for before/after screenshots |
 
 `boards/` is generated output and is not committed.
