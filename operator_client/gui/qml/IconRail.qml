@@ -11,25 +11,33 @@ Item {
     signal picked(int index)
 
     readonly property var adminNav: [
-        { icon: "hierarchy",  label: "Hierarchy" },
-        { icon: "tasks",      label: "Tasks" },
-        { icon: "flows",      label: "Flows" },
-        { icon: "automation", label: "Automation" },
-        { icon: "play",       label: "Actions" },
-        { icon: "assistance", label: "Assistance" },
-        { icon: "reports",    label: "Reports" }
+        { key: "hierarchy",  icon: "hierarchy",  label: "Hierarchy" },
+        { key: "tasks",      icon: "tasks",      label: "Tasks" },
+        { key: "flows",      icon: "flows",      label: "Flows" },
+        { key: "automation", icon: "automation", label: "Automation" },
+        { key: "actions",    icon: "play",       label: "Actions" },
+        { key: "assistance", icon: "assistance", label: "Assistance" },
+        { key: "reports",    icon: "reports",    label: "Reports" }
     ]
-    // governance, not operation: no Automation, no Actions -- that combo is reached by entering an Admin
+    // governance, not operation: no Automation, no Actions -- that combo is reached by entering an
+    // Admin. It leads with Overview because the Super User's first job is to see the whole system.
     readonly property var superNav: [
-        { icon: "hierarchy",  label: "Hierarchy" },
-        { icon: "eye",        label: "Views" },
-        { icon: "reports",    label: "Reports" },
-        { icon: "shield",     label: "Updates" },
-        { icon: "tasks",      label: "Tasks" },
-        { icon: "flows",      label: "Flows" },
-        { icon: "assistance", label: "Assistance" }
+        { key: "overview",   icon: "pulse",      label: "Overview" },
+        { key: "hierarchy",  icon: "hierarchy",  label: "Hierarchy" },
+        { key: "views",      icon: "eye",        label: "Views" },
+        { key: "reports",    icon: "reports",    label: "Reports" },
+        { key: "updates",    icon: "shield",     label: "Updates" },
+        { key: "tasks",      icon: "tasks",      label: "Tasks" },
+        { key: "flows",      icon: "flows",      label: "Flows" },
+        { key: "assistance", icon: "assistance", label: "Assistance" }
     ]
     readonly property var nav: role === "super_user" ? superNav : adminNav
+    readonly property string currentKey: current < nav.length ? nav[current].key : ""
+
+    function indexOfKey(key) {
+        for (var i = 0; i < nav.length; i++) if (nav[i].key === key) return i
+        return -1
+    }
 
     implicitWidth: Theme.railWidth
 

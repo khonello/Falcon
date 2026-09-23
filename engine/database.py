@@ -312,6 +312,14 @@ class SessionsRepo(_Repo):
     async def list_active(self) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE s.ended_at IS NULL ORDER BY s.pc_id")
 
+    async def list_since(self, since: datetime, *, department_id: int | None = None) -> list[dict[str, Any]]:
+        """Every session that was open at any point since `since` -- ended ones included. The day's
+        record: no status changes, nothing deleted, so a session read here is exactly what happened."""
+        return await self._fetch(
+            f"SELECT {self._COLS}, p.hostname, p.department_id {self._FROM} JOIN pcs p ON p.id = s.pc_id "
+            "WHERE (s.ended_at IS NULL OR s.ended_at >= $1) AND ($2::int IS NULL OR p.department_id = $2) "
+            "ORDER BY p.hostname, s.entered_at", since, department_id)
+
     async def open(self, pc_id: int, occupant_account_id: int, occupied_via: str,
                    deadline_at: datetime | None, un_evictable: bool) -> int:
         """INSERT; the partial unique index `one_active_session_per_pc` refuses an occupied PC.
@@ -1037,7 +1045,7 @@ class UpdatesRepo(_Repo):
     async def pcs_behind(self, version_id: int) -> list[dict[str, Any]]:
         """PCs not confirmed on `version_id` -- the hard gate for approving N+1."""
         return await self._fetch(
-            "SELECT p.id, p.hostname, p.department_id, s.current_version_id FROM pcs p "
+            "SELECT p.id, p.hostname, p.department_id, s.current_version_id, s.escalated_at FROM pcs p "
             "LEFT JOIN pc_version_status s ON s.pc_id = p.id "
             "WHERE s.current_version_id IS DISTINCT FROM $1 ORDER BY p.department_id, p.hostname", version_id)
 

@@ -31,7 +31,8 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 | `v2.py`, `v3.py` | earlier passes kept for the states, worker surfaces and dialogs they still own |
 | `mood.py` | the component mood board (M01–M15): every component in three or four approaches |
 | `su_mood.py` | the Super User mood board (S01–S04): shape, figures, authority, descent |
-| `shot_gui.py` | renders the **real QML app** offscreen with a stubbed bridge, for before/after screenshots |
+| `su_dash.py` | the Super User dashboards (D01–D04): the charts, and the descent into one department |
+| `shot_gui.py` | renders the **real QML app** offscreen with a stubbed bridge (it answers the same handlers the views call), for before/after screenshots |
 
 `boards/` is generated output and is not committed.
 
@@ -41,8 +42,9 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 2. Publish the changed `boards/*.dc.html` to the canvas (as `project/<name>.dc.html`).
 3. Carry it into `operator_client/gui/qml/` — tokens to `Theme.qml`, components to the kit files, screens
    to `<Name>View.qml`.
-4. Screenshot the running app with `shot_gui.py <out-dir> <admin|super_user> [rail-index]` and check the
-   two match.
+4. Screenshot the running app with `shot_gui.py <out-dir> <admin|super_user> [rail-index] [page] [department]`
+   and check the two match. Edge writes its screenshot after the process returns, and only to an absolute
+   path.
 
 The design rules these boards encode (one gradient frame, four toned meanings, one-line rows, the detail
 card that never closes, no tables, no left-edge accents) are written on the `Tokens` board.

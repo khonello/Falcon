@@ -287,6 +287,30 @@ async def session_state(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     }
 
 
+@handler("hierarchy.sessions_today")
+async def sessions_today(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """The record of the day: who held each PC and for how long, ended sessions included.
+    {"hours"?: int} -- how far back to look, 1..168, 12 by default. Super User sees every
+    department, an Admin only their own. Nothing here is a status change; it is what happened."""
+    ident = require_role(ctx, "super_user", "admin")
+    db = ctx.engine.db
+    hours = int_field(payload, "hours", required=False) or 12
+    since = _now() - timedelta(hours=min(max(hours, 1), 168))
+    department_id = None if ident.role == "super_user" else ident.department_id
+    found = await db.sessions.list_since(since, department_id=department_id)
+    names = await db.accounts.display_names_for(
+        ident.account_id, sorted({s["occupant_account_id"] for s in found}))
+    out = []
+    for s in found:
+        view = _session_view(s, names)
+        view["hostname"] = s["hostname"]
+        view["department_id"] = s["department_id"]
+        view["ended_at"] = s["ended_at"].isoformat() if s["ended_at"] else None
+        view["ended_reason"] = s["ended_reason"]
+        out.append(view)
+    return {"since": since.isoformat(), "now": _now().isoformat(), "sessions": out}
+
+
 @handler("hierarchy.claim_native")
 async def claim_native(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """A Worker/Admin client (re-)claims its own PC after a block is released."""

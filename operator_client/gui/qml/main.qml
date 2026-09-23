@@ -26,6 +26,13 @@ ApplicationWindow {
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint | Qt.CustomizeWindowHint
 
     property int view: 0
+    // which surface is up is a name, not a number: the two roles have different rails, and the
+    // rail owns the list. Views switch each other with shell.show("hierarchy").
+    readonly property string viewKey: rail.currentKey
+    function show(key) {
+        var i = rail.indexOfKey(key)
+        if (i >= 0) shell.view = i
+    }
     // the views not yet rebuilt call root.notify(): keep that name resolving while they are ported
     property var root: shell
     function notify(text, alert) { toast.show(text, alert) }
@@ -80,6 +87,7 @@ ApplicationWindow {
             spacing: 0
 
             IconRail {
+                id: rail
                 Layout.preferredWidth: Theme.railWidth
                 Layout.fillHeight: true
                 role: falcon.role
@@ -109,11 +117,20 @@ ApplicationWindow {
                         ConnectView { objectName: "connectView" }
 
                         Item {
+                            // Super User leads with the dashboards; both roles keep the hierarchy
+                            // screen as the place work is actually done.
+                            OverviewView {
+                                id: overview
+                                objectName: "overviewView"
+                                anchors.fill: parent
+                                visible: shell.viewKey === "overview"
+                            }
+
                             HomeView {
                                 id: home
                                 objectName: "hierarchyRail"      // the hierarchy tree lives here now
                                 anchors.fill: parent
-                                visible: shell.view === 0
+                                visible: shell.viewKey === "hierarchy"
                             }
 
                             // ported one at a time; mounted so their state and tests keep working
@@ -130,7 +147,7 @@ ApplicationWindow {
                             // the views not yet rebuilt on the new kit keep their own surface
                             Item {
                                 anchors.fill: parent
-                                visible: shell.view !== 0
+                                visible: shell.viewKey !== "hierarchy" && shell.viewKey !== "overview"
                                 Column {
                                     anchors.centerIn: parent
                                     spacing: 12

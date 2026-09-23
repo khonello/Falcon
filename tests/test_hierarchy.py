@@ -135,6 +135,39 @@ async def test_network_drop_mid_traversal_expires_by_the_same_deadline(engine, o
     assert (await engine.db.sessions.by_id(sid))["ended_reason"] == "network_drop_deadline_expired"
 
 
+# --- the record of the day ----------------------------------------------------------------------
+
+async def test_sessions_today_keeps_ended_sessions_and_stays_in_scope(engine, org, connect):
+    """What the Super User dashboard draws its timeline from: sessions are never deleted, so an
+    ended traversal is still in the record, and an Admin only ever sees their own department."""
+    a1 = await connect("cid-a1")
+    await connect("cid-w1")                       # a native session on FIN-01
+    entered = await a1.ok("hierarchy.traverse", {"pc_id": org["w2_pc"]})
+    sid = entered["session"]["session_id"]
+    await a1.ok("hierarchy.end_session", {"session_id": sid})
+
+    su = await connect("cid-su")
+    res = await su.ok("hierarchy.sessions_today")
+    by_host = {s["hostname"]: s for s in res["sessions"] if s["pc_id"] == org["w2_pc"]}
+    assert by_host["FIN-02"]["ended_at"] is not None
+    assert by_host["FIN-02"]["ended_reason"] == "voluntary"
+    assert by_host["FIN-02"]["occupied_via"] == "traversal"
+    assert by_host["FIN-02"]["occupant_account_id"] == org["a1"]
+    assert {s["hostname"] for s in res["sessions"]} >= {"FIN-01", "FIN-02"}
+
+    # an Admin sees their department only; HR's Admin never appears in Finance's record
+    a2 = await connect("cid-a2")
+    hr = await a2.ok("hierarchy.sessions_today")
+    assert all(s["department_id"] == org["hr"] for s in hr["sessions"])
+    assert await (await connect("cid-w1")).err("hierarchy.sessions_today") == "forbidden"
+
+    # the window is honoured: nothing that ended before it
+    await engine.db.pool.execute("UPDATE sessions SET entered_at = now() - interval '3 days', "
+                                 "ended_at = now() - interval '3 days' WHERE id = $1", sid)
+    narrow = await su.ok("hierarchy.sessions_today", {"hours": 2})
+    assert sid not in {s["session_id"] for s in narrow["sessions"]}
+
+
 # --- tree & display names -----------------------------------------------------------------------
 
 async def test_tree_scope_and_display_names_do_not_propagate(engine, org, connect):

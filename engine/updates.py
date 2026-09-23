@@ -33,7 +33,8 @@ log = logging.getLogger(__name__)
 
 def _behind_view(rows_: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"pc_id": r["id"], "hostname": r["hostname"], "department_id": r["department_id"],
-             "current_version_id": r["current_version_id"]} for r in rows_]
+             "current_version_id": r["current_version_id"],
+             "escalated": r.get("escalated_at") is not None} for r in rows_]
 
 
 @handler("updates.current")
@@ -132,12 +133,13 @@ async def rollout_health(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     db = ctx.engine.db
     cur = await db.updates.current_version()
     health = await db.updates.rollout_health_by_department()
+    behind = await db.updates.pcs_behind(cur["id"]) if cur else []
     if ident.role == "admin":
         health = [h for h in health if h["department_id"] == ident.department_id]
-        behind = [b for b in (await db.updates.pcs_behind(cur["id"]) if cur else [])
-                  if b["department_id"] == ident.department_id]
-        return {"version": row(cur), "departments": rows(health), "pcs_behind": _behind_view(behind)}
-    return {"version": row(cur), "departments": rows(health)}
+        behind = [b for b in behind if b["department_id"] == ident.department_id]
+    # Super User sees every PC that is behind, not only the per-department totals: the fleet is
+    # what the N+1 gate is actually held on, so it is drawn one square per PC.
+    return {"version": row(cur), "departments": rows(health), "pcs_behind": _behind_view(behind)}
 
 
 @handler("updates.prompt_admin")

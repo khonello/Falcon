@@ -43,6 +43,14 @@ QtObject {
     readonly property color dangerDeep: "#B92828"
     readonly property color assistDeep: "#0E6E77"
 
+    // --- charts -------------------------------------------------------------------------------
+    // Identity (which department) uses a validated categorical ramp, checked against the chart
+    // surface below. State (confirmed / behind / failing) keeps the four reserved meanings above
+    // and always carries a word beside the hue -- a colour alone never says what happened.
+    readonly property color chartBg: ground
+    readonly property var chartSeries: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"]
+    function series(i) { return chartSeries[((i % 5) + 5) % 5] }
+
     // --- selection ----------------------------------------------------------------------------
     readonly property color select: "#33446B"                                   // a selected sidebar row
     readonly property color selectSub: Qt.rgba(1, 1, 1, 0.68)

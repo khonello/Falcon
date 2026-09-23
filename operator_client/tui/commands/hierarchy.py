@@ -72,6 +72,22 @@ async def session(ctx: ShellContext, args: Args) -> str:
             f"you: {_session_line(res['my_session'])}" + ("\nBLOCKED" if res["blocked"] else ""))
 
 
+@command("sessions", usage="[hours=<n>]",
+         help_="The record of the day: who held each PC and for how long, ended sessions included")
+async def sessions(ctx: ShellContext, args: Args) -> str:
+    payload = {"hours": args.opt_int("hours")} if args.opt("hours") else {}
+    res = await ctx.call("hierarchy.sessions_today", payload)
+    if not res["sessions"]:
+        return f"(no sessions since {res['since'][11:16]})"
+    lines = [f"since {res['since'][11:16]}"]
+    for s in res["sessions"]:
+        span = f"{s['entered_at'][11:16]}-{s['ended_at'][11:16] if s['ended_at'] else 'now '}"
+        tag = "native" if s["occupied_via"] == "native" else s["occupied_via"].upper()
+        ended = f"  ({s['ended_reason']})" if s["ended_reason"] else ""
+        lines.append(f"  {s['hostname']:<12} {span}  {tag:<15} {s.get('occupant_name') or '?'}{ended}")
+    return "\n".join(lines)
+
+
 @command("claim", help_="Re-claim your own PC after a block is released")
 async def claim(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("hierarchy.claim_native")

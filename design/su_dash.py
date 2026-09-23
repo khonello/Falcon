@@ -100,8 +100,10 @@ def trend(points, w=440, h=96, colour=None, label=""):
             f'</svg>')
 
 
-def org_map(w=600, h=300):
-    """Department -> Admin -> PC, drawn. Colour is the department; the shape is the level."""
+def org_map(w=600, h=300, focus=None):
+    """Department -> Admin -> PC, drawn. Colour is the department; the shape is the level.
+    With `focus`, the same drawing quietens every other department: descent is a change of
+    attention, not a different picture."""
     root = (46, h / 2)
     depts = [("Operations", 2, 7), ("Finance", 1, 4), ("Logistics", 0, 3)]
     dx, px = 210, 400
@@ -109,23 +111,29 @@ def org_map(w=600, h=300):
     spread = [h * 0.22, h * 0.5, h * 0.78]
     for i, (name, admins, pcs) in enumerate(depts):
         c = DEPT_COLOR[name]
+        on = focus is None or focus == name
+        fade = "" if on else ' opacity="0.22"'
         dy = spread[i]
         links.append(f'<path d="M{root[0] + 10} {root[1]} C {(root[0] + dx) / 2} {root[1]}, {(root[0] + dx) / 2} {dy}, {dx - 9} {dy}" '
-                     f'fill="none" stroke="{c}" stroke-width="1.5" opacity="0.55"/>')
-        nodes.append(f'<circle cx="{dx}" cy="{dy}" r="8" fill="{c}"/>')
-        labels.append(f'<text x="{dx - 14}" y="{dy + 4}" text-anchor="end" fill="{T["ink"]}" font-family="{T["sans"]}" font-size="12.5">{name}</text>')
+                     f'fill="none" stroke="{c}" stroke-width="1.5" opacity="{0.55 if on else 0.14}"/>')
+        nodes.append(f'<circle cx="{dx}" cy="{dy}" r="{10 if focus == name else 8}" fill="{c}"{fade}/>')
+        if focus == name:
+            nodes.append(f'<circle cx="{dx}" cy="{dy}" r="15" fill="none" stroke="{c}" stroke-width="1.5" opacity="0.45"/>')
+        lx = dx - (22 if focus == name else 14)
+        labels.append(f'<text x="{lx}" y="{dy + 4}" text-anchor="end" fill="{T["ink"] if on else T["faint"]}" '
+                      f'font-family="{T["sans"]}" font-size="12.5" font-weight="{600 if focus == name else 400}">{name}</text>')
         # the PCs of this department, as a small constellation
         per_row = 4
         for k in range(pcs):
             ox = px + (k % per_row) * 22
             oy = dy - 18 + (k // per_row) * 20
             links.append(f'<path d="M{dx + 9} {dy} C {(dx + px) / 2} {dy}, {(dx + px) / 2} {oy}, {ox - 5} {oy}" fill="none" '
-                         f'stroke="{c}" stroke-width="1" opacity="0.28"/>')
-            nodes.append(f'<circle cx="{ox}" cy="{oy}" r="5" fill="{c}" opacity="0.85"/>')
+                         f'stroke="{c}" stroke-width="1" opacity="{0.28 if on else 0.08}"/>')
+            nodes.append(f'<circle cx="{ox}" cy="{oy}" r="5" fill="{c}" opacity="{0.85 if on else 0.2}"/>')
         if admins == 0:
-            labels.append(f'<text x="{dx - 14}" y="{dy + 20}" text-anchor="end" fill="{T["danger"]}" font-family="{T["sans"]}" font-size="11.5">no Admin</text>')
+            labels.append(f'<text x="{lx}" y="{dy + 21}" text-anchor="end" fill="{T["danger"] if on else T["faint"]}" font-family="{T["sans"]}" font-size="11.5">no Admin</text>')
         else:
-            labels.append(f'<text x="{dx - 14}" y="{dy + 20}" text-anchor="end" fill="{T["faint"]}" font-family="{T["sans"]}" font-size="11.5">{admins} Admin{"s" if admins > 1 else ""}</text>')
+            labels.append(f'<text x="{lx}" y="{dy + 21}" text-anchor="end" fill="{T["faint"]}" font-family="{T["sans"]}" font-size="11.5">{admins} Admin{"s" if admins > 1 else ""}</text>')
     nodes.append(f'<circle cx="{root[0]}" cy="{root[1]}" r="10" fill="{T["ink"]}"/>')
     labels.append(f'<text x="{root[0]}" y="{root[1] + 26}" text-anchor="middle" fill="{T["dim"]}" font-family="{T["sans"]}" font-size="12">you</text>')
     return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" aria-label="The hierarchy">{"".join(links + nodes + labels)}</svg>'
@@ -217,36 +225,85 @@ def tier_bars(w=440):
     return f'<svg width="{w}" height="{y}" viewBox="0 0 {w} {y}" aria-label="Violations by tier">{"".join(out)}</svg>'
 
 
+
+# ------------------------------------------------------------------ per-department health
+# A small multiple: the same two bars, drawn once per department, to one scale. Identity is the
+# swatch; state is the reserved colours, and the legend carries the words.
+WORDS = {"tasks": [("On track", "confirmed"), ("Due soon", "behind"), ("Overdue", "failing")],
+         "flows": [("Syncing", "confirmed"), ("Paused", "behind"), ("Failing", "failing")]}
+
+
+def mini_bar(parts, w=162, h=9):
+    total = max(1, sum(v for _, v in parts))
+    x, out = 0, []
+    out.append(f'<rect x="0" y="0" width="{w}" height="{h}" rx="{h / 2}" fill="{T["line"]}" opacity="0.55"/>')
+    for state, v in parts:
+        if v <= 0:
+            continue
+        sw = max(4, (v / total) * w - 2)
+        out.append(f'<rect x="{x:.1f}" y="0" width="{sw:.1f}" height="{h}" rx="{h / 2}" fill="{ST[state]}"/>')
+        x += sw + 2
+    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>'
+
+
+def health_line(label, parts, w=162):
+    total = sum(v for _, v in parts)
+    head = row(txt(label, 11.5, T["dim"]), txt(str(total), 11.5, T["faint"], mono=True),
+               gap=8, justify="space-between", extra="width: 100%;")
+    return col(head, mini_bar(parts, w=w), gap=5, extra="width: 100%;")
+
+
+def health_card(name, colour, tasks, flows, w=190):
+    return col(row(swatch(colour, "dot"), txt(name, 12.5, T["ink"], 600), gap=7),
+               health_line("Tasks", tasks, w=w - 28), health_line("Flows", flows, w=w - 28),
+               gap=11, extra=f"width: {w}px; padding: 13px 14px; border-radius: 12px; background: {T['pane']}; "
+                             "box-sizing: border-box; flex: none;")
+
+
+def health_panel(w=650):
+    cards = [health_card("Operations", DEPT_COLOR["Operations"], [("confirmed", 5), ("behind", 2), ("failing", 1)],
+                         [("confirmed", 3), ("behind", 0), ("failing", 1)]),
+             health_card("Finance", DEPT_COLOR["Finance"], [("confirmed", 3), ("behind", 0), ("failing", 0)],
+                         [("confirmed", 2), ("behind", 1), ("failing", 0)]),
+             health_card("Logistics", DEPT_COLOR["Logistics"], [("confirmed", 1), ("behind", 1), ("failing", 2)],
+                         [("confirmed", 0), ("behind", 0), ("failing", 0)])]
+    return panel("Work, by department", "the same two bars, three times",
+                 row(*cards, gap=14, align="stretch"),
+                 legend([("On track", ST["confirmed"]), ("Due soon", ST["behind"]), ("Overdue / failing", ST["failing"])],
+                        "Logistics has no Admin, and no flows"), w=w)
+
+
 # ------------------------------------------------------------------ D01: the system at a glance
 def d01():
     heroes = row(hero("14", "client PCs", "across 3 departments"),
                  hero("12", "on 1.4.2", "2 still behind", "warn"),
                  hero("2", "waiting on you", "approval, and an empty department", "danger"),
                  hero("4", "traversals today", "1 still open"),
-                 gap=40, extra="flex: none;")
+                 gap=64, extra="flex: none;")
 
     roll = panel("Rollout 1.4.2", "by department, to the same scale",
                  stacked_bars([("Operations", [("confirmed", 6), ("behind", 1), ("failing", 0)]),
                                ("Finance", [("confirmed", 4), ("behind", 0), ("failing", 0)]),
-                               ("Logistics", [("confirmed", 2), ("behind", 0), ("failing", 1)])]),
+                               ("Logistics", [("confirmed", 2), ("behind", 0), ("failing", 1)])], w=640),
                  legend([("Confirmed", ST["confirmed"]), ("Behind", ST["behind"]), ("Failing", ST["failing"])],
-                        "1.4.3 stays blocked until all 14 confirm"), w=490)
+                        "1.4.3 stays blocked until all 14 confirm"), w=690)
 
     fleet = panel("The fleet", "one square per PC",
                   waffle([("confirmed", "OPS-01")] * 6 + [("behind", "OPS-06 retrying")] +
-                         [("confirmed", "FIN")] * 4 + [("confirmed", "LOG")] * 2 + [("failing", "LOG-02, 6 failures")], cols=7, w=210),
-                  legend([("Confirmed", ST["confirmed"]), ("Behind", ST["behind"]), ("Failing", ST["failing"])]), w=250)
+                         [("confirmed", "FIN")] * 4 + [("confirmed", "LOG")] * 2 + [("failing", "LOG-02, 6 failures")],
+                         cols=14, size=30, gap=8, w=524),
+                  legend([("Confirmed", ST["confirmed"]), ("Behind", ST["behind"]), ("Failing", ST["failing"])]), w=654)
 
     tr = panel("Confirmations", "since the rollout was approved, Monday",
-               trend([0, 3, 6, 8, 10, 11, 12], w=760, h=110, label="PCs confirmed on 1.4.2"),
-               row(*[txt(d, 11.5, T["faint"], extra="width: 104px; text-align: center;") for d in
-                     ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Today"]], gap=0), w=800)
+               trend([0, 3, 6, 8, 10, 11, 12], w=640, h=118, label="PCs confirmed on 1.4.2"),
+               row(*[txt(d, 11.5, T["faint"], extra="width: 88px; text-align: center;") for d in
+                     ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Today"]], gap=0), w=690)
 
     inner = col(row(f'<span style="width: 10px; height: 26px; border-radius: 3px; background: #fff;"></span>',
                     txt("Everything", 22, "#fff", 700), txt("3 departments  ·  3 Admins  ·  14 client PCs", 13, T["frame_dim"]), gap=12),
-                col(heroes, gap=0, extra=f"padding: 18px 20px; border-radius: 16px; background: {CHART_BG};"),
-                row(roll, fleet, gap=16, align="flex-start"),
-                tr,
+                col(heroes, gap=0, extra=f"padding: 20px 24px; border-radius: 16px; background: {CHART_BG};"),
+                row(roll, fleet, gap=16, align="stretch", extra="flex: 1; min-height: 0;"),
+                row(tr, health_panel(w=654), gap=16, align="stretch", extra="flex: 1; min-height: 0;"),
                 gap=16, extra=f"width: {W}px; height: {H}px; box-sizing: border-box; padding: 26px 40px; background: {FRAME['native']}; overflow: hidden;")
     return page("Super User: the system at a glance", "", "", inner, "", "native")
 
@@ -254,7 +311,8 @@ def d01():
 # ------------------------------------------------------------------ D02: the hierarchy, seen
 def d02():
     themap = panel("The hierarchy", "every department, Admin and PC you govern", org_map(w=620, h=290),
-                   legend([(d, c) for d, c in DEPT_COLOR.items()], "colour is the department, everywhere"), w=660)
+                   legend([(d, c) for d, c in DEPT_COLOR.items()],
+                          "colour is the department, everywhere  ·  pick one to descend into it"), w=660)
     arcp = panel("Assistance between departments", "peer help, by consent", arcs(w=420, h=150),
                  txt("You see every session and gate none of them.", 11.5, T["faint"]), w=460)
     rout = panel("Report routing", "additive: routing never takes your copy away", routing(w=420, h=190), w=460)
@@ -286,6 +344,51 @@ def d03():
     return page("Super User: the record", "", "", inner, "", "native")
 
 
+
+# ------------------------------------------------------------------ D04: descending into one department
+# Descent is a change of attention, not a different picture: the same map, everything else quietened,
+# and the right-hand column swaps from the system's relationships to this department's own numbers.
+def d04():
+    themap = panel("The hierarchy", "Operations, in place", org_map(w=620, h=250, focus="Operations"),
+                   legend([(d, c) for d, c in DEPT_COLOR.items()], "back out by picking `Everything`"), w=690)
+
+    people = panel("Its Admins", "who governs here",
+                   col(*[row(f'<span style="width: 30px; height: 30px; border-radius: 9px; background: {T["line2"]}; '
+                             f'display: inline-flex; align-items: center; justify-content: center; font-family: {T["sans"]}; '
+                             f'font-size: 11.5px; font-weight: 600; color: {T["ink"]}; flex: none;">{ini}</span>',
+                             col(txt(name, 13, T["ink"], 500), txt(host, 11.5, T["faint"], mono=True), gap=1),
+                             f'<span style="flex: 1;"></span>', chip(state, tone, 11), gap=11,
+                             extra="padding: 8px 0;")
+                         for ini, name, host, state, tone in
+                         [("RM", "R. Mensah", "WS-OPS-A1", "At the PC", "neutral"),
+                          ("AQ", "A. Quaye", "WS-OPS-A2", "Helping Finance", "accent")]], gap=0), w=690)
+
+    lanes = panel("Sessions today, here", "who held each PC, and for how long", day_timeline(w=610, h=250),
+                  legend([("At the PC", T["line2"]), ("An Admin entered", T["warn"]), ("You entered", T["danger"])]), w=654)
+
+    work = panel("Operations, in numbers", "its rollout, and its work",
+                 stacked_bars([("Rollout", [("confirmed", 6), ("behind", 1), ("failing", 0)])], w=606),
+                 row(health_card("Tasks and flows", DEPT_COLOR["Operations"],
+                                 [("confirmed", 5), ("behind", 2), ("failing", 1)],
+                                 [("confirmed", 3), ("behind", 0), ("failing", 1)], w=290),
+                     col(hero("1", "PC behind", "OPS-06, retrying", "warn"),
+                         hero("2", "waiting on you", "a ping, and a violation", "danger"), gap=18),
+                     gap=20, align="flex-start"),
+                 legend([("Confirmed / on track", ST["confirmed"]), ("Behind / due soon", ST["behind"]),
+                         ("Failing / overdue", ST["failing"])]), w=654)
+
+    inner = col(row(txt("Everything", 13, T["frame_faint"]), txt("›", 13, T["frame_faint"]),
+                    txt("Operations", 13, T["frame_dim"], 600), gap=8),
+                row(f'<span style="width: 10px; height: 26px; border-radius: 3px; background: {DEPT_COLOR["Operations"]};"></span>',
+                    txt("Operations", 22, "#fff", 700),
+                    txt("2 Admins  ·  7 client PCs  ·  6 on 1.4.2", 13, T["frame_dim"]), gap=12),
+                row(col(themap, people, gap=16, extra="flex: none;"), col(lanes, work, gap=16, extra="flex: none;"),
+                    gap=16, align="flex-start", extra="flex: 1; min-height: 0;"),
+                gap=14, extra=f"width: {W}px; height: {H}px; box-sizing: border-box; padding: 26px 40px; background: {FRAME['native']}; overflow: hidden;")
+    return page("Super User: descending into a department", "", "", inner, "", "native")
+
+
 SU_DASH = [("D01-Glance.dc.html", "Super User: the system at a glance", d01),
            ("D02-Hierarchy.dc.html", "Super User: the hierarchy, seen", d02),
-           ("D03-Record.dc.html", "Super User: the record of a day", d03)]
+           ("D03-Record.dc.html", "Super User: the record of a day", d03),
+           ("D04-Department.dc.html", "Super User: descending into a department", d04)]

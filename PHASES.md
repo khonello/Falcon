@@ -212,7 +212,12 @@ on it for both roles; the other views are still the pre-kit ones, mounted hidden
 
 When resumed, build to `design-brief.md` and the canvas, not to the old screens. The remaining named work:
 - [x] Design reaching "acceptable", then approved — canvas <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw>
-- [ ] Port the Super User dashboards (`D01`–`D03`) into QML as its home
+- [x] Port the Super User dashboards (`D01`–`D03`) into QML as its home — rail entry **Overview**, three
+      pages (`GlancePage`, `HierarchyPage`, `RecordPage`) on a new chart kit (`Panel`, `Legend`, `Hero`,
+      `StackedBars`, `Waffle`, `Trend`, `MiniBar`, `HealthCard`, `OrgMap`, `Arcs`, `RoutingMap`,
+      `DayTimeline`, `TierBars`), all fed by real handlers
+- [x] Push the dashboards further — descend into a department from the map (`D04-Department`), the
+      timeline on real sessions (`hierarchy.sessions_today`), per-department task/flow small multiple
 - [ ] Port the Admin views one at a time against their boards, deleting each legacy view as it lands
 - [ ] Fine-tune each surface to its concept (per `design-brief.md`): traversal/session, task proposal review, **flow as a graph**, resource tiers/violations, assistance channels, automation dashboard, reports/routing/alerts/updates, indicators
 - [ ] Worker Overlay + Dialog designs
