@@ -30,13 +30,14 @@ def figure_band(h=104):
                             f"height: {h}px; box-sizing: border-box; flex: none;")
 
 
-def lshell(title, sub, structure, note, pill=0):
+def lshell(title, sub, structure, note, pill=0, brow=""):
     pills = row(*[f'<span style="display: inline-flex; align-items: center; height: 30px; padding: 0 15px; '
                   f'border-radius: 999px; background: {T["select"] if i == pill else T["ground"]}; '
                   f'color: {"#fff" if i == pill else T["dim"]}; font-family: {T["sans"]}; font-size: 13px; '
                   f'font-weight: 600;">{p}</span>'
                   for i, p in enumerate(["At a glance", "The hierarchy", "The record"])], gap=7, extra="flex: none;")
-    header = col(txt("Everything", 13, T["frame_dim"], 600),
+    header = col(brow if brow else "",
+                 txt("Everything", 13, T["frame_dim"], 600),
                  row(f'<span style="width: 10px; height: 26px; border-radius: 3px; background: #fff;"></span>',
                      txt(title, 22, "#fff", 700), txt(sub, 13, T["frame_dim"]), gap=12),
                  pills, gap=12, extra="flex: none;")
@@ -111,7 +112,8 @@ def l01():
                    extra="flex: 1; min-height: 0;"),
                gap=LGAP, extra=f"height: {LH}px; display: flex; flex-direction: column;")
     return lshell("Everything", "3 departments · 3 Admins · 14 client PCs", body,
-                  "L01 · Three panels — a band of figures over two charts. Numbers first, charts explain.")
+                  "L01 · Three panels — a band of figures over two charts. Numbers first, charts explain.",
+                  brow=eyebrow("LAYOUT", "arranges the slots into 3 panels", "suits page 1 — At a glance"))
 
 
 def l02():
@@ -122,7 +124,8 @@ def l02():
                    extra="flex: 1; min-width: 0; display: flex; flex-direction: column;"),
                gap=LGAP, align="stretch", extra=f"height: {LH}px;")
     return lshell("Everything", "3 departments · 3 Admins · 14 client PCs", body,
-                  "L02 · Three panels — one subject, two supporting. The shape for a page that is about one thing.", 1)
+                  "L02 · Three panels — one subject, two supporting. The shape for a page that is about one thing.", 1,
+                  brow=eyebrow("LAYOUT", "arranges the slots into 3 panels", "suits page 2 — The hierarchy"))
 
 
 def l03():
@@ -134,7 +137,8 @@ def l03():
                    extra="flex: 1; min-height: 0;"),
                gap=LGAP, extra=f"height: {LH}px; display: flex; flex-direction: column;")
     return lshell("Everything", "3 departments · 3 Admins · 14 client PCs", body,
-                  "L03 · Four panels, even — a survey. Nothing claims to matter more than anything else.")
+                  "L03 · Four panels, even — a survey. Nothing claims to matter more than anything else.",
+                  brow=eyebrow("LAYOUT", "arranges the slots into 4 panels", "a survey; suits no one page in particular"))
 
 
 def l04():
@@ -145,7 +149,8 @@ def l04():
                    gap=LGAP, extra="flex: none; display: flex; flex-direction: column;"),
                gap=LGAP, align="stretch", extra=f"height: {LH}px;")
     return lshell("Everything", "Today, 08:00 to now", body,
-                  "L04 · Four panels, weighted — one lead story, three glances beside it.", 2)
+                  "L04 · Four panels, weighted — one lead story, three glances beside it.", 2,
+                  brow=eyebrow("LAYOUT", "arranges the slots into 4 panels", "suits page 3 — The record"))
 
 
 def l05():
@@ -158,7 +163,8 @@ def l05():
                    extra="flex: 1; min-height: 0;"),
                gap=LGAP, extra=f"height: {LH}px; display: flex; flex-direction: column;")
     return lshell("Everything", "3 departments · 3 Admins · 14 client PCs", body,
-                  "L05 · Five panels — the most a page carries before the titles start doing the navigating.")
+                  "L05 · Five panels — the most a page carries before the titles start doing the navigating.",
+                  brow=eyebrow("LAYOUT", "arranges the slots into 5 panels", "suits page 1 when it carries more"))
 
 
 def l06():
@@ -178,7 +184,8 @@ def l06():
                    extra="flex: none; display: flex; flex-direction: column;"),
                gap=LGAP, align="stretch", extra=f"height: {LH}px;")
     return lshell("Everything", "3 departments · 3 Admins · 14 client PCs", body,
-                  "L06 · Five panels, asymmetric — a triage column on the left, the substance beside it.")
+                  "L06 · Five panels, asymmetric — a triage column on the left, the substance beside it.",
+                  brow=eyebrow("LAYOUT", "arranges the slots into 5 panels", "suits page 1 when triage comes first"))
 
 
 LAYOUTS = [("L01-Three-Band.dc.html", "Three: a band and two charts", l01),

@@ -75,6 +75,7 @@ ICONS = {
     "clock": '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
     "chev": '<path d="M9 6l6 6-6 6"/>',
     "chevd": '<path d="M6 9l6 6 6-6"/>',
+    "chart": '<path d="M4 19V9M10 19V5M16 19v-6M22 19H2"/>',
     "plus": '<path d="M12 5v14M5 12h14"/>',
     "check": '<path d="M5 12l5 5 9-10"/>',
     "x": '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -1111,7 +1112,7 @@ def screen_tokens():
 
 # ------------------------------------------------------------------ the screens, by module
 # Each module is plain Python executed in this namespace: they share the tokens and helpers above.
-for _module in ("v2", "v3", "v4", "v5", "v6", "v7", "v8", "mood", "su_mood", "su_dash", "charts", "charts2", "layouts"):
+for _module in ("v2", "v3", "v4", "v5", "v6", "v7", "v8", "mood", "su_mood", "su_dash", "charts", "charts2", "layouts", "index_board", "interaction"):
     exec(compile((Path(__file__).parent / (_module + ".py")).read_text(encoding="utf-8"), _module + ".py", "exec"))
 
 
@@ -1119,7 +1120,7 @@ for _module in ("v2", "v3", "v4", "v5", "v6", "v7", "v8", "mood", "su_mood", "su
 for _n, _f in (("Lane-Filled.dc.html", screen_lane_filled), ("Lane-Empty.dc.html", screen_lane_empty)):
     (OUT / _n).write_text(_f(), encoding="utf-8")
 
-SCREENS = [
+SCREENS = INDEX + [
     # row 1: the shell and its states of authority
     ("Main.dc.html", "Admin at home", screen_admin_home),
     ("SuperUser.dc.html", "Super User at home", screen_su_home),
@@ -1146,7 +1147,7 @@ SCREENS = [
     ("Worker.dc.html", "Worker: Overlay and Dialog", screen_worker),
     ("Tokens.dc.html", "The language", screen_tokens),
     ("Dialogs.dc.html", "Dialogs and the plus menu", screen_dialogs),
-] + MOOD + SU_MOOD + SU_DASH + CHART_MOOD + CHART_MOOD_2 + LAYOUTS
+] + MOOD + SU_MOOD + SU_DASH + CHART_MOOD + CHART_MOOD_2 + LAYOUTS + INTERACTION
 ROW_TITLES = ["The shell: one gradient frame, the state band says whose authority you are under", "Timed sessions, occupation, peer help", "Work: decide, wire, run", "Policy, reports, states", "Worker surfaces, the language, dialogs",
               "Mood board 1: cards, rows, status, decisions", "Mood board 2: sessions, titles, talk", "Mood board 3: the shell, bands, rails, sidebar, top bar, indicators, inspector", "Mood board 4: buttons, chips, inputs, avatars, feel", "Mood board 5: density, metrics, notices, logs, hierarchy shapes, creating"]
 

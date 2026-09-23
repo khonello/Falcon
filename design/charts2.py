@@ -9,27 +9,31 @@ DEPTS = ["Operations", "Finance", "Logistics"]
 
 
 # ------------------------------------------------------------------ C06: assistance
-def chord(w=340, h=280):
-    """A circle of departments with the help drawn across it. Direction is the taper: thick where
-    it left, thin where it arrived."""
-    cx, cy, r = w / 2, h / 2 - 6, 96
-    pos = {}
-    out = []
-    for i, d in enumerate(DEPTS):
-        ang = _math.radians(-90 + i * (360 / len(DEPTS)))
-        pos[d] = (cx + _math.cos(ang) * r, cy + _math.sin(ang) * r, ang)
-    out.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{T["line"]}" stroke-width="1"/>')
+def gave_received(w=520):
+    """Per department: how much help it gave, and how much it took. Two numbers each, which is
+    what a Super User is actually checking -- is one department carrying the others."""
+    out, y = [], 22
+    out.append(f'<text x="200" y="10" text-anchor="middle" fill="{T["faint"]}" font-family="{T["sans"]}" font-size="11.5">Gave</text>')
+    out.append(f'<text x="330" y="10" text-anchor="middle" fill="{T["faint"]}" font-family="{T["sans"]}" font-size="11.5">Took</text>')
+    totals = {d: [0, 0] for d in DEPTS}
     for a, b, n in PAIRS:
-        xa, ya, _ = pos[a]
-        xb, yb, _ = pos[b]
-        out.append(f'<path d="M{xa:.1f} {ya:.1f} Q {cx} {cy} {xb:.1f} {yb:.1f}" fill="none" '
-                   f'stroke="{DEPT_COLOR[a]}" stroke-width="{1.5 + n * 2}" opacity="0.8" stroke-linecap="round"/>')
-    for d, (x, y, ang) in pos.items():
-        out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="8" fill="{DEPT_COLOR[d]}"/>')
-        lx, ly = cx + _math.cos(ang) * (r + 26), cy + _math.sin(ang) * (r + 26)
-        out.append(f'<text x="{lx:.1f}" y="{ly + 4:.1f}" text-anchor="middle" fill="{T["dim"]}" '
-                   f'font-family="{T["sans"]}" font-size="12">{d}</text>')
-    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>'
+        totals[a][0] += n
+        totals[b][1] += n
+    m = max(max(v) for v in totals.values()) or 1
+    for d in DEPTS:
+        gave, took = totals[d]
+        out.append(f'<circle cx="8" cy="{y - 4}" r="6" fill="{DEPT_COLOR[d]}"/>')
+        out.append(f'<text x="24" y="{y}" fill="{T["ink"]}" font-family="{T["sans"]}" font-size="12.5">{d}</text>')
+        for k, (v, anchor) in enumerate(((gave, 200), (took, 330))):
+            bw = (v / m) * 78
+            out.append(f'<rect x="{anchor - 39}" y="{y - 13}" width="78" height="14" rx="7" fill="{T["line"]}" opacity="0.6"/>')
+            if v:
+                out.append(f'<rect x="{anchor - 39}" y="{y - 13}" width="{max(8, bw):.1f}" height="14" rx="7" '
+                           f'fill="{DEPT_COLOR[d]}" opacity="0.85"/>')
+            out.append(f'<text x="{anchor + 48}" y="{y}" fill="{T["faint"]}" font-family="{T["mono"]}" font-size="11.5">{v}</text>')
+        y += 34
+    return f'<svg width="{w}" height="{y}" viewBox="0 0 {w} {y}">{"".join(out)}</svg>'
+
 
 
 def ribbons(w=520, h=230):
@@ -74,11 +78,13 @@ def pair_rows(w=520):
 
 def c06():
     note = txt("You see every session and gate none of them.", 11.5, T["faint"])
-    return mood("Assistance, four ways", "cross-department help today — by consent, never gated", [
-        variant("A · Arcs", "a baseline of peers, help drawn over it", arcs(w=540, h=200), CW, CH, note),
-        variant("B · Chord", "a circle of peers; thickness is the count", chord(w=540, h=270), CW, CH, note),
+    return mood("Assistance, four ways", "cross-department help today — by consent, never gated",
+                brow=eyebrow("CHART", "fills the Assistance slot", "page 2, The hierarchy"), cells=[
+        variant("A · One line per pair", "reads as a sentence, and says 'never' out loud",
+                pair_rows(w=540), CW, CH, note),
+        variant("B · Gave and took", "is one department carrying the others?", gave_received(w=540), CW, CH, note),
         variant("C · Ribbons", "direction is the layout, not an arrowhead", ribbons(w=540), CW, CH, note),
-        variant("D · One line per pair", "reads as a sentence; says 'never' out loud", pair_rows(w=540), CW, CH, note),
+        variant("D · Arcs", "the prettiest, and the slowest to read", arcs(w=540, h=200), CW, CH, note),
     ])
 
 
@@ -113,24 +119,20 @@ def sankey(w=520, h=250):
     return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>'
 
 
-def orbit(w=460, h=250):
-    """You are the centre and cannot be routed away from; a category that is also routed puts a
-    coloured arc on the ring around you."""
-    cx, cy = w / 2 - 40, h / 2
-    out = [f'<circle cx="{cx}" cy="{cy}" r="13" fill="{T["ink"]}"/>',
-           f'<text x="{cx}" y="{cy + 34}" text-anchor="middle" fill="{T["dim"]}" font-family="{T["sans"]}" font-size="12">you</text>']
-    for i, (cat, to, n) in enumerate(CATS):
-        r = 34 + i * 17
-        out.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{T["line"]}" stroke-width="6" opacity="0.7"/>')
-        for k, d in enumerate(to):
-            c = 2 * _math.pi * r
-            seg = c * 0.26
-            off = -c * (0.06 + k * 0.30)
-            out.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{DEPT_COLOR[d]}" stroke-width="6" '
-                       f'stroke-linecap="round" stroke-dasharray="{seg:.1f} {c:.1f}" stroke-dashoffset="{off:.1f}"/>')
-        out.append(f'<text x="{w - 150}" y="{28 + i * 26}" fill="{T["dim"]}" font-family="{T["sans"]}" font-size="12">{cat}</text>')
-        out.append(f'<circle cx="{w - 162}" cy="{24 + i * 26}" r="4" fill="{DEPT_COLOR[to[0]] if to else T["line2"]}"/>')
-    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>'
+def routing_cards(w=540):
+    """One card per category: who always gets it, and who else. No geometry to learn -- the word
+    'always' does the work the diagram was doing."""
+    cards = []
+    for cat, to, n in CATS:
+        chips = row(chip("You", "accent", 11), *[chip(d, "neutral", 11) for d in to], gap=6)
+        cards.append(col(row(txt(cat, 12.5, T["ink"], 600),
+                             f'<span style="flex: 1;"></span>',
+                             txt(f"{n} today", 11, T["faint"], mono=True), gap=8, extra="width: 100%;"),
+                         chips, gap=9,
+                         extra=f"width: {(w - 12) // 2}px; padding: 12px 14px; border-radius: 12px; "
+                               f"background: {T['pane']}; box-sizing: border-box;"))
+    return row(*cards, gap=12, extra="flex-wrap: wrap;")
+
 
 
 def routing_rows(w=540):
@@ -148,13 +150,16 @@ def routing_rows(w=540):
 
 def c07():
     note = txt("Additive: routing never takes your copy away.", 11.5, T["faint"])
-    return mood("Report routing, four ways", "five categories; two of them also reach a department", [
-        variant("A · Flow lines", "every category reaches you, some reach further",
-                routing(w=540, h=210), CW, CH, note),
-        variant("B · Sankey", "thickness is how loud the category is", sankey(w=540, h=250), CW, CH, note),
-        variant("C · Orbit", "you are the centre and cannot be routed away", orbit(w=540, h=250), CW, CH, note),
-        variant("D · Lines, no diagram", "the plainest thing that still says additive",
+    return mood("Report routing, four ways", "five categories; two of them also reach a department",
+                brow=eyebrow("CHART", "fills the Report routing slot", "page 2, The hierarchy"), cells=[
+        variant("A · Lines, no diagram", "the plainest thing that still says additive",
                 routing_rows(), CW, CH, note),
+        variant("B · A card per category", "the word 'always' does the diagram's job",
+                routing_cards(), CW, CH, note),
+        variant("C · Flow lines", "every category reaches you, some reach further",
+                routing(w=540, h=210), CW, CH, note),
+        variant("D · Sankey", "thickness is how loud the category is; earns its place only when volumes differ",
+                sankey(w=540, h=250), CW, CH, note),
     ])
 
 
@@ -200,7 +205,8 @@ def tier_single(w=520, h=34):
 
 def c08():
     note = txt("budget-2026.xlsx, found in /workers/ on OPS-07 at 10:41.", 11.5, T["faint"])
-    return mood("Violations, four ways", "a tier is a policy, so a zero keeps its row", [
+    return mood("Violations, four ways", "a tier is a policy, so a zero keeps its row",
+                brow=eyebrow("CHART", "fills the Violations by tier slot", "page 3, The record"), cells=[
         variant("A · Bars", "the one on the boards now", tier_bars(w=540), CW, CH, note),
         variant("B · Lollipops", "the count is a position, not an area", lollipop(w=540), CW, CH, note),
         variant("C · Tiles", "each tier is an object you can act on", tier_tiles(), CW, CH, note),
@@ -273,7 +279,9 @@ def work_columns(w=520, h=190):
 
 def c09():
     lg = legend([("On track", ST["confirmed"]), ("Needs attention", ST["behind"]), ("Overdue", ST["failing"])])
-    return mood("Work by department, four ways", "tasks and flows, the same two measures each time", [
+    return mood("Work by department, four ways", "tasks and flows, the same two measures each time",
+                brow=eyebrow("CHART", "fills the Work, by department slot", "page 1, At a glance — and page 2 when descended"),
+                cells=[
         variant("A · Two bars in a card", "the one on the boards now",
                 row(*[health_card(n, DEPT_COLOR[n], list(zip(WORK_TONES, t)), list(zip(WORK_TONES, f)), w=168)
                       for n, (t, f) in WORK.items()], gap=14), CW, CH, lg),
@@ -328,7 +336,8 @@ def figures(kind):
 
 
 def c10():
-    return mood("The figures, four ways", "the four numbers the Super User opens on", [
+    return mood("The figures, four ways", "the four numbers the Super User opens on",
+                brow=eyebrow("CHART", "fills the The figures slot", "page 1, At a glance"), cells=[
         variant("A · Numbers alone", "nothing competes with the figure", figures("plain"), CW, CH),
         variant("B · Number and share", "a rule under it says how big the whole is", figures("bar"), CW, CH),
         variant("C · Number and trend", "the figure plus where it came from", figures("spark"), CW, CH),

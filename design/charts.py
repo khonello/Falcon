@@ -22,11 +22,21 @@ def variant(caption, note, body, w, h=None, foot=""):
                      f"background: {CHART_BG}; box-sizing: border-box; flex: none;")
 
 
-def mood(title, sub, cells, gap=16):
-    inner = col(row(f'<span style="width: 10px; height: 26px; border-radius: 3px; background: #fff;"></span>',
+def eyebrow(kind, phrase, where):
+    """The line that stops a board being a mystery: what it is, what it is for, which page."""
+    tag = (f'<span style="display: inline-flex; align-items: center; height: 20px; padding: 0 9px; '
+           f'border-radius: 6px; background: rgba(255,255,255,0.14); color: #fff; font-family: {T["mono"]}; '
+           f'font-size: 11px; font-weight: 500; flex: none;">{kind}</span>')
+    return row(tag, txt(phrase, 12, T["frame_dim"]),
+               txt("·", 12, T["frame_faint"]), txt(where, 12, T["frame_dim"]), gap=8, extra="flex: none;")
+
+
+def mood(title, sub, cells, gap=16, brow=""):
+    inner = col(brow if brow else "",
+                row(f'<span style="width: 10px; height: 26px; border-radius: 3px; background: #fff;"></span>',
                     txt(title, 22, "#fff", 700), txt(sub, 13, T["frame_dim"]), gap=12, extra="flex: none;"),
                 row(*cells, gap=gap, align="flex-start", extra="flex-wrap: wrap;"),
-                gap=16, extra=f"width: {W}px; height: {H}px; box-sizing: border-box; padding: 26px 40px; "
+                gap=12, extra=f"width: {W}px; height: {H}px; box-sizing: border-box; padding: 22px 40px; "
                               f"background: {FRAME['native']}; overflow: hidden;")
     return page(title, "", "", inner, "", "native")
 
@@ -118,7 +128,8 @@ def one_bar(rows_, w=560):
 
 def c01():
     lg = legend([(l, ST[t]) for t, l in TONE_ORDER])
-    return mood("Rollout, four ways", "one version across three departments — 12 of 14 confirmed", [
+    return mood("Rollout, four ways", "one version across three departments — 12 of 14 confirmed",
+                brow=eyebrow("CHART", "fills the Rollout slot", "page 1, At a glance"), cells=[
         variant("A · Stacked, one scale", "totals comparable at a glance",
              stacked_bars([(n, [("confirmed", a), ("behind", b), ("failing", f)]) for n, a, b, f in ROLLOUT], w=580),
              CW, CH, lg),
@@ -169,7 +180,7 @@ def grouped_waffle(groups, size=26, gap=7, per_row=7):
     return row(*cols, gap=30, align="flex-start")
 
 
-def strip_fleet(groups, w=560, h=22):
+def strip_fleet(groups, w=560, h=22, gap_y=12):
     """One strip per department: length is its size, and the parts of it that are not confirmed
     are picked out. Reads as a fleet rather than as counted objects."""
     total = max(len(c) for _, c in groups) or 1
@@ -180,34 +191,21 @@ def strip_fleet(groups, w=560, h=22):
         for i, (state, label) in enumerate(cells):
             out.append(f'<rect x="{100 + i * unit:.1f}" y="{y}" width="{unit - 3:.1f}" height="{h}" rx="5" '
                        f'fill="{ST[state]}"><title>{label}</title></rect>')
-        y += h + 12
+        y += h + gap_y
     return f'<svg width="{w}" height="{y}" viewBox="0 0 {w} {y}">{"".join(out)}</svg>'
 
-
-def hex_fleet(cells, cols=7, r=15, gap=4):
-    out = []
-    dx, dy = (r * 1.732 + gap), (r * 1.5 + gap)
-    for i, (state, label) in enumerate(cells):
-        cxi, cyi = i % cols, i // cols
-        cx = cxi * dx + (dx / 2 if cyi % 2 else 0) + r
-        cy = cyi * dy + r
-        pts = " ".join(f"{cx + r * __import__('math').cos(__import__('math').radians(60 * k - 30)):.1f},"
-                       f"{cy + r * __import__('math').sin(__import__('math').radians(60 * k - 30)):.1f}" for k in range(6))
-        out.append(f'<polygon points="{pts}" fill="{ST[state]}"><title>{label}</title></polygon>')
-    rows_n = (len(cells) + cols - 1) // cols
-    w, h = cols * dx + r, rows_n * dy + r
-    return f'<svg width="{w:.0f}" height="{h:.0f}" viewBox="0 0 {w:.0f} {h:.0f}">{"".join(out)}</svg>'
 
 
 def c02():
     lg = legend([(l, ST[t]) for t, l in TONE_ORDER])
-    return mood("The fleet, four ways", "one mark per client PC — 14 of them", [
+    return mood("The fleet, four ways", "one mark per client PC — 14 of them",
+                brow=eyebrow("CHART", "fills the The fleet slot", "page 1, At a glance"), cells=[
         variant("A · Squares", "countable, neutral", waffle(FLEET, cols=7, size=30, gap=8, w=260), CW, CH, lg),
         variant("B · Dots", "lighter; the fleet reads as a population", dot_fleet(FLEET), CW, CH, lg),
         variant("C · Grouped by department", "the split is structural, not a filter",
              grouped_waffle(FLEET_GROUPS), CW, CH, lg),
-        variant("D · A strip per department", "length is the department's size",
-             col(strip_fleet(FLEET_GROUPS, w=560), hex_fleet(FLEET), gap=22), CW, CH, lg),
+        variant("D · A strip per department", "length is the department's size; no counting needed",
+                strip_fleet(FLEET_GROUPS, w=560, h=30, gap_y=16), CW, CH, lg),
     ])
 
 
@@ -272,40 +270,23 @@ def spark_rows(series_map, w=560, h=34):
     return f'<svg width="{w}" height="{total_h}" viewBox="0 0 {w} {total_h}">{"".join(out)}</svg>'
 
 
-def slope(series_map, w=560, h=170):
-    """Monday against today, one line each: the change, with nothing in between to read."""
-    m = max(max(v) for v in series_map.values()) or 1
-    x1, x2 = 130, w - 150
-    out = [f'<line x1="{x1}" y1="14" x2="{x1}" y2="{h - 26}" stroke="{T["line"]}" stroke-width="1"/>',
-           f'<line x1="{x2}" y1="14" x2="{x2}" y2="{h - 26}" stroke="{T["line"]}" stroke-width="1"/>',
-           f'<text x="{x1}" y="{h - 8}" text-anchor="middle" fill="{T["faint"]}" font-family="{T["sans"]}" font-size="11.5">Monday</text>',
-           f'<text x="{x2}" y="{h - 8}" text-anchor="middle" fill="{T["faint"]}" font-family="{T["sans"]}" font-size="11.5">Today</text>']
-    for name, vals in series_map.items():
-        y1 = h - 26 - (vals[0] / m) * (h - 46)
-        y2 = h - 26 - (vals[-1] / m) * (h - 46)
-        c = DEPT_COLOR[name]
-        out.append(f'<line x1="{x1}" y1="{y1:.1f}" x2="{x2}" y2="{y2:.1f}" stroke="{c}" stroke-width="2"/>')
-        out.append(f'<circle cx="{x1}" cy="{y1:.1f}" r="4" fill="{c}"/><circle cx="{x2}" cy="{y2:.1f}" r="4" fill="{c}"/>')
-        out.append(f'<text x="{x1 - 10}" y="{y1 + 4:.1f}" text-anchor="end" fill="{T["dim"]}" font-family="{T["sans"]}" font-size="12">{name}</text>')
-        out.append(f'<text x="{x2 + 10}" y="{y2 + 4:.1f}" fill="{T["ink"]}" font-family="{T["mono"]}" font-size="12">{vals[-1]}</text>')
-    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>'
-
 
 def days_row(w=560):
     return row(*[txt(d, 11.5, T["faint"], extra=f"width: {w // 7}px; text-align: center;") for d in DAYS], gap=0)
 
 
 def c03():
-    return mood("Confirmations, four ways", "PCs confirmed on 1.4.2 since the rollout was approved", [
+    return mood("Confirmations, four ways", "PCs confirmed on 1.4.2 since the rollout was approved",
+                brow=eyebrow("CHART", "fills the Confirmations slot", "page 1, At a glance"), cells=[
         variant("A · Line", "one series, the last point labelled",
              col(trend(SERIES, w=560, h=150), days_row(), gap=4), CW, CH),
         variant("B · Area", "the same line, with weight under it",
              col(area(SERIES), days_row(), gap=4), CW, CH),
         variant("C · Step", "a confirmation is an event, not a slope",
              col(step(SERIES), days_row(), gap=4), CW, CH),
-        variant("D · One line each", "the shape of each department's rollout",
-             col(spark_rows(PER_DEPT), slope(PER_DEPT, h=150), gap=16), CW, CH,
-             legend([(d, c) for d, c in DEPT_COLOR.items()])),
+        variant("D · One line each", "the shape of each department's rollout, and where it got to",
+                spark_rows(PER_DEPT, h=48), CW, CH,
+                legend([(d, c) for d, c in DEPT_COLOR.items()])),
     ])
 
 
@@ -388,7 +369,8 @@ def columns(w=560, h=260):
 
 def c04():
     lg = legend([(d, c) for d, c in DEPT_COLOR.items()], "colour is the department, everywhere")
-    return mood("The hierarchy, four ways", "three departments, three Admins, fourteen client PCs", [
+    return mood("The hierarchy, four ways", "three departments, three Admins, fourteen client PCs",
+                brow=eyebrow("CHART", "fills the The hierarchy slot", "page 2, The hierarchy"), cells=[
         variant("A · Curves", "organic; the one on the boards now", org_map(w=560, h=250), CW, CH, lg),
         variant("B · Indented", "plainest; survives twenty departments", indented_tree(), CW, CH, lg),
         variant("C · Radial", "everything reports to one place", radial(w=560, h=270), CW, CH, lg),
@@ -434,29 +416,28 @@ def heat_grid(w=560, cell_w=None, cell_h=20, gap=3):
     return f'<svg width="{w}" height="{total_h}" viewBox="0 0 {w} {total_h}">{"".join(out)}</svg>'
 
 
-def density(w=560, h=120):
-    """How many PCs were occupied at each moment, as one band. The fleet's day in one shape,
-    with the two entries marked on it rather than listed."""
-    steps = 60
-    out, pts = [], []
-    for s in range(steps + 1):
-        t = T0 + (T1 - T0) * s / steps
-        n = sum(1 for _, blocks in LANES for _, a, b in blocks if a <= t < b)
-        pts.append((8 + (w - 16) * s / steps, h - 24 - (n / max(1, len(LANES))) * (h - 44)))
-    poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-    out.append(f'<polygon points="{poly} {pts[-1][0]:.1f},{h - 24} {pts[0][0]:.1f},{h - 24}" fill="{T["line2"]}" opacity="0.45"/>')
-    out.append(f'<polyline points="{poly}" fill="none" stroke="{T["line2"]}" stroke-width="2"/>')
-    for _, blocks in LANES:
+
+def coverage(w=560, row_h=26, bar=15):
+    """One bar per PC: how many of the day's hours it was in use, segmented by who held them. The
+    question it answers -- 'is this machine being used, and by whom' -- needs no geometry explained."""
+    span = T1 - T0
+    label_w = 62
+    plot = w - label_w - 56
+    out, y = [], 6
+    for name, blocks in LANES:
+        held = sum(b - a for _, a, b in blocks)
+        x = label_w
+        out.append(f'<text x="0" y="{y + bar - 3}" fill="{T["dim"]}" font-family="{T["sans"]}" font-size="12.5">{name}</text>')
+        out.append(f'<rect x="{label_w}" y="{y}" width="{plot}" height="{bar}" rx="{bar / 2}" fill="{T["pane"]}" opacity="0.6"/>')
         for st, a, b in blocks:
-            if st in ("traversed", "su"):
-                x = 8 + (w - 16) * (a - T0) / (T1 - T0)
-                out.append(f'<line x1="{x:.1f}" y1="{h - 24}" x2="{x:.1f}" y2="18" stroke="{KIND[st]}" stroke-width="2"/>')
-                out.append(f'<circle cx="{x:.1f}" cy="18" r="4" fill="{KIND[st]}"/>')
-    out.append(f'<line x1="0" y1="{h - 24}" x2="{w}" y2="{h - 24}" stroke="{T["line"]}" stroke-width="1"/>')
-    for hour in range(8, 19, 2):
-        x = 8 + (w - 16) * (hour - T0) / (T1 - T0)
-        out.append(f'<text x="{x:.1f}" y="{h - 8}" text-anchor="middle" fill="{T["faint"]}" font-family="{T["mono"]}" font-size="11">{hour:02d}</text>')
-    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>'
+            bw = ((b - a) / span) * plot
+            out.append(f'<rect x="{x:.1f}" y="{y}" width="{max(3, bw - 1):.1f}" height="{bar}" rx="{bar / 2}" fill="{KIND[st]}"/>')
+            x += bw
+        label = f"{held:.1f}h" if held else "not used"
+        out.append(f'<text x="{label_w + plot + 10}" y="{y + bar - 3}" fill="{T["faint"]}" '
+                   f'font-family="{T["mono"] if held else T["sans"]}" font-size="11.5">{label}</text>')
+        y += row_h
+    return f'<svg width="{w}" height="{y}" viewBox="0 0 {w} {y}">{"".join(out)}</svg>'
 
 
 def event_marks(w=560, row_h=22):
@@ -484,12 +465,14 @@ def event_marks(w=560, row_h=22):
 
 def c05():
     lg = legend([("At the PC", KIND["native"]), ("An Admin entered", KIND["traversed"]), ("You entered", KIND["su"])])
-    return mood("Sessions today, four ways", "seven client PCs, 08:00 to 18:00", [
+    return mood("Sessions today, four ways", "seven client PCs, 08:00 to 18:00",
+                brow=eyebrow("CHART", "fills the Sessions today slot", "page 3, The record — and page 2 when descended"),
+                cells=[
         variant("A · Lanes", "duration is length; the one on the boards now",
              day_timeline(w=560, h=230), CW, CH, lg),
         variant("B · Hour grid", "scan a column as well as a row", heat_grid(), CW, CH, lg),
-        variant("C · Occupancy", "the fleet's day as one shape, entries marked",
-             density(), CW, CH, lg),
+        variant("C · Coverage", "how much of the day each PC was in use, and by whom",
+                coverage(w=560), CW, CH, lg),
         variant("D · Only what changed", "native time is the quiet rule; entries are the marks",
              event_marks(), CW, CH, lg),
     ])

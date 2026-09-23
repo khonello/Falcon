@@ -4,6 +4,7 @@ The GUI's visual design is generated here and published to a design canvas, so a
 change to a file, reviewable like any other.
 
 **Canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> ("Falcon Operator Design").
+**What every board is: `BOARDS.md`**, and the `INDEX` board says the same on the canvas.
 
 ```powershell
 environ-engine\Scripts\python.exe design\gen.py          # writes design/boards/*.dc.html
@@ -34,6 +35,8 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 | `su_dash.py` | the Super User dashboards (D01–D04): the charts, and the descent into one department |
 | `charts.py`, `charts2.py` | the chart mood boards (C01–C10): **one chart type per board, four ways to draw it** |
 | `layouts.py` | the layout-structure boards (L01–L06): the same content in three, four and five panels |
+| `index_board.py` | `INDEX` — the contents page: which board is what, and which page's slot it fills |
+| `interaction.py` | `X01`–`X02` — how a slot is chosen, and what happens when a chart is clicked |
 | `shot_gui.py` | renders the **real QML app** offscreen with a stubbed bridge (it answers the same handlers the views call), for before/after screenshots |
 
 `boards/` is generated output and is not committed.
