@@ -104,6 +104,62 @@ Item {
         return { label: d.name, parts: root.rolloutParts(d.department_id) }
     })
 
+    // --- the bones a panel keeps when it has nothing to draw -------------------------------------
+    // A panel is never blank. With no data the chart still draws its own structure, quietened, and
+    // the notice is laid over it. A zero is NOT this: a zero is a result and is drawn normally.
+    readonly property var skeletonRows: {
+        var names = tree.length > 0 ? tree.map(function (d) { return d.name })
+                                    : ["Department", "Department", "Department"]
+        return names.map(function (n) { return { label: n, parts: [{ tone: "quiet", value: 1 }] } })
+    }
+    readonly property var skeletonCells: {
+        var out = []
+        for (var i = 0; i < 8; i++) out.push({ tone: "quiet", label: "" })
+        return out
+    }
+    readonly property var skeletonLanes: {
+        var out = []
+        for (var i = 0; i < 4; i++) out.push({ name: "PC", blocks: [] })
+        return out
+    }
+    readonly property var skeletonTiers: [{ label: "/restricted/", count: 0 }, { label: "/admin/", count: 0 },
+                                          { label: "/workers/", count: 0 }, { label: "/common/", count: 0 }]
+
+    // the pairs the assistance sentence is generated from, with names rather than indexes
+    readonly property var assistPairs: assistLinks.map(function (l) {
+        return { from_name: tree[l.from] ? tree[l.from].name : "", 
+                 to_name: tree[l.to] ? tree[l.to].name : "", count: l.count }
+    })
+    readonly property int quietPcs: {
+        var n = 0
+        for (var i = 0; i < timelineLanes.length; i++)
+            if (timelineLanes[i].blocks.length === 0) n++
+        return n
+    }
+    // the same three counts, scoped to whatever department is descended into
+    function tasksIn(departmentId) {
+        return tasks.filter(function (t) { return deptOfAccount(t.assignee_account_id) === departmentId })
+    }
+    function flowsIn(departmentId) {
+        return flows.filter(function (f) { return deptOfPc(f.source_pc_id) === departmentId })
+    }
+    function overdueIn(departmentId) {
+        var now = Date.now(), n = 0, list = tasksIn(departmentId)
+        for (var i = 0; i < list.length; i++) {
+            var hard = list[i].final_deadline_at ? Date.parse(list[i].final_deadline_at) : NaN
+            if (!isNaN(hard) && hard < now) n++
+        }
+        return n
+    }
+    readonly property int overdueTasks: {
+        var now = Date.now(), n = 0
+        for (var i = 0; i < tasks.length; i++) {
+            var hard = tasks[i].final_deadline_at ? Date.parse(tasks[i].final_deadline_at) : NaN
+            if (!isNaN(hard) && hard < now) n++
+        }
+        return n
+    }
+
     // --- work, by department ----------------------------------------------------------------------
     function taskParts(departmentId) {
         var now = Date.now(), on = 0, soon = 0, over = 0
@@ -171,12 +227,17 @@ Item {
         }
         return out
     }
+    // the window is the day that actually happened, not a window around "now": at 00:30 the
+    // morning's sessions are still the record, and starting the axis at midnight would bury them
     readonly property real windowStart: {
-        var lo = nowHours
+        var lo = NaN
         for (var i = 0; i < timelineLanes.length; i++)
-            for (var j = 0; j < timelineLanes[i].blocks.length; j++)
-                lo = Math.min(lo, timelineLanes[i].blocks[j].from)
-        return Math.max(0, Math.floor(Math.min(lo, nowHours - 2)))
+            for (var j = 0; j < timelineLanes[i].blocks.length; j++) {
+                var f = timelineLanes[i].blocks[j].from
+                lo = isNaN(lo) ? f : Math.min(lo, f)
+            }
+        if (isNaN(lo)) return Math.max(0, Math.floor(nowHours - 4))
+        return Math.max(0, Math.floor(lo))
     }
     readonly property real windowEnd: {
         var hi = nowHours + 0.5

@@ -12,6 +12,9 @@ Item {
     readonly property real leftX: 4
     readonly property real rightX: width - 116
     readonly property real rowGap: 34
+    // the diagram sizes itself from how many categories there are, so the last label never lands
+    // on whatever sits under the panel
+    implicitHeight: 16 + Math.max(1, categories.length) * rowGap + 26
 
     function catY(i) { return 16 + i * rowGap }
     function destY(i) { return 26 + i * 50 }

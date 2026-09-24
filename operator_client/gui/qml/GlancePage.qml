@@ -2,19 +2,34 @@ import QtQuick
 import QtQuick.Layouts
 import "."
 
-// The system at a glance: four figures, the rollout it is all held on, and the work underneath.
-// The four figures are the only place a number stands on its own; everything else is drawn.
+// Page 1, composed (board P02). The densities run diagonally: figures at the top, shapes down the
+// left, a shape with its sentence, and the words at the bottom right. The page answers without
+// anything being clicked.
+//
+// Its signature is a band over two columns -- pages 2 and 3 have their own, so you can tell which
+// page you are on from the shape alone.
 Item {
     id: page
     property var view: null
+
+    // the sentences: generated in core/narrate.py from exactly the data these charts drew
+    readonly property var rolloutSays: falcon.narrate("rollout", {
+        version: page.view.version, pcs_behind: page.view.behind, pc_count: page.view.pcCount })
+    readonly property var confirmsSays: falcon.narrate("confirmations", { points: page.view.confirmations })
+    readonly property var fleetSays: falcon.narrate("fleet", {
+        pc_count: page.view.pcCount, pcs_behind: page.view.behind })
+    readonly property var needsSays: falcon.narrate("needs_you", {
+        tree: page.view.tree, pcs_behind: page.view.behind,
+        violations: page.view.violations, deviations: page.view.deviations })
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 16
 
+        // --- density 1: figures. A number and a word; no chart and no sentence.
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 108
+            Layout.preferredHeight: 104
             radius: Theme.radiusLg
             color: Theme.chartBg
 
@@ -32,26 +47,13 @@ Item {
                 Hero {
                     value: String(page.view.confirmedCount)
                     label: page.view.version ? ("on " + page.view.version.version_string) : "on the current build"
-                    sub: page.view.behindCount === 0 ? "all confirmed"
-                                                     : page.view.behindCount + " still behind"
+                    sub: page.view.behindCount === 0 ? "all confirmed" : page.view.behindCount + " still behind"
                     tone: page.view.behindCount > 0 ? "warn" : "ok"
                 }
                 Hero {
                     value: String(page.view.waitingOnYou)
                     label: "waiting on you"
-                    sub: {
-                        var bits = []
-                        if (page.view.emptyDepartments > 0)
-                            bits.push(page.view.emptyDepartments === 1 ? "an empty department"
-                                                                      : page.view.emptyDepartments + " empty departments")
-                        if (page.view.violations.length > 0)
-                            bits.push(page.view.violations.length
-                                      + (page.view.violations.length === 1 ? " violation" : " violations"))
-                        if (page.view.deviations.length > 0)
-                            bits.push(page.view.deviations.length
-                                      + (page.view.deviations.length === 1 ? " deviation" : " deviations"))
-                        return bits.length ? bits.join(", ") : "nothing outstanding"
-                    }
+                    sub: page.needsSays.sentence
                     tone: page.view.waitingOnYou > 0 ? "danger" : "ok"
                 }
                 Hero {
@@ -67,133 +69,91 @@ Item {
             Layout.fillHeight: true
             spacing: 16
 
-            Panel {
-                Layout.preferredWidth: page.width * 0.52
+            ColumnLayout {
                 Layout.fillWidth: true
+                Layout.preferredWidth: page.width - Theme.laneWidth - 16
                 Layout.fillHeight: true
-                title: page.view.version ? ("Rollout " + page.view.version.version_string) : "Rollout"
-                note: "by department, to the same scale"
+                spacing: 16
 
-                StackedBars {
-                    width: parent.width
-                    rows: page.view.rolloutRows
-                    visible: page.view.rolloutRows.length > 0
-                }
-                Txt {
-                    text: "No version has been approved yet"
-                    color: Theme.faint
-                    visible: page.view.rolloutRows.length === 0
-                }
+                // --- density 2: a shape and its legend.
+                Panel {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    title: page.view.version ? ("Rollout " + page.view.version.version_string) : "Rollout"
+                    note: "by department, to the same scale"
+                    notice: page.rolloutSays.state === "empty" ? page.rolloutSays.note : ""
+                    noticeSub: page.rolloutSays.state === "empty" ? page.rolloutSays.sentence : ""
 
-                foot: Legend {
-                    items: [{ label: "Confirmed", color: Theme.ok, round: true },
-                            { label: "Behind", color: Theme.warn, round: true },
-                            { label: "Failing", color: Theme.danger, round: true }]
-                    note: page.view.behindCount > 0
-                          ? "the next version stays blocked until all " + page.view.pcCount + " confirm"
-                          : "every PC has confirmed"
-                }
-            }
-
-            Panel {
-                Layout.preferredWidth: page.width * 0.45
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                title: "The fleet"
-                note: "one square per PC"
-
-                Waffle {
-                    width: parent.width
-                    cells: page.view.fleetCells
-                }
-                Txt {
-                    text: "No client PCs registered"
-                    color: Theme.faint
-                    visible: page.view.fleetCells.length === 0
-                }
-
-                foot: Legend {
-                    items: [{ label: "Confirmed", color: Theme.ok, round: true },
-                            { label: "Behind", color: Theme.warn, round: true },
-                            { label: "Failing", color: Theme.danger, round: true }]
-                }
-            }
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 16
-
-            Panel {
-                id: confPanel
-                Layout.preferredWidth: page.width * 0.52
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                title: "Confirmations"
-                note: "PCs confirmed on the current version, this week"
-
-                Trend {
-                    width: parent.width
-                    height: Math.max(80, confPanel.height - 122)
-                    points: page.view.confirmations
-                    visible: page.view.confirmations.length > 0
-                }
-                Row {
-                    width: parent.width
-                    visible: page.view.confirmations.length > 0
-                    Repeater {
-                        model: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-                        delegate: Txt {
-                            required property int index
-                            width: parent.width / 7
-                            text: {
-                                var t = new Date()
-                                t.setDate(t.getDate() - (6 - index))
-                                return index === 6 ? "Today" : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][t.getDay()]
-                            }
-                            color: Theme.faint
-                            font.pixelSize: Theme.fMeta
-                            horizontalAlignment: Text.AlignHCenter
-                        }
+                    StackedBars {
+                        width: parent.width
+                        rows: page.view.rolloutRows.length > 0 ? page.view.rolloutRows : page.view.skeletonRows
                     }
-                }
-                Txt {
-                    text: "No update attempts recorded this week"
-                    color: Theme.faint
-                    visible: page.view.confirmations.length === 0
-                }
-            }
 
-            Panel {
-                Layout.preferredWidth: page.width * 0.45
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                title: "Work, by department"
-                note: "the same two bars, once each"
-
-                Row {
-                    width: parent.width
-                    spacing: 14
-
-                    Repeater {
-                        model: page.view.tree
-                        delegate: HealthCard {
-                            required property var modelData
-                            required property int index
-                            width: (parent.width - (page.view.tree.length - 1) * 14) / Math.max(1, page.view.tree.length)
-                            name: modelData.name
-                            tint: Theme.series(index)
-                            tasks: page.view.taskParts(modelData.department_id)
-                            flows: page.view.flowParts(modelData.department_id)
-                        }
+                    foot: Legend {
+                        items: [{ label: "Confirmed", color: Theme.ok, round: true },
+                                { label: "Behind", color: Theme.warn, round: true },
+                                { label: "Failing", color: Theme.danger, round: true }]
                     }
                 }
 
-                foot: Legend {
-                    items: [{ label: "On track", color: Theme.ok, round: true },
-                            { label: "Needs attention", color: Theme.warn, round: true },
-                            { label: "Overdue", color: Theme.danger, round: true }]
+                // --- density 3: the same kind of shape, and the one sentence it is making.
+                Panel {
+                    id: confPanel
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    title: "Confirmations"
+                    note: "since the rollout was approved"
+                    notice: page.confirmsSays.state !== "ok" ? page.confirmsSays.note : ""
+                    noticeSub: page.confirmsSays.state !== "ok" ? page.confirmsSays.sentence : ""
+
+                    Trend {
+                        width: parent.width
+                        height: Math.max(70, confPanel.height - 150)
+                        points: page.view.confirmations.length > 1 ? page.view.confirmations
+                                                                   : [0, 0, 0, 0, 0, 0, 0]
+                    }
+                    Sentence {
+                        width: parent.width
+                        text: page.confirmsSays.state === "ok" ? page.confirmsSays.sentence : ""
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: false
+                Layout.preferredWidth: Theme.laneWidth
+                Layout.fillHeight: true
+                spacing: 16
+
+                // --- density 2, short: the fleet.
+                Panel {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 196
+                    title: "The fleet"
+                    note: "one square per PC"
+                    notice: page.fleetSays.state === "empty" ? page.fleetSays.note : ""
+                    noticeSub: page.fleetSays.state === "empty" ? page.fleetSays.sentence : ""
+
+                    Waffle {
+                        width: parent.width
+                        cells: page.view.fleetCells.length > 0 ? page.view.fleetCells : page.view.skeletonCells
+                    }
+
+                    foot: Legend {
+                        items: [{ label: "Confirmed", color: Theme.ok, round: true },
+                                { label: "Behind", color: Theme.warn, round: true },
+                                { label: "Failing", color: Theme.danger, round: true }]
+                    }
+                }
+
+                // --- density 4: the words. The end of the reading order, and the panel you would
+                //     read first if you only had ten seconds.
+                ReadingPanel {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    title: "What needs you"
+                    narration: page.needsSays
+                    onActionTriggered: shell.notify(narration.action + " — not wired yet", false)
                 }
             }
         }

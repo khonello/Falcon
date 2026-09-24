@@ -162,7 +162,18 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         Indicator(kind="task_completed", text="Task done", key="Fleet inventory, Yaw OPS-03"),
     ]
 
+    # FALCON_SHOT_EMPTY=1 renders a system that has only just been bootstrapped: no version, no
+    # sessions, no violations. It is how the "a panel is never blank" rule is checked in the real
+    # app rather than only on a board.
+    empty = os.environ.get("FALCON_SHOT_EMPTY") == "1"
+
     def fake_call(type_, payload, callback):
+        if empty:
+            data = {"departments": [], "sessions": [], "entries": [], "violations": [],
+                    "deviations": [], "tasks": [], "flows": [], "categories": [], "routing": [],
+                    "version": None, "pcs_behind": [], "since": _at(6), "now": _at(18)}
+            callback.call([bridge.js_engine.toScriptValue(True), bridge.js_engine.toScriptValue(data)])
+            return
         if type_ == "hierarchy.tree":
             data = {"departments": tree}
         elif type_ == "hierarchy.sessions_today":
@@ -194,7 +205,7 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
 
     def grab():
         img = win.grabWindow()
-        name = f"gui-{role}" + (f"-view{view}" if view else "") + (f"-p{page}" if page else "")
+        name = f"gui-{role}" + ("-empty" if empty else "") + (f"-view{view}" if view else "") + (f"-p{page}" if page else "")
         name += f"-d{focus}" if focus else ""
         path = out_dir / (name + ".png")
         img.save(str(path))

@@ -58,8 +58,9 @@ QtObject {
 
     function soft(c) { return Qt.rgba(c.r, c.g, c.b, 0.14) }
     function tone(name) {
+        // "quiet" is the skeleton's colour: the structure a panel keeps when it has nothing to draw
         return name === "ok" ? ok : name === "warn" ? warn : name === "danger" ? danger
-             : name === "accent" ? accent : dim
+             : name === "accent" ? accent : name === "quiet" ? line : dim
     }
     function toneSoft(name) {
         return name === "ok" ? okSoft : name === "warn" ? warnSoft : name === "danger" ? dangerSoft

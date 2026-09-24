@@ -23,6 +23,7 @@ from PySide6.QtQml import QJSValue
 from common.connection import ConnectionError_, EngineConnection, EngineError
 from operator_client.core.config import LocalConfig
 from operator_client.core.deadlines import resolve_phrase
+from operator_client.core.narrate import narrate as _narrate
 from operator_client.core.state import ClientState
 from operator_client.tui.push_format import describe_push
 
@@ -250,6 +251,13 @@ class FalconBridge(QObject):
         """A deadline phrase -> ISO timestamp, or "" when it cannot be resolved mechanically."""
         dt = resolve_phrase(phrase)
         return dt.isoformat() if dt else ""
+
+    @Slot(str, "QVariant", result="QVariant")
+    def narrate(self, topic: str, data: Any) -> Any:
+        """The sentence a chart is making, and the facts behind it: see `core/narrate.py`. QML hands
+        over the payloads it already fetched, so the words are generated from exactly what was drawn.
+        Returns {sentence, facts:[{label,value,tone}], action, state, note?}."""
+        return _narrate(topic, _to_python(data))
 
     @Slot(str, result=str)
     def readFile(self, path: str) -> str:

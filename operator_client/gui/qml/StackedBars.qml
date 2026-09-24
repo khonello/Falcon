@@ -22,6 +22,12 @@ Item {
         for (var i = 0; i < parts.length; i++) if (parts[i].value > 0) return i
         return -1
     }
+    // a skeleton row carries a nominal value so the track has a length; it is structure, not data,
+    // so it never shows a total
+    function isSkeleton(parts) {
+        for (var i = 0; i < parts.length; i++) if (parts[i].tone !== "quiet") return false
+        return parts.length > 0
+    }
     function lastDrawn(parts) {
         for (var i = parts.length - 1; i >= 0; i--) if (parts[i].value > 0) return i
         return -1
@@ -95,7 +101,8 @@ Item {
                     anchors.left: bar.right
                     anchors.leftMargin: 10
                     anchors.verticalCenter: parent.verticalCenter
-                    text: String(root.total(line.modelData.parts))
+                    text: root.isSkeleton(line.modelData.parts) ? ""
+                                                                : String(root.total(line.modelData.parts))
                     color: Theme.faint
                     monospace: true
                     font.pixelSize: Theme.fMeta

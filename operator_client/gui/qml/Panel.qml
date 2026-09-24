@@ -9,6 +9,11 @@ Rectangle {
 
     property string title: ""
     property string note: ""
+    // A panel is never blank. When there is nothing to draw the chart keeps its own structure --
+    // its rows, its lanes, its track -- quietened, and the notice is laid OVER it, never in place
+    // of it. A zero is not this case: a zero is a result and is drawn normally.
+    property string notice: ""
+    property string noticeSub: ""
     property alias foot: footColumn.data
     default property alias content: column.data
 
@@ -49,6 +54,33 @@ Rectangle {
         anchors.leftMargin: 18
         anchors.rightMargin: 18
         spacing: 12
+        opacity: root.notice === "" ? 1 : 0.28
+    }
+
+    Column {
+        visible: root.notice !== ""
+        anchors.centerIn: column
+        width: column.width - 24
+        spacing: 4
+
+        Txt {
+            width: parent.width
+            text: root.notice
+            color: Theme.dim
+            font.pixelSize: Theme.fBody
+            font.weight: Font.DemiBold
+            horizontalAlignment: Text.AlignHCenter
+        }
+        Txt {
+            width: parent.width
+            text: root.noticeSub
+            visible: text !== ""
+            color: Theme.faint
+            font.pixelSize: Theme.fMeta
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            elide: Text.ElideNone
+        }
     }
 
     Column {

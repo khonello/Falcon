@@ -2,39 +2,44 @@ import QtQuick
 import QtQuick.Layouts
 import "."
 
-// The record of the day. Nothing here is a status a person set: sessions are never deleted, a
-// violation is never quietly cleared and a deviation is logged rather than corrected, so what is
-// drawn is simply what happened.
+// Page 3, composed (board P04). Its signature is a lead and a column: the day is one large shape,
+// and the column beside it hands over 3 → 3 → 4. A third structure again, so the three pages are
+// told apart by their shape before anything is read.
+//
+// Nothing here is a status a person set: sessions are never deleted, a violation is never quietly
+// cleared and a deviation is logged rather than corrected. What is drawn is what happened.
 Item {
     id: page
     property var view: null
+
+    readonly property var daySays: falcon.narrate("the_day", {
+        sessions: page.view.sessions, pc_count: page.view.pcCount, quiet_pcs: page.view.quietPcs })
+    readonly property var violationSays: falcon.narrate("violations", { violations: page.view.violations })
+    readonly property var deviationSays: falcon.narrate("deviations", { deviations: page.view.deviations })
 
     RowLayout {
         anchors.fill: parent
         spacing: 16
 
+        // --- density 2: the lead. The whole day as one shape.
         Panel {
             id: sessionsPanel
-            Layout.preferredWidth: page.width * 0.5
             Layout.fillWidth: true
+            Layout.preferredWidth: page.width - Theme.laneWidth - 16
             Layout.fillHeight: true
             title: "Sessions today"
             note: "who held each PC, and for how long"
+            notice: page.view.timelineLanes.length === 0 ? "Nothing recorded yet" : ""
+            noticeSub: page.view.timelineLanes.length === 0 ? "no client PCs are registered" : ""
 
             DayTimeline {
                 width: parent.width
                 // the lanes share out whatever height the panel has, so the day fills its panel
-                laneHeight: Math.max(18, Math.min(32, (sessionsPanel.height - 140)
+                laneHeight: Math.max(18, Math.min(46, (sessionsPanel.height - 140)
                                                       / Math.max(1, lanes.length) - laneGap))
-                lanes: page.view.timelineLanes
+                lanes: page.view.timelineLanes.length > 0 ? page.view.timelineLanes : page.view.skeletonLanes
                 fromHour: page.view.windowStart
                 toHour: page.view.windowEnd
-                visible: page.view.timelineLanes.length > 0
-            }
-            Txt {
-                text: "No client PCs registered"
-                color: Theme.faint
-                visible: page.view.timelineLanes.length === 0
             }
 
             foot: Legend {
@@ -42,69 +47,54 @@ Item {
                         { label: "An Admin entered", color: Theme.warn, round: false },
                         { label: "You entered", color: Theme.danger, round: false },
                         { label: "Assisted", color: Theme.accent, round: false }]
-                note: {
-                    var quiet = 0
-                    for (var i = 0; i < page.view.timelineLanes.length; i++)
-                        if (page.view.timelineLanes[i].blocks.length === 0) quiet++
-                    return quiet === 0 ? "" : quiet + (quiet === 1 ? " PC was never signed in"
-                                                                   : " PCs were never signed in")
-                }
+                note: page.view.quietPcs === 0 ? ""
+                      : page.view.quietPcs + (page.view.quietPcs === 1 ? " PC was never signed in"
+                                                                       : " PCs were never signed in")
             }
         }
 
         ColumnLayout {
-            Layout.preferredWidth: page.width * 0.47
-            Layout.fillWidth: true
+            Layout.fillWidth: false
+            Layout.preferredWidth: Theme.laneWidth
             Layout.fillHeight: true
             spacing: 16
 
+            // --- density 3: a shape with its sentence. A tier with nothing in it keeps its row
+            //     and its zero -- that is a result, not an absence.
             Panel {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: 190
                 title: "Violations by tier"
-                note: "files found where their tier does not allow them"
 
                 TierBars {
                     width: parent.width
                     rows: page.view.tierRows
                 }
-
-                foot: Txt {
-                    width: parent.width
-                    text: page.view.violations.length === 0
-                          ? "Nothing is out of place right now."
-                          : (page.view.violations[0].filename + ", found in " + page.view.violations[0].path
-                             + " on " + page.view.violations[0].hostname + ".")
-                    color: Theme.faint
-                    font.pixelSize: Theme.fMeta
-                    wrapMode: Text.WordWrap
-                    elide: Text.ElideRight
-                    maximumLineCount: 2
-                }
+                Sentence { width: parent.width; text: page.violationSays.sentence }
             }
 
+            // --- density 3 again.
             Panel {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: 172
                 title: "Deviations"
-                note: "logged, surfaced, never silently corrected"
 
                 Column {
                     width: parent.width
                     spacing: 0
 
                     Repeater {
-                        model: page.view.deviations.slice(0, 5)
+                        model: page.view.deviations.slice(0, 3)
                         delegate: Item {
                             required property var modelData
                             width: parent.width
-                            height: 34
+                            height: 30
 
                             Txt {
                                 id: at
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 46
+                                width: 42
                                 text: String(modelData.detected_at).substring(11, 16)
                                 color: Theme.faint
                                 monospace: true
@@ -112,15 +102,15 @@ Item {
                             }
                             Txt {
                                 anchors.left: at.right
-                                anchors.leftMargin: 10
+                                anchors.leftMargin: 8
                                 anchors.right: mark.left
-                                anchors.rightMargin: 10
+                                anchors.rightMargin: 8
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: {
                                     var w = String(modelData.expectation).replace(/_/g, " ")
                                     return w.charAt(0).toUpperCase() + w.slice(1)
                                 }
-                                font.pixelSize: Theme.fBody
+                                font.pixelSize: Theme.fMeta
                             }
                             Chip {
                                 id: mark
@@ -131,14 +121,19 @@ Item {
                             }
                         }
                     }
-                    Txt {
-                        text: "Nothing has deviated from what the system expects."
-                        color: Theme.faint
-                        font.pixelSize: Theme.fBody
-                        height: 34
-                        visible: page.view.deviations.length === 0
-                    }
                 }
+                Sentence { width: parent.width; text: page.deviationSays.sentence }
+            }
+
+            // --- density 4: the day in words. The panel a Super User would read first with ten
+            //     seconds, so it sits at the end of the reading order.
+            ReadingPanel {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                title: "Today, in words"
+                maxFacts: 3
+                narration: page.daySays
+                onActionTriggered: shell.show("hierarchy")
             }
         }
     }

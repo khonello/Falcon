@@ -152,65 +152,155 @@ def p02():
                   brow=eyebrow("PAGE", "page 1 — At a glance, composed from the densities", "ready to build"))
 
 
-# ------------------------------------------------------------------ P03: page 2, composed
+# ------------------------------------------------------------------ P03: page 2, an equal quartet
+# A different signature from page 1 on purpose: four equal boxes, the density rising across the
+# reading order. Pages that all share one shape stop telling you which page you are on.
 def p03():
-    themap = ppanel("The hierarchy", "every department, Admin and PC", org_map(w=620, h=300),
-                    density=2, grow=True,
+    QW, QH = 672, 350
+    themap = ppanel("The hierarchy", "every department, Admin and PC", org_map(w=600, h=196),
+                    density=2, w=QW, h=QH,
                     foot=legend([(d, c) for d, c in DEPT_COLOR.items()], "pick a department to descend"))
-    assist = ppanel("Assistance", "", told(pair_rows(w=330), "Logistics has asked no one for help."),
-                    density=3, w=390)
-    routing_p = ppanel("Report routing", "", told(routing_rows(w=330),
-                                                  "Three categories reach only you."),
-                       density=3, w=390)
+    assist = ppanel("Assistance", "across departments, today",
+                    told(pair_rows(w=600), "No department has asked another for help today."),
+                    density=3, w=QW, h=QH)
+    routing_p = ppanel("Report routing", "additive, always",
+                       told(routing_rows(w=600), "Three categories reach only you."),
+                       density=3, w=QW, h=QH)
     thin = ppanel("Where authority is thin", "",
-                  reading("Logistics has no Admin, so nobody below you governs three PCs.",
-                          [("Department", "Logistics", "danger"), ("Client PCs", "3"),
-                           ("Last traversal", "you, 4 days ago"), ("Open reports", "2 unaddressed", "warn")],
-                          action="Assign an Admin", w=300),
-                  density=4, w=372)
+                  row(reading("Logistics has no Admin, so nobody below you governs it.",
+                              [("Department", "Logistics", "danger"), ("Its client PCs", "3"),
+                               ("Last traversal", "you, 4 days ago"), ("Open reports", "2 unaddressed", "warn")],
+                              action="Assign an Admin", w=320),
+                      col(f'<span style="display: block; width: 10px; height: 10px; border-radius: 5px; '
+                          f'background: {DEPT_COLOR["Logistics"]};"></span>',
+                          txt("Logistics", 12, T["dim"]), gap=8, extra="padding-top: 6px;"),
+                      gap=20, align="flex-start"),
+                  density=4, w=QW, h=QH)
 
-    body = row(col(themap, row(assist, routing_p, gap=16, align="stretch", extra="flex: none; height: 250px;"),
-                   gap=16, extra="flex: 1; min-width: 0; display: flex; flex-direction: column;"),
-               thin, gap=16, align="stretch", extra="height: 716px;")
+    body = col(row(themap, assist, gap=16, align="stretch", extra="flex: none;"),
+               row(routing_p, thin, gap=16, align="stretch", extra="flex: none;"),
+               gap=16, extra="height: 716px; display: flex; flex-direction: column;")
     return pshell("Everything", "3 departments · 3 Admins · 14 client PCs", body,
-                  "P03 · Page 2. The map carries the shape; the two told panels each add one line; the "
-                  "reading panel says the thing the map cannot: what the gap means.", 1,
-                  brow=eyebrow("PAGE", "page 2 — The hierarchy, composed from the densities", "ready to build"))
+                  "P03 · Page 2 as an equal quartet — four boxes the same size, density rising 2 → 3 → 3 → 4 "
+                  "across the reading order. A different shape from page 1, so the page is recognisable.", 1,
+                  brow=eyebrow("PAGE", "page 2 — The hierarchy, an equal quartet", "ready to build"))
 
 
-# ------------------------------------------------------------------ P04: page 3, composed
+# ------------------------------------------------------------------ P04: page 3, a lead and a column
+# A third signature: one panel carries the day, and the column beside it hands over to words.
 def p04():
-    lanes = ppanel("Sessions today", "who held each PC, and for how long", day_timeline(w=620, h=300, lane_h=30),
-                   density=2, grow=True,
-                   foot=legend([("At the PC", T["line2"]), ("An Admin entered", T["warn"]), ("You entered", T["danger"])]))
+    lanes = ppanel("Sessions today", "who held each PC, and for how long",
+                   day_timeline(w=880, h=430, lane_h=44), density=2, grow=True,
+                   foot=legend([("At the PC", T["line2"]), ("An Admin entered", T["warn"]),
+                                ("You entered", T["danger"]), ("Assisted", T["accent"])],
+                               "Efua and Kwame were never signed in"))
     vio = ppanel("Violations by tier", "", told(tier_bars(w=330), "One file is where it should not be."),
-                 density=3, w=390)
-    dev = ppanel("Deviations", "", told(col(*[row(txt(t, 11.5, T["faint"], mono=True, extra="width: 42px;"),
-                                                  txt(x, 12.5, extra="flex: 1;"), chip(s_, tone, 10), gap=10,
-                                                  extra="padding: 6px 0; width: 100%;")
-                                              for t, x, s_, tone in
-                                              [("11:05", "Account from an unbound PC", "Addressed", "ok"),
-                                               ("09:12", "Hostname did not match", "Logged", "neutral")]], gap=0,
-                                            extra="width: 330px;"),
-                                        "One deviation is still unaddressed."),
-                 density=3, w=390)
+                 density=3, w=372, h=210)
+    dev = ppanel("Deviations", "",
+                 told(col(*[row(txt(t, 11.5, T["faint"], mono=True, extra="width: 42px;"),
+                                txt(x, 12.5, extra="flex: 1;"), chip(s_, tone, 10), gap=10,
+                                extra="padding: 5px 0; width: 100%;")
+                            for t, x, s_, tone in
+                            [("11:05", "Account from an unbound PC", "Addressed", "ok"),
+                             ("09:12", "Hostname did not match", "Logged", "neutral")]], gap=0,
+                          extra="width: 330px;"),
+                      "One deviation is still unaddressed."),
+                 density=3, w=372, h=190)
     day = ppanel("Today, in words", "",
-                 reading("Two PCs were never signed into, and you entered one workstation yourself.",
-                         [("Traversals", "4, one still open"), ("You entered", "OPS-07, 24 minutes"),
-                          ("Never signed in", "Efua, Kwame", "warn"), ("Assisted", "Operations → Finance, once")],
+                 reading("Four traversals today, one of them yours.",
+                         [("You entered", "OPS-07, 24 minutes"), ("Still open", "1", "warn"),
+                          ("Never signed in", "Efua, Kwame", "warn"),
+                          ("Assisted", "Operations → Finance, once")],
                          action="Open the trail", w=300),
-                 density=4, w=372)
+                 density=4, w=372, grow=True)
 
-    body = row(col(lanes, row(vio, dev, gap=16, align="stretch", extra="flex: none; height: 250px;"),
-                   gap=16, extra="flex: 1; min-width: 0; display: flex; flex-direction: column;"),
-               day, gap=16, align="stretch", extra="height: 716px;")
+    body = row(lanes,
+               col(vio, dev, day, gap=16,
+                   extra="width: 372px; flex: none; display: flex; flex-direction: column;"),
+               gap=16, align="stretch", extra="height: 716px;")
     return pshell("Everything", "Today, 08:00 to now", body,
-                  "P04 · Page 3. The day as a shape, two told panels, and the day in words — which is the "
-                  "panel a Super User would read first if they only had ten seconds.", 2,
-                  brow=eyebrow("PAGE", "page 3 — The record, composed from the densities", "ready to build"))
+                  "P04 · Page 3 as a lead and a column — the day is one large shape, and the column beside "
+                  "it hands over 3 → 3 → 4. A third signature again.", 2,
+                  brow=eyebrow("PAGE", "page 3 — The record, a lead and a column", "ready to build"))
+
+
+# ------------------------------------------------------------------ P05: a panel is never blank
+# The rule: the visual stays. An empty panel keeps its own structure -- the rows, the lanes, the
+# tiers, the track -- drawn quiet and at zero, with a short notice laid over it. What never happens
+# is a panel that is simply empty space, or one whose chart is replaced by a line of text.
+#
+# A ZERO IS NOT EMPTY. It is a result, and it is drawn normally with no notice at all: "all 14
+# confirmed" and "no violations in /workers/" are answers, not absences.
+def ghost(svg, note, sub=""):
+    """A chart's own structure, quietened, with the notice over it."""
+    return (f'<div style="position: relative;">'
+            f'<div style="opacity: 0.28; filter: grayscale(1);">{svg}</div>'
+            f'<div style="position: absolute; inset: 0; display: flex; flex-direction: column; '
+            f'align-items: center; justify-content: center; gap: 4px;">'
+            f'{txt(note, 12.5, T["dim"], 600)}{txt(sub, 11.5, T["faint"]) if sub else ""}</div></div>')
+
+
+def skeleton_rows(labels, w=440, bar=18, gap_y=26):
+    """A chart's bones: its rows at full width, no values. What an empty panel keeps."""
+    out, y = [], 4
+    for name in labels:
+        out.append(f'<text x="0" y="{y + bar - 4}" fill="{T["faint"]}" font-family="{T["sans"]}" font-size="12.5">{name}</text>')
+        out.append(f'<rect x="96" y="{y}" width="{w - 140}" height="{bar}" rx="4" fill="{T["line"]}"/>')
+        y += gap_y
+    return f'<svg width="{w}" height="{y}" viewBox="0 0 {w} {y}">{"".join(out)}</svg>'
+
+
+def p05():
+    PH = 248
+    zero_rollout = stacked_bars([("Operations", [("confirmed", 7), ("behind", 0), ("failing", 0)]),
+                                 ("Finance", [("confirmed", 4), ("behind", 0), ("failing", 0)]),
+                                 ("Logistics", [("confirmed", 3), ("behind", 0), ("failing", 0)])], w=440)
+    struct_rollout = skeleton_rows(["Operations", "Finance", "Logistics"], w=440)
+
+    a = ppanel("Rollout 1.4.2", "by department", zero_rollout, density=2, w=CW, h=PH,
+               foot=col(txt("Every PC is on 1.4.2.", 13, T["ink"], 500),
+                        txt("A ZERO IS A RESULT. Drawn normally, no notice — the chart is answering.",
+                            11.5, T["faint"]), gap=8))
+    b = ppanel("Rollout 1.4.2", "by department",
+               col(ghost(struct_rollout, "Nothing recorded yet", "no version has been approved"),
+                   gap=0, extra="padding-top: 10px;"),
+               density=2, w=CW, h=PH,
+               foot=txt("NOTHING YET. The rows stay so the panel keeps its shape and its size.",
+                        11.5, T["faint"]))
+    c = ppanel("Confirmations", "since Monday",
+               ghost(trend([0, 1], w=440, h=96), "Not enough to draw yet", "one day of attempts so far"),
+               density=3, w=CW, h=PH,
+               foot=txt("NOT ENOUGH. There is data, but less than this shape needs.", 11.5, T["faint"]))
+    d = ppanel("What needs you", "",
+               row(reading("Nothing is waiting on you.",
+                           [("Behind", "0"), ("Empty departments", "0"), ("Violations", "0")], w=290),
+                   col(mini_bar([("confirmed", 14)], w=140), gap=0, extra="width: 140px; padding-top: 8px;"),
+                   gap=20, align="flex-start"),
+               density=4, w=CW, h=PH,
+               foot=txt("A reading panel with nothing to report still reports it, in the same shape.",
+                        11.5, T["faint"]))
+
+    rules = col(row(txt("A panel is never blank", 13.5, T["ink"], 600),
+                    txt("three cases, and only two of them get a notice", 11.5, T["faint"]), gap=10),
+                row(*[row(f'<span style="width: 6px; height: 6px; border-radius: 3px; background: {c_}; '
+                          f'flex: none;"></span>',
+                          col(txt(k, 12.5, T["ink"], 600), txt(v, 11.5, T["faint"]), gap=2, extra="flex: 1;"),
+                          gap=10, extra="width: 420px;")
+                      for k, v, c_ in
+                      [("A zero", "drawn normally, no notice — it is an answer", T["ok"]),
+                       ("Nothing yet", "structure stays, quietened, notice over it", T["warn"]),
+                       ("Not enough", "the shape's frame, and what is missing", T["accent"])]],
+                    gap=16, align="flex-start", extra="flex-wrap: wrap;"),
+                gap=14, extra=f"width: {CW * 2 + 16}px; padding: 16px 18px; border-radius: 16px; "
+                              f"background: {CHART_BG}; box-sizing: border-box; flex: none;")
+
+    return mood("A panel is never blank", "the visual stays; the notice is laid over it, not put in place of it",
+                [a, b, c, d, rules],
+                brow=eyebrow("SYSTEM", "applies to every panel on every page", "all three pages"))
 
 
 PAGES_COMPOSED = [("P01-Density.dc.html", "The four panel densities", p01),
                   ("P02-Glance.dc.html", "Page 1 composed: At a glance", p02),
                   ("P03-Hierarchy.dc.html", "Page 2 composed: The hierarchy", p03),
-                  ("P04-Record.dc.html", "Page 3 composed: The record", p04)]
+                  ("P04-Record.dc.html", "Page 3 composed: The record", p04),
+                  ("P05-Empty.dc.html", "A panel is never blank", p05)]
