@@ -48,6 +48,23 @@ own surfaces — the work from the earlier pass:
 
 The red lid is **admin-level chrome**. It must not appear on a department screen.
 
+## The levels share one visual language; depth is told, not restyled
+
+Super User and department are **deliberately close**: the same containers, the same four-cell
+composition, the same words. A level is not a new skin, and nothing about the frame, the palette or the
+kit changes as you go down. What tells you where you are:
+
+1. **The crumb** — `Everything › Operations` — which grows by one step per gesture.
+2. **The page's own title**, which is the name of the place you are in.
+3. **The subject's identity colour**, stamped small beside that title. Departments already carry one
+   from the categorical ramp (Operations, Finance, Logistics). It marks the place without touching the
+   four reserved state colours, and it is the cheapest honest way to say "you are one level in".
+4. **The rail stays the Super User's five** while a Super User is looking — you are deeper inside
+   **Authority**, not somewhere else. The rail says which area; the crumb and the title say how deep.
+
+Holding a session (level 3 and 4) is the only thing that changes chrome, and it does it with the lid
+— because that is a state, not a depth.
+
 ## Every level gets a mood board first
 
 Super User had `S01`–`S04`, the Admin console had `M01`–`M15`. A level's approaches are put side by

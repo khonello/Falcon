@@ -19,29 +19,53 @@ into Work**.
 
 ## How an area is entered: through its contents, not through tabs
 
-**Settled 24 Sep 2026, and it governs every area.** An area is not a page with tabs across the top. It
-is a small set of **containers — a chart, a drawing, a figure — one per thing the area covers**. You
-enter a subject by clicking the thing itself.
+**Settled 24 Sep 2026, and it governs every area and every level.** An area is not a page with tabs
+across the top. It is a small set of **containers — a chart, a diagram, a drawing, a figure — one per
+thing the area covers**. You enter a subject by going into the thing itself.
 
-- **Clicking a container opens it in place.** It grows where it stands and reveals what is specific to
-  what you clicked; the page recomposes around it rather than navigating away.
-- **The containers around it become the context that explains it**, re-scoped to the opened subject —
-  quietened, expanded, or re-drawn for it, never left saying something about a different subject.
-- **One level only.** Inside an opened container a click selects or filters; it never opens again.
-- **Back is the same gesture, or Escape**, and the area returns exactly as it was.
-- **A container with nothing to explain does not open.**
+### One gesture, one meaning
 
-This is the rule the Super User Overview already runs on (`K01` at rest, `K03`–`K06` opened, all four
-built) — it is now the rule for **all five areas**, not a trick the Overview plays. The door into a
-subject is the drawing of that subject.
+| Gesture | Means | Everywhere |
+|---|---|---|
+| **Single click** | *select / inspect.* The mark or row is selected and its text arrives beside it. Nothing moves, nothing opens. | a chart mark, a row, a slot |
+| **Double click** | *go deeper into this.* | any container that has something behind it |
+| **Escape, or the crumb, or the back arrow** | come back out, exactly as it was | everywhere |
+| **Enter key** | same as double click, on the focused container | keyboard equivalent, required |
 
-It also answers navigation downward: the department page (level 2) is what the **Departments**
-container in Authority opens into, and entering an Admin (level 3) is what a department opens into.
-The levels are the same gesture repeated, not three different navigations.
+This settles a conflict between two rules that were both approved and disagreed: `K01` said *clicking a
+cell opens it*, while `X02` said *clicking a chart brings its text beside it*. They cannot both own the
+single click. **Single click inspects; double click enters.** It is also the idiom of every desktop
+file manager, so it arrives already learned.
 
-**Why this over tabs:** a tab row names things you have not seen yet and makes you guess which one holds
-your answer. A container has already answered the page-level question by being drawn — you click it
-because you saw something in it.
+### What "deeper" means depends on the container
+
+Both are the same gesture and both are reversed the same way; only the distance differs.
+
+- **A container that owns a subject within its area** recomposes the area around it: it grows where it
+  stands, the other containers re-scope to what was opened, the crumb gains a step. (`K03`–`K06`.)
+- **A container that stands for a place with its own page** — a department, an Admin, a client PC —
+  takes you to that place. The crumb gains a step the same way.
+
+**Double-clicking a mark enters that mark's subject; double-clicking the container's own ground enters
+the container's subject.** Double-clicking Operations inside the Departments map goes to Operations;
+double-clicking the map itself goes to Departments.
+
+### Not everything is enterable, and the enterable must say so
+
+- A container with **nothing behind it** does not respond to a double click — the same rule as *a cell
+  with nothing to explain does not open* (`P05`, `K01`).
+- **An enterable container advertises it**: the pointer changes, the container lifts on hover, and the
+  hover state names where it goes ("Operations ›"). Nothing invisible is load-bearing.
+- A container is enterable only when there is a genuine space behind it. A figure, a legend, a single
+  sentence are not doors.
+- **One level per gesture.** Depth comes from repeating the gesture, never from one click landing two
+  levels down.
+
+### It is the same gesture at every level
+
+Super User → department → Admin is **one gesture repeated**, not three different navigations:
+double-click a department in Authority to go to the department; double-click an Admin there to enter
+them. The Admin level then hands over the Admin screens that already exist.
 
 ## If tabs are ever used anyway
 
