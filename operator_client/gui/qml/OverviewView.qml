@@ -129,10 +129,15 @@ Item {
         return { from_name: tree[l.from] ? tree[l.from].name : "", 
                  to_name: tree[l.to] ? tree[l.to].name : "", count: l.count }
     })
+    // counted from every PC, not from the drawn lanes: the lanes collapse the quiet ones into
+    // "N more", so counting them there would report one PC when it is six
     readonly property int quietPcs: {
         var n = 0
-        for (var i = 0; i < timelineLanes.length; i++)
-            if (timelineLanes[i].blocks.length === 0) n++
+        for (var i = 0; i < tree.length; i++) {
+            if (focusDept !== 0 && tree[i].department_id !== focusDept) continue
+            for (var j = 0; j < tree[i].workers.length; j++)
+                if (blocksFor(tree[i].workers[j].pc_id).length === 0) n++
+        }
         return n
     }
     // the same three counts, scoped to whatever department is descended into
@@ -231,7 +236,14 @@ Item {
                 out.push({ name: w.name || w.hostname, blocks: blocksFor(w.pc_id) })
             }
         }
-        return out
+        // Past nine lanes the bars get too thin to read, so the PCs nobody touched collapse into
+        // one quiet lane that says how many they are. Every PC that was used keeps its own.
+        if (out.length <= 9) return out
+        var used = out.filter(function (l) { return l.blocks.length > 0 })
+        var quiet = out.length - used.length
+        if (quiet > 0)
+            used.push({ name: quiet + " more", blocks: [], quiet: true })
+        return used
     }
     // the window is the day that actually happened, not a window around "now": at 00:30 the
     // morning's sessions are still the record, and starting the axis at midnight would bury them

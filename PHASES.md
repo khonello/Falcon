@@ -218,6 +218,13 @@ When resumed, build to `design-brief.md` and the canvas, not to the old screens.
       `DayTimeline`, `TierBars`), all fed by real handlers
 - [x] Push the dashboards further — descend into a department from the map (`D04-Department`), the
       timeline on real sessions (`hierarchy.sessions_today`), per-department task/flow small multiple
+- [x] The Super User **Overview** rebuilt as one page, a perfect 2×2 grid (board `K01`): Authority,
+      Rollout, Today, Out of place. No tabs; `GlancePage`/`HierarchyPage`/`RecordPage` deleted
+- [x] The sentence layer — `operator_client/core/narrate.py` + `tests/test_narrate.py`: generated,
+      never written; twelve words; a zero is a result, an absence is not
+- [ ] **Traversal into an Admin: how the GUI changes.** No design, no code, no test — a backbone
+      behaviour that the dependent pages need settled first
+- [ ] The other Super User pages: Views, Reports, Updates, Tasks, Flows, Assistance
 - [ ] Port the Admin views one at a time against their boards, deleting each legacy view as it lands
 - [ ] Fine-tune each surface to its concept (per `design-brief.md`): traversal/session, task proposal review, **flow as a graph**, resource tiers/violations, assistance channels, automation dashboard, reports/routing/alerts/updates, indicators
 - [ ] Worker Overlay + Dialog designs

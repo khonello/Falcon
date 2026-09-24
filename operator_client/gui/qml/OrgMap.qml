@@ -12,16 +12,24 @@ Item {
     property int focusId: 0                // 0 = the whole system
     signal picked(int departmentId)
 
-    readonly property real rootX: 46
-    readonly property real deptX: Math.max(150, width * 0.34)
-    readonly property real pcX: Math.max(deptX + 120, width * 0.64)
+    // the drawing is centred in whatever width it is given, and the PC constellation spreads with
+    // it -- otherwise a wide cell leaves the whole map hugging its left edge
     readonly property int perRow: 4
+    readonly property real colGap: Math.max(22, width * 0.05)
+    readonly property real rowGap: Math.max(20, height * 0.09)
+    readonly property real baseDeptX: Math.max(150, width * 0.32)
+    readonly property real basePcX: Math.max(baseDeptX + 110, width * 0.58)
+    readonly property real contentWidth: basePcX + (perRow - 1) * colGap + 30
+    readonly property real xOffset: Math.max(0, (width - contentWidth) / 2)
+    readonly property real rootX: 46 + xOffset
+    readonly property real deptX: baseDeptX + xOffset
+    readonly property real pcX: basePcX + xOffset
 
     function deptY(i) { return height * (i + 1) / (departments.length + 1) }
     function lit(d) { return focusId === 0 || focusId === d.department_id }
     function tintOf(i) { return Theme.series(i) }
-    function pcX2(i) { return pcX + (i % perRow) * 22 }
-    function pcY(deptIndex, i) { return deptY(deptIndex) - 18 + Math.floor(i / perRow) * 20 }
+    function pcX2(i) { return pcX + (i % perRow) * colGap }
+    function pcY(deptIndex, i) { return deptY(deptIndex) - rowGap * 0.9 + Math.floor(i / perRow) * rowGap }
 
     // a cubic as points: one path type for every link on the map, so they all bend alike
     function curve(x0, y0, x1, y1) {

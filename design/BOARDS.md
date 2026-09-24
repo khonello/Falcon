@@ -1,5 +1,8 @@
 # What every board is
 
+**`DECISIONS.md` is the companion to this file** — what was approved, what was rejected and why, and
+what has not been started. Read it before proposing anything new.
+
 The canvas grew past the point where a board's name told you what it was for. This is the map; the
 `INDEX` board on the canvas says the same thing visually.
 
@@ -11,7 +14,8 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `C01`–`C10` | **Charts.** One chart type per board, four ways to draw it. Pick one per slot. |
 | `L01`–`L06` | **Layouts.** Ways of arranging a page's slots. Pick one per page. |
 | `X01`–`X02` | **Behaviour.** How a slot is chosen, and what happens when a chart is clicked. |
-| `P01`–`P04` | **The pages, composed.** The density system, and the three pages built from it. **Start here — these supersede `L01`–`L06` as the proposal.** |
+| `P01`–`P05` | **The density system**, the pages composed from it, and the never-blank rule. |
+| `K01`–`K02` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
 | everything else | The Admin screens, the worker surfaces, the language, the dialogs. |

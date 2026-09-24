@@ -4,6 +4,7 @@ The GUI's visual design is generated here and published to a design canvas, so a
 change to a file, reviewable like any other.
 
 **Canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> ("Falcon Operator Design").
+**What every board is: `BOARDS.md`. What was decided and what was rejected: `DECISIONS.md`.**
 **What every board is: `BOARDS.md`**, and the `INDEX` board says the same on the canvas.
 
 ```powershell
@@ -37,7 +38,8 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 | `layouts.py` | the layout-structure boards (L01–L06): the same content in three, four and five panels |
 | `index_board.py` | `INDEX` — the contents page: which board is what, and which page's slot it fills |
 | `interaction.py` | `X01`–`X02` — how a slot is chosen, and what happens when a chart is clicked |
-| `pages.py` | `P01`–`P05` — the four panel densities, the three pages composed from them, and the never-blank rule |
+| `pages.py` | `P01`–`P05` — the four panel densities, the pages composed from them, and the never-blank rule |
+| `grid.py` | `K01`–`K02` — the Super User Overview; `K01` (the perfect grid) is what is built |
 | `run_gui.py` | opens the GUI **on screen** against the same stub, to click through without an Engine |
 | `shot_gui.py` | renders the **real QML app** offscreen with a stubbed bridge (it answers the same handlers the views call), for before/after screenshots |
 
