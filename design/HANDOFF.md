@@ -1,34 +1,72 @@
 # Where the Operator Client UI stands — 24 Sep 2026
 
-A snapshot for whoever picks this up next, which will be a fresh session. It records what exists,
-what was decided, and what to do next.
+A snapshot for a fresh session: what exists, what was decided, and the one thing to do next.
 
-**Read in this order:**
+**Read in this order:** `design/DECISIONS.md` (what the user approved, rejected and why — it is what
+stops the rejected shapes coming back) → `design/BOARDS.md` (what every board is) → this file (where
+the code stands and what to do next).
 
-1. **`design/DECISIONS.md`** — what the user approved, what they rejected and why, the principles
-   that shape every page still to be designed, and what has not been started. The Overview was
-   redesigned several times before it landed; this is the file that stops the rejected shapes coming
-   back.
-2. **`design/BOARDS.md`** — what every board on the canvas is.
-3. This file — where the code stands.
+**Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design",
+76 boards, version 41. Rejected proposals have been deleted from it. Branch
+`phase7/design-and-gui-rebuild`; **122 tests green, `ruff check .` clean**.
 
-**Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design", 76
-boards, version 41. Rejected proposals have been deleted from it.
+---
 
-## The short version
+## CONTINUE FROM HERE — traversal into an Admin
 
-Phase 7 was paused because the GUI was *functional, not acceptable*. A full design was then made and
-reviewed over many rounds, and the Super User **Overview** is now built on it.
+**No GUI design, no code, no test.** The Engine enforces it and the integration tests cover it; only
+the UI is missing. It is Hierarchy-backbone behaviour, so it is settled *before* the pages that
+depend on it (Views, Reports, Updates, Tasks, Flows, Assistance for Super User; then the Admin
+views).
 
-**The Overview is one page and a perfect 2 × 2 grid** (board `K01`): **Authority**, **Rollout**,
-**Today**, **Out of place**. No tabs. Each cell's title sits above it on the frame with a generated
-state phrase beside it; the header is "Must see" and the time, with no description of the
-organisation. The panels sit on the gradient — there is no grey sheet behind the body.
+**The question to answer:** what the window becomes when a Super User enters an Admin's workstation,
+and how you get back out.
 
-**Clicking a cell opens it in place** rather than navigating: the cell grows where it is and the
-panels around it become the gradient that explains it. Escape or the breadcrumb restores the grid
-exactly. **All four cells are built, and the composition belongs to the cell** — no two share a
-shape, so you know which one you opened before reading a word:
+- The frame **never** changes colour (settled rule) — so what says "you are inside someone else's
+  machine"? Today the shell has a floating state pill, the status line and `TopBar`; the design has
+  to make that unmistakable without touching the gradient.
+- What happens to the **rail**: does the Super User keep their own eight entries, gain the Admin's
+  (Automation, Actions — the combo only reachable by entering an Admin), or swap wholesale?
+- What the **body** shows, what is hidden, and what the countdown looks like: a traversal carries a
+  deadline (`traversal_limit_minutes`) and can be extended; that is chrome, not a page.
+- **Getting back**: ending the session vs. the deadline expiring vs. being blocked by a superior.
+- The same shape must answer **Assisted Access**, which is a *separate* state machine — do not reuse
+  the traversal code path (design rule from the spec).
+
+**What already exists to build on**
+
+| Layer | What is there |
+|---|---|
+| Engine | `hierarchy.traverse` (`{pc_id, force}`; `force` = block-or-end, vertical only, never against an un-evictable Super User), `hierarchy.end_session`, `hierarchy.extend_session`, `hierarchy.session_state`, `hierarchy.claim_native`; pushes `session.blocked`, `session.ended` |
+| Bridge | `falcon.traversing`, `falcon.superUserBanner`, `falcon.sessionText`, `falcon.session`; state-changing replies update `ClientState` inside `bridge.request` |
+| Tests | `tests/test_integration.py` scenario 1 and `test_network_drop_mid_traversal_with_real_clients`; `tests/test_operator_gui.py` drives a real traversal through the bridge |
+| Boards | `Traversing` and `Occupied` exist from the Admin pass and are in the current kit — read them first; they are the starting point, not necessarily the answer |
+| Legacy code | `HierarchyView.qml` (pre-kit) holds the old traverse / extend / end levers and is **no longer mounted**; `HomeView.qml` is the built Hierarchy screen |
+
+**How to work it** (the process that produced everything above): draw it as a board in `design/`
+first → `gen.py` → screenshot with Edge → show the user → only then QML + a test. Every piece of UI
+work is presented as **images in the conversation**, never described.
+
+Then, in order: the other Super User pages (Views, Reports, Updates, Tasks, Flows, Assistance — none
+designed, none built) · chart treatments from `C01`–`C10` (two applied, the rest are boards only;
+`X01` is designed and unbuilt, recommendation in `DECISIONS.md`) · the Admin views, one at a time,
+deleting each legacy view as its replacement lands · the remaining states (connect, loading,
+disconnected, `Dialogs`, the Worker Overlay and Dialog) · un-pause Phase 7 in `PHASES.md` and update
+`design-brief.md`'s status line.
+
+---
+
+## What is built
+
+**The Super User Overview is one page and a perfect 2 × 2 grid** (board `K01`): **Authority**,
+**Rollout**, **Today**, **Out of place**. No tabs. Each cell's title sits above it on the frame with
+a generated state phrase beside it; the header is "Must see" and the time, with no description of the
+organisation. The panels sit on the gradient — no grey sheet behind the body.
+
+**Clicking a cell opens it in place**: the cell grows where it is and the panels around it become the
+gradient that explains it. Escape or the breadcrumb restores the grid exactly. **The composition
+belongs to the cell — all four are built and no two share a shape**, so you know which one you opened
+before reading a word:
 
 | Cell | Composition | Board | Its shape |
 |---|---|---|---|
@@ -37,209 +75,152 @@ shape, so you know which one you opened before reading a word:
 | Today | `OpenedToday.qml` | `K05` | a lead running the whole height, a column of three beside it |
 | Out of place | `OpenedOutOfPlace.qml` | `K06` | three full-width bands, shape to words, read downward |
 
-A cell with nothing to explain does not open: no ungoverned department, no approved version, no
-client PCs, or nothing out of place, and that cell stays shut (checked on an empty system).
+A cell with **nothing to explain does not open** (no ungoverned department, no approved version, no
+client PCs, nothing out of place) — checked on an empty system. One level only: inside an opened cell
+a click selects or filters, it never opens again.
 
-Words are generated, never written: `operator_client/core/narrate.py`, held to twelve words for a
-sentence and six for a cell's `brief`, with `tests/test_narrate.py` on every rule.
+**Words are generated, never written**: `operator_client/core/narrate.py`, pure functions over the
+dicts the handlers already return, reached from QML as `falcon.narrate(topic, data)`. Twelve words for
+a sentence and six for a cell's `brief`, both enforced with a raise, not a long line; a topic with no
+matching condition states the plain fact. `tests/test_narrate.py` holds every topic to those rules.
 
-## Run it
+## Run it, render it, check it
 
 ```powershell
-environ-operator\Scripts\python.exe design\run_gui.py super_user          # stubbed, no Engine
-$env:FALCON_SHOT_EMPTY=1; ... design\run_gui.py super_user                 # a system with no data
+environ-operator\Scripts\python.exe design\run_gui.py super_user      # a real window, stubbed, no Engine
+$env:FALCON_SHOT_EMPTY=1; ... design\run_gui.py super_user            # a system with no data
+
+environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0    # the Overview, at rest
+$env:FALCON_SHOT_OPEN="rollout"; ... design\shot_gui.py design\shots super_user 0   # a cell opened
+                                                  # authority | rollout | today | place
+environ-operator\Scripts\python.exe design\shot_gui.py design\shots admin
+
+environ-engine\Scripts\python.exe design\gen.py       # -> design/boards/*.dc.html (git-ignored)
+$edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+& $edge --headless=new --disable-gpu --hide-scrollbars --window-size=1440,900 `
+        "--screenshot=design\shots\K05-Opened-Lead.png" "file:///$PWD/design/boards/K05-Opened-Lead.dc.html"
+
+environ-engine\Scripts\python.exe -m pytest tests/test_operator_gui.py tests/test_narrate.py -q
+environ-engine\Scripts\python.exe -m ruff check .
 ```
 
-## What to do next, in order
-
-1. **Traversal into an Admin.** No GUI design, no code, no test — what the rail, the frame and the
-   body become when a Super User enters an Admin's workstation, and how you get back. The Engine
-   enforces it and the integration tests cover it; only the UI is missing. It is a backbone
-   behaviour, so settle it before the pages that depend on it.
-2. **The other Super User pages**: Views, Reports, Updates, Tasks, Flows, Assistance. None designed,
-   none built.
-3. **Pick chart treatments** from `C01`–`C10`. Two are applied (assistance → one line per pair;
-   routing → lines and chips); the rest exist only as boards. `X01` (choosing a treatment in the
-   slot) is designed and unbuilt, and the recommendation on it is in `DECISIONS.md`.
-4. **Port the Admin views** one at a time against their boards, deleting each legacy view as its
-   replacement lands. What carries over from the Super User work is a deliberate later decision.
-5. **The remaining states**: the connect screen, loading, disconnected, the dialogs (`Dialogs`
-   board), and the Worker Overlay and Dialog (`Worker` board).
-6. **Un-pause Phase 7** in `PHASES.md` and update `design-brief.md`'s status line.
-
-## How it was decided
-
-The user's own Slack-style app (`ClassCap/classcap_desktop`) was the agreed reference for *architecture*
-— coloured frame as identity, slim icon rail, accordion sidebar, white-on-dark body — not for colour.
-A 15-board mood board (M01–M15) put every component in three or four variants; the user picked from it,
-and those picks are the kit. Super User was then rejected twice: first for being the Admin screens with
-items removed, then for being too restrained; the answer was to draw the system (D01–D03).
+Edge writes its `--screenshot` **after** the process returns and only to an absolute path — wait a
+moment and check the file. To change the design: edit the module, re-run `gen.py`, screenshot, then
+publish the changed `boards/<name>.dc.html` to the canvas as `project/<name>.dc.html` (one Artifact
+call: `root` = a folder holding `project/…`, `file_path` = `project/canvas.json` only when the board
+list changes). `design/README.md` has the detail.
 
 ## Rules that are settled
 
-- **One gradient frame**, always: `#121220 → #2A1F50 45% → #4B2F8A`, 155°. It never changes with state.
-  Session state is said by a floating pill, the status line and the detail card — never by the frame.
+- **One gradient frame**, always: `#121220 → #2A1F50 45% → #4B2F8A`, 155°; it never changes with
+  state. Session state is said by a floating pill, the status line and the detail card.
 - **Four toned meanings only**: accent `#8AA6E0`, ok `#7FB396`, warn `#D2A468`, danger `#DD8A8A`, each
   with a ~14 % tint. A border or highlight is a toned variation of a core colour, never a new hue.
+- **Charts**: identity uses the categorical ramp (`#3987e5 #d95926 #199e70 #c98500 #d55181`, validated
+  against the `#12151C` chart surface, stated once as `Theme.series(i)`); the four status colours stay
+  reserved and always carry a word beside the hue.
 - **Selection** is a 1 px inset line in a soft accent, or a filled muted row in the sidebar. **Never a
   left-edge accent** — the user's strongest dislike.
-- **A body row is one line** — short title, at most one value, a chevron. No sentences in a body; the
-  detail card explains. Titles ≤ 4 words, values ≤ 3.
-- **No accordions in a body** (rows select, the card carries depth); accordions live *inside* the card.
+- **A body row is one line**: short title (≤ 4 words), at most one value (≤ 3 words), a chevron. No
+  sentences in a body — the detail card explains. **No accordions in a body**; they live inside the card.
 - **The detail card** sits in a reserved 372 px lane, is always present, never opens or closes, has no
   close button, and shows an empty state when nothing is selected. The body column is a fixed 620 px.
-- **The sidebar names the category; the pills filter on a different axis.** Never the same axis twice.
-- **Stable order** in the sidebar (admins, then PCs by hostname). It never resorts by state.
-- **The card shows what is selected**, never what was just triggered; results are confirmed by a toast.
-- **Avatars are neutral** with no state dot; session state is an icon (person / lock / monitor / shield).
-- **Buttons are tonal or ghost only.** Chips are soft. Inputs are filled.
-- **No tables anywhere. Cards in one space are all one size.** Consistency within a space; a different
-  accepted variant in a different space is fine.
-- **Super User is designed for its own job**, not the Admin screens adapted: what cannot be done in that
-  space is not named in it (no Automation/Actions entry at all).
+  It shows **what is selected**, never what was just triggered; results are confirmed by a toast.
+- **The sidebar names the category; the pills filter on a different axis**, never the same one twice.
+  The sidebar keeps a **stable order** (admins, then PCs by hostname) and never resorts by state.
+- **Avatars are neutral**, no state dot; session state is an icon (person / lock / monitor / shield).
+  **Buttons are tonal or ghost only.** Chips are soft. Inputs are filled.
+- **No tables anywhere. Cards in one space are all one size.** A different accepted variant in a
+  different space is fine.
+- **Super User is designed for its own job**, not the Admin screens adapted: what cannot be done in
+  that space is not named in it (no Automation/Actions entry at all).
 - **A chart must pass one test**: *what question does this panel answer, and does the shape answer it
-  faster than a sentence would?* Three treatments were cut for failing it (a chord diagram, an orbit
-  diagram, an occupancy band) — each was legible only once its geometry had been explained. Expressive
-  treatments are kept as alternatives, never as the default.
-- **Panel density** (`P01`): a panel is a Figure (1), a Chart (2), a Chart told (3) or a Reading (4), and
-  a layout is a sequence of them running diagonally from shape to words. The page explains itself without
-  a click; the click is kept for the item-level question. A sentence is generated from a condition, never
-  written, and falls back to the plain fact when no condition matches.
-- **Layout is editorial, not a preference**: one layout per page, chosen once, never per viewer.
-- **Each page has its own structural signature**, so you know which page you are on before reading a
-  word: page 1 is a band over two columns, page 2 an equal quartet, page 3 a lead and a column.
-- **A panel is never blank** (`P05`). Three cases, and only two get a notice: a **zero is a result** and
-  is drawn normally; **nothing yet** keeps the chart's own structure, quietened, with the notice laid
-  over it; **not enough** draws the shape's frame and says what is missing.
-  The gradient itself is **declared, not assumed**: every panel carries a `density`, each page exposes
-  its `readingOrder`, and `tests/test_operator_gui.py` refuses a page whose density ever falls. A *reading* panel takes no
-  overlay — its content is words, so it simply says so, and keeps the rules its fact rows would sit on.
-- **Visual first, text on demand** (`X02`): a page is nearly wordless; clicking a chart settles it to one
-  side and brings text beside it — one sentence, then facts one line each, then at most one action. The
-  chart stays on screen, because the text is an extension of it.
-- **Charts**: identity uses a validated categorical ramp (`#3987e5 #d95926 #199e70 #c98500 #d55181`,
-  checked against the `#12151C` chart surface); the four status colours stay reserved and always carry a
-  word beside the hue.
+  faster than a sentence would?* Three treatments were cut for failing it (chord, orbit, occupancy
+  band). Expressive treatments stay as alternatives, never as defaults.
+- **Panel density** (`P01`): a panel is a Figure (1), a Chart (2), a Chart told (3) or a Reading (4),
+  and a layout is a sequence of them running diagonally from shape to words, so the page answers
+  without a click. **Layout is editorial, not a preference** — one layout per page, chosen once.
+- **Every page, and every opened cell, has its own structural signature**, so you know where you are
+  before reading a word. Never give two of them the same shape.
+- **A panel is never blank** (`P05`): a **zero is a result**, drawn normally; **nothing yet** keeps
+  the chart's own structure, quietened, with the notice laid over it; **not enough** draws the shape's
+  frame and says what is missing. A *reading* panel takes no overlay — its content is words.
+- **Visual first, text on demand** (`X02`): clicking a chart settles it to one side and brings text
+  beside it — one sentence, then facts one line each, then at most one action. The chart stays.
+- **A count is drawn against the largest, not on its own** (a department's PCs are drawn as as many
+  slots as the biggest department has, the unfilled ones faded).
 
 ## What exists
 
-### The design (this folder → the canvas)
+### The design (`design/*.py` → the canvas)
 
 | Row on the canvas | Boards |
 |---|---|
-| The Admin shell | `Main`, `SuperUser`, `Traversing` |
-| Sessions | `Occupied`, `Assisted`, `Tasks` |
-| Work | `Flows`, `Automation`, `Actions`, `Automation-Live`, `Assistance` |
-| Policy | `Resources`, `Reports`, `States` |
+| The Admin shell · sessions · work · policy | `Main`, `SuperUser`, `Traversing`, `Occupied`, `Assisted`, `Tasks`, `Flows`, `Automation`, `Actions`, `Automation-Live`, `Assistance`, `Resources`, `Reports`, `States` |
 | Worker + language | `Worker`, `Tokens`, `Dialogs` |
-| Mood board | `M01`–`M15` — every component in 3–4 variants |
+| Mood boards | `M01`–`M15` (every component in 3–4 variants) · `S01`–`S04` (Super User) — both already picked from |
 | The lane | `Lane-Filled`, `Lane-Empty` |
-| Super User | `SU-Departments`, `SU-Views`, `SU-Updates`, `SU-Audit` |
-| Super User mood board | `S01-Shape`, `S02-Figures`, `S03-Authority`, `S04-Descent` |
-| **Super User dashboards** | `D01-Glance`, `D02-Hierarchy`, `D03-Record` ← the direction the user loved, and `D04-Department`, the descent |
-| **Chart mood boards** | `C01`–`C10` — one chart type per board, four ways to draw it (rollout, fleet, confirmations, hierarchy, sessions, assistance, routing, violations, work, the figures) |
-| **Layout structures** | `L01`–`L06` — the same content in three, four and five panels, weighted differently |
-| **Behaviour** | `X01` choosing how a slot is drawn · `X02` reading a chart (visual → text) |
-| **The map** | `INDEX` — which board is what, and which page's slot it fills |
-| **The pages, composed** | `P01` the four panel densities · `P02`–`P04` the three pages built from them · `P05` a panel is never blank — **built** |
+| Super User pages | `SU-Departments`, `SU-Views`, `SU-Updates`, `SU-Audit` · dashboards `D01`–`D04` (superseded by the grid) |
+| Charts | `C01`–`C10` — one chart type per board, four ways to draw it |
+| Layouts | `L01`–`L06` — the same content in three, four and five panels |
+| Behaviour | `X01` choosing how a slot is drawn · `X02` reading a chart |
+| Densities and pages | `P01`–`P05` |
+| **The Overview** | `K01` the grid (built) · `K02` the rejected ranked alternative · `K03`–`K06` the four cells opened |
+| The map | `INDEX` — **out of date**; `design/BOARDS.md` is the current map |
 
 ### The code (`operator_client/gui/qml/`)
 
-Built on the new kit and running: `Theme.qml` (tokens, plus back-compat aliases so unported views still
-load), `Icons.qml` + `Icon.qml` (stroke glyphs as SVG path data drawn with QtQuick.Shapes — no image
-assets), `Txt`, `Chip`, `TBtn`, `GBtn`, `IconBtn`, `Avatar`, `Pills`, `CardRow`, `DetailCard`, `KeyRow`,
-`Sidebar`, `SbSection`, `SbRow`, `IconRail`, `TopBar`, `Body`, `HomeView`, and a rewritten `main.qml`.
+The kit: `Theme.qml` (tokens, plus back-compat aliases so unported views still load), `Icons`+`Icon`
+(stroke glyphs as SVG path data drawn with `QtQuick.Shapes` — no image assets), `Txt`, `Chip`, `TBtn`,
+`GBtn`, `IconBtn`, `Avatar`, `Pills`, `CardRow`, `DetailCard`, `KeyRow`, `Sidebar`/`SbSection`/`SbRow`,
+`IconRail`, `TopBar`, `Body`, `HomeView`, and `main.qml` (gradient frame, floating state pill, toast,
+status line).
 
-**The Overview** (`OverviewView.qml`) holds the data and the grid; `GridCell.qml` is one cell, with
-its title above it on the frame, `openable` gating whether it opens, and the never-blank notice.
-`OpenedAuthority`, `OpenedRollout`, `OpenedToday` and `OpenedOutOfPlace` are the four opened
-compositions, chosen by `opened` on a `StackLayout`. `DeptSlots`, `FleetGroups`, `QuietStrip`,
-`EnteredRows`, `DevStrip`, `ReadingBody`, `Sentence`, `Panel`, `Legend`, `Hero` and the chart
-components are the kit they are built from.
+The charts, all `QtQuick.Shapes` and plain rectangles — no charting library: `Panel`, `Legend`, `Hero`,
+`StackedBars`, `Waffle`, `FleetGroups`, `DeptSlots`, `QuietStrip`, `Trend`, `MiniBar`, `HealthCard`,
+`OrgMap`, `Arcs`, `RoutingMap`, `DayTimeline`, `DevStrip`, `EnteredRows`, `TierBars`, plus `Sentence`
+and `ReadingBody` for the words.
+
+`OverviewView.qml` holds the data and the grid; `GridCell.qml` is one cell (title above it on the
+frame, `openable`, the never-blank notice); the four `Opened*.qml` are its compositions, chosen by
+`opened` on a `StackLayout`. Everything on them is real: `hierarchy.tree`, `updates.rollout_health`,
+`hierarchy.sessions_today`, `resource.violations`, `audit.deviations`, `reports.routing_get`,
+`task.list`, `flow.list`, and `audit.recent` with prefix `update.attempt` for the confirmations trend.
 
 Two things the opened panels needed from below the UI: `updates.rollout_health` now reports how many
 attempts each PC behind has lost (`failures`, `last_attempt_at`), so *What is blocking* can name the
 machine the N+1 gate rests on; and `TierBars` takes a `notes` map so a violation is named on the tier
-line it broke. A fleet square carries its machine's number only where there is room for one, and the
-opened Rollout groups the squares by department — hostname numbers repeat across departments, so an
-ungrouped row of them says nothing.
-**`GlancePage`, `HierarchyPage` and `RecordPage` were deleted** when the three tabs went.
+line it broke. The opened Rollout groups its fleet squares by department — hostname numbers repeat
+across departments, so an ungrouped row of them says nothing.
 
-**The sentence layer is real code**: `operator_client/core/narrate.py`, pure functions over the dicts
-the handlers already return, reached from QML as `falcon.narrate(topic, data)`. The twelve-word limit is
-enforced in `_say` (a raise, not a long line), a topic with no matching condition states the plain fact,
-and `tests/test_narrate.py` holds every sentence to those rules. `design/shot_gui.py` with
-`FALCON_SHOT_EMPTY=1` renders a freshly bootstrapped system, which is how the never-blank rule is checked
-in the real app rather than only on a board.
+**Role differences live in exactly one place**: `IconRail.qml`'s `adminNav` / `superNav`. Each entry
+carries a `key` and `main.qml` routes on `shell.viewKey`, so the rails can differ in length; a view
+switches to another with `shell.show("hierarchy")`.
 
-**The Super User dashboards were ported** (D01–D04) and then superseded by the grid. Rail entry **Overview**, which Super User leads with;
-`OverviewView.qml` holds the data and three pages — `GlancePage`, `HierarchyPage`, `RecordPage` — behind
-pills, with a breadcrumb that descends into one department and backs out again. The chart kit, all drawn
-with `QtQuick.Shapes` and plain rectangles (no image assets, no charting library): `Panel`, `Legend`,
-`Hero`, `StackedBars`, `Waffle`, `Trend`, `MiniBar`, `HealthCard`, `OrgMap`, `Arcs`, `RoutingMap`,
-`DayTimeline`, `TierBars`. The categorical ramp is stated once as `Theme.chartSeries` / `Theme.series(i)`.
-
-Everything on those pages is real: `hierarchy.tree`, `updates.rollout_health`, `hierarchy.sessions_today`,
-`resource.violations`, `audit.deviations`, `reports.routing_get`, `task.list`, `flow.list`, and
-`audit.recent` with prefix `update.attempt` for the confirmations trend. A panel with nothing behind it
-says so instead of drawing an empty chart.
-
-Still the pre-kit versions, mounted hidden so their tests keep passing: `TasksView`, `FlowsView`,
-`ControlView`, `AssistanceView`, `ReportsView`, `ConnectView`, plus `Btn`, `Field`, `DataTable` etc.
-
-**Role differences live in exactly one place**: `IconRail.qml`'s `adminNav` / `superNav`. Each entry now
-carries a `key`, and `main.qml` routes on `shell.viewKey` rather than an index, so the two rails can differ
-in length; a view switches to another with `shell.show("hierarchy")`.
-
-### Checks
-
-Full suite → 122 passed (`tests/test_operator_gui.py` → 5 passed, 1 skipped). `ruff check .` → clean
-(`design/` is excluded; its long inline-style lines are the point). `tests/test_narrate.py` holds
-every sentence to the twelve-word rule, including the new `blocking`, `rollout_departments`,
-`entries` and `never_signed_in` topics.
+Still pre-kit, mounted hidden so their tests keep passing: `TasksView`, `FlowsView`, `ControlView`,
+`AssistanceView`, `ReportsView`, plus `ConnectView` and `Btn`, `Field`, `DataTable`, `Picker`,
+`SegmentedControl`, `Eyebrow`, `Section`. Orphaned by the rebuild and safe to delete when their
+replacements land: `HierarchyView.qml`, `HierarchyRail.qml`. `GlancePage`, `HierarchyPage` and
+`RecordPage` were deleted when the three Overview tabs went.
 
 ## Qt gotchas already paid for
 
-- A **nested layout fills by default**: a `RowLayout` inside a `ColumnLayout` will starve its
-  sibling unless told `Layout.fillHeight: false`. This cost an hour twice.
-- A component's children only land where you meant if the alias is a **`default property alias`**;
-  otherwise they attach to the wrapper and spill over everything above it.
+- A **nested layout fills by default**: a `RowLayout` inside a `ColumnLayout` starves its sibling
+  unless told `Layout.fillHeight: false`. This cost an hour twice.
+- **Size a panel by its content, not by a fraction of the window**, when its content is words:
+  `Layout.preferredHeight: 77 + body.implicitHeight` (77 = a `GridCell`'s title line and padding).
+  Chasing percentages clips the last row or the action button.
+- A component's children only land where you meant if the alias is a **`default property alias`**.
 - `icon` is FINAL on `AbstractButton` — our buttons use `iconName`.
 - `font.families` is not available in this Qt build — `Theme.pick()` resolves one family at runtime.
-- `font.pixelSize` rejects fractional values.
+- `font.pixelSize` rejects fractional values, so the boards' 11.5 / 12.5 px map onto `Theme.fMeta` /
+  `Theme.fBody`, never `+ 0.5`.
+- A duplicated `Layout.*` property in one object is a load error, not a warning.
 - The legacy views call `root.notify(...)`, so `main.qml` carries `property var root: shell`.
-
-## Working commands
-
-Two things paid for since: Edge writes its `--screenshot` **after** the process returns and only to an
-absolute path, so wait a moment and check the file; and `font.pixelSize` still rejects fractional values,
-so the boards' 11.5 / 12.5 px sizes map onto `Theme.fMeta` / `Theme.fBody`, never `+ 0.5`.
-
-```powershell
-environ-engine\Scripts\python.exe design\gen.py            # -> design/boards/*.dc.html (git-ignored)
-
-# a board, as a picture
-$edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-& $edge --headless=new --disable-gpu --hide-scrollbars --window-size=1440,900 `
-        "--screenshot=design\shots\D01-Glance.png" "file:///$PWD/design/boards/D01-Glance.dc.html"
-
-# the real app, as a picture (stubbed bridge, offscreen)
-environ-operator\Scripts\python.exe design
-un_gui.py super_user   # a real window, stubbed, to click through
-environ-operator\Scripts\python.exe design\shot_gui.py design\shots admin
-environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0     # the Overview, at rest
-$env:FALCON_SHOT_OPEN="rollout"; ... design\shot_gui.py design\shots super_user 0    # a cell opened
-                                                     # authority | rollout | today | place
-
-environ-engine\Scripts\python.exe -m pytest tests/test_operator_gui.py -q
-```
-
-To change the design: edit the module, re-run `gen.py`, screenshot, then publish the changed
-`boards/<name>.dc.html` to the canvas as `project/<name>.dc.html`. `design/README.md` has the detail.
 
 ## Two things the user will ask about
 
 - **Screenshots, always.** Every piece of UI work is presented as images in the conversation, not
-  described. Render, look at it, send it.
-- **Say what is not done.** The unported views show an honest "Being rebuilt on the new kit" placeholder
-  rather than pretending; keep that habit in the reporting too.
+  described. Render it, look at it, send it.
+- **Say what is not done.** The unported views show an honest "Being rebuilt on the new kit"
+  placeholder rather than pretending; keep that habit in the reporting too.
