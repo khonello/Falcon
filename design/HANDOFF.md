@@ -8,52 +8,62 @@ stops the rejected shapes coming back) → `design/BOARDS.md` (what every board 
 the code stands and what to do next).
 
 **Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design",
-76 boards, version 41. Rejected proposals have been deleted from it. Branch
-`phase7/design-and-gui-rebuild`; **122 tests green, `ruff check .` clean**.
+84 boards, **version 44**. Rejected and superseded proposals are deleted from it. Branch
+`phase7/design-and-gui-rebuild`; **122 tests green, `ruff check .` clean**. No QML has changed in this
+pass — everything below is design.
 
 ---
 
-## CONTINUE FROM HERE — traversal into an Admin
+## CONTINUE FROM HERE — the department level, waiting on picks from its mood board
 
-**No GUI design, no code, no test.** The Engine enforces it and the integration tests cover it; only
-the UI is missing. It is Hierarchy-backbone behaviour, so it is settled *before* the pages that
-depend on it (Views, Reports, Updates, Tasks, Flows, Assistance for Super User; then the Admin
-views).
+**We work one level at a time** (`design/LEVELS.md` — read it first). Level 1 Super User is designed
+and built. **Level 2, the department, is the current and only work.** Level 3, the Admin, was designed
+and built in the earlier pass and is not to be redesigned: traversing into an Admin hands over *those*
+screens. Level 4, a client PC, has not started.
 
-**The question to answer:** what the window becomes when a Super User enters an Admin's workstation,
-and how you get back out.
+**What just happened.** Two passes at the department went wrong and were thrown away or parked: the
+first fell back on the pre-kit sidebar-and-card-strip shell, the second mixed level 3 into level 2 (a
+red "you are inside" lid on a department screen). The cause was the same both times — **the department
+never had a mood board**, so approaches were never put side by side and picked from. Super User had
+`S01`–`S04`; the Admin console had `M01`–`M15`.
 
-- The frame **never** changes colour (settled rule) — so what says "you are inside someone else's
-  machine"? Today the shell has a floating state pill, the status line and `TopBar`; the design has
-  to make that unmistakable without touching the gradient.
-- What happens to the **rail**: does the Super User keep their own eight entries, gain the Admin's
-  (Automation, Actions — the combo only reachable by entering an Admin), or swap wholesale?
-- What the **body** shows, what is hidden, and what the countdown looks like: a traversal carries a
-  deadline (`traversal_limit_minutes`) and can be extended; that is chrome, not a page.
-- **Getting back**: ending the session vs. the deadline expiring vs. being blocked by a superior.
-- The same shape must answer **Assisted Access**, which is a *separate* state machine — do not reuse
-  the traversal code path (design rule from the spec).
+**`DP01`–`DP04`, the department mood board, is now on the canvas** (`design/dept_mood.py`), in the same
+format as the others: one facet per board, two sections, four approaches at the same size, each
+captioned so a pick can be named.
 
-**What already exists to build on**
+| Board | Section 1 | Section 2 |
+|---|---|---|
+| `DP01` shape | Colonnade · Floor first · Roster · Split | where the Admins sit: Columns · Header band · Ledger · On the machines |
+| `DP02` people | one Admin: Station · Ledger line · Figures · Portrait | what is said: their machines · their work · one sentence · a state word |
+| `DP03` machines | the seven: Grouped by Admin · One waffle · Day lanes · Roster | one machine: Slot · With its Admin · Its day · Figure |
+| `DP04` doors | choosing: Opens in place · Detail lane · Drill · Reveal | asking to enter: In the cell · A confirm · A reading · Two doors named |
 
-| Layer | What is there |
-|---|---|
-| Engine | `hierarchy.traverse` (`{pc_id, force}`; `force` = block-or-end, vertical only, never against an un-evictable Super User), `hierarchy.end_session`, `hierarchy.extend_session`, `hierarchy.session_state`, `hierarchy.claim_native`; pushes `session.blocked`, `session.ended` |
-| Bridge | `falcon.traversing`, `falcon.superUserBanner`, `falcon.sessionText`, `falcon.session`; state-changing replies update `ClientState` inside `bridge.request` |
-| Tests | `tests/test_integration.py` scenario 1 and `test_network_drop_mid_traversal_with_real_clients`; `tests/test_operator_gui.py` drives a real traversal through the bridge |
-| Boards | `Traversing` and `Occupied` exist from the Admin pass and are in the current kit — read them first; they are the starting point, not necessarily the answer |
-| Legacy code | `HierarchyView.qml` (pre-kit) holds the old traverse / extend / end levers and is **no longer mounted**; `HomeView.qml` is the built Hierarchy screen |
+**THE NEXT STEP: the user picks, one per section.** Then the department page is composed from exactly
+those picks and nothing else. `T01` (at rest) and `T02` (an Admin chosen) exist as the pre-mood-board
+attempts — they are *material*, not the answer, and should be rebuilt from the picks.
 
-**How to work it** (the process that produced everything above): draw it as a board in `design/`
-first → `gen.py` → screenshot with Edge → show the user → only then QML + a test. Every piece of UI
-work is presented as **images in the conversation**, never described.
+**Then, before any QML:** tab names for each level. The rail is one-tab-per-feature today (Super User:
+Overview, Hierarchy, Views, Reports, Updates, Tasks, Flows, Assistance) and the user wants **combo
+names that gather features by the job they serve**, decided per level.
 
-Then, in order: the other Super User pages (Views, Reports, Updates, Tasks, Flows, Assistance — none
-designed, none built) · chart treatments from `C01`–`C10` (two applied, the rest are boards only;
-`X01` is designed and unbuilt, recommendation in `DECISIONS.md`) · the Admin views, one at a time,
-deleting each legacy view as its replacement lands · the remaining states (connect, loading,
-disconnected, `Dialogs`, the Worker Overlay and Dialog) · un-pause Phase 7 in `PHASES.md` and update
-`design-brief.md`'s status line.
+**Settled at this level so far**
+
+- **Four cells, and the widths vary** — *"the width varies and usually four is the sweet spot."* A
+  level's page is four cells, never full-width bands; the widths do the ranking, and which cell is
+  wide is the page's signature.
+- Detail arrives by **opening a cell**, not by crowding the page — the Overview rule carried down.
+- A department has **two doors**: an Admin, and a client PC. A Super User may enter either; the client
+  PC does not have to be reached through its Admin.
+- Levels 1–2 are **looking** (nothing held, no clock). Levels 3–4 are **holding**.
+
+**Parked, because they belong to level 3:** `T03` (inside an Admin), `T05` (the lid and its clock),
+and `T06` (assisted access, its own state machine). They stay on the canvas labelled `PARKED`. When
+level 3 is opened, the question is how the **existing** Admin screens are wrapped — not what replaces
+them.
+
+**How to work it:** draw it as a board in `design/` first → `gen.py` → screenshot with Edge → show the
+user → only then QML + a test. Every piece of UI work is presented as **images in the conversation**,
+never described. And no UI change without being asked for it.
 
 ---
 
