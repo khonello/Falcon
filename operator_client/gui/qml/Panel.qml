@@ -9,6 +9,12 @@ Rectangle {
 
     property string title: ""
     property string note: ""
+    // How much of this panel is picture and how much is words (board P01). A page declares its
+    // panels in reading order and the density must never decrease along it: shape at the top left,
+    // sentences at the bottom right. `tests/test_operator_gui.py` holds every page to that.
+    //   1 Figure  a number and a word      2 Chart        a shape and its legend
+    //   3 Chart, told  a shape and its one sentence       4 Reading  the words
+    property int density: 0
     // A panel is never blank. When there is nothing to draw the chart keeps its own structure --
     // its rows, its lanes, its track -- quietened, and the notice is laid OVER it, never in place
     // of it. A zero is not this case: a zero is a result and is drawn normally.

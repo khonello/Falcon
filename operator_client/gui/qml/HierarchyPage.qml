@@ -10,8 +10,15 @@ import "."
 // quietens everything but that department, so descent is a change of attention, not a new screen.
 Item {
     id: page
+    objectName: "hierarchyPage"
     property var view: null
     readonly property bool descended: page.view.focusDept !== 0
+
+    // The quartet in reading order. Descending swaps what fills two boxes, never the gradient.
+    readonly property var readingOrder: page.descended
+        ? [mapPanel, herePanel, numbersPanel, thinPanel]
+        : [mapPanel, assistPanel, routingPanel, thinPanel]
+    readonly property var densities: readingOrder.map(function (p) { return p.density })
 
     readonly property var hierarchySays: falcon.narrate("hierarchy", { tree: page.view.tree })
     readonly property var assistSays: falcon.narrate("assistance", { pairs: page.view.assistPairs })
@@ -32,6 +39,8 @@ Item {
         // --- density 2: the map. The page's subject, and the only thing here you act on by
         //     pointing at it.
         Panel {
+            id: mapPanel
+            density: 2
             Layout.fillWidth: true
             Layout.fillHeight: true
             title: "The hierarchy"
@@ -58,6 +67,8 @@ Item {
 
         // --- density 3: a shape with the one sentence it is making.
         Panel {
+            id: assistPanel
+            density: 3
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: !page.descended
@@ -74,6 +85,7 @@ Item {
 
         Panel {
             id: herePanel
+            density: 3
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: page.descended
@@ -92,6 +104,8 @@ Item {
 
         // --- density 3 again: the other relationship this page is responsible for.
         Panel {
+            id: routingPanel
+            density: 3
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: !page.descended
@@ -112,6 +126,8 @@ Item {
         }
 
         Panel {
+            id: numbersPanel
+            density: 3
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: page.descended
@@ -136,6 +152,7 @@ Item {
 
         // --- density 4: the words. What the map cannot say — what the gap actually means.
         ReadingPanel {
+            id: thinPanel
             Layout.fillWidth: true
             Layout.fillHeight: true
             title: page.descended ? "This department" : "Where authority is thin"

@@ -10,7 +10,11 @@ import "."
 // cleared and a deviation is logged rather than corrected. What is drawn is what happened.
 Item {
     id: page
+    objectName: "recordPage"
     property var view: null
+
+    readonly property var readingOrder: [sessionsPanel, violationsPanel, deviationsPanel, dayPanel]
+    readonly property var densities: readingOrder.map(function (p) { return p.density })
 
     readonly property var daySays: falcon.narrate("the_day", {
         sessions: page.view.sessions, pc_count: page.view.pcCount, quiet_pcs: page.view.quietPcs })
@@ -24,6 +28,7 @@ Item {
         // --- density 2: the lead. The whole day as one shape.
         Panel {
             id: sessionsPanel
+            density: 2
             Layout.fillWidth: true
             Layout.preferredWidth: page.width - Theme.laneWidth - 16
             Layout.fillHeight: true
@@ -62,6 +67,8 @@ Item {
             // --- density 3: a shape with its sentence. A tier with nothing in it keeps its row
             //     and its zero -- that is a result, not an absence.
             Panel {
+                id: violationsPanel
+                density: 3
                 Layout.fillWidth: true
                 Layout.preferredHeight: 190
                 title: "Violations by tier"
@@ -75,6 +82,8 @@ Item {
 
             // --- density 3 again.
             Panel {
+                id: deviationsPanel
+                density: 3
                 Layout.fillWidth: true
                 Layout.preferredHeight: 172
                 title: "Deviations"
@@ -128,6 +137,7 @@ Item {
             // --- density 4: the day in words. The panel a Super User would read first with ten
             //     seconds, so it sits at the end of the reading order.
             ReadingPanel {
+                id: dayPanel
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 title: "Today, in words"

@@ -9,6 +9,7 @@ import "."
 Panel {
     id: root
 
+    density: 4                              // a reading panel is the end of a page, always
     property var narration: ({})            // {sentence, facts, action, state, note}
     // How many facts this panel has room for. The narrator may offer more; the panel decides, and
     // the action must never be the thing that falls off the bottom.

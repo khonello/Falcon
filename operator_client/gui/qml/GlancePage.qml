@@ -10,7 +10,13 @@ import "."
 // page you are on from the shape alone.
 Item {
     id: page
+    objectName: "glancePage"
     property var view: null
+
+    // The panels in reading order, and the gradient they run. Declared, not assumed: a test
+    // walks this list and refuses a page whose density ever falls.
+    readonly property var readingOrder: [band, rolloutPanel, fleetPanel, confPanel, needsPanel]
+    readonly property var densities: readingOrder.map(function (p) { return p.density })
 
     // the sentences: generated in core/narrate.py from exactly the data these charts drew
     readonly property var rolloutSays: falcon.narrate("rollout", {
@@ -28,6 +34,8 @@ Item {
 
         // --- density 1: figures. A number and a word; no chart and no sentence.
         Rectangle {
+            id: band
+            property int density: 1      // a number and a word; no chart and no sentence
             Layout.fillWidth: true
             Layout.preferredHeight: 104
             radius: Theme.radiusLg
@@ -77,6 +85,8 @@ Item {
 
                 // --- density 2: a shape and its legend.
                 Panel {
+                    id: rolloutPanel
+                    density: 2
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     title: page.view.version ? ("Rollout " + page.view.version.version_string) : "Rollout"
@@ -99,6 +109,7 @@ Item {
                 // --- density 3: the same kind of shape, and the one sentence it is making.
                 Panel {
                     id: confPanel
+                    density: 3
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     title: "Confirmations"
@@ -127,6 +138,8 @@ Item {
 
                 // --- density 2, short: the fleet.
                 Panel {
+                    id: fleetPanel
+                    density: 2
                     Layout.fillWidth: true
                     Layout.preferredHeight: 196
                     title: "The fleet"
@@ -149,6 +162,7 @@ Item {
                 // --- density 4: the words. The end of the reading order, and the panel you would
                 //     read first if you only had ten seconds.
                 ReadingPanel {
+                    id: needsPanel
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     title: "What needs you"

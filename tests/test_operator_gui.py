@@ -58,6 +58,22 @@ def test_helpers_are_pure(gui):
     assert bridge.pretty({"a": 1}) == '{\n  "a": 1\n}'
 
 
+def test_every_page_runs_from_shape_to_words(gui):
+    """Panel density (board P01) is a design rule, so it is a test and not a convention: each page
+    declares its panels in reading order, and the density must never fall along it. A page that
+    puts its words before its shapes -- or forgets to end on a reading panel -- fails here."""
+    win, _, _ = gui
+    for name, expected_end in (("glancePage", 4), ("hierarchyPage", 4), ("recordPage", 4)):
+        page = win.findChild(QObject, name)
+        assert page is not None, name
+        densities = prop(page, "densities")
+        assert densities, name
+        assert all(d > 0 for d in densities), (name, densities)
+        assert densities == sorted(densities), (name, densities)     # never falls
+        assert densities[0] <= 2, (name, densities)                  # starts on a shape
+        assert densities[-1] == expected_end, (name, densities)      # ends on the words
+
+
 def prop(obj: QObject, name: str):
     """A QML `property var` as plain Python (JS arrays/objects arrive as QJSValue)."""
     v = obj.property(name)

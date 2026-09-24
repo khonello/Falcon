@@ -58,7 +58,9 @@ items removed, then for being too restrained; the answer was to draw the system 
   word: page 1 is a band over two columns, page 2 an equal quartet, page 3 a lead and a column.
 - **A panel is never blank** (`P05`). Three cases, and only two get a notice: a **zero is a result** and
   is drawn normally; **nothing yet** keeps the chart's own structure, quietened, with the notice laid
-  over it; **not enough** draws the shape's frame and says what is missing. A *reading* panel takes no
+  over it; **not enough** draws the shape's frame and says what is missing.
+  The gradient itself is **declared, not assumed**: every panel carries a `density`, each page exposes
+  its `readingOrder`, and `tests/test_operator_gui.py` refuses a page whose density ever falls. A *reading* panel takes no
   overlay — its content is words, so it simply says so, and keeps the rules its fact rows would sit on.
 - **Visual first, text on demand** (`X02`): a page is nearly wordless; clicking a chart settles it to one
   side and brings text beside it — one sentence, then facts one line each, then at most one action. The
@@ -167,6 +169,7 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
         "--screenshot=design\shots\D01-Glance.png" "file:///$PWD/design/boards/D01-Glance.dc.html"
 
 # the real app, as a picture (stubbed bridge, offscreen)
+environ-operator\Scripts\python.exe designun_gui.py super_user   # a real window, stubbed, to click through
 environ-operator\Scripts\python.exe design\shot_gui.py design\shots admin
 environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0 1     # Overview, page 1
 environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0 1 1   # ... descended into department 1
