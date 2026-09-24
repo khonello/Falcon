@@ -109,20 +109,90 @@ def confirmations(data: dict[str, Any]) -> dict[str, Any]:
         else:
             break
     if flat_days >= 2:
-        return _out(f"Nothing has confirmed for {_n(flat_days, 'day')}.")
+        return _out(f"Nothing has confirmed for {_n(flat_days, 'day')}.",
+                    [_fact("Confirmed", points[-1]), _fact("Stalled for", _n(flat_days, "day"), "warn")],
+                    brief=f"stalled {_n(flat_days, 'day')}", tone="warn")
     if moved <= 0:
-        return _out("No PC confirmed this week.")
-    return _out(f"{_n(moved, 'PC')} confirmed this week.")
+        return _out("No PC confirmed this week.", [_fact("Confirmed", points[-1])],
+                    brief="none this week", tone="warn")
+    return _out(f"{_n(moved, 'PC')} confirmed this week.",
+                [_fact("Confirmed", points[-1]), _fact("This week", f"+{moved}", "ok")],
+                brief=f"{_n(moved, 'PC')} this week", tone="ok")
 
 
 def fleet(data: dict[str, Any]) -> dict[str, Any]:
     pcs = int(data.get("pc_count") or 0)
     behind = data.get("pcs_behind") or []
     if pcs == 0:
-        return _empty("No client PCs are registered.")
+        return _empty("No client PCs are registered.", brief="no client PCs")
     if not behind:
-        return _out(f"All {pcs} PCs are on the current version.")
-    return _out(f"{_n(len(behind), 'PC')} of {pcs} still to confirm.")
+        return _out(f"All {pcs} PCs are on the current version.",
+                    [_fact("Client PCs", pcs), _fact("Confirmed", pcs, "ok")],
+                    brief="all confirmed", tone="ok")
+    failing = [b for b in behind if b.get("escalated")]
+    return _out(f"{_n(len(behind), 'PC')} of {pcs} still to confirm.",
+                [_fact("Confirmed", f"{max(0, pcs - len(behind))} of {pcs}"),
+                 _fact("Behind", len(behind) - len(failing), "warn" if len(behind) > len(failing) else ""),
+                 _fact("Failing", len(failing), "danger" if failing else "")],
+                brief=f"{len(behind)} of {pcs} behind", tone="danger" if failing else "warn")
+
+
+def rollout_departments(data: dict[str, Any]) -> dict[str, Any]:
+    """The same rollout, one bar per department: which department is holding the fleet up."""
+    departments = data.get("departments") or []
+    if not departments:
+        return _empty("No departments exist yet.")
+    failing = [d for d in departments if int(d.get("escalated") or 0) > 0]
+    pending = [d for d in departments if int(d.get("pending") or 0) > 0]
+    if failing:
+        if len(failing) == 1:
+            sentence = f"{failing[0]['department_name']} is the only one failing."
+            brief = f"{failing[0]['department_name']} failing"
+        else:
+            sentence = f"{len(failing)} departments have a PC past the threshold."
+            brief = f"{len(failing)} departments failing"
+        return _out(sentence, [_fact(d["department_name"], _n(int(d["escalated"]), "PC"), "danger")
+                               for d in failing[:4]], brief=brief, tone="danger")
+    if pending:
+        total = sum(int(d.get("pending") or 0) for d in pending)
+        return _out(f"{_n(total, 'PC')} still retrying, none past the threshold.",
+                    [_fact(d["department_name"], _n(int(d["pending"]), "PC"), "warn") for d in pending[:4]],
+                    brief=f"{_n(total, 'PC')} retrying", tone="warn")
+    return _out("Every department is fully confirmed.",
+                [_fact(d["department_name"], _n(int(d.get("pcs") or 0), "PC"), "ok") for d in departments[:4]],
+                brief="all departments confirmed", tone="ok")
+
+
+def blocking(data: dict[str, Any]) -> dict[str, Any]:
+    """What holds the next version back. The Engine refuses to approve N+1 while any PC is not
+    confirmed on N, so this panel names the machines the gate is actually resting on."""
+    version = (data.get("version") or {}).get("version_string")
+    behind = data.get("pcs_behind") or []
+    pcs = int(data.get("pc_count") or 0)
+    if not version:
+        return _empty("No version has been approved yet.")
+    if not behind:
+        return _out("Nothing is blocking the next version.",
+                    [_fact("Current version", version), _fact("Confirmed", f"{pcs} of {pcs}", "ok")],
+                    brief="nothing blocking", tone="ok")
+    failing = [b for b in behind if b.get("escalated")]
+    retrying = [b for b in behind if not b.get("escalated")]
+    # ordered by what has to be dealt with first, because a panel shows only the first few
+    facts = []
+    for b in failing[:2]:
+        attempts = int(b.get("failures") or 0)
+        facts.append(_fact("Failing", f"{b['hostname']}, {_n(attempts, 'attempt')}" if attempts
+                           else b["hostname"], "danger"))
+    if retrying:
+        facts.append(_fact("Retrying", ", ".join(b["hostname"] for b in retrying[:2]), "warn"))
+    facts.append(_fact("Confirmed", f"{max(0, pcs - len(behind))} of {pcs}"))
+    facts.append(_fact("Current version", version))
+    verb = "confirms" if len(behind) == 1 else "confirm"
+    return _out(f"The next version stays blocked until {_n(len(behind), 'PC')} {verb}.", facts,
+                action="Prompt their Admins",
+                brief=(f"{_n(len(failing), 'PC')} failing" if failing
+                       else f"{_n(len(retrying), 'PC')} retrying"),
+                tone="danger" if failing else "warn")
 
 
 # --- what needs the Super User ------------------------------------------------------------------
@@ -334,6 +404,7 @@ def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
 
 TOPICS = {
     "rollout": rollout, "confirmations": confirmations, "fleet": fleet, "needs_you": needs_you,
+    "rollout_departments": rollout_departments, "blocking": blocking,
     "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
     "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet,
 }

@@ -94,11 +94,26 @@ Item {
                 var w = tree[i].workers[j]
                 var b = behindFor(w.pc_id)
                 out.push({ tone: !b ? "ok" : b.escalated ? "danger" : "warn",
+                           name: (w.hostname || w.name),
                            label: (w.hostname || w.name)
                                   + (!b ? " — confirmed" : b.escalated ? " — failing" : " — behind") })
             }
         return out
     }
+    // the same squares as `fleetCells`, kept under the department that owns them -- what the
+    // opened Rollout draws, where a machine has to be nameable
+    readonly property var fleetGroups: tree.map(function (d) {
+        return { name: d.name, cells: d.workers.map(function (w) {
+            var b = root.behindFor(w.pc_id)
+            return { tone: !b ? "ok" : b.escalated ? "danger" : "warn",
+                     name: (w.hostname || w.name),
+                     label: (w.hostname || w.name)
+                            + (!b ? " — confirmed" : b.escalated ? " — failing" : " — behind") }
+        }) }
+    })
+    readonly property var skeletonGroups: [{ name: "Department", cells: [{ tone: "quiet", name: "" },
+                                                                        { tone: "quiet", name: "" },
+                                                                        { tone: "quiet", name: "" }] }]
     readonly property var rolloutRows: tree.map(function (d) {
         return { label: d.name, parts: root.rolloutParts(d.department_id) }
     })
@@ -444,6 +459,11 @@ Item {
     // Which cell is open, "" at rest. One level only: inside an opened cell a click selects or
     // filters, it never opens again, or "back" becomes a stack and the one-page promise dies.
     property string opened: ""
+    // the breadcrumb says the cell's own title, which is not always its key: the Rollout cell
+    // carries its version number
+    readonly property string openedTitle: root.opened === "authority" ? "Authority"
+                                          : root.opened === "rollout" ? rolloutTitle : root.opened
+    readonly property string rolloutTitle: root.version ? ("Rollout " + root.version.version_string) : "Rollout"
     // the department nobody governs -- the subject Authority opens into, and the reason it opens
     readonly property var gapDept: {
         for (var i = 0; i < tree.length; i++)
@@ -510,7 +530,7 @@ Item {
                 }
                 Icon { name: "chev"; color: Qt.rgba(1, 1, 1, 0.45); size: 13; anchors.verticalCenter: parent.verticalCenter }
                 Txt {
-                    text: root.opened === "authority" ? "Authority" : root.opened
+                    text: root.openedTitle
                     color: "#ffffff"
                     font.pixelSize: Theme.fSection
                     font.weight: Font.DemiBold
@@ -529,7 +549,7 @@ Item {
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: root.opened === "" ? 0 : 1
+            currentIndex: root.opened === "" ? 0 : root.opened === "authority" ? 1 : 2
 
         GridLayout {
             id: grid
@@ -562,8 +582,12 @@ Item {
                 objectName: "cellRollout"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                title: root.version ? ("Rollout " + root.version.version_string) : "Rollout"
+                title: root.rolloutTitle
                 narration: root.rolloutSays
+                // nothing to explain until a version has been approved: with no rollout in flight
+                // the cell has no fleet, no gate and no lever, so it stays shut
+                openable: root.version !== null && root.version !== undefined
+                onOpened: root.opened = "rollout"
 
                 StackedBars {
                     width: parent.width
@@ -689,8 +713,10 @@ Item {
         }
 
         // The opened composition belongs to the cell, not to the Overview: Authority takes the
-        // shape from board K03, and another cell would take its own.
+        // shape from board K03 -- a map, two told panels, the words down the right -- and Rollout
+        // takes a different one entirely (K04), because a fleet is wide.
         OpenedAuthority { view: root }
+        OpenedRollout { view: root }
         }
     }
 

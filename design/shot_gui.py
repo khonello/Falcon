@@ -107,8 +107,10 @@ STUB = {
         "departments": [{"department_id": 1, "department_name": "Operations", "pcs": 7, "current": 6, "pending": 1, "escalated": 0},
                         {"department_id": 2, "department_name": "Finance", "pcs": 2, "current": 2, "pending": 0, "escalated": 0},
                         {"department_id": 3, "department_name": "Logistics", "pcs": 2, "current": 1, "pending": 0, "escalated": 1}],
-        "pcs_behind": [{"pc_id": 26, "hostname": "OPS-06", "department_id": 1, "current_version_id": 3, "escalated": False},
-                       {"pc_id": 42, "hostname": "LOG-02", "department_id": 3, "current_version_id": 2, "escalated": True}],
+        "pcs_behind": [{"pc_id": 26, "hostname": "OPS-06", "department_id": 1, "current_version_id": 3,
+                        "failures": 1, "last_attempt_at": _at(9.5), "escalated": False},
+                       {"pc_id": 42, "hostname": "LOG-02", "department_id": 3, "current_version_id": 2,
+                        "failures": 6, "last_attempt_at": _at(7.5), "escalated": True}],
     },
     "resource.violations": {"violations": [
         {"id": 7, "resource_tag": "restricted", "filename": "budget-2026.xlsx",

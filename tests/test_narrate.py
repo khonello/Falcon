@@ -36,7 +36,23 @@ def test_every_sentence_is_twelve_words_or_fewer():
         ("confirmations", {"points": []}),
         ("confirmations", {"points": [0, 1]}),
         ("fleet", {"pc_count": 14, "pcs_behind": [{"hostname": "OPS-06"}]}),
+        ("fleet", {"pc_count": 14, "pcs_behind": []}),
         ("fleet", {"pc_count": 0}),
+        ("rollout_departments", {"departments": [
+            {"department_name": "Operations", "pcs": 7, "pending": 1, "escalated": 0},
+            {"department_name": "Logistics", "pcs": 2, "pending": 0, "escalated": 1}]}),
+        ("rollout_departments", {"departments": [
+            {"department_name": "Operations", "pcs": 7, "pending": 1, "escalated": 0}]}),
+        ("rollout_departments", {"departments": [
+            {"department_name": "Operations", "pcs": 7, "pending": 0, "escalated": 0}]}),
+        ("rollout_departments", {"departments": []}),
+        ("blocking", {"version": {"version_string": "1.4.2"}, "pc_count": 11, "pcs_behind": [
+            {"hostname": "OPS-06", "failures": 1},
+            {"hostname": "LOG-02", "failures": 6, "escalated": True}]}),
+        ("blocking", {"version": {"version_string": "1.4.2"}, "pc_count": 11,
+                      "pcs_behind": [{"hostname": "OPS-06", "failures": 1}]}),
+        ("blocking", {"version": {"version_string": "1.4.2"}, "pc_count": 11, "pcs_behind": []}),
+        ("blocking", {"pc_count": 11}),
         ("needs_you", {"tree": [DEPT, EMPTY_DEPT], "pcs_behind": [{"hostname": "OPS-06"}],
                        "violations": [{"filename": "b.xlsx", "hostname": "OPS-07"}], "deviations": []}),
         ("needs_you", {"tree": [DEPT, EMPTY_DEPT], "pcs_behind": [], "violations": [], "deviations": []}),
@@ -119,6 +135,39 @@ def test_confirmations_notices_a_stall_before_it_reports_progress():
         "Nothing has confirmed for 3 days."
     assert n.narrate("confirmations", {"points": [0, 3, 6, 8, 10, 11, 12]})["sentence"] == \
         "12 PCs confirmed this week."
+
+
+def test_the_opened_rollout_names_the_machines_the_gate_rests_on():
+    """Approving N+1 is refused while any PC is behind on N, so the reading panel is about the
+    machines holding the gate -- what is failing first, because that is what has to be dealt with."""
+    r = n.narrate("blocking", {"version": {"version_string": "1.4.2"}, "pc_count": 11, "pcs_behind": [
+        {"hostname": "OPS-06", "failures": 1},
+        {"hostname": "LOG-02", "failures": 6, "escalated": True}]})
+    assert r["sentence"] == "The next version stays blocked until 2 PCs confirm."
+    assert r["facts"][0] == {"label": "Failing", "value": "LOG-02, 6 attempts", "tone": "danger"}
+    assert r["facts"][1]["value"] == "OPS-06" and r["action"] == "Prompt their Admins"
+
+    one = n.narrate("blocking", {"version": {"version_string": "1.4.2"}, "pc_count": 11,
+                                 "pcs_behind": [{"hostname": "OPS-06", "failures": 1}]})
+    assert one["sentence"].endswith("until 1 PC confirms.")
+
+    clear = n.narrate("blocking", {"version": {"version_string": "1.4.2"}, "pc_count": 11, "pcs_behind": []})
+    assert clear["state"] == "ok" and clear["tone"] == "ok"
+
+
+def test_by_department_names_the_one_holding_the_fleet_up():
+    r = n.narrate("rollout_departments", {"departments": [
+        {"department_name": "Operations", "pcs": 7, "pending": 1, "escalated": 0},
+        {"department_name": "Logistics", "pcs": 2, "pending": 0, "escalated": 1}]})
+    assert r["sentence"] == "Logistics is the only one failing." and r["tone"] == "danger"
+
+    retrying = n.narrate("rollout_departments", {"departments": [
+        {"department_name": "Operations", "pcs": 7, "pending": 1, "escalated": 0}]})
+    assert retrying["tone"] == "warn" and "none past the threshold" in retrying["sentence"]
+
+    done = n.narrate("rollout_departments", {"departments": [
+        {"department_name": "Operations", "pcs": 7, "pending": 0, "escalated": 0}]})
+    assert done["sentence"] == "Every department is fully confirmed." and done["tone"] == "ok"
 
 
 def test_an_empty_department_outranks_a_rollout_in_what_needs_you():

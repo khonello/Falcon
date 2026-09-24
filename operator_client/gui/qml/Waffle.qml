@@ -22,6 +22,18 @@ Flow {
             color: modelData.tone === "quiet" ? Theme.line2 : Theme.tone(modelData.tone)
             opacity: modelData.tone === "quiet" ? 0.5 : 1
 
+            // once a square is big enough to hold it, it says which machine it is -- the same way
+            // DeptSlots names a department's PCs. Below that size the tooltip is the only name.
+            Txt {
+                anchors.centerIn: parent
+                visible: root.cellSize >= 34 && !!modelData.name
+                text: modelData.name ? String(modelData.name).split("-").pop() : ""
+                color: Theme.chartBg
+                monospace: true
+                font.pixelSize: Theme.fRow
+                font.weight: Font.Medium
+            }
+
             ToolTip.visible: area.containsMouse && modelData.label !== ""
             ToolTip.text: modelData.label || ""
             MouseArea { id: area; anchors.fill: parent; hoverEnabled: true }

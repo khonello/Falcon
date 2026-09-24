@@ -1045,7 +1045,8 @@ class UpdatesRepo(_Repo):
     async def pcs_behind(self, version_id: int) -> list[dict[str, Any]]:
         """PCs not confirmed on `version_id` -- the hard gate for approving N+1."""
         return await self._fetch(
-            "SELECT p.id, p.hostname, p.department_id, s.current_version_id, s.escalated_at FROM pcs p "
+            "SELECT p.id, p.hostname, p.department_id, s.current_version_id, s.escalated_at, "
+            " s.attempt_failure_count, s.last_attempt_at FROM pcs p "
             "LEFT JOIN pc_version_status s ON s.pc_id = p.id "
             "WHERE s.current_version_id IS DISTINCT FROM $1 ORDER BY p.department_id, p.hostname", version_id)
 

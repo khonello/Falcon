@@ -32,9 +32,13 @@ log = logging.getLogger(__name__)
 
 
 def _behind_view(rows_: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [{"pc_id": r["id"], "hostname": r["hostname"], "department_id": r["department_id"],
-             "current_version_id": r["current_version_id"],
-             "escalated": r.get("escalated_at") is not None} for r in rows_]
+    # `failures` is how many attempts have been made and lost: what a Super User reads to tell a
+    # machine that is retrying from one that has given up. A PC with no status row has made none.
+    return rows([{"pc_id": r["id"], "hostname": r["hostname"], "department_id": r["department_id"],
+                  "current_version_id": r["current_version_id"],
+                  "failures": r.get("attempt_failure_count") or 0,
+                  "last_attempt_at": r.get("last_attempt_at"),
+                  "escalated": r.get("escalated_at") is not None} for r in rows_])
 
 
 @handler("updates.current")

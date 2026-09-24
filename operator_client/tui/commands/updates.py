@@ -13,7 +13,8 @@ async def updates(ctx: ShellContext, args: Args) -> str:
     out = f"current version: {v['version_string'] if v else '(none approved)'}\n"
     out += table(res["departments"], ["department_name", "pcs", "current", "pending", "escalated"])
     if res.get("pcs_behind"):
-        out += "\n\nPCs behind:\n" + table(res["pcs_behind"], ["pc_id", "hostname", "current_version_id"])
+        out += "\n\nPCs behind:\n" + table(res["pcs_behind"],
+                                             ["pc_id", "hostname", "current_version_id", "failures", "escalated"])
     return out
 
 

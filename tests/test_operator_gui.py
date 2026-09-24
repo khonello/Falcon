@@ -98,6 +98,28 @@ def test_a_cell_opens_in_place_and_escape_restores_the_grid(gui):
     assert view.property("opened") == ""
 
 
+def test_each_cell_opens_into_its_own_composition(gui):
+    """The composition belongs to the cell (board K04): Rollout's subject is a fleet, so its hero
+    runs the full width with three panels beneath -- not Authority's map-and-column shape."""
+    win, _, _ = gui
+    view = win.findChild(QObject, "overviewView")
+
+    for name in ("openedRollout", "rolloutHero", "rolloutByDept", "rolloutTrend", "rolloutBlocking"):
+        assert win.findChild(QObject, name) is not None, name
+
+    # the two compositions are different objects, and the breadcrumb says the cell's own title
+    assert win.findChild(QObject, "openedRollout") is not win.findChild(QObject, "openedAuthority")
+    view.setProperty("opened", "rollout")
+    assert view.property("openedTitle") == "Rollout"
+    view.setProperty("opened", "authority")
+    assert view.property("openedTitle") == "Authority"
+    view.setProperty("opened", "")
+
+    # nothing is loaded in this fixture, so no version is approved and the cell has no gate to
+    # explain: it stays shut, exactly as a cell with nothing to say must
+    assert win.findChild(QObject, "cellRollout").property("openable") is False
+
+
 def prop(obj: QObject, name: str):
     """A QML `property var` as plain Python (JS arrays/objects arrive as QJSValue)."""
     v = obj.property(name)
