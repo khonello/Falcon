@@ -72,6 +72,19 @@ becoming the context that explains it. One level only; back restores the area ex
 `K01`→`K03`–`K06` behaviour is the general rule, not a special case. Where a tab row is genuinely
 needed it is **plain text with colour marking the current one** — no pill, box or underline.
 
+**One gesture, everywhere** (24 Sep 2026, `TABS.md`): **single click inspects** — a mark or row is
+selected and its text arrives beside it — and **double click enters**, whether that means an area
+recomposing around a container or moving to a place with its own page. Escape, the crumb or the back
+arrow comes out; Enter is the keyboard equivalent. An enterable container advertises itself on hover;
+one with nothing behind it does not respond. This settled the standing conflict between `K01` and
+`X02`, which both claimed the single click.
+
+**A session is a container, not a navigation** (24 Sep 2026): starting a traversal creates the session
+and draws it as a small landscape container with the countdown; double-clicking it takes the window
+into that level, and Escape comes back out *while the session is still held*. Holding and looking are
+different things. There is no screen streaming in the protocol, so it is a live-state card, never a
+viewport.
+
 **Layout is editorial, not a preference.** One layout per page, chosen once, never per viewer.
 
 **Four cells, and the widths vary.** The user's own call, made on the `T02` board: *"the width

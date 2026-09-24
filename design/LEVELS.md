@@ -48,6 +48,13 @@ own surfaces — the work from the earlier pass:
 
 The red lid is **admin-level chrome**. It must not appear on a department screen.
 
+## Crossing a level is the same gesture as everything else
+
+**Double click enters, single click inspects** (`TABS.md`). Crossing from Super User to a department,
+and from a department into an Admin, is that gesture repeated — not three different navigations. And
+starting a session does not move the window: it draws a container, and double-clicking *that* is what
+puts you at the level below.
+
 ## The levels share one visual language; depth is told, not restyled
 
 Super User and department are **deliberately close**: the same containers, the same four-cell

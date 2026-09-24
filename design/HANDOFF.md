@@ -38,14 +38,37 @@ captioned so a pick can be named.
 | `DP03` machines | the seven: Grouped by Admin · One waffle · Day lanes · Roster | one machine: Slot · With its Admin · Its day · Figure |
 | `DP04` doors | choosing: Opens in place · Detail lane · Drill · Reveal | asking to enter: In the cell · A confirm · A reading · Two doors named |
 
-**THE NEXT STEP: the user picks, one per section.** Then the department page is composed from exactly
-those picks and nothing else. `T01` (at rest) and `T02` (an Admin chosen) exist as the pre-mood-board
-attempts — they are *material*, not the answer, and should be rebuilt from the picks.
+**THE NEXT STEP: one word from the user.** The mood board has done its job; picking from a menu of
+option names was a bad way to ask and was dropped. The department page is to be built from this
+combination unless the user changes part of it:
 
-**Then, before any QML:** the areas. The rail stops being one tab per feature — Super User goes from
-eight tabs to five (**Must see · Authority · Rollout · Record · Work**, Assistance folded into Work),
-agreed 24 Sep. `design/TABS.md` holds the decision, where every handler lands, and **nine open issues
-to be settled in that document first**. Nothing is drawn or built from it until they are.
+> Admins as columns across the top · each drawn as a **station** (avatar, machine, then the slots they
+> govern) · the seven client PCs **grouped under the Admin** who answers for them · entering asked for
+> with **the cost stated first, then the act** · everything opened by **double click, in place**.
+
+`T01` (at rest) and `T02` (an Admin chosen) are the pre-mood-board attempts — material, not the answer.
+Rebuild from the combination above, screenshot it, and let the user react to the real page.
+
+**Settled since, and binding on everything drawn from here**
+
+- **Areas, not features** (`TABS.md`): the Super User rail is five — **Must see · Authority · Rollout ·
+  Record · Work** — with Assistance folded into Work. Nine open issues in that file are to be settled
+  *in the document* before any of it is drawn.
+- **An area is entered through its contents, not through tabs.** Each area is a handful of containers,
+  one per thing it covers.
+- **One gesture: single click inspects, double click enters.** Escape, the crumb or the back arrow comes
+  out; Enter is the keyboard equivalent. This resolved a standing conflict between `K01` (a click opens
+  a cell) and `X02` (a click brings a chart's text beside it) — they cannot both own the single click.
+  An enterable container advertises itself on hover; one with nothing behind it does not respond.
+- **A session is a container.** Starting a traversal does not move the window: it creates the session,
+  which appears as a small landscape container carrying the countdown, and *double-clicking that* is
+  what takes the window into the Admin. Escape comes back out while the session is still held. There is
+  **no screen streaming in the protocol**, so the container is a live-state card (`control.metrics`, the
+  machine, the countdown), never a fake viewport.
+- **The levels share one visual language.** Depth is told by the crumb, the title and the subject's
+  identity colour — not by restyling. Only *holding* a session changes chrome, because that is a state,
+  not a depth.
+- **If a tab row is ever needed**: plain text, colour on the current one, no pill, box or underline.
 
 **Settled at this level so far**
 
