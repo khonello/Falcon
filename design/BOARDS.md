@@ -15,7 +15,7 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `L01`–`L06` | **Layouts.** Ways of arranging a page's slots. Pick one per page. |
 | `X01`–`X02` | **Behaviour.** How a slot is chosen, and what happens when a chart is clicked. |
 | `P01`–`P05` | **The density system**, the pages composed from it, and the never-blank rule. |
-| `K01`–`K02` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built. |
+| `K01`–`K06` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built (`K02` is the rejected alternative); `K03`–`K06` are its four cells opened in place, one shape each. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
 | everything else | The Admin screens, the worker surfaces, the language, the dialogs. |
@@ -112,3 +112,16 @@ Three treatments were cut for failing it: a chord diagram for assistance, an orb
 routing, and an occupancy band for sessions. Each was legible only once someone explained its geometry,
 which is one explanation too many. The expressive versions that survived (`C06-D` arcs, `C07-D` sankey)
 are kept as alternatives, not as defaults.
+
+## The Overview, opened (`K03`–`K06`)
+
+Clicking a cell does not navigate: the page recomposes around it, and **the composition belongs to
+the cell**. No two share a shape, so you know which cell you opened before reading a word. All four
+are built.
+
+| Board | Cell | Its shape | Why that shape |
+|---|---|---|---|
+| `K03` | Authority | a map, two told panels beneath it, a tall reading down the right | a structure, whose meaning needs saying at length |
+| `K04` | Rollout | the fleet across the full width, three panels beneath | a fleet is wide |
+| `K05` | Today | a lead running the whole height, a column of three beside it | a record is read down, one lane per machine |
+| `K06` | Out of place | three full-width bands, shape to words, read downward | a small subject wants a ledger, not a hero |

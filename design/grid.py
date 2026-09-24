@@ -353,3 +353,209 @@ GRID_TAKES = [("K01-Perfect.dc.html", "Must see: a perfect grid", k01),
               ("K02-Ranked.dc.html", "Must see: ranked by size", k02),
               ("K03-Opened.dc.html", "Must see: Authority opened", k03),
               ("K04-Opened-Wide.dc.html", "Must see: Rollout opened, a different shape", k04)]
+
+
+# ------------------------------------------------------------------ K05: Today, opened
+# A third composition, and a third shape. Today's subject is a RECORD -- one lane per machine, read
+# down -- so its hero is tall rather than wide: a lead on the left running the whole height, and a
+# column of three down the right that explains it. Shape at the top left, words at the bottom right:
+# the same diagonal as everywhere else, turned on its side.
+def lead_shape(hero_, a, b, reading_, right_w=440):
+    # the three are not equal: the reading is words, and words need the room. 220 + 200 + 260.
+    left_w = 1360 - right_w - 20
+    return row(kcell(*hero_[:3], hero_[3], w=left_w, h=720),
+               col(kcell(*a[:3], a[3], w=right_w, h=220),
+                   kcell(*b[:3], b[3], w=right_w, h=200),
+                   kcell(*reading_[:3], reading_[3], w=right_w, h=260, top=True),
+                   gap=20, extra="flex: none; display: flex; flex-direction: column;"),
+               gap=20, align="flex-start", extra="flex: 1; min-height: 0;")
+
+
+def full_day(w=820, lane_h=34, gap_y=12):
+    """Every machine a lane, the whole day across. The same drawing as the cell, given the height to
+    show every PC rather than collapsing the quiet ones into "N more"."""
+    lanes = [("Kojo", "OPS-01", [("native", 8.2, 12.0), ("native", 13.0, 17.4)]),
+             ("Efua", "OPS-02", []),
+             ("Yaw", "OPS-03", [("native", 9.0, 12.5), ("traversed", 12.5, 13.2), ("native", 13.2, 17.0)]),
+             ("Adjoa", "OPS-04", [("native", 8.0, 10.3), ("traversed", 10.3, 11.0), ("native", 11.0, 16.0)]),
+             ("Nana", "OPS-05", [("native", 8.5, 17.5)]),
+             ("Kwame", "OPS-06", []),
+             ("Ama", "OPS-07", [("native", 8.2, 10.7), ("su", 10.7, 11.1), ("native", 11.1, 17.6)]),
+             ("Afi", "FIN-01", []),
+             ("Kofi", "FIN-02", [("assisted", 9.4, 10.2)]),
+             ("Esi", "LOG-01", []),
+             ("Abena", "LOG-02", [])]
+    kind = {"native": T["line2"], "traversed": T["warn"], "su": T["danger"], "assisted": T["accent"]}
+    t0, t1 = 8.0, 18.0
+    label_w = 108
+    plot = w - label_w - 12
+    bottom = len(lanes) * (lane_h + gap_y) - gap_y + 2
+    out = []
+    for hour in range(8, 19, 2):
+        x = label_w + ((hour - t0) / (t1 - t0)) * plot
+        out.append(f'<line x1="{x:.1f}" y1="2" x2="{x:.1f}" y2="{bottom}" stroke="{T["line"]}" stroke-width="1"/>')
+        out.append(f'<text x="{x:.1f}" y="{bottom + 20}" text-anchor="middle" fill="{T["faint"]}" '
+                   f'font-family="{T["mono"]}" font-size="11">{hour:02d}</text>')
+    for i, (name, host, blocks) in enumerate(lanes):
+        y = 2 + i * (lane_h + gap_y)
+        name_c = T["dim"] if blocks else T["faint"]
+        out.append(f'<text x="0" y="{y + lane_h / 2 + 4}" fill="{name_c}" font-family="{T["sans"]}" '
+                   f'font-size="12.5">{name}</text>')
+        out.append(f'<text x="{label_w - 12}" y="{y + lane_h / 2 + 4}" text-anchor="end" fill="{T["faint"]}" '
+                   f'font-family="{T["mono"]}" font-size="11">{host}</text>')
+        out.append(f'<rect x="{label_w}" y="{y}" width="{plot}" height="{lane_h}" rx="8" '
+                   f'fill="{T["pane"]}" opacity="0.5"/>')
+        for state, a, b in blocks:
+            bx = label_w + ((a - t0) / (t1 - t0)) * plot
+            bw = max(5, ((b - a) / (t1 - t0)) * plot - 2)
+            out.append(f'<rect x="{bx:.1f}" y="{y}" width="{bw:.1f}" height="{lane_h}" rx="8" fill="{kind[state]}"/>')
+    h = bottom + 26
+    return col(f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>',
+               legend([("At the PC", T["line2"]), ("An Admin entered", T["warn"]),
+                       ("You entered", T["danger"]), ("Assisted", T["accent"])]),
+               gap=18, extra=f"width: {w}px;")
+
+
+def entered_rows(w=380):
+    """Who was on a machine that is not theirs, and when. One line each, read as a sentence."""
+    rows_ = [("R. Mensah", "OPS-03", "12:30", "warn"), ("R. Mensah", "OPS-04", "10:18", "warn"),
+             ("You", "OPS-07", "10:42", "danger"), ("A. Quaye", "FIN-02", "09:24", "accent")]
+    tone_of = {"warn": T["warn"], "danger": T["danger"], "accent": T["accent"]}
+    out, y = [], 16
+    for who, host, when, tone in rows_:
+        c = tone_of[tone]
+        out.append(f'<circle cx="7" cy="{y - 4}" r="6" fill="{c}"/>')
+        out.append(f'<text x="22" y="{y}" fill="{T["ink"]}" font-family="{T["sans"]}" font-size="12.5">{who}</text>')
+        out.append(f'<path d="M108 {y - 4} h24 m-6 -4 l6 4 l-6 4" fill="none" stroke="{T["line2"]}" '
+                   f'stroke-width="1.5"/>')
+        out.append(f'<text x="144" y="{y}" fill="{T["dim"]}" font-family="{T["mono"]}" font-size="12">{host}</text>')
+        out.append(f'<text x="{w - 10}" y="{y}" text-anchor="end" fill="{T["faint"]}" font-family="{T["mono"]}" '
+                   f'font-size="11.5">{when}</text>')
+        y += 30
+    return f'<svg width="{w}" height="{y}" viewBox="0 0 {w} {y}">{"".join(out)}</svg>'
+
+
+def quiet_slots(w=380, size=26, gap=6):
+    """The fleet again, asking one question: which machines nobody signed in to. The used ones stay
+    faded, so the proportion is the shape -- and the answer is NAMED underneath, because a number
+    stamped in a square repeats across departments (OPS-01, FIN-01, LOG-01) and says nothing."""
+    used = {"OPS-01", "OPS-03", "OPS-04", "OPS-05", "OPS-07", "FIN-02"}
+    hosts = ["OPS-0" + str(i) for i in range(1, 8)] + ["FIN-01", "FIN-02", "LOG-01", "LOG-02"]
+    quiet = [h for h in hosts if h not in used]
+    out = []
+    for i, host in enumerate(hosts):
+        x = i * (size + gap)
+        off = host not in used
+        fill = T["warn"] if off else T["line"]
+        out.append(f'<rect x="{x}" y="0" width="{size}" height="{size}" rx="7" fill="{fill}" '
+                   f'opacity="{0.9 if off else 0.4}"><title>{host}</title></rect>')
+    total_w = len(hosts) * (size + gap) - gap
+    return col(f'<svg width="{total_w}" height="{size}" viewBox="0 0 {total_w} {size}">{"".join(out)}</svg>',
+               txt(", ".join(quiet), 11.5, T["faint"], mono=True),
+               txt("Five machines were never signed in today.", 12.5, T["ink"], 500),
+               gap=12, extra=f"width: {w}px;")
+
+
+def k05():
+    shape = lead_shape(
+        ("The day", "five machines never used", "warn", full_day(w=820)),
+        ("Who entered", "four times, one yours", "dim",
+         entered_rows(w=380)),
+        ("Never signed in", "five of eleven", "warn", quiet_slots(w=380)),
+        ("What the day means", "one still open", "warn",
+         reading_block("Four traversals today, one of them still open.",
+                       [("Traversals", "4, 1 still open", "warn"), ("You entered", "OPS-07, 10:42", ""),
+                        ("Never signed in", "5 PCs", "warn")],
+                       "Open the trail", w=376)))
+    return opened_page("Today", shape,
+                       "K05 · Today opened. A record is read down, so the lead runs the whole height and "
+                       "a column of three explains it — neither Authority's shape nor Rollout's.",
+                       "Today, opened")
+
+
+# ------------------------------------------------------------------ K06: Out of place, opened
+# The fourth shape, and the plainest: three full-width bands, stacked, going from shape to words as
+# you read DOWN rather than across. The subject is small -- a file or two, a deviation or two -- so
+# it wants no hero at all. What it wants is the ledger, in order, with the meaning last.
+def ledger_shape(a, b, reading_):
+    # the bands are not equal either: four tier rows need less room than a day with its marks
+    return col(kcell(*a[:3], a[3], w=1360, h=190),
+               kcell(*b[:3], b[3], w=1360, h=210),
+               kcell(*reading_[:3], reading_[3], w=1360, h=280, top=True),
+               gap=20, extra="flex: 1; min-height: 0; display: flex; flex-direction: column;")
+
+
+def tier_wide(w=1290):
+    """Every tier, always all four, with the file that broke the rule named on the line it broke.
+    A zero is a result: the three quiet tiers keep their rows and their 0."""
+    data = [("/restricted/", 1, "failing", "budget-2026.xlsx on OPS-07, sitting in /workers/"),
+            ("/admin/", 0, "quiet", ""), ("/workers/", 0, "quiet", ""), ("/common/", 0, "quiet", "")]
+    out, y = [], 8
+    for name, n, tone, note in data:
+        bw = max(8, n * 150)
+        out.append(f'<text x="0" y="{y + 15}" fill="{T["dim"]}" font-family="{T["mono"]}" '
+                   f'font-size="12.5">{name}</text>')
+        out.append(f'<rect x="110" y="{y}" width="{bw}" height="17" rx="5" fill="{ST[tone]}" '
+                   f'opacity="{1 if n else 0.35}"/>')
+        out.append(f'<text x="{110 + bw + 10}" y="{y + 15}" fill="{T["faint"]}" font-family="{T["mono"]}" '
+                   f'font-size="12">{n}</text>')
+        if note:
+            out.append(f'<text x="{110 + bw + 38}" y="{y + 15}" fill="{T["ink"]}" font-family="{T["sans"]}" '
+                       f'font-size="12.5">{note}</text>')
+        y += 29
+    return f'<svg width="{w}" height="{y}" viewBox="0 0 {w} {y}">{"".join(out)}</svg>'
+
+
+def dev_strip(w=1290):
+    """Deviations are moments, not quantities, so they are drawn on the day they happened on -- the
+    same axis the sessions were drawn on, so the two panels read as one day. Each mark says itself
+    on one line, and the lines alternate above and below the track, so two close marks never collide
+    and no label has to be squeezed against an edge."""
+    marks = [(9.2, "Hostname did not match the certificate", False),
+             (11.1, "Account used from an unbound PC", True)]
+    t0, t1 = 8.0, 18.0
+    pad = 10
+    plot = w - pad * 2
+    track_y = 46
+    out = [f'<rect x="{pad}" y="{track_y}" width="{plot}" height="10" rx="5" fill="{T["pane"]}" opacity="0.5"/>']
+    for hour in range(8, 19, 2):
+        x = pad + ((hour - t0) / (t1 - t0)) * plot
+        out.append(f'<line x1="{x:.1f}" y1="{track_y - 6}" x2="{x:.1f}" y2="{track_y + 16}" '
+                   f'stroke="{T["line"]}" stroke-width="1"/>')
+        out.append(f'<text x="{x:.1f}" y="{track_y - 12}" text-anchor="middle" fill="{T["faint"]}" '
+                   f'font-family="{T["mono"]}" font-size="11">{hour:02d}</text>')
+    for i, (at, what, addressed) in enumerate(marks):
+        x = pad + ((at - t0) / (t1 - t0)) * plot
+        c = T["ok"] if addressed else T["warn"]
+        fill = "none" if addressed else c
+        word = "addressed" if addressed else "logged"
+        y = 76 if i % 2 == 0 else 96
+        out.append(f'<circle cx="{x:.1f}" cy="{track_y + 5}" r="7" fill="{fill}" stroke="{c}" stroke-width="2"/>')
+        out.append(f'<line x1="{x:.1f}" y1="{track_y + 13}" x2="{x:.1f}" y2="{y - 11}" stroke="{c}" '
+                   f'stroke-width="1" opacity="0.5"/>')
+        out.append(f'<text x="{x - 6:.1f}" y="{y}" fill="{T["ink"]}" font-family="{T["sans"]}" '
+                   f'font-size="12.5">{what} '
+                   f'<tspan fill="{T["faint"]}" font-family="{T["mono"]}" font-size="11">'
+                   f'{int(at):02d}:{int((at % 1) * 60):02d} · {word}</tspan></text>')
+    return col(f'<svg width="{w}" height="102" viewBox="0 0 {w} 102">{"".join(out)}</svg>',
+               txt("One deviation is still unaddressed.", 12.5, T["ink"], 500),
+               gap=12, extra=f"width: {w}px;")
+
+
+def k06():
+    shape = ledger_shape(
+        ("Files against their tier", "one file, /restricted/", "danger", tier_wide()),
+        ("Deviations today", "one still unaddressed", "warn", dev_strip()),
+        ("What it adds up to", "one of each", "danger",
+         reading_block("One file and one deviation are out of place.",
+                       [("File", "budget-2026.xlsx", "danger"), ("Found on", "OPS-07, in /workers/", "danger"),
+                        ("Deviation", "hostname did not match", "warn")],
+                       "Open the violation", w=620)))
+    return opened_page("Out of place", shape,
+                       "K06 · Out of place opened. Its subject is small, so it takes no hero: three bands "
+                       "read downward, shape to words, with the meaning last.",
+                       "Out of place, opened")
+
+
+GRID_TAKES += [("K05-Opened-Lead.dc.html", "Must see: Today opened, a lead and a column", k05),
+               ("K06-Opened-Ledger.dc.html", "Must see: Out of place opened, the ledger", k06)]

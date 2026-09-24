@@ -311,27 +311,75 @@ def the_day(data: dict[str, Any]) -> dict[str, Any]:
                 action="Open the trail", brief=f"{_n(len(traversals), 'traversal')}, none yours")
 
 
+def entries(data: dict[str, Any]) -> dict[str, Any]:
+    """Who was on a machine that is not their own today. Traversal and Assisted Access are two
+    different state machines, but the question this panel answers is the same one: who entered."""
+    sessions = data.get("sessions") or []
+    entered = [s for s in sessions if s.get("occupied_via") != "native"]
+    if not entered:
+        return _out("Nobody entered another machine today.", brief="nobody entered", tone="ok")
+    yours = [s for s in entered if s.get("occupant_role") == "super_user"]
+    still_open = [s for s in entered if not s.get("ended_at")]
+    facts = [_fact(s.get("occupant_name") or "someone", s.get("hostname") or "a PC",
+                   "danger" if s.get("occupant_role") == "super_user" else "warn")
+             for s in entered[:4]]
+    brief = (f"{_n(len(entered), 'time')}, {len(yours)} yours" if yours
+             else f"{_n(len(entered), 'time')}, none yours")
+    tone = "danger" if yours else "warn"
+    if still_open:
+        return _out(f"{_n(len(entered), 'entry', 'entries')} today, {len(still_open)} still open.",
+                    facts, action="Open the trail", brief=brief, tone=tone)
+    if yours:
+        return _out(f"{_n(len(entered), 'entry', 'entries')} today, {len(yours)} of them yours.",
+                    facts, brief=brief, tone=tone)
+    return _out(f"{_n(len(entered), 'entry', 'entries')} today, none of them yours.",
+                facts, brief=brief, tone=tone)
+
+
+def never_signed_in(data: dict[str, Any]) -> dict[str, Any]:
+    """The machines nobody touched all day. An empty lane is information, not a gap in the data --
+    which is why this gets a panel of its own rather than a footnote under the timeline."""
+    quiet = list(data.get("quiet") or [])
+    pcs = int(data.get("pc_count") or 0)
+    if pcs == 0:
+        return _empty("No client PCs are registered.", brief="no client PCs")
+    if not quiet:
+        return _out(f"All {pcs} machines were signed in today.", [_fact("Client PCs", pcs)],
+                    brief="all signed in", tone="ok")
+    verb = "was" if len(quiet) == 1 else "were"
+    return _out(f"{_n(len(quiet), 'machine')} {verb} never signed in today.",
+                [_fact("Never signed in", _n(len(quiet), "PC"), "warn"), _fact("Client PCs", pcs)],
+                brief=f"{len(quiet)} of {pcs}", tone="warn")
+
+
 def violations(data: dict[str, Any]) -> dict[str, Any]:
     found = data.get("violations") or []
     if not found:
-        return _out("Nothing is out of place right now.")
+        return _out("Nothing is out of place right now.", brief="nothing out of place", tone="ok")
     v = found[0]
-    return _out(f"{_n(len(found), 'file')} sits where its tier does not allow.",
+    verb = "sits" if len(found) == 1 else "sit"
+    return _out(f"{_n(len(found), 'file')} {verb} where its tier does not allow.",
                 [_fact("File", v.get("filename", "")), _fact("Found on", v.get("hostname", ""), "danger"),
                  _fact("Tier", v.get("resource_tag", ""))],
-                action="Open the violation")
+                action="Open the violation",
+                brief=f"{_n(len(found), 'file')}, {v.get('resource_tag', '')}".strip(", "), tone="danger")
 
 
 def deviations(data: dict[str, Any]) -> dict[str, Any]:
     found = data.get("deviations") or []
     open_ = [d for d in found if not d.get("resolved_at")]
     if not found:
-        return _out("Nothing has deviated from what the system expects.")
+        return _out("Nothing has deviated from what the system expects.",
+                    brief="nothing deviated", tone="ok")
     if not open_:
-        return _out(f"All {len(found)} deviations have been addressed.")
-    return _out(f"{_n(len(open_), 'deviation')} still unaddressed.",
+        return _out(f"All {len(found)} deviations have been addressed.",
+                    [_fact("Deviations", len(found)), _fact("Addressed", len(found), "ok")],
+                    brief="all addressed", tone="ok")
+    verb = "is" if len(open_) == 1 else "are"
+    return _out(f"{_n(len(open_), 'deviation')} {verb} still unaddressed.",
                 [_fact(str(d.get("expectation", "")).replace("_", " ").capitalize(), "logged", "warn")
-                 for d in open_[:3]])
+                 for d in open_[:3]],
+                brief=f"{len(open_)} still unaddressed", tone="warn")
 
 
 def work(data: dict[str, Any]) -> dict[str, Any]:
@@ -405,6 +453,7 @@ def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
 TOPICS = {
     "rollout": rollout, "confirmations": confirmations, "fleet": fleet, "needs_you": needs_you,
     "rollout_departments": rollout_departments, "blocking": blocking,
+    "entries": entries, "never_signed_in": never_signed_in,
     "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
     "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet,
 }

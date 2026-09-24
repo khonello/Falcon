@@ -7,7 +7,8 @@ import "."
 Item {
     id: root
 
-    property var lanes: []                 // [{ name, blocks: [{ state, from, to, label }] }] -- from/to in hours
+    property var lanes: []                 // [{ name, hostname?, blocks: [{ state, from, to, label }] }]
+                                           // -- from/to in hours; hostname is drawn when there is room
     property real fromHour: 8
     property real toHour: 18
     property int labelWidth: 66
@@ -67,11 +68,24 @@ Item {
                 Txt {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    width: root.labelWidth - 8
+                    // the machine's name takes its own column when the lane is wide enough to
+                    // carry one: opened, a lane has to say WHICH machine, not only whose it is
+                    width: root.labelWidth - (host.visible ? host.width + 16 : 8)
                     text: lane.modelData.name
-                    color: Theme.dim
+                    color: lane.modelData.blocks.length > 0 ? Theme.dim : Theme.faint
                     font.pixelSize: Theme.fBody
                     elide: Text.ElideRight
+                }
+                Txt {
+                    id: host
+                    anchors.right: parent.left
+                    anchors.rightMargin: -(root.labelWidth - 10)
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: !!lane.modelData.hostname && root.labelWidth >= 96
+                    text: lane.modelData.hostname || ""
+                    color: Theme.faint
+                    monospace: true
+                    font.pixelSize: Theme.fSmall
                 }
                 Rectangle {
                     x: root.labelWidth

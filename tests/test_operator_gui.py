@@ -120,6 +120,32 @@ def test_each_cell_opens_into_its_own_composition(gui):
     assert win.findChild(QObject, "cellRollout").property("openable") is False
 
 
+def test_all_four_cells_have_their_own_composition(gui):
+    """Four cells, four shapes: Authority's map with the words down the right (K03), Rollout's
+    full-width fleet (K04), Today's tall lead and column (K05), and Out of place's ledger (K06).
+    Two cells sharing a shape would make the page one template again, which is what was rejected."""
+    win, _, _ = gui
+    view = win.findChild(QObject, "overviewView")
+
+    panels = {
+        "authority": ("openedAuthority", "openedHero", "openedFleet", "openedSessions", "openedReading"),
+        "rollout": ("openedRollout", "rolloutHero", "rolloutByDept", "rolloutTrend", "rolloutBlocking"),
+        "today": ("openedToday", "todayLead", "todayEntered", "todayQuiet", "todayReading"),
+        "place": ("openedOutOfPlace", "placeTiers", "placeDeviations", "placeReading"),
+    }
+    for key, names in panels.items():
+        for name in names:
+            assert win.findChild(QObject, name) is not None, name
+        view.setProperty("opened", key)
+        assert view.property("opened") == key
+        assert view.property("openedTitle") != key, key        # the breadcrumb says the cell's title
+    view.setProperty("opened", "")
+
+    # with nothing loaded not one of them opens: a cell with nothing to explain stays shut
+    for cell in ("cellAuthority", "cellRollout", "cellToday", "cellOutOfPlace"):
+        assert win.findChild(QObject, cell).property("openable") is False, cell
+
+
 def prop(obj: QObject, name: str):
     """A QML `property var` as plain Python (JS arrays/objects arrive as QJSValue)."""
     v = obj.property(name)

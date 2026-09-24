@@ -12,8 +12,8 @@ what was decided, and what to do next.
 2. **`design/BOARDS.md`** — what every board on the canvas is.
 3. This file — where the code stands.
 
-**Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design", 74
-boards, version 40. Rejected proposals have been deleted from it.
+**Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design", 76
+boards, version 41. Rejected proposals have been deleted from it.
 
 ## The short version
 
@@ -25,12 +25,20 @@ reviewed over many rounds, and the Super User **Overview** is now built on it.
 state phrase beside it; the header is "Must see" and the time, with no description of the
 organisation. The panels sit on the gradient — there is no grey sheet behind the body.
 
-**Clicking a cell opens it in place** (board `K03`) rather than navigating: the cell grows where it
-is and the panels around it become the gradient that explains it. **Authority is built end to end**
-— its composition is `OpenedAuthority.qml`: the map as the hero, *Its client PCs* and *Sessions
-there* as told panels beneath, and the reading down the right for the whole height. Escape or the
-breadcrumb restores the grid exactly. **The composition belongs to the cell**, so Rollout, Today and
-Out of place each need their own; Rollout's is already drawn (board `K04`).
+**Clicking a cell opens it in place** rather than navigating: the cell grows where it is and the
+panels around it become the gradient that explains it. Escape or the breadcrumb restores the grid
+exactly. **All four cells are built, and the composition belongs to the cell** — no two share a
+shape, so you know which one you opened before reading a word:
+
+| Cell | Composition | Board | Its shape |
+|---|---|---|---|
+| Authority | `OpenedAuthority.qml` | `K03` | the map as hero, two told panels beneath, the reading down the right |
+| Rollout | `OpenedRollout.qml` | `K04` | the fleet across the full width, three panels beneath |
+| Today | `OpenedToday.qml` | `K05` | a lead running the whole height, a column of three beside it |
+| Out of place | `OpenedOutOfPlace.qml` | `K06` | three full-width bands, shape to words, read downward |
+
+A cell with nothing to explain does not open: no ungoverned department, no approved version, no
+client PCs, or nothing out of place, and that cell stays shut (checked on an empty system).
 
 Words are generated, never written: `operator_client/core/narrate.py`, held to twelve words for a
 sentence and six for a cell's `brief`, with `tests/test_narrate.py` on every rule.
@@ -44,24 +52,20 @@ $env:FALCON_SHOT_EMPTY=1; ... design\run_gui.py super_user                 # a s
 
 ## What to do next, in order
 
-1. **Finish the opened state.** Rollout, Today and Out of place each need their own composition.
-   Rollout's shape is drawn on board `K04` and is deliberately unlike Authority's — its subject is a
-   fleet, so the hero runs the full width. `GridCell.openable` gates every cell: one with nothing to
-   explain stays shut.
-2. **Traversal into an Admin.** No GUI design, no code, no test — what the rail, the frame and the
+1. **Traversal into an Admin.** No GUI design, no code, no test — what the rail, the frame and the
    body become when a Super User enters an Admin's workstation, and how you get back. The Engine
    enforces it and the integration tests cover it; only the UI is missing. It is a backbone
    behaviour, so settle it before the pages that depend on it.
-3. **The other Super User pages**: Views, Reports, Updates, Tasks, Flows, Assistance. None designed,
+2. **The other Super User pages**: Views, Reports, Updates, Tasks, Flows, Assistance. None designed,
    none built.
-4. **Pick chart treatments** from `C01`–`C10`. Two are applied (assistance → one line per pair;
+3. **Pick chart treatments** from `C01`–`C10`. Two are applied (assistance → one line per pair;
    routing → lines and chips); the rest exist only as boards. `X01` (choosing a treatment in the
    slot) is designed and unbuilt, and the recommendation on it is in `DECISIONS.md`.
-5. **Port the Admin views** one at a time against their boards, deleting each legacy view as its
+4. **Port the Admin views** one at a time against their boards, deleting each legacy view as its
    replacement lands. What carries over from the Super User work is a deliberate later decision.
-6. **The remaining states**: the connect screen, loading, disconnected, the dialogs (`Dialogs`
+5. **The remaining states**: the connect screen, loading, disconnected, the dialogs (`Dialogs`
    board), and the Worker Overlay and Dialog (`Worker` board).
-7. **Un-pause Phase 7** in `PHASES.md` and update `design-brief.md`'s status line.
+6. **Un-pause Phase 7** in `PHASES.md` and update `design-brief.md`'s status line.
 
 ## How it was decided
 
@@ -148,8 +152,17 @@ assets), `Txt`, `Chip`, `TBtn`, `GBtn`, `IconBtn`, `Avatar`, `Pills`, `CardRow`,
 
 **The Overview** (`OverviewView.qml`) holds the data and the grid; `GridCell.qml` is one cell, with
 its title above it on the frame, `openable` gating whether it opens, and the never-blank notice.
-`OpenedAuthority.qml` is Authority's opened composition. `DeptSlots`, `ReadingBody`, `Sentence`,
-`Panel`, `Legend`, `Hero` and the chart components are the kit it is built from.
+`OpenedAuthority`, `OpenedRollout`, `OpenedToday` and `OpenedOutOfPlace` are the four opened
+compositions, chosen by `opened` on a `StackLayout`. `DeptSlots`, `FleetGroups`, `QuietStrip`,
+`EnteredRows`, `DevStrip`, `ReadingBody`, `Sentence`, `Panel`, `Legend`, `Hero` and the chart
+components are the kit they are built from.
+
+Two things the opened panels needed from below the UI: `updates.rollout_health` now reports how many
+attempts each PC behind has lost (`failures`, `last_attempt_at`), so *What is blocking* can name the
+machine the N+1 gate rests on; and `TierBars` takes a `notes` map so a violation is named on the tier
+line it broke. A fleet square carries its machine's number only where there is room for one, and the
+opened Rollout groups the squares by department — hostname numbers repeat across departments, so an
+ungrouped row of them says nothing.
 **`GlancePage`, `HierarchyPage` and `RecordPage` were deleted** when the three tabs went.
 
 **The sentence layer is real code**: `operator_client/core/narrate.py`, pure functions over the dicts
@@ -180,8 +193,10 @@ in length; a view switches to another with `shell.show("hierarchy")`.
 
 ### Checks
 
-Full suite → 117 passed (`tests/test_operator_gui.py` → 2 passed, 1 skipped). `ruff check .` → clean (`design/` is excluded; its
-long inline-style lines are the point).
+Full suite → 122 passed (`tests/test_operator_gui.py` → 5 passed, 1 skipped). `ruff check .` → clean
+(`design/` is excluded; its long inline-style lines are the point). `tests/test_narrate.py` holds
+every sentence to the twelve-word rule, including the new `blocking`, `rollout_departments`,
+`entries` and `never_signed_in` topics.
 
 ## Qt gotchas already paid for
 
@@ -212,8 +227,9 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 environ-operator\Scripts\python.exe design
 un_gui.py super_user   # a real window, stubbed, to click through
 environ-operator\Scripts\python.exe design\shot_gui.py design\shots admin
-environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0 1     # Overview, page 1
-environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0 1 1   # ... descended into department 1
+environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0     # the Overview, at rest
+$env:FALCON_SHOT_OPEN="rollout"; ... design\shot_gui.py design\shots super_user 0    # a cell opened
+                                                     # authority | rollout | today | place
 
 environ-engine\Scripts\python.exe -m pytest tests/test_operator_gui.py -q
 ```

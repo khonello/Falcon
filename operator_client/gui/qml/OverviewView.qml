@@ -346,6 +346,9 @@ Item {
     }
 
     // --- violations, deviations, routing ------------------------------------------------------------
+    // the four tiers ARE the policy, so all four are always drawn; a zero is a result
+    readonly property var tierLabels: ({ "restricted": "/restricted/", "admin": "/admin/",
+                                         "worker_dept": "/workers/", "common": "/common/" })
     readonly property var tierRows: {
         var tiers = [{ label: "/restricted/", tag: "restricted" }, { label: "/admin/", tag: "admin" },
                      { label: "/workers/", tag: "worker_dept" }, { label: "/common/", tag: "common" }]
@@ -462,7 +465,9 @@ Item {
     // the breadcrumb says the cell's own title, which is not always its key: the Rollout cell
     // carries its version number
     readonly property string openedTitle: root.opened === "authority" ? "Authority"
-                                          : root.opened === "rollout" ? rolloutTitle : root.opened
+                                          : root.opened === "rollout" ? rolloutTitle
+                                          : root.opened === "today" ? "Today"
+                                          : root.opened === "place" ? "Out of place" : root.opened
     readonly property string rolloutTitle: root.version ? ("Rollout " + root.version.version_string) : "Rollout"
     // the department nobody governs -- the subject Authority opens into, and the reason it opens
     readonly property var gapDept: {
@@ -549,7 +554,8 @@ Item {
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: root.opened === "" ? 0 : root.opened === "authority" ? 1 : 2
+            currentIndex: root.opened === "" ? 0 : root.opened === "authority" ? 1
+                          : root.opened === "rollout" ? 2 : root.opened === "today" ? 3 : 4
 
         GridLayout {
             id: grid
@@ -620,6 +626,9 @@ Item {
                 Layout.fillHeight: true
                 title: "Today"
                 narration: root.daySays
+                // with no PCs there is no record to explain, and the cell stays shut
+                openable: root.pcCount > 0
+                onOpened: root.opened = "today"
 
                 DayTimeline {
                     width: parent.width
@@ -648,6 +657,10 @@ Item {
                 Layout.fillHeight: true
                 title: "Out of place"
                 narration: root.placeSays
+                // nothing out of place is a result, not a subject: with neither a violation nor a
+                // deviation on record the cell has nothing to say at length, so it does not open
+                openable: root.violations.length > 0 || root.deviations.length > 0
+                onOpened: root.opened = "place"
 
                 TierBars {
                     width: parent.width
@@ -717,6 +730,8 @@ Item {
         // takes a different one entirely (K04), because a fleet is wide.
         OpenedAuthority { view: root }
         OpenedRollout { view: root }
+        OpenedToday { view: root }
+        OpenedOutOfPlace { view: root }
         }
     }
 

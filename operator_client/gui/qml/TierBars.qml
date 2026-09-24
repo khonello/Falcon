@@ -7,6 +7,9 @@ Item {
     id: root
 
     property var rows: []                  // [{ label, count }]
+    // optional, keyed by the tier's label: the file that broke the rule, named on the line it
+    // broke. The cell has no room for it; opened, the line has the whole width.
+    property var notes: ({})
     property int labelWidth: 108
     property int barHeight: 16
     property int rowGap: 26
@@ -49,6 +52,7 @@ Item {
                     opacity: line.modelData.count > 0 ? 1 : 0.35
                 }
                 Txt {
+                    id: n
                     anchors.left: bar.right
                     anchors.leftMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
@@ -56,6 +60,16 @@ Item {
                     color: Theme.faint
                     monospace: true
                     font.pixelSize: Theme.fMeta
+                }
+                Txt {
+                    anchors.left: n.right
+                    anchors.leftMargin: 20
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.notes[line.modelData.label] || ""
+                    visible: text !== ""
+                    font.pixelSize: Theme.fBody
+                    elide: Text.ElideRight
                 }
             }
         }

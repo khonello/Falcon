@@ -70,7 +70,19 @@ def test_every_sentence_is_twelve_words_or_fewer():
             {"occupied_via": "traversal", "occupant_role": "super_user", "hostname": "OPS-07", "ended_at": None}]}),
         ("the_day", {"pc_count": 7, "quiet_pcs": 7, "sessions": []}),
         ("the_day", {"pc_count": 0}),
+        ("entries", {"sessions": [
+            {"occupied_via": "traversal", "occupant_role": "admin", "occupant_name": "R. Mensah",
+             "hostname": "OPS-03", "ended_at": "t"},
+            {"occupied_via": "traversal", "occupant_role": "super_user", "occupant_name": "You",
+             "hostname": "OPS-07", "ended_at": None}]}),
+        ("entries", {"sessions": [{"occupied_via": "native"}]}),
+        ("never_signed_in", {"quiet": ["OPS-02", "OPS-06"], "pc_count": 11}),
+        ("never_signed_in", {"quiet": ["OPS-02"], "pc_count": 11}),
+        ("never_signed_in", {"quiet": [], "pc_count": 11}),
+        ("never_signed_in", {"quiet": [], "pc_count": 0}),
         ("violations", {"violations": [{"filename": "b.xlsx", "hostname": "OPS-07", "resource_tag": "restricted"}]}),
+        ("violations", {"violations": [{"filename": "b.xlsx", "hostname": "OPS-07", "resource_tag": "restricted"},
+                                       {"filename": "c.xlsx", "hostname": "OPS-01", "resource_tag": "admin"}]}),
         ("violations", {"violations": []}),
         ("deviations", {"deviations": [{"expectation": "hostname_mismatch"}]}),
         ("deviations", {"deviations": [{"expectation": "x", "resolved_at": "t"}]}),
@@ -193,6 +205,29 @@ def test_the_day_separates_your_own_traversal_from_everyone_else_s():
     assert "none of them yours" in theirs["sentence"]
     nobody = n.narrate("the_day", {"pc_count": 7, "quiet_pcs": 7, "sessions": []})
     assert nobody["sentence"] == "Nobody signed in anywhere today." and nobody["state"] == "ok"
+
+
+def test_the_opened_day_separates_who_entered_from_what_was_never_touched():
+    """Two panels, two questions. Neither is the timeline's own sentence: the lead says how the day
+    went, these say who was where they do not belong, and which machines nobody touched at all."""
+    r = n.narrate("entries", {"sessions": [
+        {"occupied_via": "traversal", "occupant_role": "admin", "occupant_name": "R. Mensah",
+         "hostname": "OPS-03", "ended_at": "t"},
+        {"occupied_via": "traversal", "occupant_role": "super_user", "occupant_name": "You",
+         "hostname": "OPS-07", "ended_at": None}]})
+    assert r["sentence"] == "2 entries today, 1 still open." and r["tone"] == "danger"
+    assert r["facts"][1] == {"label": "You", "value": "OPS-07", "tone": "danger"}
+
+    none = n.narrate("entries", {"sessions": [{"occupied_via": "native"}]})
+    assert none["sentence"] == "Nobody entered another machine today." and none["tone"] == "ok"
+
+    quiet = n.narrate("never_signed_in", {"quiet": ["OPS-02", "OPS-06"], "pc_count": 11})
+    assert quiet["sentence"] == "2 machines were never signed in today." and quiet["brief"] == "2 of 11"
+    one = n.narrate("never_signed_in", {"quiet": ["OPS-02"], "pc_count": 11})
+    assert one["sentence"] == "1 machine was never signed in today."
+    # every machine used is a result, drawn normally, not an empty panel
+    every = n.narrate("never_signed_in", {"quiet": [], "pc_count": 11})
+    assert every["state"] == "ok" and every["tone"] == "ok"
 
 
 def test_an_unknown_topic_is_an_empty_panel_not_an_exception():
