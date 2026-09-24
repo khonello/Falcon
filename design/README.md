@@ -39,7 +39,7 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 | `index_board.py` | `INDEX` — the contents page: which board is what, and which page's slot it fills |
 | `interaction.py` | `X01`–`X02` — how a slot is chosen, and what happens when a chart is clicked |
 | `pages.py` | `P01`–`P05` — the four panel densities, the pages composed from them, and the never-blank rule |
-| `traverse.py` | `T01`–`T06` — entering someone else's machine: the held bar, the rails, the clock, assisted access |
+| `traverse.py` | `T01`–`T06` — a department as a place (the colonnade over a floor), an Admin chosen, and the held state: the red lid, the clock, assisted access |
 | `grid.py` | `K01`–`K02` — the Super User Overview; `K01` (the perfect grid) is what is built |
 | `run_gui.py` | opens the GUI **on screen** against the same stub, to click through without an Engine |
 | `shot_gui.py` | renders the **real QML app** offscreen with a stubbed bridge (it answers the same handlers the views call), for before/after screenshots |

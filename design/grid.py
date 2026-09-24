@@ -19,7 +19,8 @@ MUST_SEE = [
 
 
 def cell_title(name, state, tone):
-    colour = {"danger": T["danger"], "warn": T["warn"], "ok": T["ok"], "dim": T["frame_faint"]}[tone]
+    colour = {"danger": T["danger"], "warn": T["warn"], "ok": T["ok"], "accent": T["accent"],
+              "dim": T["frame_faint"]}[tone]
     return row(txt(name, 15, "#fff", 600),
                f'<span style="flex: 1;"></span>',
                txt(state, 12.5, colour, 500),

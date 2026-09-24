@@ -15,7 +15,7 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `L01`–`L06` | **Layouts.** Ways of arranging a page's slots. Pick one per page. |
 | `X01`–`X02` | **Behaviour.** How a slot is chosen, and what happens when a chart is clicked. |
 | `P01`–`P05` | **The density system**, the pages composed from it, and the never-blank rule. |
-| `T01`–`T06` | **Traversal.** What the window becomes when you enter someone else's machine: the decision, the four answers, inside (proposed and the alternative rail), the clock and its endings, and assisted access beside it. |
+| `T01`–`T06` | **A department, and entering an Admin in it.** The department drawn as a place in the Overview's language — a colonnade over a floor — then one Admin chosen, then held under a red lid. |
 | `K01`–`K06` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built (`K02` is the rejected alternative); `K03`–`K06` are its four cells opened in place, one shape each. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
@@ -127,18 +127,30 @@ are built.
 | `K05` | Today | a lead running the whole height, a column of three beside it | a record is read down, one lane per machine |
 | `K06` | Out of place | three full-width bands, shape to words, read downward | a small subject wants a ledger, not a hero |
 
-## Traversal, entering someone else's machine (`T01`–`T06`)
+## A department, and entering an Admin in it (`T01`–`T06`)
 
-The frame never changes colour, so the answer is structural: while you are inside, the sheet grows a
-**held bar** across its top — above the sidebar *and* the body, so it reads as containing everything
-under it — and the **rail becomes theirs**. Whose surfaces these are is said at the top of the rail;
-who you are stays at its foot; the way out sits on the bar, in the same place in every state.
+Traversal from Super User to Admin *starts in a department*, and a department had never been drawn.
+The first pass fell back on the old sidebar-and-card-strip shell, which put a page from a different
+design in the middle of this one. It was thrown away.
+
+A department is a **place**, drawn the way the Overview is drawn: panels on the gradient, titles above
+them on the frame with a generated state phrase beside them, charts before words. No sheet, no
+sidebar, no card strips. Quieter than the Overview, because a department is smaller.
+
+**Its signature is a colonnade over a floor**: one column per Admin across the top (they are who you
+choose, so they are the subject), the day every machine here shared as a full-width floor beneath, and
+a one-line ledger at the foot. No other page has that shape.
+
+Entering an Admin is then **not another design — it is the same place in another state**: the
+colonnade re-weights when you choose one, and is held when you are inside. What says you are inside is
+a slim **red** lid, 38 px, one line: red because the occupant is a Super User, which is what red means
+everywhere else in this system — including on the screen of the Admin being stood in.
 
 | Board | What it settles |
 |---|---|
-| `T01` | The decision: what entering gives you, what it costs them, how long you have — all facts the handlers already return. |
-| `T02` | The four answers to asking: free, block-or-end (the only forcing dialog), a peer's hard refusal, a Super User's un-evictable session. |
-| `T03` | **The proposal.** Inside an Admin: the held bar, their rail, what is hidden (Enter is disabled — you already hold a session), and whose Display Names you are reading. |
-| `T04` | The alternative: your eight kept, theirs appended under a divider. Drawn so it can be compared, not argued about. |
-| `T05` | The clock as chrome — running, under five minutes, extended — and the four endings: you left, time ran out, ended from above, and what they see meanwhile. |
-| `T06` | Assisted access: the same lid, deliberately different — accent not warn, a ceiling instead of a clock, consent instead of eviction, and your own rail stays. |
+| `T01` | The department: the colonnade, the floor, the ledger. Where you choose an Admin. |
+| `T02` | An Admin chosen: the column grows where it stands, the other quietens, the lower bands re-scope to the person, and Enter is one action in a reading. |
+| `T03` | Inside them: the same place under the red lid, their rail, and their automation drawn — the thing that exists nowhere else in a Super User's window. |
+| `T04` | The four answers to asking: free, block-or-end (the only forcing dialog), a peer's hard refusal, a Super User's un-evictable session. |
+| `T05` | The lid's three states — running, under five minutes, extended — and the four endings: you left, time ran out, ended from above, and what they see meanwhile. |
+| `T06` | Assisted access: the same skeleton, deliberately unlike it — teal, a ceiling instead of a clock, consent instead of eviction, and your own rail kept. |

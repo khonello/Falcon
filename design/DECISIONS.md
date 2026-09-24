@@ -87,6 +87,7 @@ identity uses the categorical ramp, every hue carries a word.
 | **Hex fleet, slope chart** | Decoration and specialist reading; neither earned its place. |
 | **Identical rounded cards on a grid, repeated** | The module that made every early take interchangeable. A page needs an organising idea, not a card kit. |
 | **Empty space where a chart has no data** | "I'd rather the visual exists, with a no information notice… rather than the space being empty." |
+| **The first traversal pass** (a sidebar-and-card-strip department screen, a tall amber banner) | "No way am accepting this disgusting work… this mood board you are giving me for department level is just terrible." The level was wrong (traversal starts in a *department*, which had never been drawn) and the page fell back on the pre-kit shell. Redrawn in the Overview's language; the banner became a 38 px red lid. |
 
 Rejected from earlier in the phase and still binding: **left-edge accent borders** on selected rows
 or cards, **tables anywhere**, a **docked right panel**, **accordions in a body**, **progress bars on
@@ -116,7 +117,11 @@ The Overview is one page of what is now a seven-entry rail. Everything below is 
 - **Updates** — approval, rollout by department, the escalation lever.
 - **Tasks**, **Flows**, **Assistance** — the Super User's view of each.
 
-**Traversal into an Admin is neither implemented nor tested in the GUI.** The Engine enforces it and
+**Traversal into an Admin is designed (`T01`–`T06`) but not built.** A department is a place drawn in
+the Overview's language — a colonnade of Admin columns over the day they share — and entering one is a
+*state* of that place, under a slim red lid. Still unbuilt in QML.
+
+**Superseded:** The Engine enforces it and
 the integration tests cover it, but *how the UI changes when a Super User enters an Admin's
 workstation* — what the rail becomes, what the frame says, what is hidden, how you get back — has no
 design and no code. This is a Hierarchy-backbone behaviour, so it should be settled before the
