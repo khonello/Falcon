@@ -48,9 +48,18 @@ own surfaces — the work from the earlier pass:
 
 The red lid is **admin-level chrome**. It must not appear on a department screen.
 
+## Every level gets a mood board first
+
+Super User had `S01`–`S04`, the Admin console had `M01`–`M15`. A level's approaches are put side by
+side at the same size and **picked from** before any page is composed. Skipping that step is what
+produced two wrong passes at the department.
+
+**`DP01`–`DP04` is the department's** — shape, people, machines, doors; four approaches each.
+Nothing on them is a finished screen, and nothing on them is from the level below.
+
 ## The boards, sorted by level
 
-- **Department (current work):** `T01` the department at rest · `T02` an Admin chosen · `T04` the
+- **Department (current work):** `DP01`–`DP04` the mood board, to pick from · `T01` the department at rest · `T02` an Admin chosen · `T04` the
   answer that comes back when you ask to enter.
 - **Admin level, parked until level 3 is opened:** `T03` (inside an Admin), `T05` (the lid and its
   clock). Both were drawn during department work, which was the mixing. They stay on the canvas as
