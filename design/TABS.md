@@ -61,6 +61,49 @@ double-clicking the map itself goes to Departments.
 - **One level per gesture.** Depth comes from repeating the gesture, never from one click landing two
   levels down.
 
+### Starting a session makes a container; entering it is the same double click
+
+**The user's proposal, 24 Sep 2026, and it keeps traversal inside the one gesture instead of making it
+a special navigation.**
+
+Starting a traversal **does not move your window**. It creates the session, and the session shows up as
+a **small landscape container** on the page where you started it — the Admin or the client PC you
+entered, now marked as held, carrying the countdown.
+
+- **Double-clicking that container takes your window into that level**, where the lid at the top says
+  what is going on. Exactly the gesture used for everything else.
+- **Escape comes back out while you are still holding the session.** The container stays where it is,
+  still counting down, and the same double click goes back in. Holding and looking are two different
+  things, and the Engine already works this way: the session lives until it is ended or expires,
+  whatever your window happens to be showing.
+- **Leaving is an explicit act** — on the lid, or on the container. It is never a side effect of
+  navigating away.
+- The same shape one level further down: an Admin entering a client PC gets the same container, and
+  double-clicking it is what puts them in that machine.
+
+This also gives the countdown a home while you are *not* inside: it is on the container, in the place
+that names the machine, rather than floating over a page it has nothing to do with.
+
+**What the container can honestly show.** There is **no screen streaming in the protocol** — nothing in
+`engine/` or `protocol/` carries frames, and Assisted Access's "screen, read only" ceiling is a design
+intention with nothing implementing it. What exists today:
+
+- `control.metrics` — CPU, memory and idle seconds, reported by the Worker client;
+- the active window and the machine's own identity;
+- a **`screenshot` Action** (`engine/control/actions.py`), which is a still taken on demand, not a feed;
+- the session itself: who is blocked, how long is left, how you got in.
+
+So the container is a **live-state card, not a viewport**: metrics, the machine, the countdown. Drawing
+a fake screen preview would promise something the system cannot do. If a real preview is wanted, a
+still via the `screenshot` Action is reachable now; a live feed is a new Engine capability and a
+separate decision.
+
+**Open:** where the container lives when you have navigated elsewhere. There is only ever one session
+per person (`sessions.active_for_account` returns one), so the options are: (a) it lives only on the
+page where it was started, and the status line carries the way back; (b) it is pinned into Must see
+while it exists; (c) both. **Recommendation: (c)** — on the page where it was started, and mirrored in
+Must see, because a held session is by definition something you must see.
+
 ### It is the same gesture at every level
 
 Super User → department → Admin is **one gesture repeated**, not three different navigations:
