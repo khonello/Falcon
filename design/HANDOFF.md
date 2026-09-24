@@ -148,21 +148,24 @@ long inline-style lines are the point).
 2. ~~Push the dashboards further: descend into a department, real sessions on the timeline, a
    per-department task/flow small multiple.~~ **Done** — `D04-Department` is the board for the descent;
    the timeline runs on `hierarchy.sessions_today` (a new handler, with `sessions` in the TUI).
-3. **Traversal into an Admin has no design and no code in the GUI.** The Engine enforces it and the
+3. **Finish the opened state.** Authority opens (`OpenedAuthority.qml`, board `K03`); Rollout, Today
+   and Out of place each need their own composition — the shape belongs to the cell, not to the
+   Overview. `GridCell.openable` gates it: a cell with nothing to explain stays shut.
+4. **Traversal into an Admin has no design and no code in the GUI.** The Engine enforces it and the
    integration tests cover it, but what the rail, the frame and the body become when a Super User
    enters an Admin's workstation is undecided. It is a backbone behaviour — settle it before the
    pages that depend on it.
-4. **The other Super User pages are untouched**: Views, Reports, Updates, Tasks, Flows, Assistance.
-5. **Pick from `C01`–`C10` and `L01`–`L06`** — the chart and layout mood boards are the Super User's
+5. **The other Super User pages are untouched**: Views, Reports, Updates, Tasks, Flows, Assistance.
+6. **Pick from `C01`–`C10` and `L01`–`L06`** — the chart and layout mood boards are the Super User's
    equivalent of `M01`–`M15`: pick a treatment per chart and a structure per page, then change the QML
    components (they are one file each, so a pick is a small edit). These are Super User only on purpose;
    what carries over to Admin is decided afterwards.
-6. **Port the Admin views** one at a time against their boards: Tasks, Flows, Automation + Actions,
+7. **Port the Admin views** one at a time against their boards: Tasks, Flows, Automation + Actions,
    Assistance, Resources, Reports. Delete each legacy view as its replacement lands, and move the
    `objectName`s the tests use onto the new views.
-7. **Then the remaining states**: the connect screen, loading skeletons, disconnected, the dialogs
+8. **Then the remaining states**: the connect screen, loading skeletons, disconnected, the dialogs
    (`Dialogs` board) and the worker Overlay/Dialog (`Worker` board).
-8. **Un-pause Phase 7 in `PHASES.md`** once the Admin views are ported, and update `design-brief.md`'s
+9. **Un-pause Phase 7 in `PHASES.md`** once the Admin views are ported, and update `design-brief.md`'s
    status line — the design it asked for now exists.
 
 ## Working commands

@@ -283,6 +283,30 @@ def work(data: dict[str, Any]) -> dict[str, Any]:
                 [_fact("Tasks", len(tasks)), _fact("Flows", len(flows))])
 
 
+def dept_fleet(data: dict[str, Any]) -> dict[str, Any]:
+    """One department's client PCs, always counted against the largest department rather than on
+    their own -- so the panel says how big it is as well as how it stands."""
+    hosts = data.get("hosts") or []
+    biggest = int(data.get("biggest") or len(hosts))
+    if not hosts:
+        return _empty("This department has no client PCs.", brief="no client PCs")
+    failing = [h for h in hosts if h.get("state") == "failing"]
+    behind = [h for h in hosts if h.get("state") == "behind"]
+    brief = f"{len(hosts)} of {biggest}"
+    if failing:
+        return _out(f"{failing[0]['hostname']} has failed past the threshold.",
+                    [_fact("Client PCs", f"{len(hosts)} of {biggest} the largest has"),
+                     _fact("Failing", failing[0]["hostname"], "danger")],
+                    brief=brief, tone="danger")
+    if behind:
+        return _out(f"{_n(len(behind), 'machine')} here is still behind.",
+                    [_fact("Client PCs", f"{len(hosts)} of {biggest} the largest has")],
+                    brief=brief, tone="warn")
+    return _out(f"All {len(hosts)} machines here are on the current version.",
+                [_fact("Client PCs", f"{len(hosts)} of {biggest} the largest has")],
+                brief=brief, tone="ok")
+
+
 def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
     """The Overview's fourth cell: files against their tier, and deviations logged but not yet
     addressed. Two different records, one question -- has anything gone where it should not."""
@@ -311,7 +335,7 @@ def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
 TOPICS = {
     "rollout": rollout, "confirmations": confirmations, "fleet": fleet, "needs_you": needs_you,
     "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
-    "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place,
+    "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet,
 }
 
 

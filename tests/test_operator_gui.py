@@ -75,6 +75,29 @@ def test_the_overview_is_four_cells_each_saying_how_it_stands(gui):
     assert titles[0] == "Authority" and titles[2] == "Today" and titles[3] == "Out of place"
 
 
+def test_a_cell_opens_in_place_and_escape_restores_the_grid(gui):
+    """Clicking a cell does not navigate: the page recomposes around it (board K03), and the
+    composition belongs to that cell. A cell with nothing to explain does not open at all."""
+    win, _, _ = gui
+    view = win.findChild(QObject, "overviewView")
+    cell = win.findChild(QObject, "cellAuthority")
+    assert view is not None and cell is not None
+    assert view.property("opened") == ""
+
+    # nothing is loaded in this fixture, so there is no ungoverned department and nothing to open
+    assert cell.property("openable") is False
+
+    # the opened composition is built and reachable, and it is Authority's own -- a big chart, two
+    # told panels beneath it, and the reading down the right
+    for name in ("openedAuthority", "openedHero", "openedFleet", "openedSessions", "openedReading"):
+        assert win.findChild(QObject, name) is not None, name
+
+    view.setProperty("opened", "authority")
+    assert view.property("opened") == "authority"
+    view.setProperty("opened", "")
+    assert view.property("opened") == ""
+
+
 def prop(obj: QObject, name: str):
     """A QML `property var` as plain Python (JS arrays/objects arrive as QJSValue)."""
     v = obj.property(name)

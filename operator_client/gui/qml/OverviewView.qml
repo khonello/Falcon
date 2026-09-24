@@ -441,6 +441,16 @@ Item {
         version: root.version, pcs_behind: root.behind, pc_count: root.pcCount })
     readonly property var daySays: falcon.narrate("the_day", {
         sessions: root.sessions, pc_count: root.pcCount, quiet_pcs: root.quietPcs })
+    // Which cell is open, "" at rest. One level only: inside an opened cell a click selects or
+    // filters, it never opens again, or "back" becomes a stack and the one-page promise dies.
+    property string opened: ""
+    // the department nobody governs -- the subject Authority opens into, and the reason it opens
+    readonly property var gapDept: {
+        for (var i = 0; i < tree.length; i++)
+            if (tree[i].admins.length === 0) return tree[i]
+        return null
+    }
+
     readonly property var placeSays: falcon.narrate("out_of_place", {
         violations: root.violations, deviations: root.deviations })
 
@@ -473,11 +483,57 @@ Item {
             }
         }
 
+        // the way back, and the only thing that appears when a cell is open
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: root.opened === "" ? 0 : 22
+            visible: root.opened !== ""
+
+            Row {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+
+                Txt {
+                    text: "Must see"
+                    color: Qt.rgba(1, 1, 1, 0.45)
+                    font.pixelSize: Theme.fSection
+                    font.weight: Font.Medium
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -6
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.opened = ""
+                    }
+                }
+                Icon { name: "chev"; color: Qt.rgba(1, 1, 1, 0.45); size: 13; anchors.verticalCenter: parent.verticalCenter }
+                Txt {
+                    text: root.opened === "authority" ? "Authority" : root.opened
+                    color: "#ffffff"
+                    font.pixelSize: Theme.fSection
+                    font.weight: Font.DemiBold
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+            Txt {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Esc to go back"
+                color: Qt.rgba(1, 1, 1, 0.35)
+                font.pixelSize: Theme.fMeta
+            }
+        }
+
+        StackLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: root.opened === "" ? 0 : 1
+
         GridLayout {
             id: grid
             objectName: "mustSeeGrid"
-            Layout.fillWidth: true
-            Layout.fillHeight: true
             columns: 2
             rowSpacing: 20
             columnSpacing: 20
@@ -489,6 +545,8 @@ Item {
                 Layout.fillHeight: true
                 title: "Authority"
                 narration: root.authoritySays
+                openable: root.gapDept !== null
+                onOpened: root.opened = "authority"
 
                 OrgMap {
                     width: parent.width
@@ -629,5 +687,13 @@ Item {
                 }
             }
         }
+
+        // The opened composition belongs to the cell, not to the Overview: Authority takes the
+        // shape from board K03, and another cell would take its own.
+        OpenedAuthority { view: root }
+        }
     }
+
+    Keys.onEscapePressed: root.opened = ""
+    focus: true
 }
