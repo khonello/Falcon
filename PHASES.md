@@ -222,6 +222,9 @@ When resumed, build to `design-brief.md` and the canvas, not to the old screens.
       Rollout, Today, Out of place. No tabs; `GlancePage`/`HierarchyPage`/`RecordPage` deleted
 - [x] The sentence layer — `operator_client/core/narrate.py` + `tests/test_narrate.py`: generated,
       never written; twelve words; a zero is a result, an absence is not
+- [x] Clicking a cell **opens it in place** (board `K03`): the cell grows where it is and the panels
+      around it become the gradient that explains it. **Authority is built end to end**; Rollout,
+      Today and Out of place each need their own composition — the shape belongs to the cell
 - [ ] **Traversal into an Admin: how the GUI changes.** No design, no code, no test — a backbone
       behaviour that the dependent pages need settled first
 - [ ] The other Super User pages: Views, Reports, Updates, Tasks, Flows, Assistance
