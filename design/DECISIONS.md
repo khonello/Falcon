@@ -68,6 +68,14 @@ saying at length.
 
 **Layout is editorial, not a preference.** One layout per page, chosen once, never per viewer.
 
+**Four cells, and the widths vary.** The user's own call, made on the `T02` board: *"the width
+varies and usually four is the sweet spot."* So a level's page is **four cells**, never a stack of
+full-width bands, and their widths do the ranking — 670/670 over 900/440, or 440/900 over 670/670.
+Which cell is the wide one is what gives the page its signature, and it moves with the subject: at
+rest in a department the day is wide; inside an Admin their *automation* is wide and the person
+shrinks, because the lid and the rail already say whose machine it is. Detail arrives by opening a
+cell, not by crowding the page — the Overview's rule (`K01` → `K03`–`K06`), carried down every level.
+
 **A count is drawn against the largest, not on its own.** "Its client PCs" draws as many slots as
 the biggest department has and fades the ones this department does not fill, so its size is legible
 at the same time as its state. Applies wherever one member of a set is shown alone.

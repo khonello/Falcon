@@ -117,7 +117,7 @@ def dept_day(w=1276, lane_h=16, gap_y=6):
                gap=14, extra=f"width: {w}px;")
 
 
-def station(a, w, slot=46, heroes=None, wide=False):
+def station(a, w, slot=46, heroes=None, wide=False, slots=True):
     """One Admin, drawn. Their machine, the PCs they govern (against the largest here, so their size
     reads at the same time as their state), their work, and the one sentence it is making."""
     head = row(av(a["initials"], "admin", 38, "native"),
@@ -126,7 +126,7 @@ def station(a, w, slot=46, heroes=None, wide=False):
                        gap=6), gap=3, extra="flex: 1; min-width: 0;"),
                gap=12, extra="width: 100%;")
     pcs = col(txt("Governs, against the largest here", 11.5, T["faint"]),
-              dept_pcs(a["pcs"], BIGGEST, size=slot, gap=8), gap=10)
+              dept_pcs(a["pcs"], BIGGEST, size=slot, gap=8), gap=10) if slots else ""
     if heroes:
         work = row(*[hero(v, k, s, tone) for v, k, s, tone in heroes], gap=40, extra="flex: none;")
     else:
@@ -219,25 +219,28 @@ def held_rail(active, entries, head=None, foot=("SU", "Super User")):
 
 # ------------------------------------------------------------------ T01: the department
 def t01():
+    """Four cells, and the widths do the ranking: the two Admins share the top because neither is
+    chosen yet, and the day takes the wide cell below because it is the one thing that says what
+    actually happened here. Nothing is a full-width band any more."""
     top = topbar2([IND["rollout"], IND["pings"]], "Go to, do, find")
     rail = held_rail("hierarchy", SU_NAV_T)
-    cols = row(kcell(ADMINS[0]["name"], *ADMINS[0]["phrase"], station(ADMINS[0], 626), w=670, h=288, top=True),
-               kcell(ADMINS[1]["name"], *ADMINS[1]["phrase"], station(ADMINS[1], 626), w=670, h=288, top=True),
+    cols = row(kcell(ADMINS[0]["name"], *ADMINS[0]["phrase"], station(ADMINS[0], 626), w=670, h=330, top=True),
+               kcell(ADMINS[1]["name"], *ADMINS[1]["phrase"], station(ADMINS[1], 626), w=670, h=330, top=True),
                gap=20, align="stretch", extra="flex: none;")
     floor = kcell("Today, here", "two machines were entered", "warn",
-                  dept_day(w=1276), w=1360, h=262, pad=16, top=True)
-    foot = kcell("What waits on you here", "two things", "warn",
-                 foot_band("Nothing here is ungoverned; two machines need a decision.",
-                        [("PCs", "7", None), ("Behind", "OPS-06", "warn"),
-                         ("Out of place", "OPS-07", "danger"), ("Reports", "2", "warn")],
-                        ("Open reports", "accent", "reports")),
-                 w=1360, h=104, top=True)
+                  dept_day(w=816), w=900, h=330, top=True)
+    waits = kcell("What waits on you here", "two things", "warn",
+                  reading_block("Nothing here is ungoverned; two machines need a decision.",
+                                [("Client PCs", "7", ""), ("Behind", "OPS-06", "warn"),
+                                 ("Out of place", "OPS-07", "danger"), ("Reports", "2", "warn")],
+                                "Open reports", w=396),
+                  w=440, h=330, top=True)
     return place_page("Operations", "", ["Everything", "Operations"], "Operations",
                       "one Admin is away helping Finance", "accent",
-                      [cols, floor, foot],
-                      "T01 · The department, drawn in the Overview's language and scoped to itself: one column "
-                      "per Admin over the day they all share. The columns are the subject, because they are who you enter.",
-                      eyebrow("PAGE", "A department — where you choose an Admin", "a colonnade over a floor"),
+                      [cols, row(floor, waits, gap=20, align="stretch", extra="flex: none;")],
+                      "T01 · The department at rest: two Admins, the day they share, and what waits on you. "
+                      "A column opens an Admin; a slot inside one opens that client PC.",
+                      eyebrow("PAGE", "A department — where you choose an Admin", "four cells, two doors"),
                       rail, top)
 
 
@@ -311,31 +314,43 @@ def automation_ladder(rows_, w=1276):
 
 
 def t03():
+    """Four cells again, and the weight has moved: whose machine this is is said by the lid and the
+    rail, so the person takes the narrow cell and THEIR AUTOMATION takes the wide one -- it is the
+    thing that exists nowhere else in a Super User's window, and the reason you came in."""
     top = topbar2([IND["pings"]], "Go to, do, find")
     rail = held_rail("automation", ADMIN_NAV, head=("RM", "inside"))
     bar = lid("shield", "You are inside R. Mensah", "WS-OPS-A1", lid_clock("21:18", 0.71))
-    held = kcell("R. Mensah", "you hold this workstation", "danger",
-                 station(ADMINS[0], 1276, slot=50, wide=True,
-                         heroes=[("8", "tasks", "one overdue", None), ("4", "flows", "one failing", None),
-                                 ("2", "pings", "unanswered", "warn"), ("9", "actions", "theirs to run", None)]),
-                 w=1360, h=258, top=True)
+    held = ADMINS[0] | {"state": "su", "when": "you entered 14:12"}
+    who = kcell("R. Mensah", "blocked while you are in", "danger",
+                station(held, 396, slots=False), w=440, h=310, top=True)
     auto = kcell("Their automation", "one failed last night", "danger",
                  automation_ladder([("Restricted file opened", "11:41", [("Notify Admin", "confirmed"),
                                                                         ("Lock folder", "confirmed"),
                                                                         ("Report", "confirmed")]),
                                     ("Payroll flow fails", "10:52", [("Notify", "confirmed"), ("Retry", "behind")]),
                                     ("Disk under 10 %", "11:04", [("Clear temp", "confirmed"), ("Report", "confirmed")]),
-                                    ("Nightly cleanup", "02:00", [("Archive", "confirmed"), ("Prune", "failing")])]),
-                 w=1360, h=252, pad=16, top=True)
-    foot = kcell("Only in here", "the reason you entered", "accent",
-                 foot_band("Automation and Actions exist nowhere else in your window.",
-                        [("Events", "4", None), ("Actions", "9", None),
-                         ("Last run", "11:04, clean", "ok"), ("Left", "21:18", "danger")],
-                        ("Run an action", "accent", "play")),
-                 w=1360, h=100, top=True)
+                                    ("Nightly cleanup", "02:00", [("Archive", "confirmed"), ("Prune", "failing")])],
+                                   w=816),
+                 w=900, h=310, top=True)
+    machines = kcell("Their client PCs", "one behind", "warn",
+                     col(dept_pcs(ADMINS[0]["pcs"], BIGGEST, size=58, gap=10),
+                         row(*[hero(v, k, s, tone) for v, k, s, tone in
+                               [("8", "tasks", "one overdue", None), ("4", "flows", "one failing", None),
+                                ("2", "pings", "unanswered", "warn")]], gap=40, extra="flex: none;"),
+                         txt("OPS-06 is still retrying 1.4.2; the other three confirmed on Tuesday.",
+                             12.5, T["ink"], 500, extra="line-height: 1.4;"),
+                         gap=20, extra="width: 596px;"),
+                     w=670, h=310, top=True)
+    only = kcell("Only in here", "the reason you entered", "accent",
+                 reading_block("Automation and Actions exist nowhere else in your window.",
+                               [("Events", "4", ""), ("Actions", "9", ""),
+                                ("Last run", "11:04, clean", "ok"), ("Left of your time", "21:18", "danger")],
+                               "Run an action", w=596),
+                 w=670, h=310, top=True)
     return place_page("Inside R. Mensah", bar, ["Everything", "Operations", "R. Mensah"],
                       "Operations", "as R. Mensah sees it", "danger",
-                      [held, auto, foot],
+                      [row(who, auto, gap=20, align="stretch", extra="flex: none;"),
+                       row(machines, only, gap=20, align="stretch", extra="flex: none;")],
                       "T03 · The same place, held. Red because the occupant is a Super User — the same red "
                       "R. Mensah's own screen is showing. The rail is theirs; you are still you, at its foot.",
                       eyebrow("STATE", "traversed into an Admin", "the place does not change, its state does"),
@@ -427,14 +442,24 @@ def t05():
                      "they get and Claim is the only lever on it.", 12, T["faint"], extra="line-height: 1.5;"),
                  gap=0, extra="width: 100%;")
 
-    cells = [variant("Running", "the ordinary half hour", running, 1348, 116),
-             variant("Under five minutes", "the ring, and nothing else, changes", last, 1348, 158),
-             variant("Extended", "a toast confirms; the trail records it", extended, 1348, 164),
-             variant("You left", "your own rail is back", left_, 326, 236),
-             variant("Time ran out", "never silent", expired, 326, 236),
-             variant("Ended from above", "an Admin, evicted", evicted, 326, 236),
-             variant("What they see", "the same red, from under it", theirs, 326, 236)]
-    return mood("The lid, and the six ways it ends",
+    states = col(running, '<span style="height: 16px;"></span>', last, gap=0, extra="width: 100%;")
+    endings = col(*[row(ic(i, 16, T[t]),
+                        col(txt(line, 12.5, T["ink"], 600), txt(sub, 11.5, T["faint"], extra="line-height: 1.45;"),
+                            gap=2, extra="flex: 1; min-width: 0;"),
+                        gap=10, align="flex-start",
+                        extra=f"width: 100%; padding: 10px 0; border-bottom: 1px solid {T['line']};")
+                    for i, t, line, sub in
+                    [("check", "ok", "You left", "Their workstation goes back to them; your own rail returns."),
+                     ("clock", "warn", "Time ran out", "The Engine ends it at zero and says so — never silently."),
+                     ("shield", "danger", "Ended from above", "Only to an Admin: a Super User's session cannot be evicted."),
+                     ("power", "dim", "The link dropped", "The session stands until its deadline; you rejoin into it.")]],
+                 gap=0, extra="width: 100%;")
+
+    cells = [variant("Running, and the last five minutes", "the ring is all that changes", states, 900, 236),
+             variant("What they see", "the same red, from under it", theirs, 440, 236),
+             variant("Extended", "a toast confirms; the trail records it", extended, 670, 286),
+             variant("How it ends", "four ways, none of them quiet", endings, 670, 286)]
+    return mood("The lid, and the four ways it ends",
                 "one place to look, one place to press — and no ending that happens quietly",
                 cells, brow=eyebrow("CHROME", "the traversal deadline", "38 px, one line, never a panel"))
 
@@ -455,20 +480,27 @@ def t06():
              "pcs": [("FIN-01", "confirmed"), ("FIN-02", "behind"), ("FIN-03", "confirmed")],
              "tasks": [("confirmed", 2), ("behind", 1)], "flows": [("confirmed", 2), ("failing", 1)],
              "told": "Their payroll flow has hung since the update."}
-    theirs = kcell("K. Boateng", "Finance · by consent", "accent", station(guest, 626), w=670, h=310, top=True)
+    screen = kcell("Their screen", "read only, while they watch", "accent",
+                   col(f'<div style="width: 816px; height: 172px; border-radius: 14px; '
+                       f'background: linear-gradient(135deg, #222B3A, #171E29); display: flex; align-items: center; '
+                       f'justify-content: center; color: {T["faint"]}; font-family: {T["sans"]}; font-size: 13px;">'
+                       f'FIN-02, live</div>',
+                       txt("They see everything you do, and either of you can end it.",
+                           12.5, T["ink"], 500), gap=16, extra="width: 816px;"),
+                   w=900, h=310, top=True)
 
     def gate(label, ok):
         return row(ic("check" if ok else "x", 15, T["ok"] if ok else T["faint"]),
                    txt(label, 12.5, T["dim"] if ok else T["faint"]),
                    '<span style="flex: 1;"></span>',
                    txt("allowed" if ok else "closed", 11.5, T["ok"] if ok else T["faint"], 600),
-                   gap=10, extra=f"width: 600px; padding: 9px 0; border-bottom: 1px solid {T['line']};")
+                   gap=10, extra=f"width: 396px; padding: 9px 0; border-bottom: 1px solid {T['line']};")
     ceiling = kcell("What you may reach", "two of four", "accent",
                     col(gate("Their screen, read only", True), gate("Workers and common files", True),
                         gate("Control and Actions", False), gate("Restricted files", False),
                         txt("The ceiling is theirs to set, and it does not widen while you are in it.",
-                            12.5, T["ink"], 500), gap=10, extra="width: 600px;"),
-                    w=670, h=310, top=True)
+                            12.5, T["ink"], 500, extra="line-height: 1.45;"), gap=10, extra="width: 396px;"),
+                    w=440, h=310, top=True)
     talk = kcell("The channel", "two messages", "dim",
                  col(*[row(av("SU" if w_ == "You" else "KB", "admin", 28, "native"),
                            col(row(txt(w_, 12.5, T["ink"], 600), txt(t_, 11, T["faint"]), gap=7),
@@ -480,11 +512,14 @@ def t06():
                          f'padding: 0 13px; border: 0; border-radius: 10px; background: {T["pane"]}; '
                          f'font-family: {T["sans"]}; font-size: 13px; color: {T["ink"]};">',
                          tbtn("Send", "accent", size="sm"), gap=8, extra="width: 100%;"),
-                     gap=12, extra="width: 1276px;"),
-                 w=1360, h=286, top=True)
+                     gap=12, extra="width: 596px;"),
+                 w=670, h=310, top=True)
+    theirs = kcell("K. Boateng", "Finance · asked for help", "accent",
+                   station(guest, 596, slot=42), w=670, h=310, top=True)
     return place_page("Assisted access", bar, ["Finance", "K. Boateng"], "Finance",
                       "you are a guest here, not an authority", "accent",
-                      [row(theirs, ceiling, gap=20, align="stretch", extra="flex: none;"), talk],
+                      [row(screen, ceiling, gap=20, align="stretch", extra="flex: none;"),
+                       row(theirs, talk, gap=20, align="stretch", extra="flex: none;")],
                       "T06 · The same skeleton, deliberately unlike the one beside it: teal, a ceiling instead "
                       "of a clock, no eviction, and your own rail kept — you never left your machine.",
                       eyebrow("STATE", "assisted access", "a separate state machine, and it looks it"),
@@ -495,5 +530,5 @@ TRAVERSE = [("T01-Department.dc.html", "A department: the colonnade over the flo
             ("T02-Admin.dc.html", "An Admin chosen: the same page, re-weighted", t02),
             ("T03-Inside.dc.html", "Inside an Admin: the same place, held", t03),
             ("T04-Answers.dc.html", "Asking to enter: the four answers", t04),
-            ("T05-Clock.dc.html", "The lid, and the six ways it ends", t05),
+            ("T05-Clock.dc.html", "The lid, and the four ways it ends", t05),
             ("T06-Assisted.dc.html", "Assisted access: the same skeleton, by consent", t06)]

@@ -137,9 +137,10 @@ A department is a **place**, drawn the way the Overview is drawn: panels on the 
 them on the frame with a generated state phrase beside them, charts before words. No sheet, no
 sidebar, no card strips. Quieter than the Overview, because a department is smaller.
 
-**Its signature is a colonnade over a floor**: one column per Admin across the top (they are who you
-choose, so they are the subject), the day every machine here shared as a full-width floor beneath, and
-a one-line ledger at the foot. No other page has that shape.
+**Four cells, widths varying** — the rule the user set on `T02`, and the composition for every level
+from here down. At rest a department is: the two Admins side by side (670 / 670) over the day they
+share and what waits on you (900 / 440). Which cell is the wide one is the page's signature, and it
+moves with the subject rather than staying put.
 
 Entering an Admin is then **not another design — it is the same place in another state**: the
 colonnade re-weights when you choose one, and is held when you are inside. What says you are inside is
@@ -152,5 +153,5 @@ everywhere else in this system — including on the screen of the Admin being st
 | `T02` | An Admin chosen: the column grows where it stands, the other quietens, the lower bands re-scope to the person, and Enter is one action in a reading. |
 | `T03` | Inside them: the same place under the red lid, their rail, and their automation drawn — the thing that exists nowhere else in a Super User's window. |
 | `T04` | The four answers to asking: free, block-or-end (the only forcing dialog), a peer's hard refusal, a Super User's un-evictable session. |
-| `T05` | The lid's three states — running, under five minutes, extended — and the four endings: you left, time ran out, ended from above, and what they see meanwhile. |
+| `T05` | The lid's states — running, the last five minutes, extended — what they see from under it, and the four ways it ends. |
 | `T06` | Assisted access: the same skeleton, deliberately unlike it — teal, a ceiling instead of a clock, consent instead of eviction, and your own rail kept. |
