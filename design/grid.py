@@ -26,9 +26,10 @@ def cell_title(name, state, tone):
                gap=12, extra="width: 100%; flex: none; padding: 0 4px 9px;")
 
 
-def kcell(name, state, tone, chart, w=None, h=None, grow=False, pad=22):
-    surface = col(f'<div style="flex: 1; min-height: 0; display: flex; align-items: center; '
-                  f'justify-content: center; overflow: hidden;">{chart}</div>',
+def kcell(name, state, tone, chart, w=None, h=None, grow=False, pad=22, top=False):
+    surface = col(f'<div style="flex: 1; min-height: 0; display: flex; align-items: '
+                  f'{"flex-start" if top else "center"}; '
+                  f'justify-content: {"flex-start" if top else "center"}; overflow: hidden;">{chart}</div>',
                   gap=0, extra=f"flex: 1; min-height: 0; padding: {pad}px; border-radius: 18px; "
                                f"background: {CHART_BG}; box-sizing: border-box;")
     size = (f"width: {w}px; " if w else "") + (f"height: {h}px; " if h else "")
@@ -183,110 +184,161 @@ def k02():
 
 
 
-# ------------------------------------------------------------------ K03: a cell, opened in place
-# The user's question, and the best idea of the pass: when a chart is clicked, the page does not
-# navigate anywhere -- it RECOMPOSES around what was clicked. The clicked cell grows where it
-# already is, and the other three become the gradient that explains it: a shape, a shape with its
-# sentence, then the words.
+# ------------------------------------------------------------------ K03-K04: a cell, opened in place
+# When a chart is clicked the page does not navigate -- it RECOMPOSES around it. The clicked cell
+# grows where it already is, and the panels around it become the gradient that explains it: shapes
+# first, then a shape with its sentence, then the words.
 #
-# It makes the density gradient load-bearing instead of decorative. Rest is a grid of four
-# questions; opened is one question and its answer, told from picture to prose.
+# THE COMPOSITION IS PER CELL. Authority opens into the shape below -- the one that was drawn on
+# board P03 and that the user picked out: a big chart, two told panels beneath it, and one tall
+# reading panel down the right. Rollout does not want that shape at all; its subject is a fleet, so
+# it opens wide (K04). Every cell declares the composition its own subject needs.
 #
 # Four rules keep it from becoming a maze:
-#   1. The clicked cell GROWS WHERE IT IS. It never jumps to the first position -- if everything
-#      moves at once you lose your place, and the anchor is the whole point.
+#   1. The clicked cell GROWS WHERE IT IS. It never jumps to first position -- if everything moves
+#      at once you lose your place, and the anchor is the whole point.
 #   2. One level only. Inside an opened cell a click selects or filters; it never opens again.
 #   3. Back is the same gesture, or Escape, and the grid returns exactly as it was.
-#   4. A cell with nothing to explain does not open. "Out of place" with no violations stays shut.
-def opened_title(subject):
+#   4. A cell with nothing to explain does not open.
+def opened_head(subject):
     return row(txt("Must see", 15, T["frame_faint"], 500),
                ic("chev", 14, T["frame_faint"]),
                txt(subject, 15, "#fff", 600),
                f'<span style="flex: 1;"></span>',
                txt("Esc to go back", 12, T["frame_faint"]),
-               gap=9, extra="width: 100%; flex: none; padding: 0 4px 9px;")
+               gap=9, extra="width: 100%; flex: none; padding: 0 0 12px;")
 
 
-def sub_cell(name, state, tone, chart, h=193, w=502):
-    return kcell(name, state, tone, chart, w=w, h=h, pad=18)
+def tall_shape(hero, told_a, told_b, reading_, hero_h=352, told_h=236, right_w=372):
+    """The P03 shape: a big chart, two told panels beneath it, one tall reading panel down the
+    right. It suits a subject whose shape is the point and whose meaning needs saying at length."""
+    left_w = 1360 - right_w - 20
+    bottom_w = (left_w - 20) // 2
+    return row(col(kcell(*hero[:3], hero[3], w=left_w, h=hero_h + 33),
+                   row(kcell(*told_a[:3], told_a[3], w=bottom_w, h=told_h + 33),
+                       kcell(*told_b[:3], told_b[3], w=bottom_w, h=told_h + 33),
+                       gap=20, align="stretch", extra="flex: none;"),
+                   gap=20, extra="flex: none; display: flex; flex-direction: column;"),
+               kcell(*reading_[:3], reading_[3], w=right_w, h=hero_h + told_h + 53, top=True),
+               gap=20, align="flex-start", extra="flex: 1; min-height: 0;")
 
 
+def wide_shape(hero, told_a, told_b, reading_, hero_h=300):
+    """A different shape for a different subject: the hero runs the full width, and the three
+    panels that explain it sit in a row beneath. A fleet is wide, so its page is."""
+    third = (1360 - 40) // 3
+    rest_h = 720 - hero_h - 33 - 20 - 33
+    return col(kcell(*hero[:3], hero[3], w=1360, h=hero_h + 33),
+               row(kcell(*told_a[:3], told_a[3], w=third, h=rest_h + 33),
+                   kcell(*told_b[:3], told_b[3], w=third, h=rest_h + 33),
+                   kcell(*reading_[:3], reading_[3], w=third, h=rest_h + 33, top=True),
+                   gap=20, align="stretch", extra="flex: none;"),
+               gap=20, extra="flex: 1; min-height: 0; display: flex; flex-direction: column;")
+
+
+def opened_page(subject, shape, note, brow_phrase):
+    inner = col(eyebrow("BEHAVIOUR", brow_phrase, "the composition is per cell"),
+                row(txt("Must see", 24, "#fff", 700),
+                    f'<span style="flex: 1;"></span>',
+                    txt("Wednesday, 14:20", 12.5, T["frame_faint"]), gap=14,
+                    extra="width: 100%; flex: none;"),
+                opened_head(subject), shape,
+                row(txt(note, 11.5, T["frame_faint"]), gap=0, extra="flex: none;"),
+                gap=14, extra=f"width: {W}px; height: {H}px; box-sizing: border-box; padding: 24px 40px 18px; "
+                              f"background: {FRAME['native']}; overflow: hidden; display: flex; "
+                              f"flex-direction: column;")
+    return page("Must see", "", "", inner, "", "native")
+
+
+# --- the panels Authority opens into -----------------------------------------------------------
 def logistics_pcs(w=420):
-    """Density 2: the three machines the gap actually leaves ungoverned."""
     marks = []
-    for i, (host, st) in enumerate([("LOG-01", "confirmed"), ("LOG-03", "confirmed"), ("LOG-02", "failing")]):
+    for i, (host, st, note) in enumerate([("LOG-01", "confirmed", "on 1.4.2"),
+                                          ("LOG-03", "confirmed", "on 1.4.2"),
+                                          ("LOG-02", "failing", "failed 6 times")]):
         x = i * 128
-        marks.append(f'<rect x="{x}" y="0" width="112" height="60" rx="14" fill="{ST[st]}" opacity="0.9"/>')
-        marks.append(f'<text x="{x + 56}" y="36" text-anchor="middle" fill="{CHART_BG}" '
+        marks.append(f'<rect x="{x}" y="0" width="112" height="58" rx="14" fill="{ST[st]}" opacity="0.9"/>')
+        marks.append(f'<text x="{x + 56}" y="35" text-anchor="middle" fill="{CHART_BG}" '
                      f'font-family="{T["mono"]}" font-size="14" font-weight="500">{host}</text>')
-        marks.append(f'<text x="{x + 56}" y="80" text-anchor="middle" fill="{T["faint"]}" '
-                     f'font-family="{T["sans"]}" font-size="11.5">'
-                     f'{"failed 6 times" if st == "failing" else "on 1.4.2"}</text>')
-    return f'<svg width="{w}" height="88" viewBox="0 0 {3 * 128 - 16} 88">{"".join(marks)}</svg>'
+        marks.append(f'<text x="{x + 56}" y="78" text-anchor="middle" fill="{T["faint"]}" '
+                     f'font-family="{T["sans"]}" font-size="11.5">{note}</text>')
+    return f'<svg width="{w}" height="86" viewBox="0 0 {3 * 128 - 16} 86">{"".join(marks)}</svg>'
 
 
-def logistics_day(w=420):
-    """Density 3: the same timeline, scoped, and the one sentence it makes."""
-    lanes = [("Esi", [("native", 9.0, 16.2)]), ("Abena", []), ("LOG-02", [])]
+def scoped_day(names, used, w=400):
     t0, t1 = 8.0, 18.0
-    label_w, lane_h, gap_y = 62, 18, 8
+    label_w, lane_h, gap_y = 62, 18, 9
     plot = w - label_w - 10
     out = []
-    for i, (name, blocks) in enumerate(lanes):
+    for i, name in enumerate(names):
         y = 2 + i * (lane_h + gap_y)
         out.append(f'<text x="0" y="{y + lane_h / 2 + 4}" fill="{T["dim"]}" font-family="{T["sans"]}" '
                    f'font-size="12">{name}</text>')
         out.append(f'<rect x="{label_w}" y="{y}" width="{plot}" height="{lane_h}" rx="6" '
                    f'fill="{T["pane"]}" opacity="0.5"/>')
-        for state, a, b in blocks:
+        if name in used:
+            a, b = used[name]
             bx = label_w + ((a - t0) / (t1 - t0)) * plot
             bw = max(5, ((b - a) / (t1 - t0)) * plot - 2)
             out.append(f'<rect x="{bx:.1f}" y="{y}" width="{bw:.1f}" height="{lane_h}" rx="6" fill="{T["line2"]}"/>')
-    h = len(lanes) * (lane_h + gap_y)
-    return col(f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>',
-               txt("Only one of the three was used today.", 12.5, T["ink"], 500),
-               gap=14, extra=f"width: {w}px;")
+    h = len(names) * (lane_h + gap_y)
+    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>'
 
 
-def gap_reading(w=420):
-    """Density 4: the words. What the map cannot say -- what the gap actually costs."""
-    facts = [("Ungoverned PCs", "3", "danger"), ("Last traversal", "you, 4 days ago", ""),
-             ("Unaddressed reports", "2", "warn")]
-    return col(txt("Nobody below you has governed Logistics for four days.", 15, T["ink"], 600,
-                   extra="line-height: 1.35;"),
+def reading_block(sentence, facts, action, w=330):
+    return col(txt(sentence, 15, T["ink"], 600, extra="line-height: 1.35;"),
                col(*[row(txt(k, 12.5, T["dim"]), f'<span style="flex: 1;"></span>',
                          txt(v, 12.5, tone_c(tone, T["ink"]) if tone else T["ink"], 500), gap=10,
-                         extra=f"width: 100%; padding: 7px 0; border-bottom: 1px solid {T['line']};")
+                         extra=f"width: 100%; padding: 8px 0; border-bottom: 1px solid {T['line']};")
                      for k, v, tone in facts], gap=0, extra="width: 100%;"),
-               row(f'<span style="display: inline-flex; align-items: center; height: 30px; padding: 0 14px; '
+               row(f'<span style="display: inline-flex; align-items: center; height: 32px; padding: 0 14px; '
                    f'border-radius: 9px; background: {T["accent_soft"]}; color: {T["accent"]}; '
-                   f'font-family: {T["sans"]}; font-size: 12.5px; font-weight: 500;">Assign an Admin</span>',
-                   gap=0, extra="padding-top: 4px;"),
-               gap=14, extra=f"width: {w}px;")
+                   f'font-family: {T["sans"]}; font-size: 12.5px; font-weight: 500;">{action}</span>',
+                   gap=0, extra="padding-top: 6px;") if action else "",
+               gap=16, extra=f"width: {w}px;")
 
 
 def k03():
-    hero = col(opened_title("Authority"),
-               col(f'<div style="flex: 1; min-height: 0; display: flex; align-items: center; '
-                   f'justify-content: center;">{authority(w=760, h=560)}</div>',
-                   gap=0, extra=f"flex: 1; min-height: 0; padding: 22px; border-radius: 18px; "
-                                f"background: {CHART_BG}; box-sizing: border-box;"),
-               gap=0, extra="width: 838px; height: 100%; flex: none; display: flex; flex-direction: column;")
+    shape = tall_shape(
+        ("The hierarchy", "Logistics has no Admin", "danger", authority(w=850, h=356)),
+        ("Its client PCs", "one failing", "danger", logistics_pcs(w=420)),
+        ("Sessions there", "one machine used", "dim",
+         col(scoped_day(["Esi", "Abena", "LOG-02"], {"Esi": (9.0, 16.2)}, w=400),
+             txt("Only one of the three was used today.", 12.5, T["ink"], 500), gap=14)),
+        ("What the gap means", "four days", "danger",
+         reading_block("Nobody below you has governed Logistics for four days.",
+                       [("Ungoverned PCs", "3", "danger"), ("Last traversal", "you, 4 days ago", ""),
+                        ("Unaddressed reports", "2", "warn"), ("Its Admins", "none", "danger")],
+                       "Assign an Admin")))
+    return opened_page("Authority", shape,
+                       "K03 · Authority opened, in the shape from board P03: a big chart, two told panels "
+                       "beneath it, one tall reading panel down the right.",
+                       "Authority, opened")
 
-    # the three share the column exactly: 720 less three titles and two gaps
-    right = col(sub_cell("Its client PCs", "one failing", "danger", logistics_pcs(), h=160),
-                sub_cell("Sessions there", "one machine used", "dim", logistics_day(), h=170),
-                sub_cell("What the gap means", "four days", "danger", gap_reading(), h=255),
-                gap=18, extra="width: 502px; flex: none; display: flex; flex-direction: column;")
 
-    body = row(hero, right, gap=20, align="stretch", extra="flex: 1; min-height: 0;")
-    return kshell(body,
-                  "K03 · The clicked cell grows where it already is, and the other three become the "
-                  "gradient that explains it — a shape, a shape with its sentence, then the words. "
-                  "One level, and Escape puts the grid back exactly as it was.",
-                  brow=eyebrow("BEHAVIOUR", "a cell opened in place", "the grid recomposes, it never navigates"))
+def k04():
+    shape = wide_shape(
+        ("The fleet", "2 of 14 behind", "warn",
+         col(waffle(FLEET, cols=14, size=48, gap=12, w=14 * 60), gap=0)),
+        ("By department", "Logistics failing", "danger",
+         col(stacked_bars([(n, [("confirmed", a), ("behind", b), ("failing", f)])
+                           for n, a, b, f in ROLLOUT], w=380, bar_h=16, gap_y=28),
+             txt("Logistics is the only one failing.", 12.5, T["ink"], 500), gap=14)),
+        ("Since Monday", "stalled since Friday", "warn",
+         col(trend(SERIES, w=380, h=120),
+             txt("Nothing has confirmed for three days.", 12.5, T["ink"], 500), gap=14)),
+        ("What is blocking", "1.4.3 held", "warn",
+         reading_block("Approving 1.4.3 stays blocked until both confirm.",
+                       [("Retrying", "OPS-06", "warn"), ("Failing", "LOG-02, 6 attempts", "danger"),
+                        ("Threshold", "3 attempts", "")],
+                       "Prompt their Admins", w=330)))
+    return opened_page("Rollout 1.4.2", shape,
+                       "K04 · Rollout opened, and it does NOT take Authority's shape. Its subject is a "
+                       "fleet, so the hero runs the full width and the three that explain it sit beneath.",
+                       "Rollout, opened")
 
 
 GRID_TAKES = [("K01-Perfect.dc.html", "Must see: a perfect grid", k01),
               ("K02-Ranked.dc.html", "Must see: ranked by size", k02),
-              ("K03-Opened.dc.html", "Must see: a cell opened in place", k03)]
+              ("K03-Opened.dc.html", "Must see: Authority opened", k03),
+              ("K04-Opened-Wide.dc.html", "Must see: Rollout opened, a different shape", k04)]

@@ -58,7 +58,13 @@ cell title is enforced the same way.
 
 **Each page gets its own structural signature** so you know which page you are on before reading a
 word — a band over two columns, an equal quartet, a lead and a column. Do not give two pages the
-same shape.
+same shape. The same holds one level down: **an opened cell's composition belongs to that cell**,
+not to the Overview.
+
+**The shape the user named**, from board `P03` and reused for `K03`: a big chart top-left, two
+"told" panels (density 3) in a row beneath it, and one tall **reading** panel (density 4) down the
+right for the whole height. It suits a subject whose shape is the point and whose meaning needs
+saying at length.
 
 **Layout is editorial, not a preference.** One layout per page, chosen once, never per viewer.
 
@@ -90,7 +96,7 @@ reasoning is not lost, not so they can be revived.
 | | |
 |---|---|
 | **`X01` — choosing how a slot is drawn** | Each chart has alternatives; the control lives in the slot's own header. My recommendation, given and not yet answered: ship it as **one choice per slot, set once**, not a cycle button met on every panel — a panel that changes form under you costs what a re-sorting list costs. The mechanism is the same either way. **Not built.** |
-| **`K03` — a cell opened in place** | The user's own idea, and the strongest of the pass: clicking a chart does not navigate — the page **recomposes** around it. The clicked cell grows where it already is, and the other three become the gradient that explains it: a shape, a shape with its sentence, then the words. It makes the density gradient load-bearing instead of decorative, and it folds `X02` into the layout rather than adding a mode. Four rules keep it from becoming a maze: the cell grows **where it is** and never jumps to first position; **one level only** (inside, a click selects or filters); back is the same gesture or Escape and restores the grid exactly; a cell with **nothing to explain does not open**. **Designed, not built** — the cost is the three supporting panels for each of the four cells, twelve in all, plus their narration. |
+| **`K03`/`K04` — a cell opened in place** | The user's own idea, and the strongest of the pass: clicking a chart does not navigate — the page **recomposes** around it. The clicked cell grows where it already is, and the panels around it become the gradient that explains it. **The composition is per cell, not fixed:** Authority opens into the **P03 shape** (a big chart, two told panels beneath it, one tall reading panel down the right — `K03`, and the shape the user picked out by name); Rollout does not want that shape at all, because its subject is a fleet, so it opens wide with the hero across the top and three panels beneath (`K04`). Every cell declares the composition its own subject needs. Four rules: the cell grows **where it is** and never jumps to first position; **one level only** (inside, a click selects or filters); back is the same gesture or Escape and restores the grid exactly; a cell with **nothing to explain does not open**. **Designed, not built.** |
 | **`C01`–`C10`, the chart treatments** | Ten boards, four treatments each. Two have been applied (assistance → one line per pair; routing → lines and chips). **The other thirty-odd exist only as boards.** |
 | **`L01`–`L06`, the layout structures** | Three-, four- and five-panel arrangements. Superseded for the Overview by the grid; still the library for pages with more than one panel. |
 | **`K02`** | The same four cells ranked by size. Kept as the alternative to the chosen `K01`. |
