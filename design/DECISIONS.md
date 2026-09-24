@@ -66,6 +66,12 @@ not to the Overview.
 right for the whole height. It suits a subject whose shape is the point and whose meaning needs
 saying at length.
 
+**An area is entered through its contents, not through tabs** (24 Sep 2026, `TABS.md`). Each area is a
+handful of containers — one per thing it covers — and clicking one opens it in place, the rest
+becoming the context that explains it. One level only; back restores the area exactly. The Overview's
+`K01`→`K03`–`K06` behaviour is the general rule, not a special case. Where a tab row is genuinely
+needed it is **plain text with colour marking the current one** — no pill, box or underline.
+
 **Layout is editorial, not a preference.** One layout per page, chosen once, never per viewer.
 
 **Four cells, and the widths vary.** The user's own call, made on the `T02` board: *"the width

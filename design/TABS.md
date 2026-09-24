@@ -17,6 +17,48 @@ into Work**.
 | **Record** | audit, sessions, Views, addressed reports, deviations, violations | what happened, and who was where |
 | **Work** | Tasks, Flows, **Assistance** | what is moving through the organisation |
 
+## How an area is entered: through its contents, not through tabs
+
+**Settled 24 Sep 2026, and it governs every area.** An area is not a page with tabs across the top. It
+is a small set of **containers — a chart, a drawing, a figure — one per thing the area covers**. You
+enter a subject by clicking the thing itself.
+
+- **Clicking a container opens it in place.** It grows where it stands and reveals what is specific to
+  what you clicked; the page recomposes around it rather than navigating away.
+- **The containers around it become the context that explains it**, re-scoped to the opened subject —
+  quietened, expanded, or re-drawn for it, never left saying something about a different subject.
+- **One level only.** Inside an opened container a click selects or filters; it never opens again.
+- **Back is the same gesture, or Escape**, and the area returns exactly as it was.
+- **A container with nothing to explain does not open.**
+
+This is the rule the Super User Overview already runs on (`K01` at rest, `K03`–`K06` opened, all four
+built) — it is now the rule for **all five areas**, not a trick the Overview plays. The door into a
+subject is the drawing of that subject.
+
+It also answers navigation downward: the department page (level 2) is what the **Departments**
+container in Authority opens into, and entering an Admin (level 3) is what a department opens into.
+The levels are the same gesture repeated, not three different navigations.
+
+**Why this over tabs:** a tab row names things you have not seen yet and makes you guess which one holds
+your answer. A container has already answered the page-level question by being drawn — you click it
+because you saw something in it.
+
+## If tabs are ever used anyway
+
+Somewhere one will be needed — a filter inside an opened container, most likely. When it is:
+
+- **Plain text only.** No pill, no box, no background, no underline, no chevron.
+- **The current one differs by colour** (and weight, at most). Nothing else changes.
+- Set out like a header row, spaced, reading as words rather than controls:
+
+```
+  Name            Age            Sex
+  ^ current, in ink; the others faint
+```
+
+This replaces the filled `Pills` treatment wherever a *tab* is meant. `Pills` stays what it is — a
+filter on a different axis from the sidebar — and is not to be used as a tab row.
+
 ## The two rules the names have to keep
 
 1. **A tab is a question someone asks, not a module.** If what is inside cannot be said without
