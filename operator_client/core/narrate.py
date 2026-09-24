@@ -45,17 +45,29 @@ def _fact(label: str, value: Any, tone: str = "") -> dict[str, Any]:
     return {"label": label, "value": str(value), "tone": tone}
 
 
+def _brief(text: str) -> str:
+    """The phrase that sits beside a cell's title on the Overview: six words at the outside, because
+    it shares a line with the title and must never wrap."""
+    words = text.split()
+    if len(words) > 6:
+        raise ValueError(f"brief is {len(words)} words, limit is 6: {text!r}")
+    return text
+
+
 def _out(sentence: str, facts: list[dict[str, Any]] | None = None, action: str = "",
-         state: str = "ok") -> dict[str, Any]:
-    return {"sentence": _say(sentence), "facts": facts or [], "action": action, "state": state}
+         state: str = "ok", brief: str = "", tone: str = "") -> dict[str, Any]:
+    return {"sentence": _say(sentence), "facts": facts or [], "action": action, "state": state,
+            "brief": _brief(brief), "tone": tone}
 
 
-def _empty(sentence: str, note: str = "Nothing recorded yet") -> dict[str, Any]:
-    return {"sentence": _say(sentence), "facts": [], "action": "", "state": "empty", "note": note}
+def _empty(sentence: str, note: str = "Nothing recorded yet", brief: str = "nothing yet") -> dict[str, Any]:
+    return {"sentence": _say(sentence), "facts": [], "action": "", "state": "empty", "note": note,
+            "brief": _brief(brief), "tone": ""}
 
 
-def _thin(sentence: str, note: str = "Not enough to draw yet") -> dict[str, Any]:
-    return {"sentence": _say(sentence), "facts": [], "action": "", "state": "thin", "note": note}
+def _thin(sentence: str, note: str = "Not enough to draw yet", brief: str = "not enough yet") -> dict[str, Any]:
+    return {"sentence": _say(sentence), "facts": [], "action": "", "state": "thin", "note": note,
+            "brief": _brief(brief), "tone": ""}
 
 
 # --- the rollout --------------------------------------------------------------------------------
@@ -70,7 +82,8 @@ def rollout(data: dict[str, Any]) -> dict[str, Any]:
     retrying = [b for b in behind if not b.get("escalated")]
     if not behind:
         return _out(f"Every PC is on {version}.",
-                    [_fact("Client PCs", pcs), _fact("Confirmed", pcs, "ok")])
+                    [_fact("Client PCs", pcs), _fact("Confirmed", pcs, "ok")],
+                    brief="all confirmed", tone="ok")
     facts = [_fact("Confirmed", f"{max(0, pcs - len(behind))} of {pcs}")]
     if retrying:
         facts.append(_fact("Retrying", ", ".join(b["hostname"] for b in retrying[:3]), "warn"))
@@ -78,7 +91,8 @@ def rollout(data: dict[str, Any]) -> dict[str, Any]:
         facts.append(_fact("Failing", ", ".join(b["hostname"] for b in failing[:3]), "danger"))
     verb = "are" if len(behind) != 1 else "is"
     return _out(f"{_n(len(behind), 'PC')} {verb} behind, so the next version stays blocked.",
-                facts, action="Prompt their Admins")
+                facts, action="Prompt their Admins",
+                brief=f"{_n(len(behind), 'PC')} behind, next version blocked", tone="warn")
 
 
 def confirmations(data: dict[str, Any]) -> dict[str, Any]:
@@ -159,13 +173,16 @@ def hierarchy(data: dict[str, Any]) -> dict[str, Any]:
     empty_depts = [d for d in tree if not d.get("admins")]
     if not empty_depts:
         return _out("Every department has an Admin.",
-                    [_fact("Departments", len(tree)), _fact("Admins", admins), _fact("Client PCs", pcs)])
+                    [_fact("Departments", len(tree)), _fact("Admins", admins), _fact("Client PCs", pcs)],
+                    brief="every department governed", tone="ok")
     d = empty_depts[0]
     ungoverned = sum(len(x.get("workers") or []) for x in empty_depts)
     facts = [_fact("Department", d["name"], "danger"), _fact("Its client PCs", len(d.get("workers") or [])),
              _fact("Ungoverned PCs", ungoverned, "danger"), _fact("Departments", len(tree))]
     return _out(f"{d['name']} has no Admin, so nobody below you governs it.", facts,
-                action="Assign an Admin")
+                action="Assign an Admin",
+                brief=(f"{d['name']} has no Admin" if len(empty_depts) == 1
+                       else f"{len(empty_depts)} departments have no Admin"), tone="danger")
 
 
 def assistance(data: dict[str, Any]) -> dict[str, Any]:
@@ -201,7 +218,8 @@ def the_day(data: dict[str, Any]) -> dict[str, Any]:
         return _empty("No client PCs are registered.")
     if not sessions:
         return _out("Nobody signed in anywhere today.",
-                    [_fact("Client PCs", pcs), _fact("Never signed in", pcs, "warn")])
+                    [_fact("Client PCs", pcs), _fact("Never signed in", pcs, "warn")],
+                    brief="nobody signed in", tone="warn")
     traversals = [s for s in sessions if s.get("occupied_via") != "native"]
     yours = [s for s in traversals if s.get("occupant_role") == "super_user"]
     assisted = [s for s in traversals if s.get("occupied_via") == "assisted_access"]
@@ -215,12 +233,12 @@ def the_day(data: dict[str, Any]) -> dict[str, Any]:
     if assisted:
         facts.append(_fact("Assisted", _n(len(assisted), "session")))
     if not traversals:
-        return _out("Everyone worked at their own PC today.", facts)
+        return _out("Everyone worked at their own PC today.", facts, brief="nobody entered a machine")
     if yours:
         return _out(f"{_n(len(traversals), 'traversal')} today, one of them yours.", facts,
-                    action="Open the trail")
+                    action="Open the trail", brief="you entered one machine")
     return _out(f"{_n(len(traversals), 'traversal')} today, none of them yours.", facts,
-                action="Open the trail")
+                action="Open the trail", brief=f"{_n(len(traversals), 'traversal')}, none yours")
 
 
 def violations(data: dict[str, Any]) -> dict[str, Any]:
@@ -265,10 +283,35 @@ def work(data: dict[str, Any]) -> dict[str, Any]:
                 [_fact("Tasks", len(tasks)), _fact("Flows", len(flows))])
 
 
+def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
+    """The Overview's fourth cell: files against their tier, and deviations logged but not yet
+    addressed. Two different records, one question -- has anything gone where it should not."""
+    found = data.get("violations") or []
+    open_dev = [d for d in (data.get("deviations") or []) if not d.get("resolved_at")]
+    if not found and not open_dev:
+        return _out("Nothing is out of place, and nothing has deviated.",
+                    brief="nothing out of place", tone="ok")
+    facts = []
+    if found:
+        v = found[0]
+        facts.append(_fact("File", f"{v.get('filename', 'a file')}, {v.get('hostname', '')}".strip(", "), "danger"))
+        facts.append(_fact("Tier", v.get("resource_tag", ""), "danger"))
+    if open_dev:
+        facts.append(_fact("Deviation", str(open_dev[0].get("expectation", "")).replace("_", " "), "warn"))
+    bits = []
+    if found:
+        bits.append(_n(len(found), "file"))
+    if open_dev:
+        bits.append(_n(len(open_dev), "deviation"))
+    return _out(f"{' and '.join(bits)} out of place.", facts,
+                action="Open the violation" if found else "",
+                brief=", ".join(bits), tone="danger" if found else "warn")
+
+
 TOPICS = {
     "rollout": rollout, "confirmations": confirmations, "fleet": fleet, "needs_you": needs_you,
     "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
-    "violations": violations, "deviations": deviations, "work": work,
+    "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place,
 }
 
 

@@ -14,7 +14,6 @@ import "."
 Item {
     id: root
 
-    property int page: 0                   // 0 at a glance, 1 the hierarchy, 2 the record
     property int focusDept: 0              // 0 = everything
 
     property var tree: []
@@ -186,6 +185,13 @@ Item {
     }
 
     // --- the record --------------------------------------------------------------------------------
+    readonly property string clock: {
+        var d = new Date()
+        var days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        var hh = d.getHours() < 10 ? "0" + d.getHours() : String(d.getHours())
+        var mm = d.getMinutes() < 10 ? "0" + d.getMinutes() : String(d.getMinutes())
+        return days[d.getDay()] + ", " + hh + ":" + mm
+    }
     readonly property real nowHours: {
         var d = new Date()
         return d.getHours() + d.getMinutes() / 60
@@ -411,118 +417,205 @@ Item {
     Component.onCompleted: if (falcon.isConnected) refresh()
 
     // ==============================================================================================
+    // ==============================================================================================
+    // The page is a perfect grid: four equal cells, so nothing claims to matter more than anything
+    // else. Each cell's title sits ABOVE it on the frame, with its state beside it; the cell is a
+    // clean surface holding nothing but the drawing. Board K01.
+    //
+    // There are no tabs and no description of the organisation. A Super User knows how many
+    // departments they have; the page says what they must see.
+    readonly property var authoritySays: falcon.narrate("hierarchy", { tree: root.tree })
+    readonly property var rolloutSays: falcon.narrate("rollout", {
+        version: root.version, pcs_behind: root.behind, pc_count: root.pcCount })
+    readonly property var daySays: falcon.narrate("the_day", {
+        sessions: root.sessions, pc_count: root.pcCount, quiet_pcs: root.quietPcs })
+    readonly property var placeSays: falcon.narrate("out_of_place", {
+        violations: root.violations, deviations: root.deviations })
+
     ColumnLayout {
         anchors.fill: parent
         anchors.leftMargin: Theme.s6
         anchors.rightMargin: Theme.s6
         anchors.topMargin: Theme.s5
         anchors.bottomMargin: Theme.s5
-        spacing: 0
-
-        // the breadcrumb: descent is one level, and you back out by picking Everything
-        Row {
-            spacing: 7
-            Layout.preferredHeight: 20
-
-            Txt {
-                text: "Everything"
-                color: root.focusDept === 0 ? Theme.ink : Theme.faint
-                font.pixelSize: Theme.fBody
-                font.weight: root.focusDept === 0 ? Font.DemiBold : Font.Normal
-
-                MouseArea {
-                    anchors.fill: parent
-                    enabled: root.focusDept !== 0
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.focusDept = 0
-                }
-            }
-            Icon {
-                name: "chev"
-                color: Theme.faint
-                size: 12
-                visible: root.focusDept !== 0
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Txt {
-                visible: root.focusDept !== 0
-                text: root.focused ? root.focused.name : ""
-                font.pixelSize: Theme.fBody
-                font.weight: Font.DemiBold
-            }
-        }
-
-        Item { Layout.preferredHeight: 10 }
+        spacing: 20
 
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 46
+            Layout.preferredHeight: 34
 
-            Row {
+            Txt {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 13
-
-                Rectangle {
-                    width: 10
-                    height: 28
-                    radius: 3
-                    color: root.focusDept === 0 ? Theme.ink : Theme.series(root.deptIndex(root.focusDept))
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Txt {
-                    text: root.focusDept === 0 ? "Everything" : (root.focused ? root.focused.name : "")
-                    font.pixelSize: Theme.fTitle - 2
-                    font.weight: Font.Bold
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Txt {
-                    text: root.focusDept === 0
-                          ? (root.tree.length + " departments  ·  " + root.adminCount + " Admins  ·  "
-                             + root.pcCount + " client PCs")
-                          : (root.focused
-                             ? (root.focused.admins.length
-                                + (root.focused.admins.length === 1 ? " Admin  ·  " : " Admins  ·  ")
-                                + root.focused.workers.length + " client PCs")
-                             : "")
-                    color: Theme.dim
-                    font.pixelSize: Theme.fBody
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+                text: "Must see"
+                color: "#ffffff"
+                font.pixelSize: Theme.fTitle
+                font.weight: Font.Bold
             }
-
-            GBtn {
+            Txt {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                visible: root.focusDept !== 0
-                small: true
-                text: "Open in Hierarchy"
-                iconName: "hierarchy"
-                onClicked: shell.show("hierarchy")
+                text: root.clock
+                color: Qt.rgba(1, 1, 1, 0.45)
+                font.pixelSize: Theme.fBody
             }
         }
 
-        Item { Layout.preferredHeight: 14 }
-
-        Pills {
-            Layout.fillWidth: true
-            model: [{ label: "At a glance", count: "" },
-                    { label: "The hierarchy", count: "" },
-                    { label: "The record", count: "" }]
-            current: root.page
-            onPicked: function (i) { root.page = i }
-        }
-
-        Item { Layout.preferredHeight: 14 }
-
-        StackLayout {
+        GridLayout {
+            id: grid
+            objectName: "mustSeeGrid"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: root.page
+            columns: 2
+            rowSpacing: 20
+            columnSpacing: 20
 
-            GlancePage { view: root }
-            HierarchyPage { view: root }
-            RecordPage { view: root }
+            // --- who governs what, and where nobody does
+            GridCell {
+                objectName: "cellAuthority"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                title: "Authority"
+                narration: root.authoritySays
+
+                OrgMap {
+                    width: parent.width
+                    height: Math.max(150, grid.height / 2 - 120)
+                    departments: root.tree
+                    focusId: 0
+                    onPicked: function (id) { shell.show("hierarchy") }
+                }
+            }
+
+            // --- the lever only a Super User holds
+            GridCell {
+                objectName: "cellRollout"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                title: root.version ? ("Rollout " + root.version.version_string) : "Rollout"
+                narration: root.rolloutSays
+
+                StackedBars {
+                    width: parent.width
+                    barHeight: 20
+                    rowGap: 34
+                    rows: root.rolloutRows.length > 0 ? root.rolloutRows : root.skeletonRows
+                }
+                Txt {
+                    text: "the fleet, one square each"
+                    color: Theme.faint
+                    font.pixelSize: Theme.fMeta
+                }
+                Waffle {
+                    width: parent.width
+                    cellSize: 24
+                    gap: 7
+                    cells: root.fleetCells.length > 0 ? root.fleetCells : root.skeletonCells
+                }
+                Legend {
+                    items: [{ label: "Confirmed", color: Theme.ok, round: true },
+                            { label: "Behind", color: Theme.warn, round: true },
+                            { label: "Failing", color: Theme.danger, round: true }]
+                }
+            }
+
+            // --- who held each machine, and who never signed in
+            GridCell {
+                objectName: "cellToday"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                title: "Today"
+                narration: root.daySays
+
+                DayTimeline {
+                    width: parent.width
+                    laneGap: 6
+                    // the lanes share out what the cell has, and always leave the legend its room
+                    laneHeight: Math.max(11, Math.min(26, (grid.height / 2 - 132)
+                                                          / Math.max(1, lanes.length) - laneGap))
+                    lanes: root.timelineLanes.length > 0 ? root.timelineLanes : root.skeletonLanes
+                    fromHour: root.windowStart
+                    toHour: root.windowEnd
+                }
+                Legend {
+                    items: [{ label: "At the PC", color: Theme.line2, round: false },
+                            { label: "An Admin entered", color: Theme.warn, round: false },
+                            { label: "You entered", color: Theme.danger, round: false }]
+                    note: root.quietPcs === 0 ? ""
+                          : root.quietPcs + (root.quietPcs === 1 ? " PC was never signed in"
+                                                                 : " PCs were never signed in")
+                }
+            }
+
+            // --- files against their tier, and what deviated from what the system expects
+            GridCell {
+                objectName: "cellOutOfPlace"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                title: "Out of place"
+                narration: root.placeSays
+
+                TierBars {
+                    width: parent.width
+                    rows: root.tierRows
+                }
+                Rectangle { width: parent.width; height: 1; color: Theme.line }
+                Column {
+                    width: parent.width
+                    spacing: 0
+
+                    Repeater {
+                        model: root.deviations.slice(0, 2)
+                        delegate: Item {
+                            required property var modelData
+                            width: parent.width
+                            height: 30
+
+                            Txt {
+                                id: at
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 44
+                                text: String(modelData.detected_at).substring(11, 16)
+                                color: Theme.faint
+                                monospace: true
+                                font.pixelSize: Theme.fMeta
+                            }
+                            Txt {
+                                anchors.left: at.right
+                                anchors.leftMargin: 8
+                                anchors.right: mark.left
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: {
+                                    var w = String(modelData.expectation).replace(/_/g, " ")
+                                    return w.charAt(0).toUpperCase() + w.slice(1)
+                                }
+                                font.pixelSize: Theme.fBody
+                            }
+                            Chip {
+                                id: mark
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.resolved_at ? "Addressed" : "Logged"
+                                tone: modelData.resolved_at ? "ok" : "neutral"
+                            }
+                        }
+                    }
+                }
+                Txt {
+                    width: parent.width
+                    text: root.violations.length === 0 ? "" :
+                          (root.violations[0].filename + ", " + root.violations[0].resource_tag
+                           + ", found on " + root.violations[0].hostname + ".")
+                    visible: text !== ""
+                    color: Theme.faint
+                    font.pixelSize: Theme.fMeta
+                    wrapMode: Text.WordWrap
+                    elide: Text.ElideRight
+                    maximumLineCount: 2
+                }
+            }
         }
     }
 }

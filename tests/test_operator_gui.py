@@ -58,20 +58,21 @@ def test_helpers_are_pure(gui):
     assert bridge.pretty({"a": 1}) == '{\n  "a": 1\n}'
 
 
-def test_every_page_runs_from_shape_to_words(gui):
-    """Panel density (board P01) is a design rule, so it is a test and not a convention: each page
-    declares its panels in reading order, and the density must never fall along it. A page that
-    puts its words before its shapes -- or forgets to end on a reading panel -- fails here."""
+def test_the_overview_is_four_cells_each_saying_how_it_stands(gui):
+    """The Overview is one page and a perfect grid (board K01): four cells, each with a title and a
+    generated state phrase beside it. No tabs, and no cell is missing its narration."""
     win, _, _ = gui
-    for name, expected_end in (("glancePage", 4), ("hierarchyPage", 4), ("recordPage", 4)):
-        page = win.findChild(QObject, name)
-        assert page is not None, name
-        densities = prop(page, "densities")
-        assert densities, name
-        assert all(d > 0 for d in densities), (name, densities)
-        assert densities == sorted(densities), (name, densities)     # never falls
-        assert densities[0] <= 2, (name, densities)                  # starts on a shape
-        assert densities[-1] == expected_end, (name, densities)      # ends on the words
+    grid = win.findChild(QObject, "mustSeeGrid")
+    assert grid is not None and grid.property("columns") == 2
+
+    titles = []
+    for name in ("cellAuthority", "cellRollout", "cellToday", "cellOutOfPlace"):
+        cell = win.findChild(QObject, name)
+        assert cell is not None, name
+        titles.append(cell.property("title"))
+        # `brief` shares the title's line, so it is held to six words in core/narrate.py
+        assert len(str(cell.property("brief")).split()) <= 6, (name, cell.property("brief"))
+    assert titles[0] == "Authority" and titles[2] == "Today" and titles[3] == "Out of place"
 
 
 def prop(obj: QObject, name: str):

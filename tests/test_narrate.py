@@ -63,6 +63,9 @@ def test_every_sentence_is_twelve_words_or_fewer():
         ("work", {"tasks": [{}], "flows": [{"status": "paused"}], "overdue": 0}),
         ("work", {"tasks": [{}], "flows": [{"status": "active"}], "overdue": 0}),
         ("work", {"tasks": [], "flows": []}),
+        ("out_of_place", {"violations": [{"filename": "b.xlsx", "hostname": "OPS-07", "resource_tag": "restricted"}],
+                          "deviations": [{"expectation": "hostname_mismatch"}]}),
+        ("out_of_place", {"violations": [], "deviations": []}),
         ("nonsense", {}),
     ]
     for topic, data in cases:
@@ -70,6 +73,8 @@ def test_every_sentence_is_twelve_words_or_fewer():
         assert words(r) <= n.MAX_WORDS, (topic, r["sentence"])
         assert r["sentence"].endswith("."), (topic, r["sentence"])
         assert r["state"] in ("ok", "empty", "thin")
+        # the brief shares a line with a cell's title on the Overview, so it must never wrap
+        assert len(r["brief"].split()) <= 6, (topic, r["brief"])
 
 
 def test_the_word_limit_is_a_raise_not_a_long_line():
