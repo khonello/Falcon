@@ -280,6 +280,38 @@ Item {
     }
     readonly property var assistNodes: tree.map(function (d) { return { id: d.department_id, name: d.name } })
 
+    // every ordered pair of departments, so a pair that never happened says "never" out loud
+    readonly property var assistRows: {
+        var counts = ({})
+        for (var i = 0; i < assistLinks.length; i++)
+            counts[assistLinks[i].from + ">" + assistLinks[i].to] = assistLinks[i].count
+        var out = []
+        for (var a = 0; a < tree.length; a++)
+            for (var b = 0; b < tree.length; b++) {
+                if (a === b) continue
+                var n = counts[a + ">" + b] || 0
+                if (n === 0 && out.length >= 3) continue
+                out.push({ from_name: tree[a].name, to_name: tree[b].name, count: n,
+                           fromTint: Theme.series(a), toTint: Theme.series(b) })
+            }
+        return out.slice(0, 5)
+    }
+
+    // a line per category with the departments it also reaches; "You" is always the first chip
+    readonly property var routingLines: {
+        var cats = routing.categories || []
+        var conf = routing.routing || []
+        return cats.map(function (c) {
+            var depts = []
+            for (var i = 0; i < conf.length; i++)
+                if (conf[i].category === c)
+                    depts.push({ name: conf[i].department_name,
+                                 tint: Theme.series(root.deptIndex(conf[i].routed_department_id)) })
+            var words = String(c).replace(/_/g, " ")
+            return { label: words.charAt(0).toUpperCase() + words.slice(1), departments: depts }
+        })
+    }
+
     // --- violations, deviations, routing ------------------------------------------------------------
     readonly property var tierRows: {
         var tiers = [{ label: "/restricted/", tag: "restricted" }, { label: "/admin/", tag: "admin" },

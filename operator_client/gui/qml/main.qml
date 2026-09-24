@@ -107,7 +107,10 @@ ApplicationWindow {
                     id: sheet
                     anchors.fill: parent
                     radius: Theme.radiusMd
-                    color: Theme.pane
+                    // The dashboards are drawn on the frame itself: the panels are the surfaces and
+                    // the gradient shows between them, as on the boards. The views that still carry
+                    // a sidebar keep the sheet under them.
+                    color: shell.viewKey === "overview" ? "transparent" : Theme.pane
                     clip: true
 
                     StackLayout {

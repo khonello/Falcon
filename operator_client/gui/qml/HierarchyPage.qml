@@ -64,11 +64,10 @@ Item {
             title: "Assistance"
             note: "across departments, today"
 
-            Arcs {
+            // C06-A, not the arcs: most days this says "never", and that reads as a sentence
+            PairRows {
                 width: parent.width
-                height: Math.max(110, page.height / 2 - 190)
-                nodes: page.view.assistNodes
-                links: page.view.assistLinks
+                pairs: page.view.assistRows
             }
             Sentence { width: parent.width; text: page.assistSays.sentence }
         }
@@ -101,11 +100,10 @@ Item {
             notice: page.routingSays.state === "empty" ? page.routingSays.note : ""
             noticeSub: page.routingSays.state === "empty" ? page.routingSays.sentence : ""
 
-            RoutingMap {
+            // C07-A, not the flow lines: the word "always" does the diagram's job
+            RoutingLines {
                 width: parent.width
-                height: implicitHeight
-                categories: page.view.routingRows
-                destinations: page.view.routingDests
+                categories: page.view.routingLines
             }
             Sentence {
                 width: parent.width
