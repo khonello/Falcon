@@ -251,18 +251,25 @@ def opened_page(subject, shape, note, brow_phrase):
 
 
 # --- the panels Authority opens into -----------------------------------------------------------
-def logistics_pcs(w=420):
+def dept_pcs(hosts, biggest, w=430, size=54, gap=8):
+    """Its client PCs, drawn against the largest department rather than on their own. Every slot the
+    biggest department has is drawn; the ones this department does not fill stay faded. You can then
+    see at a glance that Logistics is small as well as that one of its machines is failing."""
     marks = []
-    for i, (host, st, note) in enumerate([("LOG-01", "confirmed", "on 1.4.2"),
-                                          ("LOG-03", "confirmed", "on 1.4.2"),
-                                          ("LOG-02", "failing", "failed 6 times")]):
-        x = i * 128
-        marks.append(f'<rect x="{x}" y="0" width="112" height="58" rx="14" fill="{ST[st]}" opacity="0.9"/>')
-        marks.append(f'<text x="{x + 56}" y="35" text-anchor="middle" fill="{CHART_BG}" '
-                     f'font-family="{T["mono"]}" font-size="14" font-weight="500">{host}</text>')
-        marks.append(f'<text x="{x + 56}" y="78" text-anchor="middle" fill="{T["faint"]}" '
-                     f'font-family="{T["sans"]}" font-size="11.5">{note}</text>')
-    return f'<svg width="{w}" height="86" viewBox="0 0 {3 * 128 - 16} 86">{"".join(marks)}</svg>'
+    for i in range(biggest):
+        x = i * (size + gap)
+        if i < len(hosts):
+            host, st = hosts[i]
+            marks.append(f'<rect x="{x}" y="0" width="{size}" height="{size}" rx="13" fill="{ST[st]}" '
+                         f'opacity="0.92"><title>{host}</title></rect>')
+            marks.append(f'<text x="{x + size / 2}" y="{size / 2 + 5}" text-anchor="middle" fill="{CHART_BG}" '
+                         f'font-family="{T["mono"]}" font-size="14" font-weight="500">'
+                         f'{host.split("-")[-1]}</text>')
+        else:
+            marks.append(f'<rect x="{x}" y="0" width="{size}" height="{size}" rx="13" fill="{T["line"]}" '
+                         f'opacity="0.45"/>')
+    total_w = biggest * (size + gap) - gap
+    return f'<svg width="{total_w}" height="{size}" viewBox="0 0 {total_w} {size}">{"".join(marks)}</svg>'
 
 
 def scoped_day(names, used, w=400):
@@ -301,7 +308,11 @@ def reading_block(sentence, facts, action, w=330):
 def k03():
     shape = tall_shape(
         ("The hierarchy", "Logistics has no Admin", "danger", authority(w=850, h=356)),
-        ("Its client PCs", "one failing", "danger", logistics_pcs(w=420)),
+        ("Its client PCs", "three of seven", "danger",
+         col(dept_pcs([("LOG-01", "confirmed"), ("LOG-03", "confirmed"), ("LOG-02", "failing")], 7),
+             txt("Three machines, against the seven Operations has. LOG-02 has failed six times.",
+                 12.5, T["ink"], 500, extra="line-height: 1.4; max-width: 420px;"),
+             gap=16)),
         ("Sessions there", "one machine used", "dim",
          col(scoped_day(["Esi", "Abena", "LOG-02"], {"Esi": (9.0, 16.2)}, w=400),
              txt("Only one of the three was used today.", 12.5, T["ink"], 500), gap=14)),

@@ -68,6 +68,10 @@ saying at length.
 
 **Layout is editorial, not a preference.** One layout per page, chosen once, never per viewer.
 
+**A count is drawn against the largest, not on its own.** "Its client PCs" draws as many slots as
+the biggest department has and fades the ones this department does not fill, so its size is legible
+at the same time as its state. Applies wherever one member of a set is shown alone.
+
 **Colour** stays as already settled: one gradient frame that never changes, four toned meanings,
 identity uses the categorical ramp, every hue carries a word.
 
