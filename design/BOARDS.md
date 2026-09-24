@@ -15,6 +15,7 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `L01`–`L06` | **Layouts.** Ways of arranging a page's slots. Pick one per page. |
 | `X01`–`X02` | **Behaviour.** How a slot is chosen, and what happens when a chart is clicked. |
 | `P01`–`P05` | **The density system**, the pages composed from it, and the never-blank rule. |
+| `T01`–`T06` | **Traversal.** What the window becomes when you enter someone else's machine: the decision, the four answers, inside (proposed and the alternative rail), the clock and its endings, and assisted access beside it. |
 | `K01`–`K06` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built (`K02` is the rejected alternative); `K03`–`K06` are its four cells opened in place, one shape each. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
@@ -125,3 +126,19 @@ are built.
 | `K04` | Rollout | the fleet across the full width, three panels beneath | a fleet is wide |
 | `K05` | Today | a lead running the whole height, a column of three beside it | a record is read down, one lane per machine |
 | `K06` | Out of place | three full-width bands, shape to words, read downward | a small subject wants a ledger, not a hero |
+
+## Traversal, entering someone else's machine (`T01`–`T06`)
+
+The frame never changes colour, so the answer is structural: while you are inside, the sheet grows a
+**held bar** across its top — above the sidebar *and* the body, so it reads as containing everything
+under it — and the **rail becomes theirs**. Whose surfaces these are is said at the top of the rail;
+who you are stays at its foot; the way out sits on the bar, in the same place in every state.
+
+| Board | What it settles |
+|---|---|
+| `T01` | The decision: what entering gives you, what it costs them, how long you have — all facts the handlers already return. |
+| `T02` | The four answers to asking: free, block-or-end (the only forcing dialog), a peer's hard refusal, a Super User's un-evictable session. |
+| `T03` | **The proposal.** Inside an Admin: the held bar, their rail, what is hidden (Enter is disabled — you already hold a session), and whose Display Names you are reading. |
+| `T04` | The alternative: your eight kept, theirs appended under a divider. Drawn so it can be compared, not argued about. |
+| `T05` | The clock as chrome — running, under five minutes, extended — and the four endings: you left, time ran out, ended from above, and what they see meanwhile. |
+| `T06` | Assisted access: the same lid, deliberately different — accent not warn, a ceiling instead of a clock, consent instead of eviction, and your own rail stays. |
