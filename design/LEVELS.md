@@ -67,6 +67,12 @@ Nothing on them is a finished screen, and nothing on them is from the level belo
   screens are wrapped, not what replaces them.
 - **Its own state machine, not a level:** `T06` assisted access. Parked with the same reasoning.
 
+## The rail
+
+Named areas, not one tab per feature: **Must see · Authority · Rollout · Record · Work** for Super
+User, Assistance folded into Work. `design/TABS.md` is the working document — the mapping is there,
+and so are the open issues, which are settled in that file before anything is drawn.
+
 ## Settled while working at department level
 
 - **Four cells, and the widths vary** — the user's call: *"the width varies and usually four is the

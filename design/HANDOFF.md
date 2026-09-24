@@ -42,9 +42,10 @@ captioned so a pick can be named.
 those picks and nothing else. `T01` (at rest) and `T02` (an Admin chosen) exist as the pre-mood-board
 attempts — they are *material*, not the answer, and should be rebuilt from the picks.
 
-**Then, before any QML:** tab names for each level. The rail is one-tab-per-feature today (Super User:
-Overview, Hierarchy, Views, Reports, Updates, Tasks, Flows, Assistance) and the user wants **combo
-names that gather features by the job they serve**, decided per level.
+**Then, before any QML:** the areas. The rail stops being one tab per feature — Super User goes from
+eight tabs to five (**Must see · Authority · Rollout · Record · Work**, Assistance folded into Work),
+agreed 24 Sep. `design/TABS.md` holds the decision, where every handler lands, and **nine open issues
+to be settled in that document first**. Nothing is drawn or built from it until they are.
 
 **Settled at this level so far**
 
