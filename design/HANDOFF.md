@@ -2,7 +2,8 @@
 
 A snapshot for a fresh session: what exists, what was decided, and the one thing to do next.
 
-**Read in this order:** `design/DECISIONS.md` (what the user approved, rejected and why — it is what
+**Read `design/LEVELS.md` first** — the levels, which one is being worked on, and the rule that only
+that level's UI is touched. Then in this order: `design/DECISIONS.md` (what the user approved, rejected and why — it is what
 stops the rejected shapes coming back) → `design/BOARDS.md` (what every board is) → this file (where
 the code stands and what to do next).
 
