@@ -38,6 +38,8 @@ ApplicationWindow {
     // the page, never the rail. 0 = the area itself.
     property int departmentId: 0
     readonly property bool inDepartment: onAuthority && departmentId !== 0
+    // drawn on the gradient, with no sheet behind it
+    readonly property bool onFrame: onMustSee || inDepartment
     function enterDepartment(id) {
         shell.departmentId = id
         shell.show("authority")
@@ -124,9 +126,11 @@ ApplicationWindow {
                     anchors.fill: parent
                     radius: Theme.radiusMd
                     // The dashboards are drawn on the frame itself: the panels are the surfaces and
-                    // the gradient shows between them, as on the boards. The views that still carry
-                    // a sidebar keep the sheet under them.
-                    color: shell.onMustSee ? "transparent" : Theme.pane
+                    // the gradient shows between them, as on the boards. Only the views that still
+                    // carry a sidebar -- the pre-kit ones -- keep the sheet under them. A department
+                    // is drawn in the Overview's language, so it gets the frame too: the grey sheet
+                    // under it was the old Admin-console shell showing through.
+                    color: shell.onFrame ? "transparent" : Theme.pane
                     clip: true
 
                     StackLayout {

@@ -58,18 +58,28 @@ Item {
 
     // rollout_health keys its PCs by id; the fleet needs one state per machine of this department
     readonly property var fleet: {
+        // `updates.rollout_health` returns `pcs_behind`, not `pcs`, and a row says `escalated` --
+        // reading the wrong names drew every machine green while the page named a violation beside it.
         var behind = {}
-        var pcs = (rollout && rollout.pcs) ? rollout.pcs : []
+        var pcs = (rollout && rollout.pcs_behind) ? rollout.pcs_behind : []
         for (var i = 0; i < pcs.length; i++)
-            behind[pcs[i].pc_id] = (pcs[i].failures || 0) >= 3 ? "danger" : "warn"
+            behind[pcs[i].pc_id] = pcs[i].escalated ? "danger" : "warn"
+        // A violation row is `v.*` from resource_violations joined to the PC, so it carries
+        // `found_on_pc_id` AND `hostname` -- match on either, because a machine named in "Waiting on
+        // you" and drawn green beside it is the page contradicting itself.
         var bad = {}
-        for (var v = 0; v < violations.length; v++) bad[violations[v].pc_id] = true
+        for (var v = 0; v < violations.length; v++) {
+            var vi = violations[v]
+            if (vi.found_on_pc_id || vi.pc_id) bad[vi.found_on_pc_id || vi.pc_id] = true
+            if (vi.hostname) bad["host:" + vi.hostname] = true
+        }
         var out = []
         for (var w = 0; w < workers.length; w++) {
             var pc = workers[w]
             if (!pc.pc_id) continue
+            var wrong = bad[pc.pc_id] || bad["host:" + (pc.hostname || "")]
             out.push({ hostname: pc.hostname || "", pc_id: pc.pc_id,
-                       state: bad[pc.pc_id] ? "danger" : (behind[pc.pc_id] || "ok") })
+                       state: wrong ? "danger" : (behind[pc.pc_id] || "ok") })
         }
         // a stable order, and the settled one: by hostname, never resorted by state
         out.sort(function (a, b) { return String(a.hostname).localeCompare(String(b.hostname)) })
@@ -89,7 +99,14 @@ Item {
         { admins: admins, selected: admin, machines: workers.length })
     readonly property var waiting: falcon.narrate("needs_you",
         { tree: dept ? [dept] : [], violations: violations, deviations: deviations, pcs_behind: [] })
-    readonly property var fleetSays: falcon.narrate("dept_fleet", { hosts: fleet, biggest: fleet.length })
+    // A count is drawn against the largest, not against itself: "7 of 7" compared this department
+    // with this department and said nothing. `biggest` is the largest department's machine count.
+    readonly property int biggestDept: {
+        var n = 0
+        for (var i = 0; i < tree.length; i++) n = Math.max(n, (tree[i].workers || []).length)
+        return n
+    }
+    readonly property var fleetSays: falcon.narrate("dept_fleet", { hosts: fleet, biggest: biggestDept })
     readonly property var daySays: falcon.narrate("the_day",
         { sessions: deptSessions, quiet_pcs: quietPcs, pc_count: workers.length })
 

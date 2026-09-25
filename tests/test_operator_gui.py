@@ -334,3 +334,53 @@ def test_a_chart_maximises_into_itself_and_escape_restores_the_cells(gui):
 
     dept.setProperty("maximised", "")          # Escape restores the four cells exactly
     assert dept.property("maximised") == ""
+
+
+def test_a_department_is_drawn_on_the_frame_not_on_a_sheet(gui):
+    """No grey sheet. A page drawn in the Overview's language sits on the gradient and the frame
+    shows between its panels; only the pre-kit views still carry a sheet. The department had been
+    inheriting the old Admin-console shell, which is what made it look like a different product."""
+    win, _, _ = gui
+    QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "authority"))
+    assert win.property("onFrame") is False          # the area itself still uses the old HomeView
+    QMetaObject.invokeMethod(win, "enterDepartment", Q_ARG("QVariant", 1))
+    assert win.property("onFrame") is True           # the department page does not
+
+
+def test_the_fleet_reads_the_fields_the_handlers_actually_return(gui):
+    """`updates.rollout_health` returns `pcs_behind` (not `pcs`) whose rows say `escalated`, and a
+    violation row carries `found_on_pc_id` and `hostname`. Reading the wrong names drew every machine
+    green while the page named a violation beside it -- the page contradicting itself."""
+    win, _, _ = gui
+    dept = win.findChild(QObject, "departmentView")
+    dept.setProperty("tree", [{
+        "department_id": 1, "name": "Operations", "admins": [],
+        "workers": [{"pc_id": 11, "hostname": "OPS-01"}, {"pc_id": 12, "hostname": "OPS-06"},
+                    {"pc_id": 13, "hostname": "OPS-07"}],
+    }])
+    dept.setProperty("departmentId", 1)
+    dept.setProperty("rollout", {"pcs_behind": [{"pc_id": 12, "escalated": False}]})
+    dept.setProperty("violations", [{"found_on_pc_id": 13, "hostname": "OPS-07"}])
+
+    state = {h["hostname"]: h["state"] for h in val(dept.property("fleet"))}
+    assert state == {"OPS-01": "ok", "OPS-06": "warn", "OPS-07": "danger"}
+
+    # a violation that arrives with only a hostname still marks its machine
+    dept.setProperty("violations", [{"hostname": "OPS-01"}])
+    assert {h["hostname"]: h["state"] for h in val(dept.property("fleet"))}["OPS-01"] == "danger"
+
+
+def test_a_count_is_drawn_against_the_largest_department_not_itself(gui):
+    """"7 of 7" compared a department with itself and said nothing. The brief reads against the
+    biggest department there is, which is the settled rule for any count of one member of a set."""
+    win, _, _ = gui
+    dept = win.findChild(QObject, "departmentView")
+    dept.setProperty("tree", [
+        {"department_id": 1, "name": "Logistics", "admins": [],
+         "workers": [{"pc_id": 1, "hostname": "LOG-01"}, {"pc_id": 2, "hostname": "LOG-02"}]},
+        {"department_id": 2, "name": "Operations", "admins": [],
+         "workers": [{"pc_id": i, "hostname": f"OPS-{i:02d}"} for i in range(10, 17)]},
+    ])
+    dept.setProperty("departmentId", 1)
+    assert dept.property("biggestDept") == 7
+    assert val(dept.property("fleetSays"))["brief"] == "2 of 7"
