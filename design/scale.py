@@ -328,3 +328,54 @@ def dp13():
 
 SCALE += [("DP12-Big.dc.html", "A department at 96 machines", dp12),
           ("DP13-Hover.dc.html", "The cell, advertising itself", dp13)]
+
+
+# ------------------------------------------------------------------ DP14: an Admin opened, at scale
+# DP06 is this same state at the sample size. Drawn again on the big department so the whole path can
+# be shown on one organisation: an Admin who answers for twenty-four machines rather than four. The
+# composition is unchanged -- the reading still leads -- which is the point: scale changes what a cell
+# draws, never what the page is.
+def big_chosen_station(a, w=876):
+    head = row(av(a["initials"], "admin", 44, "native"),
+               col(txt(a["name"], 16, T["ink"], 600),
+                   row(txt(a["host"], 12, T["faint"], mono=True), sicon(a["state"], 13),
+                       txt(SESSION_WORD[a["state"]] + " · " + a["when"], 12, T["faint"]), gap=7),
+                   gap=3, extra="flex: 1; min-width: 0;"),
+               sp(), txt("Esc to go back", 12, T["faint"]),
+               gap=13, extra=f"width: {w}px;")
+    figs = row(figure("8", "tasks", "one overdue", 34), figure("4", "flows", "one failing", 34),
+               figure("2", "pings", "unanswered", 34, "warn"),
+               figure("24", "machines", "one behind", 34), gap=48, extra="flex: none;")
+    return col(head, rule(), figs,
+               txt("Twenty-four machines, and OPS-09 has been behind since Friday.", 13, T["ink"], 500,
+                   extra="line-height: 1.4;"),
+               gap=17, extra=f"width: {w}px;")
+
+
+def dp14():
+    a = BIG_ADMINS[0]
+    lane = kcell("Entering R. Mensah", "the cost, then the act", "danger", reading_lane(372),
+                 w=416, h=660, top=True, pad=22)
+    hero_ = kcell("R. Mensah", "chosen", "accent", big_chosen_station(a, 876), w=924, h=308, top=True)
+    theirs = kcell("Their machines", "one behind", "warn",
+                   fleet_cell([(a["name"], a["pcs"])], 396), w=452, h=332, top=True)
+    theirday = kcell("Their day", "two were used", "warn",
+                     col(scoped_day(["OPS-03", "OPS-09", "OPS-14", "OPS-22"],
+                                    {"OPS-03": (8.2, 17.4), "OPS-22": (8.0, 16.2)}, w=396),
+                         legend([("At the PC", T["line2"])], "twenty-two were quiet"),
+                         txt("Two of their twenty-four machines were used today.", 12.5, T["ink"], 500,
+                             extra="line-height: 1.4; max-width: 396px;"),
+                         gap=13),
+                     w=452, h=332, top=True)
+    right = col(hero_, row(theirs, theirday, gap=20, align="stretch", extra="flex: none;"),
+                gap=20, extra="flex: none; display: flex; flex-direction: column;")
+    return dept_page("Operations", ["Authority", "Operations", "R. Mensah"], "Operations",
+                     "choosing whether to enter", "accent",
+                     [row(lane, right, gap=20, align="flex-start", extra="flex: none;")],
+                     "DP14 · The same state as DP06, on the big department. The composition does not change "
+                     "with scale — the reading still leads, the cost is still stated before the act — and "
+                     "only the machines cell draws differently, because there are twenty-four of them.",
+                     eyebrow("BEHAVIOUR", "Who governs, opened on an Admin", "the reading leads, at scale"))
+
+
+SCALE += [("DP14-Chosen-Big.dc.html", "An Admin opened, at 96 machines", dp14)]

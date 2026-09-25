@@ -46,11 +46,11 @@ app, 3–5 from the boards — so a break in continuity is visible instead of ar
   on the boards. Fixed on the boards: a department is reached *through* Authority, so the crumb now
   reads `Authority › Operations › R. Mensah` and the rail and the crumb agree on the same word.
 
-**The two sequences, rendered:** `design/flow_strip.py` → `boards/FLOW.html` (shoot at 1440×1620) is
+**The three sequences, rendered:** `design/flow_strip.py` → `boards/FLOW.html` (shoot at 1440×1620) is
 Super User → department → Admin → held → back out. `design/maximise_strip.py` → `boards/MAXIMISE.html`
 (shoot at 1440×1120) is at rest → hover → double click → Escape, drawn at 96 machines. Steps 1 and 4
 of the second are deliberately the same image: Escape restores the page exactly, which is what makes the
-gesture safe to try.
+gesture safe to try. `design/journey_strip.py` → `boards/JOURNEY.html` (1440×1620) is the whole path on one organisation — Must see → Authority → the department → an Admin → a chart maximised — and is the one to show when the question is whether the gesture holds together.
 
 **Two rules the build must honour, settled 25 Sep 2026 (`DP10`, `DP11`):**
 
