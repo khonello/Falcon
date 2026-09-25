@@ -282,14 +282,13 @@ When resumed, build to `design-brief.md` and the canvas, not to the old screens.
   and a refresh the client asks for. The card labels the picture with its age precisely because it is a
   still. **A live feed is a separate, larger capability and is not implied by this.**
 
-- **Does an Admin answer for particular machines?** Boards `DP05`–`DP17` group a department's client
-  PCs under the Admin who answers for each. **There is no such relationship and it looks deliberate.**
-  `accounts` carries `department_id` and no supervising Admin; `database-schema.md` §routing says the
-  absence of a `routed_admin_id` column is on purpose, because Report Routing resolves to *every Admin
-  in the department*; `hierarchy-system-design.md` has Admins as peers within a department. The built
-  `DepartmentView` therefore draws the department's own machines and says "All N Admins here govern
-  all M machines". Making the boards literal means a schema column, a handler change and a contradiction
-  of the backbone — a decision, not a UI task. **Found 25 Sep 2026 while building level 2.**
+- ~~**Does an Admin answer for particular machines?**~~ — **answered 25 Sep 2026: no.** A client PC
+  belongs to a **department**. `accounts` carries `department_id` and the person's own `bound_pc_id`,
+  and nothing ties a worker's machine to one Admin; every operation that might have meant it is
+  department-wide (an Admin may traverse into ANY PC in their department, and report routing resolves
+  to EVERY Admin in it). Boards `DP05`–`DP17` had drawn the machines grouped under an Admin's name;
+  that grouping is removed, and an Admin is drawn with what is actually theirs — their own
+  workstation, their tasks, their flows. No schema change, nothing to decide.
 
 ## Deferred (spec §10) — decide when reached, not before
 

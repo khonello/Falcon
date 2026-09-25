@@ -5,7 +5,7 @@
 # The picks, and where each one shows up here:
 #   DP01 s2 "Columns"          -- the Admins sit side by side, equal, across the top
 #   DP02 s1 "Station"          -- one Admin is an avatar, their workstation, their state, their slots
-#   DP03 s1 "Grouped by Admin" -- the seven client PCs are grouped under whoever answers for them
+#   DP03 s1 "Grouped by Admin" -- VOID, 25 Sep 2026: machines belong to departments, not Admins
 #   DP04 s1 "Opens in place"   -- a cell grows where it stands; nothing navigates
 #   DP04 s2 "A reading"        -- asking to enter states the COST first, and the act last
 #
@@ -29,8 +29,10 @@
 SU_AREAS = [("mustsee", "Must see", "pulse"), ("authority", "Authority", "home"),
             ("rollout", "Rollout", "shield"), ("record", "Record", "eye"), ("work", "Work", "tasks")]
 
-STATION_LINE = {"RM": "Four machines; OPS-06 behind since Friday.",
-                "AQ": "Three machines; OPS-07 keeps a restricted file."}
+# What is true of ONE Admin: their own workstation, their state, their work. Never a count of
+# client PCs -- those are the department's, and every Admin here governs all of them.
+STATION_LINE = {"RM": "At their workstation since 08:14; eight tasks open.",
+                "AQ": "Helping Finance since 10:40; four tasks open."}
 
 DEPT_TINT = DEPT_COLOR["Operations"]          # identity, from the categorical ramp, never a state colour
 
@@ -84,8 +86,7 @@ def other_line(a, selected=False):
                txt(a["name"], 12.5, ink, 500),
                sicon(a["state"], 12), txt(SESSION_WORD[a["state"]].lower(), 11.5,
                                           T["select_sub"] if selected else T["faint"]),
-               sp(), txt(f'{len(a["pcs"])} machines', 11.5,
-                         T["select_sub"] if selected else T["faint"]),
+               sp(), txt(a["host"], 11.5, T["select_sub"] if selected else T["faint"], mono=True),
                ic("chev", 13, T["select_sub"] if selected else T["faint"]),
                gap=8, extra=f"width: 100%; {fill}")
 
@@ -100,7 +101,7 @@ def one_admin(a, others, w=856, selected=None):
                    row(txt(a["host"], 12, T["faint"], mono=True), sicon(a["state"], 13),
                        txt(SESSION_WORD[a["state"]] + " · " + a["when"], 12, T["faint"]), gap=7),
                    gap=3, extra="flex: 1; min-width: 0;"),
-               *([] if narrow else [sp(), txt(f'Answers for {len(a["pcs"])}', 12, T["faint"])]),
+               *([] if narrow else [sp(), txt("Governs with the others", 12, T["faint"])]),
                gap=13, extra=f"width: {w}px;")
     if narrow:
         work = col(health_line("Tasks", a["tasks"], w=w), health_line("Flows", a["flows"], w=w),
@@ -116,17 +117,22 @@ def one_admin(a, others, w=856, selected=None):
     return col(head, rule(), work, told, sp(), foot, gap=13, extra=f"width: {w}px; height: 100%;")
 
 
-# ------------------------------------------------------------------ Its machines: grouped under their Admin
+# ------------------------------------------------------------------ Its machines: the DEPARTMENT's
+# DP03's pick was "grouped by Admin", and it was drawn that way until 25 Sep 2026. It was wrong.
+# A client PC belongs to a DEPARTMENT, not to an Admin: `accounts` carries `department_id` and the
+# machine's own `bound_pc_id`, and nothing ties a worker's PC to one Admin. Every operation that
+# might have meant "answers for" is department-wide -- an Admin may traverse into ANY PC in their
+# department (`require_department_scope`), and report routing resolves to EVERY Admin in it. So the
+# heading "R. Mensah" over four machines was a relationship the system does not have.
+#
+# The seven are drawn as what they are: this department's machines.
+DEPT_PCS = [pc for a in ADMINS for pc in a["pcs"]]
+
+
 def machines_grouped(w=626, size=52, gap=9):
-    """DP03's pick. The seven are never one anonymous waffle and never orphaned from whoever answers
-    for them: each Admin's row is drawn to the largest row here, so who governs more is legible at
-    the same time as what is wrong. This cell NAMES the machines; the stations above only count them."""
-    groups = []
-    for a in ADMINS:
-        groups.append(col(row(txt(a["name"], 11.5, T["faint"]), sp(),
-                              txt(f'{len(a["pcs"])} of {BIGGEST}', 11, T["faint"], mono=True), gap=8,
-                              extra=f"width: {BIGGEST * (size + gap) - gap}px;"),
-                          dept_pcs(a["pcs"], BIGGEST, size=size, gap=gap), gap=7))
+    """The department's client PCs, drawn against the largest department rather than on their own,
+    and NAMED -- the stations above only say who governs, because that is all they can say."""
+    groups = [dept_pcs(DEPT_PCS, len(DEPT_PCS), size=size, gap=gap)]
     notes = col(*[row(dot(ST[st], 7), txt(line, 12, T["ink"], 500), gap=9, extra="width: 100%;")
                   for st, line in [("behind", "OPS-06 has been behind since Friday, six attempts."),
                                    ("failing", "OPS-07 keeps budget-2026.xlsx, restricted, in /workers/.")]],
@@ -163,7 +169,7 @@ def dp05():
                       row(waits, today, gap=20, align="stretch", extra="flex: none;")],
                      "DP05 · The department at rest. Who governs draws ONE Admin at full width and names the "
                      "others below — single click swaps who is drawn, double click enters them. Its machines "
-                     "names the seven. Nothing here offers to enter anybody; the act appears when you reach for it.",
+                     "are the DEPARTMENT's: no Admin owns a subset of them, so none is grouped under a name.",
                      eyebrow("PAGE", "A department — level 2, looking", "a pinwheel"))
 
 
@@ -210,9 +216,11 @@ def chosen_station(a, w=920):
                    gap=3, extra="flex: 1; min-width: 0;"),
                sp(), txt("Esc to go back", 12, T["faint"]),
                gap=13, extra=f"width: {w}px;")
+    # No "machines" figure. An Admin does not have a number of client PCs -- every Admin in a
+    # department governs all of them -- so the figures are what is theirs: their work.
     figs = row(figure("8", "tasks", "one overdue", 34), figure("4", "flows", "one failing", 34),
                figure("2", "pings", "unanswered", 34, "warn"),
-               figure("4", "machines", "one behind", 34), gap=48, extra="flex: none;")
+               figure("30", "minutes", "if you enter", 34), gap=48, extra="flex: none;")
     return col(head, rule(), figs, txt(a["told"], 13, T["ink"], 500, extra="line-height: 1.4;"),
                gap=17, extra=f"width: {w}px;")
 
@@ -221,20 +229,26 @@ def dp06():
     lane = kcell("Entering R. Mensah", "the cost, then the act", "danger",
                  reading_lane(372), w=416, h=660, top=True, pad=22)
     hero_ = kcell("R. Mensah", "chosen", "accent", chosen_station(ADMINS[0], 876), w=924, h=308, top=True)
-    theirs = kcell("Their machines", "OPS-06 behind", "warn",
-                   col(dept_pcs(ADMINS[0]["pcs"], BIGGEST, size=46, gap=9),
-                       txt("Four of the seven here; OPS-06 has lost six attempts at 1.4.2.", 12.5,
-                           T["ink"], 500, extra="line-height: 1.4; max-width: 400px;"),
-                       col(*[row(txt(h_, 12, T["dim"], mono=True), sp(),
+    # The one machine that IS theirs, and the one entering would take. Their name over a group of
+    # client PCs would be a relationship the system does not have.
+    theirs = kcell("Their workstation", "the machine you would take", "warn",
+                   col(row(dept_pcs([("WS-OPS-A1", "confirmed")], 1, size=46, gap=9),
+                           col(txt("WS-OPS-A1", 13, T["ink"], 600, mono=True),
+                               txt("1.4.2 confirmed \u00b7 signed in since 08:14", 11.5, T["faint"]),
+                               gap=3), gap=13, extra="width: 396px;"),
+                       rule(),
+                       col(*[row(txt(k, 12, T["dim"]), sp(),
                                  txt(v, 11.5, tone_c(tone, T["faint"]), 500), gap=8,
                                  extra=f"width: 396px; padding: 6px 0; border-bottom: 1px solid {T['line']};")
-                             for h_, v, tone in [("OPS-01", "1.4.2 confirmed", "ok"),
-                                                 ("OPS-02", "1.4.2 confirmed", "ok"),
-                                                 ("OPS-03", "1.4.2 confirmed", "ok"),
-                                                 ("OPS-06", "retrying 1.4.2", "warn")]],
-                           gap=0), gap=13),
+                             for k, v, tone in [("Tasks open", "8, one overdue", "warn"),
+                                                ("Flows", "4, one failing", "danger"),
+                                                ("Pings unanswered", "2", "warn")]],
+                           gap=0),
+                       txt("The department's machines are not hers to lose; they stay reachable.",
+                           12, T["faint"], extra="line-height: 1.45; max-width: 396px;"),
+                       gap=13),
                    w=452, h=332, top=True)
-    theirday = kcell("Their day", "one was entered", "warn",
+    theirday = kcell("The day here", "two machines were entered", "warn",
                      col(scoped_day(["OPS-01", "OPS-02", "OPS-03", "OPS-06"],
                                     {"OPS-01": (8.2, 17.4), "OPS-03": (9.0, 17.0)}, w=396),
                          legend([("At the PC", T["line2"])], "OPS-02 and OPS-06 not signed in"),
@@ -341,9 +355,9 @@ def dp07():
                  w=416, h=660, top=True, pad=22)
     hero_ = kcell("R. Mensah", "blocked out of their own machine", "danger",
                   chosen_station(ADMINS[0], 876), w=924, h=308, top=True)
-    theirs = kcell("Their machines", "OPS-06 behind", "warn",
-                   col(dept_pcs(ADMINS[0]["pcs"], BIGGEST, size=46, gap=9),
-                       txt("Four of the seven here; OPS-06 has lost six attempts at 1.4.2.", 12.5,
+    theirs = kcell("Their workstation", "you are holding it", "danger",
+                   col(dept_pcs([("WS-OPS-A1", "confirmed")], 1, size=46, gap=9),
+                       txt("WS-OPS-A1, theirs, and yours until 14:50.", 12.5,
                            T["ink"], 500, extra="line-height: 1.4; max-width: 400px;"),
                        col(*[row(txt(h_, 12, T["dim"], mono=True), sp(),
                                  txt(v, 11.5, tone_c(tone, T["faint"]), 500), gap=8,
@@ -358,8 +372,8 @@ def dp07():
                      col(scoped_day(["OPS-01", "OPS-02", "OPS-03", "OPS-06"],
                                     {"OPS-01": (8.2, 17.4), "OPS-03": (9.0, 17.0)}, w=396),
                          legend([("At the PC", T["line2"])], "OPS-02 and OPS-06 not signed in"),
-                         txt("Two of their four machines were used today. Your session on their "
-                             "workstation began at 14:20.", 12.5, T["ink"], 500,
+                         txt("Two of the seven machines here were used today. Your session on "
+                             "their workstation began at 14:20.", 12.5, T["ink"], 500,
                              extra="line-height: 1.4; max-width: 396px;"),
                          gap=13),
                      w=452, h=332, top=True)

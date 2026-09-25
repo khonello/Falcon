@@ -29,7 +29,7 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `DP09` | **Back out, still holding.** Escape leaves the session running: the department page returns to its resting layout and the session rides along as a small container beside the Admin, carrying the clock and the way back in. The screen picture does not come with it. |
 | `DP07` | **The yes, answered in the lane that asked.** The composition does not change when the answer comes back: the lane that stated the price now carries the session, their screen and the way out. The picture is a still and says its age. |
 | `DP08` | **What comes back when you ask.** Free · below you and occupied · a Super User holds it · not reachable. The answer lands in the lane that stated the cost; no modal anywhere in the level. |
-| `DP01`–`DP04` | **The department mood board.** The level currently being worked on: its shape, its people, its machines, and the two doors out of it — four approaches each, to be picked from the way `S01`–`S04` and `M01`–`M15` were. |
+| `DP01`–`DP04` | **The department mood board** — its shape, its people, its machines, and the two doors out of it, four approaches each. `DP03`'s pick, *grouped by Admin*, is **void** (25 Sep 2026): machines belong to departments, not Admins, so the boards it shaped were redrawn. Every other pick stands. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
 | everything else | The Admin screens, the worker surfaces, the language, the dialogs. |

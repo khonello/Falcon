@@ -25,19 +25,14 @@
 import math
 
 
-def fleet_of(n_admins, n_each, bad_at=()):
-    """A department of any size: admins, their machines, and a few in trouble. `bad_at` may be a dict
-    of {number: state} so a machine's trouble is stated rather than derived from its number."""
-    states = bad_at if isinstance(bad_at, dict) else {n: "behind" for n in bad_at}
-    out = []
-    k = 0
-    for a in range(n_admins):
-        pcs = []
-        for i in range(n_each):
-            k += 1
-            pcs.append((f"OPS-{k:02d}", states.get(k, "confirmed")))
-        out.append((f"Admin {chr(65 + a)}", pcs))
-    return out
+def fleet_of(n, bad_at=()):
+    """A DEPARTMENT's client PCs. `bad_at` may be a dict of {number: state} so a machine's trouble is
+    stated rather than derived from its number.
+
+    It used to return one group per Admin. That was a relationship the system does not have -- a PC
+    carries a department, and an Admin may traverse into any PC in theirs -- so there is one set."""
+    states = bad_at if isinstance(bad_at, dict) else {n_: "behind" for n_ in bad_at}
+    return [(f"OPS-{k:02d}", states.get(k, "confirmed")) for k in range(1, n + 1)]
 
 
 def slot_size(total):
@@ -66,37 +61,31 @@ def machine_marks(pcs, size, labels, per_row, gap=6):
     return col(*rows, gap=gap, extra="flex: none;")
 
 
-def fleet_cell(groups, w=396, note=""):
-    """Its machines, at whatever size the department turns out to be."""
-    total = sum(len(pcs) for _, pcs in groups)
+def fleet_cell(hosts, w=396, note=""):
+    """Its machines, at whatever size the department turns out to be. One set, because that is what a
+    department's machines are."""
+    total = len(hosts)
     size, labels = slot_size(total)
-    bad = [(h, s) for _, pcs in groups for h, s in pcs if s != "confirmed"]
+    bad = [(h, s) for h, s in hosts if s != "confirmed"]
 
     dense = size == 0 or size <= 16
     packed = total > 60          # past this the exceptions line matters more than a second named row
     if size == 0:
-        # Past the point where one mark per machine says anything: the shape of each Admin's fleet,
-        # and only the machines that are wrong get named.
+        # Past the point where one mark per machine says anything: the shape of the fleet, one bar
+        # per state, and only the machines that are wrong get named.
         bars = []
-        for name, pcs in groups:
-            parts = [("confirmed", sum(1 for _, s in pcs if s == "confirmed")),
-                     ("behind", sum(1 for _, s in pcs if s == "behind")),
-                     ("failing", sum(1 for _, s in pcs if s == "failing"))]
-            # health_line already prints the total on the right; printing it twice is noise.
-            bars.append(col(txt(name, 11.5, T["dim"]),
-                            health_line("", [p for p in parts if p[1]], w=w), gap=4))
+        for label, key in (("Confirmed", "confirmed"), ("Behind", "behind"), ("Out of place", "failing")):
+            n_ = sum(1 for _, st in hosts if st == key)
+            if n_:
+                bars.append(col(txt(label, 11.5, T["dim"]),
+                                health_line("", [(key, n_)], w=w), gap=4))
         body = col(*bars, gap=8, extra=f"width: {w}px;")
     else:
         gap = 6 if size > 20 else 3
         per_row = max(1, (w + gap) // (size + gap))
         # Dense fleets drop the per-Admin count -- the caption already carries the total, and at this
         # size the row of marks IS the count.
-        body = col(*[col(row(txt(name, 11.5, T["faint"]), sp(),
-                             ("" if dense else txt(f"{len(pcs)}", 11, T["faint"], mono=True)), gap=8,
-                             extra=f"width: {w}px;"),
-                         machine_marks(pcs, size, labels, per_row, gap if not packed else 2), gap=4 if packed else (5 if dense else 6))
-                     for name, pcs in groups],
-                   gap=7 if packed else (9 if dense else 12), extra=f"width: {w}px;")
+        body = machine_marks(hosts, size, labels, per_row, gap if not packed else 2)
 
     shown = 1 if (size == 0 or packed) else 2
     named = col(*[row(dot(ST[s], 7), txt(h, 12, T["ink"], 500, mono=True),
@@ -111,19 +100,19 @@ def fleet_cell(groups, w=396, note=""):
 
 # ------------------------------------------------------------------ DP10: the same cell, four sizes
 def dp10():
-    seven = [("R. Mensah", [(f"OPS-0{i}", "confirmed") for i in (1, 2, 3)] + [("OPS-06", "behind")]),
-             ("A. Quaye", [("OPS-04", "confirmed"), ("OPS-05", "confirmed"), ("OPS-07", "failing")])]
+    seven = [(f"OPS-0{i}", "confirmed") for i in (1, 2, 3)] + [("OPS-06", "behind")] \
+            + [("OPS-04", "confirmed"), ("OPS-05", "confirmed"), ("OPS-07", "failing")]
     cells = [
         variant("7 machines", "46 px — every hostname readable",
                 fleet_cell(seven, 396, "the sample every board so far was drawn from"), 440, 380),
         variant("24 machines", "30 px — no labels, you can still count them",
-                fleet_cell(fleet_of(2, 12, bad_at=(5, 17, 20)), 396,
+                fleet_cell(fleet_of(24, bad_at=(5, 17, 20)), 396,
                            "the slot keeps its shape; only the label goes"), 440, 380),
         variant("96 machines", "16 px — proportion and outliers, not names",
-                fleet_cell(fleet_of(4, 24, bad_at={9: "behind", 31: "failing", 60: "behind", 77: "failing", 88: "behind"}), 396,
+                fleet_cell(fleet_of(96, bad_at={9: "behind", 31: "failing", 60: "behind", 77: "failing", 88: "behind"}), 396,
                            "still one mark per machine, still grouped by Admin"), 440, 380),
         variant("240 machines", "the drawing changes kind",
-                fleet_cell(fleet_of(4, 60, bad_at=(11, 44, 90, 120, 150, 200, 233)), 396,
+                fleet_cell(fleet_of(240, bad_at=(11, 44, 90, 120, 150, 200, 233)), 396,
                            "one bar per Admin; only what is wrong is named"), 440, 380),
         variant("What it never does", "the rejected answer",
                 col(txt("Horizontal scrolling.", 13.5, T["ink"], 600),
@@ -167,14 +156,13 @@ def dp11():
     """Maximised, the marks go back UP to 46 px and the hostname returns inside the slot. That is the
     whole argument for maximising rather than recomposing: the cell had to drop the names to fit, and
     this is where they come back -- for ninety-six machines or for seven."""
-    groups = BIG
+
     plate_w, size, gap, per_row = 940, 46, 10, 16
-    plate = col(*[col(row(txt(name, 12.5, T["dim"], 500), sp(),
-                          txt(f"{len(pcs)} machines", 11.5, T["faint"], mono=True), gap=8,
-                          extra=f"width: {plate_w}px;"),
-                      machine_marks(pcs, size, True, per_row, gap), gap=7)
-                  for name, pcs in groups],
-                gap=14, extra=f"width: {plate_w}px; flex: none;")
+    plate = col(row(txt("Operations", 12.5, T["dim"], 500), sp(),
+                    txt(f"{len(BIG)} machines", 11.5, T["faint"], mono=True), gap=8,
+                    extra=f"width: {plate_w}px;"),
+                machine_marks(BIG, size, True, per_row, gap),
+                gap=8, extra=f"width: {plate_w}px; flex: none;")
     reading = col(txt("Ninety-six machines, five of them wrong.", 15, T["ink"], 600,
                       extra="line-height: 1.35;"),
                   col(*[row(dot(ST[st], 8), txt(h, 12.5, T["ink"], 500, mono=True), sp(),
@@ -217,7 +205,7 @@ SCALE = [("DP10-Scale.dc.html", "Its machines at 7, 24, 96, 240", dp10),
 # The day cell has to scale too: ninety-six lanes is not a drawing. It draws the machines that were
 # actually used and says how many were quiet -- the same principle as the fleet, applied to time.
 
-BIG = fleet_of(4, 24, bad_at={9: "behind", 31: "failing", 60: "behind", 77: "failing", 88: "behind"})
+BIG = fleet_of(96, bad_at={9: "behind", 31: "failing", 60: "behind", 77: "failing", 88: "behind"})
 
 BIG_ADMINS = [dict(a) for a in ADMINS] + [
     {"initials": "KB", "name": "K. Boateng", "host": "WS-OPS-A3", "state": "native", "when": "since 07:55",
@@ -226,19 +214,20 @@ BIG_ADMINS = [dict(a) for a in ADMINS] + [
      "phrase": ("free", "dim"), "pcs": [], "tasks": [], "flows": [], "told": ""},
 ]
 # each Admin here answers for one of the four groups above, so "answers for N" is the truth
-_TOLD = ["Twenty-four machines, and OPS-09 has been behind since Friday.",
-         "Twenty-four machines, and OPS-31 keeps a restricted file.",
-         "Twenty-four machines, and OPS-60 has been behind since Monday.",
-         "Twenty-four machines, and OPS-77 keeps a restricted file."]
+_TOLD = ["At their workstation since 07:55; eight tasks open.",
+         "Helping Finance since 10:40; five tasks open.",
+         "At their workstation since 08:14; nine tasks open.",
+         "Not signed in today; three tasks open."]
 _WORK = [([("confirmed", 5), ("behind", 2), ("failing", 1)], [("confirmed", 3), ("failing", 1)]),
          ([("confirmed", 4), ("behind", 1)], [("confirmed", 2)]),
          ([("confirmed", 6), ("behind", 1)], [("confirmed", 3)]),
          ([("confirmed", 3)], [("confirmed", 1), ("failing", 1)])]
-for _i, (_a, (_name, _pcs)) in enumerate(zip(BIG_ADMINS, BIG)):
-    _a["pcs"] = _pcs
+# An Admin has their own workstation, their tasks and their flows. They do NOT have a slice of the
+# department's client PCs -- all four of these govern all ninety-six.
+for _i, _a in enumerate(BIG_ADMINS):
+    _a["pcs"] = []
     _a["told"] = _TOLD[_i]
     _a["tasks"], _a["flows"] = _WORK[_i]
-BIG = [(a["name"], a["pcs"]) for a in BIG_ADMINS]
 
 
 def big_day(w=816, lane_h=21, gap_y=9):
@@ -354,9 +343,9 @@ def big_chosen_station(a, w=876):
                gap=13, extra=f"width: {w}px;")
     figs = row(figure("8", "tasks", "one overdue", 34), figure("4", "flows", "one failing", 34),
                figure("2", "pings", "unanswered", 34, "warn"),
-               figure("24", "machines", "one behind", 34), gap=48, extra="flex: none;")
+               figure("30", "minutes", "if you enter", 34), gap=48, extra="flex: none;")
     return col(head, rule(), figs,
-               txt("Twenty-four machines, and OPS-09 has been behind since Friday.", 13, T["ink"], 500,
+               txt("At their workstation since 07:55, with eight tasks open.", 13, T["ink"], 500,
                    extra="line-height: 1.4;"),
                gap=17, extra=f"width: {w}px;")
 
@@ -366,13 +355,20 @@ def dp14():
     lane = kcell("Entering R. Mensah", "the cost, then the act", "danger", reading_lane(372),
                  w=416, h=660, top=True, pad=22)
     hero_ = kcell("R. Mensah", "chosen", "accent", big_chosen_station(a, 876), w=924, h=308, top=True)
-    theirs = kcell("Their machines", "one behind", "warn",
-                   fleet_cell([(a["name"], a["pcs"])], 396), w=452, h=332, top=True)
+    theirs = kcell("Their workstation", "the machine you would take", "warn",
+                   col(dept_pcs([(a["host"], "confirmed")], 1, size=46, gap=9),
+                       txt(a["host"] + " — 1.4.2 confirmed, signed in since 07:55.", 12.5,
+                           T["ink"], 500, extra="line-height: 1.4; max-width: 396px;"),
+                       txt("The department's ninety-six machines are not hers to lose: every Admin "
+                           "here governs all of them, and they stay reachable while you hold this one.",
+                           12, T["faint"], extra="line-height: 1.5; max-width: 396px;"),
+                       gap=14),
+                   w=452, h=332, top=True)
     theirday = kcell("Their day", "two were used", "warn",
                      col(scoped_day(["OPS-03", "OPS-09", "OPS-14", "OPS-22"],
                                     {"OPS-03": (8.2, 17.4), "OPS-22": (8.0, 16.2)}, w=396),
                          legend([("At the PC", T["line2"])], "twenty-two were quiet"),
-                         txt("Two of their twenty-four machines were used today.", 12.5, T["ink"], 500,
+                         txt("Two of the ninety-six machines here were used today.", 12.5, T["ink"], 500,
                              extra="line-height: 1.4; max-width: 396px;"),
                          gap=13),
                      w=452, h=332, top=True)
@@ -505,20 +501,27 @@ def dp17():
                sp(), txt("Esc to go back", 12, T["faint"]), gap=13, extra="width: 876px;")
     figs = row(figure("5", "tasks", "none overdue", 34), figure("2", "flows", "both healthy", 34),
                figure("1", "ping", "unanswered", 34, "warn"),
-               figure("24", "machines", "one out of place", 34), gap=48, extra="flex: none;")
+               figure("30", "minutes", "if you enter", 34), gap=48, extra="flex: none;")
     hero_ = kcell("A. Quaye", "chosen", "accent",
                   col(head, rule(), figs,
-                      txt("Twenty-four machines, and OPS-31 keeps a restricted file.", 13, T["ink"], 500,
+                      txt("Helping Finance since 10:40, with five tasks open.", 13, T["ink"], 500,
                           extra="line-height: 1.4;"),
                       gap=17, extra="width: 876px;"),
                   w=924, h=308, top=True)
-    theirs = kcell("Their machines", "one out of place", "danger",
-                   fleet_cell([(a["name"], a["pcs"])], 396), w=452, h=332, top=True)
+    theirs = kcell("Their workstation", "the machine you would take", "warn",
+                   col(dept_pcs([(a["host"], "confirmed")], 1, size=46, gap=9),
+                       txt(a["host"] + " — 1.4.2 confirmed, assisting Finance since 10:40.", 12.5,
+                           T["ink"], 500, extra="line-height: 1.4; max-width: 396px;"),
+                       txt("The department's ninety-six machines are not theirs to lose: every Admin "
+                           "here governs all of them, and they stay reachable while you hold this one.",
+                           12, T["faint"], extra="line-height: 1.5; max-width: 396px;"),
+                       gap=14),
+                   w=452, h=332, top=True)
     theirday = kcell("Their day", "two were used", "warn",
                      col(scoped_day(["OPS-25", "OPS-31", "OPS-38", "OPS-44"],
                                     {"OPS-25": (8.4, 17.0), "OPS-44": (9.1, 16.4)}, w=396),
                          legend([("At the PC", T["line2"])], "twenty-two were quiet"),
-                         txt("Two of their twenty-four machines were used today.", 12.5, T["ink"], 500,
+                         txt("Two of the ninety-six machines here were used today.", 12.5, T["ink"], 500,
                              extra="line-height: 1.4; max-width: 396px;"),
                          gap=13),
                      w=452, h=332, top=True)

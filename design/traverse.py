@@ -67,13 +67,13 @@ ADMINS = [
      "pcs": [("OPS-01", "confirmed"), ("OPS-02", "confirmed"), ("OPS-03", "confirmed"), ("OPS-06", "behind")],
      "tasks": [("confirmed", 5), ("behind", 2), ("failing", 1)],
      "flows": [("confirmed", 3), ("failing", 1)],
-     "told": "Four machines, and OPS-06 has been behind since Friday."},
+     "told": "At their workstation since 08:14, with eight tasks open."},
     {"initials": "AQ", "name": "A. Quaye", "host": "WS-OPS-A2", "state": "assisted", "when": "since 10:40",
      "phrase": ("helping Finance", "accent"),
      "pcs": [("OPS-04", "confirmed"), ("OPS-05", "confirmed"), ("OPS-07", "failing")],
      "tasks": [("confirmed", 3), ("behind", 1)],
      "flows": [("confirmed", 1)],
-     "told": "Three machines, and OPS-07 keeps a restricted file."},
+     "told": "Helping Finance since 10:40, with four tasks open."},
 ]
 SESSION_WORD = {"native": "At their workstation", "free": "Free", "assisted": "Assisting, by consent",
                 "traversed": "Entered", "su": "You are inside"}
