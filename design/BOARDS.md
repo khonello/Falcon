@@ -19,6 +19,8 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `K01`–`K06` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built (`K02` is the rejected alternative); `K03`–`K06` are its four cells opened in place, one shape each. |
 | `DP05` | **The department page, built from the picks.** Four cells — Who governs · Its machines · Today · Waiting on you — an equal pair over a split, with the day wide. Level 2: nothing is held, nothing offers to enter anybody. |
 | `DP06` | **An Admin opened in place**, and the ask. The reading LEADS the shape, because the subject is a decision with a price: the cost is stated before the act, and the second door (a machine, directly) is named beside it. |
+| `DP07` | **The session, as a container.** Pressing Enter does not move the window: the session appears where the ask was made, counting down, and double-clicking it is what goes into level 3. A live-state card — metrics, the machine, a still on demand — never a fake screen. |
+| `DP08` | **What comes back when you ask.** Free · below you and occupied · a Super User holds it · not reachable. The answer lands in the lane that stated the cost; no modal anywhere in the level. |
 | `DP01`–`DP04` | **The department mood board.** The level currently being worked on: its shape, its people, its machines, and the two doors out of it — four approaches each, to be picked from the way `S01`–`S04` and `M01`–`M15` were. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |

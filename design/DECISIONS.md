@@ -17,6 +17,7 @@ Read with `BOARDS.md` (what each board is) and `HANDOFF.md` (where the code stan
 | **Titles sit above the cells**, on the frame, not inside them | Each carries its state phrase on the right, in the tone. The cell itself is a clean surface holding only the drawing. |
 | **The header is "Must see" and the time** | The line describing the organisation ("three departments, three Admins, fourteen client PCs") was **removed on request** — a Super User already knows that. The page says what they must see. |
 | **The dashboards are drawn on the frame** | No grey sheet behind the body. The gradient shows between the panels. |
+| **The department page, `DP05`–`DP08`** | Approved 25 Sep 2026 — *"the design works for me, not perfect but it works."* Four cells (Who governs · Its machines · Today · Waiting on you) over the signature *an equal pair over a split*; an Admin opened with *the reading leads*; the session drawn as a container on the page; and the four answers arriving in the lane that stated the cost. **Design approved, not yet in QML** — and "not perfect" is on the record, so refinement is expected during the build, not a new pass. |
 | **`D01`–`D03`, the Super User dashboards** | The first unreserved "beautiful" of the whole pass. `D04` is the descent into one department. |
 
 ## 2. Approved principles — these shape every page still to be designed

@@ -229,3 +229,123 @@ def dp06():
 
 DEPT_PAGE = [("DP05-Department.dc.html", "Department: the page, from the picks", dp05),
              ("DP06-Entering.dc.html", "Department: an Admin opened, the cost first", dp06)]
+
+
+# ================================================================== DP07-DP08: the answer that comes back
+# Pressing Enter does not move the window. It creates the SESSION, and the session appears as a small
+# landscape container on the page where it was started -- here, in the cell where R. Mensah was
+# standing. Double-clicking that container is what takes the window into level 3. Escape comes back
+# out while the session is still held, and the container keeps counting.
+#
+# There is NO SCREEN STREAMING in the protocol, so the container is a live-state card and never a
+# viewport: control.metrics (CPU, memory, idle), the active window, the machine, the countdown, and
+# the screenshot Action for a still on demand. Drawing a fake preview would promise what the system
+# cannot do.
+#
+# T04 drew the four answers as modal dialogs. DP04's pick replaced the confirm with a reading, so the
+# answers arrive WHERE THE ASK WAS MADE -- the same lane that stated the cost now carries what came
+# back. One place, before and after, and no modal anywhere in the level.
+
+def held_card(w=396):
+    """The session, as a container. Landscape, because it is a thing you hold rather than a panel of
+    the page, and ringed in the colour that means you are occupying someone."""
+    head = row(av("RM", "admin", 34, "native"),
+               col(txt("R. Mensah", 13, T["ink"], 600),
+                   txt("WS-OPS-A1", 11.5, T["faint"], mono=True), gap=2, extra="flex: 1; min-width: 0;"),
+               ring(0.96, 26, T["danger"], 3),
+               txt("28:41 left", 12.5, T["danger"], 600, mono=True),
+               gap=10, extra=f"width: 100%;")
+    metrics = row(*[col(txt(v, 15, T["ink"], 600, mono=True), txt(k, 11, T["faint"]), gap=2)
+                    for v, k in [("12%", "CPU"), ("41%", "memory"), ("0s", "idle")]],
+                  gap=30, extra="flex: none;")
+    now = row(ic("window", 13, T["faint"]), txt("Excel — budget-2026.xlsx", 12, T["dim"]), gap=7,
+              extra="width: 100%;")
+    foot = col(txt("Double-click to go in", 11.5, T["faint"]),
+               row(gbtn("Take a still", "camera", "sm"), sp(), tbtn("Leave", "danger", "back", "sm"),
+                   gap=6, extra="width: 100%;"),
+               gap=8, extra="width: 100%;")
+    return col(head, rule(), metrics, now, rule(), foot, gap=12,
+               extra=f"width: {w}px; box-sizing: border-box; padding: 14px 16px; border-radius: 14px; "
+                     f"background: {T['pane']}; box-shadow: inset 0 0 0 1px {T['danger']}66;")
+
+
+def dp07():
+    govern = kcell("Who governs", "you hold R. Mensah's workstation", "danger",
+                   row(held_card(334), mini_station(ADMINS[1], 268), gap=24, align="flex-start",
+                       extra="width: 626px;"),
+                   w=670, h=308, top=True)
+    machines = kcell("Its machines", "one behind, one out of place", "warn",
+                     machines_grouped(626), w=670, h=308, top=True)
+    today = kcell("Today", "two machines were entered", "warn",
+                  dept_day(w=816, lane_h=21, gap_y=9), w=900, h=340, top=True)
+    waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
+    return dept_page("Operations", ["Everything", "Operations"], "Operations",
+                     "you are holding one workstation", "danger",
+                     [row(govern, machines, gap=20, align="stretch", extra="flex: none;"),
+                      row(today, waits, gap=20, align="stretch", extra="flex: none;")],
+                     "DP07 · The session, held. The window did not move: the container sits where the ask was "
+                     "made, counts down, and double-clicking it is what takes you into level 3. It is a "
+                     "live-state card — metrics, the machine, a still on demand — never a fake screen. "
+                     "It is mirrored into Must see for as long as it exists, and nowhere else.",
+                     eyebrow("STATE", "A session is a container, not a navigation", "level 2, holding"),
+                     status=("holding WS-OPS-A1   28:41 left", "danger"))
+
+
+# ------------------------------------------------------------------ DP08: when the answer is not yes
+def answer_lane(title, tone, sentence, facts, actions, w=300):
+    return col(row(ic({"ok": "check", "warn": "warn", "danger": "x"}[tone], 15, T[tone]),
+                   txt(title, 13, tone_c(tone), 600), gap=8, extra="width: 100%;"),
+               txt(sentence, 13, T["ink"], 600, extra="line-height: 1.35;"),
+               col(*[row(txt(k, 12, T["dim"]), sp(), txt(v, 12, tone_c(t, T["ink"]), 500), gap=10,
+                         extra=f"width: 100%; padding: 7px 0; border-bottom: 1px solid {T['line']};")
+                     for k, v, t in facts], gap=0, extra="width: 100%;"),
+               row(*actions, gap=6, extra="width: 100%; flex-wrap: wrap; padding-top: 4px;"),
+               gap=13, extra=f"width: {w}px;")
+
+
+def dp08():
+    yes = answer_lane("It was free", "ok", "You hold WS-OPS-A1 for thirty minutes.",
+                      [("Started", "14:20", ""), ("Ends", "14:50", "warn"), ("Written to", "the trail", "")],
+                      [tbtn("Go in", "accent", "lock", "sm"), gbtn("Leave", "back", "sm")])
+    occupied = answer_lane("They are working in it", "warn",
+                           "R. Mensah has been signed in since 08:14.",
+                           [("Their session", "ends now", "danger"), ("They see", "who took it", ""),
+                            ("They reclaim it", "when you leave", "")],
+                           [tbtn("End theirs and enter", "danger", "lock", "sm"), gbtn("Cancel", size="sm")])
+    su = answer_lane("Another Super User is inside", "danger",
+                     "A Super User's session cannot be evicted, by anyone.",
+                     [("Holder", "K. Owusu", ""), ("Ends", "12:41 left", "warn"),
+                      ("You may", "watch it in Record", "")],
+                     [tbtn("Open Record", "accent", "eye", "sm")])
+    gone = answer_lane("The machine is not reachable", "danger",
+                       "WS-OPS-A1 has not reported since 11:02.",
+                       [("Last seen", "11:02", ""), ("Client", "offline", "danger"),
+                        ("Nothing", "was blocked", "")],
+                       [gbtn("Close", size="sm")])
+    def commonality(line, body):
+        return col(txt(line, 13, T["ink"], 600, extra="line-height: 1.35;"),
+                   txt(body, 12, T["dim"], extra="line-height: 1.5;"), gap=9, extra="width: 404px;")
+
+    cells = [variant("Free", "the ordinary case", yes, 322, 300),
+             variant("Below you, occupied", "the only forcing act in the level", occupied, 322, 300),
+             variant("A Super User holds it", "un-evictable, by design", su, 322, 300),
+             variant("Not reachable", "nobody was blocked", gone, 322, 300),
+             variant("Where it lands", "never a modal", commonality(
+                 "The answer arrives in the lane that stated the cost.",
+                 "You asked in one place and you are answered in that place. Nothing covers the page, "
+                 "nothing navigates, and Escape still restores the four cells.", ), 440, 236),
+             variant("What it may offer", "one forcing act, at most", commonality(
+                 "Only the occupied answer offers to force anything.",
+                 "And it names what it costs before it offers it: their session ends now, they are told "
+                 "who took it, they reclaim it when you leave.", ), 440, 236),
+             variant("What a refusal owes you", "never a dead end", commonality(
+                 "A refusal always names somewhere else to go.",
+                 "Watch it in Record, ping the holder, or enter a machine directly. A no that leaves you "
+                 "with nothing to do is a bug in the answer.", ), 440, 236)]
+    return mood("Asking to enter: what comes back",
+                "the Engine decides; the lane that stated the cost carries the answer — no modal, no new page",
+                cells, brow=eyebrow("BEHAVIOUR", "hierarchy.traverse", "four answers, one place"))
+
+
+DEPT_PAGE += [("DP07-Held.dc.html", "Department: the session, as a container", dp07),
+              ("DP08-Answers.dc.html", "Department: what comes back when you ask", dp08)]

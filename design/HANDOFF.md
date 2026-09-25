@@ -15,7 +15,29 @@ pass — everything below is design.
 
 ---
 
-## CONTINUE FROM HERE — draw the department page. Nothing is blocking it any more.
+## CONTINUE FROM HERE — build level 2 in QML. Its design is approved.
+
+**The department is designed and the user has approved it** (25 Sep 2026: *"the design works for me, not
+perfect but it works"*). Four boards, all in `design/dept.py`:
+
+| Board | What it settles |
+|---|---|
+| `DP05` | the department at rest — four cells, *an equal pair over a split*, the day wide |
+| `DP06` | an Admin opened in place — *the reading leads*, the cost stated before the act |
+| `DP07` | the session as a container on the page, counting down; double-click enters level 3 |
+| `DP08` | the four answers, arriving in the lane that stated the cost — no modal in the level |
+
+**The next step is QML**, not more drawing: a `DepartmentView` on the same kit, reached by
+double-clicking a department in Authority, with a test that finds it by `objectName`. "Not perfect" is
+on the record, so expect to refine while building — that is not a new design pass.
+
+**Not drawn, and deliberately:** level 4 (a client PC) has not started, and level 3 keeps the Admin
+screens it already has. The canvas is still at **version 44** — `DP05`–`DP08` have not been published to
+it yet.
+
+---
+
+## How the department was reached (the design pass)
 
 **The nine open issues in `TABS.md` were settled on 25 Sep 2026**, which was the last thing standing
 between the design and the drawing. Four went to the user, five to the recommendations already argued in
