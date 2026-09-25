@@ -74,6 +74,7 @@ def fleet_cell(groups, w=396, note=""):
     bad = [(h, s) for _, pcs in groups for h, s in pcs if s != "confirmed"]
 
     dense = size == 0 or size <= 16
+    packed = total > 60          # past this the exceptions line matters more than a second named row
     if size == 0:
         # Past the point where one mark per machine says anything: the shape of each Admin's fleet,
         # and only the machines that are wrong get named.
@@ -94,11 +95,11 @@ def fleet_cell(groups, w=396, note=""):
         body = col(*[col(row(txt(name, 11.5, T["faint"]), sp(),
                              ("" if dense else txt(f"{len(pcs)}", 11, T["faint"], mono=True)), gap=8,
                              extra=f"width: {w}px;"),
-                         machine_marks(pcs, size, labels, per_row, gap), gap=5 if dense else 6)
+                         machine_marks(pcs, size, labels, per_row, gap if not packed else 2), gap=4 if packed else (5 if dense else 6))
                      for name, pcs in groups],
-                   gap=9 if dense else 12, extra=f"width: {w}px;")
+                   gap=7 if packed else (9 if dense else 12), extra=f"width: {w}px;")
 
-    shown = 1 if size == 0 else 2
+    shown = 1 if (size == 0 or packed) else 2
     named = col(*[row(dot(ST[s], 7), txt(h, 12, T["ink"], 500, mono=True),
                       txt({"behind": "behind", "failing": "out of place"}[s], 11.5, T["faint"]), gap=8,
                       extra=f"width: {w}px;")
@@ -206,3 +207,124 @@ def dp11():
 
 SCALE = [("DP10-Scale.dc.html", "Its machines at 7, 24, 96, 240", dp10),
          ("DP11-Maximised.dc.html", "A chart, maximised", dp11)]
+
+
+# ================================================================== DP12-DP13: the gesture, at scale
+# The maximise only earns its place when the cell has had to drop something. So these are drawn on a
+# BIG Operations -- four Admins, ninety-six machines -- where the cell is at 16 px and the hostnames
+# are gone. DP12 is that page at rest, DP13 is the same page with the pointer over the cell, and DP11
+# is what the double click gives you. Escape puts DP12 back exactly.
+#
+# The day cell has to scale too: ninety-six lanes is not a drawing. It draws the machines that were
+# actually used and says how many were quiet -- the same principle as the fleet, applied to time.
+
+BIG = fleet_of(4, 24, bad_at=(9, 31, 60, 77, 88))
+
+BIG_ADMINS = [dict(a) for a in ADMINS] + [
+    {"initials": "KB", "name": "K. Boateng", "host": "WS-OPS-A3", "state": "native", "when": "since 07:55",
+     "phrase": ("at their workstation", "dim"), "pcs": [], "tasks": [], "flows": [], "told": ""},
+    {"initials": "EO", "name": "E. Owusu", "host": "WS-OPS-A4", "state": "free", "when": "not signed in",
+     "phrase": ("free", "dim"), "pcs": [], "tasks": [], "flows": [], "told": ""},
+]
+# each Admin here answers for one of the four groups above, so "answers for N" is the truth
+for _a, (_name, _pcs) in zip(BIG_ADMINS, BIG):
+    _a["pcs"] = _pcs
+BIG = [(a["name"], a["pcs"]) for a in BIG_ADMINS]
+
+
+def big_day(w=816, lane_h=21, gap_y=9):
+    """At scale the day draws what happened, not every machine that exists: the lanes that have
+    something on them, and a count of the ones that have nothing."""
+    lanes = [("OPS-03", [("native", 8.2, 12.0), ("native", 13.0, 17.4)]),
+             ("OPS-09", [("native", 9.0, 10.3), ("su", 10.3, 11.0), ("native", 11.0, 17.0)]),
+             ("OPS-22", [("native", 8.0, 16.2)]),
+             ("OPS-31", [("native", 8.5, 17.5)]),
+             ("OPS-48", [("native", 8.0, 10.3), ("traversed", 10.3, 11.0), ("native", 11.0, 16.0)]),
+             ("OPS-60", [("native", 10.0, 15.4)]),
+             ("OPS-77", [("native", 8.2, 17.6)])]
+    kind = {"native": T["line2"], "traversed": T["warn"], "su": T["danger"]}
+    t0, t1, label_w = 8.0, 18.0, 62
+    plot = w - label_w - 12
+    out = []
+    for hour in range(8, 19, 2):
+        x = label_w + ((hour - t0) / (t1 - t0)) * plot
+        out.append(f'<line x1="{x:.1f}" y1="2" x2="{x:.1f}" y2="{len(lanes) * (lane_h + gap_y) - gap_y + 2}" '
+                   f'stroke="{T["line"]}" stroke-width="1"/>')
+        out.append(f'<text x="{x:.1f}" y="{len(lanes) * (lane_h + gap_y) + 15}" text-anchor="middle" '
+                   f'fill="{T["faint"]}" font-family="{T["mono"]}" font-size="11">{hour:02d}</text>')
+    for i, (name, blocks) in enumerate(lanes):
+        y = 2 + i * (lane_h + gap_y)
+        out.append(f'<text x="0" y="{y + lane_h / 2 + 4}" fill="{T["dim"]}" font-family="{T["mono"]}" '
+                   f'font-size="11.5">{name}</text>')
+        out.append(f'<rect x="{label_w}" y="{y}" width="{plot}" height="{lane_h}" rx="6" '
+                   f'fill="{T["pane"]}" opacity="0.5"/>')
+        for state, a, b in blocks:
+            bx = label_w + ((a - t0) / (t1 - t0)) * plot
+            bw = max(5, ((b - a) / (t1 - t0)) * plot - 2)
+            out.append(f'<rect x="{bx:.1f}" y="{y}" width="{bw:.1f}" height="{lane_h}" rx="6" fill="{kind[state]}"/>')
+    h = len(lanes) * (lane_h + gap_y) + 20
+    return col(f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(out)}</svg>',
+               legend([("At the PC", T["line2"]), ("An Admin entered", T["warn"]), ("You entered", T["danger"])],
+                      "the other 89 machines were never signed in today"),
+               gap=14, extra=f"width: {w}px;")
+
+
+def hover_cell(name, state, tone, chart, w, h, hint):
+    """The same cell, with the pointer on it. An enterable container advertises itself: it lifts, the
+    pointer changes, and the hover names where it goes. Nothing invisible is load-bearing."""
+    surface = col(f'<div style="flex: 1; min-height: 0; display: flex; align-items: flex-start; '
+                  f'justify-content: flex-start; overflow: hidden;">{chart}</div>',
+                  gap=0, extra=f"flex: 1; min-height: 0; padding: 22px; border-radius: 18px; "
+                               f"background: {CHART_BG}; box-sizing: border-box; cursor: zoom-in; "
+                               f"box-shadow: inset 0 0 0 1px {T['selectline']}, 0 14px 34px rgba(0,0,0,0.42); "
+                               f"transform: translateY(-2px);")
+    title = row(txt(name, 15, "#fff", 600),
+                txt(hint, 12.5, T["accent"], 600),
+                f'<span style="flex: 1;"></span>',
+                txt(state, 12.5, tone_c(tone, T["frame_faint"]), 500),
+                gap=10, extra="width: 100%; flex: none; padding: 0 4px 9px;")
+    return col(title, surface, gap=0,
+               extra=f"width: {w}px; height: {h}px; box-sizing: border-box; flex: none; "
+                     f"display: flex; flex-direction: column;")
+
+
+def big_page(machines_cell, note, brow):
+    govern = kcell("Who governs", "R. Mensah, of four", "accent",
+                   one_admin(BIG_ADMINS[0], BIG_ADMINS[1:], 856), w=900, h=396, top=True)
+    waits = kcell("Waiting on you", "five things", "warn",
+                  reading_block("Five of the ninety-six need a decision.",
+                                [("Behind", "three", "warn"), ("Out of place", "two", "danger"),
+                                 ("Reports unaddressed", "2", "warn")],
+                                "Open the two reports", w=396),
+                  w=440, h=284, top=True)
+    today = kcell("Today", "seven machines were used", "warn",
+                  big_day(w=816, lane_h=17, gap_y=6), w=900, h=284, top=True)
+    return dept_page("Operations", ["Authority", "Operations"], "Operations",
+                     "ninety-six machines, four Admins", "dim",
+                     [row(govern, machines_cell, gap=20, align="stretch", extra="flex: none;"),
+                      row(waits, today, gap=20, align="stretch", extra="flex: none;")],
+                     note, brow)
+
+
+def dp12():
+    cell = kcell("Its machines", "three behind, two out of place", "warn",
+                 fleet_cell(BIG, 396), w=440, h=396, top=True)
+    return big_page(cell,
+                    "DP12 · The same page, eight times the department. Its machines is at 16 px, the hostnames "
+                    "are gone, and the cell says “open it to name them”. The day draws what happened, not "
+                    "every machine that exists.",
+                    eyebrow("PAGE", "A department at 96 machines", "the page does not change shape"))
+
+
+def dp13():
+    cell = hover_cell("Its machines", "three behind, two out of place", "warn",
+                      fleet_cell(BIG, 396), 440, 396, "— maximise ›")
+    return big_page(cell,
+                    "DP13 · The pointer is on the cell. It lifts, takes a 1 px accent line, the cursor becomes "
+                    "zoom-in and the title says where the gesture goes. A container with nothing behind it does "
+                    "none of this and does not respond — nothing invisible is load-bearing.",
+                    eyebrow("BEHAVIOUR", "hover, before the double click", "the container advertises itself"))
+
+
+SCALE += [("DP12-Big.dc.html", "A department at 96 machines", dp12),
+          ("DP13-Hover.dc.html", "The cell, advertising itself", dp13)]

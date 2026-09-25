@@ -79,7 +79,7 @@ def other_line(a):
                txt(a["name"], 12.5, T["dim"], 500),
                sicon(a["state"], 12), txt(SESSION_WORD[a["state"]].lower(), 11.5, T["faint"]),
                sp(), txt(f'{len(a["pcs"])} machines', 11.5, T["faint"]), ic("chev", 13, T["faint"]),
-               gap=8, extra=f"width: 100%; padding: 9px 0;")
+               gap=8, extra=f"width: 100%; padding: 7px 0;")
 
 
 def one_admin(a, others, w=856):
