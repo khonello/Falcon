@@ -46,6 +46,15 @@ app, 3–5 from the boards — so a break in continuity is visible instead of ar
   on the boards. Fixed on the boards: a department is reached *through* Authority, so the crumb now
   reads `Authority › Operations › R. Mensah` and the rail and the crumb agree on the same word.
 
+**Two rules the build must honour, settled 25 Sep 2026 (`DP10`, `DP11`):**
+
+- **Scale.** `Its machines` must pick its mark size from the count — 46 px labelled, 30 px, 16 px, then
+  bars per Admin past ~120 — and must never scroll horizontally. `design/scale.py` has `slot_size()`
+  and `fleet_cell()`, which the QML should mirror rather than reinvent.
+- **Maximising.** Double-clicking a chart gives that chart full size with its words beside it and no
+  other chart. An area still recomposes (`K03`–`K06`); a chart maximises. The hostnames the cell drops
+  at scale are what maximising gives back.
+
 **One dependency the build inherits:** `DP07` shows a picture of the held machine's screen. Nothing carries that image today — the `screenshot` Action writes a PNG on the worker and returns a path. The user has agreed the Engine work comes later; it is written down in `PHASES.md`. Until it exists the card should show its empty state rather than a placeholder image, by the never-blank rule.
 
 **Not drawn, and deliberately:** level 4 (a client PC) has not started, and level 3 keeps the Admin

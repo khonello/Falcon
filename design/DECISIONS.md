@@ -96,6 +96,28 @@ is deferred to level 3; and the department's four cells are **Who governs · Its
 Waiting on you**, with Today the wide one. The rule that keeps five honest: **a thing appears in two
 areas only if one of them is Must see, or a filter that names the other.**
 
+**A chart maximises; an area recomposes** (25 Sep 2026, the user's proposal, `DP11`). Double-clicking
+a container opens it into *whatever explains it* — and what explains a chart is **more of that chart**,
+not four more charts. So:
+
+| The container stands for | Opening it gives you |
+|---|---|
+| an **area** — authority, a rollout, a day | a composition of several panels (`K03`–`K06`) |
+| **one chart** — its machines, the fleet | that chart at full size, its words beside it, and nothing else |
+
+It needs no new rule and no new gesture: the composition already belongs to the cell, and a maximised
+chart is simply a composition of one panel. Same double click, same Escape, still one level.
+
+**A set too big to draw does not get a scrollbar** (25 Sep 2026, `DP10`). The sample department had
+seven machines; the design has to hold a hundred. **The mark shrinks while shrinking still says
+something, and past that the drawing changes kind** — 46 px with the hostname inside, then 30 px
+unlabelled, then 16 px dense, then one bar per Admin with only the exceptions named. **Never
+horizontal scrolling**: a chart you have to scroll has stopped answering in one look, and it breaks
+*a count is drawn against the largest*, because you can no longer see the largest. At every size the
+cell answers the same three things — how many, how healthy, whose — and *which one, and what is wrong
+with it* is the maximised view's job. That is why maximising and scale are one decision: the cell drops
+the names to fit, and maximising is where they come back.
+
 **Layout is editorial, not a preference.** One layout per page, chosen once, never per viewer.
 
 **Four cells, and the widths vary.** The user's own call, made on the `T02` board: *"the width
