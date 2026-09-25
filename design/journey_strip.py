@@ -25,19 +25,25 @@ STEPS = [
     ("gui-super_user.png", "1", "Must see", "where a Super User starts — the running app",
      "no crumb — this is the top", "The running app", OK),
     ("gui-super_user-authority.png", "2", "Authority, opened",
-     "double-click a CELL — the area recomposes around it",
+     "DOUBLE click a cell — the area recomposes around it",
      "Must see › Authority", "The running app", OK),
-    ("DP12-Big.png", "3", "Operations",
-     "double-click the department — a PLACE, so you go there",
+    ("DP16-Dept-Selected.png", "3", "Operations selected",
+     "SINGLE click the department — it is ringed and its text arrives beside the map",
+     "crumb unchanged — nothing has opened", "Design only", ACCENT),
+    ("DP12-Big.png", "4", "Operations",
+     "DOUBLE click the same mark — now you are there",
      "Authority › Operations", "Design only", ACCENT),
-    ("DP14-Chosen-Big.png", "4", "R. Mensah, chosen",
-     "double-click the Admin — a place again, one level deeper",
-     "Authority › Operations › R. Mensah", "Design only", ACCENT),
-    ("DP13-Hover.png", "5", "Escape, then a chart",
-     "back out, and put the pointer on Its machines instead",
+    ("DP15-Admin-Selected.png", "5", "A. Quaye selected",
+     "SINGLE click their line — the cell swaps to draw them",
+     "crumb unchanged — still just looking", "Design only", ACCENT),
+    ("DP17-Admin-Entered.png", "6", "A. Quaye, entered",
+     "DOUBLE click — the cost is stated before the act",
+     "Authority › Operations › A. Quaye", "Design only", ACCENT),
+    ("DP13-Hover.png", "7", "Escape, then a chart",
+     "back out, and put the pointer on Its machines",
      "the cell advertises itself: “— maximise ›”", "Design only", ACCENT),
-    ("DP11-Maximised.png", "6", "Maximised",
-     "double-click a CHART — it opens into itself, and the names come back",
+    ("DP11-Maximised.png", "8", "Maximised",
+     "DOUBLE click a chart — it opens into itself, and the names come back",
      "Authority › Operations › Its machines", "Design only", ACCENT),
 ]
 
@@ -80,10 +86,11 @@ html = f'''<!doctype html>
     <span style="font-family:{SANS};font-size:13px;color:{DIM};">one gesture the whole way — what changes is what the container is about</span>
   </div>
   <div style="font-family:{SANS};font-size:12.5px;color:{FAINT};padding:8px 0 20px 22px;">
-    Steps 1–2 are the running app; 3–6 are boards. Drawn on a department of ninety-six machines so the last
-    step has a reason to exist. Watch what the double click lands on: a CELL recomposes its area (2), a PLACE
-    takes you there (3, 4), and a CHART opens into itself with nothing else on the page (6). Escape reverses
-    every one of them exactly.
+    Steps 1–2 are the running app; 3–8 are boards. The odd steps are the SINGLE click — selecting, which was
+    missing from the first version of this page and is the step you were looking for. It rings or swaps, brings
+    text beside it, and never grows the crumb. The even steps are the DOUBLE click, which does grow it. What the
+    double click lands on decides what you get: a cell recomposes its area, a place takes you there, a chart
+    opens into itself. Escape reverses all of them exactly.
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:34px 60px;">{cards}</div>
 </div>

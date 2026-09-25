@@ -52,6 +52,8 @@ Super User → department → Admin → held → back out. `design/maximise_stri
 of the second are deliberately the same image: Escape restores the page exactly, which is what makes the
 gesture safe to try. `design/journey_strip.py` → `boards/JOURNEY.html` (1440×1620) is the whole path on one organisation — Must see → Authority → the department → an Admin → a chart maximised — and is the one to show when the question is whether the gesture holds together.
 
+**Selecting must be visible in the QML.** `DP16` (a department ringed in the map), `DP15` (an Admin swapped into the cell) and `DP17` (that Admin entered) are the single-click states. The test for whether the build got it right: **the crumb moves on a double click and never on a single one.**
+
 **Two rules the build must honour, settled 25 Sep 2026 (`DP10`, `DP11`):**
 
 - **Scale.** `Its machines` must pick its mark size from the count — 46 px labelled, 30 px, 16 px, then

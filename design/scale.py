@@ -26,17 +26,16 @@ import math
 
 
 def fleet_of(n_admins, n_each, bad_at=()):
-    """A department of any size: admins, their machines, and a few in trouble."""
+    """A department of any size: admins, their machines, and a few in trouble. `bad_at` may be a dict
+    of {number: state} so a machine's trouble is stated rather than derived from its number."""
+    states = bad_at if isinstance(bad_at, dict) else {n: "behind" for n in bad_at}
     out = []
     k = 0
     for a in range(n_admins):
         pcs = []
         for i in range(n_each):
             k += 1
-            st = "confirmed"
-            if k in bad_at:
-                st = "behind" if k % 2 else "failing"
-            pcs.append((f"OPS-{k:02d}", st))
+            pcs.append((f"OPS-{k:02d}", states.get(k, "confirmed")))
         out.append((f"Admin {chr(65 + a)}", pcs))
     return out
 
@@ -121,7 +120,7 @@ def dp10():
                 fleet_cell(fleet_of(2, 12, bad_at=(5, 17, 20)), 396,
                            "the slot keeps its shape; only the label goes"), 440, 380),
         variant("96 machines", "16 px — proportion and outliers, not names",
-                fleet_cell(fleet_of(4, 24, bad_at=(9, 31, 60, 77, 88)), 396,
+                fleet_cell(fleet_of(4, 24, bad_at={9: "behind", 31: "failing", 60: "behind", 77: "failing", 88: "behind"}), 396,
                            "still one mark per machine, still grouped by Admin"), 440, 380),
         variant("240 machines", "the drawing changes kind",
                 fleet_cell(fleet_of(4, 60, bad_at=(11, 44, 90, 120, 150, 200, 233)), 396,
@@ -168,7 +167,7 @@ def dp11():
     """Maximised, the marks go back UP to 46 px and the hostname returns inside the slot. That is the
     whole argument for maximising rather than recomposing: the cell had to drop the names to fit, and
     this is where they come back -- for ninety-six machines or for seven."""
-    groups = fleet_of(4, 24, bad_at=(9, 31, 60, 77, 88))
+    groups = BIG
     plate_w, size, gap, per_row = 940, 46, 10, 16
     plate = col(*[col(row(txt(name, 12.5, T["dim"], 500), sp(),
                           txt(f"{len(pcs)} machines", 11.5, T["faint"], mono=True), gap=8,
@@ -218,7 +217,7 @@ SCALE = [("DP10-Scale.dc.html", "Its machines at 7, 24, 96, 240", dp10),
 # The day cell has to scale too: ninety-six lanes is not a drawing. It draws the machines that were
 # actually used and says how many were quiet -- the same principle as the fleet, applied to time.
 
-BIG = fleet_of(4, 24, bad_at=(9, 31, 60, 77, 88))
+BIG = fleet_of(4, 24, bad_at={9: "behind", 31: "failing", 60: "behind", 77: "failing", 88: "behind"})
 
 BIG_ADMINS = [dict(a) for a in ADMINS] + [
     {"initials": "KB", "name": "K. Boateng", "host": "WS-OPS-A3", "state": "native", "when": "since 07:55",
@@ -227,8 +226,18 @@ BIG_ADMINS = [dict(a) for a in ADMINS] + [
      "phrase": ("free", "dim"), "pcs": [], "tasks": [], "flows": [], "told": ""},
 ]
 # each Admin here answers for one of the four groups above, so "answers for N" is the truth
-for _a, (_name, _pcs) in zip(BIG_ADMINS, BIG):
+_TOLD = ["Twenty-four machines, and OPS-09 has been behind since Friday.",
+         "Twenty-four machines, and OPS-31 keeps a restricted file.",
+         "Twenty-four machines, and OPS-60 has been behind since Monday.",
+         "Twenty-four machines, and OPS-77 keeps a restricted file."]
+_WORK = [([("confirmed", 5), ("behind", 2), ("failing", 1)], [("confirmed", 3), ("failing", 1)]),
+         ([("confirmed", 4), ("behind", 1)], [("confirmed", 2)]),
+         ([("confirmed", 6), ("behind", 1)], [("confirmed", 3)]),
+         ([("confirmed", 3)], [("confirmed", 1), ("failing", 1)])]
+for _i, (_a, (_name, _pcs)) in enumerate(zip(BIG_ADMINS, BIG)):
     _a["pcs"] = _pcs
+    _a["told"] = _TOLD[_i]
+    _a["tasks"], _a["flows"] = _WORK[_i]
 BIG = [(a["name"], a["pcs"]) for a in BIG_ADMINS]
 
 
@@ -379,3 +388,151 @@ def dp14():
 
 
 SCALE += [("DP14-Chosen-Big.dc.html", "An Admin opened, at 96 machines", dp14)]
+
+
+# ================================================================== DP15-DP17: where you SELECT
+# The journey showed six pages and no selecting, which is exactly what a reader noticed. Single click
+# inspects and double click enters -- but only the second of those had ever been drawn, so the act of
+# choosing a department or an Admin was invisible.
+#
+# Three states, one per place where a choice is made:
+#   DP16  a department selected in the hierarchy, before you enter it
+#   DP15  an Admin selected in Who governs -- the cell swaps to draw them
+#   DP17  that Admin entered, so the selection and the entering are the same person
+#
+# The rule they make visible: WHOEVER THE CELL DRAWS IS WHOEVER IS SELECTED. At rest that is the first
+# Admin in the stable order, which is why entering the first one needs no click first -- and why
+# entering anyone else needs exactly one.
+
+def org_selected(w=620, h=300, pick="Operations"):
+    """The hierarchy with one department selected. X02's rule: a single click settles the chart and
+    brings its text beside it -- the mark is ringed, not recoloured, because colour already means state."""
+    depts = [("Operations", 4, 96), ("Finance", 1, 4), ("Logistics", 0, 3)]
+    rx, dx, px = 26, w * 0.40, w * 0.66
+    ys = [h * 0.17, h * 0.5, h * 0.83]
+    links, nodes, labels = [], [], []
+    for i, (name, admins, pcs) in enumerate(depts):
+        c = DEPT_COLOR[name]
+        dy = ys[i]
+        on = name == pick
+        links.append(f'<path d="M{rx + 12} {h * 0.5} C {(rx + dx) / 2} {h * 0.5}, {(rx + dx) / 2} {dy}, '
+                     f'{dx - 13} {dy}" fill="none" stroke="{c}" stroke-width="{2.4 if on else 1.8}" '
+                     f'opacity="{0.9 if on else 0.35}"/>')
+        for k in range(min(pcs, 12)):
+            ox = px + (k % 6) * 26
+            oy = dy - 13 + (k // 6) * 26
+            links.append(f'<path d="M{dx + 12} {dy} C {(dx + px) / 2} {dy}, {(dx + px) / 2} {oy}, {ox - 7} {oy}" '
+                         f'fill="none" stroke="{c}" stroke-width="1" opacity="{0.28 if on else 0.12}"/>')
+            nodes.append(f'<circle cx="{ox}" cy="{oy}" r="6" fill="{c}" opacity="{0.9 if on else 0.35}"/>')
+        if on:
+            nodes.append(f'<circle cx="{dx}" cy="{dy}" r="18" fill="none" stroke="{T["accent"]}" stroke-width="1.5"/>')
+        nodes.append(f'<circle cx="{dx}" cy="{dy}" r="12" fill="{c}" opacity="{1 if on else 0.4}"/>')
+        labels.append(f'<text x="{dx - 24}" y="{dy + 1}" text-anchor="end" fill="{T["ink"] if on else T["faint"]}" '
+                      f'font-family="{T["sans"]}" font-size="14" font-weight="{600 if on else 400}">{name}</text>')
+        labels.append(f'<text x="{dx - 24}" y="{dy + 18}" text-anchor="end" '
+                      f'fill="{T["danger"] if admins == 0 else T["faint"]}" font-family="{T["sans"]}" '
+                      f'font-size="12">{"no Admin" if admins == 0 else str(admins) + " Admins"}</text>')
+    nodes.append(f'<circle cx="{rx}" cy="{h * 0.5}" r="14" fill="{T["ink"]}"/>')
+    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(links + nodes + labels)}</svg>'
+
+
+def dp16():
+    reading = col(txt("Operations is the largest department you have.", 15, T["ink"], 600,
+                      extra="line-height: 1.35;"),
+                  col(*[row(txt(k, 12.5, T["dim"]), sp(), txt(v, 12.5, tone_c(t, T["ink"]), 500), gap=10,
+                            extra=f"width: 320px; padding: 8px 0; border-bottom: 1px solid {T['line']};")
+                        for k, v, t in [("Admins", "four", ""), ("Client PCs", "96", ""),
+                                        ("Behind", "three", "warn"), ("Out of place", "two", "danger"),
+                                        ("Entered today", "two machines", "")]],
+                      gap=0, extra="width: 320px;"),
+                  txt("Double click it to go there. Escape clears the selection and leaves the map as "
+                      "it was.", 11.5, T["faint"], extra="line-height: 1.5;"),
+                  gap=14, extra="width: 320px;")
+    cell = kcell("The hierarchy", "Operations selected", "accent",
+                 row(org_selected(800, 430), sp(), reading, gap=36, align="center",
+                     extra="width: 1276px;"),
+                 w=1320, h=640, top=False)
+    return dept_page("Everything", ["Must see", "Authority"], "Authority",
+                     "one department selected", "accent", [cell],
+                     "DP16 \u00b7 A SINGLE click on Operations. The mark is ringed rather than recoloured \u2014 colour "
+                     "already means state \u2014 and its text arrives beside the map. Nothing has opened and nothing "
+                     "has moved; this is the step that was missing between the Overview and the department.",
+                     eyebrow("BEHAVIOUR", "single click selects a department", "inspect, before enter"),
+                     active="authority")
+
+
+def dp15():
+    """A. Quaye picked out of the four. The cell now draws THEM, and R. Mensah has moved to the foot."""
+    a = BIG_ADMINS[1]
+    others = [BIG_ADMINS[0], BIG_ADMINS[2], BIG_ADMINS[3]]
+    govern = kcell("Who governs", "A. Quaye selected", "accent",
+                   one_admin(a, others, 856, selected=None), w=900, h=396, top=True)
+    machines = kcell("Its machines", "three behind, two out of place", "warn",
+                     fleet_cell(BIG, 396), w=440, h=396, top=True)
+    waits = kcell("Waiting on you", "five things", "warn",
+                  reading_block("Five of the ninety-six need a decision.",
+                                [("Behind", "three", "warn"), ("Out of place", "two", "danger"),
+                                 ("Reports unaddressed", "2", "warn")],
+                                "Open the two reports", w=396),
+                  w=440, h=284, top=True)
+    today = kcell("Today", "seven machines were used", "warn",
+                  big_day(w=816, lane_h=17, gap_y=6), w=900, h=284, top=True)
+    return dept_page("Operations", ["Authority", "Operations"], "Operations",
+                     "A. Quaye selected", "accent",
+                     [row(govern, machines, gap=20, align="stretch", extra="flex: none;"),
+                      row(waits, today, gap=20, align="stretch", extra="flex: none;")],
+                     "DP15 \u00b7 A SINGLE click on A. Quaye\u2019s line. The cell swaps to draw them and R. Mensah "
+                     "drops to the foot \u2014 whoever the cell draws is whoever is selected. Nothing opened, the "
+                     "crumb did not grow. Double-clicking now enters A. Quaye.",
+                     eyebrow("BEHAVIOUR", "single click selects an Admin", "the cell swaps who it draws"))
+
+
+def dp17():
+    """The same person entered. Selection and entering are one person, which is the whole point."""
+    a = BIG_ADMINS[1]
+    lane = kcell("Entering A. Quaye", "the cost, then the act", "danger",
+                 reading_lane(372, who="A. Quaye", host="WS-OPS-A2",
+                              doors=[("OPS-25", "confirmed", "in use since 08:40"),
+                                     ("OPS-31", "failing", "restricted file"),
+                                     ("OPS-38", "confirmed", "not signed in"),
+                                     ("OPS-44", "confirmed", "in use since 09:10")]),
+                 w=416, h=660, top=True, pad=22)
+    head = row(av(a["initials"], "admin", 44, "native"),
+               col(txt(a["name"], 16, T["ink"], 600),
+                   row(txt(a["host"], 12, T["faint"], mono=True), sicon(a["state"], 13),
+                       txt(SESSION_WORD[a["state"]] + " \u00b7 " + a["when"], 12, T["faint"]), gap=7),
+                   gap=3, extra="flex: 1; min-width: 0;"),
+               sp(), txt("Esc to go back", 12, T["faint"]), gap=13, extra="width: 876px;")
+    figs = row(figure("5", "tasks", "none overdue", 34), figure("2", "flows", "both healthy", 34),
+               figure("1", "ping", "unanswered", 34, "warn"),
+               figure("24", "machines", "one out of place", 34), gap=48, extra="flex: none;")
+    hero_ = kcell("A. Quaye", "chosen", "accent",
+                  col(head, rule(), figs,
+                      txt("Twenty-four machines, and OPS-31 keeps a restricted file.", 13, T["ink"], 500,
+                          extra="line-height: 1.4;"),
+                      gap=17, extra="width: 876px;"),
+                  w=924, h=308, top=True)
+    theirs = kcell("Their machines", "one out of place", "danger",
+                   fleet_cell([(a["name"], a["pcs"])], 396), w=452, h=332, top=True)
+    theirday = kcell("Their day", "two were used", "warn",
+                     col(scoped_day(["OPS-25", "OPS-31", "OPS-38", "OPS-44"],
+                                    {"OPS-25": (8.4, 17.0), "OPS-44": (9.1, 16.4)}, w=396),
+                         legend([("At the PC", T["line2"])], "twenty-two were quiet"),
+                         txt("Two of their twenty-four machines were used today.", 12.5, T["ink"], 500,
+                             extra="line-height: 1.4; max-width: 396px;"),
+                         gap=13),
+                     w=452, h=332, top=True)
+    right = col(hero_, row(theirs, theirday, gap=20, align="stretch", extra="flex: none;"),
+                gap=20, extra="flex: none; display: flex; flex-direction: column;")
+    return dept_page("Operations", ["Authority", "Operations", "A. Quaye"], "Operations",
+                     "choosing whether to enter", "accent",
+                     [row(lane, right, gap=20, align="flex-start", extra="flex: none;")],
+                     "DP17 \u00b7 DOUBLE click on the Admin who was selected. The reading leads, the cost is stated "
+                     "before the act, and the page is scoped to them. The crumb has grown by one step, which is "
+                     "the difference between selecting and entering.",
+                     eyebrow("BEHAVIOUR", "double click enters the selected Admin", "the crumb grows"))
+
+
+SCALE += [("DP16-Dept-Selected.dc.html", "A department selected", dp16),
+          ("DP15-Admin-Selected.dc.html", "An Admin selected", dp15),
+          ("DP17-Admin-Entered.dc.html", "That Admin entered", dp17)]

@@ -74,15 +74,23 @@ def dept_page(title, crumbs, heading, phrase, tone, bands, note, brow, active="a
 #
 # Which one is drawn at rest follows the STABLE ORDER rule -- admins in their fixed order, never
 # resorted by state -- so the cell does not rearrange itself under you when something goes wrong.
-def other_line(a):
+def other_line(a, selected=False):
+    """One of the Admins who is not currently drawn. Single click selects them, which swaps who the
+    cell draws; double click enters them. Selection is a filled muted row -- never a left-edge accent."""
+    fill = (f"background: {T['select']}; border-radius: 9px; padding: 7px 10px; margin: 0 -10px;"
+            if selected else "padding: 7px 0;")
+    ink = "#fff" if selected else T["dim"]
     return row(av(a["initials"], "admin", 22, "native"),
-               txt(a["name"], 12.5, T["dim"], 500),
-               sicon(a["state"], 12), txt(SESSION_WORD[a["state"]].lower(), 11.5, T["faint"]),
-               sp(), txt(f'{len(a["pcs"])} machines', 11.5, T["faint"]), ic("chev", 13, T["faint"]),
-               gap=8, extra=f"width: 100%; padding: 7px 0;")
+               txt(a["name"], 12.5, ink, 500),
+               sicon(a["state"], 12), txt(SESSION_WORD[a["state"]].lower(), 11.5,
+                                          T["select_sub"] if selected else T["faint"]),
+               sp(), txt(f'{len(a["pcs"])} machines', 11.5,
+                         T["select_sub"] if selected else T["faint"]),
+               ic("chev", 13, T["select_sub"] if selected else T["faint"]),
+               gap=8, extra=f"width: 100%; {fill}")
 
 
-def one_admin(a, others, w=856):
+def one_admin(a, others, w=856, selected=None):
     """One Admin, given the room two of them were fighting over. Below ~600px the station goes
     NARROW -- the count leaves the head and the two bars stack -- because a head that wraps to three
     lines is worse than a column that is one line taller."""
@@ -103,7 +111,7 @@ def one_admin(a, others, w=856):
     told = txt(a["told"], 13, T["ink"], 500, extra="line-height: 1.4;")
     foot = col(rule(),
                *([] if narrow else [txt("Also here", 11.5, T["faint"])]),
-               col(*[other_line(o) for o in others], gap=0, extra=f"width: {w}px;"),
+               col(*[other_line(o, o["name"] == selected) for o in others], gap=0, extra=f"width: {w}px;"),
                gap=9, extra=f"width: {w}px;")
     return col(head, rule(), work, told, sp(), foot, gap=13, extra=f"width: {w}px; height: 100%;")
 
@@ -163,18 +171,18 @@ def dp05():
 # The fifth structural signature, and it is deliberately inverted: THE READING LEADS, down the left,
 # because what this state is about is not a picture of a person -- it is a decision with a price. The
 # cost is stated before the act, which is DP04's pick, made structural rather than decorative.
-def reading_lane(w=372):
+def reading_lane(w=372, who="R. Mensah", host="WS-OPS-A1", doors=None):
     cost = col(txt("Entering takes their workstation.", 15, T["ink"], 600, extra="line-height: 1.35;"),
                col(*[row(txt(k, 12.5, T["dim"]), sp(), txt(v, 12.5, tone_c(tone, T["ink"]), 500), gap=10,
                          extra=f"width: 100%; padding: 8px 0; border-bottom: 1px solid {T['line']};")
-                     for k, v, tone in [("R. Mensah gets", "a red screen", "danger"),
+                     for k, v, tone in [(who + " gets", "a red screen", "danger"),
                                         ("They keep", "nothing open", "danger"),
                                         ("You hold it for", "30 minutes", "warn"),
                                         ("Extend", "once, by 15", "warn"),
                                         ("They are told", "it was you", "")]],
                    gap=0, extra=f"width: {w}px;"),
                gap=14, extra=f"width: {w}px;")
-    act = col(row(tbtn("Enter WS-OPS-A1", "accent", "lock"), gap=0, extra=f"width: {w}px;"),
+    act = col(row(tbtn("Enter " + host, "accent", "lock"), gap=0, extra=f"width: {w}px;"),
               gap=0, extra=f"width: {w}px;")
     # DP04's other pick: the two doors, named. A client PC is not only reachable through its Admin,
     # so the second door is offered here rather than hidden behind the person.
@@ -183,10 +191,10 @@ def reading_lane(w=372):
                 col(*[row(dot(ST[st], 8), txt(host, 12.5, T["ink"], 500, mono=True),
                           txt(word, 12, T["faint"]), sp(), ic("chev", 13, T["faint"]), gap=9,
                           extra=f"width: {w}px; padding: 7px 0; border-bottom: 1px solid {T['line']};")
-                      for host, st, word in [("OPS-01", "confirmed", "in use since 08:12"),
-                                             ("OPS-02", "confirmed", "not signed in"),
-                                             ("OPS-03", "confirmed", "in use since 09:00"),
-                                             ("OPS-06", "behind", "behind, six attempts")]],
+                      for host, st, word in (doors or [("OPS-01", "confirmed", "in use since 08:12"),
+                                                      ("OPS-02", "confirmed", "not signed in"),
+                                                      ("OPS-03", "confirmed", "in use since 09:00"),
+                                                      ("OPS-06", "behind", "behind, six attempts")])],
                     gap=0, extra=f"width: {w}px;"),
                 txt("Entering a machine blocks its worker, not their Admin.", 11.5, T["faint"],
                     extra="line-height: 1.45;"),

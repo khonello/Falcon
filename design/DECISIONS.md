@@ -96,6 +96,19 @@ is deferred to level 3; and the department's four cells are **Who governs · Its
 Waiting on you**, with Today the wide one. The rule that keeps five honest: **a thing appears in two
 areas only if one of them is Must see, or a filter that names the other.**
 
+**Whoever the cell draws is whoever is selected** (25 Sep 2026, `DP15`–`DP17`). Selecting had been
+settled in words since 24 Sep but never drawn, so a reader looking at the journey could not find the
+step where a department or an Admin is chosen — every board was a destination. The three states now
+exist, and they fix the rule:
+
+- **Single click selects**: a mark is *ringed* (never recoloured — colour already means state) and its
+  text arrives beside it; a foot row becomes a filled muted row and the cell swaps to draw that person.
+  **The crumb does not move.** Nothing has opened.
+- **Double click enters**, and **the crumb grows by one**. That growth is the only reliable sign that
+  you went somewhere rather than merely looked.
+- At rest the **first Admin in the stable order is already the selected one**, which is why entering
+  them takes no click first, and entering anybody else takes exactly one.
+
 **A chart maximises; an area recomposes** (25 Sep 2026, the user's proposal, `DP11`). Double-clicking
 a container opens it into *whatever explains it* — and what explains a chart is **more of that chart**,
 not four more charts. So:

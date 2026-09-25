@@ -19,6 +19,9 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `K01`–`K06` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built (`K02` is the rejected alternative); `K03`–`K06` are its four cells opened in place, one shape each. |
 | `DP05` | **The department page, built from the picks.** Four cells — Who governs · Its machines · Today · Waiting on you — an equal pair over a split, with the day wide. Level 2: nothing is held, nothing offers to enter anybody. |
 | `DP06` | **An Admin opened in place**, and the ask. The reading LEADS the shape, because the subject is a decision with a price: the cost is stated before the act, and the second door (a machine, directly) is named beside it. |
+| `DP16` | **A department selected.** The single click that was missing: Operations is ringed, its text arrives beside the map, the crumb does not move. |
+| `DP15` | **An Admin selected.** Single click on a foot line swaps who the cell draws — whoever is drawn is whoever is selected. |
+| `DP17` | **That Admin entered.** The double click that follows, on the person who was selected; the crumb grows, which is the whole difference. |
 | `DP14` | **An Admin opened, at 96 machines.** The same state as `DP06` on the big department — the composition does not change with scale, only what the machines cell draws. |
 | `DP12`–`DP13` | **A department at 96 machines**, at rest and with the pointer on a cell. The page does not change shape at scale; the cell changes how it draws, and the day draws what happened rather than every machine that exists. |
 | `DP10` | **Its machines at 7, 24, 96 and 240.** The same cell at four department sizes, the rejected answer (horizontal scrolling) and why scale and maximising are one question. |
