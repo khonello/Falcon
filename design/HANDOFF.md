@@ -22,14 +22,16 @@ perfect but it works"*). Four boards, all in `design/dept.py`:
 
 | Board | What it settles |
 |---|---|
-| `DP05` | the department at rest — four cells, *an equal pair over a split*, the day wide |
+| `DP05` | the department at rest — four cells in *a pinwheel*, one Admin drawn at full width, the day wide |
 | `DP06` | an Admin opened in place — *the reading leads*, the cost stated before the act |
-| `DP07` | the session as a container on the page, counting down; double-click enters level 3 |
+| `DP07` | the session as a container: **their screen**, the countdown, the way in — no metrics card |
 | `DP08` | the four answers, arriving in the lane that stated the cost — no modal in the level |
 
 **The next step is QML**, not more drawing: a `DepartmentView` on the same kit, reached by
 double-clicking a department in Authority, with a test that finds it by `objectName`. "Not perfect" is
 on the record, so expect to refine while building — that is not a new design pass.
+
+**One dependency the build inherits:** `DP07` shows a picture of the held machine's screen. Nothing carries that image today — the `screenshot` Action writes a PNG on the worker and returns a path. The user has agreed the Engine work comes later; it is written down in `PHASES.md`. Until it exists the card should show its empty state rather than a placeholder image, by the never-blank rule.
 
 **Not drawn, and deliberately:** level 4 (a client PC) has not started, and level 3 keeps the Admin
 screens it already has. The canvas is still at **version 44** — `DP05`–`DP08` have not been published to

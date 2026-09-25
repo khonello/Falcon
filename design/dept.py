@@ -67,30 +67,36 @@ def dept_page(title, crumbs, heading, phrase, tone, bands, note, brow, active="a
     return page(title, top, rail, inner, statusbar("Connected, TLS pinned", status[0], status[1]), "native")
 
 
-# ------------------------------------------------------------------ Who governs: two stations, side by side
-def mini_station(a, w=300, slot=30):
-    """DP02's Station, at column width: who they are, the machine they sit at, the state word, and a
-    quiet cluster of the slots they answer for. The slots here are a HEALTH GLYPH -- how many, and
-    are they well. Which machine, and what is wrong with it, is the next cell's job."""
-    head = row(av(a["initials"], "admin", 34, "native"),
-               col(txt(a["name"], 13, T["ink"], 600),
-                   txt(a["host"], 11.5, T["faint"], mono=True), gap=2,
-                   extra="flex: 1; min-width: 0;"),
-               gap=10, extra="width: 100%;")
-    state = row(sicon(a["state"], 13), txt(SESSION_WORD[a["state"]], 12, T["dim"]),
-                txt(a["when"], 11.5, T["faint"], mono=True), gap=6, extra="width: 100%;")
-    govern = col(txt(f'Answers for {len(a["pcs"])}', 11.5, T["faint"]),
-                 dept_pcs(a["pcs"], BIGGEST, size=slot, gap=6), gap=7)
-    work = row(health_line("Tasks", a["tasks"], w=(w - 24) // 2),
-               health_line("Flows", a["flows"], w=(w - 24) // 2), gap=24, extra="width: 100%;")
-    told = txt(STATION_LINE[a["initials"]], 12, T["ink"], 500, extra="line-height: 1.4;")
-    return col(head, state, rule(), govern, work, told, gap=12, extra=f"width: {w}px;")
+# ------------------------------------------------------------------ Who governs: ONE Admin at a time
+# Two stations crammed into one cell was rejected ("the who governs is terrible"). The cell now draws
+# ONE Admin at full width and names the others on a line at the foot. Single click on a name swaps
+# which one is drawn; double click enters them. Nothing is compressed, because only one is there.
+#
+# Which one is drawn at rest follows the STABLE ORDER rule -- admins in their fixed order, never
+# resorted by state -- so the cell does not rearrange itself under you when something goes wrong.
+def other_line(a):
+    return row(av(a["initials"], "admin", 22, "native"),
+               txt(a["name"], 12.5, T["dim"], 500),
+               sicon(a["state"], 12), txt(SESSION_WORD[a["state"]].lower(), 11.5, T["faint"]),
+               sp(), txt(f'{len(a["pcs"])} machines', 11.5, T["faint"]), ic("chev", 13, T["faint"]),
+               gap=8, extra=f"width: 100%; padding: 9px 0;")
 
 
-def who_governs(w=626):
-    half = (w - 26) // 2
-    return row(mini_station(ADMINS[0], half), mini_station(ADMINS[1], half),
-               gap=26, align="flex-start", extra=f"width: {w}px;")
+def one_admin(a, others, w=856):
+    head = row(av(a["initials"], "admin", 44, "native"),
+               col(txt(a["name"], 16, T["ink"], 600),
+                   row(txt(a["host"], 12, T["faint"], mono=True), sicon(a["state"], 13),
+                       txt(SESSION_WORD[a["state"]] + " · " + a["when"], 12, T["faint"]), gap=7),
+                   gap=3, extra="flex: 1; min-width: 0;"),
+               sp(), txt(f'Answers for {len(a["pcs"])}', 12, T["faint"]),
+               gap=13, extra=f"width: {w}px;")
+    work = row(health_line("Tasks", a["tasks"], w=282), health_line("Flows", a["flows"], w=282),
+               sp(), gap=44, extra=f"width: {w}px;")
+    told = txt(a["told"], 13, T["ink"], 500, extra="line-height: 1.4;")
+    foot = col(rule(), txt("Also here", 11.5, T["faint"]),
+               col(*[other_line(o) for o in others], gap=0, extra=f"width: {w}px;"),
+               gap=9, extra=f"width: {w}px;")
+    return col(head, rule(), work, told, sp(), foot, gap=13, extra=f"width: {w}px; height: 100%;")
 
 
 # ------------------------------------------------------------------ Its machines: grouped under their Admin
@@ -123,22 +129,25 @@ def waiting(w=396):
 
 
 # ------------------------------------------------------------------ DP05: the department at rest
+# THE SIGNATURE IS A PINWHEEL: the two big cells sit on a diagonal -- who governs at the top left,
+# the day at the bottom right -- with the two narrow ones filling the other corners. No other page
+# has it, and it keeps the day wide as settled.
 def dp05():
-    govern = kcell("Who governs", "one Admin is away helping Finance", "accent",
-                   who_governs(626), w=670, h=308, top=True)
+    govern = kcell("Who governs", "R. Mensah, of two", "accent",
+                   one_admin(ADMINS[0], ADMINS[1:], 856), w=900, h=316, top=True)
     machines = kcell("Its machines", "one behind, one out of place", "warn",
-                     machines_grouped(626), w=670, h=308, top=True)
+                     machines_grouped(396, size=46, gap=9), w=440, h=316, top=True)
+    waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
     today = kcell("Today", "two machines were entered", "warn",
                   dept_day(w=816, lane_h=21, gap_y=9), w=900, h=340, top=True)
-    waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
     return dept_page("Operations", ["Everything", "Operations"], "Operations",
                      "seven machines, two Admins", "dim",
                      [row(govern, machines, gap=20, align="stretch", extra="flex: none;"),
-                      row(today, waits, gap=20, align="stretch", extra="flex: none;")],
-                     "DP05 · The department at rest, from the mood-board picks. Double-click a cell to open it "
-                     "where it stands; double-click an Admin, or a single machine, to go into that place. "
-                     "Nothing here offers to enter anybody yet — the act appears when you reach for it.",
-                     eyebrow("PAGE", "A department — level 2, looking", "an equal pair over a split"))
+                      row(waits, today, gap=20, align="stretch", extra="flex: none;")],
+                     "DP05 · The department at rest. Who governs draws ONE Admin at full width and names the "
+                     "others below — single click swaps who is drawn, double click enters them. Its machines "
+                     "names the seven. Nothing here offers to enter anybody; the act appears when you reach for it.",
+                     eyebrow("PAGE", "A department — level 2, looking", "a pinwheel"))
 
 
 # ------------------------------------------------------------------ DP06: Who governs, opened on one Admin
@@ -246,47 +255,86 @@ DEPT_PAGE = [("DP05-Department.dc.html", "Department: the page, from the picks",
 # answers arrive WHERE THE ASK WAS MADE -- the same lane that stated the cost now carries what came
 # back. One place, before and after, and no modal anywhere in the level.
 
-def held_card(w=396):
-    """The session, as a container. Landscape, because it is a thing you hold rather than a panel of
-    the page, and ringed in the colour that means you are occupying someone."""
-    head = row(av("RM", "admin", 34, "native"),
-               col(txt("R. Mensah", 13, T["ink"], 600),
+def screen_still(w=856, h=214):
+    """A picture of what is on their monitor. The user asked for this instead of a metrics card.
+
+    WHAT IT IS TODAY: a STILL, not a feed. `engine/control/actions.py` has a `screenshot` Action and
+    `worker_client/executor.py` implements it -- but it saves the PNG on the worker's own disk and
+    prints the path. Nothing carries the bytes back. So this drawing is ahead of the system by three
+    specific pieces: the Action returning image data rather than a path, a protocol message able to
+    carry it, and a refresh the Operator Client asks for. A live feed is a fourth, larger thing.
+    The card says how old the picture is for exactly that reason -- an unlabelled image would read as
+    live and promise what does not exist."""
+    bar = (f'<div style="height: 22px; border-radius: 7px 7px 0 0; background: {T["line"]}; display: flex; '
+           f'align-items: center; gap: 6px; padding: 0 9px;">'
+           + "".join(f'<span style="width: 8px; height: 8px; border-radius: 999px; background: {c};"></span>'
+                     for c in (T["danger"], T["warn"], T["ok"]))
+           + f'<span style="font-family: {T["sans"]}; font-size: 10.5px; color: {T["faint"]}; margin-left: 6px;">'
+             f'budget-2026.xlsx — Excel</span></div>')
+    grid_rows = "".join(
+        f'<div style="display: flex; gap: 4px; margin-bottom: 4px;">'
+        + "".join(f'<span style="height: 9px; width: {wd}px; border-radius: 2px; background: '
+                  f'{T["line2"] if (r == 0) else T["line"]}; opacity: {0.9 if r == 0 else 0.6};"></span>'
+                  for wd in (58, 82, 64, 96, 72))
+        + '</div>' for r in range(7))
+    sheet = (f'<div style="flex: 1; min-width: 0; border-radius: 0 0 7px 7px; background: {T["pane"]}; '
+             f'padding: 10px;">{grid_rows}</div>')
+    window = (f'<div style="position: absolute; left: 26px; top: 18px; width: {int(w * 0.62)}px; '
+              f'height: {h - 52}px; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; '
+              f'box-shadow: 0 10px 26px rgba(0,0,0,0.5);">{bar}{sheet}</div>')
+    side = (f'<div style="position: absolute; right: 22px; top: 34px; width: {int(w * 0.24)}px; '
+            f'height: {h - 86}px; border-radius: 8px; background: {T["ground"]}; opacity: 0.75;"></div>')
+    taskbar = (f'<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 18px; '
+               f'background: rgba(0,0,0,0.35); display: flex; align-items: center; gap: 6px; padding: 0 10px;">'
+               + "".join(f'<span style="width: 10px; height: 10px; border-radius: 3px; background: {T["line2"]}; '
+                         f'opacity: 0.7;"></span>' for _ in range(4)) + '</div>')
+    return (f'<div style="position: relative; width: {w}px; height: {h}px; border-radius: 10px; overflow: hidden; '
+            f'background: linear-gradient(150deg, #1d2b3a, #121a24); box-shadow: inset 0 0 0 1px {T["line"]};">'
+            f'{window}{side}{taskbar}</div>')
+
+
+def held_card(w=856):
+    """The session, as a container: their screen at its own proportions, and beside it who is held,
+    for how long, and the way in. No metrics card and no still-button — the picture is the subject."""
+    shot_w = 396
+    right = w - shot_w - 32
+    head = row(av("RM", "admin", 32, "native"),
+               col(txt("R. Mensah", 13.5, T["ink"], 600),
                    txt("WS-OPS-A1", 11.5, T["faint"], mono=True), gap=2, extra="flex: 1; min-width: 0;"),
-               ring(0.96, 26, T["danger"], 3),
+               sp(), ring(0.96, 26, T["danger"], 3),
                txt("28:41 left", 12.5, T["danger"], 600, mono=True),
-               gap=10, extra=f"width: 100%;")
-    metrics = row(*[col(txt(v, 15, T["ink"], 600, mono=True), txt(k, 11, T["faint"]), gap=2)
-                    for v, k in [("12%", "CPU"), ("41%", "memory"), ("0s", "idle")]],
-                  gap=30, extra="flex: none;")
-    now = row(ic("window", 13, T["faint"]), txt("Excel — budget-2026.xlsx", 12, T["dim"]), gap=7,
-              extra="width: 100%;")
-    foot = col(txt("Double-click to go in", 11.5, T["faint"]),
-               row(gbtn("Take a still", "camera", "sm"), sp(), tbtn("Leave", "danger", "back", "sm"),
-                   gap=6, extra="width: 100%;"),
-               gap=8, extra="width: 100%;")
-    return col(head, rule(), metrics, now, rule(), foot, gap=12,
-               extra=f"width: {w}px; box-sizing: border-box; padding: 14px 16px; border-radius: 14px; "
-                     f"background: {T['pane']}; box-shadow: inset 0 0 0 1px {T['danger']}66;")
+               gap=10, extra=f"width: {right}px;")
+    facts = col(*[row(txt(k, 12, T["dim"]), sp(), txt(v, 12, tone_c(tone, T["ink"]), 500), gap=10,
+                      extra=f"width: {right}px; padding: 7px 0; border-bottom: 1px solid {T['line']};")
+                  for k, v, tone in [("Ends", "14:50", "warn"),
+                                     ("They see", "a red screen", "danger"),
+                                     ("The picture", "a still, 12s old", "")]],
+                gap=0, extra=f"width: {right}px;")
+    foot = row(txt("Double-click to go in", 11.5, T["faint"]), sp(),
+               gbtn("Refresh", "arrow", "sm"), tbtn("Leave", "danger", "back", "sm"),
+               gap=6, extra=f"width: {right}px;")
+    return row(screen_still(shot_w, 214),
+               col(head, rule(), facts, sp(), foot, gap=12, extra=f"width: {right}px; height: 214px;"),
+               gap=32, align="flex-start", extra=f"width: {w}px;")
 
 
 def dp07():
     govern = kcell("Who governs", "you hold R. Mensah's workstation", "danger",
-                   row(held_card(334), mini_station(ADMINS[1], 268), gap=24, align="flex-start",
-                       extra="width: 626px;"),
-                   w=670, h=308, top=True)
+                   held_card(856), w=900, h=316, top=True)
     machines = kcell("Its machines", "one behind, one out of place", "warn",
-                     machines_grouped(626), w=670, h=308, top=True)
+                     machines_grouped(396, size=46, gap=9), w=440, h=316, top=True)
+    waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
     today = kcell("Today", "two machines were entered", "warn",
                   dept_day(w=816, lane_h=21, gap_y=9), w=900, h=340, top=True)
-    waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
     return dept_page("Operations", ["Everything", "Operations"], "Operations",
                      "you are holding one workstation", "danger",
                      [row(govern, machines, gap=20, align="stretch", extra="flex: none;"),
-                      row(today, waits, gap=20, align="stretch", extra="flex: none;")],
-                     "DP07 · The session, held. The window did not move: the container sits where the ask was "
-                     "made, counts down, and double-clicking it is what takes you into level 3. It is a "
-                     "live-state card — metrics, the machine, a still on demand — never a fake screen. "
-                     "It is mirrored into Must see for as long as it exists, and nowhere else.",
+                      row(waits, today, gap=20, align="stretch", extra="flex: none;")],
+                     "DP07 · The session, held. The window did not move: the big cell becomes the session, "
+                     "carrying their screen and the countdown, and double-clicking it is what takes you into "
+                     "level 3. THE PICTURE IS A STILL AND SAYS ITS AGE — the screenshot Action writes a PNG on "
+                     "the worker and returns a path, so carrying the image back is not built yet, and a live "
+                     "feed is a separate Engine capability.",
                      eyebrow("STATE", "A session is a container, not a navigation", "level 2, holding"),
                      status=("holding WS-OPS-A1   28:41 left", "danger"))
 

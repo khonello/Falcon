@@ -17,7 +17,7 @@ Read with `BOARDS.md` (what each board is) and `HANDOFF.md` (where the code stan
 | **Titles sit above the cells**, on the frame, not inside them | Each carries its state phrase on the right, in the tone. The cell itself is a clean surface holding only the drawing. |
 | **The header is "Must see" and the time** | The line describing the organisation ("three departments, three Admins, fourteen client PCs") was **removed on request** — a Super User already knows that. The page says what they must see. |
 | **The dashboards are drawn on the frame** | No grey sheet behind the body. The gradient shows between the panels. |
-| **The department page, `DP05`–`DP08`** | Approved 25 Sep 2026 — *"the design works for me, not perfect but it works."* Four cells (Who governs · Its machines · Today · Waiting on you) over the signature *an equal pair over a split*; an Admin opened with *the reading leads*; the session drawn as a container on the page; and the four answers arriving in the lane that stated the cost. **Design approved, not yet in QML** — and "not perfect" is on the record, so refinement is expected during the build, not a new pass. |
+| **The department page, `DP05`–`DP08`** | Approved 25 Sep 2026 — *"the design works for me, not perfect but it works."* Four cells (Who governs · Its machines · Today · Waiting on you) over the signature *a pinwheel* — the two big cells on a diagonal; an Admin opened with *the reading leads*; the session drawn as a container on the page; and the four answers arriving in the lane that stated the cost. **Design approved, not yet in QML** — and "not perfect" is on the record, so refinement is expected during the build, not a new pass. |
 | **`D01`–`D03`, the Super User dashboards** | The first unreserved "beautiful" of the whole pass. `D04` is the descent into one department. |
 
 ## 2. Approved principles — these shape every page still to be designed
@@ -125,6 +125,8 @@ identity uses the categorical ramp, every hue carries a word.
 | **Hex fleet, slope chart** | Decoration and specialist reading; neither earned its place. |
 | **Identical rounded cards on a grid, repeated** | The module that made every early take interchangeable. A page needs an organising idea, not a card kit. |
 | **Empty space where a chart has no data** | "I'd rather the visual exists, with a no information notice… rather than the space being empty." |
+| **Two Admin stations crammed into one cell** (`DP05`, first cut) | *"The who governs is terrible."* Two people compressed side by side gave neither enough room. Replaced by **one Admin at full width**, the others named on a line at the foot — single click swaps who is drawn, double click enters them. |
+| **A metrics card as the held session** (`DP07`, first cut) | CPU, memory, idle and a *Take a still* button. *"Not metrics, screenshot."* The held session now carries **a picture of their screen**, with the session facts beside it. The picture states its age, because it is a still and the transport for it is not built — see `PHASES.md`. |
 | **The first traversal pass** (a sidebar-and-card-strip department screen, a tall amber banner) | "No way am accepting this disgusting work… this mood board you are giving me for department level is just terrible." The level was wrong (traversal starts in a *department*, which had never been drawn) and the page fell back on the pre-kit shell. Redrawn in the Overview's language; the banner became a 38 px red lid. |
 
 Rejected from earlier in the phase and still binding: **left-edge accent borders** on selected rows

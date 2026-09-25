@@ -270,6 +270,16 @@ When resumed, build to `design-brief.md` and the canvas, not to the old screens.
 
 ---
 
+## Engine work the approved UI now depends on — agreed 25 Sep 2026, "to be done later"
+
+- **Carry a screen picture to the Operator Client.** Board `DP07` draws the held session with a picture
+  of the Admin's screen, approved by the user with the gap understood. Today `engine/control/actions.py`
+  declares a `screenshot` Action and `worker_client/executor.py` implements it, but it writes a PNG to the
+  worker's own disk and returns the *path* — nothing carries the bytes. Three pieces: the Action returning
+  image data, a protocol message able to carry it (size limits, NDJSON means base64 or a side channel),
+  and a refresh the client asks for. The card labels the picture with its age precisely because it is a
+  still. **A live feed is a separate, larger capability and is not implied by this.**
+
 ## Deferred (spec §10) — decide when reached, not before
 
 - Dashboard refresh mechanism (poll vs push)
