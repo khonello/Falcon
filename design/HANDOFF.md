@@ -9,9 +9,14 @@ and the nine questions about them, all settled) → `design/BOARDS.md` (what eve
 (where the code stands and what to do next).
 
 **Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design",
-84 boards, **version 44**. Rejected and superseded proposals are deleted from it. Branch
-`phase7/design-and-gui-rebuild`; **122 tests green, `ruff check .` clean**. No QML has changed in this
-pass — everything below is design.
+**version 44, and out of date**: `gen.py` now writes **97 artboards**, so everything from `DP05`
+onwards (the whole department level) exists only on disk. Publishing it is one Artifact call and has
+not been done. Rejected and superseded proposals are deleted from the canvas.
+
+Branch `phase7/design-and-gui-rebuild`; **122 tests pass and `ruff check .` is clean** (re-verified
+25 Sep 2026 with `FALCON_TEST_DATABASE_URL` set — without it 79 of them skip and the run is not
+evidence of anything). **No QML has changed in this entire pass** — everything below is design, and
+the build is the next thing to happen.
 
 ---
 

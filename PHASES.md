@@ -223,10 +223,12 @@ When resumed, build to `design-brief.md` and the canvas, not to the old screens.
 - [x] The sentence layer — `operator_client/core/narrate.py` + `tests/test_narrate.py`: generated,
       never written; twelve words; a zero is a result, an absence is not
 - [x] Clicking a cell **opens it in place** (board `K03`): the cell grows where it is and the panels
-      around it become the gradient that explains it. **Authority is built end to end**; Rollout,
-      Today and Out of place each need their own composition — the shape belongs to the cell
-- [ ] **Traversal into an Admin: how the GUI changes.** No design, no code, no test — a backbone
-      behaviour that the dependent pages need settled first
+      around it become the gradient that explains it. **All four are built** — `OpenedAuthority`,
+      `OpenedRollout`, `OpenedToday`, `OpenedOutOfPlace`, each with its own composition
+- [ ] **Traversal into an Admin: how the GUI changes.** **Designed and approved 25 Sep 2026**
+      (`DP05`–`DP17`, the department level end to end: the place, selecting, entering, the cost, the
+      four answers, the two held states, scale and maximising). **No QML, no test yet** — this is the
+      next build, and it carries the rail 8→5 with it because the department page renders the five
 - [ ] The other Super User pages: Views, Reports, Updates, Tasks, Flows, Assistance
 - [ ] Port the Admin views one at a time against their boards, deleting each legacy view as it lands
 - [ ] Fine-tune each surface to its concept (per `design-brief.md`): traversal/session, task proposal review, **flow as a graph**, resource tiers/violations, assistance channels, automation dashboard, reports/routing/alerts/updates, indicators
