@@ -24,8 +24,11 @@ perfect but it works"*). Four boards, all in `design/dept.py`:
 |---|---|
 | `DP05` | the department at rest — four cells in *a pinwheel*, one Admin drawn at full width, the day wide |
 | `DP06` | an Admin opened in place — *the reading leads*, the cost stated before the act |
-| `DP07` | the session as a container: **their screen**, the countdown, the way in — no metrics card |
+| `DP07` | the yes, answered **in the lane that asked** — their screen, the countdown, the way out |
+| `DP09` | Escape, still holding — the resting layout back, with the session riding beside the Admin |
 | `DP08` | the four answers, arriving in the lane that stated the cost — no modal in the level |
+
+**Two held states, not one.** `DP07` is holding *while still inside* the opened Admin, and `DP09` is holding *after Escape*. The first draft collapsed them and drew only the second, which made the flow page show step 5 as a repeat of step 3. `DP08`'s own rule — the answer lands in the lane that asked — is what says the first held state keeps the opened composition.
 
 **The next step is QML**, not more drawing: a `DepartmentView` on the same kit, reached by
 double-clicking a department in Authority, with a test that finds it by `objectName`. "Not perfect" is

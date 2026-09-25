@@ -30,8 +30,10 @@ STEPS = [
      "Authority › Operations", "Design only", ACCENT),
     ("DP06-Entering.png", "4", "R. Mensah, chosen", "double-click the Admin in Who governs",
      "Authority › Operations › R. Mensah", "Design only", ACCENT),
-    ("DP07-Held.png", "5", "Holding their workstation", "press Enter — the window does not move",
-     "crumb unchanged; the status line changes", "Design only", ACCENT),
+    ("DP07-Held.png", "5", "Holding them", "press Enter — the answer lands in the lane that asked",
+     "Authority › Operations › R. Mensah", "Design only", ACCENT),
+    ("DP09-Carried.png", "6", "Back out, still holding", "Escape — the session keeps running",
+     "Authority › Operations", "Design only", ACCENT),
 ]
 
 TW, TH = 640, 400
@@ -70,7 +72,7 @@ html = f'''<!doctype html>
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="width:10px;height:26px;border-radius:3px;background:#fff;"></span>
     <span style="font-family:{SANS};font-size:22px;font-weight:700;color:#fff;">Super User → department → Admin → held</span>
-    <span style="font-family:{SANS};font-size:13px;color:{DIM};">one gesture repeated, five times — single click inspects, double click enters, Escape comes back</span>
+    <span style="font-family:{SANS};font-size:13px;color:{DIM};">one gesture repeated, and one Escape — single click inspects, double click enters, Escape comes back</span>
   </div>
   <div style="font-family:{SANS};font-size:12.5px;color:{FAINT};padding:8px 0 20px 22px;">
     Steps 1–2 are screenshots of the running app. Steps 3–5 are boards, because no QML exists for them yet.

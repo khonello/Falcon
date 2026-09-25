@@ -83,17 +83,26 @@ def other_line(a):
 
 
 def one_admin(a, others, w=856):
+    """One Admin, given the room two of them were fighting over. Below ~600px the station goes
+    NARROW -- the count leaves the head and the two bars stack -- because a head that wraps to three
+    lines is worse than a column that is one line taller."""
+    narrow = w < 600
     head = row(av(a["initials"], "admin", 44, "native"),
                col(txt(a["name"], 16, T["ink"], 600),
                    row(txt(a["host"], 12, T["faint"], mono=True), sicon(a["state"], 13),
                        txt(SESSION_WORD[a["state"]] + " · " + a["when"], 12, T["faint"]), gap=7),
                    gap=3, extra="flex: 1; min-width: 0;"),
-               sp(), txt(f'Answers for {len(a["pcs"])}', 12, T["faint"]),
+               *([] if narrow else [sp(), txt(f'Answers for {len(a["pcs"])}', 12, T["faint"])]),
                gap=13, extra=f"width: {w}px;")
-    work = row(health_line("Tasks", a["tasks"], w=282), health_line("Flows", a["flows"], w=282),
-               sp(), gap=44, extra=f"width: {w}px;")
+    if narrow:
+        work = col(health_line("Tasks", a["tasks"], w=w), health_line("Flows", a["flows"], w=w),
+                   gap=12, extra=f"width: {w}px;")
+    else:
+        work = row(health_line("Tasks", a["tasks"], w=282), health_line("Flows", a["flows"], w=282),
+                   sp(), gap=44, extra=f"width: {w}px;")
     told = txt(a["told"], 13, T["ink"], 500, extra="line-height: 1.4;")
-    foot = col(rule(), txt("Also here", 11.5, T["faint"]),
+    foot = col(rule(),
+               *([] if narrow else [txt("Also here", 11.5, T["faint"])]),
                col(*[other_line(o) for o in others], gap=0, extra=f"width: {w}px;"),
                gap=9, extra=f"width: {w}px;")
     return col(head, rule(), work, told, sp(), foot, gap=13, extra=f"width: {w}px; height: 100%;")
@@ -116,7 +125,7 @@ def machines_grouped(w=626, size=52, gap=9):
                 gap=7, extra=f"width: {w}px;")
     return col(col(*groups, gap=14), notes,
                legend([("Confirmed", ST["confirmed"]), ("Behind", ST["behind"]), ("Out of place", ST["failing"])],
-                      "faded slots are machines this Admin does not have"),
+                      "faded slots are machines this Admin does not have" if w >= 500 else ""),
                gap=15, extra=f"width: {w}px;")
 
 
@@ -293,49 +302,112 @@ def screen_still(w=856, h=214):
             f'{window}{side}{taskbar}</div>')
 
 
-def held_card(w=856):
-    """The session, as a container: their screen at its own proportions, and beside it who is held,
-    for how long, and the way in. No metrics card and no still-button — the picture is the subject."""
-    shot_w = 396
-    right = w - shot_w - 32
-    head = row(av("RM", "admin", 32, "native"),
-               col(txt("R. Mensah", 13.5, T["ink"], 600),
-                   txt("WS-OPS-A1", 11.5, T["faint"], mono=True), gap=2, extra="flex: 1; min-width: 0;"),
-               sp(), ring(0.96, 26, T["danger"], 3),
-               txt("28:41 left", 12.5, T["danger"], 600, mono=True),
-               gap=10, extra=f"width: {right}px;")
+def held_lane(w=372):
+    """The lane that stated the cost now carries the session -- DP08's rule, applied to the yes.
+    This is where their screen lives, because this is where you are looking at them."""
+    head = row(ring(0.96, 26, T["danger"], 3),
+               txt("28:41 left", 13, T["danger"], 600, mono=True), sp(),
+               txt("WS-OPS-A1", 11.5, T["faint"], mono=True), gap=9, extra=f"width: {w}px;")
     facts = col(*[row(txt(k, 12, T["dim"]), sp(), txt(v, 12, tone_c(tone, T["ink"]), 500), gap=10,
-                      extra=f"width: {right}px; padding: 7px 0; border-bottom: 1px solid {T['line']};")
-                  for k, v, tone in [("Ends", "14:50", "warn"),
-                                     ("They see", "a red screen", "danger"),
+                      extra=f"width: {w}px; padding: 7px 0; border-bottom: 1px solid {T['line']};")
+                  for k, v, tone in [("Ends", "14:50", "warn"), ("They see", "a red screen", "danger"),
                                      ("The picture", "a still, 12s old", "")]],
-                gap=0, extra=f"width: {right}px;")
-    foot = row(txt("Double-click to go in", 11.5, T["faint"]), sp(),
-               gbtn("Refresh", "arrow", "sm"), tbtn("Leave", "danger", "back", "sm"),
-               gap=6, extra=f"width: {right}px;")
-    return row(screen_still(shot_w, 214),
-               col(head, rule(), facts, sp(), foot, gap=12, extra=f"width: {right}px; height: 214px;"),
-               gap=32, align="flex-start", extra=f"width: {w}px;")
+                gap=0, extra=f"width: {w}px;")
+    doors = col(rule(), txt("Or go straight to a machine", 12, T["faint"]),
+                col(*[row(dot(ST[st], 8), txt(host, 12.5, T["ink"], 500, mono=True),
+                          txt(word, 12, T["faint"]), sp(), ic("chev", 13, T["faint"]), gap=9,
+                          extra=f"width: {w}px; padding: 7px 0; border-bottom: 1px solid {T['line']};")
+                      for host, st, word in [("OPS-01", "confirmed", "in use since 08:12"),
+                                             ("OPS-06", "behind", "behind, six attempts")]],
+                    gap=0, extra=f"width: {w}px;"),
+                gap=12, extra=f"width: {w}px;")
+    foot = row(gbtn("Refresh", "arrow", "sm"), sp(), tbtn("Leave", "danger", "back", "sm"),
+               gap=6, extra=f"width: {w}px;")
+    return col(head, screen_still(w, 209), facts, doors, sp(), foot, gap=15, extra=f"width: {w}px;")
 
 
 def dp07():
-    govern = kcell("Who governs", "you hold R. Mensah's workstation", "danger",
-                   held_card(856), w=900, h=316, top=True)
+    """The yes, answered where it was asked. Same composition as DP06 -- the reading still leads --
+    but the lane now holds the session instead of its price. Nothing navigated; one cell changed."""
+    lane = kcell("Holding R. Mensah", "28:41 left", "danger", held_lane(372),
+                 w=416, h=660, top=True, pad=22)
+    hero_ = kcell("R. Mensah", "blocked out of their own machine", "danger",
+                  chosen_station(ADMINS[0], 876), w=924, h=308, top=True)
+    theirs = kcell("Their machines", "OPS-06 behind", "warn",
+                   col(dept_pcs(ADMINS[0]["pcs"], BIGGEST, size=46, gap=9),
+                       txt("Four of the seven here; OPS-06 has lost six attempts at 1.4.2.", 12.5,
+                           T["ink"], 500, extra="line-height: 1.4; max-width: 400px;"),
+                       col(*[row(txt(h_, 12, T["dim"], mono=True), sp(),
+                                 txt(v, 11.5, tone_c(tone, T["faint"]), 500), gap=8,
+                                 extra=f"width: 396px; padding: 6px 0; border-bottom: 1px solid {T['line']};")
+                             for h_, v, tone in [("OPS-01", "1.4.2 confirmed", "ok"),
+                                                 ("OPS-02", "1.4.2 confirmed", "ok"),
+                                                 ("OPS-03", "1.4.2 confirmed", "ok"),
+                                                 ("OPS-06", "retrying 1.4.2", "warn")]],
+                           gap=0), gap=13),
+                   w=452, h=332, top=True)
+    theirday = kcell("Their day", "you are on it now", "danger",
+                     col(scoped_day(["OPS-01", "OPS-02", "OPS-03", "OPS-06"],
+                                    {"OPS-01": (8.2, 17.4), "OPS-03": (9.0, 17.0)}, w=396),
+                         legend([("At the PC", T["line2"])], "OPS-02 and OPS-06 not signed in"),
+                         txt("Two of their four machines were used today. Your session on their "
+                             "workstation began at 14:20.", 12.5, T["ink"], 500,
+                             extra="line-height: 1.4; max-width: 396px;"),
+                         gap=13),
+                     w=452, h=332, top=True)
+    right = col(hero_, row(theirs, theirday, gap=20, align="stretch", extra="flex: none;"),
+                gap=20, extra="flex: none; display: flex; flex-direction: column;")
+    return dept_page("Operations", ["Authority", "Operations", "R. Mensah"], "Operations",
+                     "you are holding one workstation", "danger",
+                     [row(lane, right, gap=20, align="flex-start", extra="flex: none;")],
+                     "DP07 · The yes, answered in the lane that asked. The composition does not change when "
+                     "the answer comes back — the lane that stated the price now carries the session, their "
+                     "screen and the way out. THE PICTURE IS A STILL AND SAYS ITS AGE. Escape leaves the "
+                     "session running and takes you back out to DP09.",
+                     eyebrow("STATE", "The answer lands where the ask was made", "level 2, holding, inside"),
+                     status=("holding WS-OPS-A1   28:41 left", "danger"))
+
+
+# ------------------------------------------------------------------ DP09: escaped back out, still holding
+# Step 3's layout again, and that is the point: you came back to the same place. What differs is one
+# cell -- the session rides along as a small container beside the Admin, which is the shape TABS.md
+# settled ("a small landscape container carrying the countdown"). The screen picture does NOT come
+# with it: the picture belongs where you are looking at them, and out here what you carry is the clock.
+def held_chip(w=340):
+    head = row(av("RM", "admin", 28, "native"),
+               col(txt("R. Mensah", 12.5, T["ink"], 600),
+                   txt("WS-OPS-A1", 11, T["faint"], mono=True), gap=1, extra="flex: 1; min-width: 0;"),
+               ring(0.96, 24, T["danger"], 3),
+               txt("28:41", 12, T["danger"], 600, mono=True),
+               gap=9, extra=f"width: {w - 32}px;")
+    foot = row(txt("Double-click to go back in", 11.5, T["faint"]), sp(),
+               tbtn("Leave", "danger", "back", "sm"), gap=6, extra=f"width: {w - 32}px;")
+    return col(head, rule(),
+               txt("Held since 14:20. They are blocked until you leave.", 12, T["dim"],
+                   extra="line-height: 1.45;"), foot,
+               gap=11, extra=f"width: {w}px; box-sizing: border-box; padding: 14px 16px; "
+                             f"border-radius: 13px; background: {T['pane']}; "
+                             f"box-shadow: inset 0 0 0 1px {T['danger']}66;")
+
+
+def dp09():
+    govern = kcell("Who governs", "you are holding R. Mensah", "danger",
+                   row(one_admin(ADMINS[0], ADMINS[1:], 484), held_chip(340), gap=32,
+                       align="flex-start", extra="width: 856px;"),
+                   w=900, h=330, top=True)
     machines = kcell("Its machines", "one behind, one out of place", "warn",
-                     machines_grouped(396, size=46, gap=9), w=440, h=316, top=True)
-    waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
+                     machines_grouped(396, size=46, gap=9), w=440, h=330, top=True)
+    waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=326, top=True)
     today = kcell("Today", "two machines were entered", "warn",
-                  dept_day(w=816, lane_h=21, gap_y=9), w=900, h=340, top=True)
+                  dept_day(w=816, lane_h=19, gap_y=8), w=900, h=326, top=True)
     return dept_page("Operations", ["Authority", "Operations"], "Operations",
                      "you are holding one workstation", "danger",
                      [row(govern, machines, gap=20, align="stretch", extra="flex: none;"),
                       row(waits, today, gap=20, align="stretch", extra="flex: none;")],
-                     "DP07 · The session, held. The window did not move: the big cell becomes the session, "
-                     "carrying their screen and the countdown, and double-clicking it is what takes you into "
-                     "level 3. THE PICTURE IS A STILL AND SAYS ITS AGE — the screenshot Action writes a PNG on "
-                     "the worker and returns a path, so carrying the image back is not built yet, and a live "
-                     "feed is a separate Engine capability.",
-                     eyebrow("STATE", "A session is a container, not a navigation", "level 2, holding"),
+                     "DP09 · Escape came back out; the session is still running. The page is step 3's layout "
+                     "again — deliberately, because it is the same place — and the only difference is the "
+                     "container riding beside the Admin, carrying the clock and the way back in.",
+                     eyebrow("STATE", "Holding and looking are different things", "level 2, holding, outside"),
                      status=("holding WS-OPS-A1   28:41 left", "danger"))
 
 
@@ -395,5 +467,6 @@ def dp08():
                 cells, brow=eyebrow("BEHAVIOUR", "hierarchy.traverse", "four answers, one place"))
 
 
-DEPT_PAGE += [("DP07-Held.dc.html", "Department: the session, as a container", dp07),
-              ("DP08-Answers.dc.html", "Department: what comes back when you ask", dp08)]
+DEPT_PAGE += [("DP07-Held.dc.html", "Department: the yes, answered in the lane", dp07),
+              ("DP08-Answers.dc.html", "Department: what comes back when you ask", dp08),
+              ("DP09-Carried.dc.html", "Department: back out, still holding", dp09)]
