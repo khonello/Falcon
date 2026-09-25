@@ -66,7 +66,25 @@ one, built from this combination unless the user changes part of it:
 > with **the cost stated first, then the act** · everything opened by **double click, in place**.
 
 `T01` (at rest) and `T02` (an Admin chosen) are the pre-mood-board attempts — material, not the answer.
-Rebuild from the combination above, screenshot it, and let the user react to the real page.
+
+**`DP05` and `DP06` are that rebuild** (`design/dept.py`), drawn 25 Sep 2026 and waiting on the user's
+reaction. `DP05` is the department at rest: **Who governs** (the two Admins as stations, side by side,
+equal) · **Its machines** (the seven, grouped under whoever answers for them, named) · **Today** (the
+wide cell) · **Waiting on you** (a reading). Its signature is **an equal pair over a split**, which no
+other page has. `DP06` is `Who governs` opened on one Admin, and its signature is **the reading leads**:
+the cost of entering is stated down the left before the act, with the second door — a machine, directly —
+named under it. The rail is drawn as the five settled areas with **Authority** lit; `IconRail.qml` still
+has eight, so the board is ahead of the code on purpose.
+
+**Judgement calls made while drawing, for the user to confirm or overrule:**
+
+- The station keeps its slots as a **health glyph** (how many, are they well) and `Its machines` **names**
+  them. `DP02`'s Station and `DP03`'s Grouped-by-Admin are nearly the same drawing, so each was given a
+  different question to answer rather than drawing the seven twice.
+- The at-rest page **offers to enter nobody**. The act appears only once a cell is opened, which is
+  `DP04`'s "quiet until you reach for it" carried into the page rather than into a hover.
+- Both boards still carry some air in the cells. That was left rather than padded with invented content,
+  because the shape is what needs a reaction first.
 
 **Settled since, and binding on everything drawn from here**
 

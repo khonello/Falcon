@@ -17,6 +17,8 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `P01`–`P05` | **The density system**, the pages composed from it, and the never-blank rule. |
 | `T01`–`T06` | **A department, and entering an Admin in it.** The department drawn as a place in the Overview's language — a colonnade over a floor — then one Admin chosen, then held under a red lid. |
 | `K01`–`K06` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built (`K02` is the rejected alternative); `K03`–`K06` are its four cells opened in place, one shape each. |
+| `DP05` | **The department page, built from the picks.** Four cells — Who governs · Its machines · Today · Waiting on you — an equal pair over a split, with the day wide. Level 2: nothing is held, nothing offers to enter anybody. |
+| `DP06` | **An Admin opened in place**, and the ask. The reading LEADS the shape, because the subject is a decision with a price: the cost is stated before the act, and the second door (a machine, directly) is named beside it. |
 | `DP01`–`DP04` | **The department mood board.** The level currently being worked on: its shape, its people, its machines, and the two doors out of it — four approaches each, to be picked from the way `S01`–`S04` and `M01`–`M15` were. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
