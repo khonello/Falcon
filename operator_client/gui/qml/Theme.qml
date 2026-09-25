@@ -51,6 +51,15 @@ QtObject {
     readonly property var chartSeries: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"]
     function series(i) { return chartSeries[((i % 5) + 5) % 5] }
 
+    // two letters off a name, for an avatar. Written here once because it was about to be
+    // written a third time.
+    function initials(name) {
+        if (!name) return "?"
+        var parts = String(name).replace(/\./g, " ").split(" ").filter(function (p) { return p.length > 0 })
+        return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0]
+                                 : String(name).substring(0, 2)).toUpperCase()
+    }
+
     // --- selection ----------------------------------------------------------------------------
     readonly property color select: "#33446B"                                   // a selected sidebar row
     readonly property color selectSub: Qt.rgba(1, 1, 1, 0.68)

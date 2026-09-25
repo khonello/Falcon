@@ -68,6 +68,8 @@ Item {
             out.push({ hostname: pc.hostname || "", pc_id: pc.pc_id,
                        state: bad[pc.pc_id] ? "danger" : (behind[pc.pc_id] || "ok") })
         }
+        // a stable order, and the settled one: by hostname, never resorted by state
+        out.sort(function (a, b) { return String(a.hostname).localeCompare(String(b.hostname)) })
         return out
     }
     readonly property var deptSessions: {
@@ -91,13 +93,6 @@ Item {
         var n = 0
         for (var w = 0; w < workers.length; w++) if (workers[w].pc_id && !seen[workers[w].pc_id]) n++
         return n
-    }
-
-    function initialsOf(name) {
-        var parts = String(name || "").trim().split(/\s+/).filter(function (p) { return p.length > 0 })
-        if (parts.length === 0) return "?"
-        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     }
 
     function stateWord(a) {

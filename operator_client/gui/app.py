@@ -42,6 +42,11 @@ def create(config: LocalConfig, *, auto_connect: bool = False) -> tuple[QGuiAppl
     app = application()
     bridge = FalconBridge(config)
     engine = QQmlApplicationEngine()
+    # QML errors are otherwise silent here: the loader below raises "see errors above" with nothing
+    # above it, because Qt's default message handler does not reach this console. One bad property
+    # name then costs an hour. Print them instead.
+    engine.warnings.connect(
+        lambda warnings: [print("QML:", w.toString(), file=sys.stderr) for w in warnings])
     bridge.js_engine = engine          # QJSValue.engine() is not exposed by PySide6; results are converted through this
     engine.rootContext().setContextProperty("falcon", bridge)
     engine.rootContext().setContextProperty("autoConnect", auto_connect)

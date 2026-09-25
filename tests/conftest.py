@@ -40,6 +40,16 @@ TEST_DB_URL = os.environ.get("FALCON_TEST_DATABASE_URL")
 requires_db = pytest.mark.skipif(not TEST_DB_URL, reason="FALCON_TEST_DATABASE_URL not set")
 
 
+def pytest_report_header(config):
+    """Say it at the top, not in a count nobody reads. Without the URL most of the suite skips, and
+    a green run then means almost nothing -- which is exactly how "122 tests green" got written down
+    after a run that had only executed 43 of them."""
+    if TEST_DB_URL:
+        return f"falcon: database tests ON ({TEST_DB_URL.rsplit('/', 1)[-1]})"
+    return ["falcon: NO DATABASE -- every DB-backed test will SKIP and a pass here proves little.",
+            "        set FALCON_TEST_DATABASE_URL=postgresql://falcon:falcon@localhost:5432/falcon_test"]
+
+
 async def _wipe_and_migrate(database: Database) -> None:
     async with database.pool.acquire() as conn:
         await conn.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")

@@ -1175,3 +1175,8 @@ canvas = {
 }
 (OUT / "canvas.json").write_text(json.dumps(canvas, indent=1), encoding="utf-8")
 print("wrote", len(SCREENS), "artboards")
+# The live canvas is arranged BY HAND. This index is a fallback for a canvas that does not exist yet
+# and a source of board titles -- publishing it as-is would throw away the layout, the row notes and
+# the boards the generator does not place. design/README.md has the merge.
+print("NOTE: boards/canvas.json is generated, not publishable. Merge into the live index instead --")
+print("      read the artifact's project/canvas.json, keep every x/y and note, append new boards.")

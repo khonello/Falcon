@@ -54,11 +54,7 @@ Item {
         }
         return 0
     }
-    function initials(name) {
-        if (!name) return "?"
-        var parts = String(name).replace(".", " ").split(" ").filter(function (p) { return p.length > 0 })
-        return (parts.length > 1 ? parts[0][0] + parts[1][0] : String(name).substring(0, 2)).toUpperCase()
-    }
+    function initials(name) { return Theme.initials(name) }   // kept as a name the views already call
 
     // --- rollout --------------------------------------------------------------------------------
     readonly property var version: rollout.version || null

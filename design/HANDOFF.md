@@ -62,6 +62,18 @@ gesture safe to try. `design/journey_strip.py` → `boards/JOURNEY.html` (1440×
 
 **Selecting must be visible in the QML.** `DP16` (a department ringed in the map), `DP15` (an Admin swapped into the cell) and `DP17` (that Admin entered) are the single-click states. The test for whether the build got it right: **the crumb moves on a double click and never on a single one.**
 
+**Known, and not yet paid off (found building level 2):**
+
+- **`DepartmentView` gets its day from `OverviewView.lanesForDept(id)`.** The date arithmetic
+  (`hoursOf`, `sessionState`, `blocksFor`) lives in the Overview, so the department page depends on a
+  sibling view rather than on a component. It works because both are mounted; it should become a
+  shared piece when the next view needs lanes.
+- **The department's "Waiting on you" reading is written inline** rather than using `ReadingPanel`,
+  which carries its own `Panel` title and would double up inside a `GridCell`. Two renderings of the
+  same idea now exist — fold them together when the other cells are ported.
+- **`Its machines` does not maximise yet.** `FleetGrid` picks its mark size and drops the hostnames at
+  scale (`DP10`), but the double click that gives them back (`DP11`) is designed and not built.
+
 **Two rules the build must honour, settled 25 Sep 2026 (`DP10`, `DP11`):**
 
 - **Scale.** `Its machines` must pick its mark size from the count — 46 px labelled, 30 px, 16 px, then
@@ -341,6 +353,21 @@ replacements land: `HierarchyView.qml`, `HierarchyRail.qml`. `GlancePage`, `Hier
 `RecordPage` were deleted when the three Overview tabs went.
 
 ## Qt gotchas already paid for
+
+- **`signal left()` never registers.** `left` collides with an existing `Item` member, so the signal
+  is silently dropped and the handler is refused with *Cannot assign to non-existent property
+  "onLeft"*. The signal is `back()`. Suspect any signal named after an anchor or a geometry property.
+- **QML errors used to be invisible here.** The loader raised "failed to load QML (see errors above)"
+  with nothing above it. `gui/app.py` now connects `engine.warnings` and prints them, which is the
+  only reason the one above took minutes instead of an hour. The GUI test fixture disconnects that
+  handler before teardown, because tearing the engine down re-evaluates bindings against a `falcon`
+  that is already gone.
+- **A `property var` is a `QJSValue` from QML and a plain dict when the value came back through the
+  bridge.** `tests/test_operator_gui.py` has a `val()` helper that reads either; `.toVariant()` alone
+  fails on the second kind.
+- **A pytest run without `FALCON_TEST_DATABASE_URL` skips most of the suite and still says "passed".**
+  `tests/conftest.py` now prints a header saying so — that trap is how "122 tests green" got written
+  down after a run that executed 43 of them.
 
 - A **nested layout fills by default**: a `RowLayout` inside a `ColumnLayout` starves its sibling
   unless told `Layout.fillHeight: false`. This cost an hour twice.

@@ -29,6 +29,10 @@ def gui(tmp_path: Path):
     _app, qml, bridge = create(cfg)
     win = qml.rootObjects()[0]
     yield win, qml, bridge
+    # `create` prints QML warnings, which is what makes a bad property name findable. Tearing the
+    # engine down re-evaluates bindings against a `falcon` that is already gone, so the handler is
+    # dropped first: that noise is the harness's, not the app's.
+    qml.warnings.disconnect()
     qml.deleteLater()
 
 
