@@ -31,6 +31,18 @@ perfect but it works"*). Four boards, all in `design/dept.py`:
 double-clicking a department in Authority, with a test that finds it by `objectName`. "Not perfect" is
 on the record, so expect to refine while building — that is not a new design pass.
 
+**The whole path, in one page:** `design/flow_strip.py` → `design/boards/FLOW.html` → shoot it at
+1440×1560. It lays the five steps side by side from the real screenshots — steps 1–2 from the running
+app, 3–5 from the boards — so a break in continuity is visible instead of argued about. It found two:
+
+- **The rail changes in the middle of the path.** The app still carries the eight-entry `superNav`;
+  the department boards carry the settled five. That seam is `TABS.md`'s code cost, unspent — and it
+  sits right in the primary journey, which is why it is worth doing before the department view lands
+  rather than after.
+- **The crumb root disagreed** — `Must see › Authority` in the app against `Everything › Operations`
+  on the boards. Fixed on the boards: a department is reached *through* Authority, so the crumb now
+  reads `Authority › Operations › R. Mensah` and the rail and the crumb agree on the same word.
+
 **One dependency the build inherits:** `DP07` shows a picture of the held machine's screen. Nothing carries that image today — the `screenshot` Action writes a PNG on the worker and returns a path. The user has agreed the Engine work comes later; it is written down in `PHASES.md`. Until it exists the card should show its empty state rather than a placeholder image, by the never-blank rule.
 
 **Not drawn, and deliberately:** level 4 (a client PC) has not started, and level 3 keeps the Admin

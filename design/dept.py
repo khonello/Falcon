@@ -140,7 +140,7 @@ def dp05():
     waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
     today = kcell("Today", "two machines were entered", "warn",
                   dept_day(w=816, lane_h=21, gap_y=9), w=900, h=340, top=True)
-    return dept_page("Operations", ["Everything", "Operations"], "Operations",
+    return dept_page("Operations", ["Authority", "Operations"], "Operations",
                      "seven machines, two Admins", "dim",
                      [row(govern, machines, gap=20, align="stretch", extra="flex: none;"),
                       row(waits, today, gap=20, align="stretch", extra="flex: none;")],
@@ -227,7 +227,7 @@ def dp06():
                      w=452, h=332, top=True)
     right = col(hero_, row(theirs, theirday, gap=20, align="stretch", extra="flex: none;"),
                 gap=20, extra="flex: none; display: flex; flex-direction: column;")
-    return dept_page("Operations", ["Everything", "Operations", "R. Mensah"], "Operations",
+    return dept_page("Operations", ["Authority", "Operations", "R. Mensah"], "Operations",
                      "choosing whether to enter", "accent",
                      [row(lane, right, gap=20, align="flex-start", extra="flex: none;")],
                      "DP06 · The same page, one Admin opened in place. The reading LEADS this shape because the "
@@ -326,7 +326,7 @@ def dp07():
     waits = kcell("Waiting on you", "two things", "warn", waiting(396), w=440, h=340, top=True)
     today = kcell("Today", "two machines were entered", "warn",
                   dept_day(w=816, lane_h=21, gap_y=9), w=900, h=340, top=True)
-    return dept_page("Operations", ["Everything", "Operations"], "Operations",
+    return dept_page("Operations", ["Authority", "Operations"], "Operations",
                      "you are holding one workstation", "danger",
                      [row(govern, machines, gap=20, align="stretch", extra="flex: none;"),
                       row(waits, today, gap=20, align="stretch", extra="flex: none;")],
