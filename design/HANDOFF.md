@@ -9,9 +9,12 @@ and the nine questions about them, all settled) → `design/BOARDS.md` (what eve
 (where the code stands and what to do next).
 
 **Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design",
-**version 44, and out of date**: `gen.py` now writes **97 artboards**, so everything from `DP05`
-onwards (the whole department level) exists only on disk. Publishing it is one Artifact call and has
-not been done. Rejected and superseded proposals are deleted from the canvas.
+**version 46**, 99 boards — the department level (`DP05`–`DP17`) is on it, in three new rows at the
+foot. Rejected and superseded proposals are deleted from the canvas.
+
+**The canvas is arranged by hand, so its index is merged and never replaced** — publishing
+`gen.py`'s `canvas.json` would discard the layout, 22 row notes and two boards the generator does not
+place. `design/README.md` has the four-step merge.
 
 Branch `phase7/design-and-gui-rebuild`; **122 tests pass and `ruff check .` is clean** (re-verified
 25 Sep 2026 with `FALCON_TEST_DATABASE_URL` set — without it 79 of them skip and the run is not

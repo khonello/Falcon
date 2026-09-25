@@ -46,6 +46,25 @@ $edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 
 `boards/` is generated output and is not committed.
 
+## NEVER publish the generated `canvas.json` wholesale
+
+**The live canvas has been arranged by hand.** On 25 Sep 2026 its 86 boards sat at positions that
+`gen.py` does not compute, with 22 row notes against the generator's 10, two boards the generator
+does not place (`Lane-Filled`, `Lane-Empty`) and an `attachments` key it does not write. Publishing
+`design/boards/canvas.json` as-is would have thrown all of that away.
+
+So the index is **merged, never replaced**:
+
+1. `read` the artifact, then `read` its `project/canvas.json` (it saves to a local file).
+2. Start from **that** object. Keep every existing board's `x`/`y`, every note, and every key you did
+   not come to change.
+3. Add only the new boards, in a fresh row below the lowest live `y` (rows step 1280, columns 1520),
+   append them to `order`, and add one `row<N>` note per new row.
+4. Publish that merged index with the new `.dc.html` files in one call.
+
+`gen.py`'s `canvas.json` is a **fallback for a canvas that does not exist yet**, and a source of board
+titles. It is not the thing to upload.
+
 ## How a change travels
 
 1. Edit the module, re-run `gen.py`, screenshot the board.
