@@ -19,17 +19,24 @@ Item {
         { key: "assistance", icon: "assistance", label: "Assistance" },
         { key: "reports",    icon: "reports",    label: "Reports" }
     ]
-    // governance, not operation: no Automation, no Actions -- that combo is reached by entering an
-    // Admin. It leads with Overview because the Super User's first job is to see the whole system.
+    // AREAS, NOT FEATURES (design/TABS.md, settled 25 Sep 2026). Five entries, each named after the
+    // question a person is asking rather than after a module, and the same noun means the same thing
+    // at every level -- Work is Work whether you see three departments or one.
+    //
+    //   Must see   what needs me right now          Record   what happened, and who was where
+    //   Authority  who governs what, and where nobody does
+    //   Rollout    what version is where, and what is stuck
+    //   Work       what is moving through the organisation (Assistance folded in, watched not started)
+    //
+    // A department page is INSIDE Authority: going there does not change the rail, only the crumb
+    // and the title. `adminNav` keeps its old shape deliberately -- the Admin rail is level 3 and is
+    // deferred (TABS.md issue 8).
     readonly property var superNav: [
-        { key: "overview",   icon: "pulse",      label: "Overview" },
-        { key: "hierarchy",  icon: "hierarchy",  label: "Hierarchy" },
-        { key: "views",      icon: "eye",        label: "Views" },
-        { key: "reports",    icon: "reports",    label: "Reports" },
-        { key: "updates",    icon: "shield",     label: "Updates" },
-        { key: "tasks",      icon: "tasks",      label: "Tasks" },
-        { key: "flows",      icon: "flows",      label: "Flows" },
-        { key: "assistance", icon: "assistance", label: "Assistance" }
+        { key: "mustsee",   icon: "pulse",     label: "Must see" },
+        { key: "authority", icon: "hierarchy", label: "Authority" },
+        { key: "rollout",   icon: "shield",    label: "Rollout" },
+        { key: "record",    icon: "eye",       label: "Record" },
+        { key: "work",      icon: "tasks",     label: "Work" }
     ]
     readonly property var nav: role === "super_user" ? superNav : adminNav
     readonly property string currentKey: current < nav.length ? nav[current].key : ""

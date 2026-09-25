@@ -29,8 +29,15 @@ ApplicationWindow {
     // which surface is up is a name, not a number: the two roles have different rails, and the
     // rail owns the list. Views switch each other with shell.show("hierarchy").
     readonly property string viewKey: rail.currentKey
+    // The Super User rail is the five areas; the Admin rail is still the old list until level 3 is
+    // opened, so the two spell the same place differently. These two names are what the views test,
+    // rather than a literal key, so neither rail has to know about the other.
+    readonly property bool onMustSee: shell.viewKey === "mustsee"
+    readonly property bool onAuthority: shell.viewKey === "authority" || shell.viewKey === "hierarchy"
     function show(key) {
         var i = rail.indexOfKey(key)
+        if (i < 0 && key === "authority") i = rail.indexOfKey("hierarchy")
+        if (i < 0 && key === "hierarchy") i = rail.indexOfKey("authority")
         if (i >= 0) shell.view = i
     }
     // the views not yet rebuilt call root.notify(): keep that name resolving while they are ported
@@ -110,7 +117,7 @@ ApplicationWindow {
                     // The dashboards are drawn on the frame itself: the panels are the surfaces and
                     // the gradient shows between them, as on the boards. The views that still carry
                     // a sidebar keep the sheet under them.
-                    color: shell.viewKey === "overview" ? "transparent" : Theme.pane
+                    color: shell.onMustSee ? "transparent" : Theme.pane
                     clip: true
 
                     StackLayout {
@@ -126,14 +133,14 @@ ApplicationWindow {
                                 id: overview
                                 objectName: "overviewView"
                                 anchors.fill: parent
-                                visible: shell.viewKey === "overview"
+                                visible: shell.onMustSee
                             }
 
                             HomeView {
                                 id: home
                                 objectName: "hierarchyRail"      // the hierarchy tree lives here now
                                 anchors.fill: parent
-                                visible: shell.viewKey === "hierarchy"
+                                visible: shell.onAuthority
                             }
 
                             // ported one at a time; mounted so their state and tests keep working
@@ -150,7 +157,7 @@ ApplicationWindow {
                             // the views not yet rebuilt on the new kit keep their own surface
                             Item {
                                 anchors.fill: parent
-                                visible: shell.viewKey !== "hierarchy" && shell.viewKey !== "overview"
+                                visible: !shell.onAuthority && !shell.onMustSee
                                 Column {
                                     anchors.centerIn: parent
                                     spacing: 12

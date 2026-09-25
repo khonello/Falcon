@@ -491,14 +491,9 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 34
 
-            Txt {
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Must see"
-                color: "#ffffff"
-                font.pixelSize: Theme.fTitle
-                font.weight: Font.Bold
-            }
+            // No page title. The rail entry says "Must see" and one name for one place is enough
+            // (design/TABS.md, issue 7) -- so the header carries the time and nothing else. The
+            // crumb below still roots on "Must see", because that is where a cell was opened from.
             Txt {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
