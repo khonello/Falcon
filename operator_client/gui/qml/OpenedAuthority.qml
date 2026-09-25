@@ -73,7 +73,10 @@ Item {
                     height: Math.max(160, page.height * 0.44)
                     departments: page.view.tree
                     focusId: page.subject ? page.subject.department_id : 0
-                    onPicked: function (id) { shell.show("hierarchy") }
+                    selectedId: page.subject ? page.subject.department_id : 0
+                    // single click inspects -- the panels beside the map already re-scope to the
+                    // subject -- and double click is what leaves for that department's own page
+                    onEntered: function (id) { shell.enterDepartment(id) }
                 }
             }
 

@@ -35,6 +35,9 @@ def test_every_sentence_is_twelve_words_or_fewer():
         ("confirmations", {"points": [0, 3, 6, 8, 10, 10, 10]}),
         ("confirmations", {"points": []}),
         ("confirmations", {"points": [0, 1]}),
+        ("dept_people", {"admins": [{"name": "R. Mensah"}, {"name": "A. Quaye"}],
+                         "selected": {"name": "R. Mensah"}, "machines": 96}),
+        ("dept_people", {"admins": [], "machines": 7}),
         ("fleet", {"pc_count": 14, "pcs_behind": [{"hostname": "OPS-06"}]}),
         ("fleet", {"pc_count": 14, "pcs_behind": []}),
         ("fleet", {"pc_count": 0}),
@@ -233,3 +236,57 @@ def test_the_opened_day_separates_who_entered_from_what_was_never_touched():
 def test_an_unknown_topic_is_an_empty_panel_not_an_exception():
     r = n.narrate("does_not_exist", {})
     assert r["state"] == "empty" and r["facts"] == []
+
+
+# --- who governs a department --------------------------------------------------------------------
+
+def test_an_admin_never_owns_a_subset_of_the_departments_machines():
+    """The boards group machines under an Admin; the system has no such relationship. `accounts`
+    carries a department and never a supervising Admin, and report routing resolves to every Admin
+    in the department by design. So the sentence says all of them govern all of it, and no fact ever
+    claims an Admin "answers for" a number of machines."""
+    at_work = {"name": "R. Mensah", "session": {"occupied_via": "native"}}
+    also = {"name": "A. Quaye", "session": {"occupied_via": "native"}}
+    r = n.narrate("dept_people", {"admins": [at_work, also], "selected": at_work, "machines": 96})
+    assert r["sentence"] == "All 2 Admins here govern all 96 machines."
+    labels = [f["label"] for f in r["facts"]]
+    assert "Admins here" in labels and "Client PCs" in labels
+    assert not any("answers" in lbl.lower() for lbl in labels)
+
+
+def test_one_admin_governing_alone_is_said_in_the_singular():
+    alone = {"name": "E. Owusu", "session": {"occupied_via": "native"}}
+    r = n.narrate("dept_people", {"admins": [alone], "selected": alone, "machines": 7})
+    assert r["sentence"] == "E. Owusu governs all 7 machines here."
+
+
+def test_a_department_with_no_admin_is_a_danger_not_an_empty_panel():
+    """Ungoverned is a RESULT: it is drawn normally, in the danger tone, with something to do about
+    it -- never the "nothing recorded yet" overlay."""
+    r = n.narrate("dept_people", {"admins": [], "machines": 7})
+    assert r["state"] == "ok"
+    assert r["tone"] == "danger"
+    assert r["action"] == "Assign an Admin"
+    assert "Nobody governs" in r["sentence"]
+
+
+def test_the_selected_admin_is_what_the_sentence_is_about():
+    """Whoever the cell draws is whoever is selected, so selecting someone away helping changes the
+    sentence rather than only the picture."""
+    away = {"name": "A. Quaye", "session": {"occupied_via": "assisted_access"}}
+    r = n.narrate("dept_people", {"admins": [{"name": "R. Mensah", "session": {"occupied_via": "native"}}, away],
+                                  "selected": away, "machines": 96})
+    assert r["sentence"] == "A. Quaye is helping another department right now."
+    assert r["tone"] == "accent"
+
+
+def test_the_fallback_count_agrees_with_its_verb():
+    """"2 things needs addressing" reached a screenshot before anyone noticed. A generated sentence
+    is still a sentence."""
+    one = n.narrate("needs_you", {"tree": [], "violations": [{"filename": "a.xlsx", "hostname": "OPS-07"}],
+                                  "deviations": [], "pcs_behind": []})
+    assert one["sentence"] == "1 thing needs addressing."
+    two = n.narrate("needs_you", {"tree": [],
+                                  "violations": [{"filename": "a.xlsx", "hostname": "OPS-07"}],
+                                  "deviations": [{"expectation": "hostname_match"}], "pcs_behind": []})
+    assert two["sentence"] == "2 things need addressing."

@@ -34,6 +34,14 @@ ApplicationWindow {
     // rather than a literal key, so neither rail has to know about the other.
     readonly property bool onMustSee: shell.viewKey === "mustsee"
     readonly property bool onAuthority: shell.viewKey === "authority" || shell.viewKey === "hierarchy"
+    // A department is a place INSIDE Authority, not a rail entry: entering one changes the crumb and
+    // the page, never the rail. 0 = the area itself.
+    property int departmentId: 0
+    readonly property bool inDepartment: onAuthority && departmentId !== 0
+    function enterDepartment(id) {
+        shell.departmentId = id
+        shell.show("authority")
+    }
     function show(key) {
         var i = rail.indexOfKey(key)
         if (i < 0 && key === "authority") i = rail.indexOfKey("hierarchy")
@@ -95,6 +103,7 @@ ApplicationWindow {
 
             IconRail {
                 id: rail
+                objectName: "iconRail"
                 Layout.preferredWidth: Theme.railWidth
                 Layout.fillHeight: true
                 role: falcon.role
@@ -140,7 +149,27 @@ ApplicationWindow {
                                 id: home
                                 objectName: "hierarchyRail"      // the hierarchy tree lives here now
                                 anchors.fill: parent
-                                visible: shell.onAuthority
+                                visible: shell.onAuthority && !shell.inDepartment
+                            }
+
+                            // level 2: the department, drawn in the Overview's language and fed by
+                            // the same handlers the Overview already asked for
+                            DepartmentView {
+                                objectName: "departmentView"
+                                anchors.fill: parent
+                                visible: shell.inDepartment
+                                departmentId: shell.departmentId
+                                tree: overview.tree
+                                rollout: overview.rollout
+                                sessions: overview.sessions
+                                lanes: overview.lanesForDept(shell.departmentId)
+                                violations: overview.violations
+                                deviations: overview.deviations
+                                clock: overview.clock
+                                onBack: shell.departmentId = 0
+                                onEnterAdmin: function (admin) {
+                                    shell.notify("Entering an Admin is the next build", false)
+                                }
                             }
 
                             // ported one at a time; mounted so their state and tests keep working

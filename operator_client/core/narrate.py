@@ -229,7 +229,8 @@ def needs_you(data: dict[str, Any]) -> dict[str, Any]:
     if behind:
         return _out(f"{_n(len(behind), 'PC')} behind, so the next version stays blocked.",
                     facts, action="Prompt their Admins")
-    return _out(f"{_n(len(facts), 'thing')} needs addressing.", facts)
+    verb = "needs" if len(facts) == 1 else "need"
+    return _out(f"{_n(len(facts), 'thing')} {verb} addressing.", facts)
 
 
 # --- the hierarchy ------------------------------------------------------------------------------
@@ -425,6 +426,44 @@ def dept_fleet(data: dict[str, Any]) -> dict[str, Any]:
                 brief=brief, tone="ok")
 
 
+def dept_people(data: dict[str, Any]) -> dict[str, Any]:
+    """Who governs one department, and what is true of the one being drawn.
+
+    An Admin does NOT own a subset of the department's machines -- `accounts` carries a department
+    and never a supervising Admin, and report routing resolves to every Admin in the department by
+    design. So this never says "answers for four"; it says how many Admins the department has and
+    what the one on screen is doing right now.
+    """
+    admins = data.get("admins") or []
+    selected = data.get("selected") or None
+    machines = int(data.get("machines") or 0)
+
+    if not admins:
+        return _out("Nobody governs this department.",
+                    [_fact("Admins", 0, "danger"), _fact("Client PCs", machines)],
+                    action="Assign an Admin", brief="no Admin", tone="danger")
+
+    away = [a for a in admins
+            if (a.get("session") or {}).get("occupied_via") == "assisted_access"]
+    free = [a for a in admins if not a.get("session")]
+    name = (selected or {}).get("name") or "This Admin"
+    facts = [_fact("Admins here", len(admins)), _fact("Client PCs", machines)]
+    if away:
+        facts.append(_fact("Assisting elsewhere", away[0].get("name") or "an Admin", "warn"))
+    if free:
+        facts.append(_fact("Not signed in", _n(len(free), "Admin"), "warn"))
+
+    brief = f"{(selected or {}).get('name') or 'one'} of {len(admins)}" if len(admins) > 1 else "one Admin"
+    if selected and (selected.get("session") or {}).get("occupied_via") == "assisted_access":
+        return _out(f"{name} is helping another department right now.", facts,
+                    brief=brief, tone="accent")
+    if selected and not selected.get("session"):
+        return _out(f"{name} is not signed in anywhere.", facts, brief=brief, tone="warn")
+    if len(admins) == 1:
+        return _out(f"{name} governs all {machines} machines here.", facts, brief=brief)
+    return _out(f"All {len(admins)} Admins here govern all {machines} machines.", facts, brief=brief)
+
+
 def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
     """The Overview's fourth cell: files against their tier, and deviations logged but not yet
     addressed. Two different records, one question -- has anything gone where it should not."""
@@ -455,7 +494,7 @@ TOPICS = {
     "rollout_departments": rollout_departments, "blocking": blocking,
     "entries": entries, "never_signed_in": never_signed_in,
     "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
-    "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet,
+    "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet, "dept_people": dept_people,
 }
 
 

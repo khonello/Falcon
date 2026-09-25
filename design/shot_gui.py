@@ -203,12 +203,16 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
     overview = win.findChild(object, "overviewView")
     if overview is not None and os.environ.get("FALCON_SHOT_OPEN"):
         overview.setProperty("opened", os.environ["FALCON_SHOT_OPEN"])
+    # FALCON_SHOT_DEPT=<id> enters that department -- level 2, inside Authority
+    if os.environ.get("FALCON_SHOT_DEPT"):
+        win.setProperty("departmentId", int(os.environ["FALCON_SHOT_DEPT"]))
 
     def grab():
         img = win.grabWindow()
         name = f"gui-{role}" + ("-empty" if empty else "") + (f"-view{view}" if view else "")
         name += "-" + os.environ["FALCON_SHOT_OPEN"] if os.environ.get("FALCON_SHOT_OPEN") else ""
         name += f"-d{focus}" if focus else ""
+        name += "-dept" + os.environ["FALCON_SHOT_DEPT"] if os.environ.get("FALCON_SHOT_DEPT") else ""
         path = out_dir / (name + ".png")
         img.save(str(path))
         print("saved", path, img.width(), img.height())

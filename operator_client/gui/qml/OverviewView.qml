@@ -242,6 +242,22 @@ Item {
         }
         return out
     }
+    // one department's lanes, without moving `focusDept` -- the department page asks for its own
+    // day and the Overview's descent is a different thing
+    function lanesForDept(departmentId) {
+        var d = findDept(departmentId)
+        if (!d) return []
+        var out = []
+        for (var j = 0; j < d.workers.length; j++) {
+            var w = d.workers[j]
+            out.push({ name: w.hostname || w.name, blocks: blocksFor(w.pc_id) })
+        }
+        if (out.length <= 9) return out
+        var used = out.filter(function (l) { return l.blocks.length > 0 })
+        var quiet = out.length - used.length
+        if (quiet > 0) used.push({ name: quiet + " more", blocks: [], quiet: true })
+        return used
+    }
     readonly property var timelineLanes: {
         var out = []
         for (var i = 0; i < tree.length; i++) {
@@ -574,7 +590,7 @@ Item {
                     height: Math.max(150, grid.height / 2 - 120)
                     departments: root.tree
                     focusId: 0
-                    onPicked: function (id) { shell.show("hierarchy") }
+                    onEntered: function (id) { shell.enterDepartment(id) }
                 }
             }
 

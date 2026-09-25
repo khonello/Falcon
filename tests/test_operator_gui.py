@@ -203,3 +203,101 @@ async def test_bridge_connects_and_views_populate(gui, engine, org):
     bridge.disconnect()
     await _wait(lambda: not bridge.isConnected)
     assert bridge.sessionText == "no session"
+
+
+def val(x):
+    """A QML `property var` reaches Python as a QJSValue; one whose value came back from the bridge
+    is already a dict. Read either the same way."""
+    return x.toVariant() if hasattr(x, "toVariant") else x
+
+
+# --- level 2: a department ------------------------------------------------------------------------
+
+def test_the_rail_is_five_areas_not_eight_features(gui):
+    """Areas, not features (design/TABS.md). The Super User rail names the question a person is
+    asking; the Admin rail is deliberately left alone until level 3 is opened."""
+    win, _, _ = gui
+    rail = win.findChild(QObject, "iconRail")
+    assert rail is not None
+    keys = [e["key"] for e in val(rail.property("superNav"))]
+    assert keys == ["mustsee", "authority", "rollout", "record", "work"]
+    # the Admin rail is untouched: its area names wait for level 3
+    assert val(rail.property("adminNav"))[0]["key"] == "hierarchy"
+
+
+def test_the_crumb_moves_on_entering_a_department_and_not_on_looking(gui):
+    """The one test of the gesture: a double click enters and the crumb grows; nothing a single
+    click does moves it. `shell.enterDepartment` is what the map's double click calls."""
+    win, _, _ = gui
+    assert win.property("departmentId") == 0
+    assert win.property("inDepartment") is False
+
+    # the fixture is not connected, so the rail is still the Admin one: show() resolves the area
+    # name to whichever key that rail spells it with, which is the point of having two names
+    QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "authority"))
+    assert win.property("onAuthority") is True
+    assert win.property("inDepartment") is False    # looking at the area is not being in a place
+
+    QMetaObject.invokeMethod(win, "enterDepartment", Q_ARG("QVariant", 1))
+    assert win.property("departmentId") == 1
+    assert win.property("inDepartment") is True
+
+    dept = win.findChild(QObject, "departmentView")
+    # `visible` is not asserted: the shell's StackLayout is on the connect view in this fixture, so
+    # effective visibility is false for everything behind it. What matters is that the page is bound
+    # to the department that was entered.
+    assert dept is not None and dept.property("departmentId") == 1
+    assert win.findChild(QObject, "deptCrumbRoot").property("text") == "Authority"
+
+    # and back out again: the crumb is the thing that returns
+    QMetaObject.invokeMethod(dept, "back")
+    assert win.property("departmentId") == 0
+    assert win.property("inDepartment") is False
+
+
+def test_a_department_draws_one_admin_and_never_says_an_admin_owns_machines(gui):
+    """The boards group machines under the Admin who answers for each. The system has no such
+    relationship -- `accounts` carries a department, never a supervising Admin -- so the page draws
+    the department's own machines and the sentence says all its Admins govern all of them."""
+    win, _, _ = gui
+    dept = win.findChild(QObject, "departmentView")
+    assert dept is not None
+    dept.setProperty("tree", [{
+        "department_id": 1, "name": "Operations",
+        "admins": [{"account_id": 2, "name": "R. Mensah", "hostname": "WS-OPS-A1",
+                    "session": {"occupied_via": "native"}},
+                   {"account_id": 3, "name": "A. Quaye", "hostname": "WS-OPS-A2", "session": None}],
+        "workers": [{"account_id": 4, "pc_id": 11, "hostname": "OPS-01"},
+                    {"account_id": 5, "pc_id": 12, "hostname": "OPS-02"}],
+    }])
+    dept.setProperty("departmentId", 1)
+
+    assert dept.property("deptName") == "Operations"
+    assert len(val(dept.property("fleet"))) == 2
+    says = val(dept.property("people"))
+    assert says["sentence"] == "All 2 Admins here govern all 2 machines."
+    assert not any("answers" in f["label"].lower() for f in says["facts"])
+
+    # whoever the cell draws is whoever is selected; at rest that is the first in the stable order
+    assert val(dept.property("admin"))["name"] == "R. Mensah"
+    dept.setProperty("selectedAdmin", 1)
+    assert val(dept.property("admin"))["name"] == "A. Quaye"
+    assert val(dept.property("people"))["sentence"] == "A. Quaye is not signed in anywhere."
+
+
+def test_the_fleet_changes_kind_rather_than_scrolling(gui):
+    """A department was never going to stay the size of the sample: the mark shrinks while shrinking
+    still says something, and past that the drawing changes kind. Mirrors slot_size() in
+    design/scale.py -- never a scrollbar."""
+    win, _, _ = gui
+    grid = win.findChild(QObject, "deptFleet")
+    assert grid is not None
+
+    def sized(n):
+        grid.setProperty("hosts", [{"hostname": f"OPS-{i:02d}", "state": "ok"} for i in range(n)])
+        return grid.property("slot"), grid.property("labelled"), grid.property("asBars")
+
+    assert sized(7) == (46, True, False)        # every hostname readable
+    assert sized(24) == (30, False, False)      # countable, unlabelled
+    assert sized(96) == (16, False, False)      # proportion and outliers
+    assert sized(240) == (0, False, True)       # the shape of the fleet, not one mark each

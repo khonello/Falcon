@@ -10,7 +10,11 @@ Item {
 
     property var departments: []           // hierarchy.tree's departments, in order
     property int focusId: 0                // 0 = the whole system
+    property int selectedId: 0             // ringed, not recoloured: colour already means state
+    // One gesture, one meaning (design/TABS.md): a single click SELECTS a department and brings its
+    // text beside the map; a double click ENTERS it, and only then does the crumb grow.
     signal picked(int departmentId)
+    signal entered(int departmentId)
 
     // the drawing is centred in whatever width it is given, and the PC constellation spreads with
     // it -- otherwise a wide cell leaves the whole map hugging its left edge
@@ -149,6 +153,7 @@ Item {
                 height: 36
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.picked(lane.modelData.department_id)
+                onDoubleClicked: root.entered(lane.modelData.department_id)
             }
         }
     }
