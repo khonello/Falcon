@@ -15,6 +15,13 @@ Item {
     id: root
 
     property int focusDept: 0              // 0 = everything
+    // A held session is mirrored here for as long as it exists (TABS.md): it lives on the page it
+    // was started from, and Must see is the one other place it may appear. Never a list -- an
+    // account holds at most one session.
+    property var heldAdmin: null
+    property double nowMs: Date.now()
+    signal goInside()
+    signal leaveSession()
 
     property var tree: []
     property var rollout: ({})             // updates.rollout_health
@@ -405,6 +412,7 @@ Item {
     Connections {
         target: falcon
         function onConnected() { root.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) root.refresh() }
         function onDisconnected() {
             root.tree = []
             root.sessions = []
@@ -464,8 +472,22 @@ Item {
             Layout.preferredHeight: 34
 
             // No page title. The rail entry says "Must see" and one name for one place is enough
-            // (design/TABS.md, issue 7) -- so the header carries the time and nothing else. The
-            // crumb below still roots on "Must see", because that is where a cell was opened from.
+            // (design/TABS.md, issue 7) -- so the header carries the time, and a held session when
+            // there is one. The crumb below still roots on "Must see".
+            HeldCard {
+                objectName: "heldMirror"
+                compact: true
+                visible: root.heldAdmin !== null
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: implicitWidth
+                height: implicitHeight
+                admin: root.heldAdmin
+                session: falcon.session
+                nowMs: root.nowMs
+                onGoInside: root.goInside()
+                onLeave: root.leaveSession()
+            }
             Txt {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter

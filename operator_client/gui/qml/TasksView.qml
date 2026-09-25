@@ -22,6 +22,7 @@ Item {
     Connections {
         target: falcon
         function onConnected() { view.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) view.refresh() }
         function onPushReceived(type, p) {
             if (type.indexOf("task.") === 0) { view.refresh(); if (view.task && p.task_id === view.task.id) view.open(view.task.id) }
         }

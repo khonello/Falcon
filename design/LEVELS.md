@@ -17,11 +17,30 @@ work.
 |---|---|---|---|
 | 1 | **Super User** | the whole system: the Overview (`K01`) and its four cells opened (`K03`–`K06`) | **designed and built** |
 | 2 | **Department** | a place: its Admins, its client PCs, its day, what waits on you. Where you choose whom to enter. | **in progress — this is the current work** |
-| 3 | **Admin** | what you get when you traverse into an Admin's workstation | **already designed, and built** — see below |
+| 3 | **Admin** | what you get when you traverse into an Admin's workstation | **built 25 Sep 2026** — their interface, literally, under the red lid |
 | 4 | **Client PC** | a worker's machine, enterable from the department by a Super User, or by its Admin | not started |
 
 Levels 1 and 2 are **looking** — nothing is held, nobody is blocked, no clock runs. Levels 3 and 4 are
 **holding** — a session exists, a deadline runs, someone is blocked out of their own machine.
+
+## Level 3, as built (25 Sep 2026)
+
+The user's words when it was opened: *"when you traverse admin, literally show how their interface
+looks, note their design signature with the banner."* So inside an Admin **nothing is restyled**: their
+seven-entry rail, their grey sheet, their home page scoped to their department — exactly the Admin's own
+window — and the **38 px red lid** (`T05`) across the top is the whole of the difference. The rail's
+foot still says who you are. You land on their home page.
+
+The path, one gesture throughout: double-click an Admin on the department → they open **in place**
+(`DP06`, crumb grows, still level 2) and the lane states the cost → *Enter* asks the Engine, and the
+answer lands in that lane (`DP08`) → yes makes the session and the lane carries it (`DP07`) →
+double-click the lane (or *Go in*) and the window becomes theirs. Escape steps out **with the session
+still held** (`DP09`: a container beside the Admin in Who governs, counting down, and mirrored as one
+line on Must see); Leave ends it; the session ending any other way drops you out to the department.
+
+Inside, the Engine answers reads **as the Admin** (`protocol/viewing.py`) — "exactly what that Admin
+sees" — while every act stays the Super User's and is logged as theirs. `DP08`'s *not reachable* belongs
+to level 4: entering an Admin needs only the Engine, not their machine.
 
 ## What "traverse into an Admin" shows
 

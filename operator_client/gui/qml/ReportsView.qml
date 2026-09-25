@@ -36,6 +36,7 @@ Item {
     Connections {
         target: falcon
         function onConnected() { view.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) view.refresh() }
         function onPushReceived(type, p) { if (type.indexOf("report.") === 0 || type.indexOf("alert.") === 0 || type.indexOf("update.") === 0) view.refresh() }
     }
 

@@ -11,6 +11,8 @@ Column {
 
     property var narration: ({})
     property int maxFacts: 4
+    // off when the caller draws its own buttons -- a lane that offers a pair (act / cancel)
+    property bool showAction: true
     signal actionTriggered()
 
     readonly property string sentence: narration.sentence || ""
@@ -95,12 +97,12 @@ Column {
         }
     }
 
-    Item { width: 1; height: 6; visible: root.actionLabel !== "" }
+    Item { width: 1; height: 6; visible: root.showAction && root.actionLabel !== "" }
 
     TBtn {
         text: root.actionLabel
         tone: "accent"
-        visible: root.actionLabel !== ""
+        visible: root.showAction && root.actionLabel !== ""
         onClicked: root.actionTriggered()
     }
 }

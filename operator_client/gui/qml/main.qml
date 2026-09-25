@@ -37,9 +37,81 @@ ApplicationWindow {
     // A department is a place INSIDE Authority, not a rail entry: entering one changes the crumb and
     // the page, never the rail. 0 = the area itself.
     property int departmentId: 0
-    readonly property bool inDepartment: onAuthority && departmentId !== 0
-    // drawn on the gradient, with no sheet behind it
-    readonly property bool onFrame: onMustSee || inDepartment
+    readonly property bool inDepartment: !insideNow && onAuthority && departmentId !== 0
+    // drawn on the gradient, with no sheet behind it. Inside an Admin never is: their interface is
+    // shown exactly as they see it, grey sheet and all.
+    readonly property bool onFrame: !insideNow && (onMustSee || inDepartment)
+
+    // LEVEL 3 -- INSIDE AN ADMIN. Holding a session and looking through it are different things:
+    // `hierarchy.traverse` makes the session and the department page draws it as a container;
+    // double-clicking that container is what sets `inside`. Escape clears it and the session runs on.
+    // Inside, the window IS the Admin's interface -- their seven-entry rail, their home page, their
+    // grey sheet -- and the red lid is the only thing that says it is not your own.
+    property bool inside: false
+    // whose workstation the held session is on, found in the tree the Overview already has: derived,
+    // so a session that was already running when the window connected is still named
+    readonly property var heldAdmin: {
+        var s = falcon.session
+        if (!falcon.traversing || !s || !s.pc_id) return null
+        var t = overview.tree
+        for (var i = 0; i < t.length; i++)
+            for (var j = 0; j < t[i].admins.length; j++)
+                if (t[i].admins[j].pc_id === s.pc_id) {
+                    var o = {}
+                    for (var k in t[i].admins[j]) o[k] = t[i].admins[j][k]
+                    o.department_id = t[i].department_id
+                    o.department_name = t[i].name
+                    return o
+                }
+        return null
+    }
+    readonly property bool insideNow: inside && heldAdmin !== null
+    // the one ticking clock: every countdown reads it, so they can never disagree by a second
+    property double nowMs: Date.now()
+    Timer {
+        interval: 1000
+        repeat: true
+        running: falcon.traversing
+        triggeredOnStart: true
+        onTriggered: shell.nowMs = Date.now()
+    }
+    function goInside() {
+        if (shell.heldAdmin === null) return
+        shell.departmentId = shell.heldAdmin.department_id
+        shell.inside = true
+        shell.view = 0                  // the Admin's rail starts at their home, as theirs does
+    }
+    function stepOut() {
+        shell.inside = false
+        shell.show("authority")         // back to the department, the session still held
+    }
+    function leaveSession() {
+        var s = falcon.session
+        falcon.call("hierarchy.end_session", { session_id: s ? s.session_id : 0 }, function (ok, r) {
+            shell.notify(ok ? "You left; the workstation is theirs again" : r.message, !ok)
+        })
+    }
+    function extendSession() {
+        var s = falcon.session
+        falcon.call("hierarchy.extend_session", { session_id: s ? s.session_id : 0 }, function (ok, r) {
+            shell.notify(ok ? "Extended" : r.message, !ok)
+        })
+    }
+    // the session ended -- left, expired, or the link dropped past its deadline: out, never quietly
+    // (Watched on heldAdmin, not insideNow: writing `inside` from insideNow's own handler is a loop,
+    // and the rail has to be the Super User's again before "authority" can be found on it.)
+    onHeldAdminChanged: if (heldAdmin === null && inside) stepOut()
+    // reads look THROUGH the session only while the window is inside it -- holding is not looking
+    Binding {
+        target: falcon
+        property: "viewThroughSession"
+        value: shell.insideNow
+    }
+    Shortcut {
+        sequence: "Escape"
+        enabled: shell.insideNow
+        onActivated: shell.stepOut()
+    }
     function enterDepartment(id) {
         shell.departmentId = id
         shell.show("authority")
@@ -108,7 +180,8 @@ ApplicationWindow {
                 objectName: "iconRail"
                 Layout.preferredWidth: Theme.railWidth
                 Layout.fillHeight: true
-                role: falcon.role
+                // inside an Admin the rail is theirs, entry for entry; the foot still says who you are
+                role: shell.insideNow ? "admin" : falcon.role
                 current: shell.view
                 onPicked: function (i) { shell.view = i }
             }
@@ -121,9 +194,27 @@ ApplicationWindow {
                 Layout.topMargin: 2
                 Layout.bottomMargin: 8
 
+                SessionLid {
+                    id: lid
+                    objectName: "sessionLid"
+                    visible: shell.insideNow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 38
+                    name: shell.heldAdmin ? (shell.heldAdmin.name || "an Admin") : ""
+                    hostname: shell.heldAdmin ? (shell.heldAdmin.hostname || "") : ""
+                    session: falcon.session
+                    nowMs: shell.nowMs
+                    onExtend: shell.extendSession()
+                    onLeave: shell.leaveSession()
+                    onStepOut: shell.stepOut()
+                }
+
                 Rectangle {
                     id: sheet
                     anchors.fill: parent
+                    anchors.topMargin: shell.insideNow ? 46 : 0
                     radius: Theme.radiusMd
                     // The dashboards are drawn on the frame itself: the panels are the surfaces and
                     // the gradient shows between them, as on the boards. Only the views that still
@@ -147,12 +238,18 @@ ApplicationWindow {
                                 objectName: "overviewView"
                                 anchors.fill: parent
                                 visible: shell.onMustSee
+                                heldAdmin: shell.heldAdmin
+                                nowMs: shell.nowMs
+                                onGoInside: shell.goInside()
+                                onLeaveSession: shell.leaveSession()
                             }
 
                             HomeView {
                                 id: home
                                 objectName: "hierarchyRail"      // the hierarchy tree lives here now
                                 anchors.fill: parent
+                                // inside, it is the Admin's home: their department, drawn as theirs
+                                asDepartment: shell.insideNow ? shell.heldAdmin.department_id : 0
                                 visible: shell.onAuthority && !shell.inDepartment
                             }
 
@@ -169,27 +266,39 @@ ApplicationWindow {
                                 violations: overview.violations
                                 deviations: overview.deviations
                                 clock: overview.clock
+                                heldAdmin: shell.heldAdmin
+                                nowMs: shell.nowMs
+                                tasks: overview.tasks
+                                flows: overview.flows
+                                onOpenRecord: shell.show("record")
                                 onBack: shell.departmentId = 0
-                                onEnterAdmin: function (admin) {
-                                    shell.notify("Entering an Admin is the next build", false)
-                                }
+                                onGoInside: shell.goInside()
+                                onLeaveSession: shell.leaveSession()
                             }
 
-                            // ported one at a time; mounted so their state and tests keep working
-                            Item {
-                                width: 0
-                                height: 0
-                                clip: true
-                                TasksView { objectName: "tasksView"; width: 600; height: 400 }
-                                FlowsView { objectName: "flowsView"; width: 600; height: 400 }
-                                ControlView { objectName: "controlView"; width: 600; height: 400 }
-                                AssistanceView { objectName: "assistanceView"; width: 600; height: 400 }
-                                ReportsView { objectName: "reportsView"; width: 600; height: 400 }
+                            // THE ADMIN'S OWN SCREENS, on the Admin rail's entries. They are the pre-kit
+                            // views and are shown as they are: an Admin at home and a Super User inside
+                            // that Admin see the same window (LEVELS.md, level 3). The Super User's own
+                            // rail has no such entries, so there they stay mounted out of sight.
+                            TasksView { objectName: "tasksView"; anchors.fill: parent
+                                        visible: shell.viewKey === "tasks" }
+                            FlowsView { objectName: "flowsView"; anchors.fill: parent
+                                        visible: shell.viewKey === "flows" }
+                            // Automation and Actions are one view with tabs; each entry opens its own
+                            ControlView {
+                                objectName: "controlView"
+                                anchors.fill: parent
+                                visible: shell.viewKey === "automation" || shell.viewKey === "actions"
+                                section: shell.viewKey === "actions" ? 1 : shell.viewKey === "automation" ? 0 : -1
                             }
-                            // the views not yet rebuilt on the new kit keep their own surface
+                            AssistanceView { objectName: "assistanceView"; anchors.fill: parent
+                                             visible: shell.viewKey === "assistance" }
+                            ReportsView { objectName: "reportsView"; anchors.fill: parent
+                                          visible: shell.viewKey === "reports" }
+                            // the Super User areas not designed yet: Rollout, Record, Work
                             Item {
                                 anchors.fill: parent
-                                visible: !shell.onAuthority && !shell.onMustSee
+                                visible: ["rollout", "record", "work"].indexOf(shell.viewKey) >= 0
                                 Column {
                                     anchors.centerIn: parent
                                     spacing: 12
@@ -200,14 +309,14 @@ ApplicationWindow {
                                         Icon { anchors.centerIn: parent; name: "automation"; color: Theme.faint; size: 23 }
                                     }
                                     Txt {
-                                        text: "Being rebuilt on the new kit"
+                                        text: "Not designed yet"
                                         color: Theme.dim
                                         font.pixelSize: Theme.fRow
                                         font.weight: Font.DemiBold
                                         anchors.horizontalCenter: parent.horizontalCenter
                                     }
                                     Txt {
-                                        text: "Hierarchy is done. This one is next."
+                                        text: "Designed next, after level 3."
                                         color: Theme.faint
                                         font.pixelSize: Theme.fBody
                                         anchors.horizontalCenter: parent.horizontalCenter
@@ -220,7 +329,10 @@ ApplicationWindow {
                     // state, as a floating pill over the sheet -- the frame never changes
                     Rectangle {
                         id: statePill
-                        visible: falcon.superUserBanner || falcon.blocked || falcon.traversing
+                        // A Super User's held session is carried by the container on the department
+                        // page and, inside, by the lid -- a third copy floating over every page
+                        // would be the same fact said twice.
+                        visible: falcon.blocked || (falcon.traversing && falcon.role !== "super_user")
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
                         anchors.topMargin: 10

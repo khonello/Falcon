@@ -14,7 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PySide6.QtCore import QTimer  # noqa: E402
+from PySide6.QtCore import QMetaObject, QTimer  # noqa: E402
 
 from operator_client.core.config import LocalConfig  # noqa: E402
 from operator_client.gui import app as gui_app  # noqa: E402
@@ -126,20 +126,20 @@ STUB = {
                     {"category": "resource_violation", "routed_department_id": 1, "department_name": "Operations"},
                     {"category": "resource_violation", "routed_department_id": 2, "department_name": "Finance"}]},
     "task.list": {"tasks": [
-        {"id": 1, "assignee_account_id": 4001, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 2, "assignee_account_id": 4003, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 3, "assignee_account_id": 4004, "soft_deadline_at": _at(9), "final_deadline_at": None},
-        {"id": 4, "assignee_account_id": 4005, "soft_deadline_at": _at(9), "final_deadline_at": None},
-        {"id": 5, "assignee_account_id": 4007, "soft_deadline_at": _at(8, 2), "final_deadline_at": _at(9, 1)},
-        {"id": 6, "assignee_account_id": 4002, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 7, "assignee_account_id": 4006, "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 1, "assigner_account_id": 3012, "assignee_account_id": 4001, "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 2, "assigner_account_id": 3012, "assignee_account_id": 4003, "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 3, "assigner_account_id": 3012, "assignee_account_id": 4004, "soft_deadline_at": _at(9), "final_deadline_at": None},
+        {"id": 4, "assigner_account_id": 3012, "assignee_account_id": 4005, "soft_deadline_at": _at(9), "final_deadline_at": None},
+        {"id": 5, "assigner_account_id": 3012, "assignee_account_id": 4007, "soft_deadline_at": _at(8, 2), "final_deadline_at": _at(9, 1)},
+        {"id": 6, "assigner_account_id": 3013, "assignee_account_id": 4002, "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 7, "assigner_account_id": 3012, "assignee_account_id": 4006, "soft_deadline_at": None, "final_deadline_at": None},
         {"id": 8, "assignee_account_id": 4101, "soft_deadline_at": None, "final_deadline_at": None},
         {"id": 9, "assignee_account_id": 4102, "soft_deadline_at": None, "final_deadline_at": None},
         {"id": 10, "assignee_account_id": 4201, "soft_deadline_at": _at(8, 3), "final_deadline_at": _at(9, 2)},
         {"id": 11, "assignee_account_id": 4202, "soft_deadline_at": None, "final_deadline_at": None}]},
     "flow.list": {"flows": [
-        {"id": 1, "source_pc_id": 21, "status": "active"}, {"id": 2, "source_pc_id": 23, "status": "active"},
-        {"id": 3, "source_pc_id": 25, "status": "active"}, {"id": 4, "source_pc_id": 27, "status": "paused"},
+        {"id": 1, "created_by_account_id": 3012, "source_pc_id": 21, "status": "active"}, {"id": 2, "created_by_account_id": 3012, "source_pc_id": 23, "status": "active"},
+        {"id": 3, "created_by_account_id": 3012, "source_pc_id": 25, "status": "active"}, {"id": 4, "created_by_account_id": 3012, "source_pc_id": 27, "status": "paused"},
         {"id": 5, "source_pc_id": 31, "status": "active"}, {"id": 6, "source_pc_id": 32, "status": "active"},
         {"id": 7, "source_pc_id": 31, "status": "paused"}]},
 }
@@ -187,6 +187,15 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         callback.call([bridge.js_engine.toScriptValue(True), bridge.js_engine.toScriptValue(data)])
 
     bridge.call = fake_call  # type: ignore[assignment]
+    # FALCON_SHOT_HOLD=1: this Super User holds R. Mensah's workstation, 28:41 left of thirty minutes
+    if os.environ.get("FALCON_SHOT_HOLD") or os.environ.get("FALCON_SHOT_INSIDE"):
+        now = datetime.now().astimezone()
+        bridge.state.session = {
+            "session_id": 9, "pc_id": 11, "occupant_account_id": 1, "occupant_name": "You",
+            "occupant_role": "super_user", "occupied_via": "traversal",
+            "entered_at": (now - timedelta(seconds=79)).isoformat(),
+            "deadline_at": (now + timedelta(minutes=28, seconds=41)).isoformat(),
+            "extended_count": 0, "un_evictable": True, "restricted_view": False, "super_user_banner": True}
     bridge.stateChanged.emit()
     bridge.connected.emit()
 
@@ -212,6 +221,24 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             if dept is not None:
                 dept.setProperty("maximised", os.environ["FALCON_SHOT_MAX"])
 
+    # FALCON_SHOT_ENTER=1 opens the first Admin in place (DP06); FALCON_SHOT_ANSWER=<kind> puts
+    # that answer in the lane (DP08); FALCON_SHOT_INSIDE=1 goes in -- level 3, their interface
+    def later():
+        dept = win.findChild(object, "departmentView")
+        if os.environ.get("FALCON_SHOT_ENTER") and dept is not None:
+            dept.setProperty("entering", True)
+            if os.environ.get("FALCON_SHOT_ANSWER"):
+                lane = win.findChild(object, "enteringAdmin")
+                lane.setProperty("answer", {"kind": os.environ["FALCON_SHOT_ANSWER"], "holder": "K. Owusu",
+                                            "message": "no such pc"})
+        if os.environ.get("FALCON_SHOT_INSIDE"):
+            QMetaObject.invokeMethod(win, "goInside")
+            # FALCON_SHOT_TAB=<key> opens that entry of the Admin's rail once inside
+            if os.environ.get("FALCON_SHOT_TAB"):
+                win.setProperty("view", {"tasks": 1, "flows": 2, "automation": 3, "actions": 4,
+                                         "assistance": 5, "reports": 6}[os.environ["FALCON_SHOT_TAB"]])
+    QTimer.singleShot(1600, later)
+
     def grab():
         img = win.grabWindow()
         name = f"gui-{role}" + ("-empty" if empty else "") + (f"-view{view}" if view else "")
@@ -219,6 +246,11 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += f"-d{focus}" if focus else ""
         name += "-dept" + os.environ["FALCON_SHOT_DEPT"] if os.environ.get("FALCON_SHOT_DEPT") else ""
         name += "-max" if os.environ.get("FALCON_SHOT_MAX") else ""
+        for flag, tag in (("FALCON_SHOT_HOLD", "-held"), ("FALCON_SHOT_ENTER", "-enter"),
+                          ("FALCON_SHOT_INSIDE", "-inside")):
+            name += tag if os.environ.get(flag) else ""
+        name += "-" + os.environ["FALCON_SHOT_ANSWER"] if os.environ.get("FALCON_SHOT_ANSWER") else ""
+        name += "-" + os.environ["FALCON_SHOT_TAB"] if os.environ.get("FALCON_SHOT_TAB") else ""
         path = out_dir / (name + ".png")
         img.save(str(path))
         print("saved", path, img.width(), img.height())

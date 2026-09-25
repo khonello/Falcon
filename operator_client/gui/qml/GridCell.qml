@@ -16,6 +16,9 @@ Item {
     // nothing to say at length, so it stays shut rather than recomposing into panels of nothing.
     property bool openable: false
     property bool topAlign: false
+    // One gesture (TABS.md): where a single click already means "select" inside the cell, only a
+    // double click opens it. The Overview's cells predate that and keep opening on a click.
+    property bool openOnDoubleClick: false
     signal opened()
     default property alias content: body.data
     readonly property string brief: narration.brief || ""
@@ -77,7 +80,8 @@ Item {
             hoverEnabled: root.openable
             cursorShape: root.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
             acceptedButtons: root.openable ? Qt.LeftButton : Qt.NoButton
-            onClicked: root.opened()
+            onClicked: if (!root.openOnDoubleClick) root.opened()
+            onDoubleClicked: if (root.openOnDoubleClick) root.opened()
         }
 
         Item {

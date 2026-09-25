@@ -5,7 +5,7 @@ is worked at a time), then `design/DECISIONS.md` (what was approved and rejected
 stops rejected shapes coming back), `design/TABS.md` (the five areas and where every handler lands),
 `design/BOARDS.md` (what every board is). This file is where the *code* stands.
 
-**Branch** `phase7/design-and-gui-rebuild` · **132 tests pass, `ruff check .` clean.**
+**Branch** `phase7/design-and-gui-rebuild` · **150 tests pass, `ruff check .` clean.**
 The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it 79 skip and pytest
 still says "passed"; `conftest.py` prints which run you are in.
 **Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — **version 47, 99 boards**, and
@@ -16,14 +16,29 @@ still says "passed"; `conftest.py` prints which run you are in.
 
 ## CONTINUE FROM HERE
 
-Levels 1 and 2 are built. **The next piece is entering an Admin — level 3 — and it needs a decision
-before code**, because `LEVELS.md` says level 3 keeps the screens it already has: the open question is
-how they are *wrapped*, not what replaces them.
+Levels 1, 2 and 3 are built. **Level 3 (entering an Admin) went in on 25 Sep 2026** and is waiting
+for the user to look at it in the running app (`design/run_gui.py super_user`: Authority → double-click
+Operations → double-click R. Mensah → Enter → *End theirs and enter* → Go in). Two decisions were
+taken to build it (`TABS.md` issue 8): **the Admin keeps their seven-entry rail**, and **you land on
+their home page**. The user's standing instruction for this level: *literally show how their interface
+looks* — the red lid is the only difference.
 
-Today `DepartmentView.onEnterAdmin` raises a toast saying so. Already settled and waiting: the red lid
-and its clock (`T05`), the four answers (`DP08`), the two held states (`DP07` inside, `DP09` after
-Escape). Not settled: what the rail becomes inside an Admin (`TABS.md` issue 8, deferred on purpose),
-and how the existing `TasksView` / `FlowsView` / `ControlView` are mounted under it.
+Level 3's four loose ends were closed the same day:
+- **The held session is mirrored into Must see** — the same container, one line, in the header
+  (`HeldCard.compact`, `objectName: "heldMirror"`).
+- **The Admin's own screens are mounted** on their rail's entries — Tasks, Flows, Automation (the
+  Dashboard tab), Actions (the Actions tab), Assistance, Reports — for an Admin at home and a Super
+  User inside alike, because they are one interface. They are the pre-kit screens, table and all,
+  shown as they are. Rollout · Record · Work (Super User) now say *Not designed yet*.
+- **The Engine scopes what a Super User sees inside** (`protocol/viewing.py`). The client sends
+  `"view": "session"` on the listed reads only while the window is inside (`falcon.viewThroughSession`,
+  bound to `shell.insideNow`); `engine/dispatch.py` answers those as the Admin being looked through,
+  and only for a Super User holding a traversal into an Admin workstation. Writes never narrow, and
+  `Context.viewed_by` keeps the audit trail on the real Super User. Holding without looking narrows
+  nothing — that is why the client has to say it.
+- **"Not reachable" is a level-4 answer, not a level-3 one**: inside an Admin you see their data from
+  the Engine, not their screen, so their machine being offline stops nothing. What was wrong instead —
+  the lane telling you a signed-out Admin "gets a red screen" — now says *nobody is blocked*.
 
 Then, in the order that keeps the primary path whole:
 
@@ -83,6 +98,18 @@ does not change.
   M machines"*, an Admin is drawn with their own workstation and their work, and no station says
   "answers for N". The boards were redrawn to match on 25 Sep 2026.
 
+**Level 3 — inside an Admin** (`SessionLid`, `EnteringAdmin`, `HeldCard`, `Ring`; boards `T05`,
+`DP06`–`DP09`). The shell owns it: `shell.inside` is set by the double click, `shell.heldAdmin` is
+*derived* from `falcon.session` and the tree (so a session already running at connect is still named),
+and `insideNow` is both together. Inside, `IconRail.role` is `"admin"`, the sheet is the grey one
+(`onFrame` false), `HomeView.asDepartment` scopes the home page, and a window-level `Shortcut` makes
+Escape step out. One ticking clock (`shell.nowMs`) feeds every countdown; the arithmetic is in `Day`
+(`leftText`, `leftFraction`). On the department, **double click** opens the drawn Admin
+(`GridCell.openOnDoubleClick` — the Overview's cells still open on a click, by design), and the lane's
+words come from four new `narrate` topics: `enter_cost`, `enter_answer`, `held`, `workstation`.
+`shot_gui.py` renders each state: `FALCON_SHOT_ENTER=1`, `+ FALCON_SHOT_ANSWER=occupied`,
+`FALCON_SHOT_HOLD=1`, `FALCON_SHOT_INSIDE=1` (all with `FALCON_SHOT_DEPT=1`, view 1).
+
 **Words are generated, never written**: `operator_client/core/narrate.py`, pure functions over the
 dicts the handlers already return, reached as `falcon.narrate(topic, data)`. Twelve words for a
 sentence, six for a cell's `brief`, both enforced with a raise. `tests/test_narrate.py` holds every
@@ -94,8 +121,7 @@ topic to it.
 
 | | Boards | State |
 |---|---|---|
-| Entering an Admin, the lid, the clock | `T05`, `DP08` | designed; `onEnterAdmin` raises a toast |
-| The session as a container, both held states | `DP07` inside, `DP09` after Escape | designed |
+| "Not reachable" when entering a client PC | `DP08`, fourth card | level 4 — needs the Engine to refuse an offline Worker |
 | Assisted access (its own state machine) | `T06` | parked with level 3 |
 | Record, Rollout, Work | none yet | no design |
 | Level 4, a client PC | none | not started |
@@ -143,6 +169,11 @@ maximised, shoot at 1440×2130), `flow_strip.py` (through holding a session, 144
 
 ## Traps already paid for
 
+- **Never write a property from its own change handler.** `onInsideNowChanged` setting `inside` was a
+  binding loop *and* sent the window to Must see, because the rail was still the Admin's when
+  `show("authority")` ran. Watch the input (`onHeldAdminChanged`) instead.
+- **A `MouseArea` sized from its `Row` is a polish loop** that starves every other layout in the window
+  (the rail and top bar rendered garbled). Wrap the row in an `Item` and fill that.
 - **`signal left()` never registers.** `left` collides with an `Item` member: the signal is dropped and
   the handler refused with *Cannot assign to non-existent property "onLeft"*. It is `back()`. Suspect
   any signal named after an anchor or geometry property.

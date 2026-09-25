@@ -25,6 +25,7 @@ Item {
     Connections {
         target: falcon
         function onConnected() { view.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) view.refresh() }
         function onPushReceived(type, p) {
             if (type.indexOf("flow.") === 0) { view.refresh(); if (view.flow && p.flow_id === view.flow.id) view.open(view.flow.id) }
         }

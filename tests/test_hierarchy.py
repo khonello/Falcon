@@ -299,3 +299,49 @@ async def test_assisted_access_consent_flow(engine, org, connect):
     assert "assisted_access.closed" in a2.push_types(await a2.drain_pushes())
     assert (await engine.db.sessions.by_id(acc["session_id"]))["ended_reason"] == "voluntary"
     assert (await a1.ok("hierarchy.claim_native"))["blocked"] is False
+
+
+# --- looking THROUGH a held session (protocol/viewing.py) ----------------------------------------
+
+async def test_a_super_user_inside_an_admin_is_answered_as_that_admin_on_reads(engine, org, connect):
+    """"Interface reflects exactly what that Admin sees" -- on reads, and only when the client says it
+    is looking through the session. Holding is not looking: without `view` nothing narrows."""
+    su = await connect("cid-su", hostname="SU-PC")
+    everything = {d["name"] for d in (await su.ok("hierarchy.tree"))["departments"]}
+    assert everything == {"Finance", "HR"}
+
+    # asking to look through a session you do not hold narrows nothing
+    loose = await su.ok("hierarchy.tree", {"view": "session"})
+    assert {d["name"] for d in loose["departments"]} == everything
+
+    await su.ok("hierarchy.traverse", {"pc_id": org["a1_pc"]})
+    held = await su.ok("hierarchy.tree")                          # holding, looking elsewhere
+    assert {d["name"] for d in held["departments"]} == everything
+    inside = await su.ok("hierarchy.tree", {"view": "session"})  # looking through it
+    assert [d["name"] for d in inside["departments"]] == ["Finance"]
+    assert inside["viewer"] == {"account_id": org["a1"], "role": "admin"}
+
+
+async def test_looking_through_a_session_never_changes_who_acts(engine, org, connect):
+    """Writes are the Super User's own acts, logged as theirs (the Super User Exemption) -- the flag
+    is ignored on them -- and even a read that audits is recorded against the real Super User."""
+    su = await connect("cid-su", hostname="SU-PC")
+    s = (await su.ok("hierarchy.traverse", {"pc_id": org["a1_pc"]}))["session"]
+
+    ext = await su.ok("hierarchy.extend_session", {"session_id": s["session_id"], "view": "session"})
+    assert ext["extended_count"] == 1                 # still the occupant: it was the Super User
+
+    await su.ok("audit.recent", {"actor_account_id": org["w1"], "view": "session"})
+    reviewed = await engine.db.audit.recent(limit=5, action_prefix="audit.reviewed")
+    assert reviewed and reviewed[0]["actor_account_id"] == org["su"]
+    extended = await engine.db.audit.recent(limit=5, action_prefix="session.extended")
+    assert extended[0]["actor_account_id"] == org["su"]
+
+
+async def test_an_admin_cannot_use_the_flag_to_see_anything_new(engine, org, connect):
+    """Only a Super User holding an Admin workstation is narrowed; for anyone else the flag is inert."""
+    a1 = await connect("cid-a1", hostname="FIN-ADM")
+    await a1.ok("hierarchy.traverse", {"pc_id": org["w1_pc"]})
+    tree = await a1.ok("hierarchy.tree", {"view": "session"})
+    assert [d["name"] for d in tree["departments"]] == ["Finance"]
+    assert tree["viewer"] == {"account_id": org["a1"], "role": "admin"}

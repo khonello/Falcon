@@ -30,7 +30,8 @@ class AuditTrail:
                      target_id: Any = None, detail: dict[str, Any] | None = None) -> None:
         entry = {
             "at": datetime.now(timezone.utc),
-            "actor_account_id": ctx.identity.account_id if ctx else None,
+            # through a held session the handler sees the Admin; the act is still the Super User's
+            "actor_account_id": (ctx.viewed_by or ctx.identity).account_id if ctx else None,
             "action": action,
             "target_type": target_type,
             "target_id": None if target_id is None else str(target_id),

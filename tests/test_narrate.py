@@ -290,3 +290,52 @@ def test_the_fallback_count_agrees_with_its_verb():
                                   "violations": [{"filename": "a.xlsx", "hostname": "OPS-07"}],
                                   "deviations": [{"expectation": "hostname_match"}], "pcs_behind": []})
     assert two["sentence"] == "2 things need addressing."
+
+
+# --- entering an Admin: the cost, the answer, the held session -----------------------------------
+
+def test_the_cost_is_stated_before_the_act_and_names_the_machine():
+    free = n.narrate("enter_cost", {"name": "R. Mensah", "hostname": "WS-OPS-A1", "session": None})
+    assert free["action"] == "Enter WS-OPS-A1" and free["tone"] == ""
+    working = n.narrate("enter_cost", {"name": "R. Mensah", "hostname": "WS-OPS-A1",
+                                       "session": {"occupied_via": "native"}})
+    # entering while they work ends their session: that is said first, before the button
+    assert working["facts"][0]["value"] == "ends when you enter" and working["tone"] == "warn"
+
+
+def test_a_super_user_holder_is_never_offered_a_forcing_act():
+    """A Super User's session is un-evictable, by anyone -- so the page offers nothing that forces."""
+    held = n.narrate("enter_cost", {"name": "R. Mensah", "hostname": "WS-OPS-A1",
+                                    "session": {"occupied_via": "traversal", "un_evictable": True,
+                                                "occupant_name": "K. Owusu"}})
+    assert held["action"] == "" and held["tone"] == "danger"
+    answer = n.narrate("enter_answer", {"kind": "super_user", "holder": "K. Owusu"})
+    assert answer["action"] == "Open Record"
+
+
+def test_every_refusal_names_somewhere_else_to_go():
+    for kind in ("occupied", "super_user", "refused"):
+        said = n.narrate("enter_answer", {"kind": kind, "name": "R. Mensah", "hostname": "WS-OPS-A1",
+                                          "message": "no such pc"})
+        assert said["action"], kind
+    assert n.narrate("enter_answer", {"kind": "occupied"})["action"] == "End theirs and enter"
+
+
+def test_the_held_session_says_its_screen_is_not_carried_rather_than_faking_one():
+    said = n.narrate("held", {"name": "R. Mensah", "hostname": "WS-OPS-A1",
+                              "entered_at": "2026-09-25T14:20:00+00:00",
+                              "deadline_at": "2026-09-25T14:50:00+00:00"})
+    assert said["action"] == "Go in"
+    assert {"label": "Their screen", "value": "not carried yet", "tone": ""} in said["facts"]
+
+
+def test_a_workstation_with_no_time_drops_the_clause_rather_than_printing_a_blank():
+    said = n.narrate("workstation", {"hostname": "WS-OPS-A1", "session": {"occupied_via": "native"}})
+    assert said["sentence"] == "WS-OPS-A1 is theirs, and they are signed in."
+
+
+def test_entering_a_signed_out_admin_does_not_claim_anyone_is_blocked():
+    said = n.narrate("enter_cost", {"name": "A. Quaye", "hostname": "WS-OPS-A2", "session": None})
+    assert said["sentence"] == "A. Quaye is not signed in, so nobody is blocked."
+    assert said["action"] == "Enter WS-OPS-A2"
+    assert not any(f["label"].endswith("gets") for f in said["facts"])

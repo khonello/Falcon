@@ -384,3 +384,128 @@ def test_a_count_is_drawn_against_the_largest_department_not_itself(gui):
     dept.setProperty("departmentId", 1)
     assert dept.property("biggestDept") == 7
     assert val(dept.property("fleetSays"))["brief"] == "2 of 7"
+
+
+# --- level 3: inside an Admin ---------------------------------------------------------------------
+
+OPS = [{
+    "department_id": 1, "name": "Operations",
+    "admins": [{"account_id": 2, "name": "R. Mensah", "pc_id": 11, "hostname": "WS-OPS-A1",
+                "session": {"occupied_via": "native"}},
+               {"account_id": 3, "name": "A. Quaye", "pc_id": 12, "hostname": "WS-OPS-A2", "session": None}],
+    "workers": [{"account_id": 4, "pc_id": 21, "hostname": "OPS-01"}],
+}]
+HELD = {"session_id": 9, "pc_id": 11, "occupant_account_id": 1, "occupied_via": "traversal",
+        "entered_at": "2026-09-25T14:20:00+00:00", "deadline_at": "2099-01-01T00:00:00+00:00",
+        "super_user_banner": True, "un_evictable": True}
+
+
+def _as_super_user(win, bridge):
+    bridge.state.role = "super_user"
+    bridge.state.account_id = 1
+    win.findChild(QObject, "overviewView").setProperty("tree", OPS)
+    bridge.stateChanged.emit()
+
+
+def test_opening_an_admin_grows_the_crumb_and_holds_nothing(gui):
+    """Double-clicking an Admin opens them IN PLACE (DP06): the crumb gains their name and the lane
+    states what entering costs. Still level 2 -- no session, no lid, the rail unchanged."""
+    win, _, bridge = gui
+    _as_super_user(win, bridge)
+    QMetaObject.invokeMethod(win, "enterDepartment", Q_ARG("QVariant", 1))
+    dept = win.findChild(QObject, "departmentView")
+    dept.setProperty("entering", True)
+
+    assert win.findChild(QObject, "enterCrumbHere").property("text") == "R. Mensah"
+    lane = win.findChild(QObject, "enteringAdmin")
+    assert val(lane.property("lane"))["action"] == "Enter WS-OPS-A1"
+    assert win.property("insideNow") is False
+    assert win.findChild(QObject, "sessionLid").property("visible") is False
+    assert val(win.findChild(QObject, "iconRail").property("nav"))[0]["key"] == "mustsee"
+
+
+def test_inside_an_admin_the_window_is_their_interface_under_the_lid(gui):
+    """Going in hands over the Admin's own interface -- their seven-entry rail, their home page
+    scoped to their department, their grey sheet -- and the red lid is the only difference."""
+    win, _, bridge = gui
+    _as_super_user(win, bridge)
+    QMetaObject.invokeMethod(win, "enterDepartment", Q_ARG("QVariant", 1))
+    bridge.state.set_session(dict(HELD))
+    assert val(win.property("heldAdmin"))["name"] == "R. Mensah"
+
+    QMetaObject.invokeMethod(win, "goInside")
+    assert win.property("insideNow") is True
+    rail = win.findChild(QObject, "iconRail")
+    assert [e["key"] for e in val(rail.property("nav"))] == \
+        ["hierarchy", "tasks", "flows", "automation", "actions", "assistance", "reports"]
+    assert rail.property("currentKey") == "hierarchy"
+    assert win.property("onFrame") is False and win.property("inDepartment") is False
+    home = win.findChild(QObject, "hierarchyRail")
+    assert home.property("asDepartment") == 1 and home.property("isSuper") is False
+    assert win.findChild(QObject, "lidWho").property("text") == "You are inside R. Mensah"
+
+    # Escape steps out and the session runs on: holding and looking are different things
+    QMetaObject.invokeMethod(win, "stepOut")
+    assert win.property("insideNow") is False and bridge.state.session is not None
+    assert rail.property("currentKey") == "authority" and win.property("inDepartment") is True
+
+
+def test_the_session_ending_takes_you_out_rather_than_leaving_you_in_their_rail(gui):
+    win, _, bridge = gui
+    _as_super_user(win, bridge)
+    bridge.state.set_session(dict(HELD))
+    QMetaObject.invokeMethod(win, "goInside")
+    assert win.property("insideNow") is True
+
+    bridge.state.set_session(None)                  # left, expired, or ended from above
+    assert win.property("insideNow") is False and win.property("inside") is False
+    assert win.findChild(QObject, "iconRail").property("currentKey") == "authority"
+
+
+def test_the_held_session_is_mirrored_on_must_see_and_reads_look_through_only_inside(gui):
+    """Holding: the container is mirrored into Must see and reads are NOT narrowed. Inside: reads ask
+    the Engine to answer as the Admin. Stepping out stops that again."""
+    win, _, bridge = gui
+    _as_super_user(win, bridge)
+    mirror = win.findChild(QObject, "heldMirror")
+    assert mirror.property("visible") is False
+
+    bridge.state.set_session(dict(HELD))
+    assert val(win.findChild(QObject, "overviewView").property("heldAdmin"))["name"] == "R. Mensah"
+    assert bridge.viewThroughSession is False           # holding is not looking
+
+    QMetaObject.invokeMethod(win, "goInside")
+    assert bridge.viewThroughSession is True
+    QMetaObject.invokeMethod(win, "stepOut")
+    assert bridge.viewThroughSession is False
+
+
+def test_the_admin_rail_opens_the_admins_own_screens(gui):
+    """Automation and Actions are one view with tabs; each rail entry opens its own tab."""
+    win, _, _ = gui
+    control = win.findChild(QObject, "controlView")
+    QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "actions"))
+    assert win.property("viewKey") == "actions" and control.property("section") == 1
+    QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "automation"))
+    assert control.property("section") == 0
+
+
+async def test_the_bridge_asks_to_look_through_only_on_listed_reads(gui):
+    """Writes never carry the flag: an act inside an Admin is the Super User's own."""
+    _, _, bridge = gui
+    sent = []
+
+    class Conn:
+        connected = True
+
+        async def call(self, type_, payload):
+            sent.append((type_, payload))
+            return {}
+
+    bridge.conn = Conn()
+    bridge.viewThroughSession = True
+    await bridge.request("hierarchy.tree", {})
+    await bridge.request("task.verify", {"task_id": 1})
+    assert sent[0] == ("hierarchy.tree", {"view": "session"})
+    assert sent[1] == ("task.verify", {"task_id": 1})
+    bridge.conn = None

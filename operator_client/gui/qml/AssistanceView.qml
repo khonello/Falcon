@@ -24,6 +24,7 @@ Item {
     Connections {
         target: falcon
         function onConnected() { view.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) view.refresh() }
         function onPushReceived(type, p) {
             if (type.indexOf("assistance.") === 0) { view.refreshPings(); view.refreshChannels(); if (view.channel && p.channel_id === view.channel.channel.id) view.openChannel(p.channel_id) }
             if (type.indexOf("resource.") === 0) view.refreshViolations()

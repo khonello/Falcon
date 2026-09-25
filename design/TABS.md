@@ -238,11 +238,13 @@ worker surfaces.
 ### 7. "Must see" as a rail entry when it is also the page title — **one name, the rail's**
 The rail entry says **Must see**; the page header drops to just the time. One name for one place.
 
-### 8. The Admin rail — **deferred to level 3, deliberately**
-Rule 2 says the nouns carry, but an Admin has no Authority in the Super User sense and has two areas the
-Super User does not (`control.*`). The sketch stands as a sketch, to be decided when level 3 is opened:
-**Must see · Department · Work · Control · Record** — five again, same shape, and only "Department" and
-"Control" differ. Nothing is built from it yet.
+### 8. The Admin rail — **settled 25 Sep 2026: the Admin keeps their seven**
+*The user's call, made when level 3 was opened.* Inside an Admin the rail is **theirs, entry for entry**:
+Hierarchy · Tasks · Flows · Automation · Actions · Assistance · Reports. The five-area sketch
+(*Must see · Department · Work · Control · Record*) was the recommendation and was **not** taken. The
+reason is level 3's own rule: a Super User who enters an Admin is shown **their interface literally, as
+they see it**, and the red lid is the only difference — so the rail cannot be renamed for the visitor.
+You land on **their home page** (the Hierarchy entry), not on Control.
 
 ### 9. The department level's own four — **Who governs · Its machines · Today · Waiting on you**
 *The user's call.* And they are **cells, not tabs**: the department is one page of four cells, the rail

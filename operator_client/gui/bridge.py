@@ -26,6 +26,7 @@ from operator_client.core.deadlines import resolve_phrase
 from operator_client.core.narrate import narrate as _narrate
 from operator_client.core.state import ClientState
 from operator_client.tui.push_format import describe_push
+from protocol.viewing import VIEW_KEY, VIEW_SESSION, VIEWED_AS_TRAVERSED
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +36,8 @@ class FalconBridge(QObject):
     pushReceived = Signal(str, "QVariant")
     pushText = Signal(str, bool)            # (line, is_alert) for the live feed
     connected = Signal()
+    # the window went into, or came out of, a held session: every view refetches in the new scope
+    scopeChanged = Signal()
     connectionFailed = Signal(str)
     disconnected = Signal()
 
@@ -46,6 +49,7 @@ class FalconBridge(QObject):
         self.conn: EngineConnection | None = None
         self.js_engine: Any = None          # the QQmlEngine, set by app.create(); converts results for callbacks
         self.hostname = socket.gethostname()
+        self._through_session = False
 
     # --- properties (read by QML bindings) -----------------------------------------------------
 
@@ -90,6 +94,18 @@ class FalconBridge(QObject):
             return "native session on your PC"
         until = f" until {str(s.get('deadline_at', ''))[11:16]}" if s.get("deadline_at") else ""
         return f"{str(s.get('occupied_via', '')).upper()} into pc {s.get('pc_id')}{until}"
+
+    def _get_through_session(self) -> bool:
+        return self._through_session
+
+    def _set_through_session(self, value: bool) -> None:
+        if bool(value) != self._through_session:
+            self._through_session = bool(value)
+            self.scopeChanged.emit()
+
+    # Set by the shell while the window is INSIDE a held session. Reads then ask the Engine to answer
+    # as the Admin being looked through (protocol/viewing.py); holding without looking does not.
+    viewThroughSession = Property(bool, _get_through_session, _set_through_session, notify=scopeChanged)
 
     @Property(bool, notify=stateChanged)
     def superUserBanner(self) -> bool:
@@ -224,8 +240,11 @@ class FalconBridge(QObject):
         """Python-side entry (tests, helpers): (ok, result | {code, message})."""
         if self.conn is None or not self.conn.connected:
             return False, {"code": "connection", "message": "not connected"}
+        payload = dict(payload or {})
+        if self._through_session and type_ in VIEWED_AS_TRAVERSED:
+            payload[VIEW_KEY] = VIEW_SESSION
         try:
-            result = await self.conn.call(type_, payload or {})
+            result = await self.conn.call(type_, payload)
         except EngineError as exc:
             return False, {"code": exc.code, "message": exc.message}
         except ConnectionError_ as exc:

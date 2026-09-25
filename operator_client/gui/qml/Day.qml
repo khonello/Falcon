@@ -81,4 +81,21 @@ QtObject {
                 hi = Math.max(hi, lanes[i].blocks[j].to)
         return Math.min(24, Math.ceil(hi))
     }
+    // --- a held session's clock: the lid and the container read the same arithmetic ------------
+    // `nowMs` is passed in (the shell's one ticking clock) so a binding re-evaluates every second.
+    function secondsLeft(deadlineIso, nowMs) {
+        if (!deadlineIso) return 0
+        return Math.max(0, Math.floor((new Date(deadlineIso).getTime() - nowMs) / 1000))
+    }
+    function leftText(deadlineIso, nowMs) {
+        var s = secondsLeft(deadlineIso, nowMs)
+        var m = Math.floor(s / 60), r = s % 60
+        return m + ":" + (r < 10 ? "0" : "") + r
+    }
+    // how much of the session is left, 0..1 -- what the ring draws
+    function leftFraction(enteredIso, deadlineIso, nowMs) {
+        if (!enteredIso || !deadlineIso) return 0
+        var a = new Date(enteredIso).getTime(), b = new Date(deadlineIso).getTime()
+        return b <= a ? 0 : Math.max(0, Math.min(1, (b - nowMs) / (b - a)))
+    }
 }

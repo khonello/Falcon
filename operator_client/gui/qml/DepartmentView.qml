@@ -35,8 +35,20 @@ Item {
     // is explained by more of that chart -- which is where the hostnames the cell had to drop at
     // scale come back. "" = the four cells.
     property string maximised: ""
+    // AN ADMIN OPENED IN PLACE (DP06): the crumb grows by their name and the lane states what
+    // entering costs. Still level 2 -- nothing is held until the Engine says yes.
+    property bool entering: false
+    property var tasks: []
+    property var flows: []
+    // the session this Super User holds, if it is on an Admin of THIS department (DP09)
+    property var heldAdmin: null
+    property double nowMs: Date.now()
+    readonly property bool heldHere: heldAdmin !== null && heldAdmin.department_id === departmentId
     signal back()                    // `left` collides with an Item member; do not rename to it
-    signal enterAdmin(var admin)
+    signal goInside()
+    signal leaveSession()
+    signal openRecord()
+    onDepartmentIdChanged: { entering = false; maximised = "" }
 
     readonly property var dept: {
         for (var i = 0; i < tree.length; i++)
@@ -230,12 +242,34 @@ Item {
         }
     }
 
-    Keys.onEscapePressed: root.maximised !== "" ? root.maximised = "" : root.back()
+    Keys.onEscapePressed: root.entering ? root.entering = false
+                          : root.maximised !== "" ? root.maximised = "" : root.back()
+
+    EnteringAdmin {
+        objectName: "enteringAdmin"
+        anchors.fill: parent
+        visible: root.entering
+        admin: root.admin
+        deptName: root.deptName
+        tint: root.tint
+        clock: root.clock
+        lanes: root.lanes
+        people: root.people
+        tasks: root.tasks
+        flows: root.flows
+        machines: root.workers.length
+        heldAdmin: root.heldAdmin
+        nowMs: root.nowMs
+        onBack: root.entering = false
+        onGoInside: root.goInside()
+        onLeaveSession: root.leaveSession()
+        onOpenRecord: root.openRecord()
+    }
     focus: true
 
     ColumnLayout {
         anchors.fill: parent
-        visible: root.maximised === ""
+        visible: root.maximised === "" && !root.entering
         anchors.leftMargin: 6
         anchors.rightMargin: 22
         anchors.topMargin: 8
@@ -324,11 +358,19 @@ Item {
                 topAlign: true
                 title: "Who governs"
                 narration: root.people
+                // double click opens whoever is drawn; the crumb grows by their name
+                openable: root.admin !== null
+                openOnDoubleClick: true
+                onOpened: root.entering = true
+
+                Row {
+                width: parent.width
+                spacing: 20
 
                 // ONE Admin at full width; the others are a line at the foot. Two stations crammed
                 // into one cell was rejected outright.
                 Column {
-                    width: parent.width
+                    width: parent.width - (root.heldHere ? 350 : 0)
                     spacing: 13
                     visible: root.admin !== null
 
@@ -429,11 +471,24 @@ Item {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: root.selectedAdmin = index          // select
-                                    onDoubleClicked: root.enterAdmin(modelData)       // enter
+                                    onDoubleClicked: { root.selectedAdmin = index; root.entering = true }
                                 }
                             }
                         }
                     }
+                }
+
+                // the held session rides beside the Admin, carrying its clock and the way back in
+                HeldCard {
+                    objectName: "heldCard"
+                    visible: root.heldHere
+                    width: 330
+                    admin: root.heldAdmin
+                    session: falcon.session
+                    nowMs: root.nowMs
+                    onGoInside: root.goInside()
+                    onLeave: root.leaveSession()
+                }
                 }
 
                 // a department with nobody governing it is a result, not an absence

@@ -28,6 +28,9 @@ async def recent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             return {"entries": []}
         found = await db.audit.recent(limit=limit * 4, actor_account_id=actor, action_prefix=prefix)
         found = [e for e in found if e["actor_account_id"] in dept_ids][:limit]
+        if actor is not None and ctx.viewed_by is not None:
+            # a Super User reviewing one person's trail is audited, whatever they are looking through
+            await ctx.engine.audit.record(ctx, "audit.reviewed", target_type="accounts", target_id=actor)
     else:
         found = await db.audit.recent(limit=limit, actor_account_id=actor, action_prefix=prefix)
         if actor is not None:

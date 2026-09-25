@@ -13,6 +13,7 @@ To drive the real thing instead:
 """
 import os
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # must beat shot_gui's own setdefault, which is offscreen
@@ -47,7 +48,42 @@ def main(role: str = "super_user") -> None:
         Indicator(kind="task_completed", text="Task done", key="Fleet inventory, Yaw OPS-03"),
     ]
 
+    def reply(callback, ok, data):
+        callback.call([bridge.js_engine.toScriptValue(ok), bridge.js_engine.toScriptValue(data)])
+
+    def sessions(type_, payload, callback) -> bool:
+        """A stand-in for the Engine's session rules, enough to walk level 3: an Admin at their
+        workstation needs `force`, anyone else is free; leave and extend do what the Engine does."""
+        now = datetime.now().astimezone()
+        p = payload.toVariant() if hasattr(payload, "toVariant") else (payload or {})
+        if type_ == "hierarchy.traverse":
+            host = next((a for d in tree for a in d["admins"] if a["pc_id"] == p.get("pc_id")), None)
+            working = host and (host.get("session") or {}).get("occupied_via") == "native"
+            if working and not p.get("force"):
+                reply(callback, False, {"code": "conflict", "message":
+                      f"occupied by {host['name']}; pass force=true to block-or-end first"})
+                return True
+            session = {"session_id": 9, "pc_id": p.get("pc_id"), "occupant_account_id": 1,
+                       "occupant_role": "super_user", "occupied_via": "traversal",
+                       "entered_at": now.isoformat(), "deadline_at": (now + timedelta(minutes=30)).isoformat(),
+                       "extended_count": 0, "un_evictable": True, "super_user_banner": True}
+            bridge.state.set_session(session)
+            reply(callback, True, {"session": session, "already_occupying": False})
+        elif type_ == "hierarchy.end_session":
+            bridge.state.set_session(None)
+            reply(callback, True, {"ended": True, "reason": "voluntary"})
+        elif type_ == "hierarchy.extend_session" and bridge.state.session:
+            s = dict(bridge.state.session)
+            s["deadline_at"] = (datetime.fromisoformat(s["deadline_at"]) + timedelta(minutes=15)).isoformat()
+            bridge.state.set_session(s)
+            reply(callback, True, {"deadline_at": s["deadline_at"]})
+        else:
+            return False
+        return True
+
     def fake_call(type_, payload, callback):
+        if sessions(type_, payload, callback):
+            return
         if empty:
             data = {"departments": [], "sessions": [], "entries": [], "violations": [], "deviations": [],
                     "tasks": [], "flows": [], "categories": [], "routing": [], "version": None,

@@ -11,8 +11,15 @@ import "."
 Item {
     id: root
 
-    property bool isSuper: falcon.role === "super_user"
-    property var tree: []
+    // A Super User inside an Admin sees THIS page as that Admin sees it: one department, drawn the
+    // Admin's way. The Engine already answers these reads as the Admin (protocol/viewing.py); the
+    // filter here is only so the page never draws a wider tree in the moment before that reply.
+    property int asDepartment: 0
+    property bool isSuper: falcon.role === "super_user" && asDepartment === 0
+    property var fullTree: []
+    readonly property var tree: asDepartment === 0 ? fullTree
+        : fullTree.filter(function (d) { return d.department_id === root.asDepartment })
+    onAsDepartmentChanged: { root.selected = null; root.page = 0; root.strip = 0 }
     property var selected: null            // {account_id, name, pc_id, hostname, role, session, ...}
     property int page: 0
     property int strip: 0
@@ -21,7 +28,7 @@ Item {
         if (!falcon.isConnected) return
         falcon.call("hierarchy.tree", {}, function (ok, r) {
             if (!ok) { shell.notify(r.message, true); return }
-            root.tree = r.departments
+            root.fullTree = r.departments
             if (root.selected) root.selected = root.find(root.selected.account_id)
         })
     }
@@ -56,7 +63,8 @@ Item {
     Connections {
         target: falcon
         function onConnected() { root.refresh() }
-        function onDisconnected() { root.tree = []; root.selected = null }
+        function onScopeChanged() { if (falcon.isConnected) root.refresh() }
+        function onDisconnected() { root.fullTree = []; root.selected = null }
         function onPushReceived(type, p) {
             if (type.indexOf("session.") === 0 || type.indexOf("assisted_access.") === 0 || type === "hierarchy.changed")
                 root.refresh()

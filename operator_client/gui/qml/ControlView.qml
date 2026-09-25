@@ -7,6 +7,9 @@ import "."
 // enabled automations with their recent executions, and live runs with output + terminate.
 Item {
     id: view
+    // which tab the rail entry opened: 0 Dashboard (Automation), 1 Actions; -1 leaves it alone
+    property int section: -1
+    onSectionChanged: if (section >= 0) tabs.currentIndex = section
     property var builtin: ({})
     property var actions: []        // flattened: [{id, kind, name, builtin_type, ...}]
     property var events: []
@@ -40,6 +43,7 @@ Item {
     Connections {
         target: falcon
         function onConnected() { view.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) view.refresh() }
         function onPushReceived(type, p) {
             if (type.indexOf("control.") === 0) { view.refresh(); if (view.execution && p.execution_id === view.execution.id) view.openExec(view.execution.id) }
         }

@@ -24,6 +24,7 @@ without a database. `FalconBridge.narrate(topic, data)` is the only caller.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 MAX_WORDS = 12
@@ -464,6 +465,118 @@ def dept_people(data: dict[str, Any]) -> dict[str, Any]:
     return _out(f"All {len(admins)} Admins here govern all {machines} machines.", facts, brief=brief)
 
 
+def _clock(iso: Any) -> str:
+    """An Engine timestamp (UTC, ISO) as the reader's own HH:MM; "" when there is none."""
+    if not iso:
+        return ""
+    try:
+        return datetime.fromisoformat(str(iso)).astimezone().strftime("%H:%M")
+    except ValueError:
+        return ""
+
+
+# --- entering an Admin (board DP06, DP07, DP08) -------------------------------------------------
+#
+# The lane that states the cost is the lane the answer arrives in, and then the lane that carries the
+# session. Three topics, one per moment, so each moment has its own words and none is reworded in QML.
+
+def enter_cost(data: dict[str, Any]) -> dict[str, Any]:
+    """Before asking: what entering an Admin costs, stated before the act. Read from the Admin's row
+    in `hierarchy.tree`, whose `session` is whatever holds their workstation right now."""
+    name = data.get("name") or "This Admin"
+    host = data.get("hostname") or ""
+    s = data.get("session") or {}
+    if not host:
+        return _out(f"{name} has no workstation to enter.", brief="nothing to enter", tone="danger")
+    if s.get("un_evictable"):
+        return _out("Another Super User is inside, and cannot be evicted.",
+                    [_fact("Holder", s.get("occupant_name") or "a Super User", "danger"),
+                     _fact("Ends", _clock(s.get("deadline_at")) or "when they leave")],
+                    brief="a Super User holds it", tone="danger")
+    if not s:
+        # Not signed in: nobody is at the machine, so nobody is blocked. Entering still works --
+        # what you see inside is their data from the Engine, not their screen -- and what they meet
+        # is the lid's other side, if they sign in while you hold it.
+        return _out(f"{name} is not signed in, so nobody is blocked.",
+                    [_fact("They are", "not signed in"),
+                     _fact("If they sign in", "a red screen", "danger"),
+                     _fact("It ends", "when you leave, or at the deadline")],
+                    action=f"Enter {host}", brief="the cost, then the act")
+    facts = [_fact(f"{name} gets", "a red screen", "danger"),
+             _fact("They are told", "it was you"),
+             _fact("It ends", "when you leave, or at the deadline")]
+    if s.get("occupied_via") == "native":
+        facts.insert(0, _fact("Their session", "ends when you enter", "warn"))
+        return _out("Entering takes their workstation while they are working.", facts,
+                    action=f"Enter {host}", brief="the cost, then the act", tone="warn")
+    return _out("Entering takes their workstation.", facts,
+                action=f"Enter {host}", brief="the cost, then the act")
+
+
+def enter_answer(data: dict[str, Any]) -> dict[str, Any]:
+    """What `hierarchy.traverse` said, when it did not simply say yes. `kind` is decided by the view
+    from the reply: occupied (a vertical block the Engine will force on request), super_user (an
+    un-evictable holder), refused (anything else, with the Engine's own words). A refusal always
+    names somewhere else to go -- a no that leaves you with nothing to do is a bug in the answer."""
+    kind = data.get("kind")
+    name = data.get("name") or "They"
+    host = data.get("hostname") or "the workstation"
+    if kind == "occupied":
+        return _out(f"{name} is signed in at {host} now.",
+                    [_fact("Their session", "ends now", "danger"), _fact("They see", "who took it"),
+                     _fact("They reclaim it", "when you leave")],
+                    action="End theirs and enter", brief="they are working in it", tone="warn")
+    if kind == "super_user":
+        return _out("A Super User's session cannot be evicted, by anyone.",
+                    [_fact("Holder", data.get("holder") or "a Super User", "danger"),
+                     _fact("You may", "watch it in Record")],
+                    action="Open Record", brief="a Super User holds it", tone="danger")
+    return _out(f"{host} could not be entered.",
+                [_fact("The Engine said", data.get("message") or "no reason given", "danger"),
+                 _fact("Nobody", "was blocked")],
+                action="Close", brief="refused", tone="danger")
+
+
+def held(data: dict[str, Any]) -> dict[str, Any]:
+    """The yes: the session this Super User now holds on an Admin's workstation. Holding is not
+    looking -- the session runs whatever the window shows, so this is said wherever it is drawn."""
+    name = data.get("name") or "They"
+    host = data.get("hostname") or "the workstation"
+    return _out(f"You hold {host}; {name} is blocked until you leave.",
+                [_fact("Held since", _clock(data.get("entered_at"))),
+                 _fact("Ends", _clock(data.get("deadline_at")), "warn"),
+                 _fact("They see", "a red screen", "danger"),
+                 # the screenshot Action returns a path on the worker, not an image: nothing carries
+                 # the picture yet (PHASES.md), so the fact says so instead of drawing a fake one
+                 _fact("Their screen", "not carried yet")],
+                action="Go in", brief="you are holding it", tone="danger")
+
+
+def workstation(data: dict[str, Any]) -> dict[str, Any]:
+    """An Admin's own workstation -- the machine entering them takes. Never their department's
+    machines: those are not theirs to lose, and stay reachable."""
+    host = data.get("hostname") or ""
+    s = data.get("session") or {}
+    if not host:
+        return _empty("This Admin has no workstation registered.", brief="no workstation")
+    if data.get("held_by_me"):
+        return _out(f"{host} is theirs, and yours until {_clock(s.get('deadline_at'))}.",
+                    [_fact("Held since", _clock(s.get("entered_at")))],
+                    brief="you are holding it", tone="danger")
+    if s.get("occupied_via") == "native":
+        since = _clock(s.get("entered_at"))
+        # a missing time is not written as a blank: the sentence drops the clause instead
+        return _out(f"{host} is theirs; they signed in at {since}." if since
+                    else f"{host} is theirs, and they are signed in.",
+                    [_fact("Signed in", since or "yes")],
+                    brief="the machine you would take")
+    if s:
+        return _out(f"{host} is held by {s.get('occupant_name') or 'someone else'}.",
+                    [_fact("Ends", _clock(s.get("deadline_at")) or "when they leave", "warn")],
+                    brief="someone else holds it", tone="warn")
+    return _out(f"{host} is theirs, and nobody is on it.", brief="the machine you would take")
+
+
 def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
     """The Overview's fourth cell: files against their tier, and deviations logged but not yet
     addressed. Two different records, one question -- has anything gone where it should not."""
@@ -495,6 +608,7 @@ TOPICS = {
     "entries": entries, "never_signed_in": never_signed_in,
     "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
     "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet, "dept_people": dept_people,
+    "enter_cost": enter_cost, "enter_answer": enter_answer, "held": held, "workstation": workstation,
 }
 
 
