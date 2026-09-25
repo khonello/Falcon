@@ -25,13 +25,16 @@ Item {
     property var tree: []
     property var rollout: ({})
     property var sessions: []
-    property var lanes: []
     property var violations: []
     property var deviations: []
     property var reports: []
     property string clock: ""
     // whoever the cell draws is whoever is selected; at rest that is the first in the stable order
     property int selectedAdmin: 0
+    // A CHART OPENS INTO ITSELF, not into four more charts (board DP11). An area recomposes; a chart
+    // is explained by more of that chart -- which is where the hostnames the cell had to drop at
+    // scale come back. "" = the four cells.
+    property string maximised: ""
     signal back()                    // `left` collides with an Item member; do not rename to it
     signal enterAdmin(var admin)
 
@@ -79,6 +82,9 @@ Item {
         for (var s = 0; s < sessions.length; s++) if (ids[sessions[s].pc_id]) out.push(sessions[s])
         return out
     }
+    // its own lanes: a lane is a PC and a block is a session, and the arithmetic is the Day
+    // singleton's, so this page does not borrow the Overview's
+    readonly property var lanes: Day.lanesFor(sessions, workers)
     readonly property var people: falcon.narrate("dept_people",
         { admins: admins, selected: admin, machines: workers.length })
     readonly property var waiting: falcon.narrate("needs_you",
@@ -103,11 +109,116 @@ Item {
              : via === "assisted_access" ? "Assisting, by consent" : "Entered"
     }
 
-    Keys.onEscapePressed: root.back()
+    // --- one chart, full size, and nothing else on the page --------------------------------
+    Item {
+        anchors.fill: parent
+        anchors.leftMargin: 6
+        anchors.rightMargin: 22
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
+        visible: root.maximised === "machines"
+
+        Column {
+            id: maxHead
+            anchors.top: parent.top
+            anchors.left: parent.left
+            spacing: 4
+
+            Row {
+                spacing: 6
+                Txt {
+                    text: "Authority"
+                    color: Qt.rgba(1, 1, 1, 0.45)
+                    font.pixelSize: Theme.fBody
+                }
+                Icon { name: "chev"; color: Qt.rgba(1, 1, 1, 0.45); size: 12
+                       anchors.verticalCenter: parent.verticalCenter }
+                Txt {
+                    text: root.deptName
+                    color: Qt.rgba(1, 1, 1, 0.45)
+                    font.pixelSize: Theme.fBody
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -6
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.maximised = ""
+                    }
+                }
+                Icon { name: "chev"; color: Qt.rgba(1, 1, 1, 0.45); size: 12
+                       anchors.verticalCenter: parent.verticalCenter }
+                Txt {
+                    objectName: "deptMaxCrumb"
+                    text: "Its machines"
+                    color: "#ffffff"
+                    font.pixelSize: Theme.fBody
+                    font.weight: Font.DemiBold
+                }
+            }
+            Txt {
+                text: root.deptName
+                color: "#ffffff"
+                font.pixelSize: Theme.fTitle
+                font.weight: Font.Bold
+            }
+        }
+        Txt {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: 12
+            text: "Esc to go back"
+            color: Qt.rgba(1, 1, 1, 0.45)
+            font.pixelSize: Theme.fBody
+        }
+
+        GridCell {
+            objectName: "deptMachinesMax"
+            anchors.top: maxHead.bottom
+            anchors.topMargin: 16
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            topAlign: true
+            title: "Its machines"
+            narration: root.fleetSays
+
+            Row {
+                width: parent.width
+                spacing: 36
+
+                // the marks go back up and the hostnames return -- the cell dropped them to fit,
+                // and this is where they come back
+                Column {
+                    width: parent.width - 396
+                    spacing: 14
+                    FleetGrid {
+                        objectName: "deptFleetMax"
+                        width: parent.width
+                        hosts: root.fleet
+                        forceLabels: true
+                    }
+                    Legend {
+                        width: parent.width
+                        items: [ { label: "Confirmed", color: Theme.ok },
+                                 { label: "Behind", color: Theme.warn },
+                                 { label: "Out of place", color: Theme.danger } ]
+                    }
+                }
+
+                ReadingBody {
+                    width: 360
+                    narration: root.fleetSays
+                    maxFacts: 6
+                }
+            }
+        }
+    }
+
+    Keys.onEscapePressed: root.maximised !== "" ? root.maximised = "" : root.back()
     focus: true
 
     ColumnLayout {
         anchors.fill: parent
+        visible: root.maximised === ""
         anchors.leftMargin: 6
         anchors.rightMargin: 22
         anchors.topMargin: 8
@@ -207,7 +318,7 @@ Item {
                     Row {
                         width: parent.width
                         spacing: 13
-                        Avatar { initials: root.initialsOf(root.admin ? root.admin.name : ""); size: 44 }
+                        Avatar { initials: Theme.initials(root.admin ? root.admin.name : ""); size: 44 }
                         Column {
                             spacing: 3
                             width: parent.width - 60
@@ -273,7 +384,7 @@ Item {
                                     anchors.leftMargin: rowArea.containsMouse ? 8 : 0
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: 8
-                                    Avatar { initials: root.initialsOf(modelData.name || ""); size: 22
+                                    Avatar { initials: Theme.initials(modelData.name || ""); size: 22
                                              anchors.verticalCenter: parent.verticalCenter }
                                     Txt {
                                         text: modelData.name || "Admin"
@@ -327,6 +438,8 @@ Item {
                 topAlign: true
                 title: "Its machines"
                 narration: root.fleetSays
+                openable: root.fleet.length > 0
+                onOpened: root.maximised = "machines"
 
                 FleetGrid {
                     objectName: "deptFleet"
@@ -357,51 +470,9 @@ Item {
                 title: "Waiting on you"
                 narration: root.waiting
 
-                Column {
+                ReadingBody {
                     width: parent.width
-                    spacing: 14
-
-                    Txt {
-                        width: parent.width
-                        text: root.waiting.sentence || ""
-                        color: Theme.ink
-                        font.pixelSize: Theme.fSection
-                        font.weight: Font.DemiBold
-                        wrapMode: Text.WordWrap
-                    }
-                    Column {
-                        width: parent.width
-                        spacing: 0
-                        Repeater {
-                            model: root.waiting.facts || []
-                            delegate: Item {
-                                required property var modelData
-                                width: parent.width
-                                height: 33
-                                Txt {
-                                    anchors.left: parent.left
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: modelData.label
-                                    color: Theme.dim
-                                    font.pixelSize: Theme.fBody
-                                }
-                                Txt {
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: modelData.value
-                                    color: modelData.tone ? Theme.tone(modelData.tone) : Theme.ink
-                                    font.pixelSize: Theme.fBody
-                                    font.weight: Font.Medium
-                                }
-                                Rectangle {
-                                    anchors.bottom: parent.bottom
-                                    width: parent.width
-                                    height: 1
-                                    color: Theme.line
-                                }
-                            }
-                        }
-                    }
+                    narration: root.waiting
                 }
             }
 

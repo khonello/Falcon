@@ -20,10 +20,14 @@ Item {
 
     property var hosts: []                  // [{ hostname, state }], state a tone name
     property int gap: 6
+    // Maximised, the panel has the room the cell did not: every mark goes back to 46 px and carries
+    // its hostname again. That is the whole argument for maximising rather than recomposing.
+    property bool forceLabels: false
     readonly property int count: hosts.length
-    readonly property int slot: count <= 8 ? 46 : count <= 30 ? 30 : count <= 120 ? 16 : 0
-    readonly property bool labelled: count <= 8
-    readonly property bool asBars: slot === 0
+    readonly property int slot: forceLabels ? 46
+                              : count <= 8 ? 46 : count <= 30 ? 30 : count <= 120 ? 16 : 0
+    readonly property bool labelled: forceLabels || count <= 8
+    readonly property bool asBars: slot === 0 && !forceLabels
 
     implicitHeight: asBars ? bars.implicitHeight : flow.implicitHeight
 

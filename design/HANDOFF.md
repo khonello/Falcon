@@ -62,17 +62,18 @@ gesture safe to try. `design/journey_strip.py` → `boards/JOURNEY.html` (1440×
 
 **Selecting must be visible in the QML.** `DP16` (a department ringed in the map), `DP15` (an Admin swapped into the cell) and `DP17` (that Admin entered) are the single-click states. The test for whether the build got it right: **the crumb moves on a double click and never on a single one.**
 
-**Known, and not yet paid off (found building level 2):**
+**Paid off, 25 Sep 2026** — the three debts this build left are closed:
 
-- **`DepartmentView` gets its day from `OverviewView.lanesForDept(id)`.** The date arithmetic
-  (`hoursOf`, `sessionState`, `blocksFor`) lives in the Overview, so the department page depends on a
-  sibling view rather than on a component. It works because both are mounted; it should become a
-  shared piece when the next view needs lanes.
-- **The department's "Waiting on you" reading is written inline** rather than using `ReadingPanel`,
-  which carries its own `Panel` title and would double up inside a `GridCell`. Two renderings of the
-  same idea now exist — fold them together when the other cells are ported.
-- **`Its machines` does not maximise yet.** `FleetGrid` picks its mark size and drops the hostnames at
-  scale (`DP10`), but the double click that gives them back (`DP11`) is designed and not built.
+- The lane arithmetic moved out of `OverviewView` into a **`Day` singleton** (`Day.qml`, in `qmldir`):
+  `nowHours`, `hoursOf`, `sessionState`, `blocksFor`, `lanesFor`, `windowStart`/`windowEnd`. A lane is
+  a PC and a block is a session whatever page is asking, so the department no longer reaches into a
+  sibling view for its own day.
+- The department's reading uses **`ReadingBody`**, the same component the Overview's cells use.
+  `ReadingPanel` is `ReadingBody` inside a `Panel`, and a `Panel` inside a `GridCell` would draw a
+  second surface and a second title — which is why the inline copy existed. It is gone.
+- **`Its machines` maximises** (`DP11`): double-click the cell and that chart fills the page with its
+  words beside it, every mark back to 46 px and its hostname with it, `Esc to go back`. Escape
+  restores the four cells. `FleetGrid.forceLabels` is what the maximised panel sets.
 
 **Two rules the build must honour, settled 25 Sep 2026 (`DP10`, `DP11`):**
 

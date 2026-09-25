@@ -208,52 +208,12 @@ Item {
         var mm = d.getMinutes() < 10 ? "0" + d.getMinutes() : String(d.getMinutes())
         return days[d.getDay()] + ", " + hh + ":" + mm
     }
-    readonly property real nowHours: {
-        var d = new Date()
-        return d.getHours() + d.getMinutes() / 60
-    }
-    function hoursOf(iso) {
-        if (!iso) return NaN
-        var d = new Date(iso)
-        var today = new Date()
-        var midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-        return (d.getTime() - midnight.getTime()) / 3600000
-    }
-    function sessionState(s) {
-        if (s.occupied_via === "native") return "native"
-        if (s.occupied_via === "assisted_access") return "assisted_access"
-        return s.occupant_role === "super_user" ? "super_user" : "traversal"
-    }
-    function blocksFor(pcId) {
-        var out = []
-        for (var i = 0; i < sessions.length; i++) {
-            var s = sessions[i]
-            if (s.pc_id !== pcId) continue
-            var from = hoursOf(s.entered_at)
-            var to = s.ended_at ? hoursOf(s.ended_at) : nowHours
-            if (isNaN(from) || to <= from) continue
-            out.push({ state: sessionState(s), from: from, to: to,
-                       label: (s.occupant_name || "someone") + " · "
-                              + (s.occupied_via === "native" ? "at the PC" : s.occupied_via.replace("_", " ")) })
-        }
-        return out
-    }
-    // one department's lanes, without moving `focusDept` -- the department page asks for its own
-    // day and the Overview's descent is a different thing
-    function lanesForDept(departmentId) {
-        var d = findDept(departmentId)
-        if (!d) return []
-        var out = []
-        for (var j = 0; j < d.workers.length; j++) {
-            var w = d.workers[j]
-            out.push({ name: w.hostname || w.name, blocks: blocksFor(w.pc_id) })
-        }
-        if (out.length <= 9) return out
-        var used = out.filter(function (l) { return l.blocks.length > 0 })
-        var quiet = out.length - used.length
-        if (quiet > 0) used.push({ name: quiet + " more", blocks: [], quiet: true })
-        return used
-    }
+    // the lane arithmetic lives in the Day singleton: a lane is a PC and a block is a session,
+    // whatever page is asking. These keep the names this view's bindings already use.
+    readonly property real nowHours: Day.nowHours()
+    function hoursOf(iso) { return Day.hoursOf(iso) }
+    function sessionState(s) { return Day.sessionState(s) }
+    function blocksFor(pcId) { return Day.blocksFor(sessions, pcId) }
     readonly property var timelineLanes: {
         var out = []
         for (var i = 0; i < tree.length; i++) {

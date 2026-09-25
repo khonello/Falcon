@@ -206,6 +206,11 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
     # FALCON_SHOT_DEPT=<id> enters that department -- level 2, inside Authority
     if os.environ.get("FALCON_SHOT_DEPT"):
         win.setProperty("departmentId", int(os.environ["FALCON_SHOT_DEPT"]))
+        # FALCON_SHOT_MAX=machines maximises that chart -- one chart, nothing else on the page
+        if os.environ.get("FALCON_SHOT_MAX"):
+            dept = win.findChild(object, "departmentView")
+            if dept is not None:
+                dept.setProperty("maximised", os.environ["FALCON_SHOT_MAX"])
 
     def grab():
         img = win.grabWindow()
@@ -213,6 +218,7 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-" + os.environ["FALCON_SHOT_OPEN"] if os.environ.get("FALCON_SHOT_OPEN") else ""
         name += f"-d{focus}" if focus else ""
         name += "-dept" + os.environ["FALCON_SHOT_DEPT"] if os.environ.get("FALCON_SHOT_DEPT") else ""
+        name += "-max" if os.environ.get("FALCON_SHOT_MAX") else ""
         path = out_dir / (name + ".png")
         img.save(str(path))
         print("saved", path, img.width(), img.height())

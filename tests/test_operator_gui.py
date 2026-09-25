@@ -305,3 +305,32 @@ def test_the_fleet_changes_kind_rather_than_scrolling(gui):
     assert sized(24) == (30, False, False)      # countable, unlabelled
     assert sized(96) == (16, False, False)      # proportion and outliers
     assert sized(240) == (0, False, True)       # the shape of the fleet, not one mark each
+
+
+def test_a_chart_maximises_into_itself_and_escape_restores_the_cells(gui):
+    """An area recomposes into several panels; a CHART opens into itself (board DP11). What explains
+    a chart is more of that chart -- so the hostnames the cell had to drop at scale come back, and
+    nothing else is on the page."""
+    win, _, _ = gui
+    dept = win.findChild(QObject, "departmentView")
+    dept.setProperty("tree", [{
+        "department_id": 1, "name": "Operations", "admins": [],
+        "workers": [{"account_id": i, "pc_id": i, "hostname": f"OPS-{i:02d}"} for i in range(1, 25)],
+    }])
+    dept.setProperty("departmentId", 1)
+
+    # in the cell, 24 machines have dropped their hostnames to fit
+    cell = win.findChild(QObject, "deptFleet")
+    assert cell.property("slot") == 30 and cell.property("labelled") is False
+
+    assert dept.property("maximised") == ""
+    dept.setProperty("maximised", "machines")
+    assert win.findChild(QObject, "deptMaxCrumb").property("text") == "Its machines"
+
+    # maximised, every mark is back to full size and carries its name again
+    big = win.findChild(QObject, "deptFleetMax")
+    assert big.property("slot") == 46 and big.property("labelled") is True
+    assert big.property("asBars") is False
+
+    dept.setProperty("maximised", "")          # Escape restores the four cells exactly
+    assert dept.property("maximised") == ""

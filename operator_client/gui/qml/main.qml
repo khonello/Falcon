@@ -162,7 +162,6 @@ ApplicationWindow {
                                 tree: overview.tree
                                 rollout: overview.rollout
                                 sessions: overview.sessions
-                                lanes: overview.lanesForDept(shell.departmentId)
                                 violations: overview.violations
                                 deviations: overview.deviations
                                 clock: overview.clock
