@@ -85,6 +85,16 @@ into that level, and Escape comes back out *while the session is still held*. Ho
 different things. There is no screen streaming in the protocol, so it is a live-state card, never a
 viewport.
 
+**Five areas, and the nine questions about them are closed** (25 Sep 2026, `TABS.md`). The rail is
+**Must see · Authority · Rollout · Record · Work**. What was settled, in one line each: all reports live
+in **Record** and Must see carries the unaddressed ones; Work has one **Closed** filter that hands off to
+Record; Record covers past *and* present and keeps its name; report **routing** is an Authority act;
+resource **tiering** is Admin-only and so belongs to level 3; a Super User **watches** assistance and
+never starts it; the rail owns the name "Must see" and the page header drops to the time; the Admin rail
+is deferred to level 3; and the department's four cells are **Who governs · Its machines · Today ·
+Waiting on you**, with Today the wide one. The rule that keeps five honest: **a thing appears in two
+areas only if one of them is Must see, or a filter that names the other.**
+
 **Layout is editorial, not a preference.** One layout per page, chosen once, never per viewer.
 
 **Four cells, and the widths vary.** The user's own call, made on the `T02` board: *"the width
@@ -137,12 +147,15 @@ reasoning is not lost, not so they can be revived.
 
 The Overview is one page of what is now a seven-entry rail. Everything below is untouched.
 
-**Super User pages** — none of these have been designed or built:
+**Super User pages** — none of these have been designed or built. They are now named by the area that
+owns them (`TABS.md`), not by feature, because the eight-tab rail is gone:
 
-- **Views** — the Super-User-only record of who addressed which report, when.
-- **Reports** — routing configuration and the report pane.
-- **Updates** — approval, rollout by department, the escalation lever.
-- **Tasks**, **Flows**, **Assistance** — the Super User's view of each.
+- **Record** — audit, sessions, Views (who addressed which report, when), all reports, deviations,
+  violations, and the closed half of Work.
+- **Rollout** — approval, rollout by department, the escalation lever.
+- **Authority** — departments, Admins, client PCs, appointing, display names, entering, and report
+  routing (whose UI the spec still defers, §10).
+- **Work** — Tasks, Flows, and live assistance watched read-only, plus its one **Closed** filter.
 
 **Traversal into an Admin is designed (`T01`–`T06`) but not built.** A department is a place drawn in
 the Overview's language — a colonnade of Admin columns over the day they share — and entering one is a

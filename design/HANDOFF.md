@@ -1,11 +1,12 @@
-# Where the Operator Client UI stands — 24 Sep 2026
+# Where the Operator Client UI stands — 25 Sep 2026
 
 A snapshot for a fresh session: what exists, what was decided, and the one thing to do next.
 
 **Read `design/LEVELS.md` first** — the levels, which one is being worked on, and the rule that only
 that level's UI is touched. Then in this order: `design/DECISIONS.md` (what the user approved, rejected and why — it is what
-stops the rejected shapes coming back) → `design/BOARDS.md` (what every board is) → this file (where
-the code stands and what to do next).
+stops the rejected shapes coming back) → `design/TABS.md` (the five areas, where every handler lands,
+and the nine questions about them, all settled) → `design/BOARDS.md` (what every board is) → this file
+(where the code stands and what to do next).
 
 **Design canvas:** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — "Falcon Operator Design",
 84 boards, **version 44**. Rejected and superseded proposals are deleted from it. Branch
@@ -14,7 +15,25 @@ pass — everything below is design.
 
 ---
 
-## CONTINUE FROM HERE — the department level, waiting on picks from its mood board
+## CONTINUE FROM HERE — draw the department page. Nothing is blocking it any more.
+
+**The nine open issues in `TABS.md` were settled on 25 Sep 2026**, which was the last thing standing
+between the design and the drawing. Four went to the user, five to the recommendations already argued in
+that file. The two that change what gets drawn next:
+
+- **The department's four cells are named — Who governs · Its machines · Today · Waiting on you** —
+  and they are *cells, not tabs*. **Today is the wide one.**
+- **The rail does not change at department level.** A Super User looking at a department is deeper inside
+  **Authority**; the crumb and the title carry the depth.
+
+Everything else settled there shapes pages that come later, not this one: reports all live in Record with
+Must see carrying the unaddressed, Work gets one Closed filter that hands to Record, routing is an
+Authority act, tiering is Admin-only (level 3), a Super User watches assistance and never starts it, and
+the Admin rail waits for level 3. `TABS.md` has each with its reasoning.
+
+---
+
+## The department level, and the picks from its mood board
 
 **We work one level at a time** (`design/LEVELS.md` — read it first). Level 1 Super User is designed
 and built. **Level 2, the department, is the current and only work.** Level 3, the Admin, was designed
@@ -38,9 +57,9 @@ captioned so a pick can be named.
 | `DP03` machines | the seven: Grouped by Admin · One waffle · Day lanes · Roster | one machine: Slot · With its Admin · Its day · Figure |
 | `DP04` doors | choosing: Opens in place · Detail lane · Drill · Reveal | asking to enter: In the cell · A confirm · A reading · Two doors named |
 
-**THE NEXT STEP: one word from the user.** The mood board has done its job; picking from a menu of
-option names was a bad way to ask and was dropped. The department page is to be built from this
-combination unless the user changes part of it:
+**The mood board has done its job** — picking from a menu of option names was a bad way to ask and was
+dropped. The page is **four cells: Who governs · Its machines · Today · Waiting on you**, Today the wide
+one, built from this combination unless the user changes part of it:
 
 > Admins as columns across the top · each drawn as a **station** (avatar, machine, then the slots they
 > govern) · the seven client PCs **grouped under the Admin** who answers for them · entering asked for
@@ -52,8 +71,9 @@ Rebuild from the combination above, screenshot it, and let the user react to the
 **Settled since, and binding on everything drawn from here**
 
 - **Areas, not features** (`TABS.md`): the Super User rail is five — **Must see · Authority · Rollout ·
-  Record · Work** — with Assistance folded into Work. Nine open issues in that file are to be settled
-  *in the document* before any of it is drawn.
+  Record · Work** — with Assistance folded into Work. **Its nine open issues are closed** (25 Sep 2026);
+  that file is now a record of decisions, not a queue of questions. What it costs in code is listed at
+  its foot and has not been spent yet.
 - **An area is entered through its contents, not through tabs.** Each area is a handful of containers,
   one per thing it covers.
 - **One gesture: single click inspects, double click enters.** Escape, the crumb or the back arrow comes

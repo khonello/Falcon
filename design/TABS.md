@@ -1,7 +1,8 @@
 # Areas, not features: what the rail is called at each level
 
-Decided 24 Sep 2026. **Nothing here is built or drawn yet** — this is the working document, and the
-issues at the bottom are to be settled *in here* before the mood board or any QML is touched.
+Decided 24 Sep 2026. **The nine open issues were settled 25 Sep 2026** — what follows is the decision,
+not a proposal. The reasoning for each is at the bottom, under *The nine, settled*, so a closed
+question is not reopened by accident. Still nothing here is drawn or built.
 
 ## The decision
 
@@ -11,11 +12,11 @@ into Work**.
 
 | Area | Gathers | The question it answers |
 |---|---|---|
-| **Must see** | the Overview (`K01`, built) | what needs me right now |
-| **Authority** | departments, Admins, client PCs, appointing, display names, entering | who governs what, and where nobody does |
+| **Must see** | the Overview (`K01`, built), plus the **unaddressed reports** | what needs me right now |
+| **Authority** | departments, Admins, client PCs, appointing, display names, entering, **report routing** | who governs what, and where nobody does |
 | **Rollout** | versions, approval, escalation, fleet health | what version is where, and what is stuck |
-| **Record** | audit, sessions, Views, addressed reports, deviations, violations | what happened, and who was where |
-| **Work** | Tasks, Flows, **Assistance** | what is moving through the organisation |
+| **Record** | audit, sessions, Views, **all reports**, deviations, violations, finished work | what happened, and who was where |
+| **Work** | Tasks, Flows, **live assistance (watched, not started)** | what is moving through the organisation |
 
 ## How an area is entered: through its contents, not through tabs
 
@@ -84,6 +85,13 @@ entered, now marked as held, carrying the countdown.
 This also gives the countdown a home while you are *not* inside: it is on the container, in the place
 that names the machine, rather than floating over a page it has nothing to do with.
 
+**Where the container lives when you have navigated elsewhere — settled: both.** It stays on the page
+where it was started, *and* it is mirrored into Must see for as long as it exists, because a held
+session is by definition something you must see. There is only ever one per person
+(`sessions.active_for_account` returns one), so there is never a list of them. The mirror is the same
+container, not a second design, and it obeys the two-areas rule below: Must see is one of the two
+places, so the duplication is allowed.
+
 **What the container can honestly show.** There is **no screen streaming in the protocol** — nothing in
 `engine/` or `protocol/` carries frames, and Assisted Access's "screen, read only" ceiling is a design
 intention with nothing implementing it. What exists today:
@@ -98,12 +106,6 @@ a fake screen preview would promise something the system cannot do. If a real pr
 still via the `screenshot` Action is reachable now; a live feed is a new Engine capability and a
 separate decision.
 
-**Open:** where the container lives when you have navigated elsewhere. There is only ever one session
-per person (`sessions.active_for_account` returns one), so the options are: (a) it lives only on the
-page where it was started, and the status line carries the way back; (b) it is pinned into Must see
-while it exists; (c) both. **Recommendation: (c)** — on the page where it was started, and mirrored in
-Must see, because a held session is by definition something you must see.
-
 ### It is the same gesture at every level
 
 Super User → department → Admin is **one gesture repeated**, not three different navigations:
@@ -112,7 +114,8 @@ them. The Admin level then hands over the Admin screens that already exist.
 
 ## If tabs are ever used anyway
 
-Somewhere one will be needed — a filter inside an opened container, most likely. When it is:
+Somewhere one will be needed — a filter inside an opened container, most likely, and the Work area's
+**Closed** hand-off is exactly that case. When it is:
 
 - **Plain text only.** No pill, no box, no background, no underline, no chevron.
 - **The current one differs by colour** (and weight, at most). Nothing else changes.
@@ -138,35 +141,40 @@ filter on a different axis from the sidebar — and is not to be used as a tab r
 
 `K01` already names its four cells **Authority · Rollout · Today · Out of place**. Three of them are
 area names, so the Overview is the front door to the rail rather than a separate vocabulary: opening
-a cell goes deeper into the area that owns it. ("Today" and "Out of place" both open into **Record** —
-see issue 3.)
+a cell goes deeper into the area that owns it. ("Today" and "Out of place" both open into **Record**.)
 
-**Must see holds nothing of its own.** Everything on it lives in an area; it is a view, not a
-container. If something can only be reached from Must see, that is a bug in the areas.
+**Must see holds nothing of its own** — with two exceptions that are mirrors, not homes: the
+unaddressed reports, which live in Record, and a held session's container, which lives on the page it
+was started from. Everything else on Must see lives in an area. If something can only be reached from
+Must see, that is a bug in the areas.
 
 ## Where every handler lands
 
 | Area | Handlers |
 |---|---|
-| **Must see** | none of its own — it reads from the others |
-| **Authority** | `hierarchy.tree`, `hierarchy.departments`, `hierarchy.department_create`, `hierarchy.account_create`, `hierarchy.account_get`, `hierarchy.account_offboard`, `hierarchy.pc_register`, `hierarchy.pc_rekey`, `hierarchy.set_display_name`, `hierarchy.set_self_name`, `hierarchy.resolve_names`, `hierarchy.traverse`, `hierarchy.end_session`, `hierarchy.extend_session` |
+| **Must see** | none of its own — it reads from the others. It *surfaces* `reports.list` (unaddressed) and the held session. |
+| **Authority** | `hierarchy.tree`, `hierarchy.departments`, `hierarchy.department_create`, `hierarchy.account_create`, `hierarchy.account_get`, `hierarchy.account_offboard`, `hierarchy.pc_register`, `hierarchy.pc_rekey`, `hierarchy.set_display_name`, `hierarchy.set_self_name`, `hierarchy.resolve_names`, `hierarchy.traverse`, `hierarchy.end_session`, `hierarchy.extend_session`, **`reports.routing_get`, `reports.routing_set`** |
 | **Rollout** | `updates.current`, `updates.approve`, `updates.rollout_health`, `updates.rollout_department`, `updates.prompt_admin`, `updates.report_status` |
-| **Record** | `audit.recent`, `audit.deviations`, `hierarchy.sessions_today`, `reports.list`, `reports.mark`, `reports.addressed_view`, `resource.violations` |
-| **Work** | `task.*` (create, get, list, propose, stack, start, verify, program_signal), `flow.*` (create, edit, list, status, history, pause, resume, trigger, consent, content, sync_result, delete), `assistance.*` (ping, respond, ping_status, search, channel(s), message, close_channel, listeners), `assisted_access.*` (request, accept, decline, close, status, set_available, available_helpers) |
-| **no tab** | `control.*` — Automation and Actions are reachable only by entering an Admin (level 3) · `index.*` internal · `auth.*`, `system.*` transport · `hierarchy.session_state`, `hierarchy.claim_native` are chrome · `alerts.*` feeds indicators |
-| **unplaced — see issues** | `reports.routing_get` / `routing_set`, `resource.tag` / `resource.resolve` |
+| **Record** | `audit.recent`, `audit.deviations`, `hierarchy.sessions_today`, **`reports.list`, `reports.mark`, `reports.addressed_view`**, `resource.violations`, plus the closed half of Work (verified tasks, finished flows, finished assistance) |
+| **Work** | `task.*` (create, get, list, propose, stack, start, verify, program_signal), `flow.*` (create, edit, list, status, history, pause, resume, trigger, consent, content, sync_result, delete), and **read-only**: `assistance.ping_status`, `assistance.channels`, `assistance.listeners`, `assisted_access.status`, `assisted_access.available_helpers` |
+| **no tab — level 3, or another client entirely** | `control.*` — Automation and Actions are reachable only by entering an Admin · **`resource.tag`, `resource.resolve`** — tiering is an Admin act · **`assistance.ping`, `respond`, `search`, `message`, `close_channel`, `set_available`** and **`assisted_access.request`, `accept`, `decline`, `close`** — a Super User watches assistance, never starts it |
+| **not a tab at all** | `index.*` internal · `auth.*`, `system.*` transport · `hierarchy.session_state`, `hierarchy.claim_native` are chrome · `alerts.*` feeds indicators |
 
-## The proposed rule for overlaps: open lives in Work, closed lives in Record
+## The overlap rule: open lives in its area, closed lives in Record
 
 Several things are legitimately both: a task is work until it is verified, then it is history; a
 report waits on someone, then it is addressed; an assisted session is live, then it is a record of
 who helped whom.
 
-**Proposal:** *the open thing lives in its area, the closed thing lives in Record.* Work holds what is
-still moving; Record holds what has stopped. This also gives Record a single definition — everything
+**The rule:** *the open thing lives in its area, the closed thing lives in Record.* Work holds what is
+still moving; Record holds what has stopped. That gives Record a single definition — everything
 finished, plus everything the past says about now.
 
-It has a cost, in issue 2.
+**And the hand-off that makes it survivable:** Work carries one **Closed** filter that hands off to
+Record, so a task verified yesterday is reachable from the place its owner will look for it. Which
+gives the rule that keeps the five honest:
+
+> **A thing appears in two areas only if one of them is Must see, or a filter that names the other.**
 
 ## Indicators — which area lights up
 
@@ -179,91 +187,81 @@ otherwise a badge sends you to the wrong place:
 | `deadline_reached` | Work |
 | `flow_failure` | Work |
 | `task_completed` | Work |
-| `violation` | Record — **see issue 3** |
+| `violation` | Record |
 | rollout stalled | Rollout |
-| unaddressed report | Record — **see issue 1** |
+| unaddressed report | **Must see** — that is where the unaddressed ones are surfaced and answered; Record carries no badge |
 | session blocked / ended | chrome, no badge |
 
 ---
 
-# Open issues — settle these here, before drawing
+# The nine, settled
 
-### 1. Reports are in two places at once
-`reports.list` is *waiting on someone* (unaddressed) and *what happened* (addressed). By the open/closed
-rule the unaddressed ones belong in Work and the addressed ones in Record — but a report is not "work
-moving through the organisation" in the way a task or a flow is, and "Reports" as a word has lived in
-its own tab for the whole project.
-**Options:** (a) unaddressed → Work, addressed → Record; (b) all reports → Record, and Must see carries
-the unaddressed ones; (c) Reports stays its own sixth area.
-**Recommendation:** (b). Reports are a *record that sometimes needs an answer*; Must see already exists
-to surface the ones that do, and a sixth tab undoes the point of five.
+Settled 25 Sep 2026. Four were the user's call; the other five went to the recommendation that was
+already argued here, and the two answers agreed. Recorded so the reasoning is not rediscovered — not so
+the options can be reopened.
 
-### 2. The open/closed rule splits things people think of as one list
-If a verified task leaves Work, someone who closed a task yesterday will look for it under Work and not
-find it. Same for a closed flow or a finished assisted session.
-**Options:** (a) Work has a "Closed" filter that hands off to Record; (b) Record is only *sessions and
-audit*, and each area keeps its own history; (c) closed items stay in their area, and Record is purely
-a cross-cutting trail.
-**Recommendation:** (a) — one filter, one hand-off, and the item is reachable from both. Worth a rule:
-*a thing appears in two areas only if one of them is Must see or a filter that names the other.*
+### 1. Reports are in two places at once — **all reports → Record; Must see carries the unaddressed ones**
+*The user's call.* A report is a *record that sometimes needs an answer*, not work moving through the
+organisation the way a task or a flow is. Must see already exists to surface the ones that need
+answering, so it does that job instead of Work, and a sixth area is avoided. Rejected: splitting
+unaddressed into Work (blurs what Work means), and Reports as its own sixth area (undoes the point of
+five).
 
-### 3. "Out of place" is current, not history
-A restricted file sitting in `/workers/` is *true now*, not a thing that happened. Putting violations in
-Record makes Record mean "the past **and** some of the present", which weakens the name.
-**Options:** (a) Record covers "what the rules say about us, past and present" and the name stretches;
-(b) violations move to Authority (they are about policy and who answers for it); (c) rename Record to
-something that carries both — **Oversight**, **The trail**, **Standing**.
-**Recommendation:** (a) with the name **Record** kept, because "Out of place" already has a front door on
-the Overview and the word people use for it is "what is out of place", not "what is happening".
+### 2. The open/closed rule splits lists people think of as one — **a Closed filter in Work that hands off to Record**
+One filter, one hand-off, and the item is reachable from both places. This is also the first real use of
+the plain-text tab treatment above. The general rule it produced is stated under *The overlap rule*: a
+thing appears in two areas only if one of them is Must see, or a filter that names the other.
 
-### 4. Report routing is a policy act, not a record
-`reports.routing_set` decides *who receives which category of report* — that is an authority decision,
-and the spec lists the routing-configuration UI as explicitly deferred (§10).
-**Options:** (a) routing lives in Authority; (b) routing lives in Record beside the reports it shapes.
-**Recommendation:** (a). Authority is where you decide who answers for what; Record is where you see
-what they did about it.
+### 3. "Out of place" is current, not history — **Record stretches, and keeps its name**
+Record means *what the rules say about us, past and present*. "Out of place" already has its front door
+on the Overview, and the words people use for it are "what is out of place", not "what is happening".
+Rejected: moving violations to Authority, and renaming Record to Oversight / The trail / Standing.
 
-### 5. Resource tiers have no home
-`resource.tag` and `resource.resolve` set which tier a folder belongs to — access policy, which is
-authority — while `resource.violations` reports the breaches, which is Record.
-**Recommendation:** split them: tiers to **Authority**, violations to **Record**. Confirm that a
-Super User configures tiers at all, or whether that is an Admin-only act (it may be, in which case it
-is level 3 and not our problem yet).
+### 4. Report routing is a policy act, not a record — **routing lives in Authority**
+`reports.routing_set` decides who receives which category of report; that is deciding who answers for
+what, which is Authority's whole definition. Record is where you see what they did about it. Note the
+spec still lists the routing-configuration **UI** as explicitly deferred (§10) — this settles *where* it
+goes, not that it is being built now.
 
-### 6. Assistance folded into Work loses its two halves
-For a Super User, assistance is mostly *oversight* — who helped whom, across departments — which is
-Record by the open/closed rule. The live half (a ping waiting, a channel open) is Work.
-**Recommendation:** live assistance → Work; finished assistance → Record; and the Super User's
-cross-department *picture* of assistance (the `C06` chart) lives on the Overview or in Record, not as
-a third copy. **Decide whether a Super User ever initiates assistance, or only watches it.**
+### 5. Resource tiers have no home — **tiering is Admin-only, so it is level 3**
+*The user's call.* `resource.tag` and `resource.resolve` are not on a Super User surface at all; a Super
+User sees only `resource.violations`, in Record. Nothing to design for this now — it arrives when level 3
+is opened.
 
-### 7. "Must see" as a rail entry, when it is also the page's title
-The Overview's header is "Must see" and the rail entry would be too. Harmless, or a stutter.
-**Options:** (a) rail says "Must see", page header drops to just the time; (b) rail says "Overview",
-page keeps "Must see".
-**Recommendation:** (a) — one name for one place.
+### 6. Assistance folded into Work loses its two halves — **a Super User watches assistance, never starts it**
+*The user's call.* Live pings and open channels appear in Work **read-only**; finished assistance is in
+Record by the open/closed rule; and the cross-department *picture* of assistance (the `C06` chart) is
+drawn **once**, on the Overview, not copied into a third place. The acting handlers — ping, respond,
+message, close, search, availability, and the whole of `assisted_access.*` — belong to the Admin and
+worker surfaces.
 
-### 8. The Admin rail, if nouns must mean the same everywhere
-Rule 2 says the nouns carry. An Admin has no Authority in the Super User sense, and has two areas the
-Super User does not (`control.*` — Automation and Actions).
-**Sketch, to be decided when level 3 is opened, not now:** Must see · Department · Work · Control ·
-Record. Five again, same shape, and only "Department" and "Control" differ.
+### 7. "Must see" as a rail entry when it is also the page title — **one name, the rail's**
+The rail entry says **Must see**; the page header drops to just the time. One name for one place.
 
-### 9. The department level's own four
-Proposed, not yet agreed: **Who governs · Its machines · Today · Waiting on you** — which is what
-`DP01`–`DP04` explore, so the picks and these names settle together. Alternatives floated: *The people
-/ The fleet / The day / The queue*.
-**Open:** whether these are tabs at all, or simply the four cells of the one department page. If they
-are the cells, the level has no tabs and the rail stays the Super User's five.
+### 8. The Admin rail — **deferred to level 3, deliberately**
+Rule 2 says the nouns carry, but an Admin has no Authority in the Super User sense and has two areas the
+Super User does not (`control.*`). The sketch stands as a sketch, to be decided when level 3 is opened:
+**Must see · Department · Work · Control · Record** — five again, same shape, and only "Department" and
+"Control" differ. Nothing is built from it yet.
+
+### 9. The department level's own four — **Who governs · Its machines · Today · Waiting on you**
+*The user's call.* And they are **cells, not tabs**: the department is one page of four cells, the rail
+stays the Super User's five (you are deeper inside **Authority**, not somewhere else), and the crumb and
+title say how deep. The widths do the ranking and **Today is the wide cell** — a department at rest is
+read by its day. These are the names `DP01`–`DP04` explored, so the mood-board picks and the names
+settle together. Rejected: *The people / The fleet / The day / The queue* — it reads as an inventory
+rather than as the questions the rail is named after.
 
 ---
 
 ## What this costs in code, when it is time
 
 - `IconRail.qml` — `superNav` becomes five entries with new `key`s (`mustsee`, `authority`, `rollout`,
-  `record`, `work`); `adminNav` waits for issue 8.
+  `record`, `work`); `adminNav` waits for issue 8 and level 3.
 - `main.qml` — routes on `shell.viewKey`; every `shell.show("…")` call site changes with the keys.
+- `OverviewView.qml` — the header loses the words "Must see" and keeps the time (issue 7).
 - `tests/test_operator_gui.py` — finds views by `objectName`; renaming views touches it.
-- The views themselves: `TasksView` + `FlowsView` + `AssistanceView` become one **Work** surface, which
-  is a merge, not a rename. `ReportsView` splits between Record and Authority (issue 4).
+- The views themselves: `TasksView` + `FlowsView` + the read-only half of `AssistanceView` become one
+  **Work** surface, which is a merge, not a rename, plus its one **Closed** filter. `ReportsView`
+  splits: the report pane into Record, routing into Authority.
 - Nothing in the Engine changes. Areas are a UI grouping; handlers keep their `<area>.<op>` names.

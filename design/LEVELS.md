@@ -94,11 +94,18 @@ Nothing on them is a finished screen, and nothing on them is from the level belo
 ## The rail
 
 Named areas, not one tab per feature: **Must see · Authority · Rollout · Record · Work** for Super
-User, Assistance folded into Work. `design/TABS.md` is the working document — the mapping is there,
-and so are the open issues, which are settled in that file before anything is drawn.
+User, Assistance folded into Work. `design/TABS.md` holds the mapping, and **its nine open issues were
+all settled on 25 Sep 2026** — so drawing is no longer blocked on it. The Admin rail is the one piece
+deliberately left for level 3.
+
+**The rail does not change at department level.** A Super User looking at a department is deeper inside
+**Authority**; the crumb and the title say how deep.
 
 ## Settled while working at department level
 
+- **The four cells are named: Who governs · Its machines · Today · Waiting on you** (25 Sep 2026, the
+  user's call, `TABS.md` issue 9). They are **cells, not tabs** — the department is one page — and
+  **Today is the wide one**, because a department at rest is read by its day.
 - **Four cells, and the widths vary** — the user's call: *"the width varies and usually four is the
   sweet spot."* A level's page is four cells, never a stack of full-width bands; the widths do the
   ranking and which cell is wide is the page's signature.
