@@ -199,6 +199,9 @@ than one pick in a section means they are combined, not chosen between.**
 **Approved, 26 Sep 2026:** `TK04`-`TK07` and `AU04`, the pages composed from these picks — *"The #2 works
 fine for me, am not really complaining."* Designed, not yet built.
 
+**Approved, 26 Sep 2026:** `AU05`-`AU10` (Actions, each action's own settings, a custom action, the three steps of
+making an automation, and the level control redrawn as a meter) -- *"Very good work done."* Designed, not yet built.
+
 **Each action asks for what it needs** (the user, with the AU picks): *"each action can have it specify
 needs so it visuals or designs are not necessarily standard."* There is no one settings form. Notify asks
 for a message, Lock the screen for how long, Rename a file for which file and its new name, Close a
