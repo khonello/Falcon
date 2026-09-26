@@ -125,6 +125,18 @@ STUB = {
         "routing": [{"category": "listener_report", "routed_department_id": 1, "department_name": "Operations"},
                     {"category": "resource_violation", "routed_department_id": 1, "department_name": "Operations"},
                     {"category": "resource_violation", "routed_department_id": 2, "department_name": "Finance"}]},
+    "control.action_list": {"builtin": {}, "actions": {
+        "control": [{"id": 4, "name": "Lock folder", "builtin_type": "lock_folder", "timeout_seconds": 60},
+                    {"id": 5, "name": "Clear temp", "builtin_type": "clear_temp", "timeout_seconds": 120}],
+        "monitoring": [{"id": 6, "name": "Screenshot", "builtin_type": "screenshot", "timeout_seconds": 30}],
+        "custom": [{"id": 7, "name": "Notify Admin", "custom_script_language": "python", "timeout_seconds": 30}]}},
+    "control.event_list": {"types": ["file_opened", "flow_failed", "disk_low", "schedule"], "events": [
+        {"id": 1, "condition_type": "native", "enabled": True, "last_fired_at": None,
+         "condition_spec": {"type": "file_opened", "match": {"path_prefix": "/restricted/"}},
+         "actions": [{"id": 7, "name": "Notify Admin"}, {"id": 4, "name": "Lock folder"}]},
+        {"id": 2, "condition_type": "polled", "enabled": True, "last_fired_at": None,
+         "condition_spec": {"type": "disk_low", "match": {"percent": 10}},
+         "actions": [{"id": 5, "name": "Clear temp"}]}]},
     "task.list": {"tasks": [
         {"id": 1, "assigner_account_id": 3012, "assignee_account_id": 4001, "soft_deadline_at": None, "final_deadline_at": None},
         {"id": 2, "assigner_account_id": 3012, "assignee_account_id": 4003, "soft_deadline_at": None, "final_deadline_at": None},
@@ -237,6 +249,13 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             if os.environ.get("FALCON_SHOT_TAB"):
                 win.setProperty("view", {"tasks": 1, "flows": 2, "automation": 3, "actions": 4,
                                          "assistance": 5, "reports": 6}[os.environ["FALCON_SHOT_TAB"]])
+            # FALCON_SHOT_SUBTAB=<n> picks a tab inside Automation; the events tab also selects row 1
+            if os.environ.get("FALCON_SHOT_SUBTAB"):
+                tabs = win.findChild(object, "automationTabs")
+                tabs.setProperty("currentIndex", int(os.environ["FALCON_SHOT_SUBTAB"]))
+                table = win.findChild(object, "eventTable")
+                if table is not None:
+                    table.setProperty("selectedIndex", 0)
     QTimer.singleShot(1600, later)
 
     def grab():
@@ -251,6 +270,7 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             name += tag if os.environ.get(flag) else ""
         name += "-" + os.environ["FALCON_SHOT_ANSWER"] if os.environ.get("FALCON_SHOT_ANSWER") else ""
         name += "-" + os.environ["FALCON_SHOT_TAB"] if os.environ.get("FALCON_SHOT_TAB") else ""
+        name += "-s" + os.environ["FALCON_SHOT_SUBTAB"] if os.environ.get("FALCON_SHOT_SUBTAB") else ""
         path = out_dir / (name + ".png")
         img.save(str(path))
         print("saved", path, img.width(), img.height())

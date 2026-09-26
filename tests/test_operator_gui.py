@@ -481,13 +481,23 @@ def test_the_held_session_is_mirrored_on_must_see_and_reads_look_through_only_in
 
 
 def test_the_admin_rail_opens_the_admins_own_screens(gui):
-    """Automation and Actions are one view with tabs; each rail entry opens its own tab."""
+    """Actions is its own page; Automation no longer carries an Actions tab (26 Sep 2026)."""
     win, _, _ = gui
-    control = win.findChild(QObject, "controlView")
     QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "actions"))
-    assert win.property("viewKey") == "actions" and control.property("section") == 1
-    QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "automation"))
-    assert control.property("section") == 0
+    assert win.property("viewKey") == "actions"
+    assert win.findChild(QObject, "actionsView") is not None
+    tabs = win.findChild(QObject, "automationTabs")
+    assert [t["text"] for t in val(tabs.property("segments"))] == ["Dashboard", "Events", "Executions"]
+
+
+def test_an_event_ties_to_actions_by_name_not_by_typed_ids(gui):
+    win, _, _ = gui
+    picker = win.findChild(QObject, "newEventActions")
+    picker.setProperty("actions", [{"id": 4, "name": "Lock folder"}, {"id": 7, "name": "Notify Admin"}])
+    assert val(picker.property("selected")) == []
+    assert len(val(picker.property("remaining"))) == 2
+    picker.setProperty("selected", [7])
+    assert [a["name"] for a in val(picker.property("remaining"))] == ["Lock folder"]
 
 
 async def test_the_bridge_asks_to_look_through_only_on_listed_reads(gui):

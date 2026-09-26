@@ -37,7 +37,7 @@ Item {
         spacing: 8
         RowLayout {
             Label { text: "Assistance & Resources"; font.pixelSize: Theme.fontLarge; color: Theme.text }
-            SegmentedControl { id: tabs; segments: [{text: "Pings & channels"}, {text: "File search"}, {text: "Violations"}] }
+            SegmentedControl { id: tabs; Layout.leftMargin: 18; segments: [{text: "Pings & channels"}, {text: "File search"}, {text: "Violations"}] }
             Btn { text: "Refresh"; onClicked: view.refresh() }
         }
 

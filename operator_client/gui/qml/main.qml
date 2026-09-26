@@ -284,13 +284,10 @@ ApplicationWindow {
                                         visible: shell.viewKey === "tasks" }
                             FlowsView { objectName: "flowsView"; anchors.fill: parent
                                         visible: shell.viewKey === "flows" }
-                            // Automation and Actions are one view with tabs; each entry opens its own
-                            ControlView {
-                                objectName: "controlView"
-                                anchors.fill: parent
-                                visible: shell.viewKey === "automation" || shell.viewKey === "actions"
-                                section: shell.viewKey === "actions" ? 1 : shell.viewKey === "automation" ? 0 : -1
-                            }
+                            ControlView { objectName: "controlView"; anchors.fill: parent
+                                          visible: shell.viewKey === "automation" }
+                            ActionsView { objectName: "actionsView"; anchors.fill: parent
+                                          visible: shell.viewKey === "actions" }
                             AssistanceView { objectName: "assistanceView"; anchors.fill: parent
                                              visible: shell.viewKey === "assistance" }
                             ReportsView { objectName: "reportsView"; anchors.fill: parent

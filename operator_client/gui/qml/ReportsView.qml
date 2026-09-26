@@ -46,7 +46,7 @@ Item {
         spacing: 8
         RowLayout {
             Label { text: "Reports & Administration"; font.pixelSize: Theme.fontLarge; color: Theme.text }
-            SegmentedControl { id: tabs; segments: [{text: "Reports"}, {text: "Alerts"}, {text: "Updates"}, {text: "Audit"}, {text: "Accounts"}] }
+            SegmentedControl { id: tabs; Layout.leftMargin: 18; segments: [{text: "Reports"}, {text: "Alerts"}, {text: "Updates"}, {text: "Audit"}, {text: "Accounts"}] }
             Btn { text: "Refresh"; onClicked: view.refresh() }
         }
 

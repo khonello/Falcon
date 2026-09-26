@@ -2,14 +2,15 @@ import QtQuick
 import QtQuick.Controls
 import "."
 
-// A choice *within* a page: one recessed track, the active segment tinted and underlined in its
-// own colour. Never the same shape as the header tabs, so the two levels never look alike.
+// A tab row inside a page, drawn the one way TABS.md allows: PLAIN TEXT. The current tab differs by
+// colour and weight only -- no track, no box, no fill, no underline (the user, 26 Sep 2026: "current
+// tab doesn't need a line under"). Set out like a header row, spaced, reading as words.
 // segments: [{ text: "Pending", count: 3 }, { text: "Force", tint: Theme.danger }]
 Item {
     id: root
     property var segments: []
     property int currentIndex: 0
-    property color tint: Theme.accent
+    property color tint: Theme.ink
 
     function tintOf(index) {
         var s = root.segments[index]
@@ -17,76 +18,46 @@ Item {
     }
 
     implicitHeight: 28
-    implicitWidth: track.implicitWidth
+    implicitWidth: row.implicitWidth
 
-    Rectangle {
-        id: track
-        anchors.fill: parent
-        radius: Theme.radius
-        color: Theme.canvas
-        border.width: 1
-        border.color: Theme.border
-        implicitWidth: row.implicitWidth + 4
+    Row {
+        id: row
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 22
 
-        Row {
-            id: row
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            anchors.leftMargin: 2
-            spacing: 2
+        Repeater {
+            model: root.segments
+            delegate: Item {
+                required property int index
+                required property var modelData
+                readonly property bool active: root.currentIndex === index
 
-            Repeater {
-                model: root.segments
-                delegate: Rectangle {
-                    required property int index
-                    required property var modelData
-                    readonly property bool active: root.currentIndex === index
-                    readonly property color segTint: root.tintOf(index)
+                objectName: "tab_" + modelData.text
+                width: label.implicitWidth
+                height: root.height
 
-                    height: root.height - 4
-                    width: label.implicitWidth + 26
-                    radius: Theme.radius - 1
-                    color: active ? Theme.wash(segTint, 0.18) : (hover.hovered ? Qt.rgba(1, 1, 1, 0.05) : "transparent")
-                    border.width: active ? 1 : 0
-                    border.color: Theme.wash(segTint, 0.5)
-                    Behavior on color { ColorAnimation { duration: Theme.durationFast } }
-
-                    Rectangle {
-                        visible: active
-                        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                        anchors.leftMargin: 5; anchors.rightMargin: 5
-                        height: 2; radius: 1
-                        color: segTint
+                Row {
+                    id: label
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 5
+                    Label {
+                        text: modelData.text
+                        color: active ? root.tintOf(index) : hover.hovered ? Theme.textDim : Theme.textFaint
+                        font.pixelSize: Theme.fontMedium
+                        font.weight: active ? Font.DemiBold : Font.Normal
+                        anchors.verticalCenter: parent.verticalCenter
                     }
-                    Row {
-                        id: label
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Label {
-                            text: modelData.text
-                            color: active ? segTint : Theme.textDim
-                            font.pixelSize: Theme.fontBody
-                            font.bold: active
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Rectangle {
-                            visible: modelData.count !== undefined
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: countLabel.implicitWidth + 10; height: 16; radius: 8
-                            color: active ? Theme.wash(segTint, 0.3) : Qt.rgba(1, 1, 1, 0.06)
-                            Label {
-                                id: countLabel
-                                anchors.centerIn: parent
-                                text: modelData.count !== undefined ? modelData.count : ""
-                                color: active ? Theme.text : Theme.textFaint
-                                font.pixelSize: Theme.fontTiny
-                                font.bold: true
-                            }
-                        }
+                    // a count is a word too: faint, beside the name, never a badge
+                    Label {
+                        visible: modelData.count !== undefined
+                        text: modelData.count !== undefined ? String(modelData.count) : ""
+                        color: Theme.textFaint
+                        font.pixelSize: Theme.fontBody
+                        anchors.verticalCenter: parent.verticalCenter
                     }
-                    HoverHandler { id: hover }
-                    TapHandler { onTapped: root.currentIndex = index }
                 }
+                HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
+                TapHandler { onTapped: root.currentIndex = index }
             }
         }
     }
