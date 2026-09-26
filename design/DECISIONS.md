@@ -191,8 +191,18 @@ than one pick in a section means they are combined, not chosen between.**
 | `TK03` closing it | **Review, then decide** + **What the assignee sees** |
 | `AU01` the Automation page | **When \| then** — two columns, joined |
 | `AU01` one automation | **A recipe card** + **What it did** |
-| `AU02` making an automation | *nothing picked yet* |
-| `AU03` the actions library, setting one up | *nothing picked yet* |
+| `AU02` choosing what triggers it | **Fill the sentence** + **Three steps** + **Start from an example** |
+| `AU02` saying the details | **A time is days and a clock** + **A place is a tier, or a folder** + **Machines are picked** — the threshold slider was *not* picked |
+| `AU03` the library | **Grouped, with what it does** |
+| `AU03` setting an action up | **When it runs** + **A custom action** + **Try it on one machine** |
+
+**Approved, 26 Sep 2026:** `TK04`-`TK07` and `AU04`, the pages composed from these picks — *"The #2 works
+fine for me, am not really complaining."* Designed, not yet built.
+
+**Each action asks for what it needs** (the user, with the AU picks): *"each action can have it specify
+needs so it visuals or designs are not necessarily standard."* There is no one settings form. Notify asks
+for a message, Lock the screen for how long, Rename a file for which file and its new name, Close a
+program for which program, and a Screenshot asks for nothing. The control follows the need.
 
 Nothing on a mood board is typed as code, and that is now a rule for every page: **no `k=v`, no ids,
 no ISO timestamps, no path prefixes** in anything an Admin or Super User fills in. A detail is set with

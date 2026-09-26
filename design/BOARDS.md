@@ -188,3 +188,18 @@ pages composed only from the picks (`DECISIONS.md` 3a). Canvas rows 25 and 26.
 | `TK06` | One task, running and closing: the checks and the files on the left, the verdict the full height on the right. |
 | `TK07` | What the assignee sees: the Worker Dialog, Start and the signs of work, never Complete. |
 | `AU04` | The Automation page, composed: every automation as when → first action (+ N more), the chosen one as a recipe card, what it did beneath. |
+
+### Actions, and making an automation (26 Sep 2026) — `actions_pages.py`, canvas row 27
+
+Composed from the AU02 / AU03 picks. **AU04 was corrected at the same time:** it named "Lock the folder",
+an action the Engine does not have (its built-in is `lock_session`, the screen). Every page now says
+*Lock the screen*.
+
+| Board | What it is |
+|---|---|
+| `AU05` | The Actions page: the library grouped with what each does, the chosen action's own settings, When it runs, Try it on one machine. |
+| `AU06` | Each action asks for what it needs — eight settings panels, each with the control its need calls for; a Screenshot asks for nothing. |
+| `AU07` | A custom action: a script file dropped (never typed), the check said in words, then When it runs and a trial run. |
+| `AU08` | Making an automation, step 1 of 3 (When): fill the sentence, with examples to start from beside it. |
+| `AU09` | Step 2 (Where): a tier or a folder, machines picked; a time as days and a clock; the level slider **redrawn** against what is normal. |
+| `AU10` | Step 3 (Do): the library ticked, the actions in order, the whole automation read back as one sentence before saving. |

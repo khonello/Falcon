@@ -275,7 +275,7 @@ def tk07():
 # SIGNATURE: A TALL LIST AND A STACK. Every automation down the left as WHEN -> DO, joined; the one
 # chosen is read on the right as a recipe card, and what it did sits under it. Single click chooses.
 def au04():
-    rows_ = [("file", "A restricted file is opened", "any Operations machine", [("bell", "Notify me"), ("lock", "Lock the folder")], True),
+    rows_ = [("file", "A restricted file is opened", "any Operations machine", [("bell", "Notify me"), ("lock", "Lock the screen")], True),
              ("cpu", "The disk is nearly full", "every machine", [("terminal", "Clear temp")], False),
              ("clock", "Weekdays at 18:00", "every machine", [("lock", "Lock the screen")], False),
              ("key", "A USB drive is plugged in", "OPS-03, OPS-07", [("eye", "USB contents"), ("bell", "Notify me")], False),
@@ -306,20 +306,20 @@ def au04():
         txt("DO, IN ORDER", 11, T["faint"], 700, extra="padding-top: 6px;"),
         row(txt("1", 12, T["faint"], 600, mono=True), au_icon("bell", "ok", 30), col(txt("Notify me", 13, T["dim"], 600),
                                                                                     txt("right away", 11, T["faint"]), gap=1), gap=10),
-        row(txt("2", 12, T["faint"], 600, mono=True), au_icon("lock", "ok", 30), col(txt("Lock the folder", 13, T["dim"], 600),
+        row(txt("2", 12, T["faint"], 600, mono=True), au_icon("lock", "ok", 30), col(txt("Lock the screen", 13, T["dim"], 600),
                                                                                     txt("right away · gives up after 1 min", 11, T["faint"]), gap=1), gap=10),
         row(sp(), gbtn("Pause it", "pause", "sm"), tbtn("Change", "accent", size="sm"), gap=6, extra="width: 100%;"),
         gap=9, extra="width: 656px;")
 
     did = col(
-        row(dot(T["accent"], 7), txt("Running now: Lock the folder on OPS-03, 12 seconds in", 12.5, T["ink"], 500), sp(),
+        row(dot(T["accent"], 7), txt("Running now: Lock the screen on OPS-03, 12 seconds in", 12.5, T["ink"], 500), sp(),
             gbtn("Stop", "stop", "sm"), gap=9, extra="width: 100%;"),
         *[row(txt(t, 11.5, T["faint"], mono=True, extra="width: 44px; flex: none;"),
               txt(w, 12.5, T["dim"]), sp(), txt(r, 12, tone_c(tone, T["faint"]), 600), gap=10,
               extra=f"width: 100%; padding: 8px 0; border-bottom: 1px solid {T['line']};")
-          for t, w, r, tone in [("11:41", "OPS-07 · budget-2026.xlsx · notified, locked", "clean", "ok"),
-                                ("10:02", "OPS-03 · payroll.xlsx · notified, lock gave up", "lock timed out", "warn"),
-                                ("08:55", "OPS-07 · budget-2026.xlsx · notified, locked", "clean", "ok")]],
+          for t, w, r, tone in [("11:41", "OPS-07 · budget-2026.xlsx · notified, screen locked", "clean", "ok"),
+                                ("10:02", "OPS-03 · payroll.xlsx · notified, the lock gave up", "lock timed out", "warn"),
+                                ("08:55", "OPS-07 · budget-2026.xlsx · notified, screen locked", "clean", "ok")]],
         gap=4, extra="width: 656px;")
 
     return work_page(
