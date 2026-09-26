@@ -172,6 +172,32 @@ entity cards**, and **large action cards with switches**.
 Boards for the rejected proposals have been removed from the canvas. They are recorded here so the
 reasoning is not lost, not so they can be revived.
 
+## 3a. Picked off the Tasks and Automation mood boards (26 Sep 2026)
+
+The user, on the pre-kit Tasks screen: *"the task structure being table doesn't sit right and doesn't
+reflect what we discuss for task creation at all"*, and of its assigner column: *"why is assigner
+necessary since the user is assigner"*. On Automation and Actions: *"it not programmers using it so it
+should intuitive visually using ux, not using things like k="*. Boards `TK01`-`TK03` and `AU01`-`AU03`
+were drawn for it; these are the picks, in the user's words where a section got more than one. **More
+than one pick in a section means they are combined, not chosen between.**
+
+| Section | Picked |
+|---|---|
+| `TK01` the shape of the Tasks page | **Four cells** — the Overview's language |
+| `TK01` one task, listed | **By person** — who is carrying what; never the assigner |
+| `TK02` describing it | **Side by side** — your words, and the structure they fill, beside them |
+| `TK02` what comes back | **Decisions, one at a time** + **Asked where it stands** + **The split, drafted** |
+| `TK03` while it runs | **A checklist** + **The file itself** |
+| `TK03` closing it | **Review, then decide** + **What the assignee sees** |
+| `AU01` the Automation page | **When \| then** — two columns, joined |
+| `AU01` one automation | **A recipe card** + **What it did** |
+| `AU02` making an automation | *nothing picked yet* |
+| `AU03` the actions library, setting one up | *nothing picked yet* |
+
+Nothing on a mood board is typed as code, and that is now a rule for every page: **no `k=v`, no ids,
+no ISO timestamps, no path prefixes** in anything an Admin or Super User fills in. A detail is set with
+the control that fits it.
+
 ## 4. Proposed, still open
 
 | | |

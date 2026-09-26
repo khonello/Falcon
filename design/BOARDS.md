@@ -168,3 +168,23 @@ everywhere else in this system — including on the screen of the Admin being st
 | `T04` | The four answers to asking: free, block-or-end (the only forcing dialog), a peer's hard refusal, a Super User's un-evictable session. |
 | `T05` | The lid's states — running, the last five minutes, extended — what they see from under it, and the four ways it ends. |
 | `T06` | Assisted access: the same skeleton, deliberately unlike it — teal, a ceiling instead of a clock, consent instead of eviction, and your own rail kept. |
+
+## Tasks and Automation (26 Sep 2026) — `tasks_mood.py`, `automation_mood.py`, `work_pages.py`
+
+Drawn because the pre-kit Tasks table "doesn't reflect what we discuss for task creation at all", and
+Automation and Actions were "not programmers using it… not using things like k=". Mood boards first, then
+pages composed only from the picks (`DECISIONS.md` 3a). Canvas rows 25 and 26.
+
+| Board | What it is |
+|---|---|
+| `TK01` | Mood board: the shape of the Tasks page, and one task listed (never the assigner). **Picked:** Four cells; By person. |
+| `TK02` | Mood board: describing a task, and what the model sends back. **Picked:** Side by side; Decisions one at a time + Asked where it stands + The split, drafted. |
+| `TK03` | Mood board: while it runs, and closing it. **Picked:** A checklist + The file itself; Review, then decide + What the assignee sees. |
+| `AU01` | Mood board: the Automation page, and one automation read. **Picked:** When \| then; A recipe card + What it did. |
+| `AU02` | Mood board: making an automation without code — tiles, a sentence to fill, steps, examples; sliders, day chips, tiers, picked machines. **No pick yet.** |
+| `AU03` | Mood board: the Actions library by Control / Monitoring / Custom, and setting one up. **No pick yet.** |
+| `TK04` | The Tasks page, composed: a wide left column (Needs you, By person) beside Deadlines and Closed. |
+| `TK05` | Describing a task, composed: your words beside the structure; decisions worked down one at a time, each asked where it stands; the split drafted; Confirm last. |
+| `TK06` | One task, running and closing: the checks and the files on the left, the verdict the full height on the right. |
+| `TK07` | What the assignee sees: the Worker Dialog, Start and the signs of work, never Complete. |
+| `AU04` | The Automation page, composed: every automation as when → first action (+ N more), the chosen one as a recipe card, what it did beneath. |
