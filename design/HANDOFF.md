@@ -8,7 +8,7 @@ stops rejected shapes coming back), `design/TABS.md` (the five areas and where e
 **Branch** `phase7/design-and-gui-rebuild` · **150 tests pass, `ruff check .` clean.**
 The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it 79 skip and pytest
 still says "passed"; `conftest.py` prints which run you are in.
-**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — **version 50, 116 boards**, and
+**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — **version 51, 132 boards**, and
 **arranged by hand**: its index is *merged, never replaced* (`design/README.md` has the four steps;
 `gen.py`'s `canvas.json` is a fallback for a canvas that does not exist yet).
 
