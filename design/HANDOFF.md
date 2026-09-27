@@ -4,6 +4,8 @@ The snapshot to resume from. **Read `design/LEVELS.md` first** (the levels, and 
 is worked at a time), then `design/DECISIONS.md` (what was approved and rejected, and why — it is what
 stops rejected shapes coming back), `design/TABS.md` (the five areas and where every handler lands),
 `design/BOARDS.md` (what every board is). This file is where the *code* stands.
+**`design/PATTERNS.md` measures the patterns that work** (the screen mark and its sizes, paging, cards, trees,
+sentences, ticks) -- fix any page against it.
 
 **Branch** `phase7/design-and-gui-rebuild` · **150 tests pass, `ruff check .` clean.**
 The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it 79 skip and pytest

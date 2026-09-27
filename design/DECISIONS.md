@@ -250,6 +250,13 @@ RS01's Tag by dropping: *"I hate the lineup of 4 buttons, I hate the button desi
 Redrawn: `MK01`, `HO03`, `FL06`-`FL08`, `AS03`, `RP03` (batch 1, still awaiting approval) and `RC02`, `RO02`, `WK02`,
 `RS02`, `CP02` (batch 2 mood boards, awaiting picks). `HO02`-`RP02` and `RC01`-`CP01` are superseded.
 
+**Approved, 27 Sep 2026:** batch 1 rethought (`MK01`, `HO03`, `FL06`-`FL08`, `AS03`, `RP03`) -- *"Much much better,
+honestly, they all work well."* The small-screen machine mark in particular (*"worked extraordinarily especially at
+that sizing"*). The patterns behind them are measured in **`design/PATTERNS.md`**, the reference for fixing other pages.
+
+**Paging replaces shrinking for rows of machines** (supersedes `DP10`): the mark stays full size, and clicking the far
+right / left of the container slides the next 4 (or 2) into view. `PATTERNS.md` section 3.
+
 ## 4. Proposed, still open
 
 | | |
