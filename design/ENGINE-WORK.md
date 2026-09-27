@@ -40,6 +40,13 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
    out of the page until then.
+10. **A Super User cannot watch every channel.** `assistance.channels` returns only channels the caller is a
+    party to or listens on; Work's "Help, watched" (WK03) wants every open channel across departments (read-only,
+    never taking part), with whose turn it is. The page shows the channels the Super User listens on plus help
+    across departments under way (from sessions). *Found:* Work (WK03).
+11. **A task's verification state is not in `task.list`.** Work's "Yours" wants "both checks passed · verify"
+    on the card; today that needs `task.get` per task. A per-task `checks_passed / checks_total` in the list
+    would do. *Found:* WK03.
 
 ## Done inline (for the record)
 

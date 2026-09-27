@@ -46,8 +46,9 @@ being *opened* is not offered (the Engine cannot see reads). Screenshot the make
 action's own settings (saved as changed), When it runs, Try it on one machine, and a custom action as a script
 file checked in words (`FALCON_SHOT_ACTION=<id>`, `FALCON_SHOT_CUSTOM=1`). Assistance (AS03), Reports (RP03) and
 Resources (RS03, opened over the Admin's home via `shell.subPage`, `FALCON_SHOT_RESOURCES=1`) are built:
-**step 3 is done.** **Next: step 4 -- Record (RC05), Work (WK03), level 4 (CP03), the states, dialogs, and the
-Worker's windows.** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
+**step 3 is done.** Step 4 is under way: Record (`RecordView`, RC05) and Work (`WorkView`, WK03) are built -- the Super
+User's rail has no placeholder left. **Next: level 4 (CP03), the states (ST01-ST03), dialogs (DG01), and the Worker's
+windows (WR01, TK07).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
 in one pass after the UI (the user, 27 Sep 2026); only trivial ones are fixed inline.
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):

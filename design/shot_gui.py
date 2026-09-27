@@ -143,6 +143,18 @@ EVENTS = [
 ]
 
 
+# The audit trail as audit.recent sends it (the Record page's "The trail")
+TRAIL = [
+    {"action_type": "resource.violation_resolved", "actor_account_id": 3012, "actor_name": "R. Mensah", "occurred_at": _at(11.75), "detail": {}},
+    {"action_type": "resource.violation", "actor_account_id": None, "actor_name": "engine", "occurred_at": _at(11.68), "detail": {"hostname": "OPS-07"}},
+    {"action_type": "session.ended", "actor_account_id": 1, "actor_name": "You", "occurred_at": _at(11.1), "detail": {"hostname": "OPS-07"}},
+    {"action_type": "session.traversed", "actor_account_id": 1, "actor_name": "You", "occurred_at": _at(10.7), "detail": {"hostname": "OPS-07"}},
+    {"action_type": "assisted_access.accepted", "actor_account_id": 3013, "actor_name": "A. Quaye", "occurred_at": _at(9.4), "detail": {}},
+    {"action_type": "session.traversed", "actor_account_id": 3012, "actor_name": "R. Mensah", "occurred_at": _at(10.3), "detail": {"hostname": "OPS-04"}},
+    {"action_type": "update.attempt", "actor_account_id": None, "actor_name": "engine", "occurred_at": _at(9.1), "detail": {}},
+    {"action_type": "task.created", "actor_account_id": 3012, "actor_name": "R. Mensah", "occurred_at": _at(8.8), "detail": {}},
+]
+
 # Flows as flow.list sends them: the shape (stages, destinations) rides along so every flow can be drawn
 FLOWS = [
     {"id": 1, "created_by_account_id": 3012, "source_pc_id": 21, "source_hostname": "OPS-01", "status": "active",
@@ -245,6 +257,9 @@ STUB = {
          "generated_at": _at(9.5, 3), "addressed_at": _at(10, 3)},
         {"id": 33, "category": "resource_violation", "source_table": "resource_violations", "source_id": 3,
          "generated_at": _at(15.2, 4), "addressed_at": _at(9, 2)}]},
+    "reports.addressed_view": {"addressed": [
+        {"report_id": 35, "addressed_at": _at(9.2, 3), "category": "listener_report", "addressed_by_department_id": 2},
+        {"report_id": 33, "addressed_at": _at(9, 2), "category": "resource_violation", "addressed_by_department_id": 1}]},
     "control.levels": {"machines": 7, "cpu": [21, 42], "memory": [38, 61], "idle_s": [0, 900]},
     "task.list": {"tasks": [
         {"id": 1, "description_raw": "Update the fleet inventory in inventory-2026.xlsx", "status": "in_progress", "started_at": _at(9.2), "assigner_account_id": 3012, "assignee_account_id": 4001, "assignee_name": "Kojo", "soft_deadline_at": None, "final_deadline_at": None},
@@ -376,7 +391,8 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
                     r["pc_id"] = remap.get(r["pc_id"], r["pc_id"])
             data = {"since": _at(6), "now": _at(18), "sessions": rows}
         elif type_ == "audit.recent":
-            data = {"entries": _attempts()}
+            p = payload.toVariant() if hasattr(payload, "toVariant") else (payload or {})
+            data = {"entries": _attempts() if (p or {}).get("prefix") == "update.attempt" else TRAIL}
         elif type_ == "updates.rollout_health" and scale_health:
             data = scale_health
         else:

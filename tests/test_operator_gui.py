@@ -720,3 +720,18 @@ def test_reports_are_said_from_their_source_and_resources_opens_from_home(gui):
     assert chosen.property("title") == "A restricted file on OPS-07"
     QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "resources"))
     assert win.property("subPage") == "resources"          # shown over the Admin's home (a Super User has none)
+
+
+def test_the_record_trail_is_written_in_words_newest_first(gui):
+    """RC05: the trail reads as sentences -- someone did something, or something happened -- newest first,
+    and the noise (update attempts, messages) stays out."""
+    win, _, bridge = gui
+    rv = win.findChild(QObject, "recordView")
+    rv.setProperty("entries", [
+        {"action_type": "update.attempt", "actor_account_id": None, "actor_name": "engine", "occurred_at": "2026-09-27T09:00:00+00:00"},
+        {"action_type": "resource.violation", "actor_account_id": None, "actor_name": "engine", "occurred_at": "2026-09-27T11:40:00+00:00",
+         "detail": {"hostname": "OPS-07"}},
+        {"action_type": "session.traversed", "actor_account_id": bridge.state.account_id, "actor_name": "You",
+         "occurred_at": "2026-09-27T10:40:00+00:00", "detail": {"hostname": "OPS-03"}}])
+    assert [t["text"] for t in val(rv.property("trail"))] == ["A file was found out of place — OPS-07",
+                                                             "You entered a machine — OPS-03"]

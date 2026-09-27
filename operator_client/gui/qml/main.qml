@@ -327,33 +327,19 @@ ApplicationWindow {
                                 visible: shell.viewKey === "rollout" && !shell.insideNow
                                 clock: overview.clock
                             }
-                            // the Super User areas still to build: Record, Work
-                            Item {
+                            // Record (board RC05): past and present
+                            RecordView {
+                                objectName: "recordView"
                                 anchors.fill: parent
-                                visible: ["record", "work"].indexOf(shell.viewKey) >= 0
-                                Column {
-                                    anchors.centerIn: parent
-                                    spacing: 12
-                                    Rectangle {
-                                        width: 52; height: 52; radius: Theme.radiusLg
-                                        color: Theme.ground
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        Icon { anchors.centerIn: parent; name: "automation"; color: Theme.faint; size: 23 }
-                                    }
-                                    Txt {
-                                        text: "Not designed yet"
-                                        color: Theme.dim
-                                        font.pixelSize: Theme.fRow
-                                        font.weight: Font.DemiBold
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                    }
-                                    Txt {
-                                        text: "Designed next, after level 3."
-                                        color: Theme.faint
-                                        font.pixelSize: Theme.fBody
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                    }
-                                }
+                                visible: shell.viewKey === "record" && !shell.insideNow
+                                clock: overview.clock
+                            }
+                            // Work (board WK03): by department, yours, help watched
+                            WorkView {
+                                objectName: "workView"
+                                anchors.fill: parent
+                                visible: shell.viewKey === "work" && !shell.insideNow
+                                clock: overview.clock
                             }
                         }
                     }
