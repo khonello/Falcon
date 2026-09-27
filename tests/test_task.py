@@ -210,3 +210,17 @@ async def test_super_user_assigns_to_admin_only(engine, org, connect):
                                       "verification_mode": "none", "confirm_none": True})
     assert res["task"]["assignee_account_id"] == org["a1"]
     assert len((await su.ok("task.list"))["tasks"]) == 1
+
+
+async def test_folders_are_offered_to_pick_never_typed(engine, org, connect):
+    """index.folders: a machine's indexed folders, so a flow's source is chosen, not typed as a path. Scoped: an
+    Admin sees folders only on machines in their own department."""
+    await _index(engine, org["w1_pc"], "C:/docs/q3/report.docx", "report.docx")
+    await _index(engine, org["w1_pc"], r"C:\docs\q3\data.xlsx", "data.xlsx")
+    await _index(engine, org["w1_pc"], "C:/raw/in.pdf", "in.pdf")
+    a1 = await connect("cid-a1")
+    got = await a1.ok("index.folders", {"pc_id": org["w1_pc"]})
+    by = {f["path"]: f for f in got["folders"]}
+    assert by["C:/docs/q3"]["files"] == 2 and by["C:/docs/q3"]["name"] == "q3" and "C:/raw" in by
+    a2 = await connect("cid-a2")
+    assert await a2.err("index.folders", {"pc_id": org["w1_pc"]}) == "forbidden"

@@ -56,8 +56,10 @@ async def test_creation_checks(engine, org, connect):
     # Visibility: creator, destination owner, Super User; W2 sees flows into its department.
     listed = (await a1.ok("flow.list"))["flows"]
     assert {f["id"] for f in listed} == {f1, res2["flow"]["id"], res3["flow"]["id"]}
-    # a flow is read as "from FIN-01", never as a source id
+    # a flow is read as "from FIN-01", never as a source id; the page draws every flow's shape from the list alone
     assert all(f["source_hostname"] for f in listed)
+    assert all(f["destinations"] and "destination_hostname" in f["destinations"][0] for f in listed)
+    assert (await a1.ok("flow.status", {"flow_id": f1}))["flow"]["source_hostname"]
     assert await a2.ok("flow.status", {"flow_id": res3["flow"]["id"]})
     assert await w1.err("flow.status", {"flow_id": res3["flow"]["id"]}) == "forbidden"
 

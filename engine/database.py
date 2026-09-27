@@ -414,6 +414,13 @@ class FileIndexRepo(_Repo):
             f"SELECT {self._COLS} FROM file_index WHERE lower(filename) = lower($1) "
             "AND ($2::int[] IS NULL OR pc_id = ANY($2)) ORDER BY pc_id, path", filename, pc_ids)
 
+    async def folders(self, pc_id: int, limit: int = 500) -> list[dict[str, Any]]:
+        """The folders the index knows on one machine, each with how many files it holds -- what a person picks from
+        instead of typing a path. Derived from indexed file paths (the index holds files, not directories)."""
+        return await self._fetch(
+            "SELECT regexp_replace(replace(path, chr(92), '/'), '/[^/]*$', '') AS folder, count(*) AS files "
+            "FROM file_index WHERE pc_id = $1 GROUP BY 1 ORDER BY 1 LIMIT $2", pc_id, limit)
+
     async def by_hash(self, content_hash: str) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._COLS} FROM file_index WHERE content_hash = $1", content_hash)
 
@@ -705,6 +712,28 @@ class FlowsRepo(_Repo):
             "SELECT * FROM flow_sync_log WHERE flow_destination_id = $1 AND written_by = 'flow_sync' "
             "AND lower(replace(written_path, '\\', '/')) = lower(replace($2, '\\', '/')) "
             "ORDER BY occurred_at DESC, id DESC LIMIT 1", destination_id, written_path)
+
+    async def shapes(self, flow_ids: list[int]) -> dict[int, dict[str, list[dict[str, Any]]]]:
+        """Every listed flow's stages and live destinations, in two queries rather than two per flow -- what a page
+        drawing all flows at once (the Flows map) needs. Destinations carry their machine's hostname."""
+        out: dict[int, dict[str, list[dict[str, Any]]]] = {i: {"stages": [], "destinations": []} for i in flow_ids}
+        if not flow_ids:
+            return out
+        for st in await self._fetch("SELECT id, flow_id, parent_stage_id, stage_type, config FROM flow_stages "
+                                    "WHERE flow_id = ANY($1::int[]) ORDER BY id", flow_ids):
+            out[st["flow_id"]]["stages"].append(st)
+        for d in await self._fetch(
+                "SELECT d.id, d.flow_id, d.parent_stage_id, d.destination_pc_id, d.destination_path, d.owner_account_id, "
+                "d.paused_reason, p.hostname AS destination_hostname FROM flow_destinations d "
+                "LEFT JOIN pcs p ON p.id = d.destination_pc_id "
+                "WHERE d.flow_id = ANY($1::int[]) AND d.removed_at IS NULL ORDER BY d.id", flow_ids):
+            out[d["flow_id"]]["destinations"].append(d)
+        return out
+
+    async def hostnames(self, pc_ids: list[int]) -> dict[int, str]:
+        if not pc_ids:
+            return {}
+        return {r["id"]: r["hostname"] for r in await self._fetch("SELECT id, hostname FROM pcs WHERE id = ANY($1::int[])", pc_ids)}
 
     async def history(self, flow_id: int, limit: int = 200) -> list[dict[str, Any]]:
         return await self._fetch(

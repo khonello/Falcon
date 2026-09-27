@@ -101,6 +101,33 @@ def _attempts() -> list[dict]:
     return out
 
 
+
+def _dest(i, host, path, parent=None, paused=None, owner=None):
+    return {"id": i, "parent_stage_id": parent, "destination_pc_id": i, "destination_hostname": host, "destination_path": path,
+            "paused_reason": paused, "owner_account_id": owner,
+            "suggestion": "OPS-03 has not answered since 11:20 — check it is switched on, then resume." if paused else None}
+
+
+# Flows as flow.list sends them: the shape (stages, destinations) rides along so every flow can be drawn
+FLOWS = [
+    {"id": 1, "created_by_account_id": 3012, "source_pc_id": 21, "source_hostname": "OPS-01", "status": "active",
+      "consent_status": "not_required", "source_path": "C:/Users/kojo/Documents/Invoices",
+      "stages": [], "destinations": [_dest(1, "OPS-05", "D:/Shared/Invoices")]},
+    {"id": 2, "created_by_account_id": 3012, "source_pc_id": 25, "source_hostname": "OPS-05", "status": "active",
+      "consent_status": "not_required", "source_path": "C:/Users/ama/Desktop/Scans",
+      "stages": [{"id": 1, "parent_stage_id": None, "stage_type": "categorization"}],
+      "destinations": [_dest(2, "OPS-02", "D:/Scans/Receipts", 1), _dest(3, "OPS-06", "D:/Scans/Forms", 1)]},
+    {"id": 3, "created_by_account_id": 3012, "source_pc_id": 27, "source_hostname": "OPS-07", "status": "active",
+      "consent_status": "pending", "source_path": "C:/Users/efua/Documents/Reports",
+      "stages": [], "destinations": [_dest(4, "FIN-02", "D:/Inbox/Ops reports", owner=3021)]},
+    {"id": 4, "created_by_account_id": 3012, "source_pc_id": 21, "source_hostname": "OPS-01", "status": "paused",
+      "consent_status": "not_required", "source_path": "C:/Users/kojo/Documents/Payroll",
+      "suggestion": "OPS-03 has not answered since 11:20 — check it is switched on, then resume.",
+      "stages": [{"id": 2, "parent_stage_id": None, "stage_type": "transformation"}],
+      "destinations": [_dest(5, "OPS-03", "D:/Archive/payroll", 2, paused="unreachable"),
+                       _dest(6, "OPS-04", "D:/Archive/payroll", 2), _dest(7, "OPS-06", "D:/Archive/payroll", 2)]},
+]
+
 STUB = {
     "updates.rollout_health": {
         "version": {"id": 4, "version_string": "1.4.2"},
@@ -172,11 +199,16 @@ STUB = {
                         "existing": [{"file_index_id": 92, "path": "C:/Users/yaw/Documents/reconciliation-q3.docx", "pc_id": 23}]}],
         "proposed_split": [{"description": "Reconcile the Q3 supplier invoices and produce reconciliation-q3.docx", "targets": []},
                            {"description": "archive last quarter's folder", "targets": []}]},
-    "flow.list": {"flows": [
-        {"id": 1, "created_by_account_id": 3012, "source_pc_id": 21, "source_hostname": "OPS-01", "status": "active"}, {"id": 2, "created_by_account_id": 3012, "source_pc_id": 23, "source_hostname": "OPS-03", "status": "active"},
-        {"id": 3, "created_by_account_id": 3012, "source_pc_id": 25, "source_hostname": "OPS-05", "status": "active"}, {"id": 4, "created_by_account_id": 3012, "source_pc_id": 27, "source_hostname": "OPS-07", "status": "paused"},
-        {"id": 5, "source_pc_id": 31, "source_hostname": "FIN-01", "status": "active"}, {"id": 6, "source_pc_id": 32, "source_hostname": "FIN-02", "status": "active"},
-        {"id": 7, "source_pc_id": 31, "source_hostname": "FIN-01", "status": "paused"}]},
+    "flow.list": {"flows": FLOWS},
+    "flow.status": {"flow": FLOWS[3]},
+    "flow.history": {"history": [
+        {"id": 1, "written_by": "external", "written_path": "D:/Archive/payroll/payroll-aug (kept 14.05).xlsx",
+         "destination_path": "D:/Archive/payroll", "conflict_resolved": False, "occurred_at": "2026-09-27T14:05:00+00:00"},
+        {"id": 2, "written_by": "flow", "destination_path": "D:/Archive/payroll", "occurred_at": "2026-09-27T13:40:00+00:00"}]},
+    "index.folders": {"pc_id": 21, "hostname": "OPS-01", "folders": [
+        {"path": "C:/Users/kojo/Documents/Invoices", "name": "Invoices", "files": 214},
+        {"path": "C:/Users/kojo/Documents/Payroll", "name": "Payroll", "files": 38},
+        {"path": "C:/Users/kojo/Desktop/Scans", "name": "Scans", "files": 91}]},
 }
 
 
@@ -335,6 +367,22 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
                     obj.setProperty("assignee", {"account_id": 4003, "name": "Yaw", "hostname": "OPS-03"})
                     QMetaObject.invokeMethod(obj, "propose")
                     break
+        # FALCON_SHOT_FLOW=<id> opens one flow; FALCON_SHOT_NEWFLOW=1 opens a half-written new flow
+        fv = win.findChild(object, "flowsView")
+        if os.environ.get("FALCON_SHOT_FLOW") and fv is not None:
+            QMetaObject.invokeMethod(fv, "open", Q_ARG("QVariant", int(os.environ["FALCON_SHOT_FLOW"])))
+        if os.environ.get("FALCON_SHOT_NEWFLOW") and fv is not None:
+            fv.setProperty("mode", "new")
+            for obj in fv.findChildren(object):
+                if obj.metaObject().className().startswith("NewFlow"):
+                    obj.setProperty("source", {"pc_id": 21, "hostname": "OPS-01"})
+                    obj.setProperty("sourcePath", "C:/Users/kojo/Documents/Invoices")
+                    obj.setProperty("stages", [{"stage_type": "categorization"}])
+                    obj.setProperty("destinations", [{"pc_id": 25, "hostname": "OPS-05", "path": "D:/Shared/Invoices"},
+                                                     {"pc_id": 0, "hostname": "", "path": ""}])
+                    obj.setProperty("problem", "D:/Shared/Invoices on OPS-05 already holds 12 files this flow did not write.")
+                    obj.setProperty("askCollision", True)
+                    break
         if os.environ.get("FALCON_SHOT_INSIDE"):
             QMetaObject.invokeMethod(win, "goInside")
             # FALCON_SHOT_TAB=<key> opens that entry of the Admin's rail once inside
@@ -367,6 +415,8 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""
         name += "-new" if os.environ.get("FALCON_SHOT_NEWTASK") else ""
+        name += "-flow" + os.environ["FALCON_SHOT_FLOW"] if os.environ.get("FALCON_SHOT_FLOW") else ""
+        name += "-newflow" if os.environ.get("FALCON_SHOT_NEWFLOW") else ""
         path = out_dir / (name + ".png")
         img.save(str(path))
         print("saved", path, img.width(), img.height())

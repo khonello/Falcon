@@ -617,3 +617,37 @@ def test_a_new_task_waits_for_every_decision(gui):
     QMetaObject.invokeMethod(nt, "settle", Q_ARG("QVariant", "col0"))
     assert val(nt.property("open")) == [] and val(nt.property("items"))[0]["intent"] == "update"
     assert win.findChild(QObject, "newTaskConfirm").property("enabled") is True
+
+
+def test_a_flow_is_drawn_as_a_tree_and_only_the_paused_branch_is_dashed(gui):
+    """FL07: source, stages by depth, destinations spread; each parent centred on its children."""
+    win, _, _ = gui
+    fv = win.findChild(QObject, "flowsView")
+    flow = {"source_hostname": "OPS-01", "source_path": "C:/Payroll",
+            "stages": [{"id": 2, "parent_stage_id": None, "stage_type": "transformation"}],
+            "destinations": [{"id": 5, "parent_stage_id": 2, "destination_hostname": "OPS-03", "destination_path": "D:/a",
+                              "paused_reason": "unreachable"},
+                             {"id": 6, "parent_stage_id": 2, "destination_hostname": "OPS-04", "destination_path": "D:/a"}]}
+    fv.setProperty("flow", flow)
+    tree = win.findChild(QObject, "flowTree")
+    nodes = {n["id"]: n for n in val(tree.property("nodes"))}
+    assert nodes["s"]["x"] < nodes["st2"]["x"] < nodes["d5"]["x"] == nodes["d6"]["x"]
+    assert nodes["st2"]["y"] == (nodes["d5"]["y"] + nodes["d6"]["y"]) / 2      # the parent sits between its children
+    dashed = [(link["from"], link["to"]) for link in val(tree.property("links")) if link["bad"]]
+    assert dashed == [("st2", "d5")]                                          # the trunk still runs
+
+
+def test_a_new_flow_saves_only_when_every_blank_is_filled(gui):
+    """FL08: folders and machines are chosen, never typed; Save waits for all of them."""
+    win, _, _ = gui
+    fv = win.findChild(QObject, "flowsView")
+    nf = next(o for o in fv.findChildren(QObject) if o.metaObject().className().startswith("NewFlow"))
+    save = win.findChild(QObject, "newFlowSave")
+    nf.setProperty("source", {"pc_id": 21, "hostname": "OPS-01"})
+    nf.setProperty("sourcePath", "C:/Invoices")
+    assert save.property("enabled") is False
+    nf.setProperty("destinations", [{"pc_id": 25, "hostname": "OPS-05", "path": ""}])
+    assert save.property("enabled") is False
+    nf.setProperty("destinations", [{"pc_id": 25, "hostname": "OPS-05", "path": "D:/Shared"}])
+    assert save.property("enabled") is True
+    assert len(val(nf.property("preview"))["nodes"]) == 2

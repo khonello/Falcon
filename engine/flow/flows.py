@@ -234,7 +234,12 @@ async def run_checks(engine: Engine, creator: dict[str, Any], source_pc_id: int,
 async def _flow_view(engine: Engine, flow: dict[str, Any]) -> dict[str, Any]:
     view = row(flow) or {}
     view["suggestion"] = suggestion_for(flow.get("pause_reason"))
+    # machines by name, never by id
+    names = await engine.db.flows.hostnames([flow["source_pc_id"]] + [d["destination_pc_id"] for d in flow.get("destinations", [])
+                                                                       if d.get("destination_pc_id")])
+    view["source_hostname"] = names.get(flow["source_pc_id"])
     for d in view.get("destinations", []):
+        d["destination_hostname"] = names.get(d.get("destination_pc_id")) if d.get("destination_pc_id") else None
         d["suggestion"] = suggestion_for(d.get("paused_reason"))
         last = await engine.db.flows.last_sync(d["id"])
         d["last_sync"] = row(last)
@@ -389,7 +394,16 @@ async def list_flows(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     db = ctx.engine.db
     found = await db.flows.list_all() if ident.role == "super_user" else await db.flows.list_for(
         ident.account_id, department_id=ident.department_id)
-    return {"flows": rows(found)}
+    # each flow's stages and destinations, batched: the Flows page draws every flow at once
+    shapes = await db.flows.shapes([f["id"] for f in found])
+    out = rows(found)
+    for f in out:
+        f["stages"] = rows(shapes[f["id"]]["stages"])
+        f["destinations"] = rows(shapes[f["id"]]["destinations"])
+        for d in f["destinations"]:
+            d["suggestion"] = suggestion_for(d.get("paused_reason"))
+        f["suggestion"] = suggestion_for(f.get("pause_reason"))
+    return {"flows": out}
 
 
 @handler("flow.status")

@@ -34,7 +34,11 @@ screens everywhere except levels 1-3's shells. The approved boards, one per page
 step 2 (`OverviewView` to OV02, the new `RolloutView` to RO05/RO06 with `MachineGrid` and `DeptRolloutCard`,
 `DepartmentView` to DP18) are **built**; `FleetGrid` and `OpenedRollout` are retired. Screenshot at scale with
 `FALCON_SHOT_SCALE=1` (ten departments, ~225 machines) and `FALCON_SHOT_ROLLOUT_DEPT=<id>`. The Engine reports no
-online/offline state, so the rollout words say "retrying" / "past the limit", never "offline". **Next: step 3.**
+online/offline state, so the rollout words say "retrying" / "past the limit", never "offline". Step 3 is **under way**:
+the Admin's home (`AdminHome`, HO03), Tasks (`TasksView` + `NewTask`, TK04-TK06) and Flows (`FlowsView` + `NewFlow`,
+FL06-FL08; `flow.list` now carries each flow's shape, `index.folders` offers folders to pick) are built and framed
+inside an Admin (`shell.framedAdminKeys`). Screenshot one flow with `FALCON_SHOT_FLOW=<id>`, a new one with
+`FALCON_SHOT_NEWFLOW=1`. **Next: Automation (AU04, AU08-AU10), then Actions, Assistance, Reports, Resources.**
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
 1. The kit the pages share, to `PATTERNS.md`: the screen mark (`calm_slot` → a QML `MachineMark`), the horizontal and
@@ -262,7 +266,7 @@ page is asking, so no view owns it.
 `audit.deviations`, `reports.routing_get`, `task.list`, `flow.list`, and `audit.recent` with prefix
 `update.attempt`.
 
-**Still pre-kit**, mounted hidden so their tests keep passing: `TasksView`, `FlowsView`, `ControlView`,
+**Still pre-kit**, mounted hidden so their tests keep passing: `ControlView`,
 `AssistanceView`, `ReportsView`, plus `ConnectView` and `Btn`, `Field`, `DataTable`, `Picker`,
 `SegmentedControl`, `Eyebrow`, `Section`. **Orphaned, and deletable only once their replacement lands**:
 `HierarchyView.qml`, `HierarchyRail.qml` — they are still the only way to reach a department's tree in

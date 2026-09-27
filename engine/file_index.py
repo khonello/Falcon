@@ -21,6 +21,7 @@ from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
+from engine.permissions import int_field, require_department_scope, require_role
 from engine.resource.resource import allowed_tags_for
 from protocol import ErrorCode, ProtocolError
 
@@ -133,6 +134,21 @@ async def index_event(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def index_sweep_batch(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     n = await ctx.engine.file_index.ingest_sweep_batch(_pc_id(ctx, payload), payload.get("entries") or [])
     return {"accepted": n}
+
+
+@handler("index.folders")
+async def index_folders(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"pc_id"} -> the folders indexed on that machine, for choosing a flow's source or destination without typing a
+    path. Operators only, and only for a machine in their scope."""
+    ident = require_role(ctx, "super_user", "admin")
+    pc_id = int_field(payload, "pc_id")
+    pc = await ctx.engine.db.accounts.pc(pc_id)
+    if pc is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
+    require_department_scope(ident, pc["department_id"])
+    found = await ctx.engine.db.file_index.folders(pc_id)
+    return {"pc_id": pc_id, "hostname": pc["hostname"],
+            "folders": [{"path": f["folder"], "name": PurePath(f["folder"]).name or f["folder"], "files": f["files"]} for f in found]}
 
 
 @handler("index.search")
