@@ -61,6 +61,30 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
     *task* (on `task.assigned`, with Start). *Message* and *locked* need `notify` / `lock_session` to open them
     instead of printing (item 4), and *ask* needs a way for the person to open it (a tray icon or shortcut) that
     sends `assistance.ping` with the message. Frozen Overlay/Dialog exes are Phase 9 packaging. *Found:* WR01.
+15. **Register machines from the local network instead of typing them** (the user's idea, 27 Sep 2026). Today a
+    machine is registered by typing its name (`hierarchy.account_create`), and its client id + key are copied onto it
+    by hand. The idea: a small installer on each machine stores who it is meant to be (its name, department, level --
+    worker / Admin workstation, and anything else registration needs); the Engine finds those machines on the local
+    network and registers them. It works, with two changes so a stranger on the network cannot let itself in:
+
+    - **The machine asks; the Engine does not hunt.** Scanning subnets is unreliable across VLANs and needs the Engine to
+      reach into every machine. Instead the installed agent (already the Worker Client) finds the Engine -- the address
+      from the install package, or a UDP broadcast / mDNS answer on the LAN -- and opens an unauthenticated
+      `enroll.request` over TLS (the Engine's certificate is pinned in the package): `{hostname, requested department,
+      requested level, os, mac}`. Only `auth.*`, `system.*` and this one request are allowed before the handshake.
+    - **What it says about itself is a request, never a grant** (propose, never silently resolve). Requests land in a
+      "Waiting to be registered" list -- on the department page for its Admin, and on Must see for the Super User. A
+      person confirms each one (department, level, and who uses it), or refuses it. An Admin can only confirm workers
+      in their own department; an Admin workstation needs the Super User. Nothing registers itself.
+    - **Pairing, so the right machine gets the key.** The agent shows a short code on its own screen (a Worker window,
+      "Registering this machine · code 4 7 2 9"); the person confirming types that code. On a match the Engine
+      creates the account + PC and sends the client id + key back over the agent's open enrollment connection -- no
+      one copies a key by hand, and a machine that is not really in front of someone cannot finish.
+    - Engine: `enroll.request` (pre-auth, rate-limited, audited), `enroll.list` / `enroll.confirm {code, department_id,
+      role}` / `enroll.refuse`, an `enrollments` table (pending / confirmed / refused / expired after e.g. 24 h), and
+      the pre-auth gate in `connection.py`. Worker: an `--enroll` first-run mode that requests, shows the code, waits,
+      then writes the key to its config and connects normally. UI: the waiting list replaces "Register a machine"'s
+      typed name (the dialog keeps working as the fallback). *Raised:* by the user, after the dialogs (DG01).
 
 ## Done inline (for the record)
 

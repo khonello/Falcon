@@ -1,81 +1,87 @@
 # Where the Operator Client UI stands — 27 Sep 2026
 
-The snapshot to resume from. **Read `design/LEVELS.md` first** (the levels, and the rule that only one
-is worked at a time), then `design/DECISIONS.md` (what was approved and rejected, and why — it is what
-stops rejected shapes coming back), `design/TABS.md` (the five areas and where every handler lands),
-`design/BOARDS.md` (what every board is). This file is where the *code* stands.
-**`design/PATTERNS.md` measures the patterns that work** (the screen mark and its sizes, paging, cards, trees,
-sentences, ticks) -- fix any page against it.
+The snapshot to resume from. **Read `design/LEVELS.md` first** (the levels), then `design/DECISIONS.md` (what was
+approved and rejected, and why), `design/TABS.md` (the five areas), `design/BOARDS.md` (what every board is),
+`design/PATTERNS.md` (the measured patterns every page is checked against). This file is where the *code* stands;
+**`design/ENGINE-WORK.md` is what the Engine and the Worker still owe the UI.**
 
-**Branch** `phase7/design-and-gui-rebuild` · **150 tests pass, `ruff check .` clean.**
-The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it 79 skip and pytest
-still says "passed"; `conftest.py` prints which run you are in.
-**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — **version 58, 162 boards**, and
-**arranged by hand**: its index is *merged, never replaced* (`design/README.md` has the four steps;
-`gen.py`'s `canvas.json` is a fallback for a canvas that does not exist yet).
+**Branch** `phase7/design-and-gui-rebuild` · last commit `040fe7f` · **174 tests pass, `ruff check .` clean.**
+The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it the DB tests skip and pytest still says
+"passed"; `conftest.py` prints which run you are in.
+**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — version 58, 162 boards, arranged by hand: its index is
+*merged, never replaced* (`design/README.md`).
 
 ---
 
-## CONTINUE FROM HERE — the design is complete; the build is next
+## WHERE WE ARE
 
-**Every surface is designed and approved** (27 Sep 2026, the user: *"Perfecto."*). The QML still shows the older
-screens everywhere except levels 1-3's shells. The approved boards, one per page, are the target:
+**The approved design is built.** All four build steps are done (27 Sep 2026): the kit, levels 1-2, every Admin page,
+Record, Work, level 4, the connection states, the dialogs and the Worker's windows. Every page was screenshotted
+against its board and sent to the user.
 
-| Area | Approved boards |
-|---|---|
-| Super User: Must see, Rollout, Record, Work | `OV02` (at scale), `RO05` + `RO06` (maximised), `RC05`, `WK03` |
-| Department (level 2) | `DP18` |
-| Inside an Admin / an Admin at home | `HO03`, `TK04`-`TK07`, `FL06`-`FL08`, `AU04`, `AU05`-`AU10`, `AS03`, `RP03`, `RS03` |
-| A client PC (level 4) | `CP03` |
-| States, dialogs, the Worker | `ST01`-`ST03`, `DG01`, `WR01` |
-| The machine mark and its alternatives | `MK01` |
+**What is next, in order:**
+1. **The Engine / Worker pass** -- `design/ENGINE-WORK.md`, 15 items, fixed together in one pass (the user: *"I don't
+   want to mix ui with engine work"*; only mundane fixes were done inline and are listed there). The biggest: the Worker
+   relaying OS signals (1), built-in actions honouring their settings (4), a program inventory (5), report summaries and
+   "seen" (7), every open channel for the Super User (10), a client PC's live state and "not reachable" (12), the three
+   Worker windows still without triggers (14), and **registering machines from the local network** (15, the user's
+   idea: the machine asks, a person confirms with a pairing code).
+2. **Decisions that are the user's to make** (not to be settled alone): whether an Admin may govern more than one
+   department (13 -- DG01's "assign an existing Admin"); the deferred items in `CLAUDE.md` still stand.
+3. **Leftovers from before the rebuild** -- see *Not yet done* below.
+4. Then the phases as `PHASES.md` orders them: Phase 8 human passes (GUI first), 9 packaging (incl. the Worker's
+   windows as frozen exes), 10 hardening.
 
-**Progress:** step 1 (the kit: `MachineMark`, `PagedRow`, `PagedColumn`, `InfoCard`, `SentenceSlot`, `FlowTree`) and
-step 2 (`OverviewView` to OV02, the new `RolloutView` to RO05/RO06 with `MachineGrid` and `DeptRolloutCard`,
-`DepartmentView` to DP18) are **built**; `FleetGrid` and `OpenedRollout` are retired. Screenshot at scale with
-`FALCON_SHOT_SCALE=1` (ten departments, ~225 machines) and `FALCON_SHOT_ROLLOUT_DEPT=<id>`. The Engine reports no
-online/offline state, so the rollout words say "retrying" / "past the limit", never "offline". Step 3 is **under way**:
-the Admin's home (`AdminHome`, HO03), Tasks (`TasksView` + `NewTask`, TK04-TK06) and Flows (`FlowsView` + `NewFlow`,
-FL06-FL08; `flow.list` now carries each flow's shape, `index.folders` offers folders to pick) are built and framed
-inside an Admin (`shell.framedAdminKeys`). Screenshot one flow with `FALCON_SHOT_FLOW=<id>`, a new one with
-`FALCON_SHOT_NEWFLOW=1`. Automation (`AutomationView` + `NewAutomation`, AU04 and AU08-AU10) is built too: the
-words for triggers and actions live in the `Automate` singleton, shared with Actions; `control.event_history` gives
-"What it did", `control.levels` the band a threshold is drawn against, and `match.tier` matches a file's tier. A file
-being *opened* is not offered (the Engine cannot see reads). Screenshot the maker with `FALCON_SHOT_NEWAUTO=<step>`
-(and `FALCON_SHOT_AUTOEV=<index>` to start from another automation). Actions (`ActionsView`, AU05-AU07) is built: the library with built-ins not set up listed faintly, each
-action's own settings (saved as changed), When it runs, Try it on one machine, and a custom action as a script
-file checked in words (`FALCON_SHOT_ACTION=<id>`, `FALCON_SHOT_CUSTOM=1`). Assistance (AS03), Reports (RP03) and
-Resources (RS03, opened over the Admin's home via `shell.subPage`, `FALCON_SHOT_RESOURCES=1`) are built:
-**step 3 is done.** Step 4 is under way: Record (`RecordView`, RC05) and Work (`WorkView`, WK03) are built -- the Super
-User's rail has no placeholder left. Level 4 (`PcView`, CP03) is built: double-click a machine anywhere it is drawn (`shell.enterPc`),
-the page replaces the sheet under the lid, Escape steps out with the session held (`FALCON_SHOT_PC=<id>`,
-`FALCON_SHOT_STEPOUT=1`). **Every session state is the one lid** (`SessionLid`, `shell.lidMode`: inside / holding /
-blocked, `FALCON_SHOT_BLOCKED=1`); the old state pill is gone. The states are built: the connect screen (ST01) says the last outcome once (`FALCON_SHOT_CONNECT=<kind>`); a
-dropped link keeps the page, dimmed, with the lid's *lost* wording, retries by itself and says the held session
-runs on (ST03, `FALCON_SHOT_LOST=1`); a changed machine name is the lid's *renamed* wording (`FALCON_SHOT_RENAMED=1`).
-ST02's empty cells already say what is missing; a loading skeleton per cell is not built. The dialogs are built (DG01): one `CostDialog`, asked with `shell.ask(spec, cb)` -- Extend from the lid, End theirs
-and enter (a held machine), Register a machine and Give it an Admin (department), Issue a new key and Offboard
-(the machine's page), and a one-time key via `shell.showKey` (`FALCON_SHOT_DIALOG=<name>`). The Worker's windows are built
-(WR01, TK07): `worker_client.windows`, one small process per window (`python -m worker_client.windows <kind> '<json>'`,
-the answer as a JSON line), in the Operator's palette and plain words; the service opens *blocked* from the lockout and
-*task* on `task.assigned` (Start, never Complete). Screenshot them with `design/shot_worker.py`. **Step 4 is done: the
-design is built.** What remains is `design/ENGINE-WORK.md` (the one Engine/Worker pass) and the pre-kit leftovers
-listed below. Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
-in one pass after the UI (the user, 27 Sep 2026); only trivial ones are fixed inline.
+### What is built, page by page
 
-**Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
-1. The kit the pages share, to `PATTERNS.md`: the screen mark (`calm_slot` → a QML `MachineMark`), the horizontal and
-   vertical **edge pagers**, person/thing cards, bare icons, plain-text tabs, the fill-in sentence slot, the tree
-   (curves, dashed broken branch). Retire `FleetGrid`'s shrink ladder and every coloured-square mark.
-2. Level 1 and 2 to `OV02` / `RO05` / `RO06` / `DP18` (they are built but on the old marks).
-3. The Admin's pages (Tasks, Flows, Automation, Actions, Assistance, Reports, Resources, home) — each needs Engine
-   checks: e.g. Tasks' one-question-at-a-time flow and per-check file details, "holding it up" grouped by department.
-4. Record, Work, level 4, the states, dialogs, and the Worker's windows (the last live in `worker_client`).
+Render any page with `environ-operator/Scripts/python.exe design/shot_gui.py design/shots <role> <view>` (set
+`QT_QPA_FONTDIR=C:\Windows\Fonts`); the flags pick the state. The Worker's windows: `design/shot_worker.py`.
 
-**Rules that must survive the build** (all in `PATTERNS.md`, the rejections in `DECISIONS.md` 3c): no squares with dots,
-no icon tiles, no pill lineups; legible before beautiful (anything read to act on is written, act on the card);
-never one container for many departments' machines; page, never shrink; test every set at ~12 departments × 60
-machines before calling it done.
+| Page | Board | QML | Screenshot with |
+|---|---|---|---|
+| Must see (Super User) | `OV02` | `OverviewView`, `DeptCard`, `DeptRolloutCard` | `super_user 0`, `FALCON_SHOT_SCALE=1` |
+| Rollout | `RO05`, `RO06` | `RolloutView`, `MachineGrid` | `super_user 2`, `FALCON_SHOT_ROLLOUT_DEPT=<id>` |
+| Record | `RC05` | `RecordView` | `super_user 3` |
+| Work | `WK03` | `WorkView` | `super_user 4` |
+| A department (level 2) | `DP18` | `DepartmentView` | `super_user 1`, `FALCON_SHOT_DEPT=<id>`, `FALCON_SHOT_MAX=machines` |
+| Entering / inside an Admin (level 3) | `DP06`-`DP09` | `EnteringAdmin`, `HeldCard`, `SessionLid` | `FALCON_SHOT_ENTER`, `_ANSWER`, `_HOLD`, `_INSIDE`, `_TAB=<key>` |
+| The Admin's home | `HO03` | `AdminHome` | `admin 0` |
+| Tasks | `TK04`-`TK06` | `TasksView`, `NewTask` | `admin 1`, `FALCON_SHOT_TASK=<id>`, `FALCON_SHOT_NEWTASK=1` |
+| Flows | `FL06`-`FL08` | `FlowsView`, `NewFlow`, `FlowTree` | `admin 2`, `FALCON_SHOT_FLOW=<id>`, `FALCON_SHOT_NEWFLOW=1` |
+| Automation | `AU04`, `AU08`-`AU10` | `AutomationView`, `NewAutomation`, `Automate` (words) | `admin 3`, `FALCON_SHOT_NEWAUTO=<step>`, `_AUTOEV=<i>` |
+| Actions | `AU05`-`AU07` | `ActionsView` | `admin 4`, `FALCON_SHOT_ACTION=<id>`, `FALCON_SHOT_CUSTOM=1` |
+| Assistance | `AS03` | `AssistanceView` | `admin 5`, `FALCON_SHOT_FIND=<text>` |
+| Reports | `RP03` | `ReportsView` | `admin 6` |
+| Resources (from the Admin's home) | `RS03` | `ResourcesView` (`shell.subPage`) | `FALCON_SHOT_RESOURCES=1` |
+| A client PC (level 4) | `CP03` | `PcView` (`shell.enterPc`, `heldPc`) | `FALCON_SHOT_PC=<id>`, `FALCON_SHOT_STEPOUT=1` |
+| Connecting / lost / renamed | `ST01`, `ST03` | `ConnectView`, the lid's wordings | `FALCON_SHOT_CONNECT=<kind>`, `_LOST=1`, `_RENAMED=1` |
+| Dialogs | `DG01` | `CostDialog` (`shell.ask`, `shell.showKey`) | `FALCON_SHOT_DIALOG=<extend/rekey/offboard/register/admin/key/force>` |
+| The Worker's windows | `WR01`, `TK07` | `worker_client/windows` | `design/shot_worker.py` |
+
+**Rules the build settled** (and that any new screen must keep):
+- **One bar for every session and connection state** -- `SessionLid`, worded by `shell.lidMode`: inside, holding
+  (Go in), blocked (Claim it back), lost (Retry now), renamed (Understood). No pill, no second banner, no status-line
+  echo (the user, 27 Sep 2026: *"why is traversal alert never consistent"*). The one exception is DP09: a Super User
+  holding an Admin, stepped out, is carried by the department's container and Must see.
+- **Only an act with a cost interrupts**, and it is `shell.ask`: the cost said before the button, the button names the
+  act, Cancel beside it, a one-time key shown once.
+- **Double click enters, single click inspects**, at every level -- a machine mark's `doubleClicked` enters a client PC.
+- **Nothing typed that can be picked** (folders from `index.folders`, files from search, machines as marks, actions by
+  name); **nothing offered that cannot happen** (no "file is opened" trigger, no lock length the Worker ignores) --
+  the gap goes to `ENGINE-WORK.md` instead.
+- The PATTERNS.md rules: no squares with dots, no icon tiles, no pill lineups; legible before beautiful; never one
+  container for many departments' machines; page, never shrink; test at ~12 departments x 60 machines.
+
+### Not yet done (UI)
+
+- **The Super User's Authority area** (rail index 1) still opens the pre-kit "Everything" screen (`HomeView` with
+  `HierarchyRail`); departments are reached from Must see's cards. `HierarchyView.qml` / `HierarchyRail.qml` are
+  orphaned and go once Authority is rebuilt.
+- **A loading skeleton per cell** (ST02). Empty cells already say what is missing and the next step.
+- **Still pre-kit components**, kept for the few places that use them: `DataTable`, `Picker`, `Btn`, `Eyebrow`,
+  `Section`, `SegmentedControl` (restyled to plain-text tabs).
+- The Record/Work/Rollout stubs in `shot_gui.py` are sample data, not an Engine; every page also runs against the real
+  Engine through the same `falcon.call`s the tests use.
 
 ---
 
@@ -132,7 +138,7 @@ belongs to the cell and no two share a shape, so you know which you opened befor
 | Cell | Composition | Board | Its shape |
 |---|---|---|---|
 | Authority | `OpenedAuthority.qml` | `K03` | the map as hero, two told panels beneath, the reading down the right |
-| Rollout | `OpenedRollout.qml` | `K04` | the fleet across the full width, three panels beneath |
+| Rollout | *(retired: Rollout is its own page, `RolloutView`)* | `K04` | — |
 | Today | `OpenedToday.qml` | `K05` | a lead running the whole height, a column of three beside it |
 | Out of place | `OpenedOutOfPlace.qml` | `K06` | three full-width bands, shape to words, read downward |
 
@@ -184,8 +190,12 @@ topic to it.
 
 ## What is designed and not built
 
-| | Boards | State |
-|---|---|---|
+Nothing from the approved boards is left unbuilt except ST02's loading skeleton. What the boards show and the Engine
+cannot yet supply (a screen image of a held machine, "what is in front", "not reachable", a program to pick, "where
+it should be", a file's journey, ...) is in `design/ENGINE-WORK.md`, and each page shows its honest empty state or
+leaves the cell out until then.
+
+---|---|---|
 | "Not reachable" when entering a client PC | `DP08`, fourth card | level 4 — needs the Engine to refuse an offline Worker |
 | Assisted access (its own state machine) | `T06` | parked with level 3 |
 | Record, Rollout, Work | none yet | no design |
@@ -264,6 +274,19 @@ maximised, shoot at 1440×2130), `flow_strip.py` (through holding a session, 144
   `font.pixelSize` rejects fractional values.
 - A duplicated `Layout.*` property in one object is a **load error**, not a warning.
 - The legacy views call `root.notify(...)`, so `main.qml` carries `property var root: shell`.
+- **`GridCell`'s body is a Column**: a child with `height: parent.height` collapses to 0. Use `height: <cellId>.room`.
+- A `RowLayout` whose cells `fillHeight` fills too, whatever its `preferredHeight`: give it `Layout.maximumHeight`
+  and `Layout.fillHeight: false` to cap it.
+- A `bool` bound to `a && b` gets `undefined` when `a` is missing -- write `!!a && b`.
+- A new singleton does nothing until it is listed in `qmldir` (`singleton Name 1.0 Name.qml`); until then calls on
+  it fail with "is not a function".
+- `grabWindow` needs `from PySide6.QtQuick import QQuickWindow` imported, and offscreen shots need
+  `QT_QPA_PLATFORM=offscreen` -- without it a real topmost window opens and the capture hangs.
+- `shot_gui.py`'s `_at(hour, days_ago)` takes an hour of the day and a day count, never negative hours.
+- A state set before the page has loaded shows an empty page (the page never fetched); set it in `later()`.
+- Views outside the Operator's main document still reach `shell` (the root id) and `falcon`, but not other ids
+  such as `overview` -- pass what they need as properties (`PcView.holder`).
+- Worker tests build `WorkerConfig(windows=False, ...)`: with windows on, a block or a task opens real windows.
 
 ---
 
@@ -289,10 +312,13 @@ page is asking, so no view owns it.
 `audit.deviations`, `reports.routing_get`, `task.list`, `flow.list`, and `audit.recent` with prefix
 `update.attempt`.
 
-**Still pre-kit**, mounted hidden so their tests keep passing: `ConnectView` and `Btn`, `Field`, `DataTable`, `Picker`,
-`SegmentedControl`, `Eyebrow`, `Section`. **Orphaned, and deletable only once their replacement lands**:
-`HierarchyView.qml`, `HierarchyRail.qml` — they are still the only way to reach a department's tree in
-the app, so they go *after* the level-3 work, not before.
+**Built in the rebuild** (27 Sep 2026): the kit (`MachineMark`, `PagedRow`, `PagedColumn`, `InfoCard`, `SentenceSlot`,
+`FlowTree`, `MachineGrid`, `GridCell.room`), the singletons `Fleet` (machine status), `Automate` (trigger and action
+words), and every page in the table at the top. `Field` is restyled (no floating placeholder).
+
+**Still pre-kit**: `Btn`, `DataTable`, `Picker`, `Eyebrow`, `Section`. **Orphaned, and deletable once the Super User's
+Authority area is rebuilt**: `HierarchyView.qml`, `HierarchyRail.qml`. Retired in the rebuild: `FleetGrid`,
+`OpenedRollout`, `ControlView`, `ActionPicker`, the floating state pill.
 
 **The design** is `design/*.py` → `design/boards/*.dc.html` → the canvas. `design/BOARDS.md` is the map
 of what every board is; the canvas's own `INDEX` board is out of date.
