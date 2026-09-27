@@ -233,6 +233,23 @@ and colour only on the exceptions that need someone — a thin ring and a dot. A
 green; it is quiet. `calm_slot` in `design/batch1_pages.py` is the drawing. **The built `FleetGrid` (level 2)
 and every fleet/slot drawing on the Overview must move to it when next touched.**
 
+## 3c. Batches 1 and 2 rethought (27 Sep 2026)
+
+*"I don't like the square with dots inside. Rethink it."* then *"Rethink the whole batch, 1 and 2"*, and on
+RS01's Tag by dropping: *"I hate the lineup of 4 buttons, I hate the button design there too."*
+
+**This supersedes the slot rule in 3b.** Rejected, everywhere:
+- **A square mark with a dot in it** (the calm slot). A machine is now **a small screen with its number** — a
+  faint outline when quiet, outline and number in the tone when it needs someone, the reason said beneath it.
+  `calm_slot` in `design/batch1b_pages.py`; `MK01` draws it and its alternatives.
+- **Icons sitting in rounded-square tiles.** Icons stand bare.
+- **A lineup of tinted pill buttons** as a choice. Choose among several by the things themselves (shelves to drop
+  onto), one picker, a fill-in sentence, or plain words.
+- **Lanes of squares.** Counts of events are ticks on a line; the ones needing someone stand taller in their tone.
+
+Redrawn: `MK01`, `HO03`, `FL06`-`FL08`, `AS03`, `RP03` (batch 1, still awaiting approval) and `RC02`, `RO02`, `WK02`,
+`RS02`, `CP02` (batch 2 mood boards, awaiting picks). `HO02`-`RP02` and `RC01`-`CP01` are superseded.
+
 ## 4. Proposed, still open
 
 | | |
