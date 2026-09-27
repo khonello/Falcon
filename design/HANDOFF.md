@@ -55,8 +55,12 @@ dropped link keeps the page, dimmed, with the lid's *lost* wording, retries by i
 runs on (ST03, `FALCON_SHOT_LOST=1`); a changed machine name is the lid's *renamed* wording (`FALCON_SHOT_RENAMED=1`).
 ST02's empty cells already say what is missing; a loading skeleton per cell is not built. The dialogs are built (DG01): one `CostDialog`, asked with `shell.ask(spec, cb)` -- Extend from the lid, End theirs
 and enter (a held machine), Register a machine and Give it an Admin (department), Issue a new key and Offboard
-(the machine's page), and a one-time key via `shell.showKey` (`FALCON_SHOT_DIALOG=<name>`). **Next: the Worker's
-windows (WR01, TK07).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
+(the machine's page), and a one-time key via `shell.showKey` (`FALCON_SHOT_DIALOG=<name>`). The Worker's windows are built
+(WR01, TK07): `worker_client.windows`, one small process per window (`python -m worker_client.windows <kind> '<json>'`,
+the answer as a JSON line), in the Operator's palette and plain words; the service opens *blocked* from the lockout and
+*task* on `task.assigned` (Start, never Complete). Screenshot them with `design/shot_worker.py`. **Step 4 is done: the
+design is built.** What remains is `design/ENGINE-WORK.md` (the one Engine/Worker pass) and the pre-kit leftovers
+listed below. Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
 in one pass after the UI (the user, 27 Sep 2026); only trivial ones are fixed inline.
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):

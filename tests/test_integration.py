@@ -34,7 +34,7 @@ def _op(engine, tmp_path: Path, client_id: str) -> LocalConfig:
 
 
 async def _worker(engine, tmp_path: Path, client_id: str, roots: list[str]) -> WorkerService:
-    cfg = WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
+    cfg = WorkerConfig(windows=False, engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
                        watch_roots=roots, poll_seconds=0.3, metrics_seconds=0.5, idle_sweep_after_seconds=999999,
                        path=tmp_path / f"w-{client_id}.json")
     svc = WorkerService(cfg, native_watch=False)

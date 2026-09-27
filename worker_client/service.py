@@ -51,6 +51,11 @@ class WorkerService:
         self._stopping = False
         self._reconnect_task: asyncio.Task[None] | None = None
         self.pushes_handled = 0
+        # the Worker's windows (WR01, TK07): the block overlay follows the lockout; a new task opens its window
+        self._overlay: Any = None
+        self._window_tasks: set[asyncio.Task[None]] = set()
+        if config.windows:
+            self.lockout.on_change(self._on_block_changed)
 
     # --- lifecycle ------------------------------------------------------------------------------
 
@@ -150,6 +155,8 @@ class WorkerService:
                 self.updater.on_available(payload)
             elif type_ in ("task.assigned", "task.completed", "task.incomplete"):
                 await self._refresh_tasks()
+                if type_ == "task.assigned" and self.config.windows:
+                    self._spawn(self._show_task(int(payload["task_id"])))
         except Exception:
             log.exception("push %s failed", type_)
         for fn in list(self.notifiers):
@@ -164,6 +171,48 @@ class WorkerService:
             self.native_session_id = res.get("session_id")
         except (EngineError, ConnectionError_) as exc:
             log.warning("could not re-claim the native session: %s", exc)
+
+    # --- the Worker's windows ----------------------------------------------------------------------
+
+    def _spawn(self, coro: Any) -> None:
+        t = asyncio.ensure_future(coro)
+        self._window_tasks.add(t)
+        t.add_done_callback(self._window_tasks.discard)
+
+    def _on_block_changed(self, blocked_by: dict[str, Any] | None) -> None:
+        """Someone is using this machine: the overlay says who and until when, and goes when they leave."""
+        if self._overlay is not None:
+            self._overlay.close()
+            self._overlay = None
+        if blocked_by is not None:
+            self._spawn(self._open_overlay(blocked_by))
+
+    async def _open_overlay(self, blocked_by: dict[str, Any]) -> None:
+        from worker_client.windows.spawn import open_window
+
+        handle = await open_window("blocked", {"occupant_name": blocked_by.get("occupant_name"),
+                                               "deadline_at": blocked_by.get("deadline_at")})
+        if handle is not None and self.lockout.is_blocked:
+            self._overlay = handle
+        elif handle is not None:
+            handle.close()
+
+    async def _show_task(self, task_id: int) -> None:
+        """A task given to this person: its window, and Start if they choose to (never Complete)."""
+        from worker_client.windows.spawn import open_window, task_spec
+
+        try:
+            task = (await self.call("task.get", {"task_id": task_id}))["task"]
+        except (EngineError, ConnectionError_) as exc:
+            log.debug("task %s for its window: %s", task_id, exc)
+            return
+        handle = await open_window("task", task_spec(task))
+        answer = await handle.answer() if handle is not None else None
+        if answer and answer.get("start"):
+            try:
+                await self.call("task.start", {"task_id": task_id})
+            except (EngineError, ConnectionError_) as exc:
+                log.warning("starting task %s failed: %s", task_id, exc)
 
     async def _refresh_tasks(self) -> None:
         try:

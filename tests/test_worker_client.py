@@ -21,7 +21,7 @@ pytestmark = requires_db
 
 
 def _cfg(engine, tmp_path: Path, client_id: str, roots: list[str]) -> WorkerConfig:
-    return WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
+    return WorkerConfig(windows=False, engine_host="127.0.0.1", engine_port=engine.port, client_id=client_id, client_key=key_for(client_id), tls=False,
                         watch_roots=roots, poll_seconds=0.3, metrics_seconds=0.5, idle_sweep_after_seconds=999999,
                         path=tmp_path / f"{client_id}.json")
 
@@ -284,3 +284,25 @@ def test_worker_config_roundtrip(tmp_path: Path):
     cfg.save()
     back = WorkerConfig.load(tmp_path / "w.json")
     assert back.engine_address == "h:1" and back.watch_roots == ["/x"] and back.client_id == "c"
+
+
+def test_a_task_reads_to_its_assignee_in_plain_words():
+    """TK07: the assignee's window says who it is from, what, when it is due and what will show the work -- and a file
+    to be made is said to be found by its name, wherever it is saved."""
+    from worker_client.windows.spawn import task_spec
+
+    spec = task_spec({"assigner_name": "R. Mensah", "description_raw": "Q3 reconciliation. Reconcile the invoices.",
+                      "final_deadline_at": "2026-09-30T17:00:00+00:00", "started_at": None,
+                      "items": [{"name": "suppliers-q3.xlsx", "intent": "update", "target_type": "file"},
+                                {"name": "reconciliation-q3.docx", "intent": "create", "target_type": "file"},
+                                {"name": "gone.docx", "removed": True}]})
+    assert spec["from"] == "R. Mensah" and spec["title"] == "Q3 reconciliation" and spec["started"] is False
+    assert [s["name"] for s in spec["signs"]] == ["suppliers-q3.xlsx", "reconciliation-q3.docx"]
+    assert spec["signs"][1]["hint"] == "save it anywhere; it is found by name"
+
+
+def test_the_windows_say_what_they_are_and_refuse_what_they_are_not(capsys):
+    from worker_client.windows.__main__ import main
+
+    assert main(["nonsense"]) == 2
+    assert "usage" in capsys.readouterr().err

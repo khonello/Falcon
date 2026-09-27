@@ -56,6 +56,11 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
     ("A. Quaye · Operations · already governs 14 machines"); the schema gives an account one `department_id`, so
     assigning would move them. The page offers "Give it an Admin" (a new Admin account and workstation) until an
     Admin can govern more than one department -- a decision, not only a query. *Found:* dialogs (DG01).
+14. **The Worker's windows are built; three wait for their triggers** (WR01). `worker_client.windows` has all
+    five (blocked, message, locked, ask, task), and the service already opens *blocked* (from the lockout) and
+    *task* (on `task.assigned`, with Start). *Message* and *locked* need `notify` / `lock_session` to open them
+    instead of printing (item 4), and *ask* needs a way for the person to open it (a tray icon or shortcut) that
+    sends `assistance.ping` with the message. Frozen Overlay/Dialog exes are Phase 9 packaging. *Found:* WR01.
 
 ## Done inline (for the record)
 

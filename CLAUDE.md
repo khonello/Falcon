@@ -44,6 +44,7 @@ GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`
 ```powershell
 environ-worker\Scripts\Activate.ps1
 pip install -e ".[worker]"                 # Worker Client (psutil, prompt_toolkit, watchdog)
+pip install -e ".[worker,worker-ui]"       # ... with the Worker's windows (PySide6): python -m worker_client.windows <kind> '<json>'
 python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt --watch C:\docs [--ui]
 ```
 
