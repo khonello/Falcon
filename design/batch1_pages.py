@@ -23,7 +23,7 @@ def calm_slot(label, state="ok", size=52, sub=""):
     dot_ = (f'<span style="position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 4px; '
             f'background: {ring};"></span>') if ring else ""
     box = (f'<span style="position: relative; width: {size}px; height: {size}px; border-radius: {int(size * 0.28)}px; '
-           f'background: {T["pane"]}; display: inline-flex; align-items: center; justify-content: center; '
+           f'background: rgba(255,255,255,0.08); display: inline-flex; align-items: center; justify-content: center; '
            f'font-family: {T["mono"]}; font-size: {int(size * 0.25)}px; font-weight: 600; '
            f'color: {T["ink"] if ring else T["dim"]}; opacity: {0.5 if dim else 1}; {shadow}">{label}{dot_}</span>')
     return col(box, txt(sub, 10.5, T["faint"], extra="text-align: center;") if sub else "", gap=5,
