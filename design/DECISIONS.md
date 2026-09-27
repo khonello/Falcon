@@ -268,6 +268,9 @@ sentence per fact, the act on the same card. The rule is `PATTERNS.md` section 0
 **The timeline is kept, made readable** (27 Sep 2026): `RC05` uses the Overview's day timeline with axis and legend, beside
 the written entries. Supersedes `RC04`'s cards-only Record.
 
+**A fleet that scales** (27 Sep 2026): no container holds more than one department's machines. `RO05` / `RO06` / `OV02`
+supersede `RO04` and `OV01`'s fleet cells. `PATTERNS.md` 3a.
+
 ## 4. Proposed, still open
 
 | | |

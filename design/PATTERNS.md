@@ -73,6 +73,23 @@ idea … But if you feel like actual scrolling for vertical is better, we can us
 
 The `FleetGrid` scale ladder in QML (and `slot_size()` in `design/scale.py`) must change to this when next touched.
 
+## 3a. Many departments, many machines — never one container for all
+
+*The user, 27 Sep 2026, on RO04: "what if the departments are many, what if the pcs are many ... this multi department
+in one container not really cutting it."* Plan every set for its worst case (think 12 departments × 60 machines).
+
+- **A container never holds more than one department's machines.**
+- **A page about many departments shows departments**: one card each — identity stamp, name, a thin progress line, the
+  count — and **only the machines that need someone**, as 30 px screens with hostname and reason. A department with
+  nothing wrong is one quiet line ("all current"). Many departments page down by the stack's bottom edge, naming any
+  hidden one that needs you ("3 more departments · Fleet has one offline"). A "Behind only" text filter narrows it.
+- **Double-click a department to maximise it** (DP11): that department fills the page — its machines at 58 in a grid,
+  its words and actions beside it. This is the only place a department's whole fleet is drawn.
+- **Inside one department the size decides**: one row in a cell pages sideways (≤ ~8 visible); a maximised grid fills
+  the area and **pages down by rows** (32 at a time — 200 machines is seven pages, not fifty), with plain-text filters
+  ("All 48 · Behind 2 · Offline 0") and a "1–32 of 48" position. Stable order, always.
+- `RO05` (ten departments), `RO06` (one maximised) and `OV02` (the Overview at scale) are the reference.
+
 ## 4. Cards, not rows
 
 - **A person** (`person_card`): avatar 34, name 13 px ink 600, a line 11.5 px (in tone when it says something), an
