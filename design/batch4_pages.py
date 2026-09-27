@@ -44,7 +44,8 @@ def behind_words(behind):
     head = f"{len(behind)} behind"
     parts = ([f"{len(off)} offline"] if off else []) + ([f"{len(failing)} failing"] if failing else [])
     worst = max((int(w.split()[1].rstrip("×")) for _, _, w in failing), default=0)
-    sub = " · ".join(parts) + (f" · worst {worst}×" if failing else "")
+    # kept short so the mark sits close to the chevron: with offline machines, offline is the story
+    sub = " · ".join(parts) + (f" · worst {worst}×" if failing and not off else "")
     return head, sub
 
 
@@ -57,11 +58,11 @@ def rollout_card(name, stamp, total, on, behind, w=856, compact=False):
            f'<div style="width: {int(pct * 100)}%; height: 4px; border-radius: 2px; background: {T["dim"]};"></div></div>')
     words = col(txt(head, 11.5, T[tone] if behind else T["faint"], 600 if behind else 400),
                 txt(sub, 10.5, T["faint"], extra="white-space: nowrap;") if sub else "", gap=0,
-                extra=f"width: {150 if compact else 176}px; flex: none;")
+                extra=f"width: {128 if compact else 134}px; flex: none;")
     return row(f'<span style="width: 9px; height: 9px; border-radius: 3px; background: {stamp}; flex: none;"></span>',
                txt(name, 13, T["ink"], 600, extra=f"width: {92 if compact else 130}px; flex: none;"), bar,
                txt(f"{on} of {total}", 12, T["dim"], extra="width: 58px; flex: none;"), sp(),
-               behind_mark(behind, 30), words, ic("chev", 13, T["faint"]), gap=12,
+               behind_mark(behind, 30), words, ic("chev", 13, T["faint"]), gap=10,
                extra=f"width: {w}px; box-sizing: border-box; padding: 8px 14px; border-radius: 14px; background: {T['pane']};")
 
 
