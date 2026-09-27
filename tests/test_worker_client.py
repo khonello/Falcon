@@ -9,6 +9,7 @@ metrics and program signals, update attempts.
 from __future__ import annotations
 
 import asyncio
+import inspect
 from pathlib import Path
 
 from common.connection import EngineConnection
@@ -42,7 +43,7 @@ async def _admin(engine) -> EngineConnection:
 
 async def _wait(cond, timeout: float = 5.0, step: float = 0.1):
     for _ in range(int(timeout / step)):
-        if await cond() if asyncio.iscoroutinefunction(cond) else cond():
+        if await cond() if inspect.iscoroutinefunction(cond) else cond():
             return True
         await asyncio.sleep(step)
     return False

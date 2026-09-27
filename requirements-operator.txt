@@ -1,0 +1,9 @@
+# Operator Client (Super User + Admin), TUI and GUI  ->  environ-operator
+#
+#   environ-operator\Scripts\Activate.ps1
+#   pip install -r requirements-operator.txt
+#
+# Versions live in pyproject.toml; this file only says which extras this
+# virtual environment gets.
+
+-e .[tui,gui]

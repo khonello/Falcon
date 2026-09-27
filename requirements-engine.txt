@@ -1,0 +1,13 @@
+# Engine + tests  ->  environ-engine
+#
+#   environ-engine\Scripts\Activate.ps1
+#   pip install -r requirements-engine.txt
+#
+# Versions live in pyproject.toml (one place to change them); this file only says
+# which extras this virtual environment gets.  gui/ is here too because the GUI
+# tests (tests/test_operator_gui.py) need PySide6 in this venv or they skip.
+
+# CPU wheels for llama-cpp-python, so no C compiler is needed.
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+
+-e .[engine,dev,gui]

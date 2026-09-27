@@ -9,6 +9,7 @@ a Flow failure), and a network drop mid-traversal with a real Operator connectio
 from __future__ import annotations
 
 import asyncio
+import inspect
 from datetime import timedelta
 from pathlib import Path
 
@@ -46,7 +47,7 @@ async def _worker(engine, tmp_path: Path, client_id: str, roots: list[str]) -> W
 
 async def _wait(cond, timeout: float = 10.0, step: float = 0.1) -> bool:
     for _ in range(int(timeout / step)):
-        ok = await cond() if asyncio.iscoroutinefunction(cond) else cond()
+        ok = await cond() if inspect.iscoroutinefunction(cond) else cond()
         if ok:
             return True
         await asyncio.sleep(step)

@@ -1,0 +1,10 @@
+# Worker Client service + its windows  ->  environ-worker
+#
+#   environ-worker\Scripts\Activate.ps1
+#   pip install -r requirements-worker.txt
+#
+# Versions live in pyproject.toml; this file only says which extras this
+# virtual environment gets.  Drop worker-ui (PySide6) for a headless install:
+# the service runs without the Overlay/Dialog windows.
+
+-e .[worker,worker-ui]
