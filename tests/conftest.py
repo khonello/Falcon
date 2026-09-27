@@ -33,9 +33,17 @@ def key_for(client_id: str, key_generation: int = 1) -> str:
 
 def answer(client_id: str, nonce: str, key_generation: int = 1) -> str:
     return engine_auth.expected_response(bytes.fromhex(key_for(client_id, key_generation)), nonce)
+# the same `.env` the Engine reads: `python -m engine setup` writes FALCON_TEST_DATABASE_URL there
+from common import dotenv
 from protocol import Envelope, Kind, decode, encode, request
 
+dotenv.load()
 TEST_DB_URL = os.environ.get("FALCON_TEST_DATABASE_URL")
+# The suite drops and recreates the test database's schema: it must never be the working database.
+if TEST_DB_URL and (TEST_DB_URL.rstrip("/").rsplit("/", 1)[-1] == "falcon"
+                    or TEST_DB_URL == os.environ.get("FALCON_DATABASE_URL")):
+    raise SystemExit("FALCON_TEST_DATABASE_URL points at the working database; the tests would wipe it. "
+                     "Use a dedicated one (falcon_test).")
 
 requires_db = pytest.mark.skipif(not TEST_DB_URL, reason="FALCON_TEST_DATABASE_URL not set")
 
@@ -47,7 +55,7 @@ def pytest_report_header(config):
     if TEST_DB_URL:
         return f"falcon: database tests ON ({TEST_DB_URL.rsplit('/', 1)[-1]})"
     return ["falcon: NO DATABASE -- every DB-backed test will SKIP and a pass here proves little.",
-            "        set FALCON_TEST_DATABASE_URL=postgresql://falcon:falcon@localhost:5432/falcon_test"]
+            "        run `python -m engine setup` (or put FALCON_TEST_DATABASE_URL in .env)"]
 
 
 async def _wipe_and_migrate(database: Database) -> None:

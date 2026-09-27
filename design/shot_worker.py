@@ -31,7 +31,9 @@ SPECS = {
 def main(out: str) -> None:
     out_dir = ROOT / out
     out_dir.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QPA_FONTDIR=os.environ.get("QT_QPA_FONTDIR", r"C:\Windows\Fonts"))
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    if os.name == "nt":
+        env.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
     for kind, spec in SPECS.items():
         path = out_dir / f"worker-{kind}.png"
         r = subprocess.run([sys.executable, "-m", "worker_client.windows", kind, json.dumps(spec), "--shot", str(path)],

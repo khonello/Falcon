@@ -19,27 +19,35 @@ Rules from the user:
 
 The pyenv-win shim on PATH (`python.bat`) corrupts inline `python -c "..."`; use the venv's `python.exe` directly or run scripts from files.
 
+**New machine or a real network: `docs/GETTING-STARTED.md`.** **Settings live in `.env`, never in the shell.** The Engine, the tests and the scripts load it themselves
+(`common/dotenv.py`); a variable set in the real environment still wins. `python -m engine setup` makes a fresh clone
+ready in one step and is safe to run again: it writes `.env`, makes the certificate, creates the databases (given
+`--admin-url postgresql://postgres:<pw>@localhost:5432/postgres`, else it prints the SQL), migrates, creates the master
+secret, bootstraps the first Super User (id + key printed once and written into this machine's Operator Client
+settings), and checks the model (`--download-model` fetches it).
+
 ```powershell
 environ-engine\Scripts\Activate.ps1
-pip install -e ".[engine,dev]"             # Engine + tests
-pytest                                     # all tests (asyncio_mode=auto)
+pip install -e ".[engine,dev]"             # Engine + tests (add ,gui for the GUI tests)
+python -m engine setup                     # fresh clone -> ready: .env, cert, databases, schema, secret, Super User
+python -m engine                           # run it (real auth + TLS, from .env)
+pytest                                     # all tests, DB tests included (FALCON_TEST_DATABASE_URL comes from .env)
 pytest tests/test_engine_smoke.py -k handshake   # one test
 ruff check .
-$env:FALCON_TEST_DATABASE_URL="postgresql://falcon:falcon@localhost:5432/falcon_test"; pytest   # incl. DB tests (skipped without it)
-python -m engine gencert 127.0.0.1,localhost,<hostname> data   # once: self-signed cert -> data/engine.crt + .key
-$env:FALCON_TLS_CERT="data/engine.crt"; $env:FALCON_TLS_KEY="data/engine.key"; python -m engine   # real auth + TLS
-$env:FALCON_DEV_PLAINTEXT=1; $env:FALCON_DEV_BYPASS_AUTH=1; python -m engine   # dev switches: no TLS, no handshake (loud)
+python -m engine gencert 127.0.0.1,localhost,<hostname> data   # a certificate by hand (setup does this)
+python -m engine bootstrap SU-PC           # a first Super User by hand (setup does this)
+# dev switches (no TLS, no handshake -- loud): uncomment FALCON_DEV_PLAINTEXT / FALCON_DEV_BYPASS_AUTH in .env
 
 environ-operator\Scripts\Activate.ps1
 pip install -e ".[tui,gui]"                # Operator Client TUI + GUI (PySide6, qasync)
-python -m engine bootstrap SU-PC           # (from environ-engine, once, empty DB) -> prints the Super User client_id + client_key ONCE
+python -m operator_client --gui            # after setup on this machine: connects as the Super User, nothing to type
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # interactive TUI (TLS)
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --plaintext           # against a DEV_PLAINTEXT Engine
 python -m operator_client --connect --script "tree; tasks"                              # scripted, no TUI (remembered settings)
 python -m operator_client --gui --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # QML GUI
 ```
 
-GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`pip install -e ".[engine,dev,gui]"`); they skip otherwise. Set `QT_QPA_FONTDIR=C:\Windows\Fonts` when rendering offscreen screenshots (Qt ships no fonts).
+GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`pip install -e ".[engine,dev,gui]"`); they skip otherwise. The screenshot scripts set Qt's offscreen platform and Windows font folder themselves, and take their state as options (`design/shot_gui.py design/shots admin 2 --flow=4`; `design/shot_board.py <BOARD>` for design boards).
 
 ```powershell
 environ-worker\Scripts\Activate.ps1
@@ -48,7 +56,7 @@ pip install -e ".[worker,worker-ui]"       # ... with the Worker's windows (PySi
 python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt --watch C:\docs [--ui]
 ```
 
-Engine settings are `FALCON_*` env vars (see `.env.example`, `engine/config.py`). Without `FALCON_DATABASE_URL` the Engine runs with no database (scaffold only). Without `FALCON_DEV_PLAINTEXT` it refuses to start unless TLS cert/key are set. The master secret lives at `FALCON_SECRET_PATH` (default `data/master.secret`, created on first start, git-ignored); every client key is `HMAC(master_secret, "<client_id>:<key_generation>")` and is printed once at provisioning (`bootstrap`, `hierarchy.account_create`, `hierarchy.pc_register`, `hierarchy.pc_rekey`). Clients that were provisioned before Phase 5 have no key on record — derive theirs from the secret with `engine.auth.derive_client_key`.
+Engine settings are `FALCON_*` keys in `.env` (see `.env.example`, `engine/config.py`); the suite refuses a test URL that points at the working database. Without `FALCON_DATABASE_URL` the Engine runs with no database (scaffold only). Without `FALCON_DEV_PLAINTEXT` it refuses to start unless TLS cert/key are set. The master secret lives at `FALCON_SECRET_PATH` (default `data/master.secret`, created on first start, git-ignored); every client key is `HMAC(master_secret, "<client_id>:<key_generation>")` and is printed once at provisioning (`bootstrap`, `hierarchy.account_create`, `hierarchy.pc_register`, `hierarchy.pc_rekey`). Clients that were provisioned before Phase 5 have no key on record — derive theirs from the secret with `engine.auth.derive_client_key`.
 
 ## Code layout
 

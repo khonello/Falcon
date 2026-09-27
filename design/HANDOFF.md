@@ -3,9 +3,10 @@
 The snapshot to resume from. **Read `design/LEVELS.md` first** (the levels), then `design/DECISIONS.md` (what was
 approved and rejected, and why), `design/TABS.md` (the five areas), `design/BOARDS.md` (what every board is),
 `design/PATTERNS.md` (the measured patterns every page is checked against). This file is where the *code* stands;
-**`design/ENGINE-WORK.md` is what the Engine and the Worker still owe the UI.**
+**`design/ENGINE-WORK.md` is what the Engine and the Worker still owe the UI.** Setting up a machine or a network:
+`docs/GETTING-STARTED.md` (`python -m engine setup` does a fresh clone in one step; settings live in `.env`).
 
-**Branch** `phase7/design-and-gui-rebuild` · last commit `040fe7f` · **174 tests pass, `ruff check .` clean.**
+**Branch** `phase7/design-and-gui-rebuild` · **177 tests pass, `ruff check .` clean.**
 The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it the DB tests skip and pytest still says
 "passed"; `conftest.py` prints which run you are in.
 **Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — version 58, 162 boards, arranged by hand: its index is
@@ -34,8 +35,9 @@ against its board and sent to the user.
 
 ### What is built, page by page
 
-Render any page with `environ-operator/Scripts/python.exe design/shot_gui.py design/shots <role> <view>` (set
-`QT_QPA_FONTDIR=C:\Windows\Fonts`); the flags pick the state. The Worker's windows: `design/shot_worker.py`.
+Render any page with `environ-operator/Scripts/python.exe design/shot_gui.py design/shots <role> <view> [--option=value]`;
+the options pick the state (`FALCON_SHOT_FLOW=<id>` below is written `--flow=<id>`, `FALCON_SHOT_STEPOUT=1` is
+`--stepout`). The Worker's windows: `design/shot_worker.py`. Design boards: `design/shot_board.py <BOARD>`.
 
 | Page | Board | QML | Screenshot with |
 |---|---|---|---|
@@ -211,26 +213,25 @@ state rather than a placeholder image.
 ## Run it, render it, check it
 
 ```powershell
+environ-engine\Scripts\python.exe -m engine setup                      # once per clone: .env, cert, databases, Super User
 environ-operator\Scripts\python.exe design\run_gui.py super_user          # a real window, stubbed, no Engine
-$env:FALCON_SHOT_EMPTY=1; ... design\run_gui.py super_user                # a system with no data
+environ-operator\Scripts\python.exe design\run_gui.py super_user --empty  # a system with no data
 
 # the app, offscreen -> design/shots/gui-*.png
-environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0     # Must see
-$env:FALCON_SHOT_OPEN="rollout"; ...                                                # a cell opened
-$env:FALCON_SHOT_DEPT=1; ... design\shot_gui.py design\shots super_user 1            # a department
-$env:FALCON_SHOT_DEPT=1; $env:FALCON_SHOT_MAX="machines"; ...                        # a chart maximised
+environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 0                 # Must see
+environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 1 --dept=1        # a department
+environ-operator\Scripts\python.exe design\shot_gui.py design\shots super_user 1 --dept=1 --max=machines
+environ-operator\Scripts\python.exe design\shot_gui.py design\shots admin 2 --flow=4             # one flow
+environ-operator\Scripts\python.exe design\shot_worker.py design\shots                           # the Worker's windows
 
 environ-engine\Scripts\python.exe design\gen.py                            # -> design/boards/*.dc.html
-$edge = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-& $edge --headless=new --disable-gpu --hide-scrollbars --window-size=1440,900 `
-        "--screenshot=design\shots\DP05-Department.png" "file:///$PWD/design/boards/DP05-Department.dc.html"
+environ-engine\Scripts\python.exe design\shot_board.py DP05-Department     # a board -> design/shots/DP05-Department.png
 
-$env:FALCON_TEST_DATABASE_URL="postgresql://falcon:falcon@localhost:5432/falcon_test"
-environ-engine\Scripts\python.exe -m pytest -q
+environ-engine\Scripts\python.exe -m pytest -q                             # the test URL comes from .env
 environ-engine\Scripts\python.exe -m ruff check .
 ```
 
-Edge writes its `--screenshot` **after** the process returns, and only to an absolute path.
+Edge writes its `--screenshot` **after** the process returns, and only to an absolute path -- `shot_board.py` waits for it.
 
 **The three sequences**, built from the real screenshots so a break in continuity is visible rather
 than argued about: `design/journey_strip.py` (Must see → Authority → department → an Admin → a chart

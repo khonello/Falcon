@@ -1,6 +1,9 @@
 """Render the Operator Client GUI offscreen with a stubbed connection, and save a PNG.
 
-    python design/shot_gui.py <out-dir> [admin|super_user] [rail-index] [page] [focus-department-id]
+    python design/shot_gui.py <out-dir> [admin|super_user] [rail-index] [page] [focus-department-id] [--option[=value] ...]
+
+Options pick the state to render, e.g. `--flow=4`, `--stepout`, `--dialog=offboard`, `--connect=unreachable`:
+each `--name[=value]` is the FALCON_SHOT_<NAME> setting (no value means 1), so nothing is set in the shell.
 
 The stub answers the same handlers the real views call, with a small organisation that matches the
 design boards, so a screenshot of the app can be put beside a screenshot of the board.
@@ -11,7 +14,20 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
+if os.name == "nt":
+    os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")   # offscreen Qt ships no fonts
+
+
+def take_options(argv: list[str]) -> list[str]:
+    """`--name[=value]` -> FALCON_SHOT_<NAME>; returns the positional arguments that remain."""
+    rest = []
+    for arg in argv:
+        if arg.startswith("--"):
+            name, _, value = arg[2:].partition("=")
+            os.environ["FALCON_SHOT_" + name.upper().replace("-", "_")] = value or "1"
+        else:
+            rest.append(arg)
+    return rest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from PySide6.QtCore import Q_ARG, QMetaObject, QTimer  # noqa: E402
@@ -622,8 +638,9 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]),
-         sys.argv[2] if len(sys.argv) > 2 else "admin",
-         int(sys.argv[3]) if len(sys.argv) > 3 else 0,
-         int(sys.argv[4]) if len(sys.argv) > 4 else 0,
-         int(sys.argv[5]) if len(sys.argv) > 5 else 0)
+    args = take_options(sys.argv[1:])
+    main(Path(args[0]),
+         args[1] if len(args) > 1 else "admin",
+         int(args[2]) if len(args) > 2 else 0,
+         int(args[3]) if len(args) > 3 else 0,
+         int(args[4]) if len(args) > 4 else 0)

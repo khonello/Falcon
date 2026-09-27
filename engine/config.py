@@ -1,4 +1,5 @@
-"""Engine settings, read from FALCON_* environment variables (see .env.example)."""
+"""Engine settings, read from FALCON_* environment variables -- loaded from `.env` first (see .env.example and
+common/dotenv.py), so a fresh setup needs no shell variables at all; a variable set in the real environment wins."""
 
 from __future__ import annotations
 
@@ -46,6 +47,9 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> Settings:
+        from common import dotenv
+
+        dotenv.load()
         cert = os.environ.get("FALCON_TLS_CERT")
         key = os.environ.get("FALCON_TLS_KEY")
         return cls(

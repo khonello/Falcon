@@ -1,7 +1,8 @@
 """Open the Operator Client GUI on screen, against the same stub `shot_gui.py` renders with.
 
-    environ-operator\\Scripts\\python.exe design\\run_gui.py [admin|super_user]
-    FALCON_SHOT_EMPTY=1 ...                      a system with no data, for the never-blank rule
+    environ-operator\\Scripts\\python.exe design\\run_gui.py [admin|super_user] [--empty] [--option[=value] ...]
+    --empty                                      a system with no data, for the never-blank rule
+    (every --option is shot_gui.py's, e.g. --scale)
 
 No Engine and no database: every request is answered from `shot_gui`'s sample organisation, so the
 dashboards can be clicked through -- the pills, the department descent on the map, the rail -- while
@@ -18,7 +19,8 @@ from pathlib import Path
 
 # must beat shot_gui's own setdefault, which is offscreen
 os.environ["QT_QPA_PLATFORM"] = "windows" if sys.platform == "win32" else ""
-os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
+if os.name == "nt":
+    os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -107,4 +109,5 @@ def main(role: str = "super_user") -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "super_user")
+    args = shot_gui.take_options(sys.argv[1:])
+    main(args[0] if args else "super_user")

@@ -72,7 +72,7 @@ titles. It is not the thing to upload.
 3. Carry it into `operator_client/gui/qml/` — tokens to `Theme.qml`, components to the kit files, screens
    to `<Name>View.qml`.
 4. Screenshot the running app with `shot_gui.py <out-dir> <admin|super_user> [rail-index] [page] [department]`
-   (`FALCON_SHOT_EMPTY=1` renders a system with no data, for the never-blank rule)
+   (`--empty` renders a system with no data, for the never-blank rule)
    and check the two match. Edge writes its screenshot after the process returns, and only to an absolute
    path.
 
