@@ -211,6 +211,28 @@ Nothing on a mood board is typed as code, and that is now a rule for every page:
 no ISO timestamps, no path prefixes** in anything an Admin or Super User fills in. A detail is set with
 the control that fits it.
 
+## 3b. Batch 1: the Admin's remaining pages (27 Sep 2026)
+
+The user: *"Resolve conflict yourself, just note the visual direction that am feeling so you can slide through
+without too many questions."* The picks off `HO01`, `FL01`, `FL02`, `AS01`, `RP01`, composed into `HO02`,
+`FL03`-`FL05`, `AS02`, `RP02`:
+
+| Page | Picked |
+|---|---|
+| Admin home | **Four cells**; one machine as **Slots** + **One line each** |
+| Flows page | **Map of every flow** (*"I don't see how this will look"* — so it is drawn for real on `FL03`), **From → to** (the listing, not its look — cards now), **Four cells** |
+| One flow | **A tree** (*"very beautiful, just breathtaking"*), **A sentence**, **A recipe card** — the tree is the default view, the other two the viewer's choice |
+| Making a flow | **Fill the sentence** (*"the options below chained for 'then' are nice"*) + **Checked before saving** |
+| When a flow needs you | **The broken branch** + **The fix, offered** + **Kept, not overwritten** |
+| Assistance | **The ping, unmissable**; **By person** as avatar-led rectangles anchored left, not a list; **Listening** with *"a small visual spice"*; **One search box** + **Grouped by where** |
+| Reports | **A queue to address**, **A timeline**, **Four cells**; one report as **A reading, then mark** |
+
+**THE SLOT RULE — system-wide, and it overrides earlier boards.** *"The only issues I have ever had with slots
+is the color ranging, not just here but everywhere."* A set of marks is **calm**: one quiet fill for every mark,
+and colour only on the exceptions that need someone — a thin ring and a dot. A machine that is fine is not
+green; it is quiet. `calm_slot` in `design/batch1_pages.py` is the drawing. **The built `FleetGrid` (level 2)
+and every fleet/slot drawing on the Overview must move to it when next touched.**
+
 ## 4. Proposed, still open
 
 | | |
