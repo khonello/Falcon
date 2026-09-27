@@ -284,6 +284,8 @@ async def session_state(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         "my_session": _session_view(mine, names) if mine else None,
         "blocked": bool(pc_session and pc_session["occupant_account_id"] != ident.account_id
                         and pc_id == ident.pc_id),
+        # how long one Extend adds, so the client can say the cost before the button (DG01)
+        "extension_minutes": ctx.engine.settings.traversal_extension_minutes,
     }
 
 

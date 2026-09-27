@@ -61,10 +61,15 @@ class FalconBridge(QObject):
         self._held: dict[str, Any] | None = None    # the session held when the link dropped: it runs on, on the Engine
         self._name_notice: dict[str, str] | None = None
         self._retry_task: asyncio.Task[None] | None = None
+        self._extension_minutes = 0
         self._retry_now: asyncio.Event | None = None      # made on the running loop when a retry starts
         self._deliberate = False
 
     # --- properties (read by QML bindings) -----------------------------------------------------
+
+    @Property(int, notify=stateChanged)
+    def extensionMinutes(self) -> int:
+        return self._extension_minutes
 
     @Property(str, notify=stateChanged)
     def connectState(self) -> str:
@@ -267,6 +272,7 @@ class FalconBridge(QObject):
         cfg.save()
         try:
             st = await conn.call("hierarchy.session_state")
+            self._extension_minutes = int(st.get("extension_minutes") or 0)
             self.state.set_session(st.get("my_session"))
             if st.get("blocked"):
                 self.state.blocked_by = st.get("pc_session")

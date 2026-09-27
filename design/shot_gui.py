@@ -428,6 +428,7 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
     # FALCON_SHOT_LOST=1: the link dropped mid-session (ST03); FALCON_SHOT_RENAMED=1: connected, name changed
     if os.environ.get("FALCON_SHOT_RENAMED"):
         bridge._name_notice = {"expected": "WS-OPS-A1", "announced": "WS-OPS-A1-NEW"}
+    bridge._extension_minutes = 15
     # FALCON_SHOT_BLOCKED=1: someone above is on this operator's own machine
     if os.environ.get("FALCON_SHOT_BLOCKED"):
         bridge.state.blocked_by = {"occupant_name": "the Super User", "occupant_role": "super_user"}
@@ -531,6 +532,28 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             acv.setProperty("check", {"ok": True, "problems": []})
             acv.setProperty("customName", "Clear temp")
             acv.setProperty("customDoes", "Empties the temp folders to free disk space.")
+        # FALCON_SHOT_DIALOG=<extend|rekey|offboard|register|admin|key|force>: that dialog open (DG01)
+        dlg = os.environ.get("FALCON_SHOT_DIALOG")
+        if dlg:
+            def open_dialog():
+                pcv = win.findChild(object, "pcView")
+                if dlg == "extend":
+                    QMetaObject.invokeMethod(win, "extendSession")
+                elif dlg in ("rekey", "offboard"):
+                    QMetaObject.invokeMethod(pcv, dlg)
+                elif dlg in ("register", "admin"):
+                    QMetaObject.invokeMethod(win, "registerMachine", Q_ARG("QVariant", 3), Q_ARG("QVariant", "Logistics"),
+                                             Q_ARG("QVariant", "admin" if dlg == "admin" else "worker"))
+                elif dlg == "key":
+                    QMetaObject.invokeMethod(win, "showKey", Q_ARG("QVariant", "OPS-15 is registered"),
+                                             Q_ARG("QVariant", "Give these to whoever sets up OPS-15. They go into its install package."),
+                                             Q_ARG("QVariant", "pX3rT0aQv9LmE2sK7wYb"), Q_ARG("QVariant", "7f3a91c2e04b5d18aa6e0c77"))
+                elif dlg == "force":
+                    QMetaObject.invokeMethod(win, "ask", Q_ARG("QVariant", {
+                        "title": "End Yaw's session and enter?", "lead": "Yaw is working at OPS-03 now.",
+                        "rows": [["Their session", "ends now", "danger"], ["They see", "who took it", ""], ["They get it back", "when you leave", ""]],
+                        "act": "End theirs and enter", "actTone": "danger"}), Q_ARG("QVariant", None))
+            QTimer.singleShot(300, open_dialog)
         # FALCON_SHOT_LOST=1: the link drops after the page has loaded, as it does in use (ST03)
         if os.environ.get("FALCON_SHOT_LOST"):
             now = datetime.now().astimezone()
@@ -581,6 +604,7 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-connect-" + os.environ["FALCON_SHOT_CONNECT"] if os.environ.get("FALCON_SHOT_CONNECT") else ""
         name += "-lost" if os.environ.get("FALCON_SHOT_LOST") else ""
         name += "-renamed" if os.environ.get("FALCON_SHOT_RENAMED") else ""
+        name += "-dialog-" + os.environ["FALCON_SHOT_DIALOG"] if os.environ.get("FALCON_SHOT_DIALOG") else ""
         name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""

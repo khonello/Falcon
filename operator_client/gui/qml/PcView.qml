@@ -63,6 +63,32 @@ Item {
     readonly property bool reporting: levels !== null && levels.machines > 0
     function pct(pair) { return pair ? Math.round(pair[1]) + " %" : "—" }
     function late(t) { return t.final_deadline_at && Date.parse(t.final_deadline_at) < Date.now() }
+    // the two acts that belong to the machine's own page, each asked with its cost (DG01)
+    function rekey() {
+        var host = pc.hostname
+        shell.ask({ title: "Issue a new key for " + host + "?",
+                    body: "The old key stops working at once. " + host + " disconnects until the new key is entered there.",
+                    act: "Issue a new key", actTone: "warn" }, function () {
+            falcon.call("hierarchy.pc_rekey", { pc_id: root.pc.pc_id }, function (ok, r) {
+                if (!ok) { shell.notify(r.message, true); return }
+                shell.showKey("A new key for " + host, "Enter it on " + host + " to connect it again.", r.client_id, r.client_key)
+            })
+        })
+    }
+    function offboard() {
+        var open = tasks.filter(function (t) { return t.status !== "completed" }).length
+        shell.ask({ title: "Offboard " + first + "?",
+                    lead: first + "'s account stops working. Nothing is deleted.",
+                    rows: [[pc.hostname, "stays registered, with no one on it", ""],
+                           [open === 1 ? "1 open task" : open + " open tasks", open ? "stay open, for you to reassign" : "none open", open ? "warn" : ""],
+                           ["Their files and history", "kept in Record", ""]],
+                    act: "Offboard " + first, actTone: "danger" }, function () {
+            falcon.call("hierarchy.account_offboard", { account_id: root.pc.account_id }, function (ok, r) {
+                shell.notify(ok ? first + " is offboarded" : r.message, !ok)
+                if (ok) shell.loadTree()
+            })
+        })
+    }
     function runHere(a) {
         falcon.call("control.action_run", { action_id: a.id, pc_id: pc.pc_id }, function (ok, r) {
             var c = {}; for (var k in root.ran) c[k] = root.ran[k]; c[a.id] = ok ? "pending" : "refused"; root.ran = c
@@ -104,8 +130,16 @@ Item {
                           text: root.first + "'s machine · you are holding it" }
                 }
             }
-            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: root.clock
-                  color: Qt.rgba(1, 1, 1, 0.45); font.pixelSize: Theme.fBody }
+            Row {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 12
+                GBtn { objectName: "pcRekey"; text: "Issue a new key"; iconName: "key"; small: true; anchors.verticalCenter: parent.verticalCenter
+                       onClicked: root.rekey() }
+                GBtn { objectName: "pcOffboard"; text: "Offboard " + root.first; iconName: "user"; small: true; anchors.verticalCenter: parent.verticalCenter
+                       onClicked: root.offboard() }
+                Txt { text: root.clock; color: Qt.rgba(1, 1, 1, 0.45); font.pixelSize: Theme.fBody; anchors.verticalCenter: parent.verticalCenter }
+            }
         }
 
         RowLayout {

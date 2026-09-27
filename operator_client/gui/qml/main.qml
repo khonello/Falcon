@@ -118,8 +118,18 @@ ApplicationWindow {
             if (ok) { shell.insidePc = true; return }
             var msg = r.message || ""
             if (r.code === "conflict" && msg.indexOf("force=true") >= 0) {
-                shell.forcePc = pcId
-                shell.notify("Someone is at that machine. Double-click it again to block them and enter.", true)
+                var m = null
+                for (var i = 0; i < shell.orgTree.length; i++)
+                    for (var j = 0; j < shell.orgTree[i].workers.length; j++)
+                        if (shell.orgTree[i].workers[j].pc_id === pcId) m = shell.orgTree[i].workers[j]
+                var who = m && m.session && m.session.occupant_name ? m.session.occupant_name : (m ? m.name : "Someone")
+                shell.ask({ title: "End " + who + "'s session and enter?",
+                            lead: who + " is working at " + (m ? m.hostname : "that machine") + " now.",
+                            rows: [["Their session", "ends now", "danger"], ["They see", "who took it", ""], ["They get it back", "when you leave", ""]],
+                            act: "End theirs and enter", actTone: "danger" }, function () {
+                    shell.forcePc = pcId
+                    shell.enterPc(pcId)
+                })
             } else if (r.code === "conflict" && msg.indexOf("un-evictable") >= 0) {
                 shell.notify("The Super User is on that machine; it cannot be entered until they leave.", true)
             } else shell.notify(msg, true)
@@ -151,10 +161,40 @@ ApplicationWindow {
             shell.notify(ok ? "You left; the workstation is theirs again" : r.message, !ok)
         })
     }
+    // an act with a cost asks first (DG01): shell.ask(spec, function (answer) { ... })
+    function ask(spec, cb) { costDialog.ask(spec, cb) }
+    // a one-time key, shown once
+    function showKey(title, body, clientId, key) {
+        ask({ title: title, body: body, secret: [["Client id", clientId], ["Key", key]], act: "I've saved it", actIcon: "check" }, null)
+    }
+    // provisioning, from wherever it is asked: a person and their machine together, the key shown once
+    function registerMachine(departmentId, departmentName, role) {
+        var admin = role === "admin"
+        ask({ title: admin ? "Give " + departmentName + " an Admin" : "Register a machine in " + departmentName,
+              body: admin ? departmentName + " has nobody governing it. This makes an Admin account and its workstation together."
+                          : "This makes a person's account and their machine together.",
+              field: { label: admin ? "Their workstation's name" : "The machine's name", placeholder: admin ? "WS-LOG-A1" : "OPS-15" },
+              act: admin ? "Make the Admin" : "Register it", actIcon: "plus" }, function (hostname) {
+            falcon.call("hierarchy.account_create", { role: role, hostname: hostname, department_id: departmentId }, function (ok, r) {
+                if (!ok) { shell.notify(r.message, true); return }
+                shell.loadTree()
+                shell.showKey(hostname + " is registered",
+                              "Give these to whoever sets up " + hostname + ". They go into its install package.", r.client_id, r.client_key)
+            })
+        })
+    }
     function extendSession() {
         var s = falcon.session
-        falcon.call("hierarchy.extend_session", { session_id: s ? s.session_id : 0 }, function (ok, r) {
-            shell.notify(ok ? "Extended" : r.message, !ok)
+        var host = heldPc ? heldPc.hostname : heldAdmin ? heldAdmin.hostname : "this machine"
+        var who = heldPc ? heldPc.name : heldAdmin ? heldAdmin.name : ""
+        var mins = falcon.extensionMinutes
+        ask({ title: "Extend your session on " + host + "?",
+              lead: Day.leftText(s ? s.deadline_at : "", shell.nowMs) + " left. Extending adds " + (mins ? mins + " minutes." : "more time."),
+              body: who ? who + " stays out of their machine for that time too." : "",
+              act: mins ? "Extend " + mins + " min" : "Extend", actIcon: "clock", cancel: "Not now" }, function () {
+            falcon.call("hierarchy.extend_session", { session_id: s ? s.session_id : 0 }, function (ok, r) {
+                shell.notify(ok ? "Extended" : r.message, !ok)
+            })
         })
     }
     // the session ended -- left, expired, or the link dropped past its deadline: out, never quietly
@@ -167,6 +207,7 @@ ApplicationWindow {
         property: "viewThroughSession"
         value: shell.insideNow
     }
+    CostDialog { id: costDialog; objectName: "costDialog" }
     Shortcut {
         sequence: "Escape"
         enabled: shell.insideNow || shell.insidePcNow

@@ -805,3 +805,22 @@ async def test_a_dropped_link_keeps_the_page_and_retries_a_failed_one_says_why(g
         bridge._retry_task.cancel()
     await bridge._disconnect()
     assert bridge.connectState == "idle" and win.property("online") is False
+
+
+def test_an_act_with_a_cost_asks_first_and_names_itself(gui):
+    """DG01: the dialog says the cost before its button, the button names the act, a field or a pick must be filled
+    before it can be pressed, and a one-time key can only be acknowledged."""
+    win, _, _ = gui
+    dlg = win.findChild(QObject, "costDialog")
+    QMetaObject.invokeMethod(win, "ask", Q_ARG("QVariant", {"title": "Register a machine in Ops", "field": {"label": "The machine's name"},
+                                                            "act": "Register it"}), Q_ARG("QVariant", None))
+    act = win.findChild(QObject, "dialogAct")
+    assert dlg.property("opened") or dlg.property("visible")
+    assert act.property("text") == "Register it" and act.property("enabled") is False
+    dlg.setProperty("typed", "OPS-15")
+    assert act.property("enabled") is True
+    QMetaObject.invokeMethod(dlg, "close")
+    QMetaObject.invokeMethod(win, "showKey", Q_ARG("QVariant", "OPS-15 is registered"), Q_ARG("QVariant", ""),
+                             Q_ARG("QVariant", "cid"), Q_ARG("QVariant", "7f3a91c2"))
+    assert act.property("text") == "I've saved it" and val(dlg.property("spec"))["secret"][1] == ["Key", "7f3a91c2"]
+    QMetaObject.invokeMethod(dlg, "close")

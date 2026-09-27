@@ -52,9 +52,14 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
     foreground program and its document) and a machine that is **not reachable** refused at `hierarchy.traverse`
     (the Engine keeps no online state, so a held session on a switched-off machine looks like any other).
     *Found:* level 4.
+13. **An Admin belongs to one department.** DG01's "Assign an Admin to Logistics" picks an existing Admin
+    ("A. Quaye · Operations · already governs 14 machines"); the schema gives an account one `department_id`, so
+    assigning would move them. The page offers "Give it an Admin" (a new Admin account and workstation) until an
+    Admin can govern more than one department -- a decision, not only a query. *Found:* dialogs (DG01).
 
 ## Done inline (for the record)
 
 - `control.event_history`, `control.levels`, `match.tier`, and time events firing on machine 0 (Automation).
 - `flow.list` shapes and hostnames, `index.folders` (Flows).
 - `resource.shelves`: files per tier across the department (Resources).
+- `auth.respond` says a hostname mismatch back to the client; `hierarchy.session_state` says how long an Extend adds.

@@ -348,12 +348,19 @@ Item {
                     }
                 }
             }
-            Txt {
+            Row {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.clock
-                color: Qt.rgba(1, 1, 1, 0.45)
-                font.pixelSize: Theme.fBody
+                spacing: 16
+                GBtn { objectName: "registerMachine"; text: "Register a machine"; iconName: "plus"; small: true
+                       anchors.verticalCenter: parent.verticalCenter
+                       onClicked: shell.registerMachine(root.departmentId, root.deptName, "worker") }
+                Txt {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.clock
+                    color: Qt.rgba(1, 1, 1, 0.45)
+                    font.pixelSize: Theme.fBody
+                }
             }
         }
 
@@ -500,6 +507,12 @@ Item {
                         color: Theme.danger
                         font.pixelSize: Theme.fRow
                         font.weight: Font.DemiBold
+                    }
+                    TBtn {
+                        objectName: "giveAdmin"
+                        visible: root.admin === null && falcon.role === "super_user"
+                        text: "Give it an Admin"; iconName: "plus"; small: true
+                        onClicked: shell.registerMachine(root.departmentId, root.deptName, "admin")
                     }
                 }
             }

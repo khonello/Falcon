@@ -53,8 +53,10 @@ the page replaces the sheet under the lid, Escape steps out with the session hel
 blocked, `FALCON_SHOT_BLOCKED=1`); the old state pill is gone. The states are built: the connect screen (ST01) says the last outcome once (`FALCON_SHOT_CONNECT=<kind>`); a
 dropped link keeps the page, dimmed, with the lid's *lost* wording, retries by itself and says the held session
 runs on (ST03, `FALCON_SHOT_LOST=1`); a changed machine name is the lid's *renamed* wording (`FALCON_SHOT_RENAMED=1`).
-ST02's empty cells already say what is missing; a loading skeleton per cell is not built. **Next: dialogs (DG01), and
-the Worker's windows (WR01, TK07).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
+ST02's empty cells already say what is missing; a loading skeleton per cell is not built. The dialogs are built (DG01): one `CostDialog`, asked with `shell.ask(spec, cb)` -- Extend from the lid, End theirs
+and enter (a held machine), Register a machine and Give it an Admin (department), Issue a new key and Offboard
+(the machine's page), and a one-time key via `shell.showKey` (`FALCON_SHOT_DIALOG=<name>`). **Next: the Worker's
+windows (WR01, TK07).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
 in one pass after the UI (the user, 27 Sep 2026); only trivial ones are fixed inline.
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
