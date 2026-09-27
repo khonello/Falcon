@@ -419,6 +419,15 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             "entered_at": (now - timedelta(minutes=5)).isoformat(),
             "deadline_at": (now + timedelta(minutes=24, seconds=10)).isoformat(),
             "extended_count": 0, "un_evictable": role == "super_user", "restricted_view": False, "super_user_banner": role == "super_user"}
+    # FALCON_SHOT_CONNECT=<connecting|key|unreachable|certificate>: the connect screen with that outcome (ST01)
+    if os.environ.get("FALCON_SHOT_CONNECT"):
+        kind = os.environ["FALCON_SHOT_CONNECT"]
+        bridge.state.connected = False
+        bridge._conn_state = "connecting" if kind == "connecting" else "failed"
+        bridge._fail_kind = "" if kind == "connecting" else kind
+    # FALCON_SHOT_LOST=1: the link dropped mid-session (ST03); FALCON_SHOT_RENAMED=1: connected, name changed
+    if os.environ.get("FALCON_SHOT_RENAMED"):
+        bridge._name_notice = {"expected": "WS-OPS-A1", "announced": "WS-OPS-A1-NEW"}
     # FALCON_SHOT_BLOCKED=1: someone above is on this operator's own machine
     if os.environ.get("FALCON_SHOT_BLOCKED"):
         bridge.state.blocked_by = {"occupant_name": "the Super User", "occupant_role": "super_user"}
@@ -522,6 +531,13 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             acv.setProperty("check", {"ok": True, "problems": []})
             acv.setProperty("customName", "Clear temp")
             acv.setProperty("customDoes", "Empties the temp folders to free disk space.")
+        # FALCON_SHOT_LOST=1: the link drops after the page has loaded, as it does in use (ST03)
+        if os.environ.get("FALCON_SHOT_LOST"):
+            now = datetime.now().astimezone()
+            bridge._held = {"session_id": 10, "pc_id": 23, "deadline_at": (now + timedelta(minutes=19)).isoformat()}
+            bridge._conn_state, bridge._retry_in, bridge._lost_at = "lost", 4, now.strftime("%H:%M")
+            bridge.state.connected = False
+            bridge.stateChanged.emit()
         # FALCON_SHOT_RESOURCES=1 opens Resources from the Admin's home (with FALCON_SHOT_FIND, files to shelve)
         if os.environ.get("FALCON_SHOT_RESOURCES"):
             QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "resources"))
@@ -562,6 +578,9 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-pc" + os.environ["FALCON_SHOT_PC"] if os.environ.get("FALCON_SHOT_PC") else ""
         name += "-out" if os.environ.get("FALCON_SHOT_STEPOUT") else ""
         name += "-blocked" if os.environ.get("FALCON_SHOT_BLOCKED") else ""
+        name += "-connect-" + os.environ["FALCON_SHOT_CONNECT"] if os.environ.get("FALCON_SHOT_CONNECT") else ""
+        name += "-lost" if os.environ.get("FALCON_SHOT_LOST") else ""
+        name += "-renamed" if os.environ.get("FALCON_SHOT_RENAMED") else ""
         name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""

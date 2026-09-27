@@ -110,6 +110,7 @@ class EngineConnection:
         answer = self._answer(nonce)
         result = await self.call("auth.respond", {"client_id": self.client_id, "hmac": answer,
                                                   "hostname": self.hostname})
+        self.auth_result = result             # what the Engine said back, e.g. a hostname it did not expect
         self.identity = Identity(client_id=self.client_id, account_id=result.get("account_id"),
                                  role=result.get("role"), pc_id=result.get("pc_id"),
                                  department_id=result.get("department_id"))

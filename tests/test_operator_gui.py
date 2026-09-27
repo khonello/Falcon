@@ -780,3 +780,28 @@ def test_every_session_state_is_the_one_lid(gui):
     assert win.findChild(QObject, "lidWho").property("text") == "The Super User is in charge of your machine"
     bridge.state.blocked_by = None
     bridge.stateChanged.emit()
+
+
+async def test_a_dropped_link_keeps_the_page_and_retries_a_failed_one_says_why(gui):
+    """ST01 / ST03: a failure is said as what to do about it; a drop mid-session keeps the page (dated), keeps the
+    held session's deadline in words, and retries by itself; a deliberate disconnect goes back to the form."""
+    import ssl
+
+    from common.connection import EngineError
+    from operator_client.gui.bridge import FalconBridge
+
+    assert FalconBridge._failure(EngineError("unauthenticated", "authentication failed", "auth.respond")) == "key"
+    assert FalconBridge._failure(ConnectionRefusedError()) == "unreachable"
+    assert FalconBridge._failure(ssl.SSLError()) == "certificate"
+
+    win, _, bridge = gui
+    bridge.state.connected = True
+    bridge.state.session = {"session_id": 1, "pc_id": 27, "occupied_via": "traversal", "deadline_at": "2026-09-27T14:50:00+00:00"}
+    await bridge._on_disconnect()
+    try:
+        assert bridge.connectState == "lost" and bridge.heldWhenLost["pc_id"] == 27
+        assert win.property("lidMode") == "lost" and win.property("online") is True
+    finally:
+        bridge._retry_task.cancel()
+    await bridge._disconnect()
+    assert bridge.connectState == "idle" and win.property("online") is False

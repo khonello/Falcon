@@ -16,7 +16,10 @@ import "."
 //   inside    You are inside Ama's machine   OPS-07  24:05 left         Esc steps out  Extend  Leave
 //   holding   You are holding Ama's machine  OPS-07  24:05 left         Go in          Extend  Leave
 //   blocked   The Super User is in charge of your machine                                     Claim
-// No pill, no second banner, no status-line echo: the same bar, the same place, three wordings.
+// and the connection's two states join it, in the same bar (ST01, ST03) -- no red alarm for a blip:
+//   lost      Lost the connection to the Engine.  Retrying -- next try in 4 s.   Your session ... until 14:50   Retry now
+//   renamed   Connected -- but this machine's name has changed.  Registered as SU-PC; it now says ...     Understood
+// No pill, no second banner, no status-line echo: the same bar, the same place.
 Rectangle {
     id: root
 
@@ -24,18 +27,25 @@ Rectangle {
     property string hostname: ""
     property var session: ({})
     property double nowMs: Date.now()
-    property string mode: "inside"          // inside | holding | blocked
+    property string mode: "inside"          // inside | holding | blocked | lost | renamed
+    property int retryIn: 0
+    property string heldLine: ""            // lost: what happens to the session held when the link dropped
+    property var notice: null               // renamed: {expected, announced}
     property string blockedBy: ""
     signal extend()
     signal leave()
     signal stepOut()
     signal goIn()
     signal claim()
+    signal retry()
+    signal understood()
 
     implicitHeight: 38
     radius: Theme.radiusMd
     color: Qt.rgba(1, 1, 1, 0.03)
-    border.color: Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.45)
+    readonly property bool conn: mode === "lost" || mode === "renamed"
+    border.color: mode === "lost" ? Theme.line2 : mode === "renamed" ? Qt.rgba(Theme.warn.r, Theme.warn.g, Theme.warn.b, 0.5)
+                                   : Qt.rgba(Theme.danger.r, Theme.danger.g, Theme.danger.b, 0.45)
     border.width: 1
 
     Row {
@@ -43,8 +53,15 @@ Rectangle {
         anchors.leftMargin: 14
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
+        Icon {
+            visible: root.conn
+            name: root.mode === "lost" ? "globe" : "warn"
+            size: 15
+            color: root.mode === "lost" ? Theme.dim : Theme.warn
+            anchors.verticalCenter: parent.verticalCenter
+        }
         Ring {
-            visible: root.mode !== "blocked"
+            visible: !root.conn && root.mode !== "blocked"
             width: 16; height: 16
             color: Theme.danger
             fraction: Day.leftFraction(root.session.entered_at, root.session.deadline_at, root.nowMs)
@@ -53,7 +70,9 @@ Rectangle {
         Txt {
             objectName: "lidWho"
             // only a Super User can block an operator, so the sentence names them once
-            text: root.mode === "blocked" ? "The Super User is in charge of your machine"
+            text: root.mode === "lost" ? "Lost the connection to the Engine."
+                  : root.mode === "renamed" ? "Connected — but this machine's name has changed."
+                  : root.mode === "blocked" ? "The Super User is in charge of your machine"
                   : (root.mode === "holding" ? "You are holding " : "You are inside ") + root.name
             color: Theme.ink
             font.pixelSize: Theme.fBody
@@ -61,7 +80,16 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
         }
         Txt {
-            visible: root.mode !== "blocked"
+            visible: root.conn
+            text: root.mode === "lost" ? (root.retryIn > 0 ? "Retrying — next try in " + root.retryIn + " s." : "Trying now…")
+                  : root.notice ? "Registered as " + root.notice.expected + "; this machine now says " + root.notice.announced
+                                  + ". Noted for your administrator; you can carry on." : ""
+            color: Theme.dim
+            font.pixelSize: Theme.fMeta
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        Txt {
+            visible: !root.conn && root.mode !== "blocked"
             text: root.hostname
             color: Theme.faint
             monospace: true
@@ -69,7 +97,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
         }
         Txt {
-            visible: root.mode !== "blocked" && !!root.session && !!root.session.deadline_at
+            visible: !root.conn && root.mode !== "blocked" && !!root.session && !!root.session.deadline_at
             objectName: "lidLeft"
             text: Day.leftText(root.session.deadline_at, root.nowMs) + " left"
             color: Theme.danger
@@ -86,6 +114,30 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 16
 
+        Txt {
+            visible: root.mode === "lost" && root.heldLine !== ""
+            text: root.heldLine
+            color: Theme.warn
+            font.pixelSize: Theme.fMeta
+            font.weight: Font.DemiBold
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        GBtn {
+            objectName: "lidRetry"
+            visible: root.mode === "lost"
+            text: "Retry now"
+            small: true
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: root.retry()
+        }
+        GBtn {
+            objectName: "lidUnderstood"
+            visible: root.mode === "renamed"
+            text: "Understood"
+            small: true
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: root.understood()
+        }
         // stepping out is not leaving: it is said here because nothing invisible is load-bearing
         Txt {
             visible: root.mode === "inside"
@@ -109,7 +161,7 @@ Rectangle {
             onClicked: root.goIn()
         }
         Item {
-            visible: root.mode !== "blocked"
+            visible: !root.conn && root.mode !== "blocked"
             width: extendRow.implicitWidth
             height: 28
             anchors.verticalCenter: parent.verticalCenter
@@ -145,7 +197,7 @@ Rectangle {
             onClicked: root.claim()
         }
         TBtn {
-            visible: root.mode !== "blocked"
+            visible: !root.conn && root.mode !== "blocked"
             objectName: "lidLeave"
             text: "Leave"
             iconName: "back"

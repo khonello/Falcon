@@ -345,3 +345,23 @@ async def test_an_admin_cannot_use_the_flag_to_see_anything_new(engine, org, con
     tree = await a1.ok("hierarchy.tree", {"view": "session"})
     assert [d["name"] for d in tree["departments"]] == ["Finance"]
     assert tree["viewer"] == {"account_id": org["a1"], "role": "admin"}
+
+
+async def test_a_changed_machine_name_is_said_back_to_the_client(engine, org):
+    """ST01: a hostname mismatch is a deviation, logged AND told to the person connecting ("this machine's name
+    has changed"), never a refusal. A matching name says nothing."""
+    import asyncio
+
+    from tests.conftest import Client, answer
+
+    async def respond(hostname):
+        r, w = await asyncio.open_connection("127.0.0.1", engine.port)
+        c = Client(r, w)
+        ch = await c.recv()
+        res = await c.ok("auth.respond", {"client_id": "cid-w1", "hmac": answer("cid-w1", ch.payload["nonce"]),
+                                           "hostname": hostname})
+        await c.close()
+        return res
+
+    assert (await respond("FIN-01-NEW"))["hostname_mismatch"] == {"expected": "FIN-01", "announced": "FIN-01-NEW"}
+    assert "hostname_mismatch" not in await respond("FIN-01")

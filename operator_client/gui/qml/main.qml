@@ -26,6 +26,8 @@ ApplicationWindow {
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint | Qt.CustomizeWindowHint
 
     property int view: 0
+    // connected, or connected and briefly lost (the page stays): anything else is the connect screen
+    readonly property bool online: falcon.isConnected || falcon.connectState === "lost"
     // which surface is up is a name, not a number: the two roles have different rails, and the
     // rail owns the list. Views switch each other with shell.show("hierarchy").
     readonly property string viewKey: rail.currentKey
@@ -102,9 +104,11 @@ ApplicationWindow {
     // the lid's wording: inside (level 3 or 4), holding (a session held, stepped out of), blocked (someone above is on
     // your own machine), or "" for no lid. A Super User holding an ADMIN and stepped out is the one case left to the
     // department's container and Must see (DP09); every other held session is carried by the lid.
-    readonly property string lidMode: falcon.blocked ? "blocked"
+    readonly property string lidMode: falcon.connectState === "lost" ? "lost"
+                                      : falcon.blocked ? "blocked"
                                       : (insideNow || insidePcNow) ? "inside"
-                                      : falcon.traversing && (falcon.role !== "super_user" || heldPc !== null) ? "holding" : ""
+                                      : falcon.traversing && (falcon.role !== "super_user" || heldPc !== null) ? "holding"
+                                      : falcon.nameNotice ? "renamed" : ""
     onHeldPcChanged: if (heldPc === null && insidePc) insidePc = false
     function enterPc(pcId) {
         if (heldPc && heldPc.pc_id === pcId) { insidePc = true; return }
@@ -187,9 +191,7 @@ ApplicationWindow {
     Connections {
         target: falcon
         function onPushText(text, alert) { shell.notify(text, alert) }
-        function onConnectionFailed(message) { shell.notify("connection failed: " + message, true) }
         function onConnected() { shell.notify("connected as " + Theme.roleLabel(falcon.role), false); shell.loadTree() }
-        function onDisconnected() { shell.notify("disconnected", true) }
     }
     Component.onCompleted: {
         if (autoConnect && falcon.defaultClientId.length > 0)
@@ -222,7 +224,8 @@ ApplicationWindow {
 
         TopBar {
             Layout.fillWidth: true
-            indicators: falcon.indicators
+            // before there is a connection there is nothing to be told about
+            indicators: shell.online ? falcon.indicators : []
             onMinimizeClicked: shell.showMinimized()
             onCloseClicked: Qt.quit()
         }
@@ -235,6 +238,8 @@ ApplicationWindow {
             IconRail {
                 id: rail
                 objectName: "iconRail"
+                opacity: shell.online ? 1 : 0
+                enabled: shell.online
                 Layout.preferredWidth: Theme.railWidth
                 Layout.fillHeight: true
                 // inside an Admin the rail is theirs, entry for entry; the foot still says who you are
@@ -267,6 +272,21 @@ ApplicationWindow {
                               : shell.heldAdmin ? (shell.heldAdmin.hostname || "") : ""
                     onGoIn: shell.heldPc ? (shell.insidePc = true) : shell.goInside()
                     onClaim: falcon.call("hierarchy.claim_native", {}, function (ok, r) { shell.notify(ok ? "It is yours again" : r.message, !ok) })
+                    retryIn: falcon.retryIn
+                    notice: falcon.nameNotice
+                    heldLine: {
+                        var h = falcon.heldWhenLost
+                        if (!h || !h.deadline_at) return ""
+                        var host = ""
+                        for (var i = 0; i < shell.orgTree.length; i++) {
+                            var all = shell.orgTree[i].admins.concat(shell.orgTree[i].workers)
+                            for (var j = 0; j < all.length; j++) if (all[j].pc_id === h.pc_id) host = all[j].hostname
+                        }
+                        return "Your session" + (host ? " on " + host : "") + " keeps running until "
+                               + Qt.formatDateTime(new Date(h.deadline_at), "HH:mm") + " either way."
+                    }
+                    onRetry: falcon.retryNow()
+                    onUnderstood: falcon.dismissNameNotice()
                     session: falcon.session
                     nowMs: shell.nowMs
                     onExtend: shell.extendSession()
@@ -289,7 +309,11 @@ ApplicationWindow {
 
                     StackLayout {
                         anchors.fill: parent
-                        currentIndex: falcon.isConnected ? 1 : 0
+                        // a dropped link keeps the page (dated) under the lid's "lost" wording; only never having
+                        // connected, or disconnecting on purpose, shows the connect screen
+                        currentIndex: falcon.isConnected || falcon.connectState === "lost" ? 1 : 0
+                        // what is on screen while the link is down is still readable, but visibly as of then
+                        opacity: falcon.connectState === "lost" ? 0.55 : 1
                         // inside a client PC the machine's page is the whole sheet; nothing shows through
                         visible: !shell.insidePcNow
 
@@ -486,7 +510,8 @@ ApplicationWindow {
                     }
                 }
                 Txt {
-                    text: falcon.isConnected ? ("Connected to " + falcon.engineAddress) : "Not connected"
+                    text: falcon.isConnected ? ("Connected to " + falcon.engineAddress)
+                          : falcon.connectState === "lost" ? ("Reconnecting to " + falcon.engineAddress) : "Not connected"
                     color: Qt.rgba(1, 1, 1, 0.68)
                     font.pixelSize: Theme.fSmall
                     anchors.verticalCenter: parent.verticalCenter

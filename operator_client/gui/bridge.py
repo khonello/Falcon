@@ -15,6 +15,8 @@ import asyncio
 import json
 import logging
 import socket
+import ssl
+from datetime import datetime, timezone
 from typing import Any
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
@@ -50,8 +52,57 @@ class FalconBridge(QObject):
         self.js_engine: Any = None          # the QQmlEngine, set by app.create(); converts results for callbacks
         self.hostname = socket.gethostname()
         self._through_session = False
+        # the connection as a person reads it (ST01, ST03): idle | connecting | failed | lost | connected
+        self._conn_state = "idle"
+        self._fail_kind = ""                # key | unreachable | certificate | other
+        self._fail_message = ""
+        self._retry_in = 0
+        self._lost_at = ""
+        self._held: dict[str, Any] | None = None    # the session held when the link dropped: it runs on, on the Engine
+        self._name_notice: dict[str, str] | None = None
+        self._retry_task: asyncio.Task[None] | None = None
+        self._retry_now: asyncio.Event | None = None      # made on the running loop when a retry starts
+        self._deliberate = False
 
     # --- properties (read by QML bindings) -----------------------------------------------------
+
+    @Property(str, notify=stateChanged)
+    def connectState(self) -> str:
+        return self._conn_state
+
+    @Property(str, notify=stateChanged)
+    def failKind(self) -> str:
+        return self._fail_kind
+
+    @Property(str, notify=stateChanged)
+    def failMessage(self) -> str:
+        return self._fail_message
+
+    @Property(int, notify=stateChanged)
+    def retryIn(self) -> int:
+        return self._retry_in
+
+    @Property(str, notify=stateChanged)
+    def lostAt(self) -> str:
+        return self._lost_at
+
+    @Property("QVariant", notify=stateChanged)
+    def heldWhenLost(self) -> Any:
+        return self._held
+
+    @Property("QVariant", notify=stateChanged)
+    def nameNotice(self) -> Any:
+        return self._name_notice
+
+    @Slot()
+    def dismissNameNotice(self) -> None:
+        self._name_notice = None
+        self.stateChanged.emit()
+
+    @Slot()
+    def retryNow(self) -> None:
+        if self._retry_now is not None:
+            self._retry_now.set()
 
     @Property(bool, notify=stateChanged)
     def isConnected(self) -> bool:
@@ -165,6 +216,28 @@ class FalconBridge(QObject):
 
     async def _connect(self, host: str, port: int, client_id: str, client_key: str, plaintext: bool,
                        ca_cert: str = "") -> None:
+        self._deliberate = False
+        self._set_conn("connecting")
+        if not await self._open(host, port, client_id, client_key, plaintext, ca_cert):
+            return
+
+    def _set_conn(self, state: str, kind: str = "", message: str = "") -> None:
+        self._conn_state, self._fail_kind, self._fail_message = state, kind, message
+        self.stateChanged.emit()
+
+    @staticmethod
+    def _failure(exc: BaseException) -> str:
+        """What went wrong, as the person at the screen can act on it."""
+        if isinstance(exc, ssl.SSLError):
+            return "certificate"
+        if isinstance(exc, EngineError) and exc.code in ("unauthenticated", "forbidden"):
+            return "key"
+        if isinstance(exc, (OSError, asyncio.TimeoutError, ConnectionError_)):
+            return "unreachable"
+        return "other"
+
+    async def _open(self, host: str, port: int, client_id: str, client_key: str, plaintext: bool,
+                    ca_cert: str = "", *, retrying: bool = False) -> bool:
         cfg = self.config
         cfg.engine_host, cfg.engine_port, cfg.client_id, cfg.tls = host or cfg.engine_host, int(port), client_id, not plaintext
         cfg.client_key = client_key or ""
@@ -180,9 +253,15 @@ class FalconBridge(QObject):
             ident = await conn.connect()
         except (OSError, ConnectionError_, EngineError, asyncio.TimeoutError) as exc:
             await conn.close()
-            self.connectionFailed.emit(str(exc))
-            return
+            if not retrying:
+                self._set_conn("failed", self._failure(exc), str(exc))
+                self.connectionFailed.emit(str(exc))
+            return False
         self.conn = conn
+        mismatch = (getattr(conn, "auth_result", None) or {}).get("hostname_mismatch")
+        self._name_notice = dict(mismatch) if mismatch else None
+        self._held, self._lost_at, self._retry_in = None, "", 0
+        self._conn_state = "connected"
         self.state.set_identity(ident, cfg.engine_address)
         self.state.clear_indicator("conn")
         cfg.save()
@@ -197,18 +276,57 @@ class FalconBridge(QObject):
             log.warning("post-connect state failed: %s", exc)
         self.stateChanged.emit()
         self.connected.emit()
+        return True
 
     async def _on_disconnect(self) -> None:
+        """The link dropped. The page stays, dated; the Engine keeps any held session to its deadline; we retry on
+        our own, sooner when asked (ST03). Only a deliberate disconnect goes back to the connect screen."""
+        self._held = dict(self.state.session) if self.state.session else None
         self.state.connected = False
         self.state.session = None
         self.state.add_indicator("session", "connection to Engine lost", key="conn")
+        if self._deliberate:
+            self._set_conn("idle")
+        else:
+            self._lost_at = datetime.now(timezone.utc).astimezone().strftime("%H:%M")
+            self._set_conn("lost")
+            if self._retry_task is None or self._retry_task.done():
+                self._retry_task = asyncio.ensure_future(self._retry())
         self.disconnected.emit()
+
+    async def _retry(self) -> None:
+        cfg = self.config
+        self._retry_now = asyncio.Event()
+        attempt = 0
+        while self._conn_state == "lost":
+            wait = (2, 4, 8, 15, 30)[min(attempt, 4)]
+            for left in range(wait, 0, -1):
+                self._retry_in = left
+                self.stateChanged.emit()
+                try:
+                    await asyncio.wait_for(self._retry_now.wait(), 1)
+                    break
+                except asyncio.TimeoutError:
+                    continue
+            self._retry_now.clear()
+            self._retry_in = 0
+            self.stateChanged.emit()
+            held = self._held
+            if await self._open(cfg.engine_host, cfg.engine_port, cfg.client_id or "", cfg.client_key or "",
+                                not cfg.tls, cfg.ca_cert or "", retrying=True):
+                return
+            self._held = held
+            attempt += 1
 
     @Slot()
     def disconnect(self) -> None:
         asyncio.ensure_future(self._disconnect())
 
     async def _disconnect(self) -> None:
+        self._deliberate = True
+        if self._retry_task is not None:
+            self._retry_task.cancel()
+        self._conn_state = "idle"
         if self.conn is not None:
             await self.conn.close()
             self.conn = None

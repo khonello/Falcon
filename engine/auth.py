@@ -76,7 +76,7 @@ def _identity_of(account: dict[str, Any], client_id: str) -> Identity:
                     department_id=account["department_id"], client_id=client_id)
 
 
-async def _announce_hostname(ctx: Context, account: dict[str, Any], announced_hostname: str | None) -> None:
+async def _announce_hostname(ctx: Context, account: dict[str, Any], announced_hostname: str | None) -> dict[str, str] | None:
     """Hostname mismatch is a *deviation* (hierarchy-system-design → System Expectations): logged
     and surfaced, the connection proceeds as the provisioned identity. The key proves the install
     package; the hostname says where it is being used from."""
@@ -85,6 +85,9 @@ async def _announce_hostname(ctx: Context, account: dict[str, Any], announced_ho
             "account_bound_to_one_pc", surfaced_to_account_id=account["id"],
             observed_account_id=account["id"], observed_pc_id=account["bound_pc_id"],
             detail={"expected_hostname": account["hostname"], "announced_hostname": announced_hostname})
+        # said back to the client too, so the person at it is told -- surfaced, never silently tolerated
+        return {"expected": account["hostname"], "announced": announced_hostname}
+    return None
 
 
 async def _fail(ctx: Context, client_id: str, reason: str) -> None:
@@ -120,11 +123,14 @@ async def auth_respond(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             if not verify(engine.master_secret, client_id, nonce, str(payload.get("hmac", "")),
                           account.get("key_generation") or 1):
                 await _fail(ctx, client_id, "challenge failed")
-            await _announce_hostname(ctx, account, payload.get("hostname"))
+            mismatch = await _announce_hostname(ctx, account, payload.get("hostname"))
             ctx.identity = _identity_of(account, client_id)
     conn.authenticated = True
     await ctx.engine.audit.record(ctx, "auth.connected", target_type="client", target_id=client_id)
     await ctx.engine.on_connected(conn)
     ident = ctx.identity
-    return {"authenticated": True, "client_id": client_id, "account_id": ident.account_id,
-            "role": ident.role, "pc_id": ident.pc_id, "department_id": ident.department_id}
+    out = {"authenticated": True, "client_id": client_id, "account_id": ident.account_id,
+           "role": ident.role, "pc_id": ident.pc_id, "department_id": ident.department_id}
+    if not engine.settings.dev_bypass_auth and engine.db.connected and mismatch:
+        out["hostname_mismatch"] = mismatch
+    return out
