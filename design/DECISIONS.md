@@ -257,6 +257,10 @@ that sizing"*). The patterns behind them are measured in **`design/PATTERNS.md`*
 **Paging replaces shrinking for rows of machines** (supersedes `DP10`): the mark stays full size, and clicking the far
 right / left of the container slides the next 4 (or 2) into view. `PATTERNS.md` section 3.
 
+**Batch 2 picked, 27 Sep 2026** -- the user: batch 2's rethought boards "all work well", every facet open to use.
+Composed into `RC03` Record, `RO03` Rollout (the first drawing of edge paging), `WK03` Work, `RS03` Resources (reached
+from the Admin's home, no rail entry added), `CP03` a client PC at level 4 under level 3's lid.
+
 ## 4. Proposed, still open
 
 | | |

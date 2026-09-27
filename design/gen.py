@@ -1112,7 +1112,7 @@ def screen_tokens():
 
 # ------------------------------------------------------------------ the screens, by module
 # Each module is plain Python executed in this namespace: they share the tokens and helpers above.
-for _module in ("v2", "v3", "v4", "v5", "v6", "v7", "v8", "mood", "su_mood", "su_dash", "charts", "charts2", "layouts", "index_board", "interaction", "pages", "grid", "traverse", "dept_mood", "dept", "scale", "tasks_mood", "automation_mood", "work_pages", "actions_pages", "batch1_mood", "batch1_pages", "batch2_mood", "batch1b_pages", "batch2b_mood"):
+for _module in ("v2", "v3", "v4", "v5", "v6", "v7", "v8", "mood", "su_mood", "su_dash", "charts", "charts2", "layouts", "index_board", "interaction", "pages", "grid", "traverse", "dept_mood", "dept", "scale", "tasks_mood", "automation_mood", "work_pages", "actions_pages", "batch1_mood", "batch1_pages", "batch2_mood", "batch1b_pages", "batch2b_mood", "batch2_pages"):
     exec(compile((Path(__file__).parent / (_module + ".py")).read_text(encoding="utf-8"), _module + ".py", "exec"))
 
 
@@ -1147,7 +1147,7 @@ SCREENS = INDEX + [
     ("Worker.dc.html", "Worker: Overlay and Dialog", screen_worker),
     ("Tokens.dc.html", "The language", screen_tokens),
     ("Dialogs.dc.html", "Dialogs and the plus menu", screen_dialogs),
-] + MOOD + SU_MOOD + SU_DASH + CHART_MOOD + CHART_MOOD_2 + LAYOUTS + INTERACTION + PAGES_COMPOSED + GRID_TAKES + TRAVERSE + DEPT_MOOD + DEPT_PAGE + SCALE + TASKS_MOOD + AUTOMATION_MOOD + WORK_PAGES + ACTIONS_PAGES + BATCH1_MOOD + BATCH1_PAGES + BATCH2_MOOD + BATCH1B + BATCH2B
+] + MOOD + SU_MOOD + SU_DASH + CHART_MOOD + CHART_MOOD_2 + LAYOUTS + INTERACTION + PAGES_COMPOSED + GRID_TAKES + TRAVERSE + DEPT_MOOD + DEPT_PAGE + SCALE + TASKS_MOOD + AUTOMATION_MOOD + WORK_PAGES + ACTIONS_PAGES + BATCH1_MOOD + BATCH1_PAGES + BATCH2_MOOD + BATCH1B + BATCH2B + BATCH2_PAGES
 ROW_TITLES = ["The shell: one gradient frame, the state band says whose authority you are under", "Timed sessions, occupation, peer help", "Work: decide, wire, run", "Policy, reports, states", "Worker surfaces, the language, dialogs",
               "Mood board 1: cards, rows, status, decisions", "Mood board 2: sessions, titles, talk", "Mood board 3: the shell, bands, rails, sidebar, top bar, indicators, inspector", "Mood board 4: buttons, chips, inputs, avatars, feel", "Mood board 5: density, metrics, notices, logs, hierarchy shapes, creating"]
 
