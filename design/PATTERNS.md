@@ -88,6 +88,13 @@ in one container not really cutting it."* Plan every set for its worst case (thi
 - **Inside one department the size decides**: one row in a cell pages sideways (≤ ~8 visible); a maximised grid fills
   the area and **pages down by rows** (32 at a time — 200 machines is seven pages, not fifty), with plain-text filters
   ("All 48 · Behind 2 · Offline 0") and a "1–32 of 48" position. Stable order, always.
+- **One mark per department, never one per lagging machine** (*"what if multiple independent machines like 4 failed 10
+  times. How does it render. Maybe one pc icon there. With little text info."*). The department's line carries ONE 30 px
+  screen holding the count of machines behind, in the worst tone (offline outranks failing), and two short lines: "4 behind"
+  / "4 failing · worst 10×". Fixed width, so a line never grows whether 1 or 40 are behind. Machines are named only
+  when a department is maximised.
+- **"Holding it up" groups by department** too: one card per department, one act that covers all its machines ("Ask
+  M. Addo") — the same failure on several machines is usually one cause.
 - `RO05` (ten departments), `RO06` (one maximised) and `OV02` (the Overview at scale) are the reference.
 
 ## 4. Cards, not rows
