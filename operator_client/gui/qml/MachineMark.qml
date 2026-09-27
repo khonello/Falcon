@@ -13,17 +13,17 @@ Item {
     id: root
 
     property string label: ""               // the number inside ("07"), or a count ("12") for a department's mark
-    property string status: "ok"            // ok | free | warn | danger | entered
+    property string status: "ok"            // ok | free | warn | danger | entered | chosen (picked, in a picker)
     property int size: 58
     property string name: ""                // beneath: who, or the hostname
     property string line: ""                // beneath that: why, in words
     property string lineTone: ""            // tone name for the line; "" = faint
 
     readonly property color toneColor: status === "warn" || status === "entered" ? Theme.warn
-                                     : status === "danger" ? Theme.danger : "transparent"
+                                     : status === "danger" ? Theme.danger : status === "chosen" ? Theme.accent : "transparent"
     readonly property bool needsSomeone: status === "warn" || status === "entered" || status === "danger"
     readonly property int screenH: Math.round(size * 0.66)
-    readonly property color stroke: needsSomeone ? toneColor : Qt.rgba(1, 1, 1, 0.30)
+    readonly property color stroke: needsSomeone || status === "chosen" ? toneColor : Qt.rgba(1, 1, 1, 0.30)
 
     implicitWidth: (name !== "" || line !== "") ? Math.max(size, size + 34) : size
     implicitHeight: screenH + 9 + (name !== "" ? 18 : 0) + (line !== "" ? 15 : 0)
@@ -72,7 +72,7 @@ Item {
             monospace: true
             font.pixelSize: Math.max(9, Math.round(root.size * 0.24))
             font.weight: Font.DemiBold
-            color: root.needsSomeone ? root.toneColor : Theme.dim
+            color: root.needsSomeone || root.status === "chosen" ? root.toneColor : Theme.dim
         }
     }
 

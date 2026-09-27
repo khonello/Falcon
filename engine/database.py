@@ -1015,6 +1015,22 @@ class ControlRepo(_Repo):
             "SELECT e.*, a.action_kind, a.builtin_type FROM action_executions e JOIN actions a ON a.id = e.action_id "
             "WHERE e.status = 'pending' ORDER BY e.started_at DESC")
 
+    async def executions_for_event(self, event_id: int, limit: int = 120) -> list[dict[str, Any]]:
+        """What one automation's actions did, newest first, named for reading: the action's name and
+        type, the machine's hostname."""
+        return await self._fetch(
+            "SELECT e.*, a.name AS action_name, a.builtin_type, a.action_kind, p.hostname "
+            "FROM action_executions e JOIN actions a ON a.id = e.action_id LEFT JOIN pcs p ON p.id = e.target_pc_id "
+            "WHERE e.triggered_by_event_definition_id = $1 ORDER BY e.started_at DESC LIMIT $2", event_id, limit)
+
+    async def event_firings(self, event_id: int, limit: int = 30) -> list[dict[str, Any]]:
+        """Each time the automation fired, from the audit trail (the one place it is written)."""
+        return await self._fetch(
+            "SELECT l.occurred_at, l.detail, p.hostname FROM audit_log l "
+            "LEFT JOIN pcs p ON p.id = NULLIF(l.detail->>'pc_id', '')::int "
+            "WHERE l.action_type = 'event.fired' AND l.target_type = 'event' AND l.target_id = $1 "
+            "ORDER BY l.occurred_at DESC LIMIT $2", str(event_id), limit)
+
     async def recent_executions(self, limit: int = 100) -> list[dict[str, Any]]:
         return await self._fetch(
             "SELECT e.*, a.action_kind, a.builtin_type FROM action_executions e JOIN actions a ON a.id = e.action_id "

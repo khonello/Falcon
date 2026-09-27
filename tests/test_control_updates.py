@@ -194,3 +194,49 @@ async def test_update_gate_rollout_escalation_and_health(engine, org, connect):
     r = await w1.ok("updates.report_status", {"version": "1.1.0", "succeeded": True})
     assert r["failures"] == 0 and r["target_version_id"] is None
     await asyncio.sleep(0)
+
+
+async def test_a_tier_is_matched_and_what_an_automation_did_is_read_back(engine, org, connect):
+    """AU04 / AU09: "a Restricted file is changed" matches the file's tier, not a typed path; the
+    automation's history names the machine, the file, and each action's outcome under its firing."""
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1")
+    notify = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "notify", "timeout_s": 5,
+                                                    "params": {"message": "m"}, "name": "Notify me"}))["action"]
+    assert await a1.err("control.event_create", {"type": "file.modified", "match": {"tier": "secret"},
+                                                 "action_ids": []}) == "invalid"
+    ev = (await a1.ok("control.event_create", {"type": "file.modified", "match": {"tier": "restricted"},
+                                               "action_ids": [notify["id"]]}))["event"]
+    await a1.ok("index.event", {"event": {"op": "modify", "path": "C:/docs/plain.txt", "hash": "p"}})
+    assert [p for p in await a1.drain_pushes() if p.type == "action.execute"] == []
+    await a1.ok("index.event", {"event": {"op": "modify", "path": "C:/resources/restricted/budget.xlsx", "hash": "b"}})
+    run = next(p for p in await a1.drain_pushes() if p.type == "action.execute").payload
+    await a1.ok("control.execution_result", {"execution_id": run["execution_id"], "status": "success", "exit_code": 0})
+
+    hist = await a1.ok("control.event_history", {"event_id": ev["id"]})
+    assert hist["fired_today"] == 1 and hist["running"] == []
+    firing = hist["firings"][0]
+    assert firing["subject"] == "budget.xlsx" and firing["hostname"]
+    assert [(r["action_name"], r["status"]) for r in firing["runs"]] == [("Notify me", "success")]
+    assert await w1.err("control.event_history", {"event_id": ev["id"]}) == "forbidden"
+
+    # the level a threshold is drawn against: where this department's machines sit now
+    await w1.ok("control.metrics", {"cpu": 30, "memory": 50, "idle_s": 5})
+    lv = await a1.ok("control.levels")
+    assert lv["machines"] == 1 and lv["cpu"] == [30.0, 30.0]
+
+
+async def test_a_time_automation_runs_its_actions_on_its_machines(engine, org, connect):
+    """A time event belongs to no one machine: its actions run on each machine it covers (named
+    machines, or the creator's department), never on a machine id of 0."""
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1")
+    lock = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "lock_session", "timeout_s": 5,
+                                                  "params": {"duration_s": 60}}))["action"]
+    past = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    await a1.ok("control.event_create", {"type": "time.scheduled", "match": {"at": past}, "pc_ids": [org["w1_pc"]],
+                                         "action_ids": [lock["id"]]})
+    assert await events.evaluate_polled(engine) == 1
+    run = next(p for p in await w1.drain_pushes() if p.type == "action.execute").payload
+    assert run["action"]["builtin_type"] == "lock_session"
+    assert (await engine.db.control.execution(run["execution_id"]))["target_pc_id"] == org["w1_pc"]

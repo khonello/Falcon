@@ -38,7 +38,13 @@ online/offline state, so the rollout words say "retrying" / "past the limit", ne
 the Admin's home (`AdminHome`, HO03), Tasks (`TasksView` + `NewTask`, TK04-TK06) and Flows (`FlowsView` + `NewFlow`,
 FL06-FL08; `flow.list` now carries each flow's shape, `index.folders` offers folders to pick) are built and framed
 inside an Admin (`shell.framedAdminKeys`). Screenshot one flow with `FALCON_SHOT_FLOW=<id>`, a new one with
-`FALCON_SHOT_NEWFLOW=1`. **Next: Automation (AU04, AU08-AU10), then Actions, Assistance, Reports, Resources.**
+`FALCON_SHOT_NEWFLOW=1`. Automation (`AutomationView` + `NewAutomation`, AU04 and AU08-AU10) is built too: the
+words for triggers and actions live in the `Automate` singleton, shared with Actions; `control.event_history` gives
+"What it did", `control.levels` the band a threshold is drawn against, and `match.tier` matches a file's tier. A file
+being *opened* is not offered (the Engine cannot see reads). Screenshot the maker with `FALCON_SHOT_NEWAUTO=<step>`
+(and `FALCON_SHOT_AUTOEV=<index>` to start from another automation). **Next: Actions (AU05-AU07), then Assistance,
+Reports, Resources.** Found and not yet fixed: the Worker Client never relays `usb.*`, `user.*`, `program.*` or
+`network.*` signals, so automations on those are saved but cannot fire until it does.
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
 1. The kit the pages share, to `PATTERNS.md`: the screen mark (`calm_slot` → a QML `MachineMark`), the horizontal and
@@ -266,7 +272,7 @@ page is asking, so no view owns it.
 `audit.deviations`, `reports.routing_get`, `task.list`, `flow.list`, and `audit.recent` with prefix
 `update.attempt`.
 
-**Still pre-kit**, mounted hidden so their tests keep passing: `ControlView`,
+**Still pre-kit**, mounted hidden so their tests keep passing:
 `AssistanceView`, `ReportsView`, plus `ConnectView` and `Btn`, `Field`, `DataTable`, `Picker`,
 `SegmentedControl`, `Eyebrow`, `Section`. **Orphaned, and deletable only once their replacement lands**:
 `HierarchyView.qml`, `HierarchyRail.qml` — they are still the only way to reach a department's tree in

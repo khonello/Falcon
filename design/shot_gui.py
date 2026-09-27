@@ -108,6 +108,41 @@ def _dest(i, host, path, parent=None, paused=None, owner=None):
             "suggestion": "OPS-03 has not answered since 11:20 — check it is switched on, then resume." if paused else None}
 
 
+def _act(i, kind, builtin, name, timeout=60, **extra):
+    return {"id": i, "kind": kind, "action_kind": kind, "builtin_type": builtin, "name": name,
+            "timeout_seconds": timeout, "timing": {"mode": "immediate"}, **extra}
+
+
+ACTIONS = {
+    "control": [_act(1, "control", "notify", "Notify me", 30), _act(2, "control", "lock_session", "Lock the screen", 60),
+                _act(3, "control", "screenshot", "screenshot", 30), _act(4, "control", "kill_process", "Close Excel", 30),
+                _act(8, "control", "reboot", "reboot", 120), _act(9, "control", "start_process", "Open the backup tool", 60),
+                _act(10, "control", "shutdown", "shutdown", 120)],
+    "monitoring": [_act(5, "monitoring", "system_metrics", "system_metrics", 30), _act(6, "monitoring", "process_list", "process_list", 30),
+                   _act(11, "monitoring", "usb_contents", "usb_contents", 60), _act(12, "monitoring", "idle_time", "idle_time", 30),
+                   _act(13, "monitoring", "file_activity", "Watch Finance", 60)],
+    "custom": [_act(7, "custom", None, "Clear temp", 120, custom_script_language="powershell"),
+               _act(14, "custom", None, "Archive quarter", 600, custom_script_language="python")],
+}
+_A = {a["id"]: a for k in ACTIONS for a in ACTIONS[k]}
+
+
+def _ev(i, type_, match, actions, pcs=None, enabled=True):
+    return {"id": i, "enabled": enabled, "condition_type": "native_pushed", "last_fired_at": None,
+            "condition_spec": {"type": type_, "pc_ids": pcs, "match": match}, "actions": [_A[a] for a in actions]}
+
+
+EVENTS = [
+    _ev(1, "file.modified", {"tier": "restricted"}, [1, 2]),
+    _ev(2, "threshold.memory", {"percent": 92}, [7]),
+    _ev(3, "time.recurring", {"at": "18:00", "days": [0, 1, 2, 3, 4]}, [2]),
+    _ev(4, "usb.inserted", {}, [11, 3], pcs=[23, 27]),
+    _ev(5, "user.login", {}, [1]),
+    _ev(6, "threshold.cpu", {"percent": 85, "duration_s": 300}, [6]),
+    _ev(7, "task.deadline_final", {}, [1], enabled=False),
+]
+
+
 # Flows as flow.list sends them: the shape (stages, destinations) rides along so every flow can be drawn
 FLOWS = [
     {"id": 1, "created_by_account_id": 3012, "source_pc_id": 21, "source_hostname": "OPS-01", "status": "active",
@@ -152,18 +187,25 @@ STUB = {
         "routing": [{"category": "listener_report", "routed_department_id": 1, "department_name": "Operations"},
                     {"category": "resource_violation", "routed_department_id": 1, "department_name": "Operations"},
                     {"category": "resource_violation", "routed_department_id": 2, "department_name": "Finance"}]},
-    "control.action_list": {"builtin": {}, "actions": {
-        "control": [{"id": 4, "name": "Lock folder", "builtin_type": "lock_folder", "timeout_seconds": 60},
-                    {"id": 5, "name": "Clear temp", "builtin_type": "clear_temp", "timeout_seconds": 120}],
-        "monitoring": [{"id": 6, "name": "Screenshot", "builtin_type": "screenshot", "timeout_seconds": 30}],
-        "custom": [{"id": 7, "name": "Notify Admin", "custom_script_language": "python", "timeout_seconds": 30}]}},
-    "control.event_list": {"types": ["file_opened", "flow_failed", "disk_low", "schedule"], "events": [
-        {"id": 1, "condition_type": "native", "enabled": True, "last_fired_at": None,
-         "condition_spec": {"type": "file_opened", "match": {"path_prefix": "/restricted/"}},
-         "actions": [{"id": 7, "name": "Notify Admin"}, {"id": 4, "name": "Lock folder"}]},
-        {"id": 2, "condition_type": "polled", "enabled": True, "last_fired_at": None,
-         "condition_spec": {"type": "disk_low", "match": {"percent": 10}},
-         "actions": [{"id": 5, "name": "Clear temp"}]}]},
+    "control.action_list": {"builtin": {}, "actions": ACTIONS},
+    "control.event_list": {"types": {}, "events": EVENTS},
+    "control.event_history": {"event_id": 1, "fired_today": 3, "running": [
+        {"id": 91, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "pending", "hostname": "OPS-03"}],
+        "firings": [
+        {"at": _at(14.3), "hostname": "OPS-03", "subject": "payroll.xlsx", "runs": [
+            {"id": 91, "action_name": "Notify me", "builtin_type": "notify", "status": "success"},
+            {"id": 92, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "pending"}]},
+        {"at": _at(11.68), "hostname": "OPS-07", "subject": "budget-2026.xlsx", "runs": [
+            {"id": 81, "action_name": "Notify me", "builtin_type": "notify", "status": "success"},
+            {"id": 82, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "success"}]},
+        {"at": _at(10.03), "hostname": "OPS-03", "subject": "payroll.xlsx", "runs": [
+            {"id": 71, "action_name": "Notify me", "builtin_type": "notify", "status": "success"},
+            {"id": 72, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "terminated",
+             "terminated_reason": "timeout"}]},
+        {"at": _at(8.92), "hostname": "OPS-07", "subject": "budget-2026.xlsx", "runs": [
+            {"id": 61, "action_name": "Notify me", "builtin_type": "notify", "status": "success"},
+            {"id": 62, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "success"}]}]},
+    "control.levels": {"machines": 7, "cpu": [21, 42], "memory": [38, 61], "idle_s": [0, 900]},
     "task.list": {"tasks": [
         {"id": 1, "description_raw": "Update the fleet inventory in inventory-2026.xlsx", "status": "in_progress", "started_at": _at(9.2), "assigner_account_id": 3012, "assignee_account_id": 4001, "assignee_name": "Kojo", "soft_deadline_at": None, "final_deadline_at": None},
         {"id": 2, "description_raw": "Reconcile the Q3 supplier invoices and produce reconciliation-q3.docx", "status": "in_progress", "started_at": _at(9.25), "assigner_account_id": 3012, "assignee_account_id": 4003, "assignee_name": "Yaw", "soft_deadline_at": None, "final_deadline_at": None},
@@ -383,19 +425,23 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
                     obj.setProperty("problem", "D:/Shared/Invoices on OPS-05 already holds 12 files this flow did not write.")
                     obj.setProperty("askCollision", True)
                     break
+        # FALCON_SHOT_NEWAUTO=<1|2|3> opens the automation maker at that step, filled in from the first one
+        if os.environ.get("FALCON_SHOT_NEWAUTO"):
+            av = win.findChild(object, "automationView")
+            na = win.findChild(object, "newAutomation")
+            ev = STUB["control.event_list"]["events"][int(os.environ.get("FALCON_SHOT_AUTOEV", "0"))]
+            QMetaObject.invokeMethod(na, "start", Q_ARG("QVariant", ev))
+            na.setProperty("editing", None)
+            na.setProperty("pcIds", [23, 24, 26, 27])
+            na.setProperty("actionIds", [a["id"] for a in ev["actions"]])
+            na.setProperty("step", int(os.environ["FALCON_SHOT_NEWAUTO"]))
+            av.setProperty("mode", "new")
         if os.environ.get("FALCON_SHOT_INSIDE"):
             QMetaObject.invokeMethod(win, "goInside")
             # FALCON_SHOT_TAB=<key> opens that entry of the Admin's rail once inside
             if os.environ.get("FALCON_SHOT_TAB"):
                 win.setProperty("view", {"tasks": 1, "flows": 2, "automation": 3, "actions": 4,
                                          "assistance": 5, "reports": 6}[os.environ["FALCON_SHOT_TAB"]])
-            # FALCON_SHOT_SUBTAB=<n> picks a tab inside Automation; the events tab also selects row 1
-            if os.environ.get("FALCON_SHOT_SUBTAB"):
-                tabs = win.findChild(object, "automationTabs")
-                tabs.setProperty("currentIndex", int(os.environ["FALCON_SHOT_SUBTAB"]))
-                table = win.findChild(object, "eventTable")
-                if table is not None:
-                    table.setProperty("selectedIndex", 0)
     QTimer.singleShot(1600, later)
 
     def grab():
@@ -410,7 +456,7 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             name += tag if os.environ.get(flag) else ""
         name += "-" + os.environ["FALCON_SHOT_ANSWER"] if os.environ.get("FALCON_SHOT_ANSWER") else ""
         name += "-" + os.environ["FALCON_SHOT_TAB"] if os.environ.get("FALCON_SHOT_TAB") else ""
-        name += "-s" + os.environ["FALCON_SHOT_SUBTAB"] if os.environ.get("FALCON_SHOT_SUBTAB") else ""
+        name += "-auto" + os.environ["FALCON_SHOT_NEWAUTO"] if os.environ.get("FALCON_SHOT_NEWAUTO") else ""
         name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""

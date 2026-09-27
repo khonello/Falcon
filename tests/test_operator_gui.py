@@ -475,18 +475,32 @@ def test_the_admin_rail_opens_the_admins_own_screens(gui):
     QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "actions"))
     assert win.property("viewKey") == "actions"
     assert win.findChild(QObject, "actionsView") is not None
-    tabs = win.findChild(QObject, "automationTabs")
-    assert [t["text"] for t in val(tabs.property("segments"))] == ["Dashboard", "Events", "Executions"]
+    assert win.findChild(QObject, "automationView") is not None
+    assert win.findChild(QObject, "automationTabs") is None          # one page now, no tabs
 
 
-def test_an_event_ties_to_actions_by_name_not_by_typed_ids(gui):
+def test_an_automation_is_written_as_a_sentence_and_ticks_actions_by_name(gui):
+    """AU08-AU10: every blank is a pick; machines are marks; actions are ticked from the library and
+    keep their order; the whole automation reads back as one sentence."""
     win, _, _ = gui
-    picker = win.findChild(QObject, "newEventActions")
-    picker.setProperty("actions", [{"id": 4, "name": "Lock folder"}, {"id": 7, "name": "Notify Admin"}])
-    assert val(picker.property("selected")) == []
-    assert len(val(picker.property("remaining"))) == 2
-    picker.setProperty("selected", [7])
-    assert [a["name"] for a in val(picker.property("remaining"))] == ["Lock folder"]
+    na = win.findChild(QObject, "newAutomation")
+    na.setProperty("tree", [{"department_id": 1, "name": "Ops", "admins": [], "workers": [
+        {"account_id": 1, "name": "Kojo", "pc_id": 21, "hostname": "OPS-01"},
+        {"account_id": 2, "name": "Efua", "pc_id": 22, "hostname": "OPS-02"}]}])
+    na.setProperty("actions", [{"id": 4, "kind": "control", "builtin_type": "notify", "name": "Notify me"},
+                               {"id": 5, "kind": "control", "builtin_type": "lock_session", "name": "lock_session"}])
+    QMetaObject.invokeMethod(na, "start", Q_ARG("QVariant", None))
+    QMetaObject.invokeMethod(na, "setKind", Q_ARG("QVariant", "machine"))
+    assert na.property("type") == "threshold.cpu" and val(na.property("match"))["percent"] == 85
+    QMetaObject.invokeMethod(na, "toggle", Q_ARG("QVariant", 22))              # take one machine away
+    assert val(na.property("pcIds")) == [21]
+    QMetaObject.invokeMethod(na, "tick", Q_ARG("QVariant", 5))
+    QMetaObject.invokeMethod(na, "tick", Q_ARG("QVariant", 4))
+    QMetaObject.invokeMethod(na, "moveUp", Q_ARG("QVariant", 1))
+    assert val(na.property("actionIds")) == [4, 5]
+    words = [p.get("w") or p.get("slot") for p in val(na.property("parts")) + val(na.property("doParts"))]
+    assert words == ["When", "the machine", "stays busy", "above", "85 %", "on", "OPS-01",
+                     "do", "Notify me", "then", "Lock the screen"]
 
 
 async def test_the_bridge_asks_to_look_through_only_on_listed_reads(gui):

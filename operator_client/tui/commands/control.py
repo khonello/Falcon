@@ -125,6 +125,26 @@ async def event_actions(ctx: ShellContext, args: Args) -> str:
     return f"event {res['event']['id']} actions: " + ", ".join(str(a["id"]) for a in res["event"]["actions"])
 
 
+@command("event", "history", "<event_id>", "What an event did: each firing, the machine, and every action's outcome")
+async def event_history(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("control.event_history", {"event_id": args.get_int(0, "event_id")})
+    lines = [f"event {res['event_id']}: fired {res['fired_today']} time(s) today, {len(res['running'])} running"]
+    for f in res["firings"]:
+        lines.append(f"\n{f['at']}  {f['hostname'] or '-'}" + (f"  {f['subject']}" if f["subject"] else ""))
+        for r in f["runs"]:
+            reason = f" ({r['terminated_reason']})" if r.get("terminated_reason") else ""
+            lines.append(f"  ├─ {r['action_name'] or r['builtin_type']} -> {r['status']}{reason}  [exec {r['id']}]")
+    return "\n".join(lines)
+
+
+@command("levels", usage="[pcs=3,4]", help_="Where the machines' processor, memory and idle levels sit right now")
+async def levels(ctx: ShellContext, args: Args) -> str:
+    pcs = args.opt("pcs")
+    res = await ctx.call("control.levels", {"pc_ids": [int(x) for x in pcs.split(",") if x]} if pcs else {})
+    return kv({"machines reporting": res["machines"], "processor %": res["cpu"], "memory %": res["memory"],
+               "idle seconds": res["idle_s"]})
+
+
 @command("dashboard", help_="Operational view: enabled automations, last fired, recent executions, live runs")
 async def dashboard(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.dashboard")

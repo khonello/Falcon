@@ -2,3 +2,4 @@ singleton Theme 1.0 Theme.qml
 singleton Icons 1.0 Icons.qml
 singleton Day 1.0 Day.qml
 singleton Fleet 1.0 Fleet.qml
+singleton Automate 1.0 Automate.qml

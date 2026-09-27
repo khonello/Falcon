@@ -133,6 +133,8 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
         "updates",
         "violations",
         "reports",
+        "event history 1",
+        "levels",
     ])
     assert out[1].startswith("flow 1 active") and "transformation" in out[1] and "categorization" in out[1]
     assert "1" in out[2]
@@ -145,6 +147,7 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
     assert out[9] == "forbidden: pings go between a subordinate and their direct superior" or out[9].startswith("ping ")
     assert "current version: (none approved)" in out[10]
     assert out[11] == "(none)" and out[12] == "(none)"
+    assert out[13].startswith("event 1: fired 0 time(s) today") and "machines reporting" in out[14]
 
     # HR admin answers the consent request; Super User approves a version and sees reports.
     a2 = await run_script(_cfg(engine, tmp_path, "cid-a2"), ["connect", "flow consent 2 yes", "assist available on"])

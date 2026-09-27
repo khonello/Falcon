@@ -13,7 +13,8 @@ Two evaluation mechanisms, chosen per event type by how it is actually detected:
     {"type": "<event type>",
      "pc_ids": [..] | null,            # null = every PC in the creator's department
      "match": {...}}                   # per type, all optional:
-        file.*            path_prefix, name_suffix
+        file.*            path_prefix, name_suffix, tier (admin|restricted|workers|common -- the file's
+                          resource tier, wherever the copy sits)
         program.launched  process
         usb.*             -
         threshold.cpu     percent (>=), duration_s
@@ -65,6 +66,8 @@ EVENT_TYPES: dict[str, str] = {
     "time.scheduled": "polled", "time.recurring": "polled",
 }
 
+TIER_TAGS = {"admin": "admin", "restricted": "restricted", "workers": "worker_dept", "common": "common"}
+
 FILE_OP_TO_EVENT = {"create": "file.created", "modify": "file.modified", "move": "file.moved",
                     "copy": "file.copied", "delete": "file.deleted"}
 
@@ -95,8 +98,27 @@ def install(engine: Engine) -> None:
         etype = FILE_OP_TO_EVENT.get(event["op"])
         if etype:
             await on_signal(engine, event["pc_id"], etype, {"path": event["path"], "name": event.get("name"),
-                                                            "hash": event.get("hash")})
+                                                            "hash": event.get("hash"),
+                                                            "tag": await _file_tag(engine, event)})
     engine.file_index.subscribe(on_file)
+
+
+async def _file_tag(engine: Engine, event: dict[str, Any]) -> str | None:
+    """The file's resource tier: carried on the event, already on its index row (a tracked copy), or
+    derived from the tier folder it sits in."""
+    if event.get("resource_tag"):
+        return str(event["resource_tag"])
+    if not engine.db.connected:
+        return None
+    if event.get("file_index_id") is not None:
+        entry = await engine.db.file_index.get(event["file_index_id"])
+        if entry and entry.get("resource_tag"):
+            return str(entry["resource_tag"])
+    from engine.resource.resource import derive_tag
+
+    pc = await engine.db.accounts.pc(event["pc_id"])
+    derived = derive_tag(event["path"], pc["pc_type"], pc["department_id"]) if pc else None
+    return derived[0] if derived else None
 
 
 # --- matching -----------------------------------------------------------------------------------
@@ -115,6 +137,8 @@ def matches(spec: dict[str, Any], data: dict[str, Any]) -> bool:
     if "path_prefix" in m and not path.startswith(str(m["path_prefix"]).replace("\\", "/").lower().rstrip("/") + "/"):
         return False
     if "name_suffix" in m and not str(data.get("name", "")).lower().endswith(str(m["name_suffix"]).lower()):
+        return False
+    if "tier" in m and data.get("tag") != TIER_TAGS.get(str(m["tier"]), m["tier"]):
         return False
     if "process" in m and str(data.get("process", "")).lower() != str(m["process"]).lower():
         return False
@@ -154,12 +178,18 @@ async def fire(engine: Engine, definition: dict[str, Any], pc_id: int, data: dic
                "at": _last_fired[definition["id"]].isoformat()}
     await engine.push_to_role("admin", "event.fired", payload, department_id=creator["department_id"] if creator else None)
     await engine.push_to_role("super_user", "event.fired", payload)
+    # A time event belongs to no one machine (pc_id 0): its actions run on each machine the event covers.
+    if pc_id:
+        targets = [pc_id]
+    else:
+        targets = list(definition["condition_spec"].get("pc_ids") or sorted(await _dept_pcs(engine, definition) or ()))
     for action in await engine.db.control.actions_for_event(definition["id"]):
-        # Each Action independently: a failure to dispatch one never blocks the next.
-        try:
-            await executions.start(engine, action, definition["id"], pc_id)
-        except Exception:
-            log.exception("dispatching action %s for event %s failed", action["id"], definition["id"])
+        for target in targets:
+            # Each Action independently: a failure to dispatch one never blocks the next.
+            try:
+                await executions.start(engine, action, definition["id"], target)
+            except Exception:
+                log.exception("dispatching action %s for event %s failed", action["id"], definition["id"])
 
 
 # --- polled evaluation --------------------------------------------------------------------------
@@ -242,6 +272,8 @@ def _parse_spec(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
             datetime.fromisoformat(str(match.get("at")))
         except (TypeError, ValueError) as exc:
             raise ProtocolError(ErrorCode.INVALID, "time.scheduled needs match.at (ISO 8601)") from exc
+    if "tier" in match and match["tier"] not in TIER_TAGS:
+        raise ProtocolError(ErrorCode.INVALID, f"unknown tier {match['tier']!r}")
     if etype == "time.recurring" and "interval_s" not in match and ":" not in str(match.get("at", "")):
         raise ProtocolError(ErrorCode.INVALID, "time.recurring needs match.at ('HH:MM') or match.interval_s")
     return EVENT_TYPES[etype], {"type": etype, "pc_ids": [int(p) for p in pc_ids] if pc_ids else None, "match": match}
@@ -363,3 +395,51 @@ async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     _metrics[ident.pc_id] = {"cpu": float(payload.get("cpu", 0)), "memory": float(payload.get("memory", 0)),
                              "idle_s": float(payload.get("idle_s", 0)), "at": datetime.now(timezone.utc).isoformat()}
     return {"accepted": True}
+
+
+@handler("control.event_history")
+async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """What one automation did: each firing (when, which machine, what set it off) with the runs of its
+    actions on that machine beneath it -- the AU04 "What it did" card. A run belongs to the latest
+    firing on the same machine that precedes it."""
+    require_role(ctx, "super_user", "admin")
+    event_id = int_field(payload, "event_id")
+    await _load_event_in_scope(ctx, event_id)
+    db = ctx.engine.db
+    firings = []
+    for f in await db.control.event_firings(event_id):
+        detail = f["detail"] or {}
+        data = detail.get("data") or {}
+        firings.append({"at": f["occurred_at"].isoformat(), "pc_id": detail.get("pc_id"), "hostname": f["hostname"],
+                        "subject": data.get("name") or data.get("process") or None, "runs": []})
+    for ex in rows(await db.control.executions_for_event(event_id)):
+        started = datetime.fromisoformat(ex["started_at"])
+        for firing in firings:                                  # newest first: the first earlier one wins
+            if firing["pc_id"] in (ex["target_pc_id"], 0) and datetime.fromisoformat(firing["at"]) <= started:
+                firing["runs"].append(ex)
+                break
+    today = datetime.now(timezone.utc).date()
+    fired_today = sum(1 for f in firings if datetime.fromisoformat(f["at"]).date() == today)
+    running = [ex for f in firings for ex in f["runs"] if ex["status"] == "pending"]
+    return {"event_id": event_id, "firings": firings, "fired_today": fired_today, "running": running}
+
+
+@handler("control.levels")
+async def levels(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Where the machines' own levels sit right now -- the range a threshold is drawn against, so a
+    line is set clear of a normal day. {"pc_ids"?} (default: the caller's department)."""
+    ident = require_role(ctx, "super_user", "admin")
+    wanted = payload.get("pc_ids")
+    if wanted:
+        scope = {int(p) for p in wanted}
+    elif ident.role == "admin" and ident.department_id is not None:
+        scope = {p["id"] for p in await ctx.engine.db.accounts.pcs_in_department(ident.department_id)}
+    else:
+        scope = set(_metrics)
+    seen = [m for pc_id, m in _metrics.items() if pc_id in scope]
+
+    def span(key: str) -> list[float] | None:
+        vals = [float(m.get(key, 0)) for m in seen]
+        return [min(vals), max(vals)] if vals else None
+
+    return {"machines": len(seen), "cpu": span("cpu"), "memory": span("memory"), "idle_s": span("idle_s")}

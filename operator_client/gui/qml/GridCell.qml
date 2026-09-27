@@ -21,6 +21,8 @@ Item {
     property bool openOnDoubleClick: false
     signal opened()
     default property alias content: body.data
+    // the height the body has to fill: for content that pins something to the bottom (a cell's buttons)
+    readonly property real room: bodyWrap.height
     readonly property string brief: narration.brief || ""
     readonly property string tone: narration.tone || ""
     readonly property string notice: narration.state === "empty" ? (narration.note || "Nothing recorded yet")
