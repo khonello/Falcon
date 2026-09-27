@@ -519,3 +519,65 @@ async def test_the_bridge_asks_to_look_through_only_on_listed_reads(gui):
     assert sent[0] == ("hierarchy.tree", {"view": "session"})
     assert sent[1] == ("task.verify", {"task_id": 1})
     bridge.conn = None
+
+
+# --- the kit, to design/PATTERNS.md ----------------------------------------------------------------
+
+def _make(qml, source):
+    """Instantiate a snippet that imports the GUI's own QML directory, on the fixture's engine."""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtQml import QQmlComponent
+    qml_dir = Path(__file__).resolve().parents[1] / "operator_client" / "gui" / "qml"
+    comp = QQmlComponent(qml)
+    comp.setData(f'import QtQuick\nimport "{qml_dir.as_uri()}"\n{source}'.encode(), QUrl.fromLocalFile(str(qml_dir / "_kit_test.qml")))
+    obj = comp.create()
+    assert obj is not None, comp.errorString()
+    from PySide6.QtQml import QQmlEngine
+    QQmlEngine.setObjectOwnership(obj, QQmlEngine.ObjectOwnership.CppOwnership)   # keep JS from collecting it
+    _KEEP.extend([comp, obj])
+    return obj
+
+
+_KEEP: list = []
+
+
+def test_the_machine_mark_is_quiet_unless_someone_is_needed(gui):
+    """PATTERNS 2: a small screen with its number; the tone lands only on a machine that needs someone."""
+    _, qml, _ = gui
+    fine = _make(qml, 'MachineMark { label: "03"; status: "ok"; size: 84; name: "Yaw"; line: "at the PC" }')
+    bad = _make(qml, 'MachineMark { label: "07"; status: "danger"; size: 84; name: "Ama"; line: "a file out of place"; lineTone: "danger" }')
+    assert fine.property("needsSomeone") is False and bad.property("needsSomeone") is True
+    assert fine.property("screenH") == round(84 * 0.66)
+
+
+def test_a_row_pages_rather_than_shrinking_and_names_what_it_hides(gui):
+    """PATTERNS 3 (supersedes DP10): items keep their size; the edge pages and names a hidden exception."""
+    _, qml, _ = gui
+    row = _make(qml, '''PagedRow {
+        width: 700; height: 120; itemWidth: 92; spacing: 14
+        model: [{n:"01"},{n:"02"},{n:"03"},{n:"04"},{n:"05"},{n:"06"},{n:"07"},{n:"08"},{n:"09"},{n:"10",bad:true}]
+        attention: function (m) { return m.bad ? "OPS-" + m.n : "" }
+        delegate: Item { property var modelData; width: 92; height: 100 }
+    }''')
+    assert row.property("itemWidth") == 92                    # never shrunk
+    shown = row.property("shown")
+    assert 0 < shown < 10 and row.property("canBack") is False
+    assert row.property("needsAfter") == "OPS-10 needs you"
+    QMetaObject.invokeMethod(row, "forward")
+    assert row.property("first") > 0 and row.property("canBack") is True
+    # everything fits -> no edges, centred
+    few = _make(qml, 'PagedRow { width: 700; height: 120; itemWidth: 92; model: [{},{},{}]; delegate: Item { property var modelData } }')
+    assert few.property("fitsAll") is True and few.property("canForward") is False
+
+
+def test_a_stack_of_cards_pages_down(gui):
+    _, qml, _ = gui
+    col = _make(qml, '''PagedColumn {
+        width: 400; height: 250; itemHeight: 58
+        model: [{t:"a"},{t:"b"},{t:"c"},{t:"d",bad:true},{t:"e"}]
+        attention: function (m) { return m.bad ? m.t : "" }
+        delegate: InfoCard { }
+    }''')
+    assert col.property("hiddenAfter") > 0 and col.property("needsAfter") == "d"
+    QMetaObject.invokeMethod(col, "forward")
+    assert col.property("hiddenBefore") > 0
