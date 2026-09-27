@@ -1,4 +1,4 @@
-# Where the Operator Client UI stands — 25 Sep 2026
+# Where the Operator Client UI stands — 27 Sep 2026
 
 The snapshot to resume from. **Read `design/LEVELS.md` first** (the levels, and the rule that only one
 is worked at a time), then `design/DECISIONS.md` (what was approved and rejected, and why — it is what
@@ -10,13 +10,43 @@ sentences, ticks) -- fix any page against it.
 **Branch** `phase7/design-and-gui-rebuild` · **150 tests pass, `ruff check .` clean.**
 The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it 79 skip and pytest
 still says "passed"; `conftest.py` prints which run you are in.
-**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — **version 51, 132 boards**, and
+**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — **version 58, 162 boards**, and
 **arranged by hand**: its index is *merged, never replaced* (`design/README.md` has the four steps;
 `gen.py`'s `canvas.json` is a fallback for a canvas that does not exist yet).
 
 ---
 
-## CONTINUE FROM HERE
+## CONTINUE FROM HERE — the design is complete; the build is next
+
+**Every surface is designed and approved** (27 Sep 2026, the user: *"Perfecto."*). The QML still shows the older
+screens everywhere except levels 1-3's shells. The approved boards, one per page, are the target:
+
+| Area | Approved boards |
+|---|---|
+| Super User: Must see, Rollout, Record, Work | `OV02` (at scale), `RO05` + `RO06` (maximised), `RC05`, `WK03` |
+| Department (level 2) | `DP18` |
+| Inside an Admin / an Admin at home | `HO03`, `TK04`-`TK07`, `FL06`-`FL08`, `AU04`, `AU05`-`AU10`, `AS03`, `RP03`, `RS03` |
+| A client PC (level 4) | `CP03` |
+| States, dialogs, the Worker | `ST01`-`ST03`, `DG01`, `WR01` |
+| The machine mark and its alternatives | `MK01` |
+
+**Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
+1. The kit the pages share, to `PATTERNS.md`: the screen mark (`calm_slot` → a QML `MachineMark`), the horizontal and
+   vertical **edge pagers**, person/thing cards, bare icons, plain-text tabs, the fill-in sentence slot, the tree
+   (curves, dashed broken branch). Retire `FleetGrid`'s shrink ladder and every coloured-square mark.
+2. Level 1 and 2 to `OV02` / `RO05` / `RO06` / `DP18` (they are built but on the old marks).
+3. The Admin's pages (Tasks, Flows, Automation, Actions, Assistance, Reports, Resources, home) — each needs Engine
+   checks: e.g. Tasks' one-question-at-a-time flow and per-check file details, "holding it up" grouped by department.
+4. Record, Work, level 4, the states, dialogs, and the Worker's windows (the last live in `worker_client`).
+
+**Rules that must survive the build** (all in `PATTERNS.md`, the rejections in `DECISIONS.md` 3c): no squares with dots,
+no icon tiles, no pill lineups; legible before beautiful (anything read to act on is written, act on the card);
+never one container for many departments' machines; page, never shrink; test every set at ~12 departments × 60
+machines before calling it done.
+
+---
+
+## Earlier: level 3 (25 Sep 2026)
 
 Levels 1, 2 and 3 are built. **Level 3 (entering an Admin) went in on 25 Sep 2026** and is waiting
 for the user to look at it in the running app (`design/run_gui.py super_user`: Authority → double-click

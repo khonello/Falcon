@@ -271,6 +271,9 @@ the written entries. Supersedes `RC04`'s cards-only Record.
 **A fleet that scales** (27 Sep 2026): no container holds more than one department's machines. `RO05` / `RO06` / `OV02`
 supersede `RO04` and `OV01`'s fleet cells. `PATTERNS.md` 3a.
 
+**THE DESIGN IS COMPLETE — approved 27 Sep 2026** (*"Perfecto."*): the rollout card's tightened mark, and `ST01`-`ST03`,
+`DG01`, `WR01`, the last surfaces. The build follows `HANDOFF.md`'s order.
+
 ## 4. Proposed, still open
 
 | | |
