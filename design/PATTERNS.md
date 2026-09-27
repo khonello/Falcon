@@ -94,9 +94,21 @@ words. A tile is only allowed where the icon *is* the whole target (none current
 - Optional additions chain after it as **"then …"** words and slots, ending in a dashed "+ then…" slot.
 - The whole thing reads back as one sentence before anything is saved.
 
-## 8. Counts of events are ticks
+## 0. Legible before beautiful — the rule over all the others
 
-Ticks on a line: 3 px wide, radius 2; quiet ones 55 % height in rgba white 0.35; the ones needing someone full height
+*The user, 27 Sep 2026, on RC03 / RO03: "this is not easy to parse, don't get too hung up on it [being] nice ... it's
+actually going to be used and must be easily parsed."* Rejected there: **the lanes of who-was-where, the tick runs of
+update attempts, and the lever as a person card over a message box.**
+
+**When a thing will be read in order to act on it, write it.** One card per fact, one sentence per card
+("R. Mensah entered OPS-04 · 10:02 – 10:22 · 20 minutes · Adjoa was blocked"), and the one act on the same card
+("Ask R. Mensah to look"). What is fine folds into a single line ("Everyone else stayed at their own machine").
+No geometry to decode, nothing to count, no form to fill before acting. Drawings are for shape at a glance;
+anything a person must read closely is words. `RC04` and `RO04` are the reference.
+
+## 8. Counts of events are ticks — only where nobody reads them one by one
+
+Use sparingly (see section 0): a tick run is a texture, not a record. Ticks on a line: 3 px wide, radius 2; quiet ones 55 % height in rgba white 0.35; the ones needing someone full height
 (14–18 px, 40 on a timeline) in their tone. Never squares, never a rainbow.
 
 ## 9. Colour

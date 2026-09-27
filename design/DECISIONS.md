@@ -261,6 +261,10 @@ right / left of the container slides the next 4 (or 2) into view. `PATTERNS.md` 
 Composed into `RC03` Record, `RO03` Rollout (the first drawing of edge paging), `WK03` Work, `RS03` Resources (reached
 from the Admin's home, no rail entry added), `CP03` a client PC at level 4 under level 3's lid.
 
+**Rejected, 27 Sep 2026, on `RC03` / `RO03`:** the who-was-where lanes, the update-attempt ticks, and the lever as a
+person card over a message box -- *"not easy to parse ... must be easily parsed."* Redone as `RC04` / `RO04`: a card and a
+sentence per fact, the act on the same card. The rule is `PATTERNS.md` section 0.
+
 ## 4. Proposed, still open
 
 | | |
