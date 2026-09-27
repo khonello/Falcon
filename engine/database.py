@@ -421,6 +421,13 @@ class FileIndexRepo(_Repo):
             "SELECT regexp_replace(replace(path, chr(92), '/'), '/[^/]*$', '') AS folder, count(*) AS files "
             "FROM file_index WHERE pc_id = $1 GROUP BY 1 ORDER BY 1 LIMIT $2", pc_id, limit)
 
+    async def tier_counts(self, department_id: int | None) -> list[dict[str, Any]]:
+        """How many indexed files sit on each tier: across a department's machines, or everywhere (None)."""
+        return await self._fetch(
+            "SELECT f.resource_tag AS tag, count(*) AS files FROM file_index f JOIN pcs p ON p.id = f.pc_id "
+            "WHERE f.resource_tag IS NOT NULL AND ($1::int IS NULL OR p.department_id = $1) GROUP BY 1",
+            department_id)
+
     async def by_hash(self, content_hash: str) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._COLS} FROM file_index WHERE content_hash = $1", content_hash)
 

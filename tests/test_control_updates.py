@@ -240,3 +240,16 @@ async def test_a_time_automation_runs_its_actions_on_its_machines(engine, org, c
     run = next(p for p in await w1.drain_pushes() if p.type == "action.execute").payload
     assert run["action"]["builtin_type"] == "lock_session"
     assert (await engine.db.control.execution(run["execution_id"]))["target_pc_id"] == org["w1_pc"]
+
+
+
+async def test_the_shelves_count_files_per_tier_in_the_department(engine, org, connect):
+    """RS03: an Admin's shelves are their workstation's tiers, each with how many files sit on it."""
+    a1 = await connect("cid-a1")
+    await a1.ok("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/pay.xlsx", "hash": "r1"}})
+    await a1.ok("index.event", {"event": {"op": "create", "path": "C:/resources/common/menu.pdf", "hash": "c1"}})
+    await a1.ok("index.event", {"event": {"op": "create", "path": "C:/resources/common/map.pdf", "hash": "c2"}})
+    shelves = {s["folder"]: s["files"] for s in (await a1.ok("resource.shelves"))["shelves"]}
+    assert shelves == {"restricted": 1, "workers": 0, "common": 2}
+    w1 = await connect("cid-w1")
+    assert await w1.err("resource.shelves") == "forbidden"

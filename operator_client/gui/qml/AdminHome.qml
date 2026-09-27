@@ -47,8 +47,9 @@ Item {
         for (var v = 0; v < violations.length; v++) {
             var vi = violations[v]
             var ours = workers.some(function (w) { return w.pc_id === vi.found_on_pc_id || w.hostname === vi.hostname })
-            if (ours) out.push({ icon: "shield", tone: "danger", title: "A restricted file on " + vi.hostname,
-                                 line: (vi.filename || "a file"), word: "new", key: "reports" })
+            if (ours) out.push({ icon: "shield", tone: "danger", title: "A " + String(vi.expected_tag || "restricted").replace("worker_dept", "workers")
+                                                                        + " file on " + vi.hostname,
+                                 line: (vi.filename || "a file"), word: "new", key: "resources" })
         }
         var now = Date.now()
         for (var t = 0; t < tasks.length; t++) {

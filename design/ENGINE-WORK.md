@@ -28,8 +28,21 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
    machine).
 6. **Rename a file's new name is free text** and `rename_file` runs on every machine the action targets with one
    path; a per-machine path (from `file_index`, by hash or name) would be truer. *Found:* AU06.
+7. **A report keeps no words and no "seen".** `reports` stores category + source pointer + time; the summary
+   passed to `emit()` is only logged and pushed. The Reports page rebuilds the sentence by reading the source
+   (violations, flows) and falls back to a generic line for the rest (listener, cross-department, update,
+   deviation). Store the summary (or resolve every source in `reports.list`), and add a per-reader "seen" so the
+   board's new / seen / addressed can be told apart. *Found:* Reports (RP03).
+8. **A Listener can only be chosen from the Admin's own department.** `hierarchy.tree` for an Admin holds their
+   department, so "Add a listener" offers only their fellow Admins; the design's "HR is listening" needs a list
+   of active Admins across departments (names by the requester's grants). *Found:* Assistance (AS03).
+9. **Resources: "where it should be" and "a file's journey"** (RS03) have no data. The first needs files marked
+   as required on every worker machine and presence per machine (by content hash); the second a per-file history
+   (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
+   out of the page until then.
 
 ## Done inline (for the record)
 
 - `control.event_history`, `control.levels`, `match.tier`, and time events firing on machine 0 (Automation).
 - `flow.list` shapes and hostnames, `index.folders` (Flows).
+- `resource.shelves`: files per tier across the department (Resources).

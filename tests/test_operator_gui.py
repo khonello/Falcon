@@ -691,3 +691,32 @@ def test_an_action_asks_only_for_what_it_needs_and_a_script_is_checked_on_arriva
     QMetaObject.invokeMethod(av, "takeScript", Q_ARG("QVariant", bad.as_uri()))
     assert val(av.property("check"))["ok"] is False
     assert win.findChild(QObject, "saveCustom").property("enabled") is False
+
+
+def test_assistance_knows_whose_turn_it_is_and_names_the_super_user(gui):
+    """AS03: the turn is read from the channel (one reply each); for an Admin the Super User above them is
+    named by role, since their tree holds only their department."""
+    win, _, bridge = gui
+    asv = win.findChild(QObject, "assistanceView")
+    me = bridge.state.account_id
+    asv.setProperty("tree", [{"department_id": 1, "name": "Ops", "admins": [], "workers": [
+        {"account_id": 4007, "name": "Ama", "pc_id": 27, "hostname": "OPS-07"}]}])
+    asv.setProperty("channels", [{"id": 14, "initiator_account_id": 4007, "superior_account_id": me, "turn": "superior", "closed_at": None},
+                                 {"id": 12, "initiator_account_id": me, "superior_account_id": 99, "turn": "superior", "closed_at": None}])
+    order = [c["id"] for c in val(asv.property("sorted"))]
+    assert order == [14, 12]                                   # yours to answer first
+
+
+def test_reports_are_said_from_their_source_and_resources_opens_from_home(gui):
+    """RP03: a violation report reads as a sentence about the file; RS03 opens over the Admin's home."""
+    win, _, _ = gui
+    rv = win.findChild(QObject, "reportsView")
+    rv.setProperty("violations", [{"id": 7, "expected_tag": "restricted", "filename": "budget.xlsx", "hostname": "OPS-07",
+                                   "path": "C:/Shared/budget.xlsx", "detected_at": None, "resolved_at": None}])
+    rv.setProperty("reports", [{"id": 41, "category": "resource_violation", "source_table": "resource_violations",
+                                "source_id": 7, "generated_at": None, "addressed_at": None}])
+    rv.setProperty("chosenId", 41)
+    chosen = win.findChild(QObject, "reportChosen")
+    assert chosen.property("title") == "A restricted file on OPS-07"
+    QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "resources"))
+    assert win.property("subPage") == "resources"          # shown over the Admin's home (a Super User has none)

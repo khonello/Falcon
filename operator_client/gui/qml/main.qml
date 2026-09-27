@@ -29,6 +29,9 @@ ApplicationWindow {
     // which surface is up is a name, not a number: the two roles have different rails, and the
     // rail owns the list. Views switch each other with shell.show("hierarchy").
     readonly property string viewKey: rail.currentKey
+    // a page opened from another without a rail entry of its own (Resources, from the Admin's home)
+    property string subPage: ""
+    onViewKeyChanged: subPage = ""
     // The Super User rail is the five areas; the Admin rail is still the old list until level 3 is
     // opened, so the two spell the same place differently. These two names are what the views test,
     // rather than a literal key, so neither rail has to know about the other.
@@ -42,7 +45,7 @@ ApplicationWindow {
     // shown exactly as they see it, grey sheet and all.
     // The pages rebuilt in the Overview's language sit on the gradient. The Admin's pages join as they are rebuilt; a
     // Super User inside an Admin sees exactly the Admin's page, so the same list holds there.
-    readonly property var framedAdminKeys: ["hierarchy", "tasks", "flows", "automation", "actions"]
+    readonly property var framedAdminKeys: ["hierarchy", "tasks", "flows", "automation", "actions", "assistance", "reports"]
     readonly property bool onFrame: insideNow ? framedAdminKeys.indexOf(viewKey) >= 0
                                     : (onMustSee || inDepartment || viewKey === "rollout" || framedAdminKeys.indexOf(viewKey) >= 0)
 
@@ -121,6 +124,7 @@ ApplicationWindow {
         shell.show("authority")
     }
     function show(key) {
+        if (key === "resources") { show("hierarchy"); subPage = "resources"; return }
         var i = rail.indexOfKey(key)
         if (i < 0 && key === "authority") i = rail.indexOfKey("hierarchy")
         if (i < 0 && key === "hierarchy") i = rail.indexOfKey("authority")
@@ -259,11 +263,20 @@ ApplicationWindow {
                             }
 
                             // an Admin's home, at home or with a Super User inside them (HO03)
+                            ResourcesView {
+                                objectName: "resourcesView"
+                                anchors.fill: parent
+                                visible: shell.viewKey === "hierarchy" && shell.subPage === "resources"
+                                clock: overview.clock
+                                focus: visible
+                                Keys.onEscapePressed: shell.subPage = ""
+                                onBack: shell.subPage = ""
+                            }
                             AdminHome {
                                 id: adminHome
                                 objectName: "adminHome"
                                 anchors.fill: parent
-                                visible: shell.viewKey === "hierarchy"
+                                visible: shell.viewKey === "hierarchy" && shell.subPage === ""
                                 departmentId: shell.insideNow ? shell.heldAdmin.department_id : 0
                                 clock: overview.clock
                             }
@@ -304,9 +317,9 @@ ApplicationWindow {
                             ActionsView { objectName: "actionsView"; anchors.fill: parent
                                           visible: shell.viewKey === "actions"; clock: overview.clock }
                             AssistanceView { objectName: "assistanceView"; anchors.fill: parent
-                                             visible: shell.viewKey === "assistance" }
+                                             visible: shell.viewKey === "assistance" ; clock: overview.clock }
                             ReportsView { objectName: "reportsView"; anchors.fill: parent
-                                          visible: shell.viewKey === "reports" }
+                                          visible: shell.viewKey === "reports" ; clock: overview.clock }
                             // Rollout (boards RO05, RO06): departments, then one maximised
                             RolloutView {
                                 objectName: "rolloutView"

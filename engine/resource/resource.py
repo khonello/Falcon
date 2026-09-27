@@ -175,6 +175,18 @@ async def violations(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"violations": rows(found)}
 
 
+@handler("resource.shelves")
+async def shelves(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """The tiers the caller keeps (their workstation's tier folders, schema RS) with how many files sit on
+    each -- the Resources page's shelves. Admin: across their department; Super User: everywhere."""
+    ident = require_role(ctx, "super_user", "admin")
+    pc_type = "super_user_workstation" if ident.role == "super_user" else "admin_workstation"
+    counts = {r["tag"]: r["files"] for r in await ctx.engine.db.file_index.tier_counts(
+        None if ident.role == "super_user" else ident.department_id)}
+    return {"shelves": [{"folder": folder, "tag": tag, "files": counts.get(tag, 0)}
+                        for folder, tag in TIER_FOLDERS[pc_type].items()]}
+
+
 @handler("resource.resolve")
 async def resolve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"violation_id"} -- the affected user (or their Admin / Super User) marks it rectified;

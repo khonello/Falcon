@@ -175,9 +175,15 @@ STUB = {
                         "failures": 6, "last_attempt_at": _at(7.5), "escalated": True}],
     },
     "resource.violations": {"violations": [
-        {"id": 7, "resource_tag": "restricted", "filename": "budget-2026.xlsx",
-         "path": "C:/Shared/workers/budget-2026.xlsx", "hostname": "OPS-07", "department_id": 1,
-         "detected_at": _at(10.7), "resolved_at": None}]},
+        {"id": 7, "expected_tag": "restricted", "filename": "budget-2026.xlsx", "file_index_id": 70,
+         "path": "C:/Shared/workers/budget-2026.xlsx", "hostname": "OPS-07", "department_id": 1, "found_on_pc_id": 27,
+         "surfaced_to_account_id": 4007, "detected_via": "event", "detected_at": _at(10.7), "resolved_at": None},
+        {"id": 5, "expected_tag": "restricted", "filename": "pay-scales-2026.xlsx", "file_index_id": 71,
+         "path": "C:/Users/yaw/Desktop/pay-scales-2026.xlsx", "hostname": "OPS-03", "department_id": 1, "found_on_pc_id": 23,
+         "surfaced_to_account_id": 4003, "detected_via": "polling_fallback", "detected_at": _at(8.2), "resolved_at": None}]},
+    "resource.shelves": {"shelves": [{"folder": "restricted", "tag": "restricted", "files": 5},
+                                     {"folder": "workers", "tag": "worker_dept", "files": 24},
+                                     {"folder": "common", "tag": "common", "files": 40}]},
     "audit.deviations": {"deviations": [
         {"id": 3, "expectation": "account_used_from_unbound_pc", "detected_at": _at(11.1), "resolved_at": _at(11.4)},
         {"id": 2, "expectation": "hostname_did_not_match_certificate", "detected_at": _at(9.2), "resolved_at": None}]},
@@ -211,6 +217,34 @@ STUB = {
         {"at": _at(8.92), "hostname": "OPS-07", "subject": "budget-2026.xlsx", "runs": [
             {"id": 61, "action_name": "Notify me", "builtin_type": "notify", "status": "success"},
             {"id": 62, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "success"}]}]},
+    "assistance.ping_status": {"unaddressed": 2, "indicator": "unaddressed_ping", "pings": [
+        {"id": 31, "sender_account_id": 4001, "from_name": "Kojo", "sent_at": _at(9.67)},
+        {"id": 32, "sender_account_id": 4001, "from_name": "Kojo", "sent_at": _at(10.25)}]},
+    "assistance.channels": {"channels": [
+        {"id": 14, "initiator_account_id": 4007, "superior_account_id": 3012, "turn": "superior", "closed_at": None, "opened_at": _at(11.03)},
+        {"id": 12, "initiator_account_id": 3012, "superior_account_id": 1, "turn": "superior", "closed_at": None, "opened_at": _at(10.5)},
+        {"id": 9, "initiator_account_id": 4002, "superior_account_id": 3012, "turn": "sender", "closed_at": _at(9.4), "opened_at": _at(8.9)}]},
+    "assistance.channel": {"channel": {"id": 14, "initiator_account_id": 4007, "superior_account_id": 3012, "turn": "superior",
+                                       "closed_at": None, "opened_at": _at(11.03), "my_turn": True, "subordinate_account_id": 4007}, "messages": [
+        {"id": 1, "sender_account_id": 4007, "body": "I can't open the budget file any more.", "sent_at": _at(11.03)},
+        {"id": 2, "sender_account_id": 3012, "body": "It is restricted; it should not be on your machine. Move it to Documents.", "sent_at": _at(11.08)},
+        {"id": 3, "sender_account_id": 4007, "body": "Done — it says moved. Is that all?", "sent_at": _at(11.15)}]},
+    "assistance.my_listeners": {"listeners": [{"listener_account_id": 3013, "name": "A. Quaye"}]},
+    "assistance.search": {"results": [
+        {"id": 1, "filename": "budget-template-2026.xlsx", "path": "C:/resources/common/budget-template-2026.xlsx", "pc_id": 11, "resource_tag": "common"},
+        {"id": 2, "filename": "budget-q3-draft.xlsx", "path": "C:/resources/workers/budget-q3-draft.xlsx", "pc_id": 11, "resource_tag": "worker_dept"},
+        {"id": 3, "filename": "budget-notes.docx", "path": "C:/Users/yaw/Documents/budget-notes.docx", "pc_id": 23, "resource_tag": None}]},
+    "reports.list": {"reports": [
+        {"id": 41, "category": "resource_violation", "source_table": "resource_violations", "source_id": 7,
+         "generated_at": _at(11.68), "addressed_at": None},
+        {"id": 40, "category": "flow_failure", "source_table": "flow_destinations", "source_id": 5,
+         "generated_at": _at(11.33), "addressed_at": None},
+        {"id": 38, "category": "directory_structure_conflict", "source_table": "flows", "source_id": 2,
+         "generated_at": _at(14.6, 1), "addressed_at": None},
+        {"id": 35, "category": "listener_report", "source_table": "message_channels", "source_id": 14,
+         "generated_at": _at(9.5, 3), "addressed_at": _at(10, 3)},
+        {"id": 33, "category": "resource_violation", "source_table": "resource_violations", "source_id": 3,
+         "generated_at": _at(15.2, 4), "addressed_at": _at(9, 2)}]},
     "control.levels": {"machines": 7, "cpu": [21, 42], "memory": [38, 61], "idle_s": [0, 900]},
     "task.list": {"tasks": [
         {"id": 1, "description_raw": "Update the fleet inventory in inventory-2026.xlsx", "status": "in_progress", "started_at": _at(9.2), "assigner_account_id": 3012, "assignee_account_id": 4001, "assignee_name": "Kojo", "soft_deadline_at": None, "final_deadline_at": None},
@@ -459,6 +493,16 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             acv.setProperty("check", {"ok": True, "problems": []})
             acv.setProperty("customName", "Clear temp")
             acv.setProperty("customDoes", "Empties the temp folders to free disk space.")
+        # FALCON_SHOT_RESOURCES=1 opens Resources from the Admin's home (with FALCON_SHOT_FIND, files to shelve)
+        if os.environ.get("FALCON_SHOT_RESOURCES"):
+            QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "resources"))
+            rv = win.findChild(object, "resourcesView")
+            if os.environ.get("FALCON_SHOT_FIND") and rv is not None:
+                QMetaObject.invokeMethod(rv, "search", Q_ARG("QVariant", os.environ["FALCON_SHOT_FIND"]))
+        # FALCON_SHOT_FIND=<text> types that into Assistance's file search
+        asv = win.findChild(object, "assistanceView")
+        if os.environ.get("FALCON_SHOT_FIND") and asv is not None:
+            QMetaObject.invokeMethod(asv, "search", Q_ARG("QVariant", os.environ["FALCON_SHOT_FIND"]))
         if os.environ.get("FALCON_SHOT_INSIDE"):
             QMetaObject.invokeMethod(win, "goInside")
             # FALCON_SHOT_TAB=<key> opens that entry of the Admin's rail once inside
@@ -482,6 +526,7 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-auto" + os.environ["FALCON_SHOT_NEWAUTO"] if os.environ.get("FALCON_SHOT_NEWAUTO") else ""
         name += "-action" + os.environ["FALCON_SHOT_ACTION"] if os.environ.get("FALCON_SHOT_ACTION") else ""
         name += "-custom" if os.environ.get("FALCON_SHOT_CUSTOM") else ""
+        name += "-resources" if os.environ.get("FALCON_SHOT_RESOURCES") else ""
         name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""

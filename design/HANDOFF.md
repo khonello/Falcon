@@ -44,8 +44,10 @@ words for triggers and actions live in the `Automate` singleton, shared with Act
 being *opened* is not offered (the Engine cannot see reads). Screenshot the maker with `FALCON_SHOT_NEWAUTO=<step>`
 (and `FALCON_SHOT_AUTOEV=<index>` to start from another automation). Actions (`ActionsView`, AU05-AU07) is built: the library with built-ins not set up listed faintly, each
 action's own settings (saved as changed), When it runs, Try it on one machine, and a custom action as a script
-file checked in words (`FALCON_SHOT_ACTION=<id>`, `FALCON_SHOT_CUSTOM=1`). **Next: Assistance (AS03), Reports
-(RP03), Resources (RS03).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
+file checked in words (`FALCON_SHOT_ACTION=<id>`, `FALCON_SHOT_CUSTOM=1`). Assistance (AS03), Reports (RP03) and
+Resources (RS03, opened over the Admin's home via `shell.subPage`, `FALCON_SHOT_RESOURCES=1`) are built:
+**step 3 is done.** **Next: step 4 -- Record (RC05), Work (WK03), level 4 (CP03), the states, dialogs, and the
+Worker's windows.** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
 in one pass after the UI (the user, 27 Sep 2026); only trivial ones are fixed inline.
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
@@ -274,8 +276,7 @@ page is asking, so no view owns it.
 `audit.deviations`, `reports.routing_get`, `task.list`, `flow.list`, and `audit.recent` with prefix
 `update.attempt`.
 
-**Still pre-kit**, mounted hidden so their tests keep passing:
-`AssistanceView`, `ReportsView`, plus `ConnectView` and `Btn`, `Field`, `DataTable`, `Picker`,
+**Still pre-kit**, mounted hidden so their tests keep passing: `ConnectView` and `Btn`, `Field`, `DataTable`, `Picker`,
 `SegmentedControl`, `Eyebrow`, `Section`. **Orphaned, and deletable only once their replacement lands**:
 `HierarchyView.qml`, `HierarchyRail.qml` — they are still the only way to reach a department's tree in
 the app, so they go *after* the level-3 work, not before.

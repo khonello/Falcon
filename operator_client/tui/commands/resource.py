@@ -26,3 +26,9 @@ async def tag(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("resource.tag", {"file_index_id": args.get_int(0, "file_index_id"), "tag": args.get(1, "tag"),
                                           "scope_department_id": args.opt_int("dept")})
     return f"file {res['file_index_id']} tagged {res['tag']}"
+
+
+@command("shelves", help_="The tiers you keep, with how many files sit on each")
+async def shelves(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("resource.shelves")
+    return "\n".join(f"{s['folder']:<12} {s['files']} file(s)" for s in res["shelves"])

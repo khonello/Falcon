@@ -3,141 +3,415 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "."
 
-// Resource & Assistance: file search over the Global File Index, resource tags, violations,
-// pings (unaddressed → respond opens a channel), turn-based message channels and listeners.
+// ASSISTANCE (board AS03), three columns:
+//
+//   left    who is asking for you (a ping is a warm banner that stays lit until you answer), then everyone you
+//           have a channel with, by person: your turn / waiting for them / closed
+//   middle  the chosen channel: one reply each, in turn; the Listeners YOU added (never the other side's), and
+//           only the superior closes it
+//   right   find a file, the results grouped by where they sit -- only what you may see is ever shown
+//
+// Names and hostnames come from hierarchy.tree, which already speaks in the requester's own Display Names.
 Item {
-    id: view
-    property var results: []
+    id: root
+
     property var pings: []
     property var channels: []
-    property var channel: null      // {channel, messages}
-    property var violations: []
+    property var tree: []
+    property int chosenId: 0
+    property var channel: null
+    property var messages: []
+    property var listeners: []
+    property var results: []
+    property string query: ""
+    property string clock: ""
 
-    function refreshPings() { falcon.call("assistance.ping_status", {}, function(ok, r) { if (ok) view.pings = r.pings }) }
-    function refreshChannels() { falcon.call("assistance.channels", {}, function(ok, r) { if (ok) view.channels = r.channels }) }
-    function refreshViolations() { falcon.call("resource.violations", {include_resolved: showResolved.checked}, function(ok, r) { if (ok) view.violations = r.violations }) }
-    function openChannel(id) {
-        falcon.call("assistance.channel", {channel_id: id}, function(ok, r) { if (ok) view.channel = r; else root.notify(r.message, true) })
+    function refresh() {
+        if (!falcon.isConnected) return
+        falcon.call("assistance.ping_status", {}, function (ok, r) { if (ok) root.pings = r.pings })
+        falcon.call("assistance.channels", {}, function (ok, r) {
+            if (!ok) return
+            root.channels = r.channels
+            if (!root.chosenId && r.channels.length) root.choose(r.channels[0].id)
+            else if (root.chosenId) root.load()
+        })
+        falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
     }
-    function refresh() { refreshPings(); refreshChannels(); refreshViolations() }
-    Component.onCompleted: if (falcon.isConnected) refresh()
+    function choose(id) { chosenId = id; channel = null; messages = []; listeners = []; load() }
+    function load() {
+        if (!chosenId) return
+        var id = chosenId
+        falcon.call("assistance.channel", { channel_id: id }, function (ok, r) {
+            if (!ok || id !== root.chosenId) return
+            root.channel = r.channel
+            root.messages = r.messages
+        })
+        falcon.call("assistance.my_listeners", { channel_id: id }, function (ok, r) { if (ok && id === root.chosenId) root.listeners = r.listeners })
+    }
     Connections {
         target: falcon
-        function onConnected() { view.refresh() }
-        function onScopeChanged() { if (falcon.isConnected) view.refresh() }
-        function onPushReceived(type, p) {
-            if (type.indexOf("assistance.") === 0) { view.refreshPings(); view.refreshChannels(); if (view.channel && p.channel_id === view.channel.channel.id) view.openChannel(p.channel_id) }
-            if (type.indexOf("resource.") === 0) view.refreshViolations()
+        function onConnected() { root.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) root.refresh() }
+        function onPushReceived(type, p) { if (type.indexOf("assistance.") === 0) root.refresh() }
+    }
+    Component.onCompleted: if (falcon.isConnected) refresh()
+
+    // --- people -------------------------------------------------------------------------------------------
+    readonly property int me: falcon ? falcon.accountId : 0
+    function person(accountId) {
+        for (var i = 0; i < tree.length; i++) {
+            var all = tree[i].admins.concat(tree[i].workers)
+            for (var j = 0; j < all.length; j++) if (all[j].account_id === accountId) return all[j]
         }
+        return null
+    }
+    // an Admin's tree holds their department, not the Super User above them: that one is named by role
+    function nameOf(id, fallback) {
+        var p = person(id)
+        if (p) return p.name
+        if (fallback) return fallback
+        return falcon && falcon.role === "admin" && channels.some(function (c) { return c.superior_account_id === id }) ? "the Super User" : "Someone"
+    }
+    function initialsOf(id) { var n = nameOf(id); return n === "the Super User" ? "SU" : Theme.initials(n) }
+    function hostOf(id) { var p = person(id); return p && p.hostname ? p.hostname : "" }
+    function hostOfPc(pcId) {
+        for (var i = 0; i < tree.length; i++) {
+            var all = tree[i].admins.concat(tree[i].workers)
+            for (var j = 0; j < all.length; j++) if (all[j].pc_id === pcId) return all[j].hostname
+        }
+        return ""
+    }
+    function otherOf(c) { return c.superior_account_id === me ? c.initiator_account_id : c.superior_account_id }
+    function myTurn(c) {
+        if (c.closed_at) return false
+        return (c.turn === "superior") === (c.superior_account_id === me)
+    }
+    function timeOf(iso) { return iso ? Qt.formatDateTime(new Date(iso), "HH:mm") : "" }
+    function whenOf(iso) {
+        if (!iso) return ""
+        var d = new Date(iso), now = new Date()
+        return d.toDateString() === now.toDateString() ? (d.getHours() < 12 ? "this morning" : "today at " + timeOf(iso))
+                                                       : Qt.formatDateTime(d, "ddd d MMM")
+    }
+    function stateOf(c) {
+        var who = nameOf(otherOf(c))
+        return c.closed_at ? "closed " + whenOf(c.closed_at) : myTurn(c) ? "your turn to reply" : "waiting for " + who
+    }
+    // pings grouped by who sent them: "Kojo is asking for you", twice
+    readonly property var asking: {
+        var by = {}, order = []
+        for (var i = 0; i < pings.length; i++) {
+            var p = pings[i]
+            if (!by[p.sender_account_id]) { by[p.sender_account_id] = { sender: p.sender_account_id, name: p.from_name, pings: [] }; order.push(p.sender_account_id) }
+            by[p.sender_account_id].pings.push(p)
+        }
+        return order.map(function (k) { return by[k] })
+    }
+    readonly property var sorted: channels.slice().sort(function (a, b) {
+        var ra = a.closed_at ? 2 : root.myTurn(a) ? 0 : 1, rb = b.closed_at ? 2 : root.myTurn(b) ? 0 : 1
+        return ra !== rb ? ra - rb : String(b.opened_at).localeCompare(String(a.opened_at))
+    })
+    readonly property var admins: {
+        var out = []
+        for (var i = 0; i < tree.length; i++)
+            for (var j = 0; j < tree[i].admins.length; j++) {
+                var a = tree[i].admins[j]
+                if (a.account_id !== me && channel && a.account_id !== channel.initiator_account_id && a.account_id !== channel.superior_account_id)
+                    out.push({ account_id: a.account_id, name: a.name, dept: tree[i].name })
+            }
+        return out
+    }
+    function answer(group) {
+        falcon.call("assistance.respond", { ping_id: group.pings[0].id }, function (ok, r) {
+            if (!ok) { shell.notify(r.message, true); return }
+            root.chosenId = r.channel_id
+            root.refresh()
+        })
+    }
+    function send(text) {
+        if (!text.trim() || !channel) return
+        falcon.call("assistance.message", { channel_id: channel.id, body: text.trim() }, function (ok, r) {
+            if (!ok) { shell.notify(r.message, true); return }
+            reply.text = ""
+            root.refresh()
+        })
+    }
+    function search(text) {
+        query = text
+        if (text.trim().length < 2) { results = []; return }
+        falcon.call("assistance.search", { query: text.trim() }, function (ok, r) { if (ok && text === root.query) root.results = r.results })
+    }
+    // search results grouped by where they sit, in the order a person would look
+    readonly property var groups: {
+        var order = [["common", "Common — everyone", "ok"], ["worker_dept", tree.length === 1 ? tree[0].name + " — your department" : "Your department", "accent"],
+                     ["restricted", "Restricted", "danger"], ["admin", "Admin", "warn"], ["", "On the machines", ""]]
+        var out = []
+        for (var i = 0; i < order.length; i++) {
+            var key = order[i][0]
+            var items = results.filter(function (f) { return (f.resource_tag || "") === key })
+            if (items.length) out.push({ title: order[i][1], tone: order[i][2], items: items })
+        }
+        return out
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 8
-        RowLayout {
-            Label { text: "Assistance & Resources"; font.pixelSize: Theme.fontLarge; color: Theme.text }
-            SegmentedControl { id: tabs; Layout.leftMargin: 18; segments: [{text: "Pings & channels"}, {text: "File search"}, {text: "Violations"}] }
-            Btn { text: "Refresh"; onClicked: view.refresh() }
+        anchors.leftMargin: 6
+        anchors.rightMargin: 22
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
+        spacing: 16
+
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 48
+            Column {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+                Txt { text: "Assistance"; color: "#ffffff"; font.pixelSize: Theme.fBody; font.weight: Font.DemiBold }
+                Row {
+                    spacing: 12
+                    Txt { text: "Assistance"; color: "#ffffff"; font.pixelSize: Theme.fTitle; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { anchors.verticalCenter: parent.verticalCenter; font.pixelSize: Theme.fBody
+                          color: root.asking.length ? Theme.warn : Qt.rgba(1, 1, 1, 0.55)
+                          text: root.asking.length === 0 ? "no one is asking for you"
+                                : root.asking.length === 1 ? "one person asking for you" : root.asking.length + " people asking for you" }
+                }
+            }
+            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: root.clock
+                  color: Qt.rgba(1, 1, 1, 0.45); font.pixelSize: Theme.fBody }
         }
 
-        StackLayout {
-            Layout.fillWidth: true; Layout.fillHeight: true
-            currentIndex: tabs.currentIndex
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 20
 
-            // --- pings & channels
-            RowLayout {
-                spacing: 10
-                ColumnLayout {
-                    Layout.preferredWidth: 420; Layout.fillHeight: true
-                    RowLayout {
-                        Eyebrow { label: "ping an account" }
-                        Field { id: pingTo; Layout.preferredWidth: 70; placeholderText: "account" }
-                        Btn { text: "Ping"; enabled: pingTo.text.length > 0
-                                 onClicked: falcon.call("assistance.ping", {to_account_id: parseInt(pingTo.text)}, function(ok, r) { root.notify(ok ? "ping " + r.ping_id + " sent" : r.message, !ok) }) }
-                    }
-                    Label { text: "unaddressed pings to you (" + view.pings.length + ")"; color: Theme.textDim }
-                    DataTable { id: pingTable; Layout.fillWidth: true; Layout.preferredHeight: 140; rows: view.pings
-                                columns: ["id", "from_name", "sender_account_id", "sent_at"]; widths: ({id: 50, from_name: 150, sender_account_id: 70, sent_at: 130}); emptyText: "(none)" }
-                    Btn { text: "Respond → open channel"; enabled: pingTable.selectedIndex >= 0
-                             onClicked: falcon.call("assistance.respond", {ping_id: view.pings[pingTable.selectedIndex].id},
-                                                    function(ok, r) { if (!ok) { root.notify(r.message, true); return } root.notify("channel " + r.channel_id + (r.opened ? " opened" : " already open"), false); view.refresh(); view.openChannel(r.channel_id) }) }
-                    Eyebrow { label: "channels" }
-                    DataTable { Layout.fillWidth: true; Layout.fillHeight: true; rows: view.channels
-                                columns: ["id", "initiator_account_id", "superior_account_id", "turn", "opened_at", "closed_at"]
-                                widths: ({id: 50, initiator_account_id: 70, superior_account_id: 70, turn: 80, opened_at: 130, closed_at: 130})
-                                onRowClicked: function(row) { view.openChannel(row.id) } }
-                }
-                Rectangle {
-                    Layout.fillWidth: true; Layout.fillHeight: true; color: Theme.surface; radius: Theme.radius; border.width: 1; border.color: Theme.border
-                    ColumnLayout {
-                        anchors.fill: parent; anchors.margins: 10; spacing: 6
-                        RowLayout {
-                            Label { color: Theme.text; font.bold: true
-                                    text: view.channel ? "Channel " + view.channel.channel.id + " — " + (view.channel.channel.closed_at ? "closed" : (view.channel.channel.my_turn ? "your turn" : "waiting for the other party")) : "select a channel" }
-                            Item { Layout.fillWidth: true }
-                            Field { id: listener; Layout.preferredWidth: 70; placeholderText: "admin id"; visible: !!view.channel }
-                            Btn { text: "Add listener"; visible: !!view.channel; enabled: listener.text.length > 0
-                                     onClicked: falcon.call("assistance.add_listener", {channel_id: view.channel.channel.id, admin_account_id: parseInt(listener.text)}, function(ok, r) { root.notify(ok ? (r.added ? "listener added" : "already listening") : r.message, !ok) }) }
-                            Btn { text: "Listeners"; visible: !!view.channel
-                                     onClicked: falcon.call("assistance.my_listeners", {channel_id: view.channel.channel.id}, function(ok, r) { root.notify(ok ? "listeners: " + (r.listeners.map(function(l) { return l.name + " (" + l.listener_account_id + ")" }).join(", ") || "none") : r.message, !ok) }) }
-                            Btn { text: "Close"; visible: !!view.channel && !view.channel.channel.closed_at
-                                     onClicked: falcon.call("assistance.close_channel", {channel_id: view.channel.channel.id}, function(ok, r) { root.notify(ok ? "channel closed" : r.message, !ok); view.refresh(); if (ok) view.openChannel(r.channel_id) }) }
-                        }
-                        ListView {
-                            id: msgs
-                            Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 4
-                            model: view.channel ? view.channel.messages : []
-                            delegate: Label {
+            // --- left: asking for you, then by person ---------------------------------------------------
+            ColumnLayout {
+                Layout.preferredWidth: 400
+                Layout.maximumWidth: 400
+                Layout.fillHeight: true
+                spacing: 20
+                GridCell {
+                    objectName: "assistAsking"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.max(150, 90 + Math.min(2, root.asking.length) * 126)
+                    Layout.fillHeight: false
+                    topAlign: true
+                    title: "Asking for you"
+                    narration: ({ brief: root.asking.length ? (root.asking.length === 1 ? "a ping" : root.asking.length + " pings") : "",
+                                  tone: "warn", state: "ok" })
+                    Column {
+                        width: parent.width
+                        spacing: 10
+                        Txt { visible: root.asking.length === 0; text: "No one is asking for you."; color: Theme.faint; font.pixelSize: Theme.fBody }
+                        Repeater {
+                            model: root.asking.slice(0, 2)
+                            delegate: Rectangle {
                                 required property var modelData
-                                width: msgs.width; wrapMode: Text.Wrap; color: Theme.textDim
-                                text: modelData.sent_at.substring(11, 16) + "  " + (view.channel.channel.names[String(modelData.sender_account_id)] || modelData.sender_account_id) + ": " + modelData.body
+                                width: parent.width; height: 114; radius: 14; color: Theme.warnSoft
+                                Column {
+                                    anchors.fill: parent; anchors.margins: 16; spacing: 8
+                                    Row { spacing: 10
+                                          Icon { name: "ping"; size: 17; color: Theme.warn; anchors.verticalCenter: parent.verticalCenter }
+                                          Txt { text: (modelData.name || root.nameOf(modelData.sender)) + " is asking for you"; color: Theme.ink
+                                                font.pixelSize: Theme.fSection; font.weight: Font.DemiBold } }
+                                    Txt { width: parent.width; elide: Text.ElideRight; color: Theme.warn; font.pixelSize: Theme.fMeta
+                                          text: (modelData.pings.length === 1 ? "Pinged at " + root.timeOf(modelData.pings[0].sent_at)
+                                                 : "Pinged " + (modelData.pings.length === 2 ? "twice" : modelData.pings.length + " times") + " — "
+                                                   + root.timeOf(modelData.pings[0].sent_at) + ", again at " + root.timeOf(modelData.pings[modelData.pings.length - 1].sent_at))
+                                                + (root.hostOf(modelData.sender) ? " · " + root.hostOf(modelData.sender) : "") }
+                                    Item { width: parent.width; height: 28
+                                        TBtn { objectName: "answerPing"; tone: "warn"; small: true; text: "Answer " + (modelData.name || root.nameOf(modelData.sender)).split(" ")[0]
+                                               onClicked: root.answer(modelData) }
+                                        Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "stays lit until you answer"
+                                              color: Theme.faint; font.pixelSize: Theme.fMeta } }
+                                }
                             }
-                            onCountChanged: positionViewAtEnd()
                         }
-                        RowLayout {
-                            visible: !!view.channel && !view.channel.channel.closed_at
-                            Field { id: body; Layout.fillWidth: true; placeholderText: view.channel && view.channel.channel.my_turn ? "your message" : "not your turn"; enabled: !!view.channel && view.channel.channel.my_turn
-                                        onAccepted: sendBtn.clicked() }
-                            Btn { id: sendBtn; text: "Send"; enabled: body.enabled && body.text.length > 0
-                                     onClicked: falcon.call("assistance.message", {channel_id: view.channel.channel.id, body: body.text},
-                                                            function(ok, r) { if (ok) { body.text = ""; view.openChannel(view.channel.channel.id) } else root.notify(r.message, true) }) }
+                        Txt { visible: root.asking.length > 2; text: "+ " + (root.asking.length - 2) + " more asking"; color: Theme.warn; font.pixelSize: Theme.fMeta }
+                    }
+                }
+                GridCell {
+                    objectName: "assistPeople"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    topAlign: true
+                    title: "By person"
+                    narration: ({ brief: root.channels.length + (root.channels.length === 1 ? " channel" : " channels"),
+                                  state: root.channels.length ? "ok" : "empty", note: "No channels yet",
+                                  sentence: "A channel opens when a ping is answered." })
+                    PagedColumn {
+                        id: peoplePager
+                        width: parent.width
+                        height: Math.max(140, peopleCell.room)
+                        itemHeight: 60
+                        model: root.sorted
+                        attention: function (c) { return root.myTurn(c) ? root.nameOf(root.otherOf(c)) + " waits" : "" }
+                        delegate: InfoCard {
+                            initials: modelData ? root.initialsOf(root.otherOf(modelData)) : ""
+                            title: modelData ? root.nameOf(root.otherOf(modelData)) : ""
+                            line: modelData ? [root.hostOf(root.otherOf(modelData)), root.stateOf(modelData)].filter(function (x) { return !!x }).join(" · ") : ""
+                            lineTone: modelData && root.myTurn(modelData) ? "accent" : ""
+                            stateWord: modelData && root.myTurn(modelData) ? "your turn" : ""
+                            stateTone: "accent"
+                            selected: modelData && modelData.id === root.chosenId
+                            onClicked: root.choose(modelData.id)
                         }
+                    }
+                    id: peopleCell
+                }
+            }
+
+            // --- middle: the channel ---------------------------------------------------------------------
+            GridCell {
+                id: talkCell
+                objectName: "assistChannel"
+                Layout.fillWidth: true
+                Layout.preferredWidth: 3
+                Layout.fillHeight: true
+                topAlign: true
+                title: root.channel ? root.nameOf(root.otherOf(root.channel)) : "A channel"
+                narration: ({ brief: !root.channel ? "" : root.channel.closed_at ? "closed" : root.channel.my_turn ? "your turn" : "their turn",
+                              tone: root.channel && root.channel.my_turn ? "accent" : "", state: root.channel ? "ok" : "empty",
+                              note: "No channel open", sentence: "Answer a ping, or pick someone on the left." })
+                ColumnLayout {
+                    visible: root.channel !== null
+                    width: parent.width
+                    height: talkCell.room
+                    spacing: 10
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 44
+                        Rectangle { id: av; width: 38; height: 38; radius: 10; color: Qt.rgba(1, 1, 1, 0.08); anchors.verticalCenter: parent.verticalCenter
+                                    Txt { anchors.centerIn: parent; text: root.channel ? root.initialsOf(root.otherOf(root.channel)) : ""
+                                          color: Theme.ink; font.pixelSize: Theme.fBody; font.weight: Font.Bold } }
+                        Column {
+                            anchors.left: av.right; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
+                            Txt { text: root.channel ? root.nameOf(root.otherOf(root.channel)) : ""; color: Theme.ink; font.pixelSize: Theme.fBody; font.weight: Font.DemiBold }
+                            Txt { color: Theme.faint; font.pixelSize: Theme.fMeta
+                                  text: root.channel ? [root.hostOf(root.otherOf(root.channel)), "opened " + root.timeOf(root.channel.opened_at)].filter(function (x) { return !!x }).join(" · ") : "" }
+                        }
+                        // the Listeners you added -- an eye on a soft pill; you alone see it
+                        Row {
+                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                            spacing: 8
+                            Repeater {
+                                model: root.listeners
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: lt.implicitWidth + 40; height: 28; radius: 14
+                                    gradient: Gradient { orientation: Gradient.Horizontal
+                                                         GradientStop { position: 0; color: Qt.rgba(0.54, 0.65, 0.88, 0.22) }
+                                                         GradientStop { position: 1; color: Qt.rgba(0.66, 0.52, 0.88, 0.22) } }
+                                    Icon { x: 11; anchors.verticalCenter: parent.verticalCenter; name: "eye"; size: 13; color: Theme.accent }
+                                    Txt { id: lt; x: 30; anchors.verticalCenter: parent.verticalCenter; text: (modelData.name || "An Admin") + " is listening"
+                                          color: Theme.accent; font.pixelSize: Theme.fMeta; font.weight: Font.DemiBold }
+                                }
+                            }
+                            GBtn { visible: root.channel && !root.channel.closed_at && root.admins.length > 0; text: "Add a listener"; iconName: "eye"; small: true
+                                   onClicked: listenMenu.open()
+                                   Menu { id: listenMenu; y: parent.height + 4
+                                          Repeater { model: root.admins
+                                                     delegate: MenuItem { required property var modelData; text: modelData.name + "  ·  " + modelData.dept
+                                                                          onTriggered: falcon.call("assistance.add_listener", { channel_id: root.channel.id, admin_account_id: modelData.account_id },
+                                                                                                   function (ok, r) { shell.notify(ok ? modelData.name + " is listening" : r.message, !ok); root.load() }) } } } }
+                        }
+                    }
+                    Txt { Layout.fillWidth: true; visible: root.listeners.length > 0; wrapMode: Text.WordWrap; color: Theme.faint; font.pixelSize: Theme.fMeta
+                          text: "Only you see who you added. " + (root.channel ? root.nameOf(root.otherOf(root.channel)) : "They") + " is not told; the audit trail records it." }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+                    ListView {
+                        id: talk
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        spacing: 12
+                        model: root.messages
+                        onCountChanged: positionViewAtEnd()
+                        delegate: Item {
+                            required property var modelData
+                            readonly property bool mine: modelData.sender_account_id === root.me
+                            width: talk.width
+                            height: bubble.height
+                            Rectangle {
+                                id: bubble
+                                x: parent.mine ? parent.width - width : 0
+                                width: Math.min(talk.width * 0.62, body.implicitWidth + 28)
+                                height: body.implicitHeight + meta.implicitHeight + 24
+                                radius: 12
+                                color: parent.mine ? Theme.accentSoft : "transparent"
+                                Txt { id: body; x: 14; y: 10; width: Math.min(talk.width * 0.62 - 28, implicitWidth); wrapMode: Text.WordWrap
+                                      text: modelData.body; color: Theme.ink; font.pixelSize: Theme.fBody }
+                                Txt { id: meta; x: 14; anchors.top: body.bottom; anchors.topMargin: 4; color: Theme.faint; font.pixelSize: Theme.fMeta - 1
+                                      text: (parent.parent.mine ? "you" : root.nameOf(modelData.sender_account_id)) + " · " + root.timeOf(modelData.sent_at) }
+                            }
+                        }
+                    }
+                    Field {
+                        id: reply
+                        objectName: "assistReply"
+                        Layout.fillWidth: true
+                        enabled: root.channel && root.channel.my_turn
+                        placeholderText: !root.channel ? "" : root.channel.closed_at ? "This channel is closed."
+                                         : root.channel.my_turn ? "Your turn — one reply, then " + root.nameOf(root.otherOf(root.channel)).split(" ")[0] + "'s"
+                                         : "Waiting for " + root.nameOf(root.otherOf(root.channel)).split(" ")[0] + " to reply"
+                        onAccepted: root.send(text)
+                    }
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 30
+                        GBtn { visible: root.channel && !root.channel.closed_at && root.channel.superior_account_id === root.me; text: "Close the channel"; small: true
+                               anchors.verticalCenter: parent.verticalCenter
+                               onClicked: falcon.call("assistance.close_channel", { channel_id: root.channel.id }, function (ok, r) {
+                                   shell.notify(ok ? "Closed" : r.message, !ok); root.refresh() }) }
+                        Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; color: Theme.faint; font.pixelSize: Theme.fMeta
+                              text: !root.channel || root.channel.closed_at ? "" : root.channel.superior_account_id === root.me ? "only you can close it"
+                                    : "only " + root.nameOf(root.channel.superior_account_id) + " can close it" }
                     }
                 }
             }
 
-            // --- file search + tagging
-            ColumnLayout {
-                RowLayout {
-                    Field { id: query; Layout.fillWidth: true; placeholderText: "file name or path fragment"; onAccepted: searchBtn.clicked() }
-                    Btn { id: searchBtn; text: "Search"; enabled: query.text.length > 0
-                             onClicked: falcon.call("assistance.search", {query: query.text}, function(ok, r) { if (ok) view.results = r.results; else root.notify(r.message, true) }) }
+            // --- right: find a file ----------------------------------------------------------------------
+            GridCell {
+                objectName: "assistFind"
+                Layout.fillWidth: true
+                Layout.preferredWidth: 2
+                Layout.fillHeight: true
+                topAlign: true
+                title: "Find a file"
+                narration: ({ brief: "grouped by where", state: "ok" })
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    Field { objectName: "assistSearch"; width: parent.width; placeholderText: "a few letters of its name"; onTextEdited: root.search(text) }
+                    Repeater {
+                        model: root.groups
+                        delegate: Column {
+                            required property var modelData
+                            width: parent.width
+                            spacing: 8
+                            Txt { topPadding: 4; text: modelData.title; color: modelData.tone ? Theme.tone(modelData.tone) : Theme.dim
+                                  font.pixelSize: Theme.fMeta; font.weight: Font.DemiBold }
+                            Repeater {
+                                model: modelData.items.slice(0, 4)
+                                delegate: InfoCard {
+                                    required property var modelData
+                                    width: parent.width
+                                    iconName: "file"; iconTone: "ok"
+                                    title: modelData.filename
+                                    line: [root.hostOfPc(modelData.pc_id), "in " + Automate.folderName(String(modelData.path).replace(/[\\/][^\\/]*$/, ""))]
+                                          .filter(function (x) { return !!x }).join(" · ")
+                                }
+                            }
+                        }
+                    }
+                    Txt { visible: root.query.length >= 2 && root.results.length === 0; text: "Nothing by that name you may see."
+                          color: Theme.faint; font.pixelSize: Theme.fBody }
+                    Txt { text: "Only what you may see is ever shown."; color: Theme.faint; font.pixelSize: Theme.fMeta }
                 }
-                DataTable { id: resultTable; Layout.fillWidth: true; Layout.fillHeight: true; rows: view.results
-                            columns: ["id", "pc_id", "path", "resource_tag", "resource_tag_scope_department_id", "last_seen_at"]
-                            widths: ({id: 60, pc_id: 50, path: 500, resource_tag: 90, resource_tag_scope_department_id: 60, last_seen_at: 130}); emptyText: "(no results)" }
-                RowLayout {
-                    Label { text: resultTable.selectedIndex >= 0 ? "tag file " + view.results[resultTable.selectedIndex].id : "select a file to tag"; color: Theme.textDim }
-                    Picker { id: tag; model: ["admin", "restricted", "workers", "common"]; Layout.preferredWidth: 120 }
-                    Field { id: tagDept; Layout.preferredWidth: 70; placeholderText: "dept (opt)" }
-                    Btn { text: "Tag"; enabled: resultTable.selectedIndex >= 0
-                             onClicked: falcon.call("resource.tag", {file_index_id: view.results[resultTable.selectedIndex].id, tag: tag.currentText, scope_department_id: tagDept.text ? parseInt(tagDept.text) : null},
-                                                    function(ok, r) { root.notify(ok ? "file " + r.file_index_id + " tagged " + r.tag : r.message, !ok); if (ok) searchBtn.clicked() }) }
-                }
-            }
-
-            // --- violations
-            ColumnLayout {
-                RowLayout {
-                    CheckBox { id: showResolved; text: "include resolved"; onToggled: view.refreshViolations() }
-                    Item { Layout.fillWidth: true }
-                    Btn { text: "Resolve"; enabled: vTable.selectedIndex >= 0
-                             onClicked: falcon.call("resource.resolve", {violation_id: view.violations[vTable.selectedIndex].id}, function(ok, r) { root.notify(ok ? "violation " + r.violation_id + " resolved" : r.message, !ok); view.refreshViolations() }) }
-                }
-                DataTable { id: vTable; Layout.fillWidth: true; Layout.fillHeight: true; rows: view.violations
-                            columns: ["id", "hostname", "filename", "expected_tag", "detected_via", "detected_at", "resolved_at", "report_id", "path"]
-                            widths: ({id: 50, hostname: 100, filename: 160, expected_tag: 90, detected_via: 100, detected_at: 130, resolved_at: 130, report_id: 70, path: 400}); emptyText: "(no violations)" }
             }
         }
     }
