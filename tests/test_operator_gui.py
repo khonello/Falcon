@@ -431,7 +431,7 @@ def test_inside_an_admin_the_window_is_their_interface_under_the_lid(gui):
     assert win.property("onFrame") is True and win.property("inDepartment") is False
     home = win.findChild(QObject, "adminHome")
     assert home.property("deptId") == 1 and home.property("visible") is not None
-    assert win.findChild(QObject, "lidWho").property("text") == "You are inside R. Mensah"
+    assert win.findChild(QObject, "lidWho").property("text") == "You are inside R. Mensah's workstation"
 
     # Escape steps out and the session runs on: holding and looking are different things
     QMetaObject.invokeMethod(win, "stepOut")
@@ -735,3 +735,48 @@ def test_the_record_trail_is_written_in_words_newest_first(gui):
          "occurred_at": "2026-09-27T10:40:00+00:00", "detail": {"hostname": "OPS-03"}}])
     assert [t["text"] for t in val(rv.property("trail"))] == ["A file was found out of place — OPS-07",
                                                              "You entered a machine — OPS-03"]
+
+
+def test_a_client_pc_is_entered_and_stepped_out_of_like_an_admin(gui):
+    """Level 4 (CP03): holding a worker's machine and going in shows its page under the lid; Escape steps out
+    with the session still held, and the pill offers the way back in."""
+    win, _, bridge = gui
+    win.setProperty("orgTree", [{"department_id": 1, "name": "Ops", "admins": [], "workers": [
+        {"account_id": 4007, "name": "Ama", "pc_id": 27, "hostname": "OPS-07"}]}])
+    bridge.state.session = {"session_id": 10, "pc_id": 27, "occupant_account_id": bridge.state.account_id,
+                            "occupied_via": "traversal", "deadline_at": None}
+    bridge.stateChanged.emit()
+    assert val(win.property("heldPc"))["hostname"] == "OPS-07"
+    QMetaObject.invokeMethod(win, "enterPc", Q_ARG("QVariant", 27))   # already held: straight in
+    assert win.property("insidePcNow") is True
+    assert win.findChild(QObject, "pcView").property("visible") is True
+    QMetaObject.invokeMethod(win, "stepOut")
+    assert win.property("insidePcNow") is False and val(win.property("heldPc")) is not None
+    bridge.state.session = None
+    bridge.stateChanged.emit()
+
+
+def test_every_session_state_is_the_one_lid(gui):
+    """27 Sep 2026: a held session is told by ONE bar in three wordings -- inside, holding, blocked -- never a
+    pill or a second banner."""
+    win, _, bridge = gui
+    win.setProperty("orgTree", [{"department_id": 1, "name": "Ops", "admins": [], "workers": [
+        {"account_id": 4007, "name": "Ama", "pc_id": 27, "hostname": "OPS-07"}]}])
+    lid = win.findChild(QObject, "sessionLid")
+    assert win.property("lidMode") == "" and lid.property("visible") is False
+    bridge.state.session = {"session_id": 10, "pc_id": 27, "occupant_account_id": bridge.state.account_id,
+                            "occupied_via": "traversal", "deadline_at": None}
+    bridge.stateChanged.emit()
+    assert win.property("lidMode") == "holding"
+    assert win.findChild(QObject, "lidWho").property("text") == "You are holding Ama's machine"
+    QMetaObject.invokeMethod(win, "enterPc", Q_ARG("QVariant", 27))
+    assert win.property("lidMode") == "inside"
+    assert win.findChild(QObject, "statePill") is None                  # the old pill is gone
+    QMetaObject.invokeMethod(win, "stepOut")
+    bridge.state.session = None
+    bridge.state.blocked_by = {"occupant_name": "the Super User"}
+    bridge.stateChanged.emit()
+    assert win.property("lidMode") == "blocked"
+    assert win.findChild(QObject, "lidWho").property("text") == "The Super User is in charge of your machine"
+    bridge.state.blocked_by = None
+    bridge.stateChanged.emit()

@@ -73,6 +73,54 @@ ApplicationWindow {
         return null
     }
     readonly property bool insideNow: inside && heldAdmin !== null
+
+    // LEVEL 4 -- INSIDE A CLIENT PC. The same session, on a worker's machine: `enterPc` asks the Engine (double
+    // click on a machine, wherever one is drawn), and a yes puts the window on that machine at once, under the
+    // same lid. Unlike an Admin, a machine has no interface of its own to show: the page is ABOUT it (PcView,
+    // board CP03), and the viewer keeps their own rail. Escape steps out, the session still held.
+    property bool insidePc: false
+    property int forcePc: 0                 // a machine someone is at: a second double click blocks them
+    // the organisation as the viewer may see it, for either role (the Overview's own copy is the Super User's only)
+    property var orgTree: []
+    function loadTree() { if (falcon.isConnected) falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) shell.orgTree = r.departments }) }
+    readonly property var heldPc: {
+        var s = falcon.session
+        if (!falcon.traversing || !s || !s.pc_id) return null
+        var t = orgTree.length ? orgTree : overview.tree
+        for (var i = 0; i < t.length; i++)
+            for (var j = 0; j < t[i].workers.length; j++)
+                if (t[i].workers[j].pc_id === s.pc_id) {
+                    var o = {}
+                    for (var k in t[i].workers[j]) o[k] = t[i].workers[j][k]
+                    o.department_id = t[i].department_id
+                    o.department_name = t[i].name
+                    return o
+                }
+        return null
+    }
+    readonly property bool insidePcNow: insidePc && heldPc !== null
+    // the lid's wording: inside (level 3 or 4), holding (a session held, stepped out of), blocked (someone above is on
+    // your own machine), or "" for no lid. A Super User holding an ADMIN and stepped out is the one case left to the
+    // department's container and Must see (DP09); every other held session is carried by the lid.
+    readonly property string lidMode: falcon.blocked ? "blocked"
+                                      : (insideNow || insidePcNow) ? "inside"
+                                      : falcon.traversing && (falcon.role !== "super_user" || heldPc !== null) ? "holding" : ""
+    onHeldPcChanged: if (heldPc === null && insidePc) insidePc = false
+    function enterPc(pcId) {
+        if (heldPc && heldPc.pc_id === pcId) { insidePc = true; return }
+        var force = forcePc === pcId
+        falcon.call("hierarchy.traverse", { pc_id: pcId, force: force }, function (ok, r) {
+            shell.forcePc = 0
+            if (ok) { shell.insidePc = true; return }
+            var msg = r.message || ""
+            if (r.code === "conflict" && msg.indexOf("force=true") >= 0) {
+                shell.forcePc = pcId
+                shell.notify("Someone is at that machine. Double-click it again to block them and enter.", true)
+            } else if (r.code === "conflict" && msg.indexOf("un-evictable") >= 0) {
+                shell.notify("The Super User is on that machine; it cannot be entered until they leave.", true)
+            } else shell.notify(msg, true)
+        })
+    }
     // the one ticking clock: every countdown reads it, so they can never disagree by a second
     property double nowMs: Date.now()
     Timer {
@@ -89,6 +137,7 @@ ApplicationWindow {
         shell.view = 0                  // the Admin's rail starts at their home, as theirs does
     }
     function stepOut() {
+        if (shell.insidePc) { shell.insidePc = false; return }      // back to where the machine was chosen
         shell.inside = false
         shell.show("authority")         // back to the department, the session still held
     }
@@ -116,7 +165,7 @@ ApplicationWindow {
     }
     Shortcut {
         sequence: "Escape"
-        enabled: shell.insideNow
+        enabled: shell.insideNow || shell.insidePcNow
         onActivated: shell.stepOut()
     }
     function enterDepartment(id) {
@@ -139,7 +188,7 @@ ApplicationWindow {
         target: falcon
         function onPushText(text, alert) { shell.notify(text, alert) }
         function onConnectionFailed(message) { shell.notify("connection failed: " + message, true) }
-        function onConnected() { shell.notify("connected as " + Theme.roleLabel(falcon.role), false) }
+        function onConnected() { shell.notify("connected as " + Theme.roleLabel(falcon.role), false); shell.loadTree() }
         function onDisconnected() { shell.notify("disconnected", true) }
     }
     Component.onCompleted: {
@@ -205,13 +254,19 @@ ApplicationWindow {
                 SessionLid {
                     id: lid
                     objectName: "sessionLid"
-                    visible: shell.insideNow
+                    visible: shell.lidMode !== ""
+                    mode: shell.lidMode || "inside"
+                    blockedBy: falcon.blockedBy
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
                     height: 38
-                    name: shell.heldAdmin ? (shell.heldAdmin.name || "an Admin") : ""
-                    hostname: shell.heldAdmin ? (shell.heldAdmin.hostname || "") : ""
+                    name: shell.heldPc ? (shell.heldPc.name || "someone") + "'s machine"
+                          : shell.heldAdmin ? (shell.heldAdmin.name || "an Admin") + "'s workstation" : "a machine"
+                    hostname: shell.heldPc ? (shell.heldPc.hostname || "")
+                              : shell.heldAdmin ? (shell.heldAdmin.hostname || "") : ""
+                    onGoIn: shell.heldPc ? (shell.insidePc = true) : shell.goInside()
+                    onClaim: falcon.call("hierarchy.claim_native", {}, function (ok, r) { shell.notify(ok ? "It is yours again" : r.message, !ok) })
                     session: falcon.session
                     nowMs: shell.nowMs
                     onExtend: shell.extendSession()
@@ -222,19 +277,21 @@ ApplicationWindow {
                 Rectangle {
                     id: sheet
                     anchors.fill: parent
-                    anchors.topMargin: shell.insideNow ? 46 : 0
+                    anchors.topMargin: shell.lidMode !== "" ? 46 : 0
                     radius: Theme.radiusMd
                     // The dashboards are drawn on the frame itself: the panels are the surfaces and
                     // the gradient shows between them, as on the boards. Only the views that still
                     // carry a sidebar -- the pre-kit ones -- keep the sheet under them. A department
                     // is drawn in the Overview's language, so it gets the frame too: the grey sheet
                     // under it was the old Admin-console shell showing through.
-                    color: shell.onFrame ? "transparent" : Theme.pane
+                    color: shell.onFrame || shell.insidePcNow ? "transparent" : Theme.pane
                     clip: true
 
                     StackLayout {
                         anchors.fill: parent
                         currentIndex: falcon.isConnected ? 1 : 0
+                        // inside a client PC the machine's page is the whole sheet; nothing shows through
+                        visible: !shell.insidePcNow
 
                         ConnectView { objectName: "connectView" }
 
@@ -343,52 +400,22 @@ ApplicationWindow {
                             }
                         }
                     }
-
-                    // state, as a floating pill over the sheet -- the frame never changes
-                    Rectangle {
-                        id: statePill
-                        // A Super User's held session is carried by the container on the department
-                        // page and, inside, by the lid -- a third copy floating over every page
-                        // would be the same fact said twice.
-                        visible: falcon.blocked || (falcon.traversing && falcon.role !== "super_user")
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.top: parent.top
-                        anchors.topMargin: 10
-                        height: 36
-                        width: pillRow.implicitWidth + 28
-                        radius: Theme.pill
-                        color: falcon.blocked ? Theme.dangerDeep : Theme.warnDeep
-
-                        Row {
-                            id: pillRow
-                            anchors.centerIn: parent
-                            spacing: 9
-                            Icon {
-                                name: falcon.blocked ? "shield" : "lock"
-                                color: "#ffffff"
-                                size: 15
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                            Txt {
-                                text: falcon.blocked
-                                      ? ("Super User is in charge of your view" + (falcon.blockedBy ? " — " + falcon.blockedBy : ""))
-                                      : falcon.sessionText
-                                color: "#ffffff"
-                                font.pixelSize: Theme.fBody
-                                font.weight: Font.Medium
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                            GBtn {
-                                text: falcon.blocked ? "Claim" : "Leave"
-                                small: true
-                                anchors.verticalCenter: parent.verticalCenter
-                                onClicked: falcon.blocked
-                                    ? falcon.call("hierarchy.claim_native", {}, function (ok, r) { shell.notify(ok ? "claimed" : r.message, !ok) })
-                                    : falcon.call("hierarchy.end_session", { session_id: falcon.session ? falcon.session.session_id : 0 },
-                                                  function (ok, r) { shell.notify(ok ? "left" : r.message, !ok) })
+                        // Level 4 (board CP03): a client PC, held -- over whatever page it was entered from
+                        PcView {
+                            objectName: "pcView"
+                            anchors.fill: parent
+                            visible: shell.insidePcNow
+                            pc: shell.heldPc
+                            clock: overview.clock
+                            holder: {
+                                var t = shell.orgTree
+                                for (var i = 0; i < t.length; i++)
+                                    for (var j = 0; j < t[i].admins.length; j++)
+                                        if (t[i].admins[j].account_id === falcon.accountId) return t[i].admins[j].name
+                                return ""
                             }
                         }
-                    }
+
 
                     // a toast confirms what you did; it never changes the detail card
                     Rectangle {
@@ -469,7 +496,8 @@ ApplicationWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                text: falcon.isConnected ? falcon.sessionText : ""
+                // the lid says the session; the status line never repeats it
+                text: !falcon.isConnected ? "" : falcon.session ? "" : "no session"
                 color: Qt.rgba(1, 1, 1, 0.45)
                 monospace: true
                 font.pixelSize: Theme.fSmall

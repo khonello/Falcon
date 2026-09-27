@@ -47,6 +47,11 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
 11. **A task's verification state is not in `task.list`.** Work's "Yours" wants "both checks passed · verify"
     on the card; today that needs `task.get` per task. A per-task `checks_passed / checks_total` in the list
     would do. *Found:* WK03.
+12. **A client PC's live state is thin** (level 4, CP03). `control.levels` gives processor, memory and idle from the
+    Worker's last metrics report (in memory, lost on restart); the design also wants **what is in front** (the
+    foreground program and its document) and a machine that is **not reachable** refused at `hierarchy.traverse`
+    (the Engine keeps no online state, so a held session on a switched-off machine looks like any other).
+    *Found:* level 4.
 
 ## Done inline (for the record)
 

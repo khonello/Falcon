@@ -47,8 +47,11 @@ action's own settings (saved as changed), When it runs, Try it on one machine, a
 file checked in words (`FALCON_SHOT_ACTION=<id>`, `FALCON_SHOT_CUSTOM=1`). Assistance (AS03), Reports (RP03) and
 Resources (RS03, opened over the Admin's home via `shell.subPage`, `FALCON_SHOT_RESOURCES=1`) are built:
 **step 3 is done.** Step 4 is under way: Record (`RecordView`, RC05) and Work (`WorkView`, WK03) are built -- the Super
-User's rail has no placeholder left. **Next: level 4 (CP03), the states (ST01-ST03), dialogs (DG01), and the Worker's
-windows (WR01, TK07).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
+User's rail has no placeholder left. Level 4 (`PcView`, CP03) is built: double-click a machine anywhere it is drawn (`shell.enterPc`),
+the page replaces the sheet under the lid, Escape steps out with the session held (`FALCON_SHOT_PC=<id>`,
+`FALCON_SHOT_STEPOUT=1`). **Every session state is the one lid** (`SessionLid`, `shell.lidMode`: inside / holding /
+blocked, `FALCON_SHOT_BLOCKED=1`); the old state pill is gone. **Next: the states (ST01-ST03), dialogs (DG01), and
+the Worker's windows (WR01, TK07).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
 in one pass after the UI (the user, 27 Sep 2026); only trivial ones are fixed inline.
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):

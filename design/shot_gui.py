@@ -409,6 +409,19 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             "entered_at": (now - timedelta(seconds=79)).isoformat(),
             "deadline_at": (now + timedelta(minutes=28, seconds=41)).isoformat(),
             "extended_count": 0, "un_evictable": True, "restricted_view": False, "super_user_banner": True}
+    # FALCON_SHOT_PC=<pc_id>: holding that client PC and inside it -- level 4
+    if os.environ.get("FALCON_SHOT_PC"):
+        now = datetime.now().astimezone()
+        me = 1 if role == "super_user" else 3012
+        bridge.state.session = {
+            "session_id": 10, "pc_id": int(os.environ["FALCON_SHOT_PC"]), "occupant_account_id": me,
+            "occupant_name": "You" if role == "super_user" else "R. Mensah", "occupant_role": role, "occupied_via": "traversal",
+            "entered_at": (now - timedelta(minutes=5)).isoformat(),
+            "deadline_at": (now + timedelta(minutes=24, seconds=10)).isoformat(),
+            "extended_count": 0, "un_evictable": role == "super_user", "restricted_view": False, "super_user_banner": role == "super_user"}
+    # FALCON_SHOT_BLOCKED=1: someone above is on this operator's own machine
+    if os.environ.get("FALCON_SHOT_BLOCKED"):
+        bridge.state.blocked_by = {"occupant_name": "the Super User", "occupant_role": "super_user"}
     bridge.stateChanged.emit()
     bridge.connected.emit()
 
@@ -519,6 +532,9 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         asv = win.findChild(object, "assistanceView")
         if os.environ.get("FALCON_SHOT_FIND") and asv is not None:
             QMetaObject.invokeMethod(asv, "search", Q_ARG("QVariant", os.environ["FALCON_SHOT_FIND"]))
+        # FALCON_SHOT_STEPOUT=1 holds the machine but steps out of it (the lid says "holding")
+        if os.environ.get("FALCON_SHOT_PC") and not os.environ.get("FALCON_SHOT_STEPOUT"):
+            QMetaObject.invokeMethod(win, "enterPc", Q_ARG("QVariant", int(os.environ["FALCON_SHOT_PC"])))
         if os.environ.get("FALCON_SHOT_INSIDE"):
             QMetaObject.invokeMethod(win, "goInside")
             # FALCON_SHOT_TAB=<key> opens that entry of the Admin's rail once inside
@@ -543,6 +559,9 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-action" + os.environ["FALCON_SHOT_ACTION"] if os.environ.get("FALCON_SHOT_ACTION") else ""
         name += "-custom" if os.environ.get("FALCON_SHOT_CUSTOM") else ""
         name += "-resources" if os.environ.get("FALCON_SHOT_RESOURCES") else ""
+        name += "-pc" + os.environ["FALCON_SHOT_PC"] if os.environ.get("FALCON_SHOT_PC") else ""
+        name += "-out" if os.environ.get("FALCON_SHOT_STEPOUT") else ""
+        name += "-blocked" if os.environ.get("FALCON_SHOT_BLOCKED") else ""
         name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""

@@ -18,6 +18,9 @@ Item {
     property string name: ""                // beneath: who, or the hostname
     property string line: ""                // beneath that: why, in words
     property string lineTone: ""            // tone name for the line; "" = faint
+    // double click enters, as everywhere (TABS.md): the page that draws the mark decides what entering means
+    signal doubleClicked()
+    TapHandler { onDoubleTapped: root.doubleClicked() }
 
     readonly property color toneColor: status === "warn" || status === "entered" ? Theme.warn
                                      : status === "danger" ? Theme.danger : status === "chosen" ? Theme.accent : "transparent"

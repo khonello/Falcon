@@ -391,6 +391,7 @@ Item {
                         name: modelData.name || ""
                         line: modelData.line || ""
                         lineTone: modelData.lineTone || ""
+                        onDoubleClicked: if (modelData.pc_id) shell.enterPc(modelData.pc_id)
                     }
                 }
                 Txt {

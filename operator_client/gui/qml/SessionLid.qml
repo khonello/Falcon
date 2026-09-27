@@ -11,6 +11,12 @@ import "."
 //
 // One place to look (who, which machine, how long) and one place to press (Extend, Leave). Escape
 // steps out and keeps the session; Leave ends it. Holding and looking are different things.
+//
+// It is THE ONE way a session is shown (the user, 27 Sep 2026: "why is the traversal alert never consistent"):
+//   inside    You are inside Ama's machine   OPS-07  24:05 left         Esc steps out  Extend  Leave
+//   holding   You are holding Ama's machine  OPS-07  24:05 left         Go in          Extend  Leave
+//   blocked   The Super User is in charge of your machine                                     Claim
+// No pill, no second banner, no status-line echo: the same bar, the same place, three wordings.
 Rectangle {
     id: root
 
@@ -18,9 +24,13 @@ Rectangle {
     property string hostname: ""
     property var session: ({})
     property double nowMs: Date.now()
+    property string mode: "inside"          // inside | holding | blocked
+    property string blockedBy: ""
     signal extend()
     signal leave()
     signal stepOut()
+    signal goIn()
+    signal claim()
 
     implicitHeight: 38
     radius: Theme.radiusMd
@@ -34,6 +44,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
         Ring {
+            visible: root.mode !== "blocked"
             width: 16; height: 16
             color: Theme.danger
             fraction: Day.leftFraction(root.session.entered_at, root.session.deadline_at, root.nowMs)
@@ -41,13 +52,16 @@ Rectangle {
         }
         Txt {
             objectName: "lidWho"
-            text: "You are inside " + root.name
+            // only a Super User can block an operator, so the sentence names them once
+            text: root.mode === "blocked" ? "The Super User is in charge of your machine"
+                  : (root.mode === "holding" ? "You are holding " : "You are inside ") + root.name
             color: Theme.ink
             font.pixelSize: Theme.fBody
             font.weight: Font.DemiBold
             anchors.verticalCenter: parent.verticalCenter
         }
         Txt {
+            visible: root.mode !== "blocked"
             text: root.hostname
             color: Theme.faint
             monospace: true
@@ -55,6 +69,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
         }
         Txt {
+            visible: root.mode !== "blocked" && !!root.session && !!root.session.deadline_at
             objectName: "lidLeft"
             text: Day.leftText(root.session.deadline_at, root.nowMs) + " left"
             color: Theme.danger
@@ -73,6 +88,7 @@ Rectangle {
 
         // stepping out is not leaving: it is said here because nothing invisible is load-bearing
         Txt {
+            visible: root.mode === "inside"
             text: "Esc steps out"
             color: Theme.faint
             font.pixelSize: Theme.fMeta
@@ -84,7 +100,16 @@ Rectangle {
                 onClicked: root.stepOut()
             }
         }
+        TBtn {
+            objectName: "lidGoIn"
+            visible: root.mode === "holding"
+            text: "Go in"
+            small: true
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: root.goIn()
+        }
         Item {
+            visible: root.mode !== "blocked"
             width: extendRow.implicitWidth
             height: 28
             anchors.verticalCenter: parent.verticalCenter
@@ -111,6 +136,16 @@ Rectangle {
             }
         }
         TBtn {
+            objectName: "lidClaim"
+            visible: root.mode === "blocked"
+            text: "Claim it back"
+            tone: "danger"
+            small: true
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: root.claim()
+        }
+        TBtn {
+            visible: root.mode !== "blocked"
             objectName: "lidLeave"
             text: "Leave"
             iconName: "back"
