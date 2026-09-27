@@ -37,3 +37,6 @@ data/
 # design boards are generated output
 design/boards/
 design/shots/
+
+# disc images from tools/build_iso.py
+*.iso
