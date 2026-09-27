@@ -187,7 +187,13 @@ STUB = {
         "routing": [{"category": "listener_report", "routed_department_id": 1, "department_name": "Operations"},
                     {"category": "resource_violation", "routed_department_id": 1, "department_name": "Operations"},
                     {"category": "resource_violation", "routed_department_id": 2, "department_name": "Finance"}]},
-    "control.action_list": {"builtin": {}, "actions": ACTIONS},
+    "control.action_list": {"builtin": {t: {"category": c, "params": []} for c, ts in (
+        ("control", ["screenshot", "notify", "lock_session", "rename_file", "restore_file", "kill_process", "start_process",
+                     "shutdown", "reboot"]),
+        ("monitoring", ["process_list", "system_metrics", "file_activity", "idle_time", "snapshot_file", "usb_contents"]))
+        for t in ts}, "actions": ACTIONS},
+    "control.execution": {"execution": {"id": 95, "status": "success"}, "output": ["locked"]},
+    "control.action_run": {"execution_id": 95, "executions": [{"pc_id": 27, "hostname": "OPS-07", "execution_id": 95}]},
     "control.event_list": {"types": {}, "events": EVENTS},
     "control.event_history": {"event_id": 1, "fired_today": 3, "running": [
         {"id": 91, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "pending", "hostname": "OPS-03"}],
@@ -436,6 +442,23 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
             na.setProperty("actionIds", [a["id"] for a in ev["actions"]])
             na.setProperty("step", int(os.environ["FALCON_SHOT_NEWAUTO"]))
             av.setProperty("mode", "new")
+        # FALCON_SHOT_ACTION=<id> chooses that action on the Actions page (and tries it on OPS-07);
+        # FALCON_SHOT_CUSTOM=1 opens a new custom action with a script already dropped
+        acv = win.findChild(object, "actionsView")
+        if os.environ.get("FALCON_SHOT_ACTION") and acv is not None:
+            want = int(os.environ["FALCON_SHOT_ACTION"])
+            act = next(a for k in ACTIONS for a in ACTIONS[k] if a["id"] == want)
+            QMetaObject.invokeMethod(acv, "choose", Q_ARG("QVariant", act))
+            acv.setProperty("tryPc", 27)
+            QMetaObject.invokeMethod(acv, "tryIt")
+            QTimer.singleShot(200, lambda: QMetaObject.invokeMethod(acv, "readTrial"))
+        if os.environ.get("FALCON_SHOT_CUSTOM") and acv is not None:
+            QMetaObject.invokeMethod(acv, "newCustom")
+            acv.setProperty("scriptPath", "C:/Users/rm/Documents/clear_temp.ps1")
+            acv.setProperty("scriptText", "\n".join(["# empties the temp folders"] * 40))
+            acv.setProperty("check", {"ok": True, "problems": []})
+            acv.setProperty("customName", "Clear temp")
+            acv.setProperty("customDoes", "Empties the temp folders to free disk space.")
         if os.environ.get("FALCON_SHOT_INSIDE"):
             QMetaObject.invokeMethod(win, "goInside")
             # FALCON_SHOT_TAB=<key> opens that entry of the Admin's rail once inside
@@ -457,6 +480,8 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-" + os.environ["FALCON_SHOT_ANSWER"] if os.environ.get("FALCON_SHOT_ANSWER") else ""
         name += "-" + os.environ["FALCON_SHOT_TAB"] if os.environ.get("FALCON_SHOT_TAB") else ""
         name += "-auto" + os.environ["FALCON_SHOT_NEWAUTO"] if os.environ.get("FALCON_SHOT_NEWAUTO") else ""
+        name += "-action" + os.environ["FALCON_SHOT_ACTION"] if os.environ.get("FALCON_SHOT_ACTION") else ""
+        name += "-custom" if os.environ.get("FALCON_SHOT_CUSTOM") else ""
         name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""

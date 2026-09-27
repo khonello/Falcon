@@ -42,7 +42,7 @@ ApplicationWindow {
     // shown exactly as they see it, grey sheet and all.
     // The pages rebuilt in the Overview's language sit on the gradient. The Admin's pages join as they are rebuilt; a
     // Super User inside an Admin sees exactly the Admin's page, so the same list holds there.
-    readonly property var framedAdminKeys: ["hierarchy", "tasks", "flows", "automation"]
+    readonly property var framedAdminKeys: ["hierarchy", "tasks", "flows", "automation", "actions"]
     readonly property bool onFrame: insideNow ? framedAdminKeys.indexOf(viewKey) >= 0
                                     : (onMustSee || inDepartment || viewKey === "rollout" || framedAdminKeys.indexOf(viewKey) >= 0)
 
@@ -302,7 +302,7 @@ ApplicationWindow {
                             AutomationView { objectName: "automationView"; anchors.fill: parent
                                              visible: shell.viewKey === "automation"; clock: overview.clock }
                             ActionsView { objectName: "actionsView"; anchors.fill: parent
-                                          visible: shell.viewKey === "actions" }
+                                          visible: shell.viewKey === "actions"; clock: overview.clock }
                             AssistanceView { objectName: "assistanceView"; anchors.fill: parent
                                              visible: shell.viewKey === "assistance" }
                             ReportsView { objectName: "reportsView"; anchors.fill: parent

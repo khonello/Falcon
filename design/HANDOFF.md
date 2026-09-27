@@ -42,9 +42,11 @@ inside an Admin (`shell.framedAdminKeys`). Screenshot one flow with `FALCON_SHOT
 words for triggers and actions live in the `Automate` singleton, shared with Actions; `control.event_history` gives
 "What it did", `control.levels` the band a threshold is drawn against, and `match.tier` matches a file's tier. A file
 being *opened* is not offered (the Engine cannot see reads). Screenshot the maker with `FALCON_SHOT_NEWAUTO=<step>`
-(and `FALCON_SHOT_AUTOEV=<index>` to start from another automation). **Next: Actions (AU05-AU07), then Assistance,
-Reports, Resources.** Found and not yet fixed: the Worker Client never relays `usb.*`, `user.*`, `program.*` or
-`network.*` signals, so automations on those are saved but cannot fire until it does.
+(and `FALCON_SHOT_AUTOEV=<index>` to start from another automation). Actions (`ActionsView`, AU05-AU07) is built: the library with built-ins not set up listed faintly, each
+action's own settings (saved as changed), When it runs, Try it on one machine, and a custom action as a script
+file checked in words (`FALCON_SHOT_ACTION=<id>`, `FALCON_SHOT_CUSTOM=1`). **Next: Assistance (AS03), Reports
+(RP03), Resources (RS03).** Engine and Worker gaps found while building are listed in `ENGINE-WORK.md`, to be fixed
+in one pass after the UI (the user, 27 Sep 2026); only trivial ones are fixed inline.
 
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
 1. The kit the pages share, to `PATTERNS.md`: the screen mark (`calm_slot` → a QML `MachineMark`), the horizontal and

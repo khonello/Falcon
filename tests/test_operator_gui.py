@@ -665,3 +665,29 @@ def test_a_new_flow_saves_only_when_every_blank_is_filled(gui):
     nf.setProperty("destinations", [{"pc_id": 25, "hostname": "OPS-05", "path": "D:/Shared"}])
     assert save.property("enabled") is True
     assert len(val(nf.property("preview"))["nodes"]) == 2
+
+
+def test_an_action_asks_only_for_what_it_needs_and_a_script_is_checked_on_arrival(gui, tmp_path):
+    """AU06 / AU07: a built-in not set up yet waits for what it needs; a custom action is a script FILE,
+    checked in words the moment it is picked -- an import outside the allowed set is refused."""
+    win, _, _ = gui
+    av = win.findChild(QObject, "actionsView")
+    av.setProperty("builtin", {"notify": {"category": "control", "params": ["message"]},
+                               "screenshot": {"category": "control", "params": []}})
+    QMetaObject.invokeMethod(av, "choose", Q_ARG("QVariant", {"id": 0, "kind": "control", "builtin_type": "notify"}))
+    assert val(av.property("missing")) == ["message"]
+    QMetaObject.invokeMethod(av, "setParam", Q_ARG("QVariant", "message"), Q_ARG("QVariant", "Save your work"))
+    assert val(av.property("missing")) == []
+    QMetaObject.invokeMethod(av, "choose", Q_ARG("QVariant", {"id": 0, "kind": "control", "builtin_type": "screenshot"}))
+    assert val(av.property("missing")) == []                                       # some ask for nothing
+
+    QMetaObject.invokeMethod(av, "newCustom")
+    good = tmp_path / "clear_temp.py"
+    good.write_text("import os\nprint(os.name)\n", encoding="utf-8")
+    QMetaObject.invokeMethod(av, "takeScript", Q_ARG("QVariant", good.as_uri()))
+    assert val(av.property("check"))["ok"] is True and av.property("customName") == "Clear temp"
+    bad = tmp_path / "fetch.py"
+    bad.write_text("import requests\n", encoding="utf-8")
+    QMetaObject.invokeMethod(av, "takeScript", Q_ARG("QVariant", bad.as_uri()))
+    assert val(av.property("check"))["ok"] is False
+    assert win.findChild(QObject, "saveCustom").property("enabled") is False

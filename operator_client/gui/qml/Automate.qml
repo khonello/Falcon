@@ -104,7 +104,7 @@ QtObject {
     // --- actions -----------------------------------------------------------------------------------
     readonly property var builtinWords: ({
         notify: { text: "Notify", does: "shows a message on their screen", done: "notified", icon: "bell" },
-        lock_session: { text: "Lock the screen", does: "for a set time, with a message", done: "screen locked", icon: "lock", short: "the lock" },
+        lock_session: { text: "Lock the screen", does: "locks it; they sign in again", done: "screen locked", icon: "lock", short: "the lock" },
         screenshot: { text: "Screenshot", does: "a still of their screen, now", done: "screenshot taken", icon: "camera" },
         rename_file: { text: "Rename a file", does: "gives a file a new name", done: "file renamed", icon: "file" },
         restore_file: { text: "Restore a file", does: "puts the last good copy back", done: "file restored", icon: "file" },

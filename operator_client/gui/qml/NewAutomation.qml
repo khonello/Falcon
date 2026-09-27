@@ -457,7 +457,7 @@ ColumnLayout {
                         visible: root.kind === "program"
                         width: parent.width
                         spacing: 8
-                        TextField {
+                        Field {
                             id: processField
                             width: Math.min(parent.width, 320)
                             placeholderText: "any program, or a name like excel.exe"
