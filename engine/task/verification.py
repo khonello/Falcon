@@ -122,7 +122,7 @@ async def check_create_collisions(engine: Engine, items: list[VerificationItem],
             hits = [h for h in hits if h["path"].replace("\\", "/").lower() == wanted]
         if hits:
             collisions.append({"item_index": idx, "name": item.name, "path": item.path,
-                               "existing": [{"path": h["path"], "pc_id": h["pc_id"]} for h in hits],
+                               "existing": [{"file_index_id": h["id"], "path": h["path"], "pc_id": h["pc_id"]} for h in hits],
                                "hint": "a file with this name already exists -- give a path or a new name, "
                                        "or did you mean Update?"})
     return collisions

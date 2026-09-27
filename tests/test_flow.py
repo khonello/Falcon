@@ -54,7 +54,10 @@ async def test_creation_checks(engine, org, connect):
     st = (await a1.ok("flow.status", {"flow_id": res3["flow"]["id"]}))["flow"]
     assert st["status"] == "active" and st["consent_status"] == "granted"
     # Visibility: creator, destination owner, Super User; W2 sees flows into its department.
-    assert {f["id"] for f in (await a1.ok("flow.list"))["flows"]} == {f1, res2["flow"]["id"], res3["flow"]["id"]}
+    listed = (await a1.ok("flow.list"))["flows"]
+    assert {f["id"] for f in listed} == {f1, res2["flow"]["id"], res3["flow"]["id"]}
+    # a flow is read as "from FIN-01", never as a source id
+    assert all(f["source_hostname"] for f in listed)
     assert await a2.ok("flow.status", {"flow_id": res3["flow"]["id"]})
     assert await w1.err("flow.status", {"flow_id": res3["flow"]["id"]}) == "forbidden"
 

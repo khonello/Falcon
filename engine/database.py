@@ -617,7 +617,8 @@ class FlowsRepo(_Repo):
     async def list_for(self, account_id: int, *, department_id: int | None) -> list[dict[str, Any]]:
         """Flows the account created, owns a destination of, or whose endpoints sit in their department."""
         return await self._fetch(
-            "SELECT DISTINCT f.* FROM flows f "
+            # the source's hostname rides along: a flow is read as "from OPS-02", never as an id
+            "SELECT DISTINCT f.*, sp.hostname AS source_hostname FROM flows f "
             "LEFT JOIN pcs sp ON sp.id = f.source_pc_id "
             "LEFT JOIN flow_destinations fd ON fd.flow_id = f.id AND fd.removed_at IS NULL "
             "LEFT JOIN pcs dp ON dp.id = fd.destination_pc_id "
@@ -626,7 +627,8 @@ class FlowsRepo(_Repo):
             "ORDER BY f.id", account_id, department_id)
 
     async def list_all(self) -> list[dict[str, Any]]:
-        return await self._fetch("SELECT * FROM flows WHERE status <> 'inactive' ORDER BY id")
+        return await self._fetch("SELECT f.*, sp.hostname AS source_hostname FROM flows f "
+                                 "LEFT JOIN pcs sp ON sp.id = f.source_pc_id WHERE f.status <> 'inactive' ORDER BY f.id")
 
     async def sources_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(

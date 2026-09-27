@@ -97,29 +97,8 @@ Item {
         out.sort(function (a, b) { return String(a.hostname).localeCompare(String(b.hostname)) })
         return out
     }
-    // each machine as the screen mark reads it: rollout and violations first (they need someone), then who is on it
-    readonly property var machines: {
-        var byPc = {}
-        for (var f = 0; f < fleet.length; f++) byPc[fleet[f].pc_id] = fleet[f].state
-        return fleet.map(function (m) {
-            var w = root.workers.filter(function (x) { return x.pc_id === m.pc_id })[0] || {}
-            var s = w.session
-            var host = m.hostname || ""
-            var st = byPc[m.pc_id]
-            var status = st === "danger" ? "danger" : st === "warn" ? "warn"
-                       : !s ? "free" : s.occupied_via === "native" ? "ok" : "entered"
-            var line = st === "danger" ? "needs you" : st === "warn" ? "a version behind"
-                     : !s ? "free" : s.occupied_via === "native" ? "at the PC"
-                     : (s.occupant_name || "someone") + " entered"
-            // a violation is named, not just toned
-            for (var v = 0; v < root.violations.length; v++) {
-                var vi = root.violations[v]
-                if (vi.found_on_pc_id === m.pc_id || vi.hostname === host) { status = "danger"; line = "a file out of place" }
-            }
-            return { label: host.split("-").pop(), host: host, name: w.name || host, status: status, line: line,
-                     lineTone: status === "danger" ? "danger" : (status === "warn" || status === "entered") ? "warn" : "" }
-        })
-    }
+    // each machine as the screen mark reads it -- the shared rule, so this page and the Admin's home agree
+    readonly property var machines: Fleet.machines(workers, rollout, violations)
     // what waits on you here, as cards: files out of place, machines behind, and nobody governing
     readonly property var waitItems: {
         var out = []
@@ -132,7 +111,7 @@ Item {
             out.push({ icon: "shield", tone: "danger", title: (vi.filename || "A file") + " is out of place",
                        line: "on " + (vi.hostname || ""), word: "new" })
         }
-        var behindHere = machines.filter(function (m) { return m.line === "a version behind" })
+        var behindHere = machines.filter(function (m) { return m.line === "a version behind" || m.line === "update past the limit" })
         if (behindHere.length > 0)
             out.push({ icon: "shield", tone: "warn", title: behindHere.length === 1 ? behindHere[0].host + " is a version behind"
                                                                                   : behindHere.length + " machines are a version behind",

@@ -330,7 +330,7 @@ def test_a_department_is_drawn_on_the_frame_not_on_a_sheet(gui):
     inheriting the old Admin-console shell, which is what made it look like a different product."""
     win, _, _ = gui
     QMetaObject.invokeMethod(win, "show", Q_ARG("QVariant", "authority"))
-    assert win.property("onFrame") is False          # the area itself still uses the old HomeView
+    assert win.property("onFrame") is True           # (this fixture has the Admin rail: its home is on the kit now)
     QMetaObject.invokeMethod(win, "enterDepartment", Q_ARG("QVariant", 1))
     assert win.property("onFrame") is True           # the department page does not
 
@@ -427,9 +427,10 @@ def test_inside_an_admin_the_window_is_their_interface_under_the_lid(gui):
     assert [e["key"] for e in val(rail.property("nav"))] == \
         ["hierarchy", "tasks", "flows", "automation", "actions", "assistance", "reports"]
     assert rail.property("currentKey") == "hierarchy"
-    assert win.property("onFrame") is False and win.property("inDepartment") is False
-    home = win.findChild(QObject, "hierarchyRail")
-    assert home.property("asDepartment") == 1 and home.property("isSuper") is False
+    # the Admin's home is on the new kit now, so inside it sits on the frame like the Admin's own window
+    assert win.property("onFrame") is True and win.property("inDepartment") is False
+    home = win.findChild(QObject, "adminHome")
+    assert home.property("deptId") == 1 and home.property("visible") is not None
     assert win.findChild(QObject, "lidWho").property("text") == "You are inside R. Mensah"
 
     # Escape steps out and the session runs on: holding and looking are different things
@@ -590,3 +591,29 @@ def test_rollout_shows_departments_then_one_maximised(gui):
     machines = val(rv.property("openMachines"))
     assert len(machines) == 40 and sum(1 for m in machines if m["status"] == "warn") == 4
     assert win.findChild(QObject, "rolloutCrumbDept").property("text") == "D4"
+
+
+
+def test_a_new_task_waits_for_every_decision(gui):
+    """TK05: whatever the model could not settle is a decision, worked down one at a time; Confirm waits for them.
+    A name that already exists can be answered 'it means the existing file', which makes the line an Update."""
+    win, _, _ = gui
+    tv = win.findChild(QObject, "tasksView")
+    nt = next(o for o in tv.findChildren(QObject) if o.metaObject().className().startswith("NewTask"))
+    nt.setProperty("assignee", {"account_id": 4003, "name": "Yaw"})
+    nt.setProperty("proposal", {
+        "items": [], "final_deadline": None,
+        "flags": [{"kind": "ambiguous_deadline", "candidates": ["Monday", "Wednesday"]}],
+        "collisions": [{"item_index": 0, "name": "r.docx", "existing": [{"file_index_id": 92, "path": "C:/r.docx"}]}],
+        "proposed_split": []})
+    nt.setProperty("items", [{"target_type": "file", "intent": "create", "name": "r.docx", "path": None,
+                              "linked_item_index": None, "file_index_id": None, "populated_by": "llm", "removed": False}])
+    assert len(val(nt.property("open"))) == 2
+    assert val(nt.property("current"))["kind"] == "ambiguous_deadline"          # one at a time, in order
+    assert win.findChild(QObject, "newTaskConfirm").property("enabled") is False
+    QMetaObject.invokeMethod(nt, "settle", Q_ARG("QVariant", "flag0"))
+    assert val(nt.property("current"))["kind"] == "collision"
+    QMetaObject.invokeMethod(nt, "setItem", Q_ARG("QVariant", 0), Q_ARG("QVariant", {"intent": "update", "file_index_id": 92}))
+    QMetaObject.invokeMethod(nt, "settle", Q_ARG("QVariant", "col0"))
+    assert val(nt.property("open")) == [] and val(nt.property("items"))[0]["intent"] == "update"
+    assert win.findChild(QObject, "newTaskConfirm").property("enabled") is True

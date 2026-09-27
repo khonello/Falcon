@@ -109,6 +109,8 @@ async def test_propose_reports_collisions_and_llm_state(engine, org, connect):
     await _index(engine, org["w1_pc"], "C:/docs/report.docx", "report.docx")
     res = await a1.ok("task.propose", {"description": "write report.docx", "assignee_account_id": org["w1"]})
     assert res["items"][0]["intent"] == "create" and res["collisions"][0]["name"] == "report.docx"
+    # the existing file is named by its index id, so "it means the existing file" can bind an Update to it
+    assert res["collisions"][0]["existing"][0]["file_index_id"]
     assert res["needs_assigner"] is True and res["llm_available"] is True
     # Scope: Admin cannot propose for another department's worker or for an Admin.
     assert await a1.err("task.propose", {"description": "x", "assignee_account_id": org["a2"]}) == "forbidden"

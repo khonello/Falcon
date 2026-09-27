@@ -3,190 +3,434 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "."
 
-// Tasks: list / detail with the verification stack, and the propose -> review -> create editor.
-// The proposal is never committed on its own: the operator reviews items, flags and the deadline.
+// TASKS (boards TK04 the page, TK05 describing one, TK06 one task). An Admin's -- and a Super User inside one sees it.
+//
+//   list  four cells: Needs you (to verify, given to you), Deadlines, By person, Closed (hands off to Record)
+//   new   side by side: your words, and the structure the local model filled; whatever it could not settle is a
+//         DECISION, worked down one at a time, each asked on the line it is about; a detected split is drafted;
+//         Confirm waits for every decision. Nothing is committed on the model's say-so.
+//   task  the checks and the files on the left, the verdict the full height on the right -- only the assigner closes it
+//
+// Never the assigner on a list: on your own page it is always you. A task given TO you names who gave it.
 Item {
-    id: view
-    property var tasks: []
-    property var task: null
-    property var proposal: null      // {items, flags, collisions, final_deadline, llm_available}
-    property var items: []           // the working stack being edited
+    id: root
 
+    property string mode: "list"            // list | new | task
+    property var tasks: []
+    property var closed: []
+    property var task: null                 // task.get
+    property var tree: []
+    property string clock: ""
+
+    // --- data -------------------------------------------------------------------------------------
     function refresh() {
-        falcon.call("task.list", {include_completed: showAll.checked}, function(ok, r) { if (ok) view.tasks = r.tasks; else root.notify(r.message, true) })
+        if (!falcon.isConnected) return
+        falcon.call("task.list", {}, function (ok, r) { if (ok) root.tasks = r.tasks; else shell.notify(r.message, true) })
+        falcon.call("task.list", { include_completed: true }, function (ok, r) {
+            if (ok) root.closed = r.tasks.filter(function (t) { return t.status === "completed" })
+        })
+        falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
     }
     function open(id) {
-        falcon.call("task.get", {task_id: id}, function(ok, r) { if (ok) view.task = r.task; else root.notify(r.message, true) })
+        falcon.call("task.get", { task_id: id }, function (ok, r) {
+            if (ok) { root.task = r.task; root.mode = "task" } else shell.notify(r.message, true)
+        })
     }
-    Component.onCompleted: if (falcon.isConnected) refresh()
     Connections {
         target: falcon
-        function onConnected() { view.refresh() }
-        function onScopeChanged() { if (falcon.isConnected) view.refresh() }
+        function onConnected() { root.refresh() }
+        function onScopeChanged() { if (falcon.isConnected) root.refresh() }
         function onPushReceived(type, p) {
-            if (type.indexOf("task.") === 0) { view.refresh(); if (view.task && p.task_id === view.task.id) view.open(view.task.id) }
+            if (type.indexOf("task.") === 0) { root.refresh(); if (root.task && p.task_id === root.task.id) root.open(root.task.id) }
         }
     }
+    Component.onCompleted: if (falcon.isConnected) refresh()
+    Keys.onEscapePressed: root.mode = "list"
+    focus: true
 
-    RowLayout {
+    readonly property int me: shell.heldAdmin ? shell.heldAdmin.account_id : falcon.accountId
+    readonly property var mine: tasks.filter(function (t) { return t.assigner_account_id === root.me })
+    readonly property var givenToMe: tasks.filter(function (t) { return t.assignee_account_id === root.me && t.assigner_account_id !== root.me })
+    function isOverdue(t) { var h = t.final_deadline_at ? Date.parse(t.final_deadline_at) : NaN; return !isNaN(h) && h < Date.now() }
+    function dayOf(iso) {
+        if (!iso) return ""
+        var d = new Date(iso), now = new Date()
+        var days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        return (d.toDateString() === now.toDateString()) ? "today" : days[d.getDay()]
+    }
+    // to verify: you set it, it has begun, and nothing in its stack is still waiting
+    readonly property var toVerify: mine.filter(function (t) { return t.status === "in_progress" })
+    readonly property var deadlines: mine.filter(function (t) { return t.final_deadline_at }).sort(function (a, b) {
+        return Date.parse(a.final_deadline_at) - Date.parse(b.final_deadline_at) })
+    readonly property var people: {
+        var by = {}, order = []
+        for (var i = 0; i < mine.length; i++) {
+            var t = mine[i]
+            if (!by[t.assignee_account_id]) { by[t.assignee_account_id] = { name: t.assignee_name || "Someone", tasks: [] }; order.push(t.assignee_account_id) }
+            by[t.assignee_account_id].tasks.push(t)
+        }
+        return order.map(function (k) { return by[k] })
+    }
+    readonly property var closedThisWeek: closed.filter(function (t) {
+        return t.completed_at && (Date.now() - Date.parse(t.completed_at)) < 7 * 86400000 })
+
+    // --- the header, shared by the three modes --------------------------------------------------------
+    ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 10
+        anchors.leftMargin: 6
+        anchors.rightMargin: 22
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
+        spacing: 16
 
-        ColumnLayout {
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 48
+            Column {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+                Row {
+                    spacing: 6
+                    Txt { text: "Tasks"; color: root.mode === "list" ? "#ffffff" : Qt.rgba(1, 1, 1, 0.45); font.pixelSize: Theme.fBody
+                          font.weight: root.mode === "list" ? Font.DemiBold : Font.Normal
+                          MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor; onClicked: root.mode = "list" } }
+                    Icon { visible: root.mode !== "list"; name: "chev"; color: Qt.rgba(1, 1, 1, 0.45); size: 12; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { objectName: "tasksCrumb"; visible: root.mode !== "list"; color: "#ffffff"; font.pixelSize: Theme.fBody; font.weight: Font.DemiBold
+                          text: root.mode === "new" ? "New task" : (root.task ? root.taskTitle(root.task) : "") }
+                }
+                Row {
+                    spacing: 12
+                    Txt { text: root.mode === "new" ? "New task" : root.mode === "task" && root.task ? root.taskTitle(root.task) : "Tasks"
+                          color: "#ffffff"; font.pixelSize: Theme.fTitle; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { anchors.verticalCenter: parent.verticalCenter; font.pixelSize: Theme.fBody; color: Theme.warn
+                          text: root.mode === "list" ? ((root.toVerify.length + root.givenToMe.length) > 0
+                                                         ? (root.toVerify.length + root.givenToMe.length) + " waiting on you" : "")
+                                : root.mode === "task" && root.task ? (root.task.assignee_name || "") + (root.task.final_deadline_at ? " · due " + root.dayOf(root.task.final_deadline_at) : "")
+                                : "the model proposes; you decide" }
+                }
+            }
+            Row {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 16
+                TBtn { visible: root.mode === "list"; text: "New task"; iconName: "plus"; onClicked: { newTask.reset(); root.mode = "new" } }
+                Txt { text: root.mode === "list" ? root.clock : "Esc to go back"; color: Qt.rgba(1, 1, 1, 0.45); font.pixelSize: Theme.fBody
+                      anchors.verticalCenter: parent.verticalCenter }
+            }
+        }
+
+        // ===================================================================================================
+        // TK04: the page
+        GridLayout {
+            visible: root.mode === "list"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            RowLayout {
-                Label { text: "Tasks"; font.pixelSize: Theme.fontLarge; color: Theme.text }
-                CheckBox { id: showAll; text: "include completed"; onToggled: view.refresh() }
-                Item { Layout.fillWidth: true }
-                Btn { text: "New task"; onClicked: editor.visible = !editor.visible }
-                Btn { text: "Refresh"; onClicked: view.refresh() }
-            }
-            DataTable {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 240
-                rows: view.tasks
-                columns: ["id", "status", "assigner_name", "assignee_name", "description_raw", "verification_mode", "final_deadline_at"]
-                widths: ({id: 50, status: 90, assigner_name: 110, assignee_name: 110, description_raw: 260, verification_mode: 90, final_deadline_at: 130})
-                onRowClicked: function(row) { view.open(row.id) }
-            }
+            columns: 2
+            rowSpacing: 20
+            columnSpacing: 20
 
-            // detail
-            Rectangle {
+            GridCell {
+                objectName: "tasksNeeds"
                 Layout.fillWidth: true
+                Layout.preferredWidth: 2
                 Layout.fillHeight: true
-                color: Theme.surface; radius: Theme.radius; border.width: 1; border.color: Theme.border
-                visible: !!view.task
-                ColumnLayout {
-                    anchors.fill: parent; anchors.margins: 10; spacing: 6
-                    RowLayout {
-                        Label { text: view.task ? "Task " + view.task.id + " — " + view.task.status + " (" + view.task.verification_mode + ")" : ""; color: Theme.text; font.bold: true }
-                        Item { Layout.fillWidth: true }
-                        Btn { text: "Start (assignee)"; onClicked: falcon.call("task.start", {task_id: view.task.id}, view.after) }
-                        Btn { text: "Verify complete"; onClicked: falcon.call("task.verify", {task_id: view.task.id, outcome: "complete"}, view.after) }
-                        Btn { text: "Incomplete"; onClicked: falcon.call("task.verify", {task_id: view.task.id, outcome: "incomplete"}, view.after) }
-                        Btn { text: "Re-evaluate stack"; onClicked: falcon.call("task.stack", {task_id: view.task.id}, function(ok, r) { view.after(ok, r); if (ok) view.open(view.task.id) }) }
+                topAlign: true
+                title: "Needs you"
+                narration: ({ brief: (root.toVerify.length + root.givenToMe.length) === 0 ? "nothing" : (root.toVerify.length + root.givenToMe.length) + " things",
+                              tone: (root.toVerify.length + root.givenToMe.length) > 0 ? "accent" : "", state: "ok" })
+                Row {
+                    width: parent.width
+                    spacing: 24
+                    Column {
+                        width: (parent.width - 24) / 2
+                        spacing: 8
+                        Txt { text: "Under way — yours to verify"; color: Theme.faint; font.pixelSize: Theme.fMeta; font.weight: Font.DemiBold }
+                        PagedColumn {
+                            width: parent.width; height: Math.max(80, root.height / 2 - 150); itemHeight: 58
+                            model: root.toVerify
+                            visible: root.toVerify.length > 0
+                            delegate: InfoCard {
+                                initials: modelData ? Theme.initials(modelData.assignee_name || "") : ""
+                                title: modelData ? root.taskTitle(modelData) : ""
+                                line: modelData ? (modelData.assignee_name || "") + " · started " + root.dayOf(modelData.started_at) : ""
+                                stateWord: "verify"; stateTone: "ok"
+                                onClicked: root.open(modelData.id)
+                            }
+                        }
+                        Txt { visible: root.toVerify.length === 0; text: "Nothing to verify."; color: Theme.faint; font.pixelSize: Theme.fBody }
                     }
-                    Label { text: view.task ? view.task.description_raw : ""; color: Theme.textDim; wrapMode: Text.Wrap; Layout.fillWidth: true }
-                    Label { color: Theme.textFaint; text: view.task ? ("assigned by " + view.task.assigner_name + " to " + view.task.assignee_name
-                                                              + "  ·  soft " + (view.task.soft_deadline_at || "-") + "  ·  final " + (view.task.final_deadline_at || "-")) : "" }
-                    Eyebrow { label: "verification stack" }
-                    DataTable {
-                        Layout.fillWidth: true; Layout.fillHeight: true
-                        rows: view.task ? view.task.items : []
-                        columns: ["sequence", "target_type", "intent", "proposed_filename", "program_name", "file_path", "status"]
-                        widths: ({sequence: 40, target_type: 80, intent: 120, proposed_filename: 160, program_name: 120, file_path: 220, status: 90})
-                        emptyText: "(no verification items)"
+                    Column {
+                        width: (parent.width - 24) / 2
+                        spacing: 8
+                        Txt { text: "Given to you"; color: Theme.faint; font.pixelSize: Theme.fMeta; font.weight: Font.DemiBold }
+                        PagedColumn {
+                            width: parent.width; height: Math.max(80, root.height / 2 - 150); itemHeight: 58
+                            model: root.givenToMe
+                            visible: root.givenToMe.length > 0
+                            delegate: InfoCard {
+                                iconName: "tasks"; iconTone: "accent"
+                                title: modelData ? root.taskTitle(modelData) : ""
+                                line: modelData ? "from " + (modelData.assigner_name || "above") + (modelData.final_deadline_at ? " · by " + root.dayOf(modelData.final_deadline_at) : "") : ""
+                                stateWord: modelData && modelData.status === "active" ? "start" : "started"
+                                stateTone: modelData && modelData.status === "active" ? "accent" : ""
+                                onClicked: root.open(modelData.id)
+                            }
+                        }
+                        Txt { visible: root.givenToMe.length === 0; text: "Nothing given to you."; color: Theme.faint; font.pixelSize: Theme.fBody }
                     }
                 }
             }
-            Item { Layout.fillHeight: true; visible: !view.task }
+
+            GridCell {
+                objectName: "tasksDeadlines"
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                Layout.fillHeight: true
+                topAlign: true
+                title: "Deadlines"
+                narration: ({ brief: root.deadlines.filter(root.isOverdue).length > 0 ? root.deadlines.filter(root.isOverdue).length + " overdue" : "on time",
+                              tone: root.deadlines.filter(root.isOverdue).length > 0 ? "danger" : "", state: "ok" })
+                Column {
+                    width: parent.width
+                    spacing: 0
+                    Txt { width: parent.width; wrapMode: Text.WordWrap; color: Theme.ink; font.pixelSize: Theme.fSection; font.weight: Font.DemiBold
+                          bottomPadding: 10
+                          text: root.deadlines.length === 0 ? "No task you set has a deadline."
+                                : root.isOverdue(root.deadlines[0]) ? (root.deadlines[0].assignee_name || "Someone") + " is past the final deadline."
+                                : "The next is due " + root.dayOf(root.deadlines[0].final_deadline_at) + "." }
+                    Repeater {
+                        model: root.deadlines.slice(0, 5)
+                        delegate: Item {
+                            required property var modelData
+                            width: parent.width; height: 34
+                            Txt { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 90; elide: Text.ElideRight
+                                  text: root.taskTitle(modelData); color: Theme.dim; font.pixelSize: Theme.fBody }
+                            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: Theme.fBody; font.weight: Font.Medium
+                                  text: root.isOverdue(modelData) ? "overdue" : root.dayOf(modelData.final_deadline_at)
+                                  color: root.isOverdue(modelData) ? Theme.danger : Theme.ink }
+                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.line }
+                        }
+                    }
+                }
+            }
+
+            GridCell {
+                objectName: "tasksByPerson"
+                Layout.fillWidth: true
+                Layout.preferredWidth: 2
+                Layout.fillHeight: true
+                topAlign: true
+                title: "By person"
+                narration: ({ brief: "who is carrying what", state: root.people.length === 0 ? "empty" : "ok",
+                              note: "No tasks set", sentence: "Describe one with New task." })
+                PagedColumn {
+                    width: parent.width
+                    height: Math.max(100, root.height / 2 - 110)
+                    itemHeight: 58
+                    model: root.people
+                    delegate: InfoCard {
+                        initials: modelData ? Theme.initials(modelData.name) : ""
+                        title: modelData ? modelData.name : ""
+                        line: modelData ? modelData.tasks.map(function (t) { return root.taskTitle(t) }).join(" · ") : ""
+                        stateWord: modelData ? (modelData.tasks.filter(root.isOverdue).length > 0 ? "overdue"
+                                                : modelData.tasks.length + (modelData.tasks.length === 1 ? " task" : " tasks")) : ""
+                        stateTone: modelData && modelData.tasks.filter(root.isOverdue).length > 0 ? "danger" : ""
+                        onClicked: if (modelData) root.open(modelData.tasks[0].id)
+                    }
+                }
+            }
+
+            GridCell {
+                objectName: "tasksClosed"
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                Layout.fillHeight: true
+                topAlign: true
+                title: "Closed"
+                narration: ({ brief: "hands off to Record", state: "ok" })
+                Column {
+                    width: parent.width
+                    spacing: 8
+                    Txt { width: parent.width; wrapMode: Text.WordWrap; color: Theme.ink; font.pixelSize: Theme.fSection; font.weight: Font.DemiBold
+                          text: root.closedThisWeek.length === 0 ? "Nothing closed this week."
+                                : root.closedThisWeek.length + (root.closedThisWeek.length === 1 ? " closed this week." : " closed this week.") }
+                    Repeater {
+                        model: root.closedThisWeek.slice(0, 3)
+                        delegate: InfoCard { required property var modelData; width: parent.width; iconName: "check"; iconTone: "ok"
+                                             title: root.taskTitle(modelData); line: (modelData.assignee_name || "") + " · " + root.dayOf(modelData.completed_at)
+                                             stateWord: "verified"; stateTone: "ok" }
+                    }
+                    Row { spacing: 4
+                          Txt { text: "All of them are in Record"; color: Theme.accent; font.pixelSize: Theme.fBody
+                                MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: shell.show("reports") } }
+                          Icon { name: "chev"; size: 12; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter } }
+                }
+            }
         }
 
-        // editor: propose -> review -> create
-        Rectangle {
-            id: editor
-            Layout.preferredWidth: 420
+        // ===================================================================================================
+        // TK06: one task -- the checks and the files, and the verdict the full height
+        RowLayout {
+            visible: root.mode === "task" && root.task !== null
+            Layout.fillWidth: true
             Layout.fillHeight: true
-            color: Theme.surface; radius: Theme.radius; border.width: 1; border.color: Theme.border
-            visible: false
-            ColumnLayout {
-                anchors.fill: parent; anchors.margins: 12; spacing: 6
-                Label { text: "New task"; font.pixelSize: Theme.fontMedium; color: Theme.text }
-                RowLayout {
-                    Eyebrow { label: "assignee account" }
-                    Field { id: assignee; Layout.preferredWidth: 80; validator: IntValidator { bottom: 1 } }
-                }
-                TextArea { id: desc; Layout.fillWidth: true; Layout.preferredHeight: 90; placeholderText: "describe the task in plain language"; wrapMode: TextEdit.Wrap }
-                RowLayout {
-                    Btn { text: "Propose (local LLM)"; enabled: assignee.text.length > 0 && desc.text.length > 0
-                             onClicked: falcon.call("task.propose", {description: desc.text, assignee_account_id: parseInt(assignee.text)}, view.onProposal) }
-                    Label { text: view.proposal && !view.proposal.llm_available ? "LLM unavailable — manual" : ""; color: Theme.warn }
-                }
-                Label { text: view.proposal && view.proposal.flags.length ? "needs your decision: " + view.proposal.flags.map(view.flagText).join("; ") : ""
-                        color: Theme.warn; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text.length > 0 }
-                Label { text: view.proposal && view.proposal.collisions.length ? "name collisions: " + view.proposal.collisions.map(function(c) { return c.name + " exists at " + c.existing.map(function(e) { return e.path }).join(", ") }).join("; ") : ""
-                        color: Theme.danger; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text.length > 0 }
+            spacing: 20
 
-                Label { text: "verification items (" + view.items.length + ")"; color: Theme.textDim }
-                DataTable {
-                    id: itemTable
-                    Layout.fillWidth: true; Layout.preferredHeight: 150
-                    rows: view.items
-                    columns: ["target_type", "intent", "name", "path", "populated_by"]
-                    widths: ({target_type: 70, intent: 110, name: 120, path: 90, populated_by: 60})
-                    emptyText: "(empty — create with 'no verification' or add items)"
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 2
+                Layout.fillHeight: true
+                spacing: 20
+
+                GridCell {
+                    objectName: "taskChecks"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    topAlign: true
+                    title: "The checks"
+                    narration: ({ brief: root.task ? root.checksBrief(root.task) : "", tone: root.task && root.itemsFailed(root.task) > 0 ? "warn" : "", state: "ok" })
+                    Column {
+                        width: parent.width
+                        spacing: 0
+                        Txt { visible: root.task && root.task.verification_mode === "none"; width: parent.width; wrapMode: Text.WordWrap
+                              text: "No verification was chosen for this task. You close it by looking at the work."; color: Theme.dim; font.pixelSize: Theme.fBody }
+                        Repeater {
+                            model: root.task ? (root.task.items || []) : []
+                            delegate: Item {
+                                required property var modelData
+                                width: parent.width; height: 52
+                                Row {
+                                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; spacing: 12
+                                    Rectangle { width: 20; height: 20; radius: 6; anchors.verticalCenter: parent.verticalCenter
+                                                color: modelData.status === "passed" ? Theme.ok : modelData.status === "failed" ? Theme.danger : Theme.line2
+                                                Icon { anchors.centerIn: parent; visible: modelData.status !== "pending"; size: 12; weight: 2.4; color: "#10131a"
+                                                       name: modelData.status === "passed" ? "check" : "x" } }
+                                    Column { anchors.verticalCenter: parent.verticalCenter; spacing: 1
+                                        Txt { text: modelData.proposed_filename || modelData.program_name || ("item " + modelData.sequence)
+                                              color: Theme.ink; font.pixelSize: Theme.fRow - 1; font.weight: Font.DemiBold }
+                                        Txt { text: root.itemLine(modelData); color: Theme.faint; font.pixelSize: Theme.fMeta } }
+                                }
+                                Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: root.intentWord(modelData.intent)
+                                      color: Theme.tone(modelData.intent === "create" ? "ok" : "accent"); font.pixelSize: Theme.fMeta; font.weight: Font.DemiBold }
+                                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.line }
+                            }
+                        }
+                        Txt { topPadding: 8; visible: root.task && root.task.verification_mode !== "none"; color: Theme.faint; font.pixelSize: Theme.fMeta
+                              text: "Signs of work, never proof of it. The checks inform; the verdict is yours." }
+                    }
                 }
-                RowLayout {
-                    Picker { id: newType; model: ["file", "program"]; Layout.preferredWidth: 90 }
-                    Picker { id: newIntent; Layout.preferredWidth: 150
-                               model: newType.currentText === "file" ? ["create", "update", "exists"] : ["used", "used_with_file", "installed_available", "closed_not_running"] }
-                    Field { id: newName; Layout.fillWidth: true; placeholderText: "name" }
-                    Btn { text: "+"; enabled: newName.text.length > 0
-                             onClicked: { var a = view.items.slice(); a.push({target_type: newType.currentText, intent: newIntent.currentText, name: newName.text, path: null,
-                                                                             linked_item_index: null, file_index_id: null, populated_by: "manual"}); view.items = a; newName.text = "" } }
-                    Btn { text: "−"; enabled: itemTable.selectedIndex >= 0
-                             onClicked: { var a = view.items.slice(); a.splice(itemTable.selectedIndex, 1); view.items = a; itemTable.selectedIndex = -1 } }
+                GridCell {
+                    objectName: "taskFiles"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 190
+                    topAlign: true
+                    title: "The files"
+                    narration: ({ brief: "tracked by name, not by folder", state: "ok" })
+                    Flow {
+                        width: parent.width
+                        spacing: 14
+                        Repeater {
+                            model: root.task ? (root.task.items || []).filter(function (i) { return i.target_type === "file" }) : []
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: (parent.width - 14) / 2; height: 96; radius: 12; color: Theme.pane
+                                Column { anchors.fill: parent; anchors.margins: 14; spacing: 6
+                                    Row { spacing: 9
+                                          Icon { name: "file"; size: 17; color: modelData.file_path ? Theme.accent : Theme.faint }
+                                          Txt { text: modelData.proposed_filename || ""; color: Theme.ink; monospace: true; font.pixelSize: Theme.fRow - 1; font.weight: Font.DemiBold } }
+                                    Txt { width: parent.width; elide: Text.ElideMiddle; color: Theme.faint; font.pixelSize: Theme.fMeta
+                                          text: modelData.file_path ? modelData.file_path : "not created yet — found by name wherever it is saved" }
+                                    Txt { visible: !!modelData.file_last_seen_at; color: Theme.dim; font.pixelSize: Theme.fMeta
+                                          text: "last seen " + String(modelData.file_last_seen_at || "").substring(11, 16) }
+                                }
+                            }
+                        }
+                    }
                 }
-                GridLayout {
-                    columns: 3; Layout.fillWidth: true
-                    Eyebrow { label: "soft deadline" }
-                    Field { id: soft; Layout.fillWidth: true; placeholderText: "friday 5pm / ISO"; onEditingFinished: softResolved.text = text ? (falcon.resolveDeadline(text) || "?") : "" }
-                    Label { id: softResolved; color: Theme.textDim; Layout.preferredWidth: 130 }
-                    Eyebrow { label: "final deadline" }
-                    Field { id: final; Layout.fillWidth: true; placeholderText: "tomorrow 3pm / ISO"; onEditingFinished: finalResolved.text = text ? (falcon.resolveDeadline(text) || "?") : "" }
-                    Label { id: finalResolved; color: Theme.textDim; Layout.preferredWidth: 130 }
+            }
+
+            GridCell {
+                objectName: "taskVerdict"
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                Layout.fillHeight: true
+                topAlign: true
+                title: root.task && root.task.assigner_account_id === root.me ? "Review, then decide" : "Your part"
+                narration: ({ brief: root.task && root.task.assigner_account_id === root.me ? "yours alone" : "", tone: "accent", state: "ok" })
+                Column {
+                    width: parent.width
+                    spacing: 12
+                    Txt { width: parent.width; wrapMode: Text.WordWrap; color: Theme.ink; font.pixelSize: Theme.fSection; font.weight: Font.DemiBold
+                          text: root.task ? root.verdictSentence(root.task) : "" }
+                    Txt { width: parent.width; wrapMode: Text.WordWrap; color: Theme.dim; font.pixelSize: Theme.fBody
+                          text: root.task ? String(root.task.description_raw || "") : "" }
+                    KeyRow { label: "For"; value: root.task ? (root.task.assignee_name || "") : "" }
+                    KeyRow { label: "Final deadline"; value: root.task && root.task.final_deadline_at ? root.dayOf(root.task.final_deadline_at) : "none"
+                             tone: root.task && root.isOverdue(root.task) ? "danger" : "" }
+                    KeyRow { label: "State"; value: root.task ? (root.task.status === "active" ? "not started" : root.task.status === "in_progress" ? "under way" : "closed") : "" }
+                    Txt { visible: root.task && root.task.assigner_account_id === root.me && root.task.status !== "completed"; width: parent.width; wrapMode: Text.WordWrap
+                          text: "Only you can close this task, and only as a whole."; color: Theme.dim; font.pixelSize: Theme.fBody }
+                    Row {
+                        spacing: 8
+                        visible: root.task && root.task.assigner_account_id === root.me && root.task.status !== "completed"
+                        TBtn { text: "Complete"; tone: "ok"; iconName: "check"
+                               onClicked: falcon.call("task.verify", { task_id: root.task.id, outcome: "complete" }, root.after) }
+                        TBtn { text: "Send back"; tone: "warn"
+                               onClicked: falcon.call("task.verify", { task_id: root.task.id, outcome: "incomplete" }, root.after) }
+                    }
+                    TBtn { visible: root.task && root.task.assignee_account_id === root.me && root.task.status === "active"
+                           text: "Start"; iconName: "play"; onClicked: falcon.call("task.start", { task_id: root.task.id }, root.after) }
                 }
-                RowLayout {
-                    Btn { text: "Create"; enabled: view.items.length > 0 && assignee.text.length > 0 && desc.text.length > 0; onClicked: view.create(false) }
-                    Btn { text: "Create with no verification"; enabled: assignee.text.length > 0 && desc.text.length > 0; onClicked: view.create(true) }
-                    Item { Layout.fillWidth: true }
-                    Btn { text: "Close"; flat: true; onClicked: editor.visible = false }
-                }
-                Item { Layout.fillHeight: true }
             }
         }
-    }
 
-    function flagText(f) {
-        switch (f.kind) {
-        case "unclear": return "unclear: " + f.question
-        case "ambiguous_deadline": return "ambiguous deadline: " + JSON.stringify(f.candidates)
-        case "contradiction": return "contradiction: " + f.detail
-        case "no_target": return f.ask + " (create with no verification to confirm)"
-        case "file_not_indexed": return "item " + (f.item_index + 1) + ": " + f.ask
-        default: return JSON.stringify(f)
+        // ===================================================================================================
+        // TK05: describing a task
+        NewTask {
+            id: newTask
+            visible: root.mode === "new"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            tree: root.tree
+            onCreated: function (id) { root.refresh(); root.open(id) }
         }
     }
-    function onProposal(ok, r) {
-        if (!ok) { root.notify(r.message, true); return }
-        view.proposal = r
-        view.items = r.items.map(function(i) { return {target_type: i.target_type, intent: i.intent, name: i.name, path: i.path || null,
-                                                       linked_item_index: i.linked_item_index === undefined ? null : i.linked_item_index,
-                                                       file_index_id: i.file_index_id === undefined ? null : i.file_index_id, populated_by: "llm"} })
-        if (r.final_deadline) { final.text = r.final_deadline; finalResolved.text = falcon.resolveDeadline(r.final_deadline) || "?" }
-        root.notify("proposal: " + r.items.length + " item(s)" + (r.flags.length ? ", " + r.flags.length + " flag(s)" : "")
-                    + (r.proposed_split && r.proposed_split.length ? " — looks like " + r.proposed_split.length + " tasks: " + r.proposed_split.map(function(p) { return p.description }).join(" | ") : ""), false)
+
+    // --- words -------------------------------------------------------------------------------------------
+    function taskTitle(t) {
+        var d = String(t.description_raw || "Task")
+        var cut = d.split(/[.;]/)[0]
+        return cut.length > 44 ? cut.substring(0, 42) + "…" : cut
     }
-    function deadline(field, label) {
-        if (!field.text) return null
-        var iso = falcon.resolveDeadline(field.text)
-        if (!iso) { root.notify(label + " deadline must be ISO 8601 or a phrase like 'friday 5pm'", true); return undefined }
-        return iso
+    function intentWord(i) {
+        return ({ create: "Create", update: "Update", exists: "Exists", used: "Used", used_with_file: "Used with",
+                  installed_available: "Installed", closed_not_running: "Closed" })[i] || i
     }
-    function create(none) {
-        var s = deadline(soft, "soft"), f = deadline(final, "final")
-        if (s === undefined || f === undefined) return
-        falcon.call("task.create", {assignee_account_id: parseInt(assignee.text), description: desc.text,
-                                    verification_mode: none ? "none" : "stack", confirm_none: none, items: none ? [] : view.items,
-                                    soft_deadline_at: s, final_deadline_at: f},
-                    function(ok, r) {
-                        if (!ok) { root.notify(r.message, true); return }
-                        root.notify("task " + r.task.id + " created for " + r.task.assignee_name, false)
-                        view.items = []; view.proposal = null; desc.text = ""; soft.text = ""; final.text = ""; softResolved.text = ""; finalResolved.text = ""
-                        editor.visible = false; view.refresh()
-                    })
+    function itemLine(it) {
+        if (it.status === "passed") return it.file_path ? "found at " + it.file_path : "passed"
+        if (it.status === "failed") return "not met"
+        return it.target_type === "program" ? "watching the program" : it.intent === "create" ? "not created yet" : "waiting for a change"
     }
-    function after(ok, r) { root.notify(ok ? falcon.pretty(r) : r.message, !ok); view.refresh(); if (ok && view.task) view.open(view.task.id) }
+    function itemsFailed(t) { return (t.items || []).filter(function (i) { return i.status === "failed" }).length }
+    function checksBrief(t) {
+        var items = t.items || []
+        if (items.length === 0) return "no checks"
+        var passed = items.filter(function (i) { return i.status === "passed" }).length
+        return passed + " of " + items.length + " passed"
+    }
+    function verdictSentence(t) {
+        if (t.status === "completed") return "This task is closed."
+        var items = t.items || []
+        if (t.verification_mode === "none") return "Look at the work, then decide."
+        var passed = items.filter(function (i) { return i.status === "passed" }).length
+        var failed = itemsFailed(t)
+        if (passed === items.length) return "Every check passed. Look at the work, then decide."
+        return passed + " of " + items.length + " checks passed" + (failed > 0 ? "; " + failed + " not met." : "; the rest are waiting.")
+    }
+    function after(ok, r) {
+        shell.notify(ok ? "Done" : r.message, !ok)
+        root.refresh()
+        if (ok && root.task) root.open(root.task.id)
+    }
 }

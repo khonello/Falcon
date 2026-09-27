@@ -14,7 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PySide6.QtCore import QMetaObject, QTimer  # noqa: E402
+from PySide6.QtCore import Q_ARG, QMetaObject, QTimer  # noqa: E402
 
 from operator_client.core.config import LocalConfig  # noqa: E402
 from operator_client.gui import app as gui_app  # noqa: E402
@@ -138,22 +138,45 @@ STUB = {
          "condition_spec": {"type": "disk_low", "match": {"percent": 10}},
          "actions": [{"id": 5, "name": "Clear temp"}]}]},
     "task.list": {"tasks": [
-        {"id": 1, "assigner_account_id": 3012, "assignee_account_id": 4001, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 2, "assigner_account_id": 3012, "assignee_account_id": 4003, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 3, "assigner_account_id": 3012, "assignee_account_id": 4004, "soft_deadline_at": _at(9), "final_deadline_at": None},
-        {"id": 4, "assigner_account_id": 3012, "assignee_account_id": 4005, "soft_deadline_at": _at(9), "final_deadline_at": None},
-        {"id": 5, "assigner_account_id": 3012, "assignee_account_id": 4007, "soft_deadline_at": _at(8, 2), "final_deadline_at": _at(9, 1)},
-        {"id": 6, "assigner_account_id": 3013, "assignee_account_id": 4002, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 7, "assigner_account_id": 3012, "assignee_account_id": 4006, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 8, "assignee_account_id": 4101, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 9, "assignee_account_id": 4102, "soft_deadline_at": None, "final_deadline_at": None},
-        {"id": 10, "assignee_account_id": 4201, "soft_deadline_at": _at(8, 3), "final_deadline_at": _at(9, 2)},
-        {"id": 11, "assignee_account_id": 4202, "soft_deadline_at": None, "final_deadline_at": None}]},
+        {"id": 1, "description_raw": "Update the fleet inventory in inventory-2026.xlsx", "status": "in_progress", "started_at": _at(9.2), "assigner_account_id": 3012, "assignee_account_id": 4001, "assignee_name": "Kojo", "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 2, "description_raw": "Reconcile the Q3 supplier invoices and produce reconciliation-q3.docx", "status": "in_progress", "started_at": _at(9.25), "assigner_account_id": 3012, "assignee_account_id": 4003, "assignee_name": "Yaw", "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 3, "description_raw": "Archive last quarter's folder", "status": "active", "assigner_account_id": 3012, "assignee_account_id": 4004, "assignee_name": "Adjoa", "soft_deadline_at": _at(9), "final_deadline_at": None},
+        {"id": 4, "description_raw": "Prepare the onboarding pack for the new starters", "status": "active", "assigner_account_id": 3012, "assignee_account_id": 4005, "assignee_name": "Nana", "soft_deadline_at": _at(9), "final_deadline_at": None},
+        {"id": 5, "description_raw": "Finish the quarterly report", "status": "in_progress", "started_at": _at(8.1), "assigner_account_id": 3012, "assignee_account_id": 4007, "assignee_name": "Ama", "soft_deadline_at": _at(8, 2), "final_deadline_at": _at(9, 1)},
+        {"id": 6, "description_raw": "Tidy the shared drive", "status": "active", "assigner_account_id": 3013, "assignee_account_id": 4002, "assignee_name": "Efua", "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 7, "description_raw": "Check the printer logs", "status": "active", "assigner_account_id": 3012, "assignee_account_id": 4006, "assignee_name": "Kwame", "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 12, "description_raw": "Department audit for Operations", "status": "active", "assigner_account_id": 1,
+         "assigner_name": "Super User", "assignee_account_id": 3012, "assignee_name": "R. Mensah", "soft_deadline_at": None,
+         "final_deadline_at": _at(17, -2)},
+        {"id": 8, "assignee_account_id": 4101, "assignee_name": "Afi", "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 9, "assignee_account_id": 4102, "assignee_name": "Kofi", "soft_deadline_at": None, "final_deadline_at": None},
+        {"id": 10, "assignee_account_id": 4201, "assignee_name": "Esi", "soft_deadline_at": _at(8, 3), "final_deadline_at": _at(9, 2)},
+        {"id": 11, "assignee_account_id": 4202, "assignee_name": "Abena", "soft_deadline_at": None, "final_deadline_at": None}]},
+    "task.get": {"task": {
+        "id": 2, "description_raw": "Reconcile the Q3 supplier invoices against suppliers-q3.xlsx and produce reconciliation-q3.docx",
+        "status": "in_progress", "verification_mode": "stack", "assigner_account_id": 3012, "assigner_name": "R. Mensah",
+        "assignee_account_id": 4003, "assignee_name": "Yaw", "final_deadline_at": _at(17, -3), "started_at": _at(9.25),
+        "items": [
+            {"id": 1, "sequence": 1, "target_type": "file", "intent": "update", "proposed_filename": "suppliers-q3.xlsx",
+             "status": "passed", "file_path": "D:/Finance/Q3/suppliers-q3.xlsx", "file_last_seen_at": _at(10.7)},
+            {"id": 2, "sequence": 2, "target_type": "file", "intent": "create", "proposed_filename": "reconciliation-q3.docx",
+             "status": "passed", "file_path": "C:/Users/yaw/Documents/reconciliation-q3.docx", "file_last_seen_at": _at(13.1)},
+            {"id": 3, "sequence": 3, "target_type": "program", "intent": "used_with_file", "program_name": "Excel",
+             "status": "failed", "file_path": None}]}},
+    "task.propose": {
+        "llm_available": True, "final_deadline": None, "soft_deadline": None,
+        "items": [{"target_type": "file", "intent": "update", "name": "suppliers-q3.xlsx", "file_index_id": 91},
+                  {"target_type": "file", "intent": "create", "name": "reconciliation-q3.docx"}],
+        "flags": [{"kind": "ambiguous_deadline", "candidates": ["Monday", "Wednesday"]}],
+        "collisions": [{"item_index": 1, "name": "reconciliation-q3.docx", "path": None,
+                        "existing": [{"file_index_id": 92, "path": "C:/Users/yaw/Documents/reconciliation-q3.docx", "pc_id": 23}]}],
+        "proposed_split": [{"description": "Reconcile the Q3 supplier invoices and produce reconciliation-q3.docx", "targets": []},
+                           {"description": "archive last quarter's folder", "targets": []}]},
     "flow.list": {"flows": [
-        {"id": 1, "created_by_account_id": 3012, "source_pc_id": 21, "status": "active"}, {"id": 2, "created_by_account_id": 3012, "source_pc_id": 23, "status": "active"},
-        {"id": 3, "created_by_account_id": 3012, "source_pc_id": 25, "status": "active"}, {"id": 4, "created_by_account_id": 3012, "source_pc_id": 27, "status": "paused"},
-        {"id": 5, "source_pc_id": 31, "status": "active"}, {"id": 6, "source_pc_id": 32, "status": "active"},
-        {"id": 7, "source_pc_id": 31, "status": "paused"}]},
+        {"id": 1, "created_by_account_id": 3012, "source_pc_id": 21, "source_hostname": "OPS-01", "status": "active"}, {"id": 2, "created_by_account_id": 3012, "source_pc_id": 23, "source_hostname": "OPS-03", "status": "active"},
+        {"id": 3, "created_by_account_id": 3012, "source_pc_id": 25, "source_hostname": "OPS-05", "status": "active"}, {"id": 4, "created_by_account_id": 3012, "source_pc_id": 27, "source_hostname": "OPS-07", "status": "paused"},
+        {"id": 5, "source_pc_id": 31, "source_hostname": "FIN-01", "status": "active"}, {"id": 6, "source_pc_id": 32, "source_hostname": "FIN-02", "status": "active"},
+        {"id": 7, "source_pc_id": 31, "source_hostname": "FIN-01", "status": "paused"}]},
 }
 
 
@@ -296,6 +319,22 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
                 lane = win.findChild(object, "enteringAdmin")
                 lane.setProperty("answer", {"kind": os.environ["FALCON_SHOT_ANSWER"], "holder": "K. Owusu",
                                             "message": "no such pc"})
+        # FALCON_SHOT_TASK=<id> opens one task; FALCON_SHOT_NEWTASK=1 opens a proposed new task
+        tv = win.findChild(object, "tasksView")
+        if os.environ.get("FALCON_SHOT_TASK") and tv is not None:
+            QMetaObject.invokeMethod(tv, "open", Q_ARG("QVariant", int(os.environ["FALCON_SHOT_TASK"])))
+        if os.environ.get("FALCON_SHOT_NEWTASK") and tv is not None:
+            tv.setProperty("mode", "new")
+            nt = win.findChild(object, "newTaskWords")
+            words = win.findChild(object, "newTaskText")
+            if words is not None:
+                words.setProperty("text", "Reconcile the Q3 supplier invoices against suppliers-q3.xlsx and produce "
+                                          "reconciliation-q3.docx by Monday or Wednesday. Also archive last quarter's folder.")
+            for obj in tv.findChildren(object):
+                if obj.metaObject().className().startswith("NewTask"):
+                    obj.setProperty("assignee", {"account_id": 4003, "name": "Yaw", "hostname": "OPS-03"})
+                    QMetaObject.invokeMethod(obj, "propose")
+                    break
         if os.environ.get("FALCON_SHOT_INSIDE"):
             QMetaObject.invokeMethod(win, "goInside")
             # FALCON_SHOT_TAB=<key> opens that entry of the Admin's rail once inside
@@ -326,6 +365,8 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-s" + os.environ["FALCON_SHOT_SUBTAB"] if os.environ.get("FALCON_SHOT_SUBTAB") else ""
         name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
         name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
+        name += "-task" + os.environ["FALCON_SHOT_TASK"] if os.environ.get("FALCON_SHOT_TASK") else ""
+        name += "-new" if os.environ.get("FALCON_SHOT_NEWTASK") else ""
         path = out_dir / (name + ".png")
         img.save(str(path))
         print("saved", path, img.width(), img.height())

@@ -40,7 +40,11 @@ ApplicationWindow {
     readonly property bool inDepartment: !insideNow && onAuthority && departmentId !== 0
     // drawn on the gradient, with no sheet behind it. Inside an Admin never is: their interface is
     // shown exactly as they see it, grey sheet and all.
-    readonly property bool onFrame: !insideNow && (onMustSee || inDepartment || viewKey === "rollout")
+    // The pages rebuilt in the Overview's language sit on the gradient. The Admin's pages join as they are rebuilt; a
+    // Super User inside an Admin sees exactly the Admin's page, so the same list holds there.
+    readonly property var framedAdminKeys: ["hierarchy", "tasks"]
+    readonly property bool onFrame: insideNow ? framedAdminKeys.indexOf(viewKey) >= 0
+                                    : (onMustSee || inDepartment || viewKey === "rollout" || framedAdminKeys.indexOf(viewKey) >= 0)
 
     // LEVEL 3 -- INSIDE AN ADMIN. Holding a session and looking through it are different things:
     // `hierarchy.traverse` makes the session and the department page draws it as a container;
@@ -249,8 +253,19 @@ ApplicationWindow {
                                 objectName: "hierarchyRail"      // the hierarchy tree lives here now
                                 anchors.fill: parent
                                 // inside, it is the Admin's home: their department, drawn as theirs
-                                asDepartment: shell.insideNow ? shell.heldAdmin.department_id : 0
-                                visible: shell.onAuthority && !shell.inDepartment
+                                asDepartment: 0
+                                // the Super User's Authority area; an Admin's home is AdminHome below
+                                visible: shell.viewKey === "authority" && !shell.inDepartment
+                            }
+
+                            // an Admin's home, at home or with a Super User inside them (HO03)
+                            AdminHome {
+                                id: adminHome
+                                objectName: "adminHome"
+                                anchors.fill: parent
+                                visible: shell.viewKey === "hierarchy"
+                                departmentId: shell.insideNow ? shell.heldAdmin.department_id : 0
+                                clock: overview.clock
                             }
 
                             // level 2: the department, drawn in the Overview's language and fed by
@@ -281,7 +296,7 @@ ApplicationWindow {
                             // that Admin see the same window (LEVELS.md, level 3). The Super User's own
                             // rail has no such entries, so there they stay mounted out of sight.
                             TasksView { objectName: "tasksView"; anchors.fill: parent
-                                        visible: shell.viewKey === "tasks" }
+                                        visible: shell.viewKey === "tasks"; clock: overview.clock }
                             FlowsView { objectName: "flowsView"; anchors.fill: parent
                                         visible: shell.viewKey === "flows" }
                             ControlView { objectName: "controlView"; anchors.fill: parent
