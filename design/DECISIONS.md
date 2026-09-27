@@ -265,6 +265,9 @@ from the Admin's home, no rail entry added), `CP03` a client PC at level 4 under
 person card over a message box -- *"not easy to parse ... must be easily parsed."* Redone as `RC04` / `RO04`: a card and a
 sentence per fact, the act on the same card. The rule is `PATTERNS.md` section 0.
 
+**The timeline is kept, made readable** (27 Sep 2026): `RC05` uses the Overview's day timeline with axis and legend, beside
+the written entries. Supersedes `RC04`'s cards-only Record.
+
 ## 4. Proposed, still open
 
 | | |

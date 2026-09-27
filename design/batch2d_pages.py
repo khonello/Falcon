@@ -103,3 +103,46 @@ def ro04():
 
 BATCH2D = [("RC04-Record.dc.html", "Record: redone for reading", rc04),
            ("RO04-Rollout.dc.html", "Rollout: redone for reading", ro04)]
+
+# ------------------------------------------------------------------ RC05: Record, with the readable timeline back
+# The user, 27 Sep 2026: "Am not opposing the timeline, it been used a lot already, just make it readable like it
+# done in super user areas or other areas." So the lanes are the Overview's own day timeline (dept_day: labelled
+# lanes, an hour axis, gridlines, a legend -- the one on the department's Today), and the written entries sit
+# beside it as its key.
+def rc05():
+    day = dept_day(w=856, lane_h=16, gap_y=7)
+    entered = col(
+        entry_card("SU", "admin", "You entered OPS-03", "10:20 – 11:00 · Yaw was blocked", "40 min", "danger"),
+        entry_card("AQ", "admin", "A. Quaye is helping Finance", "since 10:40 · by consent", "now", "accent"),
+        entry_card("RM", "admin", "R. Mensah entered OPS-04", "10:02 – 10:22 · Adjoa blocked", "20 min"),
+        txt("Everyone else stayed at their own machine.", 11.5, T["faint"]), gap=9, extra="width: 396px;")
+    trail = col(*[row(txt(t, 11, T["faint"], mono=True, extra="width: 44px; flex: none;"), ic(i, 15, T[tn] if tn else T["dim"]),
+                      txt(w_, 12, T["ink"] if tn else T["dim"], 500 if tn else 400), gap=10,
+                      extra=f"width: 100%; padding: 8px 0; border-bottom: 1px solid {T['line']};")
+                  for t, i, w_, tn in [("11:45", "check", "A violation was addressed", None),
+                                       ("11:41", "shield", "A restricted file on OPS-07", "danger"),
+                                       ("11:00", "lock", "You left OPS-03 after 40 minutes", "danger"),
+                                       ("10:40", "assistance", "A. Quaye began helping Finance", "accent"),
+                                       ("09:11", "warn", "A hostname did not match", "warn")]],
+                gap=0, extra="width: 396px;")
+    views = col(thing_card("eye", "ok", "Listener report, channel 14", "HR · addressed Mon 09:12", "addressed"),
+                thing_card("shield", "danger", "A restricted file on OPS-07", "Operations · not addressed", "open", "danger"),
+                txt("Who addressed what is yours alone; it is never routed.", 10.5, T["faint"]), gap=9, extra="width: 396px;")
+    place = col(txt("Two things are out of place right now.", 13.5, T["ink"], 600, extra="line-height: 1.35;"),
+                thing_card("file", "danger", "budget-2026.xlsx", "Restricted · on OPS-07"),
+                thing_card("warn", "warn", "A hostname did not match", "OPS-05 · not addressed"), gap=10, extra="width: 396px;")
+    return area_page(
+        "Record", "record", ["Record"], "Record", "past and present · two things still out of place", "warn",
+        [row(kcell("Who was where, today", "you entered one machine", "danger", day, w=900, h=316, top=True),
+             kcell("Entered today", "three", "danger", entered, w=440, h=316, top=True),
+             gap=20, align="stretch", extra="flex: none;"),
+         row(kcell("The trail", "newest first", "dim", trail, w=440, h=340, top=True),
+             kcell("Reports and their Views", "one still open", "warn", views, w=440, h=340, top=True),
+             kcell("Out of place", "two", "danger", place, w=440, h=340, top=True),
+             gap=20, align="stretch", extra="flex: none;")],
+        "RC05 · The timeline back, drawn the way the Overview and the department draw their day — labelled lanes, an hour axis, a "
+        "legend — with the written entries beside it as its key. Below: the trail, reports and their Views, what is out of place.",
+        eyebrow("PAGE", "Record — the readable timeline", "a pair over three"))
+
+
+BATCH2D += [("RC05-Record.dc.html", "Record: the readable timeline", rc05)]

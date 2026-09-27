@@ -106,6 +106,12 @@ update attempts, and the lever as a person card over a message box.**
 No geometry to decode, nothing to count, no form to fill before acting. Drawings are for shape at a glance;
 anything a person must read closely is words. `RC04` and `RO04` are the reference.
 
+**The day timeline stays** (*"Am not opposing the timeline ... just make it readable like it done in super user areas"*):
+use the Overview's own one (`dept_day` / `DayTimeline`) — a lane per machine labelled on the left, an hour axis with
+gridlines, blocks in grey (at their own PC), amber (an Admin entered), red (you), and a legend under it naming the
+colours and the machines never signed in. Never a bare set of bars without axis or legend. Pair it with the written
+entries as its key (`RC05`).
+
 ## 8. Counts of events are ticks — only where nobody reads them one by one
 
 Use sparingly (see section 0): a tick run is a texture, not a record. Ticks on a line: 3 px wide, radius 2; quiet ones 55 % height in rgba white 0.35; the ones needing someone full height
