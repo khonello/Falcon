@@ -339,3 +339,14 @@ def test_entering_a_signed_out_admin_does_not_claim_anyone_is_blocked():
     assert said["sentence"] == "A. Quaye is not signed in, so nobody is blocked."
     assert said["action"] == "Enter WS-OPS-A2"
     assert not any(f["label"].endswith("gets") for f in said["facts"])
+
+
+
+def test_the_department_fleet_sentence_reads_the_tones_the_page_passes():
+    """The page builds states as tone names (danger / warn). The sentence once looked only for failing / behind,
+    so it said "all current" beside a machine in red -- the page contradicting itself."""
+    said = n.narrate("dept_fleet", {"hosts": [{"hostname": "OPS-06", "state": "warn"},
+                                              {"hostname": "OPS-07", "state": "danger"},
+                                              {"hostname": "OPS-01", "state": "ok"}]})
+    assert said["tone"] == "danger" and "OPS-07" in said["sentence"]
+    assert not said["sentence"].startswith("All")

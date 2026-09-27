@@ -40,7 +40,7 @@ ApplicationWindow {
     readonly property bool inDepartment: !insideNow && onAuthority && departmentId !== 0
     // drawn on the gradient, with no sheet behind it. Inside an Admin never is: their interface is
     // shown exactly as they see it, grey sheet and all.
-    readonly property bool onFrame: !insideNow && (onMustSee || inDepartment)
+    readonly property bool onFrame: !insideNow && (onMustSee || inDepartment || viewKey === "rollout")
 
     // LEVEL 3 -- INSIDE AN ADMIN. Holding a session and looking through it are different things:
     // `hierarchy.traverse` makes the session and the department page draws it as a container;
@@ -292,10 +292,17 @@ ApplicationWindow {
                                              visible: shell.viewKey === "assistance" }
                             ReportsView { objectName: "reportsView"; anchors.fill: parent
                                           visible: shell.viewKey === "reports" }
-                            // the Super User areas not designed yet: Rollout, Record, Work
+                            // Rollout (boards RO05, RO06): departments, then one maximised
+                            RolloutView {
+                                objectName: "rolloutView"
+                                anchors.fill: parent
+                                visible: shell.viewKey === "rollout" && !shell.insideNow
+                                clock: overview.clock
+                            }
+                            // the Super User areas still to build: Record, Work
                             Item {
                                 anchors.fill: parent
-                                visible: ["rollout", "record", "work"].indexOf(shell.viewKey) >= 0
+                                visible: ["record", "work"].indexOf(shell.viewKey) >= 0
                                 Column {
                                     anchors.centerIn: parent
                                     spacing: 12

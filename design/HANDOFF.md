@@ -30,6 +30,12 @@ screens everywhere except levels 1-3's shells. The approved boards, one per page
 | States, dialogs, the Worker | `ST01`-`ST03`, `DG01`, `WR01` |
 | The machine mark and its alternatives | `MK01` |
 
+**Progress:** step 1 (the kit: `MachineMark`, `PagedRow`, `PagedColumn`, `InfoCard`, `SentenceSlot`, `FlowTree`) and
+step 2 (`OverviewView` to OV02, the new `RolloutView` to RO05/RO06 with `MachineGrid` and `DeptRolloutCard`,
+`DepartmentView` to DP18) are **built**; `FleetGrid` and `OpenedRollout` are retired. Screenshot at scale with
+`FALCON_SHOT_SCALE=1` (ten departments, ~225 machines) and `FALCON_SHOT_ROLLOUT_DEPT=<id>`. The Engine reports no
+online/offline state, so the rollout words say "retrying" / "past the limit", never "offline". **Next: step 3.**
+
 **Build order** (foundations first, then page by page, each screenshotted against its board with `shot_gui.py`):
 1. The kit the pages share, to `PATTERNS.md`: the screen mark (`calm_slot` → a QML `MachineMark`), the horizontal and
    vertical **edge pagers**, person/thing cards, bare icons, plain-text tabs, the fill-in sentence slot, the tree

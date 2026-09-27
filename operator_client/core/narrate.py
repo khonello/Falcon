@@ -410,13 +410,16 @@ def dept_fleet(data: dict[str, Any]) -> dict[str, Any]:
     biggest = int(data.get("biggest") or len(hosts))
     if not hosts:
         return _empty("This department has no client PCs.", brief="no client PCs")
-    failing = [h for h in hosts if h.get("state") == "failing"]
-    behind = [h for h in hosts if h.get("state") == "behind"]
+    # the page passes tone names (danger / warn); older callers pass failing / behind -- both mean the same
+    failing = [h for h in hosts if h.get("state") in ("failing", "danger")]
+    behind = [h for h in hosts if h.get("state") in ("behind", "warn")]
     brief = f"{len(hosts)} of {biggest}"
     if failing:
-        return _out(f"{failing[0]['hostname']} has failed past the threshold.",
+        return _out(f"{_n(len(failing), 'machine')} here {'needs' if len(failing) == 1 else 'need'} you."
+                    if len(failing) > 1 else f"{failing[0]['hostname']} needs you.",
                     [_fact("Client PCs", f"{len(hosts)} of {biggest} the largest has"),
-                     _fact("Failing", failing[0]["hostname"], "danger")],
+                     _fact("Needs you", ", ".join(h["hostname"] for h in failing[:3]), "danger")]
+                    + ([_fact("Behind", _n(len(behind), "machine"), "warn")] if behind else []),
                     brief=brief, tone="danger")
     if behind:
         return _out(f"{_n(len(behind), 'machine')} here is still behind.",

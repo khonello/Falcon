@@ -97,6 +97,49 @@ Item {
         out.sort(function (a, b) { return String(a.hostname).localeCompare(String(b.hostname)) })
         return out
     }
+    // each machine as the screen mark reads it: rollout and violations first (they need someone), then who is on it
+    readonly property var machines: {
+        var byPc = {}
+        for (var f = 0; f < fleet.length; f++) byPc[fleet[f].pc_id] = fleet[f].state
+        return fleet.map(function (m) {
+            var w = root.workers.filter(function (x) { return x.pc_id === m.pc_id })[0] || {}
+            var s = w.session
+            var host = m.hostname || ""
+            var st = byPc[m.pc_id]
+            var status = st === "danger" ? "danger" : st === "warn" ? "warn"
+                       : !s ? "free" : s.occupied_via === "native" ? "ok" : "entered"
+            var line = st === "danger" ? "needs you" : st === "warn" ? "a version behind"
+                     : !s ? "free" : s.occupied_via === "native" ? "at the PC"
+                     : (s.occupant_name || "someone") + " entered"
+            // a violation is named, not just toned
+            for (var v = 0; v < root.violations.length; v++) {
+                var vi = root.violations[v]
+                if (vi.found_on_pc_id === m.pc_id || vi.hostname === host) { status = "danger"; line = "a file out of place" }
+            }
+            return { label: host.split("-").pop(), host: host, name: w.name || host, status: status, line: line,
+                     lineTone: status === "danger" ? "danger" : (status === "warn" || status === "entered") ? "warn" : "" }
+        })
+    }
+    // what waits on you here, as cards: files out of place, machines behind, and nobody governing
+    readonly property var waitItems: {
+        var out = []
+        if (admins.length === 0)
+            out.push({ icon: "dept", tone: "danger", title: "Nobody governs " + deptName, line: "assign an Admin", word: "" })
+        for (var v = 0; v < violations.length; v++) {
+            var vi = violations[v]
+            var ours = root.workers.some(function (w) { return w.pc_id === vi.found_on_pc_id || w.hostname === vi.hostname })
+            if (!ours) continue
+            out.push({ icon: "shield", tone: "danger", title: (vi.filename || "A file") + " is out of place",
+                       line: "on " + (vi.hostname || ""), word: "new" })
+        }
+        var behindHere = machines.filter(function (m) { return m.line === "a version behind" })
+        if (behindHere.length > 0)
+            out.push({ icon: "shield", tone: "warn", title: behindHere.length === 1 ? behindHere[0].host + " is a version behind"
+                                                                                  : behindHere.length + " machines are a version behind",
+                       line: "updates retry by themselves", word: "" })
+        return out
+    }
+
     readonly property var deptSessions: {
         var ids = {}
         for (var w = 0; w < workers.length; w++) if (workers[w].pc_id) ids[workers[w].pc_id] = true
@@ -216,21 +259,13 @@ Item {
 
                 // the marks go back up and the hostnames return -- the cell dropped them to fit,
                 // and this is where they come back
-                Column {
+                // every machine at full size, paging down by rows -- never shrunk (PATTERNS 3a)
+                MachineGrid {
+                    objectName: "deptFleetMax"
                     width: parent.width - 396
-                    spacing: 14
-                    FleetGrid {
-                        objectName: "deptFleetMax"
-                        width: parent.width
-                        hosts: root.fleet
-                        forceLabels: true
-                    }
-                    Legend {
-                        width: parent.width
-                        items: [ { label: "Confirmed", color: Theme.ok },
-                                 { label: "Behind", color: Theme.warn },
-                                 { label: "Out of place", color: Theme.danger } ]
-                    }
+                    height: Math.max(200, root.height - 170)
+                    machines: root.machines
+                    filterLabel: "Needs you"
                 }
 
                 ReadingBody {
@@ -343,195 +378,50 @@ Item {
             }
         }
 
-        // --- the pinwheel: the two big cells on a diagonal ------------------------------------
+        // --- DP18: its machines wide, what waits on you beside them ------------------------------
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.preferredHeight: 1
             spacing: 20
-
-            GridCell {
-                objectName: "deptGoverns"
-                Layout.preferredWidth: 2
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                topAlign: true
-                title: "Who governs"
-                narration: root.people
-                // double click opens whoever is drawn; the crumb grows by their name
-                openable: root.admin !== null
-                openOnDoubleClick: true
-                onOpened: root.entering = true
-
-                Row {
-                width: parent.width
-                spacing: 20
-
-                // ONE Admin at full width; the others are a line at the foot. Two stations crammed
-                // into one cell was rejected outright.
-                Column {
-                    width: parent.width - (root.heldHere ? 350 : 0)
-                    spacing: 13
-                    visible: root.admin !== null
-
-                    Row {
-                        width: parent.width
-                        spacing: 13
-                        Avatar { initials: Theme.initials(root.admin ? root.admin.name : ""); size: 44 }
-                        Column {
-                            spacing: 3
-                            width: parent.width - 60
-                            Txt {
-                                text: root.admin ? (root.admin.name || "Admin") : ""
-                                color: Theme.ink
-                                font.pixelSize: Theme.fSection
-                                font.weight: Font.DemiBold
-                            }
-                            Row {
-                                spacing: 7
-                                Txt {
-                                    text: root.admin ? (root.admin.hostname || "no workstation") : ""
-                                    color: Theme.faint
-                                    font.pixelSize: Theme.fBody
-                                    monospace: true
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                                Txt {
-                                    text: root.stateWord(root.admin)
-                                    color: Theme.faint
-                                    font.pixelSize: Theme.fBody
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle { width: parent.width; height: 1; color: Theme.line }
-
-                    Txt {
-                        width: parent.width
-                        text: root.people.sentence || ""
-                        color: Theme.ink
-                        font.pixelSize: Theme.fRow
-                        font.weight: Font.Medium
-                        wrapMode: Text.WordWrap
-                    }
-
-                    // the others: single click swaps who is drawn, double click enters them
-                    Column {
-                        width: parent.width
-                        spacing: 0
-                        visible: root.admins.length > 1
-
-                        Txt { text: "Also here"; color: Theme.faint; font.pixelSize: Theme.fMeta
-                              bottomPadding: 6 }
-
-                        Repeater {
-                            model: root.admins
-                            delegate: Rectangle {
-                                required property var modelData
-                                required property int index
-                                visible: index !== root.selectedAdmin
-                                width: parent.width
-                                height: visible ? 34 : 0
-                                radius: Theme.radiusMd
-                                // selection is a filled muted row, never a left-edge accent
-                                color: rowArea.containsMouse ? Theme.select : "transparent"
-
-                                Row {
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: rowArea.containsMouse ? 8 : 0
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    spacing: 8
-                                    Avatar { initials: Theme.initials(modelData.name || ""); size: 22
-                                             anchors.verticalCenter: parent.verticalCenter }
-                                    Txt {
-                                        text: modelData.name || "Admin"
-                                        color: Theme.dim
-                                        font.pixelSize: Theme.fBody
-                                        font.weight: Font.Medium
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                    Txt {
-                                        text: root.stateWord(modelData).toLowerCase()
-                                        color: Theme.faint
-                                        font.pixelSize: Theme.fMeta
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                }
-                                Icon {
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: rowArea.containsMouse ? 8 : 0
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    name: "chev"; color: Theme.faint; size: 13
-                                }
-                                MouseArea {
-                                    id: rowArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.selectedAdmin = index          // select
-                                    onDoubleClicked: { root.selectedAdmin = index; root.entering = true }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // the held session rides beside the Admin, carrying its clock and the way back in
-                HeldCard {
-                    objectName: "heldCard"
-                    visible: root.heldHere
-                    width: 330
-                    admin: root.heldAdmin
-                    session: falcon.session
-                    nowMs: root.nowMs
-                    onGoInside: root.goInside()
-                    onLeave: root.leaveSession()
-                }
-                }
-
-                // a department with nobody governing it is a result, not an absence
-                Txt {
-                    width: parent.width
-                    visible: root.admin === null
-                    text: "Nobody governs this department."
-                    color: Theme.danger
-                    font.pixelSize: Theme.fRow
-                    font.weight: Font.DemiBold
-                }
-            }
 
             GridCell {
                 objectName: "deptMachines"
-                Layout.preferredWidth: 1
+                Layout.preferredWidth: 2
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                topAlign: true
                 title: "Its machines"
                 narration: root.fleetSays
-                openable: root.fleet.length > 0
+                openable: root.machines.length > 0
+                openOnDoubleClick: true
                 onOpened: root.maximised = "machines"
 
-                FleetGrid {
+                // full size, paged sideways; a hidden machine that needs you is named at the edge
+                PagedRow {
                     objectName: "deptFleet"
                     width: parent.width
-                    hosts: root.fleet
+                    height: 124
+                    itemWidth: 118
+                    model: root.machines
+                    attention: function (m) { return m.status === "danger" || m.status === "warn" ? m.host : "" }
+                    delegate: MachineMark {
+                        property var modelData: ({})
+                        size: 70
+                        label: modelData.label || ""
+                        status: modelData.status || "ok"
+                        name: modelData.name || ""
+                        line: modelData.line || ""
+                        lineTone: modelData.lineTone || ""
+                    }
                 }
-                Legend {
+                Txt {
                     width: parent.width
-                    items: [ { label: "Confirmed", color: Theme.ok },
-                             { label: "Behind", color: Theme.warn },
-                             { label: "Out of place", color: Theme.danger } ]
+                    horizontalAlignment: Text.AlignHCenter
+                    text: "Quiet means fine. A machine in colour says why beneath it."
+                    color: Theme.faint
+                    font.pixelSize: Theme.fMeta
                 }
             }
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredHeight: 1
-            spacing: 20
 
             GridCell {
                 objectName: "deptWaiting"
@@ -542,9 +432,95 @@ Item {
                 title: "Waiting on you"
                 narration: root.waiting
 
-                ReadingBody {
+                PagedColumn {
+                    objectName: "deptWaitingList"
                     width: parent.width
-                    narration: root.waiting
+                    height: Math.max(120, parent.height > 0 ? parent.height : 200)
+                    itemHeight: 58
+                    model: root.waitItems
+                    delegate: InfoCard {
+                        iconName: modelData ? modelData.icon : ""
+                        iconTone: modelData ? modelData.tone : "accent"
+                        title: modelData ? modelData.title : ""
+                        line: modelData ? modelData.line : ""
+                        stateWord: modelData ? modelData.word : ""
+                        stateTone: modelData ? modelData.tone : ""
+                    }
+                }
+                Txt {
+                    visible: root.waitItems.length === 0
+                    text: "Nothing waits on you here."
+                    color: Theme.faint
+                    font.pixelSize: Theme.fBody
+                }
+            }
+        }
+
+        // --- who governs, and the day ------------------------------------------------------------
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.preferredHeight: 1
+            spacing: 20
+
+            GridCell {
+                objectName: "deptGoverns"
+                Layout.preferredWidth: 1
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                topAlign: true
+                title: "Who governs"
+                narration: root.people
+
+                // each Admin a card: single click selects, double click opens them (the crumb grows)
+                Column {
+                    width: parent.width
+                    spacing: 9
+                    Repeater {
+                        model: root.admins
+                        delegate: InfoCard {
+                            required property var modelData
+                            required property int index
+                            width: parent.width
+                            initials: Theme.initials(modelData.name || "")
+                            title: modelData.name || "Admin"
+                            line: root.stateWord(modelData)
+                                  + (modelData.hostname ? " · " + modelData.hostname : "")
+                            lineTone: modelData.session && modelData.session.occupied_via === "assisted_access" ? "accent" : ""
+                            selected: index === root.selectedAdmin
+                            stateWord: index === root.selectedAdmin ? "selected" : ""
+                            onClicked: root.selectedAdmin = index
+                            onDoubleClicked: { root.selectedAdmin = index; root.entering = true }
+                        }
+                    }
+                    Txt {
+                        width: parent.width
+                        visible: root.admins.length > 0
+                        text: root.people.sentence || ""
+                        color: Theme.faint
+                        font.pixelSize: Theme.fMeta
+                        wrapMode: Text.WordWrap
+                    }
+                    // the held session rides with the Admins, carrying its clock and the way back in
+                    HeldCard {
+                        objectName: "heldCard"
+                        visible: root.heldHere
+                        width: parent.width
+                        admin: root.heldAdmin
+                        session: falcon.session
+                        nowMs: root.nowMs
+                        onGoInside: root.goInside()
+                        onLeave: root.leaveSession()
+                    }
+                    // a department with nobody governing it is a result, not an absence
+                    Txt {
+                        width: parent.width
+                        visible: root.admin === null
+                        text: "Nobody governs this department."
+                        color: Theme.danger
+                        font.pixelSize: Theme.fRow
+                        font.weight: Font.DemiBold
+                    }
                 }
             }
 
@@ -560,12 +536,20 @@ Item {
                 DayTimeline {
                     objectName: "deptDay"
                     width: parent.width
-                    height: Math.max(120, parent.height - 30)
+                    height: Math.max(120, parent.height - 64)
                     labelWidth: 96
                     laneGap: 9
                     laneHeight: Math.max(12, Math.min(26, (parent.height - 90)
                                                           / Math.max(1, lanes.length) - laneGap))
                     lanes: root.lanes
+                }
+                // a timeline always carries its key (PATTERNS 0): what the colours are, who never signed in
+                Legend {
+                    items: [{ label: "At the PC", color: Theme.line2, round: false },
+                            { label: "An Admin entered", color: Theme.warn, round: false },
+                            { label: "You entered", color: Theme.danger, round: false }]
+                    note: root.quietPcs === 0 ? ""
+                          : root.quietPcs + (root.quietPcs === 1 ? " machine was never signed in" : " machines were never signed in")
                 }
             }
         }

@@ -25,23 +25,27 @@ AbstractButton {
             Behavior on opacity { NumberAnimation { duration: Theme.durFast } }
         }
     }
-    contentItem: Row {
-        id: row
-        anchors.centerIn: parent
-        spacing: 7
-        Icon {
-            name: root.iconName
-            visible: root.iconName !== ""
-            color: Theme.tone(root.tone)
-            size: 15
-            anchors.verticalCenter: parent.verticalCenter
-        }
-        Txt {
-            text: root.text
-            color: Theme.tone(root.tone)
-            font.pixelSize: root.small ? Theme.fMeta : Theme.fBody
-            font.weight: Font.DemiBold
-            anchors.verticalCenter: parent.verticalCenter
+    // the control stretches contentItem to fill it; the row is centred inside a plain Item so the label never
+    // drifts left when the button is wider than its words
+    contentItem: Item {
+        Row {
+            id: row
+            anchors.centerIn: parent
+            spacing: 7
+            Icon {
+                name: root.iconName
+                visible: root.iconName !== ""
+                color: Theme.tone(root.tone)
+                size: 15
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Txt {
+                text: root.text
+                color: Theme.tone(root.tone)
+                font.pixelSize: root.small ? Theme.fMeta : Theme.fBody
+                font.weight: Font.DemiBold
+                anchors.verticalCenter: parent.verticalCenter
+            }
         }
     }
 }

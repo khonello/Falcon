@@ -227,17 +227,21 @@ Item {
             if (focusDept !== 0 && tree[i].department_id !== focusDept) continue
             for (var j = 0; j < tree[i].workers.length; j++) {
                 var w = tree[i].workers[j]
-                out.push({ name: w.name || w.hostname, blocks: blocksFor(w.pc_id) })
+                out.push({ name: w.hostname || w.name, blocks: blocksFor(w.pc_id) })
             }
         }
-        // Past nine lanes the bars get too thin to read, so the PCs nobody touched collapse into
-        // one quiet lane that says how many they are. Every PC that was used keeps its own.
+        // Past nine lanes the bars get too thin to read. At that scale the lanes worth a line are the
+        // machines SOMEONE ELSE entered (an Admin, you, an assist) -- everyone at their own PC folds into one
+        // quiet lane that says how many. Planned for the worst case: 225 machines still reads.
         if (out.length <= 9) return out
-        var used = out.filter(function (l) { return l.blocks.length > 0 })
-        var quiet = out.length - used.length
-        if (quiet > 0)
-            used.push({ name: quiet + " more", blocks: [], quiet: true })
-        return used
+        var entered = out.filter(function (l) {
+            return l.blocks.some(function (b) { return b.state && b.state !== "native" })
+        })
+        var rest = out.length - entered.length
+        if (entered.length > 9) entered = entered.slice(0, 8)
+        if (rest > 0)
+            entered.push({ name: rest + " more", blocks: [], quiet: true })
+        return entered
     }
     // the window is the day that actually happened, not a window around "now": at 00:30 the
     // morning's sessions are still the record, and starting the axis at midnight would bury them
@@ -357,6 +361,39 @@ Item {
             if (seen[d]) continue
             seen[d] = true
             out.push({ index: root.deptIndex(d), name: conf[i].department_name })
+        }
+        return out
+    }
+
+    // the Engine's per-department rollout, in the tree's order so the identity colours agree
+    readonly property var rolloutDepts: (rollout.departments || []).slice().sort(function (a, b) {
+        return root.deptIndex(a.department_id) - root.deptIndex(b.department_id)
+    })
+    function behindIn(id) { return behind.filter(function (b) { return b.department_id === id }) }
+    // what a department card says on its right: the one thing true of it now
+    function deptState(d) {
+        if (d.admins.length === 0) return { word: "", tone: "" }
+        for (var i = 0; i < d.admins.length; i++) {
+            var s = d.admins[i].session
+            if (s && s.occupied_via === "assisted_access") return { word: d.admins[i].name + " assisting elsewhere", tone: "accent" }
+        }
+        var n = root.behindIn(d.department_id).length
+        return n > 0 ? { word: n + " behind", tone: "warn" } : { word: "", tone: "" }
+    }
+    // out of place, as cards: violations first (a file is in the wrong place now), then deviations still open
+    readonly property var placeItems: {
+        var out = []
+        for (var i = 0; i < violations.length; i++) {
+            var v = violations[i]
+            out.push({ icon: "file", tone: "danger", title: (v.filename || "a file") + " is out of place",
+                       line: String(v.resource_tag || "").replace("worker_dept", "workers") + " · on " + (v.hostname || ""), word: "new" })
+        }
+        for (var j = 0; j < deviations.length; j++) {
+            var d = deviations[j]
+            if (d.resolved_at) continue
+            var w = String(d.expectation || "").replace(/_/g, " ")
+            out.push({ icon: "warn", tone: "warn", title: w.charAt(0).toUpperCase() + w.slice(1),
+                       line: "logged " + String(d.detected_at || "").substring(11, 16) + ", not addressed", word: "" })
         }
         return out
     }
@@ -544,7 +581,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: root.opened === "" ? 0 : root.opened === "authority" ? 1
-                          : root.opened === "rollout" ? 2 : root.opened === "today" ? 3 : 4
+                          : root.opened === "today" ? 2 : 3
 
         GridLayout {
             id: grid
@@ -563,12 +600,22 @@ Item {
                 openable: root.gapDept !== null
                 onOpened: root.opened = "authority"
 
-                OrgMap {
+                // departments as cards (OV02), paging down; double click enters one
+                PagedColumn {
+                    objectName: "authorityList"
                     width: parent.width
-                    height: Math.max(150, grid.height / 2 - 120)
-                    departments: root.tree
-                    focusId: 0
-                    onEntered: function (id) { shell.enterDepartment(id) }
+                    height: Math.max(130, grid.height / 2 - 90)
+                    itemHeight: 58
+                    model: root.tree
+                    attention: function (d) { return d.admins.length === 0 ? d.name + " has nobody" : "" }
+                    delegate: DeptCard {
+                        dept: modelData || ({})
+                        stamp: Theme.series(index)
+                        stateWord: modelData ? root.deptState(modelData).word : ""
+                        stateTone: modelData ? root.deptState(modelData).tone : ""
+                        onEntered: shell.enterDepartment(modelData.department_id)
+                        onAssign: shell.enterDepartment(modelData.department_id)
+                    }
                 }
             }
 
@@ -581,30 +628,36 @@ Item {
                 narration: root.rolloutSays
                 // nothing to explain until a version has been approved: with no rollout in flight
                 // the cell has no fleet, no gate and no lever, so it stays shut
+                // opening the cell goes to the Rollout area itself (RO05): the page that holds the fleet
                 openable: root.version !== null && root.version !== undefined
-                onOpened: root.opened = "rollout"
+                onOpened: shell.show("rollout")
 
-                StackedBars {
+                Row {
+                    spacing: 10
+                    Txt { text: root.version ? root.version.version_string : "—"; color: Theme.ink; monospace: true
+                          font.pixelSize: 22; font.weight: Font.Bold }
+                    Txt { text: "on " + root.confirmedCount + " of " + root.pcCount + " machines"; color: Theme.dim
+                          font.pixelSize: Theme.fRow - 1; anchors.baseline: parent.children[0].baseline }
+                }
+                // one line per department, one mark holding the count behind -- never one mark per machine
+                PagedColumn {
+                    objectName: "rolloutCellList"
                     width: parent.width
-                    barHeight: 20
-                    rowGap: 34
-                    rows: root.rolloutRows.length > 0 ? root.rolloutRows : root.skeletonRows
-                }
-                Txt {
-                    text: "the fleet, one square each"
-                    color: Theme.faint
-                    font.pixelSize: Theme.fMeta
-                }
-                Waffle {
-                    width: parent.width
-                    cellSize: 24
-                    gap: 7
-                    cells: root.fleetCells.length > 0 ? root.fleetCells : root.skeletonCells
-                }
-                Legend {
-                    items: [{ label: "Confirmed", color: Theme.ok, round: true },
-                            { label: "Behind", color: Theme.warn, round: true },
-                            { label: "Failing", color: Theme.danger, round: true }]
+                    height: Math.max(110, grid.height / 2 - 130)
+                    itemHeight: 50
+                    spacing: 8
+                    model: root.rolloutDepts
+                    attention: function (d) {
+                        var n = root.behindIn(d.department_id).length
+                        return n > 0 ? d.department_name + ": " + n + " behind" : ""
+                    }
+                    delegate: DeptRolloutCard {
+                        compact: true
+                        dept: modelData || ({})
+                        behind: modelData ? root.behindIn(modelData.department_id) : []
+                        stamp: modelData ? Theme.series(root.deptIndex(modelData.department_id)) : Theme.accent
+                        onOpened: shell.show("rollout")
+                    }
                 }
             }
 
@@ -651,65 +704,21 @@ Item {
                 openable: root.violations.length > 0 || root.deviations.length > 0
                 onOpened: root.opened = "place"
 
-                TierBars {
+                // files against their tier and deviations, as cards (OV02), paging down
+                PagedColumn {
+                    objectName: "placeList"
                     width: parent.width
-                    rows: root.tierRows
-                }
-                Rectangle { width: parent.width; height: 1; color: Theme.line }
-                Column {
-                    width: parent.width
-                    spacing: 0
-
-                    Repeater {
-                        model: root.deviations.slice(0, 2)
-                        delegate: Item {
-                            required property var modelData
-                            width: parent.width
-                            height: 30
-
-                            Txt {
-                                id: at
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 44
-                                text: String(modelData.detected_at).substring(11, 16)
-                                color: Theme.faint
-                                monospace: true
-                                font.pixelSize: Theme.fMeta
-                            }
-                            Txt {
-                                anchors.left: at.right
-                                anchors.leftMargin: 8
-                                anchors.right: mark.left
-                                anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: {
-                                    var w = String(modelData.expectation).replace(/_/g, " ")
-                                    return w.charAt(0).toUpperCase() + w.slice(1)
-                                }
-                                font.pixelSize: Theme.fBody
-                            }
-                            Chip {
-                                id: mark
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.resolved_at ? "Addressed" : "Logged"
-                                tone: modelData.resolved_at ? "ok" : "neutral"
-                            }
-                        }
+                    height: Math.max(130, grid.height / 2 - 90)
+                    itemHeight: 58
+                    model: root.placeItems
+                    delegate: InfoCard {
+                        iconName: modelData ? modelData.icon : ""
+                        iconTone: modelData ? modelData.tone : "accent"
+                        title: modelData ? modelData.title : ""
+                        line: modelData ? modelData.line : ""
+                        stateWord: modelData ? modelData.word : ""
+                        stateTone: modelData ? modelData.tone : ""
                     }
-                }
-                Txt {
-                    width: parent.width
-                    text: root.violations.length === 0 ? "" :
-                          (root.violations[0].filename + ", " + root.violations[0].resource_tag
-                           + ", found on " + root.violations[0].hostname + ".")
-                    visible: text !== ""
-                    color: Theme.faint
-                    font.pixelSize: Theme.fMeta
-                    wrapMode: Text.WordWrap
-                    elide: Text.ElideRight
-                    maximumLineCount: 2
                 }
             }
         }
@@ -718,7 +727,6 @@ Item {
         // shape from board K03 -- a map, two told panels, the words down the right -- and Rollout
         // takes a different one entirely (K04), because a fleet is wide.
         OpenedAuthority { view: root }
-        OpenedRollout { view: root }
         OpenedToday { view: root }
         OpenedOutOfPlace { view: root }
         }

@@ -157,6 +157,44 @@ STUB = {
 }
 
 
+# FALCON_SHOT_SCALE=1: the worst case the design is held to -- ten departments, ~240 machines, several failing
+SCALE_DEPTS = [("Operations", "OPS", 14, ["RM:R. Mensah", "AQ:A. Quaye"], {6: (6, False)}),
+               ("Logistics", "LOG", 2, [], {2: (9, True)}),
+               ("Finance", "FIN", 22, ["KB:K. Boateng"], {}),
+               ("Harbour", "HAR", 48, ["MA:M. Addo", "JT:J. Tetteh"], {12: (10, False), 17: (10, False), 31: (10, False), 40: (10, False)}),
+               ("Customs", "CUS", 31, ["EO:E. Owusu"], {}),
+               ("Records", "REC", 9, ["AB:A. Boakye"], {}),
+               ("Procurement", "PRO", 17, ["NA:N. Ansah"], {}),
+               ("Legal", "LEG", 6, ["SD:S. Darko"], {}),
+               ("Payroll", "PAY", 12, ["YF:Y. Frimpong"], {}),
+               ("Fleet", "FLT", 64, ["KA:K. Asante"], {n: (11 if n in (41, 44, 50) else 4, n in (41, 44, 50))
+                                                        for n in (3, 8, 11, 19, 22, 27, 33, 41, 44, 50, 58, 61)})]
+
+
+def scale_data():
+    tree, depts, behind, pc, acc = [], [], [], 100, 5000
+    for di, (name, pre, n, admins, bad) in enumerate(SCALE_DEPTS, start=1):
+        a = []
+        for spec in admins:
+            _, full = spec.split(":")
+            acc += 1
+            a.append({"account_id": acc, "name": full, "pc_id": None, "hostname": f"WS-{pre}-A{len(a) + 1}", "role": "admin",
+                      "session": {"occupied_via": "native"}})
+        w = []
+        for i in range(1, n + 1):
+            pc += 1
+            acc += 1
+            w.append({"account_id": acc, "name": f"Worker {i}", "pc_id": pc, "hostname": f"{pre}-{i:02d}", "role": "worker", "session": None})
+            if i in bad:
+                f, esc = bad[i]
+                behind.append({"pc_id": pc, "hostname": f"{pre}-{i:02d}", "department_id": di, "current_version_id": 3,
+                               "failures": f, "last_attempt_at": _at(11.3), "escalated": esc})
+        tree.append({"department_id": di, "name": name, "admins": a, "workers": w})
+        depts.append({"department_id": di, "department_name": name, "pcs": n, "current": n - len(bad), "pending": len(bad),
+                      "escalated": sum(1 for f, e in bad.values() if e)})
+    return tree, {"version": {"id": 4, "version_string": "1.4.2"}, "departments": depts, "pcs_behind": behind}
+
+
 def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus: int = 0) -> None:
     from operator_client.core.state import Indicator
 
@@ -164,6 +202,9 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
     app, engine, bridge = gui_app.create(cfg, auto_connect=False)
 
     tree = SUPER_TREE if role == "super_user" else TREE
+    scale_health = None
+    if os.environ.get("FALCON_SHOT_SCALE"):
+        tree, scale_health = scale_data()
     bridge.state.connected = True
     bridge.state.role = role
     bridge.state.account_id = 1 if role == "super_user" else 3012
@@ -191,9 +232,16 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         if type_ == "hierarchy.tree":
             data = {"departments": tree}
         elif type_ == "hierarchy.sessions_today":
-            data = {"since": _at(6), "now": _at(18), "sessions": _sessions()}
+            rows = _sessions()
+            if scale_health:
+                remap = {21: 101, 23: 103, 24: 104, 25: 105, 27: 107, 32: 118}
+                for r in rows:
+                    r["pc_id"] = remap.get(r["pc_id"], r["pc_id"])
+            data = {"since": _at(6), "now": _at(18), "sessions": rows}
         elif type_ == "audit.recent":
             data = {"entries": _attempts()}
+        elif type_ == "updates.rollout_health" and scale_health:
+            data = scale_health
         else:
             data = STUB.get(type_, {})
         callback.call([bridge.js_engine.toScriptValue(True), bridge.js_engine.toScriptValue(data)])
@@ -236,6 +284,11 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
     # FALCON_SHOT_ENTER=1 opens the first Admin in place (DP06); FALCON_SHOT_ANSWER=<kind> puts
     # that answer in the lane (DP08); FALCON_SHOT_INSIDE=1 goes in -- level 3, their interface
     def later():
+        # FALCON_SHOT_ROLLOUT_DEPT=<id> maximises that department on the Rollout page
+        if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT"):
+            rv = win.findChild(object, "rolloutView")
+            if rv is not None:
+                rv.setProperty("openDept", int(os.environ["FALCON_SHOT_ROLLOUT_DEPT"]))
         dept = win.findChild(object, "departmentView")
         if os.environ.get("FALCON_SHOT_ENTER") and dept is not None:
             dept.setProperty("entering", True)
@@ -271,6 +324,8 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         name += "-" + os.environ["FALCON_SHOT_ANSWER"] if os.environ.get("FALCON_SHOT_ANSWER") else ""
         name += "-" + os.environ["FALCON_SHOT_TAB"] if os.environ.get("FALCON_SHOT_TAB") else ""
         name += "-s" + os.environ["FALCON_SHOT_SUBTAB"] if os.environ.get("FALCON_SHOT_SUBTAB") else ""
+        name += "-scale" if os.environ.get("FALCON_SHOT_SCALE") else ""
+        name += "-rd" + os.environ["FALCON_SHOT_ROLLOUT_DEPT"] if os.environ.get("FALCON_SHOT_ROLLOUT_DEPT") else ""
         path = out_dir / (name + ".png")
         img.save(str(path))
         print("saved", path, img.width(), img.height())

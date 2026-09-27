@@ -108,13 +108,11 @@ def test_each_cell_opens_into_its_own_composition(gui):
     win, _, _ = gui
     view = win.findChild(QObject, "overviewView")
 
-    for name in ("openedRollout", "rolloutHero", "rolloutByDept", "rolloutTrend", "rolloutBlocking"):
+    for name in ():
         assert win.findChild(QObject, name) is not None, name
 
     # the two compositions are different objects, and the breadcrumb says the cell's own title
-    assert win.findChild(QObject, "openedRollout") is not win.findChild(QObject, "openedAuthority")
-    view.setProperty("opened", "rollout")
-    assert view.property("openedTitle") == "Rollout"
+    assert win.findChild(QObject, "openedRollout") is None      # retired: the cell opens the Rollout area
     view.setProperty("opened", "authority")
     assert view.property("openedTitle") == "Authority"
     view.setProperty("opened", "")
@@ -133,7 +131,6 @@ def test_all_four_cells_have_their_own_composition(gui):
 
     panels = {
         "authority": ("openedAuthority", "openedHero", "openedFleet", "openedSessions", "openedReading"),
-        "rollout": ("openedRollout", "rolloutHero", "rolloutByDept", "rolloutTrend", "rolloutBlocking"),
         "today": ("openedToday", "todayLead", "todayEntered", "todayQuiet", "todayReading"),
         "place": ("openedOutOfPlace", "placeTiers", "placeDeviations", "placeReading"),
     }
@@ -289,50 +286,41 @@ def test_a_department_draws_one_admin_and_never_says_an_admin_owns_machines(gui)
     assert val(dept.property("people"))["sentence"] == "A. Quaye is not signed in anywhere."
 
 
-def test_the_fleet_changes_kind_rather_than_scrolling(gui):
-    """A department was never going to stay the size of the sample: the mark shrinks while shrinking
-    still says something, and past that the drawing changes kind. Mirrors slot_size() in
-    design/scale.py -- never a scrollbar."""
+def test_the_fleet_pages_rather_than_shrinking(gui):
+    """PATTERNS 3 (supersedes DP10's shrink ladder): the machines keep their full size at any count; the
+    row pages, and the edge names a hidden machine that needs someone."""
     win, _, _ = gui
-    grid = win.findChild(QObject, "deptFleet")
-    assert grid is not None
+    dept = win.findChild(QObject, "departmentView")
+    workers = [{"account_id": i, "pc_id": i, "hostname": f"OPS-{i:02d}", "session": {"occupied_via": "native"}}
+               for i in range(1, 97)]
+    dept.setProperty("tree", [{"department_id": 1, "name": "Operations", "admins": [], "workers": workers}])
+    dept.setProperty("violations", [{"found_on_pc_id": 90, "hostname": "OPS-90", "filename": "budget.xlsx"}])
+    dept.setProperty("departmentId", 1)
+    row = win.findChild(QObject, "deptFleet")
+    row.setProperty("width", 860)
+    assert row.property("itemWidth") == 118                 # the same at 96 machines as at 7
+    assert row.property("canForward") is True
+    assert "OPS-90" in row.property("needsAfter")           # hidden, and still named
 
-    def sized(n):
-        grid.setProperty("hosts", [{"hostname": f"OPS-{i:02d}", "state": "ok"} for i in range(n)])
-        return grid.property("slot"), grid.property("labelled"), grid.property("asBars")
 
-    assert sized(7) == (46, True, False)        # every hostname readable
-    assert sized(24) == (30, False, False)      # countable, unlabelled
-    assert sized(96) == (16, False, False)      # proportion and outliers
-    assert sized(240) == (0, False, True)       # the shape of the fleet, not one mark each
-
-
-def test_a_chart_maximises_into_itself_and_escape_restores_the_cells(gui):
-    """An area recomposes into several panels; a CHART opens into itself (board DP11). What explains
-    a chart is more of that chart -- so the hostnames the cell had to drop at scale come back, and
-    nothing else is on the page."""
+def test_a_chart_maximises_into_a_grid_that_pages_down(gui):
+    """A chart opens into itself (DP11): every machine at full size in a grid paging down by rows (RO06)."""
     win, _, _ = gui
     dept = win.findChild(QObject, "departmentView")
     dept.setProperty("tree", [{
         "department_id": 1, "name": "Operations", "admins": [],
-        "workers": [{"account_id": i, "pc_id": i, "hostname": f"OPS-{i:02d}"} for i in range(1, 25)],
+        "workers": [{"account_id": i, "pc_id": i, "hostname": f"OPS-{i:02d}"} for i in range(1, 49)],
     }])
     dept.setProperty("departmentId", 1)
-
-    # in the cell, 24 machines have dropped their hostnames to fit
-    cell = win.findChild(QObject, "deptFleet")
-    assert cell.property("slot") == 30 and cell.property("labelled") is False
-
     assert dept.property("maximised") == ""
     dept.setProperty("maximised", "machines")
     assert win.findChild(QObject, "deptMaxCrumb").property("text") == "Its machines"
-
-    # maximised, every mark is back to full size and carries its name again
-    big = win.findChild(QObject, "deptFleetMax")
-    assert big.property("slot") == 46 and big.property("labelled") is True
-    assert big.property("asBars") is False
-
-    dept.setProperty("maximised", "")          # Escape restores the four cells exactly
+    grid = win.findChild(QObject, "deptFleetMax")
+    grid.setProperty("width", 900)
+    grid.setProperty("height", 500)
+    assert grid.property("markSize") == 58
+    assert grid.property("pages") >= 2 and grid.property("page") == 0
+    dept.setProperty("maximised", "")
     assert dept.property("maximised") == ""
 
 
@@ -581,3 +569,24 @@ def test_a_stack_of_cards_pages_down(gui):
     assert col.property("hiddenAfter") > 0 and col.property("needsAfter") == "d"
     QMetaObject.invokeMethod(col, "forward")
     assert col.property("hiddenBefore") > 0
+
+
+def test_rollout_shows_departments_then_one_maximised(gui):
+    """RO05 / RO06: many departments are one line each, with ONE mark holding the count behind; double click
+    maximises one into its machines. Never one container for many departments' machines."""
+    win, _, _ = gui
+    rv = win.findChild(QObject, "rolloutView")
+    rv.setProperty("tree", [{"department_id": d, "name": f"D{d}", "admins": [], "workers":
+                             [{"account_id": d * 100 + i, "pc_id": d * 100 + i, "hostname": f"D{d}-{i:02d}"} for i in range(1, 41)]}
+                            for d in range(1, 11)])
+    rv.setProperty("health", {"version": {"id": 4, "version_string": "1.4.2"},
+                              "departments": [{"department_id": d, "department_name": f"D{d}", "pcs": 40} for d in range(1, 11)],
+                              "pcs_behind": [{"pc_id": 400 + i, "hostname": f"D4-{i:02d}", "department_id": 4, "failures": 10,
+                                              "escalated": False} for i in (12, 17, 31, 40)]})
+    assert rv.property("behindTotal") == 4
+    assert len(val(rv.property("deptsBehind"))) == 1
+    assert "4 behind" not in (win.findChild(QObject, "rolloutPhrase").property("text") or "")
+    rv.setProperty("openDept", 4)
+    machines = val(rv.property("openMachines"))
+    assert len(machines) == 40 and sum(1 for m in machines if m["status"] == "warn") == 4
+    assert win.findChild(QObject, "rolloutCrumbDept").property("text") == "D4"
