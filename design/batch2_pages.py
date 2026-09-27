@@ -31,7 +31,8 @@ def paged_row(items, shown, size, more, needs="", w=None):
                gap=4, extra="align-items: center; justify-content: center; width: 104px; flex: none; align-self: stretch; "
                              "border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.06));")
     width = f"width: {w}px;" if w else ""
-    return row(*cols, sp(), edge, gap=14, align="flex-start", extra=width)
+    # the machines are centred in the room left of the pager; the pager stays pinned to the right edge
+    return row(sp(), *cols, sp(), edge, gap=14, align="flex-start", extra=width)
 
 
 def lanes_(rows_, w):

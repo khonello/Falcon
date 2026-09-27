@@ -61,6 +61,16 @@ This **replaces** the `DP10` rule (shrink 46 → 30 → 16 → bars, never scrol
 - Keyboard: Left / Right arrows page when the row has focus.
 - The order is the stable one (by hostname) — paging never re-sorts.
 
+**The same idea goes vertical** (*the user, 27 Sep 2026: "all listing or card that goes vertical should use that paging
+idea … But if you feel like actual scrolling for vertical is better, we can use that."*):
+
+- **A stack of cards in a fixed-height cell pages vertically.** As many cards as fit are shown whole; the cell's
+  **bottom edge** is the pager — a soft fade, a down-chevron, "2 more ↓", and the name of any hidden card that needs
+  someone. The top edge pages back. Cards slide, never scroll by the pixel. (Waiting on you, To address, By person.)
+- **A continuous record read top to bottom scrolls** — the trail, a channel's messages, a history. Paging would cut a
+  sentence in half; a thin, quiet scrollbar that appears on hover is right there.
+- Horizontal rows of marks page sideways (above). A list is never shrunk to fit.
+
 The `FleetGrid` scale ladder in QML (and `slot_size()` in `design/scale.py`) must change to this when next touched.
 
 ## 4. Cards, not rows

@@ -65,14 +65,18 @@ def ro04():
         ("ok", "Kojo", "on 1.4.2", None), ("ok", "Efua", "on 1.4.2", None), ("ok", "Yaw", "on 1.4.2", None),
         ("ok", "Adjoa", "on 1.4.2", None), ("ok", "Nana", "on 1.4.2", None), ("warn", "Kwame", "still on 1.4.1", "warn"),
         ("ok", "Ama", "on 1.4.2", None), ("ok", "Kofi", "on 1.4.2", None)], start=1)]
+    # centred: each department's heading over its machines, the machines centred in the room left of the pager
+    head = lambda name, sub, tone=None, pad=0: row(txt(name, 13, T["ink"], 600), txt(sub, 11.5, tone_c(tone, T["faint"])), gap=10,
+                                                   extra=f"justify-content: center; width: 1212px; padding-top: {pad}px;")
     fleet = col(
-        row(txt("Operations", 13, T["ink"], 600), txt("13 of 14 on 1.4.2", 11.5, T["faint"]), gap=12),
+        head("Operations", "13 of 14 on 1.4.2"),
         paged_row(ops, 8, 58, "6 more", "", w=1316),
-        row(txt("Logistics", 13, T["ink"], 600), txt("1 of 2 on 1.4.2", 11.5, T["faint"]), sp(),
-            txt("Finance: 2 of 2, all current", 11.5, T["faint"]), gap=12, extra="width: 1316px; padding-top: 4px;"),
-        row(*[col(calm_slot(n, st, 58), txt(who, 12, T["ink"], 600), txt(line, 10.5, tone_c(tone, T["faint"]), 500 if tone else 400),
-                  gap=3, extra="align-items: center; width: 92px;") for n, st, who, line, tone in
-              [("01", "ok", "Esi", "on 1.4.2", None), ("02", "danger", "Abena", "still on 1.4.1", "danger")]], gap=14),
+        head("Logistics", "1 of 2 on 1.4.2", pad=12),
+        row(sp(), *[col(calm_slot(n, st, 58), txt(who, 12, T["ink"], 600), txt(line, 10.5, tone_c(tone, T["faint"]), 500 if tone else 400),
+                        gap=3, extra="align-items: center; width: 92px;") for n, st, who, line, tone in
+                    [("01", "ok", "Esi", "on 1.4.2", None), ("02", "danger", "Abena", "still on 1.4.1", "danger")]], sp(), gap=14,
+            extra="width: 1212px;"),
+        txt("Finance: 2 of 2, all current — folded away.", 11.5, T["faint"], extra="text-align: center; width: 1212px;"),
         gap=10, extra="width: 1316px;")
     gate = col(txt("1.4.3 can't be approved yet.", 15, T["ink"], 600, extra="line-height: 1.35;"),
                txt("Two machines are still on 1.4.1. Every machine must be on 1.4.2 first.", 12, T["dim"], extra="line-height: 1.45;"),
@@ -92,7 +96,7 @@ def ro04():
         gap=10, extra="width: 856px;")
     return area_page(
         "Rollout", "rollout", ["Rollout"], "Rollout", "1.4.2 on 16 of 18 machines", "warn",
-        [row(kcell("The fleet", "two machines behind", "warn", fleet, w=1360, h=350, top=True), gap=0, extra="flex: none;"),
+        [row(kcell("The fleet", "two machines behind", "warn", fleet, w=1360, h=350), gap=0, extra="flex: none;"),
          row(kcell("The gate", "1.4.3 waits", "warn", gate, w=440, h=306, top=True),
              kcell("Holding it up", "two machines", "warn", holding, w=900, h=306, top=True),
              gap=20, align="stretch", extra="flex: none;")],
