@@ -17,7 +17,7 @@ from operator_client.tui.render import bullet, kv, table
 from operator_client.tui.shell import Args, ShellContext, UsageError, command
 
 FILE_INTENTS = ("create", "update", "exists")
-PROGRAM_INTENTS = ("used", "used_with_file", "installed_available", "closed_not_running")
+PROGRAM_INTENTS = ("used", "used_with_file", "installed_available", "closed_not_running", "running")
 
 
 def _work(ctx: ShellContext) -> dict[str, Any]:

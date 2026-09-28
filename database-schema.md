@@ -147,7 +147,7 @@ The stack. Ordering is a display concern (per Task's "no output piping" principl
 | `task_id` | INTEGER FK → tasks.id NOT NULL | |
 | `sequence` | INTEGER NOT NULL | Display order within the stack — "no nesting," so a flat integer is sufficient, no parent/child self-reference needed |
 | `target_type` | TEXT NOT NULL CHECK (`target_type` IN ('file','program')) | |
-| `intent` | TEXT NOT NULL CHECK ( (`target_type` = 'file' AND `intent` IN ('create','update','exists')) OR (`target_type` = 'program' AND `intent` IN ('used','used_with_file','installed_available','closed_not_running')) ) | Compound CHECK ties Intent's legal values to target_type, matching the design's explicit File-vs-Program Intent lists |
+| `intent` | TEXT NOT NULL CHECK ( (`target_type` = 'file' AND `intent` IN ('create','update','exists')) OR (`target_type` = 'program' AND `intent` IN ('used','used_with_file','installed_available','closed_not_running','running')) ) | Compound CHECK ties Intent's legal values to target_type, matching the design's explicit File-vs-Program Intent lists |
 | `file_index_id` | INTEGER FK → file_index.id, NULLABLE | Set for `target_type = 'file'`; NULL for a Create-intent target until the file actually appears and gets indexed |
 | `proposed_filename` | TEXT NULLABLE | Create-intent, name-first: populated immediately even before `file_index_id` exists |
 | `proposed_path` | TEXT NULLABLE | Optional per design — "shown only if the assigner's input specified one" |

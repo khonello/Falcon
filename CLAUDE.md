@@ -28,7 +28,7 @@ settings), and checks the model (`--download-model` fetches it).
 
 ```powershell
 environ-engine\Scripts\Activate.ps1
-pip install -e ".[engine,dev]"             # Engine + tests (add ,gui for the GUI tests)
+pip install -r requirements-engine.txt     # Engine + tests + the GUI tests (extras: engine,dev,gui)
 python -m engine setup                     # fresh clone -> ready: .env, cert, databases, schema, secret, Super User
 python -m engine                           # run it (real auth + TLS, from .env)
 pytest                                     # all tests, DB tests included (FALCON_TEST_DATABASE_URL comes from .env)
@@ -39,7 +39,7 @@ python -m engine bootstrap SU-PC           # a first Super User by hand (setup d
 # dev switches (no TLS, no handshake -- loud): uncomment FALCON_DEV_PLAINTEXT / FALCON_DEV_BYPASS_AUTH in .env
 
 environ-operator\Scripts\Activate.ps1
-pip install -e ".[tui,gui]"                # Operator Client TUI + GUI (PySide6, qasync)
+pip install -r requirements-operator.txt    # Operator Client TUI + GUI (PySide6, qasync)
 python -m operator_client --gui            # after setup on this machine: connects as the Super User, nothing to type
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # interactive TUI (TLS)
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --plaintext           # against a DEV_PLAINTEXT Engine
@@ -47,12 +47,12 @@ python -m operator_client --connect --script "tree; tasks"                      
 python -m operator_client --gui --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # QML GUI
 ```
 
-GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`pip install -e ".[engine,dev,gui]"`); they skip otherwise. The screenshot scripts set Qt's offscreen platform and Windows font folder themselves, and take their state as options (`design/shot_gui.py design/shots admin 2 --flow=4`; `design/shot_board.py <BOARD>` for design boards).
+GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`requirements-engine.txt` includes it); they skip otherwise. The screenshot scripts set Qt's offscreen platform and Windows font folder themselves, and take their state as options (`design/shot_gui.py design/shots admin 2 --flow=4`; `design/shot_board.py <BOARD>` for design boards).
 
 ```powershell
 environ-worker\Scripts\Activate.ps1
-pip install -e ".[worker]"                 # Worker Client (psutil, prompt_toolkit, watchdog)
-pip install -e ".[worker,worker-ui]"       # ... with the Worker's windows (PySide6): python -m worker_client.windows <kind> '<json>'
+pip install -r requirements-worker.txt      # Worker Client + its windows (psutil, watchdog, prompt_toolkit, PySide6)
+# headless, without the windows: pip install -e ".[worker]"   -- windows: python -m worker_client.windows <kind> '<json>'
 python -m worker_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt --watch C:\docs [--ui]
 ```
 
@@ -155,7 +155,13 @@ Dashboard refresh mechanism (poll vs. push), Report-routing configuration UI, in
 
 ## Local LLM (Task)
 
-In-process llama.cpp by default (`llama-cpp-python`, CPU wheel), model file at `models/Qwen3-0.6B-Q8_0.gguf` (git-ignored; download from `huggingface.co/Qwen/Qwen3-0.6B-GGUF`). Sidecar alternatives via `FALCON_LLM_BACKEND=openai|ollama` — see `.env.example`. **A 0.6B model answers YES to every yes/no question and "one" to every count** — so `engine/task/llm_graph.py` asks it only list-picks and verbatim-checked extractions; presence, counting, file names, deadline phrases and multi-task splits are found mechanically. Keep it that way: any new question to the model must be a pick-from-list or an extraction validated against the text. Re-run `scripts/llm_benchmark.py` (must stay 13/13) after touching the graph or prompts.
+In-process llama.cpp by default (`llama-cpp-python`, CPU wheel). Default model `models/Qwen3-1.7B-Q8_0.gguf` (1.8GB, git-ignored; `huggingface.co/Qwen/Qwen3-1.7B-GGUF`); `Qwen3-0.6B-Q8_0.gguf` is kept as the fast-but-weaker option. Sidecar alternatives via `FALCON_LLM_BACKEND=openai|ollama` — see `.env.example`.
+
+The graph asks the model only **pick-from-list** and **verbatim-checked extraction** questions; presence, counting, file names, deadline phrases and multi-task splits are found mechanically. Keep it that way. Two hard-won guards: a model-extracted span is rejected if it occurs only inside a file name (`backup-2026-09-28.bak` really does contain a date), and a deadline the model finds on its own must be an unambiguous date or clock time — a bare day word is settled by position, or "the usual Friday things" becomes a Friday deadline.
+
+**Do not force the model's answer with a GBNF grammar.** It looks like free accuracy and is a downgrade: the grammar constrains from the first token, Qwen3 wants to emit `<think>` there, and masking it makes both models answer almost constantly — which reads like a model with no signal and is really a broken measurement. An unparsed answer is the "unclear → surface to the assigner" signal the design wants; a well-formed guess is one the graph cannot tell from a real answer.
+
+Two benchmark suites in `scripts/llm_cases.py`, and the split is the point: `tuned` is a regression guard the code has seen the answers to and must stay perfect; `heldout` is the real measurement and must **never be tuned against** — fix only defects that are wrong by the system's own rules, then move the case that exposed one into `tuned` and add fresh held-out cases. `scripts/llm_probe.py` is the 20-second gate before trying any new model: 8 unmistakable cases, and it says `COLLAPSED` if the model answers the same thing regardless of the text (Qwen3-0.6B 6/8, Qwen3-1.7B 8/8). `scripts/llm_benchmark.py --no-model` answers nothing, to show how much the model contributes at all. Held-out scores: **29/32 with the 1.7B, 24/32 with the 0.6B, 13/24 with no model** — the model matters, and so does the mechanical graph. The 1.7B costs ~5s per call against ~1.4s, so a task proposal takes ~10-20s.
 
 ## Linux / WSL
 

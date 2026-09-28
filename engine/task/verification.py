@@ -3,7 +3,7 @@
 Each item targets a File or a Program; its check is defined by the target's Intent:
 
     File:    create | update | exists
-    Program: used | used_with_file | installed_available | closed_not_running
+    Program: used | used_with_file | installed_available | closed_not_running | running
 
 A Create-intent File target is name-first (path optional); its name is checked against the
 Global File Index scoped to the assignee, and any collision is surfaced to the assigner --
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 TARGET_TYPES = ("file", "program")
 FILE_INTENTS = ("create", "update", "exists")
-PROGRAM_INTENTS = ("used", "used_with_file", "installed_available", "closed_not_running")
+PROGRAM_INTENTS = ("used", "used_with_file", "installed_available", "closed_not_running", "running")
 ITEM_STATUS = ("pending", "passed", "failed")
 
 
@@ -173,6 +173,8 @@ async def evaluate_item(engine: Engine, task: dict[str, Any], item: dict[str, An
     value = state["value"] or {}
     if intent == "closed_not_running":
         return "passed" if not value.get("running") else "failed"
+    if intent == "running":
+        return "passed" if value.get("running") else "failed"
     if intent == "used":
         active = await db.tasks.latest_signal(item["id"], "process_active")
         return "passed" if active else "pending"

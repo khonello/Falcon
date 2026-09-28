@@ -11,7 +11,7 @@ Every step is checked first and skipped when already done, so it is safe to run 
   5. secret       the master secret created (data/master.secret -- back it up)
   6. Super User   bootstrapped once on an empty database; its client id + key printed ONCE, and written into this
                   machine's Operator Client settings so it connects without typing anything
-  7. local model  checked; --download-model fetches it (~640 MB) from Hugging Face
+  7. local model  checked; --download-model fetches it (~1.8 GB) from Hugging Face
 
 PostgreSQL itself and the three virtual environments are installed beforehand (the user's rule).
 """
@@ -30,7 +30,7 @@ from typing import Any
 from common import dotenv
 
 ROOT = dotenv.REPO_ROOT
-MODEL_URL = "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf"
+MODEL_URL = "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf"
 
 
 def say(step: str, text: str) -> None:

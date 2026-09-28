@@ -1,0 +1,153 @@
+"""Benchmark cases for the Task decision graph, in two suites that must stay separate.
+
+TUNED    the cases the graph was built against -- its regexes, cue lists and prompts were
+         written or corrected until these passed. A regression guard, and nothing more:
+         a score here is not evidence of accuracy, because the code has seen the answers.
+
+HELDOUT  realistic descriptions written after the graph, never used to change it. This is
+         the only honest measurement of "is the model / graph good enough". Expectations
+         are what a careful assigner would want, not what the code currently produces, so
+         a failing case is information -- do NOT tune the graph until HELDOUT passes, or
+         it stops measuring anything and becomes a second TUNED.
+
+Case shape:
+    (description,
+     expected items [(target_type, intent, name-substring)],
+     expected flag kinds,
+     expected deadline substring or None,
+     expect a multi-task split)
+"""
+
+from __future__ import annotations
+
+Case = tuple[str, list[tuple[str, str, str]], set[str], str | None, bool]
+
+TUNED: list[Case] = [
+    ("Put together the Q3 sales report as sales-q3.xlsx by Friday",
+     [("file", "create", "sales-q3.xlsx")], set(), "Friday", False),
+    ("Keep inventory.csv current -- update it with this week's counts",
+     [("file", "update", "inventory.csv")], set(), None, False),
+    ("Make sure onboarding.pdf is present on your machine before the new hire starts on Monday",
+     [("file", "exists", "onboarding.pdf")], set(), "Monday", False),
+    ("Use Excel to update budget.xlsx before end of day Thursday",
+     [("file", "update", "budget.xlsx"), ("program", "used_with_file", "Excel")], set(), "Thursday", False),
+    ("Spend the afternoon in Photoshop cleaning up the product photos",
+     [("program", "used", "Photoshop")], set(), None, False),
+    ("Install 7-Zip so it's available when we need it",
+     [("program", "installed_available", "7-Zip")], set(), None, False),
+    ("Close Outlook before you leave today",
+     [("program", "closed_not_running", "Outlook")], set(), "today", False),
+    ("Write the minutes into meeting-notes.docx in the Shared/Minutes folder",
+     [("file", "create", "meeting-notes.docx")], set(), None, False),
+    ("Finish the slides by Monday or Wednesday, whichever works",
+     [], {"ambiguous_deadline"}, None, False),
+    ("Update payroll.xlsx and also archive last year's invoices into archive-2024.zip",
+     [("file", "update", "payroll.xlsx"), ("file", "create", "archive-2024.zip")], set(), None, True),
+    ("Open the CRM and export this month's leads to leads-sept.csv",
+     [("file", "create", "leads-sept.csv"), ("program", "used_with_file", "CRM")], set(), None, False),
+    ("Fix the typos in handbook.docx and send it back to me by 3pm tomorrow",
+     [("file", "update", "handbook.docx")], set(), "3pm", False),
+    ("Please take care of the usual Friday things",
+     [], {"no_target"}, None, False),
+
+    # --- added after the first held-out pass exposed them; the graph was corrected for these,
+    # so they belong here and not in HELDOUT ------------------------------------------------
+    ("Confirm that the signed NDA nda-acme.pdf is sitting in Legal/Signed",
+     [("file", "exists", "nda-acme.pdf")], set(), None, False),
+    ("Convert scan.tiff to scan.pdf using Acrobat",
+     [("file", "exists", "scan.tiff"), ("file", "create", "scan.pdf"), ("program", "used_with_file", "Acrobat")],
+     set(), None, False),
+    ("Check whether Slack is still running on that machine",
+     [("program", "running", "Slack")], set(), None, False),
+    ("Finish the audit by the 14th",
+     [], {"no_target"}, "14th", False),
+    ("Deadline is 17:00 sharp for the timesheet",
+     [], {"no_target"}, "17:00", False),
+    ("Draft the onboarding checklist and save it as checklist.md",
+     [("file", "create", "checklist.md")], set(), None, False),
+    ("Please revise the pricing sheet pricing.xlsx before the board call on Tuesday",
+     [("file", "update", "pricing.xlsx")], set(), "Tuesday", False),
+    ("Get Zoom installed on the new laptop",
+     [("program", "installed_available", "Zoom")], set(), None, False),
+    ("Shut down Chrome when you're done",
+     [("program", "closed_not_running", "Chrome")], set(), None, False),
+    ("The report needs doing sometime this week",
+     [], {"no_target"}, None, False),
+    ("sales_q4.XLSX needs to be built from the raw dumps by next monday",
+     [("file", "create", "sales_q4.XLSX")], set(), "next monday", False),
+    ("Leave Veeam running overnight",
+     [("program", "running", "Veeam")], set(), None, False),
+    ("Check whether the print spooler is still running",
+     [("program", "running", "spooler")], set(), None, False),
+    ("Shut Slack and Discord down for the deploy",
+     [("program", "closed_not_running", "Slack"), ("program", "closed_not_running", "Discord")], set(), None, False),
+]
+
+HELDOUT: list[Case] = [
+    ("Export the attendance log to attendance-oct.csv",
+     [("file", "create", "attendance-oct.csv")], set(), None, False),
+    ("The vendor contract contract-signed.pdf must be on the shared drive before we pay them",
+     [("file", "exists", "contract-signed.pdf")], set(), None, False),
+    ("Rebuild the dashboard workbook dash.xlsx from scratch",
+     [("file", "create", "dash.xlsx")], set(), None, False),
+    ("Please double-check that Defender is installed on every machine you touch",
+     [("program", "installed_available", "Defender")], set(), None, False),
+    ("Kill Teams before the demo starts at 2pm",
+     [("program", "closed_not_running", "Teams")], set(), "2pm", False),
+    ("Make sure the signed timesheet timesheet-w40.pdf is there before payroll closes on Friday",
+     [("file", "exists", "timesheet-w40.pdf")], set(), "Friday", False),
+    ("Add this quarter's numbers to forecast.xlsx by 2026-10-15",
+     [("file", "update", "forecast.xlsx")], set(), "2026-10-15", False),
+    ("Produce a one-pager summary.pdf and also update the README",
+     [("file", "create", "summary.pdf")], set(), None, False),
+    ("Zip the logs into logs-archive.zip and then delete nothing",
+     [("file", "create", "logs-archive.zip")], set(), None, False),
+    ("Revise the org chart org-chart.pptx before the all-hands tomorrow",
+     [("file", "update", "org-chart.pptx")], set(), "tomorrow", False),
+    ("Install Node and keep the dev server running",
+     [("program", "installed_available", "Node")], set(), None, False),
+    ("Draft the incident writeup as incident-2026-09.md by end of day",
+     [("file", "create", "incident-2026-09.md")], set(), "end of day", False),
+    ("Confirm budget-2027.xlsx exists and that Excel is closed",
+     [("file", "exists", "budget-2027.xlsx"), ("program", "closed_not_running", "Excel")], set(), None, False),
+    ("Get the scanned invoices out of invoices.zip into the Finance folder",
+     [("file", "exists", "invoices.zip")], set(), None, False),
+    ("Nothing to do here, just keep an eye on things",
+     [], {"no_target"}, None, False),
+    ("Prepare slides.pptx and notes.docx for Monday's review",
+     [("file", "create", "slides.pptx"), ("file", "create", "notes.docx")], set(), "Monday", False),
+    ("Update the wiki, then export wiki-backup.zip by noon",
+     [("file", "create", "wiki-backup.zip")], set(), "noon", False),
+    ("Verify that antivirus.log is being written to",
+     [("file", "update", "antivirus.log")], set(), None, False),
+    ("The report is due 10/31",
+     [], {"no_target"}, "10/31", False),
+    ("Open Acrobat and sign nda-2026.pdf",
+     [("file", "update", "nda-2026.pdf"), ("program", "used_with_file", "Acrobat")], set(), None, False),
+    ("Back up the database to backup-2026-09-28.bak before you restart anything",
+     [("file", "create", "backup-2026-09-28.bak")], set(), None, False),
+    ("Keep Jenkins running while the build finishes",
+     [("program", "running", "Jenkins")], set(), None, False),
+    ("Please make sure the backup service is running before you go home",
+     [("program", "running", "backup service")], set(), None, False),
+    ("Delete nothing, just rename summary.docx to summary-final.docx",
+     [("file", "exists", "summary.docx"), ("file", "create", "summary-final.docx")], set(), None, False),
+    ("Turn off OneDrive syncing for the rest of the week",
+     [("program", "closed_not_running", "OneDrive")], set(), None, False),
+    ("The compliance pack compliance-2026.zip has to be uploaded by Thursday 5pm",
+     [("file", "exists", "compliance-2026.zip")], set(), "Thursday", False),
+    ("Set up Postman on the test box",
+     [("program", "installed_available", "Postman")], set(), None, False),
+    ("Write up findings.md, then hand it to legal before Friday",
+     [("file", "create", "findings.md")], set(), "Friday", False),
+    ("Confirm nothing is running on port 8080",
+     [], {"no_target"}, None, False),
+    ("Refresh the KPI numbers in kpi-dashboard.xlsx every morning this week",
+     [("file", "update", "kpi-dashboard.xlsx")], set(), None, False),
+    ("Have Visio installed and open when the architect calls",
+     [("program", "installed_available", "Visio")], set(), None, False),
+    ("Archive the old tickets into tickets-2025.tar.gz by month end",
+     [("file", "create", "tickets-2025.tar.gz")], set(), None, False),
+]
+
+SUITES = {"tuned": TUNED, "heldout": HELDOUT}

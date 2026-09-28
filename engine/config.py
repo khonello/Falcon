@@ -36,9 +36,9 @@ class Settings:
     # Local LLM (spec 7.2.1). Never an external API. In-process llama.cpp by default (open
     # item 10.3); 'openai' / 'ollama' select a local sidecar process instead.
     llm_backend: str = "llamacpp"
-    llm_model_path: str | None = "models/Qwen3-0.6B-Q8_0.gguf"
+    llm_model_path: str | None = "models/Qwen3-1.7B-Q8_0.gguf"
     llm_endpoint: str = "http://127.0.0.1:11434"
-    llm_model: str = "qwen3:0.6b"
+    llm_model: str = "qwen3:1.7b"
     debug: bool = False
 
     # Development-only. Both are hard, visible skips — never a quietly-always-true check (spec §8.1).

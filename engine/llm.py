@@ -9,7 +9,7 @@ Backends (open item 10.3 -- in-process is the default, a sidecar remains availab
               Inference runs on ONE dedicated worker thread (llama.cpp releases the GIL), so
               the event loop keeps serving connections and calls are naturally serialised.
     openai    an OpenAI-compatible HTTP sidecar in its own process, e.g.
-                  python -m llama_cpp.server --model models/Qwen3-0.6B-Q8_0.gguf --port 8008
+                  python -m llama_cpp.server --model models/Qwen3-1.7B-Q8_0.gguf --port 8008
               set FALCON_LLM_BACKEND=openai FALCON_LLM_ENDPOINT=http://127.0.0.1:8008
     ollama    an Ollama sidecar (FALCON_LLM_ENDPOINT, FALCON_LLM_MODEL as an Ollama tag).
 
@@ -41,7 +41,7 @@ SYSTEM = ("You classify short workplace task descriptions. Answer with exactly w
 
 class LocalLLM:
     def __init__(self, backend: str = "llamacpp", *, model_path: str | None = None,
-                 endpoint: str = "http://127.0.0.1:11434", model: str = "qwen3:0.6b",
+                 endpoint: str = "http://127.0.0.1:11434", model: str = "qwen3:1.7b",
                  timeout: float = 30.0, n_threads: int | None = None) -> None:
         if backend not in BACKENDS:
             raise ValueError(f"unknown LLM backend {backend!r}")
@@ -91,7 +91,16 @@ class LocalLLM:
             if norm == opt.lower():
                 return opt
         hits = [opt for opt in options if opt.lower() in norm]
-        return hits[0] if len(hits) == 1 else None
+        if len(hits) == 1:
+            return hits[0]
+        # One option can contain another ("use it" inside "use it on the file"): the longest
+        # hit is the answer when the shorter ones are merely parts of it. Anything else --
+        # notably a model that echoes the whole option list back -- stays unclear.
+        if len(hits) > 1:
+            longest = max(hits, key=len)
+            if all(h.lower() in longest.lower() for h in hits):
+                return longest
+        return None
 
     async def extract(self, what: str, text: str) -> str | None:
         """Short span extraction (a file name, a program name, a date phrase)."""

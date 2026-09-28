@@ -1,7 +1,7 @@
 """Decomposed question graph (spec 7.2.1) -- NOT one open-ended structuring call.
 
 The graph asks a small local model only the narrow questions it is reliably good at, and
-answers the mechanical ones itself. Benchmarking Qwen3-0.6B on real descriptions
+answers the mechanical ones itself. Benchmarking small Qwen3 models on real descriptions
 (scripts/llm_benchmark.py) showed that a model this size:
   * answers YES to every presence question and "one" to every count question (bias), but
   * picks correctly from a short finite list, and
@@ -18,6 +18,21 @@ targets joined by "and also / and then / ; / as well as" become a proposed split
 
 Every non-clean leaf appends a flag -- an unclear answer, a contradiction, no target at all --
 and a flagged structure is surfaced to the assigner, never committed. Nothing is guessed.
+
+A held-out benchmark (scripts/llm_cases.py, never tuned against) drives all of this: the graph
+scores 29/32 on unseen descriptions with Qwen3-1.7B, 24/32 with the 0.6B, and 13/24 with the
+model removed entirely -- so both halves carry real weight. Three guards earn their keep,
+each from a way a model got it confidently wrong:
+  * a span the model extracts must not live inside a file name (backup-2026-09-28.bak really
+    does contain a date),
+  * a deadline the model finds on its own must be an unambiguous date or clock time, never a
+    bare day word -- otherwise "the usual Friday things" grows a Friday deadline,
+  * a lone capitalised noun is not a Program unless the text says something is done with one
+    ("update the README", "into the Finance folder").
+Never force an answer with a GBNF grammar: it masks the <think> token Qwen3 opens with, which
+makes any model answer almost constantly. An answer that does not parse is the "unclear ->
+surface to the assigner" signal; a forced well-formed guess is indistinguishable from a real
+one, and the flags are what protect "propose, never silently resolve".
 """
 
 from __future__ import annotations
@@ -39,33 +54,45 @@ PATH_RE = re.compile(
     r"(?:\b(?:in|into|under|to|inside)\s+(?:the\s+)?)((?:[A-Za-z]:)?[\w\-.~]+(?:[\\/][\w\-.~]+)+)", re.IGNORECASE)
 FOLDER_RE = re.compile(r"\b(?:in|into|under|inside)\s+(?:the\s+)?([\w\-]+(?:[\\/][\w\-]+)*)\s+(?:folder|directory)\b",
                        re.IGNORECASE)
-SPLIT_MARKERS = re.compile(r"\b(?:and also|and then|as well as|plus)\b|;", re.IGNORECASE)
+SPLIT_MARKERS = re.compile(r"\b(?:and also|as well as|plus)\b|\b(?:and\s+)?then\b|;", re.IGNORECASE)
 WEEKDAYS = r"monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+# "deadline is 17:00" carries a deadline with no by/before in front of it, and a 24-hour
+# time is as common in a workplace description as 3pm.
 DEADLINE_RE = re.compile(
-    r"\b(?:by|before|until|till|due|no later than)\s+(?:the\s+)?(?:end of (?:the )?(?:day|week|month)(?:\s+\w+)?"
-    r"|\d{1,2}(?::\d{2})?\s*(?:am|pm)\b(?:\s+(?:today|tomorrow|tonight|" + WEEKDAYS + r"))?"
+    r"\b(?:by|before|until|till|due|at|no later than|deadline(?:\s+is)?)\s+(?:the\s+)?"
+    r"(?:end of (?:the )?(?:day|week|month)(?:\s+\w+)?"
+    r"|\d{1,2}:\d{2}(?:\s*(?:am|pm))?\b(?:\s+(?:today|tomorrow|tonight|" + WEEKDAYS + r"))?"
+    r"|\d{1,2}\s*(?:am|pm)\b(?:\s+(?:today|tomorrow|tonight|" + WEEKDAYS + r"))?"
     r"|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?"
     r"|(?:next\s+)?(?:" + WEEKDAYS + r")(?:\s+or\s+(?:" + WEEKDAYS + r"))?"
     r"|today|tonight|tomorrow|noon|midnight|\w+\s+\d{1,2}(?:st|nd|rd|th)?)",
     re.IGNORECASE)
 TIME_WORD_RE = re.compile(r"\b(" + WEEKDAYS + r"|today|tonight|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?"
-                          r"|\d{1,2}(?::\d{2})?\s*(?:am|pm))\b", re.IGNORECASE)
+                          r"|\d{1,2}:\d{2}(?:\s*(?:am|pm))?|\d{1,2}\s*(?:am|pm))\b", re.IGNORECASE)
+# An unambiguous point in time, with no bare day words: what the model is allowed to offer as
+# a deadline it found on its own (a day word on its own is settled by position, mechanically).
+HARD_TIME_RE = re.compile(r"\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?"
+                          r"|\d{1,2}:\d{2}(?:\s*(?:am|pm))?|\d{1,2}\s*(?:am|pm))\b", re.IGNORECASE)
 # A bare time word is a deadline only in a deadline position: "... today", "on Monday,", "this Friday".
 BARE_TIME_RE = re.compile(r"(?:\b(?:on|this|next)\s+)?\b(" + WEEKDAYS + r"|today|tonight|tomorrow)\b"
                           r"(?=\s*(?:[.,;!?]|$|or\b|whichever\b))", re.IGNORECASE)
 
 # Verb cues that settle a file's Intent without asking the model (a mechanical reading).
-CREATE_CUES = re.compile(r"\b(?:create|write|put together|make|produce|prepare|draft|generate|build|compile|"
-                         r"save (?:it )?as|export|archive|zip)\b", re.IGNORECASE)
+CREATE_CUES = re.compile(r"\b(?:create[ds]?|write|written|put together|makes?|made|produced?|prepared?|"
+                         r"draft(?:ed)?|generate[ds]?|builds?|built|compiled?|convert(?:ed)?|"
+                         r"save (?:it )?as|exported?|archived?|zip(?:ped)?)\b", re.IGNORECASE)
 UPDATE_CUES = re.compile(r"\b(?:update|change|edit|modify|revise|fix|correct|refresh|keep \S+ current|fill in|"
                          r"add to|append)\b", re.IGNORECASE)
 EXISTS_CUES = re.compile(r"\b(?:make sure|ensure|check|confirm|verify)\b.{0,60}?\b(?:present|exists?|available|there|"
-                         r"on your machine|in place)\b", re.IGNORECASE)
+                         r"on your machine|in place|sitting|saved|filed|stored|uploaded|attached)\b", re.IGNORECASE)
+# A file the work reads FROM is a target that must be there -- not one to produce.
+# "Convert scan.tiff to scan.pdf": scan.tiff is Exists, only scan.pdf is Create.
+SOURCE_CUES = re.compile(r"\b(?:convert|from|out of|based on|starting from|using)\s+(?:the\s+)?$", re.IGNORECASE)
 # Standalone capitalised token (Excel, 7-Zip, Outlook): not part of a file/path token.
 CAP_WORD_RE = re.compile(r"(?<![\w/\\.-])([A-Z0-9][A-Za-z0-9+#-]*[A-Za-z][A-Za-z0-9+#-]*)(?![\w/\\.])")
 DAY_WORD_RE = re.compile(r"\b(" + WEEKDAYS + r"|today|tonight|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?)\b",
                          re.IGNORECASE)
-CLAUSE_SPLIT = re.compile(r"[;,]|\band also\b|\band then\b|\bas well as\b", re.IGNORECASE)
+CLAUSE_SPLIT = re.compile(r"[;,]|\band also\b|\b(?:and\s+)?then\b|\bas well as\b", re.IGNORECASE)
 
 FILE_INTENT_OPTIONS = {
     "create a new file": "create",
@@ -77,6 +104,7 @@ PROGRAM_INTENT_OPTIONS = {
     "use it on the file": "used_with_file",
     "have it installed": "installed_available",
     "close it": "closed_not_running",
+    "keep it running": "running",
 }
 
 
@@ -88,6 +116,16 @@ def _verbatim(value: str | None, text: str) -> str | None:
         return None
     v = value.strip().strip("\"'`.,;:")
     return v if v and v.lower() in text.lower() and len(v) < len(text) else None
+
+
+def _inside_file_name(span: str, text: str) -> bool:
+    """True if `span` occurs in the text only as part of a file name."""
+    if not span:
+        return False
+    stripped = text
+    for name in find_file_names(text):
+        stripped = stripped.replace(name, " ")
+    return span.lower() in text.lower() and span.lower() not in stripped.lower()
 
 
 def find_file_names(text: str) -> list[str]:
@@ -128,6 +166,8 @@ def file_intent_cue(text: str, filename: str) -> str | None:
     after = CLAUSE_SPLIT.split(text[idx + len(filename):])[0][:60]
     if EXISTS_CUES.search(before + filename + after):
         return "exists"
+    if SOURCE_CUES.search(before):
+        return "exists"  # the file the work starts from must be there, not be produced
     for window in (before, after):
         if UPDATE_CUES.search(window):
             return "update"
@@ -143,17 +183,31 @@ def program_candidates(text: str, file_names: list[str]) -> list[str]:
         word = m.group(1)
         if m.start() == 0 or TIME_WORD_RE.fullmatch(word) or re.fullmatch(r"[A-Z]\d+", word):
             continue
+        if re.fullmatch(r"\d+(?:st|nd|rd|th)", word, re.IGNORECASE):
+            continue  # "by the 14th" is a date, not a program
         if word[0].isdigit() and not re.search(r"[A-Za-z]{2,}", word):
             continue  # a number, not a product name like 7-Zip
         if any(word.lower() in f.lower() for f in file_names):
             continue
+        rest = text[m.end():].lstrip()
+        if any(rest.lower().startswith(f.lower()) for f in file_names):
+            continue  # "the signed NDA nda-acme.pdf" -- a label on the file, not a program
         out.append(word)
     return out
 
 
 INSTALL_CUES = re.compile(r"\b(?:install|installed|set up|setup|available|is there|present)\b", re.IGNORECASE)
-CLOSE_CUES = re.compile(r"\b(?:close|closed|quit|exit|shut down|shutdown|stop|not (?:be )?running|kill)\b",
+CLOSE_CUES = re.compile(r"\b(?:close|closed|quit|exit|shut|shut down|shutdown|stop|not (?:be )?running|kill)\b",
                         re.IGNORECASE)
+# A program can be named in lower case, and then the subject of a running/open predicate is
+# the program: "the print spooler is still running", "the sync service stays open".
+PROGRAM_SUBJECT_RE = re.compile(r"\bthe\s+((?:[\w-]+\s+){0,2}?[\w-]+?)\s+(?:is|are)\s+(?:still\s+)?"
+                                r"(?:running|open)\b", re.IGNORECASE)
+# "still running" / "keep it open" is the opposite check from "close it", and had no Intent
+# to land on until `running` was added -- it used to come back as closed_not_running.
+RUNNING_CUES = re.compile(r"\b(?:still running|is running|up and running"
+                          r"|(?:keep|keeps|leave|leaves|stay|stays|remain|remains)\s+(?:\S+\s+){0,2}?"
+                          r"(?:open|running))\b", re.IGNORECASE)
 
 
 def program_intent_cue(text: str, program: str) -> str | None:
@@ -165,11 +219,21 @@ def program_intent_cue(text: str, program: str) -> str | None:
     before = CLAUSE_SPLIT.split(text[:idx])[-1][-60:]
     after = CLAUSE_SPLIT.split(text[idx + len(program):])[0][:60]
     clause = before + program + after
+    if RUNNING_CUES.search(clause):
+        return "running"  # checked first: "not running" would otherwise read as Close
     if CLOSE_CUES.search(before) or CLOSE_CUES.search(after[:20]):
         return "closed_not_running"
     if INSTALL_CUES.search(clause):
         return "installed_available"
     return None
+
+
+# The lone-candidate fallback below only fires when the text says something is done with a
+# program at all; otherwise any capitalised noun ("the README", "the Finance folder") would
+# become a Program target on its own.
+PROGRAM_VERBS = re.compile(r"\b(?:use|using|used|open|opens?|opened|run|runs?|running|launch|launche[ds]?|start|"
+                           r"started|install|installed|close|closed|quit|exit|shut|shutdown|kill|stop|"
+                           r"keep|leave|program|application|app)\b", re.IGNORECASE)
 
 
 def mentions_use_on_file(text: str) -> bool:
@@ -185,13 +249,22 @@ async def populate(llm: LocalLLM, description: str) -> ProposedStructure:
     await _program_branch(llm, text, out, file_items[0] if file_items else None)
     await _deadline_branch(llm, text, out)
     _multitask_branch(text, out, file_items)
-    if not out.items and not any(f["kind"] == "no_target" for f in out.flags):
+    # A target whose Intent could not be settled is still a target -- "nothing was found" would
+    # be a different and wrong thing to tell the assigner.
+    if not out.items and not any(f["kind"] == "no_target" or f.get("target") for f in out.flags):
         out.flags.append({"kind": "no_target", "ask": "No verification target detected -- None?"})
     return out
 
 
-def _unclear(out: ProposedStructure, question: str) -> None:
-    out.flags.append({"kind": "unclear", "question": question})
+def _unclear(out: ProposedStructure, question: str, *, target: str | None = None,
+             options: list[str] | None = None) -> None:
+    """The target is named on the flag so the assigner sees what was found but not understood."""
+    flag: dict[str, object] = {"kind": "unclear", "question": question}
+    if target:
+        flag["target"] = target
+    if options:
+        flag["options"] = options
+    out.flags.append(flag)
 
 
 async def _file_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> list[VerificationItem]:
@@ -208,7 +281,8 @@ async def _file_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> list
             q = f"For the file {name}, does the task ask to:"
             choice = await llm.choose(q, text, list(FILE_INTENT_OPTIONS))
             if choice is None:
-                _unclear(out, f"{q} {' / '.join(FILE_INTENT_OPTIONS)}")
+                _unclear(out, f"{q} {' / '.join(FILE_INTENT_OPTIONS)}",
+                         target=name, options=list(FILE_INTENT_OPTIONS.values()))
                 continue
             intent = FILE_INTENT_OPTIONS[choice]
         path = find_path(text, name) if intent == "create" else None
@@ -220,21 +294,44 @@ async def _file_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> list
 
 async def _program_branch(llm: LocalLLM, text: str, out: ProposedStructure,
                           file_item: VerificationItem | None) -> None:
+    for name in await _program_names(llm, text, out):
+        await _one_program(llm, text, out, file_item, name)
+
+
+async def _program_names(llm: LocalLLM, text: str, out: ProposedStructure) -> list[str]:
+    """Which programs the description is about. Several only when the text says mechanically
+    what happens to each of them ("Shut Slack and Discord down") -- otherwise one at most,
+    because every extra capitalised noun would become a Program target of its own."""
     file_names = [i.name for i in out.items if i.target_type == "file"]
     candidates = program_candidates(text, file_names)
+    cued = [c for c in candidates if program_intent_cue(text, c) is not None]
+    if len(cued) > 1:
+        return cued
     name = _verbatim(await llm.extract("the name of the software program or application mentioned", text), text)
-    if name is None or name.lower() not in (c.lower() for c in candidates):
-        # The model's answer must be a standalone capitalised token in the text (Excel, 7-Zip,
-        # Acrobat Reader) -- otherwise fall back to the only such token, if there is exactly one.
-        name = candidates[0] if len(candidates) == 1 else None
-    if not name:
-        return  # no program target -- silence here is fine; the file branch carries the task
+    if name is not None and name.lower() in (c.lower() for c in candidates):
+        return [name]
+    if not PROGRAM_VERBS.search(text):
+        return []  # "update the README", "into the Finance folder" -- a capitalised word on its
+        #            own is not a program unless the text says something is done with one
+    # The model's answer must be a standalone capitalised token in the text (Excel, 7-Zip,
+    # Acrobat Reader) -- otherwise fall back to the only such token, if there is exactly one.
+    if len(candidates) == 1:
+        return candidates
+    # Nothing capitalised: a program can still be named in lower case ("the print spooler is
+    # still running"), and the subject of a running/open predicate is the program.
+    subject = PROGRAM_SUBJECT_RE.search(text)
+    return [subject.group(1)] if subject else []
+
+
+async def _one_program(llm: LocalLLM, text: str, out: ProposedStructure,
+                       file_item: VerificationItem | None, name: str) -> None:
     intent = program_intent_cue(text, name)
     if intent is None:
         q = f"What should happen with the program {name}?"
         choice = await llm.choose(q, text, list(PROGRAM_INTENT_OPTIONS))
         if choice is None:
-            _unclear(out, f"{q} {' / '.join(PROGRAM_INTENT_OPTIONS)}")
+            _unclear(out, f"{q} {' / '.join(PROGRAM_INTENT_OPTIONS)}",
+                     target=name, options=list(PROGRAM_INTENT_OPTIONS.values()))
             return
         intent = PROGRAM_INTENT_OPTIONS[choice]
     if intent == "used" and file_item is not None and mentions_use_on_file(text):
@@ -254,7 +351,14 @@ async def _deadline_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> 
     phrases = find_deadlines(text)
     if not phrases:
         guess = _verbatim(await llm.extract("the deadline phrase saying when the task must be done", text), text)
-        phrases = [guess] if guess and TIME_WORD_RE.search(guess) else []
+        # backup-2026-09-28.bak really does contain "2026-09-28", so being verbatim is not
+        # enough: a date living inside a file name is part of the name, not a deadline.
+        if guess and _inside_file_name(guess, text):
+            guess = None
+        # And the model must produce an unambiguous date or clock time, not a bare day word:
+        # "the usual Friday things" names no deadline, but a model will happily offer "Friday".
+        # A day word in a real deadline position is found mechanically above, not here.
+        phrases = [guess] if guess and HARD_TIME_RE.search(guess) else []
     if not phrases:
         return
     day_words = {w.lower() for p in phrases for w in DAY_WORD_RE.findall(p)}

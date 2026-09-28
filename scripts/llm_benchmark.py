@@ -1,13 +1,22 @@
 """Benchmark the Task decision graph (spec 7.2.1) against a local model.
 
-Runs realistic task descriptions through `engine.task.llm_graph.populate` with the real
-`LocalLLM` and compares the produced structure with what a careful assigner would expect.
-Accuracy on THIS graph is what matters, not leaderboard standing.
+Runs realistic task descriptions through `engine.task.llm_graph.populate` and compares the
+produced structure with what a careful assigner would expect. Accuracy on THIS graph is what
+matters, not leaderboard standing.
 
-    environ-engine\\Scripts\\python.exe scripts\\llm_benchmark.py [--backend llamacpp|openai|ollama]
-        [--model-path models/Qwen3-0.6B-Q8_0.gguf] [--endpoint URL] [--model NAME] [-v]
+Two suites (see scripts/llm_cases.py), and the difference between them is the point:
+  tuned    the cases the graph was written against -- a regression guard. Must stay 100%.
+  heldout  cases the graph has never been tuned against -- the actual measurement. Reported
+           as a score; do not "fix" the graph until it passes, or it stops measuring.
 
-Exit code 0 when every case matches, 1 otherwise. Prints a per-case table and a summary.
+    environ-engine\\Scripts\\python.exe scripts\\llm_benchmark.py [--suite tuned|heldout|all]
+        [--backend llamacpp|openai|ollama] [--model-path models/Qwen3-1.7B-Q8_0.gguf]
+        [--endpoint URL] [--model NAME] [--floor N] [--no-model] [-v]
+
+`--no-model` answers every question with None instead of calling the model, which measures
+how much the model contributes at all: whatever still passes is mechanical, not the model.
+
+Exit code 0 when the tuned suite is perfect and the held-out score is at least `--floor`.
 """
 
 from __future__ import annotations
@@ -22,40 +31,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from engine.llm import LocalLLM
 from engine.task import llm_graph
+from scripts.llm_cases import HELDOUT, SUITES, TUNED, Case
 
-# (description, expected items [(target_type, intent, name-substring)], expected flags kinds,
-#  expected deadline substring or None, expect split)
-CASES: list[tuple[str, list[tuple[str, str, str]], set[str], str | None, bool]] = [
-    ("Put together the Q3 sales report as sales-q3.xlsx by Friday",
-     [("file", "create", "sales-q3.xlsx")], set(), "Friday", False),
-    ("Keep inventory.csv current -- update it with this week's counts",
-     [("file", "update", "inventory.csv")], set(), None, False),
-    ("Make sure onboarding.pdf is present on your machine before the new hire starts on Monday",
-     [("file", "exists", "onboarding.pdf")], set(), "Monday", False),
-    ("Use Excel to update budget.xlsx before end of day Thursday",
-     [("file", "update", "budget.xlsx"), ("program", "used_with_file", "Excel")], set(), "Thursday", False),
-    ("Spend the afternoon in Photoshop cleaning up the product photos",
-     [("program", "used", "Photoshop")], set(), None, False),
-    ("Install 7-Zip so it's available when we need it",
-     [("program", "installed_available", "7-Zip")], set(), None, False),
-    ("Close Outlook before you leave today",
-     [("program", "closed_not_running", "Outlook")], set(), "today", False),
-    ("Write the minutes into meeting-notes.docx in the Shared/Minutes folder",
-     [("file", "create", "meeting-notes.docx")], set(), None, False),
-    ("Finish the slides by Monday or Wednesday, whichever works",
-     [], {"ambiguous_deadline"}, None, False),
-    ("Update payroll.xlsx and also archive last year's invoices into archive-2024.zip",
-     [("file", "update", "payroll.xlsx"), ("file", "create", "archive-2024.zip")], set(), None, True),
-    ("Open the CRM and export this month's leads to leads-sept.csv",
-     [("file", "create", "leads-sept.csv"), ("program", "used_with_file", "CRM")], set(), None, False),
-    ("Fix the typos in handbook.docx and send it back to me by 3pm tomorrow",
-     [("file", "update", "handbook.docx")], set(), "3pm", False),
-    ("Please take care of the usual Friday things",
-     [], {"no_target"}, None, False),
-]
+CASES = TUNED  # the name the suite was known by before the split
 
 
-def check(case, structure) -> list[str]:
+class NoModel:
+    """Every question unanswered. What still passes is the graph's mechanical reading."""
+
+    calls = 0
+
+    async def yes_no(self, question: str, text: str) -> None:
+        self.calls += 1
+
+    async def choose(self, question: str, text: str, options: list[str]) -> None:
+        self.calls += 1
+
+    async def extract(self, what: str, text: str) -> None:
+        self.calls += 1
+
+
+def check(case: Case, structure) -> list[str]:
     _desc, items, flags, deadline, split = case
     problems: list[str] = []
     got = [(i.target_type, i.intent, i.name) for i in structure.items]
@@ -82,21 +78,12 @@ def check(case, structure) -> list[str]:
     return problems
 
 
-async def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--backend", default="llamacpp")
-    ap.add_argument("--model-path", default="models/Qwen3-0.6B-Q8_0.gguf")
-    ap.add_argument("--endpoint", default="http://127.0.0.1:11434")
-    ap.add_argument("--model", default="qwen3:0.6b")
-    ap.add_argument("-v", "--verbose", action="store_true")
-    args = ap.parse_args()
-    llm = LocalLLM(args.backend, model_path=args.model_path, endpoint=args.endpoint, model=args.model)
-    print(f"backend: {llm.describe()}  available={llm.available}")
-    if not llm.available:
-        return 2
+async def run_suite(llm, cases: list[Case], label: str, verbose: bool) -> int:
+    print(f"\n--- {label} ({len(cases)} cases) ---")
     passed = 0
+    calls_at_start = llm.calls
     t0 = time.perf_counter()
-    for case in CASES:
+    for case in cases:
         calls_before = llm.calls
         t1 = time.perf_counter()
         structure = await llm_graph.populate(llm, case[0])
@@ -105,15 +92,54 @@ async def main() -> int:
         ok = not problems
         passed += ok
         print(f"[{'OK ' if ok else 'BAD'}] {dt:5.1f}s {llm.calls - calls_before:2d} calls  {case[0]}")
-        if args.verbose or not ok:
+        if verbose or not ok:
             print(f"      items={[(i.target_type, i.intent, i.name, i.path) for i in structure.items]}")
-            print(f"      deadline={structure.final_deadline!r} flags={structure.flags} split={bool(structure.proposed_split)}")
+            print(f"      deadline={structure.final_deadline!r} flags={structure.flags} "
+                  f"split={bool(structure.proposed_split)}")
             for p in problems:
                 print(f"      - {p}")
     total = time.perf_counter() - t0
-    print(f"\n{passed}/{len(CASES)} cases correct, {llm.calls} model calls, {total:.1f}s total "
-          f"({total / max(llm.calls, 1):.2f}s per call)")
-    return 0 if passed == len(CASES) else 1
+    calls = llm.calls - calls_at_start
+    print(f"{label}: {passed}/{len(cases)} correct, {calls} model calls, {total:.1f}s "
+          f"({total / max(calls, 1):.2f}s per call)")
+    return passed
+
+
+async def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--suite", default="all", choices=("tuned", "heldout", "all"))
+    ap.add_argument("--backend", default="llamacpp")
+    ap.add_argument("--model-path", default="models/Qwen3-1.7B-Q8_0.gguf")
+    ap.add_argument("--endpoint", default="http://127.0.0.1:11434")
+    ap.add_argument("--model", default="qwen3:1.7b")
+    ap.add_argument("--floor", type=int, default=0,
+                    help="fail if fewer than N held-out cases pass (0 = report only)")
+    ap.add_argument("--no-model", action="store_true",
+                    help="answer nothing instead of calling the model, to measure its contribution")
+    ap.add_argument("-v", "--verbose", action="store_true")
+    args = ap.parse_args()
+
+    if args.no_model:
+        llm: object = NoModel()
+        print("backend: none (every question unanswered)")
+    else:
+        llm = LocalLLM(args.backend, model_path=args.model_path, endpoint=args.endpoint, model=args.model)
+        print(f"backend: {llm.describe()}  available={llm.available}")
+        if not llm.available:
+            return 2
+
+    suites = [(k, SUITES[k]) for k in (("tuned", "heldout") if args.suite == "all" else (args.suite,))]
+    scores = {name: await run_suite(llm, cases, name, args.verbose) for name, cases in suites}
+
+    print()
+    failed = False
+    if "tuned" in scores:
+        print(f"tuned   {scores['tuned']}/{len(TUNED)}   (regression guard -- must be perfect)")
+        failed |= scores["tuned"] != len(TUNED) and not args.no_model
+    if "heldout" in scores:
+        print(f"heldout {scores['heldout']}/{len(HELDOUT)}   (the measurement -- do not tune against it)")
+        failed |= scores["heldout"] < args.floor
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

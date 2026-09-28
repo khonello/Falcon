@@ -97,6 +97,56 @@ def test_graph_mechanical_helpers():
     assert llm_graph.program_intent_cue("Use Excel to update budget.xlsx", "Excel") is None
 
 
+def test_graph_reads_running_source_and_bare_times():
+    """The corrections a held-out pass forced: an Intent for 'still running', a file the work
+    reads FROM, 24-hour deadlines, a bare 'then' split, and nouns that are not programs."""
+    # "still running" is the opposite check from "close it" -- it used to become Close.
+    assert llm_graph.program_intent_cue("Check whether Slack is still running", "Slack") == "running"
+    assert llm_graph.program_intent_cue("Keep Jenkins running while the build finishes", "Jenkins") == "running"
+    assert llm_graph.program_intent_cue("Close Outlook before you leave", "Outlook") == "closed_not_running"
+    # A source file must be there, not be produced.
+    assert llm_graph.file_intent_cue("Convert scan.tiff to scan.pdf", "scan.tiff") == "exists"
+    assert llm_graph.file_intent_cue("Get the invoices out of invoices.zip", "invoices.zip") == "exists"
+    assert llm_graph.file_intent_cue("Confirm nda.pdf is sitting in Legal/Signed", "nda.pdf") == "exists"
+    # 24-hour times and a deadline with no by/before in front of it.
+    assert llm_graph.find_deadlines("Deadline is 17:00 sharp") == ["Deadline is 17:00"]
+    assert llm_graph.find_deadlines("hand it in by 09:30 tomorrow") == ["by 09:30 tomorrow"]
+    assert llm_graph.find_deadlines("finish by 3pm tomorrow") == ["by 3pm tomorrow"]
+    # A date inside a file name is part of the name, however verbatim it is.
+    assert llm_graph._inside_file_name("2026-09-28", "back it up to backup-2026-09-28.bak")
+    assert not llm_graph._inside_file_name("2026-09-28", "backup-2026-09-28.bak by 2026-09-28")
+    # Capitalised nouns that are not programs.
+    assert llm_graph.program_candidates("Finish the audit by the 14th", []) == []
+    assert llm_graph.program_candidates("Confirm the signed NDA nda-acme.pdf is there", ["nda-acme.pdf"]) == []
+
+
+async def test_graph_keeps_a_target_it_cannot_read():
+    """An unsettled Intent is 'surface to the assigner', not 'nothing was found' -- the flag
+    names the target so the assigner sees what the graph saw."""
+    s = await llm_graph.populate(ScriptedLLM({}), "Look at data.csv")
+    assert s.items == []  # nothing is guessed
+    flag = next(f for f in s.flags if f["kind"] == "unclear")
+    assert flag["target"] == "data.csv" and flag["options"] == ["create", "update", "exists"]
+    assert not any(f["kind"] == "no_target" for f in s.flags)
+
+
+async def test_choose_prefers_the_longest_option_it_contains():
+    """'use it' is a substring of 'use it on the file': a correct answer must not read as two."""
+    llm = LocalLLM("ollama")
+    options = ["use it", "use it on the file", "close it"]
+    assert await _chosen(llm, "use it on the file", options) == "use it on the file"
+    assert await _chosen(llm, "close it", options) == "close it"
+    # A model that echoes the option list back has not chosen anything.
+    assert await _chosen(llm, "use it | close it", options) is None
+
+
+async def _chosen(llm: LocalLLM, answer: str, options: list[str]) -> str | None:
+    async def _ask(prompt: str, *, max_tokens: int) -> str:
+        return answer
+    llm._ask = _ask  # type: ignore[method-assign]
+    return await llm.choose("q", "text", options)
+
+
 # --- lifecycle ----------------------------------------------------------------------------------
 
 async def _index(engine, pc_id: int, path: str, name: str, h: str = "h") -> int:

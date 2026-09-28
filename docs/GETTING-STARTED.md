@@ -5,13 +5,14 @@ one machine, the Super User, Admins and their people on theirs). Settings live i
 shell. Commands are shown for Windows; on Linux use `bin/python` instead of `Scripts\python.exe`.
 
 **On every machine, beforehand:** Python 3.10+ and a clone (or copy) of this repository. On the Engine's machine,
-PostgreSQL (16 or later). The virtual environments are made once per machine, one per package:
+PostgreSQL (16 or later). The virtual environments are made once per machine, one per package, and each has a
+requirements file in the repository root. Run the install from the root of the clone:
 
 | Machine | Environment | Install |
 |---|---|---|
-| the Engine | `environ-engine` | `pip install -e ".[engine,dev]"` |
-| the Super User, an Admin | `environ-operator` | `pip install -e ".[tui,gui]"` |
-| a person's PC (a Worker) | `environ-worker` | `pip install -e ".[worker,worker-ui]"` (`worker-ui` = its small windows) |
+| the Engine | `environ-engine` | `pip install -r requirements-engine.txt` |
+| the Super User, an Admin | `environ-operator` | `pip install -r requirements-operator.txt` |
+| a person's PC (a Worker) | `environ-worker` | `pip install -r requirements-worker.txt` (includes its small windows) |
 
 ---
 
@@ -19,7 +20,7 @@ PostgreSQL (16 or later). The virtual environments are made once per machine, on
 
 ```powershell
 python -m venv environ-engine
-environ-engine\Scripts\python.exe -m pip install -e ".[engine,dev,gui]"
+environ-engine\Scripts\python.exe -m pip install -r requirements-engine.txt
 environ-engine\Scripts\python.exe -m engine setup --admin-url postgresql://postgres:<postgres-password>@localhost:5432/postgres
 ```
 
@@ -27,13 +28,13 @@ environ-engine\Scripts\python.exe -m engine setup --admin-url postgresql://postg
 `falcon` role and the `falcon` / `falcon_test` databases, applies the schema, creates the master secret, makes the
 first **Super User** (its id and key printed **once**) and writes them into this machine's Operator Client settings.
 Without `--admin-url` it prints the SQL to run as a PostgreSQL superuser, and stops until the databases exist.
-`--download-model` also fetches the local language model (~640 MB) used by Tasks.
+`--download-model` also fetches the local language model (~1.8 GB) used by Tasks.
 
 ```powershell
 environ-engine\Scripts\python.exe -m engine                              # the Engine (leave it running)
 
 python -m venv environ-operator
-environ-operator\Scripts\python.exe -m pip install -e ".[tui,gui]"
+environ-operator\Scripts\python.exe -m pip install -r requirements-operator.txt
 environ-operator\Scripts\python.exe -m operator_client --gui             # opens as the Super User, nothing to type
 ```
 
@@ -89,7 +90,7 @@ client needs it.
 
 ```powershell
 python -m venv environ-operator
-environ-operator\Scripts\python.exe -m pip install -e ".[tui,gui]"
+environ-operator\Scripts\python.exe -m pip install -r requirements-operator.txt
 environ-operator\Scripts\python.exe -m operator_client --gui
 ```
 
@@ -113,7 +114,7 @@ In the Super User's window:
 
    ```powershell
    python -m venv environ-worker
-   environ-worker\Scripts\python.exe -m pip install -e ".[worker,worker-ui]"
+   environ-worker\Scripts\python.exe -m pip install -r requirements-worker.txt
    environ-worker\Scripts\python.exe -m worker_client --engine falcon.internal:7400 --client-id <id> --client-key <key> --ca C:\path\to\engine.crt --watch C:\Users\<them>\Documents
    ```
 
