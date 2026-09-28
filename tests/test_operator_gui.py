@@ -39,14 +39,13 @@ def gui(tmp_path: Path):
 def test_qml_loads_and_starts_on_connect_view(gui):
     win, _, bridge = gui
     assert win.title().startswith("Falcon")
-    # full screen without resize: pinned to the work area, min == max, minimize + close only
+    # frameless: it opens maximised over the work area and restores to the design's own size, with
+    # a floor that keeps a four-cell page from collapsing. Nothing is pinned any more.
     size = fit_to_screen(win)
     avail = win.screen().availableGeometry()
-    assert win.minimumSize() == win.maximumSize() == size
     assert size.width() <= avail.width() and size.height() <= avail.height() and size.width() > 0
-    flags = int(win.flags())
-    assert flags & int(Qt.WindowMinimizeButtonHint) and flags & int(Qt.WindowCloseButtonHint)
-    assert not flags & int(Qt.WindowMaximizeButtonHint)
+    assert win.minimumSize().width() <= size.width() and win.maximumSize().width() > size.width()
+    assert int(win.flags()) & int(Qt.WindowType.FramelessWindowHint)
     assert win.findChild(QObject, "connectView") is not None
     assert not bridge.isConnected and bridge.sessionText == "no session"
     assert bridge.defaultHost == "127.0.0.1" and bridge.defaultPlaintext is True
@@ -93,7 +92,7 @@ def test_a_cell_opens_in_place_and_escape_restores_the_grid(gui):
 
     # the opened composition is built and reachable, and it is Authority's own -- a big chart, two
     # told panels beneath it, and the reading down the right
-    for name in ("openedAuthority", "openedHero", "openedFleet", "openedSessions", "openedReading"):
+    for name in ("openedAuthority", "openedHero", "openedFleet", "openedFleetRow", "openedSessions", "openedReading"):
         assert win.findChild(QObject, name) is not None, name
 
     view.setProperty("opened", "authority")
@@ -131,7 +130,8 @@ def test_all_four_cells_have_their_own_composition(gui):
 
     panels = {
         "authority": ("openedAuthority", "openedHero", "openedFleet", "openedSessions", "openedReading"),
-        "today": ("openedToday", "todayLead", "todayEntered", "todayQuiet", "todayReading"),
+        "today": ("openedToday", "todayLead", "todayEntered", "todayEnteredCards",
+                  "todayQuiet", "todayQuietRow", "todayReading"),
         "place": ("openedOutOfPlace", "placeTiers", "placeDeviations", "placeReading"),
     }
     for key, names in panels.items():
@@ -172,9 +172,9 @@ async def test_bridge_connects_and_views_populate(gui, engine, org):
     assert bridge.role == "super_user" and bridge.roleLabel == "Super User" and bridge.accountId == org["su"]
 
     # views refresh on connect: the hierarchy tree lands in QML state
-    rail = win.findChild(QObject, "hierarchyRail")
-    await _wait(lambda: len(prop(rail, "tree") or []) == 2)
-    depts = prop(rail, "tree")
+    authority = win.findChild(QObject, "authorityView")
+    await _wait(lambda: len(prop(authority, "tree") or []) == 2)
+    depts = prop(authority, "tree")
     assert [d["name"] for d in depts] == ["Finance", "HR"]
     assert {w["hostname"] for w in depts[0]["workers"]} == {"FIN-01", "FIN-02"}
 
@@ -824,3 +824,96 @@ def test_an_act_with_a_cost_asks_first_and_names_itself(gui):
                              Q_ARG("QVariant", "cid"), Q_ARG("QVariant", "7f3a91c2"))
     assert act.property("text") == "I've saved it" and val(dlg.property("spec"))["secret"][1] == ["Key", "7f3a91c2"]
     QMetaObject.invokeMethod(dlg, "close")
+
+
+def test_the_authority_area_is_the_kit_and_carries_the_names(gui):
+    """The Super User's Authority area was the last pre-kit screen -- a sidebar, a card strip and a
+    detail card printing account and PC ids. It is now four cells on the frame, and it is the only
+    place display names are set: hierarchy.set_display_name and set_self_name had no GUI at all once
+    the orphaned HierarchyView stopped being mounted."""
+    win, _, _ = gui
+    for name in ("authorityView", "authorityDepartments", "authorityPeople",
+                 "authorityGap", "authorityNaming", "newDepartment", "setSelfName"):
+        assert win.findChild(QObject, name) is not None, name
+
+    view = win.findChild(QObject, "authorityView")
+    view.setProperty("tree", [
+        {"department_id": 1, "name": "Operations", "workers": [{"pc_id": 1, "hostname": "OPS-01"}],
+         "admins": [{"account_id": 7, "name": "R. Mensah", "hostname": "WS-A1", "session": None}]},
+        {"department_id": 2, "name": "Logistics", "workers": [{"pc_id": 2, "hostname": "LOG-01"}], "admins": []},
+    ])
+    assert [p["name"] for p in prop(view, "people")] == ["R. Mensah"]
+    assert [d["name"] for d in prop(view, "orphans")] == ["Logistics"]     # where nobody governs
+    # nobody is picked until you pick them, and then the naming cell is about that person
+    assert prop(view, "selected") is None
+    view.setProperty("selectedId", 7)
+    assert prop(view, "selected")["name"] == "R. Mensah"
+    assert "R. Mensah" in prop(view, "nameSays")["sentence"]
+
+
+def test_assisted_access_has_a_surface_and_it_is_the_admin_s(gui):
+    """The whole combo was reachable only from the TUI: the five handlers' only GUI was a screen
+    nothing mounted. It lives on Assistance, for an Admin -- every assisted_access handler refuses
+    anyone else -- and it is consent, not eviction: what the helper may do is said before either
+    side agrees, and there is no clock anywhere in it."""
+    win, _, _ = gui
+    view = win.findChild(QObject, "assistanceView")
+    assert win.findChild(QObject, "assistHelp") is not None
+    assert win.findChild(QObject, "askForHelp") is not None
+
+    # an offer arriving by push is drawn with the scope in words, never as a spec
+    view.setProperty("offers", [{"request_id": 4, "requester_name": "A. Quaye",
+                                 "scope": {"control_actions": True, "monitoring_actions": True,
+                                           "custom_actions": False, "tasks": False, "flows": False}}])
+    said = prop(view, "helpSays")
+    assert "A. Quaye" in said["sentence"]
+    assert said["action"] == "Accept"
+    # the scope reaches the page as words, never as a spec
+    assert "control actions" in said["facts"][0]["value"]
+    assert "monitoring checks" in said["facts"][0]["value"]
+
+
+def test_every_act_the_engine_answers_has_a_button(gui):
+    """The audit found eight live handlers with no way to reach them. These are the ones that landed
+    on a page that already read their data: the Admin's own rollout, changing and retiring a flow,
+    the destination owner's yes, the verification stack, and what is running right now."""
+    win, _, _ = gui
+    for name in ("rolloutDepartment",        # updates.rollout_department, on the Admin's home
+                 "flowChange", "flowRetire",  # flow.edit / flow.delete, on the opened flow
+                 "flowAllow", "flowRefuse",   # flow.consent, for the owner being asked
+                 "recheckStack",              # task.stack, under the checks
+                 "automationRunning", "automationLiveList"):   # control.dashboard's live rows
+        assert win.findChild(QObject, name) is not None, name
+
+
+def test_a_cell_keeps_its_shape_while_it_waits(gui):
+    """ST02's loading half. A cell with nothing yet keeps its structure, quietened, and says no state
+    phrase -- a phrase drawn from nothing would be wrong, and a spinner over blank space says even
+    less. The empty half (a zero is a result) was already built."""
+    win, _, _ = gui
+    overview = win.findChild(QObject, "overviewView")
+    cell = win.findChild(QObject, "cellAuthority")
+    overview.setProperty("loaded", False)
+    assert cell.property("loading") is True
+    overview.setProperty("loaded", True)
+    assert cell.property("loading") is False
+
+
+def test_the_window_wears_one_set_of_chrome(gui):
+    """The app draws its own minimise, maximise and close, so it does not also wear Windows' --
+    the window is frameless and the top bar is the title bar: it drags, and a double click on it
+    maximises. Without the grips a frameless window cannot be resized at all, so they are part of
+    the same change rather than a polish item."""
+    win, _, _ = gui
+    from PySide6.QtCore import Qt as QtNS
+    assert bool(win.flags() & QtNS.WindowType.FramelessWindowHint)
+
+    for name in ("winMinimize", "winMaximize", "winClose"):
+        assert win.findChild(QObject, name) is not None, name
+    for name in ("gripLeft", "gripRight", "gripTop", "gripBottom"):
+        grip = win.findChild(QObject, name)
+        assert grip is not None and grip.property("enabled") is True, name
+
+    # the button says which act it offers, and that follows the window's own state
+    assert win.property("maximised") is False
+    assert win.findChild(QObject, "winMaximize").property("iconName") == "max"

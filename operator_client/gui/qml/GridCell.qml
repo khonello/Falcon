@@ -19,6 +19,9 @@ Item {
     // One gesture (TABS.md): where a single click already means "select" inside the cell, only a
     // double click opens it. The Overview's cells predate that and keep opening on a click.
     property bool openOnDoubleClick: false
+    // ST02: while the first reply is outstanding the cell keeps its SHAPE, quietened -- no spinner
+    // over blank space, and no state phrase, because a phrase drawn from nothing would be wrong.
+    property bool loading: false
     signal opened()
     default property alias content: body.data
     // the height the body has to fill: for content that pins something to the bottom (a cell's buttons)
@@ -59,6 +62,7 @@ Item {
             anchors.rightMargin: root.openable ? 20 : 0
             anchors.verticalCenter: parent.verticalCenter
             text: root.brief
+            visible: !root.loading
             color: root.tone === "" ? Qt.rgba(1, 1, 1, 0.45) : Theme.tone(root.tone)
             font.pixelSize: Theme.fBody
             font.weight: root.tone === "" ? Font.Normal : Font.Medium
@@ -79,9 +83,9 @@ Item {
         MouseArea {
             id: area
             anchors.fill: parent
-            hoverEnabled: root.openable
-            cursorShape: root.openable ? Qt.PointingHandCursor : Qt.ArrowCursor
-            acceptedButtons: root.openable ? Qt.LeftButton : Qt.NoButton
+            hoverEnabled: root.openable && !root.loading
+            cursorShape: root.openable && !root.loading ? Qt.PointingHandCursor : Qt.ArrowCursor
+            acceptedButtons: root.openable && !root.loading ? Qt.LeftButton : Qt.NoButton
             onClicked: if (!root.openOnDoubleClick) root.opened()
             onDoubleClicked: if (root.openOnDoubleClick) root.opened()
         }
@@ -90,7 +94,8 @@ Item {
             id: bodyWrap
             anchors.fill: parent
             anchors.margins: 22
-            opacity: root.notice === "" ? 1 : 0.28
+            opacity: root.loading ? 0.16 : root.notice === "" ? 1 : 0.28
+            Behavior on opacity { NumberAnimation { duration: Theme.durBase } }
 
             Column {
                 id: body
@@ -104,7 +109,7 @@ Item {
         }
 
         Column {
-            visible: root.notice !== ""
+            visible: root.notice !== "" && !root.loading
             anchors.centerIn: parent
             width: parent.width - 48
             spacing: 4

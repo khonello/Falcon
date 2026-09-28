@@ -23,9 +23,12 @@ Item {
     property var deviations: []
     property string clock: ""
 
+    // ST02: the cells keep their shape, quietened, until the first reply lands
+    property bool loaded: false
+
     function refresh() {
         if (!falcon.isConnected) return
-        falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
+        falcon.call("hierarchy.tree", {}, function (ok, r) { root.loaded = true; if (ok) root.tree = r.departments })
         falcon.call("hierarchy.sessions_today", { hours: 24 }, function (ok, r) { if (ok) root.sessions = r.sessions })
         falcon.call("audit.recent", { limit: 200 }, function (ok, r) { if (ok) root.entries = r.entries })
         falcon.call("reports.list", {}, function (ok, r) { if (ok) root.reports = r.reports })
@@ -208,6 +211,7 @@ Item {
             GridCell {
                 id: dayCell
                 objectName: "recordDay"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 2
                 Layout.fillHeight: true
@@ -237,6 +241,7 @@ Item {
             GridCell {
                 id: enteredCell
                 objectName: "recordEntered"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
@@ -274,6 +279,7 @@ Item {
             GridCell {
                 id: trailCell
                 objectName: "recordTrail"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 topAlign: true
@@ -303,6 +309,7 @@ Item {
             GridCell {
                 id: viewsCell
                 objectName: "recordViews"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 topAlign: true
@@ -331,6 +338,7 @@ Item {
             GridCell {
                 id: placeCell
                 objectName: "recordOutOfPlace"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 topAlign: true

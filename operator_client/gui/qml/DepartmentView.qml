@@ -518,6 +518,7 @@ Item {
             }
 
             GridCell {
+                id: todayCell
                 objectName: "deptToday"
                 Layout.preferredWidth: 2
                 Layout.fillWidth: true
@@ -526,13 +527,14 @@ Item {
                 title: "Today"
                 narration: root.daySays
 
+                // it draws to its own implicit height (lanes + axis); forcing a height would put the
+                // legend on top of the last lane, which is what it used to do
                 DayTimeline {
                     objectName: "deptDay"
                     width: parent.width
-                    height: Math.max(120, parent.height - 64)
                     labelWidth: 96
                     laneGap: 9
-                    laneHeight: Math.max(12, Math.min(26, (parent.height - 90)
+                    laneHeight: Math.max(12, Math.min(26, (todayCell.room - 76)
                                                           / Math.max(1, lanes.length) - laneGap))
                     lanes: root.lanes
                 }

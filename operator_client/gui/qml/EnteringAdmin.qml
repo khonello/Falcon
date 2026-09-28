@@ -310,17 +310,16 @@ Item {
                         Column {
                             width: parent.width
                             spacing: 14
-                            Rectangle {
-                                width: 46; height: 46; radius: Theme.radiusMd
-                                color: root.held ? Theme.dangerSoft : Theme.okSoft
-                                Txt {
-                                    anchors.centerIn: parent
-                                    text: root.admin ? String(root.admin.hostname || "").slice(-2) : ""
-                                    color: root.held ? Theme.danger : Theme.ok
-                                    monospace: true
-                                    font.pixelSize: Theme.fBody
-                                    font.weight: Font.Bold
-                                }
+                            // the one mark for a machine, everywhere (PATTERNS 2): a small screen with its
+                            // number, its hostname beneath and the reason in words -- never a filled square
+                            MachineMark {
+                                size: 56
+                                label: root.admin ? String(root.admin.hostname || "").split("-").pop() : ""
+                                status: root.held ? "entered" : root.admin && root.admin.session ? "ok" : "free"
+                                name: root.admin ? (root.admin.hostname || "") : ""
+                                line: root.held ? "you are holding it"
+                                      : root.admin && root.admin.session ? "they are at it" : "nobody on it"
+                                lineTone: root.held ? "warn" : ""
                             }
                             ReadingBody { width: parent.width; narration: root.station; maxFacts: 3 }
                         }
@@ -328,6 +327,7 @@ Item {
 
                     // --- the day here ----------------------------------------------------------------
                     GridCell {
+                        id: enterDayCell
                         objectName: "enterDay"
                         Layout.fillWidth: true
                         Layout.preferredWidth: 1
@@ -338,10 +338,9 @@ Item {
 
                         DayTimeline {
                             width: parent.width
-                            height: Math.max(100, parent.height - 20)
                             labelWidth: 80
                             laneGap: 8
-                            laneHeight: Math.max(10, Math.min(20, (parent.height - 70)
+                            laneHeight: Math.max(10, Math.min(20, (enterDayCell.room - 70)
                                                                   / Math.max(1, root.lanes.length) - laneGap))
                             lanes: root.lanes
                         }

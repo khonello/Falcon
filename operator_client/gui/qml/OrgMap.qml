@@ -2,9 +2,14 @@ import QtQuick
 import QtQuick.Shapes
 import "."
 
-// Department -> Admin -> PC, drawn. Colour is the department and nothing else; the shape is the
-// level. Picking a department descends into it: the same drawing with everything else quietened,
+// Department -> Admin -> its machines, drawn. Colour is the department and nothing else; the shape is
+// the level. Picking a department descends into it: the same drawing with everything else quietened,
 // so descent is a change of attention rather than a different picture.
+//
+// ONE MARK PER DEPARTMENT, never one per machine (design/PATTERNS.md 3a): a constellation of dots put
+// every department's whole fleet in one container, which stops reading at twelve departments of sixty.
+// Each department now carries a single 30 px screen holding its machine count, in the worst tone among
+// them, with the reason in words. Machines are named only where a department is maximised.
 Item {
     id: root
 
@@ -18,12 +23,13 @@ Item {
 
     // the drawing is centred in whatever width it is given, and the PC constellation spreads with
     // it -- otherwise a wide cell leaves the whole map hugging its left edge
-    readonly property int perRow: 4
-    readonly property real colGap: Math.max(22, width * 0.05)
-    readonly property real rowGap: Math.max(20, height * 0.09)
+    // markFor(dept) -> { label, status, line }: the department's one mark, from whoever owns the
+    // machine state (Fleet). Without it the mark is a quiet count.
+    property var markFor: null
     readonly property real baseDeptX: Math.max(150, width * 0.32)
     readonly property real basePcX: Math.max(baseDeptX + 110, width * 0.58)
-    readonly property real contentWidth: basePcX + (perRow - 1) * colGap + 30
+    // the drawing runs you -> department -> its one mark, so the content ends at the mark plus its words
+    readonly property real contentWidth: basePcX + 150
     readonly property real xOffset: Math.max(0, (width - contentWidth) / 2)
     readonly property real rootX: 46 + xOffset
     readonly property real deptX: baseDeptX + xOffset
@@ -32,8 +38,11 @@ Item {
     function deptY(i) { return height * (i + 1) / (departments.length + 1) }
     function lit(d) { return focusId === 0 || focusId === d.department_id }
     function tintOf(i) { return Theme.series(i) }
-    function pcX2(i) { return pcX + (i % perRow) * colGap }
-    function pcY(deptIndex, i) { return deptY(deptIndex) - rowGap * 0.9 + Math.floor(i / perRow) * rowGap }
+    function markOf(dept) {
+        if (root.markFor) return root.markFor(dept)
+        var n = dept && dept.workers ? dept.workers.length : 0
+        return { label: String(n), status: n === 0 ? "free" : "ok", line: n === 1 ? "one machine" : n + " machines" }
+    }
 
     // a cubic as points: one path type for every link on the map, so they all bend alike
     function curve(x0, y0, x1, y1) {
@@ -74,35 +83,27 @@ Item {
                     capStyle: ShapePath.RoundCap
                     PathPolyline { path: root.curve(root.rootX + 10, root.height / 2, root.deptX - 9, lane.dy) }
                 }
-                // this department -> each of its PCs
+                // this department -> its machines, as one line to one mark
                 ShapePath {
-                    strokeColor: Qt.rgba(lane.tint.r, lane.tint.g, lane.tint.b, lane.on ? 0.28 : 0.08)
-                    strokeWidth: 1
+                    strokeColor: Qt.rgba(lane.tint.r, lane.tint.g, lane.tint.b, lane.on ? 0.30 : 0.08)
+                    strokeWidth: 1.4
                     fillColor: "transparent"
-                    PathMultiline {
-                        paths: {
-                            var out = []
-                            for (var i = 0; i < lane.modelData.workers.length; i++)
-                                out.push(root.curve(root.deptX + 9, lane.dy, root.pcX2(i) - 5, root.pcY(lane.index, i)))
-                            return out
-                        }
-                    }
+                    capStyle: ShapePath.RoundCap
+                    PathPolyline { path: root.curve(root.deptX + 9, lane.dy, root.pcX - 6, lane.dy) }
                 }
             }
 
-            Repeater {
-                model: lane.modelData.workers
-                delegate: Rectangle {
-                    required property var modelData
-                    required property int index
-                    width: 10
-                    height: 10
-                    radius: 5
-                    color: lane.tint
-                    opacity: lane.on ? 0.85 : 0.2
-                    x: root.pcX2(index) - 5
-                    y: root.pcY(lane.index, index) - 5
-                }
+            MachineMark {
+                readonly property var mark: root.markOf(lane.modelData)
+                size: 30
+                label: mark.label
+                status: mark.status
+                line: mark.line
+                lineTone: mark.status === "danger" ? "danger" : mark.status === "warn" ? "warn" : ""
+                opacity: lane.on ? 1 : 0.24
+                x: root.pcX
+                y: lane.dy - 14
+                onDoubleClicked: root.entered(lane.modelData.department_id)
             }
 
             Rectangle {

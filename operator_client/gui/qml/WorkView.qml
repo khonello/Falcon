@@ -22,9 +22,12 @@ Item {
     property int chosenTask: 0
     property string clock: ""
 
+    // ST02: the cells keep their shape, quietened, until the first reply lands
+    property bool loaded: false
+
     function refresh() {
         if (!falcon.isConnected) return
-        falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
+        falcon.call("hierarchy.tree", {}, function (ok, r) { root.loaded = true; if (ok) root.tree = r.departments })
         falcon.call("task.list", { include_completed: true }, function (ok, r) { if (ok) root.tasks = r.tasks })
         falcon.call("flow.list", {}, function (ok, r) { if (ok) root.flows = r.flows })
         falcon.call("assistance.channels", {}, function (ok, r) { if (ok) root.channels = r.channels })
@@ -141,6 +144,7 @@ Item {
             GridCell {
                 id: deptCell
                 objectName: "workDepartments"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
@@ -178,6 +182,7 @@ Item {
 
             GridCell {
                 objectName: "workYours"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
@@ -246,6 +251,7 @@ Item {
 
             GridCell {
                 objectName: "workWatched"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true

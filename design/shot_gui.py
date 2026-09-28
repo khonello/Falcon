@@ -229,6 +229,10 @@ STUB = {
     "control.execution": {"execution": {"id": 95, "status": "success"}, "output": ["locked"]},
     "control.action_run": {"execution_id": 95, "executions": [{"pc_id": 27, "hostname": "OPS-07", "execution_id": 95}]},
     "control.event_list": {"types": {}, "events": EVENTS},
+    # everything running this second, whichever automation started it (AU04's "Running now")
+    "control.dashboard": {"automations": [], "live": [
+        {"id": 95, "action_id": 3, "target_pc_id": 23, "builtin_type": "lock_session",
+         "status": "pending", "started_at": "2026-09-28T14:18:00+00:00"}]},
     "control.event_history": {"event_id": 1, "fired_today": 3, "running": [
         {"id": 91, "action_name": "Lock the screen", "builtin_type": "lock_session", "status": "pending", "hostname": "OPS-03"}],
         "firings": [

@@ -274,6 +274,39 @@ supersede `RO04` and `OV01`'s fleet cells. `PATTERNS.md` 3a.
 **THE DESIGN IS COMPLETE — approved 27 Sep 2026** (*"Perfecto."*): the rollout card's tightened mark, and `ST01`-`ST03`,
 `DG01`, `WR01`, the last surfaces. The build follows `HANDOFF.md`'s order.
 
+
+## 3d. Every page brought onto the batch 2 standard (28 Sep 2026)
+
+The user: *"i just want everything in line, am exhausted, buckle up and get things right. ui clean as a slate."*
+An audit of all 29 surfaces against `PATTERNS.md` found five pages off the standard, four partly off, one combo
+with no page at all, eight live handlers with no button, and 26 dead QML files. All of it is closed:
+
+| What was wrong | What it is now |
+|---|---|
+| The Super User's **Authority** area was the pre-kit console screen (sidebar, card strip, detail card printing account and PC ids) and had no board | `AuthorityView.qml`, board `OV03`: three columns — the departments · the people · where nobody governs over what you call them |
+| **Display names** (`set_display_name`, `set_self_name`) had no GUI once the orphaned `HierarchyView` stopped being mounted | the Authority area's fourth cell, and the only place they are set |
+| **Assisted access** was drawn on `T06` and never built; its five handlers' only GUI was that same dead screen | a cell on the Admin's Assistance page, board `AS04` — availability, asking, offers with the scope in words, the help running |
+| The **opened Overview cells** drew machines as tone-filled squares that shrank, PCs as dots on the map, and entries as a dot and a row | the one machine mark, rows that page, one card per fact with its act (`K03`, `K05` redrawn) |
+| **Entering an Admin** drew the workstation as a 46 px filled square | `MachineMark`, like every other page |
+| The **Actions library** scrolled with a drawn scrollbar; **Automation**'s rows were hand-made; **describing a task** used two pre-kit combo boxes | a `PagedColumn`, the kit's card, and sentence slots |
+| Eight handlers with no button | the Admin's own rollout (`updates.rollout_department`), changing and retiring a flow, the destination owner's yes (`flow.consent`), the verification stack (`task.stack`), and **Running now** across every automation (`control.dashboard`) |
+| ST02's loading half unbuilt | `GridCell.loading`: the cell keeps its shape, quietened, and says no state phrase until the first reply |
+| 26 dead QML files, and the `DP10` shrink ladder still in `design/scale.py` | deleted; `slot_size()` returns the patterns' sizes and pages |
+
+**Corrections to the audit, found while doing it:** `index.search` was never a gap (`assistance.search` is the same
+search with the same tier scoping, and both Resources and Assistance already use it), and assisted access is
+**Admin-only** — every one of its handlers refuses anyone else — so it belongs on the Admin's page, not the Super
+User's Authority area.
+
+**Assisted access keeps the four toned meanings.** `T06` drew it in teal; `PATTERNS.md` 9 (which postdates that
+board) allows four, and a fifth would break the rule everywhere else. Consent, a ceiling said in words and the
+absence of a clock carry the difference instead.
+
+**Deliberately still out:** `alerts.create` / `alerts.list` (scheduled alerts have no board and no agreed surface —
+designing one is new design, not conformance) and `reports.routing_set` (deferred in `CLAUDE.md`).
+
+---
+
 ## 4. Proposed, still open
 
 | | |

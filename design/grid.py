@@ -54,25 +54,34 @@ def kshell(structure, note, brow=""):
 
 # ------------------------------------------------------------------ the four drawings
 def authority(w=600, h=260):
-    """Who governs what, and where nobody does. The department with no Admin is the only thing
-    coloured against its own department hue."""
-    depts = [("Operations", 2, 7), ("Finance", 1, 4), ("Logistics", 0, 3)]
+    """Who governs what, and where nobody does.
+
+    ONE MARK PER DEPARTMENT, never one per machine (PATTERNS 3a, 28 Sep 2026). A dot per PC put every
+    department's whole fleet in one container, which stops reading at twelve departments of sixty; the
+    department now carries a single small screen holding its machine count, in the worst tone among
+    them, with the reason in words. Machines are named where a department is maximised, not here."""
+    depts = [("Operations", 2, 7, "ok", "7 machines"), ("Finance", 1, 4, "warn", "1 behind"),
+             ("Logistics", 0, 3, "danger", "1 needs you")]
     rx, dx, px = 26, w * 0.40, w * 0.62
     ys = [h * 0.17, h * 0.5, h * 0.83]
-    links, nodes, labels = [], [], []
-    for i, (name, admins, pcs) in enumerate(depts):
+    links, nodes, labels, marks = [], [], [], []
+    for i, (name, admins, pcs, state, why) in enumerate(depts):
         c = DEPT_COLOR[name]
         dy = ys[i]
         links.append(f'<path d="M{rx + 12} {h * 0.5} C {(rx + dx) / 2} {h * 0.5}, {(rx + dx) / 2} {dy}, '
                      f'{dx - 13} {dy}" fill="none" stroke="{c}" stroke-width="1.8" opacity="0.5"/>')
-        for k in range(pcs):
-            ox = px + (k % 4) * 38
-            oy = dy - 22 + (k // 4) * 34
-            bad = (name == "Logistics" and k == 2)
-            links.append(f'<path d="M{dx + 12} {dy} C {(dx + px) / 2} {dy}, {(dx + px) / 2} {oy}, {ox - 9} {oy}" '
-                         f'fill="none" stroke="{c}" stroke-width="1" opacity="0.2"/>')
-            nodes.append(f'<circle cx="{ox}" cy="{oy}" r="{9 if bad else 7}" '
-                         f'fill="{ST["failing"] if bad else c}" opacity="{1 if bad else 0.8}"/>')
+        links.append(f'<path d="M{dx + 12} {dy} C {(dx + px) / 2} {dy}, {(dx + px) / 2} {dy}, {px - 6} {dy}" '
+                     f'fill="none" stroke="{c}" stroke-width="1.4" opacity="0.32"/>')
+        stroke = {"warn": T["warn"], "danger": T["danger"]}.get(state, "rgba(255,255,255,0.30)")
+        ink = {"warn": T["warn"], "danger": T["danger"]}.get(state, T["dim"])
+        nodes.append(f'<rect x="{px}" y="{dy - 10}" width="30" height="20" rx="4" fill="rgba(255,255,255,0.03)" '
+                     f'stroke="{stroke}" stroke-width="1.5"/>')
+        nodes.append(f'<path d="M{px + 15} {dy + 10} V{dy + 14} M{px + 9} {dy + 16} H{px + 21}" stroke="{stroke}" '
+                     f'stroke-width="1.5" stroke-linecap="round"/>')
+        marks.append(f'<text x="{px + 15}" y="{dy + 4}" text-anchor="middle" fill="{ink}" '
+                     f'font-family="{T["mono"]}" font-size="11" font-weight="600">{pcs}</text>')
+        marks.append(f'<text x="{px + 38}" y="{dy + 4}" fill="{ink if state != "ok" else T["faint"]}" '
+                     f'font-family="{T["sans"]}" font-size="11.5">{why}</text>')
         nodes.append(f'<circle cx="{dx}" cy="{dy}" r="12" fill="{c}"/>')
         labels.append(f'<text x="{dx - 20}" y="{dy + 1}" text-anchor="end" fill="{T["ink"]}" '
                       f'font-family="{T["sans"]}" font-size="14" font-weight="500">{name}</text>')
@@ -80,7 +89,7 @@ def authority(w=600, h=260):
                       f'fill="{T["danger"] if admins == 0 else T["faint"]}" font-family="{T["sans"]}" '
                       f'font-size="12">{"no Admin" if admins == 0 else str(admins) + " Admin" + ("s" if admins > 1 else "")}</text>')
     nodes.append(f'<circle cx="{rx}" cy="{h * 0.5}" r="14" fill="{T["ink"]}"/>')
-    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(links + nodes + labels)}</svg>'
+    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{"".join(links + nodes + labels + marks)}</svg>'
 
 
 def rollout_cell(w=560, bars=True):
@@ -253,9 +262,9 @@ def opened_page(subject, shape, note, brow_phrase):
 
 # --- the panels Authority opens into -----------------------------------------------------------
 def dept_pcs(hosts, biggest, w=430, size=54, gap=8):
-    """Its client PCs, drawn against the largest department rather than on their own. Every slot the
-    biggest department has is drawn; the ones this department does not fill stay faded. You can then
-    see at a glance that Logistics is small as well as that one of its machines is failing."""
+    """RETIRED 28 Sep 2026 -- kept only so older boards still render. A machine is a small screen
+    with its number (`batch1b_pages.calm_slot`, PATTERNS 2), and a row of them PAGES rather than
+    shrinking (PATTERNS 3). `dept_marks` below is what K03 draws now."""
     marks = []
     for i in range(biggest):
         x = i * (size + gap)
@@ -271,6 +280,37 @@ def dept_pcs(hosts, biggest, w=430, size=54, gap=8):
                          f'opacity="0.45"/>')
     total_w = biggest * (size + gap) - gap
     return f'<svg width="{total_w}" height="{size}" viewBox="0 0 {total_w} {size}">{"".join(marks)}</svg>'
+
+
+def dept_marks(hosts, w=430, size=56, gap=12, more=""):
+    """One department's machines at full size, the row paging sideways -- the exceptions named
+    beneath their own mark, never a tone-filled square (PATTERNS 2, 3)."""
+    shown = hosts[:5]
+    marks = [calm_slot(h.split("-")[-1], st, size, sub=h) for h, st, _ in shown]
+    edge = (col(ic("chev", 15, T["dim"]), txt(more, 11, T["dim"], 600), gap=4,
+                extra=f"align-items: center; justify-content: center; width: 72px; height: {int(size * 0.66) + 26}px; "
+                      f"border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.06));")
+            if more else "")
+    return row(*marks, edge, gap=gap, extra=f"width: {w}px; align-items: flex-start;")
+
+
+def entered_cards(w=380):
+    """Who was on a machine that is not theirs: ONE CARD PER FACT with its act on the same card
+    (PATTERNS 0), not a dot and a row -- this is read in order to act on it."""
+    return col(person_card("SU", "You entered OPS-07", "10:42 · still in there", "danger", right="End it"),
+               person_card("RM", "R. Mensah entered OPS-03", "12:30 – 13:11 · left"),
+               v_edge("2 more", "", w), gap=9, extra=f"width: {w}px;")
+
+
+def quiet_marks(w=380):
+    """The machines nobody signed in to. Free is not a problem, so they stay quiet and say nothing
+    beneath them: the cell's title is the reason, and repeating it under every mark says nothing."""
+    hosts = ["OPS-02", "OPS-05", "OPS-06", "FIN-01"]
+    return col(row(*[calm_slot(h.split("-")[-1], "free", 42, sub=h) for h in hosts],
+                   col(ic("chev", 14, T["dim"]), txt("2 more", 10.5, T["dim"], 600), gap=3,
+                       extra="align-items: center; justify-content: center; width: 58px; height: 54px;"),
+                   gap=10, extra=f"width: {w}px; align-items: flex-start;"),
+               txt("6 machines were never signed in today.", 12, T["ink"], 500), gap=12, extra=f"width: {w}px;")
 
 
 def scoped_day(names, used, w=400):
@@ -310,7 +350,7 @@ def k03():
     shape = tall_shape(
         ("The hierarchy", "Logistics has no Admin", "danger", authority(w=850, h=356)),
         ("Its client PCs", "three of seven", "danger",
-         col(dept_pcs([("LOG-01", "confirmed"), ("LOG-03", "confirmed"), ("LOG-02", "failing")], 7),
+         col(dept_marks([("LOG-01", "ok", ""), ("LOG-03", "ok", ""), ("LOG-02", "danger", "failed six times")]),
              txt("Three machines, against the seven Operations has. LOG-02 has failed six times.",
                  12.5, T["ink"], 500, extra="line-height: 1.4; max-width: 420px;"),
              gap=16)),
@@ -459,14 +499,14 @@ def quiet_slots(w=380, size=26, gap=6):
 
 def k05():
     shape = lead_shape(
-        ("The day", "five machines never used", "warn", full_day(w=820)),
+        ("The day", "six machines never used", "warn", full_day(w=820)),
         ("Who entered", "four times, one yours", "dim",
-         entered_rows(w=380)),
-        ("Never signed in", "five of eleven", "warn", quiet_slots(w=380)),
+         entered_cards(w=380)),
+        ("Never signed in", "six of eleven", "warn", quiet_marks(w=380)),
         ("What the day means", "one still open", "warn",
          reading_block("Four traversals today, one of them still open.",
                        [("Traversals", "4, 1 still open", "warn"), ("You entered", "OPS-07, 10:42", ""),
-                        ("Never signed in", "5 PCs", "warn")],
+                        ("Never signed in", "6 PCs", "warn")],
                        "Open the trail", w=376)))
     return opened_page("Today", shape,
                        "K05 · Today opened. A record is read down, so the lead runs the whole height and "

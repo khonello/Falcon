@@ -71,6 +71,26 @@ Item {
     }
     readonly property var broken: flows.filter(isBroken)
     readonly property var waiting: flows.filter(function (f) { return f.consent_status === "pending" })
+    // a flow waiting on MY yes: it is into a folder I own, and nobody else can answer for me
+    function mine(f) {
+        if (!f || f.consent_status !== "pending") return false
+        var me = falcon ? falcon.accountId : 0
+        return (f.destinations || []).some(function (d) { return d.owner_account_id === me })
+    }
+    // retiring says its cost first: it stops syncing, and what it already copied stays where it is
+    function retire() {
+        if (!root.flow) return
+        var f = root.flow
+        shell.ask({ title: "Retire this flow?",
+                    lead: "It stops copying from " + (f.source_hostname || "the source") + " straight away.",
+                    body: "Everything it has already copied stays where it is, and its history is kept.",
+                    act: "Retire it", actIcon: "stop", cancel: "Keep it" }, function () {
+            falcon.call("flow.delete", { flow_id: f.id }, function (ok, r) {
+                shell.notify(ok ? "The flow is retired" : r.message, !ok)
+                if (ok) { root.mode = "list"; root.refresh() }
+            })
+        })
+    }
 
     // A flow as a tree: source at the left, stages by depth, destinations at the right; leaves spaced evenly and each
     // parent centred on its children. Broken branches (a paused destination) are dashed.
@@ -391,13 +411,25 @@ Item {
                                     : (root.flow.suggestion || ((root.flow.destinations || []).filter(function (d) { return d.suggestion })[0] || {}).suggestion || "A branch is paused.") }
                         Txt { visible: root.flow && root.isBroken(root.flow); width: parent.width; wrapMode: Text.WordWrap; color: Theme.faint; font.pixelSize: Theme.fMeta
                               text: "Only the paused branch waits. Resume once the cause is fixed." }
+                        // THE OWNER'S ANSWER (flow.consent). A flow into somebody else's folder does not
+                        // run until they agree, and this is where they say so -- on the flow itself.
+                        Row { spacing: 8
+                              visible: root.mine(root.flow)
+                              TBtn { objectName: "flowAllow"; text: "Yes, allow it"; tone: "ok"; iconName: "check"
+                                     onClicked: falcon.call("flow.consent", { flow_id: root.flow.id, granted: true }, root.after) }
+                              GBtn { objectName: "flowRefuse"; text: "No"
+                                     onClicked: falcon.call("flow.consent", { flow_id: root.flow.id, granted: false }, root.after) } }
                         Row { spacing: 8
                               TBtn { visible: root.flow && root.isBroken(root.flow); text: "Resume"; iconName: "play"
                                      onClicked: falcon.call("flow.resume", { flow_id: root.flow.id }, root.after) }
                               GBtn { visible: root.flow && !root.isBroken(root.flow) && root.flow.status === "active"; text: "Pause"; iconName: "pause"
                                      onClicked: falcon.call("flow.pause", { flow_id: root.flow.id }, root.after) }
                               GBtn { visible: root.flow && root.flow.status === "active"; text: "Sync now"
-                                     onClicked: falcon.call("flow.trigger", { flow_id: root.flow.id }, root.after) } }
+                                     onClicked: falcon.call("flow.trigger", { flow_id: root.flow.id }, root.after) }
+                              GBtn { objectName: "flowChange"; visible: root.flow !== null; text: "Change"; iconName: "branch"
+                                     onClicked: { newFlow.start(root.flow); root.mode = "new" } }
+                              GBtn { objectName: "flowRetire"; visible: root.flow !== null; text: "Retire"; iconName: "stop"
+                                     onClicked: root.retire() } }
                     }
                 }
                 GridCell {

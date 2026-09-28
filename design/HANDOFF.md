@@ -1,4 +1,4 @@
-# Where the Operator Client UI stands — 27 Sep 2026
+# Where the Operator Client UI stands — 28 Sep 2026
 
 The snapshot to resume from. **Read `design/LEVELS.md` first** (the levels), then `design/DECISIONS.md` (what was
 approved and rejected, and why), `design/TABS.md` (the five areas), `design/BOARDS.md` (what every board is),
@@ -6,10 +6,10 @@ approved and rejected, and why), `design/TABS.md` (the five areas), `design/BOAR
 **`design/ENGINE-WORK.md` is what the Engine and the Worker still owe the UI.** Setting up a machine or a network:
 `docs/GETTING-STARTED.md` (`python -m engine setup` does a fresh clone in one step; settings live in `.env`).
 
-**Branch** `phase7/design-and-gui-rebuild` · **177 tests pass, `ruff check .` clean.**
+**Branch** `phase7/design-and-gui-rebuild` · **184 tests pass, `ruff check .` clean.**
 The suite only means something with `FALCON_TEST_DATABASE_URL` set — without it the DB tests skip and pytest still says
 "passed"; `conftest.py` prints which run you are in.
-**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — version 58, 162 boards, arranged by hand: its index is
+**Canvas** <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw> — version 58, 164 boards (OV03 and AS04 are new and not yet on it), arranged by hand: its index is
 *merged, never replaced* (`design/README.md`).
 
 ---
@@ -74,14 +74,35 @@ the options pick the state (`FALCON_SHOT_FLOW=<id>` below is written `--flow=<id
 - The PATTERNS.md rules: no squares with dots, no icon tiles, no pill lineups; legible before beautiful; never one
   container for many departments' machines; page, never shrink; test at ~12 departments x 60 machines.
 
+### The conformance pass (28 Sep 2026)
+
+Every page is on the batch 2 standard; `DECISIONS.md` 3d is the table of what changed. In code:
+
+| New or rebuilt | Where |
+|---|---|
+| The Authority area (board `OV03`) | `AuthorityView.qml`, mounted at rail index 1; `HomeView` is gone |
+| Assisted access (board `AS04`) | `AssistanceView.qml`'s "Help from another department" cell, Admin-only |
+| The opened Overview cells | `OpenedAuthority`, `OpenedToday` on `MachineMark` / `PagedRow` / `InfoCard`; `OrgMap` carries one mark per department |
+| The acts that had no button | `AdminHome` (rollout), `FlowsView` + `NewFlow.start()` (change, retire, consent), `TasksView` (the stack), `AutomationView` ("Running now") |
+| ST02's loading half | `GridCell.loading`, wired in the five page views that fetch their own data |
+| New words | `narrate.py`: `authority`, `nobody_governs`, `naming`, `helping`, `running_now` |
+
+**Deleted, and not coming back:** `HomeView`, `HierarchyView`, `HierarchyRail`, `DataTable`, `Picker`, `Btn`,
+`Section`, `StatTile`, `StatePill`, `Eyebrow`, `Banner`, `PushFeed`, `PairRows`, `RoutingLines`, `RoutingMap`,
+`Arcs`, `StackedBars`, `Trend`, `Hero`, `HealthCard`, `MiniBar`, `Waffle`, `FleetGroups`, `DeptSlots`,
+`QuietStrip`, `EnteredRows`, `Body`, `Sidebar`, `SbRow`, `SbSection`, `CardRow`, `DetailCard`, `Pills` — 33 files.
+`Field` and `SegmentedControl` moved to the current tokens, so `Theme`'s legacy aliases have no callers left.
+
+**184 tests pass** (`tests/test_operator_gui.py` gained the Authority area, assisted access, the acts and the
+loading state), `ruff check .` clean.
+
 ### Not yet done (UI)
 
-- **The Super User's Authority area** (rail index 1) still opens the pre-kit "Everything" screen (`HomeView` with
-  `HierarchyRail`); departments are reached from Must see's cards. `HierarchyView.qml` / `HierarchyRail.qml` are
-  orphaned and go once Authority is rebuilt.
-- **A loading skeleton per cell** (ST02). Empty cells already say what is missing and the next step.
-- **Still pre-kit components**, kept for the few places that use them: `DataTable`, `Picker`, `Btn`, `Eyebrow`,
-  `Section`, `SegmentedControl` (restyled to plain-text tabs).
+- ~~The Super User's Authority area still opens the pre-kit "Everything" screen~~ — **done 28 Sep 2026**
+  (`AuthorityView.qml`, board `OV03`); the orphaned files are deleted.
+- ~~A loading skeleton per cell (ST02)~~ — **done 28 Sep 2026** (`GridCell.loading`).
+- ~~Still pre-kit components~~ — **gone 28 Sep 2026**. `SegmentedControl` stays (it is the plain-text tab row)
+  and is on the current tokens.
 - The Record/Work/Rollout stubs in `shot_gui.py` are sample data, not an Engine; every page also runs against the real
   Engine through the same `falcon.call`s the tests use.
 

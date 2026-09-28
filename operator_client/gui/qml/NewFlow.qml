@@ -28,7 +28,31 @@ ColumnLayout {
 
     spacing: 20
 
-    function reset() { source = null; sourcePath = ""; destinations = []; stages = []; problem = ""; askCollision = false }
+    // 0 = making a new one; an id = changing that flow, which replaces its destinations and steps
+    property int editingId: 0
+    readonly property bool editing: editingId !== 0
+
+    function reset() { source = null; sourcePath = ""; destinations = []; stages = []; problem = ""; askCollision = false; editingId = 0 }
+
+    // CHANGING AN EXISTING FLOW (flow.edit). The source is what the flow was built on and does not
+    // move -- the Engine replaces destinations and steps only -- so it is filled in and left alone.
+    function start(flow) {
+        reset()
+        if (!flow) return
+        editingId = flow.id
+        source = { pc_id: flow.source_pc_id, hostname: flow.source_hostname || "" }
+        sourcePath = flow.source_path || ""
+        var ds = []
+        for (var i = 0; i < (flow.destinations || []).length; i++) {
+            var d = flow.destinations[i]
+            ds.push({ pc_id: d.destination_pc_id, hostname: d.destination_hostname || "", path: d.destination_path || "" })
+        }
+        destinations = ds
+        var st = []
+        for (var j = 0; j < (flow.stages || []).length; j++) st.push({ stage_type: flow.stages[j].stage_type })
+        stages = st
+        if (source && source.pc_id) loadFolders(source.pc_id)
+    }
     readonly property var machines: {
         var out = []
         for (var i = 0; i < tree.length; i++) {
@@ -68,11 +92,15 @@ ColumnLayout {
     function save(confirmCollisions) {
         var st = stages.map(function (s, i) { return { stage_type: s.stage_type, parent_index: i === 0 ? null : i - 1, config: null } })
         var ds = destinations.map(function (d) { return { destination_pc_id: d.pc_id, destination_path: d.path, parent_index: st.length ? st.length - 1 : null } })
-        falcon.call("flow.create", { source_pc_id: source.pc_id, source_path: sourcePath, destinations: ds, stages: st,
-                                     confirm_collisions: !!confirmCollisions }, function (ok, r) {
+        var payload = root.editing
+            ? { flow_id: root.editingId, destinations: ds, stages: st, confirm_collisions: !!confirmCollisions }
+            : { source_pc_id: source.pc_id, source_path: sourcePath, destinations: ds, stages: st,
+                confirm_collisions: !!confirmCollisions }
+        falcon.call(root.editing ? "flow.edit" : "flow.create", payload, function (ok, r) {
             if (ok) {
                 root.problem = ""; root.askCollision = false
-                shell.notify(r.flow && r.flow.consent_status === "pending" ? "Saved — waiting for the owner's yes" : "Flow saved", false)
+                shell.notify(root.editing ? "The flow is changed"
+                             : r.flow && r.flow.consent_status === "pending" ? "Saved — waiting for the owner's yes" : "Flow saved", false)
                 root.created(r.flow.id)
                 root.reset()
                 return

@@ -43,9 +43,12 @@ Item {
     function adminsOf(id) { var d = treeDept(id); return d ? d.admins : [] }
     function prefixed(host) { return host || "" }
 
+    // ST02: the cells keep their shape, quietened, until the first reply lands
+    property bool loaded: false
+
     function refresh() {
         if (!falcon.isConnected || falcon.role !== "super_user") return
-        falcon.call("updates.rollout_health", {}, function (ok, r) { if (ok) root.health = r })
+        falcon.call("updates.rollout_health", {}, function (ok, r) { root.loaded = true; if (ok) root.health = r })
         falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
     }
     function ask(id) {
@@ -184,6 +187,7 @@ Item {
 
             GridCell {
                 objectName: "rolloutDepartments"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 2
                 Layout.fillHeight: true
@@ -231,6 +235,7 @@ Item {
 
                 GridCell {
                     objectName: "rolloutGate"
+                    loading: !root.loaded
                     Layout.fillWidth: true
                     Layout.preferredHeight: 230
                     topAlign: true
@@ -263,6 +268,7 @@ Item {
                 }
                 GridCell {
                     objectName: "rolloutHolding"
+                    loading: !root.loaded
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     topAlign: true
@@ -297,6 +303,7 @@ Item {
 
             GridCell {
                 objectName: "rolloutMachines"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 2
                 Layout.fillHeight: true

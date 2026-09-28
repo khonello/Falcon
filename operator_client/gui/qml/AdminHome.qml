@@ -38,6 +38,29 @@ Item {
     }
     readonly property var others: admins.filter(function (a) { return !root.me || a.account_id !== root.me.account_id })
 
+    // THE ROLLOUT IS THE ADMIN'S OWN ACT (updates.rollout_department). A Super User approves a
+    // version; bringing this department's machines to it is done here, by whoever governs them.
+    readonly property var behindHere: {
+        var rows = (rollout && rollout.pcs_behind) ? rollout.pcs_behind : []
+        var mine = {}
+        for (var w = 0; w < root.workers.length; w++) mine[root.workers[w].pc_id] = true
+        return rows.filter(function (b) { return mine[b.pc_id] })
+    }
+    readonly property string currentVersion: (rollout && rollout.version && rollout.version.version_string)
+                                             ? rollout.version.version_string : ""
+    function updateThem() {
+        var n = root.behindHere.length
+        shell.ask({ title: "Update " + (n === 1 ? "one machine" : n + " machines") + " to " + root.currentVersion + "?",
+                    lead: "Each one installs when it is next idle, and reports back.",
+                    body: "Nobody is interrupted: a machine in use waits until it is not.",
+                    act: "Send it out", actIcon: "shield", cancel: "Not now" }, function () {
+            falcon.call("updates.rollout_department", { department_id: root.deptId }, function (ok, r) {
+                shell.notify(ok ? "On its way to " + (n === 1 ? "one machine" : n + " machines") : r.message, !ok)
+                if (ok) root.refresh()
+            })
+        })
+    }
+
     // what needs you, as cards: pings, files out of place, overdue tasks, flows that stopped
     readonly property var needs: {
         var out = []
@@ -66,9 +89,12 @@ Item {
         return out
     }
 
+    // ST02: the cells keep their shape, quietened, until the first reply lands
+    property bool loaded: false
+
     function refresh() {
         if (!falcon.isConnected) return
-        falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
+        falcon.call("hierarchy.tree", {}, function (ok, r) { root.loaded = true; if (ok) root.tree = r.departments })
         falcon.call("updates.rollout_health", {}, function (ok, r) { if (ok) root.rollout = r })
         falcon.call("resource.violations", {}, function (ok, r) { if (ok) root.violations = r.violations })
         falcon.call("hierarchy.sessions_today", { hours: 24 }, function (ok, r) { if (ok) root.sessions = r.sessions })
@@ -122,8 +148,10 @@ Item {
         // --- the machines: the room -------------------------------------------------------------
         GridCell {
             objectName: "homeMachines"
+            loading: !root.loaded
             Layout.fillWidth: true
-            Layout.preferredHeight: 226
+            // 150 of marks, the foot row, and the cell's own furniture -- sized to what it holds
+            Layout.preferredHeight: 263
             title: "The machines"
             narration: ({ brief: root.needCount === 0 ? "all quiet" : root.needCount + (root.needCount === 1 ? " needs looking at" : " need looking at"),
                           tone: root.needCount > 0 ? "warn" : "", state: root.machines.length === 0 ? "empty" : "ok",
@@ -150,8 +178,25 @@ Item {
                         onDoubleClicked: if (modelData.pc_id) shell.enterPc(modelData.pc_id)
                     }
                 }
-                Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; color: Theme.faint; font.pixelSize: Theme.fMeta
-                      text: "Quiet means fine. A machine in colour says why beneath it." }
+                Item {
+                    width: parent.width
+                    height: 24
+                    Txt { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                          color: Theme.faint; font.pixelSize: Theme.fMeta
+                          text: "Quiet means fine. A machine in colour says why beneath it." }
+                    TBtn {
+                        objectName: "rolloutDepartment"
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: root.behindHere.length > 0 && root.currentVersion !== ""
+                        small: true
+                        tone: "accent"
+                        iconName: "shield"
+                        text: "Update " + (root.behindHere.length === 1 ? "one machine" : root.behindHere.length + " machines")
+                              + " to " + root.currentVersion
+                        onClicked: root.updateThem()
+                    }
+                }
             }
         }
 
@@ -162,6 +207,7 @@ Item {
 
             GridCell {
                 objectName: "homeNeeds"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 520
                 Layout.fillHeight: true
@@ -189,6 +235,7 @@ Item {
 
             GridCell {
                 objectName: "homeToday"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 420
                 Layout.fillHeight: true
@@ -216,6 +263,7 @@ Item {
 
             GridCell {
                 objectName: "homeGoverning"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.preferredWidth: 380
                 Layout.fillHeight: true

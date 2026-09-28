@@ -21,6 +21,19 @@ RowLayout {
     property var assignee: null             // { account_id, name, hostname }
     property var pendingSplits: []          // parts still to describe after this one
     property bool proposing: false
+    // a check added by hand: what kind of thing, and what must be true of it. Held as words on the page
+    // and sent as the Engine's own terms (PATTERNS 11: nothing a person fills in reads as code)
+    property string addKind: "file"
+    property string addIntent: "create"
+    readonly property var addIntents: addKind === "file"
+        ? [{ v: "create", t: "is created" }, { v: "update", t: "is updated" }, { v: "exists", t: "exists already" }]
+        : [{ v: "used", t: "was used" }, { v: "installed_available", t: "is installed" },
+           { v: "closed_not_running", t: "is closed" }, { v: "running", t: "is running" }]
+    function addIntentText(v) {
+        for (var i = 0; i < addIntents.length; i++) if (addIntents[i].v === v) return addIntents[i].t
+        return addIntents[0].t
+    }
+    function setAddKind(k) { addKind = k; addIntent = k === "file" ? "create" : "used" }
     signal created(int id)
 
     spacing: 20
@@ -239,7 +252,7 @@ RowLayout {
                     Row {
                         spacing: 10
                         Txt { text: ({ create: "Create", update: "Update", exists: "Exists", used: "Used", used_with_file: "Used with",
-                                       installed_available: "Installed", closed_not_running: "Closed" })[modelData.intent] || modelData.intent
+                                       installed_available: "Installed", closed_not_running: "Closed", running: "Running" })[modelData.intent] || modelData.intent
                               color: Theme.tone(modelData.intent === "create" ? "ok" : "accent"); font.pixelSize: Theme.fMeta; font.weight: Font.DemiBold
                               width: 70; anchors.verticalCenter: parent.verticalCenter }
                         Txt { text: modelData.name; color: Theme.ink; font.pixelSize: Theme.fRow - 1; font.weight: Font.DemiBold; anchors.verticalCenter: parent.verticalCenter }
@@ -363,16 +376,39 @@ RowLayout {
                 }
             }
 
-            // a check added by hand (the correction path)
+            // a check added by hand (the correction path), read as a sentence with slots (PATTERNS 7)
             Row {
+                objectName: "newTaskAddCheck"
                 visible: root.proposal !== null
                 spacing: 8
-                Picker { id: addType; model: ["file", "program"]; width: 100 }
-                Picker { id: addIntent; width: 150
-                         model: addType.currentText === "file" ? ["create", "update", "exists"] : ["used", "installed_available", "closed_not_running"] }
-                Field { id: addName; width: 200; placeholderText: addType.currentText === "file" ? "file name" : "program name" }
+                Txt { text: "Also check that a"; color: Theme.dim; font.pixelSize: Theme.fBody
+                      height: 34; verticalAlignment: Text.AlignVCenter }
+                SentenceSlot {
+                    objectName: "addCheckKind"
+                    text: root.addKind === "file" ? "file" : "program"
+                    onClicked: kindMenu.open()
+                    Menu {
+                        id: kindMenu; y: parent.height + 4
+                        MenuItem { text: "file"; onTriggered: root.setAddKind("file") }
+                        MenuItem { text: "program"; onTriggered: root.setAddKind("program") }
+                    }
+                }
+                Field { id: addName; width: 190
+                        placeholderText: root.addKind === "file" ? "its name, like report-q3.docx" : "its name, like excel.exe" }
+                SentenceSlot {
+                    objectName: "addCheckIntent"
+                    text: root.addIntentText(root.addIntent)
+                    tone: "ok"
+                    onClicked: intentMenu.open()
+                    Menu {
+                        id: intentMenu; y: parent.height + 4
+                        Repeater { model: root.addIntents
+                                   delegate: MenuItem { required property var modelData; text: modelData.t
+                                                        onTriggered: root.addIntent = modelData.v } }
+                    }
+                }
                 GBtn { text: "+ Add a check"; small: true; enabled: addName.text.length > 0
-                       onClicked: { root.items = root.items.concat([{ target_type: addType.currentText, intent: addIntent.currentText, name: addName.text,
+                       onClicked: { root.items = root.items.concat([{ target_type: root.addKind, intent: root.addIntent, name: addName.text,
                                                                       path: null, linked_item_index: null, file_index_id: null, populated_by: "manual", removed: false }])
                                     addName.text = ""; root.noVerification = false } }
             }

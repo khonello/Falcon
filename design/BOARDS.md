@@ -16,6 +16,7 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `X01`–`X02` | **Behaviour.** How a slot is chosen, and what happens when a chart is clicked. |
 | `P01`–`P05` | **The density system**, the pages composed from it, and the never-blank rule. |
 | `T01`–`T06` | **A department, and entering an Admin in it.** The department drawn as a place in the Overview's language — a colonnade over a floor — then one Admin chosen, then held under a red lid. |
+| `K03`, `K05` | **Redrawn 28 Sep 2026** to what the app draws: the opened cells use the one machine mark and page, and who-entered is one card per fact with its act — the tone-filled squares and the dot-and-row list were the rejected patterns still standing in level 1. `K03`'s map now carries **one mark per department**, not a dot per machine. |
 | `K01`–`K06` | **The Super User Overview.** `K01`, the perfect 2 × 2 grid, is what is built (`K02` is the rejected alternative); `K03`–`K06` are its four cells opened in place, one shape each. |
 | `DP05` | **The department page, built from the picks.** Four cells — Who governs · Its machines · Today · Waiting on you — an equal pair over a split, with the day wide. Level 2: nothing is held, nothing offers to enter anybody. |
 | `DP06` | **An Admin opened in place**, and the ask. The reading LEADS the shape, because the subject is a decision with a price: the cost is stated before the act, and the second door (a machine, directly) is named beside it. |
@@ -30,6 +31,8 @@ The canvas grew past the point where a board's name told you what it was for. Th
 | `DP07` | **The yes, answered in the lane that asked.** The composition does not change when the answer comes back: the lane that stated the price now carries the session, their screen and the way out. The picture is a still and says its age. |
 | `DP08` | **What comes back when you ask.** Free · below you and occupied · a Super User holds it · not reachable. The answer lands in the lane that stated the cost; no modal anywhere in the level. |
 | `DP01`–`DP04` | **The department mood board** — its shape, its people, its machines, and the two doors out of it, four approaches each. `DP03`'s pick, *grouped by Admin*, is **void** (25 Sep 2026): machines belong to departments, not Admins, so the boards it shaped were redrawn. Every other pick stands. |
+| `OV03` | **The Super User's Authority area** (28 Sep 2026) — who governs what, where nobody does, and the only place display names are set. Three columns of unequal width: it replaced the last pre-kit screen, which had no board at all. |
+| `AS04` | **Assisted access, as built** (28 Sep 2026) — the Admin's Assistance page: asking, being asked, and the help running, each answered in the cell that asked. Consent, a ceiling said in words, and no clock. `T06` stays parked: it draws the helper watching the requester's screen, which the Engine cannot supply. |
 | `M01`–`M15` | The component mood board (buttons, rows, cards…) — already picked from. |
 | `S01`–`S04` | The Super User mood board — already picked from. |
 | everything else | The Admin screens, the worker surfaces, the language, the dialogs. |

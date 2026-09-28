@@ -29,6 +29,8 @@ QtObject {
         "chevd":   ["M6 9l6 6 6-6"],
         "chevu":   ["M6 15l6-6 6 6"],
         "min":     ["M5 12h14"],
+        "max":     ["M5 5h14v14H5z"],
+        "restore": ["M8 8h11v11H8z", "M16 8V5H5v11h3"],
         "close":   ["M6 6l12 12", "M18 6L6 18"],
         "x":       ["M6 6l12 12", "M18 6L6 18"],
         "plus":    ["M12 5v14", "M5 12h14"],

@@ -2,23 +2,23 @@ import QtQuick
 import QtQuick.Controls
 import "."
 
-// The console text field: one control height, recessed, hairline border that brightens on focus.
-// The Material style floats its placeholder above the text once there is some; here the placeholder is a
-// plain hint inside the field that simply goes away when something is written.
+// The one text field, on the kit's own tokens: recessed into the panel, a hairline that brightens on
+// focus. The Material style floats its placeholder above the text once there is some; here the
+// placeholder is a plain hint inside the field that simply goes away when something is written.
 TextField {
     id: root
-    implicitHeight: Theme.controlHeight
-    font.pixelSize: Theme.fontBody
-    color: Theme.text
+    implicitHeight: 36
+    font.pixelSize: Theme.fBody
+    color: Theme.ink
     placeholderTextColor: "transparent"
-    leftPadding: Theme.space2; rightPadding: Theme.space2
+    leftPadding: Theme.s3; rightPadding: Theme.s3
     selectByMouse: true
     background: Rectangle {
-        radius: Theme.radius
-        color: root.enabled ? Theme.canvas : Theme.surface
+        radius: Theme.radiusSm
+        color: root.enabled ? Theme.ground : Theme.pane
         border.width: 1
-        border.color: root.activeFocus ? Theme.accent : Theme.border
-        Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
+        border.color: root.activeFocus ? Theme.accent : Theme.line
+        Behavior on border.color { ColorAnimation { duration: Theme.durFast } }
     }
     Text {
         anchors.left: parent.left
@@ -30,6 +30,6 @@ TextField {
         text: root.placeholderText
         elide: Text.ElideRight
         font: root.font
-        color: Theme.textFaint
+        color: Theme.faint
     }
 }

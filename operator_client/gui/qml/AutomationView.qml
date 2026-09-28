@@ -20,7 +20,30 @@ Item {
     property var tree: []
     property int chosenId: 0
     property var history: null              // control.event_history of the chosen one
+    property var live: []                   // every execution running now, across every automation
     property string clock: ""
+
+    // the dashboard's live rows carry ids, not words: the page already knows the actions and the
+    // machines, so it names them here rather than asking the Engine to repeat itself
+    function actionOf(id) {
+        for (var i = 0; i < actions.length; i++) if (actions[i].id === id) return actions[i]
+        return null
+    }
+    function hostOfPc(pcId) {
+        for (var i = 0; i < tree.length; i++) {
+            var all = tree[i].admins.concat(tree[i].workers)
+            for (var j = 0; j < all.length; j++) if (all[j].pc_id === pcId) return all[j].hostname
+        }
+        return ""
+    }
+    readonly property var liveRows: (live || []).map(function (e) {
+        var a = root.actionOf(e.action_id)
+        return { id: e.id, action_id: e.action_id,
+                 action_name: Automate.actionName(a || { builtin_type: e.builtin_type }),
+                 hostname: root.hostOfPc(e.target_pc_id),
+                 started_at: String(e.started_at || "").substring(11, 16) }
+    })
+    readonly property var runningSays: falcon.narrate("running_now", { live: root.liveRows })
 
     function refresh() {
         if (!falcon.isConnected) return
@@ -37,6 +60,9 @@ Item {
             root.actions = flat
         })
         falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
+        // EVERYTHING RUNNING, not just the chosen automation's (control.dashboard). When something is
+        // stuck you rarely know which automation started it, so the page answers that without a guess.
+        falcon.call("control.dashboard", {}, function (ok, r) { if (ok) root.live = r.live || [] })
     }
     function choose(id) { chosenId = id; history = null; loadHistory() }
     function loadHistory() {
@@ -118,10 +144,15 @@ Item {
             spacing: 20
 
             // --- when -> then ---------------------------------------------------------------------
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                Layout.fillHeight: true
+                spacing: 20
+
             GridCell {
                 objectName: "automationList"
                 Layout.fillWidth: true
-                Layout.preferredWidth: 1
                 Layout.fillHeight: true
                 topAlign: true
                 title: "When · then"
@@ -133,9 +164,10 @@ Item {
                     spacing: 14
                     PagedColumn {
                         width: parent.width
-                        height: Math.min(root.events.length * 62, Math.max(120, root.height - 250))
-                        itemHeight: 53
+                        height: Math.min(root.events.length * 67, Math.max(125, root.height - 250))
+                        itemHeight: 58
                         model: root.events
+                        // the kit's card shell (PATTERNS 4) holding the picked reading: when | then, joined
                         delegate: Rectangle {
                             id: rowCard
                             property var modelData: null
@@ -143,8 +175,9 @@ Item {
                             readonly property var words: modelData ? root.line(modelData) : ({})
                             readonly property var acts: modelData ? modelData.actions : []
                             readonly property bool picked: modelData && modelData.id === root.chosenId
-                            radius: 10
-                            color: picked ? Theme.accentSoft : rowArea.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                            radius: 14
+                            color: picked ? Theme.select : rowArea.containsMouse ? Qt.lighter(Theme.pane, 1.12) : Theme.pane
+                            Behavior on color { ColorAnimation { duration: Theme.durFast } }
                             opacity: modelData && !modelData.enabled ? 0.55 : 1
                             RowLayout {
                                 anchors.fill: parent
@@ -156,11 +189,13 @@ Item {
                                     Layout.fillWidth: true
                                     Layout.preferredWidth: 3
                                     spacing: 2
-                                    Txt { width: parent.width; elide: Text.ElideRight; text: rowCard.words.title || ""; color: Theme.ink
+                                    Txt { width: parent.width; elide: Text.ElideRight; text: rowCard.words.title || ""
+                                          color: rowCard.picked ? "#ffffff" : Theme.ink
                                           font.pixelSize: Theme.fBody; font.weight: Font.DemiBold }
                                     Txt { width: parent.width; elide: Text.ElideRight; font.pixelSize: Theme.fMeta
                                           text: rowCard.modelData && !rowCard.modelData.enabled ? "switched off" : (rowCard.words.sub || "")
-                                          color: rowCard.modelData && !rowCard.modelData.enabled ? Theme.warn : Theme.faint }
+                                          color: rowCard.modelData && !rowCard.modelData.enabled ? Theme.warn
+                                                 : rowCard.picked ? Theme.selectSub : Theme.faint }
                                 }
                                 Icon { name: "fwd"; size: 13; color: Theme.faint }
                                 Row {
@@ -183,6 +218,56 @@ Item {
                     TBtn { objectName: "newAutomationButton"; text: "New automation"; iconName: "plus"
                            onClicked: { maker.start(null); root.mode = "new" } }
                 }
+            }
+
+            // --- what is running this second, whichever automation started it -----------------------
+            GridCell {
+                id: runningCell
+                objectName: "automationRunning"
+                Layout.fillWidth: true
+                Layout.fillHeight: false
+                Layout.preferredHeight: 214
+                topAlign: true
+                title: "Running now"
+                narration: root.runningSays
+
+                Column {
+                    width: parent.width
+                    spacing: 9
+
+                    Txt {
+                        visible: root.liveRows.length === 0
+                        width: parent.width
+                        text: root.runningSays.sentence
+                        color: Theme.dim
+                        font.pixelSize: Theme.fBody
+                        wrapMode: Text.WordWrap
+                    }
+                    PagedColumn {
+                        objectName: "automationLiveList"
+                        visible: root.liveRows.length > 0
+                        width: parent.width
+                        height: Math.max(58, runningCell.room - 10)
+                        itemHeight: 58
+                        spacing: 9
+                        model: root.liveRows
+                        attention: function (e) { return e.hostname }
+                        delegate: InfoCard {
+                            property var modelData: null
+                            readonly property var e: modelData || ({})
+                            width: parent ? parent.width : 0
+                            iconName: "play"
+                            iconTone: "accent"
+                            title: (e.action_name || "An action") + " on " + (e.hostname || "a machine")
+                            line: e.started_at ? "started " + e.started_at : "started just now"
+                            lineTone: "accent"
+                            stateWord: "Stop"
+                            stateTone: "warn"
+                            onClicked: falcon.call("control.terminate", { execution_id: e.id }, root.after)
+                        }
+                    }
+                }
+            }
             }
 
             ColumnLayout {

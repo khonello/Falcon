@@ -34,11 +34,30 @@ Item {
             if (s.occupied_via === "native") continue
             out.push({ who: s.occupant_name || "someone", hostname: s.hostname || "a PC",
                        at: String(s.entered_at).substring(11, 16),
-                       open: !s.ended_at,
+                       until: s.ended_at ? String(s.ended_at).substring(11, 16) : "",
+                       open: !s.ended_at, session_id: s.session_id, pc_id: s.pc_id,
+                       assisted: s.occupied_via === "assisted_access",
                        tone: s.occupant_role === "super_user" ? "danger"
                              : s.occupied_via === "assisted_access" ? "accent" : "warn" })
         }
         return out.sort(function (a, b) { return a.at < b.at ? 1 : -1 })
+    }
+
+    // the machines nobody signed in to, as the one mark -- unused is not a problem, so they stay quiet
+    readonly property var quietMarks: page.quietHosts.filter(function (h) { return h.quiet })
+        .map(function (h) { return { host: h.hostname, label: String(h.hostname).split("-").pop() } })
+
+    // the one act a card about an open session carries, and it states its cost first (DG01)
+    function endSession(e) {
+        shell.ask({ title: "End " + e.who + "'s session on " + e.hostname + "?",
+                    lead: "They are in there now. Ending it puts the machine back to whoever owns it.",
+                    body: "They are not warned first; the trail records that you ended it.",
+                    act: "End it", actIcon: "stop", cancel: "Leave it" }, function () {
+            falcon.call("hierarchy.end_session", { session_id: e.session_id }, function (ok, r) {
+                shell.notify(ok ? e.hostname + " is theirs again" : r.message, !ok)
+                if (ok && page.view) page.view.refresh()
+            })
+        })
     }
 
     readonly property var daySays: falcon.narrate("the_day", {
@@ -88,6 +107,7 @@ Item {
 
             // --- who was on a machine that is not theirs
             GridCell {
+                id: enteredCell
                 objectName: "todayEntered"
                 Layout.fillWidth: true
                 Layout.fillHeight: false
@@ -96,9 +116,29 @@ Item {
                 topAlign: true
                 narration: page.enteredSays
 
-                EnteredRows {
+                PagedColumn {
+                    objectName: "todayEnteredCards"
                     width: parent.width
-                    entries: page.entered
+                    // a GridCell's body is a Column: `parent.height` would collapse to nothing
+                    height: enteredCell.room
+                    itemHeight: 58
+                    spacing: 9
+                    model: page.entered
+                    attention: function (e) { return e.open ? e.hostname : "" }
+                    delegate: InfoCard {
+                        property var modelData: null
+                        readonly property var e: modelData || ({})
+                        width: parent ? parent.width : 0
+                        iconName: e.assisted ? "assistance" : "user"
+                        iconTone: e.tone || "warn"
+                        title: (e.who || "") + " entered " + (e.hostname || "")
+                        line: e.open ? e.at + " · still in there"
+                              : e.at + " – " + e.until + " · left"
+                        lineTone: e.open ? (e.tone || "warn") : ""
+                        stateWord: e.open ? "End it" : ""
+                        stateTone: e.tone || "warn"
+                        onClicked: if (e.open) page.endSession(e)
+                    }
                 }
             }
 
@@ -107,13 +147,26 @@ Item {
                 objectName: "todayQuiet"
                 Layout.fillWidth: true
                 Layout.fillHeight: false
-                Layout.preferredHeight: Math.max(140, page.height * 0.24)
+                Layout.preferredHeight: Math.max(166, page.height * 0.26)
                 title: "Never signed in"
                 narration: page.quietSays
 
-                QuietStrip {
+                // free is not a problem: the marks stay quiet, and the reason is the cell's title --
+                // repeating "never signed in" under every one of them says nothing and collides
+                PagedRow {
+                    objectName: "todayQuietRow"
                     width: parent.width
-                    hosts: page.quietHosts
+                    height: 72
+                    itemWidth: 58
+                    spacing: 10
+                    model: page.quietMarks
+                    delegate: MachineMark {
+                        property var modelData: ({})
+                        size: 42
+                        label: modelData.label || ""
+                        status: "free"
+                        name: modelData.host || ""
+                    }
                 }
                 Sentence {
                     width: parent.width

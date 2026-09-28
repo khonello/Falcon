@@ -42,7 +42,7 @@ Item {
                     spacing: 5
                     Label {
                         text: modelData.text
-                        color: active ? root.tintOf(index) : hover.hovered ? Theme.textDim : Theme.textFaint
+                        color: active ? root.tintOf(index) : hover.hovered ? Theme.dim : Theme.faint
                         font.pixelSize: Theme.fontMedium
                         font.weight: active ? Font.DemiBold : Font.Normal
                         anchors.verticalCenter: parent.verticalCenter
@@ -51,8 +51,8 @@ Item {
                     Label {
                         visible: modelData.count !== undefined
                         text: modelData.count !== undefined ? String(modelData.count) : ""
-                        color: Theme.textFaint
-                        font.pixelSize: Theme.fontBody
+                        color: Theme.faint
+                        font.pixelSize: Theme.fBody
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }

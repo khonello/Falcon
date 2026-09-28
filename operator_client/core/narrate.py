@@ -605,6 +605,125 @@ def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
                 brief=", ".join(bits), tone="danger" if found else "warn")
 
 
+# --- the Authority area (OV03), and helping across departments ----------------------------------
+
+def authority(data: dict[str, Any]) -> dict[str, Any]:
+    """The Authority area's first cell: who governs what. A department with nobody governing it
+    outranks everything else here, because it is the only condition that needs an act."""
+    depts = data.get("departments") or []
+    if not depts:
+        return _empty("No departments exist yet.", note="No departments yet", brief="no departments")
+    orphans = [d for d in depts if not (d.get("admins") or [])]
+    admins = sum(len(d.get("admins") or []) for d in depts)
+    machines = sum(len(d.get("workers") or []) for d in depts)
+    facts = [_fact("Departments", len(depts)), _fact("Admins", admins), _fact("Client PCs", machines)]
+    if orphans:
+        facts.insert(1, _fact("Nobody governs", ", ".join(d["name"] for d in orphans[:3]), "danger"))
+        if len(orphans) == 1:
+            return _out(f"{orphans[0]['name']} has nobody governing it.", facts,
+                        action="Assign an Admin", brief=f"{_n(len(depts), 'department')}, one empty",
+                        tone="danger")
+        return _out(f"{_n(len(orphans), 'department')} have nobody governing them.", facts,
+                    action="Assign an Admin", brief=f"{_n(len(orphans), 'department')} empty", tone="danger")
+    if len(depts) == 1:
+        return _out(f"{depts[0]['name']} is the only department, and governed.", facts,
+                    brief="one department, governed", tone="ok")
+    return _out(f"All {len(depts)} departments have an Admin.", facts,
+                brief=f"{_n(len(depts), 'department')}, all governed", tone="ok")
+
+
+def nobody_governs(data: dict[str, Any]) -> dict[str, Any]:
+    """The cell that exists to be empty: departments with no Admin, and the machines left in them.
+    A zero here is a result, so it is drawn plainly and gets no notice."""
+    depts = data.get("departments") or []
+    orphans = [d for d in depts if not (d.get("admins") or [])]
+    if not orphans:
+        return _out("Every department has somebody governing it.",
+                    [_fact("Departments", len(depts))], brief="nowhere unattended", tone="ok")
+    stranded = sum(len(d.get("workers") or []) for d in orphans)
+    facts = [_fact("Departments", ", ".join(d["name"] for d in orphans[:3]), "danger"),
+             _fact("Machines in them", stranded, "danger" if stranded else "")]
+    if len(orphans) == 1:
+        return _out(f"{orphans[0]['name']} has nobody governing its {stranded} machines.", facts,
+                    action="Assign an Admin", brief=f"{orphans[0]['name']} unattended", tone="danger")
+    return _out(f"{_n(len(orphans), 'department')} have nobody, and {stranded} machines with them.", facts,
+                action="Assign an Admin", brief=f"{_n(len(orphans), 'department')} unattended", tone="danger")
+
+
+def naming(data: dict[str, Any]) -> dict[str, Any]:
+    """Display Names, said from the namer's side. A name never propagates across relationship
+    layers, so this only ever speaks about what THIS caller sees and what they are seen as."""
+    selected = data.get("selected") or None
+    self_name = data.get("self_name") or ""
+    # a READING panel takes no empty overlay (P05): its content is words, so it says what to do
+    if not selected:
+        return _out("Pick somebody to give them a name.",
+                    [_fact("They see you as", self_name or "your own name")],
+                    brief="nobody picked", tone="")
+    name = selected.get("name") or "This person"
+    facts = [_fact("You see them as", name),
+             _fact("They see you as", self_name or "your own name")]
+    dept = selected.get("department_name")
+    if dept:
+        facts.append(_fact("Department", dept))
+    return _out(f"{name} is the name you see for them.", facts,
+                action="Call them something else", brief="your names only", tone="accent")
+
+
+def helping(data: dict[str, Any]) -> dict[str, Any]:
+    """Assisted access, from the Admin's side. It is consent, not eviction: no clock, no forcing,
+    and what the helper may do is said in words before anyone agrees."""
+    session = data.get("session") or None
+    offers = data.get("offers") or []
+    answer = data.get("answer") or None
+    available = bool(data.get("available"))
+
+    if session:
+        who = session.get("with_name") or "another Admin"
+        return _out(f"You are helping {who} right now.",
+                    [_fact("Allowed", session.get("allowed") or "control and monitoring actions", "accent"),
+                     _fact("Ends", "when either of you closes it")],
+                    action="End it", brief="helping now", tone="accent")
+    if offers:
+        first = offers[0]
+        who = first.get("requester_name") or "An Admin"
+        return _out(f"{who} needs help and picked you.",
+                    [_fact("They would let you", first.get("allowed") or "run control actions", "accent"),
+                     _fact("Waiting", _n(len(offers), "request"), "warn")],
+                    action="Accept", brief=_n(len(offers), "asking"), tone="warn")
+    if answer and answer.get("matched"):
+        return _out(f"{answer.get('helper_name') or 'An Admin'} was asked to help you.",
+                    [_fact("Waiting on", answer.get("helper_name") or "them", "accent")],
+                    brief="waiting on them", tone="accent")
+    if answer and not answer.get("matched"):
+        return _out("Nobody is free to help right now.",
+                    [_fact("Try", "again in a few minutes")], brief="nobody free", tone="warn")
+    if available:
+        return _out("You are available to help other departments.",
+                    [_fact("Asked so far", "nobody today")], brief="available", tone="ok")
+    return _out("You are not available, and nobody is being helped.",
+                action="Ask for help", brief="not available", tone="")
+
+
+def running_now(data: dict[str, Any]) -> dict[str, Any]:
+    """What is executing at this moment, across every automation. A count of zero is the normal
+    state and is said plainly rather than as an absence."""
+    live = data.get("live") or []
+    if not live:
+        return _out("Nothing is running right now.", brief="nothing running", tone="ok")
+    first = live[0]
+    what = first.get("action_name") or first.get("name") or "An action"
+    where = first.get("hostname") or "a machine"
+    if len(live) == 1:
+        return _out(f"{what} is running on {where}.",
+                    [_fact("Started", first.get("started_at") or "just now")],
+                    brief="one running", tone="accent")
+    hosts = {x.get("hostname") for x in live if x.get("hostname")}
+    return _out(f"{_n(len(live), 'action')} are running on {_n(len(hosts), 'machine')}.",
+                [_fact("Longest", what, "accent"), _fact("On", where)],
+                brief=_n(len(live), "action"), tone="accent")
+
+
 TOPICS = {
     "rollout": rollout, "confirmations": confirmations, "fleet": fleet, "needs_you": needs_you,
     "rollout_departments": rollout_departments, "blocking": blocking,
@@ -612,6 +731,8 @@ TOPICS = {
     "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
     "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet, "dept_people": dept_people,
     "enter_cost": enter_cost, "enter_answer": enter_answer, "held": held, "workstation": workstation,
+    "authority": authority, "nobody_governs": nobody_governs, "naming": naming,
+    "helping": helping, "running_now": running_now,
 }
 
 

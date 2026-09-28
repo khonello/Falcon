@@ -76,7 +76,7 @@ Item {
             // the one band that stretches: a day with more marks on it can use the room, and the
             // two bands either side of it are the size of what they hold
             Layout.fillHeight: true
-            Layout.minimumHeight: 77 + strip.implicitHeight + 14 + devSentence.implicitHeight
+            Layout.minimumHeight: 77 + strip.implicitHeight + 34 + devSentence.implicitHeight
             title: "Deviations today"
             narration: page.devSays
 
@@ -86,6 +86,12 @@ Item {
                 marks: page.deviationMarks
                 fromHour: page.view.windowStart
                 toHour: page.view.windowEnd
+            }
+            // an axis is never left bare (PATTERNS 0): the legend names what the two marks mean
+            Legend {
+                items: [{ label: "Logged, still open", color: Theme.warn, round: true },
+                        { label: "Addressed", color: Theme.dim, round: true }]
+                note: page.deviationMarks.length === 0 ? "nothing logged today" : ""
             }
             Sentence {
                 id: devSentence

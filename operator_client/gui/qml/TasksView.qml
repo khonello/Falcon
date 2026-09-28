@@ -33,7 +33,25 @@ Item {
     }
     function open(id) {
         falcon.call("task.get", { task_id: id }, function (ok, r) {
-            if (ok) { root.task = r.task; root.mode = "task" } else shell.notify(r.message, true)
+            if (ok) { root.task = r.task; root.mode = "task"; root.recheck(true) } else shell.notify(r.message, true)
+        })
+    }
+    // THE VERIFICATION STACK (task.stack): the checks re-evaluated against the file index as it is
+    // now. Signs of work, never proof of it -- the verdict stays the assigner's, which is why this
+    // only ever changes what the checks SAY, never the task's status.
+    property string checkedAt: ""
+    function recheck(quiet) {
+        if (!root.task) return
+        var id = root.task.id
+        falcon.call("task.stack", { task_id: id }, function (ok, r) {
+            if (!ok) { if (!quiet) shell.notify(r.message, true); return }
+            if (!root.task || root.task.id !== id) return
+            var t = {}
+            for (var k in root.task) t[k] = root.task[k]
+            t.items = r.items
+            root.task = t
+            root.checkedAt = Qt.formatTime(new Date(), "HH:mm")
+            if (!quiet) shell.notify("Checked again", false)
         })
     }
     Connections {
@@ -318,6 +336,16 @@ Item {
                         }
                         Txt { topPadding: 8; visible: root.task && root.task.verification_mode !== "none"; color: Theme.faint; font.pixelSize: Theme.fMeta
                               text: "Signs of work, never proof of it. The checks inform; the verdict is yours." }
+                        Item {
+                            visible: root.task && root.task.verification_mode !== "none"
+                            width: parent.width
+                            height: 34
+                            GBtn { objectName: "recheckStack"; anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                                   text: "Check them again"; iconName: "check"; small: true; onClicked: root.recheck(false) }
+                            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                                  visible: root.checkedAt !== ""
+                                  text: "checked " + root.checkedAt; color: Theme.faint; font.pixelSize: Theme.fMeta }
+                        }
                     }
                 }
                 GridCell {
@@ -405,7 +433,7 @@ Item {
     }
     function intentWord(i) {
         return ({ create: "Create", update: "Update", exists: "Exists", used: "Used", used_with_file: "Used with",
-                  installed_available: "Installed", closed_not_running: "Closed" })[i] || i
+                  installed_available: "Installed", closed_not_running: "Closed", running: "Running" })[i] || i
     }
     function itemLine(it) {
         if (it.status === "passed") return it.file_path ? "found at " + it.file_path : "passed"

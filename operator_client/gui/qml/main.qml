@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
@@ -23,7 +24,16 @@ ApplicationWindow {
     visible: true
     color: "transparent"
     title: "Falcon" + (falcon.isConnected ? "  —  " + Theme.roleLabel(falcon.role) : "")
-    flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint | Qt.CustomizeWindowHint
+    // FRAMELESS: the app already draws its own minimise, maximise and close, and a second set of
+    // Windows' own buttons above them is one chrome too many. The top bar becomes the title bar --
+    // it drags, and double-clicking it maximises -- and the eight strips below resize the window.
+    flags: Qt.Window | Qt.FramelessWindowHint
+    readonly property bool maximised: shell.visibility === Window.Maximized
+
+    function toggleMaximised() {
+        if (shell.maximised) shell.showNormal()
+        else shell.showMaximized()
+    }
 
     property int view: 0
     // connected, or connected and briefly lost (the page stays): anything else is the connect screen
@@ -227,7 +237,6 @@ ApplicationWindow {
     // the views not yet rebuilt call root.notify(): keep that name resolving while they are ported
     property var root: shell
     function notify(text, alert) { toast.show(text, alert) }
-    function select(accountId) { home.selected = home.find(accountId) }
 
     Connections {
         target: falcon
@@ -267,8 +276,12 @@ ApplicationWindow {
             Layout.fillWidth: true
             // before there is a connection there is nothing to be told about
             indicators: shell.online ? falcon.indicators : []
+            maximised: shell.maximised
             onMinimizeClicked: shell.showMinimized()
+            onMaximizeClicked: shell.toggleMaximised()
             onCloseClicked: Qt.quit()
+            // dragging the bar moves the window, and Windows' own snapping still applies
+            onDragStarted: if (!shell.maximised) shell.startSystemMove()
         }
 
         RowLayout {
@@ -374,13 +387,14 @@ ApplicationWindow {
                                 onLeaveSession: shell.leaveSession()
                             }
 
-                            HomeView {
-                                id: home
-                                objectName: "hierarchyRail"      // the hierarchy tree lives here now
+                            // the Super User's Authority area (OV03): who governs what, where nobody
+                            // does, and the only place display names are set. An Admin's home is
+                            // AdminHome below -- the two are different pages for different roles.
+                            AuthorityView {
+                                id: authority
+                                objectName: "authorityView"
                                 anchors.fill: parent
-                                // inside, it is the Admin's home: their department, drawn as theirs
-                                asDepartment: 0
-                                // the Super User's Authority area; an Admin's home is AdminHome below
+                                clock: overview.clock
                                 visible: shell.viewKey === "authority" && !shell.inDepartment
                             }
 
@@ -569,5 +583,59 @@ ApplicationWindow {
                 font.pixelSize: Theme.fSmall
             }
         }
+    }
+
+    // --- resizing, since there is no frame to grab -------------------------------------------
+    // Four edges and four corners, 6 px each (10 in the corners), inert while maximised.
+    component Grip: MouseArea {
+        property int edges: 0
+        enabled: !shell.maximised
+        acceptedButtons: Qt.LeftButton
+        onPressed: shell.startSystemResize(edges)
+    }
+
+    Grip { objectName: "gripLeft"; edges: Qt.LeftEdge; cursorShape: Qt.SizeHorCursor
+           anchors { left: parent.left; top: parent.top; bottom: parent.bottom; topMargin: 10; bottomMargin: 10 }
+           width: 6 }
+    Grip { objectName: "gripRight"; edges: Qt.RightEdge; cursorShape: Qt.SizeHorCursor
+           anchors { right: parent.right; top: parent.top; bottom: parent.bottom; topMargin: 10; bottomMargin: 10 }
+           width: 6 }
+    Grip { objectName: "gripTop"; edges: Qt.TopEdge; cursorShape: Qt.SizeVerCursor
+           anchors { top: parent.top; left: parent.left; right: parent.right; leftMargin: 10; rightMargin: 10 }
+           height: 6 }
+    Grip { objectName: "gripBottom"; edges: Qt.BottomEdge; cursorShape: Qt.SizeVerCursor
+           anchors { bottom: parent.bottom; left: parent.left; right: parent.right; leftMargin: 10; rightMargin: 10 }
+           height: 6 }
+    Grip {
+        edges: Qt.LeftEdge | Qt.TopEdge
+        cursorShape: Qt.SizeFDiagCursor
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: 10
+        height: 10
+    }
+    Grip {
+        edges: Qt.RightEdge | Qt.TopEdge
+        cursorShape: Qt.SizeBDiagCursor
+        anchors.right: parent.right
+        anchors.top: parent.top
+        width: 10
+        height: 10
+    }
+    Grip {
+        edges: Qt.LeftEdge | Qt.BottomEdge
+        cursorShape: Qt.SizeBDiagCursor
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        width: 10
+        height: 10
+    }
+    Grip {
+        edges: Qt.RightEdge | Qt.BottomEdge
+        cursorShape: Qt.SizeFDiagCursor
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        width: 10
+        height: 10
     }
 }

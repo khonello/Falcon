@@ -69,6 +69,21 @@ Item {
         for (var t in builtin) if (builtin[t].category === k && have.indexOf(t) < 0) out.push({ id: 0, kind: k, action_kind: k, builtin_type: t })
         return out
     }
+    // the library as ONE flat list -- a heading row, then its actions, at one pitch, so the cell can page
+    readonly property var libraryRows: {
+        var out = []
+        for (var g = 0; g < groups.length; g++) {
+            var k = groups[g].k
+            var stored = storedIn(k)
+            var all = stored.concat(unsetIn(k))
+            out.push({ head: groups[g].t, count: stored.length })
+            for (var i = 0; i < all.length; i++) out.push({ action: all[i] })
+            if (k === "custom" && stored.length === 0)
+                out.push({ note: (falcon && falcon.role === "admin") ? "None yet. Add your own with New custom action."
+                                                                    : "None yet. Only the Admin adds their own scripts." })
+        }
+        return out
+    }
     function usedIn(id) { return events.filter(function (e) { return e.actions.some(function (a) { return a.id === id }) }).length }
     function choose(a) {
         mode = "library"
@@ -238,41 +253,45 @@ Item {
                 topAlign: true
                 title: "The library"
                 narration: ({ brief: "grouped, with what each does", state: "ok" })
-                Flickable {
-                    id: libFlick
+                // the library pages by its bottom edge -- a stack of rows in a fixed cell is paged, never
+                // scrolled (PATTERNS 3, vertical). One flat model so every row keeps the same pitch.
+                PagedColumn {
+                    objectName: "actionsLibraryRows"
                     width: parent.width
                     height: libCell.room
-                    contentHeight: libCol.implicitHeight
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    ScrollBar.vertical: ScrollBar { policy: libFlick.contentHeight > libFlick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
-                    Column {
-                        id: libCol
-                        width: libFlick.width - 10
-                        spacing: 0
-                        Repeater {
-                            model: root.groups
-                            delegate: Column {
-                                id: grp
-                                required property var modelData
-                                readonly property var stored: root.storedIn(modelData.k)
-                                readonly property var unset: root.unsetIn(modelData.k)
-                                width: parent.width
-                                Item { width: 1; height: 8 }
-                                Item {
-                                    width: parent.width; height: 22
-                                    Txt { text: grp.modelData.t; color: grp.modelData.k === "custom" ? Theme.warn : grp.modelData.k === "monitoring" ? Theme.ok : Theme.accent
-                                          font.pixelSize: Theme.fMeta; font.weight: Font.Bold }
-                                    Txt { anchors.right: parent.right; text: String(grp.stored.length); color: Theme.faint; font.pixelSize: Theme.fMeta }
-                                }
-                                Repeater {
-                                    model: grp.stored.concat(grp.unset)
-                                    delegate: LibRow { required property var modelData; width: grp.width; action: modelData }
-                                }
-                                Txt { visible: grp.modelData.k === "custom" && grp.stored.length === 0; topPadding: 4; bottomPadding: 6
-                                      text: (falcon && falcon.role === "admin") ? "None yet. Add your own with New custom action." : "None yet. Only the Admin adds their own scripts."
-                                      color: Theme.faint; font.pixelSize: Theme.fMeta }
-                            }
+                    itemHeight: 35
+                    spacing: 0
+                    step: 4
+                    model: root.libraryRows
+                    delegate: Item {
+                        property var modelData: null
+                        readonly property bool isHead: modelData && modelData.head !== undefined
+                        readonly property bool isNote: modelData && modelData.note !== undefined
+                        Row {
+                            visible: isHead
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 6
+                            width: parent.width
+                            Txt { text: modelData && modelData.head ? modelData.head : ""
+                                  color: modelData && modelData.head === "CUSTOM" ? Theme.warn
+                                         : modelData && modelData.head === "MONITORING" ? Theme.ok : Theme.accent
+                                  font.pixelSize: Theme.fMeta; font.weight: Font.Bold }
+                            Item { width: parent.width - 120; height: 1 }
+                            Txt { text: modelData && modelData.count !== undefined ? String(modelData.count) : ""
+                                  color: Theme.faint; font.pixelSize: Theme.fMeta }
+                        }
+                        Txt {
+                            visible: isNote
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width
+                            text: modelData && modelData.note ? modelData.note : ""
+                            color: Theme.faint; font.pixelSize: Theme.fMeta
+                            wrapMode: Text.WordWrap; elide: Text.ElideRight
+                        }
+                        LibRow {
+                            visible: !isHead && !isNote
+                            width: parent.width
+                            action: modelData && modelData.action ? modelData.action : null
                         }
                     }
                 }

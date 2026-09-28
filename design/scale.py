@@ -36,13 +36,21 @@ def fleet_of(n, bad_at=()):
 
 
 def slot_size(total):
+    """SUPERSEDED BY PATTERNS 3 (27 Sep 2026): the mark does not shrink with the count any more --
+    it stays full size and the row PAGES. The sizes are the two the patterns name: 84 on a page, 58
+    in a maximised grid. The second value says whether hostnames are drawn beneath.
+
+    The old ladder (46 -> 30 -> 16 -> bars) is what DP10 proposed and the user replaced: "instead of
+    making things small when the pcs are many, it can be like clicking the far right on the container
+    scrolls horizontally to reveal next 4 or 2 pcs"."""
     if total <= 8:
-        return 46, True
-    if total <= 30:
-        return 30, False
-    if total <= 120:
-        return 16, False
-    return 0, False
+        return 84, True
+    return 58, True
+
+
+def page_size(total, per_page=32):
+    """How many marks a page shows, and how many pages that makes -- paging replaces shrinking."""
+    return per_page, max(1, (total + per_page - 1) // per_page)
 
 
 def machine_marks(pcs, size, labels, per_row, gap=6):

@@ -59,34 +59,27 @@ def create(config: LocalConfig, *, auto_connect: bool = False) -> tuple[QGuiAppl
 
 
 def fit_to_screen(win) -> QSize:
-    """Full screen without resizing: pin min == max size to the screen's available work area
-    (minus the native frame) and place the window at its top-left. Equal min/max sizes make the
-    Windows frame non-resizable and drop the maximize button; minimize/close stay."""
-    _drop_resize_frame(win)
+    """The window is FRAMELESS (main.qml), so it owns what the frame used to do.
+
+    It opens maximised over the work area -- the pages are drawn for that much room -- and restores
+    to the design's own 1440 x 900, centred, so the maximise button in the top bar means something
+    in both directions. A minimum size keeps a four-cell page from collapsing into unreadable
+    columns. The returned size is the restored one.
+
+    This replaces the old pinning (min == max == the work area), which existed to make the NATIVE
+    frame non-resizable and drop its maximize button. With no native frame there is nothing to
+    strip, and the window can be moved and resized from the top bar and the grips instead.
+    """
     screen = win.screen()
     avail = screen.availableGeometry()
-    fm = win.frameMargins()
-    size = QSize(avail.width() - fm.left() - fm.right(), avail.height() - fm.top() - fm.bottom())
-    win.setMinimumSize(size)
-    win.setMaximumSize(size)
-    win.setPosition(avail.x() + fm.left(), avail.y() + fm.top())
-    return size
-
-
-def _drop_resize_frame(win) -> None:
-    """Windows keeps the thick (resize) frame even for a fixed-size window; strip it so the edges
-    show no resize cursor. Operator Client is Windows-only; a no-op elsewhere."""
-    if sys.platform != "win32":
-        return
-    import ctypes
-
-    user32 = ctypes.windll.user32
-    hwnd = int(win.winId())
-    GWL_STYLE, WS_THICKFRAME, WS_MAXIMIZEBOX = -16, 0x00040000, 0x00010000
-    style = user32.GetWindowLongW(hwnd, GWL_STYLE)
-    user32.SetWindowLongW(hwnd, GWL_STYLE, style & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX)
-    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_FRAMECHANGED = 0x0002, 0x0001, 0x0004, 0x0020
-    user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+    win.setMaximumSize(QSize(16777215, 16777215))
+    win.setMinimumSize(QSize(min(1024, avail.width()), min(680, avail.height())))
+    normal = QSize(min(1440, avail.width()), min(900, avail.height()))
+    win.resize(normal)
+    win.setPosition(avail.x() + (avail.width() - normal.width()) // 2,
+                    avail.y() + (avail.height() - normal.height()) // 2)
+    win.showMaximized()
+    return normal
 
 
 def run(config: LocalConfig, *, auto_connect: bool = False) -> None:

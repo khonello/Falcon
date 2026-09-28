@@ -406,11 +406,14 @@ Item {
     readonly property int waitingOnYou: emptyDepartments + violations.length + deviations.length
 
     // ==============================================================================================
+    // ST02: the cells keep their shape, quietened, until the first reply lands
+    property bool loaded: false
+
     function refresh() {
         // these are the Super User's surfaces; reports.routing_get is refused to anyone else, so
         // the view stays quiet rather than firing requests it knows will come back forbidden
         if (!falcon.isConnected || falcon.role !== "super_user") return
-        falcon.call("hierarchy.tree", {}, function (ok, r) { if (ok) root.tree = r.departments })
+        falcon.call("hierarchy.tree", {}, function (ok, r) { root.loaded = true; if (ok) root.tree = r.departments })
         falcon.call("updates.rollout_health", {}, function (ok, r) { if (ok) root.rollout = r })
         falcon.call("hierarchy.sessions_today", { hours: 24 }, function (ok, r) { if (ok) root.sessions = r.sessions })
         falcon.call("resource.violations", {}, function (ok, r) { if (ok) root.violations = r.violations })
@@ -593,6 +596,7 @@ Item {
             // --- who governs what, and where nobody does
             GridCell {
                 objectName: "cellAuthority"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 title: "Authority"
@@ -622,6 +626,7 @@ Item {
             // --- the lever only a Super User holds
             GridCell {
                 objectName: "cellRollout"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 title: root.rolloutTitle
@@ -664,6 +669,7 @@ Item {
             // --- who held each machine, and who never signed in
             GridCell {
                 objectName: "cellToday"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 title: "Today"
@@ -695,6 +701,7 @@ Item {
             // --- files against their tier, and what deviated from what the system expects
             GridCell {
                 objectName: "cellOutOfPlace"
+                loading: !root.loaded
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 title: "Out of place"

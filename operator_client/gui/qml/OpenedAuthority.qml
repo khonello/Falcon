@@ -14,19 +14,27 @@ Item {
     property var view: null
 
     readonly property var subject: page.view.gapDept
-    readonly property var hosts: {
-        if (!subject) return []
-        return subject.workers.map(function (w) {
-            var b = page.view.behindFor(w.pc_id)
-            return { hostname: w.hostname || w.name,
-                     state: !b ? "ok" : b.escalated ? "danger" : "warn" }
-        })
-    }
+    // one department's machines, read the way every other page reads them (Fleet), and drawn as the
+    // one mark at full size -- the row pages sideways rather than shrinking (PATTERNS 2, 3)
+    readonly property var marks: subject ? Fleet.machines(subject.workers, page.view.rollout, page.view.violations) : []
+    readonly property var hosts: page.marks.map(function (m) {
+        return { hostname: m.host, state: m.status === "danger" ? "danger" : m.status === "warn" ? "warn" : "ok" }
+    })
     readonly property int biggest: {
         var m = 0
         for (var i = 0; i < page.view.tree.length; i++)
             m = Math.max(m, page.view.tree[i].workers.length)
         return m
+    }
+    // the map carries ONE mark per department: its count, in the worst tone among its machines
+    function deptMark(dept) {
+        var ms = Fleet.machines(dept.workers, page.view.rollout, page.view.violations)
+        var bad = ms.filter(function (m) { return m.status === "danger" })
+        var warn = ms.filter(function (m) { return m.status === "warn" || m.status === "entered" })
+        return { label: String(ms.length),
+                 status: bad.length ? "danger" : warn.length ? "warn" : ms.length ? "ok" : "free",
+                 line: bad.length ? bad.length + " need you" : warn.length ? warn.length + " behind"
+                       : ms.length === 1 ? "one machine" : ms.length + " machines" }
     }
     readonly property var scopedSessions: {
         if (!subject) return []
@@ -72,6 +80,7 @@ Item {
                     width: parent.width
                     height: Math.max(160, page.height * 0.44)
                     departments: page.view.tree
+                    markFor: function (d) { return page.deptMark(d) }
                     focusId: page.subject ? page.subject.department_id : 0
                     selectedId: page.subject ? page.subject.department_id : 0
                     // single click inspects -- the panels beside the map already re-scope to the
@@ -95,10 +104,24 @@ Item {
                     title: "Its client PCs"
                     narration: page.fleetSays
 
-                    DeptSlots {
+                    PagedRow {
+                        objectName: "openedFleetRow"
                         width: parent.width
-                        hosts: page.hosts
-                        biggest: page.biggest
+                        height: 96
+                        itemWidth: 68
+                        spacing: 12
+                        model: page.marks
+                        attention: function (m) { return Fleet.needsSomeone(m) ? m.host : "" }
+                        delegate: MachineMark {
+                            property var modelData: ({})
+                            size: 56
+                            label: modelData.label || ""
+                            status: modelData.status || "ok"
+                            name: modelData.host || ""
+                            line: modelData.line || ""
+                            lineTone: modelData.lineTone || ""
+                            onDoubleClicked: if (modelData.pc_id) shell.enterPc(modelData.pc_id)
+                        }
                     }
                     Sentence {
                         width: parent.width

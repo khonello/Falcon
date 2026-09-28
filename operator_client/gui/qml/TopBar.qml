@@ -3,15 +3,30 @@ import "."
 
 // Minimal chrome on the frame: history, the command palette, the indicators, the window buttons.
 // Where you are is said by the body's breadcrumb, not here.
+//
+// THE WINDOW IS FRAMELESS, so this bar IS the title bar: its empty space drags the window, a double
+// click on it maximises, and the three buttons on the right are the only ones there are.
 Item {
     id: root
 
     property var indicators: []
+    property bool maximised: false
     signal paletteClicked()
     signal minimizeClicked()
+    signal maximizeClicked()
     signal closeClicked()
+    signal dragStarted()
 
     implicitHeight: Theme.topBarHeight
+
+    // declared first, so it sits BENEATH the palette, the indicators and the buttons: they take
+    // their own clicks and what is left over is the bar itself, which moves the window
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.LeftButton
+        onPressed: root.dragStarted()
+        onDoubleClicked: root.maximizeClicked()
+    }
 
     Row {
         anchors.left: parent.left
@@ -127,7 +142,11 @@ Item {
         anchors.rightMargin: 4
         anchors.verticalCenter: parent.verticalCenter
         spacing: 0
-        IconBtn { iconName: "min"; color: Qt.rgba(1, 1, 1, 0.75); onClicked: root.minimizeClicked() }
-        IconBtn { iconName: "close"; color: Qt.rgba(1, 1, 1, 0.75); onClicked: root.closeClicked() }
+        IconBtn { objectName: "winMinimize"; iconName: "min"; glyph: 15
+                  color: Qt.rgba(1, 1, 1, 0.75); onClicked: root.minimizeClicked() }
+        IconBtn { objectName: "winMaximize"; iconName: root.maximised ? "restore" : "max"; glyph: 13
+                  color: Qt.rgba(1, 1, 1, 0.75); onClicked: root.maximizeClicked() }
+        IconBtn { objectName: "winClose"; iconName: "close"; glyph: 15
+                  color: Qt.rgba(1, 1, 1, 0.75); onClicked: root.closeClicked() }
     }
 }
