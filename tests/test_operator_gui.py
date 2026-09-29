@@ -122,6 +122,24 @@ REPORTS = [
 ]
 
 
+def _at(hhmm: str) -> str:
+    """An ISO time on whatever day the test runs, since the timeline draws today."""
+    from datetime import datetime
+
+    return datetime.now().replace(hour=int(hhmm[:2]), minute=int(hhmm[3:]),
+                                  second=0, microsecond=0).isoformat()
+
+
+DAY = [
+    {"session_id": 1, "pc_id": 1, "hostname": "OPS-01", "occupant_name": "Kojo",
+     "occupied_via": "native", "entered_at": _at("08:12"), "ended_at": _at("17:30")},
+    {"session_id": 2, "pc_id": 22, "hostname": "LOG-02", "occupant_name": "A. Quaye",
+     "occupied_via": "traversal", "entered_at": _at("02:14"), "ended_at": _at("03:02")},
+    {"session_id": 3, "pc_id": 11, "hostname": "FIN-02", "occupant_name": "A. Quaye",
+     "occupied_via": "assisted", "entered_at": _at("10:41"), "ended_at": _at("11:20")},
+]
+
+
 class _Identity:
     client_id, account_id, role, pc_id, department_id = "test", 1, "super_user", 1, 1
 
@@ -152,6 +170,8 @@ class _Connection:
                                                 "threshold.cpu": "polled"}}
         if type_ == "control.event_history":
             return {"firings": []}
+        if type_ == "hierarchy.sessions_today":
+            return {"sessions": DAY}
         if type_ == "assistance.channels":
             return {"channels": CHANNELS}
         if type_ == "assistance.ping_status":
@@ -652,3 +672,67 @@ async def test_a_person_without_a_status_has_not_left(gui):
     assert rows["R. Mensah"]["role"] == "Admin" and rows["R. Mensah"]["department"] == "Operations"
     assert rows["Kojo"]["stateWord"] == "signed in"        # it has a session
     assert rows["Efua"]["stateWord"] == "not signed in"    # no session, but not gone either
+
+
+async def test_the_night_is_shaded_and_never_cropped(gui):
+    """24 hours is the default span, on purpose: an entry at 02:14 is exactly the thing somebody is
+    looking for, and a 6-to-6 chart would simply not draw it. 6 to 6 is a switch, and it does crop --
+    which is the point of making it a choice rather than the default."""
+    win, bridge = gui
+    win.setProperty("view", "machines")
+    view = win.findChild(QObject, "machinesView")
+    day = win.findChild(QObject, "machinesDay")
+    assert day is not None
+    bridge.connected.emit()
+
+    view.setProperty("look", "day")
+    await _wait(lambda: len(prop(day, "lanes") or []) == 3)
+    hosts = [lane["host"] for lane in prop(day, "lanes")]
+    assert hosts == ["FIN-02", "LOG-02", "OPS-01"]          # sorted, one lane per machine
+    assert prop(day, "fromHour") == 0 and prop(day, "toHour") == 24
+
+    night = [lane for lane in prop(day, "lanes") if lane["host"] == "LOG-02"][0]
+    assert round(night["bars"][0]["from"], 1) == 2.2 and night["bars"][0]["via"] == "traversal"
+
+    # the working-day window drops it, and that is the switch saying so
+    view.setProperty("fromHour", 6)
+    await _wait(lambda: len(prop(day, "lanes") or []) == 2)
+    assert "LOG-02" not in [lane["host"] for lane in prop(day, "lanes")]
+    assert prop(day, "toHour") == 18
+
+    # a bar that starts before the window is clipped to it, not dropped
+    view.setProperty("fromHour", 0)
+    await _wait(lambda: len(prop(day, "lanes") or []) == 3)
+
+
+async def test_the_fleet_grid_groups_by_department(gui):
+    """The table is the default answer; the grid is for when a table stops being scannable, and it
+    says one thing per machine because that is all that survives at this size."""
+    win, bridge = gui
+    win.setProperty("view", "machines")
+    view = win.findChild(QObject, "machinesView")
+    grid = win.findChild(QObject, "machinesGrid")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "machines") or []) == 2)
+    view.setProperty("look", "grid")
+    groups = prop(grid, "groups")
+    assert [g["name"] for g in groups] == ["Operations"]
+    assert [m["host"] for m in groups[0]["machines"]] == ["OPS-01", "OPS-02"]
+
+
+def test_the_session_banner_empties_as_the_clock_runs(gui):
+    """One row, only when you are actually inside somebody's machine, with a real bar for the clock --
+    not a stripe, and not a picture of one moment."""
+    win, _ = gui
+    banner = win.findChild(QObject, "sessionBanner")
+    assert banner is not None
+    assert banner.property("visible") is False          # nothing is held, so it is not there
+
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+    banner.setProperty("since", (now - timedelta(minutes=10)).isoformat())
+    banner.setProperty("until", (now + timedelta(minutes=10)).isoformat())
+    assert 0.4 < prop(banner, "remaining") < 0.6       # halfway through
+    assert 9 <= prop(banner, "minutes") <= 11

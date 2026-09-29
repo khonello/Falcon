@@ -11,6 +11,9 @@ Item {
     property var violations: []
     property bool loaded: false
     property var chosen: null
+    property string look: "list"          // list | grid | day
+    property var day: []                  // hierarchy.sessions_today
+    property int fromHour: 0
 
     // one place decides what a machine's state is, so every page agrees
     readonly property var machines: {
@@ -52,12 +55,20 @@ Item {
         falcon.call("hierarchy.tree", {}, function (ok, r) { root.loaded = true; if (ok) root.tree = r.departments })
         falcon.call("updates.rollout_health", {}, function (ok, r) { if (ok) root.rollout = r })
         falcon.call("resource.violations", {}, function (ok, r) { if (ok) root.violations = r.violations || [] })
+        if (look === "day") loadDay()
+    }
+    function loadDay() {
+        falcon.call("hierarchy.sessions_today", { hours: 24 }, function (ok, r) {
+            if (ok) root.day = r.sessions || []
+        })
     }
     Connections {
         target: falcon
         function onConnected() { root.refresh() }
         function onDisconnected() { root.tree = []; root.loaded = false }
     }
+    // the day is fetched when it is first looked at, however the look was changed
+    onLookChanged: if (look === "day" && day.length === 0) loadDay()
     Component.onCompleted: if (falcon.isConnected) refresh()
 
     Column {
@@ -70,6 +81,22 @@ Item {
             title: "Machines"
             subtitle: root.machines.length + " client PCs"
                       + (root.needing > 0 ? " \u00b7 " + root.needing + " need someone" : "")
+            Segmented {
+                objectName: "machinesLook"
+                anchors.verticalCenter: parent.verticalCenter
+                value: root.look
+                options: [{ value: "list", label: "List" }, { value: "grid", label: "Grid" },
+                          { value: "day", label: "Day" }]
+                onPicked: function (v) { root.look = v; if (v === "day") root.loadDay() }
+            }
+            Segmented {
+                objectName: "daySpan"
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.look === "day"
+                value: root.fromHour
+                options: [{ value: 0, label: "24 hours" }, { value: 6, label: "6 to 6" }]
+                onPicked: function (v) { root.fromHour = v }
+            }
             Btn { objectName: "registerMachine"; kind: "primary"; iconName: "plus"; text: "Register"
                   onClicked: reg.open() }
         }
@@ -82,10 +109,32 @@ Item {
             border.width: 1
             border.color: Theme.split
 
+            FleetGrid {
+                objectName: "machinesGrid"
+                anchors.fill: parent
+                anchors.margins: Theme.s4
+                visible: root.look === "grid"
+                machines: root.machines
+                onChose: function (m) { root.chosen = m; detail.open() }
+            }
+
+            DayTimeline {
+                objectName: "machinesDay"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Theme.s4
+                visible: root.look === "day"
+                sessions: root.day
+                fromHour: root.fromHour
+                toHour: root.fromHour === 6 ? 18 : 24
+            }
+
             Table {
                 objectName: "machinesTable"
                 anchors.fill: parent
                 anchors.margins: Theme.s1
+                visible: root.look === "list"
                 loading: !root.loaded
                 pageSize: 12
                 rows: root.machines

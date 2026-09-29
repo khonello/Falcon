@@ -142,9 +142,32 @@ ApplicationWindow {
                 }
             }
 
+            // --- you are inside somebody's machine, and only then --------------------------------
+            SessionBanner {
+                id: banner
+                objectName: "sessionBanner"
+                anchors.top: header.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                visible: falcon.traversing
+                session: falcon.session
+                until: falcon.session && falcon.session.deadline_at ? falcon.session.deadline_at : ""
+                since: falcon.session && falcon.session.entered_at ? falcon.session.entered_at : ""
+                onLeave: falcon.call("hierarchy.end_session",
+                                     { session_id: falcon.session.session_id }, function (ok, r) {
+                    if (!ok) { Msg.failed(r && r.message ? r.message : "Still inside"); return }
+                    Msg.ok("Left")
+                })
+                onExtend: falcon.call("hierarchy.extend_session",
+                                      { session_id: falcon.session.session_id }, function (ok, r) {
+                    if (!ok) { Msg.failed(r && r.message ? r.message : "Not extended"); return }
+                    Msg.ok("Extended")
+                })
+            }
+
             // --- the content -----------------------------------------------------------------------
             Item {
-                anchors.top: header.bottom
+                anchors.top: banner.visible ? banner.bottom : header.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom

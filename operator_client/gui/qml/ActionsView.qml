@@ -139,32 +139,13 @@ Item {
             elide: Text.ElideNone
         }
 
-        Rectangle {
+        ScriptPanel {
+            objectName: "actionScript"
             width: parent.width
             visible: root.chosen && root.chosen.script !== ""
-            height: Math.min(240, body.contentHeight + 2 * Theme.s2)
-            radius: Theme.radius
-            color: Theme.fill
-            border.width: 1
-            border.color: Theme.split
-            Flickable {
-                anchors.fill: parent
-                anchors.margins: Theme.s2
-                contentHeight: body.contentHeight
-                clip: true
-                TextEdit {
-                    id: body
-                    objectName: "actionScript"
-                    width: parent.width
-                    readOnly: true
-                    selectByMouse: true
-                    wrapMode: TextEdit.NoWrap
-                    font.family: Theme.mono
-                    font.pixelSize: Theme.fSmall
-                    color: Theme.ink
-                    text: root.chosen ? root.chosen.script : ""
-                }
-            }
+            readOnly: true
+            language: root.chosen ? root.chosen.language : "python"
+            text: root.chosen ? root.chosen.script : ""
         }
 
         Alert {

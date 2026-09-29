@@ -26,6 +26,7 @@ Modal {
     property bool busy: false
     property string problem: ""
     property var scriptProblems: []
+    property bool reviewed: false
 
     readonly property bool custom: kind === "custom"
     readonly property var typeOptions: {
@@ -86,6 +87,7 @@ Modal {
         if (!custom || script.trim() === "") { scriptProblems = []; return }
         var r = falcon.validateScript(language, script)
         scriptProblems = r.ok ? [] : r.problems
+        reviewed = true
     }
 
     function submit() {
@@ -204,15 +206,15 @@ Modal {
         required: true
         hint: "The standard library and what Windows already has. Nothing installed, nothing fetched."
         problem: root.tried ? root.scriptProblem : ""
-        Area {
+        ScriptPanel {
             id: scriptArea
             objectName: "actionScriptEditor"
             width: parent.width
-            implicitHeight: 160
-            font.family: Theme.mono
-            font.pixelSize: Theme.fSmall
-            placeholderText: "import os, shutil"
-            onTextChanged: { root.script = text; root.scriptProblems = [] }
+            language: root.language
+            problems: root.scriptProblems
+            checked: root.reviewed
+            onTextChanged: { root.script = text; root.scriptProblems = []; root.reviewed = false }
+            onCheck: root.check()
         }
     }
 
@@ -245,19 +247,6 @@ Modal {
     }
 
     footer: [
-        Btn {
-            objectName: "checkScript"
-            text: "Check"
-            visible: root.custom && !root.busy
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: cancel.left
-            anchors.rightMargin: Theme.s2
-            onClicked: {
-                root.check()
-                root.tried = true
-                if (root.scriptProblems.length === 0 && root.script.trim() !== "") Msg.ok("Script reads clean")
-            }
-        },
         Btn {
             id: cancel
             text: "Cancel"

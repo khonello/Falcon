@@ -138,6 +138,14 @@ Item {
             ] : []
         }
 
+        FlowGraph {
+            width: parent.width
+            visible: root.chosen !== null
+            source: root.chosen && root.chosen.flow ? (root.chosen.flow.source_hostname || "") : ""
+            sourcePath: root.chosen ? root.chosen.fromPath : ""
+            destinations: root.chosen && root.chosen.flow ? (root.chosen.flow.destinations || []) : []
+        }
+
         Txt {
             width: parent.width
             text: "Where it lands"
@@ -170,16 +178,7 @@ Item {
                         }
                         Txt {
                             width: parent.width
-                            visible: text !== ""
-                            text: modelData.suggestion || ""
-                            tone: "danger"
-                            font.pixelSize: Theme.fSmall
-                            wrapMode: Text.WordWrap
-                            elide: Text.ElideNone
-                        }
-                        Txt {
-                            width: parent.width
-                            visible: !modelData.suggestion && modelData.last_sync
+                            visible: !!modelData.last_sync
                             text: modelData.last_sync ? "last copied " + Task.when(modelData.last_sync.synced_at)
                                                       : ""
                             tone: "quiet"
