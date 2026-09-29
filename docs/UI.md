@@ -203,6 +203,13 @@ Stated once, so no screen invents its own.
     deadline, a name that already exists, more than one task in one sentence — is a `warn` or `danger`
     alert at the top, in the words of what it means, not the name of the flag.
 
+15. **When the Engine has written the sentence, the console says that sentence.** A stopped flow's
+    suggestion, a refused act's message, a deviation's reason: they are already written once, on the
+    server, in words chosen for a person. The UI renders them. It does not paraphrase them, map them
+    to its own copy, or reduce them to a status word — the word goes in the `Tag`, the sentence goes
+    beside it. A refusal a person can answer (a destination that already holds files) becomes rule 4's
+    confirm, carrying the Engine's own line inside the cost.
+
 ---
 
 ## What stays custom

@@ -76,6 +76,31 @@ ANSWERS = {
         "version": {"version_string": "1.4.2"},
         "pcs_behind": [{"pc_id": 6, "hostname": "OPS-06", "escalated": False, "version": "1.4.1"},
                        {"pc_id": 22, "hostname": "LOG-02", "escalated": True, "version": "1.4.0"}]},
+    "flow.list": {"flows": [
+        {"id": 1, "source_pc_id": 1, "source_hostname": "OPS-01", "source_path": "C:/work/payroll",
+         "status": "active", "pause_reason": None, "consent_status": "not_required", "stages": [],
+         "destinations": [
+             {"id": 1, "destination_pc_id": 11, "destination_hostname": "FIN-01",
+              "destination_path": "C:/shared/payroll", "suggestion": None,
+              "last_sync": {"synced_at": "2026-09-29T12:40:00+00:00"}}]},
+        {"id": 2, "source_pc_id": 7, "source_hostname": "OPS-07", "source_path": "C:/reports/weekly",
+         "status": "paused", "pause_reason": "destination:path_missing", "consent_status": "granted",
+         "stages": [], "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else.",
+         "destinations": [
+             {"id": 2, "destination_pc_id": 21, "destination_hostname": "LOG-01",
+              "destination_path": "D:/handover/weekly",
+              "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else.",
+              "last_sync": None},
+             {"id": 3, "destination_pc_id": None, "destination_hostname": None,
+              "destination_path": "//archive/weekly", "suggestion": None, "last_sync": None}]},
+        {"id": 3, "source_pc_id": 3, "source_hostname": "OPS-03", "source_path": "C:/intake",
+         "status": "paused", "pause_reason": "consent:pending", "consent_status": "pending",
+         "stages": [], "destinations": [
+             {"id": 4, "destination_pc_id": 12, "destination_hostname": "FIN-02",
+              "destination_path": "C:/intake", "suggestion": None, "last_sync": None}]},
+    ]},
+    "flow.pause": {}, "flow.resume": {}, "flow.delete": {},
+    "flow.create": {"flow": {"id": 9}, "consent_pending": False, "collisions_confirmed": []},
     "task.list": {"tasks": [
         {"id": 1, "description_raw": "Reconcile the Q3 invoices", "assignee_name": "R. Mensah",
          "assigner_name": "You", "status": "in_progress", "verification_mode": "stack",

@@ -144,6 +144,9 @@ antd has no vocabulary for these; they are built in the same language, from the 
    the same modal, and `task.create` only fires from there. Not yet built: editing a proposed item
    by hand (the linked `used_with_file` index makes removal unsafe), so the assigner's choices are
    keep the stack, drop a deadline, or say nothing is checked.*
+   *Flows done — table, drawer, pause/resume/retire, and a create form that is source + destinations
+   and nothing else. No stage editor: the JSON shapes of a Flow stage's `config` are on the deferred
+   list (spec §10), so branch/transform/categorize wait for that decision, not for the UI.*
 6. **The rest**: Assistance, Resources, Reports, Rollout, Overview, Settings.
 7. **The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.
 

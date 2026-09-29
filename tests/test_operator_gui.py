@@ -19,6 +19,7 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 from PySide6.QtCore import QMetaObject, QObject, Qt
 from PySide6.QtQml import QJSValue
 
+from common.connection import EngineError
 from operator_client.core import LocalConfig
 from operator_client.gui.app import create
 
@@ -60,6 +61,21 @@ PROPOSAL = {
 }
 
 
+FLOWS = [
+    {"id": 1, "source_hostname": "OPS-01", "source_path": "C:/work/payroll", "status": "active",
+     "pause_reason": None, "consent_status": "not_required", "stages": [],
+     "destinations": [{"id": 1, "destination_hostname": "FIN-01",
+                       "destination_path": "C:/shared/payroll", "suggestion": None, "last_sync": None}]},
+    {"id": 2, "source_hostname": "OPS-07", "source_path": "C:/reports", "status": "paused",
+     "pause_reason": "destination:path_missing", "consent_status": "granted", "stages": [],
+     "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else.",
+     "destinations": []},
+    {"id": 3, "source_hostname": "OPS-03", "source_path": "C:/intake", "status": "paused",
+     "pause_reason": "consent:pending", "consent_status": "pending", "stages": [],
+     "destinations": []},
+]
+
+
 class _Identity:
     client_id, account_id, role, pc_id, department_id = "test", 1, "super_user", 1, 1
 
@@ -81,6 +97,15 @@ class _Connection:
             return PROPOSAL
         if type_ == "task.create":
             return {"task": {"id": 5}}
+        if type_ == "flow.list":
+            return {"flows": FLOWS}
+        if type_ == "flow.create":
+            # the Engine refuses a destination that already holds files, unless it is confirmed
+            if not payload.get("confirm_collisions"):
+                raise EngineError("conflict", "destination path collides with existing content: "
+                                              "D:/handover (3 files) -- change the path or pass "
+                                              "confirm_collisions=true", type_)
+            return {"flow": {"id": 9}, "consent_pending": False, "collisions_confirmed": []}
         if type_ == "audit.recent":
             return {"entries": AUDIT}
         if type_ == "hierarchy.tree":
@@ -321,3 +346,47 @@ async def test_nothing_to_check_has_to_be_said_on_purpose(gui):
     payload = [p for t, p in bridge.conn.seen if t == "task.create"][-1]
     assert payload["verification_mode"] == "none" and payload["confirm_none"] is True
     assert "items" not in payload and "final_deadline_at" not in payload
+
+
+async def test_a_stopped_flow_says_the_engine_s_own_sentence(gui):
+    """The Engine already writes the suggestion for a failure; the console never invents its own, and
+    a flow still waiting on consent is amber, not red -- nobody has done anything wrong."""
+    win, bridge = gui
+    win.setProperty("view", "flows")
+    view = win.findChild(QObject, "flowsView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 3)
+    rows = {r["flow_id"]: r for r in prop(view, "rows")}
+    assert rows[1]["stateWord"] == "running" and rows[1]["stateTone"] == ""
+    assert rows[2]["stateWord"] == "stopped" and rows[2]["stateTone"] == "danger"
+    assert rows[2]["line"] == FLOWS[1]["suggestion"]
+    assert rows[3]["stateWord"] == "waiting" and rows[3]["stateTone"] == "warn"
+    assert prop(view, "stopped") == 1
+
+
+async def test_a_destination_that_already_holds_files_is_a_question(gui):
+    """The Engine refuses that once and says so; the console turns the refusal into the cost, and only
+    a person's answer sends it again with the confirm."""
+    win, bridge = gui
+    win.setProperty("view", "flows")
+    modal = win.findChild(QObject, "newFlowModal")
+    confirm = win.findChild(QObject, "collisionConfirm")
+    assert modal is not None and confirm is not None
+    bridge.connected.emit()
+
+    modal.setProperty("visible", True)
+    modal.setProperty("sourcePcId", 1)
+    modal.setProperty("sourcePath", "C:/work/payroll")
+    modal.setProperty("targets", [{"pc_id": 21, "path": "D:/handover"}])
+    assert prop(modal, "valid") is True
+
+    QMetaObject.invokeMethod(modal, "create")
+    await _wait(lambda: confirm.property("visible") is True)
+    assert "not backed up" in prop(confirm, "cost") or "files in that folder" in prop(confirm, "cost")
+    sent = [p for t, p in bridge.conn.seen if t == "flow.create"]
+    assert len(sent) == 1 and "confirm_collisions" not in sent[0]   # refused, and not retried on its own
+
+    QMetaObject.invokeMethod(modal, "createAnyway")   # what the confirm does
+    await _wait(lambda: len([p for t, p in bridge.conn.seen if t == "flow.create"]) == 2)
+    assert [p for t, p in bridge.conn.seen if t == "flow.create"][-1]["confirm_collisions"] is True
