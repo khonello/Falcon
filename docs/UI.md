@@ -60,6 +60,16 @@ Ant Design ships six status hues (blue, green, orange, red, purple, cyan) and us
 two**, plus three weights of ink, plus the accent for things you can click. Green is not used at all: a
 machine that is fine is quiet, not green. **A screen where nothing is wrong is entirely grey.**
 
+**The one exception: a chart whose job is telling kinds apart.** The day timeline distinguishes four
+things — at their own machine, an Admin entered, you entered, assisted by consent — and three greys
+cannot do that at a glance. So it uses grey for the ordinary case (most of the chart) and a hue per kind
+of entry, each named in its legend. Nothing else on a page may do this; if a second chart needs it, it
+needs a reason of the same weight.
+
+**Cards are filled, not outlined.** An empty white box on a white page is a line drawing of nothing:
+figures and summaries sit on `#fafafa` with no border. The outline is kept for a card that holds a form
+or a chart, where a fill would fight its contents.
+
 ---
 
 ## The shell
@@ -116,6 +126,9 @@ Every page is reachable from the sider. No page is reachable only by clicking a 
 
 Stated once, so no screen invents its own.
 
+0. **Label and value read down one column**, label left and value right, with hairline dividers — never
+   antd's two-column bordered grid, which makes you hunt for which value belongs to which label. Past
+   about six facts, group them under plain headings.
 1. **A row opens a `Drawer`** from the right for detail. A subject with its own workspace (a task, a
    flow, an automation) opens a **page** instead, with the breadcrumb growing.
 2. **The primary action is top-right** of the page header, and there is exactly one.
@@ -153,7 +166,7 @@ antd has no vocabulary for these, and they are the product:
 | **Fleet view** | a department's machines at a glance, 4 to 240 | `Table` by default; a compact grid as a second view |
 | **Flow graph** | source → transforms → destinations, and where it broke | custom, in the flow's detail page |
 | **Hierarchy** | department → Admin → machine | antd `Tree` where it is a list; custom only if a picture earns it |
-| **Session banner** | you are inside someone's machine, and for how long | `Alert` banner with a countdown |
+| **Session banner** | you are inside someone's machine, and for how long | a slim strip — three treatments drawn in the kit, one to pick |
 | **Machine cell** | a machine's state inside a table row | `Badge` + hostname + a reason |
 
 The rule for all of them: **use the antd component unless it genuinely cannot say the thing.** A table
