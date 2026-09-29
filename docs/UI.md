@@ -27,7 +27,7 @@ reason, and they change in one file (`Theme.qml`).
 
 | | Value | Where |
 |---|---|---|
-| Primary | one accent, chosen from the kit's three candidates | **interaction only**: primary buttons, links, the selected menu entry, focus rings. Never status |
+| Primary | `#1677ff` — Ant blue, chosen 29 Sep 2026 | **interaction only**: primary buttons, links, the selected menu entry, focus rings. Never status |
 | Will need someone | `#d48806` | a version behind, waiting for a yes. Rare |
 | Needs someone now | `#cf1322` | a file out of place, an update past the limit, a machine you are holding. Rarer |
 | Text | `rgba(0,0,0,0.88)` primary · `0.65` secondary · `0.45` tertiary · `0.25` disabled | |
