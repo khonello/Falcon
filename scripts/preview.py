@@ -82,8 +82,58 @@ ANSWERS = {
     ]},
     "updates.rollout_health": {
         "version": {"version_string": "1.4.2"},
-        "pcs_behind": [{"pc_id": 6, "hostname": "OPS-06", "escalated": False, "version": "1.4.1"},
-                       {"pc_id": 22, "hostname": "LOG-02", "escalated": True, "version": "1.4.0"}]},
+        "departments": [{"department_id": 1, "name": "Operations", "on_current": 6, "total": 7},
+                        {"department_id": 3, "name": "Logistics", "on_current": 1, "total": 2}],
+        "pcs_behind": [{"pc_id": 6, "hostname": "OPS-06", "department_id": 1,
+                        "department_name": "Operations", "escalated": False, "version": "1.4.1"},
+                       {"pc_id": 22, "hostname": "LOG-02", "department_id": 3,
+                        "department_name": "Logistics", "escalated": True, "version": "1.4.0"}]},
+    "reports.list": {"reports": [
+        {"id": 1, "category": "resource_violation", "source_table": "resource_violations",
+         "source_id": 1, "generated_at": "2026-09-29T10:02:00+00:00", "addressed_at": None},
+        {"id": 2, "category": "flow_failure", "source_table": "flow_destinations", "source_id": 2,
+         "generated_at": "2026-09-29T08:44:00+00:00", "addressed_at": "2026-09-29T09:10:00+00:00"},
+        {"id": 3, "category": "listener_report", "source_table": "message_channels", "source_id": 4,
+         "generated_at": "2026-09-28T16:20:00+00:00", "addressed_at": None},
+        {"id": 4, "category": "update_status", "source_table": "pc_version_status", "source_id": 9,
+         "generated_at": "2026-09-28T09:05:00+00:00", "addressed_at": None},
+    ]},
+    "reports.addressed_view": {"views": [
+        {"report_id": 2, "category": "flow_failure", "addressed_by_name": "K. Boateng",
+         "department_name": "Finance", "addressed_at": "2026-09-29T09:10:00+00:00"},
+    ]},
+    "reports.mark": {"view_id": 1},
+    "resource.shelves": {"shelves": [
+        {"folder": "Resources/Admin", "tag": "admin", "files": 42},
+        {"folder": "Resources/Restricted", "tag": "restricted", "files": 17},
+        {"folder": "Resources/Department", "tag": "worker_dept", "files": 310},
+        {"folder": "Resources/Common", "tag": "common", "files": 1204},
+    ]},
+    "resource.resolve": {},
+    "assistance.ping_status": {"pings": [
+        {"ping_id": 5, "from_name": "Kojo", "count": 2},
+    ]},
+    "assistance.channels": {"channels": [
+        {"id": 1, "initiator_account_id": 21, "superior_account_id": 1, "turn": "superior",
+         "initiator_name": "Ama", "opened_at": "2026-09-29T09:40:00+00:00", "closed_at": None},
+        {"id": 2, "initiator_account_id": 22, "superior_account_id": 1, "turn": "sender",
+         "initiator_name": "Efua", "opened_at": "2026-09-28T14:05:00+00:00", "closed_at": None},
+        {"id": 3, "initiator_account_id": 23, "superior_account_id": 1, "turn": "sender",
+         "initiator_name": "Yaw", "opened_at": "2026-09-27T11:00:00+00:00",
+         "closed_at": "2026-09-27T11:40:00+00:00"},
+    ]},
+    "assistance.channel": {
+        "channel": {"id": 1, "turn": "superior", "superior_account_id": 1},
+        "superior_account_id": 1,
+        "messages": [
+            {"id": 1, "sender_account_id": 21, "body": "The payroll folder will not open on OPS-07."},
+            {"id": 2, "sender_account_id": 1, "body": "Which error does it give you?"},
+            {"id": 3, "sender_account_id": 21, "body": "Access denied, straight away."},
+        ]},
+    "assistance.my_listeners": {"listeners": []},
+    "assistance.message": {"message_id": 9, "turn": "sender"},
+    "assistance.respond": {"channel_id": 4, "opened": True},
+    "assistance.close_channel": {"channel_id": 1, "closed": True},
     "control.action_list": {
         "builtin": {
             "screenshot": {"category": "control", "params": []},
@@ -205,7 +255,10 @@ ANSWERS = {
                                             "6a8c0e2f4b6d8a0c2e4f60718293a4b5"},
     "resource.violations": {"violations": [
         {"violation_id": 1, "found_on_pc_id": 7, "hostname": "OPS-07", "filename": "budget-2026.xlsx",
-         "resource_tag": "restricted"}]},
+         "resource_tag": "restricted", "detected_at": "2026-09-29T10:02:00+00:00", "resolved_at": None},
+        {"violation_id": 2, "found_on_pc_id": 2, "hostname": "OPS-02", "filename": "salaries.csv",
+         "resource_tag": "admin", "detected_at": "2026-09-26T15:12:00+00:00",
+         "resolved_at": "2026-09-26T16:00:00+00:00"}]},
 }
 
 

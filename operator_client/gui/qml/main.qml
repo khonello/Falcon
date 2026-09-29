@@ -187,14 +187,34 @@ ApplicationWindow {
                     visible: shell.view === "actions"
                 }
 
+                AssistanceView {
+                    objectName: "assistanceView"
+                    anchors.fill: parent
+                    visible: shell.view === "assistance"
+                }
+                ResourcesView {
+                    objectName: "resourcesView"
+                    anchors.fill: parent
+                    visible: shell.view === "resources"
+                }
+                ReportsView {
+                    objectName: "reportsView"
+                    anchors.fill: parent
+                    visible: shell.view === "reports"
+                }
+                RolloutView {
+                    objectName: "rolloutView"
+                    anchors.fill: parent
+                    visible: shell.view === "rollout"
+                }
+
                 // every other area, until its page is built
                 Empty {
-                    visible: ["record", "machines", "departments", "tasks", "flows",
-                              "automation", "actions"].indexOf(shell.view) < 0
+                    visible: ["overview", "people", "settings"].indexOf(shell.view) >= 0
                     anchors.centerIn: parent
                     width: 360
                     text: "Not built yet"
-                    hint: "Seven pages are built. The rest follow, in the order in docs/UI-COMPONENTS.md."
+                    hint: "Overview, People and Settings are the last three. The rest follow, in the order in docs/UI-COMPONENTS.md."
                 }
             }
         }

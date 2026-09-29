@@ -103,6 +103,25 @@ EVENTS = [
 ]
 
 
+CHANNELS = [
+    # account 1 is the viewer (the _Identity below), and it is the superior on both
+    {"id": 1, "initiator_account_id": 21, "superior_account_id": 1, "turn": "superior",
+     "initiator_name": "Ama", "opened_at": "2026-09-29T09:40:00+00:00", "closed_at": None},
+    {"id": 2, "initiator_account_id": 22, "superior_account_id": 1, "turn": "sender",
+     "initiator_name": "Efua", "opened_at": "2026-09-28T14:05:00+00:00", "closed_at": None},
+    {"id": 3, "initiator_account_id": 23, "superior_account_id": 1, "turn": "sender",
+     "initiator_name": "Yaw", "opened_at": "2026-09-27T11:00:00+00:00",
+     "closed_at": "2026-09-27T11:40:00+00:00"},
+]
+
+REPORTS = [
+    {"id": 1, "category": "resource_violation", "source_table": "resource_violations",
+     "source_id": 1, "generated_at": "2026-09-29T10:02:00+00:00", "addressed_at": None},
+    {"id": 2, "category": "flow_failure", "source_table": "flow_destinations", "source_id": 2,
+     "generated_at": "2026-09-29T08:44:00+00:00", "addressed_at": "2026-09-29T09:10:00+00:00"},
+]
+
+
 class _Identity:
     client_id, account_id, role, pc_id, department_id = "test", 1, "super_user", 1, 1
 
@@ -133,6 +152,18 @@ class _Connection:
                                                 "threshold.cpu": "polled"}}
         if type_ == "control.event_history":
             return {"firings": []}
+        if type_ == "assistance.channels":
+            return {"channels": CHANNELS}
+        if type_ == "assistance.ping_status":
+            return {"pings": [{"ping_id": 5, "from_name": "Kojo", "count": 2}]}
+        if type_ == "resource.shelves":
+            return {"shelves": [{"folder": "Resources/Admin", "tag": "admin", "files": 1}]}
+        if type_ == "reports.list":
+            return {"reports": REPORTS}
+        if type_ == "reports.addressed_view":
+            return {"views": []}
+        if type_ == "updates.current":
+            return {}
         if type_ == "flow.create":
             # the Engine refuses a destination that already holds files, unless it is confirmed
             if not payload.get("confirm_collisions"):
@@ -148,7 +179,16 @@ class _Connection:
             return {"version": {"version_string": "1.4.2"},
                     "pcs_behind": [{"pc_id": 2, "hostname": "OPS-02", "escalated": True}]}
         if type_ == "resource.violations":
-            return {"violations": [{"found_on_pc_id": 1, "hostname": "OPS-01"}]}
+            # the second one is on a PC outside this tree, so it is a Resources row and not a
+            # Machines state -- which is exactly how the two pages differ
+            return {"violations": [
+                {"violation_id": 1, "found_on_pc_id": 1, "hostname": "OPS-01",
+                 "filename": "budget-2026.xlsx", "resource_tag": "restricted",
+                 "detected_at": "2026-09-29T10:02:00+00:00", "resolved_at": None},
+                {"violation_id": 2, "found_on_pc_id": 99, "hostname": "OPS-09",
+                 "filename": "salaries.csv", "resource_tag": "admin",
+                 "detected_at": "2026-09-26T15:12:00+00:00",
+                 "resolved_at": "2026-09-26T16:00:00+00:00"}]}
         return {}
 
     async def close(self) -> None:
@@ -509,3 +549,73 @@ async def test_a_drawer_leaves_with_the_page_that_opened_it(gui):
 
     win.setProperty("view", "tasks")
     _spin(lambda: drawer.property("visible") is False)     # it slides out, so turn the loop
+
+
+async def test_a_channel_says_whose_turn_it_is(gui):
+    """A Message Channel takes turns, and the Engine sends the turn as a word plus the two parties --
+    the console works out whose it is rather than waiting for a field that does not exist."""
+    win, bridge = gui
+    win.setProperty("view", "assistance")
+    view = win.findChild(QObject, "assistanceView")
+    reply = win.findChild(QObject, "replyBox")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 3)
+    rows = {r["channel_id"]: r for r in prop(view, "rows")}
+    assert rows[1]["stateWord"] == "your turn" and rows[1]["stateTone"] == "warn"
+    assert rows[2]["stateWord"] == "waiting on them" and rows[2]["mineNow"] is False
+    assert rows[3]["stateWord"] == "closed" and rows[3]["open"] is False
+    assert prop(view, "waiting") == 1
+
+    # the turn is the state of the box, not a sentence about a rule
+    view.setProperty("chosen", rows[2])
+    assert reply.property("enabled") is False
+    view.setProperty("chosen", rows[1])
+    assert reply.property("enabled") is True
+
+
+async def test_a_file_on_the_wrong_shelf_is_the_only_red_on_resources(gui):
+    """Which shelf a file sits on is who may have it, so a violation is a file on the wrong shelf --
+    and one already sorted is neutral, because nobody has to do anything about it."""
+    win, bridge = gui
+    win.setProperty("view", "resources")
+    view = win.findChild(QObject, "resourcesView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 2)
+    rows = {r["file"]: r for r in prop(view, "rows")}
+    assert rows["budget-2026.xlsx"]["stateTone"] == "danger"
+    assert rows["budget-2026.xlsx"]["tier"] == "Named people only"
+    assert rows["salaries.csv"]["stateTone"] == "" and rows["salaries.csv"]["resolved"] is True
+    assert prop(view, "loose") == 1
+
+
+async def test_the_super_user_gets_no_addressed_column(gui):
+    """`addressed` is written to a separate table and is an Admin's act. The Super User sees every
+    report regardless of routing, so a state column there would always read "open" and mean nothing."""
+    win, bridge = gui
+    win.setProperty("view", "reports")
+    view = win.findChild(QObject, "reportsView")
+    table = win.findChild(QObject, "reportsTable")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 2)
+    assert prop(view, "boss") is True
+    assert [c["title"] for c in prop(table, "columns")] == ["What", "Written from", "When"]
+    assert prop(view, "rows")[0]["what"] == "A file turned up where it should not"
+
+
+async def test_the_gate_holds_while_anything_is_behind(gui):
+    """N and N+1, never more: the next version cannot be approved while a machine is still behind, so
+    the button is off and the page says why rather than letting the Engine refuse it."""
+    win, bridge = gui
+    win.setProperty("view", "rollout")
+    view = win.findChild(QObject, "rolloutView")
+    approve = win.findChild(QObject, "approveVersion")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 1)
+    assert prop(view, "clear") is False
+    assert approve.property("enabled") is False
+    row = prop(view, "rows")[0]
+    assert row["stateWord"] == "past the limit" and row["stateTone"] == "danger"

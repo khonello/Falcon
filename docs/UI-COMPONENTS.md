@@ -153,6 +153,10 @@ antd has no vocabulary for these; they are built in the same language, from the 
    is the same check the Engine and then the worker run again. No condition builder beyond what the
    Engine requires (a time event needs a time): `condition_spec`'s shape is deferred too.*
 6. **The rest**: Assistance, Resources, Reports, Rollout, Overview, Settings.
+   *Assistance, Resources, Reports and Rollout done. Overview, People and Settings are what is
+   left. Not built: `reports.routing_set` (deferred), tagging a file by hand (`resource.tag`),
+   `assistance.search` and `assistance.add_listener` from the UI — the drawer says Listeners
+   exist and how they work, but adding one still goes through the TUI.*
 7. **The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.
 
 Tests come back with step 2: `tests/test_operator_gui.py` was deleted with the old views, and the new

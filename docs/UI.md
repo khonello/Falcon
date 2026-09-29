@@ -220,6 +220,16 @@ Stated once, so no screen invents its own.
     the page's own visibility does not reach, so each one carries `page:` and closes when that page is
     left. Without it a detail panel sits over the next page as if it belonged there.
 
+18. **A rule is shown as the state of a control, not as a sentence about a rule.** The turn in a
+    Message Channel is whether the box can be typed into. The N+1 gate is whether *Approve next* is
+    enabled. The sentence is still there underneath, for the person who wants to know why — but the
+    control has already said it, and nobody has to read to find out what they may do.
+
+19. **What a role may see decides the columns, not only the rows.** The Super User sees every report
+    whatever the routing says, so they get no *addressed* column: it would always read "open" and mean
+    nothing. They get the View instead, which answers a different question — who addressed what — and
+    is structurally never a report.
+
 ---
 
 ## What stays custom

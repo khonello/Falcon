@@ -79,6 +79,10 @@ QtObject {
         if (name === "accent") return primarySoft
         return fill
     }
+    // "1 file", "4 files" -- said in one place so no page has to remember the s
+    function many(n, word, plural) {
+        return n + " " + (n === 1 ? word : (plural ? plural : word + "s"))
+    }
     function initials(name) {
         if (!name) return "?"
         var parts = String(name).replace(".", " ").split(" ").filter(function (p) { return p.length > 0 })
