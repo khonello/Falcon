@@ -171,6 +171,10 @@ Stated once, so no screen invents its own.
 6. **`Skeleton` while loading**, never a spinner over a blank page.
 7. **`message` for the result of something you did**; `notification` for something that arrived on its
    own (a ping, a report, a session blocked).
+7a. **An alert is one line** — an icon, what happened, and at most one act, all on that line. antd's
+   description block (a paragraph under the message) is never used: what would have gone there belongs
+   on the page the act opens. Three kinds only — red where somebody must act, amber where somebody will
+   have to, grey for everything else. **There is no blue alert and no green one: good news is grey.**
 8. **Status is a `Tag` or a `Badge`**, coloured from the status tokens, with the word always present —
    never colour alone.
 9. **Nothing typed that can be picked.** Folders, machines, people, actions, programs come from
