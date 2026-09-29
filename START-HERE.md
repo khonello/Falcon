@@ -34,14 +34,22 @@ service on every staff machine, with small windows when it has something to say)
 - **Engine** — 100 handlers, no stubs; 9 migrations; TLS with a pinned certificate, a master secret,
   per-client derived keys and a real challenge/response handshake; the file index, the audit trail, the
   scheduler and a local LLM for proposing task checks.
-- **Operator Client** — the full GUI (every page in the design, on one component kit) plus a TUI that
-  can drive the same handlers from a script.
+- **Operator Client** — a TUI that drives every handler from a script, and a GUI **being rebuilt**
+  (see below).
 - **Worker Client** — file watching with a polling fallback, idle detection, detached execution of 17
   built-in actions and custom scripts, flow relay, lockout, and five windows.
 - **184 tests pass**, `ruff` clean. Integration tests run the real handshake over a real socket.
 
 **What that means:** the product is real software, not a prototype. What it is not yet is a *product a
-stranger can install*.
+stranger can install*, and its console is mid-rebuild.
+
+**The UI, as of 29 Sep 2026.** The bespoke design built through Phase 7 was judged to fail as a product
+-- careful to look at, but not what a company recognises as the software it runs its IT on. It has been
+deleted. The console is being rebuilt in the **Ant Design idiom** (light, dense, tables and forms,
+familiar to anyone who has used an admin console), in the same PySide6/QML client over the same
+`FalconBridge`. `docs/UI.md` says what we are building; `docs/UI-COMPONENTS.md` is the build list in
+priority order. Until its first screen lands, `python -m operator_client --gui` says so and the **TUI
+is the working surface** -- it reaches every handler.
 
 ---
 
@@ -68,7 +76,7 @@ fixed. Phase 8.
 
 ### 3. Some features are drawn but hollow
 
-Fifteen specific gaps, in `design/ENGINE-WORK.md`. The ones that would embarrass a demo:
+Fifteen specific gaps, in `docs/ENGINE-GAPS.md`. The ones that would embarrass a demo:
 
 - the Worker sends no OS signals, so automations on "a USB drive is plugged in" or "someone signs in"
   can be created but never fire (item 1);
@@ -91,28 +99,33 @@ Concretely, in this order:
 
 1. **Freeze and install.** `python -m engine setup` already prepares a machine from a clone; turn that
    into an installer, freeze the Worker (service + its two windows), and prove it on a clean machine.
-2. **Close the hollow features that the demo touches** — ENGINE-WORK items 1, 4, 5, 12, 14.
+2. **Close the hollow features that the demo touches** — ENGINE-GAPS items 1, 4, 5, 12, 14.
 3. **Run the day yourself**, write down what went wrong, fix that list.
-4. Then hardening and the rest of `ENGINE-WORK.md`.
+4. Then hardening and the rest of `docs/ENGINE-GAPS.md`.
+
+The console rebuild (`docs/UI.md`) runs alongside 1 and 2: the demo needs a window, and the first slice
+-- the shell and the Record page -- is what proves the new idiom before the other pages follow.
 
 ---
 
 ## The rabbit hole, named so we do not fall back in
 
 Phase 7 (the UI) ran long: 164 design boards, four rounds of mood boards, three rewrites of the same
-screens, and a documentation trail about the documentation. The design was approved on 27 Sep 2026 and
-every page was rebuilt to it on 28 Sep. **It is finished.**
+screens, and a documentation trail about the documentation. It produced a careful bespoke design, and
+on 29 Sep 2026 that design was judged to fail at the only thing that mattered -- looking like software
+a company runs its IT on. **It is deleted, and the lesson is the point:** we were designing a product
+identity when we needed a familiar tool.
 
 From here:
 
-- **No new design passes, no new boards, no mood boards.** The UI changes only when a real person hits
-  a real problem, and then only that screen.
-- **The board generators and the design-process record are deleted** (they are in git history if ever
-  needed: commit `1985766` and earlier). What survives is `design/PATTERNS.md` — the measured rules any
-  fixed screen must still follow — and `design/ENGINE-WORK.md`, which is a work list, not a design.
-- **`design/run_gui.py`** opens the app with sample data and no Engine, for looking at it;
-  `design/shot_gui.py` and `design/shot_worker.py` do the same offscreen for screenshots. That is all
-  that is left of the design tooling, and it is enough.
+- **No bespoke design passes, no boards, no mood boards.** The console is built to an existing,
+  published design language (Ant Design), so the question "what should this look like" has an answer
+  we look up rather than invent.
+- **The old UI, its rulebook and its process record are deleted** -- 64 QML files, the design boards,
+  PATTERNS.md, the brief. All of it is in git history (commit `a91cca4` has the tree intact) if a
+  drawing is ever wanted again.
+- **`design/` is gone.** What survived moved: `docs/ENGINE-GAPS.md` (the fifteen real gaps) and
+  `scripts/shot_worker.py` (photographs the Worker's windows).
 
 ---
 
@@ -128,8 +141,9 @@ From here:
 | `implementation-spec.md` | how it is built; authoritative on architecture and security |
 | `database-schema.md` | every table and column, traced to the rule that demands it |
 | `system-ecosystem-synthesis.md` | one page a buyer can read |
-| `design/PATTERNS.md` | the UI rules, for fixing a screen |
-| `design/ENGINE-WORK.md` | the 15 known gaps between what the UI offers and what the Engine does |
+| `docs/UI.md` | what the console is being rebuilt into, and the rules that govern it |
+| `docs/UI-COMPONENTS.md` | the component build list, in priority order |
+| `docs/ENGINE-GAPS.md` | the 15 known gaps between what the UI offers and what the Engine does |
 
 `CLAUDE.md` is instructions for the coding agent, not documentation.
 
@@ -142,8 +156,9 @@ environ-engine\Scripts\Activate.ps1
 python -m engine setup          # .env, certificate, databases, schema, first Super User
 python -m engine                # run it
 
-environ-operator\Scripts\python.exe design\run_gui.py super_user   # the GUI, sample data, no Engine
-python -m operator_client --gui                                     # the GUI against a real Engine
+environ-operator\Scripts\Activate.ps1
+python -m operator_client --connect                      # the TUI -- the working surface today
+python -m operator_client --connect --script "tree; tasks"   # scripted, no terminal UI
 ```
 
 Full detail, including a real network: `docs/GETTING-STARTED.md`.

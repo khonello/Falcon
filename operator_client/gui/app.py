@@ -50,7 +50,13 @@ def create(config: LocalConfig, *, auto_connect: bool = False) -> tuple[QGuiAppl
     bridge.js_engine = engine          # QJSValue.engine() is not exposed by PySide6; results are converted through this
     engine.rootContext().setContextProperty("falcon", bridge)
     engine.rootContext().setContextProperty("autoConnect", auto_connect)
-    engine.load(QUrl.fromLocalFile(str(QML_DIR / "main.qml")))
+    main_qml = QML_DIR / "main.qml"
+    if not main_qml.exists():
+        # The console is being rebuilt to docs/UI.md (the Ant Design idiom). Until its first screen
+        # lands there is no window to open, and the TUI drives every handler in the meantime.
+        raise SystemExit("The GUI is being rebuilt (see docs/UI.md). "
+                         "Use the TUI meanwhile: python -m operator_client --connect")
+    engine.load(QUrl.fromLocalFile(str(main_qml)))
     if not engine.rootObjects():
         raise SystemExit("failed to load QML (see errors above)")
     win = engine.rootObjects()[0]

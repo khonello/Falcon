@@ -37,7 +37,7 @@ def main(out: str) -> None:
     for kind, spec in SPECS.items():
         path = out_dir / f"worker-{kind}.png"
         r = subprocess.run([sys.executable, "-m", "worker_client.windows", kind, json.dumps(spec), "--shot", str(path)],
-                           cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+                           cwd=ROOT, env=env, capture_output=True, text=True, timeout=60, check=False)
         print(kind, r.stdout.strip() or r.stderr.strip()[-400:])
 
 
