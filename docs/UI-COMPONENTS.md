@@ -1,7 +1,10 @@
 # The component build list
 
-Ant Design's inventory, in antd's own groups, with what each is for **in Falcon** and when we build it.
-`docs/UI.md` is why; this is what.
+Ant Design 6's inventory, in antd's own groups, with what each is for **in Falcon** and when we build
+it. `docs/UI.md` is why; this is what.
+
+Every row here is drawn live in the **Console Kit** page (real antd 6, Falcon's content) so it can be
+judged before it is built.
 
 **Priority**
 

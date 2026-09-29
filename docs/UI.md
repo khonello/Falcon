@@ -9,16 +9,20 @@ forms — so that nobody has to be taught it and nobody wonders whether it is re
 design was visually careful and commercially wrong: it read as a dashboard someone made rather than a
 tool a company runs on.
 
-**The idiom is Ant Design.** We are not shipping React, so we are not using antd's code — the client
-stays PySide6 + QML over `FalconBridge`. We take antd's **design language** (its tokens, its component
-inventory, its interaction conventions) and build those components in QML. `docs/UI-COMPONENTS.md` is
-the build list.
+**The idiom is Ant Design 6** (6.6.5 is current as of 29 Sep 2026). We are not shipping React, so we
+are not using antd's code — the client stays PySide6 + QML over `FalconBridge`. We take antd's **design
+language** (its tokens, its component inventory, its interaction conventions) and build those components
+in QML. `docs/UI-COMPONENTS.md` is the build list.
+
+**The kit is drawn before it is built.** Every component below exists as a live page rendered with real
+antd 6 and Falcon's own content, so it can be approved or changed before a line of QML is written. Ask
+for the Console Kit link; regenerate it from the same source if it is ever lost.
 
 ---
 
 ## Tokens
 
-Ant Design v5's defaults are the starting values. They are not sacred, but nothing changes without a
+Ant Design 6's defaults are the starting values. They are not sacred, but nothing changes without a
 reason, and they change in one file (`Theme.qml`).
 
 | | Value | Where |
