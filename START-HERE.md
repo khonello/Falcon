@@ -141,6 +141,7 @@ From here:
 | `implementation-spec.md` | how it is built; authoritative on architecture and security |
 | `database-schema.md` | every table and column, traced to the rule that demands it |
 | `system-ecosystem-synthesis.md` | one page a buyer can read |
+| `docs/design/super-user-reference.md`, `admin-reference.md`, `client-reference.md` | what each role can see and do, in one place — the source for what belongs on each page |
 | `docs/UI.md` | what the console is being rebuilt into, and the rules that govern it |
 | `docs/UI-COMPONENTS.md` | the component build list, in priority order |
 | `docs/ENGINE-GAPS.md` | the 15 known gaps between what the UI offers and what the Engine does |

@@ -85,6 +85,8 @@ Dark mode is a later token swap, not a second design.
 
 Every page is reachable from the sider. No page is reachable only by clicking a chart.
 
+**What belongs on each page** comes from the role references — `docs/design/super-user-reference.md`, `admin-reference.md` and `client-reference.md` — which list every capability each role has, gathered from the design documents. Build a page from its role's list, not from memory.
+
 ---
 
 ## Interaction rules
