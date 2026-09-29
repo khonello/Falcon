@@ -42,6 +42,24 @@ TREE = [
 ]
 
 
+TASKS = [
+    {"id": 1, "description_raw": "Reconcile the Q3 invoices", "assignee_name": "R. Mensah",
+     "assigner_name": "You", "status": "in_progress", "verification_mode": "stack",
+     "soft_deadline_at": None, "final_deadline_at": "2026-09-20T16:00:00+00:00"},
+    {"id": 2, "description_raw": "Walk the new starter through it", "assignee_name": "R. Mensah",
+     "assigner_name": "You", "status": "active", "verification_mode": "none",
+     "soft_deadline_at": None, "final_deadline_at": None},
+]
+
+PROPOSAL = {
+    "llm_available": True, "needs_assigner": True, "collisions": [], "proposed_split": [],
+    "flags": ["deadline_ambiguous"], "soft_deadline": None,
+    "final_deadline": "2026-10-03T16:00:00+00:00",
+    "items": [{"target_type": "file", "intent": "update", "name": "reconciliation.xlsx",
+               "path": None, "populated_by": "llm", "status": "pending"}],
+}
+
+
 class _Identity:
     client_id, account_id, role, pc_id, department_id = "test", 1, "super_user", 1, 1
 
@@ -57,6 +75,12 @@ class _Connection:
         self.seen.append((type_, payload))
         if type_ == "hierarchy.pc_register":
             return {"pc_id": 9, "client_id": "abc123", "client_key": "0f" * 32}
+        if type_ == "task.list":
+            return {"tasks": TASKS}
+        if type_ == "task.propose":
+            return PROPOSAL
+        if type_ == "task.create":
+            return {"task": {"id": 5}}
         if type_ == "audit.recent":
             return {"entries": AUDIT}
         if type_ == "hierarchy.tree":
@@ -227,3 +251,73 @@ async def test_registering_a_machine_is_one_form(gui):
     assert prop(modal, "done")["client_key"] == "0f" * 32
     assert prop(modal, "busy") is False and prop(modal, "problem") == ""
     assert prop(toast, "count") == 1               # "OPS-08 registered", said once
+
+
+async def test_a_task_that_is_past_its_deadline_says_so(gui):
+    """One place decides a task's state, and the only red on the page is a deadline that went by."""
+    win, bridge = gui
+    win.setProperty("view", "tasks")
+    view = win.findChild(QObject, "tasksView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 2)
+    rows = {r["what"]: r for r in prop(view, "rows")}
+    assert rows["Reconcile the Q3 invoices"]["stateWord"] == "late"
+    assert rows["Reconcile the Q3 invoices"]["stateTone"] == "danger"
+    assert rows["Walk the new starter through it"]["stateWord"] == "not started"
+    assert rows["Walk the new starter through it"]["checks"] == "nothing to check"
+    assert prop(view, "late") == 1
+
+
+async def test_a_proposal_is_read_before_it_is_committed(gui):
+    """Propose, never silently resolve: task.propose commits nothing, and the modal will not send
+    task.create until the assigner has seen what came back."""
+    win, bridge = gui
+    win.setProperty("view", "tasks")
+    modal = win.findChild(QObject, "newTaskModal")
+    assert modal is not None
+    bridge.connected.emit()
+
+    modal.setProperty("visible", True)
+    QMetaObject.invokeMethod(modal, "propose")          # nothing entered
+    assert prop(modal, "proposal") is None
+    assert "who" in prop(modal, "whoProblem")
+
+    modal.setProperty("assigneeId", 7)
+    modal.setProperty("description", "Reconcile the Q3 invoices in reconciliation.xlsx")
+    QMetaObject.invokeMethod(modal, "propose")
+    await _wait(lambda: prop(modal, "proposal") is not None)
+
+    sent = [t for t, _ in bridge.conn.seen]
+    assert "task.propose" in sent and "task.create" not in sent    # read first, commit second
+    assert prop(modal, "keepStack") is True
+
+    QMetaObject.invokeMethod(modal, "commit")
+    await _wait(lambda: any(t == "task.create" for t, _ in bridge.conn.seen))
+    payload = [p for t, p in bridge.conn.seen if t == "task.create"][-1]
+    assert payload["verification_mode"] == "stack" and len(payload["items"]) == 1
+    assert payload["final_deadline_at"] == "2026-10-03T16:00:00+00:00"
+    assert "confirm_none" not in payload
+
+
+async def test_nothing_to_check_has_to_be_said_on_purpose(gui):
+    """The Engine refuses verification_mode 'none' without an explicit confirm, and the console sends
+    that confirm only because a person picked it from the list."""
+    win, bridge = gui
+    win.setProperty("view", "tasks")
+    modal = win.findChild(QObject, "newTaskModal")
+    bridge.connected.emit()
+
+    modal.setProperty("visible", True)
+    modal.setProperty("assigneeId", 7)
+    modal.setProperty("description", "Walk the new starter through the console")
+    QMetaObject.invokeMethod(modal, "propose")
+    await _wait(lambda: prop(modal, "proposal") is not None)
+
+    modal.setProperty("keepStack", False)
+    modal.setProperty("keepFinal", False)
+    QMetaObject.invokeMethod(modal, "commit")
+    await _wait(lambda: any(t == "task.create" for t, _ in bridge.conn.seen))
+    payload = [p for t, p in bridge.conn.seen if t == "task.create"][-1]
+    assert payload["verification_mode"] == "none" and payload["confirm_none"] is True
+    assert "items" not in payload and "final_deadline_at" not in payload

@@ -197,6 +197,12 @@ Stated once, so no screen invents its own.
     the identifiers, the key in a selectable block, and *Copy key* where the submit button was. The
     `message` still fires, because the act did happen; it is the modal that waits.
 
+14. **Anything a model proposed is a page you have to read.** Never a filled-in form you can submit
+    without looking: the ask and the answer are two steps of the same modal, the second says *nothing
+    is saved yet*, and the commit button is on that page only. Whatever made it uncertain — a guessed
+    deadline, a name that already exists, more than one task in one sentence — is a `warn` or `danger`
+    alert at the top, in the words of what it means, not the name of the flag.
+
 ---
 
 ## What stays custom

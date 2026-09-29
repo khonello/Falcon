@@ -140,6 +140,10 @@ antd has no vocabulary for these; they are built in the same language, from the 
 4. ~~**One form end to end** — register a machine: `Modal` + `Form` + `Select` + validation + `message`.~~
    *done — and it grew a `Toast`, an `Alert`, and rule 13: a key shown once keeps the modal open.*
 5. **Tasks, Flows, Automation, Actions** — each a table, a detail, and its wizard.
+   *Tasks done — the proposal step is the rule made visible: `task.propose` fills a second page of
+   the same modal, and `task.create` only fires from there. Not yet built: editing a proposed item
+   by hand (the linked `used_with_file` index makes removal unsafe), so the assigner's choices are
+   keep the stack, drop a deadline, or say nothing is checked.*
 6. **The rest**: Assistance, Resources, Reports, Rollout, Overview, Settings.
 7. **The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.
 

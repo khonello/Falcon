@@ -164,13 +164,19 @@ ApplicationWindow {
                     visible: shell.view === "departments"
                 }
 
+                TasksView {
+                    objectName: "tasksView"
+                    anchors.fill: parent
+                    visible: shell.view === "tasks"
+                }
+
                 // every other area, until its page is built
                 Empty {
-                    visible: ["record", "machines", "departments"].indexOf(shell.view) < 0
+                    visible: ["record", "machines", "departments", "tasks"].indexOf(shell.view) < 0
                     anchors.centerIn: parent
                     width: 360
                     text: "Not built yet"
-                    hint: "Record, Machines and Departments are built. The rest follow, in the order in docs/UI-COMPONENTS.md."
+                    hint: "Record, Machines, Departments and Tasks are built. The rest follow, in the order in docs/UI-COMPONENTS.md."
                 }
             }
         }

@@ -1,3 +1,4 @@
 singleton Theme 1.0 Theme.qml
 singleton Icons 1.0 Icons.qml
 singleton Msg 1.0 Msg.qml
+singleton Task 1.0 Task.qml
