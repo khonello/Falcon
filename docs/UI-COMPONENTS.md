@@ -133,11 +133,12 @@ antd has no vocabulary for these; they are built in the same language, from the 
 
 ## Order of work
 
-1. **Tokens + shell** — `Theme.qml`, `Layout`, `Menu`, `Breadcrumb`, `Button`, `Typography`, `Icon`.
-2. **Table, and the Record page** — with sort, filters, a `RangePicker` and `Empty`. This is the proof
-   that the idiom works; nothing else starts until it looks like software a company buys.
-3. **Machines and Departments** — Table + Drawer + `Descriptions` + `Tag` + `MachineCell`.
-4. **One form end to end** — register a machine: `Modal` + `Form` + `Select` + validation + `message`.
+1. ~~**Tokens + shell** — `Theme.qml`, `Layout`, `Menu`, `Breadcrumb`, `Button`, `Typography`, `Icon`.~~ *done*
+2. ~~**Table, and the Record page** — with sort, filters, a `RangePicker` and `Empty`. This is the proof
+   that the idiom works; nothing else starts until it looks like software a company buys.~~ *done*
+3. ~~**Machines and Departments** — Table + Drawer + `Descriptions` + `Tag` + `MachineCell`.~~ *done*
+4. ~~**One form end to end** — register a machine: `Modal` + `Form` + `Select` + validation + `message`.~~
+   *done — and it grew a `Toast`, an `Alert`, and rule 13: a key shown once keeps the modal open.*
 5. **Tasks, Flows, Automation, Actions** — each a table, a detail, and its wizard.
 6. **The rest**: Assistance, Resources, Reports, Rollout, Overview, Settings.
 7. **The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.

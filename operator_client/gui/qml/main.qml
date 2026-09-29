@@ -176,6 +176,15 @@ ApplicationWindow {
         }
     }
 
+    // every `Msg` from anywhere in the console lands here, over everything, including a modal
+    Toast {
+        objectName: "toast"
+        parent: Overlay.overlay
+        anchors.fill: parent
+        anchors.topMargin: header.height          // it belongs under the title bar, not across it
+        z: 100
+    }
+
     // --- resizing, since there is no frame to grab ----------------------------------------------
     component Grip: MouseArea {
         property int edges: 0

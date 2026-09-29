@@ -70,7 +70,8 @@ Item {
             title: "Machines"
             subtitle: root.machines.length + " client PCs"
                       + (root.needing > 0 ? " \u00b7 " + root.needing + " need someone" : "")
-            Btn { objectName: "registerMachine"; kind: "primary"; iconName: "plus"; text: "Register" }
+            Btn { objectName: "registerMachine"; kind: "primary"; iconName: "plus"; text: "Register"
+                  onClicked: reg.open() }
         }
 
         Rectangle {
@@ -106,6 +107,13 @@ Item {
                 ]
             }
         }
+    }
+
+    RegisterMachine {
+        id: reg
+        objectName: "registerModal"
+        departments: root.tree
+        onRegistered: root.refresh()
     }
 
     Drawer {

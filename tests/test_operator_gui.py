@@ -16,7 +16,7 @@ import pytest
 pytest.importorskip("PySide6")
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QMetaObject, QObject, Qt
 from PySide6.QtQml import QJSValue
 
 from operator_client.core import LocalConfig
@@ -49,8 +49,14 @@ class _Identity:
 class _Connection:
     connected = True
 
+    def __init__(self) -> None:
+        self.seen: list[tuple[str, dict]] = []
+
     async def call(self, type_: str, payload: dict) -> dict:
         await asyncio.sleep(0)
+        self.seen.append((type_, payload))
+        if type_ == "hierarchy.pc_register":
+            return {"pc_id": 9, "client_id": "abc123", "client_key": "0f" * 32}
         if type_ == "audit.recent":
             return {"entries": AUDIT}
         if type_ == "hierarchy.tree":
@@ -179,3 +185,45 @@ def test_the_crumb_follows_the_view(gui):
     assert prop(win, "crumbs") == ["Falcon", "Record"]
     win.setProperty("view", "machines")
     assert prop(win, "crumbs") == ["Falcon", "Machines"]
+
+
+async def test_registering_a_machine_is_one_form(gui):
+    """The form says what is missing before the Engine is asked, and the key that comes back is shown
+    once -- so the modal has a second half rather than closing on success."""
+    win, bridge = gui
+    win.setProperty("view", "machines")
+    modal = win.findChild(QObject, "registerModal")
+    toast = win.findChild(QObject, "toast")
+    assert modal is not None and toast is not None
+    bridge.connected.emit()
+    await _wait(lambda: len(prop(win.findChild(QObject, "machinesView"), "machines") or []) == 2)
+
+    modal.setProperty("visible", True)             # opening it resets the form
+    assert prop(modal, "hostname") == "" and prop(modal, "valid") is False
+
+    # nothing entered: the form answers, and nothing is sent
+    before = len(bridge.conn.seen)
+    QMetaObject.invokeMethod(modal, "submit")
+    assert prop(modal, "tried") is True
+    assert "hostname" in prop(modal, "hostnameProblem")
+    assert "department" in prop(modal, "departmentProblem")
+    assert len(bridge.conn.seen) == before
+
+    # a Super User workstation belongs to no department, so that row is not asked for
+    modal.setProperty("kind", "super_user_workstation")
+    assert prop(modal, "needsDepartment") is False and prop(modal, "departmentProblem") == ""
+    modal.setProperty("kind", "client_pc")
+
+    modal.setProperty("hostname", "OPS 08")
+    assert "spaces" in prop(modal, "hostnameProblem")
+    modal.setProperty("hostname", "OPS-08")
+    modal.setProperty("departmentId", 1)
+    assert prop(modal, "valid") is True
+
+    QMetaObject.invokeMethod(modal, "submit")
+    await _wait(lambda: prop(modal, "done") is not None)
+    assert ("hierarchy.pc_register",
+            {"hostname": "OPS-08", "pc_type": "client_pc", "department_id": 1}) in bridge.conn.seen
+    assert prop(modal, "done")["client_key"] == "0f" * 32
+    assert prop(modal, "busy") is False and prop(modal, "problem") == ""
+    assert prop(toast, "count") == 1               # "OPS-08 registered", said once

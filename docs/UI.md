@@ -191,6 +191,12 @@ Stated once, so no screen invents its own.
     *Assign Admin*, not "Assign an Admin to Logistics". *Re-check*, not "Check them again". The same
     holds for menu entries and the confirm's own buttons.
 
+13. **A secret is shown once, so the form does not close on success.** Registering a machine, creating
+    an account and rekeying all hand back a client key the Engine will never print again. Those forms
+    have a second half: the same modal turns into the answer — a `warn` alert saying it is shown once,
+    the identifiers, the key in a selectable block, and *Copy key* where the submit button was. The
+    `message` still fires, because the act did happen; it is the modal that waits.
+
 ---
 
 ## What stays custom

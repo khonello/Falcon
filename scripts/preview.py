@@ -74,6 +74,9 @@ ANSWERS = {
         "version": {"version_string": "1.4.2"},
         "pcs_behind": [{"pc_id": 6, "hostname": "OPS-06", "escalated": False, "version": "1.4.1"},
                        {"pc_id": 22, "hostname": "LOG-02", "escalated": True, "version": "1.4.0"}]},
+    "hierarchy.pc_register": {"pc_id": 31, "client_id": "9Qv3k1sLpZ2rT8xw",
+                              "client_key": "3f9c1a7e2b4d6058a1c3e5f70981b2d4"
+                                            "6a8c0e2f4b6d8a0c2e4f60718293a4b5"},
     "resource.violations": {"violations": [
         {"violation_id": 1, "found_on_pc_id": 7, "hostname": "OPS-07", "filename": "budget-2026.xlsx",
          "resource_tag": "restricted"}]},
@@ -118,6 +121,10 @@ def main() -> int:
     win = engine.rootObjects()[0]
     if "--view" in sys.argv:
         win.setProperty("view", sys.argv[sys.argv.index("--view") + 1])
+    if "--open" in sys.argv:                      # a modal or drawer, by objectName
+        name = sys.argv[sys.argv.index("--open") + 1]
+        from PySide6.QtCore import QObject
+        QTimer.singleShot(700, lambda: win.findChild(QObject, name).setProperty("visible", True))
     app.aboutToQuit.connect(loop.stop)       # qasync raises if the Qt loop stops under a pending await
 
     if not SHOT:
