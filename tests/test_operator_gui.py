@@ -34,6 +34,14 @@ AUDIT = [
 ]
 
 
+TREE = [
+    {"department_id": 1, "name": "Operations", "admins": [{"account_id": 7, "name": "R. Mensah"}],
+     "workers": [{"pc_id": 1, "hostname": "OPS-01", "name": "Kojo", "session": {"occupied_via": "native"}},
+                 {"pc_id": 2, "hostname": "OPS-02", "name": "Efua", "session": None}]},
+    {"department_id": 2, "name": "Logistics", "admins": [], "workers": []},
+]
+
+
 class _Identity:
     client_id, account_id, role, pc_id, department_id = "test", 1, "super_user", 1, 1
 
@@ -43,7 +51,16 @@ class _Connection:
 
     async def call(self, type_: str, payload: dict) -> dict:
         await asyncio.sleep(0)
-        return {"entries": AUDIT} if type_ == "audit.recent" else {}
+        if type_ == "audit.recent":
+            return {"entries": AUDIT}
+        if type_ == "hierarchy.tree":
+            return {"departments": TREE}
+        if type_ == "updates.rollout_health":
+            return {"version": {"version_string": "1.4.2"},
+                    "pcs_behind": [{"pc_id": 2, "hostname": "OPS-02", "escalated": True}]}
+        if type_ == "resource.violations":
+            return {"violations": [{"found_on_pc_id": 1, "hostname": "OPS-01"}]}
+        return {}
 
     async def close(self) -> None:
         return None
@@ -125,3 +142,40 @@ async def test_the_record_reads_what_the_engine_answers(gui):
     assert len(prop(table, "filtered")) == 3
     table.setProperty("activeFilters", {"kind": "violation"})
     assert [r["kind"] for r in prop(table, "filtered")] == ["violation"]
+
+
+async def test_machines_names_every_state_and_only_two_carry_a_hue(gui):
+    """One place decides what a machine's state is, so every page agrees: a file out of place and an
+    update past the limit need somebody; free, at the PC and entered do not."""
+    win, bridge = gui
+    win.setProperty("view", "machines")
+    view = win.findChild(QObject, "machinesView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "machines") or []) == 2)
+    by_host = {m["host"]: m for m in prop(view, "machines")}
+    assert by_host["OPS-01"]["state"] == "danger" and by_host["OPS-01"]["line"] == "a file out of place"
+    assert by_host["OPS-02"]["state"] == "danger" and by_host["OPS-02"]["line"] == "update past the limit"
+    assert prop(view, "needing") == 2
+
+
+async def test_a_department_with_nobody_governing_it_says_so(gui):
+    """The one condition on that page that needs an act, and the only red on it."""
+    win, bridge = gui
+    win.setProperty("view", "departments")
+    view = win.findChild(QObject, "departmentsView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 2)
+    rows = {r["name"]: r for r in prop(view, "rows")}
+    assert rows["Operations"]["governed"] == "R. Mensah" and rows["Operations"]["admins"] == 1
+    assert rows["Logistics"]["governed"] == "nobody" and rows["Logistics"]["stateWord"] == "nobody governs it"
+    assert prop(view, "ungoverned") == 1
+
+
+def test_the_crumb_follows_the_view(gui):
+    """Derived, never set: a crumb that has to be remembered gets forgotten."""
+    win, _ = gui
+    assert prop(win, "crumbs") == ["Falcon", "Record"]
+    win.setProperty("view", "machines")
+    assert prop(win, "crumbs") == ["Falcon", "Machines"]

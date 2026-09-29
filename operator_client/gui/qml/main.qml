@@ -17,7 +17,12 @@ ApplicationWindow {
 
     readonly property bool maximised: shell.visibility === Window.Maximized
     property string view: "record"
-    property var crumbs: ["Falcon", "Record"]
+    // derived, never set: a crumb that has to be remembered gets forgotten
+    readonly property var crumbs: {
+        for (var i = 0; i < areas.length; i++)
+            if (areas[i].key === view) return ["Falcon", areas[i].label]
+        return ["Falcon"]
+    }
 
     function toggleMaximised() { shell.maximised ? shell.showNormal() : shell.showMaximized() }
 
@@ -47,11 +52,7 @@ ApplicationWindow {
             height: parent.height
             entries: shell.areas
             current: shell.view
-            onPicked: function (key) {
-                shell.view = key
-                for (var i = 0; i < shell.areas.length; i++)
-                    if (shell.areas[i].key === key) shell.crumbs = ["Falcon", shell.areas[i].label]
-            }
+            onPicked: function (key) { shell.view = key }
         }
 
         Item {
@@ -152,14 +153,24 @@ ApplicationWindow {
                     anchors.fill: parent
                     visible: shell.view === "record"
                 }
+                MachinesView {
+                    objectName: "machinesView"
+                    anchors.fill: parent
+                    visible: shell.view === "machines"
+                }
+                DepartmentsView {
+                    objectName: "departmentsView"
+                    anchors.fill: parent
+                    visible: shell.view === "departments"
+                }
 
                 // every other area, until its page is built
                 Empty {
-                    visible: shell.view !== "record"
+                    visible: ["record", "machines", "departments"].indexOf(shell.view) < 0
                     anchors.centerIn: parent
                     width: 360
                     text: "Not built yet"
-                    hint: "Record is the first page. The rest follow it, in the order in docs/UI-COMPONENTS.md."
+                    hint: "Record, Machines and Departments are built. The rest follow, in the order in docs/UI-COMPONENTS.md."
                 }
             }
         }

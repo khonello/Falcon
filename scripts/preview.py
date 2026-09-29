@@ -52,11 +52,31 @@ ANSWERS = {
          "target_hostname": host, "action": action}
         for at, who, what, host, action in AUDIT]},
     "hierarchy.tree": {"departments": [
-        {"department_id": 1, "name": "Operations", "admins": [{"account_id": 7, "name": "R. Mensah"}],
-         "workers": [{"pc_id": i, "hostname": f"OPS-0{i}"} for i in range(1, 8)]},
+        {"department_id": 1, "name": "Operations",
+         "admins": [{"account_id": 7, "name": "R. Mensah"}, {"account_id": 9, "name": "A. Quaye"}],
+         "workers": [
+             {"pc_id": 1, "hostname": "OPS-01", "name": "Kojo", "session": {"occupied_via": "native"}},
+             {"pc_id": 2, "hostname": "OPS-02", "name": "Efua", "session": None},
+             {"pc_id": 3, "hostname": "OPS-03", "name": "Yaw", "session": {"occupied_via": "native"}},
+             {"pc_id": 4, "hostname": "OPS-04", "name": "Adjoa",
+              "session": {"occupied_via": "traversal", "occupant_name": "R. Mensah"}},
+             {"pc_id": 5, "hostname": "OPS-05", "name": "Nana", "session": {"occupied_via": "native"}},
+             {"pc_id": 6, "hostname": "OPS-06", "name": "Kwame", "session": None},
+             {"pc_id": 7, "hostname": "OPS-07", "name": "Ama", "session": {"occupied_via": "native"}}]},
         {"department_id": 2, "name": "Finance", "admins": [{"account_id": 8, "name": "K. Boateng"}],
-         "workers": [{"pc_id": 11, "hostname": "FIN-01"}, {"pc_id": 12, "hostname": "FIN-02"}]},
+         "workers": [{"pc_id": 11, "hostname": "FIN-01", "name": "Afi", "session": {"occupied_via": "native"}},
+                     {"pc_id": 12, "hostname": "FIN-02", "name": "Kofi", "session": None}]},
+        {"department_id": 3, "name": "Logistics", "admins": [],
+         "workers": [{"pc_id": 21, "hostname": "LOG-01", "name": "Esi", "session": None},
+                     {"pc_id": 22, "hostname": "LOG-02", "name": "Abena", "session": None}]},
     ]},
+    "updates.rollout_health": {
+        "version": {"version_string": "1.4.2"},
+        "pcs_behind": [{"pc_id": 6, "hostname": "OPS-06", "escalated": False, "version": "1.4.1"},
+                       {"pc_id": 22, "hostname": "LOG-02", "escalated": True, "version": "1.4.0"}]},
+    "resource.violations": {"violations": [
+        {"violation_id": 1, "found_on_pc_id": 7, "hostname": "OPS-07", "filename": "budget-2026.xlsx",
+         "resource_tag": "restricted"}]},
 }
 
 
@@ -96,6 +116,8 @@ def main() -> int:
     bridge.connected.emit()
 
     win = engine.rootObjects()[0]
+    if "--view" in sys.argv:
+        win.setProperty("view", sys.argv[sys.argv.index("--view") + 1])
     app.aboutToQuit.connect(loop.stop)       # qasync raises if the Qt loop stops under a pending await
 
     if not SHOT:

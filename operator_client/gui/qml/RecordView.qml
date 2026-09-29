@@ -24,6 +24,7 @@ Item {
                      : t.indexOf("updates.") === 0 ? "rollout"
                      : "other"
             out.push({
+                day: String(e.occurred_at || "").substring(0, 10),
                 at: String(e.occurred_at || e.at || "").substring(11, 16),
                 who: e.actor_name || e.who || "System",
                 what: e.summary || e.what || t.replace(/[._]/g, " "),
@@ -59,6 +60,11 @@ Item {
             width: parent.width
             title: "Record"
             subtitle: "Everything that happened, and who did it"
+            DateRange {
+                objectName: "recordRange"
+                anchors.verticalCenter: parent.verticalCenter
+                onChanged: function (f, t) { root.fromDate = f; root.toDate = t }
+            }
             Field {
                 objectName: "recordSearch"
                 width: 220
@@ -87,10 +93,7 @@ Item {
                 pageSize: 12
                 emptyText: "Nothing recorded yet"
                 emptyHint: "Every act anyone takes lands here, with who took it."
-                rows: root.searchText === "" ? root.rows : root.rows.filter(function (r) {
-                    var q = root.searchText.toLowerCase()
-                    return (r.who + " " + r.what + " " + r.subject).toLowerCase().indexOf(q) >= 0
-                })
+                rows: root.shown
                 columns: [
                     { title: "Time", key: "at", width: 80, mono: true,
                       tone: function () { return "mid" } },
@@ -110,6 +113,27 @@ Item {
     }
 
     property string searchText: ""
+    property var fromDate: null
+    property var toDate: null
+
+    // what the page is actually showing: the search box and the date range, applied in one place
+    readonly property var shown: {
+        var out = rows
+        if (searchText !== "") {
+            var q = searchText.toLowerCase()
+            out = out.filter(function (r) {
+                return (r.who + " " + r.what + " " + r.subject).toLowerCase().indexOf(q) >= 0
+            })
+        }
+        if (fromDate) {
+            var f = fromDate, t = toDate || fromDate
+            out = out.filter(function (r) {
+                if (!r.day) return true
+                return r.day >= Qt.formatDate(f, "yyyy-MM-dd") && r.day <= Qt.formatDate(t, "yyyy-MM-dd")
+            })
+        }
+        return out
+    }
     readonly property var whoFilters: {
         var seen = {}, out = []
         for (var i = 0; i < rows.length; i++) if (!seen[rows[i].who]) { seen[rows[i].who] = true; out.push(rows[i].who) }
