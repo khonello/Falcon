@@ -241,6 +241,16 @@ Stated once, so no screen invents its own.
     the connection, and the name those below them see. The rest is one sentence saying where the
     decisions are made.
 
+22. **One switch between views of the same thing.** List, Grid and Day are the same fleet seen three
+    ways, so they are one `Segmented` and not three pages — and the span switch beside it (24 hours ·
+    6 to 6) only appears while the Day is showing. A `Segmented` is never navigation and never a
+    filter: the data does not change, only how you are looking at it.
+
+23. **The day's one licensed colour exception.** A bar has nothing but colour to say what it is with,
+    so the timeline may use three hues — at the PC, entered, assisted — and nothing else in the
+    console may. It is spent there because it buys something no word could at that size. Everywhere
+    else, including the fleet grid, "entered" is a word and the accent stays for interaction.
+
 ---
 
 ## What stays custom

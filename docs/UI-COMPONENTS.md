@@ -161,7 +161,13 @@ antd has no vocabulary for these; they are built in the same language, from the 
    a dashboard. People provisions the account and its PC together and shows the key once (rule 13).
    Settings holds only what a person can actually change: the connection, and the name those below
    them see.*
-7. **The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.
+7. ~~**The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.~~ *done, plus the two P0s
+   that had been missed: `Segmented` and `SessionBanner`. Machines carries one switch — List · Grid ·
+   Day — because all three are the same fleet seen differently. The flow graph lives in the flow's
+   drawer. `ScriptPanel` is one component used twice: read-only in the Actions drawer, editable in
+   the form, with the same check under it.*
+
+Left after this: the Worker Client's five windows, still on the old dark palette.
 
 Tests come back with step 2: `tests/test_operator_gui.py` was deleted with the old views, and the new
 one is written against the new components as they land.

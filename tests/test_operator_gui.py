@@ -126,7 +126,8 @@ def _at(hhmm: str) -> str:
     """An ISO time on whatever day the test runs, since the timeline draws today."""
     from datetime import datetime
 
-    return datetime.now().replace(hour=int(hhmm[:2]), minute=int(hhmm[3:]),
+    # local wall-clock on purpose: the timeline draws the day as the person in front of it sees it
+    return datetime.now().replace(hour=int(hhmm[:2]), minute=int(hhmm[3:]),  # noqa: DTZ005
                                   second=0, microsecond=0).isoformat()
 
 
@@ -691,7 +692,7 @@ async def test_the_night_is_shaded_and_never_cropped(gui):
     assert hosts == ["FIN-02", "LOG-02", "OPS-01"]          # sorted, one lane per machine
     assert prop(day, "fromHour") == 0 and prop(day, "toHour") == 24
 
-    night = [lane for lane in prop(day, "lanes") if lane["host"] == "LOG-02"][0]
+    night = next(lane for lane in prop(day, "lanes") if lane["host"] == "LOG-02")
     assert round(night["bars"][0]["from"], 1) == 2.2 and night["bars"][0]["via"] == "traversal"
 
     # the working-day window drops it, and that is the switch saying so
@@ -731,7 +732,7 @@ def test_the_session_banner_empties_as_the_clock_runs(gui):
 
     from datetime import datetime, timedelta
 
-    now = datetime.now()
+    now = datetime.now()  # noqa: DTZ005 -- the banner reads the clock on this machine
     banner.setProperty("since", (now - timedelta(minutes=10)).isoformat())
     banner.setProperty("until", (now + timedelta(minutes=10)).isoformat())
     assert 0.4 < prop(banner, "remaining") < 0.6       # halfway through
