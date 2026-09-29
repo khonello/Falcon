@@ -157,6 +157,10 @@ antd has no vocabulary for these; they are built in the same language, from the 
    left. Not built: `reports.routing_set` (deferred), tagging a file by hand (`resource.tag`),
    `assistance.search` and `assistance.add_listener` from the UI — the drawer says Listeners
    exist and how they work, but adding one still goes through the TUI.*
+   *Overview, People and Settings done — all fourteen pages exist. Overview is a list of acts, not
+   a dashboard. People provisions the account and its PC together and shows the key once (rule 13).
+   Settings holds only what a person can actually change: the connection, and the name those below
+   them see.*
 7. **The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.
 
 Tests come back with step 2: `tests/test_operator_gui.py` was deleted with the old views, and the new

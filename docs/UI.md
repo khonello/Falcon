@@ -230,6 +230,17 @@ Stated once, so no screen invents its own.
     nothing. They get the View instead, which answers a different question — who addressed what — and
     is structurally never a report.
 
+20. **The Overview is a list of acts, not a dashboard.** No tile counting something nobody has to do
+    anything about, no chart of a number that is fine. Each line is one thing a person has to act on,
+    in the words of what it is, with why it matters underneath, and it opens the page where it gets
+    done. Red is what cannot wait, amber is what can. When there is nothing, the page says so and
+    stays quiet — good news is grey and brief.
+
+21. **A setting that cannot change anything is not a control.** Almost everything in this system is
+    decided by the Engine and merely rendered, so Settings holds only what a person can really change:
+    the connection, and the name those below them see. The rest is one sentence saying where the
+    decisions are made.
+
 ---
 
 ## What stays custom

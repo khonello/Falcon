@@ -252,7 +252,7 @@ def test_the_shell_is_the_console(gui):
     # the sider is the only navigation, and it names every area
     menu = win.findChild(QObject, "sideMenu")
     keys = [e["key"] for e in prop(menu, "entries")]
-    assert keys[0] == "overview" and "record" in keys and len(keys) == 13
+    assert keys[0] == "overview" and keys[-1] == "settings" and len(keys) == 14
 
 
 def test_the_tokens_are_the_one_place_a_colour_is_named(gui):
@@ -319,7 +319,7 @@ async def test_a_department_with_nobody_governing_it_says_so(gui):
 def test_the_crumb_follows_the_view(gui):
     """Derived, never set: a crumb that has to be remembered gets forgotten."""
     win, _ = gui
-    assert prop(win, "crumbs") == ["Falcon", "Record"]
+    assert prop(win, "crumbs") == ["Falcon", "Overview"]
     win.setProperty("view", "machines")
     assert prop(win, "crumbs") == ["Falcon", "Machines"]
 
@@ -619,3 +619,36 @@ async def test_the_gate_holds_while_anything_is_behind(gui):
     assert approve.property("enabled") is False
     row = prop(view, "rows")[0]
     assert row["stateWord"] == "past the limit" and row["stateTone"] == "danger"
+
+
+async def test_the_overview_is_a_list_of_acts(gui):
+    """Not a dashboard. Every line is something a person has to do, said in the words of what it is,
+    and it opens the page where it gets done. Nothing counts a number that is already fine."""
+    win, bridge = gui
+    win.setProperty("view", "overview")
+    view = win.findChild(QObject, "overviewView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "needs") or []) >= 5)
+    needs = prop(view, "needs")
+    assert [n["where"] for n in needs][:4] == ["assistance", "resources", "flows", "tasks"]
+    assert needs[0]["what"] == "1 person asked for you"
+    assert [n["where"] for n in needs].count("rollout") >= 1
+    assert all(n["why"] for n in needs), "every line says why it matters"
+    # the ones that can wait are amber, the ones that cannot are red
+    assert {n["tone"] for n in needs} <= {"danger", "warn"}
+
+
+async def test_a_person_without_a_status_has_not_left(gui):
+    """A row that does not carry a status is not evidence that somebody was offboarded -- only an
+    explicit non-active status is."""
+    win, bridge = gui
+    win.setProperty("view", "people")
+    view = win.findChild(QObject, "peopleView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 3)
+    rows = {r["name"]: r for r in prop(view, "rows")}
+    assert rows["R. Mensah"]["role"] == "Admin" and rows["R. Mensah"]["department"] == "Operations"
+    assert rows["Kojo"]["stateWord"] == "signed in"        # it has a session
+    assert rows["Efua"]["stateWord"] == "not signed in"    # no session, but not gone either

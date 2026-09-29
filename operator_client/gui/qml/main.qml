@@ -16,7 +16,7 @@ ApplicationWindow {
     flags: Qt.Window | Qt.FramelessWindowHint
 
     readonly property bool maximised: shell.visibility === Window.Maximized
-    property string view: "record"
+    property string view: "overview"
     // derived, never set: a crumb that has to be remembered gets forgotten
     readonly property var crumbs: {
         for (var i = 0; i < areas.length; i++)
@@ -39,7 +39,8 @@ ApplicationWindow {
         { key: "resources",   icon: "folder",  label: "Resources" },
         { key: "reports",     icon: "file",    label: "Reports" },
         { key: "rollout",     icon: "cloud",   label: "Rollout" },
-        { key: "record",      icon: "history", label: "Record" }
+        { key: "record",      icon: "history", label: "Record" },
+        { key: "settings",    icon: "gear",    label: "Settings" }
     ]
 
     Row {
@@ -208,13 +209,21 @@ ApplicationWindow {
                     visible: shell.view === "rollout"
                 }
 
-                // every other area, until its page is built
-                Empty {
-                    visible: ["overview", "people", "settings"].indexOf(shell.view) >= 0
-                    anchors.centerIn: parent
-                    width: 360
-                    text: "Not built yet"
-                    hint: "Overview, People and Settings are the last three. The rest follow, in the order in docs/UI-COMPONENTS.md."
+                OverviewView {
+                    objectName: "overviewView"
+                    anchors.fill: parent
+                    visible: shell.view === "overview"
+                    onGo: function (view) { shell.view = view }
+                }
+                PeopleView {
+                    objectName: "peopleView"
+                    anchors.fill: parent
+                    visible: shell.view === "people"
+                }
+                SettingsView {
+                    objectName: "settingsView"
+                    anchors.fill: parent
+                    visible: shell.view === "settings"
                 }
             }
         }
