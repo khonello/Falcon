@@ -28,7 +28,7 @@ reason, and they change in one file (`Theme.qml`).
 | | Value | Where |
 |---|---|---|
 | Primary | `#1677ff` — Ant blue, chosen 29 Sep 2026 | **interaction only**: primary buttons, links, the selected menu entry, focus rings. Never status |
-| Will need someone | `#d48806` | a version behind, waiting for a yes. Rare |
+| Will need someone | `#ad6800` | a version behind, waiting for a yes. Rare |
 | Needs someone now | `#cf1322` | a file out of place, an update past the limit, a machine you are holding. Rarer |
 | Text | `rgba(0,0,0,0.88)` primary · `0.65` secondary · `0.45` tertiary · `0.25` disabled | |
 | Surfaces | `#ffffff` container · `#fafafa` layout/table header · `#f5f5f5` hover | |
@@ -53,8 +53,13 @@ only where somebody has to act.
 | `rgba(0,0,0,0.25)` | quiet — free, unused, nothing recorded | a hollow dot, a faint outline |
 | `rgba(0,0,0,0.45)` | present — at the PC, running, syncing. **Most of the screen** | a filled dot, secondary text |
 | `rgba(0,0,0,0.88)` | the subject — the row you picked, the machine you are on | ink, medium weight |
-| `#d48806` | will need someone | a dot and its word, both in the tone |
+| `#ad6800` | will need someone | a dot and its word, both in the tone |
 | `#cf1322` | needs someone now | the same, and nothing else on screen competes |
+
+**The two hues are matched in weight, not just in meaning.** A lighter colour at the same size reads as
+a heavier mark — the same 92 × 5 px progress bar looked fatter in amber than in red until the amber was
+deepened from `#d48806` to `#ad6800`. That also takes it from about 3:1 to 4.6:1 on white, which is the
+contrast floor anyway. Any new tone is checked the same way: measured, not eyeballed.
 
 Ant Design ships six status hues (blue, green, orange, red, purple, cyan) and uses them freely. **We use
 two**, plus three weights of ink, plus the accent for things you can click. Green is not used at all: a
