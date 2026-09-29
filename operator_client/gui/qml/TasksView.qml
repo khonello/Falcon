@@ -109,12 +109,14 @@ Item {
     NewTask {
         id: maker
         objectName: "newTaskModal"
+        page: root
         onCreated: root.refresh()
     }
 
     Confirm {
         id: closeIt
         objectName: "verifyConfirm"
+        page: root
         title: "Close this task"
         cost: "Verifying closes the task for good: it is the only way a task completes, and nothing "
               + "reopens it. The checks are evidence -- look at the work yourself before you do this."
@@ -125,6 +127,7 @@ Item {
     Drawer {
         id: detail
         objectName: "taskDrawer"
+        page: root
         title: root.chosen ? root.chosen.what : ""
         subtitle: root.chosen ? (root.chosen.who + " · " + root.chosen.line) : ""
 

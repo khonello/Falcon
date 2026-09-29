@@ -46,6 +46,14 @@ AUDIT = [
     ("08:03", "Efua", "Signed in", "OPS-02", "session.native"),
     ("02:14", "A. Quaye", "Entered LOG-02, out of hours", "LOG-02", "session.opened"),
 ]
+CLEAR_TEMP = """import os, time, shutil
+cut = time.time() - 7 * 86400
+root = os.environ['TEMP']
+for name in os.listdir(root):
+    p = os.path.join(root, name)
+    if os.path.getmtime(p) < cut:
+        shutil.rmtree(p, ignore_errors=True)"""
+
 ANSWERS = {
     "audit.recent": {"entries": [
         {"occurred_at": f"2026-09-29T{at}:00+00:00", "actor_name": who, "summary": what,
@@ -76,6 +84,62 @@ ANSWERS = {
         "version": {"version_string": "1.4.2"},
         "pcs_behind": [{"pc_id": 6, "hostname": "OPS-06", "escalated": False, "version": "1.4.1"},
                        {"pc_id": 22, "hostname": "LOG-02", "escalated": True, "version": "1.4.0"}]},
+    "control.action_list": {
+        "builtin": {
+            "screenshot": {"category": "control", "params": []},
+            "notify": {"category": "control", "params": ["message"]},
+            "lock_session": {"category": "control", "params": ["duration_s"]},
+            "kill_process": {"category": "control", "params": ["name"]},
+            "shutdown": {"category": "control", "params": []},
+            "process_list": {"category": "monitoring", "params": []},
+            "system_metrics": {"category": "monitoring", "params": []},
+            "usb_contents": {"category": "monitoring", "params": []},
+        },
+        "actions": {
+            "control": [
+                {"id": 1, "action_kind": "control", "builtin_type": "lock_session",
+                 "name": "Lock the screen", "timeout_seconds": 30, "params": {"duration_s": 300}},
+                {"id": 2, "action_kind": "control", "builtin_type": "notify",
+                 "name": "Show them a message", "timeout_seconds": 15,
+                 "params": {"message": "Your machine is a version behind."}},
+            ],
+            "monitoring": [
+                {"id": 3, "action_kind": "monitoring", "builtin_type": "usb_contents",
+                 "name": "List what is on the USB", "timeout_seconds": 60, "params": {}},
+            ],
+            "custom": [
+                {"id": 4, "action_kind": "custom", "name": "Clear the temp folder",
+                 "custom_script_language": "python", "timeout_seconds": 120,
+                 "description": "Empties %TEMP% of anything older than a week.",
+                 "custom_script": CLEAR_TEMP},
+            ],
+        }},
+    "control.event_list": {
+        "types": {"usb.inserted": "native_pushed", "resource.violation": "native_pushed",
+                  "threshold.cpu": "polled", "time.recurring": "polled",
+                  "user.login": "native_pushed", "flow.failed": "native_pushed"},
+        "events": [
+            {"id": 1, "enabled": True, "last_fired_at": "2026-09-29T11:03:00+00:00",
+             "condition_spec": {"type": "usb.inserted", "pc_ids": None, "match": {}},
+             "actions": [{"id": 3, "action_kind": "monitoring", "builtin_type": "usb_contents",
+                          "name": "List what is on the USB", "timeout_seconds": 60}]},
+            {"id": 2, "enabled": True, "last_fired_at": "2026-09-29T10:02:00+00:00",
+             "condition_spec": {"type": "resource.violation", "pc_ids": [7], "match": {}},
+             "actions": [{"id": 2, "action_kind": "control", "builtin_type": "notify",
+                          "name": "Show them a message", "timeout_seconds": 15},
+                         {"id": 1, "action_kind": "control", "builtin_type": "lock_session",
+                          "name": "Lock the screen", "timeout_seconds": 30}]},
+            {"id": 3, "enabled": False, "last_fired_at": None,
+             "condition_spec": {"type": "threshold.cpu", "pc_ids": [1, 3, 5],
+                                "match": {"above": 90, "duration_s": 300}},
+             "actions": []},
+        ]},
+    "control.event_history": {"firings": []},
+    "control.action_run": {"execution_id": 41,
+                           "executions": [{"pc_id": 1, "hostname": "OPS-01", "execution_id": 41}]},
+    "control.action_create": {"action": {"id": 9}},
+    "control.event_create": {"event": {"id": 9}},
+    "control.event_update": {}, "control.event_delete": {},
     "flow.list": {"flows": [
         {"id": 1, "source_pc_id": 1, "source_hostname": "OPS-01", "source_path": "C:/work/payroll",
          "status": "active", "pause_reason": None, "consent_status": "not_required", "stages": [],

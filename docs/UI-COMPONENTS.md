@@ -147,6 +147,11 @@ antd has no vocabulary for these; they are built in the same language, from the 
    *Flows done — table, drawer, pause/resume/retire, and a create form that is source + destinations
    and nothing else. No stage editor: the JSON shapes of a Flow stage's `config` are on the deferred
    list (spec §10), so branch/transform/categorize wait for that decision, not for the UI.*
+   *Automation and Actions done — the library with its Run, and rules that read as one sentence.
+   A built-in's parameters come from the Engine's own catalogue, so the form cannot offer a field
+   it does not want. A Custom Action is checked by `falcon.validateScript` before it is sent, which
+   is the same check the Engine and then the worker run again. No condition builder beyond what the
+   Engine requires (a time event needs a time): `condition_spec`'s shape is deferred too.*
 6. **The rest**: Assistance, Resources, Reports, Rollout, Overview, Settings.
 7. **The custom four**: DayTimeline, FleetGrid, FlowGraph, ScriptPanel.
 

@@ -16,7 +16,7 @@ import pytest
 pytest.importorskip("PySide6")
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-from PySide6.QtCore import QMetaObject, QObject, Qt
+from PySide6.QtCore import QCoreApplication, QMetaObject, QObject, Qt
 from PySide6.QtQml import QJSValue
 
 from common.connection import EngineError
@@ -76,6 +76,33 @@ FLOWS = [
 ]
 
 
+BUILTIN = {
+    "notify": {"category": "control", "params": ["message"]},
+    "lock_session": {"category": "control", "params": ["duration_s"]},
+    "usb_contents": {"category": "monitoring", "params": []},
+}
+
+LIBRARY = {
+    "control": [{"id": 1, "action_kind": "control", "builtin_type": "lock_session",
+                 "name": "Lock the screen", "timeout_seconds": 30}],
+    "monitoring": [{"id": 3, "action_kind": "monitoring", "builtin_type": "usb_contents",
+                    "name": "List what is on the USB", "timeout_seconds": 60}],
+    "custom": [{"id": 4, "action_kind": "custom", "name": "Clear the temp folder",
+                "custom_script_language": "python", "timeout_seconds": 120,
+                "custom_script": "import os\n"}],
+}
+
+EVENTS = [
+    {"id": 1, "enabled": True, "last_fired_at": None,
+     "condition_spec": {"type": "usb.inserted", "pc_ids": None, "match": {}},
+     "actions": [{"id": 3, "action_kind": "monitoring", "builtin_type": "usb_contents",
+                  "name": "List what is on the USB", "timeout_seconds": 60}]},
+    {"id": 2, "enabled": False, "last_fired_at": None,
+     "condition_spec": {"type": "threshold.cpu", "pc_ids": [1, 3], "match": {}},
+     "actions": []},
+]
+
+
 class _Identity:
     client_id, account_id, role, pc_id, department_id = "test", 1, "super_user", 1, 1
 
@@ -99,6 +126,13 @@ class _Connection:
             return {"task": {"id": 5}}
         if type_ == "flow.list":
             return {"flows": FLOWS}
+        if type_ == "control.action_list":
+            return {"builtin": BUILTIN, "actions": LIBRARY}
+        if type_ == "control.event_list":
+            return {"events": EVENTS, "types": {"usb.inserted": "native_pushed",
+                                                "threshold.cpu": "polled"}}
+        if type_ == "control.event_history":
+            return {"firings": []}
         if type_ == "flow.create":
             # the Engine refuses a destination that already holds files, unless it is confirmed
             if not payload.get("confirm_collisions"):
@@ -140,6 +174,20 @@ def gui(tmp_path: Path):
 def prop(obj: QObject, name: str):
     v = obj.property(name)
     return v.toVariant() if isinstance(v, QJSValue) else v
+
+
+def _spin(cond, timeout: float = 2.0) -> None:
+    """Qt's own loop, turned by hand. These tests run on asyncio, so a transition only advances if
+    somebody pumps the Qt events -- and a drawer sliding out is a transition."""
+    import time
+
+    app = QCoreApplication.instance()
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        app.processEvents()
+        if cond():
+            return
+    raise AssertionError("condition not met in time")
 
 
 async def _wait(cond, timeout: float = 4.0) -> None:
@@ -390,3 +438,74 @@ async def test_a_destination_that_already_holds_files_is_a_question(gui):
     QMetaObject.invokeMethod(modal, "createAnyway")   # what the confirm does
     await _wait(lambda: len([p for t, p in bridge.conn.seen if t == "flow.create"]) == 2)
     assert [p for t, p in bridge.conn.seen if t == "flow.create"][-1]["confirm_collisions"] is True
+
+
+async def test_an_action_is_named_the_way_a_person_says_it(gui):
+    """`lock_session` is a wire identifier. One place turns it into words, so the library, the drawer
+    and an automation's sentence cannot drift apart."""
+    win, bridge = gui
+    win.setProperty("view", "actions")
+    view = win.findChild(QObject, "actionsView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 3)
+    rows = {r["name"]: r for r in prop(view, "rows")}
+    assert rows["Lock the screen"]["kind"] == "control"
+    assert rows["Clear the temp folder"]["kind"] == "custom"
+    assert rows["List what is on the USB"]["timeout"] == "60s"
+
+
+async def test_an_automation_reads_as_one_sentence(gui):
+    """When something happens, on these machines, run these -- and a rule with nothing attached says
+    so in amber, because it notices and then does nothing."""
+    win, bridge = gui
+    win.setProperty("view", "automation")
+    view = win.findChild(QObject, "automationView")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "rows") or []) == 2)
+    rows = {r["event_id"]: r for r in prop(view, "rows")}
+    assert rows[1]["when"] == "a USB goes in" and rows[1]["where"] == "every machine"
+    assert rows[1]["then"] == "List what is on the USB" and rows[1]["stateWord"] == "on"
+    assert rows[2]["where"] == "2 machines" and rows[2]["then"] == "nothing yet"
+    assert rows[2]["stateTone"] == "warn" and rows[2]["polled"] is True
+    assert prop(view, "idle") == 1
+
+
+async def test_a_script_is_read_before_it_is_sent(gui):
+    """Custom Actions are validated three times -- here, at the Engine, and again on the worker. The
+    first one is so the refusal reads as a review rather than a rejection."""
+    win, bridge = gui
+    win.setProperty("view", "actions")
+    modal = win.findChild(QObject, "newActionModal")
+    bridge.connected.emit()
+
+    modal.setProperty("visible", True)
+    modal.setProperty("kind", "custom")
+    modal.setProperty("actionName", "Fetch the thing")
+    modal.setProperty("script", "import requests\nrequests.get('http://example.com')\n")
+    QMetaObject.invokeMethod(modal, "check")
+    assert prop(modal, "scriptProblems"), "a third-party import should not pass"
+    assert prop(modal, "valid") is False
+
+    modal.setProperty("script", "import os\nprint(os.getcwd())\n")
+    QMetaObject.invokeMethod(modal, "check")
+    assert prop(modal, "scriptProblems") == []
+    assert prop(modal, "valid") is True
+
+
+async def test_a_drawer_leaves_with_the_page_that_opened_it(gui):
+    """A popup lives in the window's overlay, not in the page that declared it, so leaving the page
+    used to leave the drawer sitting over the next one."""
+    win, bridge = gui
+    win.setProperty("view", "machines")
+    view = win.findChild(QObject, "machinesView")
+    drawer = win.findChild(QObject, "machineDrawer")
+    bridge.connected.emit()
+
+    await _wait(lambda: len(prop(view, "machines") or []) == 2)
+    drawer.setProperty("visible", True)
+    assert drawer.property("visible") is True
+
+    win.setProperty("view", "tasks")
+    _spin(lambda: drawer.property("visible") is False)     # it slides out, so turn the loop

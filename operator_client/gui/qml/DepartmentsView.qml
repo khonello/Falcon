@@ -76,6 +76,7 @@ Item {
     Drawer {
         id: detail
         objectName: "departmentDrawer"
+        page: root
         title: root.chosen ? root.chosen.name : ""
         subtitle: root.chosen ? (root.chosen.machines + " machines") : ""
 

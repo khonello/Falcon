@@ -10,6 +10,15 @@ Popup {
     default property alias body: content.data
     property alias footer: foot.data
 
+    // A popup lives in the Overlay, not in the page that declared it, so leaving that page does not
+    // take it with it. `page` ties it back: when the page goes, so does this.
+    property Item page: null
+    Connections {
+        target: root.page
+        enabled: root.page !== null
+        function onVisibleChanged() { if (root.page && !root.page.visible) root.close() }
+    }
+
     parent: Overlay.overlay
     x: parent ? parent.width - width : 0
     y: 0

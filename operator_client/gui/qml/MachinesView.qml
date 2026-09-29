@@ -112,6 +112,7 @@ Item {
     RegisterMachine {
         id: reg
         objectName: "registerModal"
+        page: root
         departments: root.tree
         onRegistered: root.refresh()
     }
@@ -119,6 +120,7 @@ Item {
     Drawer {
         id: detail
         objectName: "machineDrawer"
+        page: root
         title: root.chosen ? root.chosen.host : ""
         subtitle: root.chosen ? root.chosen.department : ""
 

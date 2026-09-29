@@ -210,6 +210,16 @@ Stated once, so no screen invents its own.
     beside it. A refusal a person can answer (a destination that already holds files) becomes rule 4's
     confirm, carrying the Engine's own line inside the cost.
 
+16. **A wire identifier is never shown to a person.** `lock_session`, `threshold.cpu`, `used_with_file`
+    are names for the protocol. One file per area turns them into words — `Task.qml`, `Sync.qml`,
+    `Doing.qml` — and every page reads from it, so a thing is called the same thing in a table, a
+    drawer and a sentence. A key with no entry falls back to itself with the punctuation softened,
+    which looks wrong on purpose: that is how a missing word gets noticed.
+
+17. **A drawer or modal belongs to the page that opened it.** They live in the window's overlay, which
+    the page's own visibility does not reach, so each one carries `page:` and closes when that page is
+    left. Without it a detail panel sits over the next page as if it belonged there.
+
 ---
 
 ## What stays custom

@@ -176,13 +176,25 @@ ApplicationWindow {
                     visible: shell.view === "flows"
                 }
 
+                AutomationView {
+                    objectName: "automationView"
+                    anchors.fill: parent
+                    visible: shell.view === "automation"
+                }
+                ActionsView {
+                    objectName: "actionsView"
+                    anchors.fill: parent
+                    visible: shell.view === "actions"
+                }
+
                 // every other area, until its page is built
                 Empty {
-                    visible: ["record", "machines", "departments", "tasks", "flows"].indexOf(shell.view) < 0
+                    visible: ["record", "machines", "departments", "tasks", "flows",
+                              "automation", "actions"].indexOf(shell.view) < 0
                     anchors.centerIn: parent
                     width: 360
                     text: "Not built yet"
-                    hint: "Record, Machines, Departments, Tasks and Flows are built. The rest follow, in the order in docs/UI-COMPONENTS.md."
+                    hint: "Seven pages are built. The rest follow, in the order in docs/UI-COMPONENTS.md."
                 }
             }
         }

@@ -105,12 +105,14 @@ Item {
     NewFlow {
         id: maker
         objectName: "newFlowModal"
+        page: root
         onMade: root.refresh()
     }
 
     Confirm {
         id: retire
         objectName: "retireConfirm"
+        page: root
         title: "Retire this flow"
         cost: "It stops copying. The flow and everything it has already synced stay on record -- nothing "
               + "is deleted from either machine -- but it does not come back on its own."
@@ -122,6 +124,7 @@ Item {
     Drawer {
         id: detail
         objectName: "flowDrawer"
+        page: root
         title: root.chosen ? root.chosen.from : ""
         subtitle: root.chosen ? root.chosen.line : ""
 
