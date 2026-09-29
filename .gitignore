@@ -40,3 +40,6 @@ design/shots/
 
 # disc images from tools/build_iso.py
 *.iso
+
+# screenshots taken while working; regenerate with scripts/preview.py --shot
+design-shots/

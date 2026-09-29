@@ -27,12 +27,12 @@ QML_DIR = Path(__file__).parent / "qml"
 
 
 def application() -> QGuiApplication:
-    # Material dark, chosen in exactly one place before any QML loads (ui-reference.md): it takes
-    # accent/background as attached properties, so the whole console is themed from Theme.qml.
+    # The Basic style, chosen in exactly one place before any QML loads: every control in this console
+    # is drawn by us from Theme.qml's tokens, so a styled base would only fight it.
     app = QGuiApplication.instance() or QGuiApplication(sys.argv)
     app.setApplicationName("Falcon Operator Client")
     app.setOrganizationName("Falcon")
-    QQuickStyle.setStyle("Material")
+    QQuickStyle.setStyle("Basic")
     return app
 
 
