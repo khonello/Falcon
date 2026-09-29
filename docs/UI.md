@@ -70,10 +70,11 @@ machine is `#bfbfbf` on a `#fafafa` lane — the ladder's own quiet tone, a clea
 sits in. Recessive is not the same as faint: if the normal case cannot be seen, the chart stops showing
 how much of the day was normal.
 
-**A span is a choice, and out of hours is shaded rather than hidden.** The day timeline opens on the
-working day (06:00–18:00) and switches to a full 24 hours, where the hours outside 06:00–18:00 carry a
-light grey band. An Admin entering a machine at 02:14 is exactly what this product exists to show, so it
-is never cropped out of the view — and in the report it is called out in words.
+**The day is 24 hours by default, and out of hours is shaded rather than hidden.** The user, 29 Sep 2026:
+*"sneaky things happen at unusual times."* So the timeline opens on the whole day, with the hours outside
+06:00–18:00 under a light grey band — an Admin entering a machine at 02:14 is exactly what this product
+exists to show, and it is never cropped out of the first view anyone sees. **6 to 6** narrows it to the
+working day when that is all you are looking at. The report calls an out-of-hours entry out in words.
 
 **Every drawing carries a Report toggle.** A chart shows the shape of something at a glance; it is
 slower to *act* on. So any drawing that takes a moment to decode has a `Segmented` switch above it —
@@ -198,7 +199,7 @@ antd has no vocabulary for these, and they are the product:
 
 | | What it draws | Built from |
 |---|---|---|
-| **Day timeline** | who held each machine, and when. Two switches: **6 to 6 · 24 hours** for the span (06:00–18:00 is the default; 24 hours shades the night so an entry at 02:14 cannot pass as normal) and **Chart · Report** for how you read it | custom Shapes + `Table`, behind two `Segmented`s |
+| **Day timeline** | who held each machine, and when. Two switches: **6 to 6 · 24 hours** for the span (**24 hours is the default** — the night is shaded, never cropped) and **Chart · Report** for how you read it | custom Shapes + `Table`, behind two `Segmented`s |
 | **Fleet view** | a department's machines at a glance, 4 to 240 | `Table` by default; a compact grid as a second view |
 | **Flow graph** | source → transforms → destinations, and where it broke | custom, in the flow's detail page. Its nodes are **filled** like every other card — the source one step darker, the broken one a tinted fill rather than a red ring, and only its link stays dashed red |
 | **Hierarchy** | department → Admin → machine | antd `Tree` where it is a list; custom only if a picture earns it |
