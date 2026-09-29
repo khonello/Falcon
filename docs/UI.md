@@ -188,7 +188,7 @@ antd has no vocabulary for these, and they are the product:
 | **Fleet view** | a department's machines at a glance, 4 to 240 | `Table` by default; a compact grid as a second view |
 | **Flow graph** | source → transforms → destinations, and where it broke | custom, in the flow's detail page |
 | **Hierarchy** | department → Admin → machine | antd `Tree` where it is a list; custom only if a picture earns it |
-| **Session banner** | you are inside someone's machine, and for how long | a slim tinted strip (chosen 29 Sep 2026): the tint says the kind, a line along the **bottom** drains as the clock runs, and no stripe down the left |
+| **Session banner** | you are inside someone's machine, and for how long | a slim tinted strip (chosen 29 Sep 2026): the tint says the kind, the clock is a real `Progress` bar in the row that fills as the session is spent — not a hairline on an edge — and there is no stripe down the left |
 | **Machine cell** | a machine's state inside a table row | `Badge` + hostname + a reason |
 
 The rule for all of them: **use the antd component unless it genuinely cannot say the thing.** A table
