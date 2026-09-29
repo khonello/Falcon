@@ -2,11 +2,11 @@ import QtQuick
 import QtQuick.Shapes
 
 // The few icons the Worker's windows use, drawn as the Operator Client draws them (the same paths, stroked). The Worker
-// package does not import the Operator Client, so the set it needs lives here.
+// package does not import the Operator Client, so the set it needs lives here -- and so does its default ink.
 Item {
     id: root
     property string name: ""
-    property color color: "#A6B0BC"
+    property color color: Qt.rgba(0, 0, 0, 0.45)
     property int size: 16
     readonly property var set: ({
         shield: ["M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"],

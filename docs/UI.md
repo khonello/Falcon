@@ -251,6 +251,14 @@ Stated once, so no screen invents its own.
     console may. It is spent there because it buys something no word could at that size. Everywhere
     else, including the fleet grid, "entered" is a word and the accent stays for interaction.
 
+24. **The Worker's five windows are the same design, three seconds at a time.** A worker sees a small
+    white card, in the console's palette, saying one thing in plain words — never a wire term, never a
+    choice they do not have. Two of the rules bite hardest here: good news is grey, so a verification
+    sign that has been seen just says *changed 11:20* and a started task just says *Started*; and the
+    accent is only ever on the one act they can take. The palette is written out in
+    `worker_client/windows/qml/Window.qml` rather than imported, because that package does not depend
+    on the Operator Client — so a token changed here has to be changed there as well.
+
 ---
 
 ## What stays custom

@@ -167,7 +167,10 @@ antd has no vocabulary for these; they are built in the same language, from the 
    drawer. `ScriptPanel` is one component used twice: read-only in the Actions drawer, editable in
    the form, with the same check under it.*
 
-Left after this: the Worker Client's five windows, still on the old dark palette.
+The Worker Client's five windows are on the same palette: `worker_client/windows/qml/Window.qml`
+writes the tokens out rather than importing them, because that package does not depend on the
+Operator Client. If a token changes here it has to be changed there too — there are eleven of them,
+in one block at the top of that file.
 
 Tests come back with step 2: `tests/test_operator_gui.py` was deleted with the old views, and the new
 one is written against the new components as they land.
