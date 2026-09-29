@@ -93,7 +93,7 @@ Decided once, for every surface:
 | | Surface | Why |
 |---|---|---|
 | **Filled** `#fafafa` | figures, summary cards, machine tiles, anything read rather than filled in | the fill is what makes it a thing; forty outlined tiles is a grid of empty frames |
-| **Filled, tinted** | an exception — a violation, a machine that needs someone | the tint *is* the state; no border, and never a left-edge stripe |
+| **Filled, tinted** | an exception — a violation, a machine that needs someone, a broken node in a graph | the tint *is* the state; no border, and never a left-edge stripe |
 | **Outlined** `#fff` | a card holding a form; a conversation list | the inputs are white and would float on a fill; message rows need an edge to sit against |
 | **Neither** | a drawer's label/value block, `Empty`, `Timeline`, `Tree`, `Table` | they sit on the page itself |
 
@@ -196,9 +196,9 @@ antd has no vocabulary for these, and they are the product:
 |---|---|---|
 | **Day timeline** | who held each machine, and when. Two switches: **6 to 6 · 24 hours** for the span (06:00–18:00 is the default; 24 hours shades the night so an entry at 02:14 cannot pass as normal) and **Chart · Report** for how you read it | custom Shapes + `Table`, behind two `Segmented`s |
 | **Fleet view** | a department's machines at a glance, 4 to 240 | `Table` by default; a compact grid as a second view |
-| **Flow graph** | source → transforms → destinations, and where it broke | custom, in the flow's detail page |
+| **Flow graph** | source → transforms → destinations, and where it broke | custom, in the flow's detail page. Its nodes are **filled** like every other card — the source one step darker, the broken one a tinted fill rather than a red ring, and only its link stays dashed red |
 | **Hierarchy** | department → Admin → machine | antd `Tree` where it is a list; custom only if a picture earns it |
-| **Session banner** | you are inside someone's machine, and for how long | a slim tinted strip (chosen 29 Sep 2026): the tint says the kind, the clock is a real `Progress` bar in the row that fills as the session is spent — not a hairline on an edge — and there is no stripe down the left |
+| **Session banner** | you are inside someone's machine, and for how long | one row on a red tint: whose machine, which machine, a real `Progress` bar for the clock, and the way out. No stripe down the left, no hairline on an edge, and no second treatment — this is the only one |
 | **Machine cell** | a machine's state inside a table row | `Badge` + hostname + a reason |
 
 The rule for all of them: **use the antd component unless it genuinely cannot say the thing.** A table
