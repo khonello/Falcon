@@ -65,6 +65,11 @@ Ant Design ships six status hues (blue, green, orange, red, purple, cyan) and us
 two**, plus three weights of ink, plus the accent for things you can click. Green is not used at all: a
 machine that is fine is quiet, not green. **A screen where nothing is wrong is entirely grey.**
 
+**The ordinary case is grey, but never invisible.** On the day timeline a block for someone at their own
+machine is `#bfbfbf` on a `#fafafa` lane — the ladder's own quiet tone, a clear step above the track it
+sits in. Recessive is not the same as faint: if the normal case cannot be seen, the chart stops showing
+how much of the day was normal.
+
 **A span is a choice, and out of hours is shaded rather than hidden.** The day timeline opens on the
 working day (06:00–18:00) and switches to a full 24 hours, where the hours outside 06:00–18:00 carry a
 light grey band. An Admin entering a machine at 02:14 is exactly what this product exists to show, so it
