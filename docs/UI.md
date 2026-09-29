@@ -136,6 +136,10 @@ Stated once, so no screen invents its own.
    because it is about correctness, not looks.)
 10. **The Engine decides; the page renders.** The UI never computes authority, never hides what the
     Engine would refuse — it asks and reports the answer.
+11. **A button is two words at most.** It names the act and stops; who it affects and what it costs are
+    said beside it or in the confirm, never inside the label. *End session*, not "End their session".
+    *Assign Admin*, not "Assign an Admin to Logistics". *Re-check*, not "Check them again". The same
+    holds for menu entries and the confirm's own buttons.
 
 ---
 
