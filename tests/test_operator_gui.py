@@ -215,7 +215,7 @@ def val(x):
 # --- level 2: a department ------------------------------------------------------------------------
 
 def test_the_rail_is_five_areas_not_eight_features(gui):
-    """Areas, not features (design/TABS.md). The Super User rail names the question a person is
+    """Areas, not features (design/PATTERNS.md). The Super User rail names the question a person is
     asking; the Admin rail is deliberately left alone until level 3 is opened."""
     win, _, _ = gui
     rail = win.findChild(QObject, "iconRail")

@@ -512,7 +512,7 @@ Item {
             Layout.preferredHeight: 34
 
             // No page title. The rail entry says "Must see" and one name for one place is enough
-            // (design/TABS.md, issue 7) -- so the header carries the time, and a held session when
+            // (the rail owns the page's name) -- so the header carries the time, and a held session when
             // there is one. The crumb below still roots on "Must see".
             HeldCard {
                 objectName: "heldMirror"

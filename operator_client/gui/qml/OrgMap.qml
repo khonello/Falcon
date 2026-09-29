@@ -16,7 +16,7 @@ Item {
     property var departments: []           // hierarchy.tree's departments, in order
     property int focusId: 0                // 0 = the whole system
     property int selectedId: 0             // ringed, not recoloured: colour already means state
-    // One gesture, one meaning (design/TABS.md): a single click SELECTS a department and brings its
+    // One gesture, one meaning (design/PATTERNS.md): a single click SELECTS a department and brings its
     // text beside the map; a double click ENTERS it, and only then does the crumb grow.
     signal picked(int departmentId)
     signal entered(int departmentId)

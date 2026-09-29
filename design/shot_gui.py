@@ -636,7 +636,9 @@ def main(out_dir: Path, role: str = "admin", view: int = 0, page: int = 0, focus
         print("saved", path, img.width(), img.height())
         app.quit()
 
-    QTimer.singleShot(1200, lambda: (win.setMinimumSize(QSize(0, 0)), win.resize(1440, 900)))
+    # the app opens maximised now that it is frameless: a shot is the design's own 1440 x 900
+    QTimer.singleShot(1200, lambda: (win.showNormal(), win.setMinimumSize(QSize(0, 0)),
+                                     win.setMaximumSize(QSize(16777215, 16777215)), win.resize(1440, 900)))
     QTimer.singleShot(4300, grab)
     sys.exit(app.exec())
 

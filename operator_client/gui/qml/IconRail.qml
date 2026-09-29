@@ -19,7 +19,7 @@ Item {
         { key: "assistance", icon: "assistance", label: "Assistance" },
         { key: "reports",    icon: "reports",    label: "Reports" }
     ]
-    // AREAS, NOT FEATURES (design/TABS.md, settled 25 Sep 2026). Five entries, each named after the
+    // AREAS, NOT FEATURES (settled 25 Sep 2026). Five entries, each named after the
     // question a person is asking rather than after a module, and the same noun means the same thing
     // at every level -- Work is Work whether you see three departments or one.
     //
