@@ -60,15 +60,34 @@ Ant Design ships six status hues (blue, green, orange, red, purple, cyan) and us
 two**, plus three weights of ink, plus the accent for things you can click. Green is not used at all: a
 machine that is fine is quiet, not green. **A screen where nothing is wrong is entirely grey.**
 
+**A span is a choice, and out of hours is shaded rather than hidden.** The day timeline opens on the
+working day (06:00–18:00) and switches to a full 24 hours, where the hours outside 06:00–18:00 carry a
+light grey band. An Admin entering a machine at 02:14 is exactly what this product exists to show, so it
+is never cropped out of the view — and in the report it is called out in words.
+
+**Every drawing carries a Report toggle.** A chart shows the shape of something at a glance; it is
+slower to *act* on. So any drawing that takes a moment to decode has a `Segmented` switch above it —
+**Chart · Report** — and the report is the same data as sentences in a small table: who, which machine,
+when, for how long, and what it means. The chart is never the only way to read something. (The user,
+29 Sep 2026: *"it the only piece that is nice but can take awhile to make sense of"*.)
+
 **The one exception: a chart whose job is telling kinds apart.** The day timeline distinguishes four
 things — at their own machine, an Admin entered, you entered, assisted by consent — and three greys
 cannot do that at a glance. So it uses grey for the ordinary case (most of the chart) and a hue per kind
 of entry, each named in its legend. Nothing else on a page may do this; if a second chart needs it, it
 needs a reason of the same weight.
 
-**Cards are filled, not outlined.** An empty white box on a white page is a line drawing of nothing:
-figures and summaries sit on `#fafafa` with no border. The outline is kept for a card that holds a form
-or a chart, where a fill would fight its contents.
+**Cards are filled, not outlined** — an empty white box on a white page is a line drawing of nothing.
+Decided once, for every surface:
+
+| | Surface | Why |
+|---|---|---|
+| **Filled** `#fafafa` | figures, summary cards, machine tiles, anything read rather than filled in | the fill is what makes it a thing; forty outlined tiles is a grid of empty frames |
+| **Filled, tinted** | an exception — a violation, a machine that needs someone | the tint *is* the state; no border, and never a left-edge stripe |
+| **Outlined** `#fff` | a card holding a form; a conversation list | the inputs are white and would float on a fill; message rows need an edge to sit against |
+| **Neither** | a drawer's label/value block, `Empty`, `Timeline`, `Tree`, `Table` | they sit on the page itself |
+
+A card never goes inside another card — that is a `Divider`.
 
 ---
 
@@ -149,7 +168,10 @@ Stated once, so no screen invents its own.
    because it is about correctness, not looks.)
 10. **The Engine decides; the page renders.** The UI never computes authority, never hides what the
     Engine would refuse — it asks and reports the answer.
-11. **A button is two words at most.** It names the act and stops; who it affects and what it costs are
+11. **No left-edge stripes. Anywhere.** Nothing — no banner, card, row, alert or panel — carries a
+    coloured bar down its left side. Once one row has one, every row wants one and the page becomes a
+    barcode. State is said by a dot, a tint on the whole surface, or the words. This is a hard rule.
+12. **A button is two words at most.** It names the act and stops; who it affects and what it costs are
     said beside it or in the confirm, never inside the label. *End session*, not "End their session".
     *Assign Admin*, not "Assign an Admin to Logistics". *Re-check*, not "Check them again". The same
     holds for menu entries and the confirm's own buttons.
@@ -162,11 +184,11 @@ antd has no vocabulary for these, and they are the product:
 
 | | What it draws | Built from |
 |---|---|---|
-| **Day timeline** | who held each machine, and when | custom Canvas/Shapes in a `Card` |
+| **Day timeline** | who held each machine, and when. Two switches: **6 to 6 · 24 hours** for the span (06:00–18:00 is the default; 24 hours shades the night so an entry at 02:14 cannot pass as normal) and **Chart · Report** for how you read it | custom Shapes + `Table`, behind two `Segmented`s |
 | **Fleet view** | a department's machines at a glance, 4 to 240 | `Table` by default; a compact grid as a second view |
 | **Flow graph** | source → transforms → destinations, and where it broke | custom, in the flow's detail page |
 | **Hierarchy** | department → Admin → machine | antd `Tree` where it is a list; custom only if a picture earns it |
-| **Session banner** | you are inside someone's machine, and for how long | a slim strip — three treatments drawn in the kit, one to pick |
+| **Session banner** | you are inside someone's machine, and for how long | a slim tinted strip (chosen 29 Sep 2026): the tint says the kind, a line along the **bottom** drains as the clock runs, and no stripe down the left |
 | **Machine cell** | a machine's state inside a table row | `Badge` + hostname + a reason |
 
 The rule for all of them: **use the antd component unless it genuinely cannot say the thing.** A table
