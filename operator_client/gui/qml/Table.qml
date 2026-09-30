@@ -81,7 +81,8 @@ Item {
         return Math.max(1, n)
     }
     function colWidth(c) {
-        return c.width ? c.width : Math.max(140, (width - fixedWidth - 2 * Theme.s3) / flexCount)
+        var gutter = 2 * Theme.s3 + (selectable ? 16 + Theme.s3 : 0)
+        return c.width ? c.width : Math.max(140, (width - fixedWidth - gutter) / flexCount)
     }
     function cellText(c, row) {
         if (!row) return ""
