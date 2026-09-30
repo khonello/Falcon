@@ -30,11 +30,17 @@ Item {
             subtitle: "This machine's console, and how it reaches the Engine."
         }
 
-        Alert {
+        // not connected is not a small note: nothing on any page is live, so it takes the page
+        Result {
             width: parent.width
+            height: 200
             visible: !falcon.isConnected
             kind: "danger"
-            text: falcon.failMessage !== "" ? falcon.failMessage : "Not connected to the Engine."
+            title: "Not connected"
+            hint: (falcon.failMessage !== "" ? falcon.failMessage
+                                             : "The Engine did not answer on " + falcon.engineAddress)
+                  + ". Nothing you can see here is live."
+            Btn { kind: "primary"; text: "Reconnect"; onClicked: falcon.retryNow() }
         }
 
         Rectangle {

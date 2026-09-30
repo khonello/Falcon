@@ -99,16 +99,29 @@ Item {
                 emptyText: "No automations yet"
                 emptyHint: "An automation is one sentence: when something happens, run these Actions."
                 onRowActivated: function (row) { root.open(row) }
+                onRowToggled: function (row, on) {
+                    root.chosen = row
+                    root.act("control.event_update", { event_id: row.event_id, enabled: on },
+                             on ? "On" : "Paused")
+                }
+                onRowAction: function (key, row) {
+                    root.chosen = row
+                    if (key === "out") retire.open()
+                    else root.open(row)
+                }
                 columns: [
+                    { title: "", key: "enabled", width: 56, toggle: function (r) { return r.enabled } },
                     { title: "When", key: "when", width: 240, strong: true },
                     { title: "On", key: "where", width: 130,
                       tone: function () { return "mid" } },
                     { title: "Run", key: "then",
                       tone: function (r) { return r.then === "nothing yet" ? "warn" : "mid" } },
-                    { title: "State", key: "stateWord", width: 90, tag: true,
-                      filters: ["on", "off"] },
                     { title: "Last time", key: "lastFired", width: 150, mono: true,
-                      tone: function () { return "mid" } }
+                      tone: function () { return "mid" } },
+                    { title: "", key: "event_id", width: 44, menu: function (r) {
+                        return [{ key: "open", label: "Open" },
+                                { key: "out", label: "Take it out", danger: true, divided: true }]
+                      } }
                 ]
             }
         }

@@ -14,6 +14,8 @@ Item {
     property string look: "list"          // list | grid | day
     property var day: []                  // hierarchy.sessions_today
     property int fromHour: 0
+    property string find: ""
+    property var picked: []
 
     // one place decides what a machine's state is, so every page agrees
     readonly property var machines: {
@@ -46,6 +48,13 @@ Item {
             }
         }
         out.sort(function (a, b2) { return String(a.host).localeCompare(String(b2.host)) })
+        if (find !== "") {
+            var q = find.toLowerCase()
+            out = out.filter(function (m) {
+                return (m.host + " " + m.who + " " + m.department + " " + m.line).toLowerCase()
+                       .indexOf(q) >= 0
+            })
+        }
         return out
     }
     readonly property int needing: machines.filter(function (m) { return m.state === "warn" || m.state === "danger" }).length
@@ -81,6 +90,13 @@ Item {
             title: "Machines"
             subtitle: root.machines.length + " client PCs"
                       + (root.needing > 0 ? " \u00b7 " + root.needing + " need someone" : "")
+            Search {
+                objectName: "machinesSearch"
+                anchors.verticalCenter: parent.verticalCenter
+                width: 200
+                placeholder: "Hostname or person"
+                onSearched: function (t) { root.find = t }
+            }
             Segmented {
                 objectName: "machinesLook"
                 anchors.verticalCenter: parent.verticalCenter
@@ -138,6 +154,19 @@ Item {
                 loading: !root.loaded
                 pageSize: 12
                 rows: root.machines
+                selectable: true
+                idKey: "host"
+                onSelectionChanged: function (s) { root.picked = s }
+                onRowAction: function (key, row) { root.act(key, row) }
+                bulk: [
+                    Btn {
+                        objectName: "bulkRun"
+                        small: true
+                        kind: "primary"
+                        text: "Run action"
+                        onClicked: bulkRunner.open()
+                    }
+                ]
                 emptyText: "No machines yet"
                 emptyHint: "A machine appears here once it is registered."
                 onRowActivated: function (row) { root.chosen = row; detail.open() }
@@ -152,10 +181,62 @@ Item {
                       filters: root.tree.map(function (d) { return d.name }) },
                     { title: "Signed in", key: "who", width: 130 },
                     { title: "Version", key: "version", width: 100, mono: true,
-                      tone: function () { return "mid" } }
+                      tone: function () { return "mid" } },
+                    { title: "", key: "host", width: 44, menu: function (r) {
+                        return [{ key: "enter", label: "Enter this machine" },
+                                { key: "run", label: "Run an action" },
+                                { key: "rekey", label: "Rekey it", danger: true, divided: true }]
+                      } }
                 ]
             }
         }
+    }
+
+    function act(key, row) {
+        chosen = row
+        if (key === "enter") enter.open()
+        else if (key === "rekey") rekeying.open()
+        else if (key === "run") { root.picked = [row.host]; bulkRunner.open() }
+    }
+
+    readonly property var chosenTargets: root.machines.filter(function (m) {
+        return root.picked.indexOf(m.host) >= 0
+    }).map(function (m) { return { pc_id: m.pc_id, host: m.host } })
+
+    BulkRun {
+        id: bulkRunner
+        objectName: "bulkRunModal"
+        page: root
+        targets: root.chosenTargets
+    }
+
+    Confirm {
+        id: enter
+        objectName: "enterConfirm"
+        page: root
+        title: "Enter this machine"
+        cost: "Whoever is on it is locked out until you leave, they are told it is you, and the whole "
+              + "session is on the record. There is a time limit, and it is counted from now."
+        verb: "Enter"
+        onAccepted: falcon.call("hierarchy.traverse", { pc_id: root.chosen.pc_id }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not entered"); return }
+            Msg.ok("Inside " + root.chosen.host)
+        })
+    }
+
+    Confirm {
+        id: rekeying
+        objectName: "rekeyConfirm"
+        page: root
+        title: "Rekey this machine"
+        cost: "Its current key stops working at once and the machine drops off until it is reinstalled "
+              + "with the new one. Do this when a key has been lost, not to tidy up."
+        verb: "Rekey"
+        destructive: true
+        onAccepted: falcon.call("hierarchy.pc_rekey", { pc_id: root.chosen.pc_id }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not rekeyed"); return }
+            Msg.urgent("New key for " + root.chosen.host, "shown once \u2014 " + r.client_key)
+        })
     }
 
     RegisterMachine {

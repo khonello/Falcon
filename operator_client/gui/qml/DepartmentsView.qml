@@ -8,6 +8,29 @@ Item {
     property var tree: []
     property bool loaded: false
     property var chosen: null
+    property string look: "list"
+    property var open: ({})
+
+    // the same departments, seen as the shape they actually are: who governs, and what sits under them
+    readonly property var branches: {
+        var out = []
+        for (var d = 0; d < tree.length; d++) {
+            var dept = tree[d]
+            var admins = dept.admins || [], workers = dept.workers || []
+            out.push({ key: "d" + dept.department_id, label: dept.name,
+                       sub: Theme.many(workers.length, "machine")
+                            + (admins.length === 0 ? "  ·  nobody governs it" : ""),
+                       depth: 0, kids: true,
+                       tone: admins.length === 0 ? "danger" : "ink" })
+            for (var a = 0; a < admins.length; a++)
+                out.push({ key: "a" + admins[a].account_id, label: admins[a].name || "unnamed",
+                           sub: "Admin", depth: 1 })
+            for (var w = 0; w < workers.length; w++)
+                out.push({ key: "w" + workers[w].pc_id, label: workers[w].hostname || "a machine",
+                           sub: workers[w].name || "", depth: 1 })
+        }
+        return out
+    }
 
     readonly property var rows: tree.map(function (d) {
         var admins = d.admins || [], machines = (d.workers || []).length
@@ -27,6 +50,13 @@ Item {
         function onConnected() { root.refresh() }
         function onDisconnected() { root.tree = []; root.loaded = false }
     }
+    // opened the first time the hierarchy is looked at, however the look was changed
+    onLookChanged: if (look === "tree" && Object.keys(open).length === 0) openAll()
+    function openAll() {
+        var all = ({})
+        for (var i = 0; i < tree.length; i++) all["d" + tree[i].department_id] = true
+        open = all
+    }
     Component.onCompleted: if (falcon.isConnected) refresh()
 
     Column {
@@ -39,6 +69,13 @@ Item {
             title: "Departments"
             subtitle: root.rows.length + " departments"
                       + (root.ungoverned > 0 ? " \u00b7 " + root.ungoverned + " with nobody governing" : "")
+            Segmented {
+                objectName: "departmentsLook"
+                anchors.verticalCenter: parent.verticalCenter
+                value: root.look
+                options: [{ value: "list", label: "List" }, { value: "tree", label: "Hierarchy" }]
+                onPicked: function (v) { root.look = v }
+            }
             Btn { objectName: "newDepartment"; kind: "primary"; iconName: "plus"; text: "New department" }
         }
 
@@ -50,10 +87,27 @@ Item {
             border.width: 1
             border.color: Theme.split
 
+            Flickable {
+                anchors.fill: parent
+                anchors.margins: Theme.s4
+                visible: root.look === "tree"
+                contentHeight: hierarchy.implicitHeight
+                clip: true
+
+                Tree {
+                    id: hierarchy
+                    objectName: "departmentsTree"
+                    width: parent.width
+                    nodes: root.branches
+                    open: root.open
+                }
+            }
+
             Table {
                 objectName: "departmentsTable"
                 anchors.fill: parent
                 anchors.margins: Theme.s1
+                visible: root.look === "list"
                 loading: !root.loaded
                 pageSize: 12
                 rows: root.rows

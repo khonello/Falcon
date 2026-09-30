@@ -108,6 +108,12 @@ Modal {
         })
     }
 
+    Steps {
+        width: parent.width
+        current: root.proposal ? 1 : 0
+        steps: ["Say it", "Read what came back"]
+    }
+
     // --- step one: who, and what ------------------------------------------------------------------
     FormRow {
         width: parent.width
@@ -224,12 +230,15 @@ Modal {
         label: "Check it"
         hint: root.keepStack ? "The Engine watches for these; only you close the task."
                              : "Nothing will be watched. You are saying so on purpose."
-        Select {
+        // two choices and the choice matters, so both are on screen rather than behind a click
+        Radio {
             objectName: "modeSelect"
             width: parent.width
             value: root.keepStack
-            options: [{ value: true, label: "Watch for the lines above" },
-                      { value: false, label: "Nothing to check" }]
+            options: [{ value: true, label: "Watch for the lines above",
+                        hint: "The Engine watches for them; only you close the task." },
+                      { value: false, label: "Nothing to check",
+                        hint: "Nothing is watched. You are saying so on purpose." }]
             onPicked: function (v) { root.keepStack = v }
         }
     }

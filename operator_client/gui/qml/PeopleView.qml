@@ -111,8 +111,14 @@ Item {
                 emptyText: "Nobody yet"
                 emptyHint: "Adding a person provisions their machine at the same time: one account, one PC."
                 onRowActivated: function (row) { root.chosen = row; detail.open() }
+                onRowAction: function (key, row) {
+                    root.chosen = row
+                    if (key === "offboard") leaving.open()
+                    else detail.open()
+                }
                 columns: [
-                    { title: "Name", key: "name", strong: true,
+                    { title: "Name", key: "name", strong: true, avatar: true,
+                      muted: function (r) { return r.status && r.status !== "active" },
                       tone: function (r) { return r.name === "unnamed" ? "quiet" : "ink" } },
                     { title: "Role", key: "role", width: 140, tag: true,
                       filters: ["Super User", "Admin", "Worker"] },
@@ -121,7 +127,12 @@ Item {
                     { title: "Machine", key: "machine", width: 150, mono: true,
                       tone: function () { return "mid" } },
                     { title: "State", key: "stateWord", width: 150, tag: true,
-                      filters: ["signed in", "not signed in", "offboarded"] }
+                      filters: ["signed in", "not signed in", "offboarded"] },
+                    { title: "", key: "name", width: 44, menu: function (r) {
+                        return [{ key: "open", label: "Open" },
+                                { key: "offboard", label: "Offboard", danger: true, divided: true,
+                                  enabled: r.status === "active" }]
+                      } }
                 ]
             }
         }

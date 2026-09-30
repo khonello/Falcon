@@ -88,6 +88,15 @@ Item {
                 emptyText: "No flows yet"
                 emptyHint: "A flow copies a folder one way: what changes on the source lands where you send it."
                 onRowActivated: function (row) { root.chosen = row; detail.open() }
+                onRowAction: function (key, row) {
+                    root.chosen = row
+                    if (key === "retire") retire.open()
+                    else if (key === "pause")
+                        root.act("flow.pause", { flow_id: row.flow_id }, "Flow paused")
+                    else if (key === "resume")
+                        root.act("flow.resume", { flow_id: row.flow_id }, "Flow resumed")
+                    else detail.open()
+                }
                 columns: [
                     { title: "From", key: "from", width: 240, mono: true, strong: true },
                     { title: "To", key: "to", width: 260, mono: true,
@@ -96,7 +105,15 @@ Item {
                       filters: ["running", "waiting", "stopped", "retired"],
                       tone: function (r) { return r.stateTone } },
                     { title: "Why", key: "line",
-                      tone: function (r) { return r.stateTone === "" ? "mid" : r.stateTone } }
+                      tone: function (r) { return r.stateTone === "" ? "mid" : r.stateTone } },
+                    { title: "", key: "flow_id", width: 44, menu: function (r) {
+                        return [{ key: "open", label: "Open" },
+                                { key: r.status === "paused" ? "resume" : "pause",
+                                  label: r.status === "paused" ? "Resume it" : "Pause it",
+                                  enabled: r.status !== "inactive" },
+                                { key: "retire", label: "Retire it", danger: true, divided: true,
+                                  enabled: r.status !== "inactive" }]
+                      } }
                 ]
             }
         }

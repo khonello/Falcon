@@ -18,7 +18,7 @@ Modal {
     property var targets: []                  // pc ids; empty means every machine in reach
     property var chain: []                    // action ids, in order
     property string timeMode: "at"            // at | every
-    property string at: ""
+    property string at: "09:00"
     property int everyMinutes: 15
     property bool tried: false
     property bool busy: false
@@ -61,7 +61,7 @@ Modal {
         targets = []
         chain = [null]
         timeMode = "at"
-        at = ""
+        at = "09:00"
         atField.text = ""
         everyMinutes = 15
         tried = false
@@ -127,6 +127,12 @@ Modal {
         })
     }
 
+    Steps {
+        width: parent.width
+        current: root.eventType === null ? 0 : root.chain.filter(function (c) { return c !== null }).length === 0 ? 1 : 2
+        steps: ["When", "Where", "Do"]
+    }
+
     FormRow {
         width: parent.width
         label: "When"
@@ -160,19 +166,28 @@ Modal {
                           { value: "every", label: "Every so many minutes" }]
                 onPicked: function (v) { root.timeMode = v }
             }
-            Field {
-                id: atField
+            // a time of day is two numbers, not a string somebody has to get right
+            TimeField {
                 objectName: "eventAt"
-                width: parent.width
-                visible: !(root.recurring && root.timeMode === "every")
-                placeholderText: root.recurring ? "18:30" : "2026-10-03T16:00"
-                onTextChanged: root.at = text
+                visible: root.recurring && root.timeMode === "at"
+                onChanged: function (h, m) { root.at = (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m }
             }
             Field {
-                width: 160
+                id: atField
+                width: parent.width
+                visible: !root.recurring
+                placeholderText: "2026-10-03T16:00"
+                onTextChanged: root.at = text
+            }
+            Num {
                 visible: root.recurring && root.timeMode === "every"
-                text: "15"
-                onTextEdited: root.everyMinutes = parseInt(text) || 0
+                width: 170
+                value: 15
+                from: 1
+                to: 1440
+                step: 5
+                unit: "min"
+                onChanged: function (v) { root.everyMinutes = v }
             }
         }
     }
@@ -180,38 +195,19 @@ Modal {
     FormRow {
         width: parent.width
         label: "On"
-        hint: "Leave it empty and it watches every machine you can see."
-        Column {
+        hint: "Choose none and it watches every machine you can see."
+        // which machines are watched matters as much as which are not, so both sides are shown
+        Transfer {
+            objectName: "eventMachines"
             width: parent.width
-            spacing: Theme.s2
-
-            Repeater {
-                model: root.targets.length
-                delegate: Row {
-                    required property int index
-                    width: parent.width
-                    spacing: Theme.s2
-                    Select {
-                        width: parent.width - 32 - Theme.s2
-                        options: root.machineOptions
-                        value: root.targets[parent.index]
-                        placeholder: "Which machine"
-                        onPicked: function (v) { root.targets = root.setAt(root.targets, parent.index, v) }
-                    }
-                    Btn {
-                        kind: "text"
-                        iconName: "close"
-                        onClicked: root.dropTarget(parent.index)
-                    }
-                }
-            }
-            Btn {
-                objectName: "addEventMachine"
-                kind: "link"
-                iconName: "plus"
-                text: root.targets.length === 0 ? "One machine" : "Another"
-                onClicked: root.addTarget()
-            }
+            height: 180
+            leftTitle: "Not watched"
+            rightTitle: "Watched"
+            chosen: root.targets.filter(function (t) { return t !== null })
+            all: root.machines.map(function (m) {
+                return { key: m.pc_id, label: m.hostname + "  \u00b7  " + m.department }
+            })
+            onChanged: function (picked) { root.targets = picked }
         }
     }
 

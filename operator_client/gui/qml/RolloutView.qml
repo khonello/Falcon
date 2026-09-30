@@ -78,6 +78,57 @@ Item {
             }
         }
 
+        // how far each department has got, because the gate is held department by department
+        Rectangle {
+            width: parent.width
+            height: bars.implicitHeight + 2 * Theme.s4
+            visible: root.departments.length > 0
+            radius: Theme.radiusLg
+            color: Theme.surface
+            border.width: 1
+            border.color: Theme.split
+
+            Column {
+                id: bars
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: Theme.s4
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.s3
+
+                Repeater {
+                    model: root.departments
+                    delegate: Row {
+                        required property var modelData
+                        width: bars.width
+                        spacing: Theme.s3
+                        readonly property int total: modelData.total || 0
+                        readonly property int on: modelData.on_current || 0
+
+                        Txt {
+                            width: 160
+                            text: modelData.name || ""
+                            font.pixelSize: Theme.fSmall
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Progress {
+                            width: parent.width - 160 - 180 - 2 * Theme.s3
+                            anchors.verticalCenter: parent.verticalCenter
+                            value: parent.total === 0 ? 0 : parent.on / parent.total
+                            tone: parent.on === parent.total ? "accent" : "warn"
+                        }
+                        Txt {
+                            width: 180
+                            text: parent.on + " of " + parent.total + " on it"
+                            tone: "mid"
+                            font.pixelSize: Theme.fSmall
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                }
+            }
+        }
+
         Alert {
             width: parent.width
             visible: root.boss && !root.clear && root.loaded

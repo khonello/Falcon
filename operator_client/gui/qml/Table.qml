@@ -5,7 +5,8 @@ import "."
 // THE BACKBONE (docs/UI-COMPONENTS.md). Sort by clicking a heading, filter from its funnel, page at
 // the foot, and an Empty state that says what would be here.
 //
-//   columns: [{ title, key, width, mono, align, tag, tone(row)->string, text(row)->string, filters: [] }]
+//   columns: [{ title, key, width, mono, align, tag, avatar, tone(row), text(row), tip(row),
+//              menu(row) -> [{key,label,danger,divided}], toggle(row) -> bool, filters: [] }]
 //   width 0 (or absent) means "share what is left"
 Item {
     id: root
@@ -27,6 +28,11 @@ Item {
     property var selected: []                 // the ids, not the rows: rows are refetched, ids are not
     signal rowActivated(var row)
     signal selectionChanged(var selected)
+    signal rowAction(string key, var row)
+    signal rowToggled(var row, bool on)
+
+    // what the page offers to do with the rows that are chosen; shown only while some are
+    property alias bulk: bulkRow.data
 
     function idOf(row) { return String(row[idKey !== "" ? idKey : (columns[0] ? columns[0].key : "")]) }
     function isPicked(row) { return selected.indexOf(idOf(row)) >= 0 }
@@ -188,6 +194,52 @@ Item {
         }
     }
 
+    // WHAT YOU CHOSE, AND WHAT YOU CAN DO WITH IT. It sits over the heading rather than above the
+    // table, because the heading is what it replaces: while a set is chosen, sorting it is not the
+    // question -- what to do with it is. The Engine already takes many machines at once.
+    Rectangle {
+        anchors.fill: head
+        visible: root.selectable && root.selected.length > 0
+        z: 3
+        color: Theme.primarySoft
+        radius: Theme.radius
+
+        Check {
+            id: allPicked
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.s3
+            anchors.verticalCenter: parent.verticalCenter
+            checked: true
+            partial: root.pickedHere < root.pageRows.length
+            onToggled: root.pickAll(false)
+        }
+        Txt {
+            anchors.left: allPicked.right
+            anchors.leftMargin: Theme.s3
+            anchors.verticalCenter: parent.verticalCenter
+            text: Theme.many(root.selected.length, "chosen", "chosen")
+            strong: true
+            font.pixelSize: Theme.fSmall
+        }
+        Row {
+            id: bulkRow
+            anchors.right: drop.left
+            anchors.rightMargin: Theme.s2
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Theme.s2
+        }
+        Btn {
+            id: drop
+            kind: "text"
+            small: true
+            text: "Clear"
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.s2
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: root.pickAll(false)
+        }
+    }
+
     // --- the rows ----------------------------------------------------------------------------------
     ListView {
         id: body
@@ -241,10 +293,12 @@ Item {
                         height: rowItem.height
 
                         Txt {
-                            visible: !cell.modelData.tag
-                            anchors.left: parent.left
+                            visible: !cell.modelData.tag && !cell.modelData.menu && !cell.modelData.toggle
+                            anchors.left: cell.modelData.avatar ? face.right : parent.left
+                            anchors.leftMargin: cell.modelData.avatar ? Theme.s2 : 0
                             anchors.verticalCenter: parent.verticalCenter
-                            width: Math.max(20, parent.width - Theme.s3)
+                            width: Math.max(20, parent.width - Theme.s3
+                                            - (cell.modelData.avatar ? 22 + Theme.s2 : 0))
                             horizontalAlignment: cell.modelData.align === "right" ? Text.AlignRight : Text.AlignLeft
                             text: root.cellText(cell.modelData, rowItem.modelData)
                             mono: !!cell.modelData.mono
@@ -257,6 +311,38 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.cellText(cell.modelData, rowItem.modelData)
                             tone: root.cellTone(cell.modelData, rowItem.modelData)
+                        }
+                        // a person is a face and a name, because a column of names all looks alike
+                        Avatar {
+                            id: face
+                            visible: !!cell.modelData.avatar
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            size: 22
+                            name: root.cellText(cell.modelData, rowItem.modelData)
+                            muted: cell.modelData.muted ? !!cell.modelData.muted(rowItem.modelData) : false
+                        }
+                        // the acts on this row, without opening it
+                        RowMenu {
+                            visible: !!cell.modelData.menu
+                            anchors.right: parent.right
+                            anchors.rightMargin: Theme.s2
+                            anchors.verticalCenter: parent.verticalCenter
+                            items: cell.modelData.menu ? cell.modelData.menu(rowItem.modelData) : []
+                            onChose: function (key) { root.rowAction(key, rowItem.modelData) }
+                        }
+                        // on or off, in the row, because that is where the thing being switched is
+                        Toggle {
+                            visible: !!cell.modelData.toggle
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            on: cell.modelData.toggle ? !!cell.modelData.toggle(rowItem.modelData) : false
+                            onToggled: function (v) { root.rowToggled(rowItem.modelData, v) }
+                        }
+                        // the full value of something the column had to cut short
+                        Tip {
+                            text: cell.modelData.tip ? cell.modelData.tip(rowItem.modelData) : ""
+                            over: cell
                         }
                     }
                 }

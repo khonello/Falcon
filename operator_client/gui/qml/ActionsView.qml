@@ -85,6 +85,11 @@ Item {
                 emptyText: "Nothing in the library yet"
                 emptyHint: "An Action is one thing a machine can be made to do. Write it once, run it anywhere."
                 onRowActivated: function (row) { root.chosen = row; detail.open() }
+                onRowAction: function (key, row) {
+                    root.chosen = row
+                    if (key === "run") runner.open()
+                    else detail.open()
+                }
                 columns: [
                     { title: "Action", key: "name", strong: true },
                     { title: "Kind", key: "kind", width: 140, tag: true,
@@ -92,7 +97,11 @@ Item {
                     { title: "What it is", key: "does", width: 200,
                       tone: function () { return "mid" } },
                     { title: "Gives up after", key: "timeout", width: 130, mono: true, align: "right",
-                      tone: function () { return "mid" } }
+                      tone: function () { return "mid" } },
+                    { title: "", key: "action_id", width: 44, menu: function (r) {
+                        return [{ key: "open", label: "Open" },
+                                { key: "run", label: "Run it now" }]
+                      } }
                 ]
             }
         }

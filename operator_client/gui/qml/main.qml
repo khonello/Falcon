@@ -34,6 +34,19 @@ ApplicationWindow {
     // They reach the operating features by traversing into an Admin, and then the console shows
     // exactly what that Admin sees, with the red banner up and reads answered as them.
     readonly property bool boss: falcon.role === "super_user"
+
+    // THE SIDER SAYS WHAT NEEDS A PERSON. Overview already works out that list for its own page, so
+    // it is the one that counts them; a second count somewhere else would drift from the first.
+    readonly property var needBadges: {
+        var out = ({})
+        var needs = overviewPage && overviewPage.needs ? overviewPage.needs : []
+        for (var i = 0; i < needs.length; i++)
+            out[needs[i].where] = (out[needs[i].where] || 0) + 1
+        return out
+    }
+    readonly property var allAreas: baseAreas.map(function (a) {
+        return { key: a.key, icon: a.icon, label: a.label, badge: shell.needBadges[a.key] || 0 }
+    })
     readonly property bool lookingThrough: boss && falcon.traversing
     readonly property var governance: ["overview", "departments", "people", "tasks", "reports",
                                        "rollout", "record", "settings"]
@@ -54,7 +67,7 @@ ApplicationWindow {
     // a session without looking through it does not, which is why this is a binding and not a flag
     Binding { target: falcon; property: "viewThroughSession"; value: shell.lookingThrough }
 
-    readonly property var allAreas: [
+    readonly property var baseAreas: [
         { key: "overview",    icon: "pulse",   label: "Overview" },
         { key: "departments", icon: "dept",    label: "Departments" },
         { key: "people",      icon: "people",  label: "People" },
@@ -266,6 +279,7 @@ ApplicationWindow {
                 }
 
                 OverviewView {
+                    id: overviewPage
                     objectName: "overviewView"
                     anchors.fill: parent
                     visible: shell.view === "overview"

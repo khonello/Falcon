@@ -162,10 +162,27 @@ environ-operator\Scripts\python.exe scripts\preview.py --view kit
 It is not an area of the console; the shell lets that one view through and the sider never offers it.
 One test loads it, which is the cheapest check that no component in the kit is broken.
 
-**Still to do: adoption.** The kit is complete; the pages have not caught up with it. Nothing yet uses
-`RowMenu`, `Tabs`, `Steps`, `Trail`, `Result`, `Popconfirm`, `Toggle`, `Num`, `Level`, `Transfer`,
-`Tree`, `Feed`, `Statistic` or row selection, and several pages still hand-roll what a component now
-does properly. That is the third wave, and it is where the console actually gets better.
+### Third wave — the pages adopt it (30 Sep 2026)
+
+| Page | What it took |
+|---|---|
+| Machines | a `Search`, row selection with a **bulk bar** over the heading, a `RowMenu` per row (Enter · Run an action · Rekey), and `BulkRun` — one action across the chosen machines, one call each, because that is how the Engine takes them |
+| People | an `Avatar` in the name column, a `RowMenu` (Open · Offboard) |
+| Automation | the enabled switch is a `Toggle` **in the row**, where the thing being switched is; `RowMenu` for the rest |
+| Flows | `RowMenu`: Open · Pause/Resume · Retire, without opening the drawer |
+| Actions | `RowMenu`: Open · Run it now |
+| Tasks | the drawer is `Tabs` — Checks (with a count of what has not passed) and History, drawn as a `Trail` |
+| New task | `Steps` (Say it → Read what came back) and a `Radio` where a Select hid the second choice |
+| New rule | `Steps` (When → Where → Do), a `TimeField` instead of a typed "18:30", a `Num` for the interval, and a `Transfer` for the machines — which are watched matters as much as which are not |
+| Reports | the pane switch is a `Segmented`: the same reports seen two ways |
+| Rollout | a `Progress` per department, because the gate is held department by department |
+| Settings | not connected is a `Result` that takes the page, not a note at the top of it |
+| Departments | a `Segmented`: the table, or the hierarchy as a `Tree` |
+| Record | the search box is a `Search` and empties itself |
+| The sider | counts what needs a person, per area — from Overview's own list, so the two can never drift |
+
+The table itself grew the column kinds these needed: `menu`, `toggle`, `avatar`, `tip`, plus row
+selection and the bulk bar that replaces the heading while a set is chosen.
 
 ---
 

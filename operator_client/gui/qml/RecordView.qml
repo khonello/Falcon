@@ -65,13 +65,12 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 onChanged: function (f, t) { root.fromDate = f; root.toDate = t }
             }
-            Field {
+            Search {
                 objectName: "recordSearch"
                 width: 220
-                iconName: "search"
-                placeholderText: "Search the record"
+                placeholder: "Search the record"
                 anchors.verticalCenter: parent.verticalCenter
-                onTextEdited: root.searchText = text
+                onSearched: function (t) { root.searchText = t }
             }
             Btn { objectName: "recordExport"; kind: "primary"; iconName: "download"; text: "Export" }
         }

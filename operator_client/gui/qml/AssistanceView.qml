@@ -181,43 +181,17 @@ Item {
         subtitle: root.chosen ? root.chosen.stateWord : ""
 
         // the conversation, oldest first, because that is how it was said
-        Column {
+        Feed {
+            objectName: "channelFeed"
             width: parent.width
-            spacing: Theme.s2
-
-            Repeater {
-                model: root.channel && root.channel.messages ? root.channel.messages : []
-                delegate: Column {
-                    required property var modelData
-                    width: parent.width
-                    spacing: 1
-
-                    readonly property bool byMe: modelData.sender_account_id === falcon.accountId
-
-                    Txt {
-                        text: parent.byMe ? "You" : (root.chosen ? root.chosen.who : "them")
-                        tone: "quiet"
-                        font.pixelSize: 11
-                    }
-                    Rectangle {
-                        width: parent.width
-                        height: line.contentHeight + 2 * Theme.s2
-                        radius: Theme.radius
-                        color: parent.byMe ? Theme.primarySoft : Theme.fill
-                        border.width: 1
-                        border.color: Theme.split
-                        Txt {
-                            id: line
-                            anchors.fill: parent
-                            anchors.margins: Theme.s2
-                            text: modelData.body
-                            wrapMode: Text.WordWrap
-                            elide: Text.ElideNone
-                            font.pixelSize: Theme.fSmall
-                        }
-                    }
-                }
-            }
+            items: root.channel && root.channel.messages
+                   ? root.channel.messages.map(function (m) {
+                       return { who: root.chosen ? root.chosen.who : "them",
+                                mine: m.sender_account_id === falcon.accountId,
+                                body: m.body,
+                                at: m.sent_at ? Task.when(m.sent_at).substring(0, 5) : "" }
+                     })
+                   : []
         }
         Empty {
             width: parent.width

@@ -10,6 +10,7 @@ Item {
     property bool loaded: false
     property var chosen: null            // the table row
     property var detailTask: null        // what task.get answered, with the live stack
+    property string pane: "checks"
 
     readonly property var rows: tasks.map(function (t) {
         var s = Task.state(t)
@@ -32,6 +33,7 @@ Item {
         chosen = row
         detailTask = null
         detail.open()
+        pane = "checks"
         falcon.call("task.get", { task_id: row.task_id }, function (ok, r) {
             if (ok) root.detailTask = r.task
         })
@@ -141,17 +143,22 @@ Item {
             ] : []
         }
 
-        Txt {
+        // two kinds of thing about one task: what would show it is done, and what has happened
+        Tabs {
             width: parent.width
             visible: root.detailTask !== null
-            text: "What shows it happened"
-            tone: "mid"
-            font.pixelSize: Theme.fSmall
+            current: root.pane
+            tabs: [{ key: "checks", label: "Checks",
+                     count: root.detailTask && root.detailTask.items
+                            ? root.detailTask.items.filter(function (i) { return i.status !== "passed" }).length
+                            : 0 },
+                   { key: "history", label: "History" }]
+            onPicked: function (k) { root.pane = k }
         }
         Column {
             width: parent.width
             spacing: 0
-            visible: root.detailTask !== null
+            visible: root.detailTask !== null && root.pane === "checks"
 
             Repeater {
                 model: root.detailTask && root.detailTask.items ? root.detailTask.items : []
@@ -184,9 +191,28 @@ Item {
                 }
             }
         }
+        Trail {
+            width: parent.width
+            visible: root.detailTask !== null && root.pane === "history"
+            items: root.detailTask && root.detailTask.expectations
+                   ? root.detailTask.expectations.map(function (e) {
+                       return { at: Task.when(e.observed_at).substring(0, 5),
+                                text: e.summary || e.kind || "something happened" }
+                     })
+                   : []
+        }
+        Empty {
+            width: parent.width
+            visible: root.detailTask !== null && root.pane === "history"
+                     && !(root.detailTask.expectations || []).length
+            text: "Nothing yet"
+            hint: "What the Engine notices about this task shows up here."
+        }
+
         Alert {
             width: parent.width
-            visible: root.detailTask !== null && root.detailTask.verification_mode === "none"
+            visible: root.pane === "checks" && root.detailTask !== null
+                     && root.detailTask.verification_mode === "none"
             kind: "note"
             text: "Nothing is checked on this one. The assigner chose that when they made it."
         }

@@ -77,10 +77,11 @@ Item {
             subtitle: root.boss ? Theme.many(root.rows.length, "report") + ", all of them"
                                 : root.rows.length + " routed here"
                                   + (root.open > 0 ? " · " + root.open + " not addressed" : "")
-            Select {
+            // the same reports seen two ways, so a Segmented and not a Select
+            Segmented {
                 objectName: "reportsPane"
+                anchors.verticalCenter: parent.verticalCenter
                 visible: root.boss
-                width: 230
                 value: false
                 options: [{ value: false, label: "The reports" },
                           { value: true, label: "Who addressed what" }]
