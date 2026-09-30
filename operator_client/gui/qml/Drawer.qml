@@ -37,6 +37,8 @@ Popup {
     background: Rectangle {
         color: Theme.surface
         Rectangle { width: 1; height: parent.height; color: Theme.split }
+        // nothing pressed inside this drawer may reach the page behind it
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; hoverEnabled: true }
     }
     Overlay.modal: Rectangle { color: Qt.rgba(0, 0, 0, 0.35) }
 

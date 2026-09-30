@@ -171,11 +171,21 @@ Item {
             required property var modelData
             width: body.width
             height: 40
-            color: hover.hovered ? Theme.hover : "transparent"
+            color: hover.containsMouse ? Theme.hover : "transparent"
 
             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.split }
-            HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: root.rowActivated(rowItem.modelData) }
+
+            // MouseArea, not TapHandler. A TapHandler reacts to any press over its item, even one
+            // that landed on a dialog sitting on top of it -- so opening a dropdown in a modal could
+            // also open this row's drawer behind it. A MouseArea only hears the press when it is the
+            // topmost thing under the cursor, which is the rule a row actually wants.
+            MouseArea {
+                id: hover
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.rowActivated(rowItem.modelData)
+            }
 
             Row {
                 anchors.fill: parent

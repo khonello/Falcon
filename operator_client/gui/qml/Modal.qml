@@ -32,7 +32,12 @@ Popup {
     enter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durFast } }
     exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.durFast } }
 
-    background: Rectangle { radius: Theme.radiusLg; color: Theme.surface }
+    background: Rectangle {
+        radius: Theme.radiusLg
+        color: Theme.surface
+        // nothing pressed inside this dialog may reach the page behind it
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; hoverEnabled: true }
+    }
     Overlay.modal: Rectangle { color: Qt.rgba(0, 0, 0, 0.35) }
 
     Item {

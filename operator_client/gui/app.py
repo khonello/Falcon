@@ -61,6 +61,19 @@ def create(config: LocalConfig, *, auto_connect: bool = False) -> tuple[QGuiAppl
         raise SystemExit("failed to load QML (see errors above)")
     win = engine.rootObjects()[0]
     QTimer.singleShot(0, lambda: fit_to_screen(win))   # after the native window exists (frame margins known)
+
+    # On quit the bridge is collected before the scene is, and every binding that reads `falcon`
+    # re-evaluates against null on the way out -- two dozen "Cannot read property of null" lines
+    # after a clean close. Take the window down first, while `falcon` is still there to read.
+    def _teardown() -> None:
+        try:
+            engine.warnings.disconnect()
+            win.hide()
+            win.deleteLater()
+        except RuntimeError:
+            pass                                       # already gone: nothing to take down
+
+    app.aboutToQuit.connect(_teardown)
     return app, engine, bridge
 
 
