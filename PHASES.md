@@ -7,34 +7,34 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ---
 
-## Where things stand (2026-09-21) and the road to shippable
+## Where things stand (2026-09-30) and the road to shippable
 
 **Real, not scaffolding.** Engine: 93 message handlers, none stubbed, 157 SQL statements across 7
 migrations (~7k lines). Worker Client: native file events + polling fallback, idle detection,
 detached subprocess execution for 17 built-ins and Custom Actions (double validation), flow relay
 (~1.6k lines). Operator Client: 88 TUI commands + the QML GUI on one shared core layer (~3.6k
-lines). 93 tests green including 7 socket-level integration scenarios; live runs of Engine +
-Worker + TUI + GUI; Linux/WSL Engine check. It went fast because the docs were specific and
+lines). 168 tests green including 7 socket-level integration scenarios and 28 for the console; live
+runs of Engine + Worker + TUI + GUI; Linux/WSL Engine check. It went fast because the docs were specific and
 everything was built through the TUI + tests, not through a UI.
 
-**Not done — do not sell without these.** Worked one after the other, in this order. The GUI is
-the primary product surface (the TUI existed to test integration), so the UI reaches an acceptable,
-UX-enforced level *before* human passes and packaging — you cannot judge how the software is used
-through a UI that does not reflect it. Each phase leaves its area at a usable level rather than
-perfect; the UI keeps improving alongside later phases.
+**Not done — do not sell without these.** Worked one after the other, in this order. The GUI is the
+primary product surface; it has been rebuilt to `docs/UI.md` and keeps being worked on. **Phase 7 is
+not finished until the user says it is** — not when the build list is ticked, not when it screenshots
+well. Nothing after it starts before then. Each phase leaves its area at a usable level rather than
+perfect.
 
-Order: **5 auth ✅** → **7 UI/UX to acceptable** → **8 human passes (GUI
-first)** → **9 packaging + deployment** → **10 hardening + ops**. UI refinement continues through 8–10.
+Order: **5 auth ✅** → **7 UI/UX (in progress — the user calls it done)** → **9 packaging +
+deployment** → **8 human passes (on the installed thing)** → **10 hardening + ops**.
 
 | # | Gap | Why it blocks a sale | Phase |
 |---|-----|----------------------|-------|
 | 1 | ~~`auth.verify` accepts anyone with a client_id; no master secret, no derived keys, no TLS~~ | done in Phase 5: master secret, derived keys at provisioning, real challenge/response, TLS with pinned cert, rekey; `DEV_*` switches stay for local work | **Phase 5** ✅ |
 | 2 | Only Claude has exercised the GUI / TUI / worker UI | Behaviour gaps a human notices; judged through the GUI once it reflects intended use | **Phase 8** (human passes, GUI first) |
 | 3 | Runs from source in venvs: no bundled interpreter, no installers, no frozen Worker exes, no service install, no update pipeline (`update_command` is an empty hook), no CI | Nothing can be installed on a customer PC; packaging usually forces real changes (paths, permissions) | **Phase 9** (packaging + deployment) |
-| 4 | Worker Overlay/Dialog exes do not exist (the blocked-state surface is a text UI); no remote mouse/keyboard during traversal | The Client-PC experience in the Hierarchy doc is not what a worker sees | **Phase 9** (with the frozen toolchain) |
+| 4 | The Worker's five windows exist (QML, `python -m worker_client.windows <kind>`) but only as source run from a venv — no frozen exes; no remote mouse/keyboard during traversal | A worker machine cannot be given a Python environment; the windows have to ship as executables | **Phase 9** (with the frozen toolchain) |
 | 5 | Not hardened: no load/scale run (many departments/PCs), no security review of unsandboxed Custom Actions, no log rotation / service wrappers, Linux Engine verified but never deployed | Unknown behaviour under real load; ops story missing | **Phase 10** (hardening + ops) |
 | 6 | LLM is a 1.7B model doing list-picks and verbatim extractions only (29/32 on the held-out benchmark; the graph settles the rest mechanically) | Fine as a "proposal assistant"; must not be pitched as AI understanding tasks — every output is surfaced for confirmation, never committed | note for sales; a 4B behind the same graph is the next lever if accuracy is challenged |
-| 7 | GUI is only *functional* — wired and correct, but generic; only the tabs are acceptable | Not near what a private company will pay for | **Phase 7** — PAUSED, blocked on a proper design meeting `design-brief.md` |
+| 7 | GUI rebuilt in the Ant Design idiom (Route B): 14 pages, Super User and Admin as two shells, the component inventory and the pages that use it, the Worker's windows on the same palette | Being worked on. It is finished when the user says so, and nothing after it starts first | **Phase 7** — in progress |
 
 ---
 
@@ -172,71 +172,56 @@ layer the GUI will reuse unchanged.
 
 ## Phase 6 — GUI (PySide6 / QML / qasync) — pulled ahead of Phase 5 by agreement (TUI phases done)
 
-- [x] `operator_client/gui/` on the same `operator_client/core/` layer as the TUI: `bridge.py` (`FalconBridge` QObject exposed to QML as `falcon` — state properties, `connectTo`/`disconnect`, one generic `call(type, payload, callback)`, `resolveDeadline`/`readFile`/`validateScript`/`pretty` helpers), `app.py` (qasync loop set *before* the QML loads so `Component.onCompleted` calls are scheduled on it), `python -m operator_client --gui`
-- [x] Persistent status surface on every screen (`StatusBar.qml`): role, account/pc/dept, session, pulsing indicators, RED BANNER (Super User inside another view), BLOCKED marker; live push feed (`PushFeed.qml`)
-- [x] Views mirroring the TUI feature set: Hierarchy (tree + sessions, traverse/block-or-end/end/extend, display + self names, assisted access), Tasks (list/detail/stack, propose → review items/flags/collisions/split → create, start/verify), Flows (list/status/history, consent/pause/resume/delete/trigger, builder with stages + destinations), Automation (dashboard, action library + built-in/custom creation with local script validation, run on pc/department, events, executions + terminate), Assistance (pings → channels with turn-taking, listeners, file search + tagging, violations), Reports (reports + routing, alerts, updates rollout, audit + deviations, department/account provisioning)
-- [x] Verified offscreen against the dev Engine (every view screenshotted with real data; traverse shows the banner) and live (`--gui` window on the qasync loop); 3 GUI tests (`tests/test_operator_gui.py`, skipped without PySide6) — 97 total green
-- [x] Window opens full screen (pinned to the work area, `app.fit_to_screen`); title bar has minimize + close only, no resize frame or maximize — verified against the native window style
-- [ ] Interactive pass by a human (`python -m operator_client --gui ...` from `environ-operator`); visual polish deferred until the behaviour is signed off
-- [ ] Worker Client Overlay exe + Dialog exe (QML, frozen with the same toolchain)
+- [x] `operator_client/gui/` on the same `operator_client/core/` layer as the TUI: `bridge.py`
+  (`FalconBridge` exposed to QML as `falcon` — state properties, `call(type, payload, callback)`,
+  `viewThroughSession`, `readFile`/`validateScript`/`narrate` helpers), `app.py` (the qasync loop set
+  *before* the QML loads), `python -m operator_client --gui`
+- [x] QML stays a thin layer over the bridge: no view talks to the socket
 - [ ] Window prefs / layout persistence (`LocalConfig.prefs` is there; nothing written yet)
 - [ ] Remote mouse/keyboard during traversal (needs an input channel; deferred from Phase 4)
 
 ---
 
-## Phase 7 — UI/UX to an acceptable level — PAUSED (blocked on design)
+## Phase 7 — UI/UX — IN PROGRESS. **It is finished when the user says it is.**
 
-The GUI is the primary product surface. A **functional** GUI exists (commit cb855ae): every screen is
-wired to the Engine and behaves correctly, on a single visual language (Theme singleton, Material
-dark, header tabs, hierarchy left rail, banner, pinned feed, footer; the Hierarchy page is built
-around the session as a control). **But it is not designed to an acceptable standard** — of what has
-been built, only the top-level tab navigation is judged acceptable; everything else is functional,
-not acceptable.
+Not when the build list is ticked and not when it screenshots well. Nothing after this phase starts
+before then.
 
-**UI work is paused here and does not resume until a design meeting "acceptable" exists and is
-approved — ideally from a proper designer.** The standard, the baseline/acceptable/finished
-definitions, and the concept-by-concept expectations are written in `design-brief.md` (self-contained;
-it deliberately does not reference any other project). Other phases may proceed while the UI is
-frozen at its current functional state.
+The bespoke design was scrapped on 29 Sep 2026 (Route B): it read as a dashboard somebody designed
+rather than as software a company runs its IT on. The console is being rebuilt in the **Ant Design
+idiom** — familiar beats distinctive — in the same PySide6/QML client. `docs/UI.md` is what we are
+building and the rules that govern it (25 of them, each written when it was decided); 
+`docs/UI-COMPONENTS.md` is the build list and what has been done against it.
 
-Where the code stands (so a future session can pick up or discard it):
-- Design system: `operator_client/gui/qml/Theme.qml` (+ `qmldir`), components `Section`,
-  `SegmentedControl`, `StatePill`, `StatTile`, `Banner`, `Btn`, `Field`, `Picker`, `Eyebrow`,
-  `DataTable`; style set to Material dark in `gui/app.py`.
-- Shell `main.qml`; `HierarchyRail.qml`; pages `HierarchyView` (rebuilt as a session control),
-  `ConnectView`, plus `Tasks/Flows/Control/Assistance/Reports` moved onto the tokens.
-- All wired through `FalconBridge`; 105 tests green including `tests/test_operator_gui.py`.
+Built so far:
 
-**23 Sep 2026 — the design now exists and the rebuild has started.** A full design was made, reviewed
-screen by screen, and published to a canvas (45 boards); the generator for it is committed in `design/`
-and `design/HANDOFF.md` is the snapshot to resume from. The QML kit and the Hierarchy screen are rebuilt
-on it for both roles; the other views are still the pre-kit ones, mounted hidden so their tests pass.
+- [x] Tokens (`Theme.qml`), the frameless shell, and the 14 pages: Overview, Departments, People,
+  Machines, Tasks, Flows, Automation, Actions, Assistance, Resources, Reports, Rollout, Record,
+  Settings
+- [x] **Super User and Admin are two shells, not one.** The Admin has all fourteen areas; the Super
+  User has eight and reaches the rest by traversing into an Admin, at which point the console is that
+  Admin's console — `viewThroughSession` on, the red "Super User in charge" banner up
+- [x] The whole antd component inventory in `operator_client/gui/qml/` (~90 files), and the pages
+  using it: row menus, row selection and a bulk bar, toggles in rows, tabs, steps, transfer, tree,
+  timeline, result, popconfirm, notification, sider counts
+- [x] Falcon's own: SessionBanner, MachineCell, DayTimeline (24h default, the night shaded),
+  FleetGrid, FlowGraph, ScriptPanel
+- [x] The Worker Client's five windows on the same palette
+- [x] `KitView.qml` — the kit drawn in itself, for judging it (`scripts/preview.py --view kit`)
+- [x] `scripts/preview.py` — every page with sample data and no Engine (`--role`, `--view`, `--open`,
+  `--inside`)
+- [x] 28 GUI tests (`tests/test_operator_gui.py`), the level taken as a fixture
 
-When resumed, build to `design-brief.md` and the canvas, not to the old screens. The remaining named work:
-- [x] Design reaching "acceptable", then approved — canvas <https://claude.ai/artifact/71rNVLEqFPPwJ2mPoD7Vpw>
-- [x] Port the Super User dashboards (`D01`–`D03`) into QML as its home — rail entry **Overview**, three
-      pages (`GlancePage`, `HierarchyPage`, `RecordPage`) on a new chart kit (`Panel`, `Legend`, `Hero`,
-      `StackedBars`, `Waffle`, `Trend`, `MiniBar`, `HealthCard`, `OrgMap`, `Arcs`, `RoutingMap`,
-      `DayTimeline`, `TierBars`), all fed by real handlers
-- [x] Push the dashboards further — descend into a department from the map (`D04-Department`), the
-      timeline on real sessions (`hierarchy.sessions_today`), per-department task/flow small multiple
-- [x] The Super User **Overview** rebuilt as one page, a perfect 2×2 grid (board `K01`): Authority,
-      Rollout, Today, Out of place. No tabs; `GlancePage`/`HierarchyPage`/`RecordPage` deleted
-- [x] The sentence layer — `operator_client/core/narrate.py` + `tests/test_narrate.py`: generated,
-      never written; twelve words; a zero is a result, an absence is not
-- [x] Clicking a cell **opens it in place** (board `K03`): the cell grows where it is and the panels
-      around it become the gradient that explains it. **All four are built** — `OpenedAuthority`,
-      `OpenedRollout`, `OpenedToday`, `OpenedOutOfPlace`, each with its own composition
-- [ ] **Traversal into an Admin: how the GUI changes.** **Designed and approved 25 Sep 2026**
-      (`DP05`–`DP17`, the department level end to end: the place, selecting, entering, the cost, the
-      four answers, the two held states, scale and maximising). **No QML, no test yet** — this is the
-      next build, and it carries the rail 8→5 with it because the department page renders the five
-- [ ] The other Super User pages: Views, Reports, Updates, Tasks, Flows, Assistance
-- [ ] Port the Admin views one at a time against their boards, deleting each legacy view as it lands
-- [ ] Fine-tune each surface to its concept (per `design-brief.md`): traversal/session, task proposal review, **flow as a graph**, resource tiers/violations, assistance channels, automation dashboard, reports/routing/alerts/updates, indicators
-- [ ] Worker Overlay + Dialog designs
-- [ ] Window prefs / layout persistence (`LocalConfig.prefs`)
-- [ ] Constraint held throughout: QML stays a thin layer over `FalconBridge`; no logic in the UI
+Known gaps, all deliberate and written down in `docs/UI-COMPONENTS.md`:
+
+- [ ] No Flow **stage** editor and no automation **condition** builder — the JSON shapes of a stage's
+  `config` and of `condition_spec` are on the explicitly-deferred list (spec §10)
+- [ ] No report-routing UI (`reports.routing_set`, deferred)
+- [ ] A proposed task item cannot be edited by hand (`used_with_file` points at another item by index;
+  removing one silently breaks the link)
+- [ ] `assistance.search`, adding a Listener, and tagging a file by hand still go through the TUI
+- [ ] Several kit components are built but not yet used by a page (Popover, Collapse, Suggest,
+  TreeSelect, Upload, Secret, Level, Statistic)
 
 ---
 
