@@ -82,6 +82,8 @@ Item {
             color: Theme.surface
             border.width: 1
             border.color: Theme.split
+            // takes every press in the popup that nothing else took, so none of it reaches the page
+            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; hoverEnabled: true }
         }
 
         property date shown: new Date()
@@ -103,7 +105,7 @@ Item {
                         width: parent.width
                         height: 28
                         radius: Theme.radiusSm
-                        color: ph.hovered ? Theme.hover : "transparent"
+                        color: ph.containsMouse ? Theme.hover : "transparent"
                         Txt {
                             anchors.left: parent.left
                             anchors.leftMargin: Theme.s2
@@ -111,8 +113,13 @@ Item {
                             text: modelData[0]
                             font.pixelSize: Theme.fSmall
                         }
-                        HoverHandler { id: ph; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: root.preset(modelData[1]) }
+                        MouseArea {
+                            id: ph
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.preset(modelData[1])
+                        }
                     }
                 }
                 Item { width: 1; height: Theme.s2 }

@@ -262,6 +262,16 @@ def prop(obj: QObject, name: str):
     return v.toVariant() if isinstance(v, QJSValue) else v
 
 
+def _pump(seconds: float = 0.4) -> None:
+    """Turn Qt's loop for a while, asserting nothing -- for letting a click be delivered."""
+    import time
+
+    app = QCoreApplication.instance()
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        app.processEvents()
+
+
 def _spin(cond, timeout: float = 2.0) -> None:
     """Qt's own loop, turned by hand. These tests run on asyncio, so a transition only advances if
     somebody pumps the Qt events -- and a drawer sliding out is a transition."""
@@ -802,3 +812,26 @@ def test_the_session_banner_empties_as_the_clock_runs(gui):
     banner.setProperty("until", (now + timedelta(minutes=10)).isoformat())
     assert 0.4 < prop(banner, "remaining") < 0.6       # halfway through
     assert 9 <= prop(banner, "minutes") <= 11
+
+
+def test_a_floating_popup_consumes_its_own_clicks(gui):
+    """A popup that floats over the page is not modal, so whatever it does not swallow is delivered
+    to the item underneath -- and on a table that is a row, and a row opens a drawer.
+
+    This is structural on purpose. A TapHandler reacts to a press without consuming it; a MouseArea
+    consumes it. So every floating popup in the kit answers with MouseAreas, and this walks them to
+    say so -- a coordinate-level click test could not be made to fail on the old code offscreen, so
+    it would have been a test that proved nothing.
+    """
+    win, _ = gui
+    win.setProperty("view", "record")
+    field = win.findChild(QObject, "recordRange")           # the date range: two months and a list
+    assert field is not None
+
+    areas = [c for c in field.findChildren(QObject)
+             if "MouseArea" in c.metaObject().className()]
+    assert areas, "the date popup must answer with MouseAreas, not TapHandlers"
+
+    # and the popup's own background takes anything the contents did not
+    fills = [a for a in areas if a.property("width") and a.property("width") > 300]
+    assert fills, "the popup needs one MouseArea across it, for the gaps between its controls"

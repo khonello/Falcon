@@ -94,12 +94,16 @@ Item {
                     color: (parent.isFrom || parent.isTo) ? Theme.onDark : Theme.ink
                     font.pixelSize: Theme.fSmall
                 }
-                HoverHandler {
-                    enabled: parent.real
-                    cursorShape: Qt.PointingHandCursor
-                    onHoveredChanged: if (hovered && root.from && !root.to) root.hoverDate = parent.day
+                // MouseArea, not TapHandler: this grid floats over the page in a popup, and a
+                // TapHandler reacts to a press without consuming it -- so the table row underneath
+                // would react too, and open its drawer
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: parent.real ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onEntered: if (parent.real && root.from && !root.to) root.hoverDate = parent.day
+                    onClicked: if (parent.real) root.picked(parent.day)
                 }
-                TapHandler { enabled: parent.real; onTapped: root.picked(parent.day) }
             }
         }
     }

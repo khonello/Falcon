@@ -64,6 +64,10 @@ Item {
             color: Theme.surface
             border.width: 1
             border.color: Theme.split
+            // A popup that floats over the page is not modal, so anything it does not swallow is
+            // delivered to whatever is underneath -- which on a table is a row, and a row opens a
+            // drawer. This takes every press in the popup that no option took.
+            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; hoverEnabled: true }
         }
 
         ListView {
@@ -77,7 +81,7 @@ Item {
                 height: 30
                 radius: Theme.radiusSm
                 color: modelData.value === root.value ? Theme.primarySoft
-                       : oh.hovered ? Theme.hover : "transparent"
+                       : oh.containsMouse ? Theme.hover : "transparent"
                 Txt {
                     anchors.left: parent.left
                     anchors.leftMargin: Theme.s2
@@ -87,9 +91,14 @@ Item {
                     text: modelData.label
                     strong: modelData.value === root.value
                 }
-                HoverHandler { id: oh; cursorShape: Qt.PointingHandCursor }
-                TapHandler {
-                    onTapped: {
+                // MouseArea, not TapHandler: a TapHandler reacts to a press without consuming it,
+                // so the row under the popup would react as well
+                MouseArea {
+                    id: oh
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
                         root.value = modelData.value
                         root.picked(modelData.value)
                         pop.close()
