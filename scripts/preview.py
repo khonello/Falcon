@@ -16,6 +16,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# One word, not a flag: a level, a page, or both. Flags still work for the screenshot scripts.
+WORDS = [a for a in sys.argv[1:] if not a.startswith("-")]
+ROLE = "admin" if "admin" in WORDS else "super_user"
+INSIDE = "inside" in WORDS
+AREAS = ("overview", "departments", "people", "machines", "tasks", "flows", "automation", "actions",
+         "assistance", "resources", "reports", "rollout", "record", "settings", "kit")
+VIEW = next((w for w in WORDS if w in AREAS), "")
+if "--role" in sys.argv:                        # the older spelling, still used by the shot scripts
+    ROLE = sys.argv[sys.argv.index("--role") + 1]
+if "--view" in sys.argv:
+    VIEW = sys.argv[sys.argv.index("--view") + 1]
+INSIDE = INSIDE or "--inside" in sys.argv
+
 SHOT = "--shot" in sys.argv
 if SHOT:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -291,7 +304,7 @@ class FakeIdentity:
     different product: the Super User's is a governance shell until they traverse into an Admin."""
     client_id = "preview"
     account_id = 1
-    role = "admin" if "--role" in sys.argv and sys.argv[sys.argv.index("--role") + 1] == "admin"         else "super_user"
+    role = ROLE
     pc_id = 1
     department_id = 1
 
@@ -323,13 +336,13 @@ def main() -> int:
     bridge.connected.emit()
 
     win = engine.rootObjects()[0]
-    if "--inside" in sys.argv:            # a Super User looking through an Admin's session
+    if INSIDE:                            # a Super User looking through an Admin's session
         bridge.state.set_session({"session_id": 4, "pc_id": 7, "hostname": "ADM-01",
                                   "occupied_via": "traversal", "super_user_banner": True,
                                   "entered_at": "2026-09-30T09:00:00+00:00",
                                   "deadline_at": "2026-09-30T10:30:00+00:00"})
-    if "--view" in sys.argv:
-        win.setProperty("view", sys.argv[sys.argv.index("--view") + 1])
+    if VIEW:
+        win.setProperty("view", VIEW)
     if "--open" in sys.argv:                      # a modal or drawer, by objectName
         name = sys.argv[sys.argv.index("--open") + 1]
         from PySide6.QtCore import QObject
@@ -340,15 +353,13 @@ def main() -> int:
         # Which level you are at decides what the console IS, so the preview says which one it
         # opened: a Super User's shell is eight areas on purpose, and that is easy to mistake
         # for a console that has not been built.
-        who = "an Admin" if FakeIdentity.role == "admin" else "the Super User"
-        print("Falcon console — sample data, no Engine. Opened as " + who + ".")
-        if FakeIdentity.role != "admin":
-            print("  The Super User governs: Overview, Departments, People, Tasks, Reports,")
-            print("  Rollout, Record, Settings. Machines, Flows, Automation, Actions,")
-            print("  Assistance and Resources belong to an Admin. To see those:")
-            print("     --role admin    the Admin's console, all fourteen areas")
-            print("     --inside        the Super User looking through an Admin's session")
-        print("     --view <area>   open on a page      --view kit   the component board")
+        who = "an Admin" if ROLE == "admin" else "the Super User"
+        # a plain hyphen: a Windows console does not always have an em dash
+        print("Falcon console - sample data, no Engine. Opened as " + who + ".")
+        if ROLE != "admin" and not INSIDE and VIEW == "":
+            print("  A Super User governs and does not operate, so this is eight areas. Machines,")
+            print("  Flows, Automation, Actions, Assistance and Resources are an Admin's.")
+            print("  Try:  preview.py admin      preview.py inside      preview.py kit")
         print("  Close the window to quit.")
         with loop:
             loop.run_forever()
