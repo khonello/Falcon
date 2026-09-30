@@ -40,14 +40,16 @@ python -m engine bootstrap SU-PC           # a first Super User by hand (setup d
 
 environ-operator\Scripts\Activate.ps1
 pip install -r requirements-operator.txt    # Operator Client TUI + GUI (PySide6, qasync)
+python scripts/make_org.py                 # once: makes a department + an Admin + a Worker, prints how to run them
 python -m operator_client --gui            # after setup on this machine: connects as the Super User, nothing to type
+python -m operator_client --gui --config data/admin.json   # the Admin's console (own settings file; make_org.py writes it)
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # interactive TUI (TLS)
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --plaintext           # against a DEV_PLAINTEXT Engine
 python -m operator_client --connect --script "tree; tasks"                              # scripted, no TUI (remembered settings)
 python -m operator_client --gui --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # QML GUI
 ```
 
-GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`requirements-engine.txt` includes it); they skip otherwise. The screenshot scripts set Qt's offscreen platform and Windows font folder themselves, and take their state as options (`design/shot_gui.py design/shots admin 2 --flow=4`; `design/shot_board.py <BOARD>` for design boards).
+`scripts/preview.py` opens the console with sample data and NO Engine — a dev tool for looking at the UI, not a way to run the product (`--role admin`, `--view <area>`, `--view kit`, `--inside`). GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`requirements-engine.txt` includes it); they skip otherwise. The screenshot scripts set Qt's offscreen platform and Windows font folder themselves, and take their state as options (`design/shot_gui.py design/shots admin 2 --flow=4`; `design/shot_board.py <BOARD>` for design boards).
 
 ```powershell
 environ-worker\Scripts\Activate.ps1
