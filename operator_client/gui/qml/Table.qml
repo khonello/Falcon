@@ -19,7 +19,31 @@ Item {
     property int sortColumn: -1
     property bool sortDescending: false
     property var activeFilters: ({})
+
+    // ROW SELECTION. Off by default: a checkbox column on a table nobody acts on in bulk is a column
+    // of noise. On, it is how a department-wide act is aimed -- the Engine takes many PCs at once.
+    property bool selectable: false
+    property string idKey: ""                 // which field identifies a row; "" means use the first column's
+    property var selected: []                 // the ids, not the rows: rows are refetched, ids are not
     signal rowActivated(var row)
+    signal selectionChanged(var selected)
+
+    function idOf(row) { return String(row[idKey !== "" ? idKey : (columns[0] ? columns[0].key : "")]) }
+    function isPicked(row) { return selected.indexOf(idOf(row)) >= 0 }
+    function pick(row, on) {
+        var id = idOf(row)
+        var out = selected.filter(function (s) { return s !== id })
+        if (on) out.push(id)
+        selected = out
+        selectionChanged(out)
+    }
+    function pickAll(on) {
+        var out = []
+        if (on) for (var i = 0; i < pageRows.length; i++) out.push(idOf(pageRows[i]))
+        selected = out
+        selectionChanged(out)
+    }
+    readonly property int pickedHere: pageRows.filter(function (r) { return root.isPicked(r) }).length
 
     readonly property var filtered: {
         var out = []
@@ -84,9 +108,18 @@ Item {
         radius: Theme.radius
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.split }
 
+        Check {
+            visible: root.selectable
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.s3
+            anchors.verticalCenter: parent.verticalCenter
+            checked: root.pickedHere > 0 && root.pickedHere === root.pageRows.length
+            partial: root.pickedHere > 0 && root.pickedHere < root.pageRows.length
+            onToggled: function (on) { root.pickAll(on) }
+        }
         Row {
             anchors.fill: parent
-            anchors.leftMargin: Theme.s3
+            anchors.leftMargin: Theme.s3 + (root.selectable ? 16 + Theme.s3 : 0)
             anchors.rightMargin: Theme.s3
             Repeater {
                 model: root.columns
@@ -187,9 +220,17 @@ Item {
                 onClicked: root.rowActivated(rowItem.modelData)
             }
 
+            Check {
+                visible: root.selectable
+                anchors.left: parent.left
+                anchors.leftMargin: Theme.s3
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.isPicked(rowItem.modelData)
+                onToggled: function (on) { root.pick(rowItem.modelData, on) }
+            }
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.s3
+                anchors.leftMargin: Theme.s3 + (root.selectable ? 16 + Theme.s3 : 0)
                 anchors.rightMargin: Theme.s3
                 Repeater {
                     model: root.columns

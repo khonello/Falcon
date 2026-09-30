@@ -7,6 +7,7 @@ Row {
     property int total: 0
     property int pageSize: 20
     property int page: 0                      // zero-based
+    property var sizes: [20, 50, 100]
     readonly property int pages: Math.max(1, Math.ceil(total / Math.max(1, pageSize)))
     readonly property int from: total === 0 ? 0 : page * pageSize + 1
     readonly property int to: Math.min(total, (page + 1) * pageSize)
@@ -20,6 +21,16 @@ Row {
         tone: "mid"
         font.pixelSize: Theme.fSmall
         rightPadding: Theme.s2
+    }
+    // a page size is a choice, and it only shows once there is more than one page to make it about
+    Select {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.total > root.sizes[0]
+        width: 104
+        implicitHeight: Theme.controlSm
+        value: root.pageSize
+        options: root.sizes.map(function (n) { return { value: n, label: n + " a page" } })
+        onPicked: function (v) { root.pageSize = v; root.page = 0 }
     }
     Btn {
         small: true

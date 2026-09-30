@@ -13,7 +13,11 @@ Item {
     Connections {
         target: Msg
         function onPosted(text, kind) {
-            queue.append({ text: text, kind: kind, until: Date.now() + root.life })
+            queue.append({ text: text, title: "", kind: kind, until: Date.now() + root.life })
+        }
+        // one that arrived on its own is given three times as long, because nobody was waiting for it
+        function onArrived(title, text, kind) {
+            queue.append({ text: text, title: title, kind: kind, until: Date.now() + root.life * 3 })
         }
     }
 
@@ -39,6 +43,7 @@ Item {
             delegate: Item {
                 id: cell
                 required property string text
+                required property string title
                 required property string kind
                 width: line.implicitWidth
                 height: line.implicitHeight
@@ -47,7 +52,7 @@ Item {
                     width: parent.width
                     height: parent.height
                     kind: cell.kind
-                    text: cell.text
+                    text: cell.title === "" ? cell.text : cell.title + " · " + cell.text
                     color: Theme.surface                    // it floats over the page, so it is opaque
                     border.color: cell.kind === "danger" ? "#ffccc7"
                                   : cell.kind === "warn" ? "#ffe58f" : Theme.border

@@ -44,6 +44,7 @@ ApplicationWindow {
     onViewChanged: shell.settle()
     onAreasChanged: shell.settle()
     function settle() {
+        if (view === "kit") return                 // the kit board: reachable only from the preview
         for (var i = 0; i < areas.length; i++)
             if (areas[i].key === view) return
         view = "overview"
@@ -280,6 +281,14 @@ ApplicationWindow {
                     objectName: "settingsView"
                     anchors.fill: parent
                     visible: shell.view === "settings"
+                }
+
+                // the kit drawn in itself, for judging it. Not an area: `--view kit` only.
+                Loader {
+                    objectName: "kitView"
+                    anchors.fill: parent
+                    active: shell.view === "kit"
+                    source: "KitView.qml"
                 }
             }
         }

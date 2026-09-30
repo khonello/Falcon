@@ -94,6 +94,13 @@ Rectangle {
                     font.pixelSize: Theme.fSmall
                     strong: true
                 }
+                Count {
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.s3
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: !root.collapsed && (modelData.badge || 0) > 0
+                    value: modelData.badge || 0
+                }
                 HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: root.picked(modelData.key) }
             }

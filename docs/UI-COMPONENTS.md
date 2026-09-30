@@ -131,6 +131,44 @@ antd has no vocabulary for these; they are built in the same language, from the 
 
 ---
 
+## Second wave — the whole inventory (30 Sep 2026)
+
+The first wave built what the pages needed and stopped there, which left the kit a subset of the board.
+Everything above now exists in `operator_client/gui/qml/`:
+
+| Group | Added in the second wave |
+|---|---|
+| General | `Divider`, `Avatar`, `Count` (Badge), `Spin` |
+| Navigation | `RowMenu` (Dropdown), `Tabs`, `Steps`, Pagination's page-size changer |
+| Data entry | `Check`, `Radio`, `Toggle` (Switch), `Num` (InputNumber), `TimeField`, `TreeSelect`, `Suggest` (AutoComplete), `Transfer`, `Level` (Slider), `Upload`, `Secret` (Password), `Search` |
+| Data display | `Tree`, `Collapse`, `Feed` (List), `Trail` (Timeline), `Statistic`, `Progress`, `Tip` (Tooltip), `Popover`, row selection in `Table` |
+| Feedback | `Popconfirm`, `Result`, notification (`Msg.news` / `Msg.urgent`, drawn by `Toast`) |
+
+Two judgements worth recording:
+
+- **Cascader is folded into `TreeSelect`.** A cascade is a tree drawn sideways, and the tree is the
+  shape people already know from the sider. One control, not two that do the same job.
+- **`Slider` is `Level`**, because the useful thing is not the slider — it is the band of ordinary
+  readings drawn behind the handle. "Above 85%" means nothing until you can see these machines sit at
+  20–45 all day.
+
+**The board, in itself.** `KitView.qml` draws the entire kit out of the real components, with Falcon's
+content, in the same sections as the published Console Kit — so what is judged is what ships:
+
+```powershell
+environ-operator\Scripts\python.exe scripts\preview.py --view kit
+```
+
+It is not an area of the console; the shell lets that one view through and the sider never offers it.
+One test loads it, which is the cheapest check that no component in the kit is broken.
+
+**Still to do: adoption.** The kit is complete; the pages have not caught up with it. Nothing yet uses
+`RowMenu`, `Tabs`, `Steps`, `Trail`, `Result`, `Popconfirm`, `Toggle`, `Num`, `Level`, `Transfer`,
+`Tree`, `Feed`, `Statistic` or row selection, and several pages still hand-roll what a component now
+does properly. That is the third wave, and it is where the console actually gets better.
+
+---
+
 ## Order of work
 
 1. ~~**Tokens + shell** — `Theme.qml`, `Layout`, `Menu`, `Breadcrumb`, `Button`, `Typography`, `Icon`.~~ *done*

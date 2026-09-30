@@ -835,3 +835,19 @@ def test_a_floating_popup_consumes_its_own_clicks(gui):
     # and the popup's own background takes anything the contents did not
     fills = [a for a in areas if a.property("width") and a.property("width") > 300]
     assert fills, "the popup needs one MouseArea across it, for the gaps between its controls"
+
+
+def test_the_whole_kit_instantiates(gui):
+    """The kit board draws every component the console is made of, so loading it is the cheapest
+    check that none of them is broken -- a QML error anywhere in it leaves the Loader with no item.
+
+    It is reached only from the preview script; it is not an area of the console.
+    """
+    win, _ = gui
+    loader = win.findChild(QObject, "kitView")
+    assert loader is not None
+    assert loader.property("item") is None, "it costs nothing until it is asked for"
+
+    win.setProperty("view", "kit")
+    assert prop(win, "view") == "kit", "the shell lets the board through, though it is not an area"
+    assert loader.property("item") is not None, "a QML error anywhere in the kit shows up here"
