@@ -259,6 +259,28 @@ Stated once, so no screen invents its own.
     `worker_client/windows/qml/Window.qml` rather than imported, because that package does not depend
     on the Operator Client — so a token changed here has to be changed there as well.
 
+25. **The level decides what the console is.** This is one codebase and two products.
+
+    An **Admin** gets all fourteen areas: `hierarchy-system-design.md` puts "all features
+    concentrated at this level", and calls the Admin "the source of all monitoring and control
+    operations".
+
+    A **Super User** gets eight — Overview, Departments, People, Tasks, Reports, Rollout, Record,
+    Settings. Their focus is "reports, audit logs, system status, high-level summaries", and design
+    principle 3 says in as many words that they *do not perform day-to-day operations*. Machines,
+    Flows, Automation, Actions, Assistance and Resources are not theirs at their own level.
+
+    They reach them by **traversing into an Admin**, and then the console *is* that Admin's console:
+    the six areas appear, `viewThroughSession` goes on so the Engine re-answers reads as that Admin
+    (`protocol/viewing.py`), and the red banner says **Super User in charge**. Step out and the shell
+    is a governance shell again — and if they were on one of the Admin's pages, it lands back on
+    Overview, because that page was never theirs.
+
+    Two consequences worth stating: the Engine is deliberately more permissive than this (it lets a
+    Super User create a flow directly), so the restraint is the console's, not the protocol's; and
+    an Overview line about something only an Admin can fix still *appears* for the Super User —
+    seeing it is oversight — but it stops pretending to be a link.
+
 ---
 
 ## What stays custom

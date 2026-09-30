@@ -7,6 +7,7 @@ Rectangle {
     property var entries: []                 // [{ key, icon, label, badge }]
     property string current: ""
     property bool collapsed: false
+    property string level: ""                // which level you are at: it belongs under the name
     signal picked(string key)
 
     implicitWidth: collapsed ? 64 : 208
@@ -31,7 +32,18 @@ Rectangle {
                 width: 18; height: 18; radius: Theme.radiusSm; color: Theme.primary
                 anchors.verticalCenter: parent.verticalCenter
             }
-            Txt { text: "Falcon"; strong: true; visible: !root.collapsed; anchors.verticalCenter: parent.verticalCenter }
+            Column {
+                spacing: -1
+                visible: !root.collapsed
+                anchors.verticalCenter: parent.verticalCenter
+                Txt { text: "Falcon"; strong: true }
+                Txt {
+                    text: root.level
+                    visible: root.level !== ""
+                    tone: "quiet"
+                    font.pixelSize: 10
+                }
+            }
         }
     }
 

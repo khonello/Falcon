@@ -1,12 +1,21 @@
 import QtQuick
 import "."
 
-// YOU ARE INSIDE SOMEBODY ELSE'S MACHINE. One row on a red tint: whose, which, how long is left as a
-// real bar, and the way out. No stripe down the left, no hairline on an edge, no second treatment --
-// this is the only banner in the console and it only appears when it is true (docs/UI.md).
+// WHO IS IN CONTROL, when it is not simply you. One row on a red tint: no stripe down the left, no
+// hairline on an edge, no second treatment -- this is the only banner in the console, and it says one
+// of three things (hierarchy-system-design.md):
+//
+//   a Super User inside an Admin   "Super User in charge"  -- the red banner the design names
+//   an Admin inside a worker PC    "You are inside OPS-03"
+//   somebody inside YOUR session   "R. Mensah is in your session" -- the clock stays, because the
+//                                  design says you always see how long is left on it, but the acts
+//                                  go: there is nothing to do but wait
 Rectangle {
     id: root
     property var session: null
+    property string mode: "inside"        // inside | held
+    property bool inCharge: false         // the Super User banner, which names itself
+    property string who: ""               // whose, when somebody is in your session
     property string until: ""             // deadline, ISO
     property string since: ""             // entered_at, ISO
     signal leave()
@@ -51,8 +60,10 @@ Rectangle {
         anchors.left: mark.right
         anchors.leftMargin: Theme.s2
         anchors.verticalCenter: parent.verticalCenter
-        text: root.session && root.session.hostname
-              ? "You are inside " + root.session.hostname
+        text: root.mode === "held"
+              ? (root.who || "Somebody") + " is in your session"
+              : root.inCharge ? "Super User in charge"
+              : root.session && root.session.hostname ? "You are inside " + root.session.hostname
               : "You are inside somebody's machine"
         tone: "danger"
         strong: true
@@ -63,8 +74,11 @@ Rectangle {
         anchors.right: bar.left
         anchors.rightMargin: Theme.s3
         anchors.verticalCenter: parent.verticalCenter
-        text: root.session && root.session.occupant_name
-              ? "They cannot use it until you leave · " + root.session.occupant_name
+        text: root.mode === "held"
+              ? "You will have it back when they leave. You do not need to do anything."
+              : root.inCharge && root.session && root.session.hostname
+                ? "Everything here is answered as this Admin, and every act is logged as yours · "
+                  + root.session.hostname
               : "They cannot use it until you leave"
         tone: "danger"
         font.pixelSize: Theme.fSmall
@@ -104,6 +118,7 @@ Rectangle {
 
     Row {
         id: acts
+        visible: root.mode !== "held"
         spacing: Theme.s2
         anchors.right: parent.right
         anchors.rightMargin: Theme.s4

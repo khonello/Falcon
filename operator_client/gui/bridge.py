@@ -175,6 +175,12 @@ class FalconBridge(QObject):
     def blocked(self) -> bool:
         return self.state.blocked_by is not None
 
+    @Property("QVariant", notify=stateChanged)
+    def blockedSession(self) -> Any:
+        """The session occupying this account's own level, whole. hierarchy-system-design.md: the
+        remaining duration is shown on the Admin's interface, so they always know how much is left."""
+        return self.state.blocked_by or {}
+
     @Property(str, notify=stateChanged)
     def blockedBy(self) -> str:
         b = self.state.blocked_by

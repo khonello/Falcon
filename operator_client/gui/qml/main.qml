@@ -26,7 +26,34 @@ ApplicationWindow {
 
     function toggleMaximised() { shell.maximised ? shell.showNormal() : shell.showMaximized() }
 
-    readonly property var areas: [
+    // WHICH LEVEL YOU ARE AT DECIDES WHAT THE CONSOLE IS (hierarchy-system-design.md).
+    //
+    // The Admin is where the operating features live: "the source of all monitoring and control
+    // operations... all features concentrated at this level". The Super User governs -- reports,
+    // audit, system status, high-level summaries -- and "does not perform day-to-day operations".
+    // They reach the operating features by traversing into an Admin, and then the console shows
+    // exactly what that Admin sees, with the red banner up and reads answered as them.
+    readonly property bool boss: falcon.role === "super_user"
+    readonly property bool lookingThrough: boss && falcon.traversing
+    readonly property var governance: ["overview", "departments", "people", "tasks", "reports",
+                                       "rollout", "record", "settings"]
+    readonly property var areas: (!boss || lookingThrough) ? allAreas
+        : allAreas.filter(function (a) { return governance.indexOf(a.key) >= 0 })
+
+    // a Super User who leaves a session cannot stay on a page that was the Admin's
+    onViewChanged: shell.settle()
+    onAreasChanged: shell.settle()
+    function settle() {
+        for (var i = 0; i < areas.length; i++)
+            if (areas[i].key === view) return
+        view = "overview"
+    }
+
+    // the Engine re-answers reads as the Admin being looked through (protocol/viewing.py); holding
+    // a session without looking through it does not, which is why this is a binding and not a flag
+    Binding { target: falcon; property: "viewThroughSession"; value: shell.lookingThrough }
+
+    readonly property var allAreas: [
         { key: "overview",    icon: "pulse",   label: "Overview" },
         { key: "departments", icon: "dept",    label: "Departments" },
         { key: "people",      icon: "people",  label: "People" },
@@ -52,6 +79,8 @@ ApplicationWindow {
             objectName: "sideMenu"
             height: parent.height
             entries: shell.areas
+            level: shell.lookingThrough && falcon.session && falcon.session.hostname
+                   ? "inside " + falcon.session.hostname : falcon.roleLabel
             current: shell.view
             onPicked: function (key) { shell.view = key }
         }
@@ -149,10 +178,13 @@ ApplicationWindow {
                 anchors.top: header.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                visible: falcon.traversing
-                session: falcon.session
-                until: falcon.session && falcon.session.deadline_at ? falcon.session.deadline_at : ""
-                since: falcon.session && falcon.session.entered_at ? falcon.session.entered_at : ""
+                visible: falcon.traversing || falcon.blocked
+                mode: falcon.blocked ? "held" : "inside"
+                inCharge: falcon.superUserBanner
+                who: falcon.blocked ? falcon.blockedBy : ""
+                session: falcon.blocked ? falcon.blockedSession : falcon.session
+                until: session && session.deadline_at ? session.deadline_at : ""
+                since: session && session.entered_at ? session.entered_at : ""
                 onLeave: falcon.call("hierarchy.end_session",
                                      { session_id: falcon.session.session_id }, function (ok, r) {
                     if (!ok) { Msg.failed(r && r.message ? r.message : "Still inside"); return }
@@ -236,6 +268,7 @@ ApplicationWindow {
                     objectName: "overviewView"
                     anchors.fill: parent
                     visible: shell.view === "overview"
+                    reach: shell.areas.map(function (a) { return a.key })
                     onGo: function (view) { shell.view = view }
                 }
                 PeopleView {

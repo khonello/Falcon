@@ -7,6 +7,7 @@ import "."
 Item {
     id: root
     signal go(string view)
+    property var reach: []                 // the areas this level actually has (main.qml decides)
 
     property var tree: []
     property var behind: []
@@ -131,9 +132,13 @@ Item {
                     model: root.needs
                     delegate: Rectangle {
                         required property var modelData
+                        // a Super User sees what is wrong in a department without having the page
+                        // that fixes it -- that is oversight. It is still worth knowing, so the line
+                        // stays; it just stops pretending to be a link.
+                        readonly property bool canGo: root.reach.indexOf(modelData.where) >= 0
                         width: parent.width
                         height: 60
-                        color: hover.hovered ? Theme.hover : "transparent"
+                        color: canGo && hover.hovered ? Theme.hover : "transparent"
 
                         Dot {
                             id: mark
@@ -166,6 +171,7 @@ Item {
                             id: chev
                             name: "chevr"
                             size: 15
+                            visible: parent.canGo
                             color: Theme.quiet
                             anchors.right: parent.right
                             anchors.rightMargin: Theme.s4
@@ -177,8 +183,8 @@ Item {
                             height: 1
                             color: Theme.split
                         }
-                        HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: root.go(modelData.where) }
+                        HoverHandler { id: hover; enabled: parent.canGo; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { enabled: parent.canGo; onTapped: root.go(modelData.where) }
                     }
                 }
             }

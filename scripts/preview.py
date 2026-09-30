@@ -287,10 +287,11 @@ ANSWERS = {
 
 
 class FakeIdentity:
-    """What the handshake would have returned."""
+    """What the handshake would have returned. `--role admin` to see the Admin's console, which is a
+    different product: the Super User's is a governance shell until they traverse into an Admin."""
     client_id = "preview"
     account_id = 1
-    role = "super_user"
+    role = "admin" if "--role" in sys.argv and sys.argv[sys.argv.index("--role") + 1] == "admin"         else "super_user"
     pc_id = 1
     department_id = 1
 
@@ -322,6 +323,11 @@ def main() -> int:
     bridge.connected.emit()
 
     win = engine.rootObjects()[0]
+    if "--inside" in sys.argv:            # a Super User looking through an Admin's session
+        bridge.state.set_session({"session_id": 4, "pc_id": 7, "hostname": "ADM-01",
+                                  "occupied_via": "traversal", "super_user_banner": True,
+                                  "entered_at": "2026-09-30T09:00:00+00:00",
+                                  "deadline_at": "2026-09-30T10:30:00+00:00"})
     if "--view" in sys.argv:
         win.setProperty("view", sys.argv[sys.argv.index("--view") + 1])
     if "--open" in sys.argv:                      # a modal or drawer, by objectName

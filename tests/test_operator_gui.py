@@ -142,7 +142,13 @@ DAY = [
 
 
 class _Identity:
-    client_id, account_id, role, pc_id, department_id = "test", 1, "super_user", 1, 1
+    """What the handshake returned. The role is the whole point: the console is a different product
+    at each level, so a test has to say which one it is looking at."""
+
+    client_id, account_id, pc_id, department_id = "test", 1, 1, 1
+
+    def __init__(self, role: str = "admin") -> None:
+        self.role = role
 
 
 class _Connection:
@@ -217,19 +223,38 @@ class _Connection:
 
 
 @pytest.fixture
-def gui(tmp_path: Path):
-    """(window, bridge), connected to a stubbed Engine, torn down after."""
-    cfg = LocalConfig(path=tmp_path / "cfg.json", engine_host="127.0.0.1", engine_port=1,
-                      client_id="", tls=False)
-    _app, qml, bridge = create(cfg)
-    win = qml.rootObjects()[0]
-    bridge.conn = _Connection()
-    bridge.state.set_identity(_Identity(), "test")
-    # `connected` is emitted by the test that wants data: the views answer it with falcon.call, which
-    # needs a running asyncio loop, and a sync test has none.
-    yield win, bridge
-    qml.warnings.disconnect()          # teardown re-evaluates bindings against a falcon that is gone
-    qml.deleteLater()
+def console(tmp_path: Path):
+    """A factory: `console(role)` gives (window, bridge) at that level, torn down after."""
+    made = []
+
+    def build(role: str = "admin"):
+        cfg = LocalConfig(path=tmp_path / f"{role}.json", engine_host="127.0.0.1", engine_port=1,
+                          client_id="", tls=False)
+        _app, qml, bridge = create(cfg)
+        made.append(qml)
+        win = qml.rootObjects()[0]
+        bridge.conn = _Connection()
+        bridge.state.set_identity(_Identity(role), "test")
+        # `connected` is emitted by the test that wants data: the views answer it with falcon.call,
+        # which needs a running asyncio loop, and a sync test has none.
+        return win, bridge
+
+    yield build
+    for qml in made:
+        qml.warnings.disconnect()      # teardown re-evaluates bindings against a falcon that is gone
+        qml.deleteLater()
+
+
+@pytest.fixture
+def gui(console):
+    """The Admin's console: where every operating feature lives, so it is most tests' subject."""
+    return console("admin")
+
+
+@pytest.fixture
+def boss(console):
+    """The Super User's console: governance only, until they traverse into an Admin."""
+    return console("super_user")
 
 
 def prop(obj: QObject, name: str):
@@ -270,10 +295,50 @@ def test_the_shell_is_the_console(gui):
                  "winMinimize", "winMaximize", "winClose"):
         assert win.findChild(QObject, name) is not None, name
 
-    # the sider is the only navigation, and it names every area
+    # the Admin is where every operating feature lives, so their sider is the whole console
     menu = win.findChild(QObject, "sideMenu")
     keys = [e["key"] for e in prop(menu, "entries")]
     assert keys[0] == "overview" and keys[-1] == "settings" and len(keys) == 14
+
+
+OPERATING = ("machines", "flows", "automation", "actions", "assistance", "resources")
+
+
+def test_the_super_user_governs_and_does_not_operate(boss):
+    """hierarchy-system-design.md: the Super User observes hierarchy health, audits, maintains
+    oversight -- and "does not perform day-to-day operations". Those live at the Admin, and the Super
+    User reaches them by traversing in, at which point the console IS that Admin's console."""
+    win, bridge = boss
+    menu = win.findChild(QObject, "sideMenu")
+
+    keys = [e["key"] for e in prop(menu, "entries")]
+    assert keys == ["overview", "departments", "people", "tasks", "reports",
+                    "rollout", "record", "settings"]
+    assert not [k for k in keys if k in OPERATING]
+    assert prop(win, "lookingThrough") is False
+    assert bridge.viewThroughSession is False
+
+    # inside an Admin: the operating areas appear, and the Engine is asked to answer as that Admin
+    bridge.state.set_session({"session_id": 4, "pc_id": 7, "hostname": "ADM-01",
+                              "occupied_via": "traversal", "super_user_banner": True,
+                              "entered_at": "2026-09-30T09:00:00+00:00"})
+    assert prop(win, "lookingThrough") is True
+    assert bridge.viewThroughSession is True
+    keys = [e["key"] for e in prop(menu, "entries")]
+    assert len(keys) == 14 and all(k in keys for k in OPERATING)
+
+    # and the banner names who is in charge, which is the point of it being red
+    banner = win.findChild(QObject, "sessionBanner")
+    assert banner.property("visible") is True
+    assert banner.property("inCharge") is True
+
+    # step back out and the console is a governance shell again, off the page that was theirs
+    win.setProperty("view", "flows")
+    bridge.state.set_session(None)
+    assert prop(win, "view") == "overview"
+    assert [e["key"] for e in prop(menu, "entries")] == ["overview", "departments", "people",
+                                                         "tasks", "reports", "rollout", "record",
+                                                         "settings"]
 
 
 def test_the_tokens_are_the_one_place_a_colour_is_named(gui):
@@ -611,10 +676,10 @@ async def test_a_file_on_the_wrong_shelf_is_the_only_red_on_resources(gui):
     assert prop(view, "loose") == 1
 
 
-async def test_the_super_user_gets_no_addressed_column(gui):
+async def test_the_super_user_gets_no_addressed_column(boss):
     """`addressed` is written to a separate table and is an Admin's act. The Super User sees every
     report regardless of routing, so a state column there would always read "open" and mean nothing."""
-    win, bridge = gui
+    win, bridge = boss
     win.setProperty("view", "reports")
     view = win.findChild(QObject, "reportsView")
     table = win.findChild(QObject, "reportsTable")
@@ -626,10 +691,10 @@ async def test_the_super_user_gets_no_addressed_column(gui):
     assert prop(view, "rows")[0]["what"] == "A file turned up where it should not"
 
 
-async def test_the_gate_holds_while_anything_is_behind(gui):
+async def test_the_gate_holds_while_anything_is_behind(boss):
     """N and N+1, never more: the next version cannot be approved while a machine is still behind, so
     the button is off and the page says why rather than letting the Engine refuse it."""
-    win, bridge = gui
+    win, bridge = boss
     win.setProperty("view", "rollout")
     view = win.findChild(QObject, "rolloutView")
     approve = win.findChild(QObject, "approveVersion")
