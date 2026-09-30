@@ -337,7 +337,19 @@ def main() -> int:
     app.aboutToQuit.connect(loop.stop)       # qasync raises if the Qt loop stops under a pending await
 
     if not SHOT:
-        print("Falcon console \u2014 sample data, no Engine. Close the window to quit.")
+        # Which level you are at decides what the console IS, so the preview says which one it
+        # opened: a Super User's shell is eight areas on purpose, and that is easy to mistake
+        # for a console that has not been built.
+        who = "an Admin" if FakeIdentity.role == "admin" else "the Super User"
+        print("Falcon console — sample data, no Engine. Opened as " + who + ".")
+        if FakeIdentity.role != "admin":
+            print("  The Super User governs: Overview, Departments, People, Tasks, Reports,")
+            print("  Rollout, Record, Settings. Machines, Flows, Automation, Actions,")
+            print("  Assistance and Resources belong to an Admin. To see those:")
+            print("     --role admin    the Admin's console, all fourteen areas")
+            print("     --inside        the Super User looking through an Admin's session")
+        print("     --view <area>   open on a page      --view kit   the component board")
+        print("  Close the window to quit.")
         with loop:
             loop.run_forever()
         return 0
