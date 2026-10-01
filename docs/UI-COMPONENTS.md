@@ -61,7 +61,7 @@ Qt Quick Controls gives us a starting point for a few (`Button`, `TextField`, `C
 | **Radio** (+ `Radio.Button` group) | mutually exclusive choices: tier, verification mode, severity | **P1** |
 | **DatePicker** + **RangePicker** | the Record's date range, task deadlines, schedules. **Qt has none — this is real work and it is P0 for Record** | **P0** |
 | **TimePicker** | an automation's time of day | **P1** |
-| **Switch** | enable/disable an automation, availability to help | **P1** |
+| **Switch** | availability to help. *Not for enabling a rule: that is a checkbox since 1 Oct 2026 (UI.md rule 35)* | **P1** |
 | **InputNumber** | timeouts, thresholds, retention days | **P1** |
 | **TreeSelect** | picking a folder from the file index; picking a machine within a department | **P1** |
 | **Transfer** | choosing listeners, choosing machines an automation targets | **P2** |
@@ -168,7 +168,7 @@ One test loads it, which is the cheapest check that no component in the kit is b
 |---|---|
 | Machines | a `Search`, row selection with a **bulk bar** over the heading, a `RowMenu` per row (Enter · Run an action · Rekey), and `BulkRun` — one action across the chosen machines, one call each, because that is how the Engine takes them |
 | People | an `Avatar` in the name column, a `RowMenu` (Open · Offboard) |
-| Automation | the enabled switch is a `Toggle` **in the row**, where the thing being switched is; `RowMenu` for the rest |
+| Automation | the enabled switch is a `Toggle` **in the row**, where the thing being switched is; `RowMenu` for the rest. *To become a `Check` (UI.md rule 35)* |
 | Flows | `RowMenu`: Open · Pause/Resume · Retire, without opening the drawer |
 | Actions | `RowMenu`: Open · Run it now |
 | Tasks | the drawer is `Tabs` — Checks (with a count of what has not passed) and History, drawn as a `Trail` |
@@ -183,6 +183,36 @@ One test loads it, which is the cheapest check that no component in the kit is b
 
 The table itself grew the column kinds these needed: `menu`, `toggle`, `avatar`, `tip`, plus row
 selection and the bulk bar that replaces the heading while a set is chosen.
+
+### Fourth wave — from the console concept (1 Oct 2026)
+
+The concept (`design/console-concepts.html`; UI.md rules 26–37) needs these. None of them is built in
+QML yet. The priorities are a proposal, ordered by how much of the concept depends on each one.
+
+| Component | What it does | Used by | Built from | Priority |
+|---|---|---|---|---|
+| **HealthMark** | the five health marks: grey, amber dot, red tint, solid red, dashed | fleet map, machines table, machine page | a small Rectangle with an optional dot | **P0** |
+| **HostMap** | machines as tiles grouped by department; one *Status / CPU / Version / Check-in* switch, all using the same five marks; a tooltip that speaks for the view | Overview | HealthMark + `Segmented` + `Tip` | **P0** |
+| **TimeChart** | a time series with real axes, a crosshair tooltip, events marked as diamonds, a threshold line, a shaded dwell band; follows the page's 1h / 6h / 24h / 7d range | machine page, rule page, CPU condition | Shapes | **P0** |
+| **KpiStrip** | a figure, its trend line, and its change in words | Overview, Sessions, Rollout | `Statistic` + a spark line | **P1** |
+| **EventHistogram** | events per interval, stacked by kind, drag across it to narrow the table below | Overview, Audit log | Shapes + mouse area | **P1** |
+| **Choice** | a card-sized option with an icon, a title and one line of what it means; one of several is chosen | issue resolutions, wizard first steps | `Radio` underneath | **P0** |
+| **Wizard** | the shell every multi-step create uses: `Steps` at the top with **Cancel** beside it (asks before discarding), one step's body, Back / Next that waits for the step to be valid | New rule, New flow | `Steps` + `Modal.confirm` | **P0** |
+| **IssueResolver** | the typed *What to do* block: lead sentence, facts, Choices built from the issue's type and situation, the input the chosen one needs, one act | Issues | Choice + Form controls | **P0** |
+| **SmartText** | a description box that underlines people, files, dates and programs as they are typed, with a picker on click or pause and `@` for people | New task | Qt's `QSyntaxHighlighter` on a `TextArea`, a `Popup` for the picker | **P1** |
+| **Decision** | a tinted block asking one question with two equal buttons, turning green when answered | *No checks, I will verify it by hand* | Alert-like Rectangle + two `Button`s | **P1** |
+| **FlowPreview** | the flow drawn left to right as it is built; shared steps before the split, branch steps as labels on their edge | New flow | Shapes, laid out, never dragged | **P1** |
+| **RunOnce** | a drawer: choose machines, read what it does to them, run, then each machine Queued → Running → Success / Failed / Skipped | Actions | `Drawer` + `Progress` | **P1** |
+| **Occupancy** | the DayTimeline with an adjustable working frame and a line naming any session outside it | Sessions | extends DayTimeline | **P1** |
+| **Firings** | a rule's firings, newest first, each expanding into the runs it caused (problems only, when there are many) | rule page | `Feed` with expandable rows | **P2** |
+| **OutcomeBar** | succeeded / failed / timed out as one split bar, with the counts in words beside it | rule page, action page, Automation | Rectangle row | **P2** |
+
+Changes to what exists:
+- **Tables:** short lists inside panels become rows (UI.md rule 37).
+- **Machines:** loses four columns (rule 30).
+- **ScriptPanel:** its check runs as the script is typed, as `falcon.validateScript` already does
+  when it is sent.
+- **Actions:** the action library becomes the only list the rule builder's *Do* step offers.
 
 ---
 

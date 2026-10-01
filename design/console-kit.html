@@ -1,0 +1,939 @@
+<title>Falcon Console Kit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.13/dayjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/antd/6.6.5/antd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ant-design-icons/5.5.1/index.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/htm/3.1.1/htm.js"></script>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; background: #f5f5f5; color: rgba(0,0,0,0.88);
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  #root { min-height: 100vh; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 16px 96px; }
+  .lede { max-width: 72ch; color: rgba(0,0,0,0.65); font-size: 15px; line-height: 1.6; }
+  .secnav { position: sticky; top: 0; z-index: 20; background: rgba(245,245,245,0.94);
+            backdrop-filter: blur(6px); border-bottom: 1px solid #e8e8e8; padding: 10px 16px; }
+  .secnav .inner { max-width: 1180px; margin: 0 auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .secnav a { font-size: 13px; color: rgba(0,0,0,0.65); text-decoration: none; padding: 4px 10px;
+              border-radius: 6px; }
+  .secnav a:hover { background: #fff; color: #1677ff; }
+  h1 { font-size: 30px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h2 { font-size: 20px; font-weight: 600; margin: 48px 0 4px; scroll-margin-top: 64px; }
+  h2 + .note { color: rgba(0,0,0,0.45); font-size: 13.5px; margin: 0 0 16px; }
+  .item { background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; margin-top: 16px; overflow: hidden; }
+  .item > header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+                   padding: 12px 16px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+  .item > header .name { font-weight: 600; font-size: 14px; }
+  .item > header .use { color: rgba(0,0,0,0.65); font-size: 13px; flex: 1; min-width: 200px; }
+  .item > .demo { padding: 20px 16px; }
+  .p { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; padding: 1px 7px; border-radius: 4px; }
+  /* the page follows its own rule: these are tones of one ink, not four hues */
+  .p0 { color: rgba(0,0,0,0.88); background: #f0f0f0; border: 1px solid #e0e0e0; }
+  .p1 { color: rgba(0,0,0,0.55); background: #fafafa; border: 1px solid #f0f0f0; }
+  .p2 { color: rgba(0,0,0,0.35); background: #fff; border: 1px solid #f0f0f0; }
+  .own { color: rgba(0,0,0,0.88); background: #fff; border: 1px dashed rgba(0,0,0,0.35); }
+  .shellframe { border: 1px solid #e8e8e8; border-radius: 10px; overflow: hidden; background: #fff; }
+  .stack { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .askbar { margin-top: 44px; padding: 18px 20px; border: 1px dashed #d9d9d9; border-radius: 8px;
+            background: #fff; color: rgba(0,0,0,0.65); font-size: 14px; line-height: 1.6; }
+  .askbar b { color: rgba(0,0,0,0.88); }
+</style>
+
+<div id="root"></div>
+
+<script>
+const { useState } = React;
+const html = htm.bind(React.createElement);
+const A = window.antd;
+const I = window.icons || window.AntDesignIcons || {};
+const {
+  ConfigProvider, theme, Layout, Menu, Breadcrumb, Button, Typography, Table, Tag, Space, Input, Select,
+  DatePicker, Checkbox, Radio, Switch, InputNumber, TreeSelect, Transfer, Upload, Form, Descriptions,
+  Card, Statistic, Badge, Avatar, Empty, List, Timeline, Tree, Collapse, Segmented, Tooltip, Alert,
+  Modal, Drawer, Popconfirm, Skeleton, Result, Progress, Spin, Steps, Tabs, Pagination, Dropdown,
+  message, notification, Divider, Flex, Row, Col
+} = A;
+const { Title, Text, Paragraph, Link } = Typography;
+const ic = (n) => I[n] ? React.createElement(I[n]) : null;
+
+// ---------------------------------------------------------------- Falcon's own content, throughout
+const MACHINES = [
+  { key: 1, host: "OPS-01", who: "Kojo", dept: "Operations", version: "1.4.2", state: "ok", line: "at the PC" },
+  { key: 2, host: "OPS-02", who: "Efua", dept: "Operations", version: "1.4.2", state: "free", line: "nobody on it" },
+  { key: 3, host: "OPS-03", who: "Yaw", dept: "Operations", version: "1.4.2", state: "danger", line: "a file out of place" },
+  { key: 4, host: "OPS-04", who: "Adjoa", dept: "Operations", version: "1.4.2", state: "entered", line: "R. Mensah entered" },
+  { key: 5, host: "OPS-06", who: "Kwame", dept: "Operations", version: "1.4.1", state: "warn", line: "a version behind" },
+  { key: 6, host: "FIN-01", who: "Afi", dept: "Finance", version: "1.4.2", state: "ok", line: "at the PC" },
+  { key: 7, host: "LOG-02", who: "Abena", dept: "Logistics", version: "1.4.1", state: "danger", line: "update past the limit" },
+];
+const RECORD = [
+  { key: 1, at: "13:11", who: "R. Mensah", what: "Left OPS-03", subject: "OPS-03", kind: "session" },
+  { key: 2, at: "12:30", who: "R. Mensah", what: "Entered OPS-03", subject: "OPS-03", kind: "session" },
+  { key: 3, at: "11:42", who: "You", what: "Ended A. Quaye's session", subject: "WS-OPS-A2", kind: "session" },
+  { key: 4, at: "10:02", who: "System", what: "budget-2026.xlsx found on a worker machine", subject: "OPS-07", kind: "violation" },
+  { key: 5, at: "09:40", who: "Kojo", what: "Pinged their Admin", subject: "OPS-01", kind: "assistance" },
+  { key: 6, at: "09:11", who: "System", what: "Hostname did not match the certificate", subject: "OPS-05", kind: "deviation" },
+  { key: 7, at: "08:55", who: "Automation", what: "Lock the screen ran", subject: "OPS-07", kind: "action" },
+];
+// THE LADDER. Information is carried by TONE, not by hue: quiet -> present -> the subject.
+// Only two states are allowed a hue, and both mean a person has to do something.
+const INK = "rgba(0,0,0,0.88)", MID = "rgba(0,0,0,0.45)", QUIET = "rgba(0,0,0,0.25)";
+// the two hues are matched in WEIGHT, not just in meaning: a lighter amber reads as a fatter bar
+// than the red at the same size, and #d48806 sits under 3:1 on white anyway
+const AMBER = "#ad6800", RED = "#cf1322";
+const STATE = {
+  free:    { dot: QUIET, word: "free",               needs: false },
+  ok:      { dot: MID,   word: "at the PC",          needs: false },
+  entered: { dot: INK,   word: "someone entered",    needs: false },
+  warn:    { dot: AMBER, word: "a version behind",   needs: true },
+  danger:  { dot: RED,   word: "needs you",          needs: true },
+};
+// a dot drawn in a tone, rather than antd's five coloured Badge statuses
+function Dot({ tone, hollow }) {
+  return html`<span style=${{ display: "inline-block", width: 7, height: 7, borderRadius: 4,
+    background: hollow ? "transparent" : tone, border: hollow ? `1.5px solid ${tone}` : "none",
+    marginRight: 8, verticalAlign: "middle" }} />`;
+}
+
+// ---------------------------------------------------------------- the frame each component sits in
+function Item({ name, use, priority, children }) {
+  const cls = priority === "own" ? "p own" : "p p" + priority;
+  const label = priority === "own" ? "FALCON" : "P" + priority;
+  return html`<div class="item">
+    <header>
+      <span class="name">${name}</span>
+      <span class="use">${use}</span>
+      <span class=${cls}>${label}</span>
+    </header>
+    <div class="demo">${children}</div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- Falcon's own six
+function MachineCell({ m }) {
+  const s = STATE[m.state];
+  return html`<span>
+    <${Dot} tone=${s.dot} hollow=${m.state === "free"} />
+    <${Text} strong style=${{ fontFamily: "monospace" }}>${m.host}<//>
+    <${Text} style=${{ fontSize: 12, marginLeft: 8, color: s.needs ? s.dot : MID }}>${m.line}<//>
+  </span>`;
+}
+
+// THE SESSION BANNER. It is on screen for as long as you hold somebody's machine, so it cannot shout:
+// an Alert box with a progress bar inside it was both loud and cramped. Three treatments, all slim,
+// all saying the same four things -- whose machine, which machine, how long is left, and the way out.
+function BannerStrip({ tone }) {                  // the session banner, chosen 29 Sep 2026
+  const soft = tone === "red" ? "#fff1f0" : "#fffbe6";
+  const edge = tone === "red" ? RED : AMBER;
+  // NO LEFT-EDGE STRIPE, and no hairline along the bottom either: the clock is a REAL progress bar,
+  // a component in the row rather than a decoration on the edge. It fills as the session is spent.
+  const bar = html`<${Progress} percent=${62} size="small" showInfo=${false} strokeColor=${edge}
+      trailColor="rgba(0,0,0,0.10)" style=${{ margin: 0, width: 150, lineHeight: 1 }} />`;
+  const head = html`<${React.Fragment}>
+    <${Text} strong>Inside R. Mensah's workstation<//>
+    <${Text} style=${{ fontFamily: "monospace", fontSize: 12, color: MID }}>WS-OPS-A1<//>
+    <${Text} style=${{ fontSize: 12, color: MID }}>They cannot use it until you leave<//>
+  <//>`;
+  return html`<div style=${{ background: soft, borderRadius: 6, padding: "10px 14px",
+      display: "flex", alignItems: "center", gap: 14 }}>
+    ${head}
+    <div style=${{ flex: 1 }} />
+    ${bar}
+    <${Text} strong style=${{ fontFamily: "monospace", color: edge }}>18:24<//>
+    <${Button} size="small">Extend<//>
+    <${Button} size="small" type="primary" danger>Leave<//>
+  </div>`;
+}
+function SessionBanner() {
+  return html`<${Space} direction="vertical" size=${10} style=${{ width: "100%" }}>
+    <${BannerStrip} tone="red" />
+    <${Text} type="secondary" style=${{ fontSize: 11.5 }}>
+      Whose machine, which machine, how long is left, and the way out \u2014 in one row, on the tint that says
+      you are holding somebody else's workstation. The clock is a real Progress and fills as the session is
+      spent. No stripe down the left, and no hairline on an edge.
+    <//>
+  <//>`;
+}
+
+// THE DAY, TWICE. The chart shows the shape of the day at a glance; the report says the same thing in
+// sentences, for when you have to act on it rather than admire it. The toggle is the rule, not the
+// exception: any drawing that takes a moment to decode carries one.
+const DAY_ENTRIES = [
+  { key: 1, host: "OPS-03", who: "R. Mensah", role: "an Admin", from: "12:30", to: "13:11", mins: 41,
+    open: false, note: "Yaw was locked out for that time" },
+  { key: 2, host: "OPS-04", who: "R. Mensah", role: "an Admin", from: "10:06", to: "10:54", mins: 48,
+    open: false, note: "Adjoa was locked out for that time" },
+  { key: 3, host: "OPS-07", who: "You", role: "you", from: "10:42", to: null, mins: 18,
+    open: true, note: "Ama is locked out right now" },
+  { key: 4, host: "FIN-02", who: "K. Boateng", role: "assisting", from: "09:18", to: "09:40", mins: 22,
+    open: false, note: "Kofi asked for the help" },
+  { key: 5, host: "LOG-02", who: "A. Quaye", role: "an Admin", from: "02:14", to: "02:31", mins: 17,
+    open: false, note: "Out of hours \u2014 nobody was at the machine", night: true },
+];
+
+function DayReport() {
+  const cols = [
+    { title: "Machine", dataIndex: "host", width: 110,
+      render: (h) => html`<${Text} strong style=${{ fontFamily: "monospace" }}>${h}<//>` },
+    { title: "Who was on it", dataIndex: "who", width: 160,
+      render: (w, r) => html`<span><${Dot} tone=${r.role === "you" ? RED : r.role === "assisting" ? "#87c6d6" : "#1677ff"} />
+        <${Text}>${w}<//><${Text} type="secondary" style=${{ fontSize: 12, marginLeft: 6 }}>
+          ${r.role === "you" ? "" : r.role}<//></span>` },
+    { title: "When", width: 150,
+      render: (_, r) => html`<${Text} style=${{ fontFamily: "monospace", fontSize: 12.5 }}>
+        ${r.from} – ${r.to || "now"}<//>` },
+    { title: "For", dataIndex: "mins", width: 110,
+      render: (m, r) => html`<${Text} style=${{ color: r.open ? RED : INK }}>
+        ${m} min${r.open ? ", still open" : ""}<//>` },
+    { title: "What it means", dataIndex: "note",
+      render: (n, r) => html`<${Text} style=${{ color: r.night ? AMBER : INK }}>${n}<//>` },
+  ];
+  return html`<div>
+    <${Text} style=${{ fontSize: 13 }}>
+      Five people were on a machine that is not their own today. <${Text} style=${{ color: RED }}>One of those is
+      yours and is still open<//>, and <${Text} style=${{ color: AMBER }}>one was at 02:14, out of hours<//>.
+      Six of the eleven machines were never signed in to.
+    <//>
+    <${Table} size="small" style=${{ marginTop: 12 }} columns=${cols} dataSource=${DAY_ENTRIES}
+              pagination=${false} />
+  </div>`;
+}
+
+function DayTimeline() {
+  const [view, setView] = useState("Chart");
+  // 24 HOURS IS THE DEFAULT. The entry worth seeing is the one at 02:14 -- sneaky things happen at
+  // unusual times -- so the whole day is shown and the out-of-hours band is shaded rather than cropped.
+  // 6 to 6 narrows it to the working day when that is all you are looking at.
+  const [span, setSpan] = useState("24 hours");
+  // THE ONE COLOUR EXCEPTION. A timeline's whole job is telling kinds apart, and three greys cannot do
+  // it at a glance. So: grey for the ordinary case (their own machine, most of the chart), and a hue
+  // for each kind of entry -- which are the rare, consequential ones. Nothing else on the page does this.
+  // the ordinary case is grey, but not so faint it disappears into the lane it sits in: #bfbfbf is the
+  // ladder's own "quiet" tone, a clear step above the #fafafa track and still plainly recessive
+  const OWN = "#bfbfbf", ADMIN = "#1677ff", YOU = RED, ASSIST = "#87c6d6";
+  const lanes = [
+    { host: "OPS-01", blocks: [[8.2, 12.0, OWN]] },
+    { host: "OPS-03", blocks: [[9.4, 12.5, OWN], [12.5, 13.2, ADMIN]] },
+    { host: "OPS-04", blocks: [[8.0, 10.1, OWN], [10.1, 10.9, ADMIN]] },
+    { host: "OPS-07", blocks: [[8.1, 10.7, OWN], [10.7, 11.2, YOU]] },
+    { host: "FIN-02", blocks: [[9.3, 9.9, ASSIST]] },
+    { host: "LOG-02", blocks: [[2.23, 2.52, ADMIN]] },
+  ];
+  const full = span === "24 hours";
+  const t0 = full ? 0 : 6, t1 = full ? 24 : 18;
+  const ticks = full ? [0, 4, 8, 12, 16, 20, 24] : [6, 8, 10, 12, 14, 16, 18];
+  const W = 760, L = 72, plot = W - L - 8;
+  const x = (t) => L + ((t - t0) / (t1 - t0)) * plot;
+  if (view === "Report")
+    return html`<div>
+      <${Flex} justify="space-between" align="center" style=${{ marginBottom: 4 }}>
+        <${Text} type="secondary" style=${{ fontSize: 12 }}>Monday, every entry<//>
+        <${Space}><${Segmented} size="small" options=${["Chart", "Report"]} value=${view} onChange=${setView} /><//>
+      <//>
+      <div style=${{ marginTop: 10 }}><${DayReport} /></div>
+    </div>`;
+  return html`<div>
+    <${Flex} justify="space-between" align="center" style=${{ marginBottom: 10 }}>
+      <${Text} type="secondary" style=${{ fontSize: 12 }}>
+        Monday, ${full ? "00:00 – 24:00 · the shaded hours are out of hours" : "06:00 – 18:00 · the working day only"}
+      <//>
+      <${Space}>
+        <${Segmented} size="small" options=${["6 to 6", "24 hours"]} value=${span} onChange=${setSpan} />
+        <${Segmented} size="small" options=${["Chart", "Report"]} value=${view} onChange=${setView} />
+      <//>
+    <//>
+    <svg viewBox=${`0 0 ${W} ${lanes.length * 26 + 30}`} style=${{ width: "100%", maxWidth: W }}>
+      ${full ? html`<g>
+        <rect x=${x(0)} y=${0} width=${x(6) - x(0)} height=${lanes.length * 26} fill="#f5f5f5" />
+        <rect x=${x(18)} y=${0} width=${x(24) - x(18)} height=${lanes.length * 26} fill="#f5f5f5" />
+      </g>` : null}
+      ${ticks.map((h) => html`<g key=${h}>
+        <line x1=${x(h)} y1=${0} x2=${x(h)} y2=${lanes.length * 26} stroke="#f0f0f0" />
+        <text x=${x(h)} y=${lanes.length * 26 + 16} font-size="11" fill="rgba(0,0,0,0.45)"
+              text-anchor=${h === t1 ? "end" : h === t0 ? "start" : "middle"}>${(h % 24) < 10 ? "0" : ""}${h % 24}:00</text>
+      </g>`)}
+      ${lanes.map((l, i) => html`<g key=${l.host}>
+        <text x=${0} y=${i * 26 + 17} font-size="12" fill="rgba(0,0,0,0.65)" font-family="monospace">${l.host}</text>
+        <rect x=${L} y=${i * 26 + 5} width=${plot} height=${16} rx=${3} fill="#fafafa" />
+        ${l.blocks.map((b, j) => html`<rect key=${j} x=${x(b[0])} y=${i * 26 + 5} width=${x(b[1]) - x(b[0])}
+              height=${16} rx=${3} fill=${b[2]} opacity=${b[2] === "#d9d9d9" ? 1 : 0.85} />`)}
+      </g>`)}
+    </svg>
+    <${Space} size=${16} style=${{ marginTop: 8 }}>
+      <${Text} style=${{ fontSize: 12, color: MID }}><span style=${{ color: "#bfbfbf" }}>■<//> at their own PC<//>
+      <${Text} style=${{ fontSize: 12, color: MID }}><span style=${{ color: "#1677ff" }}>■<//> an Admin entered<//>
+      <${Text} style=${{ fontSize: 12, color: MID }}><span style=${{ color: RED }}>■<//> you entered<//>
+      <${Text} style=${{ fontSize: 12, color: MID }}><span style=${{ color: "#87c6d6" }}>■<//> assisted, by consent<//>
+      <${Text} style=${{ fontSize: 12, color: AMBER }}>A. Quaye entered LOG-02 at 02:14 — out of hours<//>
+    <//>
+  </div>`;
+}
+
+function FleetGrid() {
+  return html`<${Flex} wrap="wrap" gap=${8}>
+    ${MACHINES.concat(MACHINES.map((m, i) => ({ ...m, key: 100 + i }))).map((m) => {
+      const s = STATE[m.state];
+      // every machine the same quiet outline; only the two states that need somebody take a tone
+      // FILLED, not outlined. Forty outlined boxes is a grid of empty frames; forty filled ones read as
+      // keys on a keyboard. The two states that need somebody take a tinted fill, never a border.
+      const fill = m.state === "danger" ? "#fff1f0" : m.state === "warn" ? "#fffbe6"
+                 : m.state === "free" ? "#fcfcfc" : "#f5f5f5";
+      return html`<${Tooltip} key=${m.key} title=${`${m.host} — ${m.line}`}>
+        <div style=${{ width: 78, borderRadius: 6, padding: "8px 6px", textAlign: "center",
+                       background: fill, cursor: "pointer",
+                       border: m.state === "free" ? "1px solid #f5f5f5" : "1px solid transparent" }}>
+          <div style=${{ fontFamily: "monospace", fontSize: 13, fontWeight: 600,
+                         color: s.needs ? s.dot : m.state === "free" ? QUIET : INK }}>
+            ${m.host.split("-")[1]}
+          </div>
+          <div style=${{ fontSize: 10, color: s.needs ? s.dot : "rgba(0,0,0,0.45)", marginTop: 2 }}>${m.host}</div>
+        </div>
+      <//>`;
+    })}
+  <//>`;
+}
+
+function FlowGraph() {
+  // the nodes obey the card rule: FILLED, no outline. The broken one is a tinted fill rather than a
+  // red ring, and the source is one step darker because it is where the flow begins.
+  const node = (x, y, label, sub, kind) => html`<g key=${label}>
+    <rect x=${x} y=${y} width=${150} height=${46} rx=${6}
+          fill=${kind === "bad" ? "#fff1f0" : kind === "source" ? "#f0f0f0" : "#fafafa"} />
+    <text x=${x + 12} y=${y + 20} font-size="13" font-weight="500"
+          fill=${kind === "bad" ? RED : "rgba(0,0,0,0.88)"}>${label}</text>
+    <text x=${x + 12} y=${y + 36} font-size="11" fill=${kind === "bad" ? RED : "rgba(0,0,0,0.45)"}>${sub}</text>
+  </g>`;
+  const link = (x1, y1, x2, y2, bad) => html`<path key=${x1 + "" + y1 + x2 + y2}
+      d=${`M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`}
+      fill="none" stroke=${bad ? RED : "#d9d9d9"} stroke-width="1.5"
+      stroke-dasharray=${bad ? "4 4" : "0"} />`;
+  return html`<svg viewBox="0 0 620 230" style=${{ width: "100%", maxWidth: 620 }}>
+    ${link(162, 103, 230, 103)}${link(392, 103, 440, 40)}${link(392, 103, 440, 103, true)}${link(392, 103, 440, 166)}
+    ${node(12, 80, "OPS-01", "Payroll", "source")}
+    ${node(230, 80, "Transform", "rename by date")}
+    ${node(440, 17, "OPS-04", "payroll")}
+    ${node(440, 80, "OPS-03", "paused — not answering", "bad")}
+    ${node(440, 143, "OPS-06", "payroll")}
+  </svg>`;
+}
+
+// ---------------------------------------------------------------- the shell: a real page
+function Shell() {
+  const [drawer, setDrawer] = useState(false);
+  const cols = [
+    { title: "Time", dataIndex: "at", width: 90, sorter: true, render: (v) => html`<${Text} type="secondary" style=${{ fontFamily: "monospace" }}>${v}<//>` },
+    { title: "Who", dataIndex: "who", width: 150,
+      filters: [{ text: "R. Mensah", value: "R. Mensah" }, { text: "You", value: "You" }, { text: "System", value: "System" }],
+      onFilter: (v, r) => r.who === v },
+    { title: "What happened", dataIndex: "what" },
+    { title: "Subject", dataIndex: "subject", width: 120, render: (v) => html`<${Text} code>${v}<//>` },
+    { title: "Kind", dataIndex: "kind", width: 130,
+      filters: [{ text: "session", value: "session" }, { text: "violation", value: "violation" },
+                { text: "deviation", value: "deviation" }, { text: "action", value: "action" },
+                { text: "assistance", value: "assistance" }],
+      onFilter: (v, r) => r.kind === v,
+      // one neutral tag for everything that merely happened; a tone only where somebody must look
+      render: (k) => html`<${Tag} bordered=${false}
+        color=${k === "violation" ? "error" : k === "deviation" ? "warning" : "default"}>${k}<//>` },
+    { title: "", width: 60, render: () => html`<${Button} type="link" size="small" onClick=${() => setDrawer(true)}>Open<//>` },
+  ];
+  const menu = [
+    { key: "overview", icon: ic("DashboardOutlined"), label: "Overview" },
+    { key: "departments", icon: ic("ApartmentOutlined"), label: "Departments" },
+    { key: "people", icon: ic("TeamOutlined"), label: "People" },
+    { key: "machines", icon: ic("DesktopOutlined"), label: "Machines" },
+    { key: "tasks", icon: ic("CheckSquareOutlined"), label: "Tasks", },
+    { key: "flows", icon: ic("BranchesOutlined"), label: "Flows" },
+    { key: "automation", icon: ic("ThunderboltOutlined"), label: "Automation" },
+    { key: "actions", icon: ic("PlayCircleOutlined"), label: "Actions" },
+    { key: "assistance", icon: ic("MessageOutlined"), label: "Assistance" },
+    { key: "resources", icon: ic("FolderOutlined"), label: "Resources" },
+    { key: "reports", icon: ic("FileTextOutlined"), label: "Reports" },
+    { key: "rollout", icon: ic("CloudUploadOutlined"), label: "Rollout" },
+    { key: "record", icon: ic("HistoryOutlined"), label: "Record" },
+  ];
+  return html`<div class="shellframe">
+    <${Layout} style=${{ height: 620 }}>
+      <${Layout.Sider} width=${208} theme="light" style=${{ borderRight: "1px solid #f0f0f0" }}>
+        <div style=${{ height: 48, display: "flex", alignItems: "center", gap: 8, padding: "0 16px",
+                       borderBottom: "1px solid #f0f0f0", fontWeight: 600 }}>
+          <span style=${{ width: 18, height: 18, borderRadius: 4, background: "#1677ff", display: "inline-block" }}></span>
+          Falcon
+        </div>
+        <${Menu} mode="inline" selectedKeys=${["record"]} items=${menu}
+                 style=${{ borderInlineEnd: "none", fontSize: 13 }} />
+      <//>
+      <${Layout}>
+        <${Layout.Header} style=${{ background: "#fff", height: 48, lineHeight: "48px", padding: "0 16px",
+                                    borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 16 }}>
+          <${Breadcrumb} items=${[{ title: "Falcon" }, { title: "Record" }]} />
+          <div style=${{ flex: 1 }}></div>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}><${Dot} tone=${MID} />Connected · TLS<//>
+          <${Tag} bordered=${false} color="warning">Holding WS-OPS-A1 · 18:24<//>
+          <${Space} size=${6}><${Avatar} size=${24} style=${{ background: "#1677ff", fontSize: 11 }}>SU<//>
+            <${Text} style=${{ fontSize: 13 }}>Super User<//><//>
+        <//>
+        <${Layout.Content} style=${{ padding: 16, background: "#fff", overflow: "auto" }}>
+          <${Flex} justify="space-between" align="center" style=${{ marginBottom: 12 }}>
+            <div>
+              <${Title} level=${4} style=${{ margin: 0 }}>Record<//>
+              <${Text} type="secondary" style=${{ fontSize: 13 }}>Everything that happened, and who did it<//>
+            </div>
+            <${Space}>
+              <${DatePicker.RangePicker} size="middle" />
+              <${Input.Search} placeholder="Search the record" style=${{ width: 220 }} />
+              <${Button} type="primary" icon=${ic("DownloadOutlined")}>Export<//>
+            <//>
+          <//>
+          <${Table} size="small" columns=${cols} dataSource=${RECORD} bordered=${false}
+                    pagination=${{ pageSize: 7, size: "small", showSizeChanger: true, total: 284,
+                                   showTotal: (t) => `1–7 of ${t}` }} />
+        <//>
+      <//>
+    <//>
+    <${Drawer} title="OPS-03" open=${drawer} onClose=${() => setDrawer(false)} width=${420}
+      extra=${html`<${Button} size="small" type="primary">Enter<//>`}>
+      <${Descriptions} column=${1} size="small" colon=${false} labelStyle=${{ width: 120, color: MID }} items=${[
+        { key: 1, label: "Department", children: "Operations" },
+        { key: 2, label: "Signed in", children: "Yaw, since 09:40" },
+        { key: 3, label: "Version", children: html`<${Text} code>1.4.2<//>` },
+        { key: 4, label: "State", children: html`<${Tag} bordered=${false} color="error">a file out of place<//>` },
+        { key: 5, label: "Last seen", children: "just now" },
+      ]} />
+      <${Divider} />
+      <${Timeline} items=${[
+        { color: RED, children: html`<${Text}>10:02 · budget-2026.xlsx found here<//>` },
+        { color: "gray", children: html`<${Text} type="secondary">09:40 · Yaw signed in<//>` },
+        { color: "gray", children: html`<${Text} type="secondary">08:30 · Updated to 1.4.2<//>` },
+      ]} />
+    <//>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- sections
+function Sections() {
+  const [modal, ctxModal] = Modal.useModal();
+  const [msg, ctxMsg] = message.useMessage();
+  const [note, ctxNote] = notification.useNotification();
+  const [drawer, setDrawer] = useState(false);
+
+  const machineCols = [
+    { title: "Machine", dataIndex: "host", render: (_, m) => html`<${MachineCell} m=${m} />`,
+      sorter: (a, b) => a.host.localeCompare(b.host) },
+    { title: "Department", dataIndex: "dept", width: 140,
+      filters: [{ text: "Operations", value: "Operations" }, { text: "Finance", value: "Finance" },
+                { text: "Logistics", value: "Logistics" }],
+      onFilter: (v, r) => r.dept === v },
+    { title: "Signed in", dataIndex: "who", width: 130 },
+    { title: "Version", dataIndex: "version", width: 110, render: (v) => html`<${Text} code>${v}<//>` },
+    { title: "", width: 120, render: () => html`<${Space} size=${4}>
+        <${Button} size="small" onClick=${() => setDrawer(true)}>Detail<//>
+        <${Dropdown} menu=${{ items: [{ key: 1, label: "Enter" }, { key: 2, label: "Run action" },
+                                      { key: 3, label: "Offboard", danger: true }] }}>
+          <${Button} size="small" icon=${ic("MoreOutlined")} />
+        <//><//>` },
+  ];
+
+  return html`<div>
+    ${ctxModal}${ctxMsg}${ctxNote}
+
+    <h2 id="colour">1 · Colour<//h2>
+    <p class="note">The rule the rest of the page follows: <b>tone carries information, hue carries urgency.</b>
+      Five hues in one column is noise; the eye should be pulled only where somebody has to act.</p>
+    <${Item} name="The ladder" use="Three tones of ink say what is happening. Two hues, and only two, say somebody must act" priority=${0}>
+      <${Row} gutter=${16}>
+        <${Col} span=${14}>
+          ${[[QUIET, "Quiet", "free, unused, nothing recorded — a hollow dot, never a colour"],
+             [MID, "Present", "at the PC, running, syncing — the normal case, and most of the screen"],
+             [INK, "The subject", "the row you picked, the machine you are on, the count that matters"],
+             [AMBER, "Will need someone", "a version behind, waiting for a yes — matched in weight to the red"],
+             [RED, "Needs someone now", "a file out of place, an update past the limit, you are holding a machine"]]
+            .map(([tone, name, use]) => html`<div key=${name} style=${{ display: "flex", alignItems: "center",
+                  gap: 12, padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
+              <span style=${{ width: 44, height: 20, borderRadius: 4, background: tone, flex: "none" }} />
+              <${Text} strong style=${{ width: 150 }}>${name}<//>
+              <${Text} type="secondary" style=${{ fontSize: 13 }}>${use}<//>
+            </div>`)}
+        <//>
+        <${Col} span=${10}>
+          <${Text} strong>What this replaces<//>
+          <${Paragraph} type="secondary" style=${{ fontSize: 13, marginTop: 8 }}>
+            Ant Design ships six status hues and uses them freely — blue, green, orange, red, purple, cyan.
+            Falcon uses <b>two</b>. Everything else is grey at three weights, and blue is reserved for one
+            job: things you can click. A screen where nothing is wrong should be entirely grey.
+          <//>
+          <${Text} strong>The accent<//>
+          <${Paragraph} type="secondary" style=${{ fontSize: 13, marginTop: 8 }}>
+            One hue for interaction — the primary button, links, the selected menu entry, focus rings.
+            Never for status. Three candidates below; they change one token.
+          <//>
+        <//>
+      <//>
+    <//>
+    <${Item} name="The accent — Ant blue, chosen 29 Sep 2026" use="colorPrimary #1677ff. It changes that one token and nothing else; everything grey stays grey" priority=${0}>
+      <${Row} gutter=${16}>
+        ${[["#1677ff", "Ant blue · CHOSEN", "the default — what most consoles use"],
+           ["#0958d9", "Deeper blue", "not taken — kept for the record"],
+           ["#08838f", "Slate teal", "not taken — kept for the record"]]
+          .map(([hue, name, note]) => html`<${Col} span=${8} key=${hue}>
+            <${ConfigProvider} theme=${{ token: { colorPrimary: hue, borderRadius: 6 } }}>
+              <${Card} size="small" title=${name}
+                style=${hue === "#1677ff" ? { borderColor: "rgba(0,0,0,0.45)" } : { opacity: 0.6 }}>
+                <${Space} direction="vertical" size=${10} style=${{ width: "100%" }}>
+                  <${Space}><${Button} type="primary" size="small">Register it<//>
+                    <${Button} size="small">Cancel<//><//>
+                  <${Space}><${Text} style=${{ color: hue, fontSize: 13 }}>Open the record<//>
+                    <${Tag} bordered=${false} color=${hue}>selected<//><//>
+                  <${Progress} percent=${64} size="small" strokeColor=${hue} />
+                  <${Text} type="secondary" style=${{ fontSize: 12 }}>${note}<//>
+                <//>
+              <//>
+            <//>
+          <//>`)}
+      <//>
+    <//>
+
+    <h2 id="shell">2 · The shell, as a real page<//h2>
+    <p class="note">Sider, header, page header with one primary action, and the Record table — the whole console in
+      one picture. Click <b>Open</b> on a row to see the detail drawer.</p>
+    <${Shell} />
+
+    <h2 id="general">3 · General<//h2>
+    <p class="note">Buttons, type and icons — the vocabulary every screen uses.</p>
+    <${Item} name="Button" use="Primary (one per page), default, text, link, danger. At most two words — it names the act; the cost is said beside it, never inside it" priority=${0}>
+      <${Space} wrap>
+        <${Button} type="primary">New task<//>
+        <${Button}>Cancel<//>
+        <${Button} type="primary" danger>End session<//>
+        <${Button} danger>Retire<//>
+        <${Button} type="text">Skip<//>
+        <${Button} type="link">Open trail<//>
+        <${Button} type="primary" loading>Asking<//>
+        <${Button} size="small">Small<//>
+        <${Button} disabled>Enter<//>
+      <//>
+    <//>
+    <${Item} name="No left-edge stripes" use="A hard rule, console-wide: nothing carries a coloured bar down its left side" priority=${0}>
+      <${Row} gutter=${24}>
+        <${Col} span=${12}>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>Never<//>
+          <div style=${{ marginTop: 8, background: "#fff1f0", borderLeft: `3px solid ${RED}`, borderRadius: 4,
+                         padding: "10px 14px", opacity: 0.5 }}>
+            <${Text} style=${{ fontSize: 13 }}>budget-2026.xlsx is out of place<//>
+          </div>
+          <div style=${{ marginTop: 8, background: "#fafafa", borderLeft: "3px solid #d9d9d9", borderRadius: 4,
+                         padding: "10px 14px", opacity: 0.5 }}>
+            <${Text} style=${{ fontSize: 13 }}>OPS-01 · at the PC<//>
+          </div>
+          <div style=${{ marginTop: 8 }}><${Text} type="secondary" style=${{ fontSize: 11.5 }}>Once one row has a stripe every row wants one, and the page becomes a barcode.<//></div>
+        <//>
+        <${Col} span=${12}>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>Instead — a dot, a tint, or the words<//>
+          <div style=${{ marginTop: 8, background: "#fff1f0", borderRadius: 6, padding: "10px 14px" }}>
+            <${Text} style=${{ fontSize: 13 }}>budget-2026.xlsx is out of place<//>
+          </div>
+          <div style=${{ marginTop: 8, padding: "10px 14px", border: "1px solid #f0f0f0", borderRadius: 6 }}>
+            <${Dot} tone=${MID} /><${Text} style=${{ fontSize: 13 }}>OPS-01 · at the PC<//>
+          </div>
+          <div style=${{ marginTop: 8 }}><${Text} type="secondary" style=${{ fontSize: 11.5 }}>The tint carries the exception; the dot carries the state; neither needs an edge.<//></div>
+        <//>
+      <//>
+    <//>
+    <${Item} name="Two words" use="The rule every label follows: a button names the act and stops" priority=${0}>
+      <${Row} gutter=${24}>
+        <${Col} span=${12}>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>Instead of<//>
+          <${Space} direction="vertical" size=${8} style=${{ marginTop: 8 }}>
+            ${["End their session", "Assign an Admin to Logistics", "Check them again", "Try it on one machine"]
+              .map((t) => html`<${Button} key=${t} size="small" disabled style=${{ opacity: 0.55 }}>${t}<//>`)}
+          <//>
+        <//>
+        <${Col} span=${12}>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>We write<//>
+          <${Space} direction="vertical" size=${8} style=${{ marginTop: 8 }}>
+            ${[["End session", "who and what it costs is in the confirm"],
+               ["Assign Admin", "the department is the row it sits on"],
+               ["Re-check", "what is re-checked is the panel above it"],
+               ["Try it", "on one machine — said beside the button"]]
+              .map(([t, why]) => html`<${Space} key=${t}>
+                 <${Button} size="small">${t}<//>
+                 <${Text} type="secondary" style=${{ fontSize: 12 }}>${why}<//>
+               <//>`)}
+          <//>
+        <//>
+      <//>
+    <//>
+    <${Item} name="Typography" use="Page titles, secondary text, hostnames and versions as code, links" priority=${0}>
+      <${Title} level=${4} style=${{ marginTop: 0 }}>Operations<//>
+      <${Paragraph}>Seven machines, two Admins. <${Text} type="secondary">Three need looking at.<//><//>
+      <${Space} wrap><${Text} code>OPS-03<//><${Text} code>1.4.2<//>
+        <${Text} type="danger">a file out of place<//><${Text} type="warning">a version behind<//>
+        <${Text} disabled>never signed in<//><${Link}>Open the record<//><//>
+    <//>
+
+    <h2 id="nav">4 · Navigation<//h2>
+    <p class="note">The sider menu is the only navigation. Breadcrumb says depth; Steps run the wizards.</p>
+    <${Item} name="Breadcrumb" use="Falcon › Departments › Operations › R. Mensah — grows as you go deeper" priority=${0}>
+      <${Breadcrumb} items=${[{ title: "Falcon" }, { title: html`<a>Departments</a>` },
+                              { title: html`<a>Operations</a>` }, { title: "R. Mensah" }]} />
+    <//>
+    <${Item} name="Tabs" use="Inside a detail page: a task's Checks · Files · History" priority=${1}>
+      <${Tabs} size="small" items=${[
+        { key: "1", label: "Checks", children: html`<${Text} type="secondary">Two of three passed.<//>` },
+        { key: "2", label: "Files", children: html`<${Text} type="secondary">reconciliation-q3.docx<//>` },
+        { key: "3", label: "History", children: html`<${Text} type="secondary">Assigned 09:12<//>` },
+      ]} />
+    <//>
+    <${Item} name="Steps" use="Making an automation: When → Where → Do. Also the flow wizard" priority=${1}>
+      <${Steps} size="small" current=${1} items=${[{ title: "When" }, { title: "Where" }, { title: "Do" }]} />
+    <//>
+    <${Item} name="Dropdown" use="Row actions, bulk actions, the account menu" priority=${0}>
+      <${Dropdown} menu=${{ items: [{ key: 1, label: "Enter" }, { key: 2, label: "Run action" },
+                                    { type: "divider" }, { key: 3, label: "Offboard", danger: true }] }}>
+        <${Button}>Actions ${ic("DownOutlined")}<//>
+      <//>
+    <//>
+    <${Item} name="Pagination" use="Every table; 20 / 50 / 100" priority=${0}>
+      <${Pagination} size="small" total=${284} showSizeChanger showTotal=${(t, r) => `${r[0]}–${r[1]} of ${t}`} />
+    <//>
+
+    <h2 id="entry">5 · Data entry<//h2>
+    <p class="note">One Form component, inline validation, and nothing typed that can be picked.</p>
+    <${Item} name="Form + Input + Select" use="Register a machine — the shape every create/edit takes" priority=${0}>
+      <${Form} layout="vertical" style=${{ maxWidth: 520 }} requiredMark>
+        <${Form.Item} label="Department" required tooltip="The machine belongs to a department, not to an Admin">
+          <${Select} defaultValue="operations" options=${[
+            { value: "operations", label: "Operations" }, { value: "finance", label: "Finance" },
+            { value: "logistics", label: "Logistics" }]} />
+        <//>
+        <${Form.Item} label="Machine name" required validateStatus="error" help="A machine called OPS-07 is already registered.">
+          <${Input} defaultValue="OPS-07" />
+        <//>
+        <${Form.Item} label="Level">
+          <${Radio.Group} defaultValue="worker" options=${[
+            { value: "worker", label: "Worker machine" }, { value: "admin", label: "Admin workstation" }]} />
+        <//>
+        <${Form.Item}>
+          <${Space}><${Button} type="primary">Register<//><${Button}>Cancel<//><//>
+        <//>
+      <//>
+    <//>
+    <${Item} name="DatePicker · RangePicker" use="The Record's date range, deadlines, schedules. Qt has none — we build it" priority=${0}>
+      <${Space} wrap><${DatePicker} /><${DatePicker.RangePicker} /><${DatePicker} picker="week" /><//>
+    <//>
+    <${Item} name="Checkbox · Switch · InputNumber" use="Row selection, enabling an automation, timeouts and thresholds" priority=${1}>
+      <${Space} size=${24} wrap>
+        <${Space} direction="vertical"><${Checkbox} defaultChecked>Warn before it runs<//>
+          <${Checkbox}>Run on idle only<//><//>
+        <${Space}><${Switch} defaultChecked /><${Text}>Automation is on<//><//>
+        <${Space}><${InputNumber} min=${1} max=${120} defaultValue=${30} addonAfter="min" /><//>
+      <//>
+    <//>
+    <${Item} name="TreeSelect · Upload" use="A folder from the file index; a custom action's script. (Transfer, for picking which machines an automation targets, is P2)" priority=${1}>
+      <${Space} align="start" wrap size=${24}>
+        <${TreeSelect} style=${{ width: 260 }} placeholder="Pick a folder" treeDefaultExpandAll
+          treeData=${[{ title: "Operations", value: "ops", children: [
+            { title: "/workers/", value: "w" }, { title: "/restricted/", value: "r" }, { title: "/common/", value: "c" }] }]} />
+        <${Upload} fileList=${[{ uid: "1", name: "clear-temp.ps1", status: "done" }]}>
+          <${Button} icon=${ic("UploadOutlined")}>Add script<//>
+        <//>
+      <//>
+    <//>
+
+    <h2 id="display">6 · Data display<//h2>
+    <p class="note">The Table is the backbone. Everything else supports it.</p>
+    <${Item} name="Table" use="Machines, with a status cell, filters, sorting and row actions" priority=${0}>
+      <${Table} size="small" columns=${machineCols} dataSource=${MACHINES}
+                rowSelection=${{}} pagination=${false} />
+    <//>
+    <${Item} name="Tag · Badge" use="Status, always with the word — never colour alone" priority=${0}>
+      <${Space} direction="vertical" size=${12} style=${{ width: "100%" }}>
+        <${Space} wrap>
+          <${Text} type="secondary" style=${{ fontSize: 12, width: 130, display: "inline-block" }}>Nothing to do<//>
+          <${Tag} bordered=${false}>on 1.4.2<//><${Tag} bordered=${false}>free<//>
+          <${Tag} bordered=${false}>someone entered<//><${Tag} bordered=${false}>assisting Finance<//>
+        <//>
+        <${Space} wrap>
+          <${Text} type="secondary" style=${{ fontSize: 12, width: 130, display: "inline-block" }}>Will need someone<//>
+          <${Tag} bordered=${false} color="warning">a version behind<//>
+          <${Tag} bordered=${false} color="warning">waiting for a yes<//>
+        <//>
+        <${Space} wrap>
+          <${Text} type="secondary" style=${{ fontSize: 12, width: 130, display: "inline-block" }}>Needs someone now<//>
+          <${Tag} bordered=${false} color="error">update past the limit<//>
+          <${Tag} bordered=${false} color="error">a file out of place<//>
+        <//>
+        <${Space} wrap style=${{ paddingTop: 4 }}>
+          <${Text} type="secondary" style=${{ fontSize: 12, width: 130, display: "inline-block" }}>As a dot<//>
+          <span><${Dot} tone=${QUIET} hollow /><${Text} type="secondary">free<//></span>
+          <span style=${{ marginLeft: 16 }}><${Dot} tone=${MID} /><${Text} type="secondary">at the PC<//></span>
+          <span style=${{ marginLeft: 16 }}><${Dot} tone=${INK} /><${Text}>someone entered<//></span>
+          <span style=${{ marginLeft: 16 }}><${Dot} tone=${AMBER} /><${Text} style=${{ color: AMBER }}>behind<//></span>
+          <span style=${{ marginLeft: 16 }}><${Dot} tone=${RED} /><${Text} style=${{ color: RED }}>needs you<//></span>
+        <//>
+      <//>
+    <//>
+    <${Item} name="Descriptions" use="The label/value block in every drawer. One column, read straight down — the two-column grid made you hunt for which value belonged to which label" priority=${0}>
+      <${Row} gutter=${32}>
+        <${Col} span=${11}>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>One column, no box — label left, value right<//>
+          <div style=${{ marginTop: 10 }}>
+            ${[["Department", "Operations"], ["Signed in", "Yaw"], ["Version", "1.4.2"],
+               ["Last seen", "just now"], ["State", null]]
+              .map(([k, v]) => html`<div key=${k} style=${{ display: "flex", justifyContent: "space-between",
+                    alignItems: "center", padding: "8px 0", borderBottom: "1px solid #f5f5f5" }}>
+                <${Text} type="secondary" style=${{ fontSize: 13 }}>${k}<//>
+                ${v === null
+                  ? html`<${Tag} bordered=${false} color="error">a file out of place<//>`
+                  : html`<${Text} style=${{ fontSize: 13, fontFamily: k === "Version" ? "monospace" : "inherit" }}>${v}<//>`}
+              </div>`)}
+          </div>
+        <//>
+        <${Col} span=${13}>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>Grouped, when a subject has more than about six facts<//>
+          <div style=${{ marginTop: 10 }}>
+            <${Descriptions} size="small" column=${1} colon=${false}
+              labelStyle=${{ width: 130, color: MID }}
+              title=${html`<${Text} style=${{ fontSize: 12, color: MID, fontWeight: 400 }}>THE MACHINE<//>`}
+              items=${[
+                { key: 1, label: "Hostname", children: html`<${Text} code>OPS-03<//>` },
+                { key: 2, label: "Department", children: "Operations" },
+              ]} />
+            <${Descriptions} size="small" column=${1} colon=${false} style=${{ marginTop: 12 }}
+              labelStyle=${{ width: 130, color: MID }}
+              title=${html`<${Text} style=${{ fontSize: 12, color: MID, fontWeight: 400 }}>RIGHT NOW<//>`}
+              items=${[
+                { key: 3, label: "Signed in", children: "Yaw, since 09:40" },
+                { key: 4, label: "State", children: html`<${Tag} bordered=${false} color="error">a file out of place<//>` },
+              ]} />
+          </div>
+        <//>
+      <//>
+    <//>
+    <${Item} name="Card · Statistic" use="The Overview's figures and its summaries — filled, because an empty white box on a white page is a line drawing of nothing" priority=${1}>
+      <${Space} direction="vertical" size=${18} style=${{ width: "100%" }}>
+        <div>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>Filled — what we use<//>
+          <${Row} gutter=${12} style=${{ marginTop: 8 }}>
+            ${[["Machines", 14, null], ["Behind", 2, null], ["Open sessions", 1, null], ["Waiting on you", 3, RED]]
+              .map(([t, v, c]) => html`<${Col} span=${6} key=${t}>
+                <${Card} size="small" variant="borderless" style=${{ background: "#fafafa" }}>
+                  <${Statistic} title=${t} value=${v} valueStyle=${{ color: c || INK, fontSize: 24 }} />
+                <//>
+              <//>`)}
+          <//>
+        </div>
+        <div>
+          <${Text} type="secondary" style=${{ fontSize: 12 }}>A summary card — the same fill, with room for a title and a line of words<//>
+          <${Row} gutter=${12} style=${{ marginTop: 8 }}>
+            <${Col} span=${12}>
+              <${Card} size="small" title="Rollout" variant="borderless" style=${{ background: "#fafafa" }}>
+                <${Progress} percent=${82} size="small" />
+                <${Text} type="secondary" style=${{ fontSize: 12 }}>9 of 11 machines on 1.4.2<//>
+              <//>
+            <//>
+            <${Col} span=${12}>
+              <${Card} size="small" title="Waiting on you" variant="borderless" style=${{ background: "#fafafa" }}>
+                <${Text} style=${{ fontSize: 13 }}>Two files out of place, one flow paused.<//>
+                <div><${Button} size="small" type="link" style=${{ paddingLeft: 0 }}>Open record<//></div>
+              <//>
+            <//>
+          <//>
+          <${Text} type="secondary" style=${{ fontSize: 11.5, display: "block", marginTop: 8 }}>
+            When a card is outlined instead, and why, is settled below under <b>Filled or outlined<//>.
+          <//>
+        </div>
+      <//>
+    <//>
+    <${Item} name="Filled or outlined" use="Every card surface in the console, decided once. The default is filled; an outline has to earn itself" priority=${0}>
+      <${Row} gutter=${20}>
+        <${Col} span=${12}>
+          <${Text} strong style=${{ fontSize: 13 }}>Filled — the default<//>
+          <${Space} direction="vertical" size=${10} style=${{ width: "100%", marginTop: 10 }}>
+            <${Card} size="small" variant="borderless" style=${{ background: "#fafafa" }}>
+              <${Statistic} title="Machines" value=${14} valueStyle=${{ fontSize: 24 }} />
+            <//>
+            <${Card} size="small" title="Rollout" variant="borderless" style=${{ background: "#fafafa" }}>
+              <${Progress} percent=${82} size="small" />
+              <${Text} type="secondary" style=${{ fontSize: 12 }}>9 of 11 machines on 1.4.2<//>
+            <//>
+            <div style=${{ background: "#fafafa", borderRadius: 6, padding: "10px 12px" }}>
+              <${Dot} tone=${MID} /><${Text} strong style=${{ fontFamily: "monospace" }}>OPS-01<//>
+              <${Text} type="secondary" style=${{ fontSize: 12, marginLeft: 8 }}>a machine tile, at any size<//>
+            </div>
+            <div style=${{ background: "#fff1f0", borderRadius: 6, padding: "10px 12px" }}>
+              <${Text} style=${{ fontSize: 13 }}>budget-2026.xlsx is out of place<//>
+              <${Text} type="secondary" style=${{ fontSize: 12, marginLeft: 8 }}>an exception — the tint is the fill<//>
+            </div>
+          <//>
+          <${Text} type="secondary" style=${{ fontSize: 11.5, display: "block", marginTop: 8 }}>
+            Figures, summaries, machine tiles, exceptions, and anything that is read rather than filled in.
+          <//>
+        <//>
+        <${Col} span=${12}>
+          <${Text} strong style=${{ fontSize: 13 }}>Outlined — only these<//>
+          <${Space} direction="vertical" size=${10} style=${{ width: "100%", marginTop: 10 }}>
+            <${Card} size="small" title="Register a machine">
+              <${Input} size="small" placeholder="OPS-08" />
+              <${Text} type="secondary" style=${{ fontSize: 11.5, display: "block", marginTop: 6 }}>
+                a card holding a form — the inputs are white, and a fill would make them float
+              <//>
+            <//>
+            <${List} size="small" bordered dataSource=${["I can't open the budget file.", "Move it to Documents."]}
+              renderItem=${(i) => html`<${List.Item} style=${{ fontSize: 12.5 }}>${i}<//>`} />
+            <${Text} type="secondary" style=${{ fontSize: 11.5 }}>
+              a conversation — the rows need the edge to sit against
+            <//>
+          <//>
+          <${Divider} style=${{ margin: "14px 0 10px" }} />
+          <${Text} strong style=${{ fontSize: 13 }}>Neither<//>
+          <${Text} type="secondary" style=${{ fontSize: 11.5, display: "block", marginTop: 6 }}>
+            A drawer's label/value block, an Empty state, a Timeline, a Tree and a Table sit on the page
+            itself. And a card never goes inside another card — that is a divider.
+          <//>
+        <//>
+      <//>
+    <//>
+    <${Item} name="List · Timeline · Tree" use="A channel's messages; a report's history; the hierarchy where it is a list" priority=${1}>
+      <${Row} gutter=${16}>
+        <${Col} span=${8}>
+          <${List} size="small" header=${html`<${Text} strong>Ama · OPS-07<//>`} bordered dataSource=${[
+            "I can't open the budget file any more.", "It is restricted — move it to Documents.", "Done. Is that all?"]}
+            renderItem=${(i) => html`<${List.Item}>${i}<//>`} />
+        <//>
+        <${Col} span=${8}>
+          <${Timeline} items=${[
+            { color: RED, children: html`<${Text}>Raised 10:02<//>` },
+            { color: "gray", children: html`<${Text} type="secondary">Routed to two Admins<//>` },
+            { color: "gray", children: html`<${Text} type="secondary">Addressed 11:40<//>` }]} />
+        <//>
+        <${Col} span=${8}>
+          <${Tree} defaultExpandAll selectable=${false} treeData=${[
+            { title: "Operations", key: "o", children: [
+              { title: "R. Mensah", key: "r" }, { title: "A. Quaye", key: "a" }] },
+            { title: "Finance", key: "f", children: [{ title: "K. Boateng", key: "k" }] }]} />
+        <//>
+      <//>
+    <//>
+    <${Item} name="Empty" use="What would be here, and the one way to make one" priority=${0}>
+      <${Empty} description="No automations yet">
+        <${Button} type="primary">New automation<//>
+      <//>
+    <//>
+    <${Item} name="Segmented · Collapse · Tooltip" use="Table/Grid switch on a fleet; an action's advanced settings; a truncated cell" priority=${2}>
+      <${Space} size=${24} wrap>
+        <${Segmented} options=${["Table", "Grid"]} />
+        <${Collapse} size="small" style=${{ width: 320 }} items=${[
+          { key: "1", label: "Advanced", children: html`<${Text} type="secondary">Timeout, retries, idle-only<//>` }]} />
+        <${Tooltip} title="budget-2026.xlsx · /restricted/"><${Button}>Hover me<//><//>
+      <//>
+    <//>
+
+    <h2 id="feedback">7 · Feedback<//h2>
+    <p class="note">One rule above all: anything with a cost says the cost before the verb.</p>
+    <${Item} name="Modal.confirm" use="Every act with a cost — the words matter more than the box" priority=${0}>
+      <${Space} wrap>
+        <${Button} danger onClick=${() => modal.confirm({
+          title: "End R. Mensah's session on OPS-04?",
+          content: html`<div><p>They are in there now. Ending it puts the machine back to whoever owns it.</p>
+            <${Text} type="secondary">They are not warned first; the trail records that you ended it.<//></div>`,
+          okText: "End it", okButtonProps: { danger: true }, cancelText: "Leave it" })}>End session<//>
+        <${Popconfirm} title="Retire this flow?" description="It stops copying straight away. The history is kept."
+          okText="Retire" cancelText="Keep it"><${Button}>Retire flow<//><//>
+        <${Button} onClick=${() => msg.success("OPS-04 is theirs again")}>message<//>
+        <${Button} onClick=${() => note.warning({ message: "Kojo is asking for you",
+          description: "Pinged twice — 09:40, again at 10:15 · OPS-01", placement: "bottomRight" })}>notification<//>
+      <//>
+    <//>
+    <${Item} name="Alert" use="One line, an icon, and at most one act. If it needs a paragraph it is not an alert — it is a page" priority=${0}>
+      <${Space} direction="vertical" size=${10} style=${{ width: "100%" }}>
+        <${Alert} type="error" showIcon message="Logistics has nobody governing it — three machines answer to no Admin"
+          action=${html`<${Button} size="small" type="primary">Assign Admin<//>`} />
+        <${Alert} type="warning" showIcon message="The link to the Engine dropped at 14:02 — retrying in 6s"
+          action=${html`<${Button} size="small">Retry now<//>`} />
+        <${Alert} showIcon=${false} closable
+          style=${{ background: "#fafafa", border: "1px solid #f0f0f0" }}
+          message=${html`<span><${Dot} tone=${MID} /><${Text} style=${{ fontSize: 13 }}>1.4.3 is approved and waiting on two machines<//></span>`}
+          action=${html`<${Button} size="small">Open rollout<//>`} />
+        <${Alert} showIcon=${false} closable
+          style=${{ background: "#fafafa", border: "1px solid #f0f0f0" }}
+          message=${html`<span><${Dot} tone=${QUIET} /><${Text} type="secondary" style=${{ fontSize: 13 }}>Every machine in Operations is on 1.4.2<//></span>`} />
+        <${Text} type="secondary" style=${{ fontSize: 11.5 }}>
+          The whole thing fits one line: what happened, and the one thing to do about it. The description
+          block — a second paragraph under the message — is not used; what would have gone there belongs on
+          the page the act opens. Three kinds only: red where somebody must act, amber where somebody will
+          have to, grey for everything else. There is no blue alert and no green one — good news is grey.
+        <//>
+      <//>
+    <//>
+    <${Item} name="Skeleton · Progress · Result" use="While a page loads; a rollout's progress; an act the Engine refused" priority=${1}>
+      <${Row} gutter=${16}>
+        <${Col} span=${10}><${Skeleton} active paragraph=${{ rows: 3 }} /><//>
+        <${Col} span=${7}><${Progress} percent=${64} /><${Progress} percent=${100} status="exception"
+          format=${() => "2 failed"} /><//>
+        <${Col} span=${7}><${Result} status="warning" title="Not yours to enter"
+          subTitle="A peer holds OPS-04." extra=${html`<${Button} size="small">See who<//>`} /><//>
+      <//>
+    <//>
+
+    <h2 id="own">8 · Falcon's own<//h2>
+    <p class="note">The six things Ant Design has no vocabulary for. Everything else on this page is standard —
+      these are the product, and they sit inside the same language.</p>
+    <${Item} name="SessionBanner" use="You are inside someone's machine, the clock, and the way out. One row: whose machine, which machine, the clock as a real progress bar, and the way out" priority="own">
+      <${SessionBanner} />
+    <//>
+    <${Item} name="MachineCell" use="A machine's state inside a table row — Badge + hostname + the reason" priority="own">
+      <${Space} direction="vertical">
+        ${MACHINES.slice(0, 5).map((m) => html`<${MachineCell} key=${m.key} m=${m} />`)}
+      <//>
+    <//>
+    <${Item} name="DayTimeline" use="Who held each machine and when. the whole 24 hours by default, because the entry worth seeing is the one at 02:14; and the same day as a written report, because the chart is for the shape and the report is for acting on it" priority="own">
+      <${DayTimeline} />
+    <//>
+    <${Item} name="FleetGrid" use="A department's machines when the table is too slow to scan. Filled tiles, never outlines — forty empty frames is a grid of nothing" priority="own">
+      <${FleetGrid} />
+    <//>
+    <${Item} name="FlowGraph" use="Source → transforms → destinations, and the branch that broke. Filled nodes like every other card — the source a step darker, the broken one tinted rather than ringed" priority="own">
+      <${FlowGraph} />
+    <//>
+
+    <${Drawer} title="OPS-03" open=${drawer} onClose=${() => setDrawer(false)} width=${420}>
+      <${Descriptions} column=${1} size="small" bordered items=${[
+        { key: 1, label: "Department", children: "Operations" },
+        { key: 2, label: "State", children: html`<${Tag} color="error">a file out of place<//>` },
+      ]} />
+    <//>
+
+    <div class="askbar">
+      <b>How to use this page:</b> everything here is real Ant Design 6 with Falcon's own content — this is what the
+      console would look like, not an impression of it. Tell me per component: <b>keep</b>, <b>change</b> (say what),
+      or <b>drop</b>. <b>Settled so far:</b> the accent is Ant blue; colour is tonal with two reserved hues; buttons
+      are two words; cards are filled; the day timeline is the one licensed colour exception. <b>Settled too:</b> the session banner is the tinted strip, and no left-edge stripes anywhere. Priorities: <span class="p p0">P0</span> the demo path · <span class="p p1">P1</span> a
+      complete console · <span class="p p2">P2</span> later · <span class="p own">FALCON</span> ours to draw. <b>Beyond the kit:</b> eighteen bolder ideas live on a companion page, <a href="https://claude.ai/artifact/R2NT8v3996VDFYiS3XM4JL" target="_blank" rel="noopener">Falcon Concepts</a>.
+    </div>
+  </div>`;
+}
+
+function App() {
+  return html`<${ConfigProvider} theme=${{ algorithm: theme.compactAlgorithm,
+                                           token: { colorPrimary: "#1677ff", borderRadius: 6 } }}>
+    <div class="secnav"><div class="inner">
+      <a href="#colour">Colour</a><a href="#shell">The shell</a><a href="#general">General</a><a href="#nav">Navigation</a>
+      <a href="#entry">Data entry</a><a href="#display">Data display</a><a href="#feedback">Feedback</a>
+      <a href="#own">Falcon's own</a>
+      <a href="https://claude.ai/artifact/R2NT8v3996VDFYiS3XM4JL" target="_blank" rel="noopener" style=${{ marginLeft: "auto", color: "#1677ff", fontWeight: 600 }}>Concepts →</a>
+    </div></div>
+    <div class="wrap">
+      <h1>Falcon Console Kit</h1>
+      <p class="lede">Every component the console is built from, in the Ant Design idiom, filled with Falcon's own
+        content. This is the inventory from <code>docs/UI-COMPONENTS.md</code> made visible so it can be approved or
+        changed before any of it is built in QML.</p>
+      <${Sections} />
+    </div>
+  <//>`;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
+</script>
+

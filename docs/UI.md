@@ -18,6 +18,14 @@ in QML. `docs/UI-COMPONENTS.md` is the build list.
 antd 6 and Falcon's own content, so it can be approved or changed before a line of QML is written. Ask
 for the Console Kit link; regenerate it from the same source if it is ever lost.
 
+**The console concept (1 Oct 2026) goes further than the kit.** *Falcon Concepts* is a whole working
+console on sample data: eleven pages, live charts, and the create and resolve flows. It was reworked
+with the user over a day until it read as software a company buys. Its source is
+`design/console-concepts.html`; the kit's is `design/console-kit.html`. Both are complete pages that
+can be republished as they are. **Where the concept and an older rule below disagree, the concept
+wins.** Those rules are marked *superseded* in place, and the new ones are under *Decided 1 October
+2026* at the end. What the concept shows but nobody has decided yet is listed there too, as still open.
+
 ---
 
 ## Tokens
@@ -70,11 +78,14 @@ machine is `#bfbfbf` on a `#fafafa` lane — the ladder's own quiet tone, a clea
 sits in. Recessive is not the same as faint: if the normal case cannot be seen, the chart stops showing
 how much of the day was normal.
 
-**The day is 24 hours by default, and out of hours is shaded rather than hidden.** The user, 29 Sep 2026:
-*"sneaky things happen at unusual times."* So the timeline opens on the whole day, with the hours outside
-06:00–18:00 under a light grey band — an Admin entering a machine at 02:14 is exactly what this product
-exists to show, and it is never cropped out of the first view anyone sees. **6 to 6** narrows it to the
-working day when that is all you are looking at. The report calls an out-of-hours entry out in words.
+**The day opens on working hours, and nothing outside them is ever hidden silently.** *Superseded 1 Oct
+2026; on 29 Sep it opened on 24 hours.* The user, 1 Oct: *"make 6 to 6 default with default working
+frame adjustable."* So the occupancy chart opens on 06:00–18:00. The frame is two hour pickers beside
+the chart, and **24 hours** is one click away. The 29 Sep reason still holds: *"sneaky things happen at
+unusual times"*. So any session outside the frame is named in a line under the chart (*1 session
+outside this view: A. Quaye on LOG-02 at 02:14*), with a button to show the whole day. A non-owner
+session that starts outside the frame is outlined in amber and labelled. In the 24-hour view the hours
+outside the frame are shaded. The report calls an out-of-hours entry out in words.
 
 **Every drawing carries a Report toggle.** A chart shows the shape of something at a glance; it is
 slower to *act* on. So any drawing that takes a moment to decode has a `Segmented` switch above it —
@@ -148,6 +159,22 @@ A card never goes inside another card — that is a `Divider`.
 
 Every page is reachable from the sider. No page is reachable only by clicking a chart.
 
+**The concept (1 Oct 2026) adds two pages and changes four.**
+- **Issues** (new): every open problem from every source, typed, each with its own way to resolve it
+  (rule 31).
+- **Sessions** (new): the occupancy chart, non-owner sessions, and entries outside working hours,
+  split out of Record.
+- **Tasks**: a tall table. A row opens the task's page; below it is the new-task area (rule 32).
+- **Automation** and **Flows**: each creates through a step wizard on its own page, not a modal
+  (rule 33).
+- **Actions**: a library page with *Run once* and a custom-action editor, and the single source the
+  rule builder picks from (rule 34).
+- **Record**: the concept calls it *Audit log* and adds a histogram you can drag across to narrow the
+  table.
+
+Departments, People, Assistance, Resources and Settings were not drawn in the concept and stand as
+they are.
+
 **What belongs on each page** comes from the role references — `docs/design/super-user-reference.md`, `admin-reference.md` and `client-reference.md` — which list every capability each role has, gathered from the design documents. Build a page from its role's list, not from memory.
 
 ---
@@ -163,7 +190,8 @@ Stated once, so no screen invents its own.
    flow, an automation) opens a **page** instead, with the breadcrumb growing.
 2. **The primary action is top-right** of the page header, and there is exactly one.
 3. **Create and edit are a `Form`** in a `Modal` (short) or a `Drawer` (long), validating inline —
-   message under the field, never a toast.
+   message under the field, never a toast. *Partly superseded 1 Oct 2026: a creation with several
+   decisions in sequence (a rule, a flow) is a step wizard on its own page; see rule 33.*
 4. **Anything destructive or costly gets a confirm** that names the cost before the verb:
    *"Ending R. Mensah's session puts OPS-04 back to them. They are not warned."* `Popconfirm` for small
    things, `Modal.confirm` for real ones.
@@ -201,7 +229,10 @@ Stated once, so no screen invents its own.
     without looking: the ask and the answer are two steps of the same modal, the second says *nothing
     is saved yet*, and the commit button is on that page only. Whatever made it uncertain — a guessed
     deadline, a name that already exists, more than one task in one sentence — is a `warn` or `danger`
-    alert at the top, in the words of what it means, not the name of the flag.
+    alert at the top, in the words of what it means, not the name of the flag. *The principle stands,
+    but the form is superseded 1 Oct 2026: on the Tasks page the proposal unfolds beside the
+    description rather than as the second step of a modal. Nothing is created until the person
+    confirms, and every field says whether it came from a rule, the model or the person (rule 32).*
 
 15. **When the Engine has written the sentence, the console says that sentence.** A stopped flow's
     suggestion, a refused act's message, a deviation's reason: they are already written once, on the
@@ -230,11 +261,13 @@ Stated once, so no screen invents its own.
     nothing. They get the View instead, which answers a different question — who addressed what — and
     is structurally never a report.
 
-20. **The Overview is a list of acts, not a dashboard.** No tile counting something nobody has to do
-    anything about, no chart of a number that is fine. Each line is one thing a person has to act on,
-    in the words of what it is, with why it matters underneath, and it opens the page where it gets
-    done. Red is what cannot wait, amber is what can. When there is nothing, the page says so and
-    stays quiet — good news is grey and brief.
+20. ~~**The Overview is a list of acts, not a dashboard.**~~ *Superseded 1 Oct 2026.* The concept's
+    Overview was approved as it stands. It has a row of six figures, each with a trend line and its
+    change in words (*10 / 11 online, LOG-02 offline since 02:31*), a fleet map, the open issues,
+    event volume by kind, a live activity feed, and a department summary. What survives of the old
+    rule is the discipline. Every figure states what it counts and over what period. The open issues
+    are one-line rows that open where the work gets done. Colour on the fleet map is spent only where
+    someone has to act (rule 29).
 
 21. **A setting that cannot change anything is not a control.** Almost everything in this system is
     decided by the Engine and merely rendered, so Settings holds only what a person can really change:
@@ -242,8 +275,8 @@ Stated once, so no screen invents its own.
     decisions are made.
 
 22. **One switch between views of the same thing.** List, Grid and Day are the same fleet seen three
-    ways, so they are one `Segmented` and not three pages — and the span switch beside it (24 hours ·
-    6 to 6) only appears while the Day is showing. A `Segmented` is never navigation and never a
+    ways, so they are one `Segmented` and not three pages — and the span switch beside it (Working
+    hours · 24 hours, with the frame adjustable) only appears while the Day is showing. A `Segmented` is never navigation and never a
     filter: the data does not change, only how you are looking at it.
 
 23. **The day's one licensed colour exception.** A bar has nothing but colour to say what it is with,
@@ -283,13 +316,142 @@ Stated once, so no screen invents its own.
 
 ---
 
+## Decided 1 October 2026, from the console concept
+
+Each of these came from the user looking at the concept and saying what was wrong, or asking for it.
+They take precedence over anything above that they contradict.
+
+26. **It has to read as production software.** The first concept used gradients, glow, moving
+    particles, rings, a pill-shaped session indicator and chat bubbles. The user: *"toyish … not
+    something that a company would buy for production. The context is system monitoring."* The rework
+    was approved (*"excellent work, bravo"*). It uses dense 13px type with aligned figures, hairline
+    panels, real axes with units, crosshair tooltips, events marked on charts, filterable tables and
+    master–detail pages. Ambition means analytical depth, never decoration.
+
+27. **A figure nobody can explain is not shown.** A per-rule "success %" was rejected: *"what does a
+    percentage bar expressing success even mean."* It mixed several actions' outcomes into one
+    number. A rule shows its **last run in words** instead (*1 timed out, 1 failed, 20 succeeded*).
+    Every chart says its scope in its title (*Runs per day · all rules · last 7 days · by outcome*),
+    and a section whose meaning is not obvious says what it measures, as *How fast reports are dealt
+    with* now does. Identifiers a person never sees elsewhere are not shown either: rules are
+    referred to by name, never `R-3`, and runs have no IDs.
+
+28. **A progress chart is one line toward a goal.** The stacked version-adoption area was *"not easy
+    to understand"*. It became *Machines on 1.4.2*: one line from the approval to *9 of 11*, a dashed
+    goal at 11, and the machines that make up the gap named beneath.
+
+29. **Colour is spent only where someone has to act, and every view of a thing uses the same
+    marks.** The fleet map's colours were *"a bit much … some are just playful."* There is now one
+    vocabulary of five marks: grey (fine), grey with an amber dot (worth a look), red tint (high),
+    solid red (critical), dashed outline (offline). Status, Version, Check-in and CPU all use it;
+    CPU is put into bands (under 60 / 60–75 / 75–90 / 90 and over) rather than given a scale of its
+    own. A tooltip speaks for the view it is in: on CPU it says the CPU band, and the machine's
+    overall health drops to a grey line underneath.
+
+30. **Health, not Status, and the reason sits with it.** The machines table went from eleven columns to
+    seven because of *"possible eye strain"*. **Health** uses the fleet map's words: Healthy, Worth a
+    look, High, Critical, Offline. The reason sits under the word, and the column header explains
+    the five. The machine, its user and its department share one cell. Memory moved to the machine's
+    own page.
+
+31. **Every issue can be acted on, and its type decides how.** *"No way to address pings or any
+    issue."*
+    - **Types:** Restricted file, Help request, Deviation, Stuck update, Flow blocked.
+    - **Resolutions:** each type supplies its own (move back / delete / allow with a reason; answer
+      in a channel / enter / ask another department; and so on), and the issue's details fill them in.
+    - **Situational options:** some appear only when the situation calls for them, such as *Assign
+      an Admin* when the department has none, retry only once the machine is back if it is offline,
+      or *tell the user* only when someone is signed in. A *why these options* line says so.
+    - **Afterwards:** acting moves the issue to Waiting or Resolved, writes to its timeline, and
+      resolved issues collect in *Done today*, where they can be reopened.
+    - **The list:** one-line rows. The detail keeps its timeline, provenance and facts behind tabs.
+      Selecting an issue is a selection, not navigation, so the page header stays.
+
+32. **The Tasks page leads with the table; creating a task unfolds as it is needed.**
+    - **The table:** tall and prominent, never short because it is sparse. A row opens the task's own
+      page.
+    - **The new-task area:** two panels of equal width and equal height. The user: *"two sections
+      wrestle for attention"*, so two panels side by side must serve one purpose. The left takes
+      the input, the right shows what will be created.
+    - **Unfolding:** it starts as just the description. *Read it* unfolds *What the model read* and
+      *Details* (grouped under small headings: *Who and when*, *What shows it is done*) and the
+      summary beside them.
+    - **Live matching while typing:**
+      - **Underlines:** people, files, unambiguous dates and programs are underlined as they are
+        typed. A picker opens on click, or once on a pause; `@` picks a person; files come from the
+        file index, with *a new file* for checks that create one; programs come from what the
+        assignee's machine has installed.
+      - **Guards:** they are the reader's own. A bare day word is not a deadline, and a date inside
+        a file name is never offered as one.
+      - **Effect:** what is confirmed reaches the proposal as *You*, and the model is asked only
+        about the rest.
+    - **No checks:** *"No checks, I will verify it by hand"* is a full button beside *Add a check*.
+      Choosing it is an explicit decision, so it is never a checkbox that is easy to miss.
+
+33. **Creating a rule or a flow is a step wizard with room to breathe.**
+    - **The steps:** *When → On → Do → Review* for rules; *Source → Along the way → Destinations →
+      Check & create* for flows. The user: *"so each step has enough breathing room and space."* One
+      step shows at a time; *Next* waits until the step is valid.
+    - **Leaving:** **Cancel is at the top on every step**, and asks before discarding anything set.
+    - **Rules:** *Edit* opens the wizard filled in, and *Start from* copies an existing rule.
+    - **Flows:** the diagram is laid out automatically and nodes are not dragged; the only placement
+      with meaning, before or after the split, is a choice in the step.
+    - **A rule's page:** its setup drawn as *When → On → Do*, each action's outcomes and typical time
+      against its limit, its firings with their runs, and its change history.
+
+34. **Actions is its own page, and the one source for the rule builder.**
+    - **The library:** Control, Monitoring and Custom, each with *Used by* (one rule named; several
+      counted, with the names on hover) and *Run once*.
+    - **Run once:** states what it will do to the people affected, skips offline machines rather
+      than queueing, and shows each machine finish.
+    - **Custom actions:** checked as they are typed (compiles; standard and Windows-native imports
+      only), and the checker says it runs again on arrival and that nothing is sandboxed.
+    - **The rule builder:** *Do* picks only from this library.
+
+35. **Enabling a rule is a checkbox, not a switch.** The user's preference, and it keeps the control
+    in step with every other yes/no in a table.
+
+36. **Looking at a machine is not being in it.** A machine's page always offers **Enter session**,
+    with a confirm that names the cost. A session already running there is shown on its own strip,
+    with its own acts: *Return to it* / *Leave session* when it is yours, *End their session* when it
+    is someone else's. The user: *"when a specific machine is clicked doesnt mean we are in that
+    machine's session."*
+
+37. **A short list inside a panel is rows, not a table.** A bordered table inside a panel looked like
+    a box in a box. This applied to *How fast reports are dealt with* and the Overview's open issues.
+    Tables stay for the long, sortable lists that are the page.
+
+**Still open — shown in the concept, not yet decided:**
+
+- **Green.** The concept uses it for completed outcomes (*Success*, *Ready*, *Within target*). The 29
+  Sep rule says green is not used at all. Machines that are fine are grey either way.
+- **Rule 12, two words per button.** The concept breaks it where a choice needs its phrase (*No
+  checks, I will verify it by hand*, *Test on one machine*). Decide whether choice buttons are exempt.
+- **Destinations per flow.** The concept warns past 8 and has no hard cap.
+- **The CPU bands (60 / 75 / 90).** The top band matches the *Sustained high CPU* rule.
+- **Which areas each level sees.** The concept shows every area at one level so it can be judged;
+  rule 25 still decides what a Super User sees at their own level.
+- **Deferred items the concept draws anyway.** It has a flow stage editor and a rule condition
+  builder. The JSON shapes behind them, `condition_spec` and a flow stage's `config`, are still on
+  the deferred list (spec §10). The concept shows how they might look; it decides nothing about them.
+- **Engine work the concept assumes.**
+  - **Live matching** wants the reader's patterns in shared code (`common/`, stdlib only), plus a
+    lookup handler for the directory, file index and installed programs. Under the project's own
+    rule that is an Engine handler and TUI command first.
+  - **The rule backtest** ("if it had been on last week") needs enough stored metric history to
+    replay.
+  - **Typed issues** need one Engine read that gathers violations, pings, deviations, escalations and
+    blocked flows into a single list.
+
+---
+
 ## What stays custom
 
 antd has no vocabulary for these, and they are the product:
 
 | | What it draws | Built from |
 |---|---|---|
-| **Day timeline** | who held each machine, and when. Two switches: **6 to 6 · 24 hours** for the span (**24 hours is the default** — the night is shaded, never cropped) and **Chart · Report** for how you read it | custom Shapes + `Table`, behind two `Segmented`s |
+| **Day timeline** | who held each machine, and when. Two switches: **Working hours · 24 hours** for the span. Working hours (06:00–18:00, adjustable) is the default, and a session outside the frame is named under the chart, never dropped. **Chart · Report** for how you read it | custom Shapes + `Table`, behind two `Segmented`s |
 | **Fleet view** | a department's machines at a glance, 4 to 240 | `Table` by default; a compact grid as a second view |
 | **Flow graph** | source → transforms → destinations, and where it broke | custom, in the flow's detail page. Its nodes are **filled** like every other card — the source one step darker, the broken one a tinted fill rather than a red ring, and only its link stays dashed red |
 | **Hierarchy** | department → Admin → machine | antd `Tree` where it is a list; custom only if a picture earns it |
