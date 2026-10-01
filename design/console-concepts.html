@@ -14,6 +14,7 @@
   --crit: #c8331f; --high: #d4610f; --med: #b58105; --low: #5b6b85; --ok: #1d8a4f;
   --s1: #2459d6; --s2: #0f8f8a; --s3: #7357d9; --s4: #d4610f; --s5: #b58105; --s6: #8a94a6;
   --own: #c9ced7;
+  --bezel: #1d2027;
   --shadow-pop: 0 8px 24px -6px rgba(16,24,40,0.18), 0 2px 6px rgba(16,24,40,0.06);
   --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
@@ -28,6 +29,7 @@
     --crit: #f2604c; --high: #f08a3e; --med: #d9a93a; --low: #8796b0; --ok: #3fb877;
     --s1: #5b8cff; --s2: #2bb8b1; --s3: #9a85f2; --s4: #f08a3e; --s5: #d9a93a; --s6: #7d889b;
     --own: #3a4352;
+    --bezel: #2c323d;
     --shadow-pop: 0 10px 30px -6px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
   }
 }
@@ -40,6 +42,7 @@
   --crit: #f2604c; --high: #f08a3e; --med: #d9a93a; --low: #8796b0; --ok: #3fb877;
   --s1: #5b8cff; --s2: #2bb8b1; --s3: #9a85f2; --s4: #f08a3e; --s5: #d9a93a; --s6: #7d889b;
   --own: #3a4352;
+  --bezel: #2c323d;
   --shadow-pop: 0 10px 30px -6px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
 }
 
@@ -172,6 +175,122 @@ a { color: var(--accent); text-decoration: none; }
 .decide { padding: 12px 14px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); background: color-mix(in srgb, var(--c) 9%, transparent); }
 .breathe { animation: breathe 1.2s ease-in-out infinite; }
 @keyframes breathe { 50% { opacity: .35; } }
+.su-banner { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 20px; background: color-mix(in srgb, var(--crit) 12%, var(--surface)); color: var(--crit); border-bottom: 1px solid color-mix(in srgb, var(--crit) 30%, transparent); flex-wrap: wrap; }
+.su-banner span:not(.sp):not(.mono) { color: var(--text); }
+.nav.big { padding: 10px 12px; font-size: 14px; }
+.drow { display: grid; grid-template-columns: minmax(150px, 1.4fr) minmax(140px, 1.6fr) 70px minmax(120px, 1fr) 130px minmax(120px, 1fr); gap: 14px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; }
+.drow:hover { background: var(--surface-2); }
+.drow-h { cursor: default; padding-top: 8px; padding-bottom: 8px; font-size: 12px; }
+.drow-h:hover { background: transparent; }
+.qrow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--grid); }
+.qi { width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; font-size: 15px; background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c); }
+.grow { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 3fr); gap: 14px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--grid); }
+.adm { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border: 1px solid var(--border); border-radius: 16px; }
+.av { width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 600; background: var(--surface-3); color: var(--text-2); flex: none; }
+@media (max-width: 1000px) { .drow { grid-template-columns: minmax(0, 1fr) auto; } .drow > :nth-child(n+3) { display: none; } .qrow { grid-template-columns: 34px minmax(0, 1fr); } .qrow > :nth-child(n+3) { grid-column: 2; justify-content: flex-start; } .grow { grid-template-columns: minmax(0, 1fr); } }
+.c-work { grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); }
+@media (max-width: 900px) { .c-work { grid-template-columns: minmax(0, 1fr); } .c-work > section:first-child { position: static !important; } }
+.qitem { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--grid); }
+.qitem:hover { background: var(--surface-2); }
+.qitem.on { background: var(--accent-soft); }
+.qitem.done { opacity: .7; }
+.org-stem { width: 1px; height: 14px; background: var(--border-strong); margin: 0 auto 0; }
+.org-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding-top: 12px; border-top: 1px solid var(--border-strong); }
+.org-col { border: 1px solid var(--border); border-radius: 6px; padding: 14px; background: var(--surface); min-width: 0; }
+.org-adm { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--grid); }
+.org-empty { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px dashed color-mix(in srgb, var(--crit) 50%, transparent); border-radius: 6px; background: color-mix(in srgb, var(--crit) 6%, transparent); cursor: pointer; }
+.org-new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border-style: dashed; color: var(--text-3); cursor: pointer; min-height: 160px; background: transparent; }
+.org-new:hover { color: var(--accent); border-color: var(--accent); }
+.rgrid { display: grid; align-items: stretch; }
+.rgrid > span { display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-bottom: 1px solid var(--grid); }
+.rgrid .rh { font-size: 12px; color: var(--text-3); justify-content: center; min-height: 34px; }
+.rgrid .rc { padding-left: 14px; }
+.rgrid .rd { justify-content: center; }
+.dotc { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: inline-block; vertical-align: middle; }
+.dotc.on { background: var(--accent); border-color: var(--accent); }
+.dotc.dead { background: transparent; border: 1.5px dashed var(--crit); }
+.track { display: flex; flex-direction: column; }
+.trk { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 0 0 16px; }
+.trk-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); margin-top: 4px; flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
+.trk-line { position: absolute; left: 5.5px; top: 18px; bottom: 0; width: 1px; background: var(--border-strong); }
+.wall { display: flex; flex-direction: column; align-items: center; padding: 8px 0 4px; }
+.wall-you { display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px 5px 5px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+.wall-stem { width: 1px; height: 18px; background: var(--border-strong); }
+.wall-row { width: 100%; padding-top: 18px; border-top: 1px solid var(--border-strong); }
+.scr { cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0; outline: none; }
+.scr-bezel { position: relative; width: 100%; padding: 8px 8px 16px; border-radius: 8px; background: var(--surface-3); border: 1px solid var(--border-strong); transition: transform .15s, box-shadow .15s; }
+.scr:hover .scr-bezel, .scr:focus-visible .scr-bezel { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+.scr::after { content: ''; width: 34%; height: 8px; margin-top: 0; background: var(--border-strong); border-radius: 0 0 6px 6px; }
+.scr-display { position: relative; aspect-ratio: 16 / 10; background: var(--surface); border-radius: 3px; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border); }
+.scr-display.off .scr-body { opacity: .35; filter: grayscale(1); }
+.scr-top { display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-bottom: 1px solid var(--grid); background: var(--surface-2); }
+.scr-name { font-size: 11.5px; font-weight: 600; }
+.scr-body { flex: 1; display: grid; grid-template-columns: 18px minmax(0, 1fr); min-height: 0; }
+.scr-nav { border-right: 1px solid var(--grid); padding: 6px 4px; display: flex; flex-direction: column; gap: 4px; }
+.scr-nav i { height: 3px; border-radius: 2px; background: var(--border-strong); }
+.scr-nav i:first-child { background: var(--accent); opacity: .6; }
+.scr-main { padding: 8px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+.scr-tiles { display: flex; flex-wrap: wrap; gap: 4px; }
+.scr-tiles span { position: relative; width: 20px; height: 20px; border-radius: 3px; }
+.scr-tiles span i { position: absolute; right: -2px; top: -2px; width: 6px; height: 6px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface); }
+.scr-row { display: flex; align-items: center; gap: 6px; }
+.scr-iss { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 11.5px; font-weight: 500; }
+.scr-iss i { width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.scr-nobody { position: absolute; inset: 26px 0 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--crit); font-size: 12.5px; }
+.scr-nobody span { font-size: 18px; }
+.scr-led { position: absolute; left: 50%; bottom: 5px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; }
+.scr-cap { margin-top: 8px; font-size: 12.5px; text-align: center; }
+.trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.trend { padding: 12px 14px; }
+.dcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.dcard { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.dcard:hover { border-color: var(--border-strong); }
+.dcard.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.dcard.done { opacity: .6; }
+.dcard .qi { background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c); }
+.dviz { height: 52px; display: flex; align-items: center; overflow: hidden; }
+.vtrack { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); position: relative; }
+.vtrack::before { content: ''; position: absolute; left: 12.5%; right: 12.5%; top: 13px; height: 1px; background: var(--border-strong); }
+.vstep { text-align: center; position: relative; }
+.vdot { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto; display: grid; place-items: center; font-size: 12px; background: var(--surface); border: 1.5px solid var(--c); color: var(--c); position: relative; }
+.bigtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 12px; }
+.bt { text-align: center; cursor: pointer; }
+.bt-face { position: relative; height: 54px; border-radius: 6px; display: grid; place-items: center; font-family: var(--mono); font-size: 14px; font-weight: 500; transition: transform .12s; }
+.bt:hover .bt-face { transform: translateY(-2px); }
+.bt-face i { position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); }
+.bt-face b { position: absolute; left: 4px; bottom: 2px; font-size: 11px; color: var(--s3); }
+.carousel { position: relative; }
+.car-track { display: flex; gap: 28px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 2px; padding: 6px 2px 14px; scrollbar-width: none; }
+.car-track::-webkit-scrollbar { display: none; }
+.car-end { flex: 0 0 1px; }
+.tab { position: relative; flex: 0 0 min(64%, 820px); min-width: 300px; scroll-snap-align: start; padding: 14px 18px; border-radius: 22px; background: var(--bezel); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 12px 28px -14px rgba(0,0,0,0.45); cursor: pointer; transition: transform .18s; outline: none; }
+.tab:hover, .tab:focus-visible { transform: translateY(-3px); }
+.tab:focus-visible { box-shadow: 0 0 0 3px var(--accent); }
+.tab-cam { position: absolute; left: 7px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: #3a3f4a; }
+.tab-display { position: relative; aspect-ratio: 2.1 / 1; border-radius: 8px; overflow: hidden; background: var(--surface); display: flex; flex-direction: column; }
+.tab-display.off .tab-body { opacity: .25; filter: grayscale(1); }
+.tab-top { display: flex; align-items: center; gap: 10px; padding: 7px 12px; background: var(--surface-2); border-bottom: 1px solid var(--grid); }
+.tab-name { font-size: 13px; font-weight: 600; }
+.tab-body { flex: 1; display: grid; grid-template-columns: 26px minmax(0, 1fr); min-height: 0; }
+.tab-rail { border-right: 1px solid var(--grid); padding: 10px 7px; display: flex; flex-direction: column; gap: 7px; }
+.tab-rail i { height: 4px; border-radius: 2px; background: var(--border-strong); }
+.tab-rail i:first-child { background: var(--accent); opacity: .7; }
+.tab-main { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; padding: 12px 14px; min-height: 0; }
+.tab-left { display: flex; flex-direction: column; min-width: 0; gap: 12px; padding-right: 14px; border-right: 1px solid var(--grid); }
+.tab-tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab-tiles b { position: relative; width: 34px; height: 30px; border-radius: 4px; display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 500; }
+.tab-tiles b i { position: absolute; right: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface); }
+.tab-chart { flex: 1; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+.tab-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-top: 8px; border-top: 1px solid var(--grid); }
+.tab-right { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tab-iss { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 11.5px; }
+.tab-nobody { position: absolute; inset: 36px 0 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--crit); font-size: 13px; }
+.tab-nobody span:first-child { font-size: 22px; }
+.car-btn { position: absolute; top: calc(50% - 22px); width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-pop); z-index: 2; font-size: 14px; }
+.car-btn:hover { color: var(--accent); border-color: var(--accent); }
+.car-btn.left { left: -12px; }
+.car-btn.right { right: -12px; }
+@media (max-width: 700px) { .tab { flex-basis: 86%; } .tab-main { grid-template-columns: minmax(0, 1fr); } .tab-right { display: none; } }
 .list-item { padding: 10px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
 .list-item:hover { background: var(--surface-2); }
 .list-item.on { background: var(--accent-soft); }
@@ -253,12 +372,12 @@ let showToast = () => {};
 const toast = (t) => showToast(t);
 
 // ============================================================== the estate
-const DEPTS = [
+let DEPTS = [
   { id: "ops", name: "Operations", admins: ["R. Mensah", "A. Quaye"], c: "var(--s1)" },
   { id: "fin", name: "Finance", admins: ["K. Boateng"], c: "var(--s2)" },
   { id: "log", name: "Logistics", admins: [], c: "var(--s4)" },
 ];
-const MACHINES = [
+let MACHINES = [
   { host: "OPS-01", user: "Kojo",  dept: "ops", ip: "10.20.4.11", ver: "1.4.2", status: "warning",  note: "Help request unanswered (2 pings)", seen: 0.001 },
   { host: "OPS-02", user: null,    dept: "ops", ip: "10.20.4.12", ver: "1.4.2", status: "healthy",  note: "No one signed in", seen: 0.001 },
   { host: "OPS-03", user: "Yaw",   dept: "ops", ip: "10.20.4.13", ver: "1.4.2", status: "high",     note: "salaries.csv outside /restricted/", seen: 0.001 },
@@ -299,7 +418,7 @@ function metric(host, kind, t) {
   return 0;
 }
 
-const ISSUES = [
+let ISSUES = [
   { id: "INC-1042", sev: "critical", type: "file", title: "Restricted file on a worker machine", subject: "budget-2026.xlsx", host: "OPS-07", at: 10.03, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
     d: { file: "budget-2026.xlsx", folder: "C:\\Users\\Ama\\Documents", size: "84 KB" } },
   { id: "UPD-0318", sev: "high", type: "update", title: "Update past the escalation limit", subject: "1.4.0 → 1.4.2", host: "LOG-02", at: -62.5, owner: "Unassigned", sla: 24, state: "Escalated", kind: "rollout",
@@ -317,7 +436,7 @@ const ISSUES = [
 ];
 
 // who held each machine today: [from, to, kind, who]. kinds: own / admin / you / assist
-const LANES = [
+let LANES = [
   { host: "LOG-02", blocks: [[2.23, 2.52, "admin", "A. Quaye", true]] },
   { host: "LOG-01", blocks: [[7.97, NOWH, "own", "Esi"]] },
   { host: "OPS-01", blocks: [[8.2, NOWH, "own", "Kojo"]] },
@@ -342,7 +461,7 @@ const KINDS = {
   deviation:  { c: "var(--high)", w: "Deviation" },
   violation:  { c: "var(--crit)", w: "Violation" },
 };
-const AUDIT = (() => {
+let AUDIT = (() => {
   const out = []; const hosts = MACHINES.filter((m) => m.user).map((m) => m.host);
   const acts = ["Lock the screen", "Take a screenshot", "Check disk health", "Clear the temp folder", "Log event"];
   let id = 0;
@@ -593,11 +712,11 @@ function Overview({ range, go }) {
       compliant: ms.filter((m) => m.ver === "1.4.2").length, mtta: d.id === "ops" ? "42m" : d.id === "fin" ? "2h 10m" : "—" }; });
   return html`<${React.Fragment}>
     <div className="kpis">
-      <${Kpi} label="Machines online" value="10" unit="/ 11" delta="LOG-02 offline since 02:31" dc="var(--crit)" fn=${(t) => (t < 2.52 ? 11 : 10)} max=${11} sc="var(--ok)" />
-      <${Kpi} label="Open issues" value="7" delta="1 critical · 2 high · +3 since yesterday" dc="var(--crit)" fn=${(t) => Math.max(2, Math.round(3 + (t > 9 ? 2 : 0) + (t > 10 ? 2 : 0) + sm(3, t, 0.3)))} sc="var(--crit)" />
-      <${Kpi} label="Sessions held now" value=${String(sessionsHeld.length)} delta=${`Longest: you on OPS-07, ${dur(NOWH - 10.7 + (now - T0) / 3.6e6)}`} fn=${(t) => (working(t) ? Math.round(1 + 1.4 * sm(8, t, 1.5)) : 0)} sc="var(--s3)" />
+      <${Kpi} label="Machines online" value=${String(MACHINES.filter((m) => m.status !== "offline").length)} unit=${"/ " + MACHINES.length} delta=${MACHINES.some((m) => m.status === "offline") ? "LOG-02 offline since 02:31" : "All online"} dc=${MACHINES.some((m) => m.status === "offline") ? "var(--crit)" : undefined} fn=${(t) => MACHINES.length - (MACHINES.some((m) => m.status === "offline") && t >= 2.52 ? 1 : 0)} max=${MACHINES.length} sc="var(--ok)" />
+      <${Kpi} label="Open issues" value=${String(ISSUES.length)} delta=${ISSUES.length ? ["critical", "high"].map((k) => `${ISSUES.filter((x) => x.sev === k).length} ${k}`).join(" · ") : "Nothing open"} dc=${ISSUES.some((x) => x.sev === "critical") ? "var(--crit)" : undefined} fn=${(t) => Math.max(2, Math.round(3 + (t > 9 ? 2 : 0) + (t > 10 ? 2 : 0) + sm(3, t, 0.3)))} sc="var(--crit)" />
+      <${Kpi} label="Sessions held now" value=${String(sessionsHeld.length)} delta=${sessionsHeld.length ? `Longest: ${sessionsHeld[0].held === "You" ? "you" : sessionsHeld[0].held} on ${sessionsHeld[0].host}, ${dur(NOWH - sessionsHeld[0].heldFrom + (now - T0) / 3.6e6)}` : "Nobody is inside a machine"} fn=${(t) => (working(t) ? Math.round(1 + 1.4 * sm(8, t, 1.5)) : 0)} sc="var(--s3)" />
       <${Kpi} label="Policy violations, 24h" value="2" delta="+2 vs. 7-day average of 0.3" dc="var(--crit)" fn=${(t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0)} sc="var(--crit)" max=${3} />
-      <${Kpi} label="Version compliance" value="82" unit="%" delta="9 of 11 on 1.4.2 · target 100%" fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} sc="var(--s2)" max=${11} />
+      <${Kpi} label="Version compliance" value=${String(Math.round((MACHINES.filter((m) => m.ver === "1.4.2").length / MACHINES.length) * 100))} unit="%" delta=${`${MACHINES.filter((m) => m.ver === "1.4.2").length} of ${MACHINES.length} on 1.4.2 · target 100%`} fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} sc="var(--s2)" max=${11} />
       <${Kpi} label="Median time to address" value="42" unit="min" delta="−18 min vs. last week" dc="var(--ok)" fn=${(t) => 60 - 18 * sm(2, t, 0.2)} sc="var(--s6)" />
     </div>
     <div className="g c-75">
@@ -959,9 +1078,10 @@ function Issues({ sel, go }) {
   const [pick, setPick] = useState({});
   const [input, setInput] = useState({});
   const [notify, setNotify] = useState(true);
-  const id = sel && ISSUES.find((i) => i.id === sel) ? sel : "INC-1042";
-  const it = ISSUES.find((i) => i.id === id), stt = state[id], play = buildPlay(it), T = ISSUE_TYPES[it.type];
+  const id = sel && ISSUES.find((i) => i.id === sel) ? sel : ISSUES[0] ? ISSUES[0].id : null;
+  const it = ISSUES.find((i) => i.id === id), stt = it && state[id], play = it && buildPlay(it), T = it && ISSUE_TYPES[it.type];
   const [tf, setTf] = useState("all");
+  if (!it) return html`<${Panel} title="Issues"><div className="t3">Nothing is open in this department.</div><//>`;
   const opt = play.options.find((o) => o.key === (pick[id] || play.options[0].key));
   const age = NOWH - it.at, late = age > it.sla && stt.status !== "Resolved";
   const ago = (a) => (a > 24 ? Math.floor(a / 24) + "d" : dur(a));
@@ -1058,7 +1178,7 @@ function Issues({ sel, go }) {
 }
 
 // ============================================================== TASKS
-const TASKS = [
+let TASKS = [
   { id: "T-208", title: "Reconcile the Q3 invoices", who: "Kojo", host: "OPS-01", by: "R. Mensah", state: "In progress", assigned: -63, started: -38.75, soft: 36, final: 41,
     evidence: [
       { target: "reconciliation.xlsx", intent: "Update", st: "Passed", sig: "Saved 41 times since Tue 09:15", fn: (t) => (working(t) && t > -38.75 ? 2 + 6 * sm(4, t, 3) : 0) },
@@ -2632,17 +2752,551 @@ function Reports() {
 }
 
 // ============================================================== shell
-const NAV = [
+// ============================================================== SUPER USER
+// The Super User governs. At their own level the console is three tabs, and every item opens its own page.
+// Entering an Admin's console (after blocking or ending that Admin's session) swaps in the full
+// operational console, narrowed to that Admin's department, under "Super User in charge".
+const FULL = {};
+function applyScope(dept) {
+  if (!FULL.MACHINES) Object.assign(FULL, { MACHINES, ISSUES, LANES, AUDIT, DEPTS, TASKS });
+  const inD = (h) => !dept || (MBY[h] && MBY[h].dept === dept);
+  MACHINES = FULL.MACHINES.filter((m) => inD(m.host));
+  ISSUES = FULL.ISSUES.filter((i) => inD(i.host));
+  LANES = FULL.LANES.filter((l) => inD(l.host));
+  AUDIT = FULL.AUDIT.filter((e) => inD(e.host));
+  DEPTS = FULL.DEPTS.filter((d) => !dept || d.id === dept);
+  TASKS = FULL.TASKS.filter((t) => inD(t.host));
+}
+const ADMIN_INFO = {
+  "R. Mensah": { dept: "ops", ws: "WS-OPS-A1", now: "Inside OPS-04 since 12:58", busy: true },
+  "A. Quaye": { dept: "ops", ws: "WS-OPS-A2", now: "Signed in on WS-OPS-A2 since 08:15" },
+  "K. Boateng": { dept: "fin", ws: "WS-FIN-A1", now: "Signed in on WS-FIN-A1 since 08:20" },
+};
+const SEVORD = { critical: 0, high: 1, medium: 2, low: 3 };
+const initials = (n) => n.split(/[ .]+/).filter(Boolean).map((x) => x[0]).join("").slice(0, 2);
+function MiniTiles({ ms, go }) {
+  return html`<div className="row" style=${{ gap: 3 }}>${ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
+    return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`} onClick=${(e) => { e.stopPropagation(); go("machines", m.host); }}
+      style=${{ position: "relative", width: 18, height: 18, borderRadius: 3, background: t.bg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none"), cursor: "pointer" }}>
+      ${t.dot ? html`<i style=${{ position: "absolute", right: -2, top: -2, width: 6, height: 6, borderRadius: "50%", background: t.dot, boxShadow: "0 0 0 1.5px var(--surface)" }} />` : null}</span>`; })}</div>`;
+}
+function deptStats(d) {
+  const ms = MACHINES.filter((m) => m.dept === d.id), iss = ISSUES.filter((i) => MBY[i.host].dept === d.id).sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]);
+  return { ms, iss, online: ms.filter((m) => m.status !== "offline").length, ok: ms.filter((m) => m.ver === "1.4.2").length, worst: iss[0] ? iss[0].sev : null, mtta: d.id === "ops" ? "42m" : d.id === "fin" ? "2h 10m" : null };
+}
+// The Super User's Monitor is a view from above: one screen per department, the organisation's day as a
+// strip, and a few trends. Words appear on hover or click; the picture carries the state.
+const deptHosts = (id) => MACHINES.filter((m) => m.dept === id).map((m) => m.host);
+function deptActivity(id) {
+  const hosts = new Set(deptHosts(id)), bins = Array(25).fill(0);
+  AUDIT.forEach((e) => { if (e.t >= NOWH - 24 && hosts.has(e.host)) bins[Math.min(24, Math.floor(e.t - (NOWH - 24)))] += 1; });
+  return (t) => bins[Math.max(0, Math.min(24, Math.floor(t - (NOWH - 24))))];
+}
+const WORSTK = (ms) => { const order = ["crit", "high", "watch", "offline", "quiet"]; return ms.map((m) => HEALTH[m.status][0]).sort((a, b) => order.indexOf(a) - order.indexOf(b))[0] || "quiet"; };
+function Screen({ d, onOpen }) {
+  const ms = MACHINES.filter((m) => m.dept === d.id), iss = ISSUES.filter((i) => MBY[i.host].dept === d.id).sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]);
+  const wk = WORSTK(ms), stc = wk === "quiet" ? "var(--ok)" : wk === "watch" ? "var(--med)" : wk === "offline" ? "var(--text-4)" : "var(--crit)";
+  const stw = wk === "quiet" ? "All well" : wk === "watch" ? "Worth a look" : wk === "offline" ? "Offline" : wk === "high" ? "High" : "Critical";
+  const act = useMemo(() => deptActivity(d.id), [d.id]);
+  const off = !d.admins.length;
+  return html`<div className="tab" role="button" tabIndex="0" onClick=${() => onOpen(d.id)} onKeyDown=${(e) => e.key === "Enter" && onOpen(d.id)} aria-label=${`${d.name} console`}>
+    <span className="tab-cam" />
+    <div className=${"tab-display" + (off ? " off" : "")}>
+      <div className="tab-top">
+        <span className="tab-name">${d.name}</span>
+        <span className="st" style=${{ "--c": stc, fontSize: 11 }}><i />${stw}</span>
+        <span className="sp" />
+        ${d.admins.map((a) => html`<span key=${a} className="row" style=${{ gap: 5, flexWrap: "nowrap", fontSize: 11 }} title=${ADMIN_INFO[a].now}>
+          <span style=${{ position: "relative" }}><span className="av" style=${{ width: 18, height: 18, fontSize: 8 }}>${initials(a)}</span><i style=${{ position: "absolute", right: -1, bottom: -1, width: 6, height: 6, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 1.5px var(--surface-2)" }} /></span>
+          <span className="t2">${a}</span></span>`)}
+      </div>
+      <div className="tab-body">
+        <div className="tab-rail"><i /><i /><i /><i /><i /></div>
+        <div className="tab-main">
+          <div className="tab-left">
+            <div className="tab-tiles">${ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
+              return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`}>
+                <b style=${{ background: t.bg, color: t.fg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none") }}>${m.host.slice(-2)}${t.dot ? html`<i style=${{ background: t.dot }} />` : null}</b></span>`; })}</div>
+            <div className="tab-chart"><span className="t3" style=${{ fontSize: 10.5 }}>Activity, last 24 hours</span><${AreaFill} fn=${act} /></div>
+          </div>
+          <div className="tab-right">
+            ${iss.slice(0, 3).map((i) => html`<div key=${i.id} className="tab-iss" title=${i.title}><span className="sev" style=${{ "--c": SEV[i.sev].c }}><i /></span><span className="ttl">${i.subject}</span><span className="mono t3">${i.host}</span></div>`)}
+            ${iss.length > 3 ? html`<div className="t3" style=${{ fontSize: 10.5 }}>+${iss.length - 3} more</div>` : null}
+            ${iss.length === 0 ? html`<div className="t3" style=${{ fontSize: 11 }}>${ic("CheckOutlined")} Nothing open</div>` : null}
+            <span className="sp" />
+            <div className="tab-stats">
+              ${[["Online", `${ms.filter((m) => m.status !== "offline").length}/${ms.length}`], ["On 1.4.2", `${ms.filter((m) => m.ver === "1.4.2").length}/${ms.length}`], ["Inside now", String(ms.filter((m) => m.held).length)]].map(([k, v]) => html`<div key=${k}><div className="mono" style=${{ fontSize: 15, fontWeight: 600 }}>${v}</div><div className="t3" style=${{ fontSize: 10.5 }}>${k}</div></div>`)}
+            </div>
+          </div>
+        </div>
+      </div>
+      ${off ? html`<div className="tab-nobody"><span>${ic("UserAddOutlined")}</span><b>Nobody at this console</b><span className="t3" style=${{ fontSize: 11.5, color: "var(--text-3)" }}>Its issues and reports come to you</span></div>` : null}
+    </div>
+  </div>`;
+}
+// a filled area that stretches to whatever box it is given
+function AreaFill({ fn }) {
+  const n = 48, R = RANGES["24h"], vals = Array.from({ length: n }, (_, i) => fn(R.a + (i / (n - 1)) * (NOWH - R.a)));
+  const mx = Math.max(1, ...vals), pts = vals.map((v, i) => [(i / (n - 1)) * 100, 38 - (v / mx) * 34]);
+  const line = pts.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(2) + " " + y.toFixed(2)).join("");
+  return html`<svg viewBox="0 0 100 40" preserveAspectRatio="none" style=${{ display: "block", width: "100%", flex: 1, minHeight: 30 }}>
+    <path d=${line + "L100 40L0 40Z"} style=${{ fill: "var(--s1)", opacity: 0.14 }} />
+    <path d=${line} fill="none" style=${{ stroke: "var(--s1)" }} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+  </svg>`;
+}
+function ScreenRow({ depts, onOpen }) {
+  const ref = useRef(null);
+  const [edge, setEdge] = useState({ l: false, r: true });
+  const check = () => { const el = ref.current; if (!el) return; setEdge({ l: el.scrollLeft > 4, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 }); };
+  useEffect(() => { check(); const el = ref.current; if (!el) return; const ro = new ResizeObserver(check); ro.observe(el); return () => ro.disconnect(); }, []);
+  const step = (dir) => { const el = ref.current; if (!el) return; const item = el.querySelector(".tab"); el.scrollBy({ left: dir * (item ? item.offsetWidth + 28 : el.clientWidth * 0.6), behavior: "smooth" }); };
+  return html`<div className="carousel">
+    <div className="car-track" ref=${ref} onScroll=${check}>${depts.map((d) => html`<${Screen} key=${d.id} d=${d} onOpen=${onOpen} />`)}<span className="car-end" /></div>
+    ${edge.l ? html`<button className="car-btn left" onClick=${() => step(-1)} aria-label="Previous department">${ic("LeftOutlined")}</button>` : null}
+    ${edge.r ? html`<button className="car-btn right" onClick=${() => step(1)} aria-label="Next department">${ic("RightOutlined")}</button>` : null}
+  </div>`;
+}
+function LookCloser({ id, onClose, go, enter }) {
+  if (!id) return html`<${Modal} open=${false} />`;
+  const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id), x = deptStats(d);
+  const hosts = new Set(deptHosts(id));
+  return html`<${Modal} open=${true} onCancel=${onClose} width=${760} title=${html`<span>${d.name} <span className="t3" style=${{ fontWeight: 400, fontSize: 13 }}>· looking, read-only · nobody is affected</span></span>`}
+    footer=${html`<div className="row" style=${{ justifyContent: "flex-end" }}>
+      <${Button} onClick=${() => { onClose(); go("dept", id); }}>Department page<//>
+      ${d.admins.length ? d.admins.map((a) => html`<${Button} key=${a} type="primary" icon=${ic("LoginOutlined")} onClick=${() => { onClose(); enter(a); }}>Enter ${a}'s console<//>`)
+        : html`<${Button} type="primary" danger onClick=${() => { onClose(); go("work"); }}>Assign Admin<//>`}
+    </div>`}>
+    <div className="g c-66" style=${{ gap: 18, alignItems: "start" }}>
+      <div>
+        <div className="nt-h">Machines</div>
+        <div className="row" style=${{ gap: 6 }}>${x.ms.map((m) => { const k = HEALTH[m.status][0];
+          return html`<div key=${m.host} title=${m.note || HEALTH[m.status][1]} className="row" style=${{ flexWrap: "nowrap", gap: 6, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 5, cursor: "pointer" }} onClick=${() => { onClose(); go("machines", m.host); }}>
+            <${HealthMark} k=${k} /><span className="mono" style=${{ fontSize: 12 }}>${m.host}</span></div>`; })}</div>
+        <div className="nt-h" style=${{ marginTop: 16 }}>Today</div>
+        <${EventHistogram} entries=${AUDIT.filter((e) => hosts.has(e.host))} range="24h" height=${110} />
+      </div>
+      <div>
+        <div className="nt-h">Admins</div>
+        ${d.admins.length ? d.admins.map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", padding: "6px 0" }}><span className="av">${initials(a)}</span><div><div style=${{ fontWeight: 500 }}>${a}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a].now}</div></div></div>`)
+          : html`<div style=${{ color: "var(--crit)" }}>Nobody. Its issues and reports come to you.</div>`}
+        <div className="nt-h" style=${{ marginTop: 16 }}>Open issues</div>
+        ${x.iss.length ? x.iss.map((i) => html`<div key=${i.id} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0", cursor: "pointer" }} onClick=${() => { onClose(); go("issues", i.id); }}><span className="sev" style=${{ "--c": SEV[i.sev].c }}><i /></span><span style=${{ minWidth: 0 }}>${i.title}</span><span className="sp" /><span className="mono t3">${i.host}</span></div>`)
+          : html`<div className="t3">Nothing open.</div>`}
+      </div>
+    </div>
+  <//>`;
+}
+function OrgDay({ go }) {
+  const ref = useRef(null), w = useWidth(ref);
+  const [view, setView] = useState("Chart");
+  const depts = DEPTS, L = 92, lane = 30, H = depts.length * lane + 24, pw = w - L - 8, X = (h) => L + (h / 24) * pw;
+  const notable = AUDIT.filter((e) => e.t >= 0 && (e.notable || e.kind === "violation" || e.kind === "deviation")).filter((e) => e.kind !== "rollout" || /escalat/.test(e.what));
+  const flag = (e) => (e.kind === "violation" ? "var(--crit)" : e.kind === "deviation" || /outside working hours/.test(e.what) ? "var(--med)" : null);
+  const flagged = notable.filter(flag);
+  return html`<${Panel} title="The organisation's day" sub="every event since midnight, by department" extra=${html`<${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
+    ${view === "Report" ? html`<div className="report" style=${{ fontSize: 13.5 }}>
+        ${flagged.map((e) => html`<div key=${e.id} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0" }}><span className="mono t3" style=${{ width: 50 }}>${hhmm(e.t)}</span><span className="sev" style=${{ "--c": flag(e) }}><i /></span><span><b style=${{ fontWeight: 500 }}>${e.actor}</b> ${e.what.charAt(0).toLowerCase() + e.what.slice(1)} on <span className="mono">${e.host}</span></span></div>`)}
+        <div className="t3" style=${{ marginTop: 6 }}>Everything else today was ordinary: sign-ins, scheduled actions and flow syncs.</div>
+      </div>`
+    : html`<div ref=${ref} style=${{ position: "relative" }}><svg width=${w} height=${H} style=${{ display: "block" }}>
+        <rect x=${X(0)} y="0" width=${X(6) - X(0)} height=${depts.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
+        <rect x=${X(18)} y="0" width=${X(24) - X(18)} height=${depts.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
+        <rect x=${X(NOWH)} y="0" width=${X(24) - X(NOWH)} height=${depts.length * lane} style=${{ fill: "var(--surface)" }} opacity="0.7" />
+        ${[0, 6, 12, 18, 24].map((h) => html`<text key=${h} x=${X(h)} y=${H - 6} textAnchor=${h === 24 ? "end" : h === 0 ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
+        ${depts.map((d, i) => { const hosts = new Set(deptHosts(d.id)); const evs = AUDIT.filter((e) => e.t >= 0 && hosts.has(e.host));
+          return html`<g key=${d.id}>
+            <text x="0" y=${i * lane + 19} fontSize="12" style=${{ fill: d.admins.length ? "var(--text-2)" : "var(--crit)" }}>${d.name}</text>
+            <line x1=${L} x2=${w - 8} y1=${i * lane + 15} y2=${i * lane + 15} style=${{ stroke: "var(--grid)" }} />
+            ${evs.map((e) => { const f = flag(e);
+              return f ? html`<g key=${e.id} style=${{ cursor: "pointer" }} onClick=${() => go("audit")}><rect x=${X(e.t) - 4} y=${i * lane + 11} width="8" height="8" rx="1.5" transform=${`rotate(45 ${X(e.t)} ${i * lane + 15})`} style=${{ fill: f }} /><title>${hhmm(e.t)} · ${e.actor} · ${e.what} · ${e.host}</title></g>`
+                : html`<rect key=${e.id} x=${X(e.t) - 0.75} y=${i * lane + 9} width="1.5" height="12" style=${{ fill: KINDS[e.kind].c }} opacity="0.45"><title>${hhmm(e.t)} · ${e.actor} · ${e.what}</title></rect>`; })}
+          </g>`; })}
+        <line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${depts.length * lane} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25" />
+      </svg>
+      <div className="leg" style=${{ marginTop: 6 }}><span><i className="sq" style=${{ "--c": "var(--crit)", transform: "rotate(45deg) scale(.8)" }} />needs someone</span><span><i className="sq" style=${{ "--c": "var(--med)", transform: "rotate(45deg) scale(.8)" }} />unusual</span><span><i style=${{ "--c": "var(--s1)", width: 2, height: 10 }} />ordinary event</span><span><i className="sq" style=${{ "--c": "var(--surface-3)" }} />outside 06:00–18:00</span></div>
+    </div>`}
+  <//>`;
+}
+function Trend({ label, value, unit, fn, c, max, warn }) {
+  return html`<div className="panel trend"><div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-end" }}>
+    <div><div className="t3" style=${{ fontSize: 12 }}>${label}</div><div style=${{ fontSize: 22, fontWeight: 600, color: warn ? "var(--crit)" : "var(--text)" }}>${value}<span className="t3" style=${{ fontSize: 13, fontWeight: 400, marginLeft: 3 }}>${unit || ""}</span></div></div>
+    <span className="sp" /><${Spark} fn=${fn} w=${110} h=${30} c=${c} max=${max} range="7d" /></div></div>`;
+}
+function Monitor({ range, go, enter }) {
+  const [peek, setPeek] = useState(null);
+  const worstAll = ISSUES.length ? ISSUES.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev])[0] : null;
+  return html`<${React.Fragment}>
+    <div className="wall">
+      <div className="wall-you"><span className="av" style=${{ background: "var(--accent-soft)", color: "var(--accent)" }}>SU</span><b style=${{ fontWeight: 600 }}>You</b>
+        <span className="t3">${DEPTS.length} departments · ${MACHINES.length} machines</span>
+        ${worstAll ? html`<span className="sev" style=${{ "--c": SEV[worstAll.sev].c }} title=${worstAll.title}><i />${ISSUES.length}</span>` : null}</div>
+      <div className="wall-stem" />
+      <div className="wall-row"><${ScreenRow} depts=${DEPTS} onOpen=${setPeek} /></div>
+    </div>
+    <${OrgDay} go=${go} />
+    <div className="trends">
+      <${Trend} label="Online" value=${MACHINES.filter((m) => m.status !== "offline").length} unit=${"/ " + MACHINES.length} fn=${(t) => (t < 2.52 ? 11 : 10)} c="var(--ok)" max=${11} />
+      <${Trend} label="Open issues" value=${ISSUES.length} fn=${(t) => Math.max(1, Math.round(2 + (t > -40 ? 1 : 0) + (t > -12 ? 1 : 0) + (t > 9 ? 2 : 0) + (t > 10 ? 1 : 0)))} c="var(--crit)" warn=${ISSUES.some((i) => i.sev === "critical")} />
+      <${Trend} label="On 1.4.2" value=${Math.round((MACHINES.filter((m) => m.ver === "1.4.2").length / MACHINES.length) * 100)} unit="%" fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} c="var(--s2)" max=${11} />
+      <${Trend} label="Reports handled in" value="42" unit="min" fn=${(t) => 60 - 18 * sm(2, t, 0.2)} c="var(--s6)" />
+    </div>
+    <${LookCloser} id=${peek} onClose=${() => setPeek(null)} go=${go} enter=${enter} />
+  <//>`;
+}
+// Decisions only the Super User makes. Each carries what you need to decide it, right where you decide it.
+const QUAYE_ENTRIES = [["Fri 02:18", "LOG-01", "18 min", "Opened Event Viewer, then left"], ["Mon 02:12", "LOG-02", "17 min", "Ran no actions"], ["Today 02:14", "LOG-02", "17 min", "LOG-02 went offline 14 minutes after he left"]];
+const SU_ONLY_REPORTS = [["R-2280", "Update stuck · LOG-02", "Mon 09:30"], ["R-2283", "Update stuck · LOG-02 (second attempt)", "Tue 07:45"], ["R-2287", "Update stuck · LOG-02 past the limit", "Wed 09:30"], ["R-2292", "Update stuck · LOG-02 offline", "Today 02:40"]];
+const DECISIONS = [
+  { id: "stuck", sev: "high", icon: "CloudSyncOutlined", title: "LOG-02's update is stuck, and it came to you", short: "LOG-02 update stuck", age: "3 days",
+    why: "Logistics has no Admin, so the escalation reached you instead of stopping in the department.",
+    facts: [["Machine", "LOG-02 · Abena"], ["Running", "1.4.0, two behind"], ["Offline since", "Today 02:31"], ["Escalated", "Mon 09:30"]],
+    note: "The last person on LOG-02 was A. Quaye, from 02:14 to 02:31. It went offline right after.",
+    options: [
+      { key: "admin", icon: "UserAddOutlined", title: "Give Logistics an Admin, and this with it", desc: "The new Admin owns the update from now on, and the next one.", verb: "Assign", need: "pick", pick: ["A. Quaye", "K. Boateng", "Esi (promote)"], done: "Assigned to" },
+      { key: "exclude", icon: "StopOutlined", title: "Leave LOG-02 out of the 1.4.3 gate", desc: "1.4.3 can then be approved without it. LOG-02 stays on 1.4.0 until it updates.", verb: "Leave it out", need: "reason", done: "Left out of the gate" },
+      { key: "wait", icon: "ClockCircleOutlined", title: "Keep waiting for it to come back", desc: "It updates the moment it checks in. You hear about it again only if it does not.", verb: "Keep waiting", done: "Waiting for LOG-02" },
+    ] },
+  { id: "noadmin", sev: "high", icon: "UserAddOutlined", title: "Logistics has no Admin", short: "Logistics has no Admin", age: "since 18 Sep",
+    why: "Two machines and every report from them have nobody below you. Only you can assign an Admin.",
+    facts: [["Machines", "LOG-01 · Esi, LOG-02 · Abena"], ["Reports this week", "4, all to you"], ["Without an Admin", "13 days"]],
+    candidates: true,
+    options: [
+      { key: "quaye", icon: "UserOutlined", title: "A. Quaye", desc: "Operations Admin. Already enters Logistics machines, but three times this week at 2 a.m., which is waiting on you below.", verb: "Make Admin", done: "A. Quaye is now Logistics Admin", warn: true },
+      { key: "boateng", icon: "UserOutlined", title: "K. Boateng", desc: "Finance Admin, and Finance's only one. Already the slowest at reports: 2h 10m against a 1-hour target.", verb: "Make Admin", done: "K. Boateng is now Logistics Admin" },
+      { key: "esi", icon: "UserOutlined", title: "Esi, promoted from LOG-01", desc: "Works in Logistics every day. Promoting her gives her an Admin workstation and a new key, shown once.", verb: "Promote", done: "Esi promoted to Logistics Admin" },
+    ] },
+  { id: "quaye", sev: "medium", icon: "EyeOutlined", title: "A. Quaye entered Logistics machines at 2 a.m., three times", short: "A. Quaye's 2 a.m. entries", age: "this week",
+    why: "Nobody else sees an Admin's own pattern. Looking into it is yours to do.",
+    entries: true,
+    options: [
+      { key: "ask", icon: "MessageOutlined", title: "Ask him to explain", desc: "A message from you, recorded with this decision. You see his answer here.", verb: "Send", need: "message", done: "Asked A. Quaye" },
+      { key: "limit", icon: "ClockCircleOutlined", title: "Limit him to working hours", desc: "He can enter machines only between 06:00 and 18:00 until you lift it.", verb: "Limit", done: "Limited to working hours" },
+      { key: "fine", icon: "CheckOutlined", title: "It was expected", desc: "Note why. It stops showing up as unusual for A. Quaye on Logistics machines.", verb: "Note it", need: "reason", done: "Noted as expected" },
+    ] },
+  { id: "approve", sev: "medium", icon: "CloudUploadOutlined", title: "1.4.3 is ready, and only you can approve it", short: "Approve 1.4.3", age: "2 days",
+    why: "A version is approved only when every machine runs the one before it. Two machines still don't.",
+    gate: true,
+    options: [
+      { key: "wait", icon: "ClockCircleOutlined", title: "Wait for the gate", desc: "Approve it yourself once OPS-06 and LOG-02 are on 1.4.2. You are told when they are.", verb: "Wait", done: "Waiting for the gate" },
+      { key: "without", icon: "StopOutlined", title: "Approve now, leaving the two out", desc: "OPS-06 and LOG-02 stay behind and are recorded as left out, with your reason.", verb: "Approve 1.4.3", need: "reason", done: "1.4.3 approved without OPS-06 and LOG-02" },
+    ] },
+  { id: "reports", sev: "low", icon: "FileTextOutlined", title: "Four reports reach only you", short: "4 reports only you see", age: "this week",
+    why: "They come from Logistics, which has no Admin to route them to.",
+    reports: true,
+    options: [
+      { key: "mark", icon: "CheckOutlined", title: "Mark the ticked ones addressed", desc: "They stay in the record with your name and the time.", verb: "Mark addressed", done: "Marked addressed" },
+      { key: "later", icon: "ClockCircleOutlined", title: "Leave them until LOG-02 is sorted", desc: "They are all about the same machine.", verb: "Leave them", done: "Left until LOG-02 is sorted" },
+    ] },
+];
+const SU_QUEUE = DECISIONS;
+// Each decision's evidence as a picture: small on its card, large beside the options.
+function NightGrid({ big }) {
+  const days = [-6, -5, -4, -3, -2, -1, 0], hits = { "-6|2": 1, "-3|2": 1, "0|2": 1 };
+  const cw = big ? 16 : 6, ch = big ? 16 : 6, gap = big ? 3 : 1.5, L = big ? 40 : 0, T = 0;
+  return html`<svg width=${L + 24 * (cw + gap)} height=${7 * (ch + gap) + (big ? 18 : 0)} style=${{ display: "block", maxWidth: "100%" }}>
+    ${days.map((d, r) => html`<g key=${d}>${big ? html`<text x="0" y=${r * (ch + gap) + ch - 3} fontSize="10.5" style=${{ fill: "var(--text-3)" }}>${d === 0 ? "Today" : WEEK[((d % 7) + 7) % 7]}</text>` : null}
+      ${Array.from({ length: 24 }, (_, h) => { const hit = hits[d + "|" + h], night = h < 6 || h >= 18;
+        return html`<rect key=${h} x=${L + h * (cw + gap)} y=${T + r * (ch + gap)} width=${cw} height=${ch} rx=${big ? 3 : 1} style=${{ fill: hit ? "var(--med)" : night ? "var(--surface-3)" : "var(--grid)" }}>${hit ? html`<title>A. Quaye · ${d === 0 ? "today" : WEEK[((d % 7) + 7) % 7]} 02:00 · Logistics</title>` : null}</rect>`; })}</g>`)}
+    ${big ? [0, 6, 12, 18].map((h) => html`<text key=${h} x=${L + h * (cw + gap)} y=${7 * (ch + gap) + 13} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h).padStart(2, "0")}</text>`) : null}
+  </svg>`;
+}
+function GateTiles({ big, go }) {
+  const all = FULL.MACHINES || MACHINES;
+  return html`<div style=${{ display: "flex", flexWrap: "wrap", gap: big ? 6 : 3 }}>${all.map((m) => { const behind = m.ver !== "1.4.2";
+    return big ? html`<div key=${m.host} onClick=${() => go && go("machines", m.host)} title=${`${m.host} · ${m.ver}`} style=${{ cursor: "pointer", textAlign: "center" }}>
+        <div style=${{ width: 38, height: 38, borderRadius: 5, display: "grid", placeItems: "center", background: behind ? "color-mix(in srgb, var(--med) 16%, var(--surface))" : "color-mix(in srgb, var(--s2) 16%, var(--surface))", border: behind ? "1.5px dashed var(--med)" : "1px solid transparent", fontFamily: "var(--mono)", fontSize: 11, color: behind ? "var(--med)" : "var(--s2)" }}>${m.host.slice(-2)}</div>
+        <div className="mono" style=${{ fontSize: 10, color: behind ? "var(--med)" : "var(--text-3)", marginTop: 2 }}>${m.ver}</div></div>`
+      : html`<span key=${m.host} style=${{ width: 9, height: 9, borderRadius: 2, background: behind ? "var(--med)" : "var(--s2)", opacity: behind ? 1 : 0.55 }} />`; })}</div>`;
+}
+function Log02Lane({ big }) {
+  const W = big ? 520 : 150, H = big ? 70 : 22, X = (h) => (h / 24) * W;
+  return html`<svg viewBox=${`0 0 ${W} ${H}`} style=${{ width: "100%", maxWidth: W, display: "block" }}>
+    <rect x="0" y=${big ? 18 : 6} width=${W} height=${big ? 18 : 10} rx="3" style=${{ fill: "var(--grid)" }} />
+    <rect x=${X(2.23)} y=${big ? 18 : 6} width=${Math.max(2, X(2.52) - X(2.23))} height=${big ? 18 : 10} style=${{ fill: "var(--s3)" }}><title>A. Quaye 02:14–02:31</title></rect>
+    <rect x=${X(2.52)} y=${big ? 18 : 6} width=${X(NOWH) - X(2.52)} height=${big ? 18 : 10} style=${{ fill: "var(--text-4)" }} opacity="0.35"><title>Offline since 02:31</title></rect>
+    <line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${big ? 44 : H} style=${{ stroke: "var(--crit)" }} />
+    ${big ? html`<g>
+      <text x=${X(2.23)} y="12" fontSize="11" style=${{ fill: "var(--s3)" }}>A. Quaye 02:14</text>
+      <text x=${X(6)} y="31" fontSize="11" style=${{ fill: "var(--text-3)" }}>offline since 02:31</text>
+      ${[0, 6, 12, 18, 24].map((h) => html`<text key=${h} x=${X(h)} y="62" textAnchor=${h === 24 ? "end" : h === 0 ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
+    </g>` : null}
+  </svg>`;
+}
+function SeatViz({ big }) {
+  const ms = (FULL.MACHINES || MACHINES).filter((m) => m.dept === "log");
+  const r = big ? 22 : 9;
+  return html`<div className="row" style=${{ flexWrap: "nowrap", gap: big ? 14 : 6 }}>
+    <span style=${{ width: r * 2, height: r * 2, borderRadius: "50%", border: "1.5px dashed var(--crit)", display: "grid", placeItems: "center", color: "var(--crit)", fontSize: big ? 16 : 9, flex: "none" }} title="Empty seat">${ic("UserAddOutlined")}</span>
+    <span style=${{ width: big ? 24 : 10, height: 1, background: "var(--border-strong)" }} />
+    ${ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k]; return html`<span key=${m.host} title=${m.host} style=${{ width: big ? 34 : 12, height: big ? 34 : 12, borderRadius: 3, background: t.bg, border: t.border || "1px solid var(--border-strong)", display: "grid", placeItems: "center", fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--text-3)" }}>${big ? m.host.slice(-2) : ""}</span>`; })}
+  </div>`;
+}
+function ReportStack({ big }) {
+  return html`<div style=${{ position: "relative", height: big ? 0 : 26, width: 60 }}>${big ? null : [0, 1, 2, 3].map((i) => html`<span key=${i} style=${{ position: "absolute", left: i * 6, top: i * 3, width: 34, height: 14, borderRadius: 2, background: "var(--surface)", border: "1px solid var(--border-strong)" }} />`)}</div>`;
+}
+const DVIZ = { stuck: Log02Lane, noadmin: SeatViz, quaye: NightGrid, approve: GateTiles, reports: ReportStack };
+function Work({ go }) {
+  const [view, setView] = useState("Decide");
+  const [sel, setSel] = useState(DECISIONS[0].id);
+  const [pick, setPick] = useState({});
+  const [inp, setInp] = useState({});
+  const [done, setDone] = useState({});
+  const [ticked, setTicked] = useState(SU_ONLY_REPORTS.map((r) => r[0]));
+  const open = DECISIONS.filter((d) => !done[d.id]);
+  const d = DECISIONS.find((x) => x.id === sel) || DECISIONS[0];
+  const opt = d.options.find((o) => o.key === (pick[d.id] || d.options[0].key));
+  const val = inp[d.id + opt.key] || "";
+  const missing = (opt.need === "reason" || opt.need === "message") && !val.trim() ? (opt.need === "reason" ? "Write a reason first." : "Write the message first.") : opt.need === "pick" && !val ? "Pick someone first." : d.reports && opt.key === "mark" && !ticked.length ? "Tick at least one." : null;
+  const decide = () => { setDone({ ...done, [d.id]: { text: opt.done + (opt.need === "pick" ? " " + val : ""), at: NOWH + (Date.now() - T0) / 3.6e6 } });
+    const next = open.find((x) => x.id !== d.id); if (next) setSel(next.id); toast(opt.done + " (concept)"); };
+  const AGE = { stuck: 3, noadmin: 13, quaye: 6, approve: 2, reports: 4 };
+  const mine = TASKS.filter((t) => t.by === "You");
+  const Big = DVIZ[d.id];
+  return html`<${React.Fragment}>
+    <div className="row" style=${{ justifyContent: "space-between" }}>
+      <div className="row" style=${{ gap: 10, alignItems: "baseline" }}>
+        <span style=${{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em" }}>${open.length}</span><span className="t2">waiting on you</span>
+        ${open.filter((x) => x.sev === "high").length ? html`<span className="tag" style=${{ "--c": "var(--crit)" }}>${open.filter((x) => x.sev === "high").length} urgent<//>` : null}
+        ${Object.keys(done).length ? html`<span className="tag" style=${{ "--c": "var(--ok)" }}>${ic("CheckOutlined")} ${Object.keys(done).length} decided<//>` : null}
+      </div>
+      <${Segmented} value=${view} onChange=${setView} options=${[{ value: "Decide", label: "Decide" }, { value: "Follow up", label: "Follow up" }]} />
+    </div>
+    ${view === "Decide" ? html`<${React.Fragment}>
+      <div className="dcards">
+        ${DECISIONS.map((x) => { const V = DVIZ[x.id], dn = done[x.id];
+          return html`<div key=${x.id} className=${"dcard" + (x.id === d.id ? " on" : "") + (dn ? " done" : "")} role="button" tabIndex="0" onClick=${() => setSel(x.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(x.id)} style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c }}>
+            <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className="qi" style=${{ width: 26, height: 26, fontSize: 13 }}>${ic(dn ? "CheckOutlined" : x.icon)}</span><b style=${{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>${x.short}</b></div>
+            <div className="dviz">${V ? html`<${V} />` : null}</div>
+            <div title=${`Waiting ${x.age}`}><div className="bar" style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c, height: 3 }}><span style=${{ width: `${Math.min(100, (AGE[x.id] / 14) * 100)}%` }} /></div>
+              <div className="t3" style=${{ fontSize: 11, marginTop: 4 }}>${dn ? "decided" : x.age}</div></div>
+          </div>`; })}
+      </div>
+      <section className="panel">
+        <div className="g c-66" style=${{ gap: 0 }}>
+          <div style=${{ padding: 20, borderRight: "1px solid var(--border)", minWidth: 0 }}>
+            <div className="row"><${Sev} s=${d.sev} /></div>
+            <div style=${{ fontSize: 18, fontWeight: 600, margin: "6px 0 4px", letterSpacing: "-0.01em" }}>${d.title}</div>
+            <div className="t3" style=${{ fontSize: 12.5, marginBottom: 16 }}>${d.why}</div>
+            ${d.id === "reports" ? html`<div>${SU_ONLY_REPORTS.map(([id, t, w]) => html`<label key=${id} className="kv" style=${{ gridTemplateColumns: "22px minmax(0, 1fr) auto", cursor: "pointer" }}>
+                <${Checkbox} checked=${ticked.includes(id)} onChange=${(e) => setTicked(e.target.checked ? [...ticked, id] : ticked.filter((y) => y !== id))} /><span>${t}</span><span className="mono t3">${w}</span></label>`)}</div>`
+              : d.id === "noadmin" ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}><${SeatViz} big=${true} /><div className="t3" style=${{ fontSize: 12 }}>Two machines, four reports a week, nobody below you.</div></div>`
+              : html`<${Big} big=${true} go=${go} />`}
+            ${d.note ? html`<div className="t3" style=${{ fontSize: 12, marginTop: 12 }}>${ic("InfoCircleOutlined")} ${d.note}</div>` : null}
+          </div>
+          <div style=${{ padding: 20, minWidth: 0 }}>
+            ${done[d.id] ? html`<div className="decide" style=${{ "--c": "var(--ok)" }}><div className="row" style=${{ flexWrap: "nowrap" }}>
+                <span style=${{ color: "var(--ok)", fontSize: 16 }}>${ic("CheckCircleFilled")}</span><div><b style=${{ fontWeight: 600 }}>${done[d.id].text}</b><div className="t3" style=${{ fontSize: 12 }}>by you at ${hhmm(done[d.id].at)}</div></div>
+                <span className="sp" /><${Button} size="small" onClick=${() => { const n = { ...done }; delete n[d.id]; setDone(n); }}>Change<//></div></div>`
+            : html`<div style=${{ display: "grid", gap: 8 }} role="radiogroup">
+                ${d.options.map((o) => html`<${Choice} key=${o.key} on=${o.key === opt.key} icon=${o.icon} title=${o.title} desc=${o.desc} onClick=${() => setPick({ ...pick, [d.id]: o.key })} />`)}
+              </div>
+              ${opt.need === "reason" ? html`<${Input.TextArea} style=${{ marginTop: 10 }} value=${val} onChange=${(e) => setInp({ ...inp, [d.id + opt.key]: e.target.value })} placeholder="Why? Recorded with the decision." autoSize=${{ minRows: 2, maxRows: 4 }} />` : null}
+              ${opt.need === "message" ? html`<${Input.TextArea} style=${{ marginTop: 10 }} value=${val} onChange=${(e) => setInp({ ...inp, [d.id + opt.key]: e.target.value })} placeholder="Write to A. Quaye" autoSize=${{ minRows: 2, maxRows: 4 }} />` : null}
+              ${opt.need === "pick" ? html`<${Select} style=${{ marginTop: 10, width: 240 }} value=${val || undefined} placeholder="Who?" options=${opt.pick.map((x) => ({ value: x, label: x }))} onChange=${(v) => setInp({ ...inp, [d.id + opt.key]: v })} />` : null}
+              <div className="row" style=${{ marginTop: 14 }}>
+                ${missing ? html`<span className="t3" style=${{ fontSize: 12 }}>${missing}</span>` : null}<span className="sp" />
+                <${Button} onClick=${() => { const next = open.find((x) => x.id !== d.id); if (next) setSel(next.id); }}>Skip<//>
+                <${Button} type="primary" disabled=${!!missing} onClick=${decide}>${opt.verb}<//>
+              </div>`}
+          </div>
+        </div>
+      </section>
+    <//>` : html`<div className="g c-66" style=${{ alignItems: "start" }}>
+      <${Panel} title="Tasks you assigned">
+        <div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+        ${mine.map((t) => { const dn = t.evidence.filter((e) => e.st === "Passed").length, over = t.state === "Overdue";
+          return html`<div key=${t.id} style=${{ cursor: "pointer" }} onClick=${() => go("tasks", t.id)}>
+            <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ fontWeight: 500 }}>${t.title}</span><span className="sp" /><span className="av" title=${t.who}>${initials(t.who)}</span></div>
+            <div className="row" style=${{ flexWrap: "nowrap", marginTop: 6 }}>
+              <div style=${{ display: "flex", gap: 3, flex: 1 }}>${t.evidence.map((e, i) => html`<span key=${i} title=${e.target + " · " + e.st} style=${{ flex: 1, height: 6, borderRadius: 2, background: ESTATE[e.st] === "var(--text-4)" ? "var(--surface-3)" : ESTATE[e.st] }} />`)}</div>
+              <span className="mono" style=${{ fontSize: 12, color: over ? "var(--crit)" : "var(--text-3)", whiteSpace: "nowrap" }}>${over ? span(NOWH - t.final) + " late" : span(t.final - NOWH) + " left"}</span>
+            </div></div>`; })}
+        </div>
+      <//>
+      <${Panel} title="Reports, against the 1-hour target">
+        <div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+        ${[["Operations", 33, "R. Mensah"], ["Finance", 130, "K. Boateng"], ["OPS-07 restricted file", 198, "R. Mensah"]].map(([n, m, who]) => html`<div key=${n}>
+          <div className="row" style=${{ flexWrap: "nowrap" }}><span>${n}</span><span className="sp" /><span className="mono" style=${{ color: m > 60 ? "var(--med)" : "var(--text-2)" }}>${m >= 60 ? Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m" : m + "m"}</span>
+            ${m > 60 ? html`<${Button} size="small" onClick=${() => toast("Nudged " + who + " (concept)")}>Nudge<//>` : null}</div>
+          <div className="bar" style=${{ marginTop: 6, "--c": m > 60 ? "var(--med)" : "var(--ok)" }}><span style=${{ width: `${Math.min(100, (m / 200) * 100)}%` }} /><em style=${{ left: "30%" }} title="1 hour" /></div>
+        </div>`)}
+        </div>
+      <//>
+    </div>`}
+  <//>`;
+}
+function Govern({ go, enter }) {
+  const depts = FULL_DEPTS();
+  const cats = [["Restricted file", ["ops", "fin", "log"]], ["Flow failed", ["ops", "fin"]], ["Listener report", ["ops"]], ["Update stuck", []], ["Deviation", ["ops", "fin", "log"]]];
+  const track = [
+    { v: "1.4.3", st: "Ready", c: "var(--med)", n: 0, act: true },
+    { v: "1.4.2", st: "Current", c: "var(--ok)", n: 9, when: "26 Sep" },
+    { v: "1.4.1", st: "", c: "var(--text-4)", n: 1, when: "19 Sep" },
+    { v: "1.4.0", st: "", c: "var(--text-4)", n: 1, when: "2 Sep" },
+  ];
+  return html`<${React.Fragment}>
+    <section className="panel">
+      <div className="phd"><div className="pt">Structure</div>
+        <${Button} size="small" icon=${ic("PlusOutlined")} onClick=${() => toast("New department (concept)")}>New department<//></div>
+      <div style=${{ padding: 16 }}>
+        <div className="row" style=${{ justifyContent: "center" }}>
+          <span className="adm" style=${{ paddingRight: 14 }}><span className="av" style=${{ background: "var(--accent-soft)", color: "var(--accent)" }}>SU</span><b style=${{ fontWeight: 600 }}>You</b></span>
+        </div>
+        <div className="org-stem" />
+        <div className="org-cols">
+          ${depts.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
+            return html`<div key=${d.id} className="org-col">
+              <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}>
+                <a style=${{ fontWeight: 600, fontSize: 14 }} onClick=${() => go("dept", d.id)}>${d.name}</a>
+                <span className="t3 mono" style=${{ fontSize: 12 }} title="Machines">${ic("DesktopOutlined")} ${ms.length}</span>
+              </div>
+              <div style=${{ margin: "10px 0 14px" }}><${MiniTiles} ms=${ms} go=${go} /></div>
+              ${d.admins.map((a) => html`<div key=${a} className="org-adm" title=${ADMIN_INFO[a].now}>
+                <span style=${{ position: "relative" }}><span className="av" style=${{ width: 30, height: 30, fontSize: 11 }}>${initials(a)}</span>
+                  <i style=${{ position: "absolute", right: -1, bottom: -1, width: 9, height: 9, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
+                <span style=${{ flex: 1, fontWeight: 500 }}>${a}</span>
+                <${Button} size="small" icon=${ic("LoginOutlined")} onClick=${() => enter(a)} aria-label=${"Enter " + a + "'s console"}>Enter<//>
+                <${Dropdown} trigger=${["click"]} menu=${{ items: [{ key: "name", label: "Change the name workers see" }, { key: "move", label: "Move to another department" }, { type: "divider" }, { key: "remove", label: "Stop being an Admin", danger: true }], onClick: ({ key }) => toast((key === "remove" ? "Removed " : key === "move" ? "Moving " : "Renaming ") + a + " (concept)") }}>
+                  <${Button} size="small" type="text" icon=${ic("MoreOutlined")} aria-label=${"More for " + a} />
+                <//>
+              </div>`)}
+              ${d.admins.length ? html`<a style=${{ fontSize: 12.5, display: "inline-block", marginTop: 8 }} onClick=${() => toast("Add an Admin (concept)")}>${ic("PlusOutlined")} Admin</a>`
+                : html`<div className="org-empty" role="button" tabIndex="0" onClick=${() => go("work")} title="Its reports and escalations come to you">
+                    <span className="av" style=${{ width: 30, height: 30, background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)" }}>${ic("UserAddOutlined")}</span>
+                    <b style=${{ fontWeight: 600, color: "var(--crit)", alignSelf: "center" }}>Empty seat</b></div>`}
+            </div>`; })}
+          <div className="org-col org-new" role="button" tabIndex="0" onClick=${() => toast("New department (concept)")}>
+            <span style=${{ fontSize: 18 }}>${ic("PlusOutlined")}</span><span>Department</span>
+          </div>
+        </div>
+        <div className="leg" style=${{ justifyContent: "center", marginTop: 12 }}><span><i className="sq" style=${{ "--c": "var(--ok)", borderRadius: "50%" }} />at their desk</span><span><i className="sq" style=${{ "--c": "var(--s3)", borderRadius: "50%" }} />inside a machine</span></div>
+      </div>
+    </section>
+    <div className="g c-66" style=${{ alignItems: "start" }}>
+      <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+      <${Panel} title="Where reports go" flush>
+        <div className="rgrid" style=${{ gridTemplateColumns: `minmax(120px, 1.4fr) repeat(${depts.length + 1}, minmax(56px, 1fr))` }}>
+          <span />
+          <span className="rh">You</span>
+          ${depts.map((d) => html`<span key=${d.id} className="rh" style=${{ color: d.admins.length ? undefined : "var(--crit)" }}>${d.name}</span>`)}
+          ${cats.map(([c, to]) => html`<${React.Fragment} key=${c}>
+            <span className="rc">${c}</span>
+            <span className="rd"><span className="dotc on" title="Always" /></span>
+            ${depts.map((d) => { const on = to.includes(d.id), dead = on && !d.admins.length;
+              return html`<span key=${d.id} className="rd"><span className=${"dotc" + (on ? " on" : "") + (dead ? " dead" : "")} title=${dead ? "Routed, but nobody there" : on ? "Routed" : "Not routed"} /></span>`; })}
+          <//>`)}
+        </div>
+        <div className="leg" style=${{ padding: "10px 14px" }}><span><span className="dotc on" /> routed</span><span><span className="dotc dead" /> nobody there</span><span><span className="dotc" /> not routed</span><span className="t4">read-only for now</span></div>
+      <//>
+      <${Panel} title="Record keeping">
+        <div className="row" style=${{ gap: 22 }}>
+          ${[["HistoryOutlined", "90 days", "kept", () => go("audit")], ["DeleteOutlined", "3 days", "until the oldest goes"], ["SafetyCertificateOutlined", "Pinned", "certificate"], ["ApiOutlined", "7400", "Engine port"]].map(([i, v, k, f]) => html`<div key=${k} style=${{ cursor: f ? "pointer" : "default" }} onClick=${f || null}>
+            <div className="t3" style=${{ fontSize: 16 }}>${ic(i)}</div><div style=${{ fontWeight: 600, fontSize: 15 }}>${v}</div><div className="t3" style=${{ fontSize: 11.5 }}>${k}</div></div>`)}
+        </div>
+      <//>
+      </div>
+      <${Panel} title="Versions">
+        <div className="vtrack">
+          ${track.map((t) => html`<div key=${t.v} className="vstep" title=${t.when ? `Approved ${t.when} by you` : "Waiting on the gate"}>
+            <div className="vdot" style=${{ "--c": t.c }}>${t.act ? ic("ClockCircleOutlined") : ic("CheckOutlined")}</div>
+            <div className="mono" style=${{ fontWeight: 600, marginTop: 6 }}>${t.v}</div>
+            <div style=${{ fontSize: 11.5, color: t.c }}>${t.st || t.when}</div>
+            <div className="row" style=${{ gap: 2, justifyContent: "center", marginTop: 6, minHeight: 8 }}>${Array.from({ length: t.n }, (_, i) => html`<span key=${i} style=${{ width: 6, height: 6, borderRadius: 1.5, background: t.c, opacity: t.v === "1.4.2" ? 0.7 : 1 }} />`)}</div>
+          </div>`).reverse()}
+        </div>
+        <div className="row" style=${{ marginTop: 12, justifyContent: "space-between" }}><span className="t3" style=${{ fontSize: 12 }}>Squares are machines on that version</span><${Button} size="small" onClick=${() => go("rollout")}>Rollout<//></div>
+      <//>
+    </div>
+  <//>`;
+}
+const FULL_DEPTS = () => FULL.DEPTS || DEPTS;
+function DeptPage({ id, go, enter }) {
+  const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id);
+  const [who, setWho] = useState(null);
+  const x = deptStats(d);
+  const hosts = new Set(x.ms.map((m) => m.host));
+  const ref = useRef(null), w = useWidth(ref);
+  const L = 64, lane = 22, pw = w - L - 8, X = (h) => L + (h / 24) * pw;
+  const flag = (e) => (e.kind === "violation" ? "var(--crit)" : e.kind === "deviation" || /outside working hours/.test(e.what) ? "var(--med)" : null);
+  const ledK = WORSTK(x.ms), ledC = ledK === "quiet" ? "var(--ok)" : ledK === "watch" ? "var(--med)" : ledK === "offline" ? "var(--text-4)" : "var(--crit)";
+  return html`<${React.Fragment}>
+    <div className="row" style=${{ gap: 10 }}>
+      <span style=${{ width: 10, height: 10, borderRadius: "50%", background: ledC, boxShadow: `0 0 0 4px color-mix(in srgb, ${ledC} 20%, transparent)` }} />
+      ${[["DesktopOutlined", `${x.online}/${x.ms.length}`, "online"], ["AlertOutlined", x.iss.length, "open issues"], ["CloudUploadOutlined", `${x.ok}/${x.ms.length}`, "on 1.4.2"], ["FieldTimeOutlined", x.mtta || "—", "to handle a report"]].map(([i, v, k]) => html`<span key=${k} className="adm" style=${{ paddingLeft: 10 }} title=${k}><span className="t3">${ic(i)}</span><b style=${{ fontWeight: 600 }}>${v}</b><span className="t3" style=${{ fontSize: 12 }}>${k}</span></span>`)}
+    </div>
+    <div className="g c-75" style=${{ alignItems: "start" }}>
+      <${Panel} title="Machines">
+        <div className="bigtiles">${x.ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
+          return html`<div key=${m.host} className="bt" onClick=${() => go("machines", m.host)} title=${`${m.user || "no user"} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`}>
+            <div className="bt-face" style=${{ background: t.bg, color: t.fg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none") }}>${m.host.slice(-2)}${t.dot ? html`<i style=${{ background: t.dot }} />` : null}${m.held ? html`<b title=${m.held + " is inside"}>${ic("LoginOutlined")}</b>` : null}</div>
+            <div className="mono" style=${{ fontSize: 11, marginTop: 4 }}>${m.host}</div></div>`; })}</div>
+        <div className="leg" style=${{ marginTop: 12 }}>${[["quiet", "Healthy"], ["watch", "Worth a look"], ["high", "High"], ["crit", "Critical"], ["offline", "Offline"]].map(([k, l]) => html`<span key=${k}><${HealthMark} k=${k} size=${10} />${l}</span>`)}<span>${ic("LoginOutlined")} someone inside</span></div>
+      <//>
+      <${Panel} title="Admins">
+        ${d.admins.length ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>${d.admins.map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 12 }} title=${ADMIN_INFO[a].now}>
+            <span style=${{ position: "relative" }}><span className="av" style=${{ width: 40, height: 40, fontSize: 14 }}>${initials(a)}</span>
+              <i style=${{ position: "absolute", right: 0, bottom: 0, width: 11, height: 11, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
+            <div style=${{ flex: 1, minWidth: 0 }}><div style=${{ fontWeight: 600 }}>${a}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a].busy ? "inside OPS-04" : "at their desk"}</div></div>
+            <${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a)}>Enter<//>
+          </div>`)}</div>`
+          : html`<div style=${{ textAlign: "center", padding: "6px 0" }}>
+              <span className="av" style=${{ width: 48, height: 48, fontSize: 18, background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)" }}>${ic("UserAddOutlined")}</span>
+              <div style=${{ fontWeight: 600, color: "var(--crit)", margin: "8px 0 10px" }}>Empty seat</div>
+              <div className="row" style=${{ justifyContent: "center" }}>
+                <${Select} value=${who || undefined} placeholder="Pick someone" style=${{ width: 200 }} options=${["A. Quaye", "K. Boateng", "Esi (promote)"].map((v) => ({ value: v, label: v }))} onChange=${setWho} />
+                <${Button} type="primary" disabled=${!who} onClick=${() => toast("Assigned " + who + " (concept)")}>Assign<//>
+              </div></div>`}
+      <//>
+    </div>
+    <${Panel} title="Today" sub="every event on these machines since midnight">
+      <div ref=${ref}><svg width=${w} height=${x.ms.length * lane + 22} style=${{ display: "block" }}>
+        <rect x=${X(0)} y="0" width=${X(6) - X(0)} height=${x.ms.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
+        <rect x=${X(18)} y="0" width=${X(24) - X(18)} height=${x.ms.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
+        <rect x=${X(NOWH)} y="0" width=${X(24) - X(NOWH)} height=${x.ms.length * lane} style=${{ fill: "var(--surface)" }} opacity="0.7" />
+        ${x.ms.map((m, i) => html`<g key=${m.host}>
+          <text x="0" y=${i * lane + 15} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${m.host}</text>
+          ${AUDIT.filter((e) => e.t >= 0 && e.host === m.host).map((e) => { const f = flag(e);
+            return f ? html`<g key=${e.id}><rect x=${X(e.t) - 4} y=${i * lane + 7} width="8" height="8" rx="1.5" transform=${`rotate(45 ${X(e.t)} ${i * lane + 11})`} style=${{ fill: f }} /><title>${hhmm(e.t)} · ${e.actor} · ${e.what}</title></g>`
+              : html`<rect key=${e.id} x=${X(e.t) - 0.75} y=${i * lane + 5} width="1.5" height="12" style=${{ fill: KINDS[e.kind].c }} opacity="0.45"><title>${hhmm(e.t)} · ${e.actor} · ${e.what}</title></rect>`; })}
+        </g>`)}
+        ${[0, 6, 12, 18, 24].map((h) => html`<text key=${h} x=${X(h)} y=${x.ms.length * lane + 16} textAnchor=${h === 24 ? "end" : h === 0 ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
+        <line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${x.ms.length * lane} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25" />
+      </svg></div>
+    <//>
+    ${x.iss.length ? html`<div className="row" style=${{ gap: 8 }}>${x.iss.map((i) => html`<span key=${i.id} className="adm" style=${{ paddingLeft: 10, cursor: "pointer" }} onClick=${() => go("issues", i.id)} title=${i.title}>
+        <span className="sev" style=${{ "--c": SEV[i.sev].c }}><i /></span><span>${i.subject}</span><span className="mono t3">${i.host}</span></span>`)}</div>` : null}
+  <//>`;
+}
+// Entering an Admin's console: the design requires blocking or ending their session first.
+function EnterConsole({ admin, onClose, onEnter }) {
+  const [how, setHow] = useState("block");
+  const info = admin ? ADMIN_INFO[admin] : null;
+  return html`<${Modal} open=${!!admin} onCancel=${onClose} title=${admin ? `Enter ${admin}'s console?` : ""} width=${520}
+    footer=${admin ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${onClose}>Cancel<//><${Button} type="primary" danger=${how === "end"} onClick=${() => onEnter(admin, how)}>${how === "end" ? "End and enter" : "Block and enter"}<//></div>` : null}>
+    ${admin ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="t2">${admin} is ${info.busy ? "inside OPS-04 right now" : `signed in on ${info.ws}`}. To work as them you take their console, so their own session has to stop first.</div>
+      <div style=${{ display: "grid", gap: 8 }}>
+        <${Choice} on=${how === "block"} icon="PauseCircleOutlined" title="Block their session" desc=${`${admin} keeps their place and waits until you leave.${info.busy ? " Their session on OPS-04 is paused too." : ""}`} onClick=${() => setHow("block")} />
+        <${Choice} on=${how === "end"} icon="LogoutOutlined" title="End their session" desc=${`${admin} is signed out. Anything open on their side closes.`} onClick=${() => setHow("end")} />
+      </div>
+      <div className="t3" style=${{ fontSize: 12 }}>While you are in, nobody can move you out, and their workstation shows that the Super User is in charge. The record notes when you entered and left.</div>
+    </div>` : null}
+  <//>`;
+}
+
+const NAV_ADMIN = [
   ["Monitor", [["overview", "Overview", "DashboardOutlined"], ["machines", "Machines", "DesktopOutlined", "11"], ["sessions", "Sessions", "LoginOutlined", "2"], ["issues", "Issues", "AlertOutlined", "7", true]]],
   ["Work", [["tasks", "Tasks", "CheckSquareOutlined", "7"], ["flows", "Flows", "BranchesOutlined"], ["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
   ["Govern", [["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
 ];
-const TITLES = { actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
-function Palette({ go, close }) {
+const NAV_SU = [["", [["monitor", "Monitor", "DashboardOutlined"], ["work", "Work", "InboxOutlined", String(SU_QUEUE.length), true], ["govern", "Govern", "ApartmentOutlined"]]]];
+const SU_PARENT = { monitor: "monitor", dept: "monitor", sessions: "monitor", audit: "monitor", machines: "monitor", work: "work", issues: "work", tasks: "work", rollout: "work", govern: "govern", reports: "govern" };
+const TITLES = { monitor: ["Monitor", "The organisation from above · hover for detail, click a screen to look closer"], work: ["Work", "What is waiting on you, and nobody else"], govern: ["Govern", "How the organisation is set up"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
+function Palette({ go, close, nav }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
   useEffect(() => { r.current && r.current.focus(); }, []);
   const items = [
-    ...NAV.flatMap(([, xs]) => xs.map(([id, l, icon]) => ({ g: "Go to", l, icon, run: () => go(id) }))),
+    ...nav.flatMap(([, xs]) => xs.map(([id, l, icon]) => ({ g: "Go to", l, icon, run: () => go(id) }))),
     ...MACHINES.map((m) => ({ g: "Machines", l: m.host, sub: `${m.user || "no user"} · ${STATUS[m.status].w}`, icon: "DesktopOutlined", mono: true, run: () => go("machines", m.host) })),
     ...ISSUES.map((x) => ({ g: "Issues", l: `${x.id} ${x.title}`, sub: `${x.host} · ${x.subject}`, icon: "AlertOutlined", run: () => go("issues", x.id) })),
     { g: "Actions", l: "Leave session on OPS-07", sub: "Ama gets her machine back", icon: "LogoutOutlined", run: () => toast("Left OPS-07 (concept)") },
@@ -2683,12 +3337,20 @@ function useTheme() {
 }
 function App() {
   const th = useTheme();
-  const parse = () => { const [p, s] = (location.hash.slice(1) || "overview").split("/"); return [TITLES[p] ? p : "overview", s ? decodeURIComponent(s) : null]; };
-  const [[page, sub], setRoute] = useState(parse);
+  const [level, setLevel] = useState(null);   // null: the Super User's own level; else { admin, dept, since, how }
+  const parse = () => { const [p, s0] = (location.hash.slice(1) || "monitor").split("/"); return [TITLES[p] ? p : "monitor", s0 ? decodeURIComponent(s0) : null]; };
+  const [[rawPage, sub], setRoute] = useState(parse);
   const [range, setRange] = useState("24h");
   const [pal, setPal] = useState(false);
+  const [entering, setEntering] = useState(null);
   const now = useNow(1000);
-  const go = (p, s) => { setRoute([p, s || null]); try { history.replaceState(null, "", "#" + p + (s ? "/" + encodeURIComponent(s) : "")); } catch (e) {} if (p !== page || p !== "issues") window.scrollTo(0, 0); };
+  applyScope(level ? level.dept : null);
+  const nav = level ? NAV_ADMIN : NAV_SU;
+  const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)));
+  const page = allowed.has(rawPage) ? rawPage : level ? "overview" : "monitor";
+  const go = (p, s0) => { setRoute([p, s0 || null]); try { history.replaceState(null, "", "#" + p + (s0 ? "/" + encodeURIComponent(s0) : "")); } catch (e) {} if (p !== page || p !== "issues") window.scrollTo(0, 0); };
+  const enterConsole = (admin, how) => { setEntering(null); setLevel({ admin, dept: ADMIN_INFO[admin].dept, since: Date.now(), how }); go("overview"); toast(`${how === "end" ? "Ended" : "Blocked"} ${admin}'s session. You are in their console.`); };
+  const leave = () => { const d = level.dept, a = level.admin; setLevel(null); go("dept", d); toast(`Left ${a}'s console. Their session is back.`); };
   useEffect(() => { const k = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPal((v) => !v); } };
     const h = () => setRoute(parse());
     window.addEventListener("keydown", k); window.addEventListener("hashchange", h); return () => { window.removeEventListener("keydown", k); window.removeEventListener("hashchange", h); }; }, []);
@@ -2698,10 +3360,16 @@ function App() {
              colorBgContainer: dk ? "#12161d" : "#ffffff", colorBgElevated: dk ? "#161b23" : "#ffffff", colorBorder: dk ? "#323b48" : "#cdd2da", colorBorderSecondary: dk ? "#232a35" : "#e2e5ea",
              colorBgLayout: dk ? "#0c0f14" : "#f3f4f6", colorText: dk ? "#e4e7ed" : "#191d25", colorError: dk ? "#f2604c" : "#c8331f" },
     components: { Table: { headerBg: dk ? "#161b23" : "#f8f9fb", rowHoverBg: dk ? "#1d232d" : "#f8f9fb" } } };
-  const [title, subtitle] = TITLES[page];
+  const deptName = (id) => (FULL.DEPTS || DEPTS).find((d) => d.id === id).name;
+  const [title0, subtitle0] = TITLES[page];
+  const title = page === "dept" ? deptName(sub) : title0, subtitle = page === "dept" ? "" : level && page === "overview" ? `${deptName(level.dept)} · as ${level.admin} sees it` : subtitle0;
   const secs = Math.floor(((now - T0) / 1000) % 15);
   let body;
-  if (page === "overview") body = html`<${Overview} range=${range} go=${go} />`;
+  if (page === "monitor") body = html`<${Monitor} range=${range} go=${go} enter=${setEntering} />`;
+  else if (page === "work") body = html`<${Work} go=${go} />`;
+  else if (page === "govern") body = html`<${Govern} go=${go} enter=${setEntering} />`;
+  else if (page === "dept") body = html`<${DeptPage} key=${sub} id=${(FULL.DEPTS || DEPTS).some((d) => d.id === sub) ? sub : "ops"} go=${go} enter=${setEntering} />`;
+  else if (page === "overview") body = html`<${Overview} range=${range} go=${go} />`;
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
   else if (page === "sessions") body = html`<${Sessions} />`;
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
@@ -2713,23 +3381,43 @@ function App() {
   else if (page === "audit") body = html`<${Audit} range=${range} />`;
   else body = html`<${Reports} />`;
   const usesRange = ["overview", "machines", "audit"].includes(page);
+  const parent = !level && SU_PARENT[page] && SU_PARENT[page] !== page ? SU_PARENT[page] : null;
+  const crumbSub = sub && page === "machines" ? html`<a onClick=${() => go("machines")}>Machines</a><span>/</span><b className="mono">${sub}</b>`
+    : sub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span><b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>`
+    : sub && page === "flows" ? html`<a onClick=${() => go("flows")}>Flows</a><span>/</span><b>New flow</b>`
+    : sub && page === "automation" ? html`<a onClick=${() => go(page)}>Automation</a><span>/</span>${sub.startsWith("edit-") && RBY[sub.slice(5)] ? html`<a onClick=${() => go("automation", sub.slice(5))}>${RBY[sub.slice(5)].name}</a><span>/</span><b>Edit</b>` : html`<b>${sub === "new" ? "New rule" : RBY[sub] ? RBY[sub].name : sub}</b>`}`
+    : sub && page === "tasks" ? html`<a onClick=${() => go(page)}>Tasks</a><span>/</span><b className="mono">${sub}</b>`
+    : html`<b>${title}</b>`;
+  const crumb = html`${parent ? html`<a onClick=${() => go(parent)}>${TITLES[parent][0]}</a><span>/</span>` : null}${crumbSub}`;
+  const heldFor = level ? Math.floor((now - level.since) / 1000) : 0;
   return html`<${ConfigProvider} theme=${cfg}>
     <div className="app">
       <aside className="side">
-        <div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
-          <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · 3 departments</div></div></div>
-        ${NAV.map(([g, xs]) => html`<${React.Fragment} key=${g}><div className="grp">${g}</div>
-          ${xs.map(([id, l, icon, cnt, hot]) => html`<div key=${id} className=${"nav" + (page === id ? " on" : "")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
-            ${ic(icon)}<span>${l}</span>${cnt ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${cnt}</span>` : null}</div>`)}<//>`)}
+        ${level ? html`<div className="org" style=${{ paddingBottom: 6 }}><span className="av" style=${{ width: 26, height: 26, background: "color-mix(in srgb, var(--crit) 14%, transparent)", color: "var(--crit)" }}>${initials(level.admin)}</span>
+            <div className="orgtxt"><div style=${{ fontWeight: 600 }}>${level.admin}'s console</div><div className="t3" style=${{ fontSize: 11.5 }}>${deptName(level.dept)} · you as Super User</div></div></div>`
+          : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
+            <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · 3 departments</div></div></div>`}
+        ${nav.map(([g, xs]) => html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}
+          ${xs.map(([id, l, icon, cnt, hot]) => { const on = page === id || (!level && SU_PARENT[page] === id);
+            return html`<div key=${id} className=${"nav" + (on ? " on" : "") + (level ? "" : " big")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
+            ${ic(icon)}<span>${l}</span>${cnt ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${cnt}</span>` : null}</div>`; })}<//>`)}
         <div className="side-foot">
+          ${level ? html`<${Button} danger block icon=${ic("LogoutOutlined")} onClick=${leave}>Leave console<//>` : null}
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
           <span className="t4" style=${{ fontSize: 11 }}>Concept · sample data</span>
         </div>
       </aside>
       <div className="main">
+        ${level ? html`<div className="su-banner" role="status">
+          <span style=${{ fontSize: 15 }}>${ic("SafetyCertificateFilled")}</span>
+          <b style=${{ fontWeight: 600 }}>Super User in charge</b>
+          <span>You are in ${level.admin}'s console · ${deptName(level.dept)} · their session is ${level.how === "end" ? "ended" : "blocked"}</span>
+          <span className="sp" /><span className="mono">${Math.floor(heldFor / 60)}:${String(heldFor % 60).padStart(2, "0")}</span>
+          <${Button} size="small" onClick=${leave}>Leave<//>
+        </div>` : null}
         <header className="top">
-          <div className="crumb">${sub && page === "machines" ? html`<a onClick=${() => go("machines")}>Machines</a><span>/</span><b className="mono">${sub}</b>` : sub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span><b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>` : sub && page === "flows" ? html`<a onClick=${() => go("flows")}>Flows</a><span>/</span><b>New flow</b>` : sub && page === "automation" ? html`<a onClick=${() => go(page)}>${title}</a><span>/</span>${sub.startsWith("edit-") && RBY[sub.slice(5)] ? html`<a onClick=${() => go("automation", sub.slice(5))}>${RBY[sub.slice(5)].name}</a><span>/</span><b>Edit</b>` : html`<b>${sub === "new" ? "New rule" : RBY[sub] ? RBY[sub].name : sub}</b>`}` : sub && page === "tasks" ? html`<a onClick=${() => go(page)}>${title}</a><span>/</span><b className="mono">${sub}</b>` : html`<b>${title}</b>`}</div>
+          <div className="crumb">${crumb}</div>
           <div className="search" role="button" tabIndex="0" onClick=${() => setPal(true)} onKeyDown=${(e) => e.key === "Enter" && setPal(true)}>${ic("SearchOutlined")}<span>Search or jump to</span><span className="kbd">Ctrl K</span></div>
           <span className="sp" />
           ${usesRange ? html`<${Segmented} size="small" value=${range} onChange=${setRange} options=${["1h", "6h", "24h", "7d"]} />` : null}
@@ -2737,12 +3425,13 @@ function App() {
           <${Segmented} size="small" value=${th.mode} onChange=${th.setMode} options=${[{ value: "system", icon: ic("DesktopOutlined"), title: "System" }, { value: "light", icon: ic("SunOutlined"), title: "Light" }, { value: "dark", icon: ic("MoonOutlined"), title: "Dark" }]} />
         </header>
         <main className="content">
-          ${!sub || !["machines", "tasks", "automation", "flows", "actions"].includes(page) ? html`<div className="ph1"><div><h1>${title}</h1><div className="sub">${subtitle}</div></div></div>` : null}
+          ${!sub || !["machines", "tasks", "automation", "flows", "actions"].includes(page) ? html`<div className="ph1"><div><h1>${title}</h1>${subtitle ? html`<div className="sub">${subtitle}</div>` : null}</div></div>` : null}
           ${body}
         </main>
       </div>
     </div>
-    ${pal ? html`<${Palette} go=${go} close=${() => setPal(false)} />` : null}
+    ${pal ? html`<${Palette} go=${go} nav=${nav} close=${() => setPal(false)} />` : null}
+    <${EnterConsole} admin=${entering} onClose=${() => setEntering(null)} onEnter=${enterConsole} />
     <${Toast} />
   <//>`;
 }

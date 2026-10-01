@@ -186,7 +186,7 @@ selection and the bulk bar that replaces the heading while a set is chosen.
 
 ### Fourth wave — from the console concept (1 Oct 2026)
 
-The concept (`design/console-concepts.html`; UI.md rules 26–37) needs these. None of them is built in
+The concept (`design/console-concepts.html`; UI.md rules 26–38) needs these. None of them is built in
 QML yet. The priorities are a proposal, ordered by how much of the concept depends on each one.
 
 | Component | What it does | Used by | Built from | Priority |
@@ -206,6 +206,14 @@ QML yet. The priorities are a proposal, ordered by how much of the concept depen
 | **Occupancy** | the DayTimeline with an adjustable working frame and a line naming any session outside it | Sessions | extends DayTimeline | **P1** |
 | **Firings** | a rule's firings, newest first, each expanding into the runs it caused (problems only, when there are many) | rule page | `Feed` with expandable rows | **P2** |
 | **OutcomeBar** | succeeded / failed / timed out as one split bar, with the counts in words beside it | rule page, action page, Automation | Rectangle row | **P2** |
+| **LevelShell** | the shell switches with the level: at the Super User's own level, a sider of three tabs (Monitor · Work · Govern), with drilled-into pages keeping their tab lit and the breadcrumb starting from it; inside an Admin's console, that Admin's full menu, and **Leave console** at the foot | the whole console | `Layout` + `Menu` + `Breadcrumb`, reading `viewThroughSession` | **P0** |
+| **ChargeBanner** | *Super User in charge*: whose console, which department, block or end, a running clock, **Leave**. A tint across the full width, never a stripe | inside any Admin's console | Alert-like Rectangle + `Button` | **P0** |
+| **EnterConsole** | the confirm for entering an Admin's console: two Choices, *Block their session* or *End their session*, and what each means for them | department page, Govern | `Modal` + Choice | **P0** |
+| **DeptRow** | one department on a line: name and Admins, a small health tile per machine, online, worst issue, version progress, report response time | Monitor | HealthMark + `Bar` | **P1** |
+| **DecisionDesk** | the Super User's Work. A queue on the left (waiting, then *Decided today*) and the selected decision on the right: why it is theirs, the evidence it needs (facts, entries, a gate, reports to tick), Choices, the input the chosen one needs, one act. A decided item shows what was decided, by whom and when, with *Change*. A *Decide / Follow up* switch on top | Work | `Feed` + Choice + Form controls, master–detail | **P1** |
+| **OrgBoard** | Govern's structure: the Super User above one column per department, each with health tiles and its Admins (*Enter*, a menu). A dashed empty seat where a department has no Admin, and a dashed *New department* column | Govern | Rectangles + MiniTiles + `RowMenu` | **P1** |
+| **RoutingGrid** | report types × (You + each department): filled dot routed, empty not routed, dashed red routed to a department with no Admin. Read-only while routing stays deferred | Govern | a grid of dots | **P2** |
+| **ReleaseTrack** | versions as a vertical track: the next one (ready, held by the gate) down through each approved one, with approver and who is still on it | Govern | `Trail` | **P2** |
 
 Changes to what exists:
 - **Tables:** short lists inside panels become rows (UI.md rule 37).

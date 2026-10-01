@@ -314,6 +314,10 @@ Stated once, so no screen invents its own.
     an Overview line about something only an Admin can fix still *appears* for the Super User —
     seeing it is oversight — but it stops pretending to be a link.
 
+    *Superseded in part 1 Oct 2026 by rule 38.* The Super User's own level is now three tabs, not
+    eight areas. Entering an Admin's console is unchanged in principle. It now goes through a page per
+    department, and blocking or ending the Admin's session is a choice made in the confirm.
+
 ---
 
 ## Decided 1 October 2026, from the console concept
@@ -421,6 +425,71 @@ They take precedence over anything above that they contradict.
     a box in a box. This applied to *How fast reports are dealt with* and the Overview's open issues.
     Tables stay for the long, sortable lists that are the page.
 
+38. **The Super User has three tabs: Monitor, Work, Govern.** The user, 1 Oct 2026: *"the super user
+    has only three tabs, monitor, work and govern … since we can click on items to enter an items
+    window."* Each tab is a page that answers one question, and anything on it opens its own page.
+    - **Monitor: what is happening across the organisation?** Read-only.
+      - six organisation-wide figures
+      - one row per department: its Admins, a health tile per machine, online count, worst open
+        issue, version progress, and how fast its reports are handled
+      - activity across the organisation, opening the full audit log
+      - who is inside someone's machine now
+      - *Worth a look*: unusual things that are not yet a decision
+      - a rollout summary
+    - **Work: what is waiting on me, and nobody else?** A place to decide, not a list of links. The
+      user, on an earlier list version: *"i love the information there but i feel like you can design
+      something better."*
+      - **Summary:** waiting, urgent, oldest, decided today. A **Decide / Follow up** switch.
+      - **Decide** is a queue on the left and the selected decision on the right.
+      - **A decision carries what is needed to judge it,** for example:
+        - the facts, and the connection worth seeing (the last person on LOG-02 before it went
+          offline)
+        - the candidates for an empty Admin seat, each with the one fact that matters about them
+        - the three 2 a.m. entries, each with what was done in it
+        - the version gate and the machines holding it
+        - the reports, to tick
+      - **The options are Choices,** with any reason or pick they need, and one act. Deciding
+        records it ("Decided: … by you at 13:24"), moves it to *Decided today*, and opens the next
+        one. *Change* reopens it, and *Skip for now* moves on.
+      - **Follow up** holds the tasks they assigned, and *Being handled, but slowly*: the Admin's to
+        fix, with a *Nudge*.
+    - **Govern: how is the organisation set up?** A picture of the organisation, then its policies.
+      - **Structure:** the Super User at the top and one column per department below. Each column
+        has its machines as health tiles, and each Admin with what they are doing now, *Enter* and a
+        menu (rename for workers, move, stop being an Admin). A department with no Admin shows a
+        dashed red empty seat that leads to the decision in Work. A dashed *New department* column
+        ends the row.
+      - **Where reports go:** a grid of report types against You and each department. The Super
+        User's column is always filled. A department with no Admin shows its routed cells as dashed
+        red: routed, but nobody there to receive them. Editing the routing stays deferred.
+      - **Versions:** a release track, from the next version (ready, held by the gate) back through
+        each approved one, with who approved it and which machines are still on it.
+      - **Names people see:** for each Admin, what the Super User calls them and what their workers
+        see. Names never travel further than one level.
+      - **Record keeping and connection:** retention, the Engine, the certificate.
+
+    **Each item belongs to one tab.** Seen goes to Monitor, decided goes to Work, structure goes to
+    Govern. Other tabs only link to it.
+
+    **Drilling in.** A drilled-into page keeps its tab lit, and the breadcrumb starts from it
+    (*Monitor / Operations*, *Work / Rollout*). A department has its own page:
+    - its figures, machines and open issues
+    - each Admin with what they are doing now and **Enter console**
+    - when it has no Admin, *Nobody governs it* with a person picker
+
+    **Entering an Admin's console.** It asks whether to **block** their session (they wait) or **end**
+    it (they are signed out), and says the Super User cannot be moved out and that it is recorded.
+    Inside:
+    - a **Super User in charge** strip runs across the top, with whose console, the department, a
+      running clock and **Leave**
+    - the sidebar becomes that Admin's full Monitor / Work / Govern menu
+    - every page narrows to their department
+
+    **Leaving** returns to that department's page and gives the Admin their session back.
+
+    In the concept, Flows, Automation and Actions are not yet narrowed to the department inside a
+    console, and two Work items open the Admin's page rather than one made for the Super User.
+
 **Still open — shown in the concept, not yet decided:**
 
 - **Green.** The concept uses it for completed outcomes (*Success*, *Ready*, *Within target*). The 29
@@ -429,8 +498,11 @@ They take precedence over anything above that they contradict.
   checks, I will verify it by hand*, *Test on one machine*). Decide whether choice buttons are exempt.
 - **Destinations per flow.** The concept warns past 8 and has no hard cap.
 - **The CPU bands (60 / 75 / 90).** The top band matches the *Sustained high CPU* rule.
-- **Which areas each level sees.** The concept shows every area at one level so it can be judged;
-  rule 25 still decides what a Super User sees at their own level.
+- **Narrowing to one department inside an Admin's console.** The concept narrows machines, issues,
+  sessions, tasks and the audit log to the department. Flows, rules and actions are not narrowed yet,
+  and the cross-department parts (version approval, report routing) would also have to disappear
+  there. The Engine already answers as that Admin (`protocol/viewing.py`), so in the product this
+  comes from the Engine, not from the page.
 - **Deferred items the concept draws anyway.** It has a flow stage editor and a rule condition
   builder. The JSON shapes behind them, `condition_spec` and a flow stage's `config`, are still on
   the deferred list (spec §10). The concept shows how they might look; it decides nothing about them.
