@@ -291,6 +291,42 @@ a { color: var(--accent); text-decoration: none; }
 .car-btn.left { left: -12px; }
 .car-btn.right { right: -12px; }
 @media (max-width: 700px) { .tab { flex-basis: 86%; } .tab-main { grid-template-columns: minmax(0, 1fr); } .tab-right { display: none; } }
+.vcols { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.6fr); gap: 8px; }
+.vcol { padding: 10px; border-radius: 6px; background: var(--surface-2); min-height: 92px; }
+.vjourney { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 16px; }
+.vj { position: relative; padding-top: 16px; padding-right: 8px; }
+.vj-dot { position: absolute; top: 0; left: 0; width: 9px; height: 9px; border-radius: 50%; }
+.vj-line { position: absolute; top: 4px; left: 12px; right: 4px; height: 1px; background: var(--border-strong); }
+.rk { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px; }
+.rk-tile { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 6px; background: var(--surface-2); min-height: 110px; }
+.rk-tile.link { cursor: pointer; }
+.rk-tile.link:hover { background: var(--surface-3); }
+@media (max-width: 700px) { .rk { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.otree { padding: 16px; }
+.ot-root { display: inline-flex; align-items: center; gap: 8px; padding: 4px 14px 4px 4px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); }
+.ot-rows { position: relative; margin-left: 18px; padding: 12px 0 0 26px; display: flex; flex-direction: column; gap: 8px; }
+.ot-rows::before { content: ''; position: absolute; left: 0; top: 0; bottom: 21px; width: 1px; background: var(--border-strong); }
+.ot-row { position: relative; display: grid; grid-template-columns: minmax(130px, 200px) minmax(0, 1fr) auto 16px; gap: 18px; align-items: center; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; transition: background .15s; }
+.ot-row::before { content: ''; position: absolute; left: -27px; top: 50%; width: 26px; height: 1px; background: var(--border-strong); }
+.ot-row:hover { background: var(--surface-2); }
+.ot-dept { display: flex; flex-direction: column; min-width: 0; }
+.ot-admins { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ochip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 4px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 500; cursor: pointer; }
+.ochip:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.ochip.empty { color: var(--crit); border: 1px dashed color-mix(in srgb, var(--crit) 55%, transparent); background: color-mix(in srgb, var(--crit) 6%, transparent); }
+.ochip.add { padding: 0 10px; color: var(--text-3); font-weight: 400; border-style: dashed; opacity: 0; transition: opacity .15s; }
+.ot-row:hover .ochip.add, .ochip.add:focus-visible { opacity: 1; }
+.ot-tiles { justify-self: end; }
+.ot-new { display: flex; gap: 8px; justify-content: center; color: var(--text-3); border-style: dashed; background: transparent; padding: 9px 14px; }
+.ot-new:hover { color: var(--accent); border-color: var(--accent); background: transparent; }
+@media (max-width: 760px) { .ot-row { grid-template-columns: minmax(0, 1fr) 16px; } .ot-admins, .ot-tiles { grid-column: 1; justify-self: start; } }
+/* on a decision card only the icon carries colour; the small drawing and the waiting bar take the
+   quiet slate of the "4 reports only you see" card, which is the reference and is left untouched */
+.dcard .bar > span { background: var(--low) !important; }
+.rcell { width: 34px; height: 30px; border-radius: 6px; border: 1px solid transparent; background: transparent; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.rcell:hover { background: var(--surface-3); }
+.rcell.changed { border: 1.5px dashed var(--accent); background: var(--accent-soft); }
+.dotc.locked { display: inline-grid; place-items: center; width: 18px; height: 18px; font-size: 9px; color: #fff; }
 .list-item { padding: 10px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
 .list-item:hover { background: var(--surface-2); }
 .list-item.on { background: var(--accent-soft); }
@@ -504,7 +540,8 @@ let AUDIT = (() => {
     [13.18, "R. Mensah", "Left OPS-03", "OPS-03", "session"],
   ];
   notable.forEach(([t, actor, what, host, kind]) => out.push({ t, actor, what, host, kind, id: id++, notable: true }));
-  return out.sort((a, b) => a.t - b.t);
+  // an offline machine records nothing after it went offline (LOG-02, since 02:31)
+  return out.filter((e) => e.notable || !(MBY[e.host] && MBY[e.host].status === "offline" && e.t > 2.52)).sort((a, b) => a.t - b.t);
 })();
 const LIVE_POOL = [
   { kind: "action", actor: "Automation", what: "Take a screenshot ran", host: "OPS-07" },
@@ -868,7 +905,8 @@ function MachineDetail({ host, range, go }) {
 }
 
 // ============================================================== SESSIONS
-function Occupancy() {
+function Occupancy({ lanes, title } = {}) {
+  const LN = lanes || LANES;
   const ref = useRef(null), w = useWidth(ref);
   const [view, setView] = useState("Working hours");
   const [frame, setFrame] = useState([6, 18]);
@@ -876,13 +914,13 @@ function Occupancy() {
   const full = view === "24 hours";
   const a = full ? 0 : frame[0], b = full ? 24 : frame[1];
   const outside = (bk) => bk[0] < frame[0] || bk[0] >= frame[1];
-  const hidden = full ? [] : LANES.flatMap((l) => l.blocks.filter((bk) => bk[1] <= a || bk[0] >= b).map((bk) => ({ l, bk })));
+  const hidden = full ? [] : LN.flatMap((l) => l.blocks.filter((bk) => bk[1] <= a || bk[0] >= b).map((bk) => ({ l, bk })));
   const L = 74, rh = 24, pw = w - L - 10, X = (t) => L + ((Math.max(a, Math.min(b, t)) - a) / (b - a)) * pw;
-  const H = LANES.length * rh + 26;
+  const H = LN.length * rh + 26;
   const spanH = b - a, stepH = spanH > 14 ? 3 : spanH > 8 ? 2 : 1;
   const ticks = []; for (let t = Math.ceil(a / stepH) * stepH; t <= b; t += stepH) ticks.push(t);
   const hours = Array.from({ length: 25 }, (_, i) => ({ value: i, label: String(i).padStart(2, "0") + ":00" }));
-  return html`<${Panel} title="Machine occupancy, today" sub="who was signed in to each machine, and when" extra=${html`
+  return html`<${Panel} title=${title || "Machine occupancy, today"} sub="who was signed in to each machine, and when" extra=${html`
     <span className="t3" style=${{ fontSize: 12 }}>Working hours</span>
     <${Select} size="small" value=${frame[0]} style=${{ width: 82 }} options=${hours.filter((h) => h.value < frame[1])} onChange=${(v) => setFrame([v, frame[1]])} aria-label="Working day starts" />
     <span className="t3">to</span>
@@ -891,12 +929,12 @@ function Occupancy() {
     <div ref=${ref} style=${{ position: "relative" }}>
       <svg width=${w} height=${H} style=${{ display: "block" }}>
         ${full ? html`<g>
-          <rect x=${X(0)} y="0" width=${X(frame[0]) - X(0)} height=${LANES.length * rh} style=${{ fill: "var(--surface-3)" }} opacity="0.7" />
-          <rect x=${X(frame[1])} y="0" width=${X(24) - X(frame[1])} height=${LANES.length * rh} style=${{ fill: "var(--surface-3)" }} opacity="0.7" />
+          <rect x=${X(0)} y="0" width=${X(frame[0]) - X(0)} height=${LN.length * rh} style=${{ fill: "var(--surface-3)" }} opacity="0.7" />
+          <rect x=${X(frame[1])} y="0" width=${X(24) - X(frame[1])} height=${LN.length * rh} style=${{ fill: "var(--surface-3)" }} opacity="0.7" />
         </g>` : null}
-        ${ticks.map((t) => html`<g key=${t}><line x1=${X(t)} x2=${X(t)} y1="0" y2=${LANES.length * rh} style=${{ stroke: "var(--grid)" }} />
+        ${ticks.map((t) => html`<g key=${t}><line x1=${X(t)} x2=${X(t)} y1="0" y2=${LN.length * rh} style=${{ stroke: "var(--grid)" }} />
           <text x=${X(t)} y=${H - 8} textAnchor=${t === b ? "end" : t === a ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(t % 24).padStart(2, "0")}:00</text></g>`)}
-        ${LANES.map((l, i) => html`<g key=${l.host}>
+        ${LN.map((l, i) => html`<g key=${l.host}>
           <text x="0" y=${i * rh + 16} fontSize="12" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${l.host}</text>
           <line x1=${L} x2=${w - 10} y1=${i * rh + rh} y2=${i * rh + rh} style=${{ stroke: "var(--grid)" }} />
           ${l.blocks.filter((bk) => bk[1] > a && bk[0] < b).map((bk, j) => { const flag = bk[2] !== "own" && outside(bk);
@@ -905,7 +943,7 @@ function Occupancy() {
               onMouseEnter=${() => setHov({ l, bk, x: X(bk[0]), y: i * rh, flag })} onMouseLeave=${() => setHov(null)} />`; })}
           ${l.blocks.filter((bk) => bk[2] !== "own" && outside(bk) && bk[1] > a && bk[0] < b).map((bk, j) => html`<text key=${"f" + j} x=${Math.min(X(bk[1]) + 6, w - 230)} y=${i * rh + 16} fontSize="11" style=${{ fill: "var(--med)" }}>${bk[3]} · ${hhmm(bk[0])} · outside working hours</text>`)}
         </g>`)}
-        ${NOWH > a && NOWH < b ? html`<line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${LANES.length * rh} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25" />` : null}
+        ${NOWH > a && NOWH < b ? html`<line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${LN.length * rh} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25" />` : null}
       </svg>
       ${hov ? html`<div className="tt" style=${{ left: Math.min(hov.x, w - 240), top: hov.y + rh }}>
         <div className="h">${hov.l.host} · ${hhmm(hov.bk[0])} – ${hov.bk[1] >= NOWH ? "now" : hhmm(hov.bk[1])}</div>
@@ -2873,7 +2911,7 @@ function LookCloser({ id, onClose, go, enter }) {
           return html`<div key=${m.host} title=${m.note || HEALTH[m.status][1]} className="row" style=${{ flexWrap: "nowrap", gap: 6, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 5, cursor: "pointer" }} onClick=${() => { onClose(); go("machines", m.host); }}>
             <${HealthMark} k=${k} /><span className="mono" style=${{ fontSize: 12 }}>${m.host}</span></div>`; })}</div>
         <div className="nt-h" style=${{ marginTop: 16 }}>Today</div>
-        <${EventHistogram} entries=${AUDIT.filter((e) => hosts.has(e.host))} range="24h" height=${110} />
+        <${DayLanes} rows=${[{ key: id, label: d.name, hosts }]} go=${(p0) => { onClose(); go(p0); }} lane=${48} verdictW=${0} />
       </div>
       <div>
         <div className="nt-h">Admins</div>
@@ -2886,35 +2924,94 @@ function LookCloser({ id, onClose, go, enter }) {
     </div>
   <//>`;
 }
-function OrgDay({ go }) {
+// The organisation's day, read in one glance: each department's activity today as a soft grey shape,
+// a dashed outline of a typical weekday behind it, and pins only where something needs someone or is
+// unusual. Was today normal, and if not, when and where did it stop being normal?
+function dayProfile(id) { return hostsProfile(new Set(deptHosts(id))); }
+function hostsProfile(hosts) {
+  const H = Math.ceil(NOWH);
+  // today counts everything; the typical day leaves out the flagged events, so it stays typical
+  const count = (a, b, all) => AUDIT.reduce((n, e) => n + (e.t >= a && e.t < b && hosts.has(e.host) && (all || !e.notable) ? 1 : 0), 0);
+  const today = Array.from({ length: H }, (_, h) => { const end = Math.min(h + 1, NOWH); return count(h, end, true) / Math.max(0.25, end - h); });
+  const days = [-6, -5, -4, -3, -2, -1].filter((d) => !["Sat", "Sun"].includes(WEEK[((d % 7) + 7) % 7]));
+  const median = (xs) => { const v = xs.slice().sort((a, b) => a - b), m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
+  const usual = Array.from({ length: H }, (_, h) => median(days.map((d) => count(d * 24 + h, d * 24 + h + 1))));
+  const pins = AUDIT.filter((e) => e.t >= 0 && hosts.has(e.host) && (e.kind === "violation" || e.kind === "deviation" || /outside working hours/.test(e.what)))
+    .map((e) => ({ t: e.t, c: e.kind === "violation" ? "var(--crit)" : "var(--med)", text: `${hhmm(e.t)} · ${e.actor} · ${e.what} · ${e.host}` }));
+  const sumT = today.reduce((a, b) => a + b, 0), sumU = usual.reduce((a, b) => a + b, 0);
+  const night = AUDIT.some((e) => e.t >= 0 && hosts.has(e.host) && /outside working hours/.test(e.what));
+  // a verdict needs a real difference, not a ratio of small numbers; only night activity is amber,
+  // because busier or quieter is not in itself a problem
+  const verdict = night ? ["Activity at night", "var(--med)"]
+    : sumT > sumU * 1.3 && sumT - sumU >= 8 ? ["Busier than usual", "var(--text-2)"]
+    : sumT < sumU * 0.7 && sumU - sumT >= 8 ? ["Quieter than usual", "var(--text-2)"]
+    : ["As usual", "var(--text-3)"];
+  // an hour is unusual when it is clearly out of line with the same hour on a typical weekday:
+  // anything at all where there is normally nothing at night, or far more than usual in the day
+  // At night, automated work runs on its own, so only a person entering a machine counts as unusual.
+  // In the day, an hour is unusual when it is more than twice as busy as usual. The hour still in
+  // progress is never judged, because it is not finished.
+  const peopleAtNight = (h) => AUDIT.some((e) => e.t >= h && e.t < h + 1 && hosts.has(e.host) && /outside working hours/.test(e.what));
+  const odd = today.map((v, h) => h < Math.floor(NOWH) && ((h < 6 || h >= 18) ? peopleAtNight(h) : v >= 5 && v > usual[h] * 2));
+  return { today, usual, pins, verdict, odd };
+}
+// One row per group of machines: today's activity as a grey shape, amber where an hour is unusual for
+// that row, pins where something needs someone or is unusual, and a verdict on the right.
+function DayLanes({ rows, go, lane = 56, verdictW = 136 }) {
   const ref = useRef(null), w = useWidth(ref);
+  const [hov, setHov] = useState(null);
+  const profs = useMemo(() => rows.map((r) => hostsProfile(r.hosts)), [rows.map((r) => r.key).join()]);
+  const gap = lane > 40 ? 10 : 6, L = 104, R = verdictW, H = rows.length * (lane + gap) + 22, pw = Math.max(100, w - L - R), X = (h) => L + (h / NOWH) * pw;
+  const ticks = []; for (let h = 0; h <= NOWH; h += 2) ticks.push(h);
+  const path = (vals, y0, sc) => vals.map((v, h) => `${h ? "L" : "M"}${X(Math.min(NOWH, h + 0.5)).toFixed(1)} ${(y0 + lane - 4 - v * sc).toFixed(1)}`).join("");
+  const onMove = (e) => { const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left; if (x < L || x > L + pw) { setHov(null); return; } setHov(Math.min(Math.ceil(NOWH) - 1, Math.floor(((x - L) / pw) * NOWH))); };
+  return html`<div ref=${ref} style=${{ position: "relative" }}>
+    <svg width=${w} height=${H} style=${{ display: "block" }} onMouseMove=${onMove} onMouseLeave=${() => setHov(null)}>
+      ${rows.map((r, i) => { const pr = profs[i], y0 = i * (lane + gap), mx = Math.max(1, ...pr.today, ...pr.usual), sc = (lane - 10) / mx;
+        const area = path(pr.today, y0, sc) + `L${X(NOWH).toFixed(1)} ${y0 + lane - 4}L${X(0.5).toFixed(1)} ${y0 + lane - 4}Z`;
+        return html`<g key=${r.key}>
+          <rect x=${L} y=${y0} width=${pw} height=${lane} rx="4" style=${{ fill: "var(--surface-2)" }} />
+          <rect x=${X(0)} y=${y0} width=${X(Math.min(6, NOWH)) - X(0)} height=${lane} style=${{ fill: "var(--surface-3)" }} opacity="0.55" />
+          <text x="0" y=${y0 + lane / 2 + 4} fontSize=${lane > 40 ? 12.5 : 11.5} fontWeight="500" style=${{ fill: r.color || "var(--text)", fontFamily: r.mono ? "var(--mono)" : "var(--sans)" }}>${r.label}</text>
+          ${pr.odd.map((o, h) => (o ? html`<rect key=${"o" + h} x=${X(h)} y=${y0} width=${X(Math.min(h + 1, NOWH)) - X(h)} height=${lane} style=${{ fill: "var(--med)", opacity: 0.16 }}><title>${String(h).padStart(2, "0")}:00 · unusual for this hour · ${Math.round(pr.today[h])} events, usually ${Math.round(pr.usual[h])}</title></rect>` : null))}
+          <path d=${area} style=${{ fill: "var(--s6)", opacity: 0.32 }} />
+          <path d=${path(pr.today, y0, sc)} fill="none" style=${{ stroke: "var(--s6)" }} strokeWidth="1.5" strokeLinejoin="round" />
+          ${pr.pins.map((p0, k) => html`<g key=${k} style=${{ cursor: "pointer" }} onClick=${() => go && go("audit")}>
+            <line x1=${X(p0.t)} x2=${X(p0.t)} y1=${y0 + 9} y2=${y0 + lane - 4} style=${{ stroke: p0.c }} strokeWidth="1.25" />
+            <circle cx=${X(p0.t)} cy=${y0 + 8} r=${lane > 40 ? 5 : 4} style=${{ fill: p0.c, stroke: "var(--surface)" }} strokeWidth="1.5"><title>${p0.text}</title></circle></g>`)}
+          ${R > 0 ? html`<text x=${L + pw + 14} y=${y0 + lane / 2 + 4} fontSize="12" style=${{ fill: pr.verdict[1] }}>${pr.verdict[0]}</text>` : null}
+        </g>`; })}
+      ${ticks.map((h) => html`<text key=${h} x=${X(h)} y=${H - 6} textAnchor=${h === 0 ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h).padStart(2, "0")}:00</text>`)}
+      <text x=${X(NOWH)} y=${H - 6} textAnchor="end" fontSize="10.5" fontWeight="600" style=${{ fill: "var(--crit)", fontFamily: "var(--mono)" }}>now</text>
+      ${hov != null ? html`<line x1=${X(hov + 0.5)} x2=${X(hov + 0.5)} y1="0" y2=${H - 22} style=${{ stroke: "var(--text-3)" }} strokeDasharray="2 3" />` : null}
+    </svg>
+    ${hov != null ? html`<div className="tt" style=${{ left: Math.min(X(hov + 0.5) + 12, w - 240), top: 0 }}>
+      <div className="h">${String(hov).padStart(2, "0")}:00 – ${String(hov + 1).padStart(2, "0")}:00</div>
+      ${rows.map((r, i) => { const pr = profs[i];
+        return html`<div key=${r.key} className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className=${"t2" + (r.mono ? " mono" : "")} style=${{ width: 80 }}>${r.label}</span><b className="mono">${Math.round(pr.today[hov])}</b><span className="t3">events · usually ${Math.round(pr.usual[hov])}</span></div>`; })}
+    </div>` : null}
+    <div className="leg" style=${{ marginTop: 8 }}>
+      <span><i className="sq" style=${{ "--c": "color-mix(in srgb, var(--s6) 45%, transparent)" }} />today</span>
+      <span><i className="sq" style=${{ "--c": "color-mix(in srgb, var(--med) 30%, transparent)" }} />unusual for that hour</span>
+      <span><i className="sq" style=${{ "--c": "var(--crit)", borderRadius: "50%" }} />needs someone</span>
+      <span><i className="sq" style=${{ "--c": "var(--med)", borderRadius: "50%" }} />unusual</span>
+      <span><i className="sq" style=${{ "--c": "var(--surface-3)" }} />before 06:00</span>
+    </div>
+  </div>`;
+}
+function DayReport({ rows }) {
+  return html`<div className="report" style=${{ fontSize: 13.5 }}>
+    ${rows.map((r) => { const pr = hostsProfile(r.hosts); return html`<div key=${r.key} style=${{ marginBottom: 10 }}>
+      <b style=${{ fontWeight: 600 }} className=${r.mono ? "mono" : ""}>${r.label}</b> <span style=${{ color: pr.verdict[1] }}>· ${pr.verdict[0].toLowerCase()}</span>
+      ${pr.pins.map((p0, i) => html`<div key=${i} className="row" style=${{ flexWrap: "nowrap", padding: "2px 0" }}><span className="sev" style=${{ "--c": p0.c }}><i /></span><span>${p0.text}</span></div>`)}
+    </div>`; })}
+  </div>`;
+}
+function OrgDay({ go }) {
   const [view, setView] = useState("Chart");
-  const depts = DEPTS, L = 92, lane = 30, H = depts.length * lane + 24, pw = w - L - 8, X = (h) => L + (h / 24) * pw;
-  const notable = AUDIT.filter((e) => e.t >= 0 && (e.notable || e.kind === "violation" || e.kind === "deviation")).filter((e) => e.kind !== "rollout" || /escalat/.test(e.what));
-  const flag = (e) => (e.kind === "violation" ? "var(--crit)" : e.kind === "deviation" || /outside working hours/.test(e.what) ? "var(--med)" : null);
-  const flagged = notable.filter(flag);
-  return html`<${Panel} title="The organisation's day" sub="every event since midnight, by department" extra=${html`<${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
-    ${view === "Report" ? html`<div className="report" style=${{ fontSize: 13.5 }}>
-        ${flagged.map((e) => html`<div key=${e.id} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0" }}><span className="mono t3" style=${{ width: 50 }}>${hhmm(e.t)}</span><span className="sev" style=${{ "--c": flag(e) }}><i /></span><span><b style=${{ fontWeight: 500 }}>${e.actor}</b> ${e.what.charAt(0).toLowerCase() + e.what.slice(1)} on <span className="mono">${e.host}</span></span></div>`)}
-        <div className="t3" style=${{ marginTop: 6 }}>Everything else today was ordinary: sign-ins, scheduled actions and flow syncs.</div>
-      </div>`
-    : html`<div ref=${ref} style=${{ position: "relative" }}><svg width=${w} height=${H} style=${{ display: "block" }}>
-        <rect x=${X(0)} y="0" width=${X(6) - X(0)} height=${depts.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
-        <rect x=${X(18)} y="0" width=${X(24) - X(18)} height=${depts.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
-        <rect x=${X(NOWH)} y="0" width=${X(24) - X(NOWH)} height=${depts.length * lane} style=${{ fill: "var(--surface)" }} opacity="0.7" />
-        ${[0, 6, 12, 18, 24].map((h) => html`<text key=${h} x=${X(h)} y=${H - 6} textAnchor=${h === 24 ? "end" : h === 0 ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
-        ${depts.map((d, i) => { const hosts = new Set(deptHosts(d.id)); const evs = AUDIT.filter((e) => e.t >= 0 && hosts.has(e.host));
-          return html`<g key=${d.id}>
-            <text x="0" y=${i * lane + 19} fontSize="12" style=${{ fill: d.admins.length ? "var(--text-2)" : "var(--crit)" }}>${d.name}</text>
-            <line x1=${L} x2=${w - 8} y1=${i * lane + 15} y2=${i * lane + 15} style=${{ stroke: "var(--grid)" }} />
-            ${evs.map((e) => { const f = flag(e);
-              return f ? html`<g key=${e.id} style=${{ cursor: "pointer" }} onClick=${() => go("audit")}><rect x=${X(e.t) - 4} y=${i * lane + 11} width="8" height="8" rx="1.5" transform=${`rotate(45 ${X(e.t)} ${i * lane + 15})`} style=${{ fill: f }} /><title>${hhmm(e.t)} · ${e.actor} · ${e.what} · ${e.host}</title></g>`
-                : html`<rect key=${e.id} x=${X(e.t) - 0.75} y=${i * lane + 9} width="1.5" height="12" style=${{ fill: KINDS[e.kind].c }} opacity="0.45"><title>${hhmm(e.t)} · ${e.actor} · ${e.what}</title></rect>`; })}
-          </g>`; })}
-        <line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${depts.length * lane} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25" />
-      </svg>
-      <div className="leg" style=${{ marginTop: 6 }}><span><i className="sq" style=${{ "--c": "var(--crit)", transform: "rotate(45deg) scale(.8)" }} />needs someone</span><span><i className="sq" style=${{ "--c": "var(--med)", transform: "rotate(45deg) scale(.8)" }} />unusual</span><span><i style=${{ "--c": "var(--s1)", width: 2, height: 10 }} />ordinary event</span><span><i className="sq" style=${{ "--c": "var(--surface-3)" }} />outside 06:00–18:00</span></div>
-    </div>`}
+  const rows = DEPTS.map((d) => ({ key: d.id, label: d.name, hosts: new Set(deptHosts(d.id)), color: d.admins.length ? undefined : "var(--crit)" }));
+  return html`<${Panel} title="The organisation's day" sub="today so far · amber where an hour is unusual for it" extra=${html`<${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
+    ${view === "Report" ? html`<${DayReport} rows=${rows} />` : html`<${DayLanes} rows=${rows} go=${go} />`}
   <//>`;
 }
 function Trend({ label, value, unit, fn, c, max, warn }) {
@@ -2950,7 +3047,6 @@ const DECISIONS = [
   { id: "stuck", sev: "high", icon: "CloudSyncOutlined", title: "LOG-02's update is stuck, and it came to you", short: "LOG-02 update stuck", age: "3 days",
     why: "Logistics has no Admin, so the escalation reached you instead of stopping in the department.",
     facts: [["Machine", "LOG-02 · Abena"], ["Running", "1.4.0, two behind"], ["Offline since", "Today 02:31"], ["Escalated", "Mon 09:30"]],
-    note: "The last person on LOG-02 was A. Quaye, from 02:14 to 02:31. It went offline right after.",
     options: [
       { key: "admin", icon: "UserAddOutlined", title: "Give Logistics an Admin, and this with it", desc: "The new Admin owns the update from now on, and the next one.", verb: "Assign", need: "pick", pick: ["A. Quaye", "K. Boateng", "Esi (promote)"], done: "Assigned to" },
       { key: "exclude", icon: "StopOutlined", title: "Leave LOG-02 out of the 1.4.3 gate", desc: "1.4.3 can then be approved without it. LOG-02 stays on 1.4.0 until it updates.", verb: "Leave it out", need: "reason", done: "Left out of the gate" },
@@ -3006,7 +3102,7 @@ function GateTiles({ big, go }) {
     return big ? html`<div key=${m.host} onClick=${() => go && go("machines", m.host)} title=${`${m.host} · ${m.ver}`} style=${{ cursor: "pointer", textAlign: "center" }}>
         <div style=${{ width: 38, height: 38, borderRadius: 5, display: "grid", placeItems: "center", background: behind ? "color-mix(in srgb, var(--med) 16%, var(--surface))" : "color-mix(in srgb, var(--s2) 16%, var(--surface))", border: behind ? "1.5px dashed var(--med)" : "1px solid transparent", fontFamily: "var(--mono)", fontSize: 11, color: behind ? "var(--med)" : "var(--s2)" }}>${m.host.slice(-2)}</div>
         <div className="mono" style=${{ fontSize: 10, color: behind ? "var(--med)" : "var(--text-3)", marginTop: 2 }}>${m.ver}</div></div>`
-      : html`<span key=${m.host} style=${{ width: 9, height: 9, borderRadius: 2, background: behind ? "var(--med)" : "var(--s2)", opacity: behind ? 1 : 0.55 }} />`; })}</div>`;
+      : html`<span key=${m.host} style=${{ width: 9, height: 9, borderRadius: 2, background: behind ? "var(--med)" : "var(--border-strong)" }} />`; })}</div>`;
 }
 function Log02Lane({ big }) {
   const W = big ? 520 : 150, H = big ? 70 : 22, X = (h) => (h / 24) * W;
@@ -3034,7 +3130,63 @@ function SeatViz({ big }) {
 function ReportStack({ big }) {
   return html`<div style=${{ position: "relative", height: big ? 0 : 26, width: 60 }}>${big ? null : [0, 1, 2, 3].map((i) => html`<span key=${i} style=${{ position: "absolute", left: i * 6, top: i * 3, width: 34, height: 14, borderRadius: 2, background: "var(--surface)", border: "1px solid var(--border-strong)" }} />`)}</div>`;
 }
-const DVIZ = { stuck: Log02Lane, noadmin: SeatViz, quaye: NightGrid, approve: GateTiles, reports: ReportStack };
+// LOG-02 stuck: machines sorted into the version they run, so the one left behind stands out.
+function VersionColumns({ big, go }) {
+  const all = FULL.MACHINES || MACHINES, vers = ["1.4.0", "1.4.1", "1.4.2"];
+  if (!big) return html`<div className="row" style=${{ flexWrap: "nowrap", gap: 10, alignItems: "flex-end" }}>${vers.map((v) => { const ms = all.filter((m) => m.ver === v);
+    return html`<div key=${v} style=${{ display: "flex", flexWrap: "wrap", gap: 2, width: v === "1.4.2" ? 34 : 10, alignContent: "flex-end" }}>${ms.map((m) => html`<span key=${m.host} style=${{ width: 8, height: 8, borderRadius: 2, background: m.host === "LOG-02" ? "var(--crit)" : "var(--border-strong)" }} />`)}</div>`; })}
+    <span className="t3 mono" style=${{ fontSize: 10 }}>1.4.0 → 1.4.2</span></div>`;
+  const steps = [["Mon 07:45", "Install failed · update share unreachable", "var(--med)"], ["Mon 09:30", "Escalated to you", "var(--crit)"], ["Today 02:14", "A. Quaye entered it", "var(--s3)"], ["Today 02:31", "Went offline", "var(--text-3)"]];
+  return html`<div>
+    <div className="vcols">
+      ${vers.map((v, i) => { const ms = all.filter((m) => m.ver === v);
+        return html`<div key=${v} className="vcol">
+          <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}><span className="mono" style=${{ fontWeight: 600 }}>${v}</span><span className="t3" style=${{ fontSize: 11 }}>${v === "1.4.2" ? "current" : i === 0 ? "two behind" : "one behind"}</span></div>
+          <div style=${{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>${ms.map((m) => { const me = m.host === "LOG-02";
+            return html`<span key=${m.host} title=${`${m.host} · ${m.user || ""}`} onClick=${() => go && go("machines", m.host)} style=${{ cursor: "pointer", height: 30, padding: "0 7px", borderRadius: 4, display: "inline-grid", placeItems: "center", fontFamily: "var(--mono)", fontSize: 11,
+              background: me ? "color-mix(in srgb, var(--crit) 12%, var(--surface))" : v === "1.4.2" ? "color-mix(in srgb, var(--s2) 14%, var(--surface))" : "color-mix(in srgb, var(--med) 14%, var(--surface))",
+              border: me ? "1.5px dashed var(--crit)" : "1px solid transparent", color: me ? "var(--crit)" : v === "1.4.2" ? "var(--s2)" : "var(--med)" }}>${m.host}</span>`; })}</div>
+        </div>`; })}
+    </div>
+    <div className="vjourney">
+      ${steps.map(([w, t, c], i) => html`<div key=${w} className="vj">
+        <span className="vj-dot" style=${{ background: c }} />${i < steps.length - 1 ? html`<span className="vj-line" />` : null}
+        <div className="mono t3" style=${{ fontSize: 11 }}>${w}</div><div style=${{ fontSize: 12.5 }}>${t}</div></div>`)}
+    </div>
+  </div>`;
+}
+// Logistics has no Admin: the branch with its empty seat, and what skips it to reach you.
+function SeatBypass({ big }) {
+  if (!big) return html`<div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}>
+    <span style=${{ width: 26, height: 26, borderRadius: "50%", border: "1.5px dashed var(--crit)", display: "grid", placeItems: "center", color: "var(--crit)", fontSize: 12, fontWeight: 600 }}>?</span>
+    <svg width="44" height="14" viewBox="0 0 44 14"><path d="M2 7 H36" style=${{ stroke: "var(--text-4)" }} strokeWidth="1.5" /><path d="M34 2 L42 7 L34 12 Z" style=${{ fill: "var(--text-4)" }} /></svg>
+    <span style=${{ width: 26, height: 26, borderRadius: "50%", border: "1.5px solid var(--border-strong)", display: "grid", placeItems: "center", color: "var(--text-3)", fontSize: 9.5, fontWeight: 600 }}>You</span>
+  </div>`;
+  const W = 440, H = 180;
+  return html`<svg viewBox=${`0 0 ${W} ${H}`} style=${{ width: "100%", maxWidth: big ? W : 150, display: "block" }} role="img" aria-label="Logistics has no Admin; its reports come straight to you">
+    <defs><marker id="byArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style=${{ fill: "var(--crit)" }} /></marker></defs>
+    <path d="M70 46 C 70 70, 150 62, 170 78" fill="none" style=${{ stroke: "var(--border-strong)" }} strokeWidth="1.5" />
+    <path d="M225 104 L225 122" fill="none" style=${{ stroke: "var(--crit)" }} strokeWidth="1.5" strokeDasharray="4 3" />
+    <path d="M241 140 L300 140" fill="none" style=${{ stroke: "var(--border-strong)" }} strokeWidth="1.5" strokeDasharray="4 3" />
+    <path d="M168 92 C 110 110, 52 96, 54 52" fill="none" style=${{ stroke: "var(--crit)" }} strokeWidth="2" markerEnd="url(#byArrow)" />
+    <circle cx="70" cy="30" r="17" style=${{ fill: "var(--accent-soft)", stroke: "var(--accent)" }} strokeWidth="1.5" />
+    <text x="70" y="34" textAnchor="middle" fontSize="11" fontWeight="700" style=${{ fill: "var(--accent)" }}>You</text>
+    <rect x="170" y="70" width="110" height="34" rx="6" style=${{ fill: "var(--surface-2)", stroke: "var(--border-strong)" }} />
+    <text x="225" y="91" textAnchor="middle" fontSize="12.5" fontWeight="600" style=${{ fill: "var(--text)" }}>Logistics</text>
+    <circle cx="225" cy="140" r="17" style=${{ fill: "color-mix(in srgb, var(--crit) 8%, transparent)", stroke: "var(--crit)" }} strokeWidth="1.5" strokeDasharray="4 3" />
+    <text x="225" y="145" textAnchor="middle" fontSize="15" fontWeight="600" style=${{ fill: "var(--crit)" }}>?</text>
+    <rect x="300" y="125" width="54" height="30" rx="4" style=${{ fill: "var(--surface-3)", stroke: "var(--border-strong)" }} />
+    <text x="327" y="144" textAnchor="middle" fontSize="11" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>LOG-01</text>
+    <rect x="362" y="125" width="54" height="30" rx="4" style=${{ fill: "transparent", stroke: "var(--text-4)" }} strokeDasharray="3 3" />
+    <text x="389" y="144" textAnchor="middle" fontSize="11" style=${{ fill: "var(--text-4)", fontFamily: "var(--mono)" }}>LOG-02</text>
+    ${big ? html`<g>
+      <text x="225" y="172" textAnchor="middle" fontSize="11.5" fontWeight="600" style=${{ fill: "var(--crit)" }}>No Admin</text>
+      <text x="14" y="150" fontSize="11.5" style=${{ fill: "var(--crit)" }}>4 reports, 1 escalation</text>
+      <text x="14" y="165" fontSize="11.5" style=${{ fill: "var(--crit)" }}>skip the empty seat</text>
+    </g>` : null}
+  </svg>`;
+}
+const DVIZ = { stuck: VersionColumns, noadmin: SeatBypass, quaye: NightGrid, approve: GateTiles, reports: ReportStack };
 function Work({ go }) {
   const [view, setView] = useState("Decide");
   const [sel, setSel] = useState(DECISIONS[0].id);
@@ -3079,7 +3231,7 @@ function Work({ go }) {
             <div className="t3" style=${{ fontSize: 12.5, marginBottom: 16 }}>${d.why}</div>
             ${d.id === "reports" ? html`<div>${SU_ONLY_REPORTS.map(([id, t, w]) => html`<label key=${id} className="kv" style=${{ gridTemplateColumns: "22px minmax(0, 1fr) auto", cursor: "pointer" }}>
                 <${Checkbox} checked=${ticked.includes(id)} onChange=${(e) => setTicked(e.target.checked ? [...ticked, id] : ticked.filter((y) => y !== id))} /><span>${t}</span><span className="mono t3">${w}</span></label>`)}</div>`
-              : d.id === "noadmin" ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}><${SeatViz} big=${true} /><div className="t3" style=${{ fontSize: 12 }}>Two machines, four reports a week, nobody below you.</div></div>`
+              : d.id === "noadmin" ? html`<${SeatBypass} big=${true} />`
               : html`<${Big} big=${true} go=${go} />`}
             ${d.note ? html`<div className="t3" style=${{ fontSize: 12, marginTop: 12 }}>${ic("InfoCircleOutlined")} ${d.note}</div>` : null}
           </div>
@@ -3125,9 +3277,17 @@ function Work({ go }) {
     </div>`}
   <//>`;
 }
+const ROUTING0 = { "Restricted file": ["ops", "fin", "log"], "Flow failed": ["ops", "fin"], "Listener report": ["ops"], "Update stuck": [], "Deviation": ["ops", "fin", "log"] };
 function Govern({ go, enter }) {
   const depts = FULL_DEPTS();
-  const cats = [["Restricted file", ["ops", "fin", "log"]], ["Flow failed", ["ops", "fin"]], ["Listener report", ["ops"]], ["Update stuck", []], ["Deviation", ["ops", "fin", "log"]]];
+  // Routing goes to a department, and every Admin in it sees the report; the Super User always does.
+  // Changes are held until confirmed, then sent as one reports.routing_set per category changed.
+  const [saved, setSaved] = useState(ROUTING0);
+  const [draft, setDraft] = useState(ROUTING0);
+  const [confirming, setConfirming] = useState(false);
+  const changes = [];
+  Object.keys(draft).forEach((c) => depts.forEach((d) => { const was = saved[c].includes(d.id), now = draft[c].includes(d.id); if (was !== now) changes.push({ c, d, on: now }); }));
+  const toggle = (c, id) => setDraft({ ...draft, [c]: draft[c].includes(id) ? draft[c].filter((x) => x !== id) : [...draft[c], id] });
   const track = [
     { v: "1.4.3", st: "Ready", c: "var(--med)", n: 0, act: true },
     { v: "1.4.2", st: "Current", c: "var(--ok)", n: 9, when: "26 Sep" },
@@ -3136,65 +3296,70 @@ function Govern({ go, enter }) {
   ];
   return html`<${React.Fragment}>
     <section className="panel">
-      <div className="phd"><div className="pt">Structure</div>
-        <${Button} size="small" icon=${ic("PlusOutlined")} onClick=${() => toast("New department (concept)")}>New department<//></div>
-      <div style=${{ padding: 16 }}>
-        <div className="row" style=${{ justifyContent: "center" }}>
-          <span className="adm" style=${{ paddingRight: 14 }}><span className="av" style=${{ background: "var(--accent-soft)", color: "var(--accent)" }}>SU</span><b style=${{ fontWeight: 600 }}>You</b></span>
-        </div>
-        <div className="org-stem" />
-        <div className="org-cols">
+      <div className="phd"><div className="pt">Structure<small>click a department to open it · click an Admin for what you can do</small></div></div>
+      <div className="otree">
+        <div className="ot-root"><span className="av" style=${{ width: 30, height: 30, background: "var(--accent-soft)", color: "var(--accent)" }}>SU</span><b style=${{ fontWeight: 600 }}>You</b><span className="t3" style=${{ fontSize: 12 }}>Super User · ADM-01</span></div>
+        <div className="ot-rows">
           ${depts.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
-            return html`<div key=${d.id} className="org-col">
-              <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}>
-                <a style=${{ fontWeight: 600, fontSize: 14 }} onClick=${() => go("dept", d.id)}>${d.name}</a>
-                <span className="t3 mono" style=${{ fontSize: 12 }} title="Machines">${ic("DesktopOutlined")} ${ms.length}</span>
+            return html`<div key=${d.id} className="ot-row" role="button" tabIndex="0" onClick=${() => go("dept", d.id)} onKeyDown=${(e) => e.key === "Enter" && go("dept", d.id)}>
+              <div className="ot-dept"><b style=${{ fontWeight: 600, fontSize: 14, color: d.admins.length ? "var(--text)" : "var(--crit)" }}>${d.name}</b><span className="t3" style=${{ fontSize: 12 }}>${ms.length} machines</span></div>
+              <div className="ot-admins" onClick=${(e) => e.stopPropagation()}>
+                ${d.admins.map((a) => html`<${Dropdown} key=${a} trigger=${["click"]} menu=${{ items: [
+                    { key: "enter", icon: ic("LoginOutlined"), label: "Enter their console" },
+                    { key: "name", icon: ic("EditOutlined"), label: "Change the name workers see" },
+                    { key: "move", icon: ic("SwapOutlined"), label: "Move to another department" },
+                    { type: "divider" },
+                    { key: "remove", icon: ic("UserDeleteOutlined"), label: "Stop being an Admin", danger: true }],
+                    onClick: ({ key }) => (key === "enter" ? enter(a) : toast((key === "remove" ? "Removed " : key === "move" ? "Moving " : "Renaming ") + a + " (concept)")) }}>
+                  <button className="ochip" title=${ADMIN_INFO[a].now}>
+                    <span style=${{ position: "relative", display: "inline-flex" }}><span className="av" style=${{ width: 24, height: 24, fontSize: 9.5 }}>${initials(a)}</span>
+                      <i style=${{ position: "absolute", right: -1, bottom: -1, width: 8, height: 8, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
+                    <span>${a}</span><span className="t4" style=${{ fontSize: 10 }}>${ic("DownOutlined")}</span>
+                  </button>
+                <//>`)}
+                ${d.admins.length ? null : html`<button className="ochip empty" onClick=${() => go("work")} title="Its reports and escalations come to you. Assign someone in Work.">
+                  <span className="av" style=${{ width: 24, height: 24, background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)", fontSize: 11 }}>?</span><span>Empty seat</span></button>`}
+                <button className="ochip add" onClick=${() => toast("Add an Admin to " + d.name + " (concept)")}>${ic("PlusOutlined")} Admin</button>
               </div>
-              <div style=${{ margin: "10px 0 14px" }}><${MiniTiles} ms=${ms} go=${go} /></div>
-              ${d.admins.map((a) => html`<div key=${a} className="org-adm" title=${ADMIN_INFO[a].now}>
-                <span style=${{ position: "relative" }}><span className="av" style=${{ width: 30, height: 30, fontSize: 11 }}>${initials(a)}</span>
-                  <i style=${{ position: "absolute", right: -1, bottom: -1, width: 9, height: 9, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
-                <span style=${{ flex: 1, fontWeight: 500 }}>${a}</span>
-                <${Button} size="small" icon=${ic("LoginOutlined")} onClick=${() => enter(a)} aria-label=${"Enter " + a + "'s console"}>Enter<//>
-                <${Dropdown} trigger=${["click"]} menu=${{ items: [{ key: "name", label: "Change the name workers see" }, { key: "move", label: "Move to another department" }, { type: "divider" }, { key: "remove", label: "Stop being an Admin", danger: true }], onClick: ({ key }) => toast((key === "remove" ? "Removed " : key === "move" ? "Moving " : "Renaming ") + a + " (concept)") }}>
-                  <${Button} size="small" type="text" icon=${ic("MoreOutlined")} aria-label=${"More for " + a} />
-                <//>
-              </div>`)}
-              ${d.admins.length ? html`<a style=${{ fontSize: 12.5, display: "inline-block", marginTop: 8 }} onClick=${() => toast("Add an Admin (concept)")}>${ic("PlusOutlined")} Admin</a>`
-                : html`<div className="org-empty" role="button" tabIndex="0" onClick=${() => go("work")} title="Its reports and escalations come to you">
-                    <span className="av" style=${{ width: 30, height: 30, background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)" }}>${ic("UserAddOutlined")}</span>
-                    <b style=${{ fontWeight: 600, color: "var(--crit)", alignSelf: "center" }}>Empty seat</b></div>`}
+              <div className="ot-tiles"><${MiniTiles} ms=${ms} go=${go} /></div>
+              <span className="t4">${ic("RightOutlined")}</span>
             </div>`; })}
-          <div className="org-col org-new" role="button" tabIndex="0" onClick=${() => toast("New department (concept)")}>
-            <span style=${{ fontSize: 18 }}>${ic("PlusOutlined")}</span><span>Department</span>
-          </div>
+          <div className="ot-row ot-new" role="button" tabIndex="0" onClick=${() => toast("New department (concept)")}>${ic("PlusOutlined")} New department</div>
         </div>
-        <div className="leg" style=${{ justifyContent: "center", marginTop: 12 }}><span><i className="sq" style=${{ "--c": "var(--ok)", borderRadius: "50%" }} />at their desk</span><span><i className="sq" style=${{ "--c": "var(--s3)", borderRadius: "50%" }} />inside a machine</span></div>
       </div>
+      <div className="leg" style=${{ padding: "0 16px 14px" }}><span><i className="sq" style=${{ "--c": "var(--ok)", borderRadius: "50%" }} />at their desk</span><span><i className="sq" style=${{ "--c": "var(--s3)", borderRadius: "50%" }} />inside a machine</span></div>
     </section>
-    <div className="g c-66" style=${{ alignItems: "start" }}>
-      <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
-      <${Panel} title="Where reports go" flush>
-        <div className="rgrid" style=${{ gridTemplateColumns: `minmax(120px, 1.4fr) repeat(${depts.length + 1}, minmax(56px, 1fr))` }}>
-          <span />
-          <span className="rh">You</span>
-          ${depts.map((d) => html`<span key=${d.id} className="rh" style=${{ color: d.admins.length ? undefined : "var(--crit)" }}>${d.name}</span>`)}
-          ${cats.map(([c, to]) => html`<${React.Fragment} key=${c}>
-            <span className="rc">${c}</span>
-            <span className="rd"><span className="dotc on" title="Always" /></span>
-            ${depts.map((d) => { const on = to.includes(d.id), dead = on && !d.admins.length;
-              return html`<span key=${d.id} className="rd"><span className=${"dotc" + (on ? " on" : "") + (dead ? " dead" : "")} title=${dead ? "Routed, but nobody there" : on ? "Routed" : "Not routed"} /></span>`; })}
-          <//>`)}
-        </div>
-        <div className="leg" style=${{ padding: "10px 14px" }}><span><span className="dotc on" /> routed</span><span><span className="dotc dead" /> nobody there</span><span><span className="dotc" /> not routed</span><span className="t4">read-only for now</span></div>
-      <//>
-      <${Panel} title="Record keeping">
-        <div className="row" style=${{ gap: 22 }}>
-          ${[["HistoryOutlined", "90 days", "kept", () => go("audit")], ["DeleteOutlined", "3 days", "until the oldest goes"], ["SafetyCertificateOutlined", "Pinned", "certificate"], ["ApiOutlined", "7400", "Engine port"]].map(([i, v, k, f]) => html`<div key=${k} style=${{ cursor: f ? "pointer" : "default" }} onClick=${f || null}>
-            <div className="t3" style=${{ fontSize: 16 }}>${ic(i)}</div><div style=${{ fontWeight: 600, fontSize: 15 }}>${v}</div><div className="t3" style=${{ fontSize: 11.5 }}>${k}</div></div>`)}
-        </div>
-      <//>
+    <section className="panel">
+      <div className="phd"><div className="pt">Where reports go<small>click a cell to route a kind of report to a department · every Admin there sees it · you always do</small></div>
+        ${changes.length ? html`<div className="row"><span className="t2" style=${{ fontSize: 12 }}>${changes.length} change${changes.length > 1 ? "s" : ""} not saved</span><${Button} size="small" onClick=${() => setDraft(saved)}>Discard<//><${Button} size="small" type="primary" onClick=${() => setConfirming(true)}>Save routing<//></div>` : null}</div>
+      <div className="rgrid" style=${{ gridTemplateColumns: `minmax(120px, 1.4fr) repeat(${depts.length + 1}, minmax(56px, 1fr))` }}>
+        <span />
+        <span className="rh">You</span>
+        ${depts.map((d) => html`<span key=${d.id} className="rh" style=${{ color: d.admins.length ? undefined : "var(--crit)" }} title=${d.admins.length ? d.admins.join(", ") : "No Admin to receive them"}>${d.name}</span>`)}
+        ${Object.keys(draft).map((c) => html`<${React.Fragment} key=${c}>
+          <span className="rc">${c}</span>
+          <span className="rd"><span className="dotc on locked" title="You always receive every report">${ic("LockOutlined")}</span></span>
+          ${depts.map((d) => { const on = draft[c].includes(d.id), dead = on && !d.admins.length, changed = saved[c].includes(d.id) !== on;
+            return html`<span key=${d.id} className="rd"><button className=${"rcell" + (changed ? " changed" : "")} onClick=${() => toggle(c, d.id)}
+              aria-pressed=${on} aria-label=${`${c} to ${d.name}: ${on ? "routed" : "not routed"}`} title=${dead ? "Routed, but nobody there to read it" : on ? "Routed · click to stop" : "Not routed · click to route"}>
+              <span className=${"dotc" + (on ? " on" : "") + (dead ? " dead" : "")} /></button></span>`; })}
+        <//>`)}
       </div>
+      <div className="leg" style=${{ padding: "10px 14px" }}><span><span className="dotc on" /> routed</span><span><span className="dotc dead" /> routed, nobody there</span><span><span className="dotc" /> not routed</span><span><span className="rcell changed" style=${{ width: 18, height: 18, display: "inline-grid" }} /> changed, not saved</span></div>
+    </section>
+    <${Modal} open=${confirming} title="Save the new routing?" onCancel=${() => setConfirming(false)} width=${520}
+      footer=${html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setConfirming(false)}>Keep editing<//><${Button} type="primary" onClick=${() => { setSaved(draft); setConfirming(false); toast(`Routing saved · ${changes.length} change${changes.length > 1 ? "s" : ""}, recorded in the audit log (concept)`); }}>Save routing<//></div>`}>
+      <div style=${{ display: "flex", flexDirection: "column", gap: 8 }}>
+        ${changes.map((x, k) => html`<div key=${k} className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start" }}>
+          <span style=${{ color: x.on ? "var(--ok)" : "var(--text-3)", marginTop: 2 }}>${ic(x.on ? "PlusCircleOutlined" : "MinusCircleOutlined")}</span>
+          <div><b style=${{ fontWeight: 500 }}>${x.c}</b> ${x.on ? "will also go to" : "will stop going to"} <b style=${{ fontWeight: 500 }}>${x.d.name}</b>
+            ${x.on && !x.d.admins.length ? html`<div style=${{ color: "var(--crit)", fontSize: 12.5 }}>${x.d.name} has no Admin, so nobody there will read them until one is assigned.</div>`
+              : x.on ? html`<div className="t3" style=${{ fontSize: 12.5 }}>${x.d.admins.join(" and ")} will see them from now on. Earlier reports are not resent.</div>`
+              : html`<div className="t3" style=${{ fontSize: 12.5 }}>${x.d.admins.length ? x.d.admins.join(" and ") + " will no longer see new ones." : "Nobody there was reading them."} You still receive every one.</div>`}</div>
+        </div>`)}
+      </div>
+    <//>
+    <div className="g c-66" style=${{ alignItems: "stretch" }}>
       <${Panel} title="Versions">
         <div className="vtrack">
           ${track.map((t) => html`<div key=${t.v} className="vstep" title=${t.when ? `Approved ${t.when} by you` : "Waiting on the gate"}>
@@ -3206,10 +3371,30 @@ function Govern({ go, enter }) {
         </div>
         <div className="row" style=${{ marginTop: 12, justifyContent: "space-between" }}><span className="t3" style=${{ fontSize: 12 }}>Squares are machines on that version</span><${Button} size="small" onClick=${() => go("rollout")}>Rollout<//></div>
       <//>
+      <section className="panel" style=${{ display: "flex", flexDirection: "column" }}>
+        <div className="phd"><div className="pt">Record keeping</div></div>
+        <div className="rk">
+          ${[["HistoryOutlined", "90 days", "kept", () => go("audit")], ["DeleteOutlined", "3 days", "next deletion"], ["SafetyCertificateOutlined", "Pinned", "certificate"], ["ApiOutlined", "7400", "Engine port"]].map(([i, v, k, fn]) => html`<div key=${k} className=${"rk-tile" + (fn ? " link" : "")} onClick=${fn || null} role=${fn ? "button" : null} tabIndex=${fn ? "0" : null}>
+            <span className="t3" style=${{ fontSize: 18 }}>${ic(i)}</span>
+            <div style=${{ fontWeight: 600, fontSize: 17, marginTop: "auto" }}>${v}</div>
+            <div className="t3" style=${{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>${k}</div></div>`)}
+        </div>
+      </section>
     </div>
   <//>`;
 }
 const FULL_DEPTS = () => FULL.DEPTS || DEPTS;
+function DeptDay({ d, ms, go }) {
+  const [view, setView] = useState("Chart");
+  const rows = [{ key: d.id, label: d.name, hosts: new Set(ms.map((m) => m.host)), color: d.admins.length ? undefined : "var(--crit)" }];
+  const hostsHere = new Set(ms.map((m) => m.host));
+  return html`<${React.Fragment}>
+    <${Panel} title="Today" sub="the department so far · amber where an hour is unusual for it" extra=${html`<${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
+      ${view === "Report" ? html`<${DayReport} rows=${rows} />` : html`<${DayLanes} rows=${rows} go=${go} />`}
+    <//>
+    <${Occupancy} lanes=${LANES.filter((l) => hostsHere.has(l.host))} title="Who was on each machine, today" />
+  <//>`;
+}
 function DeptPage({ id, go, enter }) {
   const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id);
   const [who, setWho] = useState(null);
@@ -3248,21 +3433,7 @@ function DeptPage({ id, go, enter }) {
               </div></div>`}
       <//>
     </div>
-    <${Panel} title="Today" sub="every event on these machines since midnight">
-      <div ref=${ref}><svg width=${w} height=${x.ms.length * lane + 22} style=${{ display: "block" }}>
-        <rect x=${X(0)} y="0" width=${X(6) - X(0)} height=${x.ms.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
-        <rect x=${X(18)} y="0" width=${X(24) - X(18)} height=${x.ms.length * lane} style=${{ fill: "var(--surface-3)" }} opacity="0.6" />
-        <rect x=${X(NOWH)} y="0" width=${X(24) - X(NOWH)} height=${x.ms.length * lane} style=${{ fill: "var(--surface)" }} opacity="0.7" />
-        ${x.ms.map((m, i) => html`<g key=${m.host}>
-          <text x="0" y=${i * lane + 15} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${m.host}</text>
-          ${AUDIT.filter((e) => e.t >= 0 && e.host === m.host).map((e) => { const f = flag(e);
-            return f ? html`<g key=${e.id}><rect x=${X(e.t) - 4} y=${i * lane + 7} width="8" height="8" rx="1.5" transform=${`rotate(45 ${X(e.t)} ${i * lane + 11})`} style=${{ fill: f }} /><title>${hhmm(e.t)} · ${e.actor} · ${e.what}</title></g>`
-              : html`<rect key=${e.id} x=${X(e.t) - 0.75} y=${i * lane + 5} width="1.5" height="12" style=${{ fill: KINDS[e.kind].c }} opacity="0.45"><title>${hhmm(e.t)} · ${e.actor} · ${e.what}</title></rect>`; })}
-        </g>`)}
-        ${[0, 6, 12, 18, 24].map((h) => html`<text key=${h} x=${X(h)} y=${x.ms.length * lane + 16} textAnchor=${h === 24 ? "end" : h === 0 ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
-        <line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${x.ms.length * lane} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25" />
-      </svg></div>
-    <//>
+    <${DeptDay} d=${d} ms=${x.ms} go=${go} />
     ${x.iss.length ? html`<div className="row" style=${{ gap: 8 }}>${x.iss.map((i) => html`<span key=${i.id} className="adm" style=${{ paddingLeft: 10, cursor: "pointer" }} onClick=${() => go("issues", i.id)} title=${i.title}>
         <span className="sev" style=${{ "--c": SEV[i.sev].c }}><i /></span><span>${i.subject}</span><span className="mono t3">${i.host}</span></span>`)}</div>` : null}
   <//>`;

@@ -461,7 +461,17 @@ They take precedence over anything above that they contradict.
         ends the row.
       - **Where reports go:** a grid of report types against You and each department. The Super
         User's column is always filled. A department with no Admin shows its routed cells as dashed
-        red: routed, but nobody there to receive them. Editing the routing stays deferred.
+        red: routed, but nobody there to receive them.
+        **Editing the routing: decided 2 Oct 2026.** The user lifted the deferral, and routing stays
+        **to departments**: every Admin in a routed department sees the report, as Report Routing in
+        `hierarchy-system-design.md` says, and there is no routing to one named Admin. Who handles a
+        particular issue is its *Owner*, set on the Issues page, not a routing setting.
+        - **Editing:** clicking a cell switches a category on or off for a department. The Super
+          User's column is locked on. Changes are marked and held until **Save routing**.
+        - **Confirming:** the confirm says each change in words, and warns when a category would go
+          to a department with no Admin.
+        - **Saving:** one `reports.routing_set` per category changed (the handler already exists),
+          recorded in the audit log. Earlier reports are not resent.
       - **Versions:** a release track, from the next version (ready, held by the gate) back through
         each approved one, with who approved it and which machines are still on it.
       - **Names people see:** for each Admin, what the Super User calls them and what their workers
