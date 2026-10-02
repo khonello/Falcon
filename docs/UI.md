@@ -500,6 +500,41 @@ They take precedence over anything above that they contradict.
     In the concept, Flows, Automation and Actions are not yet narrowed to the department inside a
     console, and two Work items open the Admin's page rather than one made for the Super User.
 
+39. **Nothing grows with the data.** The user, 2 Oct 2026: *"i dont like the idea of growth of content
+    distorting design … you only show 2 or 4 pcs and say more or +24 more since you dont know how many
+    pcs or items might be available when actually implemented"*, and then *"enforce this with all things
+    that show listing or inventory or data model"*. Nobody knows at design time how many machines,
+    issues, Admins, departments, tasks or reports an organisation will have, so no layout may depend on
+    it. Every place that shows them does one of four things:
+    - **A fixed count and "+N more".** A short list shows a set number and counts the rest as a dashed
+      *+24 more machines* control that opens the full list. Examples: the quick look (10 machines,
+      6 issues, 3 Admins), the Overview's open issues (8), the issues done today (5), the Admin chips on
+      a structure row (3), a department screen's Admins (2), a rule's machines (8), the machines holding
+      a version back (10), the ⌘K palette (5 per group).
+    - **Pages at a fixed height.** A list or chart with one row per thing shows a page of them, with
+      *1–6 of 10* and ‹ › in the panel header, and keeps the height of a full page on the last one. The
+      organisation's day (6 departments), the Structure rows (6), the decision cards (5), the reports
+      only the Super User sees (5), Waiting on others (5), the department page's issues (6) and Admins
+      (3), and the Today and occupancy charts (12 machines).
+    - **Tables page at 10 rows.** Every table, without exception. The page control hides when there is
+      only one page.
+    - **A summary in place of the items.** Where the count is the point, show the count and a bar, then
+      name only the exceptions. The 1.4.3 gate is *228 of 268 machines on 1.4.2*, then the machines
+      holding it. The versions behind LOG-02 are counts per version with six names each.
+    - **Problems always make the cut.** When a set is cut, the machines that need someone go into it
+      first, in their original order; the rest are counted. On the organisation's day, departments with
+      something flagged come first, so paging never hides them. A tile grid is capped at two or three
+      rows: 17 tiles on a department screen, 35 per department on the Admin fleet map, 14 on a
+      structure row.
+    - **Counts come from the data.** Nav badges, subtitles (*64 machines, 1 department*) and card titles
+      (*13 reports only you see*) are computed, never typed in. A badge over 999 reads *999+*.
+
+    The concept has a **sample: small · large** switch at the foot of the sidebar. *Large* swaps in ten
+    departments and about 270 machines, with one department of five Admins and another with none, so
+    every page can be checked at scale. Two drawings on the Reports page, the routing diagram and *How
+    fast reports are dealt with*, still draw their sample departments by hand. In the product they cap
+    the departments drawn at 4, plus *N others*.
+
 **Still open — shown in the concept, not yet decided:**
 
 - **Green.** The concept uses it for completed outcomes (*Success*, *Ready*, *Within target*). The 29

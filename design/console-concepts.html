@@ -130,11 +130,12 @@ a { color: var(--accent); text-decoration: none; }
 .meta { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px 20px; }
 .meta .k { color: var(--text-3); font-size: 12px; }
 .meta .v { font-weight: 500; }
-.irow { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 52px; gap: 10px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; }
+.irow { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 64px; gap: 10px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; }
 .irow:hover { background: var(--surface-2); }
 .irow.on { background: var(--accent-soft); }
 .irow > i { width: 8px; height: 8px; border-radius: 2px; }
 .irow .ttl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.irow > .mono { white-space: nowrap; }
 .kv { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--grid); }
 .kv.chk { grid-template-columns: 18px minmax(0, 1fr) auto; }
 .src { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; white-space: nowrap; cursor: default; }
@@ -203,7 +204,8 @@ a { color: var(--accent); text-decoration: none; }
 .org-new:hover { color: var(--accent); border-color: var(--accent); }
 .rgrid { display: grid; align-items: stretch; }
 .rgrid > span { display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-bottom: 1px solid var(--grid); }
-.rgrid .rh { font-size: 12px; color: var(--text-3); justify-content: center; min-height: 34px; }
+.rgrid .rh { font-size: 12px; color: var(--text-3); justify-content: center; min-height: 34px; text-align: center; line-height: 1.25; }
+.rgrid .rc { position: sticky; left: 0; z-index: 1; background: var(--surface); }
 .rgrid .rc { padding-left: 14px; }
 .rgrid .rd { justify-content: center; }
 .dotc { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: inline-block; vertical-align: middle; }
@@ -327,6 +329,34 @@ a { color: var(--accent); text-decoration: none; }
 .rcell:hover { background: var(--surface-3); }
 .rcell.changed { border: 1.5px dashed var(--accent); background: var(--accent-soft); }
 .dotc.locked { display: inline-grid; place-items: center; width: 18px; height: 18px; font-size: 9px; color: #fff; }
+.wrow { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(80px, 1fr) 90px 14px; gap: 16px; align-items: center; padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; }
+.wrow:first-child { border-top: 0; }
+.wrow:hover { background: var(--surface-2); }
+@media (max-width: 760px) { .wrow { grid-template-columns: minmax(0, 1fr) 90px 14px; } .wrow > :nth-child(2), .wrow > :nth-child(3) { display: none; } }
+.kchips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.kchip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; cursor: pointer; }
+.kchip:hover { border-color: var(--border-strong); }
+.kchip i { width: 8px; height: 8px; border-radius: 2px; }
+.kchip span { color: var(--text-3); font-size: 11px; }
+.kchip.off { color: var(--text-4); background: transparent; border-style: dashed; }
+.kchip.off i { opacity: 0.3; }
+.lk { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(0, 0.8fr); gap: 0; }
+.lk > div { padding: 0 20px; min-width: 0; }
+.lk > div + div { border-left: 1px solid var(--border); }
+.lk > div:first-child { padding-left: 0; } .lk > div:last-child { padding-right: 0; }
+.lk-ms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.lk-m { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 8px; align-items: center; padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.lk-m:hover, .lk-i:hover { background: var(--surface-2); }
+.lk-i { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 62px; gap: 8px; align-items: center; width: 100%; padding: 7px 6px; border: 0; border-radius: 4px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.lk-i .mono:last-child { text-align: right; white-space: nowrap; }
+@media (max-width: 860px) { .lk { grid-template-columns: minmax(0, 1fr); gap: 18px; } .lk > div { padding: 0; } .lk > div + div { border-left: 0; } }
+.more { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 4px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text-3); font: inherit; font-size: 11.5px; white-space: nowrap; cursor: pointer; }
+.more:hover { color: var(--accent); border-color: var(--accent); }
+.pager { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; }
+.pager button { width: 22px; height: 22px; display: inline-grid; place-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text-2); cursor: pointer; padding: 0; font-size: 10px; }
+.pager button:first-of-type { margin-left: 6px; }
+.pager button:disabled { opacity: .4; cursor: default; }
+.tab-more { background: transparent !important; color: var(--text-3) !important; border: 1px dashed var(--border-strong) !important; font-size: 10px !important; }
 .list-item { padding: 10px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
 .list-item:hover { background: var(--surface-2); }
 .list-item.on { background: var(--accent-soft); }
@@ -380,6 +410,10 @@ const I = window.icons || window.AntDesignIcons || {};
 const { ConfigProvider, theme, Button, Segmented, Table, Input, Select, Tabs, Checkbox, Dropdown, Drawer, DatePicker, AutoComplete, Radio, InputNumber, Steps, Tooltip, Modal } = A;
 const ic = (n) => (I[n] ? React.createElement(I[n]) : null);
 const T0 = Date.now();
+// Sample size. The large sample is for checking that nothing grows with the data: ten departments,
+// about 270 machines. Remembered per viewer; the page reloads to rebuild the data.
+const LARGE = (() => { try { return localStorage.getItem("falcon-sample") === "large"; } catch (e) { return false; } })();
+const setSample = (large) => { try { localStorage.setItem("falcon-sample", large ? "large" : "small"); location.reload(); } catch (e) { toast("Your browser blocks saving this choice"); } };
 
 // ============================================================== time model
 // "Now" is Thursday 1 October 2026, 13:20. Time is in hours from today's midnight (negative = earlier days).
@@ -407,6 +441,38 @@ function niceMax(v) { const p = Math.pow(10, Math.floor(Math.log10(v))), m = v /
 let showToast = () => {};
 const toast = (t) => showToast(t);
 
+// ============================================================== bounded lists
+// Nothing grows with the data. The number of machines, issues, people or departments is unknown until the
+// product is installed, so every list shows a fixed number and counts the rest ("+24 more"), and every chart
+// with one row per thing pages through them at a fixed height. Whatever needs someone always makes the cut.
+const RANKH = { crit: 0, high: 1, watch: 2, offline: 3, quiet: 4 };
+const rankM = (m) => RANKH[HEALTH[m.status][0]];
+// machines: the worst ones first into the shown set, then the order they were in
+function pickShown(ms, n, rank = rankM) {
+  if (ms.length <= n) return { shown: ms, rest: 0 };
+  const idx = ms.map((m, i) => i).sort((a, b) => rank(ms[a]) - rank(ms[b]) || a - b).slice(0, n).sort((a, b) => a - b);
+  return { shown: idx.map((i) => ms[i]), rest: ms.length - n };
+}
+function More({ n, what, onClick, title }) {
+  return n > 0 ? html`<button className="more" title=${title} onClick=${(e) => { e.stopPropagation(); onClick && onClick(); }}>+${n} more${what ? " " + what : ""}</button>` : null;
+}
+function usePaged(list, size, key) {
+  const [pg, setPg] = useState(0);
+  useEffect(() => setPg(0), [key]);
+  const pages = Math.max(1, Math.ceil(list.length / size)), page = Math.min(pg, pages - 1);
+  return { items: list.slice(page * size, page * size + size), page, pages, total: list.length, size, setPage: setPg };
+}
+function Pager({ p, what }) {
+  if (p.pages <= 1) return null;
+  const a = p.page * p.size + 1, b = Math.min(p.total, a + p.size - 1);
+  const go1 = (d) => (e) => { e.stopPropagation(); p.setPage(p.page + d); };
+  return html`<span className="pager"><span className="mono">${a}–${b}</span><span className="t3"> of ${p.total}${what ? " " + what : ""}</span>
+    <button aria-label="Previous page" disabled=${p.page === 0} onClick=${go1(-1)}>${ic("LeftOutlined")}</button>
+    <button aria-label="Next page" disabled=${p.page >= p.pages - 1} onClick=${go1(1)}>${ic("RightOutlined")}</button></span>`;
+}
+// every table pages at ten rows
+const PG = { pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true };
+
 // ============================================================== the estate
 let DEPTS = [
   { id: "ops", name: "Operations", admins: ["R. Mensah", "A. Quaye"], c: "var(--s1)" },
@@ -426,6 +492,20 @@ let MACHINES = [
   { host: "LOG-01", user: "Esi",   dept: "log", ip: "10.20.8.31", ver: "1.4.2", status: "healthy",  note: "", seen: 0.002 },
   { host: "LOG-02", user: "Abena", dept: "log", ip: "10.20.8.32", ver: "1.4.0", status: "offline",  note: "Offline since 02:31 · update past the limit", seen: NOWH - 2.52 },
 ];
+if (LARGE) {
+  const NAMES = ["Akua", "Kwesi", "Yaa", "Kobby", "Adwoa", "Fiifi", "Esi", "Kweku", "Afua", "Mensa", "Abla", "Selasi", "Edem", "Dzifa", "Naa", "Nii", "Ekua", "Kofi", "Araba", "Yaw"];
+  const ADD = [["proc", "Procurement", "PRC", 38, ["J. Owusu"], "var(--s3)"], ["hr", "Human Resources", "HR", 22, ["M. Asante", "P. Darko"], "var(--s5)"],
+    ["cc", "Customer Care", "CC", 64, ["S. Addo", "E. Nkrumah", "B. Tetteh", "L. Ofori", "F. Amoah"], "var(--s6)"], ["wh", "Warehouse North", "WHN", 47, [], "var(--s2)"],
+    ["it", "IT Support", "IT", 18, ["D. Agyeman"], "var(--s1)"], ["lgl", "Legal", "LGL", 9, ["N. Badu"], "var(--s4)"], ["mkt", "Marketing", "MKT", 26, ["G. Sarpong"], "var(--s3)"]];
+  ADD.forEach(([id, name, , , admins, c]) => DEPTS.push({ id, name, admins, c }));
+  const gen = (dept, pre, from, to, sub) => { for (let k = from; k <= to; k++) { const r = nz(71, hs(pre) + k), host = `${pre}-${String(k).padStart(2, "0")}`;
+    const status = r < 0.03 ? "offline" : r < 0.04 ? "critical" : r < 0.07 ? "high" : r < 0.15 ? "warning" : "healthy";
+    MACHINES.push({ host, user: nz(73, hs(pre) + k) < 0.1 ? null : NAMES[Math.floor(nz(79, hs(pre) + k) * NAMES.length)], dept, ip: `10.${sub}.${Math.floor(k / 200)}.${k % 200 + 10}`,
+      ver: status === "offline" ? "1.4.0" : nz(83, hs(pre) + k) < 0.12 ? "1.4.1" : "1.4.2", status, seen: status === "offline" ? NOWH - 3 - nz(89, k) * 20 : 0.001,
+      note: status === "offline" ? "Not checking in" : status === "critical" ? "Restricted file outside /restricted/" : status === "high" ? "Restricted file outside /restricted/" : status === "warning" ? "Help request unanswered" : "" }); } };
+  gen("ops", "OPS", 8, 40, 20);
+  ADD.forEach(([id, , pre, n], k) => gen(id, pre, 1, n, 30 + k * 2));
+}
 const MBY = Object.fromEntries(MACHINES.map((m) => [m.host, m]));
 const DBY = Object.fromEntries(DEPTS.map((d) => [d.id, d]));
 const STATUS = {
@@ -470,6 +550,15 @@ let ISSUES = [
   { id: "UPD-0322", sev: "low", type: "update", title: "One version behind", subject: "1.4.1 → 1.4.2", host: "OPS-06", at: -12.67, owner: "A. Quaye", sla: 72, state: "Retrying", kind: "rollout",
     d: { cur: "1.4.1", target: "1.4.2", attempts: "2, last Wed 11:20", err: "Installer exit 1603, a file was in use" } },
 ];
+if (LARGE) {
+  const TPL = { critical: ISSUES[0], high: ISSUES[2], warning: ISSUES[3], offline: ISSUES[1] };
+  MACHINES.filter((m) => !ISSUES.some((i) => i.host === m.host) && TPL[m.status] && !/^(OPS-0[1-7]|FIN|LOG)/.test(m.host)).forEach((m, k) => {
+    const t = TPL[m.status];
+    ISSUES.push({ ...t, id: `${t.id.split("-")[0]}-${2000 + k}`, host: m.host, at: NOWH - 0.5 - nz(97, k) * 30, owner: "Unassigned", state: "Open",
+      subject: m.status === "warning" ? `${m.user || "Someone"} · 1 ping` : m.status === "offline" ? "1.4.0 → 1.4.2" : t.subject,
+      title: m.status === "offline" ? "Machine not checking in" : t.title, sev: m.status === "offline" ? "low" : t.sev });
+  });
+}
 
 // who held each machine today: [from, to, kind, who]. kinds: own / admin / you / assist
 let LANES = [
@@ -485,6 +574,16 @@ let LANES = [
   { host: "FIN-01", blocks: [[8.52, NOWH, "own", "Afi"]] },
   { host: "FIN-02", blocks: [[8.5, 9.3, "own", "Kofi"], [9.3, 9.67, "assist", "K. Boateng"], [9.68, NOWH, "own", "Kofi"]] },
 ];
+if (LARGE) {
+  MACHINES.filter((m) => !LANES.some((l) => l.host === m.host)).forEach((m, k) => {
+    const blocks = [];
+    if (m.user && m.status !== "offline") { const a = 7.7 + nz(101, k) * 1.6;
+      if (nz(103, k) < 0.06) { const b = 9 + nz(107, k) * 3; const ad = (DEPTS.find((d) => d.id === m.dept) || { admins: [] }).admins;
+        blocks.push([a, b, "own", m.user]); blocks.push([b, Math.min(NOWH, b + 0.4), ad.length ? "admin" : "own", ad.length ? ad[0] : m.user]); if (b + 0.42 < NOWH) blocks.push([b + 0.42, NOWH, "own", m.user]); }
+      else blocks.push([a, NOWH, "own", m.user]); }
+    LANES.push({ host: m.host, blocks });
+  });
+}
 const OCC = { own: { c: "var(--own)", w: "Owner signed in" }, admin: { c: "var(--s3)", w: "Admin session" }, you: { c: "var(--accent)", w: "Your session" }, assist: { c: "var(--s2)", w: "Assisted access" } };
 
 // ============================================================== the audit trail, 7 days, generated once
@@ -692,7 +791,7 @@ function tileFor(m, by) {
   // CPU is clamped into the same four bands as status, so one legend reads every view
   return v == null ? "offline" : v >= 90 ? "crit" : v >= 75 ? "high" : v >= 60 ? "watch" : "quiet";
 }
-function HostMap({ by, onOpen }) {
+function HostMap({ by, onOpen, onMore }) {
   const [hov, setHov] = useState(null);
   const legend = by === "Status" ? [["quiet", "Healthy"], ["watch", "Worth a look"], ["high", "High"], ["crit", "Critical"], ["offline", "Offline"]]
     : by === "Version" ? [["quiet", "1.4.2 (current)"], ["watch", "One version behind"], ["high", "Two or more behind"], ["offline", "Offline"]]
@@ -702,19 +801,21 @@ function HostMap({ by, onOpen }) {
   const sw = (k) => { const t = TILE[k]; return html`<span style=${{ position: "relative", width: 14, height: 14, borderRadius: 3, background: t.bg, border: t.border || "none", display: "inline-block" }}>${t.dot ? html`<i style=${{ position: "absolute", right: -2, top: -2, width: 6, height: 6, borderRadius: "50%", background: t.dot, boxShadow: "0 0 0 1.5px var(--surface)" }} />` : null}</span>`; };
   return html`<div style=${{ position: "relative" }}>
     <div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
-      ${DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
+      ${DEPTS.slice(0, 3).map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id), pk = pickShown(ms, 35, (m) => RANKH[tileFor(m, by)]);
         return html`<div key=${d.id}>
           <div className="row" style=${{ marginBottom: 6 }}><span className="b">${d.name}</span><span className="t3">${ms.length} machines · ${d.admins.length ? d.admins.join(", ") : html`<span style=${{ color: "var(--crit)" }}>no Admin</span>`}</span></div>
           <div className="row" style=${{ gap: 5 }}>
-            ${ms.map((m) => { const t = look(m);
+            ${pk.shown.map((m) => { const t = look(m);
               return html`<div key=${m.host} className="hm-tile" tabIndex="0" role="button" aria-label=${`${m.host}, ${STATUS[m.status].w}`}
                 style=${{ background: t.bg, color: t.fg, border: t.border || "1px solid transparent", position: "relative" }}
                 onMouseEnter=${() => setHov(m)} onMouseLeave=${() => setHov(null)} onFocus=${() => setHov(m)} onBlur=${() => setHov(null)} onClick=${() => onOpen(m.host)}>
                 ${m.host.slice(-2)}
                 ${t.dot ? html`<i style=${{ position: "absolute", right: 4, top: 4, width: 7, height: 7, borderRadius: "50%", background: t.dot }} />` : null}
               </div>`; })}
+            ${pk.rest ? html`<div className="hm-tile" role="button" tabIndex="0" title="All machines" onClick=${() => onMore && onMore()} style=${{ border: "1px dashed var(--border-strong)", color: "var(--text-3)", fontSize: 11 }}>+${pk.rest}</div>` : null}
           </div>
         </div>`; })}
+      ${DEPTS.length > 3 ? html`<div><${More} n=${DEPTS.length - 3} what="departments" onClick=${() => onMore && onMore()} /></div>` : null}
     </div>
     <div className="leg" style=${{ marginTop: 12, alignItems: "center" }}>
       ${by === "CPU" ? html`<span>CPU right now:</span>` : null}${legend.map(([k, w]) => html`<span key=${k}>${sw(k)}${w}</span>`)}
@@ -735,14 +836,24 @@ function HostMap({ by, onOpen }) {
       </div>`; })() : null}
   </div>`;
 }
+// a filter carried from the Overview into the Audit log, read once when the Audit log opens
+let AUDIT_PRESET = null;
 function Overview({ range, go }) {
   const [by, setBy] = useState("Status");
+  const [kinds, setKinds] = useState(Object.keys(KINDS));
+  const [brush, setBrush] = useState(null);
+  useEffect(() => setBrush(null), [range]);
   const now = useNow(1000);
   const [live, setLive] = useState(() => AUDIT.slice(-14).reverse().map((e) => ({ ...e })));
   useEffect(() => { let k = 0; const i = setInterval(() => { const p = LIVE_POOL[k++ % LIVE_POOL.length];
     setLive((l) => [{ ...p, t: NOWH + (Date.now() - T0) / 3.6e6, id: "live" + k, fresh: true }, ...l].slice(0, 40)); }, 6500); return () => clearInterval(i); }, []);
   const R = RANGES[range];
   const inRange = AUDIT.filter((e) => e.t >= R.a);
+  const kindCount = Object.fromEntries(Object.keys(KINDS).map((k) => [k, inRange.filter((e) => e.kind === k).length]));
+  const all = kinds.length === Object.keys(KINDS).length;
+  const picked = inRange.filter((e) => kinds.includes(e.kind) && (!brush || (e.t >= brush[0] && e.t < brush[1])));
+  // click a kind to show only it; click more to add them; click the last one again to show everything
+  const toggleKind = (k) => setKinds(all ? [k] : kinds.includes(k) ? (kinds.length === 1 ? Object.keys(KINDS) : kinds.filter((x) => x !== k)) : [...kinds, k]);
   const sessionsHeld = MACHINES.filter((m) => m.held);
   const deptRows = DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
     return { key: d.id, d, total: ms.length, online: ms.filter((m) => m.status !== "offline").length, issues: ISSUES.filter((i) => MBY[i.host].dept === d.id).length,
@@ -757,26 +868,32 @@ function Overview({ range, go }) {
       <${Kpi} label="Median time to address" value="42" unit="min" delta="−18 min vs. last week" dc="var(--ok)" fn=${(t) => 60 - 18 * sm(2, t, 0.2)} sc="var(--s6)" />
     </div>
     <div className="g c-75">
-      <${Panel} title="Fleet" sub="11 machines, 3 departments" extra=${html`<${Segmented} size="small" value=${by} onChange=${setBy} options=${["Status", "CPU", "Version", "Check-in"]} />`}>
-        <${HostMap} by=${by} onOpen=${(h) => go("machines", h)} />
+      <${Panel} title="Fleet" sub=${`${MACHINES.length} machines, ${DEPTS.length} department${DEPTS.length === 1 ? "" : "s"}`} extra=${html`<${Segmented} size="small" value=${by} onChange=${setBy} options=${["Status", "CPU", "Version", "Check-in"]} />`}>
+        <${HostMap} by=${by} onOpen=${(h) => go("machines", h)} onMore=${() => go("machines")} />
       <//>
       <${Panel} title="Open issues" sub="by severity" flush extra=${html`<${Button} size="small" type="link" onClick=${() => go("issues")}>View all<//>`}>
-        ${ISSUES.map((i) => { const a = NOWH - i.at;
+        ${ISSUES.slice(0, 8).map((i) => { const a = NOWH - i.at;
           return html`<div key=${i.id} className="irow" role="button" tabIndex="0" onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)} title=${SEV[i.sev].w}>
             <i style=${{ background: SEV[i.sev].c, alignSelf: "start", marginTop: 6 }} />
             <span style=${{ minWidth: 0 }}><span className="ttl" style=${{ display: "block" }}>${i.title}</span><span className="t3 mono" style=${{ fontSize: 11.5 }}>${i.subject}</span></span>
             <span className="mono t3">${i.host}</span>
             <span className="mono" style=${{ color: a > i.sla ? "var(--crit)" : "var(--text-3)", textAlign: "right" }} title=${a > i.sla ? "Past its target time" : ""}>${a > 24 ? Math.floor(a / 24) + "d" : dur(a)}</span>
           </div>`; })}
+        ${ISSUES.length > 8 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${ISSUES.length - 8} what="issues" onClick=${() => go("issues")} /></div>` : null}
       <//>
     </div>
     <div className="g c-84">
-      <${Panel} title="Event volume" sub=${`${inRange.length.toLocaleString()} events · ${range}`} extra=${html`<div className="leg">${Object.keys(KINDS).map((k) => html`<span key=${k}><i className="sq" style=${{ "--c": KINDS[k].c }} />${KINDS[k].w}</span>`)}</div>`}>
-        <${EventHistogram} entries=${AUDIT} range=${range} height=${190} />
+      <${Panel} title="Event volume" sub=${`${picked.length.toLocaleString()} events · ${brush ? `${fmtT(brush[0], range)} – ${hhmm(brush[1])}` : range}`}
+        extra=${html`${!all || brush ? html`<${Button} size="small" type="text" onClick=${() => { setKinds(Object.keys(KINDS)); setBrush(null); }}>Clear<//>` : null}
+          <${Button} size="small" onClick=${() => { AUDIT_PRESET = { kinds, brush }; go("audit"); }}>Show in audit log ${ic("ArrowRightOutlined")}<//>`}>
+        <div className="kchips">${Object.keys(KINDS).map((k) => html`<button key=${k} className=${"kchip" + (kinds.includes(k) ? "" : " off")} aria-pressed=${kinds.includes(k)} onClick=${() => toggleKind(k)}
+          title=${all ? `Show only ${KINDS[k].w.toLowerCase()}` : kinds.includes(k) ? "Hide" : "Add"}><i style=${{ background: KINDS[k].c }} />${KINDS[k].w}<span className="mono">${kindCount[k].toLocaleString()}</span></button>`)}
+          <span className="t4" style=${{ fontSize: 11.5, marginLeft: 4 }}>${brush ? "" : "drag across the chart to pick a time"}</span></div>
+        <${EventHistogram} entries=${AUDIT.filter((e) => kinds.includes(e.kind))} range=${range} height=${170} brush=${brush} onBrush=${setBrush} />
       <//>
-      <${Panel} title="Live activity" flush extra=${html`<span className="live"><i />streaming</span>`}>
+      <${Panel} title="Live activity" sub=${all ? null : "same kinds as the chart"} flush extra=${html`<span className="live"><i />streaming</span>`}>
         <div className="stream">
-          ${live.map((e) => html`<div key=${e.id} className=${"ev" + (e.fresh ? " new" : "")}>
+          ${live.filter((e) => kinds.includes(e.kind)).map((e) => html`<div key=${e.id} className=${"ev" + (e.fresh ? " new" : "")}>
             <span className="mono t3">${hhmm(e.t)}${e.fresh ? ":" + String(Math.floor((e.t * 3600) % 60)).padStart(2, "0") : ""}</span>
             <i style=${{ width: 7, height: 7, borderRadius: 2, background: KINDS[e.kind].c, display: "inline-block" }} />
             <span style=${{ minWidth: 0 }}><span className="b" style=${{ fontWeight: 500 }}>${e.actor}</span> <span className="t2">${e.what}</span> <span className="mono t3">${e.host}</span></span>
@@ -785,7 +902,7 @@ function Overview({ range, go }) {
       <//>
     </div>
     <${Panel} title="Departments" flush>
-      <${Table} size="small" pagination=${false} dataSource=${deptRows} columns=${[
+      <${Table} size="small" pagination=${PG} dataSource=${deptRows} columns=${[
         { title: "Department", render: (r) => html`<span className="row" style=${{ flexWrap: "nowrap" }}><i style=${{ width: 8, height: 8, borderRadius: 2, background: r.d.c, display: "inline-block" }} /><b style=${{ fontWeight: 500 }}>${r.d.name}</b></span>` },
         { title: "Admins", render: (r) => (r.d.admins.length ? r.d.admins.join(", ") : html`<span style=${{ color: "var(--crit)" }}>None assigned</span>`) },
         { title: "Machines", dataIndex: "total", align: "right", width: 90 },
@@ -816,7 +933,7 @@ function MachineList({ go }) {
     <${Select} size="small" value=${dept} onChange=${setDept} style=${{ width: 140 }} options=${[{ value: "all", label: "All departments" }, ...DEPTS.map((d) => ({ value: d.id, label: d.name }))]} />
     <${Select} size="small" value=${st} onChange=${setSt} style=${{ width: 140 }} options=${[{ value: "all", label: "Any health" }, ...Object.keys(HEALTH).map((k) => ({ value: k, label: HEALTH[k][1] }))]} />
     <${Button} size="small" icon=${ic("DownloadOutlined")} onClick=${() => toast("Exported " + rows.length + " rows (concept)")}>Export<//>`}>
-    <div className="scroll-x"><${Table} size="middle" pagination=${false} dataSource=${rows} onRow=${(r) => ({ onClick: () => go("machines", r.host), className: "clickrow" })} columns=${[
+    <div className="scroll-x"><${Table} size="middle" pagination=${PG} dataSource=${rows} onRow=${(r) => ({ onClick: () => go("machines", r.host), className: "clickrow" })} columns=${[
       { title: "Machine", width: 190, sorter: (a, b) => a.host.localeCompare(b.host), render: (r) => html`<div><a className="mono" style=${{ fontWeight: 500 }}>${r.host}</a><div className="t3" style=${{ fontSize: 12 }}>${r.user || "No one signed in"} · ${DBY[r.dept].name}</div></div>` },
       { title: html`<span className="row" style=${{ gap: 4, flexWrap: "nowrap" }}>Health <${Tooltip} title=${HEALTH_HELP}><span className="t4" style=${{ cursor: "help" }}>${ic("QuestionCircleOutlined")}</span><//></span>`, width: 290,
         defaultSortOrder: "ascend", sorter: (a, b) => order[a.status] - order[b.status],
@@ -850,12 +967,12 @@ function MachineDetail({ host, range, go }) {
         <${TimeChart} range=${range} series=${[{ name: t, c, fn: (x) => metric(host, k, x) }]} unit=${u} yMax=${ym} threshold=${th} marks=${marks} />
       <//>`)}
     </div>` },
-    { key: "proc", label: "Processes", children: html`<${Panel} flush><${Table} size="small" pagination=${false} dataSource=${procs.map((p) => ({ key: p[1], name: p[0], pid: p[1], cpu: p[2], mem: p[3], user: p[4] }))} columns=${[
+    { key: "proc", label: "Processes", children: html`<${Panel} flush><${Table} size="small" pagination=${PG} dataSource=${procs.map((p) => ({ key: p[1], name: p[0], pid: p[1], cpu: p[2], mem: p[3], user: p[4] }))} columns=${[
       { title: "Process", dataIndex: "name", render: (v) => html`<span className="mono">${v}</span>` }, { title: "PID", dataIndex: "pid", align: "right", width: 90, render: (v) => html`<span className="mono t3">${v}</span>` },
       { title: "CPU", dataIndex: "cpu", align: "right", width: 140, sorter: (a, b) => a.cpu - b.cpu, defaultSortOrder: "descend", render: (v) => html`<div className="row" style=${{ flexWrap: "nowrap", justifyContent: "flex-end" }}><${Bar} v=${v} max=${40} w=${60} /><span className="mono" style=${{ width: 44, textAlign: "right" }}>${v.toFixed(1)}%</span></div>` },
       { title: "Memory", dataIndex: "mem", align: "right", width: 110, render: (v) => html`<span className="mono">${v} MB</span>` }, { title: "User", dataIndex: "user", width: 100 },
       { title: "", width: 90, render: () => html`<${Button} size="small" type="text" onClick=${() => toast("End process (concept)")}>End<//>` }]} /><//>` },
-    { key: "sess", label: "Sessions", children: html`<${Panel} flush><${Table} size="small" pagination=${false} dataSource=${(LANES.find((l) => l.host === host) || { blocks: [] }).blocks.map((b, i) => ({ key: i, b }))} columns=${[
+    { key: "sess", label: "Sessions", children: html`<${Panel} flush><${Table} size="small" pagination=${PG} dataSource=${(LANES.find((l) => l.host === host) || { blocks: [] }).blocks.map((b, i) => ({ key: i, b }))} columns=${[
       { title: "Occupant", render: (r) => r.b[3] }, { title: "Type", render: (r) => html`<${Tag} c=${OCC[r.b[2]].c}>${OCC[r.b[2]].w}<//>` },
       { title: "Started", render: (r) => html`<span className="mono">${hhmm(r.b[0])}</span>` }, { title: "Ended", render: (r) => html`<span className="mono">${r.b[1] >= NOWH ? "—" : hhmm(r.b[1])}</span>` },
       { title: "Duration", align: "right", render: (r) => html`<span className="mono">${dur(r.b[1] - r.b[0])}</span>` }]} /><//>` },
@@ -906,7 +1023,10 @@ function MachineDetail({ host, range, go }) {
 
 // ============================================================== SESSIONS
 function Occupancy({ lanes, title } = {}) {
-  const LN = lanes || LANES;
+  const LALL = useMemo(() => (lanes || LANES).map((l, k) => ({ l, k })).sort((a0, b0) => {
+    const w = (x) => (x.l.blocks.some((bk) => bk[2] !== "own") ? 0 : x.l.blocks.length ? 1 : 2);
+    return w(a0) - w(b0) || a0.k - b0.k; }).map((x) => x.l), [lanes, LANES.length]);
+  const lp = usePaged(LALL, 12), LN = lp.items;
   const ref = useRef(null), w = useWidth(ref);
   const [view, setView] = useState("Working hours");
   const [frame, setFrame] = useState([6, 18]);
@@ -914,14 +1034,14 @@ function Occupancy({ lanes, title } = {}) {
   const full = view === "24 hours";
   const a = full ? 0 : frame[0], b = full ? 24 : frame[1];
   const outside = (bk) => bk[0] < frame[0] || bk[0] >= frame[1];
-  const hidden = full ? [] : LN.flatMap((l) => l.blocks.filter((bk) => bk[1] <= a || bk[0] >= b).map((bk) => ({ l, bk })));
+  const hidden = full ? [] : LALL.flatMap((l) => l.blocks.filter((bk) => bk[1] <= a || bk[0] >= b).map((bk) => ({ l, bk })));
   const L = 74, rh = 24, pw = w - L - 10, X = (t) => L + ((Math.max(a, Math.min(b, t)) - a) / (b - a)) * pw;
-  const H = LN.length * rh + 26;
+  const H = (lp.pages > 1 ? 12 : LN.length) * rh + 26;
   const spanH = b - a, stepH = spanH > 14 ? 3 : spanH > 8 ? 2 : 1;
   const ticks = []; for (let t = Math.ceil(a / stepH) * stepH; t <= b; t += stepH) ticks.push(t);
   const hours = Array.from({ length: 25 }, (_, i) => ({ value: i, label: String(i).padStart(2, "0") + ":00" }));
-  return html`<${Panel} title=${title || "Machine occupancy, today"} sub="who was signed in to each machine, and when" extra=${html`
-    <span className="t3" style=${{ fontSize: 12 }}>Working hours</span>
+  return html`<${Panel} title=${title || "Machine occupancy, today"} sub="who was signed in to each machine, and when" extra=${html`<${Pager} p=${lp} what="machines" />
+    <span className="t3" style=${{ fontSize: 12, marginLeft: 6 }}>Working hours</span>
     <${Select} size="small" value=${frame[0]} style=${{ width: 82 }} options=${hours.filter((h) => h.value < frame[1])} onChange=${(v) => setFrame([v, frame[1]])} aria-label="Working day starts" />
     <span className="t3">to</span>
     <${Select} size="small" value=${frame[1]} style=${{ width: 82 }} options=${hours.filter((h) => h.value > frame[0])} onChange=${(v) => setFrame([frame[0], v])} aria-label="Working day ends" />
@@ -952,7 +1072,7 @@ function Occupancy({ lanes, title } = {}) {
       </div>` : null}
       ${hidden.length ? html`<div className="row" style=${{ marginTop: 10, padding: "8px 10px", borderRadius: 5, background: "color-mix(in srgb, var(--med) 10%, transparent)", flexWrap: "nowrap" }}>
         <span style=${{ color: "var(--med)" }}>${ic("EyeInvisibleOutlined")}</span>
-        <span style=${{ minWidth: 0 }}><b style=${{ fontWeight: 600 }}>${hidden.length} session${hidden.length === 1 ? "" : "s"} outside this view:</b> <span className="t2">${hidden.map(({ l, bk }) => `${bk[3]} on ${l.host} at ${hhmm(bk[0])}`).join(", ")}</span></span>
+        <span style=${{ minWidth: 0 }}><b style=${{ fontWeight: 600 }}>${hidden.length} session${hidden.length === 1 ? "" : "s"} outside this view:</b> <span className="t2">${hidden.slice(0, 3).map(({ l, bk }) => `${bk[3]} on ${l.host} at ${hhmm(bk[0])}`).join(", ")}${hidden.length > 3 ? `, and ${hidden.length - 3} more` : ""}</span></span>
         <span className="sp" /><${Button} size="small" onClick=${() => setView("24 hours")}>Show 24 hours<//>
       </div>` : null}
       <div className="leg" style=${{ marginTop: 10 }}>${Object.keys(OCC).map((k) => html`<span key=${k}><i className="sq" style=${{ "--c": OCC[k].c }} />${OCC[k].w}</span>`)}${full ? html`<span><i className="sq" style=${{ "--c": "var(--surface-3)" }} />Outside ${hhmm(frame[0])}–${hhmm(frame[1])}</span>` : null}</div>
@@ -992,7 +1112,7 @@ function Sessions() {
     <${Occupancy} />
     <div className="g c-75">
       <${Panel} title="Non-owner sessions" sub="today" flush>
-        <${Table} size="small" pagination=${false} dataSource=${rows} columns=${[
+        <${Table} size="small" pagination=${PG} dataSource=${rows} columns=${[
           { title: "Machine", dataIndex: "host", width: 90, render: (h) => html`<span className="mono">${h}</span>` },
           { title: "Occupant", render: (r) => r.b[3] },
           { title: "Type", render: (r) => html`<${Tag} c=${OCC[r.b[2]].c}>${OCC[r.b[2]].w}<//>` },
@@ -1119,6 +1239,7 @@ function Issues({ sel, go }) {
   const id = sel && ISSUES.find((i) => i.id === sel) ? sel : ISSUES[0] ? ISSUES[0].id : null;
   const it = ISSUES.find((i) => i.id === id), stt = it && state[id], play = it && buildPlay(it), T = it && ISSUE_TYPES[it.type];
   const [tf, setTf] = useState("all");
+  const opg = usePaged(ISSUES.filter((i) => (tf === "all" || i.type === tf) && state[i.id].status !== "Resolved"), 10, tf);
   if (!it) return html`<${Panel} title="Issues"><div className="t3">Nothing is open in this department.</div><//>`;
   const opt = play.options.find((o) => o.key === (pick[id] || play.options[0].key));
   const age = NOWH - it.at, late = age > it.sla && stt.status !== "Resolved";
@@ -1151,10 +1272,10 @@ function Issues({ sel, go }) {
           .map(([k, v]) => html`<div key=${k}><div className="k">${k}</div><div className="v">${v}</div></div>`)}</div>` },
   ];
   return html`<div className="g c-48">
-    <${Panel} flush title=${`${open.length} open`} extra=${html`<${Select} size="small" value=${tf} onChange=${setTf} style=${{ width: 160 }} options=${[{ value: "all", label: "All types" }, ...Object.keys(ISSUE_TYPES).map((k) => ({ value: k, label: `${ISSUE_TYPES[k].label} · ${ISSUES.filter((i) => i.type === k).length}` }))]} />`}>
+    <${Panel} flush title=${`${open.length} open`} extra=${html`<${Pager} p=${opg} /><${Select} size="small" value=${tf} onChange=${setTf} style=${{ width: 160 }} options=${[{ value: "all", label: "All types" }, ...Object.keys(ISSUE_TYPES).map((k) => ({ value: k, label: `${ISSUE_TYPES[k].label} · ${ISSUES.filter((i) => i.type === k).length}` }))]} />`}>
       ${open.length + done.length === 0 ? html`<div className="t3" style=${{ padding: 14 }}>No issues of this type.</div>` : null}
-      ${open.map(row)}
-      ${done.length ? html`<div className="t3" style=${{ padding: "10px 14px 6px", fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", background: "var(--surface-2)", borderBottom: "1px solid var(--grid)" }}>Done today · ${done.length}</div>${done.map(row)}` : null}
+      ${opg.items.map(row)}
+      ${done.length ? html`<div className="t3" style=${{ padding: "10px 14px 6px", fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", background: "var(--surface-2)", borderBottom: "1px solid var(--grid)" }}>Done today · ${done.length}</div>${done.slice(0, 5).map(row)}${done.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${done.length - 5} what="done today" onClick=${() => go("audit")} /></div>` : null}` : null}
     <//>
     <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
       <section className="panel" style=${{ padding: 16 }}>
@@ -1238,6 +1359,13 @@ let TASKS = [
       { target: "delivery-notes-aug.zip", intent: "Create", st: "Failed", sig: "Not found by the final deadline", fn: () => 0 } ],
     log: [[-31, "Final deadline passed, 1 check not met"], [-55, "Soft deadline passed"], [-61.9, "/archive/2026-08/ created"], [-150, "Esi started the task"], [-160, "Assigned by you"]] },
 ];
+if (LARGE) {
+  const mineT = TASKS.filter((t) => t.by === "You");
+  ["Collect the signed leave forms", "Renew the courier contract", "Archive last year's tenders", "Check the backup drive", "Send the stock count", "Update the price list", "Close the Q2 ledger", "File the audit replies"].forEach((title, k) => {
+    const t = mineT[k % mineT.length], m = MACHINES.filter((x) => x.user && x.dept !== "ops")[k * 7];
+    TASKS.push({ ...t, id: `T-${300 + k}`, title, who: m.user, host: m.host, state: k % 3 === 0 ? "Overdue" : "In progress", final: k % 3 === 0 ? NOWH - 3 - k : NOWH + 6 + k * 5 });
+  });
+}
 TASKS.push(
   { id: "T-206", title: "Send the weekly route plan", who: "Esi", host: "LOG-01", by: "You", state: "In progress", assigned: -40, started: -39, soft: 30, final: 41,
     evidence: [{ target: "routes-w40.csv", intent: "Update", st: "Passed", sig: "Saved 6 times", fn: (t) => (working(t) && t > -39 ? 1 + 2 * sm(12, t, 3) : 0) }, { target: "route-plan-w40.pdf", intent: "Create", st: "Pending", sig: "Not seen on LOG-01 yet", fn: () => 0 }],
@@ -1299,7 +1427,7 @@ function TaskDetail({ id, go }) {
     </div>
     <div className="g c-84">
       <${Panel} title="Checks" sub=${`${done} of ${t.evidence.length} passed`} flush>
-        <${Table} size="small" pagination=${false} dataSource=${t.evidence.map((e, i) => ({ ...e, key: i }))} columns=${[
+        <${Table} size="small" pagination=${PG} dataSource=${t.evidence.map((e, i) => ({ ...e, key: i }))} columns=${[
           { title: "Target", render: (r) => html`<div><div className=${/[./]/.test(r.target) ? "mono" : ""}>${r.target}</div><div className="t3" style=${{ fontSize: 11.5 }}>${r.intent} · ${r.sig}</div></div>` },
           { title: "Activity, 7 days", width: 130, render: (r) => html`<${Spark} fn=${r.fn} range="7d" c=${r.st === "Pending" ? "var(--s6)" : ESTATE[r.st]} w=${100} />` },
           { title: "Result", width: 90, render: (r) => html`<span className="st" style=${{ "--c": ESTATE[r.st] }}><i />${r.st}</span>` },
@@ -1647,7 +1775,7 @@ function Tasks({ go }) {
         </div>
       </div>
       <div style=${{ flex: 1 }}>
-        <${Table} size="middle" pagination=${false} dataSource=${show.map((x) => ({ ...x, key: x.id }))} onRow=${(r) => ({ onClick: () => go("tasks", r.id), className: "clickrow" })}
+        <${Table} size="middle" pagination=${PG} dataSource=${show.map((x) => ({ ...x, key: x.id }))} onRow=${(r) => ({ onClick: () => go("tasks", r.id), className: "clickrow" })}
           locale=${{ emptyText: "No tasks here." }} columns=${[
           { title: "ID", dataIndex: "id", width: 76, render: (x) => html`<a className="mono">${x}</a>` },
           { title: "Task", dataIndex: "title", render: (v, r) => html`<span style=${{ color: r.state === "Completed" ? "var(--text-3)" : "inherit" }}>${v}</span>` },
@@ -1883,7 +2011,7 @@ function Flows({ go }) {
   const log = [["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /weekly/", "Synced", "4be1…77c0"], ["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /archive/", "Queued", "4be1…77c0"], ["12:41", "weekly", "report.xlsx", "LOG-01 /weekly/", "Conflict, kept as report-modified.xlsx", "9c07…a1e4"], ["12:40", "weekly", "routes-w40.csv", "LOG-01 /weekly/", "Synced", "1d2e…0b9f"], ["11:47", "payroll", "timesheet-0930.xlsx", "FIN-01 /payroll/", "Synced", "77aa…c310"]];
   return html`<${React.Fragment}>
     <${Panel} flush title="Flows" extra=${html`<${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("flows", "new")}>New flow<//>`}>
-      <${Table} size="small" pagination=${false} dataSource=${flows} rowClassName=${(r) => (r.key === "weekly" ? "sel" : "")} columns=${[
+      <${Table} size="small" pagination=${PG} dataSource=${flows} rowClassName=${(r) => (r.key === "weekly" ? "sel" : "")} columns=${[
         { title: "Flow", dataIndex: "name", width: 100, render: (v) => html`<b style=${{ fontWeight: 500 }}>${v}</b>` },
         { title: "Route", dataIndex: "route", render: (v) => html`<span className="mono">${v}</span>` },
         { title: "Status", dataIndex: "st", width: 180, render: (s) => html`<span className="st" style=${{ "--c": FS[s] }}><i />${s}</span>` },
@@ -1898,7 +2026,7 @@ function Flows({ go }) {
       <div className="t3" style=${{ fontSize: 12 }}>The /archive/ branch paused on Tue 16:10 when the folder disappeared from LOG-01. Files queue and nothing is lost. It resumes on its own when the path exists again.</div>
     <//>
     <${Panel} title="Sync log" sub="latest" flush>
-      <${Table} size="small" pagination=${false} dataSource=${log.map((l, i) => ({ key: i, l }))} columns=${[
+      <${Table} size="small" pagination=${PG} dataSource=${log.map((l, i) => ({ key: i, l }))} columns=${[
         { title: "Time", width: 70, render: (r) => html`<span className="mono t3">${r.l[0]}</span>` }, { title: "Flow", width: 80, render: (r) => r.l[1] },
         { title: "File", render: (r) => html`<span className="mono">${r.l[2]}</span>` }, { title: "Destination", render: (r) => html`<span className="mono">${r.l[3]}</span>` },
         { title: "Result", render: (r) => html`<span style=${{ color: r.l[4].startsWith("Conflict") ? "var(--med)" : r.l[4] === "Queued" ? "var(--crit)" : "inherit" }}>${r.l[4]}</span>` },
@@ -2014,7 +2142,7 @@ function Automation({ go }) {
   const latest = RUNS.slice().sort((a, b) => b[3] - a[3] || (a[6] === "Success") - (b[6] === "Success"));
   return html`<${React.Fragment}>
     <${Panel} flush title="Rules" sub="click a rule to see how it is set up" extra=${html`<${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("automation", "new")}>New rule<//>`}>
-      <div className="scroll-x"><${Table} size="small" pagination=${false} dataSource=${RULES.map((r) => ({ ...r, key: r.id }))} onRow=${(r) => ({ onClick: () => go("automation", r.id), className: "clickrow" })} columns=${[
+      <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${RULES.map((r) => ({ ...r, key: r.id }))} onRow=${(r) => ({ onClick: () => go("automation", r.id), className: "clickrow" })} columns=${[
         { title: "Enabled", width: 76, align: "center", render: (r) => html`<span onClick=${(e) => e.stopPropagation()}><${Checkbox} checked=${on[r.id]} aria-label=${"Enable " + r.name} onChange=${(e) => { setOn({ ...on, [r.id]: e.target.checked }); toast(`${r.name} ${e.target.checked ? "enabled" : "disabled"} (concept)`); }} /></span>` },
         { title: "Rule", render: (r) => html`<div><a style=${{ fontWeight: 500 }}>${r.name}</a><div className="t2" style=${{ fontSize: 12 }}>${sentence(r)}</div></div>` },
         { title: "Trigger", width: 100, render: (r) => html`<${Tag} c=${KINDC[r.kind]}>${r.kind}<//>` },
@@ -2092,7 +2220,7 @@ function RuleDetail({ id, go }) {
         <${Arrow} />
         <${FlowStep} icon="DesktopOutlined" label="On" c="var(--s1)" foot=${tm.some((m) => m.status === "offline") ? "LOG-02 is offline. The rule applies again when it is back." : `${tm.length} machines, all online`}>
           <div style=${{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>${r.scope === "All machines" ? "Every machine" : r.scope}</div>
-          <div className="row" style=${{ gap: 4 }}>${tm.map((m) => html`<a key=${m.host} className="tag mono" style=${{ "--c": m.status === "offline" ? "var(--text-4)" : "var(--text-3)" }} onClick=${() => go("machines", m.host)}>${m.host}</a>`)}</div>
+          <div className="row" style=${{ gap: 4 }}>${pickShown(tm, 8).shown.map((m) => html`<a key=${m.host} className="tag mono" style=${{ "--c": m.status === "offline" ? "var(--text-4)" : "var(--text-3)" }} onClick=${() => go("machines", m.host)}>${m.host}</a>`)}${tm.length > 8 ? html`<${More} n=${tm.length - 8} what="machines" onClick=${() => go("machines")} />` : null}</div>
         <//>
         <${Arrow} />
         <${FlowStep} icon="PlayCircleOutlined" label="Do" c="var(--s2)" foot="Each action runs on its own. One failing never stops the others.">
@@ -2104,7 +2232,7 @@ function RuleDetail({ id, go }) {
     <//>
 
     <${Panel} title="Each action" sub="last 7 days" flush>
-      <div className="scroll-x"><${Table} size="small" pagination=${false} dataSource=${r.actions.map((a) => ({ key: a[0], a }))} columns=${[
+      <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${r.actions.map((a) => ({ key: a[0], a }))} columns=${[
         { title: "Action", render: (o) => html`<span style=${{ fontWeight: 500 }}>${o.a[0]}</span>` },
         { title: "Runs", width: 70, align: "right", render: (o) => html`<span className="mono">${o.a[2]}</span>` },
         { title: "Outcomes", width: 260, render: (o) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><${OutcomeBar} ok=${o.a[3]} fail=${o.a[4]} to=${o.a[5]} /><span className="t3" style=${{ fontSize: 12 }}>${o.a[4] || o.a[5] ? [o.a[5] ? `${o.a[5]} timed out` : "", o.a[4] ? `${o.a[4]} failed` : ""].filter(Boolean).join(", ") : "all succeeded"}</span></div>` },
@@ -2273,7 +2401,7 @@ function NewRule({ go, from }) {
     </div>
     <div style=${{ marginTop: 26, display: "flex", flexDirection: "column", gap: 14 }}>
       ${scope === "dept" ? html`<${Field} label="Department"><${Select} id="nr-dept" value=${dept} onChange=${set("dept")} style=${{ width: 260 }} options=${DEPTS.map((d) => ({ value: d.id, label: `${d.name} · ${MACHINES.filter((m) => m.dept === d.id).length} machines` }))} /><//>` : null}
-      ${scope === "pick" ? html`<${Field} label="Machines"><${Select} id="nr-hosts" mode="multiple" value=${hosts} onChange=${set("hosts")} style=${{ width: "100%" }} options=${MACHINES.map((m) => ({ value: m.host, label: `${m.host} · ${m.user || "no user"}` }))} placeholder="Pick machines" /><//>` : null}
+      ${scope === "pick" ? html`<${Field} label="Machines"><${Select} id="nr-hosts" mode="multiple" maxTagCount="responsive" value=${hosts} onChange=${set("hosts")} style=${{ width: "100%" }} options=${MACHINES.map((m) => ({ value: m.host, label: `${m.host} · ${m.user || "no user"}` }))} placeholder="Pick machines" /><//>` : null}
       <div>
         <div className="t3" style=${{ marginBottom: 8 }}>${targets.length} machine${targets.length === 1 ? "" : "s"}</div>
         <div className="row" style=${{ gap: 6 }}>${targets.map((m) => html`<span key=${m.host} className="tag mono" style=${{ "--c": m.status === "offline" ? "var(--text-4)" : "var(--text-3)", height: 24, padding: "0 8px" }}>${m.host}<span className="t3" style=${{ fontFamily: "var(--sans)", marginLeft: 4 }}>${m.user || ""}</span></span>`)}</div>
@@ -2423,7 +2551,7 @@ function Actions({ go }) {
     <${Panel} flush title="Action library" sub="what rules can do, and what you can run by hand" extra=${html`
       <${Segmented} size="small" value=${cat} onChange=${setCat} options=${["All", "Control", "Monitoring", "Custom"].map((c) => ({ value: c, label: c === "All" ? `All ${ACTION_LIB.length}` : `${c} ${ACTION_LIB.filter((a) => a.cat === c).length}` }))} />
       <${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("actions", "new")}>New custom action<//>`}>
-      <div className="scroll-x"><${Table} size="middle" pagination=${false} dataSource=${rows.map((a) => ({ ...a, key: a.id }))} onRow=${(r) => ({ onClick: () => go("actions", r.id), className: "clickrow" })} columns=${[
+      <div className="scroll-x"><${Table} size="middle" pagination=${PG} dataSource=${rows.map((a) => ({ ...a, key: a.id }))} onRow=${(r) => ({ onClick: () => go("actions", r.id), className: "clickrow" })} columns=${[
         { title: "Action", render: (a) => html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}>
             <span style=${{ width: 26, height: 26, borderRadius: 5, flex: "none", display: "grid", placeItems: "center", background: `color-mix(in srgb, ${CATC[a.cat]} 12%, transparent)`, color: CATC[a.cat] }}>${ic(CATI[a.cat])}</span>
             <div style=${{ minWidth: 0 }}><a style=${{ fontWeight: 500 }}>${a.name}</a>${a.lang ? html`<span className="tag" style=${{ "--c": "var(--text-3)", marginLeft: 6 }}>${a.lang}<//>` : null}<div className="t3" style=${{ fontSize: 12 }}>${a.desc}</div></div></div>` },
@@ -2439,7 +2567,7 @@ function Actions({ go }) {
       ]} /></div>
     <//>
     <${Panel} title="Run by hand" sub="last 7 days · runs that did not come from a rule" flush>
-      <div className="scroll-x"><${Table} size="small" pagination=${false} dataSource=${MANUAL_RUNS.slice().sort((a, b) => b.t - a.t).map((x, i) => ({ key: i, x }))} columns=${[
+      <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${MANUAL_RUNS.slice().sort((a, b) => b.t - a.t).map((x, i) => ({ key: i, x }))} columns=${[
         { title: "When", width: 110, render: (o) => html`<span className="mono t3">${o.x.t >= 0 ? "Today " + hhmm(o.x.t) : dayOf(o.x.t) + " " + hhmm(o.x.t)}</span>` },
         { title: "Action", render: (o) => o.x.action }, { title: "By", width: 120, render: (o) => o.x.by },
         { title: "Machine", width: 90, render: (o) => html`<span className="mono">${o.x.host}</span>` },
@@ -2481,7 +2609,7 @@ function RunOnce({ a, onClose }) {
       <div><div className="nt-h">On which machines</div>
         <${Radio.Group} value=${scope} onChange=${(e) => setScope(e.target.value)} options=${[{ value: "pick", label: "Machines I pick" }, { value: "dept", label: "A department" }, { value: "all", label: "Every machine" }]} />
         <div style=${{ marginTop: 10 }}>
-          ${scope === "pick" ? html`<${Select} mode="multiple" value=${hosts} onChange=${setHosts} style=${{ width: "100%" }} placeholder="Pick machines" options=${MACHINES.map((m) => ({ value: m.host, label: `${m.host} · ${m.user || "no user"}${m.status === "offline" ? " · offline" : ""}` }))} />` : null}
+          ${scope === "pick" ? html`<${Select} mode="multiple" maxTagCount="responsive" value=${hosts} onChange=${setHosts} style=${{ width: "100%" }} placeholder="Pick machines" options=${MACHINES.map((m) => ({ value: m.host, label: `${m.host} · ${m.user || "no user"}${m.status === "offline" ? " · offline" : ""}` }))} />` : null}
           ${scope === "dept" ? html`<${Select} value=${dept} onChange=${setDept} style=${{ width: 240 }} options=${DEPTS.map((d) => ({ value: d.id, label: `${d.name} · ${MACHINES.filter((m) => m.dept === d.id).length} machines` }))} />` : null}
         </div></div>
       ${a.param === "message" ? html`<div><div className="nt-h">Message</div><${Input.TextArea} id="run-msg" value=${msg} onChange=${(e) => setMsg(e.target.value)} placeholder="What should they see?" autoSize=${{ minRows: 2, maxRows: 5 }} /></div>` : null}
@@ -2662,13 +2790,13 @@ function Rollout() {
     <div className="g c-75">
       <${Panel} title="Machines on 1.4.2" sub="since it was approved on 26 Sep"><${Adoption} /><//>
       <${Panel} title="By department" flush>
-        <${Table} size="small" pagination=${false} dataSource=${DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id); return { key: d.id, d, n: ms.length, ok: ms.filter((m) => m.ver === "1.4.2").length }; })} columns=${[
+        <${Table} size="small" pagination=${PG} dataSource=${DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id); return { key: d.id, d, n: ms.length, ok: ms.filter((m) => m.ver === "1.4.2").length }; })} columns=${[
           { title: "Department", render: (r) => r.d.name }, { title: "On 1.4.2", width: 170, render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Bar} v=${r.ok} max=${r.n} w=${80} c=${r.ok === r.n ? "var(--ok)" : "var(--med)"} /><span className="mono">${r.ok}/${r.n}</span></div>` },
           { title: "Escalation", width: 120, render: (r) => (r.d.id === "log" ? html`<span style=${{ color: "var(--crit)" }}>To Super User</span>` : html`<span className="t3">—</span>`) }]} />
       <//>
     </div>
     <${Panel} title="Machines holding the gate" flush>
-      <${Table} size="small" pagination=${false} dataSource=${[
+      <${Table} size="small" pagination=${PG} dataSource=${[
         { key: 1, host: "OPS-06", cur: "1.4.1", tries: 2, last: "Wed 11:20", err: "Installer exit 1603 (file in use)", esc: "—", next: "Next idle window" },
         { key: 2, host: "LOG-02", cur: "1.4.0", tries: 1, last: "Mon 07:45", err: "Could not reach the update share", esc: "Mon 09:30 · Super User", next: "When it comes back online" },
       ]} columns=${[
@@ -2683,11 +2811,13 @@ function Rollout() {
 // ============================================================== AUDIT
 function Audit({ range }) {
   const R = RANGES[range];
-  const [brush, setBrush] = useState(null);
-  const [kinds, setKinds] = useState(Object.keys(KINDS));
+  const [preset] = useState(() => { const p0 = AUDIT_PRESET; AUDIT_PRESET = null; return p0; });
+  const [brush, setBrush] = useState(preset ? preset.brush : null);
+  const [kinds, setKinds] = useState(preset ? preset.kinds : Object.keys(KINDS));
   const [actor, setActor] = useState("all");
   const [q, setQ] = useState("");
-  useEffect(() => setBrush(null), [range]);
+  const first = useRef(true);
+  useEffect(() => { if (first.current) { first.current = false; return; } setBrush(null); }, [range]);
   const base = AUDIT.filter((e) => e.t >= R.a);
   const actors = [...new Set(base.map((e) => e.actor))].sort();
   const counts = Object.fromEntries(Object.keys(KINDS).map((k) => [k, base.filter((e) => e.kind === k).length]));
@@ -2779,7 +2909,7 @@ function Reports() {
       <//>
     </div>
     <${Panel} title="Reports" flush>
-      <${Table} size="small" pagination=${false} dataSource=${rows.map((r) => ({ key: r[0], r }))} columns=${[
+      <${Table} size="small" pagination=${PG} dataSource=${rows.map((r) => ({ key: r[0], r }))} columns=${[
         { title: "ID", width: 80, render: (x) => html`<span className="mono t3">${x.r[0]}</span>` }, { title: "Category", render: (x) => x.r[1] },
         { title: "Source", width: 80, render: (x) => html`<span className="mono">${x.r[2]}</span>` }, { title: "Written", width: 110, render: (x) => html`<span className="mono">${x.r[3]}</span>` },
         { title: "Routed to", render: (x) => x.r[4] }, { title: "Seen", render: (x) => html`<span className="t2">${x.r[5]}</span>` },
@@ -2810,17 +2940,20 @@ const ADMIN_INFO = {
   "A. Quaye": { dept: "ops", ws: "WS-OPS-A2", now: "Signed in on WS-OPS-A2 since 08:15" },
   "K. Boateng": { dept: "fin", ws: "WS-FIN-A1", now: "Signed in on WS-FIN-A1 since 08:20" },
 };
+if (LARGE) DEPTS.forEach((d, k) => d.admins.forEach((a, j) => { if (!ADMIN_INFO[a]) ADMIN_INFO[a] = { dept: d.id, ws: `WS-${d.id.toUpperCase()}-A${j + 1}`, now: `Signed in on WS-${d.id.toUpperCase()}-A${j + 1} since 08:${String(10 + ((k * 7 + j * 3) % 40)).padStart(2, "0")}` }; }));
 const SEVORD = { critical: 0, high: 1, medium: 2, low: 3 };
 const initials = (n) => n.split(/[ .]+/).filter(Boolean).map((x) => x[0]).join("").slice(0, 2);
 function MiniTiles({ ms, go }) {
-  return html`<div className="row" style=${{ gap: 3 }}>${ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
+  const pk = pickShown(ms, 14);
+  return html`<div className="row" style=${{ gap: 3, flexWrap: "nowrap" }}>${pk.shown.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
     return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`} onClick=${(e) => { e.stopPropagation(); go("machines", m.host); }}
       style=${{ position: "relative", width: 18, height: 18, borderRadius: 3, background: t.bg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none"), cursor: "pointer" }}>
-      ${t.dot ? html`<i style=${{ position: "absolute", right: -2, top: -2, width: 6, height: 6, borderRadius: "50%", background: t.dot, boxShadow: "0 0 0 1.5px var(--surface)" }} />` : null}</span>`; })}</div>`;
+      ${t.dot ? html`<i style=${{ position: "absolute", right: -2, top: -2, width: 6, height: 6, borderRadius: "50%", background: t.dot, boxShadow: "0 0 0 1.5px var(--surface)" }} />` : null}</span>`; })}
+    ${pk.rest ? html`<span className="t3 mono" style=${{ fontSize: 11, marginLeft: 3 }} title="none of them worse than these">+${pk.rest}</span>` : null}</div>`;
 }
 function deptStats(d) {
   const ms = MACHINES.filter((m) => m.dept === d.id), iss = ISSUES.filter((i) => MBY[i.host].dept === d.id).sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]);
-  return { ms, iss, online: ms.filter((m) => m.status !== "offline").length, ok: ms.filter((m) => m.ver === "1.4.2").length, worst: iss[0] ? iss[0].sev : null, mtta: d.id === "ops" ? "42m" : d.id === "fin" ? "2h 10m" : null };
+  return { ms, iss, online: ms.filter((m) => m.status !== "offline").length, ok: ms.filter((m) => m.ver === "1.4.2").length, worst: iss[0] ? iss[0].sev : null, mtta: d.id === "ops" ? "42m" : d.id === "fin" ? "2h 10m" : null, slow: d.id === "fin" };
 }
 // The Super User's Monitor is a view from above: one screen per department, the organisation's day as a
 // strip, and a few trends. Words appear on hover or click; the picture carries the state.
@@ -2837,6 +2970,8 @@ function Screen({ d, onOpen }) {
   const stw = wk === "quiet" ? "All well" : wk === "watch" ? "Worth a look" : wk === "offline" ? "Offline" : wk === "high" ? "High" : "Critical";
   const act = useMemo(() => deptActivity(d.id), [d.id]);
   const off = !d.admins.length;
+  // two rows of tiles at most; the worst machines are always among them
+  const tiles = pickShown(ms, 17), adm = d.admins.slice(0, 2);
   return html`<div className="tab" role="button" tabIndex="0" onClick=${() => onOpen(d.id)} onKeyDown=${(e) => e.key === "Enter" && onOpen(d.id)} aria-label=${`${d.name} console`}>
     <span className="tab-cam" />
     <div className=${"tab-display" + (off ? " off" : "")}>
@@ -2844,17 +2979,19 @@ function Screen({ d, onOpen }) {
         <span className="tab-name">${d.name}</span>
         <span className="st" style=${{ "--c": stc, fontSize: 11 }}><i />${stw}</span>
         <span className="sp" />
-        ${d.admins.map((a) => html`<span key=${a} className="row" style=${{ gap: 5, flexWrap: "nowrap", fontSize: 11 }} title=${ADMIN_INFO[a].now}>
+        ${adm.map((a) => html`<span key=${a} className="row" style=${{ gap: 5, flexWrap: "nowrap", fontSize: 11 }} title=${ADMIN_INFO[a].now}>
           <span style=${{ position: "relative" }}><span className="av" style=${{ width: 18, height: 18, fontSize: 8 }}>${initials(a)}</span><i style=${{ position: "absolute", right: -1, bottom: -1, width: 6, height: 6, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 1.5px var(--surface-2)" }} /></span>
           <span className="t2">${a}</span></span>`)}
+        ${d.admins.length > 2 ? html`<span className="t3" style=${{ fontSize: 11 }} title=${d.admins.slice(2).join(", ")}>+${d.admins.length - 2}</span>` : null}
       </div>
       <div className="tab-body">
         <div className="tab-rail"><i /><i /><i /><i /><i /></div>
         <div className="tab-main">
           <div className="tab-left">
-            <div className="tab-tiles">${ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
+            <div className="tab-tiles">${tiles.shown.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
               return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`}>
-                <b style=${{ background: t.bg, color: t.fg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none") }}>${m.host.slice(-2)}${t.dot ? html`<i style=${{ background: t.dot }} />` : null}</b></span>`; })}</div>
+                <b style=${{ background: t.bg, color: t.fg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none") }}>${m.host.slice(-2)}${t.dot ? html`<i style=${{ background: t.dot }} />` : null}</b></span>`; })}
+              ${tiles.rest ? html`<span title=${`${tiles.rest} more machines, none of them worse than these`}><b className="tab-more">+${tiles.rest}</b></span>` : null}</div>
             <div className="tab-chart"><span className="t3" style=${{ fontSize: 10.5 }}>Activity, last 24 hours</span><${AreaFill} fn=${act} /></div>
           </div>
           <div className="tab-right">
@@ -2894,88 +3031,144 @@ function ScreenRow({ depts, onOpen }) {
     ${edge.r ? html`<button className="car-btn right" onClick=${() => step(1)} aria-label="Next department">${ic("RightOutlined")}</button>` : null}
   </div>`;
 }
+// A quick look at one department from the wall: who is on which machine, what is open, who runs it.
+// Landscape, three columns; the day itself is on the Monitor page and the department page, not here.
 function LookCloser({ id, onClose, go, enter }) {
   if (!id) return html`<${Modal} open=${false} />`;
   const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id), x = deptStats(d);
-  const hosts = new Set(deptHosts(id));
-  return html`<${Modal} open=${true} onCancel=${onClose} width=${760} title=${html`<span>${d.name} <span className="t3" style=${{ fontWeight: 400, fontSize: 13 }}>· looking, read-only · nobody is affected</span></span>`}
+  const on = (host) => { const l = (FULL.LANES || LANES).find((y) => y.host === host); const bk = l && l.blocks.find((z) => z[1] >= NOWH); return bk ? { who: bk[3], kind: bk[2] } : null; };
+  const nav = (...a0) => { onClose(); go(...a0); };
+  const mc = pickShown(x.ms, 10), ic6 = x.iss.slice(0, 6), adm = d.admins.slice(0, 3);
+  return html`<${Modal} open=${true} onCancel=${onClose} width=${1040} title=${html`<span>${d.name} <span className="t3" style=${{ fontWeight: 400, fontSize: 13 }}>· a look, read-only · nobody is affected</span></span>`}
     footer=${html`<div className="row" style=${{ justifyContent: "flex-end" }}>
-      <${Button} onClick=${() => { onClose(); go("dept", id); }}>Department page<//>
-      ${d.admins.length ? d.admins.map((a) => html`<${Button} key=${a} type="primary" icon=${ic("LoginOutlined")} onClick=${() => { onClose(); enter(a); }}>Enter ${a}'s console<//>`)
-        : html`<${Button} type="primary" danger onClick=${() => { onClose(); go("work"); }}>Assign Admin<//>`}
+      <${Button} onClick=${() => nav("dept", id)}>Department page<//>
+      ${d.admins.length > 2 ? html`<${Dropdown} trigger=${["click"]} menu=${{ items: d.admins.map((a0) => ({ key: a0, label: a0 })), onClick: ({ key }) => { onClose(); enter(key); } }}>
+          <${Button} type="primary" icon=${ic("LoginOutlined")}>Enter an Admin's console ${ic("DownOutlined")}<//><//>`
+        : d.admins.length ? d.admins.map((a0) => html`<${Button} key=${a0} type="primary" icon=${ic("LoginOutlined")} onClick=${() => { onClose(); enter(a0); }}>Enter ${a0}'s console<//>`)
+        : html`<${Button} type="primary" danger onClick=${() => nav("work")}>Assign Admin<//>`}
     </div>`}>
-    <div className="g c-66" style=${{ gap: 18, alignItems: "start" }}>
+    <div className="lk">
       <div>
-        <div className="nt-h">Machines</div>
-        <div className="row" style=${{ gap: 6 }}>${x.ms.map((m) => { const k = HEALTH[m.status][0];
-          return html`<div key=${m.host} title=${m.note || HEALTH[m.status][1]} className="row" style=${{ flexWrap: "nowrap", gap: 6, padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 5, cursor: "pointer" }} onClick=${() => { onClose(); go("machines", m.host); }}>
-            <${HealthMark} k=${k} /><span className="mono" style=${{ fontSize: 12 }}>${m.host}</span></div>`; })}</div>
-        <div className="nt-h" style=${{ marginTop: 16 }}>Today</div>
-        <${DayLanes} rows=${[{ key: id, label: d.name, hosts }]} go=${(p0) => { onClose(); go(p0); }} lane=${48} verdictW=${0} />
+        <div className="nt-h">Machines <span className="t4" style=${{ fontWeight: 400 }}>${x.online}/${x.ms.length} online</span></div>
+        <div className="lk-ms">${mc.shown.map((m) => { const k = HEALTH[m.status][0], o = on(m.host);
+          return html`<button key=${m.host} className="lk-m" title=${m.note || HEALTH[m.status][1]} onClick=${() => nav("machines", m.host)}>
+            <${HealthMark} k=${k} /><span className="mono">${m.host}</span>
+            <span className="t3" style=${{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: o && o.kind !== "own" ? OCC[o.kind].c : undefined }}>${o ? o.who : m.status === "offline" ? "offline" : "nobody"}</span>
+          </button>`; })}</div>
+        <div style=${{ marginTop: 8 }}><${More} n=${mc.rest} what="machines" title="On the department page" onClick=${() => nav("dept", id)} /></div>
+      </div>
+      <div>
+        <div className="nt-h">Open issues <span className="t4" style=${{ fontWeight: 400 }}>${x.iss.length}</span></div>
+        ${x.iss.length ? ic6.map((i) => { const age = NOWH - i.at;
+          return html`<button key=${i.id} className="lk-i" onClick=${() => nav("issues", i.id)}>
+            <span className="sev" style=${{ "--c": SEV[i.sev].c }}><i /></span>
+            <span style=${{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>${i.title}</span>
+            <span className="mono t3" style=${{ fontSize: 11.5 }}>${i.host}</span>
+            <span className="mono" style=${{ fontSize: 11.5, color: age > i.sla ? "var(--crit)" : "var(--text-3)" }}>${age > 24 ? Math.floor(age / 24) + "d" : dur(age)}</span>
+          </button>`; })
+          : html`<div className="t3" style=${{ padding: "6px 0" }}>${ic("CheckOutlined")} Nothing open.</div>`}
+        <div style=${{ marginTop: 6 }}><${More} n=${x.iss.length - ic6.length} what="issues" title="On the department page" onClick=${() => nav("dept", id)} /></div>
       </div>
       <div>
         <div className="nt-h">Admins</div>
-        ${d.admins.length ? d.admins.map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", padding: "6px 0" }}><span className="av">${initials(a)}</span><div><div style=${{ fontWeight: 500 }}>${a}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a].now}</div></div></div>`)
-          : html`<div style=${{ color: "var(--crit)" }}>Nobody. Its issues and reports come to you.</div>`}
-        <div className="nt-h" style=${{ marginTop: 16 }}>Open issues</div>
-        ${x.iss.length ? x.iss.map((i) => html`<div key=${i.id} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0", cursor: "pointer" }} onClick=${() => { onClose(); go("issues", i.id); }}><span className="sev" style=${{ "--c": SEV[i.sev].c }}><i /></span><span style=${{ minWidth: 0 }}>${i.title}</span><span className="sp" /><span className="mono t3">${i.host}</span></div>`)
-          : html`<div className="t3">Nothing open.</div>`}
+        ${d.admins.length ? adm.map((a0) => html`<div key=${a0} className="row" style=${{ flexWrap: "nowrap", padding: "6px 0", gap: 10 }}>
+            <span style=${{ position: "relative", display: "inline-flex" }}><span className="av">${initials(a0)}</span>
+              <i style=${{ position: "absolute", right: -1, bottom: -1, width: 8, height: 8, borderRadius: "50%", background: ADMIN_INFO[a0].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
+            <div style=${{ minWidth: 0 }}><div style=${{ fontWeight: 500 }}>${a0}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a0].now}</div></div></div>`)
+          : html`<div className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "6px 0" }}>
+            <span className="av" style=${{ background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)" }}>?</span>
+            <div style=${{ color: "var(--crit)", fontSize: 12.5 }}>Nobody. Its issues and reports come to you.</div></div>`}
+        <${More} n=${d.admins.length - adm.length} what="Admins" onClick=${() => nav("dept", id)} />
+        ${x.mtta ? html`<div className="t3" style=${{ fontSize: 12, marginTop: 10 }}>Reports handled in <b className="mono" style=${{ color: x.slow ? "var(--med)" : "var(--text-2)", fontWeight: 500 }}>${x.mtta}</b></div>` : null}
       </div>
     </div>
   <//>`;
 }
-// The organisation's day, read in one glance: each department's activity today as a soft grey shape,
-// a dashed outline of a typical weekday behind it, and pins only where something needs someone or is
+// The organisation's day, read in one glance: how many of each department's machines had someone on
+// them, through the day, with pins only where something needs someone or is
 // unusual. Was today normal, and if not, when and where did it stop being normal?
 function dayProfile(id) { return hostsProfile(new Set(deptHosts(id))); }
+// a typical weekday for one machine: its owner signs in around eight or nine and leaves around five
+const typicalDay = (host, day) => { const k = host.split("").reduce((a, c) => a + c.charCodeAt(0), 0) + day * 31;
+  return [7.9 + nz(41, k) * 1.2, 16.8 + nz(43, k) * 1.0]; };
+const OTHER_KINDS = { flow: ["file copy", "file copies"], action: ["action", "actions"], assistance: ["search or ping", "searches or pings"], rollout: ["update step", "update steps"] };
 function hostsProfile(hosts) {
-  const H = Math.ceil(NOWH);
-  // today counts everything; the typical day leaves out the flagged events, so it stays typical
-  const count = (a, b, all) => AUDIT.reduce((n, e) => n + (e.t >= a && e.t < b && hosts.has(e.host) && (all || !e.notable) ? 1 : 0), 0);
-  const today = Array.from({ length: H }, (_, h) => { const end = Math.min(h + 1, NOWH); return count(h, end, true) / Math.max(0.25, end - h); });
+  const H = Math.ceil(NOWH), hs = [...hosts];
+  // machines with anyone on them at any point in the hour: the owner, an Admin, you, or assisted access
+  const usedIn = (blocks, a, b) => blocks.some((x) => x[0] < b && x[1] > a);
+  const today = Array.from({ length: H }, (_, h) => hs.filter((host) => usedIn((LANES.find((l) => l.host === host) || { blocks: [] }).blocks, h, Math.min(h + 1, NOWH))).length);
   const days = [-6, -5, -4, -3, -2, -1].filter((d) => !["Sat", "Sun"].includes(WEEK[((d % 7) + 7) % 7]));
   const median = (xs) => { const v = xs.slice().sort((a, b) => a - b), m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
-  const usual = Array.from({ length: H }, (_, h) => median(days.map((d) => count(d * 24 + h, d * 24 + h + 1))));
+  const usual = Array.from({ length: H }, (_, h) => Math.round(median(days.map((d) => hs.filter((host) => usedIn([typicalDay(host, d)], h, h + 1)).length))));
+  // the rest of the hour's record, said in words, so a number always says what it counts
+  const other = Array.from({ length: H }, (_, h) => { const c = {};
+    AUDIT.forEach((e) => { if (e.t >= h && e.t < h + 1 && hosts.has(e.host) && OTHER_KINDS[e.kind]) c[e.kind] = (c[e.kind] || 0) + 1; });
+    return Object.keys(OTHER_KINDS).filter((k) => c[k]).map((k) => `${c[k]} ${OTHER_KINDS[k][c[k] > 1 ? 1 : 0]}`).join(" · "); });
   const pins = AUDIT.filter((e) => e.t >= 0 && hosts.has(e.host) && (e.kind === "violation" || e.kind === "deviation" || /outside working hours/.test(e.what)))
     .map((e) => ({ t: e.t, c: e.kind === "violation" ? "var(--crit)" : "var(--med)", text: `${hhmm(e.t)} · ${e.actor} · ${e.what} · ${e.host}` }));
-  const sumT = today.reduce((a, b) => a + b, 0), sumU = usual.reduce((a, b) => a + b, 0);
+  // machine-hours, finished hours only
+  const done = Math.floor(NOWH), sumT = today.slice(0, done).reduce((a, b) => a + b, 0), sumU = usual.slice(0, done).reduce((a, b) => a + b, 0);
   const night = AUDIT.some((e) => e.t >= 0 && hosts.has(e.host) && /outside working hours/.test(e.what));
-  // a verdict needs a real difference, not a ratio of small numbers; only night activity is amber,
-  // because busier or quieter is not in itself a problem
+  // only someone on a machine at night is amber; a busier or quieter day is not in itself a problem
   const verdict = night ? ["Activity at night", "var(--med)"]
-    : sumT > sumU * 1.3 && sumT - sumU >= 8 ? ["Busier than usual", "var(--text-2)"]
-    : sumT < sumU * 0.7 && sumU - sumT >= 8 ? ["Quieter than usual", "var(--text-2)"]
+    : sumT > sumU * 1.25 && sumT - sumU >= 4 ? ["Busier than usual", "var(--text-2)"]
+    : sumT < sumU * 0.75 && sumU - sumT >= 4 ? ["Quieter than usual", "var(--text-2)"]
     : ["As usual", "var(--text-3)"];
-  // an hour is unusual when it is clearly out of line with the same hour on a typical weekday:
-  // anything at all where there is normally nothing at night, or far more than usual in the day
-  // At night, automated work runs on its own, so only a person entering a machine counts as unusual.
-  // In the day, an hour is unusual when it is more than twice as busy as usual. The hour still in
-  // progress is never judged, because it is not finished.
+  // an hour is unusual when a person was on a machine outside working hours; the hour in progress is never judged
   const peopleAtNight = (h) => AUDIT.some((e) => e.t >= h && e.t < h + 1 && hosts.has(e.host) && /outside working hours/.test(e.what));
-  const odd = today.map((v, h) => h < Math.floor(NOWH) && ((h < 6 || h >= 18) ? peopleAtNight(h) : v >= 5 && v > usual[h] * 2));
-  return { today, usual, pins, verdict, odd };
+  const odd = today.map((v, h) => h < done && (h < 6 || h >= 18) && (v > 0 && (peopleAtNight(h) || v > usual[h])));
+  // the count at the real times: each machine's sessions joined end to end (a hand-over between people
+  // is not a gap), +1 when someone arrives on an empty machine, -1 when the last one leaves it
+  const VERB = { own: "signed in on", admin: "entered", you: "entered", assist: "started assisted access on" };
+  const moves = [];
+  hs.forEach((host) => {
+    const bl = (LANES.find((l) => l.host === host) || { blocks: [] }).blocks.slice().sort((a, b) => a[0] - b[0]);
+    let cur = null;
+    const close = () => { if (cur && cur.to < NOWH - 0.01) moves.push({ t: cur.to, d: -1, text: `${cur.last} left ${host}` }); };
+    bl.forEach((x) => {
+      if (cur && x[0] - cur.to < 0.05) { cur.to = Math.max(cur.to, x[1]); cur.last = x[3]; return; }
+      close(); cur = { to: x[1], last: x[3] };
+      moves.push({ t: x[0], d: 1, text: `${x[3]} ${VERB[x[2]]} ${host}` });
+    });
+    close();
+  });
+  moves.sort((a, b) => a.t - b.t);
+  const steps = [{ t: 0, n: 0, text: null }];
+  moves.forEach((m) => steps.push({ t: m.t, n: steps[steps.length - 1].n + m.d, text: m.text }));
+  const stepAt = (t) => { let k = 0; while (k + 1 < steps.length && steps[k + 1].t <= t) k++; return steps[k]; };
+  return { today, usual, other, total: hs.length, pins, verdict, odd, steps, stepAt };
 }
-// One row per group of machines: today's activity as a grey shape, amber where an hour is unusual for
-// that row, pins where something needs someone or is unusual, and a verdict on the right.
-function DayLanes({ rows, go, lane = 56, verdictW = 136 }) {
+// One row per group of machines: how many had someone on them, stepping at the real times, as a grey shape,
+// amber where an hour is unusual, pins where something needs someone, and a verdict.
+function DayLanes({ rows, go, lane = 56, verdictW = 136, slots }) {
   const ref = useRef(null), w = useWidth(ref);
   const [hov, setHov] = useState(null);
   const profs = useMemo(() => rows.map((r) => hostsProfile(r.hosts)), [rows.map((r) => r.key).join()]);
-  const gap = lane > 40 ? 10 : 6, L = 104, R = verdictW, H = rows.length * (lane + gap) + 22, pw = Math.max(100, w - L - R), X = (h) => L + (h / NOWH) * pw;
+  const gap = lane > 40 ? 10 : 6, L = 104, R = verdictW, H = Math.max(rows.length, slots || 0) * (lane + gap) + 22, pw = Math.max(100, w - L - R), X = (h) => L + (h / NOWH) * pw;
   const ticks = []; for (let h = 0; h <= NOWH; h += 2) ticks.push(h);
-  const path = (vals, y0, sc) => vals.map((v, h) => `${h ? "L" : "M"}${X(Math.min(NOWH, h + 0.5)).toFixed(1)} ${(y0 + lane - 4 - v * sc).toFixed(1)}`).join("");
-  const onMove = (e) => { const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left; if (x < L || x > L + pw) { setHov(null); return; } setHov(Math.min(Math.ceil(NOWH) - 1, Math.floor(((x - L) / pw) * NOWH))); };
+  // the count changes at the moment someone arrives or leaves; drawn as a running average over half an
+  // hour, so arrivals close together read as one rise instead of a staircase (the tooltip stays exact)
+  const stepPath = (steps, y0, sc) => {
+    const at = (t) => { let k = 0; while (k + 1 < steps.length && steps[k + 1].t <= t) k++; return k; };
+    const mean = (a, b) => { let sum = 0, k = at(a), t = a;
+      while (t < b) { const next = Math.min(b, k + 1 < steps.length ? steps[k + 1].t : b); sum += steps[k].n * (next - t); t = next; k++; }
+      return sum / (b - a); };
+    const pts = [];
+    for (let t = 0; t <= NOWH + 1e-9; t += 1 / 30) { const u = Math.min(t, NOWH); pts.push([u, mean(Math.max(0, u - 0.25), Math.max(Math.min(NOWH, u + 0.25), Math.max(0, u - 0.25) + 1e-6))]); }
+    return pts.map(([t, v], k) => `${k ? "L" : "M"}${X(t).toFixed(1)} ${(y0 + lane - 4 - v * sc).toFixed(1)}`).join("");
+  };
+  const onMove = (e) => { const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left; if (x < L || x > L + pw) { setHov(null); return; } setHov(((x - L) / pw) * NOWH); };
   return html`<div ref=${ref} style=${{ position: "relative" }}>
     <svg width=${w} height=${H} style=${{ display: "block" }} onMouseMove=${onMove} onMouseLeave=${() => setHov(null)}>
-      ${rows.map((r, i) => { const pr = profs[i], y0 = i * (lane + gap), mx = Math.max(1, ...pr.today, ...pr.usual), sc = (lane - 10) / mx;
-        const area = path(pr.today, y0, sc) + `L${X(NOWH).toFixed(1)} ${y0 + lane - 4}L${X(0.5).toFixed(1)} ${y0 + lane - 4}Z`;
+      ${rows.map((r, i) => { const pr = profs[i], y0 = i * (lane + gap), sc = (lane - 14) / Math.max(1, pr.total);
+        const line = stepPath(pr.steps, y0, sc), area = line + `V${y0 + lane - 4}H${X(0).toFixed(1)}Z`;
         return html`<g key=${r.key}>
           <rect x=${L} y=${y0} width=${pw} height=${lane} rx="4" style=${{ fill: "var(--surface-2)" }} />
           <rect x=${X(0)} y=${y0} width=${X(Math.min(6, NOWH)) - X(0)} height=${lane} style=${{ fill: "var(--surface-3)" }} opacity="0.55" />
           <text x="0" y=${y0 + lane / 2 + 4} fontSize=${lane > 40 ? 12.5 : 11.5} fontWeight="500" style=${{ fill: r.color || "var(--text)", fontFamily: r.mono ? "var(--mono)" : "var(--sans)" }}>${r.label}</text>
-          ${pr.odd.map((o, h) => (o ? html`<rect key=${"o" + h} x=${X(h)} y=${y0} width=${X(Math.min(h + 1, NOWH)) - X(h)} height=${lane} style=${{ fill: "var(--med)", opacity: 0.16 }}><title>${String(h).padStart(2, "0")}:00 · unusual for this hour · ${Math.round(pr.today[h])} events, usually ${Math.round(pr.usual[h])}</title></rect>` : null))}
+          ${pr.odd.map((o, h) => (o ? html`<rect key=${"o" + h} x=${X(h)} y=${y0} width=${X(Math.min(h + 1, NOWH)) - X(h)} height=${lane} style=${{ fill: "var(--med)", opacity: 0.16 }}><title>${String(h).padStart(2, "0")}:00 · unusual for this hour · ${pr.today[h]} of ${pr.total} machines in use</title></rect>` : null))}
           <path d=${area} style=${{ fill: "var(--s6)", opacity: 0.32 }} />
-          <path d=${path(pr.today, y0, sc)} fill="none" style=${{ stroke: "var(--s6)" }} strokeWidth="1.5" strokeLinejoin="round" />
+          <path d=${line} fill="none" style=${{ stroke: "var(--s6)" }} strokeWidth="1.5" strokeLinejoin="round" />
           ${pr.pins.map((p0, k) => html`<g key=${k} style=${{ cursor: "pointer" }} onClick=${() => go && go("audit")}>
             <line x1=${X(p0.t)} x2=${X(p0.t)} y1=${y0 + 9} y2=${y0 + lane - 4} style=${{ stroke: p0.c }} strokeWidth="1.25" />
             <circle cx=${X(p0.t)} cy=${y0 + 8} r=${lane > 40 ? 5 : 4} style=${{ fill: p0.c, stroke: "var(--surface)" }} strokeWidth="1.5"><title>${p0.text}</title></circle></g>`)}
@@ -2983,15 +3176,17 @@ function DayLanes({ rows, go, lane = 56, verdictW = 136 }) {
         </g>`; })}
       ${ticks.map((h) => html`<text key=${h} x=${X(h)} y=${H - 6} textAnchor=${h === 0 ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h).padStart(2, "0")}:00</text>`)}
       <text x=${X(NOWH)} y=${H - 6} textAnchor="end" fontSize="10.5" fontWeight="600" style=${{ fill: "var(--crit)", fontFamily: "var(--mono)" }}>now</text>
-      ${hov != null ? html`<line x1=${X(hov + 0.5)} x2=${X(hov + 0.5)} y1="0" y2=${H - 22} style=${{ stroke: "var(--text-3)" }} strokeDasharray="2 3" />` : null}
+      ${hov != null ? html`<line x1=${X(hov)} x2=${X(hov)} y1="0" y2=${H - 22} style=${{ stroke: "var(--text-3)" }} strokeDasharray="2 3" />` : null}
     </svg>
-    ${hov != null ? html`<div className="tt" style=${{ left: Math.min(X(hov + 0.5) + 12, w - 240), top: 0 }}>
-      <div className="h">${String(hov).padStart(2, "0")}:00 – ${String(hov + 1).padStart(2, "0")}:00</div>
-      ${rows.map((r, i) => { const pr = profs[i];
-        return html`<div key=${r.key} className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className=${"t2" + (r.mono ? " mono" : "")} style=${{ width: 80 }}>${r.label}</span><b className="mono">${Math.round(pr.today[hov])}</b><span className="t3">events · usually ${Math.round(pr.usual[hov])}</span></div>`; })}
+    ${hov != null ? html`<div className="tt" style=${{ left: Math.min(X(hov) + 12, w - 300), top: 0 }}>
+      <div className="h">${hhmm(hov)}</div>
+      ${rows.map((r, i) => { const pr = profs[i], st = pr.stepAt(hov), hh = Math.min(pr.other.length - 1, Math.floor(hov));
+        return html`<div key=${r.key} className="row" style=${{ flexWrap: "nowrap", gap: 8, alignItems: "flex-start" }}><span className=${"t2" + (r.mono ? " mono" : "")} style=${{ width: 80, flex: "none" }}>${r.label}</span><span><b className="mono">${st.n}</b><span className="t3"> of ${pr.total} in use</span>
+          ${st.text ? html`<div className="t3" style=${{ fontSize: 11.5 }}>since ${hhmm(st.t)} · ${st.text}</div>` : null}
+          ${pr.other[hh] ? html`<div className="t4" style=${{ fontSize: 11.5 }}>this hour: ${pr.other[hh]}</div>` : null}</span></div>`; })}
     </div>` : null}
     <div className="leg" style=${{ marginTop: 8 }}>
-      <span><i className="sq" style=${{ "--c": "color-mix(in srgb, var(--s6) 45%, transparent)" }} />today</span>
+      <span><i className="sq" style=${{ "--c": "color-mix(in srgb, var(--s6) 45%, transparent)" }} />machines in use today</span>
       <span><i className="sq" style=${{ "--c": "color-mix(in srgb, var(--med) 30%, transparent)" }} />unusual for that hour</span>
       <span><i className="sq" style=${{ "--c": "var(--crit)", borderRadius: "50%" }} />needs someone</span>
       <span><i className="sq" style=${{ "--c": "var(--med)", borderRadius: "50%" }} />unusual</span>
@@ -3003,15 +3198,20 @@ function DayReport({ rows }) {
   return html`<div className="report" style=${{ fontSize: 13.5 }}>
     ${rows.map((r) => { const pr = hostsProfile(r.hosts); return html`<div key=${r.key} style=${{ marginBottom: 10 }}>
       <b style=${{ fontWeight: 600 }} className=${r.mono ? "mono" : ""}>${r.label}</b> <span style=${{ color: pr.verdict[1] }}>· ${pr.verdict[0].toLowerCase()}</span>
-      ${pr.pins.map((p0, i) => html`<div key=${i} className="row" style=${{ flexWrap: "nowrap", padding: "2px 0" }}><span className="sev" style=${{ "--c": p0.c }}><i /></span><span>${p0.text}</span></div>`)}
+      ${pr.pins.slice(0, 4).map((p0, i) => html`<div key=${i} className="row" style=${{ flexWrap: "nowrap", padding: "2px 0" }}><span className="sev" style=${{ "--c": p0.c }}><i /></span><span>${p0.text}</span></div>`)}
+      ${pr.pins.length > 4 ? html`<div className="t3" style=${{ fontSize: 12, paddingLeft: 18 }}>+${pr.pins.length - 4} more in the audit log</div>` : null}
     </div>`; })}
   </div>`;
 }
 function OrgDay({ go }) {
   const [view, setView] = useState("Chart");
-  const rows = DEPTS.map((d) => ({ key: d.id, label: d.name, hosts: new Set(deptHosts(d.id)), color: d.admins.length ? undefined : "var(--crit)" }));
-  return html`<${Panel} title="The organisation's day" sub="today so far · amber where an hour is unusual for it" extra=${html`<${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
-    ${view === "Report" ? html`<${DayReport} rows=${rows} />` : html`<${DayLanes} rows=${rows} go=${go} />`}
+  // six lanes at a time; departments with something flagged today come first, so paging never hides them
+  const all = useMemo(() => { const r0 = DEPTS.map((d, k) => ({ key: d.id, label: d.name, hosts: new Set(deptHosts(d.id)), color: d.admins.length ? undefined : "var(--crit)", k }));
+    const flagged = (r) => { const pr = hostsProfile(r.hosts); return pr.pins.length || pr.odd.some(Boolean) ? 0 : 1; };
+    return r0.map((r) => ({ r, f: flagged(r) })).sort((a, b) => a.f - b.f || a.r.k - b.r.k).map((x) => x.r); }, [DEPTS.length]);
+  const pg = usePaged(all, 6), rows = pg.items;
+  return html`<${Panel} title="The organisation's day" sub="machines with someone on them · amber where an hour is unusual" extra=${html`<${Pager} p=${pg} what="departments" /><${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
+    ${view === "Report" ? html`<${DayReport} rows=${rows} />` : html`<${DayLanes} rows=${rows} go=${go} slots=${pg.pages > 1 ? 6 : 0} />`}
   <//>`;
 }
 function Trend({ label, value, unit, fn, c, max, warn }) {
@@ -3084,6 +3284,14 @@ const DECISIONS = [
       { key: "later", icon: "ClockCircleOutlined", title: "Leave them until LOG-02 is sorted", desc: "They are all about the same machine.", verb: "Leave them", done: "Left until LOG-02 is sorted" },
     ] },
 ];
+if (LARGE) {
+  DECISIONS.push({ ...DECISIONS[1], id: "noadmin-wh", title: "Warehouse North has no Admin", short: "Warehouse North has no Admin", age: "since 3 Sep",
+    why: "47 machines and every report from them have nobody below you. Only you can assign an Admin." });
+  ["CC-12", "PRC-07", "MKT-19"].forEach((h, k) => DECISIONS.push({ ...DECISIONS[0], id: "stuck-" + h, sev: k ? "medium" : "high", title: `${h}'s update is stuck, and it came to you`, short: `${h} update stuck`, age: `${k + 1} days`,
+    why: "The department's Admin did not act within the limit, so the escalation reached you." }));
+  for (let k = 0; k < 9; k++) SU_ONLY_REPORTS.push([`R-23${String(k).padStart(2, "0")}`, `Update stuck · WHN-${String(k * 4 + 3).padStart(2, "0")}`, k < 4 ? "Mon 09:30" : "Tue 08:10"]);
+}
+{ const r0 = DECISIONS.find((x) => x.id === "reports"); r0.short = `${SU_ONLY_REPORTS.length} reports only you see`; r0.title = `${SU_ONLY_REPORTS.length} reports reach only you`; }
 const SU_QUEUE = DECISIONS;
 // Each decision's evidence as a picture: small on its card, large beside the options.
 function NightGrid({ big }) {
@@ -3096,13 +3304,21 @@ function NightGrid({ big }) {
     ${big ? [0, 6, 12, 18].map((h) => html`<text key=${h} x=${L + h * (cw + gap)} y=${7 * (ch + gap) + 13} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h).padStart(2, "0")}</text>`) : null}
   </svg>`;
 }
+// Approve 1.4.3: the gate opens when every machine runs 1.4.2. One bar for all of them, however many
+// there are; names only for the machines holding the gate, and only as many as fit.
 function GateTiles({ big, go }) {
-  const all = FULL.MACHINES || MACHINES;
-  return html`<div style=${{ display: "flex", flexWrap: "wrap", gap: big ? 6 : 3 }}>${all.map((m) => { const behind = m.ver !== "1.4.2";
-    return big ? html`<div key=${m.host} onClick=${() => go && go("machines", m.host)} title=${`${m.host} · ${m.ver}`} style=${{ cursor: "pointer", textAlign: "center" }}>
-        <div style=${{ width: 38, height: 38, borderRadius: 5, display: "grid", placeItems: "center", background: behind ? "color-mix(in srgb, var(--med) 16%, var(--surface))" : "color-mix(in srgb, var(--s2) 16%, var(--surface))", border: behind ? "1.5px dashed var(--med)" : "1px solid transparent", fontFamily: "var(--mono)", fontSize: 11, color: behind ? "var(--med)" : "var(--s2)" }}>${m.host.slice(-2)}</div>
-        <div className="mono" style=${{ fontSize: 10, color: behind ? "var(--med)" : "var(--text-3)", marginTop: 2 }}>${m.ver}</div></div>`
-      : html`<span key=${m.host} style=${{ width: 9, height: 9, borderRadius: 2, background: behind ? "var(--med)" : "var(--border-strong)" }} />`; })}</div>`;
+  const all = FULL.MACHINES || MACHINES, behind = all.filter((m) => m.ver !== "1.4.2"), on = all.length - behind.length, pct = (on / all.length) * 100;
+  const bar = (h) => html`<div style=${{ display: "flex", height: h, borderRadius: 3, overflow: "hidden", background: "var(--surface-3)" }} title=${`${on} of ${all.length} on 1.4.2`}>
+    <span style=${{ width: pct + "%", background: "color-mix(in srgb, var(--s2) 55%, transparent)" }} /><span style=${{ flex: 1, background: "color-mix(in srgb, var(--med) 70%, transparent)" }} /></div>`;
+  if (!big) return html`<div style=${{ width: "100%" }}>${bar(10)}<div className="mono t3" style=${{ fontSize: 10, marginTop: 4 }}>${behind.length} holding it</div></div>`;
+  const shown = behind.slice(0, 10);
+  return html`<div>
+    <div className="row" style=${{ alignItems: "baseline", gap: 8 }}><b style=${{ fontSize: 22, fontWeight: 600 }}>${on}</b><span className="t3">of ${all.length} machines on 1.4.2</span><span className="sp" /><span style=${{ color: "var(--med)" }}>${behind.length} holding the gate</span></div>
+    <div style=${{ margin: "10px 0 14px" }}>${bar(14)}</div>
+    <div className="row" style=${{ gap: 6 }}>${shown.map((m) => html`<span key=${m.host} onClick=${() => go && go("machines", m.host)} title=${`${m.host} · ${m.user || "no user"} · ${m.ver}`}
+        style=${{ cursor: "pointer", height: 28, padding: "0 8px", borderRadius: 4, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 11.5, border: "1.5px dashed var(--med)", color: "var(--med)" }}>${m.host}<span className="t3">${m.ver}</span></span>`)}
+      <${More} n=${behind.length - shown.length} what="holding it" /></div>
+  </div>`;
 }
 function Log02Lane({ big }) {
   const W = big ? 520 : 150, H = big ? 70 : 22, X = (h) => (h / 24) * W;
@@ -3124,7 +3340,8 @@ function SeatViz({ big }) {
   return html`<div className="row" style=${{ flexWrap: "nowrap", gap: big ? 14 : 6 }}>
     <span style=${{ width: r * 2, height: r * 2, borderRadius: "50%", border: "1.5px dashed var(--crit)", display: "grid", placeItems: "center", color: "var(--crit)", fontSize: big ? 16 : 9, flex: "none" }} title="Empty seat">${ic("UserAddOutlined")}</span>
     <span style=${{ width: big ? 24 : 10, height: 1, background: "var(--border-strong)" }} />
-    ${ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k]; return html`<span key=${m.host} title=${m.host} style=${{ width: big ? 34 : 12, height: big ? 34 : 12, borderRadius: 3, background: t.bg, border: t.border || "1px solid var(--border-strong)", display: "grid", placeItems: "center", fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--text-3)" }}>${big ? m.host.slice(-2) : ""}</span>`; })}
+    ${pickShown(ms, 4).shown.map((m) => { const k = HEALTH[m.status][0], t = TILE[k]; return html`<span key=${m.host} title=${m.host} style=${{ width: big ? 34 : 12, height: big ? 34 : 12, borderRadius: 3, background: t.bg, border: t.border || "1px solid var(--border-strong)", display: "grid", placeItems: "center", fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--text-3)" }}>${big ? m.host.slice(-2) : ""}</span>`; })}
+    ${ms.length > 4 ? html`<span className="t3 mono" style=${{ fontSize: big ? 12 : 10 }}>+${ms.length - 4}</span>` : null}
   </div>`;
 }
 function ReportStack({ big }) {
@@ -3133,19 +3350,23 @@ function ReportStack({ big }) {
 // LOG-02 stuck: machines sorted into the version they run, so the one left behind stands out.
 function VersionColumns({ big, go }) {
   const all = FULL.MACHINES || MACHINES, vers = ["1.4.0", "1.4.1", "1.4.2"];
-  if (!big) return html`<div className="row" style=${{ flexWrap: "nowrap", gap: 10, alignItems: "flex-end" }}>${vers.map((v) => { const ms = all.filter((m) => m.ver === v);
-    return html`<div key=${v} style=${{ display: "flex", flexWrap: "wrap", gap: 2, width: v === "1.4.2" ? 34 : 10, alignContent: "flex-end" }}>${ms.map((m) => html`<span key=${m.host} style=${{ width: 8, height: 8, borderRadius: 2, background: m.host === "LOG-02" ? "var(--crit)" : "var(--border-strong)" }} />`)}</div>`; })}
+  const per = vers.map((v) => all.filter((m) => m.ver === v).sort((a, b) => (b.host === "LOG-02") - (a.host === "LOG-02")));
+  // small: one bar per version, its height a share of the fleet, LOG-02 marked where it sits
+  if (!big) return html`<div className="row" style=${{ flexWrap: "nowrap", gap: 10, alignItems: "flex-end" }}>
+    ${per.map((ms, k) => html`<div key=${k} title=${`${vers[k]} · ${ms.length} machines`} style=${{ position: "relative", width: 12, height: Math.max(4, Math.round(30 * Math.sqrt(ms.length / all.length))), borderRadius: 2, background: k === 2 ? "color-mix(in srgb, var(--s2) 45%, transparent)" : "color-mix(in srgb, var(--med) 55%, transparent)" }}>
+      ${ms.some((m) => m.host === "LOG-02") ? html`<i style=${{ position: "absolute", left: 2, top: -10, width: 8, height: 8, borderRadius: 2, background: "var(--crit)" }} />` : null}</div>`)}
     <span className="t3 mono" style=${{ fontSize: 10 }}>1.4.0 → 1.4.2</span></div>`;
   const steps = [["Mon 07:45", "Install failed · update share unreachable", "var(--med)"], ["Mon 09:30", "Escalated to you", "var(--crit)"], ["Today 02:14", "A. Quaye entered it", "var(--s3)"], ["Today 02:31", "Went offline", "var(--text-3)"]];
   return html`<div>
     <div className="vcols">
-      ${vers.map((v, i) => { const ms = all.filter((m) => m.ver === v);
+      ${vers.map((v, i) => { const ms = per[i], cap = 6, more = ms.length - cap;
         return html`<div key=${v} className="vcol">
-          <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}><span className="mono" style=${{ fontWeight: 600 }}>${v}</span><span className="t3" style=${{ fontSize: 11 }}>${v === "1.4.2" ? "current" : i === 0 ? "two behind" : "one behind"}</span></div>
-          <div style=${{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>${ms.map((m) => { const me = m.host === "LOG-02";
+          <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}><span className="mono" style=${{ fontWeight: 600 }}>${v}</span><span className="t3" style=${{ fontSize: 11 }}>${ms.length} · ${v === "1.4.2" ? "current" : i === 0 ? "2 behind" : "1 behind"}</span></div>
+          <div style=${{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>${ms.slice(0, cap).map((m) => { const me = m.host === "LOG-02";
             return html`<span key=${m.host} title=${`${m.host} · ${m.user || ""}`} onClick=${() => go && go("machines", m.host)} style=${{ cursor: "pointer", height: 30, padding: "0 7px", borderRadius: 4, display: "inline-grid", placeItems: "center", fontFamily: "var(--mono)", fontSize: 11,
               background: me ? "color-mix(in srgb, var(--crit) 12%, var(--surface))" : v === "1.4.2" ? "color-mix(in srgb, var(--s2) 14%, var(--surface))" : "color-mix(in srgb, var(--med) 14%, var(--surface))",
-              border: me ? "1.5px dashed var(--crit)" : "1px solid transparent", color: me ? "var(--crit)" : v === "1.4.2" ? "var(--s2)" : "var(--med)" }}>${m.host}</span>`; })}</div>
+              border: me ? "1.5px dashed var(--crit)" : "1px solid transparent", color: me ? "var(--crit)" : v === "1.4.2" ? "var(--s2)" : "var(--med)" }}>${m.host}</span>`; })}
+            ${more > 0 ? html`<span className="more" style=${{ height: 30 }}>+${more}</span>` : null}</div>
         </div>`; })}
     </div>
     <div className="vjourney">
@@ -3175,10 +3396,11 @@ function SeatBypass({ big }) {
     <text x="225" y="91" textAnchor="middle" fontSize="12.5" fontWeight="600" style=${{ fill: "var(--text)" }}>Logistics</text>
     <circle cx="225" cy="140" r="17" style=${{ fill: "color-mix(in srgb, var(--crit) 8%, transparent)", stroke: "var(--crit)" }} strokeWidth="1.5" strokeDasharray="4 3" />
     <text x="225" y="145" textAnchor="middle" fontSize="15" fontWeight="600" style=${{ fill: "var(--crit)" }}>?</text>
-    <rect x="300" y="125" width="54" height="30" rx="4" style=${{ fill: "var(--surface-3)", stroke: "var(--border-strong)" }} />
-    <text x="327" y="144" textAnchor="middle" fontSize="11" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>LOG-01</text>
-    <rect x="362" y="125" width="54" height="30" rx="4" style=${{ fill: "transparent", stroke: "var(--text-4)" }} strokeDasharray="3 3" />
-    <text x="389" y="144" textAnchor="middle" fontSize="11" style=${{ fill: "var(--text-4)", fontFamily: "var(--mono)" }}>LOG-02</text>
+    ${(() => { const lm = (FULL.MACHINES || MACHINES).filter((m) => m.dept === "log"), two = lm.slice(0, 2);
+      return html`<g>${two.map((m, k) => { const off = m.status === "offline", x0 = 300 + k * 62;
+        return html`<g key=${m.host}><rect x=${x0} y="125" width="54" height="30" rx="4" style=${{ fill: off ? "transparent" : "var(--surface-3)", stroke: off ? "var(--text-4)" : "var(--border-strong)" }} strokeDasharray=${off ? "3 3" : "0"} />
+          <text x=${x0 + 27} y="144" textAnchor="middle" fontSize="11" style=${{ fill: off ? "var(--text-4)" : "var(--text-2)", fontFamily: "var(--mono)" }}>${m.host}</text></g>`; })}
+        ${lm.length > 2 ? html`<text x="424" y="144" textAnchor="end" fontSize="11" style=${{ fill: "var(--text-3)" }}>+${lm.length - 2}</text>` : null}</g>`; })()}
     ${big ? html`<g>
       <text x="225" y="172" textAnchor="middle" fontSize="11.5" fontWeight="600" style=${{ fill: "var(--crit)" }}>No Admin</text>
       <text x="14" y="150" fontSize="11.5" style=${{ fill: "var(--crit)" }}>4 reports, 1 escalation</text>
@@ -3188,7 +3410,6 @@ function SeatBypass({ big }) {
 }
 const DVIZ = { stuck: VersionColumns, noadmin: SeatBypass, quaye: NightGrid, approve: GateTiles, reports: ReportStack };
 function Work({ go }) {
-  const [view, setView] = useState("Decide");
   const [sel, setSel] = useState(DECISIONS[0].id);
   const [pick, setPick] = useState({});
   const [inp, setInp] = useState({});
@@ -3204,6 +3425,7 @@ function Work({ go }) {
   const AGE = { stuck: 3, noadmin: 13, quaye: 6, approve: 2, reports: 4 };
   const mine = TASKS.filter((t) => t.by === "You");
   const Big = DVIZ[d.id];
+  const dpg = usePaged(DECISIONS, 5), rpg = usePaged(SU_ONLY_REPORTS, 5), wpg = usePaged(mine, 5);
   return html`<${React.Fragment}>
     <div className="row" style=${{ justifyContent: "space-between" }}>
       <div className="row" style=${{ gap: 10, alignItems: "baseline" }}>
@@ -3211,15 +3433,14 @@ function Work({ go }) {
         ${open.filter((x) => x.sev === "high").length ? html`<span className="tag" style=${{ "--c": "var(--crit)" }}>${open.filter((x) => x.sev === "high").length} urgent<//>` : null}
         ${Object.keys(done).length ? html`<span className="tag" style=${{ "--c": "var(--ok)" }}>${ic("CheckOutlined")} ${Object.keys(done).length} decided<//>` : null}
       </div>
-      <${Segmented} value=${view} onChange=${setView} options=${[{ value: "Decide", label: "Decide" }, { value: "Follow up", label: "Follow up" }]} />
+      <${Pager} p=${dpg} />
     </div>
-    ${view === "Decide" ? html`<${React.Fragment}>
       <div className="dcards">
-        ${DECISIONS.map((x) => { const V = DVIZ[x.id], dn = done[x.id];
+        ${dpg.items.map((x) => { const V = DVIZ[x.id], dn = done[x.id];
           return html`<div key=${x.id} className=${"dcard" + (x.id === d.id ? " on" : "") + (dn ? " done" : "")} role="button" tabIndex="0" onClick=${() => setSel(x.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(x.id)} style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c }}>
             <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className="qi" style=${{ width: 26, height: 26, fontSize: 13 }}>${ic(dn ? "CheckOutlined" : x.icon)}</span><b style=${{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>${x.short}</b></div>
             <div className="dviz">${V ? html`<${V} />` : null}</div>
-            <div title=${`Waiting ${x.age}`}><div className="bar" style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c, height: 3 }}><span style=${{ width: `${Math.min(100, (AGE[x.id] / 14) * 100)}%` }} /></div>
+            <div title=${`Waiting ${x.age}`}><div className="bar" style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c, height: 3 }}><span style=${{ width: `${Math.min(100, ((AGE[x.id] || 3) / 14) * 100)}%` }} /></div>
               <div className="t3" style=${{ fontSize: 11, marginTop: 4 }}>${dn ? "decided" : x.age}</div></div>
           </div>`; })}
       </div>
@@ -3229,10 +3450,11 @@ function Work({ go }) {
             <div className="row"><${Sev} s=${d.sev} /></div>
             <div style=${{ fontSize: 18, fontWeight: 600, margin: "6px 0 4px", letterSpacing: "-0.01em" }}>${d.title}</div>
             <div className="t3" style=${{ fontSize: 12.5, marginBottom: 16 }}>${d.why}</div>
-            ${d.id === "reports" ? html`<div>${SU_ONLY_REPORTS.map(([id, t, w]) => html`<label key=${id} className="kv" style=${{ gridTemplateColumns: "22px minmax(0, 1fr) auto", cursor: "pointer" }}>
-                <${Checkbox} checked=${ticked.includes(id)} onChange=${(e) => setTicked(e.target.checked ? [...ticked, id] : ticked.filter((y) => y !== id))} /><span>${t}</span><span className="mono t3">${w}</span></label>`)}</div>`
+            ${d.id === "reports" ? html`<div>${rpg.items.map(([id, t, w]) => html`<label key=${id} className="kv" style=${{ gridTemplateColumns: "22px minmax(0, 1fr) auto", cursor: "pointer" }}>
+                <${Checkbox} checked=${ticked.includes(id)} onChange=${(e) => setTicked(e.target.checked ? [...ticked, id] : ticked.filter((y) => y !== id))} /><span>${t}</span><span className="mono t3">${w}</span></label>`)}
+              ${d.id === "reports" && rpg.pages > 1 ? html`<div className="row" style=${{ marginTop: 8 }}><span className="t3" style=${{ fontSize: 12 }}>${ticked.length} of ${SU_ONLY_REPORTS.length} ticked</span><span className="sp" /><${Pager} p=${rpg} /></div>` : null}</div>`
               : d.id === "noadmin" ? html`<${SeatBypass} big=${true} />`
-              : html`<${Big} big=${true} go=${go} />`}
+              : Big ? html`<${Big} big=${true} go=${go} />` : null}
             ${d.note ? html`<div className="t3" style=${{ fontSize: 12, marginTop: 12 }}>${ic("InfoCircleOutlined")} ${d.note}</div>` : null}
           </div>
           <div style=${{ padding: 20, minWidth: 0 }}>
@@ -3253,33 +3475,25 @@ function Work({ go }) {
           </div>
         </div>
       </section>
-    <//>` : html`<div className="g c-66" style=${{ alignItems: "start" }}>
-      <${Panel} title="Tasks you assigned">
-        <div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
-        ${mine.map((t) => { const dn = t.evidence.filter((e) => e.st === "Passed").length, over = t.state === "Overdue";
-          return html`<div key=${t.id} style=${{ cursor: "pointer" }} onClick=${() => go("tasks", t.id)}>
-            <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ fontWeight: 500 }}>${t.title}</span><span className="sp" /><span className="av" title=${t.who}>${initials(t.who)}</span></div>
-            <div className="row" style=${{ flexWrap: "nowrap", marginTop: 6 }}>
-              <div style=${{ display: "flex", gap: 3, flex: 1 }}>${t.evidence.map((e, i) => html`<span key=${i} title=${e.target + " · " + e.st} style=${{ flex: 1, height: 6, borderRadius: 2, background: ESTATE[e.st] === "var(--text-4)" ? "var(--surface-3)" : ESTATE[e.st] }} />`)}</div>
-              <span className="mono" style=${{ fontSize: 12, color: over ? "var(--crit)" : "var(--text-3)", whiteSpace: "nowrap" }}>${over ? span(NOWH - t.final) + " late" : span(t.final - NOWH) + " left"}</span>
-            </div></div>`; })}
-        </div>
-      <//>
-      <${Panel} title="Reports, against the 1-hour target">
-        <div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
-        ${[["Operations", 33, "R. Mensah"], ["Finance", 130, "K. Boateng"], ["OPS-07 restricted file", 198, "R. Mensah"]].map(([n, m, who]) => html`<div key=${n}>
-          <div className="row" style=${{ flexWrap: "nowrap" }}><span>${n}</span><span className="sp" /><span className="mono" style=${{ color: m > 60 ? "var(--med)" : "var(--text-2)" }}>${m >= 60 ? Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m" : m + "m"}</span>
-            ${m > 60 ? html`<${Button} size="small" onClick=${() => toast("Nudged " + who + " (concept)")}>Nudge<//>` : null}</div>
-          <div className="bar" style=${{ marginTop: 6, "--c": m > 60 ? "var(--med)" : "var(--ok)" }}><span style=${{ width: `${Math.min(100, (m / 200) * 100)}%` }} /><em style=${{ left: "30%" }} title="1 hour" /></div>
-        </div>`)}
-        </div>
-      <//>
-    </div>`}
+    ${mine.length ? html`<section className="panel">
+      <div className="phd"><div className="pt">Waiting on others<small>tasks you assigned · only you can verify them</small></div><${Pager} p=${wpg} what="tasks" /></div>
+      <div>
+        ${wpg.items.map((t) => { const dn = t.evidence.filter((e) => e.st === "Passed").length, over = t.state === "Overdue";
+          return html`<div key=${t.id} className="wrow" role="button" tabIndex="0" onClick=${() => go("tasks", t.id)} onKeyDown=${(e) => e.key === "Enter" && go("tasks", t.id)}>
+            <span style=${{ fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>${t.title}</span>
+            <span className="row" style=${{ flexWrap: "nowrap", gap: 6 }}><span className="av" style=${{ width: 22, height: 22, fontSize: 9 }}>${initials(t.who)}</span><span className="t2">${t.who}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${t.host}</span></span>
+            <span style=${{ display: "flex", gap: 3 }} title=${`${dn} of ${t.evidence.length} checks passed`}>${t.evidence.map((e, k) => html`<span key=${k} title=${e.target + " · " + e.st} style=${{ flex: 1, height: 6, borderRadius: 2, background: ESTATE[e.st] === "var(--text-4)" ? "var(--surface-3)" : ESTATE[e.st] }} />`)}</span>
+            <span className="mono" style=${{ fontSize: 12, color: over ? "var(--crit)" : "var(--text-3)", textAlign: "right", whiteSpace: "nowrap" }}>${over ? span(NOWH - t.final) + " late" : span(t.final - NOWH) + " left"}</span>
+            <span className="t4">${ic("RightOutlined")}</span>
+          </div>`; })}
+      </div>
+    </section>` : null}
   <//>`;
 }
 const ROUTING0 = { "Restricted file": ["ops", "fin", "log"], "Flow failed": ["ops", "fin"], "Listener report": ["ops"], "Update stuck": [], "Deviation": ["ops", "fin", "log"] };
 function Govern({ go, enter }) {
   const depts = FULL_DEPTS();
+  const dp = usePaged(depts, 6);
   // Routing goes to a department, and every Admin in it sees the report; the Super User always does.
   // Changes are held until confirmed, then sent as one reports.routing_set per category changed.
   const [saved, setSaved] = useState(ROUTING0);
@@ -3296,15 +3510,15 @@ function Govern({ go, enter }) {
   ];
   return html`<${React.Fragment}>
     <section className="panel">
-      <div className="phd"><div className="pt">Structure<small>click a department to open it · click an Admin for what you can do</small></div></div>
+      <div className="phd"><div className="pt">Structure<small>click a department to open it · click an Admin for what you can do</small></div><${Pager} p=${dp} what="departments" /></div>
       <div className="otree">
         <div className="ot-root"><span className="av" style=${{ width: 30, height: 30, background: "var(--accent-soft)", color: "var(--accent)" }}>SU</span><b style=${{ fontWeight: 600 }}>You</b><span className="t3" style=${{ fontSize: 12 }}>Super User · ADM-01</span></div>
         <div className="ot-rows">
-          ${depts.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
+          ${dp.items.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
             return html`<div key=${d.id} className="ot-row" role="button" tabIndex="0" onClick=${() => go("dept", d.id)} onKeyDown=${(e) => e.key === "Enter" && go("dept", d.id)}>
               <div className="ot-dept"><b style=${{ fontWeight: 600, fontSize: 14, color: d.admins.length ? "var(--text)" : "var(--crit)" }}>${d.name}</b><span className="t3" style=${{ fontSize: 12 }}>${ms.length} machines</span></div>
               <div className="ot-admins" onClick=${(e) => e.stopPropagation()}>
-                ${d.admins.map((a) => html`<${Dropdown} key=${a} trigger=${["click"]} menu=${{ items: [
+                ${d.admins.slice(0, 3).map((a) => html`<${Dropdown} key=${a} trigger=${["click"]} menu=${{ items: [
                     { key: "enter", icon: ic("LoginOutlined"), label: "Enter their console" },
                     { key: "name", icon: ic("EditOutlined"), label: "Change the name workers see" },
                     { key: "move", icon: ic("SwapOutlined"), label: "Move to another department" },
@@ -3317,6 +3531,7 @@ function Govern({ go, enter }) {
                     <span>${a}</span><span className="t4" style=${{ fontSize: 10 }}>${ic("DownOutlined")}</span>
                   </button>
                 <//>`)}
+                <${More} n=${d.admins.length - 3} what="" title=${d.admins.slice(3).join(", ")} onClick=${() => go("dept", d.id)} />
                 ${d.admins.length ? null : html`<button className="ochip empty" onClick=${() => go("work")} title="Its reports and escalations come to you. Assign someone in Work.">
                   <span className="av" style=${{ width: 24, height: 24, background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)", fontSize: 11 }}>?</span><span>Empty seat</span></button>`}
                 <button className="ochip add" onClick=${() => toast("Add an Admin to " + d.name + " (concept)")}>${ic("PlusOutlined")} Admin</button>
@@ -3332,7 +3547,7 @@ function Govern({ go, enter }) {
     <section className="panel">
       <div className="phd"><div className="pt">Where reports go<small>click a cell to route a kind of report to a department · every Admin there sees it · you always do</small></div>
         ${changes.length ? html`<div className="row"><span className="t2" style=${{ fontSize: 12 }}>${changes.length} change${changes.length > 1 ? "s" : ""} not saved</span><${Button} size="small" onClick=${() => setDraft(saved)}>Discard<//><${Button} size="small" type="primary" onClick=${() => setConfirming(true)}>Save routing<//></div>` : null}</div>
-      <div className="rgrid" style=${{ gridTemplateColumns: `minmax(120px, 1.4fr) repeat(${depts.length + 1}, minmax(56px, 1fr))` }}>
+      <div className="scroll-x"><div className="rgrid" style=${{ gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${depts.length + 1}, minmax(76px, 1fr))` }}>
         <span />
         <span className="rh">You</span>
         ${depts.map((d) => html`<span key=${d.id} className="rh" style=${{ color: d.admins.length ? undefined : "var(--crit)" }} title=${d.admins.length ? d.admins.join(", ") : "No Admin to receive them"}>${d.name}</span>`)}
@@ -3344,6 +3559,7 @@ function Govern({ go, enter }) {
               aria-pressed=${on} aria-label=${`${c} to ${d.name}: ${on ? "routed" : "not routed"}`} title=${dead ? "Routed, but nobody there to read it" : on ? "Routed · click to stop" : "Not routed · click to route"}>
               <span className=${"dotc" + (on ? " on" : "") + (dead ? " dead" : "")} /></button></span>`; })}
         <//>`)}
+      </div>
       </div>
       <div className="leg" style=${{ padding: "10px 14px" }}><span><span className="dotc on" /> routed</span><span><span className="dotc dead" /> routed, nobody there</span><span><span className="dotc" /> not routed</span><span><span className="rcell changed" style=${{ width: 18, height: 18, display: "inline-grid" }} /> changed, not saved</span></div>
     </section>
@@ -3384,41 +3600,118 @@ function Govern({ go, enter }) {
   <//>`;
 }
 const FULL_DEPTS = () => FULL.DEPTS || DEPTS;
-function DeptDay({ d, ms, go }) {
+// The department's day on one clock: the department's activity as a strip, and under it, on exactly the
+// same hours, who was on each machine. A pin and the session it belongs to line up vertically.
+function DeptToday({ d, ms, go }) {
+  const ref = useRef(null), w = useWidth(ref);
   const [view, setView] = useState("Chart");
-  const rows = [{ key: d.id, label: d.name, hosts: new Set(ms.map((m) => m.host)), color: d.admins.length ? undefined : "var(--crit)" }];
-  const hostsHere = new Set(ms.map((m) => m.host));
-  return html`<${React.Fragment}>
-    <${Panel} title="Today" sub="the department so far · amber where an hour is unusual for it" extra=${html`<${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
-      ${view === "Report" ? html`<${DayReport} rows=${rows} />` : html`<${DayLanes} rows=${rows} go=${go} />`}
-    <//>
-    <${Occupancy} lanes=${LANES.filter((l) => hostsHere.has(l.host))} title="Who was on each machine, today" />
+  const [hov, setHov] = useState(null);
+  const [span, setSpan] = useState("Working hours");
+  const [frame, setFrame] = useState([6, 18]);
+  const full = span === "24 hours", a = full ? 0 : frame[0], b = full ? 24 : frame[1];
+  const hosts = new Set(ms.map((m) => m.host)), pr = useMemo(() => hostsProfile(hosts), [d.id]);
+  const allLanes = useMemo(() => {
+    const l0 = ms.map((m, k) => ({ m, k, blocks: (LANES.find((l) => l.host === m.host) || { blocks: [] }).blocks }));
+    // machines with something to see come first: a flag, someone other than the owner, or a health problem
+    const note = (x) => (pr.pins.some((p0) => p0.text.includes(x.m.host)) || x.blocks.some((b0) => b0[2] !== "own") ? 0 : rankM(x.m) < 4 ? 1 : 2);
+    return l0.sort((a0, b0) => note(a0) - note(b0) || a0.k - b0.k); }, [d.id]);
+  const lp = usePaged(allLanes, 12, d.id), lanes = lp.items;
+  const L = 112, R = 12, strip = 22, rowH = 26, top = strip + 16, H = top + (lp.pages > 1 ? 12 : lanes.length) * rowH + 24;
+  const pw = Math.max(100, w - L - R), X = (h) => L + ((Math.max(a, Math.min(b, h)) - a) / (b - a)) * pw;
+  const stepH = b - a > 14 ? 3 : b - a > 8 ? 2 : 1;
+  const ticks = []; for (let h = Math.ceil(a / stepH) * stepH; h <= b; h += stepH) ticks.push(h);
+  const inView = (t0, t1) => t1 > a && t0 < b;
+  // what the frame leaves out is said, never silently dropped
+  // a session that was itself flagged is named once, as a flagged session
+  const hiddenS = full ? [] : allLanes.flatMap(({ m, blocks }) => blocks.filter((x) => !inView(x[0], x[1])).map((x) => `${x[3]} on ${m.host} at ${hhmm(x[0])}${x[4] ? ", outside working hours" : ""}`));
+  const hiddenP = full ? [] : pr.pins.filter((p0) => (p0.t < a || p0.t >= b) && !/outside working hours/.test(p0.text));
+  const hours = Array.from({ length: 25 }, (_, k) => ({ value: k, label: String(k).padStart(2, "0") + ":00" }));
+  const rows = [{ key: d.id, label: d.name, hosts }];
+  return html`<${Panel} title="Today" sub="who was on each machine, with what was flagged" extra=${html`${view === "Chart" ? html`<${Pager} p=${lp} what="machines" /><span className="t3" style=${{ fontSize: 12, marginLeft: 6 }}>Working hours</span>
+      <${Select} size="small" value=${frame[0]} style=${{ width: 82 }} options=${hours.filter((h) => h.value < frame[1])} onChange=${(v) => setFrame([v, frame[1]])} aria-label="Working day starts" />
+      <span className="t3">to</span>
+      <${Select} size="small" value=${frame[1]} style=${{ width: 82 }} options=${hours.filter((h) => h.value > frame[0])} onChange=${(v) => setFrame([frame[0], v])} aria-label="Working day ends" />
+      <${Segmented} size="small" value=${span} onChange=${setSpan} options=${["Working hours", "24 hours"]} />` : null}
+      <${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
+    ${view === "Report" ? html`<div>
+        <${DayReport} rows=${rows} />
+        <div className="report" style=${{ fontSize: 13.5 }}>${lanes.flatMap(({ m, blocks }) => blocks.filter((b) => b[2] !== "own").map((b, k) => html`<div key=${m.host + k}><b style=${{ fontWeight: 500 }}>${b[3]}</b> was on <span className="mono">${m.host}</span> from ${hhmm(b[0])} to ${b[1] >= NOWH ? "now" : hhmm(b[1])}${b[4] ? html`<span style=${{ color: "var(--med)" }}>, outside working hours</span>` : null}.</div>`))}</div>
+      </div>`
+    : html`<div ref=${ref} style=${{ position: "relative" }}>
+      <svg width=${w} height=${H} style=${{ display: "block" }} onMouseLeave=${() => setHov(null)}>
+        ${full ? html`<g>
+          <rect x=${X(0)} y="0" width=${X(frame[0]) - X(0)} height=${H - 22} style=${{ fill: "var(--surface-3)" }} opacity="0.5" />
+          <rect x=${X(frame[1])} y="0" width=${X(24) - X(frame[1])} height=${H - 22} style=${{ fill: "var(--surface-3)" }} opacity="0.5" />
+        </g>` : null}
+        ${ticks.map((h) => html`<line key=${"g" + h} x1=${X(h)} x2=${X(h)} y1="0" y2=${H - 22} style=${{ stroke: "var(--grid)" }} />`)}
+        <text x="0" y="12" fontSize="11.5" style=${{ fill: "var(--text-3)" }}>Flagged</text>
+        ${pr.odd.map((o, h) => (o && inView(h, h + 1) ? html`<rect key=${"o" + h} x=${X(h)} y="0" width=${X(Math.min(h + 1, NOWH)) - X(h)} height=${H - 22} style=${{ fill: "var(--med)", opacity: 0.12 }}><title>${String(h).padStart(2, "0")}:00 · unusual for this hour</title></rect>` : null))}
+        <line x1=${L} x2=${L + pw} y1=${strip + 8} y2=${strip + 8} style=${{ stroke: "var(--border-strong)" }} />
+        ${lanes.map(({ m, blocks }, i) => { const y = top + i * rowH, k = HEALTH[m.status][0], t = TILE[k];
+          return html`<g key=${m.host}>
+            <g style=${{ cursor: "pointer" }} onClick=${() => go("machines", m.host)}>
+              <rect x="0" y=${y + 7} width="11" height="11" rx="2" style=${{ fill: t.bg === "transparent" ? "var(--surface)" : t.bg, stroke: k === "quiet" || k === "watch" || k === "offline" ? "var(--border-strong)" : "none" }} strokeDasharray=${k === "offline" ? "2 2" : "0"} />
+              ${t.dot ? html`<circle cx="11" cy=${y + 7} r="3" style=${{ fill: t.dot, stroke: "var(--surface)" }} strokeWidth="1" />` : null}
+              <text x="18" y=${y + 16.5} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${m.host}<title>${m.user || "no user"} · ${HEALTH[m.status][1]}</title></text>
+            </g>
+            <line x1=${L} x2=${L + pw} y1=${y + rowH} y2=${y + rowH} style=${{ stroke: "var(--grid)" }} />
+            ${blocks.filter((x) => inView(x[0], x[1])).map((b, j) => html`<rect key=${j} x=${X(b[0])} y=${y + 7} width=${Math.max(3, X(b[1]) - X(b[0]))} height="12" rx="2"
+              style=${{ fill: OCC[b[2]].c, stroke: b[4] ? "var(--med)" : "none" }} strokeWidth="2"
+              onMouseEnter=${() => setHov({ x: X(b[0]), y: y + rowH, text: `${m.host} · ${b[3]} · ${OCC[b[2]].w} · ${hhmm(b[0])}–${b[1] >= NOWH ? "now" : hhmm(b[1])}` })} onMouseLeave=${() => setHov(null)} />`)}
+            ${blocks.length === 0 ? html`<text x=${L + 6} y=${y + 16.5} fontSize="11" style=${{ fill: "var(--text-4)" }}>nobody signed in today</text>`
+              : !blocks.some((x) => inView(x[0], x[1])) ? html`<text x=${L + 6} y=${y + 16.5} fontSize="11" style=${{ fill: "var(--text-4)" }}>nobody signed in during these hours</text>` : null}
+          </g>`; })}
+        ${pr.pins.filter((p0) => p0.t >= a && p0.t < b).map((p0, k) => html`<g key=${"p" + k} style=${{ cursor: "pointer" }} onClick=${() => go("audit")}>
+          <line x1=${X(p0.t)} x2=${X(p0.t)} y1="9" y2=${H - 22} style=${{ stroke: p0.c }} strokeWidth="1" strokeDasharray="2 3" opacity="0.7" />
+          <circle cx=${X(p0.t)} cy="8" r="5" style=${{ fill: p0.c, stroke: "var(--surface)" }} strokeWidth="1.5"><title>${p0.text}</title></circle></g>`)}
+        ${ticks.map((h) => html`<text key=${h} x=${X(h)} y=${H - 6} textAnchor=${h === a ? "start" : h === b ? "end" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
+        ${NOWH > a && NOWH < b ? html`<line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${H - 22} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25"><title>now · ${hhmm(NOWH)}</title></line>` : null}
+      </svg>
+      ${hov ? html`<div className="tt" style=${{ left: Math.min(hov.x, w - 300), top: hov.y }}>${hov.text}</div>` : null}
+      ${hiddenS.length || hiddenP.length ? html`<div className="row" style=${{ marginTop: 10, padding: "8px 10px", borderRadius: 5, background: "color-mix(in srgb, var(--med) 10%, transparent)", flexWrap: "nowrap" }}>
+        <span style=${{ color: "var(--med)" }}>${ic("EyeInvisibleOutlined")}</span>
+        <span style=${{ minWidth: 0 }}><b style=${{ fontWeight: 600 }}>${[hiddenS.length ? `${hiddenS.length} session${hiddenS.length === 1 ? "" : "s"}` : null, hiddenP.length ? `${hiddenP.length} flag${hiddenP.length === 1 ? "" : "s"}` : null].filter(Boolean).join(" and ")} outside this view:</b> <span className="t2">${[...hiddenS, ...hiddenP.map((p0) => p0.text)].slice(0, 3).join(", ")}${hiddenS.length + hiddenP.length > 3 ? `, and ${hiddenS.length + hiddenP.length - 3} more` : ""}</span></span>
+        <span className="sp" /><${Button} size="small" onClick=${() => setSpan("24 hours")}>Show 24 hours<//>
+      </div>` : null}
+      <div className="leg" style=${{ marginTop: 8 }}>
+        <span><i className="sq" style=${{ "--c": "color-mix(in srgb, var(--med) 30%, transparent)" }} />unusual hour</span>
+        <span><i className="sq" style=${{ "--c": "var(--crit)", borderRadius: "50%" }} />needs someone</span>
+        <span><i className="sq" style=${{ "--c": "var(--med)", borderRadius: "50%" }} />unusual</span>
+        ${Object.keys(OCC).map((k0) => html`<span key=${k0}><i className="sq" style=${{ "--c": OCC[k0].c }} />${OCC[k0].w.toLowerCase()}</span>`)}
+        ${full ? html`<span><i className="sq" style=${{ "--c": "var(--surface-3)" }} />outside ${hhmm(frame[0])}–${hhmm(frame[1])}</span>` : null}
+      </div>
+    </div>`}
   <//>`;
 }
 function DeptPage({ id, go, enter }) {
   const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id);
   const [who, setWho] = useState(null);
   const x = deptStats(d);
-  const hosts = new Set(x.ms.map((m) => m.host));
-  const ref = useRef(null), w = useWidth(ref);
-  const L = 64, lane = 22, pw = w - L - 8, X = (h) => L + (h / 24) * pw;
-  const flag = (e) => (e.kind === "violation" ? "var(--crit)" : e.kind === "deviation" || /outside working hours/.test(e.what) ? "var(--med)" : null);
+  // six issues and three Admins at a time; the panels keep their height whatever the department holds
+  const ip = usePaged(x.iss, 6, id), ap = usePaged(d.admins, 3, id);
   const ledK = WORSTK(x.ms), ledC = ledK === "quiet" ? "var(--ok)" : ledK === "watch" ? "var(--med)" : ledK === "offline" ? "var(--text-4)" : "var(--crit)";
   return html`<${React.Fragment}>
     <div className="row" style=${{ gap: 10 }}>
       <span style=${{ width: 10, height: 10, borderRadius: "50%", background: ledC, boxShadow: `0 0 0 4px color-mix(in srgb, ${ledC} 20%, transparent)` }} />
       ${[["DesktopOutlined", `${x.online}/${x.ms.length}`, "online"], ["AlertOutlined", x.iss.length, "open issues"], ["CloudUploadOutlined", `${x.ok}/${x.ms.length}`, "on 1.4.2"], ["FieldTimeOutlined", x.mtta || "—", "to handle a report"]].map(([i, v, k]) => html`<span key=${k} className="adm" style=${{ paddingLeft: 10 }} title=${k}><span className="t3">${ic(i)}</span><b style=${{ fontWeight: 600 }}>${v}</b><span className="t3" style=${{ fontSize: 12 }}>${k}</span></span>`)}
+      ${x.slow ? html`<span className="row" style=${{ gap: 6 }}><span style=${{ color: "var(--med)", fontSize: 12 }}>over the 1-hour target</span>
+        <${Button} size="small" onClick=${() => toast(`Nudged ${d.admins.join(" and ") || "nobody"} (concept)`)}>Nudge ${d.admins.length ? d.admins[0] : ""}<//></span>` : null}
     </div>
-    <div className="g c-75" style=${{ alignItems: "start" }}>
-      <${Panel} title="Machines">
-        <div className="bigtiles">${x.ms.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
-          return html`<div key=${m.host} className="bt" onClick=${() => go("machines", m.host)} title=${`${m.user || "no user"} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`}>
-            <div className="bt-face" style=${{ background: t.bg, color: t.fg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none") }}>${m.host.slice(-2)}${t.dot ? html`<i style=${{ background: t.dot }} />` : null}${m.held ? html`<b title=${m.held + " is inside"}>${ic("LoginOutlined")}</b>` : null}</div>
-            <div className="mono" style=${{ fontSize: 11, marginTop: 4 }}>${m.host}</div></div>`; })}</div>
-        <div className="leg" style=${{ marginTop: 12 }}>${[["quiet", "Healthy"], ["watch", "Worth a look"], ["high", "High"], ["crit", "Critical"], ["offline", "Offline"]].map(([k, l]) => html`<span key=${k}><${HealthMark} k=${k} size=${10} />${l}</span>`)}<span>${ic("LoginOutlined")} someone inside</span></div>
+    <div className="g c-75" style=${{ alignItems: "stretch" }}>
+      <${Panel} title="Open issues" sub="worst first" flush extra=${html`<${Pager} p=${ip} />`}>
+        <div style=${{ minHeight: ip.pages > 1 ? 6 * 37 : 0 }}>
+        ${x.iss.length ? ip.items.map((i) => { const a = NOWH - i.at;
+          return html`<div key=${i.id} className="irow" role="button" tabIndex="0" onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)}>
+            <i style=${{ background: SEV[i.sev].c }} />
+            <span className="ttl">${i.title} <span className="t3">· ${i.subject}</span></span>
+            <span className="mono t3">${i.host}</span>
+            <span className="mono" style=${{ color: a > i.sla ? "var(--crit)" : "var(--text-3)", textAlign: "right" }}>${a > 24 ? Math.floor(a / 24) + "d" : dur(a)}</span>
+          </div>`; })
+          : html`<div className="t3" style=${{ padding: 14 }}>${ic("CheckOutlined")} Nothing open in ${d.name}.</div>`}
+        </div>
       <//>
-      <${Panel} title="Admins">
-        ${d.admins.length ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>${d.admins.map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 12 }} title=${ADMIN_INFO[a].now}>
+      <${Panel} title="Admins" extra=${html`<${Pager} p=${ap} />`}>
+        ${d.admins.length ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>${ap.items.map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 12 }} title=${ADMIN_INFO[a].now}>
             <span style=${{ position: "relative" }}><span className="av" style=${{ width: 40, height: 40, fontSize: 14 }}>${initials(a)}</span>
               <i style=${{ position: "absolute", right: 0, bottom: 0, width: 11, height: 11, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
             <div style=${{ flex: 1, minWidth: 0 }}><div style=${{ fontWeight: 600 }}>${a}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a].busy ? "inside OPS-04" : "at their desk"}</div></div>
@@ -3433,9 +3726,7 @@ function DeptPage({ id, go, enter }) {
               </div></div>`}
       <//>
     </div>
-    <${DeptDay} d=${d} ms=${x.ms} go=${go} />
-    ${x.iss.length ? html`<div className="row" style=${{ gap: 8 }}>${x.iss.map((i) => html`<span key=${i.id} className="adm" style=${{ paddingLeft: 10, cursor: "pointer" }} onClick=${() => go("issues", i.id)} title=${i.title}>
-        <span className="sev" style=${{ "--c": SEV[i.sev].c }}><i /></span><span>${i.subject}</span><span className="mono t3">${i.host}</span></span>`)}</div>` : null}
+    <${DeptToday} key=${d.id} d=${d} ms=${x.ms} go=${go} />
   <//>`;
 }
 // Entering an Admin's console: the design requires blocking or ending their session first.
@@ -3456,8 +3747,8 @@ function EnterConsole({ admin, onClose, onEnter }) {
 }
 
 const NAV_ADMIN = [
-  ["Monitor", [["overview", "Overview", "DashboardOutlined"], ["machines", "Machines", "DesktopOutlined", "11"], ["sessions", "Sessions", "LoginOutlined", "2"], ["issues", "Issues", "AlertOutlined", "7", true]]],
-  ["Work", [["tasks", "Tasks", "CheckSquareOutlined", "7"], ["flows", "Flows", "BranchesOutlined"], ["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
+  ["Monitor", [["overview", "Overview", "DashboardOutlined"], ["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["sessions", "Sessions", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
+  ["Work", [["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["flows", "Flows", "BranchesOutlined"], ["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
   ["Govern", [["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
 ];
 const NAV_SU = [["", [["monitor", "Monitor", "DashboardOutlined"], ["work", "Work", "InboxOutlined", String(SU_QUEUE.length), true], ["govern", "Govern", "ApartmentOutlined"]]]];
@@ -3473,7 +3764,14 @@ function Palette({ go, close, nav }) {
     { g: "Actions", l: "Leave session on OPS-07", sub: "Ama gets her machine back", icon: "LogoutOutlined", run: () => toast("Left OPS-07 (concept)") },
     { g: "Actions", l: "Run action on a machine…", icon: "PlayCircleOutlined", run: () => go("automation") },
   ];
-  const list = items.filter((x) => (x.l + " " + (x.sub || "") + " " + x.g).toLowerCase().includes(q.toLowerCase())).slice(0, 30);
+  // at most five per group; the rest are counted, and a sharper query finds them
+  const PAL_GO = { Machines: "machines", Issues: "issues" };
+  const list = (() => { const seen = {}, out = [], extra = {};
+    items.filter((x) => (x.l + " " + (x.sub || "") + " " + x.g).toLowerCase().includes(q.toLowerCase())).forEach((x) => {
+      seen[x.g] = (seen[x.g] || 0) + 1; if (seen[x.g] <= 5 || x.g === "Go to") out.push(x); else extra[x.g] = (extra[x.g] || 0) + 1; });
+    Object.keys(extra).forEach((g) => { const k = out.map((x) => x.g).lastIndexOf(g);
+      out.splice(k + 1, 0, { g, l: `+${extra[g]} more ${g.toLowerCase()}`, sub: "type more to narrow, or open the full list", icon: "EllipsisOutlined", run: () => go(PAL_GO[g] || "overview") }); });
+    return out; })();
   const pick = (x) => { if (x) { x.run(); close(); } };
   let last = null;
   return html`<div className="overlay" onMouseDown=${close}><div className="pal" onMouseDown=${(e) => e.stopPropagation()}>
@@ -3567,16 +3865,18 @@ function App() {
         ${level ? html`<div className="org" style=${{ paddingBottom: 6 }}><span className="av" style=${{ width: 26, height: 26, background: "color-mix(in srgb, var(--crit) 14%, transparent)", color: "var(--crit)" }}>${initials(level.admin)}</span>
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>${level.admin}'s console</div><div className="t3" style=${{ fontSize: 11.5 }}>${deptName(level.dept)} · you as Super User</div></div></div>`
           : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
-            <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · 3 departments</div></div></div>`}
+            <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} departments</div></div></div>`}
         ${nav.map(([g, xs]) => html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}
           ${xs.map(([id, l, icon, cnt, hot]) => { const on = page === id || (!level && SU_PARENT[page] === id);
             return html`<div key=${id} className=${"nav" + (on ? " on" : "") + (level ? "" : " big")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
-            ${ic(icon)}<span>${l}</span>${cnt ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${cnt}</span>` : null}</div>`; })}<//>`)}
+            ${ic(icon)}<span>${l}</span>${(() => { const n = typeof cnt === "function" ? cnt() : cnt; return n ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${n > 999 ? "999+" : n}</span>` : null; })()}</div>`; })}<//>`)}
         <div className="side-foot">
           ${level ? html`<${Button} danger block icon=${ic("LogoutOutlined")} onClick=${leave}>Leave console<//>` : null}
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
-          <span className="t4" style=${{ fontSize: 11 }}>Concept · sample data</span>
+          <span className="t4" style=${{ fontSize: 11 }} title="The large sample checks that nothing grows with the data">Concept · sample:
+            <a style=${{ marginLeft: 4, color: LARGE ? "var(--text-3)" : "var(--accent)", fontWeight: LARGE ? 400 : 600, cursor: "pointer" }} onClick=${() => LARGE && setSample(false)}>small</a> ·
+            <a style=${{ marginLeft: 2, color: LARGE ? "var(--accent)" : "var(--text-3)", fontWeight: LARGE ? 600 : 400, cursor: "pointer" }} onClick=${() => !LARGE && setSample(true)}>large</a></span>
         </div>
       </aside>
       <div className="main">
