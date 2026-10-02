@@ -106,7 +106,7 @@ This system grew out of a smaller predecessor: **github.com/khonello/SystemMonit
 A hierarchy-based management/automation/monitoring system for organizations structured as **Super User → Department → Admin → Client PC**. Five feature areas share one authority model, one audit trail, and one file index:
 
 - **Hierarchy** (backbone) — traversal, Session Blocking, Display Names, Report Routing, Cross-Department Assisted Access
-- **Task** — LLM-populated verification targets; only manual verification by the assigner closes a task
+- **Task** — LLM-populated verification targets; only manual verification by the assigner closes a task. A Super User's task to a department has no checks: the Admins told mark it seen / ongoing / done and only the Super User completes it (decided 2 Oct 2026, `task-natural-combo.md`)
 - **Flow** — one-directional sync pipelines (Source → Branch/Transform/Categorize → Destinations)
 - **Resource & Assistance** — tiered folders (`admin`/`restricted`/`workers`/`common`) as access policy; Ping → Message Channel → Listeners
 - **Control, Events, Monitoring & Actions** — Admin-authored automation; Custom Actions are PowerShell/Python, stdlib + Windows-native only, unsandboxed

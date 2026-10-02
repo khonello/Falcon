@@ -23,6 +23,18 @@ Verification is the anchor: it defines what the end outcome of the task must be.
 - Super User creates → Department-level task (Admin or multiple Admins in that department accountable)
 - Admin creates → Client PC-level task (specific user account on that PC accountable)
 
+**Department tasks (decided 2 Oct 2026).** A task the Super User gives a department has **no Verification and
+no Expectations**. It has a title and one deadline, and it is given to every Admin in the department or to the
+ones the Super User picks. Such work, like collecting forms or preparing for an audit, is rarely a file or a
+program the system can watch, and checks would only pretend otherwise.
+- **Admins:** each one told marks it *seen*, *ongoing* or *done*, and the time of each mark is recorded. A new
+  one stays across the top of every page of their console until they mark it seen.
+- **Super User:** a task marked done appears in their Work as a decision. They call it **complete**, or send it
+  back as ongoing with a note. Nobody else can close it.
+
+Everything below about Verification, Expectations and the LLM-populated structure applies to the tasks Admins
+give Workers.
+
 **Task Properties:**
 - Assigned to: User account
 - Created by: Super User or Admin

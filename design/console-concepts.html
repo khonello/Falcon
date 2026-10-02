@@ -66,12 +66,14 @@ a { color: var(--accent); text-decoration: none; }
 .nav.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 .nav .cnt { margin-left: auto; font-size: 11.5px; color: var(--text-3); font-family: var(--mono); }
 .nav .cnt.hot { color: var(--crit); font-weight: 500; }
+.side-foot > span { white-space: nowrap; }
 .side-foot { margin-top: auto; padding: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
 .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; min-height: 50px; display: flex; align-items: center; gap: 12px;
        padding: 8px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.crumb { display: flex; align-items: center; gap: 6px; color: var(--text-3); white-space: nowrap; }
+.crumb { display: flex; align-items: center; gap: 6px; color: var(--text-3); white-space: nowrap; min-width: 0; max-width: 46vw; }
+.crumb b, .crumb a { overflow: hidden; text-overflow: ellipsis; }
 .crumb b { color: var(--text); font-weight: 600; font-size: 14px; }
 .search { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; min-width: 240px; border: 1px solid var(--border);
           border-radius: 5px; color: var(--text-3); background: var(--surface-2); cursor: pointer; }
@@ -97,7 +99,7 @@ a { color: var(--accent); text-decoration: none; }
 .c-39 { grid-template-columns: minmax(240px, 3fr) minmax(0, 9fr); }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .kpi { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.kpi .v { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+.kpi .v { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; white-space: nowrap; flex: none; }
 .kpi .v small { font-size: 13px; font-weight: 400; color: var(--text-3); margin-left: 3px; }
 .kpi .d { font-size: 12px; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -122,6 +124,7 @@ a { color: var(--accent); text-decoration: none; }
 .scroll-x { overflow-x: auto; }
 .stream { display: flex; flex-direction: column; max-height: 316px; overflow: auto; }
 .ev { display: grid; grid-template-columns: 62px 10px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 6px 14px; border-bottom: 1px solid var(--grid); }
+.ev > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ev.new { animation: flash 1.6s ease-out; }
 @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
 .hm-tile { width: 46px; height: 46px; border-radius: 4px; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; font-weight: 500; cursor: pointer;
@@ -176,8 +179,11 @@ a { color: var(--accent); text-decoration: none; }
 .decide { padding: 12px 14px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); background: color-mix(in srgb, var(--c) 9%, transparent); }
 .breathe { animation: breathe 1.2s ease-in-out infinite; }
 @keyframes breathe { 50% { opacity: .35; } }
-.su-banner { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 20px; background: color-mix(in srgb, var(--crit) 12%, var(--surface)); color: var(--crit); border-bottom: 1px solid color-mix(in srgb, var(--crit) 30%, transparent); flex-wrap: wrap; }
+.su-banner { position: relative; display: flex; flex-wrap: nowrap; white-space: nowrap; align-items: center; gap: 10px; padding: 8px 20px; background: color-mix(in srgb, var(--crit) 12%, var(--surface)); color: var(--crit); border-bottom: 1px solid color-mix(in srgb, var(--crit) 30%, transparent); }
 .su-banner span:not(.sp):not(.mono) { color: var(--text); }
+.su-banner > span:nth-of-type(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.su-banner > * { flex: none; } .su-banner > span:nth-of-type(2) { flex: 0 1 auto; } .su-banner > .sp { flex: 1 1 auto; }
+.orgtxt { min-width: 0; } .orgtxt > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav.big { padding: 10px 12px; font-size: 14px; }
 .drow { display: grid; grid-template-columns: minmax(150px, 1.4fr) minmax(140px, 1.6fr) 70px minmax(120px, 1fr) 130px minmax(120px, 1fr); gap: 14px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; }
 .drow:hover { background: var(--surface-2); }
@@ -272,7 +278,7 @@ a { color: var(--accent); text-decoration: none; }
 .tab-display { position: relative; aspect-ratio: 2.1 / 1; border-radius: 8px; overflow: hidden; background: var(--surface); display: flex; flex-direction: column; }
 .tab-display.off .tab-body { opacity: .25; filter: grayscale(1); }
 .tab-top { display: flex; align-items: center; gap: 10px; padding: 7px 12px; background: var(--surface-2); border-bottom: 1px solid var(--grid); }
-.tab-name { font-size: 13px; font-weight: 600; }
+.tab-name { font-size: 13px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-body { flex: 1; display: grid; grid-template-columns: 26px minmax(0, 1fr); min-height: 0; }
 .tab-rail { border-right: 1px solid var(--grid); padding: 10px 7px; display: flex; flex-direction: column; gap: 7px; }
 .tab-rail i { height: 4px; border-radius: 2px; background: var(--border-strong); }
@@ -312,6 +318,7 @@ a { color: var(--accent); text-decoration: none; }
 .ot-row::before { content: ''; position: absolute; left: -27px; top: 50%; width: 26px; height: 1px; background: var(--border-strong); }
 .ot-row:hover { background: var(--surface-2); }
 .ot-dept { display: flex; flex-direction: column; min-width: 0; }
+.ot-dept > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ot-admins { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .ochip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 4px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 500; cursor: pointer; }
 .ochip:hover { border-color: var(--border-strong); background: var(--surface-2); }
@@ -357,6 +364,20 @@ a { color: var(--accent); text-decoration: none; }
 .pager button:first-of-type { margin-left: 6px; }
 .pager button:disabled { opacity: .4; cursor: default; }
 .tab-more { background: transparent !important; color: var(--text-3) !important; border: 1px dashed var(--border-strong) !important; font-size: 10px !important; }
+/* a machine name or a person's name never wraps inside a table: the cell is cut and the full name is on hover */
+.ant-table-tbody .mono, .nowrap { white-space: nowrap; }
+.cut { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.irow > .mono.t3 { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.rgrid .rh > span { font-size: 11.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.drow { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 96px minmax(0, 1.3fr) 90px; gap: 16px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border); }
+.drow:first-child { border-top: 0; } .drow:hover { background: var(--surface-2); }
+@media (max-width: 760px) { .drow { grid-template-columns: minmax(0, 1fr) 90px; } .drow > :nth-child(2), .drow > :nth-child(3), .drow > :nth-child(4) { display: none; } }
+.newtask { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; white-space: nowrap; padding: 9px 20px; background: var(--accent-soft); border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text); }
+.newtask .nt-ico { color: var(--accent); font-size: 15px; flex: none; animation: ntpulse 1.6s ease-in-out 3; }
+.newtask .nt-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@keyframes ntpulse { 50% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .newtask .nt-ico { animation: none; } }
+.drow.fresh { background: var(--accent-soft); }
 .list-item { padding: 10px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
 .list-item:hover { background: var(--surface-2); }
 .list-item.on { background: var(--accent-soft); }
@@ -412,8 +433,11 @@ const ic = (n) => (I[n] ? React.createElement(I[n]) : null);
 const T0 = Date.now();
 // Sample size. The large sample is for checking that nothing grows with the data: ten departments,
 // about 270 machines. Remembered per viewer; the page reloads to rebuild the data.
-const LARGE = (() => { try { return localStorage.getItem("falcon-sample") === "large"; } catch (e) { return false; } })();
-const setSample = (large) => { try { localStorage.setItem("falcon-sample", large ? "large" : "small"); location.reload(); } catch (e) { toast("Your browser blocks saving this choice"); } };
+// Absurd goes further: fifty departments, thousands of machines, hundreds of everything, and names far
+// longer than anyone would choose, so any list that still grows, or any label that cannot fit, shows.
+const SAMPLE_SIZE = (() => { try { return localStorage.getItem("falcon-sample") || "small"; } catch (e) { return "small"; } })();
+const LARGE = SAMPLE_SIZE === "large" || SAMPLE_SIZE === "absurd", ABSURD = SAMPLE_SIZE === "absurd";
+const setSample = (v) => { try { localStorage.setItem("falcon-sample", v); location.reload(); } catch (e) { toast("Your browser blocks saving this choice"); } };
 
 // ============================================================== time model
 // "Now" is Thursday 1 October 2026, 13:20. Time is in hours from today's midnight (negative = earlier days).
@@ -441,10 +465,24 @@ function niceMax(v) { const p = Math.pow(10, Math.floor(Math.log10(v))), m = v /
 let showToast = () => {};
 const toast = (t) => showToast(t);
 
+// A machine's sessions today, looked up by name. The index is rebuilt when LANES is swapped for a scope.
+const LANE_IDX = new WeakMap();
+const laneIn = (arr, h) => { let m = LANE_IDX.get(arr); if (!m) { m = new Map(arr.map((l) => [l.host, l])); LANE_IDX.set(arr, m); } return m.get(h) || { host: h, blocks: [] }; };
+const laneOf = (h) => laneIn(LANES, h);
+
+// Numbers are grouped (3,532), and a label drawn in a chart is cut to the room it has. A machine name
+// keeps its end, where the number is (RCX-ACC…-053); anything else keeps its start (Regional Custom…).
+const fmt = (n) => (typeof n === "number" ? n.toLocaleString("en-US") : n);
+const fitEnd = (t, max) => (t.length <= max ? t : t.slice(0, max - 1) + "…");
+const fitMid = (t, max) => (t.length <= max ? t : t.slice(0, Math.ceil((max - 1) * 0.55)) + "…" + t.slice(t.length - Math.floor((max - 1) * 0.45)));
+
 // ============================================================== bounded lists
 // Nothing grows with the data. The number of machines, issues, people or departments is unknown until the
 // product is installed, so every list shows a fixed number and counts the rest ("+24 more"), and every chart
 // with one row per thing pages through them at a fixed height. Whatever needs someone always makes the cut.
+// the label a machine tile shows: the number at the end of its name, smaller when it runs long
+const tileNo = (h) => { const m = /(\d+)$/.exec(h); return m ? m[1] : h.slice(-3); };
+const tileFs = (h) => (tileNo(h).length > 3 ? 9 : tileNo(h).length > 2 ? 10.5 : undefined);
 const RANKH = { crit: 0, high: 1, watch: 2, offline: 3, quiet: 4 };
 const rankM = (m) => RANKH[HEALTH[m.status][0]];
 // machines: the worst ones first into the shown set, then the order they were in
@@ -454,7 +492,7 @@ function pickShown(ms, n, rank = rankM) {
   return { shown: idx.map((i) => ms[i]), rest: ms.length - n };
 }
 function More({ n, what, onClick, title }) {
-  return n > 0 ? html`<button className="more" title=${title} onClick=${(e) => { e.stopPropagation(); onClick && onClick(); }}>+${n} more${what ? " " + what : ""}</button>` : null;
+  return n > 0 ? html`<button className="more" title=${title} onClick=${(e) => { e.stopPropagation(); onClick && onClick(); }}>+${fmt(n)} more${what ? " " + what : ""}</button>` : null;
 }
 function usePaged(list, size, key) {
   const [pg, setPg] = useState(0);
@@ -466,7 +504,7 @@ function Pager({ p, what }) {
   if (p.pages <= 1) return null;
   const a = p.page * p.size + 1, b = Math.min(p.total, a + p.size - 1);
   const go1 = (d) => (e) => { e.stopPropagation(); p.setPage(p.page + d); };
-  return html`<span className="pager"><span className="mono">${a}–${b}</span><span className="t3"> of ${p.total}${what ? " " + what : ""}</span>
+  return html`<span className="pager"><span className="mono">${fmt(a)}–${fmt(b)}</span><span className="t3"> of ${fmt(p.total)}${what ? " " + what : ""}</span>
     <button aria-label="Previous page" disabled=${p.page === 0} onClick=${go1(-1)}>${ic("LeftOutlined")}</button>
     <button aria-label="Next page" disabled=${p.page >= p.pages - 1} onClick=${go1(1)}>${ic("RightOutlined")}</button></span>`;
 }
@@ -498,13 +536,26 @@ if (LARGE) {
     ["cc", "Customer Care", "CC", 64, ["S. Addo", "E. Nkrumah", "B. Tetteh", "L. Ofori", "F. Amoah"], "var(--s6)"], ["wh", "Warehouse North", "WHN", 47, [], "var(--s2)"],
     ["it", "IT Support", "IT", 18, ["D. Agyeman"], "var(--s1)"], ["lgl", "Legal", "LGL", 9, ["N. Badu"], "var(--s4)"], ["mkt", "Marketing", "MKT", 26, ["G. Sarpong"], "var(--s3)"]];
   ADD.forEach(([id, name, , , admins, c]) => DEPTS.push({ id, name, admins, c }));
-  const gen = (dept, pre, from, to, sub) => { for (let k = from; k <= to; k++) { const r = nz(71, hs(pre) + k), host = `${pre}-${String(k).padStart(2, "0")}`;
+  const gen = (dept, pre, from, to, sub) => { for (let k = from; k <= to; k++) { const r = nz(71, hs(pre) + k), host = `${pre}-${String(k).padStart(to > 99 ? 3 : 2, "0")}`;
     const status = r < 0.03 ? "offline" : r < 0.04 ? "critical" : r < 0.07 ? "high" : r < 0.15 ? "warning" : "healthy";
     MACHINES.push({ host, user: nz(73, hs(pre) + k) < 0.1 ? null : NAMES[Math.floor(nz(79, hs(pre) + k) * NAMES.length)], dept, ip: `10.${sub}.${Math.floor(k / 200)}.${k % 200 + 10}`,
       ver: status === "offline" ? "1.4.0" : nz(83, hs(pre) + k) < 0.12 ? "1.4.1" : "1.4.2", status, seen: status === "offline" ? NOWH - 3 - nz(89, k) * 20 : 0.001,
       note: status === "offline" ? "Not checking in" : status === "critical" ? "Restricted file outside /restricted/" : status === "high" ? "Restricted file outside /restricted/" : status === "warning" ? "Help request unanswered" : "" }); } };
   gen("ops", "OPS", 8, 40, 20);
   ADD.forEach(([id, , pre, n], k) => gen(id, pre, 1, n, 30 + k * 2));
+  if (ABSURD) {
+    const LONGN = ["Oluwaseun Adebayo-Williamson", "Maximiliana Konadu-Ofori-Atta", "Christopher Kwabena Mensah-Bonsu", "Bartholomew Nii Armah Tettey-Quarshie"];
+    const ABS = [["rcx", "Regional Customer Experience, Escalations and Quality Assurance (West)", "RCX-ACCRA-FL3", 420, 40],
+      ["fin2", "Finance Shared Services Centre", "FSSC", 260, 3], ["wh2", "Warehouse South", "WHS", 180, 0], ["ops2", "Operations Night Shift", "ONS", 90, 1]];
+    for (let k = 1; k <= 40; k++) ABS.push([`d${k}`, `Branch ${String(k).padStart(2, "0")} · ${["Kumasi", "Tamale", "Takoradi", "Ho", "Cape Coast", "Sunyani", "Koforidua", "Bolgatanga"][k % 8]}`, `B${String(k).padStart(2, "0")}`, 20 + Math.floor(nz(111, k) * 70), k % 9 === 0 ? 0 : 1 + (k % 3)]);
+    ABS.forEach(([id, name, pre, n, na], k) => {
+      const admins = Array.from({ length: na }, (_, j) => j === 0 && k === 0 ? "Dr. Nana Akosua Owusu-Ansah-Boateng" : `${"ABCDEFGHJKLMNPRSTW"[(k + j) % 18]}. ${["Owusu", "Asante", "Mensah", "Boateng", "Darko", "Addo", "Ofori", "Amoah", "Sarpong", "Badu"][(k * 3 + j) % 10]}${j > 9 ? " " + j : ""}`);
+      DEPTS.push({ id, name, admins, c: ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)"][k % 6] });
+      gen(id, pre, 1, n, 60 + k);
+    });
+    gen("ops", "OPS", 41, 250, 20);
+    MACHINES.forEach((m, k) => { if (k % 97 === 0 && m.user) m.user = LONGN[k % LONGN.length]; });
+  }
 }
 const MBY = Object.fromEntries(MACHINES.map((m) => [m.host, m]));
 const DBY = Object.fromEntries(DEPTS.map((d) => [d.id, d]));
@@ -558,6 +609,7 @@ if (LARGE) {
       subject: m.status === "warning" ? `${m.user || "Someone"} · 1 ping` : m.status === "offline" ? "1.4.0 → 1.4.2" : t.subject,
       title: m.status === "offline" ? "Machine not checking in" : t.title, sev: m.status === "offline" ? "low" : t.sev });
   });
+  if (ABSURD) ISSUES.slice(-40).forEach((i, k) => { if (k % 4 === 0) { i.at = NOWH - 24 * (30 + k * 11); if (i.type === "file") i.subject = "Q3-2026-consolidated-board-pack-FINAL-v14-signed-and-countersigned (2).xlsx"; } });
 }
 
 // who held each machine today: [from, to, kind, who]. kinds: own / admin / you / assist
@@ -601,7 +653,7 @@ let AUDIT = (() => {
   const acts = ["Lock the screen", "Take a screenshot", "Check disk health", "Clear the temp folder", "Log event"];
   let id = 0;
   for (let t = NOWH - 168; t < NOWH; t += 0.25) {
-    const rate = working(t) ? 2.6 : weekend(t) ? 0.15 : 0.35;
+    const rate = (working(t) ? 2.6 : weekend(t) ? 0.15 : 0.35) * (ABSURD ? 10 : 1);
     const n = Math.floor(rate * sm(41, t, 2) * 1.6 + nz(5, Math.floor(t * 4)));
     for (let j = 0; j < n; j++) {
       const r = nz(9, id * 3 + 1), h = hosts[Math.floor(nz(13, id) * hosts.length)], m = MBY[h], tt = t + nz(17, id) * 0.25;
@@ -769,7 +821,7 @@ function Kpi({ label, value, unit, delta, dc, fn, sc, max }) {
     <div className="t3">${label}</div>
     <div className="row" style=${{ flexWrap: "nowrap", justifyContent: "space-between", alignItems: "flex-end" }}>
       <div className="v">${value}${unit ? html`<small>${unit}</small>` : null}</div>
-      ${fn ? html`<${Spark} fn=${fn} c=${sc || "var(--s1)"} max=${max} />` : null}
+      ${fn ? html`<div style=${{ minWidth: 0, overflow: "hidden", display: "flex", justifyContent: "flex-end" }}><${Spark} fn=${fn} c=${sc || "var(--s1)"} max=${max} /></div>` : null}
     </div>
     <div className="d" style=${{ color: dc || "var(--text-3)" }}>${delta}</div>
   </div>`;
@@ -803,13 +855,13 @@ function HostMap({ by, onOpen, onMore }) {
     <div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
       ${DEPTS.slice(0, 3).map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id), pk = pickShown(ms, 35, (m) => RANKH[tileFor(m, by)]);
         return html`<div key=${d.id}>
-          <div className="row" style=${{ marginBottom: 6 }}><span className="b">${d.name}</span><span className="t3">${ms.length} machines · ${d.admins.length ? d.admins.join(", ") : html`<span style=${{ color: "var(--crit)" }}>no Admin</span>`}</span></div>
+          <div className="row" style=${{ marginBottom: 6, flexWrap: "nowrap" }}><span className="b cut" style=${{ maxWidth: "45%", flex: "none" }} title=${d.name}>${d.name}</span><span className="t3 cut" style=${{ flex: 1, minWidth: 0 }} title=${d.admins.join(", ")}>${fmt(ms.length)} machines · ${d.admins.length ? d.admins.slice(0, 3).join(", ") + (d.admins.length > 3 ? ` and ${d.admins.length - 3} more` : "") : html`<span style=${{ color: "var(--crit)" }}>no Admin</span>`}</span></div>
           <div className="row" style=${{ gap: 5 }}>
             ${pk.shown.map((m) => { const t = look(m);
               return html`<div key=${m.host} className="hm-tile" tabIndex="0" role="button" aria-label=${`${m.host}, ${STATUS[m.status].w}`}
                 style=${{ background: t.bg, color: t.fg, border: t.border || "1px solid transparent", position: "relative" }}
                 onMouseEnter=${() => setHov(m)} onMouseLeave=${() => setHov(null)} onFocus=${() => setHov(m)} onBlur=${() => setHov(null)} onClick=${() => onOpen(m.host)}>
-                ${m.host.slice(-2)}
+                <span style=${{ fontSize: tileFs(m.host) }}>${tileNo(m.host)}</span>
                 ${t.dot ? html`<i style=${{ position: "absolute", right: 4, top: 4, width: 7, height: 7, borderRadius: "50%", background: t.dot }} />` : null}
               </div>`; })}
             ${pk.rest ? html`<div className="hm-tile" role="button" tabIndex="0" title="All machines" onClick=${() => onMore && onMore()} style=${{ border: "1px dashed var(--border-strong)", color: "var(--text-3)", fontSize: 11 }}>+${pk.rest}</div>` : null}
@@ -934,7 +986,7 @@ function MachineList({ go }) {
     <${Select} size="small" value=${st} onChange=${setSt} style=${{ width: 140 }} options=${[{ value: "all", label: "Any health" }, ...Object.keys(HEALTH).map((k) => ({ value: k, label: HEALTH[k][1] }))]} />
     <${Button} size="small" icon=${ic("DownloadOutlined")} onClick=${() => toast("Exported " + rows.length + " rows (concept)")}>Export<//>`}>
     <div className="scroll-x"><${Table} size="middle" pagination=${PG} dataSource=${rows} onRow=${(r) => ({ onClick: () => go("machines", r.host), className: "clickrow" })} columns=${[
-      { title: "Machine", width: 190, sorter: (a, b) => a.host.localeCompare(b.host), render: (r) => html`<div><a className="mono" style=${{ fontWeight: 500 }}>${r.host}</a><div className="t3" style=${{ fontSize: 12 }}>${r.user || "No one signed in"} · ${DBY[r.dept].name}</div></div>` },
+      { title: "Machine", width: 190, sorter: (a, b) => a.host.localeCompare(b.host), render: (r) => html`<div><a className="mono" style=${{ fontWeight: 500 }}>${r.host}</a><div className="t3 cut" style=${{ fontSize: 12, maxWidth: 220 }} title=${`${r.user || "No one signed in"} · ${DBY[r.dept].name}`}>${r.user || "No one signed in"} · ${DBY[r.dept].name}</div></div>` },
       { title: html`<span className="row" style=${{ gap: 4, flexWrap: "nowrap" }}>Health <${Tooltip} title=${HEALTH_HELP}><span className="t4" style=${{ cursor: "help" }}>${ic("QuestionCircleOutlined")}</span><//></span>`, width: 290,
         defaultSortOrder: "ascend", sorter: (a, b) => order[a.status] - order[b.status],
         render: (r) => { const [k, w] = HEALTH[r.status]; return html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 9 }}><span style=${{ marginTop: 4 }}><${HealthMark} k=${k} /></span><div style=${{ minWidth: 0 }}><div style=${{ color: k === "crit" || k === "high" ? "var(--crit)" : "inherit", fontWeight: k === "quiet" ? 400 : 500 }}>${w}</div>${r.note && r.status !== "healthy" ? html`<div className="t3" style=${{ fontSize: 12 }}>${r.note}</div>` : null}</div></div>`; } },
@@ -972,7 +1024,7 @@ function MachineDetail({ host, range, go }) {
       { title: "CPU", dataIndex: "cpu", align: "right", width: 140, sorter: (a, b) => a.cpu - b.cpu, defaultSortOrder: "descend", render: (v) => html`<div className="row" style=${{ flexWrap: "nowrap", justifyContent: "flex-end" }}><${Bar} v=${v} max=${40} w=${60} /><span className="mono" style=${{ width: 44, textAlign: "right" }}>${v.toFixed(1)}%</span></div>` },
       { title: "Memory", dataIndex: "mem", align: "right", width: 110, render: (v) => html`<span className="mono">${v} MB</span>` }, { title: "User", dataIndex: "user", width: 100 },
       { title: "", width: 90, render: () => html`<${Button} size="small" type="text" onClick=${() => toast("End process (concept)")}>End<//>` }]} /><//>` },
-    { key: "sess", label: "Sessions", children: html`<${Panel} flush><${Table} size="small" pagination=${PG} dataSource=${(LANES.find((l) => l.host === host) || { blocks: [] }).blocks.map((b, i) => ({ key: i, b }))} columns=${[
+    { key: "sess", label: "Sessions", children: html`<${Panel} flush><${Table} size="small" pagination=${PG} dataSource=${laneOf(host).blocks.map((b, i) => ({ key: i, b }))} columns=${[
       { title: "Occupant", render: (r) => r.b[3] }, { title: "Type", render: (r) => html`<${Tag} c=${OCC[r.b[2]].c}>${OCC[r.b[2]].w}<//>` },
       { title: "Started", render: (r) => html`<span className="mono">${hhmm(r.b[0])}</span>` }, { title: "Ended", render: (r) => html`<span className="mono">${r.b[1] >= NOWH ? "—" : hhmm(r.b[1])}</span>` },
       { title: "Duration", align: "right", render: (r) => html`<span className="mono">${dur(r.b[1] - r.b[0])}</span>` }]} /><//>` },
@@ -1035,7 +1087,7 @@ function Occupancy({ lanes, title } = {}) {
   const a = full ? 0 : frame[0], b = full ? 24 : frame[1];
   const outside = (bk) => bk[0] < frame[0] || bk[0] >= frame[1];
   const hidden = full ? [] : LALL.flatMap((l) => l.blocks.filter((bk) => bk[1] <= a || bk[0] >= b).map((bk) => ({ l, bk })));
-  const L = 74, rh = 24, pw = w - L - 10, X = (t) => L + ((Math.max(a, Math.min(b, t)) - a) / (b - a)) * pw;
+  const L = 104, rh = 24, pw = w - L - 10, X = (t) => L + ((Math.max(a, Math.min(b, t)) - a) / (b - a)) * pw;
   const H = (lp.pages > 1 ? 12 : LN.length) * rh + 26;
   const spanH = b - a, stepH = spanH > 14 ? 3 : spanH > 8 ? 2 : 1;
   const ticks = []; for (let t = Math.ceil(a / stepH) * stepH; t <= b; t += stepH) ticks.push(t);
@@ -1055,7 +1107,7 @@ function Occupancy({ lanes, title } = {}) {
         ${ticks.map((t) => html`<g key=${t}><line x1=${X(t)} x2=${X(t)} y1="0" y2=${LN.length * rh} style=${{ stroke: "var(--grid)" }} />
           <text x=${X(t)} y=${H - 8} textAnchor=${t === b ? "end" : t === a ? "start" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(t % 24).padStart(2, "0")}:00</text></g>`)}
         ${LN.map((l, i) => html`<g key=${l.host}>
-          <text x="0" y=${i * rh + 16} fontSize="12" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${l.host}</text>
+          <text x="0" y=${i * rh + 16} fontSize="12" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${fitMid(l.host, 13)}<title>${l.host}</title></text>
           <line x1=${L} x2=${w - 10} y1=${i * rh + rh} y2=${i * rh + rh} style=${{ stroke: "var(--grid)" }} />
           ${l.blocks.filter((bk) => bk[1] > a && bk[0] < b).map((bk, j) => { const flag = bk[2] !== "own" && outside(bk);
             return html`<rect key=${j} x=${X(bk[0])} y=${i * rh + 6} width=${Math.max(3, X(bk[1]) - X(bk[0]))} height=${rh - 12} rx="2"
@@ -1116,7 +1168,7 @@ function Sessions() {
           { title: "Machine", dataIndex: "host", width: 90, render: (h) => html`<span className="mono">${h}</span>` },
           { title: "Occupant", render: (r) => r.b[3] },
           { title: "Type", render: (r) => html`<${Tag} c=${OCC[r.b[2]].c}>${OCC[r.b[2]].w}<//>` },
-          { title: "Owner locked out", render: (r) => html`<span className="t2">${(LANES.find((l) => l.host === r.host).blocks.find((x) => x[2] === "own") || [0, 0, 0, "—"])[3]}</span>` },
+          { title: "Owner locked out", render: (r) => html`<span className="t2">${(laneOf(r.host).blocks.find((x) => x[2] === "own") || [0, 0, 0, "—"])[3]}</span>` },
           { title: "Started", render: (r) => html`<span className="mono">${hhmm(r.b[0])}</span>` },
           { title: "Duration", align: "right", render: (r) => html`<span className="mono">${dur(r.b[1] - r.b[0])}${r.b[1] >= NOWH ? " · open" : ""}</span>` },
           { title: "Flags", render: (r) => (r.b[4] ? html`<${Tag} c="var(--med)">Outside working hours<//>` : r.b[1] - r.b[0] > 0.5 && r.b[2] !== "assist" ? html`<${Tag} c="var(--low)">Extended<//>` : null) },
@@ -1365,6 +1417,9 @@ if (LARGE) {
     const t = mineT[k % mineT.length], m = MACHINES.filter((x) => x.user && x.dept !== "ops")[k * 7];
     TASKS.push({ ...t, id: `T-${300 + k}`, title, who: m.user, host: m.host, state: k % 3 === 0 ? "Overdue" : "In progress", final: k % 3 === 0 ? NOWH - 3 - k : NOWH + 6 + k * 5 });
   });
+  if (ABSURD) { const pool = MACHINES.filter((x) => x.user); for (let k = 0; k < 480; k++) { const t = TASKS[k % 8], m = pool[(k * 37) % pool.length];
+    TASKS.push({ ...t, id: `T-${1000 + k}`, title: k % 50 === 0 ? "Reconcile every supplier statement against the ledger for all twelve regional branches and file the variances" : `Routine task ${k + 1}`, who: m.user, host: m.host,
+      by: k % 4 === 0 ? "You" : t.by, state: ["In progress", "Overdue", "Not started", "In progress"][k % 4], final: k % 4 === 1 ? NOWH - 2 - k : NOWH + 4 + k }); } }
 }
 TASKS.push(
   { id: "T-206", title: "Send the weekly route plan", who: "Esi", host: "LOG-01", by: "You", state: "In progress", assigned: -40, started: -39, soft: 30, final: 41,
@@ -1760,12 +1815,28 @@ const SRCWORD = { rule: "Rule", model: "Model", input: "Needs input", you: "You"
 function Src({ s, why }) {
   return html`<span className="src" title=${why} style=${{ color: s === "input" ? "var(--med)" : "var(--text-3)" }}><i style=${{ background: SRC[s][0] }} />${SRCWORD[s]}</span>`;
 }
-function Tasks({ go }) {
+function Tasks({ go, me }) {
+  // tasks the Super User gave this department: the Admin says how far it has got, never closes it
+  useDT();
+  const mine = DEPT_TASKS.filter((t) => !t.complete && me && t.st[me] !== undefined).sort((a, b) => (a.st[me] === "sent" ? 0 : 1) - (b.st[me] === "sent" ? 0 : 1));
+  const fpg = usePaged(mine, 3);
+  const setMy = (id, v) => { setAdminState(id, me, v); toast(`Marked ${DSTATE[v][0].toLowerCase()} · the Super User sees it (concept)`); };
   const [f, setF] = useState("All");
   const open = TASKS.filter((t) => t.state !== "Completed");
   const show = TASKS.filter((t) => f === "All" || (f === "Open" ? t.state === "In progress" || t.state === "Not started" || t.state === "Overdue" : f === "To verify" ? t.state === "Awaiting your verification" : t.state === "Completed"));
   const count = (st) => TASKS.filter((t) => t.state === st).length;
   return html`<${React.Fragment}>
+    ${mine.length && me ? html`<section className="panel">
+      <div className="phd"><div className="pt">From the Super User<small>given to you · say how far it has got · only the Super User closes it</small></div><${Pager} p=${fpg} what="tasks" /></div>
+      ${fpg.items.map((t) => { const others = Object.keys(t.st).filter((a) => a !== me && t.st[a] !== "sent");
+        const fresh = t.st[me] === "sent";
+        return html`<div key=${t.id} id=${"dt-" + t.id} className=${"drow" + (fresh ? " fresh" : "")} style=${{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.2fr) 90px auto" }}>
+          <span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${fresh ? html`<span className="tag" style=${{ "--c": "var(--accent)", marginRight: 8 }}>New<//>` : null}${t.title}</span>
+          <span className="cut t3" style=${{ fontSize: 12.5 }}>${Object.keys(t.st).length === 1 ? "given to you alone" : others.length ? others.map((a) => `${a}: ${DSTATE[t.st[a]][0].toLowerCase()}`).join(" · ") : "no other Admin has opened it"}</span>
+          <span className="mono" style=${{ fontSize: 12, color: t.due < NOWH ? "var(--crit)" : "var(--text-3)", textAlign: "right", whiteSpace: "nowrap" }}>${dueText(t.due)}</span>
+          <${Segmented} size="small" value=${t.st[me] === "sent" ? null : t.st[me]} onChange=${(v) => setMy(t.id, v)} options=${[{ value: "seen", label: "Seen" }, { value: "ongoing", label: "Ongoing" }, { value: "done", label: "Done" }]} />
+        </div>`; })}
+    </section>` : null}
     <section className="panel" style=${{ minHeight: 600, display: "flex", flexDirection: "column" }}>
       <div className="phd">
         <div className="pt">Tasks<small>click a task to open it</small></div>
@@ -1779,7 +1850,7 @@ function Tasks({ go }) {
           locale=${{ emptyText: "No tasks here." }} columns=${[
           { title: "ID", dataIndex: "id", width: 76, render: (x) => html`<a className="mono">${x}</a>` },
           { title: "Task", dataIndex: "title", render: (v, r) => html`<span style=${{ color: r.state === "Completed" ? "var(--text-3)" : "inherit" }}>${v}</span>` },
-          { title: "Assignee", width: 140, render: (r) => html`<span>${r.who} <span className="mono t3">${r.host}</span></span>` },
+          { title: "Assignee", width: 200, render: (r) => html`<span className="cut" title=${`${r.who} · ${r.host}`}>${r.who} <span className="mono t3">${r.host}</span></span>` },
           { title: "Assigned by", dataIndex: "by", width: 120, render: (v) => html`<span className="t2">${v}</span>` },
           { title: "Status", dataIndex: "state", width: 200, render: (st) => html`<span className="st" style=${{ "--c": TSTATE[st] }}><i />${st}</span>` },
           { title: "Checks passed", width: 130, render: (r) => { const d = r.evidence.filter((e) => e.st === "Passed").length; return html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Bar} v=${d} max=${r.evidence.length} w=${60} c=${d === r.evidence.length ? "var(--ok)" : "var(--s1)"} /><span className="mono">${d}/${r.evidence.length}</span></div>`; } },
@@ -2059,6 +2130,10 @@ const RULES = [
     by: "You", created: "1 Sep", edited: "22 Sep", last: "09:00", perDay: [1, 0, 0, 1, 1, 1, 1], res: ["var(--med)", "1 timed out, 1 failed, 20 succeeded"],
     changes: [["22 Sep", "You", "Clear the temp folder timeout 60s → 90s"], ["1 Sep", "You", "Created the rule"]] },
 ];
+if (ABSURD) { const base = RULES.slice(0, 3);
+  for (let k = 0; k < 160; k++) { const b = base[k % 3], d = DEPTS[k % DEPTS.length];
+    RULES.push({ ...b, id: `rule-${k}`, name: k % 40 === 0 ? `Escalate any unacknowledged restricted file found on a ${d.name} machine after hours` : `${b.name} · ${d.name}`, scope: d.name,
+      hosts: MACHINES.filter((m) => m.dept === d.id).map((m) => m.host).slice(0, 400), perDay: [0, 0, 0, 0, 0, 1, k % 2], last: "08:" + String(10 + (k % 50)).padStart(2, "0") }); } }
 const RBY = Object.fromEntries(RULES.map((r) => [r.id, r]));
 const KINDC = { Event: "var(--s3)", Threshold: "var(--s4)", Schedule: "var(--s2)" };
 const KINDI = { Event: "ThunderboltOutlined", Threshold: "LineChartOutlined", Schedule: "ClockCircleOutlined" };
@@ -2081,7 +2156,7 @@ const FIRINGS = (() => {
           runs = [];
           MACHINES.forEach((m) => r.actions.forEach((a, ai) => { const b = bad.find((x) => x[0] === m.host && x[1] === ai); runs.push(runOf(r, m.host, a, t + ai, b ? b[2] : null)); }));
           if (di === 6) { runs.find((x) => x.host === "OPS-03" && x.outcome === "Timed out").sec = 90; runs.find((x) => x.host === "FIN-01" && x.outcome === "Failed").sec = 12; }
-          host = "11 machines"; detail = "Scheduled run";
+          host = `${MACHINES.length} machines`; detail = "Scheduled run";
         } else {
           if (r.id === "usb") { if (di === 6) { t = [10.02, 11.4, 13.05][k]; host = ["OPS-07", "OPS-01", "OPS-04"][k]; } detail = usbDev[Math.floor(nz(7, t) * usbDev.length)] + " inserted"; if (di === 6 && k === 0) detail = "Kingston DataTraveler 32 GB inserted"; }
           if (r.id === "restricted") { t = [9.5, 10.04][k]; host = ["OPS-03", "OPS-07"][k]; detail = ["salaries.csv found in C:\\Users\\Yaw\\Desktop", "budget-2026.xlsx found in C:\\Users\\Ama\\Documents"][k]; }
@@ -2527,6 +2602,8 @@ const ACTION_LIB = [
   { id: "temp", name: "Clear the temp folder", cat: "Custom", lang: "Python", by: "You", created: "1 Sep", desc: "Deletes files older than 7 days in %TEMP%.", limit: 90, names: ["Clear the temp folder"], script: TEMP_PY, impact: (n) => `Old temporary files are deleted on ${n} machine${n === 1 ? "" : "s"}. Files in use are skipped.` },
   { id: "mapdrive", name: "Map the shared drive", cat: "Custom", lang: "PowerShell", by: "R. Mensah", created: "14 Sep", desc: "Maps \\\\fileserver\\common as S: if it is missing.", limit: 30, names: ["Map the shared drive"], script: MAP_PS, impact: () => "Adds drive S: where it is missing. Nothing is removed." },
 ];
+if (ABSURD) { const t = ACTION_LIB.find((a) => a.id === "temp");
+  for (let k = 0; k < 140; k++) ACTION_LIB.push({ ...t, id: `cust-${k}`, name: k % 35 === 0 ? `Collect the full Windows event log, compress it, and copy it to the evidence share (${k})` : `Custom script ${k + 1}`, names: [`Custom script ${k + 1}`], lang: k % 2 ? "PowerShell" : "Python", by: k % 3 ? "R. Mensah" : "You" }); }
 const ABY = Object.fromEntries(ACTION_LIB.map((a) => [a.id, a]));
 const CATC = { Control: "var(--s4)", Monitoring: "var(--s1)", Custom: "var(--s3)" };
 const CATI = { Control: "ControlOutlined", Monitoring: "EyeOutlined", Custom: "CodeOutlined" };
@@ -2537,6 +2614,7 @@ const MANUAL_RUNS = [
   { t: -71.4, action: "Map the shared drive", host: "FIN-01", sec: 31, timeout: 30, outcome: "Timed out", by: "K. Boateng" },
   { t: -20.2, action: "List running programs", host: "OPS-03", sec: 3, timeout: 20, outcome: "Success", by: "You" },
 ];
+if (ABSURD) for (let k = 0; k < 900; k++) MANUAL_RUNS.push({ t: -k * 0.17, action: ["Show a message", "Lock the screen", "Take a screenshot"][k % 3], host: MACHINES[(k * 13) % MACHINES.length].host, sec: 1 + (k % 40), timeout: 60, outcome: k % 23 ? "Success" : "Timed out", by: k % 5 ? "R. Mensah" : "You" });
 const ALL_RUNS = [
   ...RULES.flatMap((r) => FIRINGS[r.id].flatMap((f) => f.runs.map((x) => ({ t: f.t, action: x.action, host: x.host, sec: x.sec, timeout: x.timeout, outcome: x.outcome, rule: r.id, exit: x.exit })))),
   ...MANUAL_RUNS.map((x) => ({ ...x, rule: null })),
@@ -2751,56 +2829,61 @@ function Adoption() {
     { d: "30 Sep", n: 9, joined: "LOG-01" },
     { d: "Today", n: 9, joined: "none · OPS-06 retrying, LOG-02 offline" },
   ];
+  // the sample's days are for eleven machines; scaled to the fleet the page is showing
+  const G = MACHINES.length, ON = MACHINES.filter((m) => m.ver === "1.4.2").length, sc = ON / 9;
+  if (G !== 11) days.forEach((d0, k) => { d0.n = Math.round(d0.n * sc); d0.joined = k ? `${d0.n - Math.round(days[k - 1].n)} machines` : `${d0.n} machines`; });
   const H = 200, P = { l: 30, r: 70, t: 14, b: 24 }, n = days.length, pw = w - P.l - P.r, ph = H - P.t - P.b;
-  const X = (i) => P.l + (i / (n - 1)) * pw, Y = (v) => P.t + ph - (v / 11) * ph;
+  const X = (i) => P.l + (i / (n - 1)) * pw, Y = (v) => P.t + ph - (v / G) * ph;
   const [hi, setHi] = useState(null);
   const line = days.map((p, i) => (i ? "L" : "M") + X(i) + " " + Y(p.n)).join("");
   return html`<div ref=${ref} style=${{ position: "relative" }}>
     <svg width=${w} height=${H} style=${{ display: "block" }} onMouseMove=${(e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.round(((e.clientX - r.left - P.l) / pw) * (n - 1)); setHi(i >= 0 && i < n ? i : null); }} onMouseLeave=${() => setHi(null)}>
-      ${[0, 5, 11].map((v) => html`<g key=${v}><line x1=${P.l} x2=${w - P.r} y1=${Y(v)} y2=${Y(v)} style=${{ stroke: "var(--grid)" }} /><text x=${P.l - 6} y=${Y(v) + 4} textAnchor="end" fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${v}</text></g>`)}
-      <line x1=${P.l} x2=${w - P.r} y1=${Y(11)} y2=${Y(11)} style=${{ stroke: "var(--ok)" }} strokeDasharray="4 3" />
-      <text x=${w - P.r + 6} y=${Y(11) + 4} fontSize="11" style=${{ fill: "var(--ok)" }}>Goal: all 11</text>
+      ${[0, Math.round(G / 2), G].map((v) => html`<g key=${v}><line x1=${P.l} x2=${w - P.r} y1=${Y(v)} y2=${Y(v)} style=${{ stroke: "var(--grid)" }} /><text x=${P.l - 6} y=${Y(v) + 4} textAnchor="end" fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${v}</text></g>`)}
+      <line x1=${P.l} x2=${w - P.r} y1=${Y(G)} y2=${Y(G)} style=${{ stroke: "var(--ok)" }} strokeDasharray="4 3" />
+      <text x=${w - P.r + 6} y=${Y(G) + 4} fontSize="11" style=${{ fill: "var(--ok)" }}>Goal: all ${G}</text>
       <path d=${line + `L${X(n - 1)} ${Y(0)}L${X(0)} ${Y(0)}Z`} style=${{ fill: "var(--s2)", opacity: 0.12 }} />
       <path d=${line} fill="none" style=${{ stroke: "var(--s2)" }} strokeWidth="2" />
       ${days.map((p, i) => html`<circle key=${i} cx=${X(i)} cy=${Y(p.n)} r=${hi === i ? 4.5 : 3} style=${{ fill: "var(--surface)", stroke: "var(--s2)" }} strokeWidth="2" />`)}
-      <text x=${w - P.r + 6} y=${Y(9) + 4} fontSize="12" fontWeight="600" style=${{ fill: "var(--text)" }}>9 of 11</text>
-      <path d=${`M${X(n - 1) + 2} ${Y(9)}V${Y(11)}`} style=${{ stroke: "var(--med)" }} strokeWidth="1.5" strokeDasharray="2 2" />
+      <text x=${w - P.r + 6} y=${Y(ON) + 4} fontSize="12" fontWeight="600" style=${{ fill: "var(--text)" }}>${ON} of ${G}</text>
+      <path d=${`M${X(n - 1) + 2} ${Y(ON)}V${Y(G)}`} style=${{ stroke: "var(--med)" }} strokeWidth="1.5" strokeDasharray="2 2" />
       ${days.map((p, i) => html`<text key=${i} x=${X(i)} y=${H - 6} textAnchor=${i === 0 ? "start" : i === n - 1 ? "end" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${p.d}</text>`)}
     </svg>
     ${hi != null ? html`<div className="tt" style=${{ left: Math.min(X(hi) + 12, w - 260), top: 4 }}>
       <div className="h">${days[hi].d}${days[hi].note ? " · " + days[hi].note : ""}</div>
-      <div><b className="mono">${days[hi].n}</b> <span className="t3">of 11 machines on 1.4.2</span></div>
+      <div><b className="mono">${days[hi].n}</b> <span className="t3">of ${G} machines on 1.4.2</span></div>
       <div className="t2" style=${{ marginTop: 2 }}>Updated that day: <span className="mono">${days[hi].joined}</span></div>
     </div>` : null}
-    <div className="t2" style=${{ marginTop: 6 }}>Two machines are still on older versions: <span className="mono">OPS-06</span> on 1.4.1 and <span className="mono">LOG-02</span> on 1.4.0. The gap between the line and the goal is them.</div>
+    ${(() => { const bh = MACHINES.filter((m) => m.ver !== "1.4.2");
+      return html`<div className="t2" style=${{ marginTop: 6 }}>${bh.length === 2 ? html`Two machines are still on older versions: <span className="mono">OPS-06</span> on 1.4.1 and <span className="mono">LOG-02</span> on 1.4.0.` : `${fmt(bh.length)} machines are still on older versions: ${fmt(bh.filter((m) => m.ver === "1.4.1").length)} on 1.4.1, ${fmt(bh.filter((m) => m.ver === "1.4.0").length)} on 1.4.0.`} The gap between the line and the goal is them.</div>`; })()}
   </div>`;
 }
 function Rollout() {
+  const behind = MACHINES.filter((m) => m.ver !== "1.4.2").sort((a, b) => a.ver.localeCompare(b.ver));
+  const names = behind.slice(0, 2).map((m) => m.host).join(", ") + (behind.length > 2 ? ` and ${fmt(behind.length - 2)} more` : "");
   return html`<${React.Fragment}>
     <div className="kpis">
       <${Kpi} label="Target version" value="1.4.2" delta="Approved 26 Sep by you" />
-      <${Kpi} label="Compliance" value="82" unit="%" delta="9 of 11 machines" fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} max=${11} sc="var(--s2)" />
-      <${Kpi} label="Blocking the next version" value="2" delta="OPS-06, LOG-02" dc="var(--med)" />
+      <${Kpi} label="Compliance" value=${String(Math.round((MACHINES.filter((m) => m.ver === "1.4.2").length / MACHINES.length) * 100))} unit="%" delta=${`${MACHINES.filter((m) => m.ver === "1.4.2").length} of ${MACHINES.length} machines`} fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} max=${11} sc="var(--s2)" />
+      <${Kpi} label="Blocking the next version" value=${fmt(behind.length)} delta=${names || "none"} dc="var(--med)" />
       <${Kpi} label="Failed install attempts, 7d" value="3" delta="OPS-06 ×2, LOG-02 ×1" />
     </div>
     <div className="gate">
-      ${ic("ClockCircleOutlined")}<div><b style=${{ fontWeight: 600 }}>1.4.3 is ready but cannot be approved yet.</b> <span className="t2">A version is approved only when every machine runs the one before it. 2 machines are holding it back.</span></div>
+      ${ic("ClockCircleOutlined")}<div><b style=${{ fontWeight: 600 }}>1.4.3 is ready but cannot be approved yet.</b> <span className="t2">A version is approved only when every machine runs the one before it. ${fmt(behind.length)} machine${behind.length === 1 ? " is" : "s are"} holding it back.</span></div>
       <span className="sp" /><${Button} size="small" disabled>Approve 1.4.3<//>
     </div>
     <div className="g c-75">
       <${Panel} title="Machines on 1.4.2" sub="since it was approved on 26 Sep"><${Adoption} /><//>
       <${Panel} title="By department" flush>
         <${Table} size="small" pagination=${PG} dataSource=${DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id); return { key: d.id, d, n: ms.length, ok: ms.filter((m) => m.ver === "1.4.2").length }; })} columns=${[
-          { title: "Department", render: (r) => r.d.name }, { title: "On 1.4.2", width: 170, render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Bar} v=${r.ok} max=${r.n} w=${80} c=${r.ok === r.n ? "var(--ok)" : "var(--med)"} /><span className="mono">${r.ok}/${r.n}</span></div>` },
+          { title: "Department", render: (r) => html`<span className="cut" style=${{ maxWidth: 220 }} title=${r.d.name}>${r.d.name}</span>` }, { title: "On 1.4.2", width: 170, render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Bar} v=${r.ok} max=${r.n} w=${80} c=${r.ok === r.n ? "var(--ok)" : "var(--med)"} /><span className="mono">${r.ok}/${r.n}</span></div>` },
           { title: "Escalation", width: 120, render: (r) => (r.d.id === "log" ? html`<span style=${{ color: "var(--crit)" }}>To Super User</span>` : html`<span className="t3">—</span>`) }]} />
       <//>
     </div>
     <${Panel} title="Machines holding the gate" flush>
-      <${Table} size="small" pagination=${PG} dataSource=${[
-        { key: 1, host: "OPS-06", cur: "1.4.1", tries: 2, last: "Wed 11:20", err: "Installer exit 1603 (file in use)", esc: "—", next: "Next idle window" },
-        { key: 2, host: "LOG-02", cur: "1.4.0", tries: 1, last: "Mon 07:45", err: "Could not reach the update share", esc: "Mon 09:30 · Super User", next: "When it comes back online" },
-      ]} columns=${[
-        { title: "Machine", dataIndex: "host", width: 90, render: (v) => html`<span className="mono">${v}</span>` }, { title: "Current", dataIndex: "cur", width: 80, render: (v) => html`<span className="mono" style=${{ color: "var(--med)" }}>${v}</span>` },
+      <${Table} size="small" pagination=${PG} dataSource=${behind.map((m) => m.host === "OPS-06" ? { key: m.host, host: "OPS-06", cur: "1.4.1", tries: 2, last: "Wed 11:20", err: "Installer exit 1603 (file in use)", esc: "—", next: "Next idle window" }
+        : m.host === "LOG-02" ? { key: m.host, host: "LOG-02", cur: "1.4.0", tries: 1, last: "Mon 07:45", err: "Could not reach the update share", esc: "Mon 09:30 · Super User", next: "When it comes back online" }
+        : { key: m.host, host: m.host, cur: m.ver, tries: 1, last: "Tue 10:15", err: m.status === "offline" ? "Machine not checking in" : "Installer exit 1603 (file in use)", esc: "—", next: m.status === "offline" ? "When it comes back online" : "Next idle window" })} columns=${[
+        { title: "Machine", dataIndex: "host", width: 150, render: (v) => html`<span className="mono cut" title=${v}>${v}</span>` }, { title: "Current", dataIndex: "cur", width: 80, render: (v) => html`<span className="mono" style=${{ color: "var(--med)" }}>${v}</span>` },
         { title: "Attempts", dataIndex: "tries", width: 90, align: "right" }, { title: "Last attempt", dataIndex: "last", width: 120, render: (v) => html`<span className="mono">${v}</span>` },
         { title: "Last error", dataIndex: "err" }, { title: "Escalated", dataIndex: "esc", width: 180 }, { title: "Next retry", dataIndex: "next", width: 180, render: (v) => html`<span className="t2">${v}</span>` },
         { title: "", width: 150, render: (r) => html`<${Button} size="small" onClick=${() => toast((r.host === "LOG-02" ? "Notified" : "Retrying") + " (concept)")}>${r.host === "LOG-02" ? "Notify" : "Retry now"}<//>` }]} />
@@ -2990,7 +3073,7 @@ function Screen({ d, onOpen }) {
           <div className="tab-left">
             <div className="tab-tiles">${tiles.shown.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
               return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`}>
-                <b style=${{ background: t.bg, color: t.fg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none") }}>${m.host.slice(-2)}${t.dot ? html`<i style=${{ background: t.dot }} />` : null}</b></span>`; })}
+                <b style=${{ background: t.bg, color: t.fg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none") , fontSize: tileFs(m.host) }}>${tileNo(m.host)}${t.dot ? html`<i style=${{ background: t.dot }} />` : null}</b></span>`; })}
               ${tiles.rest ? html`<span title=${`${tiles.rest} more machines, none of them worse than these`}><b className="tab-more">+${tiles.rest}</b></span>` : null}</div>
             <div className="tab-chart"><span className="t3" style=${{ fontSize: 10.5 }}>Activity, last 24 hours</span><${AreaFill} fn=${act} /></div>
           </div>
@@ -3036,7 +3119,7 @@ function ScreenRow({ depts, onOpen }) {
 function LookCloser({ id, onClose, go, enter }) {
   if (!id) return html`<${Modal} open=${false} />`;
   const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id), x = deptStats(d);
-  const on = (host) => { const l = (FULL.LANES || LANES).find((y) => y.host === host); const bk = l && l.blocks.find((z) => z[1] >= NOWH); return bk ? { who: bk[3], kind: bk[2] } : null; };
+  const on = (host) => { const l = laneIn(FULL.LANES || LANES, host); const bk = l && l.blocks.find((z) => z[1] >= NOWH); return bk ? { who: bk[3], kind: bk[2] } : null; };
   const nav = (...a0) => { onClose(); go(...a0); };
   const mc = pickShown(x.ms, 10), ic6 = x.iss.slice(0, 6), adm = d.admins.slice(0, 3);
   return html`<${Modal} open=${true} onCancel=${onClose} width=${1040} title=${html`<span>${d.name} <span className="t3" style=${{ fontWeight: 400, fontSize: 13 }}>· a look, read-only · nobody is affected</span></span>`}
@@ -3096,7 +3179,7 @@ function hostsProfile(hosts) {
   const H = Math.ceil(NOWH), hs = [...hosts];
   // machines with anyone on them at any point in the hour: the owner, an Admin, you, or assisted access
   const usedIn = (blocks, a, b) => blocks.some((x) => x[0] < b && x[1] > a);
-  const today = Array.from({ length: H }, (_, h) => hs.filter((host) => usedIn((LANES.find((l) => l.host === host) || { blocks: [] }).blocks, h, Math.min(h + 1, NOWH))).length);
+  const today = Array.from({ length: H }, (_, h) => hs.filter((host) => usedIn(laneOf(host).blocks, h, Math.min(h + 1, NOWH))).length);
   const days = [-6, -5, -4, -3, -2, -1].filter((d) => !["Sat", "Sun"].includes(WEEK[((d % 7) + 7) % 7]));
   const median = (xs) => { const v = xs.slice().sort((a, b) => a - b), m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
   const usual = Array.from({ length: H }, (_, h) => Math.round(median(days.map((d) => hs.filter((host) => usedIn([typicalDay(host, d)], h, h + 1)).length))));
@@ -3122,7 +3205,7 @@ function hostsProfile(hosts) {
   const VERB = { own: "signed in on", admin: "entered", you: "entered", assist: "started assisted access on" };
   const moves = [];
   hs.forEach((host) => {
-    const bl = (LANES.find((l) => l.host === host) || { blocks: [] }).blocks.slice().sort((a, b) => a[0] - b[0]);
+    const bl = laneOf(host).blocks.slice().sort((a, b) => a[0] - b[0]);
     let cur = null;
     const close = () => { if (cur && cur.to < NOWH - 0.01) moves.push({ t: cur.to, d: -1, text: `${cur.last} left ${host}` }); };
     bl.forEach((x) => {
@@ -3165,7 +3248,7 @@ function DayLanes({ rows, go, lane = 56, verdictW = 136, slots }) {
         return html`<g key=${r.key}>
           <rect x=${L} y=${y0} width=${pw} height=${lane} rx="4" style=${{ fill: "var(--surface-2)" }} />
           <rect x=${X(0)} y=${y0} width=${X(Math.min(6, NOWH)) - X(0)} height=${lane} style=${{ fill: "var(--surface-3)" }} opacity="0.55" />
-          <text x="0" y=${y0 + lane / 2 + 4} fontSize=${lane > 40 ? 12.5 : 11.5} fontWeight="500" style=${{ fill: r.color || "var(--text)", fontFamily: r.mono ? "var(--mono)" : "var(--sans)" }}>${r.label}</text>
+          <text x="0" y=${y0 + lane / 2 + 4} fontSize=${lane > 40 ? 12.5 : 11.5} fontWeight="500" style=${{ fill: r.color || "var(--text)", fontFamily: r.mono ? "var(--mono)" : "var(--sans)" }}>${r.mono ? fitMid(r.label, 13) : fitEnd(r.label, 14)}<title>${r.label}</title></text>
           ${pr.odd.map((o, h) => (o ? html`<rect key=${"o" + h} x=${X(h)} y=${y0} width=${X(Math.min(h + 1, NOWH)) - X(h)} height=${lane} style=${{ fill: "var(--med)", opacity: 0.16 }}><title>${String(h).padStart(2, "0")}:00 · unusual for this hour · ${pr.today[h]} of ${pr.total} machines in use</title></rect>` : null))}
           <path d=${area} style=${{ fill: "var(--s6)", opacity: 0.32 }} />
           <path d=${line} fill="none" style=${{ stroke: "var(--s6)" }} strokeWidth="1.5" strokeLinejoin="round" />
@@ -3181,7 +3264,7 @@ function DayLanes({ rows, go, lane = 56, verdictW = 136, slots }) {
     ${hov != null ? html`<div className="tt" style=${{ left: Math.min(X(hov) + 12, w - 300), top: 0 }}>
       <div className="h">${hhmm(hov)}</div>
       ${rows.map((r, i) => { const pr = profs[i], st = pr.stepAt(hov), hh = Math.min(pr.other.length - 1, Math.floor(hov));
-        return html`<div key=${r.key} className="row" style=${{ flexWrap: "nowrap", gap: 8, alignItems: "flex-start" }}><span className=${"t2" + (r.mono ? " mono" : "")} style=${{ width: 80, flex: "none" }}>${r.label}</span><span><b className="mono">${st.n}</b><span className="t3"> of ${pr.total} in use</span>
+        return html`<div key=${r.key} className="row" style=${{ flexWrap: "nowrap", gap: 8, alignItems: "flex-start" }}><span className=${"t2" + (r.mono ? " mono" : "")} style=${{ width: 80, flex: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>${r.label}</span><span><b className="mono">${st.n}</b><span className="t3"> of ${pr.total} in use</span>
           ${st.text ? html`<div className="t3" style=${{ fontSize: 11.5 }}>since ${hhmm(st.t)} · ${st.text}</div>` : null}
           ${pr.other[hh] ? html`<div className="t4" style=${{ fontSize: 11.5 }}>this hour: ${pr.other[hh]}</div>` : null}</span></div>`; })}
     </div>` : null}
@@ -3225,15 +3308,15 @@ function Monitor({ range, go, enter }) {
   return html`<${React.Fragment}>
     <div className="wall">
       <div className="wall-you"><span className="av" style=${{ background: "var(--accent-soft)", color: "var(--accent)" }}>SU</span><b style=${{ fontWeight: 600 }}>You</b>
-        <span className="t3">${DEPTS.length} departments · ${MACHINES.length} machines</span>
-        ${worstAll ? html`<span className="sev" style=${{ "--c": SEV[worstAll.sev].c }} title=${worstAll.title}><i />${ISSUES.length}</span>` : null}</div>
+        <span className="t3">${fmt(DEPTS.length)} departments · ${fmt(MACHINES.length)} machines</span>
+        ${worstAll ? html`<span className="sev" style=${{ "--c": SEV[worstAll.sev].c }} title=${worstAll.title}><i />${fmt(ISSUES.length)}</span>` : null}</div>
       <div className="wall-stem" />
       <div className="wall-row"><${ScreenRow} depts=${DEPTS} onOpen=${setPeek} /></div>
     </div>
     <${OrgDay} go=${go} />
     <div className="trends">
-      <${Trend} label="Online" value=${MACHINES.filter((m) => m.status !== "offline").length} unit=${"/ " + MACHINES.length} fn=${(t) => (t < 2.52 ? 11 : 10)} c="var(--ok)" max=${11} />
-      <${Trend} label="Open issues" value=${ISSUES.length} fn=${(t) => Math.max(1, Math.round(2 + (t > -40 ? 1 : 0) + (t > -12 ? 1 : 0) + (t > 9 ? 2 : 0) + (t > 10 ? 1 : 0)))} c="var(--crit)" warn=${ISSUES.some((i) => i.sev === "critical")} />
+      <${Trend} label="Online" value=${fmt(MACHINES.filter((m) => m.status !== "offline").length)} unit=${"/ " + fmt(MACHINES.length)} fn=${(t) => (t < 2.52 ? 11 : 10)} c="var(--ok)" max=${11} />
+      <${Trend} label="Open issues" value=${fmt(ISSUES.length)} fn=${(t) => Math.max(1, Math.round(2 + (t > -40 ? 1 : 0) + (t > -12 ? 1 : 0) + (t > 9 ? 2 : 0) + (t > 10 ? 1 : 0)))} c="var(--crit)" warn=${ISSUES.some((i) => i.sev === "critical")} />
       <${Trend} label="On 1.4.2" value=${Math.round((MACHINES.filter((m) => m.ver === "1.4.2").length / MACHINES.length) * 100)} unit="%" fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} c="var(--s2)" max=${11} />
       <${Trend} label="Reports handled in" value="42" unit="min" fn=${(t) => 60 - 18 * sm(2, t, 0.2)} c="var(--s6)" />
     </div>
@@ -3241,10 +3324,61 @@ function Monitor({ range, go, enter }) {
   <//>`;
 }
 // Decisions only the Super User makes. Each carries what you need to decide it, right where you decide it.
+// A decision is an instance of a kind. The kind owns its picture (DECISION_KINDS, below the pictures)
+// and its wording; an instance only says which machine, department or person it is about.
+const deptOfHost = (h) => (FULL.DEPTS || DEPTS).find((d) => d.id === ((FULL.MACHINES || MACHINES).find((m) => m.host === h) || {}).dept) || { name: "its department", admins: [] };
+function stuckDecision(host, k) {
+  const d = deptOfHost(host), m = (FULL.MACHINES || MACHINES).find((x) => x.host === host) || { ver: "1.4.0", user: null }, adm = d.admins[0];
+  return { id: "stuck-" + host, kind: "update-stuck", host, sev: k % 3 ? "medium" : "high", icon: "CloudSyncOutlined", title: `${host}'s update is stuck, and it came to you`, short: `${host} update stuck`, age: `${(k % 9) + 1} day${k % 9 ? "s" : ""}`,
+    why: adm ? `${adm} did not act within the limit, so the escalation reached you.` : `${d.name} has no Admin, so the escalation reached you instead of stopping in the department.`,
+    options: [
+      adm ? { key: "back", icon: "RollbackOutlined", title: `Hand it back to ${adm}`, desc: `${adm} owns updates in ${d.name}. They are told it came to you.`, verb: "Hand back", done: `Handed back to ${adm}` }
+        : { key: "admin", icon: "UserAddOutlined", title: `Give ${d.name} an Admin, and this with it`, desc: "The new Admin owns the update from now on, and the next one.", verb: "Assign", need: "pick", pick: ["A. Quaye", "K. Boateng"], done: "Assigned to" },
+      { key: "exclude", icon: "StopOutlined", title: `Leave ${host} out of the 1.4.3 gate`, desc: `1.4.3 can then be approved without it. ${host} stays on ${m.ver} until it updates.`, verb: "Leave it out", need: "reason", done: "Left out of the gate" },
+      { key: "wait", icon: "ClockCircleOutlined", title: "Keep waiting", desc: "It updates on its next attempt. You hear about it again only if that fails.", verb: "Keep waiting", done: `Waiting for ${host}` } ] };
+}
+function seatDecision(id) {
+  const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id), n = (FULL.MACHINES || MACHINES).filter((m) => m.dept === id).length;
+  return { id: "seat-" + id, kind: "empty-seat", dept: id, sev: "high", icon: "UserAddOutlined", title: `${d.name} has no Admin`, short: `${d.name} has no Admin`, age: "since 3 Sep",
+    why: `${fmt(n)} machine${n === 1 ? "" : "s"} and every report from them have nobody below you. Only you can assign an Admin.`,
+    options: [{ key: "pick", icon: "UserOutlined", title: "Pick an Admin", desc: "Someone who already works there, or an Admin from another department.", verb: "Assign", need: "pick", pick: ["A. Quaye", "K. Boateng"], done: "Assigned to" }] };
+}
+// Department tasks (decided 2 Oct 2026). The Super User gives a department a piece of work with a
+// deadline; there are no checks and no expectations, because such work is rarely a file or a program.
+// Every Admin in the department is told. Each marks it seen, ongoing or done; the furthest any of them
+// has got is where the task stands. Only the Super User who gave it calls it complete.
+const DSTEP = ["sent", "seen", "ongoing", "done"];
+const DSTATE = { sent: ["Not seen yet", "var(--text-4)"], seen: ["Seen", "var(--s1)"], ongoing: ["Ongoing", "var(--med)"], done: ["Done", "var(--ok)"] };
+const taskState = (t) => (t.complete ? "complete" : Object.values(t.st).reduce((a, b) => (DSTEP.indexOf(b) > DSTEP.indexOf(a) ? b : a), "sent"));
+const dueText = (h) => (h < NOWH ? `${span(NOWH - h)} late` : `${span(h - NOWH)} left`);
+let DEPT_TASKS = [
+  { id: "D-14", title: "Collect the signed leave forms from every team", dept: "ops", at: -20, due: NOWH + 28, st: { "R. Mensah": "ongoing", "A. Quaye": "seen" }, when: { "R. Mensah": 9.4, "A. Quaye": 8.2 } },
+  { id: "D-13", title: "Prepare the stock count for the auditors", dept: "fin", at: -50, due: NOWH + 3, st: { "K. Boateng": "done" }, when: { "K. Boateng": 11.75 } },
+  { id: "D-12", title: "Move last year's tender files to the archive", dept: "ops", at: -2, due: NOWH + 74, st: { "R. Mensah": "sent", "A. Quaye": "sent" }, when: {} },
+  { id: "D-11", title: "Confirm who covers the front desk during the training week", dept: "ops", at: -70, due: NOWH - 5, st: { "R. Mensah": "seen", "A. Quaye": "ongoing" }, when: { "R. Mensah": -60, "A. Quaye": -30 } },
+];
+if (LARGE) { const titles = ["Send the quarterly headcount", "Check the fire-drill list", "Renew the cleaning contract", "Collect the expense receipts", "Update the emergency contacts", "Book the year-end inventory"];
+  DEPTS.filter((d) => d.admins.length).forEach((d, k) => { for (let j = 0; j < (ABSURD ? 6 : 2); j++) { const n = k * 7 + j, st = {}, when = {};
+    d.admins.forEach((a, ai) => { st[a] = DSTEP[(n + ai) % 4]; when[a] = 8 + ((n + ai) % 5); });
+    DEPT_TASKS.push({ id: `D-${100 + n}`, title: n % 37 === 0 ? "Reconcile every supplier statement against the ledger for all twelve regional branches and file the variances" : titles[n % titles.length], dept: d.id, at: -n, due: NOWH - 10 + (n % 9) * 14, st, when }); } }); }
+// One store, so the Super User's list, the Admin's Tasks page and the strip across the console agree.
+const DT_SUBS = new Set();
+const dtChange = (fn) => { fn(); DT_SUBS.forEach((f0) => f0()); };
+function useDT() { const [, setN] = useState(0); useEffect(() => { const f0 = () => setN((n) => n + 1); DT_SUBS.add(f0); return () => DT_SUBS.delete(f0); }, []); return DEPT_TASKS; }
+const setAdminState = (id, who, v) => dtChange(() => { const t = DEPT_TASKS.find((x) => x.id === id); if (t) { t.st = { ...t.st, [who]: v }; t.when = { ...t.when, [who]: NOWH + (Date.now() - T0) / 3.6e6 }; } });
+function taskDoneDecision(t) {
+  const d = (FULL.DEPTS || DEPTS).find((x) => x.id === t.dept), by = Object.keys(t.st).find((a) => t.st[a] === "done");
+  return { id: "dtask-" + t.id, kind: "task-done", task: t.id, sev: t.due < NOWH ? "medium" : "low", icon: "CheckSquareOutlined", to: d.admins.join(" and "),
+    title: `${d.name} says “${t.title}” is done`, short: `Done: ${t.title}`, age: "today",
+    why: `${by} marked it done at ${hhmm(t.when[by] || NOWH)}. Only you can call it complete.`,
+    options: [
+      { key: "complete", icon: "CheckOutlined", title: "Complete", desc: "It leaves the list, recorded as complete with your name and the time.", verb: "Complete", done: "Marked complete" },
+      { key: "notyet", icon: "RollbackOutlined", title: "Not done yet", desc: `It goes back to ${d.name} as ongoing, with your note. Every Admin there sees it.`, verb: "Send back", need: "message", done: "Sent back" } ] };
+}
 const QUAYE_ENTRIES = [["Fri 02:18", "LOG-01", "18 min", "Opened Event Viewer, then left"], ["Mon 02:12", "LOG-02", "17 min", "Ran no actions"], ["Today 02:14", "LOG-02", "17 min", "LOG-02 went offline 14 minutes after he left"]];
 const SU_ONLY_REPORTS = [["R-2280", "Update stuck · LOG-02", "Mon 09:30"], ["R-2283", "Update stuck · LOG-02 (second attempt)", "Tue 07:45"], ["R-2287", "Update stuck · LOG-02 past the limit", "Wed 09:30"], ["R-2292", "Update stuck · LOG-02 offline", "Today 02:40"]];
 const DECISIONS = [
-  { id: "stuck", sev: "high", icon: "CloudSyncOutlined", title: "LOG-02's update is stuck, and it came to you", short: "LOG-02 update stuck", age: "3 days",
+  { id: "stuck", kind: "update-stuck", host: "LOG-02", sev: "high", icon: "CloudSyncOutlined", title: "LOG-02's update is stuck, and it came to you", short: "LOG-02 update stuck", age: "3 days",
     why: "Logistics has no Admin, so the escalation reached you instead of stopping in the department.",
     facts: [["Machine", "LOG-02 · Abena"], ["Running", "1.4.0, two behind"], ["Offline since", "Today 02:31"], ["Escalated", "Mon 09:30"]],
     options: [
@@ -3252,7 +3386,7 @@ const DECISIONS = [
       { key: "exclude", icon: "StopOutlined", title: "Leave LOG-02 out of the 1.4.3 gate", desc: "1.4.3 can then be approved without it. LOG-02 stays on 1.4.0 until it updates.", verb: "Leave it out", need: "reason", done: "Left out of the gate" },
       { key: "wait", icon: "ClockCircleOutlined", title: "Keep waiting for it to come back", desc: "It updates the moment it checks in. You hear about it again only if it does not.", verb: "Keep waiting", done: "Waiting for LOG-02" },
     ] },
-  { id: "noadmin", sev: "high", icon: "UserAddOutlined", title: "Logistics has no Admin", short: "Logistics has no Admin", age: "since 18 Sep",
+  { id: "noadmin", kind: "empty-seat", dept: "log", sev: "high", icon: "UserAddOutlined", title: "Logistics has no Admin", short: "Logistics has no Admin", age: "since 18 Sep",
     why: "Two machines and every report from them have nobody below you. Only you can assign an Admin.",
     facts: [["Machines", "LOG-01 · Esi, LOG-02 · Abena"], ["Reports this week", "4, all to you"], ["Without an Admin", "13 days"]],
     candidates: true,
@@ -3261,7 +3395,7 @@ const DECISIONS = [
       { key: "boateng", icon: "UserOutlined", title: "K. Boateng", desc: "Finance Admin, and Finance's only one. Already the slowest at reports: 2h 10m against a 1-hour target.", verb: "Make Admin", done: "K. Boateng is now Logistics Admin" },
       { key: "esi", icon: "UserOutlined", title: "Esi, promoted from LOG-01", desc: "Works in Logistics every day. Promoting her gives her an Admin workstation and a new key, shown once.", verb: "Promote", done: "Esi promoted to Logistics Admin" },
     ] },
-  { id: "quaye", sev: "medium", icon: "EyeOutlined", title: "A. Quaye entered Logistics machines at 2 a.m., three times", short: "A. Quaye's 2 a.m. entries", age: "this week",
+  { id: "quaye", kind: "admin-pattern", admin: "A. Quaye", sev: "medium", icon: "EyeOutlined", title: "A. Quaye entered Logistics machines at 2 a.m., three times", short: "A. Quaye's 2 a.m. entries", age: "this week",
     why: "Nobody else sees an Admin's own pattern. Looking into it is yours to do.",
     entries: true,
     options: [
@@ -3269,14 +3403,14 @@ const DECISIONS = [
       { key: "limit", icon: "ClockCircleOutlined", title: "Limit him to working hours", desc: "He can enter machines only between 06:00 and 18:00 until you lift it.", verb: "Limit", done: "Limited to working hours" },
       { key: "fine", icon: "CheckOutlined", title: "It was expected", desc: "Note why. It stops showing up as unusual for A. Quaye on Logistics machines.", verb: "Note it", need: "reason", done: "Noted as expected" },
     ] },
-  { id: "approve", sev: "medium", icon: "CloudUploadOutlined", title: "1.4.3 is ready, and only you can approve it", short: "Approve 1.4.3", age: "2 days",
+  { id: "approve", kind: "version-gate", version: "1.4.3", sev: "medium", icon: "CloudUploadOutlined", title: "1.4.3 is ready, and only you can approve it", short: "Approve 1.4.3", age: "2 days",
     why: "A version is approved only when every machine runs the one before it. Two machines still don't.",
     gate: true,
     options: [
       { key: "wait", icon: "ClockCircleOutlined", title: "Wait for the gate", desc: "Approve it yourself once OPS-06 and LOG-02 are on 1.4.2. You are told when they are.", verb: "Wait", done: "Waiting for the gate" },
       { key: "without", icon: "StopOutlined", title: "Approve now, leaving the two out", desc: "OPS-06 and LOG-02 stay behind and are recorded as left out, with your reason.", verb: "Approve 1.4.3", need: "reason", done: "1.4.3 approved without OPS-06 and LOG-02" },
     ] },
-  { id: "reports", sev: "low", icon: "FileTextOutlined", title: "Four reports reach only you", short: "4 reports only you see", age: "this week",
+  { id: "reports", kind: "su-reports", sev: "low", icon: "FileTextOutlined", title: "Four reports reach only you", short: "4 reports only you see", age: "this week",
     why: "They come from Logistics, which has no Admin to route them to.",
     reports: true,
     options: [
@@ -3285,12 +3419,16 @@ const DECISIONS = [
     ] },
 ];
 if (LARGE) {
-  DECISIONS.push({ ...DECISIONS[1], id: "noadmin-wh", title: "Warehouse North has no Admin", short: "Warehouse North has no Admin", age: "since 3 Sep",
-    why: "47 machines and every report from them have nobody below you. Only you can assign an Admin." });
-  ["CC-12", "PRC-07", "MKT-19"].forEach((h, k) => DECISIONS.push({ ...DECISIONS[0], id: "stuck-" + h, sev: k ? "medium" : "high", title: `${h}'s update is stuck, and it came to you`, short: `${h} update stuck`, age: `${k + 1} days`,
-    why: "The department's Admin did not act within the limit, so the escalation reached you." }));
+  DECISIONS.push(seatDecision("wh"));
+  ["cc", "proc", "mkt"].map((id) => MACHINES.find((m) => m.dept === id && m.ver !== "1.4.2")).filter(Boolean).forEach((m, k) => DECISIONS.push(stuckDecision(m.host, k)));
+  if (ABSURD) {
+    DEPTS.filter((d) => !d.admins.length && d.id !== "log" && d.id !== "wh").forEach((d) => DECISIONS.push(seatDecision(d.id)));
+    DEPTS.filter((d) => /^d\d+$/.test(d.id)).forEach((d, k) => { const m = MACHINES.find((x) => x.dept === d.id && x.ver !== "1.4.2") || MACHINES.find((x) => x.dept === d.id); if (m) DECISIONS.push(stuckDecision(m.host, k)); });
+    for (let k = 0; k < 420; k++) SU_ONLY_REPORTS.push([`R-${4000 + k}`, `Update stuck · B${String(k % 40 + 1).padStart(2, "0")}-${String(k % 60 + 1).padStart(2, "0")}`, ["Mon 09:30", "Tue 08:10", "Wed 11:45"][k % 3]]);
+  }
   for (let k = 0; k < 9; k++) SU_ONLY_REPORTS.push([`R-23${String(k).padStart(2, "0")}`, `Update stuck · WHN-${String(k * 4 + 3).padStart(2, "0")}`, k < 4 ? "Mon 09:30" : "Tue 08:10"]);
 }
+DEPT_TASKS.filter((t) => taskState(t) === "done").forEach((t) => DECISIONS.push(taskDoneDecision(t)));
 { const r0 = DECISIONS.find((x) => x.id === "reports"); r0.short = `${SU_ONLY_REPORTS.length} reports only you see`; r0.title = `${SU_ONLY_REPORTS.length} reports reach only you`; }
 const SU_QUEUE = DECISIONS;
 // Each decision's evidence as a picture: small on its card, large beside the options.
@@ -3310,13 +3448,13 @@ function GateTiles({ big, go }) {
   const all = FULL.MACHINES || MACHINES, behind = all.filter((m) => m.ver !== "1.4.2"), on = all.length - behind.length, pct = (on / all.length) * 100;
   const bar = (h) => html`<div style=${{ display: "flex", height: h, borderRadius: 3, overflow: "hidden", background: "var(--surface-3)" }} title=${`${on} of ${all.length} on 1.4.2`}>
     <span style=${{ width: pct + "%", background: "color-mix(in srgb, var(--s2) 55%, transparent)" }} /><span style=${{ flex: 1, background: "color-mix(in srgb, var(--med) 70%, transparent)" }} /></div>`;
-  if (!big) return html`<div style=${{ width: "100%" }}>${bar(10)}<div className="mono t3" style=${{ fontSize: 10, marginTop: 4 }}>${behind.length} holding it</div></div>`;
+  if (!big) return html`<div style=${{ width: "100%" }}>${bar(10)}<div className="mono t3" style=${{ fontSize: 10, marginTop: 4 }}>${fmt(behind.length)} holding it</div></div>`;
   const shown = behind.slice(0, 10);
   return html`<div>
-    <div className="row" style=${{ alignItems: "baseline", gap: 8 }}><b style=${{ fontSize: 22, fontWeight: 600 }}>${on}</b><span className="t3">of ${all.length} machines on 1.4.2</span><span className="sp" /><span style=${{ color: "var(--med)" }}>${behind.length} holding the gate</span></div>
+    <div className="row" style=${{ alignItems: "baseline", gap: 8 }}><b style=${{ fontSize: 22, fontWeight: 600 }}>${fmt(on)}</b><span className="t3">of ${fmt(all.length)} machines on 1.4.2</span><span className="sp" /><span style=${{ color: "var(--med)" }}>${fmt(behind.length)} holding the gate</span></div>
     <div style=${{ margin: "10px 0 14px" }}>${bar(14)}</div>
     <div className="row" style=${{ gap: 6 }}>${shown.map((m) => html`<span key=${m.host} onClick=${() => go && go("machines", m.host)} title=${`${m.host} · ${m.user || "no user"} · ${m.ver}`}
-        style=${{ cursor: "pointer", height: 28, padding: "0 8px", borderRadius: 4, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 11.5, border: "1.5px dashed var(--med)", color: "var(--med)" }}>${m.host}<span className="t3">${m.ver}</span></span>`)}
+        style=${{ cursor: "pointer", height: 28, padding: "0 8px", borderRadius: 4, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 11.5, border: "1.5px dashed var(--med)", color: "var(--med)", whiteSpace: "nowrap" }}>${fitMid(m.host, 16)}<span className="t3">${m.ver}</span></span>`)}
       <${More} n=${behind.length - shown.length} what="holding it" /></div>
   </div>`;
 }
@@ -3348,24 +3486,26 @@ function ReportStack({ big }) {
   return html`<div style=${{ position: "relative", height: big ? 0 : 26, width: 60 }}>${big ? null : [0, 1, 2, 3].map((i) => html`<span key=${i} style=${{ position: "absolute", left: i * 6, top: i * 3, width: 34, height: 14, borderRadius: 2, background: "var(--surface)", border: "1px solid var(--border-strong)" }} />`)}</div>`;
 }
 // LOG-02 stuck: machines sorted into the version they run, so the one left behind stands out.
-function VersionColumns({ big, go }) {
+function VersionColumns({ big, go, d }) {
   const all = FULL.MACHINES || MACHINES, vers = ["1.4.0", "1.4.1", "1.4.2"];
-  const per = vers.map((v) => all.filter((m) => m.ver === v).sort((a, b) => (b.host === "LOG-02") - (a.host === "LOG-02")));
+  const focus = (d && d.host) || "LOG-02", fm = all.find((m) => m.host === focus) || { ver: "1.4.0" };
+  const per = vers.map((v) => all.filter((m) => m.ver === v).sort((a, b) => (b.host === focus) - (a.host === focus)));
   // small: one bar per version, its height a share of the fleet, LOG-02 marked where it sits
   if (!big) return html`<div className="row" style=${{ flexWrap: "nowrap", gap: 10, alignItems: "flex-end" }}>
     ${per.map((ms, k) => html`<div key=${k} title=${`${vers[k]} · ${ms.length} machines`} style=${{ position: "relative", width: 12, height: Math.max(4, Math.round(30 * Math.sqrt(ms.length / all.length))), borderRadius: 2, background: k === 2 ? "color-mix(in srgb, var(--s2) 45%, transparent)" : "color-mix(in srgb, var(--med) 55%, transparent)" }}>
-      ${ms.some((m) => m.host === "LOG-02") ? html`<i style=${{ position: "absolute", left: 2, top: -10, width: 8, height: 8, borderRadius: 2, background: "var(--crit)" }} />` : null}</div>`)}
-    <span className="t3 mono" style=${{ fontSize: 10 }}>1.4.0 → 1.4.2</span></div>`;
-  const steps = [["Mon 07:45", "Install failed · update share unreachable", "var(--med)"], ["Mon 09:30", "Escalated to you", "var(--crit)"], ["Today 02:14", "A. Quaye entered it", "var(--s3)"], ["Today 02:31", "Went offline", "var(--text-3)"]];
+      ${ms.some((m) => m.host === focus) ? html`<i style=${{ position: "absolute", left: 2, top: -10, width: 8, height: 8, borderRadius: 2, background: "var(--crit)" }} />` : null}</div>`)}
+    <span className="t3 mono" style=${{ fontSize: 10 }}>${fm.ver} → 1.4.2</span></div>`;
+  const steps = focus === "LOG-02" ? [["Mon 07:45", "Install failed · update share unreachable", "var(--med)"], ["Mon 09:30", "Escalated to you", "var(--crit)"], ["Today 02:14", "A. Quaye entered it", "var(--s3)"], ["Today 02:31", "Went offline", "var(--text-3)"]]
+    : [["Mon 07:45", "Install failed", "var(--med)"], ["Tue 09:30", "Retried, failed again", "var(--med)"], ["Wed 09:30", "Escalated to you", "var(--crit)"], ["Today", `Still on ${fm.ver}`, "var(--text-3)"]];
   return html`<div>
     <div className="vcols">
       ${vers.map((v, i) => { const ms = per[i], cap = 6, more = ms.length - cap;
         return html`<div key=${v} className="vcol">
-          <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}><span className="mono" style=${{ fontWeight: 600 }}>${v}</span><span className="t3" style=${{ fontSize: 11 }}>${ms.length} · ${v === "1.4.2" ? "current" : i === 0 ? "2 behind" : "1 behind"}</span></div>
-          <div style=${{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>${ms.slice(0, cap).map((m) => { const me = m.host === "LOG-02";
+          <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}><span className="mono" style=${{ fontWeight: 600 }}>${v}</span><span className="t3" style=${{ fontSize: 11, whiteSpace: "nowrap" }}>${fmt(ms.length)} · ${v === "1.4.2" ? "current" : i === 0 ? "2 behind" : "1 behind"}</span></div>
+          <div style=${{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>${ms.slice(0, cap).map((m) => { const me = m.host === focus;
             return html`<span key=${m.host} title=${`${m.host} · ${m.user || ""}`} onClick=${() => go && go("machines", m.host)} style=${{ cursor: "pointer", height: 30, padding: "0 7px", borderRadius: 4, display: "inline-grid", placeItems: "center", fontFamily: "var(--mono)", fontSize: 11,
               background: me ? "color-mix(in srgb, var(--crit) 12%, var(--surface))" : v === "1.4.2" ? "color-mix(in srgb, var(--s2) 14%, var(--surface))" : "color-mix(in srgb, var(--med) 14%, var(--surface))",
-              border: me ? "1.5px dashed var(--crit)" : "1px solid transparent", color: me ? "var(--crit)" : v === "1.4.2" ? "var(--s2)" : "var(--med)" }}>${m.host}</span>`; })}
+              border: me ? "1.5px dashed var(--crit)" : "1px solid transparent", color: me ? "var(--crit)" : v === "1.4.2" ? "var(--s2)" : "var(--med)", whiteSpace: "nowrap", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>${fitMid(m.host, 14)}</span>`; })}
             ${more > 0 ? html`<span className="more" style=${{ height: 30 }}>+${more}</span>` : null}</div>
         </div>`; })}
     </div>
@@ -3377,14 +3517,15 @@ function VersionColumns({ big, go }) {
   </div>`;
 }
 // Logistics has no Admin: the branch with its empty seat, and what skips it to reach you.
-function SeatBypass({ big }) {
+function SeatBypass({ big, d }) {
+  const did = (d && d.dept) || "log", dn = ((FULL.DEPTS || DEPTS).find((x) => x.id === did) || { name: "Logistics" }).name, nM = (FULL.MACHINES || MACHINES).filter((m) => m.dept === did).length;
   if (!big) return html`<div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}>
     <span style=${{ width: 26, height: 26, borderRadius: "50%", border: "1.5px dashed var(--crit)", display: "grid", placeItems: "center", color: "var(--crit)", fontSize: 12, fontWeight: 600 }}>?</span>
     <svg width="44" height="14" viewBox="0 0 44 14"><path d="M2 7 H36" style=${{ stroke: "var(--text-4)" }} strokeWidth="1.5" /><path d="M34 2 L42 7 L34 12 Z" style=${{ fill: "var(--text-4)" }} /></svg>
     <span style=${{ width: 26, height: 26, borderRadius: "50%", border: "1.5px solid var(--border-strong)", display: "grid", placeItems: "center", color: "var(--text-3)", fontSize: 9.5, fontWeight: 600 }}>You</span>
   </div>`;
   const W = 440, H = 180;
-  return html`<svg viewBox=${`0 0 ${W} ${H}`} style=${{ width: "100%", maxWidth: big ? W : 150, display: "block" }} role="img" aria-label="Logistics has no Admin; its reports come straight to you">
+  return html`<svg viewBox=${`0 0 ${W} ${H}`} style=${{ width: "100%", maxWidth: big ? W : 150, display: "block" }} role="img" aria-label=${`${dn} has no Admin; its reports come straight to you`}>
     <defs><marker id="byArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style=${{ fill: "var(--crit)" }} /></marker></defs>
     <path d="M70 46 C 70 70, 150 62, 170 78" fill="none" style=${{ stroke: "var(--border-strong)" }} strokeWidth="1.5" />
     <path d="M225 104 L225 122" fill="none" style=${{ stroke: "var(--crit)" }} strokeWidth="1.5" strokeDasharray="4 3" />
@@ -3393,22 +3534,48 @@ function SeatBypass({ big }) {
     <circle cx="70" cy="30" r="17" style=${{ fill: "var(--accent-soft)", stroke: "var(--accent)" }} strokeWidth="1.5" />
     <text x="70" y="34" textAnchor="middle" fontSize="11" fontWeight="700" style=${{ fill: "var(--accent)" }}>You</text>
     <rect x="170" y="70" width="110" height="34" rx="6" style=${{ fill: "var(--surface-2)", stroke: "var(--border-strong)" }} />
-    <text x="225" y="91" textAnchor="middle" fontSize="12.5" fontWeight="600" style=${{ fill: "var(--text)" }}>Logistics</text>
+    <text x="225" y="91" textAnchor="middle" fontSize="12.5" fontWeight="600" style=${{ fill: "var(--text)" }}>${fitEnd(dn, 16)}<title>${dn}</title></text>
     <circle cx="225" cy="140" r="17" style=${{ fill: "color-mix(in srgb, var(--crit) 8%, transparent)", stroke: "var(--crit)" }} strokeWidth="1.5" strokeDasharray="4 3" />
     <text x="225" y="145" textAnchor="middle" fontSize="15" fontWeight="600" style=${{ fill: "var(--crit)" }}>?</text>
-    ${(() => { const lm = (FULL.MACHINES || MACHINES).filter((m) => m.dept === "log"), two = lm.slice(0, 2);
+    ${(() => { const lm = (FULL.MACHINES || MACHINES).filter((m) => m.dept === did), two = lm.slice(0, 2);
       return html`<g>${two.map((m, k) => { const off = m.status === "offline", x0 = 300 + k * 62;
         return html`<g key=${m.host}><rect x=${x0} y="125" width="54" height="30" rx="4" style=${{ fill: off ? "transparent" : "var(--surface-3)", stroke: off ? "var(--text-4)" : "var(--border-strong)" }} strokeDasharray=${off ? "3 3" : "0"} />
           <text x=${x0 + 27} y="144" textAnchor="middle" fontSize="11" style=${{ fill: off ? "var(--text-4)" : "var(--text-2)", fontFamily: "var(--mono)" }}>${m.host}</text></g>`; })}
-        ${lm.length > 2 ? html`<text x="424" y="144" textAnchor="end" fontSize="11" style=${{ fill: "var(--text-3)" }}>+${lm.length - 2}</text>` : null}</g>`; })()}
+        ${lm.length > 2 ? html`<text x="416" y="170" textAnchor="end" fontSize="11" style=${{ fill: "var(--text-3)" }}>+${fmt(lm.length - 2)} more</text>` : null}</g>`; })()}
     ${big ? html`<g>
       <text x="225" y="172" textAnchor="middle" fontSize="11.5" fontWeight="600" style=${{ fill: "var(--crit)" }}>No Admin</text>
-      <text x="14" y="150" fontSize="11.5" style=${{ fill: "var(--crit)" }}>4 reports, 1 escalation</text>
+      <text x="14" y="150" fontSize="11.5" style=${{ fill: "var(--crit)" }}>${did === "log" ? "4 reports, 1 escalation" : `${fmt(nM)} machines' reports`}</text>
       <text x="14" y="165" fontSize="11.5" style=${{ fill: "var(--crit)" }}>skip the empty seat</text>
     </g>` : null}
   </svg>`;
 }
-const DVIZ = { stuck: VersionColumns, noadmin: SeatBypass, quaye: NightGrid, approve: GateTiles, reports: ReportStack };
+// A department task someone marked done: the department's Admins, each with how far they got.
+function TaskAck({ big, d }) {
+  const t = DEPT_TASKS.find((x) => x.id === (d && d.task)); if (!t) return null;
+  const adm = Object.keys(t.st), cap = big ? 6 : 4;
+  if (!big) return html`<div className="row" style=${{ gap: 4, flexWrap: "nowrap" }}>${adm.slice(0, cap).map((a) => html`<span key=${a} title=${`${a} · ${DSTATE[t.st[a]][0]}`} className="av" style=${{ width: 24, height: 24, fontSize: 9, boxShadow: `0 0 0 2px ${DSTATE[t.st[a]][1]}` }}>${initials(a)}</span>`)}
+    ${adm.length > cap ? html`<span className="t3 mono" style=${{ fontSize: 10 }}>+${adm.length - cap}</span>` : null}<span className="t3 mono" style=${{ fontSize: 10, marginLeft: 6 }}>${dueText(t.due)}</span></div>`;
+  return html`<div>
+    <div className="row" style=${{ gap: 0, flexWrap: "nowrap", marginBottom: 14 }}>${DSTEP.map((k, i) => html`<div key=${k} style=${{ flex: 1, textAlign: "center" }}>
+      <div style=${{ height: 4, background: DSTATE[k][1], opacity: i <= 3 ? 1 : 0.3, borderRadius: 2 }} /><div className="t3" style=${{ fontSize: 11, marginTop: 4 }}>${DSTATE[k][0]}</div></div>`)}</div>
+    ${adm.slice(0, cap).map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "6px 0", borderTop: "1px solid var(--grid)" }}>
+      <span className="av" style=${{ boxShadow: `0 0 0 2px ${DSTATE[t.st[a]][1]}` }}>${initials(a)}</span><span className="cut" style=${{ flex: 1 }}>${a}</span>
+      <span style=${{ color: DSTATE[t.st[a]][1], fontSize: 12.5 }}>${DSTATE[t.st[a]][0]}</span><span className="mono t3" style=${{ fontSize: 12, width: 60, textAlign: "right" }}>${t.when[a] != null ? hhmm(t.when[a]) : "—"}</span></div>`)}
+    ${adm.length > cap ? html`<div className="t3" style=${{ fontSize: 12, paddingTop: 6 }}>+${adm.length - cap} more Admins</div>` : null}
+    <div className="t3" style=${{ fontSize: 12, marginTop: 10 }}>Given ${t.at < 0 ? dayOf(t.at) + " " + hhmm(t.at) : "today " + hhmm(t.at)} · due ${t.due < 24 ? "today " + hhmm(t.due) : dayOf(t.due) + " " + hhmm(t.due)} · ${dueText(t.due)}</div>
+  </div>`;
+}
+// The decision kinds and their pictures. A new instance of a kind gets its picture with no extra work;
+// a new kind is not shown until it has one here.
+const DECISION_KINDS = {
+  "update-stuck":  { viz: VersionColumns, label: "A machine's update is stuck" },
+  "empty-seat":    { viz: SeatBypass,     label: "A department has no Admin" },
+  "admin-pattern": { viz: NightGrid,      label: "An Admin's pattern looks wrong" },
+  "version-gate":  { viz: GateTiles,      label: "A version waits for approval" },
+  "su-reports":    { viz: ReportStack,    label: "Reports only the Super User sees" },
+  "task-done":     { viz: TaskAck,        label: "A department says its task is done" },
+};
+const DVIZ = Object.fromEntries(Object.entries(DECISION_KINDS).map(([k, v]) => [k, v.viz]));
 function Work({ go }) {
   const [sel, setSel] = useState(DECISIONS[0].id);
   const [pick, setPick] = useState({});
@@ -3420,27 +3587,30 @@ function Work({ go }) {
   const opt = d.options.find((o) => o.key === (pick[d.id] || d.options[0].key));
   const val = inp[d.id + opt.key] || "";
   const missing = (opt.need === "reason" || opt.need === "message") && !val.trim() ? (opt.need === "reason" ? "Write a reason first." : "Write the message first.") : opt.need === "pick" && !val ? "Pick someone first." : d.reports && opt.key === "mark" && !ticked.length ? "Tick at least one." : null;
+  useDT();
+  const dtasks = DEPT_TASKS.filter((t) => !t.complete);
+  const [newT, setNewT] = useState(null);
   const decide = () => { setDone({ ...done, [d.id]: { text: opt.done + (opt.need === "pick" ? " " + val : ""), at: NOWH + (Date.now() - T0) / 3.6e6 } });
+    if (d.kind === "task-done") dtChange(() => { const t = DEPT_TASKS.find((x) => x.id === d.task); if (!t) return; if (opt.key === "complete") t.complete = true; else t.st = Object.fromEntries(Object.entries(t.st).map(([a, v]) => [a, v === "done" ? "ongoing" : v])); });
     const next = open.find((x) => x.id !== d.id); if (next) setSel(next.id); toast(opt.done + " (concept)"); };
   const AGE = { stuck: 3, noadmin: 13, quaye: 6, approve: 2, reports: 4 };
-  const mine = TASKS.filter((t) => t.by === "You");
-  const Big = DVIZ[d.id];
-  const dpg = usePaged(DECISIONS, 5), rpg = usePaged(SU_ONLY_REPORTS, 5), wpg = usePaged(mine, 5);
+  const Big = DVIZ[d.kind];
+  const dpg = usePaged(DECISIONS, 5), rpg = usePaged(SU_ONLY_REPORTS, 5), wpg = usePaged(dtasks, 5);
   return html`<${React.Fragment}>
     <div className="row" style=${{ justifyContent: "space-between" }}>
       <div className="row" style=${{ gap: 10, alignItems: "baseline" }}>
-        <span style=${{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em" }}>${open.length}</span><span className="t2">waiting on you</span>
+        <span style=${{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em" }}>${fmt(open.length)}</span><span className="t2">waiting on you</span>
         ${open.filter((x) => x.sev === "high").length ? html`<span className="tag" style=${{ "--c": "var(--crit)" }}>${open.filter((x) => x.sev === "high").length} urgent<//>` : null}
         ${Object.keys(done).length ? html`<span className="tag" style=${{ "--c": "var(--ok)" }}>${ic("CheckOutlined")} ${Object.keys(done).length} decided<//>` : null}
       </div>
       <${Pager} p=${dpg} />
     </div>
       <div className="dcards">
-        ${dpg.items.map((x) => { const V = DVIZ[x.id], dn = done[x.id];
+        ${dpg.items.map((x) => { const V = DVIZ[x.kind], dn = done[x.id];
           return html`<div key=${x.id} className=${"dcard" + (x.id === d.id ? " on" : "") + (dn ? " done" : "")} role="button" tabIndex="0" onClick=${() => setSel(x.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(x.id)} style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c }}>
-            <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className="qi" style=${{ width: 26, height: 26, fontSize: 13 }}>${ic(dn ? "CheckOutlined" : x.icon)}</span><b style=${{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>${x.short}</b></div>
-            <div className="dviz">${V ? html`<${V} />` : null}</div>
-            <div title=${`Waiting ${x.age}`}><div className="bar" style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c, height: 3 }}><span style=${{ width: `${Math.min(100, ((AGE[x.id] || 3) / 14) * 100)}%` }} /></div>
+            <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className="qi" style=${{ width: 26, height: 26, fontSize: 13 }}>${ic(dn ? "CheckOutlined" : x.icon)}</span><b style=${{ fontWeight: 600, fontSize: 13, lineHeight: 1.3, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title=${x.short}>${x.short}</b></div>
+            <div className="dviz">${V ? html`<${V} d=${x} />` : null}</div>
+            <div title=${`Waiting ${x.age}`}><div className="bar" style=${{ "--c": dn ? "var(--ok)" : SEV[x.sev].c, height: 3 }}><span style=${{ width: `${Math.min(100, ((AGE[x.id] || parseInt(x.age, 10) || 3) / 14) * 100)}%` }} /></div>
               <div className="t3" style=${{ fontSize: 11, marginTop: 4 }}>${dn ? "decided" : x.age}</div></div>
           </div>`; })}
       </div>
@@ -3450,11 +3620,11 @@ function Work({ go }) {
             <div className="row"><${Sev} s=${d.sev} /></div>
             <div style=${{ fontSize: 18, fontWeight: 600, margin: "6px 0 4px", letterSpacing: "-0.01em" }}>${d.title}</div>
             <div className="t3" style=${{ fontSize: 12.5, marginBottom: 16 }}>${d.why}</div>
-            ${d.id === "reports" ? html`<div>${rpg.items.map(([id, t, w]) => html`<label key=${id} className="kv" style=${{ gridTemplateColumns: "22px minmax(0, 1fr) auto", cursor: "pointer" }}>
+            ${d.kind === "su-reports" ? html`<div>${rpg.items.map(([id, t, w]) => html`<label key=${id} className="kv" style=${{ gridTemplateColumns: "22px minmax(0, 1fr) auto", cursor: "pointer" }}>
                 <${Checkbox} checked=${ticked.includes(id)} onChange=${(e) => setTicked(e.target.checked ? [...ticked, id] : ticked.filter((y) => y !== id))} /><span>${t}</span><span className="mono t3">${w}</span></label>`)}
-              ${d.id === "reports" && rpg.pages > 1 ? html`<div className="row" style=${{ marginTop: 8 }}><span className="t3" style=${{ fontSize: 12 }}>${ticked.length} of ${SU_ONLY_REPORTS.length} ticked</span><span className="sp" /><${Pager} p=${rpg} /></div>` : null}</div>`
-              : d.id === "noadmin" ? html`<${SeatBypass} big=${true} />`
-              : Big ? html`<${Big} big=${true} go=${go} />` : null}
+              ${d.kind === "su-reports" && rpg.pages > 1 ? html`<div className="row" style=${{ marginTop: 8 }}><span className="t3" style=${{ fontSize: 12 }}>${ticked.length} of ${SU_ONLY_REPORTS.length} ticked</span><span className="sp" /><${Pager} p=${rpg} /></div>` : null}</div>`
+              : d.kind === "empty-seat" ? html`<${SeatBypass} big=${true} d=${d} />`
+              : Big ? html`<${Big} big=${true} go=${go} d=${d} />` : null}
             ${d.note ? html`<div className="t3" style=${{ fontSize: 12, marginTop: 12 }}>${ic("InfoCircleOutlined")} ${d.note}</div>` : null}
           </div>
           <div style=${{ padding: 20, minWidth: 0 }}>
@@ -3465,7 +3635,7 @@ function Work({ go }) {
                 ${d.options.map((o) => html`<${Choice} key=${o.key} on=${o.key === opt.key} icon=${o.icon} title=${o.title} desc=${o.desc} onClick=${() => setPick({ ...pick, [d.id]: o.key })} />`)}
               </div>
               ${opt.need === "reason" ? html`<${Input.TextArea} style=${{ marginTop: 10 }} value=${val} onChange=${(e) => setInp({ ...inp, [d.id + opt.key]: e.target.value })} placeholder="Why? Recorded with the decision." autoSize=${{ minRows: 2, maxRows: 4 }} />` : null}
-              ${opt.need === "message" ? html`<${Input.TextArea} style=${{ marginTop: 10 }} value=${val} onChange=${(e) => setInp({ ...inp, [d.id + opt.key]: e.target.value })} placeholder="Write to A. Quaye" autoSize=${{ minRows: 2, maxRows: 4 }} />` : null}
+              ${opt.need === "message" ? html`<${Input.TextArea} style=${{ marginTop: 10 }} value=${val} onChange=${(e) => setInp({ ...inp, [d.id + opt.key]: e.target.value })} placeholder=${d.to ? `Write to ${d.to}` : "Write to A. Quaye"} autoSize=${{ minRows: 2, maxRows: 4 }} />` : null}
               ${opt.need === "pick" ? html`<${Select} style=${{ marginTop: 10, width: 240 }} value=${val || undefined} placeholder="Who?" options=${opt.pick.map((x) => ({ value: x, label: x }))} onChange=${(v) => setInp({ ...inp, [d.id + opt.key]: v })} />` : null}
               <div className="row" style=${{ marginTop: 14 }}>
                 ${missing ? html`<span className="t3" style=${{ fontSize: 12 }}>${missing}</span>` : null}<span className="sp" />
@@ -3475,19 +3645,52 @@ function Work({ go }) {
           </div>
         </div>
       </section>
-    ${mine.length ? html`<section className="panel">
-      <div className="phd"><div className="pt">Waiting on others<small>tasks you assigned · only you can verify them</small></div><${Pager} p=${wpg} what="tasks" /></div>
-      <div>
-        ${wpg.items.map((t) => { const dn = t.evidence.filter((e) => e.st === "Passed").length, over = t.state === "Overdue";
-          return html`<div key=${t.id} className="wrow" role="button" tabIndex="0" onClick=${() => go("tasks", t.id)} onKeyDown=${(e) => e.key === "Enter" && go("tasks", t.id)}>
-            <span style=${{ fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>${t.title}</span>
-            <span className="row" style=${{ flexWrap: "nowrap", gap: 6 }}><span className="av" style=${{ width: 22, height: 22, fontSize: 9 }}>${initials(t.who)}</span><span className="t2">${t.who}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${t.host}</span></span>
-            <span style=${{ display: "flex", gap: 3 }} title=${`${dn} of ${t.evidence.length} checks passed`}>${t.evidence.map((e, k) => html`<span key=${k} title=${e.target + " · " + e.st} style=${{ flex: 1, height: 6, borderRadius: 2, background: ESTATE[e.st] === "var(--text-4)" ? "var(--surface-3)" : ESTATE[e.st] }} />`)}</span>
-            <span className="mono" style=${{ fontSize: 12, color: over ? "var(--crit)" : "var(--text-3)", textAlign: "right", whiteSpace: "nowrap" }}>${over ? span(NOWH - t.final) + " late" : span(t.final - NOWH) + " left"}</span>
-            <span className="t4">${ic("RightOutlined")}</span>
-          </div>`; })}
-      </div>
-    </section>` : null}
+    <section className="panel">
+      <div className="phd"><div className="pt">Given to departments<small>the Admins you pick are told · they mark it seen, ongoing or done · you call it complete</small></div>
+        <div className="row"><${Pager} p=${wpg} what="tasks" /><${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => setNewT({ text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] })}>New task<//></div></div>
+      ${dtasks.length ? html`<div>${wpg.items.map((t) => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === t.dept), stt = taskState(t), adm = Object.keys(t.st), late = t.due < NOWH;
+          const who = adm.filter((a) => t.st[a] === stt);
+          const seenN = adm.filter((a) => t.st[a] !== "sent").length, partial = adm.length < dd.admins.length;
+          const line = stt === "done" ? `Done · ${who[0]} · waiting for you` : stt === "ongoing" ? `Ongoing · ${who.join(", ")}` : stt === "seen" ? `Seen by ${seenN} of ${adm.length}` : `Not seen yet · ${adm.length} told at ${hhmm(t.at)}`;
+          const seenTip = adm.map((a) => `${a}: ${t.st[a] === "sent" ? "not seen" : DSTATE[t.st[a]][0].toLowerCase() + " " + hhmm(t.when[a])}`).join("\n");
+          return html`<div key=${t.id} className="drow" role="button" tabIndex="0" onClick=${() => { if (stt === "done") { setSel("dtask-" + t.id); window.scrollTo({ top: 0, behavior: "smooth" }); } }}>
+            <span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${t.title}</span>
+            <span className="cut t2" title=${dd.name}>${dd.name}${partial ? html`<span className="t3"> · ${adm.length} of ${dd.admins.length}</span>` : null}</span>
+            <span className="row" style=${{ gap: 3, flexWrap: "nowrap" }}>${adm.slice(0, 3).map((a) => html`<span key=${a} className="av" title=${`${a} · ${DSTATE[t.st[a]][0]}`} style=${{ width: 22, height: 22, fontSize: 9, boxShadow: `0 0 0 2px ${DSTATE[t.st[a]][1]}` }}>${initials(a)}</span>`)}${adm.length > 3 ? html`<span className="t3 mono" style=${{ fontSize: 10.5 }}>+${adm.length - 3}</span>` : null}</span>
+            <span className="cut" style=${{ fontSize: 12.5, color: stt === "done" ? "var(--ok)" : stt === "ongoing" ? "var(--med)" : "var(--text-3)" }} title=${seenTip}>${line}</span>
+            <span className="mono" style=${{ fontSize: 12, color: late ? "var(--crit)" : "var(--text-3)", textAlign: "right", whiteSpace: "nowrap" }}>${dueText(t.due)}</span>
+          </div>`; })}</div>`
+        : html`<div className="t3" style=${{ padding: 16 }}>Nothing given to a department. <a onClick=${() => setNewT({ text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] })}>Give one a task</a>.</div>`}
+    </section>
+    <${Drawer} open=${!!newT} onClose=${() => setNewT(null)} width=${480} title="Give a department a task"
+      footer=${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept), miss = !newT.text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : newT.who === "some" && !newT.some.length ? "Pick at least one Admin." : null;
+        return html`<div className="row"><span className="t3" style=${{ fontSize: 12 }}>${miss || ""}</span><span className="sp" /><${Button} onClick=${() => setNewT(null)}>Cancel<//>
+          <${Button} type="primary" disabled=${!!miss} onClick=${() => { const told = newT.who === "all" ? dd.admins : newT.some, st = Object.fromEntries(told.map((a) => [a, "sent"]));
+            dtChange(() => DEPT_TASKS.unshift({ id: `D-${200 + DEPT_TASKS.length}`, title: newT.text.trim(), dept: dd.id, at: NOWH + (Date.now() - T0) / 3.6e6, due: newT.due, st, when: {} })); wpg.setPage(0); setNewT(null);
+            toast(`Given to ${dd.name} · ${told.length > 2 ? told.length + " Admins" : told.join(" and ")} told (concept)`); }}>Give it to them<//></div>`; })() : null}>
+      ${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept);
+        const base = dayjs("2026-10-01T00:00:00"), quick = [["today", "End of today", 17], ["fri", "Friday 17:00", 41], ["week", "In a week", 17 + 24 * 7]];
+        return html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div><div className="nt-h">What needs doing</div>
+            <${Input.TextArea} id="dt-text" autoSize=${{ minRows: 3, maxRows: 6 }} maxLength=${280} showCount value=${newT.text} onChange=${(e) => setNewT({ ...newT, text: e.target.value })} placeholder="Collect the signed leave forms from every team" /></div>
+          <div><div className="nt-h">Department</div>
+            <${Select} id="dt-dept" showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Which department?" value=${newT.dept} onChange=${(v) => setNewT({ ...newT, dept: v, some: [] })}
+              options=${(FULL.DEPTS || DEPTS).map((x) => ({ value: x.id, label: x.admins.length ? x.name : `${x.name} · no Admin`, disabled: !x.admins.length }))} />
+            ${dd ? (() => { const told = newT.who === "all" ? dd.admins : newT.some;
+              return html`<div>
+              ${dd.admins.length > 1 ? html`<div style=${{ marginTop: 12 }}><div className="nt-h">Who is told</div>
+                <${Segmented} value=${newT.who} onChange=${(v) => setNewT({ ...newT, who: v })} options=${[{ value: "all", label: `Every Admin in ${fitEnd(dd.name, 22)} (${dd.admins.length})` }, { value: "some", label: "Only some" }]} />
+                ${newT.who === "some" ? html`<${Select} id="dt-some" mode="multiple" maxTagCount="responsive" showSearch style=${{ width: "100%", marginTop: 8 }} placeholder="Which Admins?" value=${newT.some}
+                  onChange=${(v) => setNewT({ ...newT, some: v })} options=${dd.admins.map((a) => ({ value: a, label: `${a} · ${ADMIN_INFO[a] && ADMIN_INFO[a].busy ? "inside a machine" : "at their desk"}` }))} />` : null}</div>` : null}
+              <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${ic("NotificationOutlined")} ${told.length ? `${told.length > 3 ? `${told.slice(0, 3).join(", ")} and ${told.length - 3} more` : told.join(" and ")} ${told.length === 1 ? "is" : "are"} told as soon as you give it, on every page of their console until they mark it seen.` : "Nobody picked yet."}${newT.who === "some" && told.length ? " The others in the department do not see it." : ""}</div></div>`; })()
+              : html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>A department with no Admin cannot take a task. Assign one first, from its card above.</div>`}</div>
+          <div><div className="nt-h">Deadline</div>
+            <${Segmented} value=${newT.dueKey} onChange=${(k) => { const q = quick.find((x) => x[0] === k); setNewT({ ...newT, dueKey: k, due: q ? q[2] : newT.due }); }} options=${[...quick.map(([k, l]) => ({ value: k, label: l })), { value: "pick", label: "Pick a date" }]} />
+            ${newT.dueKey === "pick" ? html`<div style=${{ marginTop: 8 }}><${DatePicker} id="dt-due" showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${base.add(newT.due * 60, "minute")} onChange=${(v) => v && setNewT({ ...newT, due: v.diff(base, "minute") / 60 })} /></div>` : null}
+            <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>Due ${base.add(newT.due * 60, "minute").format("ddd D MMM, HH:mm")}.</div></div>
+          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>No checks are set: the Admins say how far it has got, and you decide when it is complete. Nothing is closed for you.</div>
+        </div>`; })() : null}
+    <//>
   <//>`;
 }
 const ROUTING0 = { "Restricted file": ["ops", "fin", "log"], "Flow failed": ["ops", "fin"], "Listener report": ["ops"], "Update stuck": [], "Deviation": ["ops", "fin", "log"] };
@@ -3547,10 +3750,10 @@ function Govern({ go, enter }) {
     <section className="panel">
       <div className="phd"><div className="pt">Where reports go<small>click a cell to route a kind of report to a department · every Admin there sees it · you always do</small></div>
         ${changes.length ? html`<div className="row"><span className="t2" style=${{ fontSize: 12 }}>${changes.length} change${changes.length > 1 ? "s" : ""} not saved</span><${Button} size="small" onClick=${() => setDraft(saved)}>Discard<//><${Button} size="small" type="primary" onClick=${() => setConfirming(true)}>Save routing<//></div>` : null}</div>
-      <div className="scroll-x"><div className="rgrid" style=${{ gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${depts.length + 1}, minmax(76px, 1fr))` }}>
+      <div className="scroll-x"><div className="rgrid" style=${{ gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${depts.length + 1}, minmax(88px, 1fr))` }}>
         <span />
         <span className="rh">You</span>
-        ${depts.map((d) => html`<span key=${d.id} className="rh" style=${{ color: d.admins.length ? undefined : "var(--crit)" }} title=${d.admins.length ? d.admins.join(", ") : "No Admin to receive them"}>${d.name}</span>`)}
+        ${depts.map((d) => html`<span key=${d.id} className="rh" style=${{ color: d.admins.length ? undefined : "var(--crit)" }} title=${`${d.name} · ${d.admins.length ? d.admins.join(", ") : "No Admin to receive them"}`}><span>${d.name}</span></span>`)}
         ${Object.keys(draft).map((c) => html`<${React.Fragment} key=${c}>
           <span className="rc">${c}</span>
           <span className="rd"><span className="dotc on locked" title="You always receive every report">${ic("LockOutlined")}</span></span>
@@ -3611,7 +3814,7 @@ function DeptToday({ d, ms, go }) {
   const full = span === "24 hours", a = full ? 0 : frame[0], b = full ? 24 : frame[1];
   const hosts = new Set(ms.map((m) => m.host)), pr = useMemo(() => hostsProfile(hosts), [d.id]);
   const allLanes = useMemo(() => {
-    const l0 = ms.map((m, k) => ({ m, k, blocks: (LANES.find((l) => l.host === m.host) || { blocks: [] }).blocks }));
+    const l0 = ms.map((m, k) => ({ m, k, blocks: laneOf(m.host).blocks }));
     // machines with something to see come first: a flag, someone other than the owner, or a health problem
     const note = (x) => (pr.pins.some((p0) => p0.text.includes(x.m.host)) || x.blocks.some((b0) => b0[2] !== "own") ? 0 : rankM(x.m) < 4 ? 1 : 2);
     return l0.sort((a0, b0) => note(a0) - note(b0) || a0.k - b0.k); }, [d.id]);
@@ -3652,7 +3855,7 @@ function DeptToday({ d, ms, go }) {
             <g style=${{ cursor: "pointer" }} onClick=${() => go("machines", m.host)}>
               <rect x="0" y=${y + 7} width="11" height="11" rx="2" style=${{ fill: t.bg === "transparent" ? "var(--surface)" : t.bg, stroke: k === "quiet" || k === "watch" || k === "offline" ? "var(--border-strong)" : "none" }} strokeDasharray=${k === "offline" ? "2 2" : "0"} />
               ${t.dot ? html`<circle cx="11" cy=${y + 7} r="3" style=${{ fill: t.dot, stroke: "var(--surface)" }} strokeWidth="1" />` : null}
-              <text x="18" y=${y + 16.5} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${m.host}<title>${m.user || "no user"} · ${HEALTH[m.status][1]}</title></text>
+              <text x="18" y=${y + 16.5} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${fitMid(m.host, 13)}<title>${m.host} · </title><title>${m.user || "no user"} · ${HEALTH[m.status][1]}</title></text>
             </g>
             <line x1=${L} x2=${L + pw} y1=${y + rowH} y2=${y + rowH} style=${{ stroke: "var(--grid)" }} />
             ${blocks.filter((x) => inView(x[0], x[1])).map((b, j) => html`<rect key=${j} x=${X(b[0])} y=${y + 7} width=${Math.max(3, X(b[1]) - X(b[0]))} height="12" rx="2"
@@ -3805,6 +4008,7 @@ function useTheme() {
   return { mode, setMode, dark: mode === "dark" || (mode !== "light" && sys) };
 }
 function App() {
+  useDT();
   const th = useTheme();
   const [level, setLevel] = useState(null);   // null: the Super User's own level; else { admin, dept, since, how }
   const parse = () => { const [p, s0] = (location.hash.slice(1) || "monitor").split("/"); return [TITLES[p] ? p : "monitor", s0 ? decodeURIComponent(s0) : null]; };
@@ -3842,7 +4046,7 @@ function App() {
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
   else if (page === "sessions") body = html`<${Sessions} />`;
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
-  else if (page === "tasks") body = sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} />`;
+  else if (page === "tasks") body = sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} />`;
   else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} />` : html`<${Flows} go=${go} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && ABY[sub] ? html`<${ActionDetail} key=${sub} id=${sub} go=${go} />` : html`<${Actions} go=${go} />`;
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : sub && RBY[sub] ? html`<${RuleDetail} id=${sub} go=${go} />` : html`<${Automation} go=${go} />`;
@@ -3863,30 +4067,40 @@ function App() {
     <div className="app">
       <aside className="side">
         ${level ? html`<div className="org" style=${{ paddingBottom: 6 }}><span className="av" style=${{ width: 26, height: 26, background: "color-mix(in srgb, var(--crit) 14%, transparent)", color: "var(--crit)" }}>${initials(level.admin)}</span>
-            <div className="orgtxt"><div style=${{ fontWeight: 600 }}>${level.admin}'s console</div><div className="t3" style=${{ fontSize: 11.5 }}>${deptName(level.dept)} · you as Super User</div></div></div>`
+            <div className="orgtxt" title=${`${level.admin} · ${deptName(level.dept)}`}><div style=${{ fontWeight: 600 }}>${level.admin}'s console</div><div className="t3" style=${{ fontSize: 11.5 }}>${deptName(level.dept)} · you as Super User</div></div></div>`
           : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} departments</div></div></div>`}
         ${nav.map(([g, xs]) => html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}
           ${xs.map(([id, l, icon, cnt, hot]) => { const on = page === id || (!level && SU_PARENT[page] === id);
             return html`<div key=${id} className=${"nav" + (on ? " on" : "") + (level ? "" : " big")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
-            ${ic(icon)}<span>${l}</span>${(() => { const n = typeof cnt === "function" ? cnt() : cnt; return n ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${n > 999 ? "999+" : n}</span>` : null; })()}</div>`; })}<//>`)}
+            ${ic(icon)}<span>${l}</span>${(() => { const n = typeof cnt === "function" ? cnt() : cnt; return n ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null; })()}</div>`; })}<//>`)}
         <div className="side-foot">
           ${level ? html`<${Button} danger block icon=${ic("LogoutOutlined")} onClick=${leave}>Leave console<//>` : null}
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
           <span className="t4" style=${{ fontSize: 11 }} title="The large sample checks that nothing grows with the data">Concept · sample:
-            <a style=${{ marginLeft: 4, color: LARGE ? "var(--text-3)" : "var(--accent)", fontWeight: LARGE ? 400 : 600, cursor: "pointer" }} onClick=${() => LARGE && setSample(false)}>small</a> ·
-            <a style=${{ marginLeft: 2, color: LARGE ? "var(--accent)" : "var(--text-3)", fontWeight: LARGE ? 600 : 400, cursor: "pointer" }} onClick=${() => !LARGE && setSample(true)}>large</a></span>
+            ${["small", "large", "absurd"].map((v, k) => html`<${React.Fragment} key=${v}>${k ? " · " : " "}<a style=${{ color: SAMPLE_SIZE === v ? "var(--accent)" : "var(--text-3)", fontWeight: SAMPLE_SIZE === v ? 600 : 400, cursor: "pointer" }} onClick=${() => SAMPLE_SIZE !== v && setSample(v)}>${v}</a><//>`)}</span>
         </div>
       </aside>
       <div className="main">
         ${level ? html`<div className="su-banner" role="status">
           <span style=${{ fontSize: 15 }}>${ic("SafetyCertificateFilled")}</span>
           <b style=${{ fontWeight: 600 }}>Super User in charge</b>
-          <span>You are in ${level.admin}'s console · ${deptName(level.dept)} · their session is ${level.how === "end" ? "ended" : "blocked"}</span>
+          <span title=${`You are in ${level.admin}'s console · ${deptName(level.dept)}`}>You are in ${level.admin}'s console · ${deptName(level.dept)} · their session is ${level.how === "end" ? "ended" : "blocked"}</span>
           <span className="sp" /><span className="mono">${Math.floor(heldFor / 60)}:${String(heldFor % 60).padStart(2, "0")}</span>
           <${Button} size="small" onClick=${leave}>Leave<//>
         </div>` : null}
+        ${level ? (() => { const fresh = DEPT_TASKS.filter((t) => !t.complete && t.st[level.admin] === "sent"); if (!fresh.length) return null; const t = fresh[0];
+          return html`<div className="newtask" role="alert">
+            <span className="nt-ico">${ic("NotificationFilled")}</span>
+            <b style=${{ fontWeight: 600, flex: "none" }}>${fresh.length > 1 ? `${fresh.length} new tasks from the Super User` : "New task from the Super User"}</b>
+            <span className="nt-t" title=${t.title}>${t.title}</span>
+            <span className="mono" style=${{ flex: "none", color: t.due < NOWH ? "var(--crit)" : "inherit" }}>due ${t.due < 24 ? "today " + hhmm(t.due) : dayOf(t.due) + " " + hhmm(t.due)}</span>
+            ${fresh.length > 1 ? html`<span className="t3" style=${{ flex: "none" }}>+${fresh.length - 1} more</span>` : null}
+            <span className="sp" />
+            <${Button} size="small" onClick=${() => { go("tasks"); setTimeout(() => { const el = document.getElementById("dt-" + t.id); if (el) el.scrollIntoView({ block: "center" }); }, 60); }}>Open<//>
+            <${Button} size="small" type="primary" onClick=${() => { setAdminState(t.id, level.admin, "seen"); toast(`Marked seen at ${hhmm(NOWH + (Date.now() - T0) / 3.6e6)} · the Super User sees when (concept: in the product only ${level.admin} can press this)`); }}>I've seen it<//>
+          </div>`; })() : null}
         <header className="top">
           <div className="crumb">${crumb}</div>
           <div className="search" role="button" tabIndex="0" onClick=${() => setPal(true)} onKeyDown=${(e) => e.key === "Enter" && setPal(true)}>${ic("SearchOutlined")}<span>Search or jump to</span><span className="kbd">Ctrl K</span></div>

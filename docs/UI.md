@@ -529,9 +529,63 @@ They take precedence over anything above that they contradict.
     - **Counts come from the data.** Nav badges, subtitles (*64 machines, 1 department*) and card titles
       (*13 reports only you see*) are computed, never typed in. A badge over 999 reads *999+*.
 
-    The concept has a **sample: small · large** switch at the foot of the sidebar. *Large* swaps in ten
-    departments and about 270 machines, with one department of five Admins and another with none, so
-    every page can be checked at scale. Two drawings on the Reports page, the routing diagram and *How
+    - **Long names are cut, never wrapped.** A machine name, a person, a department or a breadcrumb sits
+      on one line and ends in an ellipsis, with the full text on hover. A machine name drawn in a chart
+      keeps its end, where the number is (*RCX-ACC…3-053*). A tile shows the machine's own number, not
+      its last two characters, so OPS-150 and OPS-250 are not both *50*. A routing column head takes two
+      lines at most. The *Super User in charge* strip stays one line, with **Leave** always on it.
+    - **Numbers are grouped** (*3,532*), and a figure in a card never breaks across lines.
+
+    The concept has a **sample: small · large · absurd** switch at the foot of the sidebar.
+    - *Large* swaps in ten departments and about 270 machines, with one department of five Admins and
+      another with none.
+    - *Absurd* has 54 departments and 3,532 machines. One department has 420 machines, 40 Admins and a
+      66-character name, and its machines are called *RCX-ACCRA-FL3-0NN*. There are 535 issues, 64
+      decisions, 433 reports only the Super User sees, 165 rules, 151 actions, close to 1,000 runs by
+      hand, and ten times the audit volume.
+
+    Every page has been checked at all three sizes.
+
+40. **A picture belongs to a kind, never to one item.** The user, 2 Oct 2026, on the Work cards past the
+    first page having no pictures: *"maybe the design should be a saved pattern or part of design
+    inventory so what maps to what and when needed, it is referenced"*. Every item that carries a
+    picture is an instance of a kind, and the kind owns the picture and its wording. The instance only
+    supplies its data: which machine, which department, which person. On Work, `DECISION_KINDS` maps
+    each kind to its drawing:
+    - *update stuck* → the version columns, with the machine marked
+    - *empty seat* → the department with no Admin
+    - *Admin pattern* → the night grid
+    - *version gate* → the bar
+    - *reports only you see* → the stack
+
+    So CC-25's stuck update draws the same picture as LOG-02's, with CC-25 in it. A new item of a known
+    kind needs no design work. A new kind is not shown until it has a picture. The same holds wherever a
+    picture stands for an item: issue types (`ISSUE_TYPES`), action kinds and rule triggers already work
+    this way.
+
+41. **The Super User gives departments tasks, without checks** (the user, 2 Oct 2026: *"we take the
+    verification and expectation out of this. so we assign to the department with a deadline, all admins in
+    the department are made noticed or aware. they can mark the task as seen, ongoing or done, final
+    completeness is mark by the super user"*; then *"a new task assigned must be shown at the top,
+    unmistakable … also there should be a possibility to only assign to specific admins in a department"*).
+    - **Work → *Given to departments*.** It sits under the decisions and holds the Super User's tasks: what,
+      which department (and *2 of 5* when only some Admins were told), each Admin's state as a ringed avatar,
+      where it stands, and the time left. **New task** opens a drawer with three fields:
+      - what needs doing
+      - the department: one with no Admin cannot be picked
+      - who is told: every Admin in the department, or only some
+      Then the deadline: *End of today*, *Friday 17:00*, *In a week*, or a date. No checks are set, and the
+      drawer says so.
+    - **When an Admin marks it done**, it becomes a decision of kind *task-done*. Its picture shows
+      Not seen → Seen → Ongoing → Done, with each Admin and the time they marked it. The choices are
+      **Complete**, or **Not done yet** with a note.
+    - **The Admin cannot miss it.** Until they mark it seen, a strip runs across the top of every page of
+      their console: *New task from the Super User · what · due · Open · I've seen it*. With more than one,
+      it reads *3 new tasks* and shows the first. On their Tasks page, *From the Super User* lists it first,
+      tinted, with a **New** tag. Seen, Ongoing and Done are one control per row. The time of every mark is
+      kept and shown to the Super User, which settles *"I didn't see it"*.
+
+    Engine work: `docs/ENGINE-GAPS.md` item 16. Two drawings on the Reports page, the routing diagram and *How
     fast reports are dealt with*, still draw their sample departments by hand. In the product they cap
     the departments drawn at 4, plus *N others*.
 

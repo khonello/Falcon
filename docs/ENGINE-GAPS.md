@@ -85,6 +85,27 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
       the pre-auth gate in `connection.py`. Worker: an `--enroll` first-run mode that requests, shows the code, waits,
       then writes the key to its config and connects normally. UI: the waiting list replaces "Register a machine"'s
       typed name (the dialog keeps working as the fallback). *Raised:* by the user, after the dialogs (DG01).
+16. **Department tasks from the Super User have no checks, and can go to several Admins** (the user, 2 Oct 2026).
+    Today `task.create` from a Super User needs one Admin account (`engine/task/tasks.py:45`) and carries
+    a verification stack like any task. The decision is that a Super User's task is given to a **department**,
+    with a **deadline** and **no checks and no expectations**, because such work is rarely a file or a program.
+    - **Who is told:** every Admin in the department by default, or only the ones the Super User picks.
+    - **What each of them does:** marks it *seen*, *ongoing* or *done*. The task stands at the furthest any of
+      them has got.
+    - **Who closes it:** only the Super User who gave it calls it complete, or sends it back as ongoing with a
+      note that every Admin on it sees.
+
+    Needs:
+    - a `department_tasks` row (department, title, deadline, assigner, created, completed) and a
+      `department_task_admins` row per Admin told (state, state time). The state time is the record of when it
+      was seen.
+    - handlers `task.dept_create`, `task.dept_mark {seen|ongoing|done}` (Admin, own row only),
+      `task.dept_complete` / `task.dept_reopen` (the assigner only), and `task.dept_list`
+    - a push to each Admin told, which the console turns into the strip across every page until they mark it
+      seen
+    - the soft/final deadline events reused with the one deadline
+
+    Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
 
 ## Done inline (for the record)
 
