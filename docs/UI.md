@@ -513,7 +513,8 @@ They take precedence over anything above that they contradict.
       a version back (10), the ⌘K palette (5 per group).
     - **Pages at a fixed height.** A list or chart with one row per thing shows a page of them, with
       *1–6 of 10* and ‹ › in the panel header, and keeps the height of a full page on the last one. The
-      organisation's day (6 departments), the Structure rows (6), the decision cards (5), the reports
+      organisation's day (3 departments by default; the viewer can pick 3, 6 or 10, remembered on their
+      browser), the Structure rows (6), the decision cards (5), the reports
       only the Super User sees (5), Waiting on others (5), the department page's issues (6) and Admins
       (3), and the Today and occupancy charts (12 machines).
     - **Tables page at 10 rows.** Every table, without exception. The page control hides when there is
@@ -536,7 +537,8 @@ They take precedence over anything above that they contradict.
       lines at most. The *Super User in charge* strip stays one line, with **Leave** always on it.
     - **Numbers are grouped** (*3,532*), and a figure in a card never breaks across lines.
 
-    The concept has a **sample: small · large · absurd** switch at the foot of the sidebar.
+    The concept has a **sample: empty · small · large · absurd** switch at the foot of the sidebar (*empty* is
+    rule 42).
     - *Large* swaps in ten departments and about 270 machines, with one department of five Admins and
       another with none.
     - *Absurd* has 54 departments and 3,532 machines. One department has 420 machines, 40 Admins and a
@@ -558,7 +560,9 @@ They take precedence over anything above that they contradict.
     - *version gate* → the bar
     - *reports only you see* → the stack
 
-    So CC-25's stuck update draws the same picture as LOG-02's, with CC-25 in it. A new item of a known
+    So CC-25's stuck update draws the same picture as LOG-02's, with CC-25 in it. (Since rule 43 the kinds are: *reports*, one
+    card per report category, *empty seat*, *version gate* and *task done*. The pictures of a stuck update
+    and of an Admin's pattern now draw the Update stuck and About an Admin report cards.) A new item of a known
     kind needs no design work. A new kind is not shown until it has a picture. The same holds wherever a
     picture stands for an item: issue types (`ISSUE_TYPES`), action kinds and rule triggers already work
     this way.
@@ -585,7 +589,71 @@ They take precedence over anything above that they contradict.
       tinted, with a **New** tag. Seen, Ongoing and Done are one control per row. The time of every mark is
       kept and shown to the Super User, which settles *"I didn't see it"*.
 
-    Engine work: `docs/ENGINE-GAPS.md` item 16. Two drawings on the Reports page, the routing diagram and *How
+    Engine work: `docs/ENGINE-GAPS.md` item 16.
+
+42. **Zero is a state, and slots are fixed** (the user, 2 Oct 2026: *"make sure the card size is set and not
+    determined due to items in the box … since we did work for when numbers are absurd, i feel like we should
+    do when numbers are 0"*).
+    - **Fixed slots.** A row of cards has a set number of places: the decision cards on Work have five, three
+      on a narrow screen, one on a phone. Two decisions take two of the five places; they do not stretch to
+      fill the row.
+    - **Nothing at zero is left blank or invented.** Every list, chart and figure keeps its place and its
+      height, and says in one line what will appear there, with the first step when there is one. Examples:
+      - *No departments yet*, with **Create a department**
+      - *No machines yet. They appear here as they are registered.*
+      - *Nothing open*
+      - *Quiet*
+      - *No runs yet*
+      - *No reports yet*
+      - *Nothing is waiting on you*
+    - **Tables at zero** read *Nothing here yet.*, not antd's empty box.
+    - **Figures with nothing behind them** read **—** and *No machines yet* (or *No reports yet*, and so on),
+      never *NaN* or a typed-in sample, and show *no history yet* in place of a trend line.
+    - **A department with no machines** is grey *No machines*, not green *All well*. Its day reads
+      *No machines*, not *As usual*.
+    - Counts agree in number: *1 department*, *1 machine*.
+
+    The *empty* sample is the first day: no departments, no machines, nothing recorded. Built-in actions
+    stay, since they ship with the product. Every page was checked at zero, and inside an Admin's console in
+    a department with one Admin and no machines.
+
+43. **Work holds what nobody below the Super User can take; Govern decides what that is** (the user, 2 Oct
+    2026: *"i thought the works are supposed to be reports of things to address … even if a machine is
+    paused on update … i thought admin should do, on the update i thought he was to approve on new versions
+    … the reports shown on the where the report go section should be the reports surfaced at the work
+    page"*). This follows `hierarchy-system-design.md` (Report Routing) and `implementation-spec.md` §9.5.
+    It replaces the separate decision kinds for a stuck update, an Admin's pattern, and the reports only the
+    Super User saw.
+
+    **Waiting on you is two things, and only these:**
+    - **Reports only you can address.** There is one card per report category: Restricted file, Flow
+      failed, Listener report, Update stuck, Deviation, About an Admin. The names are the rows of
+      *Where reports go*. A report lands here when its category is not routed to its department, when its
+      department has no Admin, or when it is *About an Admin*. The card says which reason applies; for
+      example, *Logistics has no Admin, so update stuck reports from there come to you*. Its reports are
+      listed with ticks, five a page. The choices:
+      - **Mark the ticked ones addressed**
+      - **Route it to those departments**, which changes the routing grid
+      - **Give that department an Admin**
+      - for Update stuck: leave the machine out of the gate
+      - for About an Admin: ask, or limit to working hours
+
+      The picture fits the category: the version columns for one stuck machine, the night grid for an
+      Admin, reports by department otherwise.
+    - **Decisions only you can make:** approve a version (*version gate*), give a department an Admin
+      (*empty seat*), and complete a department's task (*task done*).
+
+    **Not on Work:**
+    - **Reports routed to a department with an Admin** are theirs. Govern's *How departments handle their
+      reports* shows, per department, what was addressed, what waits, the typical time against the 1-hour
+      target, and **Prompt**. This is the design's Super-User-only View.
+    - **A machine whose update fails.** That goes to its Admin (*Update stuck* is routed to every department
+      by default). The Super User sees rollout health in aggregate, by department, under *Versions*, with
+      **Prompt** for a department that is behind (§9.5).
+
+    **About an Admin** is a category that is never routed. The department would be judging its own Admin, so
+    its row on the routing grid is fixed to the Super User. Routing is one setting: the grid and the
+    *Route it* choice on Work change the same thing. Two drawings on the Reports page, the routing diagram and *How
     fast reports are dealt with*, still draw their sample departments by hand. In the product they cap
     the departments drawn at 4, plus *N others*.
 

@@ -106,6 +106,15 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
     - the soft/final deadline events reused with the one deadline
 
     Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
+17. **A report category about an Admin, which can never be routed** (the user, 2 Oct 2026). An Admin's own
+    behaviour, such as entering a machine at 2 a.m., is reported only to the Super User. Routing it to the
+    department would have the Admin judge themselves.
+    - **Engine:** a fixed category, `about_admin`, whose `reports.routing_set` is refused (`FORBIDDEN`). The
+      reports are emitted by the session code when an Admin enters outside working hours.
+    - **Default routing for update escalations:** *Update stuck* is routed to every department by default,
+      so a failure past the threshold reaches that PC's Admin (§9.5). Today routing starts empty.
+
+    *Raised:* by the user, from the concept's Work page.
 
 ## Done inline (for the record)
 
