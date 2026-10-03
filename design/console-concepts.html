@@ -659,6 +659,8 @@ let MARKS = [
   { id: "M-5", kind: "file", name: "headcount-plan-2027.xlsx", host: "WS-OPS-A1", path: "C:\\Users\\RMensah\\Documents\\headcount-plan-2027.xlsx", keep: "path", by: "R. Mensah", at: "28 Sep", dept: "ops", files: 1, versions: 3 },
   { id: "M-6", kind: "folder", name: "Payroll", host: "WS-FIN-A1", path: "C:\\Finance\\Payroll\\", keep: "machine", by: "K. Boateng", at: "1 Sep", dept: "fin", files: 64, versions: 380 },
   { id: "M-7", kind: "file", name: "bank-mandates.pdf", host: "WS-FIN-A1", path: "C:\\Users\\KBoateng\\Documents\\bank-mandates.pdf", keep: "path", by: "K. Boateng", at: "22 Sep", dept: "fin", files: 1, versions: 1 },
+  { id: "M-8", kind: "folder", name: "Board", host: "ADM-01", path: "D:\\Board\\", keep: "machine", by: "Super User", at: "2 Sep", dept: "su", files: 3, versions: 18 },
+  { id: "M-9", kind: "file", name: "salaries.csv", host: "ADM-01", path: "C:\\HR\\Payroll\\salaries.csv", keep: "path", by: "Super User", at: "15 Sep", dept: "su", files: 1, versions: 6 },
 ];
 if (LARGE) { const nm = ["Contracts", "salaries-2026.csv", "Tender evaluations", "disciplinary-notes.docx", "bank-details.xlsx", "Legal"];
   DEPTS.filter((d) => d.admins.length && !["ops", "fin"].includes(d.id)).forEach((d, k) => { for (let j = 0; j < (ABSURD ? 14 : 3); j++) { const n = k * 7 + j, nmx = nm[n % nm.length], folder = !nmx.includes("."), root = `C:\\${d.name.replace(/\W+/g, "")}\\`;
@@ -670,6 +672,7 @@ const KEEP = { machine: ["Your workstation", "anywhere on it, nowhere else"], pa
 // the person at this console (set by App); Restricted shows only what they marked
 let ME = null;
 const myMarks = () => MARKS.filter((k) => k.by === ME);
+const infoOf = (who) => (who === "Super User" ? { ws: "ADM-01", dept: "su" } : ADMIN_INFO[who]);
 const myCopies = () => ISSUES.filter((i) => i.type === "file" && (markOf(i) || {}).by === ME);
 
 // who held each machine today: [from, to, kind, who]. kinds: own / admin / you / assist
@@ -2269,7 +2272,7 @@ function NewFlow({ go, me, edit }) {
   // The Super User manages everything, so (at their own level) any machine is theirs to pick.
   const ws = me && ADMIN_INFO[me] ? ADMIN_INFO[me].ws : null;
   const managed = me ? [...(ws ? [{ value: ws, label: `${ws} · your workstation` }] : []), ...MACHINES.map((m) => ({ value: m.host, label: `${m.host} · ${m.user || "no user"}${m.status === "offline" ? " · offline" : ""}` }))]
-    : FLOW_HOSTS.map((h) => ({ value: h.host, label: `${h.host} · ${h.sub}${h.offline ? " · offline" : ""}` }));
+    : [...FLOW_HOSTS.map((h) => ({ value: h.host, label: `${h.host} · ${h.sub}${h.offline ? " · offline" : ""}` })), ...Object.entries(ADMIN_INFO).map(([n, a]) => ({ value: a.ws, label: `${a.ws} · ${n}'s workstation` }))];
   const people = [{ value: "Super User", label: "Super User · on ADM-01" }, ...Object.entries(ADMIN_INFO).filter(([n]) => n !== me).map(([n, a]) => ({ value: n, label: `${n} · Admin, ${DBY[a.dept] ? DBY[a.dept].name : a.dept}` }))];
   // existing flows that already deliver somewhere, to take as a source; a flow with several branches says which
   const flowOpts = EXISTING_FLOWS.filter((x) => x.dests.some((d) => !askOf(d))).map((x) => ({ value: x.name, label: `${x.name} · by ${x.by}` }));
@@ -2526,7 +2529,7 @@ function Flows({ go, me }) {
             <${Button} size="small" onClick=${() => { setAnswers({ ...answers, [r.id]: { done: "no" } }); toast(`Declined · ${r.from} is told (concept)`); }}>Decline<//>
             <${Button} size="small" type="primary" disabled=${!a.path} onClick=${() => { setAnswers({ ...answers, [r.id]: { ...a, done: "yes" } }); toast(`Accepted · ${r.name} copies to ${myWs} ${a.path} (concept)`); }}>Accept<//>`}
       </div>`; })}
-    <${Panel} title=${cur} sub=${`by ${X0.by} · ${X0.st.toLowerCase()} · pick another flow in the table below`} extra=${html`<${Tooltip} title=${X0.by === me ? "" : `Made by ${X0.by}. Only they, or the Super User, can change it.`}><span><${Button} size="small" icon=${ic("EditOutlined")} disabled=${X0.by !== me} onClick=${() => go("flows", "edit-" + cur)}>Edit<//></span><//><${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("flows", "new")}>New flow<//>`}>
+    <${Panel} title=${cur} sub=${`by ${X0.by} · ${X0.st.toLowerCase()} · pick another flow in the table below`} extra=${html`<${Tooltip} title=${!me || X0.by === me ? "" : `Made by ${X0.by}. Only they, or the Super User, can change it.`}><span><${Button} size="small" icon=${ic("EditOutlined")} disabled=${!!me && X0.by !== me} onClick=${() => go("flows", "edit-" + cur)}>Edit<//></span><//><${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("flows", "new")}>New flow<//>`}>
       <${FlowMap} flows=${onMap} sel=${cur} onSel=${setSel} inside=${inside} />
       <div className="leg" style=${{ marginTop: 8 }}>
         ${(() => { const js = X0.dests.map((d, j) => j), paused = (X0.paused || []).length, asked = X0.dests.some(askOf), copying = js.some((j) => !(X0.paused || []).includes(j) && !askOf(X0.dests[j]));
@@ -2564,7 +2567,7 @@ function Flows({ go, me }) {
 // What the file index has seen on a machine, as folders and files to pick from. A sample; the product
 // reads it from the index, and a machine's later idle sweep fills in what was not seen yet.
 function indexTree(host) {
-  const m = MBY[host], adm = Object.entries(ADMIN_INFO).find(([, a]) => a.ws === host);
+  const m = MBY[host], adm = host === "ADM-01" ? ["Super User"] : Object.entries(ADMIN_INFO).find(([, a]) => a.ws === host);
   const spec = adm
     ? [["C:", [["Finance", ["budget-2026.xlsx", "forecast-q4.xlsx", "suppliers.xlsx", ["Invoices", ["invoices-q3.csv", "invoices-q2.csv", "credit-notes.xlsx"]]]],
           ["HR", [["Payroll", ["salaries.csv", "overtime-sep.csv", "pension.xlsx"]], ["Reviews", ["reviews-2026.docx", "reviews-2025.docx"]], ["Contracts", ["staff-contract-template.docx", "nda-template.docx"]]]],
@@ -2584,7 +2587,7 @@ const dropMark = (id) => { [FULL.MARKS, MARKS].forEach((a) => { if (!a) return; 
 // Marking is one decision with one setting, so it is a page of its own (Restricted / Mark files), not steps:
 // your workstation's files on the left, with room to browse; what you ticked, and where it may be, on the right.
 function MarkPage({ go, me }) {
-  const info = ADMIN_INFO[me], host = info ? info.ws : undefined;
+  const info = infoOf(me), host = info ? info.ws : undefined;
   const [checked, setChecked] = useState([]);
   const [keep, setKeep] = useState("machine");
   const [q, setQ] = useState("");
@@ -2672,7 +2675,7 @@ function Restricted({ go, me }) {
   const [q, setQ] = useState(""); const [kind, setKind] = useState("All");
   const [sel, setSel] = useState(null);
   // only what the person at this console marked, on their own workstation
-  const info = ADMIN_INFO[me], ws = info ? info.ws : null, mine = myMarks();
+  const info = infoOf(me), ws = info ? info.ws : null, mine = myMarks();
   const copies = myCopies().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at);
   const leaked = mine.filter((k) => copiesOf(k).length).length, nF = mine.filter((k) => k.kind === "folder").length, cov = mine.reduce((a, k) => a + k.files, 0);
   const rows = mine.filter((k) => (kind === "All" || (kind === "Files") === (k.kind === "file")) && `${k.name} ${k.path}`.toLowerCase().includes(q.toLowerCase()))
@@ -2680,9 +2683,9 @@ function Restricted({ go, me }) {
   const open = () => go("restricted", "mark");
   return html`<${React.Fragment}>
     <div className="kpis">
-      <${Kpi} none=${!mine.length} nv=${"0"} nt="Nothing marked yet" label="You have marked" value=${fmt(mine.length)} delta=${`${fmt(mine.length - nF)} files and ${fmt(nF)} folders, covering ${fmt(cov)} files`} />
+      <${Kpi} none=${!mine.length} nv=${"0"} nt="Nothing marked yet" label="You have marked" value=${fmt(mine.length)} delta=${`${fmt(mine.length - nF)} file${mine.length - nF === 1 ? "" : "s"} and ${fmt(nF)} folder${nF === 1 ? "" : "s"}, covering ${fmt(cov)} file${cov === 1 ? "" : "s"}`} />
       <${Kpi} none=${!mine.length} nv=${"0"} nt="Nothing marked yet" label="Only where they belong" value=${fmt(mine.length - leaked)} unit=${"/ " + fmt(mine.length)} delta=${leaked ? `${leaked} with a copy somewhere else` : "Every one"} dc=${leaked ? "var(--crit)" : "var(--ok)"} />
-      <${Kpi} none=${!mine.length} nv=${"0"} nt="None found" label="Copies found elsewhere" value=${fmt(copies.length)} delta=${copies.length ? "Each one is an open issue" : "None found"} dc=${copies.length ? "var(--crit)" : undefined} fn=${(t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0)} sc="var(--crit)" max=${3} />
+      <${Kpi} none=${!mine.length} nv=${"0"} nt="None found" label="Copies found elsewhere" value=${fmt(copies.length)} delta=${copies.length ? "Each one is an open issue" : "None found"} dc=${copies.length ? "var(--crit)" : undefined} fn=${copies.length ? (t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0) : null} sc="var(--crit)" max=${3} />
     </div>
     <${Panel} title="Copies found elsewhere" sub="a copy of one of your marked files, somewhere it is not allowed · worst first" flush extra=${copies.length ? html`<${Button} size="small" type="link" onClick=${() => go("issues")}>All issues<//>` : null}>
       ${!copies.length ? html`<${Empty} icon="CheckOutlined" title="Every file you marked is where it belongs" text="When a copy of one turns up anywhere it is not allowed, it appears here and as an issue. It is never deleted for you." h=${96} />` : null}
@@ -4272,10 +4275,82 @@ const DECISION_KINDS = {
   "reports":       { viz: ReportsViz,     label: "Reports only the Super User can address, one card per category" },
 };
 const DVIZ = Object.fromEntries(Object.entries(DECISION_KINDS).map(([k, v]) => [k, v.viz]));
+// Tasks the Super User gives departments: on the Super User's Tasks page (moved out of Work, which keeps only
+// decisions). A department's "done" waits on Work as a decision to call it complete.
+let WORK_PRESET = null;
+function GivenToDepts({ go }) {
+  useDT();
+  // what a department task needs from you decides where it sits, as on the Admin's Tasks page
+  const DCAT = { verify: ["Waiting for you", "SafetyCertificateOutlined", "A department says it is done. Only you call it complete."], late: ["Late", "ClockCircleOutlined", "Past its deadline and not done."],
+    unseen: ["Not seen yet", "EyeInvisibleOutlined", "Nobody told has opened it."], track: ["Under way", "SyncOutlined", "Seen or ongoing, before its deadline."] };
+  const catOf = (t) => (taskState(t) === "done" ? "verify" : t.due < NOWH ? "late" : taskState(t) === "sent" ? "unseen" : "track");
+  const [f, setF] = useState(null);
+  const open = DEPT_TASKS.filter((t) => !t.complete).sort((a, b) => Object.keys(DCAT).indexOf(catOf(a)) - Object.keys(DCAT).indexOf(catOf(b)) || a.due - b.due);
+  const dtasks = open.filter((t) => !f || catOf(t) === f);
+  const [newT, setNewT] = useState(null);
+  const wpg = usePaged(dtasks, 8, f);
+  const setSel = (id) => { WORK_PRESET = id; go("work"); };
+  return html`<${React.Fragment}>
+    <div className="tcards">
+      ${Object.entries(DCAT).map(([k, [w, icon, d]]) => { const on = f === k, n = open.filter((t) => catOf(t) === k).length;
+        return html`<div key=${k} className=${"panel tcard" + (on ? " on" : "")} role="button" tabIndex="0" aria-pressed=${on} onClick=${() => setF(on ? null : k)} onKeyDown=${(e) => e.key === "Enter" && setF(on ? null : k)}>
+          <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className="t3">${ic(icon)}</span><span className="t2">${w}</span><span className="sp" />${on ? html`<span className="t3" style=${{ fontSize: 11.5 }}>showing · click to clear</span>` : null}</div>
+          <div style=${{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2 }}>${fmt(n)}</div>
+          <div className="t3" style=${{ fontSize: 12 }}>${d}</div></div>`; })}
+    </div>
+    <section className="panel">
+      <div className="phd"><div className="pt">${f ? DCAT[f][0] : "Given to departments"}<small>${f ? html`<span>${fmt(dtasks.length)} · <a onClick=${() => setF(null)}>show all ${fmt(open.length)}</a></span>` : "the Admins you pick are told · they mark it seen, ongoing or done · you call it complete"}</small></div>
+        <div className="row"><${Pager} p=${wpg} what="tasks" /><${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => setNewT({ text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] })}>New task<//></div></div>
+      ${dtasks.length ? html`<div>${wpg.items.map((t) => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === t.dept), stt = taskState(t), adm = Object.keys(t.st), late = t.due < NOWH;
+          const who = adm.filter((a) => t.st[a] === stt);
+          const seenN = adm.filter((a) => t.st[a] !== "sent").length, partial = adm.length < dd.admins.length;
+          const line = stt === "done" ? `Done · ${who[0]} · waiting for you` : stt === "ongoing" ? `Ongoing · ${who.join(", ")}` : stt === "seen" ? `Seen by ${seenN} of ${adm.length}` : `Not seen yet · ${adm.length} told at ${hhmm(t.at)}`;
+          const seenTip = adm.map((a) => `${a}: ${t.st[a] === "sent" ? "not seen" : DSTATE[t.st[a]][0].toLowerCase() + " " + hhmm(t.when[a])}`).join("\n");
+          return html`<div key=${t.id} className="drow" role="button" tabIndex="0" onClick=${() => { if (stt === "done") { setSel("dtask-" + t.id); window.scrollTo({ top: 0, behavior: "smooth" }); } }}>
+            <span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${t.title}</span>
+            <span className="cut t2" title=${dd.name}>${dd.name}${partial ? html`<span className="t3"> · ${adm.length} of ${dd.admins.length}</span>` : null}</span>
+            <span className="row" style=${{ gap: 3, flexWrap: "nowrap" }}>${adm.slice(0, 3).map((a) => html`<span key=${a} className="av" title=${`${a} · ${DSTATE[t.st[a]][0]}`} style=${{ width: 22, height: 22, fontSize: 9, boxShadow: `0 0 0 2px ${DSTATE[t.st[a]][1]}` }}>${initials(a)}</span>`)}${adm.length > 3 ? html`<span className="t3 mono" style=${{ fontSize: 10.5 }}>+${adm.length - 3}</span>` : null}</span>
+            <span className="cut" style=${{ fontSize: 12.5, color: stt === "done" ? "var(--ok)" : stt === "ongoing" ? "var(--med)" : "var(--text-3)" }} title=${seenTip}>${line}</span>
+            <span className="mono" style=${{ fontSize: 12, color: late ? "var(--crit)" : "var(--text-3)", textAlign: "right", whiteSpace: "nowrap" }}>${dueText(t.due)}</span>
+          </div>`; })}</div>`
+        : f ? html`<div className="t3" style=${{ padding: 16 }}>Nothing here. <a onClick=${() => setF(null)}>Show all</a>.</div>`
+        : html`<div className="t3" style=${{ padding: 16 }}>Nothing given to a department. <a onClick=${() => setNewT({ text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] })}>Give one a task</a>.</div>`}
+    </section>
+    <${Drawer} open=${!!newT} onClose=${() => setNewT(null)} width=${480} title="Give a department a task"
+      footer=${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept), miss = !newT.text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : newT.who === "some" && !newT.some.length ? "Pick at least one Admin." : null;
+        return html`<div className="row"><span className="t3" style=${{ fontSize: 12 }}>${miss || ""}</span><span className="sp" /><${Button} onClick=${() => setNewT(null)}>Cancel<//>
+          <${Button} type="primary" disabled=${!!miss} onClick=${() => { const told = newT.who === "all" ? dd.admins : newT.some, st = Object.fromEntries(told.map((a) => [a, "sent"]));
+            dtChange(() => DEPT_TASKS.unshift({ id: `D-${200 + DEPT_TASKS.length}`, title: newT.text.trim(), dept: dd.id, at: NOWH + (Date.now() - T0) / 3.6e6, due: newT.due, st, when: {} })); wpg.setPage(0); setNewT(null);
+            toast(`Given to ${dd.name} · ${told.length > 2 ? told.length + " Admins" : told.join(" and ")} told (concept)`); }}>Give it to them<//></div>`; })() : null}>
+      ${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept);
+        const base = dayjs("2026-10-01T00:00:00"), quick = [["today", "End of today", 17], ["fri", "Friday 17:00", 41], ["week", "In a week", 17 + 24 * 7]];
+        return html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div><div className="nt-h">What needs doing</div>
+            <${Input.TextArea} id="dt-text" autoSize=${{ minRows: 3, maxRows: 6 }} maxLength=${280} showCount value=${newT.text} onChange=${(e) => setNewT({ ...newT, text: e.target.value })} placeholder="Collect the signed leave forms from every team" /></div>
+          <div><div className="nt-h">Department</div>
+            <${Select} id="dt-dept" showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Which department?" value=${newT.dept} onChange=${(v) => setNewT({ ...newT, dept: v, some: [] })}
+              options=${(FULL.DEPTS || DEPTS).map((x) => ({ value: x.id, label: x.admins.length ? x.name : `${x.name} · no Admin`, disabled: !x.admins.length }))} />
+            ${dd ? (() => { const told = newT.who === "all" ? dd.admins : newT.some;
+              return html`<div>
+              ${dd.admins.length > 1 ? html`<div style=${{ marginTop: 12 }}><div className="nt-h">Who is told</div>
+                <${Segmented} value=${newT.who} onChange=${(v) => setNewT({ ...newT, who: v })} options=${[{ value: "all", label: `Every Admin in ${fitEnd(dd.name, 22)} (${dd.admins.length})` }, { value: "some", label: "Only some" }]} />
+                ${newT.who === "some" ? html`<${Select} id="dt-some" mode="multiple" maxTagCount="responsive" showSearch style=${{ width: "100%", marginTop: 8 }} placeholder="Which Admins?" value=${newT.some}
+                  onChange=${(v) => setNewT({ ...newT, some: v })} options=${dd.admins.map((a) => ({ value: a, label: `${a} · ${ADMIN_INFO[a] && ADMIN_INFO[a].busy ? "inside a machine" : "at their desk"}` }))} />` : null}</div>` : null}
+              <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${ic("NotificationOutlined")} ${told.length ? `${told.length > 3 ? `${told.slice(0, 3).join(", ")} and ${told.length - 3} more` : told.join(" and ")} ${told.length === 1 ? "is" : "are"} told as soon as you give it, on every page of their console until they mark it seen.` : "Nobody picked yet."}${newT.who === "some" && told.length ? " The others in the department do not see it." : ""}</div></div>`; })()
+              : html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>A department with no Admin cannot take a task. Assign one first, from its card above.</div>`}</div>
+          <div><div className="nt-h">Deadline</div>
+            <${Segmented} value=${newT.dueKey} onChange=${(k) => { const q = quick.find((x) => x[0] === k); setNewT({ ...newT, dueKey: k, due: q ? q[2] : newT.due }); }} options=${[...quick.map(([k, l]) => ({ value: k, label: l })), { value: "pick", label: "Pick a date" }]} />
+            ${newT.dueKey === "pick" ? html`<div style=${{ marginTop: 8 }}><${DatePicker} id="dt-due" showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${base.add(newT.due * 60, "minute")} onChange=${(v) => v && setNewT({ ...newT, due: v.diff(base, "minute") / 60 })} /></div>` : null}
+            <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>Due ${base.add(newT.due * 60, "minute").format("ddd D MMM, HH:mm")}.</div></div>
+          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>No checks are set: the Admins say how far it has got, and you decide when it is complete. Nothing is closed for you.</div>
+        </div>`; })() : null}
+    <//>
+  <//>`;
+}
 function Work({ go }) {
   useDT();
   const Q = suQueue();
-  const [sel, setSel] = useState(null);
+  const [sel, setSel] = useState(() => { const p = WORK_PRESET; WORK_PRESET = null; return p; });
   const [pick, setPick] = useState({});
   const [inp, setInp] = useState({});
   const [done, setDone] = useState({});
@@ -4288,8 +4363,6 @@ function Work({ go }) {
   const val = inp[d.id + opt.key] || "";
   const ticked = d.reports ? d.reports.filter((r) => !untick[r.id]) : [];
   const missing = (opt.need === "reason" || opt.need === "message") && !val.trim() ? (opt.need === "reason" ? "Write a reason first." : "Write the message first.") : opt.need === "pick" && !val ? "Pick someone first." : d.reports && opt.key === "mark" && !ticked.length ? "Tick at least one." : null;
-  const dtasks = DEPT_TASKS.filter((t) => !t.complete);
-  const [newT, setNewT] = useState(null);
   const now = () => NOWH + (Date.now() - T0) / 3.6e6;
   const decide = () => {
     if (opt.seat) { setSel("seat-" + opt.seat); return; }
@@ -4299,7 +4372,7 @@ function Work({ go }) {
     if (d.kind === "task-done") dtChange(() => { const t = DEPT_TASKS.find((x) => x.id === d.task); if (!t) return; if (opt.key === "complete") t.complete = true; else t.st = Object.fromEntries(Object.entries(t.st).map(([a, v]) => [a, v === "done" ? "ongoing" : v])); });
     const next = open.find((x) => x.id !== d.id); if (next) setSel(next.id); toast(opt.done + " (concept)"); };
   const Big = DVIZ[d.kind];
-  const dpg = usePaged(Q, 5), rpg = usePaged(d.reports || [], 5, d.id), wpg = usePaged(dtasks, 5);
+  const dpg = usePaged(Q, 5), rpg = usePaged(d.reports || [], 5, d.id);
   return html`<${React.Fragment}>
     <div className="row" style=${{ justifyContent: "space-between" }}>
       <div className="row" style=${{ gap: 10, alignItems: "baseline" }}>
@@ -4353,52 +4426,6 @@ function Work({ go }) {
         </div>
       </section>
     <//>`}
-    <section className="panel">
-      <div className="phd"><div className="pt">Given to departments<small>the Admins you pick are told · they mark it seen, ongoing or done · you call it complete</small></div>
-        <div className="row"><${Pager} p=${wpg} what="tasks" /><${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => setNewT({ text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] })}>New task<//></div></div>
-      ${dtasks.length ? html`<div>${wpg.items.map((t) => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === t.dept), stt = taskState(t), adm = Object.keys(t.st), late = t.due < NOWH;
-          const who = adm.filter((a) => t.st[a] === stt);
-          const seenN = adm.filter((a) => t.st[a] !== "sent").length, partial = adm.length < dd.admins.length;
-          const line = stt === "done" ? `Done · ${who[0]} · waiting for you` : stt === "ongoing" ? `Ongoing · ${who.join(", ")}` : stt === "seen" ? `Seen by ${seenN} of ${adm.length}` : `Not seen yet · ${adm.length} told at ${hhmm(t.at)}`;
-          const seenTip = adm.map((a) => `${a}: ${t.st[a] === "sent" ? "not seen" : DSTATE[t.st[a]][0].toLowerCase() + " " + hhmm(t.when[a])}`).join("\n");
-          return html`<div key=${t.id} className="drow" role="button" tabIndex="0" onClick=${() => { if (stt === "done") { setSel("dtask-" + t.id); window.scrollTo({ top: 0, behavior: "smooth" }); } }}>
-            <span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${t.title}</span>
-            <span className="cut t2" title=${dd.name}>${dd.name}${partial ? html`<span className="t3"> · ${adm.length} of ${dd.admins.length}</span>` : null}</span>
-            <span className="row" style=${{ gap: 3, flexWrap: "nowrap" }}>${adm.slice(0, 3).map((a) => html`<span key=${a} className="av" title=${`${a} · ${DSTATE[t.st[a]][0]}`} style=${{ width: 22, height: 22, fontSize: 9, boxShadow: `0 0 0 2px ${DSTATE[t.st[a]][1]}` }}>${initials(a)}</span>`)}${adm.length > 3 ? html`<span className="t3 mono" style=${{ fontSize: 10.5 }}>+${adm.length - 3}</span>` : null}</span>
-            <span className="cut" style=${{ fontSize: 12.5, color: stt === "done" ? "var(--ok)" : stt === "ongoing" ? "var(--med)" : "var(--text-3)" }} title=${seenTip}>${line}</span>
-            <span className="mono" style=${{ fontSize: 12, color: late ? "var(--crit)" : "var(--text-3)", textAlign: "right", whiteSpace: "nowrap" }}>${dueText(t.due)}</span>
-          </div>`; })}</div>`
-        : html`<div className="t3" style=${{ padding: 16 }}>Nothing given to a department. <a onClick=${() => setNewT({ text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] })}>Give one a task</a>.</div>`}
-    </section>
-    <${Drawer} open=${!!newT} onClose=${() => setNewT(null)} width=${480} title="Give a department a task"
-      footer=${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept), miss = !newT.text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : newT.who === "some" && !newT.some.length ? "Pick at least one Admin." : null;
-        return html`<div className="row"><span className="t3" style=${{ fontSize: 12 }}>${miss || ""}</span><span className="sp" /><${Button} onClick=${() => setNewT(null)}>Cancel<//>
-          <${Button} type="primary" disabled=${!!miss} onClick=${() => { const told = newT.who === "all" ? dd.admins : newT.some, st = Object.fromEntries(told.map((a) => [a, "sent"]));
-            dtChange(() => DEPT_TASKS.unshift({ id: `D-${200 + DEPT_TASKS.length}`, title: newT.text.trim(), dept: dd.id, at: NOWH + (Date.now() - T0) / 3.6e6, due: newT.due, st, when: {} })); wpg.setPage(0); setNewT(null);
-            toast(`Given to ${dd.name} · ${told.length > 2 ? told.length + " Admins" : told.join(" and ")} told (concept)`); }}>Give it to them<//></div>`; })() : null}>
-      ${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept);
-        const base = dayjs("2026-10-01T00:00:00"), quick = [["today", "End of today", 17], ["fri", "Friday 17:00", 41], ["week", "In a week", 17 + 24 * 7]];
-        return html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div><div className="nt-h">What needs doing</div>
-            <${Input.TextArea} id="dt-text" autoSize=${{ minRows: 3, maxRows: 6 }} maxLength=${280} showCount value=${newT.text} onChange=${(e) => setNewT({ ...newT, text: e.target.value })} placeholder="Collect the signed leave forms from every team" /></div>
-          <div><div className="nt-h">Department</div>
-            <${Select} id="dt-dept" showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Which department?" value=${newT.dept} onChange=${(v) => setNewT({ ...newT, dept: v, some: [] })}
-              options=${(FULL.DEPTS || DEPTS).map((x) => ({ value: x.id, label: x.admins.length ? x.name : `${x.name} · no Admin`, disabled: !x.admins.length }))} />
-            ${dd ? (() => { const told = newT.who === "all" ? dd.admins : newT.some;
-              return html`<div>
-              ${dd.admins.length > 1 ? html`<div style=${{ marginTop: 12 }}><div className="nt-h">Who is told</div>
-                <${Segmented} value=${newT.who} onChange=${(v) => setNewT({ ...newT, who: v })} options=${[{ value: "all", label: `Every Admin in ${fitEnd(dd.name, 22)} (${dd.admins.length})` }, { value: "some", label: "Only some" }]} />
-                ${newT.who === "some" ? html`<${Select} id="dt-some" mode="multiple" maxTagCount="responsive" showSearch style=${{ width: "100%", marginTop: 8 }} placeholder="Which Admins?" value=${newT.some}
-                  onChange=${(v) => setNewT({ ...newT, some: v })} options=${dd.admins.map((a) => ({ value: a, label: `${a} · ${ADMIN_INFO[a] && ADMIN_INFO[a].busy ? "inside a machine" : "at their desk"}` }))} />` : null}</div>` : null}
-              <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${ic("NotificationOutlined")} ${told.length ? `${told.length > 3 ? `${told.slice(0, 3).join(", ")} and ${told.length - 3} more` : told.join(" and ")} ${told.length === 1 ? "is" : "are"} told as soon as you give it, on every page of their console until they mark it seen.` : "Nobody picked yet."}${newT.who === "some" && told.length ? " The others in the department do not see it." : ""}</div></div>`; })()
-              : html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>A department with no Admin cannot take a task. Assign one first, from its card above.</div>`}</div>
-          <div><div className="nt-h">Deadline</div>
-            <${Segmented} value=${newT.dueKey} onChange=${(k) => { const q = quick.find((x) => x[0] === k); setNewT({ ...newT, dueKey: k, due: q ? q[2] : newT.due }); }} options=${[...quick.map(([k, l]) => ({ value: k, label: l })), { value: "pick", label: "Pick a date" }]} />
-            ${newT.dueKey === "pick" ? html`<div style=${{ marginTop: 8 }}><${DatePicker} id="dt-due" showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${base.add(newT.due * 60, "minute")} onChange=${(v) => v && setNewT({ ...newT, due: v.diff(base, "minute") / 60 })} /></div>` : null}
-            <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>Due ${base.add(newT.due * 60, "minute").format("ddd D MMM, HH:mm")}.</div></div>
-          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>No checks are set: the Admins say how far it has got, and you decide when it is complete. Nothing is closed for you.</div>
-        </div>`; })() : null}
-    <//>
   <//>`;
 }
 const ROUTING0 = { "Restricted file": ["ops", "fin", "log"], "Flow failed": ["ops", "fin"], "Listener report": ["ops"], "Update stuck": ["ops", "fin", "log"], "Deviation": ["ops", "fin", "log"] };
@@ -4700,8 +4727,10 @@ const NAV_ADMIN = [
   ["Automate", [["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
   ["Govern", [["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
 ];
-const NAV_SU = [["", [["monitor", "Monitor", "DashboardOutlined"], ["work", "Work", "InboxOutlined", () => suQueue().length, true], ["govern", "Govern", "ApartmentOutlined"]]]];
-const SU_PARENT = { monitor: "monitor", dept: "monitor", sessions: "monitor", audit: "monitor", machines: "monitor", work: "work", issues: "work", tasks: "work", rollout: "work", govern: "govern", reports: "govern" };
+// The Super User's menu has the same shape as the Admin's: the core areas first, then running the organisation.
+const NAV_SU = [["Core", [["tasks", "Tasks", "CheckSquareOutlined", () => DEPT_TASKS.filter((t) => !t.complete && taskState(t) === "done").length, true], ["flows", "Flows", "BranchesOutlined"], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true]]],
+  ["Organisation", [["monitor", "Monitor", "DashboardOutlined"], ["work", "Work", "InboxOutlined", () => suQueue().length, true], ["govern", "Govern", "ApartmentOutlined"]]]];
+const SU_PARENT = { monitor: "monitor", dept: "monitor", sessions: "monitor", audit: "monitor", machines: "monitor", work: "work", issues: "work", tasks: "tasks", flows: "flows", restricted: "restricted", rollout: "work", govern: "govern", reports: "govern" };
 const TITLES = { monitor: ["Monitor", "The organisation from above · hover for detail, click a screen to look closer"], work: ["Work", "What is waiting on you, and nobody else"], govern: ["Govern", "How the organisation is set up"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
 function Palette({ go, close, nav }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
@@ -4764,7 +4793,7 @@ function App() {
   const [entering, setEntering] = useState(null);
   const now = useNow(1000);
   applyScope(level ? level.dept : null);
-  ME = level ? level.admin : null;
+  ME = level ? level.admin : "Super User";
   const nav = level ? NAV_ADMIN : NAV_SU;
   const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)));
   const page = allowed.has(rawPage) ? rawPage : level ? "overview" : "monitor";
@@ -4782,7 +4811,7 @@ function App() {
     components: { Table: { headerBg: dk ? "#161b23" : "#f8f9fb", rowHoverBg: dk ? "#1d232d" : "#f8f9fb" } } };
   const deptName = (id) => (FULL.DEPTS || DEPTS).find((d) => d.id === id).name;
   const [title0, subtitle0] = TITLES[page];
-  const title = page === "dept" ? deptName(sub) : title0, subtitle = page === "dept" ? "" : level && page === "overview" ? `${deptName(level.dept)} · as ${level.admin} sees it` : subtitle0;
+  const title = page === "dept" ? deptName(sub) : title0, subtitle = page === "dept" ? "" : level && page === "overview" ? `${deptName(level.dept)} · as ${level.admin} sees it` : !level && page === "tasks" ? "Work you give departments, and how far each has got" : !level && page === "flows" ? "Every flow in the organisation · you can send between any two machines" : subtitle0;
   const secs = Math.floor(((now - T0) / 1000) % 15);
   let body;
   if (page === "monitor") body = html`<${Monitor} range=${range} go=${go} enter=${setEntering} />`;
@@ -4793,9 +4822,9 @@ function App() {
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
   else if (page === "sessions") body = html`<${Sessions} />`;
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
-  else if (page === "tasks") body = sub === "new" ? html`<${NewTask} go=${go} />` : sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} />`;
+  else if (page === "tasks") body = !level && !sub ? html`<${GivenToDepts} go=${go} />` : sub === "new" ? html`<${NewTask} go=${go} />` : sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} />`;
   else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : html`<${Flows} go=${go} me=${level && level.admin} />`;
-  else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${level && level.admin} />` : html`<${Restricted} go=${go} me=${level && level.admin} />`;
+  else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${Restricted} go=${go} me=${ME} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && ABY[sub] ? html`<${ActionDetail} key=${sub} id=${sub} go=${go} />` : html`<${Actions} go=${go} />`;
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : sub && RBY[sub] ? html`<${RuleDetail} id=${sub} go=${go} />` : html`<${Automation} go=${go} />`;
   else if (page === "rollout") body = html`<${Rollout} />`;
@@ -4821,7 +4850,7 @@ function App() {
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} department${(FULL.DEPTS || DEPTS).length === 1 ? "" : "s"}</div></div></div>`}
         ${nav.map(([g, xs]) => {
           const items = xs.map(([id, l, icon, cnt, hot]) => { const on = page === id || (!level && SU_PARENT[page] === id), n = typeof cnt === "function" ? cnt() : cnt;
-            return html`<div key=${id} className=${"nav" + (on ? " on" : "") + (level ? "" : " big")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
+            return html`<div key=${id} className=${"nav" + (on ? " on" : "")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
             ${ic(icon)}<span>${l}</span>${n ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null}</div>`; });
           return html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}${items}<//>`; })}
         <div className="side-foot">
