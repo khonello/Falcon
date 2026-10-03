@@ -185,6 +185,22 @@ a { color: var(--accent); text-decoration: none; }
 .su-banner > * { flex: none; } .su-banner > span:nth-of-type(2) { flex: 0 1 auto; } .su-banner > .sp { flex: 1 1 auto; }
 .orgtxt { min-width: 0; } .orgtxt > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav.big { padding: 10px 12px; font-size: 14px; }
+/* the Admin's three core areas lead the menu as their own group, ruled off below; the entries look like every other */
+/* Tasks: four cards that are also the filters, then one row per task with its line of time */
+.tcards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tcard { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color .15s, background .15s; }
+.tcard:hover { background: var(--surface-2); }
+.tcard.on { background: var(--accent-soft); border-color: var(--accent); }
+.trow { display: grid; grid-template-columns: minmax(0, 1fr) 210px 104px; gap: 16px; align-items: center; min-height: 61px; padding: 10px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; }
+.trow:hover { background: var(--surface-2); }
+.trow-line { min-width: 0; }
+@media (max-width: 900px) { .tcards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .trow { grid-template-columns: minmax(0, 1fr) 104px; } .trow-line { display: none; } }
+.askbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); border-radius: 6px; background: var(--accent-soft); }
+.askbar-t { min-width: 0; flex: 1 1 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi.link { cursor: pointer; transition: border-color .15s; }
+.kpi.link:hover { border-color: var(--border-strong); }
+.mtree .ant-tree-treenode { width: 100%; }
+.mtree .ant-tree-node-content-wrapper { min-width: 0; flex: 1; }
 .drow { display: grid; grid-template-columns: minmax(150px, 1.4fr) minmax(140px, 1.6fr) 70px minmax(120px, 1fr) 130px minmax(120px, 1fr); gap: 14px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--grid); cursor: pointer; }
 .drow:hover { background: var(--surface-2); }
 .drow-h { cursor: default; padding-top: 8px; padding-bottom: 8px; font-size: 12px; }
@@ -537,11 +553,11 @@ let DEPTS = [
 let MACHINES = [
   { host: "OPS-01", user: "Kojo",  dept: "ops", ip: "10.20.4.11", ver: "1.4.2", status: "warning",  note: "Help request unanswered (2 pings)", seen: 0.001 },
   { host: "OPS-02", user: null,    dept: "ops", ip: "10.20.4.12", ver: "1.4.2", status: "healthy",  note: "No one signed in", seen: 0.001 },
-  { host: "OPS-03", user: "Yaw",   dept: "ops", ip: "10.20.4.13", ver: "1.4.2", status: "high",     note: "salaries.csv outside /restricted/", seen: 0.001 },
+  { host: "OPS-03", user: "Yaw",   dept: "ops", ip: "10.20.4.13", ver: "1.4.2", status: "high",     note: "Copy of restricted salaries.csv", seen: 0.001 },
   { host: "OPS-04", user: "Adjoa", dept: "ops", ip: "10.20.4.14", ver: "1.4.2", status: "healthy",  note: "Session held by R. Mensah", seen: 0.001, held: "R. Mensah", heldFrom: 12.97 },
   { host: "OPS-05", user: "Nana",  dept: "ops", ip: "10.20.4.15", ver: "1.4.2", status: "warning",  note: "Certificate hostname mismatch", seen: 0.002 },
   { host: "OPS-06", user: "Kwame", dept: "ops", ip: "10.20.4.16", ver: "1.4.1", status: "warning",  note: "One version behind, 2 failed attempts", seen: 0.001 },
-  { host: "OPS-07", user: "Ama",   dept: "ops", ip: "10.20.4.17", ver: "1.4.2", status: "critical", note: "budget-2026.xlsx outside /restricted/", seen: 0.0005, held: "You", heldFrom: 10.7 },
+  { host: "OPS-07", user: "Ama",   dept: "ops", ip: "10.20.4.17", ver: "1.4.2", status: "critical", note: "Copy of restricted budget-2026.xlsx", seen: 0.0005, held: "You", heldFrom: 10.7 },
   { host: "FIN-01", user: "Afi",   dept: "fin", ip: "10.20.6.21", ver: "1.4.2", status: "healthy",  note: "", seen: 0.001 },
   { host: "FIN-02", user: "Kofi",  dept: "fin", ip: "10.20.6.22", ver: "1.4.2", status: "healthy",  note: "", seen: 0.001 },
   { host: "LOG-01", user: "Esi",   dept: "log", ip: "10.20.8.31", ver: "1.4.2", status: "healthy",  note: "", seen: 0.002 },
@@ -557,7 +573,7 @@ if (LARGE) {
     const status = r < 0.03 ? "offline" : r < 0.04 ? "critical" : r < 0.07 ? "high" : r < 0.15 ? "warning" : "healthy";
     MACHINES.push({ host, user: nz(73, hs(pre) + k) < 0.1 ? null : NAMES[Math.floor(nz(79, hs(pre) + k) * NAMES.length)], dept, ip: `10.${sub}.${Math.floor(k / 200)}.${k % 200 + 10}`,
       ver: status === "offline" ? "1.4.0" : nz(83, hs(pre) + k) < 0.12 ? "1.4.1" : "1.4.2", status, seen: status === "offline" ? NOWH - 3 - nz(89, k) * 20 : 0.001,
-      note: status === "offline" ? "Not checking in" : status === "critical" ? "Restricted file outside /restricted/" : status === "high" ? "Restricted file outside /restricted/" : status === "warning" ? "Help request unanswered" : "" }); } };
+      note: status === "offline" ? "Not checking in" : status === "critical" || status === "high" ? "Copy of a restricted file" : status === "warning" ? "Help request unanswered" : "" }); } };
   gen("ops", "OPS", 8, 40, 20);
   ADD.forEach(([id, , pre, n], k) => gen(id, pre, 1, n, 30 + k * 2));
   if (ABSURD) {
@@ -603,18 +619,18 @@ function metric(host, kind, t) {
 }
 
 let ISSUES = [
-  { id: "INC-1042", sev: "critical", type: "file", title: "Restricted file on a worker machine", subject: "budget-2026.xlsx", host: "OPS-07", at: 10.03, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
-    d: { file: "budget-2026.xlsx", folder: "C:\\Users\\Ama\\Documents", size: "84 KB" } },
+  { id: "INC-1042", sev: "critical", type: "file", title: "Restricted file copied where it isn't allowed", subject: "budget-2026.xlsx", host: "OPS-07", at: 10.03, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
+    d: { file: "budget-2026.xlsx", folder: "C:\\Users\\Ama\\Documents", size: "84 KB", mark: "M-1" } },
   { id: "UPD-0318", sev: "high", type: "update", title: "Update past the escalation limit", subject: "1.4.0 → 1.4.2", host: "LOG-02", at: -62.5, owner: "Unassigned", sla: 24, state: "Escalated", kind: "rollout",
     d: { cur: "1.4.0", target: "1.4.2", attempts: "1, Mon 07:45", err: "Could not reach the update share" } },
-  { id: "INC-1041", sev: "high", type: "file", title: "Restricted file on a worker machine", subject: "salaries.csv", host: "OPS-03", at: 9.5, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
-    d: { file: "salaries.csv", folder: "C:\\Users\\Yaw\\Desktop", size: "212 KB" } },
+  { id: "INC-1041", sev: "high", type: "file", title: "Restricted file copied where it isn't allowed", subject: "salaries.csv", host: "OPS-03", at: 9.5, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
+    d: { file: "salaries.csv", folder: "C:\\Users\\Yaw\\Desktop", size: "212 KB", mark: "M-2" } },
   { id: "AST-0311", sev: "medium", type: "help", title: "Help request not answered", subject: "Kojo · 2 pings", host: "OPS-01", at: 9.67, owner: "R. Mensah", sla: 2, state: "Open", kind: "assistance",
     d: { who: "Kojo", pings: ["09:40", "10:15"] } },
   { id: "DEV-0087", sev: "medium", type: "deviation", title: "Certificate hostname mismatch", subject: "presented WS-OPS-05", host: "OPS-05", at: 9.18, owner: "R. Mensah", sla: 8, state: "Open", kind: "deviation",
     d: { what: "certificate", expected: "OPS-05", presented: "WS-OPS-05", fp: "5c:1e:…:a9" } },
-  { id: "FLW-0012", sev: "low", type: "flow", title: "Flow waiting for consent", subject: "intake → FIN-02", host: "OPS-03", at: -44, owner: "K. Boateng", sla: 72, state: "Waiting", kind: "flow",
-    d: { flow: "intake", from: "OPS-03 /intake/", to: "FIN-02 /intake/", consent: "K. Boateng", asked: "2 days ago, by R. Mensah" } },
+  { id: "FLW-0012", sev: "low", type: "flow", title: "Flow waiting for a folder", subject: "intake → K. Boateng", host: "OPS-03", at: -44, owner: "K. Boateng", sla: 72, state: "Waiting", kind: "flow",
+    d: { flow: "intake", from: "OPS-03 /intake/", to: "a folder K. Boateng picks on WS-FIN-A1", consent: "K. Boateng", asked: "2 days ago, by R. Mensah" } },
   { id: "UPD-0322", sev: "low", type: "update", title: "One version behind", subject: "1.4.1 → 1.4.2", host: "OPS-06", at: -12.67, owner: "A. Quaye", sla: 72, state: "Retrying", kind: "rollout",
     d: { cur: "1.4.1", target: "1.4.2", attempts: "2, last Wed 11:20", err: "Installer exit 1603, a file was in use" } },
 ];
@@ -628,6 +644,33 @@ if (LARGE) {
   });
   if (ABSURD) ISSUES.slice(-40).forEach((i, k) => { if (k % 4 === 0) { i.at = NOWH - 24 * (30 + k * 11); if (i.type === "file") i.subject = "Q3-2026-consolidated-board-pack-FINAL-v14-signed-and-countersigned (2).xlsx"; } });
 }
+
+// ============================================================== restricted marks
+// A file or folder is marked restricted where it already is; nothing is copied into a special folder. People
+// mark only their own files, on their own workstation, never on someone else's machine. The
+// mark keeps it to that machine, or to that exact place, and a copy found anywhere else is an issue. A
+// folder's mark covers every file inside it, and any added later. Files are matched by content, and a mark
+// remembers every version's hash, so editing the original does not let an older copy slip through.
+let MARKS = [
+  { id: "M-1", kind: "file", name: "budget-2026.xlsx", host: "WS-OPS-A1", path: "C:\\Finance\\budget-2026.xlsx", keep: "machine", by: "R. Mensah", at: "3 Sep", dept: "ops", files: 1, versions: 14 },
+  { id: "M-2", kind: "folder", name: "Payroll", host: "WS-OPS-A1", path: "C:\\HR\\Payroll\\", keep: "path", by: "R. Mensah", at: "3 Sep", dept: "ops", files: 37, versions: 212 },
+  { id: "M-3", kind: "file", name: "supplier-contracts-2026.pdf", host: "WS-OPS-A2", path: "C:\\Users\\AQuaye\\Documents\\Contracts\\supplier-contracts-2026.pdf", keep: "machine", by: "A. Quaye", at: "17 Sep", dept: "ops", files: 1, versions: 2 },
+  { id: "M-4", kind: "folder", name: "Board", host: "WS-OPS-A2", path: "D:\\Board\\", keep: "path", by: "A. Quaye", at: "9 Sep", dept: "ops", files: 12, versions: 31 },
+  { id: "M-5", kind: "file", name: "headcount-plan-2027.xlsx", host: "WS-OPS-A1", path: "C:\\Users\\RMensah\\Documents\\headcount-plan-2027.xlsx", keep: "path", by: "R. Mensah", at: "28 Sep", dept: "ops", files: 1, versions: 3 },
+  { id: "M-6", kind: "folder", name: "Payroll", host: "WS-FIN-A1", path: "C:\\Finance\\Payroll\\", keep: "machine", by: "K. Boateng", at: "1 Sep", dept: "fin", files: 64, versions: 380 },
+  { id: "M-7", kind: "file", name: "bank-mandates.pdf", host: "WS-FIN-A1", path: "C:\\Users\\KBoateng\\Documents\\bank-mandates.pdf", keep: "path", by: "K. Boateng", at: "22 Sep", dept: "fin", files: 1, versions: 1 },
+];
+if (LARGE) { const nm = ["Contracts", "salaries-2026.csv", "Tender evaluations", "disciplinary-notes.docx", "bank-details.xlsx", "Legal"];
+  DEPTS.filter((d) => d.admins.length && !["ops", "fin"].includes(d.id)).forEach((d, k) => { for (let j = 0; j < (ABSURD ? 14 : 3); j++) { const n = k * 7 + j, nmx = nm[n % nm.length], folder = !nmx.includes("."), root = `C:\\${d.name.replace(/\W+/g, "")}\\`;
+    MARKS.push({ id: `M-${100 + n}`, kind: folder ? "folder" : "file", name: nmx, host: `WS-${d.id.toUpperCase()}-A${(n % d.admins.length) + 1}`, path: root + nmx + (folder ? "\\" : ""), keep: n % 2 ? "path" : "machine",
+      by: d.admins[n % d.admins.length], at: `${1 + (n % 28)} Sep`, dept: d.id, files: folder ? 5 + (n % 60) : 1, versions: 1 + (n % 20) }); } }); }
+const copiesOf = (k) => ISSUES.filter((i) => i.type === "file" && i.d.mark === k.id);
+const markOf = (i) => (FULL.MARKS || MARKS).find((k) => k.id === i.d.mark);
+const KEEP = { machine: ["Your workstation", "anywhere on it, nowhere else"], path: ["Exactly where it is", "a copy anywhere else is caught, even elsewhere on your workstation"] };
+// the person at this console (set by App); Restricted shows only what they marked
+let ME = null;
+const myMarks = () => MARKS.filter((k) => k.by === ME);
+const myCopies = () => ISSUES.filter((i) => i.type === "file" && (markOf(i) || {}).by === ME);
 
 // who held each machine today: [from, to, kind, who]. kinds: own / admin / you / assist
 let LANES = [
@@ -696,9 +739,9 @@ let AUDIT = (() => {
     [2.52, "A. Quaye", "Left LOG-02", "LOG-02", "session"],
     [9.18, "System", "Certificate presented WS-OPS-05, expected OPS-05", "OPS-05", "deviation"],
     [9.3, "K. Boateng", "Started assisted access on FIN-02", "FIN-02", "session"],
-    [9.5, "System", "salaries.csv found outside /restricted/", "OPS-03", "violation"],
+    [9.5, "System", "Copy of restricted salaries.csv found", "OPS-03", "violation"],
     [9.67, "Kojo", "Pinged R. Mensah", "OPS-01", "assistance"],
-    [10.03, "System", "budget-2026.xlsx found outside /restricted/", "OPS-07", "violation"],
+    [10.03, "System", "Copy of restricted budget-2026.xlsx found", "OPS-07", "violation"],
     [10.1, "R. Mensah", "Entered OPS-04", "OPS-04", "session"],
     [10.25, "Kojo", "Pinged R. Mensah again", "OPS-01", "assistance"],
     [10.7, "You", "Entered OPS-07", "OPS-07", "session"],
@@ -833,9 +876,9 @@ function EventHistogram({ entries, range, height = 150, brush, onBrush }) {
 }
 
 // ============================================================== OVERVIEW
-function Kpi({ label, value, unit, delta, dc, fn, sc, max, none, nv, nt }) {
+function Kpi({ label, value, unit, delta, dc, fn, sc, max, none, nv, nt, onClick }) {
   if (none) { value = nv != null ? nv : "—"; unit = nv != null && unit && unit.startsWith("/") ? unit : null; delta = nt || "No history yet"; dc = null; fn = null; }
-  return html`<div className="panel kpi">
+  return html`<div className=${"panel kpi" + (onClick ? " link" : "")} onClick=${onClick} role=${onClick ? "link" : null} tabIndex=${onClick ? "0" : null} onKeyDown=${onClick ? (e) => e.key === "Enter" && onClick() : null}>
     <div className="t3">${label}</div>
     <div className="row" style=${{ flexWrap: "nowrap", justifyContent: "space-between", alignItems: "flex-end" }}>
       <div className="v">${value}${unit ? html`<small>${unit}</small>` : null}</div>
@@ -926,17 +969,18 @@ function Overview({ range, go }) {
   // click a kind to show only it; click more to add them; click the last one again to show everything
   const toggleKind = (k) => setKinds(all ? [k] : kinds.includes(k) ? (kinds.length === 1 ? Object.keys(KINDS) : kinds.filter((x) => x !== k)) : [...kinds, k]);
   const sessionsHeld = MACHINES.filter((m) => m.held);
+  const openT = TASKS.filter((t) => t.state !== "Completed"), verT = TASKS.filter((t) => t.state === "Awaiting your verification").length, lateT = TASKS.filter((t) => t.state === "Overdue").length;
   const deptRows = DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
     return { key: d.id, d, total: ms.length, online: ms.filter((m) => m.status !== "offline").length, issues: ISSUES.filter((i) => MBY[i.host].dept === d.id).length,
       compliant: ms.filter((m) => m.ver === "1.4.2").length, mtta: !ms.length ? "—" : d.id === "ops" ? "42m" : d.id === "fin" ? "2h 10m" : "—" }; });
   return html`<${React.Fragment}>
     <div className="kpis">
+      <${Kpi} onClick=${() => go("tasks")} none=${!MACHINES.length} nv=${"0"} nt="Nothing assigned yet" label="Tasks open" value=${fmt(openT.length)} delta=${`${verT} to verify · ${lateT} overdue`} dc=${lateT ? "var(--crit)" : verT ? "var(--s3)" : undefined} fn=${(t) => Math.max(1, Math.round(openT.length - 1 + sm(11, t, 0.15) * 2))} sc="var(--s1)" />
+      <${Kpi} onClick=${() => go("flows")} none=${!MACHINES.length} nv=${"0"} nt="No flows yet" label="Flows" value="3" delta="1 paused · 1 awaiting consent" dc="var(--high)" fn=${(t) => (working(t) ? 3 + 7 * sm(1, t, 3) : 0)} sc="var(--s2)" />
+      <${Kpi} onClick=${() => go("restricted")} none=${!MACHINES.length} nv=${"0"} nt="Nothing marked yet" label="Restricted, marked by you" value=${fmt(myMarks().length)} delta=${myCopies().length ? `${myCopies().length} cop${myCopies().length === 1 ? "y" : "ies"} found elsewhere` : "All where they belong"} dc=${myCopies().length ? "var(--crit)" : "var(--ok)"} fn=${myCopies().length ? (t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0) : null} sc="var(--crit)" max=${3} />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="No machines yet" label="Machines online" value=${String(MACHINES.filter((m) => m.status !== "offline").length)} unit=${"/ " + MACHINES.length} delta=${MACHINES.some((m) => m.status === "offline") ? "LOG-02 offline since 02:31" : "All online"} dc=${MACHINES.some((m) => m.status === "offline") ? "var(--crit)" : undefined} fn=${(t) => MACHINES.length - (MACHINES.some((m) => m.status === "offline") && t >= 2.52 ? 1 : 0)} max=${MACHINES.length} sc="var(--ok)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing open" label="Open issues" value=${String(ISSUES.length)} delta=${ISSUES.length ? ["critical", "high"].map((k) => `${ISSUES.filter((x) => x.sev === k).length} ${k}`).join(" · ") : "Nothing open"} dc=${ISSUES.some((x) => x.sev === "critical") ? "var(--crit)" : undefined} fn=${(t) => Math.max(2, Math.round(3 + (t > 9 ? 2 : 0) + (t > 10 ? 2 : 0) + sm(3, t, 0.3)))} sc="var(--crit)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nobody is inside a machine" label="Sessions held now" value=${String(sessionsHeld.length)} delta=${sessionsHeld.length ? `Longest: ${sessionsHeld[0].held === "You" ? "you" : sessionsHeld[0].held} on ${sessionsHeld[0].host}, ${dur(NOWH - sessionsHeld[0].heldFrom + (now - T0) / 3.6e6)}` : "Nobody is inside a machine"} fn=${(t) => (working(t) ? Math.round(1 + 1.4 * sm(8, t, 1.5)) : 0)} sc="var(--s3)" />
-      <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="None recorded" label="Policy violations, 24h" value="2" delta="+2 vs. 7-day average of 0.3" dc="var(--crit)" fn=${(t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0)} sc="var(--crit)" max=${3} />
-      <${Kpi} none=${!MACHINES.length} nt="No machines yet" label="Version compliance" value=${String(Math.round((MACHINES.filter((m) => m.ver === "1.4.2").length / MACHINES.length) * 100))} unit="%" delta=${`${MACHINES.filter((m) => m.ver === "1.4.2").length} of ${MACHINES.length} on 1.4.2 · target 100%`} fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} sc="var(--s2)" max=${11} />
-      <${Kpi} none=${!MACHINES.length} nt="No reports yet" label="Median time to address" value="42" unit="min" delta="−18 min vs. last week" dc="var(--ok)" fn=${(t) => 60 - 18 * sm(2, t, 0.2)} sc="var(--s6)" />
     </div>
     <div className="g c-75">
       <${Panel} title="Fleet" sub=${`${MACHINES.length} machines, ${DEPTS.length} department${DEPTS.length === 1 ? "" : "s"}`} extra=${html`<${Segmented} size="small" value=${by} onChange=${setBy} options=${["Status", "CPU", "Version", "Check-in"]} />`}>
@@ -1051,8 +1095,9 @@ function MachineDetail({ host, range, go }) {
       { title: "Started", render: (r) => html`<span className="mono">${hhmm(r.b[0])}</span>` }, { title: "Ended", render: (r) => html`<span className="mono">${r.b[1] >= NOWH ? "—" : hhmm(r.b[1])}</span>` },
       { title: "Duration", align: "right", render: (r) => html`<span className="mono">${dur(r.b[1] - r.b[0])}</span>` }]} /><//>` },
     { key: "files", label: "Files", children: html`<${Panel}><div className="g c-66">
-      <div><div className="t3" style=${{ marginBottom: 8 }}>Indexed files by tier</div>
-        ${[["common", 120, "var(--s6)"], ["workers", 41, "var(--s2)"], ["restricted (not allowed here)", host === "OPS-07" || host === "OPS-03" ? 1 : 0, "var(--crit)"]].map(([k, v, c]) => html`<div key=${k} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0" }}><span style=${{ width: 190 }}>${k}</span><${Bar} v=${v} max=${120} c=${c} w=${140} /><span className="mono">${v}</span></div>`)}</div>
+      <div><div className="t3" style=${{ marginBottom: 8 }}>Indexed files</div>
+        ${[["Shared with everyone", 120, "var(--s6)"], ["Department files", 41, "var(--s2)"], ["Marked restricted here", MARKS.filter((k) => k.host === host).reduce((a, k) => a + k.files, 0), "var(--accent)"], ["Copies of restricted files", ISSUES.filter((i) => i.type === "file" && i.host === host).length, "var(--crit)"]].map(([k, v, c]) => html`<div key=${k} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0" }}><span style=${{ width: 190 }}>${k}</span><${Bar} v=${v} max=${120} c=${c} w=${140} /><span className="mono" style=${{ color: c === "var(--crit)" && v ? "var(--crit)" : "inherit" }}>${v}</span></div>`)}
+        <div style=${{ marginTop: 6 }}><a onClick=${() => go("restricted")}>Restricted files ${ic("ArrowRightOutlined")}</a></div></div>
       <div><div className="t3" style=${{ marginBottom: 8 }}>Index coverage</div><div className="row"><span style=${{ fontSize: 22, fontWeight: 600 }}>98.6%</span><span className="t3">last idle sweep 06:12 · 4,210 files · native watcher active</span></div></div>
     </div><//>` },
   ];
@@ -1207,39 +1252,41 @@ function Sessions() {
 function Provenance() {
   const ref = useRef(null), w = useWidth(ref, 560);
   const nodes = [
-    { host: "ADM-01", path: "/resources/restricted/budget-2026.xlsx", t: 8.2, tone: "var(--text-3)", note: "Origin · allowed" },
-    { host: "FIN-01", path: "/resources/restricted/budget-2026.xlsx", t: 9.1, tone: "var(--text-3)", note: "Copy · allowed on an Admin tier" },
-    { host: "OPS-07", path: "C:\\Users\\Ama\\Documents\\budget-2026.xlsx", t: 10.03, tone: "var(--crit)", note: "Copy · not allowed on a worker machine" },
+    { host: "WS-OPS-A1", path: "C:\\Finance\\budget-2026.xlsx", t: 8.2, tone: "var(--text-3)", note: "Version 13 · marked restricted, kept to this machine" },
+    { host: "WS-OPS-A1", path: "C:\\Finance\\budget-2026.xlsx", t: 9.1, tone: "var(--text-3)", note: "Version 14 · edited in place, still followed" },
+    { host: "OPS-07", path: "C:\\Users\\Ama\\Documents\\budget-2026.xlsx", t: 10.03, tone: "var(--crit)", note: "Copy of version 13 · not allowed here" },
   ];
-  const L = 70, X = (t) => L + ((t - 8) / 2.5) * (w - L - 20);
+  const L = 84, X = (t) => L + ((t - 8) / 2.5) * (w - L - 20);
   return html`<div ref=${ref}>
     <svg width=${w} height="168" style=${{ display: "block" }}>
       ${[8, 8.5, 9, 9.5, 10, 10.5].map((t) => html`<g key=${t}><line x1=${X(t)} x2=${X(t)} y1="6" y2="140" style=${{ stroke: "var(--grid)" }} /><text x=${X(t)} y="160" textAnchor="middle" fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${hhmm(t)}</text></g>`)}
-      ${nodes.slice(1).map((n, i) => html`<path key=${n.host} d=${`M${X(nodes[0].t)} 28C${X(nodes[0].t) + 50} 28 ${X(n.t) - 50} ${28 + (i + 1) * 46} ${X(n.t)} ${28 + (i + 1) * 46}`} fill="none" style=${{ stroke: n.tone }} strokeWidth="1.5" />`)}
-      ${nodes.map((n, i) => html`<g key=${n.host}>
+      ${nodes.slice(1).map((n, i) => html`<path key=${i} d=${`M${X(nodes[0].t)} 28C${X(nodes[0].t) + 50} 28 ${X(n.t) - 50} ${28 + (i + 1) * 46} ${X(n.t)} ${28 + (i + 1) * 46}`} fill="none" style=${{ stroke: n.tone }} strokeWidth="1.5" />`)}
+      ${nodes.map((n, i) => html`<g key=${i}>
         <text x="0" y=${28 + i * 46 + 4} fontSize="12" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${n.host}</text>
         <circle cx=${X(n.t)} cy=${28 + i * 46} r="5" style=${{ fill: n.tone, stroke: "var(--surface)" }} strokeWidth="2" />
         <text x=${X(n.t) + 10} y=${28 + i * 46 - 3} fontSize="11.5" style=${{ fill: n.tone === "var(--crit)" ? "var(--crit)" : "var(--text)" }}>${hhmm(n.t)} · ${n.note}</text>
         <text x=${X(n.t) + 10} y=${28 + i * 46 + 12} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${n.path}</text>
       </g>`)}
     </svg>
-    <div className="t3" style=${{ fontSize: 12 }}>Matched by content: all three files have SHA-256 <span className="mono">9f3a…e1c2</span>. Detected on OPS-07 by a native file event, not a sweep.</div>
+    <div className="t3" style=${{ fontSize: 12 }}>Matched by content: the copy's SHA-256 <span className="mono">9f3a…e1c2</span> is version 13 of the marked file. The mark keeps every version's hash, so editing the original does not let an older copy slip through. Detected on OPS-07 by a native file event, not a sweep.</div>
   </div>`;
 }
 // Issues are typed. A type fixes the possible resolutions; the issue's own details fill them in; and a few
 // options appear only in certain situations (an offline machine, a department with no Admin, nobody signed in).
 const ISSUE_TYPES = {
   file: { label: "Restricted file", icon: "FileProtectOutlined", from: "File index",
-    build: (i, m) => ({
-      lead: "A file that belongs in restricted storage is on a worker machine.",
-      facts: [["File", i.d.file], ["Found in", i.d.folder], ["Size", i.d.size], ["Belongs in", "/restricted/ on Admin machines"]],
-      notify: m.user && m.status !== "offline" ? m.user : null,
-      why: m.user ? [] : ["Nobody is signed in, so there is nobody to tell."],
-      options: [
-        { key: "move", icon: "ImportOutlined", title: "Move it back to restricted storage", desc: `Removes it from ${m.host}. The original on ADM-01 stays where it is.`, verb: "Move it", done: "Resolved", log: `Moved ${i.d.file} off ${m.host}` },
-        { key: "delete", icon: "DeleteOutlined", title: "Delete this copy", desc: `Deletes it from ${m.host} only. Nothing else is touched.`, verb: "Delete copy", done: "Resolved", log: `Deleted the copy of ${i.d.file} on ${m.host}` },
-        { key: "allow", icon: "SafetyCertificateOutlined", title: `Allow it on ${m.host}`, desc: "Records an exception with your reason. It is not reported again.", verb: "Allow it", done: "Resolved", need: "reason", log: `Allowed ${i.d.file} on ${m.host} as an exception` },
-      ] }) },
+    build: (i, m) => { const k = markOf(i) || { host: "its machine", path: "", keep: "machine", by: "an Admin", kind: "file" };
+      const home = k.keep === "machine" ? k.host : `${k.host} ${k.path}`;
+      return {
+        lead: `A copy of a file marked restricted is on ${m.host}. It is kept to ${k.keep === "machine" ? `the machine ${k.host}` : `one place on ${k.host}`}, so nowhere else may have it.`,
+        facts: [["File", i.d.file], ["Found in", i.d.folder], ["Size", i.d.size], ["Allowed only on", home], ["Marked by", `${k.by}${k.kind === "folder" ? `, as part of ${k.path}` : ""}`]],
+        notify: m.user && m.status !== "offline" ? m.user : null,
+        why: m.user ? [] : ["Nobody is signed in, so there is nobody to tell."],
+        options: [
+          ...(m.user && m.status !== "offline" ? [{ key: "ask", icon: "MessageOutlined", title: `Ask ${m.user} to delete it`, desc: `${m.user} sees which file and why. The issue closes on its own when the copy is gone.`, verb: "Ask", done: "Waiting", log: `Asked ${m.user} to delete the copy of ${i.d.file}` }] : []),
+          { key: "delete", icon: "DeleteOutlined", title: "Delete this copy", desc: `Deletes it from ${m.host} only. The original on ${k.host} is not touched.`, verb: "Delete copy", done: "Resolved", log: `Deleted the copy of ${i.d.file} on ${m.host}` },
+          { key: "allow", icon: "SafetyCertificateOutlined", title: `Allow it on ${m.host} too`, desc: "Adds this one place to the mark, with your reason. It is not reported again.", verb: "Allow it", done: "Resolved", need: "reason", log: `Allowed ${i.d.file} on ${m.host} as an exception` },
+        ] }; } },
   help: { label: "Help request", icon: "BellOutlined", from: "Assistance",
     build: (i, m, dp) => {
       const online = m.status !== "offline", others = ["R. Mensah", "A. Quaye", "K. Boateng"].filter((a) => !dp.admins.includes(a));
@@ -1285,12 +1332,12 @@ const ISSUE_TYPES = {
     } },
   flow: { label: "Flow blocked", icon: "BranchesOutlined", from: "Flows",
     build: (i) => ({
-      lead: `The ${i.d.flow} flow cannot start until ${i.d.consent} agrees to receive files.`,
+      lead: `The ${i.d.flow} flow starts when ${i.d.consent} picks a folder on their workstation for it. Picking it is how they agree.`,
       facts: [["Flow", i.d.flow], ["From", i.d.from], ["To", i.d.to], ["Asked", i.d.asked]],
       why: [],
       options: [
-        { key: "remind", icon: "BellOutlined", title: `Remind ${i.d.consent}`, desc: "Sends the consent request again, with your name on it.", verb: "Remind", done: "Waiting", log: `Reminded ${i.d.consent}` },
-        { key: "dest", icon: "SwapOutlined", title: "Send it somewhere else", desc: "A destination inside the same department needs no consent.", verb: "Change it", done: "Resolved", need: "pick", pick: ["OPS-01 /intake/", "OPS-04 /intake/", "ADM-01 /resources/workers/"], pickHint: "Pick a destination", log: "Changed the destination" },
+        { key: "remind", icon: "BellOutlined", title: `Remind ${i.d.consent}`, desc: "Sends the request again, with your name on it.", verb: "Remind", done: "Waiting", log: `Reminded ${i.d.consent}` },
+        { key: "dest", icon: "SwapOutlined", title: "Send it somewhere you manage instead", desc: "A machine in your own department needs nobody to agree.", verb: "Change it", done: "Resolved", need: "pick", pick: ["OPS-01 /intake/", "OPS-04 /intake/", "WS-OPS-A1 /intake/"], pickHint: "Pick a destination", log: "Changed the destination" },
         { key: "withdraw", icon: "DeleteOutlined", title: "Withdraw the flow", desc: "Nothing has been copied yet. The request is closed.", verb: "Withdraw", done: "Resolved", log: `Withdrew the ${i.d.flow} flow` },
       ] }) },
 };
@@ -1299,7 +1346,7 @@ const ISTATE0 = Object.fromEntries(ISSUES.map((i) => [i.id, { status: i.state ==
 const ISC = { Open: "var(--text-2)", Waiting: "var(--s1)", Resolved: "var(--ok)" };
 function IssueTimeline({ it, extra }) {
   const base = it.id === "INC-1042"
-    ? [[10.03, "System", "Detected budget-2026.xlsx in C:\\Users\\Ama\\Documents", "var(--crit)"], [10.04, "System", "Report written, routed to Super User and Operations", "var(--text-3)"], [10.05, "Automation", "Took a screenshot of OPS-07 (rule: Restricted file on a worker machine)", "var(--s3)"], [10.7, "You", "Entered OPS-07", "var(--accent)"], [11.1, "R. Mensah", "Viewed the report", "var(--text-3)"]]
+    ? [[10.03, "System", "Detected budget-2026.xlsx in C:\\Users\\Ama\\Documents", "var(--crit)"], [10.04, "System", "Report written, routed to Super User and Operations", "var(--text-3)"], [10.05, "Automation", "Took a screenshot of OPS-07 (rule: Restricted file copied where it isn't allowed)", "var(--s3)"], [10.7, "You", "Entered OPS-07", "var(--accent)"], [11.1, "R. Mensah", "Viewed the report", "var(--text-3)"]]
     : it.id === "AST-0311" ? [[9.67, "Kojo", "Pinged R. Mensah", "var(--s5)"], [10.25, "Kojo", "Pinged again", "var(--s5)"]]
     : AUDIT.filter((e) => e.host === it.host && Math.abs(e.t - it.at) < 2).slice(0, 5).map((e) => [e.t, e.actor, e.what, KINDS[e.kind].c]);
   const all = [...base, ...extra.map(([t, w]) => [t, "You", w, "var(--accent)"])];
@@ -1450,7 +1497,7 @@ TASKS.push(
     evidence: [{ target: "routes-w40.csv", intent: "Update", st: "Passed", sig: "Saved 6 times", fn: (t) => (working(t) && t > -39 ? 1 + 2 * sm(12, t, 3) : 0) }, { target: "route-plan-w40.pdf", intent: "Create", st: "Pending", sig: "Not seen on LOG-01 yet", fn: () => 0 }],
     log: [[-39, "Esi started the task"], [-40, "Assigned by you"]] },
   { id: "T-204", title: "Clear duplicate files from the shared drive", who: "Nana", host: "OPS-05", by: "R. Mensah", state: "In progress", assigned: -90, started: -80, soft: null, final: 113,
-    evidence: [{ target: "/common/duplicates/", intent: "Must exist", st: "Passed", sig: "Folder present", fn: () => 1 }, { target: "duplicates-report.xlsx", intent: "Create", st: "Pending", sig: "Not seen on OPS-05 yet", fn: () => 0 }],
+    evidence: [{ target: "/common/duplicates/", intent: "Must exist", st: "Passed", sig: "Folder present, last changed Mon 16:00", fn: (t) => (working(t) && t > -66 && t < -56 ? 1 : 0) }, { target: "duplicates-report.xlsx", intent: "Create", st: "Pending", sig: "Not seen on OPS-05 yet", fn: () => 0 }],
     log: [[-80, "Nana started the task"], [-90, "Assigned by R. Mensah"]] },
   { id: "T-203", title: "Install the label printer driver", who: "Kwame", host: "OPS-06", by: "A. Quaye", state: "Awaiting your verification", assigned: -100, started: -98, soft: null, final: -10,
     evidence: [{ target: "LabelPrint.exe", intent: "Installed", st: "Passed", sig: "Found Tue 14:22", fn: (t) => (t > -34 ? 1 : 0) }],
@@ -1467,6 +1514,77 @@ TASKS.push(
 );
 const TSTATE = { "Completed": "var(--ok)", "In progress": "var(--s1)", "Not started": "var(--text-3)", "Awaiting your verification": "var(--s3)", "Overdue": "var(--crit)" };
 const ESTATE = { Passed: "var(--ok)", Pending: "var(--text-4)", Failed: "var(--crit)" };
+// Verification and expectation, kept apart (task-natural-combo.md). A target says what done looks like, and
+// the system reports what it found there, never "passed". Expectations are the signs of progress that follow
+// from each target, each saying how it is measured. They never close a task; only the assigner does.
+const FOUND = { Passed: ["Found", "var(--text-2)", "CheckOutlined"], Pending: ["Not seen yet", "var(--text-4)", "MinusOutlined"], Failed: ["Missing at the deadline", "var(--med)", "ExclamationOutlined"] };
+const WANT = { Create: "to be created", Update: "to be changed after the task was given", "Must exist": "to be there", Exists: "to be there", "Used with file": "to be used", Used: "to be used", Installed: "to be installed", "Not running": "to be closed" };
+function targetOf(e) {
+  const prog = /\.exe\b/i.test(e.target), wf = /with (.+?) open/.exec(e.target);
+  return { kind: prog ? "program" : /[\/\\]$/.test(e.target) ? "folder" : "file", name: prog ? e.target.split(" ")[0] : e.target, withFile: wf ? wf[1] : e.withFile || null };
+}
+const KIND_ICON = { file: "FileOutlined", folder: "FolderOutlined", program: "AppstoreOutlined" };
+function measure(e, host) {
+  const x = targetOf(e), on = host || "the machine";
+  if (x.kind === "program" && e.intent === "Installed") return { sig: "Shows up among the installed programs", how: `Read from ${on}'s list of installed programs each time it checks in.` };
+  if (x.kind === "program") return { sig: x.withFile ? `Time in real use with ${x.withFile}` : "Time in real use", how: `Counted only while ${x.name} is in use${x.withFile ? ` with ${x.withFile} open` : ""}: keyboard, processor and memory moving. Open but idle does not count.` };
+  return { sig: x.kind === "folder" ? "Files added, changed or renamed inside it" : e.intent === "Create" ? "The file appearing, then its saves" : "Saves, renames and moves of the file", how: `Watched through ${on}'s own file events, as they happen. Recognised by content, so a rename or a move does not lose it.` };
+}
+function HowChecking({ who }) {
+  const lines = [
+    ["AimOutlined", "When the task was given, it named what done looks like: a file to create or change, a folder, a program to use. You confirmed each one."],
+    ["EyeOutlined", "The system watches the machine for signs of progress, through its own file events and what its programs are doing. Nothing is installed for this task."],
+    ["FileSearchOutlined", "It reports what it found. It never marks a task done, and never closes one."],
+    ["UserOutlined", `${who || "The person doing the task"} sees the same signs of progress on their machine.`],
+    ["FieldTimeOutlined", "A task under way with nothing seen for two days is marked quiet, so you can ask early rather than at the deadline."],
+    ["CheckCircleOutlined", "You close it: Complete, or Incomplete with a reason."],
+  ];
+  return html`<${A.Popover} trigger="click" placement="bottomRight" title="How checking works" content=${html`<div style=${{ width: 340, display: "flex", flexDirection: "column", gap: 10 }}>${lines.map(([i, t], k) => html`<div key=${k} className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}><span className="t3" style=${{ marginTop: 2 }}>${ic(i)}</span><span className="t2" style=${{ fontSize: 12.5 }}>${t}</span></div>`)}</div>`}>
+    <${Button} type="link" icon=${ic("QuestionCircleOutlined")}>How checking works<//><//>`;
+}
+// The task on one clock: a row per target, from when it was given to its deadline. The shading is that
+// target's signs of progress (darker is busier); the dot is when the target itself was found.
+function TaskEvidence({ t }) {
+  const ref = useRef(null), w = useWidth(ref, 760);
+  const [hov, setHov] = useState(null);
+  const a = t.assigned, b = Math.max(t.final, Math.min(NOWH, t.final + 24), a + 1);
+  const L = 190, R = 96, top = 22, lane = 30, H = top + t.evidence.length * lane + 24, pw = Math.max(120, w - L - R);
+  const X = (h) => L + ((Math.max(a, Math.min(b, h)) - a) / (b - a)) * pw;
+  const nb = Math.max(20, Math.floor(pw / 4)), bw = (b - a) / nb, end = Math.min(NOWH, b);
+  const lanes = useMemo(() => t.evidence.map((e) => {
+    const x = targetOf(e), bins = [];
+    for (let k = 0; k < nb; k++) { const t0 = a + k * bw; if (t0 > end) break; let v = 0; for (let s = 0; s < 4; s++) v = Math.max(v, e.fn(t0 + (s / 4) * bw) || 0); bins.push(v); }
+    const mx = Math.max(1e-9, ...bins), first = bins.findIndex((v) => v > 0);
+    const found = e.st === "Passed" ? (first >= 0 ? a + first * bw : Math.min(end, t.final)) : null;
+    return { e, x, bins, mx, found };
+  }), [t.id, w]);
+  const ticks = []; const step = b - a > 24 * 8 ? 48 : 24;
+  for (let d = Math.ceil(a / 24) * 24; d <= b; d += step) ticks.push(d);
+  const marks = [["Started", t.started, "var(--text-3)"], ["Soft", t.soft, "var(--med)"], ["Final", t.final, NOWH > t.final && t.state !== "Completed" && t.state !== "Awaiting your verification" ? "var(--crit)" : "var(--text-2)"], ["Now", NOWH <= b ? NOWH : null, "var(--accent)"]].filter((m) => m[1] != null && m[1] >= a);
+  const C = { file: "var(--s2)", folder: "var(--s2)", program: "var(--s3)" };
+  return html`<div ref=${ref} style=${{ position: "relative" }}>
+    <svg width=${w} height=${H} style=${{ display: "block" }} onMouseLeave=${() => setHov(null)}>
+      ${ticks.map((d) => html`<g key=${d}><line x1=${X(d)} x2=${X(d)} y1=${top - 4} y2=${H - 22} style=${{ stroke: "var(--grid)" }} />
+        <text x=${X(d)} y=${H - 7} textAnchor="middle" fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${d >= 0 && d < 24 ? "Today" : dayOf(d)}</text></g>`)}
+      ${lanes.map((l, i) => { const y = top + i * lane;
+        return html`<g key=${i}>
+          <text x="0" y=${y + 18} fontSize="12" style=${{ fill: "var(--text)", fontFamily: "var(--mono)" }}>${fitEnd(l.x.name, 22)}<title>${l.x.name}${l.x.withFile ? " with " + l.x.withFile : ""}</title></text>
+          <rect x=${L} y=${y + 6} width=${pw} height=${lane - 12} rx="3" style=${{ fill: "var(--surface-2)" }} />
+          ${l.bins.map((v, k) => (v > 0 ? html`<rect key=${k} x=${L + (k / nb) * pw} y=${y + 6} width=${Math.max(1, pw / nb + 0.5)} height=${lane - 12} style=${{ fill: C[l.x.kind], opacity: 0.25 + 0.75 * Math.min(1, v / l.mx) }}
+            onMouseEnter=${() => setHov({ x: L + (k / nb) * pw, y: y + lane, text: `${l.x.name} · ${atDay(a + k * bw)} · ${measure(l.e, t.host).sig.toLowerCase()}` })} />` : null))}
+          ${l.found != null ? html`<g><circle cx=${X(l.found)} cy=${y + lane / 2} r="6" style=${{ fill: "var(--surface)", stroke: "var(--text)" }} strokeWidth="1.5" /><circle cx=${X(l.found)} cy=${y + lane / 2} r="2.5" style=${{ fill: "var(--text)" }} /><title>Found ${atDay(l.found)} · ${l.e.sig}</title></g>` : null}
+          <text x=${L + pw + 10} y=${y + 18} fontSize="11.5" style=${{ fill: FOUND[l.e.st][1] }}>${FOUND[l.e.st][0].replace("Missing at the deadline", "Missing")}</text>
+        </g>`; })}
+      ${marks.map(([k, v, c]) => html`<g key=${k}><line x1=${X(v)} x2=${X(v)} y1=${top - 6} y2=${H - 22} style=${{ stroke: c }} strokeWidth=${k === "Now" ? 1.5 : 1} strokeDasharray=${k === "Now" ? "0" : "3 3"} />
+        <text x=${X(v)} y="11" textAnchor=${X(v) > L + pw - 30 ? "end" : "middle"} fontSize="10.5" style=${{ fill: c }}>${k}</text></g>`)}
+    </svg>
+    ${hov ? html`<div className="tt" style=${{ left: Math.min(hov.x, w - 300), top: hov.y }}>${hov.text}</div>` : null}
+    <div className="leg" style=${{ marginTop: 4 }}>
+      <span><i className="sq" style=${{ "--c": "var(--s2)" }} />file activity</span><span><i className="sq" style=${{ "--c": "var(--s3)" }} />program in real use</span>
+      <span><i className="sq" style=${{ "--c": "var(--text)", borderRadius: "50%" }} />target found</span><span className="t4">darker is busier · nothing shaded means nothing seen</span>
+    </div>
+  </div>`;
+}
 const atDay = (t) => (t >= 0 && t < 24 ? `Today ${hhmm(t)}` : `${dayOf(t)} ${hhmm(t)}`);
 const span = (h) => (h > 24 ? `${Math.floor(h / 24)}d ${Math.round(h % 24)}h` : dur(h));
 function Deadline({ t }) {
@@ -1485,37 +1603,104 @@ function Deadline({ t }) {
     </div>
   </div>`;
 }
+// A task's page is built around its targets. Each target is one block: what done looks like for it, whether
+// it has been found, its signs of progress on the task's clock, and how those are measured. Beside them, the
+// verdict, which is the assigner's alone, and the history.
 function TaskDetail({ id, go }) {
   const t = TASKS.find((x) => x.id === id);
   const [v, setV] = useState(null);
-  const done = t.evidence.filter((e) => e.st === "Passed").length;
+  const [asking, setAsking] = useState(false);
+  const [why, setWhy] = useState("");
+  const ref = useRef(null), w = useWidth(ref, 640);
+  const a = t.assigned, b = Math.max(t.final, Math.min(NOWH, t.final + 24), a + 1), end = Math.min(NOWH, b);
+  const X = (h) => ((Math.max(a, Math.min(b, h)) - a) / (b - a)) * w;
+  const nb = Math.max(24, Math.floor(w / 4)), bw = (b - a) / nb;
+  const lanes = useMemo(() => t.evidence.map((e) => {
+    const bins = []; for (let k = 0; k < nb && a + k * bw <= end; k++) { let x = 0; for (let s = 0; s < 4; s++) x = Math.max(x, e.fn(a + k * bw + (s / 4) * bw) || 0); bins.push(x); }
+    const first = bins.findIndex((x) => x > 0);
+    return { e, x: targetOf(e), m: measure(e, t.host), bins, mx: Math.max(1e-9, ...bins), found: e.st === "Passed" ? (first >= 0 ? a + first * bw : Math.min(end, t.final)) : null };
+  }), [t.id, w]);
+  const last = (() => { for (let x = NOWH; x > a; x -= 0.25) if (t.evidence.some((e) => (e.fn(x) || 0) > 0)) return x; return null; })();
+  const nFound = t.evidence.filter((e) => e.st === "Passed").length, waiting = t.evidence.filter((e) => e.st !== "Passed");
+  const finished = t.state === "Completed" || t.state === "Awaiting your verification", over = !finished && NOWH > t.final;
+  const marks = [["Started", t.started, "var(--text-3)"], ["Soft", t.soft, "var(--med)"], ["Final", t.final, over ? "var(--crit)" : "var(--text-2)"], ["Now", NOWH <= b ? NOWH : null, "var(--accent)"]].filter((m) => m[1] != null && m[1] >= a);
+  const ticks = []; for (let d = Math.ceil(a / 24) * 24; d <= b; d += b - a > 24 * 8 ? 48 : 24) ticks.push(d);
+  const C = { file: "var(--s2)", folder: "var(--s2)", program: "var(--s3)" };
+  const facts = [["Given", atDay(a)], ...(t.started != null ? [["Started", atDay(t.started)]] : [["Started", "Not yet"]]), ...(t.soft != null ? [["Soft deadline", atDay(t.soft)]] : []), ["Final deadline", atDay(t.final)],
+    [finished ? "Handed in" : over ? "Late by" : "Time left", finished ? (t.state === "Completed" ? "Closed" : "Yes") : span(Math.abs(t.final - NOWH))]];
   return html`<${React.Fragment}>
-    <div className="panel" style=${{ padding: 16 }}>
-      <div className="row" style=${{ justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div className="row"><span className="mono t3">${t.id}</span><span className="st" style=${{ "--c": TSTATE[t.state] }}><i />${t.state}</span></div>
-          <div style=${{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>${t.title}</div>
-          <div className="t2" style=${{ marginTop: 2 }}>${t.who} on <a className="mono" onClick=${() => go("machines", t.host)}>${t.host}</a><span className="t3"> · assigned by ${t.by}</span></div>
-        </div>
-        <div className="row">
-          ${v ? html`<span style=${{ color: v === "c" ? "var(--ok)" : "var(--crit)", fontWeight: 500 }}>${v === "c" ? "Marked complete" : "Returned as incomplete"}</span><${Button} type="text" onClick=${() => setV(null)}>Undo<//>`
-            : html`<${Button} onClick=${() => setV("i")}>Incomplete<//><${Button} type="primary" onClick=${() => setV("c")}>Complete<//>`}
-        </div>
+    <section className="panel" style=${{ padding: "16px 18px" }}>
+      <div className="row" style=${{ gap: 10 }}><span className="mono t3">${t.id}</span><span className="st" style=${{ "--c": TSTATE[t.state] }}><i />${t.state}</span></div>
+      <div style=${{ fontSize: 20, fontWeight: 600, margin: "4px 0 2px", letterSpacing: "-0.01em" }}>${t.title}</div>
+      <div className="t2">${t.who} on <a className="mono" onClick=${() => go("machines", t.host)}>${t.host}</a><span className="t3"> · given by ${t.by}</span></div>
+      <div className="row" style=${{ gap: 32, marginTop: 14, flexWrap: "wrap" }}>
+        ${facts.map(([k, x]) => html`<div key=${k}><div className="t3" style=${{ fontSize: 12 }}>${k}</div><div className="mono" style=${{ fontSize: 13, color: k === "Soft deadline" ? "var(--med)" : k === "Late by" || (k === "Final deadline" && over) ? "var(--crit)" : "var(--text)" }}>${x}</div></div>`)}
       </div>
-      <div style=${{ marginTop: 16 }}><${Deadline} t=${t} /></div>
-    </div>
-    <div className="g c-84">
-      <${Panel} title="Checks" sub=${`${done} of ${t.evidence.length} passed`} flush>
-        <${Table} size="small" pagination=${PG} dataSource=${t.evidence.map((e, i) => ({ ...e, key: i }))} columns=${[
-          { title: "Target", render: (r) => html`<div><div className=${/[./]/.test(r.target) ? "mono" : ""}>${r.target}</div><div className="t3" style=${{ fontSize: 11.5 }}>${r.intent} · ${r.sig}</div></div>` },
-          { title: "Activity, 7 days", width: 130, render: (r) => html`<${Spark} fn=${r.fn} range="7d" c=${r.st === "Pending" ? "var(--s6)" : ESTATE[r.st]} w=${100} />` },
-          { title: "Result", width: 90, render: (r) => html`<span className="st" style=${{ "--c": ESTATE[r.st] }}><i />${r.st}</span>` },
-        ]} />
-        <div className="t3" style=${{ fontSize: 12, padding: "10px 14px" }}>The checks are evidence, not a verdict. Only the person who assigned the task can close it.</div>
-      <//>
-      <${Panel} title="History" flush>
-        ${t.log.map(([at, what], i) => html`<div key=${i} className="ev"><span className="mono t3">${at >= 0 && at < 24 ? hhmm(at) : dayOf(at)}</span><i style=${{ width: 7, height: 7, borderRadius: "50%", background: "var(--s6)", display: "inline-block" }} /><span className="t2">${what}</span></div>`)}
-      <//>
+    </section>
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <section className="panel" style=${{ minWidth: 0 }}>
+        <div className="phd"><div className="pt">Targets<small>what done looks like, and the signs of progress for each</small></div><${HowChecking} who=${t.who} /></div>
+        <div className="pbd" style=${{ paddingTop: 6 }}>
+          <div ref=${ref}>
+            <svg width=${w} height="16" style=${{ display: "block" }}>
+              ${marks.map(([k, x, c]) => { const near = X(x) > w - 30, anc = k === "Soft" || near ? "end" : X(x) < 30 ? "start" : "middle";
+                return html`<text key=${k} x=${X(x) + (k === "Soft" ? -3 : 0)} y="11" textAnchor=${anc} fontSize="10.5" style=${{ fill: c }}>${k}</text>`; })}
+            </svg>
+            ${lanes.map((l, i) => { const f = FOUND[l.e.st];
+              return html`<div key=${i} style=${{ padding: "10px 0 12px", borderBottom: "1px solid var(--grid)" }}>
+                <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}>
+                  <span className="t3">${ic(KIND_ICON[l.x.kind])}</span>
+                  <span style=${{ minWidth: 0 }} className="cut"><span className="mono" style=${{ fontWeight: 500 }}>${l.x.name}</span>${l.x.withFile ? html`<span className="t3"> with </span><span className="mono">${l.x.withFile}</span>` : null} <span className="t3">${WANT[l.e.intent] || l.e.intent.toLowerCase()}</span></span>
+                  <span className="sp" />
+                  ${l.e.st !== "Pending" ? html`<span className="t3 cut" style=${{ fontSize: 12, maxWidth: 220, flex: "0 1 auto" }} title=${l.e.sig}>${l.e.sig}</span>` : null}
+                  <span className="row" style=${{ gap: 5, flexWrap: "nowrap", color: f[1], fontSize: 12.5, whiteSpace: "nowrap" }}>${ic(f[2])}${f[0]}</span>
+                </div>
+                <svg width=${w} height="22" style=${{ display: "block", marginTop: 8 }}>
+                  <rect x="0" y="5" width=${w} height="12" rx="3" style=${{ fill: "var(--surface-2)" }} />
+                  ${over ? html`<rect x=${X(t.final)} y="5" width=${w - X(t.final)} height="12" style=${{ fill: "var(--crit)", opacity: 0.12 }} />` : null}
+                  ${l.bins.map((x, k) => (x > 0 ? html`<rect key=${k} x=${(k / nb) * w} y="5" width=${w / nb + 0.5} height="12" style=${{ fill: C[l.x.kind], opacity: 0.25 + 0.75 * Math.min(1, x / l.mx) }}><title>${atDay(a + k * bw)} · ${l.m.sig.toLowerCase()}</title></rect>` : null))}
+                  ${marks.map(([k, x, c]) => html`<line key=${k} x1=${X(x)} x2=${X(x)} y1="1" y2="21" style=${{ stroke: c }} strokeWidth=${k === "Now" ? 1.5 : 1} strokeDasharray=${k === "Now" ? "0" : "3 2"} />`)}
+                  ${l.found != null ? html`<g><circle cx=${X(l.found)} cy="11" r="5.5" style=${{ fill: "var(--surface)", stroke: "var(--text)" }} strokeWidth="1.5" /><circle cx=${X(l.found)} cy="11" r="2.2" style=${{ fill: "var(--text)" }} /><title>Found ${atDay(l.found)}</title></g>` : null}
+                </svg>
+              </div>`; })}
+            <svg width=${w} height="16" style=${{ display: "block", marginTop: 4 }}>
+              ${ticks.map((d) => html`<text key=${d} x=${X(d)} y="12" textAnchor=${X(d) < 20 ? "start" : X(d) > w - 20 ? "end" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${d >= 0 && d < 24 ? "Today" : dayOf(d)}</text>`)}
+            </svg>
+          </div>
+          <div className="leg" style=${{ marginTop: 10 }}>
+            <span><i className="sq" style=${{ "--c": "var(--s2)" }} />file activity</span><span><i className="sq" style=${{ "--c": "var(--s3)" }} />program in real use</span>
+            <span><i className="sq" style=${{ "--c": "var(--text)", borderRadius: "50%" }} />found</span><span className="t4">darker is busier · nothing shaded means nothing seen</span>
+          </div>
+          <div style=${{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 6 }}>
+            <div className="nt-h" style=${{ marginBottom: 2 }}>How these are measured</div>
+            ${[...new Map(lanes.map((l) => [l.x.kind === "program" ? "program:" + l.e.intent : "file", l])).values()].map((l) => html`<div key=${l.x.kind + l.e.intent} className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 8, fontSize: 12.5 }}>
+              <span className="t3" style=${{ marginTop: 1 }}>${ic(l.x.kind === "program" ? "AppstoreOutlined" : "FileOutlined")}</span>
+              <span><span className="t2">${l.x.kind === "program" ? "Programs" : "Files and folders"}:</span> <span className="t3">${l.m.how.replace(l.x.name, "the program").replace(` with ${l.x.withFile} open`, " with its file open")}</span></span></div>`)}
+          </div>
+        </div>
+      </section>
+      <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+        <section className="panel">
+          <div className="phd"><div className="pt">Your verdict<small>the system never closes a task</small></div></div>
+          <div className="pbd" style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style=${{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em" }}>${nFound} <span className="t3" style=${{ fontSize: 14, fontWeight: 400 }}>of ${t.evidence.length} targets found</span></div>
+              <div className="t3" style=${{ fontSize: 12.5, marginTop: 2 }}>${last != null ? `Last sign of progress ${atDay(last)}` : "No signs of progress yet"}</div>
+              ${waiting.length ? html`<div style=${{ fontSize: 12.5, marginTop: 6, color: waiting.some((e) => e.st === "Failed") ? "var(--med)" : "var(--text-2)" }}>${waiting.map((e) => targetOf(e).name).join(", ")} ${waiting.some((e) => e.st === "Failed") ? "missing at the deadline" : "not seen yet"}.</div>` : html`<div style=${{ fontSize: 12.5, marginTop: 6, color: "var(--text-2)" }}>Everything the task named has been found. Whether it is good enough is for you to judge.</div>`}
+            </div>
+            ${v ? html`<div className="decide" style=${{ "--c": v === "c" ? "var(--ok)" : "var(--med)" }}>
+                <div className="row" style=${{ flexWrap: "nowrap" }}><b style=${{ fontWeight: 600 }}>${v === "c" ? "Marked complete" : "Sent back as incomplete"}</b><span className="sp" /><${Button} size="small" type="text" onClick=${() => { setV(null); setAsking(false); }}>Undo<//></div>
+                ${v === "i" && why ? html`<div className="t2" style=${{ fontSize: 12.5, marginTop: 4 }}>“${why}” · ${t.who} sees this</div>` : null}</div>`
+              : asking ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <${Input.TextArea} autoSize=${{ minRows: 2, maxRows: 5 }} value=${why} onChange=${(e) => setWhy(e.target.value)} placeholder=${`What is missing? ${t.who} sees this.`} />
+                <div className="row"><span className="sp" /><${Button} onClick=${() => setAsking(false)}>Cancel<//><${Button} type="primary" disabled=${!why.trim()} onClick=${() => setV("i")}>Send back<//></div></div>`
+              : html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Button} block onClick=${() => setAsking(true)}>Incomplete<//><${Button} block type="primary" onClick=${() => setV("c")}>Complete<//></div>`}
+          </div>
+        </section>
+        <${Panel} title="History" flush>
+          ${t.log.map(([at, what], i) => html`<div key=${i} className="ev"><span className="mono t3">${at >= 0 && at < 24 ? hhmm(at) : dayOf(at)}</span><i style=${{ width: 7, height: 7, borderRadius: "50%", background: "var(--s6)", display: "inline-block" }} /><span className="t2">${what}</span></div>`)}
+        <//>
+      </div>
     </div>
   <//>`;
 }
@@ -1563,7 +1748,7 @@ const FILE_INDEX = [
   { name: "invoices-q3.csv", path: "C:\\Users\\Kojo\\Documents\\invoices-q3.csv", host: "OPS-01", note: "changed Mon 11:02" },
   { name: "invoices-q3.csv", path: "/resources/workers/finance/invoices-q3.csv", host: "FIN-01", note: "shared copy" },
   { name: "supplier-contacts.xlsx", path: "C:\\Users\\Efua\\Documents\\supplier-contacts.xlsx", host: "OPS-02", note: "changed 12 Sep" },
-  { name: "budget-2026.xlsx", path: "/resources/restricted/budget-2026.xlsx", host: "ADM-01", note: "restricted", restricted: true },
+  { name: "budget-2026.xlsx", path: "C:\\Finance\\budget-2026.xlsx", host: "WS-OPS-A1", note: "restricted · kept to WS-OPS-A1", restricted: true },
   { name: "report.xlsx", path: "C:\\Users\\Ama\\Documents\\report.xlsx", host: "OPS-07", note: "changed today 12:41" },
 ];
 const PEOPLE_ALL = [...MACHINES.filter((m) => m.user).map((m) => ({ name: m.user, sub: `${m.host} · ${DBY[m.dept].name}`, host: m.host })),
@@ -1693,7 +1878,7 @@ function applyConfirmed(base, conf) {
   }));
 }
 
-function NewTask() {
+function NewTask({ go }) {
   const [text, setText] = useState("");
   const [checked, setChecked] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -1752,7 +1937,7 @@ function NewTask() {
               <${DatePicker} id=${"nt-final-" + i} showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" placeholder="Final" value=${t.final.v ? dayjs(t.final.v) : null} onChange=${(d) => patch(i, () => ({ final: { v: d ? d.format("YYYY-MM-DD HH:mm") : null, ...mine } }))} style=${{ flex: 1, minWidth: 170 }} />
               <${DatePicker} id=${"nt-soft-" + i} showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" placeholder="Soft (optional)" value=${t.soft.v ? dayjs(t.soft.v) : null} onChange=${(d) => patch(i, () => ({ soft: { v: d ? d.format("YYYY-MM-DD HH:mm") : null, ...mine } }))} style=${{ flex: 1, minWidth: 170 }} />
             </div></div>
-          <div className="nt-sub" style=${{ marginTop: 8 }}>What shows it is done</div>
+          <div className="nt-sub" style=${{ marginTop: 8 }}>What done looks like</div>
           <div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start" }}><${Lbl} need=${blocked(t)}>Checks<//>
             <div style=${{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
               ${t.checks.map((c, k) => html`<div key=${k} className="row" style=${{ flexWrap: "wrap", gap: 6 }}>
@@ -1803,7 +1988,7 @@ function NewTask() {
           <span style=${{ color: r[2] === "none" ? "var(--text-3)" : "inherit", fontWeight: r[0] === "Title" ? 500 : 400 }}>${r[1]}</span>
           <${Src} s=${r[2]} why=${r[3]} />
         </div>`)}
-        <div className="t3" style=${{ margin: "16px 0 2px" }}>Checks${t.checks.length ? ` · ${t.checks.length}` : ""}</div>
+        <div className="t3" style=${{ margin: "16px 0 2px" }}>What done looks like${t.checks.length ? ` · ${t.checks.length}` : ""} <span className="t4">· verification, you confirm it when the work is in</span></div>
         ${t.checks.length
           ? t.checks.map((c, k) => html`<div key=${k} className="kv chk">
               <span className="t3">${ic(c.kind === "File" ? "FileOutlined" : "AppstoreOutlined")}</span>
@@ -1815,13 +2000,22 @@ function NewTask() {
               <span style=${{ color: t.none ? "inherit" : "var(--med)" }}>${t.none ? "None. You will verify it by hand." : "None found yet"}</span>
               <${Src} s=${t.none ? "you" : "input"} why=${t.none ? "You confirmed it needs no checks" : "“" + t.phrase + "” names no file, folder or program"} />
             </div>`}
+        ${(() => { const host = (MACHINES.find((m) => m.user === t.who.v) || {}).host, cs = t.checks.filter((c) => c.target);
+          return html`<div className="t3" style=${{ margin: "16px 0 2px" }}>Signs of progress <span className="t4">· expectations, they follow from the targets above</span></div>
+            ${cs.length ? cs.map((c, k) => { const m = measure({ target: c.target, intent: c.intent, withFile: c.intent === "Used with file" ? c.withFile : null }, host);
+              return html`<div key=${k} className="kv chk" style=${{ gridTemplateColumns: "18px minmax(0, 1fr)" }}>
+                <span className="t3">${ic("EyeOutlined")}</span>
+                <span style=${{ minWidth: 0 }}>${m.sig} <span className="t3">·</span> <span className="mono t2">${c.target}</span><div className="t3" style=${{ fontSize: 12 }}>${m.how}</div></span>
+              </div>`; })
+            : html`<div className="kv chk" style=${{ gridTemplateColumns: "18px minmax(0, 1fr)" }}><span className="t3">${ic("EyeInvisibleOutlined")}</span><span className="t3">${t.none ? "Nothing is watched. You judge it when the work is in." : "None until a target is set."}</span></div>`}`; })()}
       </div>
       <div className="sp" />
       <div className="row" style=${{ padding: "12px 14px", borderTop: "1px solid var(--border)" }}>
         ${tasks.length > 1 ? html`<span className="row" style=${{ gap: 6 }}>${tasks.map((x, j) => html`<a key=${j} onClick=${() => setCur(j)} style=${{ color: j === cur ? "var(--text)" : blocked(x) ? "var(--med)" : "var(--text-3)", fontWeight: j === cur ? 500 : 400 }}>Task ${j + 1}${blocked(x) ? " · needs input" : " · ready"}</a>`)}</span>` : null}
         <span className="sp" />
+        <${Button} onClick=${() => go && go("tasks")}>Cancel<//>
         <${Button} disabled=${busy || stale} onClick=${() => toast("Kept as one task (concept)")}>Keep as one<//>
-        <${Button} type="primary" disabled=${busy || stale || open > 0} onClick=${() => toast("Created T-209 and T-210 (concept)")}>Create ${tasks.length} tasks<//>
+        <${Button} type="primary" disabled=${busy || stale || open > 0} onClick=${() => { toast("Created T-209 and T-210 (concept)"); go && go("tasks"); }}>Create ${tasks.length} tasks<//>
       </div>
     </section>
     </div>` : html`<section className="panel" style=${{ minWidth: 0, display: "flex", flexDirection: "column" }}>
@@ -1839,93 +2033,167 @@ const SRCWORD = { rule: "Rule", model: "Model", input: "Needs input", you: "You"
 function Src({ s, why }) {
   return html`<span className="src" title=${why} style=${{ color: s === "input" ? "var(--med)" : "var(--text-3)" }}><i style=${{ background: SRC[s][0] }} />${SRCWORD[s]}</span>`;
 }
+// A task on one line of time: from when it was given to its deadline. Shading is its signs of progress
+// (darker is busier), dots are its targets as they were found, the blue line is now. The same picture as the
+// task's own page, folded into one row.
+function TaskLine({ t, w = 240 }) {
+  const done = t.state === "Completed" || t.state === "Awaiting your verification";
+  const a = t.assigned, b = done ? t.final : Math.max(t.final, Math.min(NOWH, t.final + (t.final - a) * 0.4));
+  const X = (h) => ((Math.max(a, Math.min(b, h)) - a) / (b - a)) * w, end = Math.min(NOWH, b), nb = 48, bw = (b - a) / nb;
+  const bins = []; for (let k = 0; k < nb && a + k * bw <= end; k++) { let v = 0; for (let s = 0; s < 3; s++) v = Math.max(v, t.evidence.reduce((m, e) => m + (e.fn(a + k * bw + (s / 3) * bw) || 0), 0)); bins.push(v); }
+  const mx = Math.max(1e-9, ...bins);
+  const found = t.evidence.filter((e) => e.st === "Passed").map((e) => { for (let x = a; x <= end; x += bw / 3) if ((e.fn(x) || 0) > 0) return x; return Math.min(end, t.final); });
+  const over = !done && NOWH > t.final;
+  return html`<svg width=${w} height="24" style=${{ display: "block", overflow: "visible" }}>
+    <rect x="0" y="7" width=${w} height="10" rx="2" style=${{ fill: "var(--surface-3)" }} />
+    ${over ? html`<rect x=${X(t.final)} y="7" width=${w - X(t.final)} height="10" style=${{ fill: "var(--crit)", opacity: 0.16 }} />` : null}
+    ${bins.map((v, k) => (v > 0 ? html`<rect key=${k} x=${(k / nb) * w} y="7" width=${w / nb + 0.4} height="10" style=${{ fill: "var(--s1)", opacity: 0.25 + 0.7 * Math.min(1, v / mx) }} />` : null))}
+    ${t.soft != null ? html`<line x1=${X(t.soft)} x2=${X(t.soft)} y1="4" y2="20" style=${{ stroke: "var(--med)" }} strokeWidth="1.5"><title>Soft deadline ${atDay(t.soft)}</title></line>` : null}
+    <line x1=${X(t.final)} x2=${X(t.final)} y1="3" y2="21" style=${{ stroke: over ? "var(--crit)" : "var(--text-3)" }} strokeWidth="1.5"><title>Final deadline ${atDay(t.final)}</title></line>
+    ${found.map((x, k) => html`<circle key=${k} cx=${X(x)} cy="12" r="3.5" style=${{ fill: "var(--text)", stroke: "var(--surface)" }} strokeWidth="1.5"><title>A target was found ${atDay(x)}</title></circle>`)}
+    ${!done && NOWH < b ? html`<line x1=${X(NOWH)} x2=${X(NOWH)} y1="2" y2="22" style=${{ stroke: "var(--accent)" }} strokeWidth="1.5"><title>Now</title></line>` : null}
+  </svg>`;
+}
+// What a task needs from you decides where it sits: to verify first, then overdue, then quiet, then on track.
+const TCAT = {
+  verify:  { w: "To verify",  c: "var(--s3)",   icon: "SafetyCertificateOutlined", d: "Every target found. Waiting for you to close it." },
+  overdue: { w: "Overdue",    c: "var(--crit)", icon: "ClockCircleOutlined",       d: "Past the final deadline and not handed in." },
+  quiet:   { w: "Quiet",      c: "var(--med)",  icon: "PauseCircleOutlined",       d: "Under way, but nothing seen for two days." },
+  track:   { w: "On track",   c: "var(--ok)",   icon: "SyncOutlined",              d: "Under way, with signs of progress." },
+  done:    { w: "Completed",  c: "var(--text-3)", icon: "CheckOutlined",           d: "Closed by whoever gave it." },
+};
+const TORDER = ["verify", "overdue", "quiet", "track", "done"];
 function Tasks({ go, me }) {
-  // tasks the Super User gave this department: the Admin says how far it has got, never closes it
   useDT();
   const mine = DEPT_TASKS.filter((t) => !t.complete && me && t.st[me] !== undefined).sort((a, b) => (a.st[me] === "sent" ? 0 : 1) - (b.st[me] === "sent" ? 0 : 1));
   const fpg = usePaged(mine, 3);
   const setMy = (id, v) => { setAdminState(id, me, v); toast(`Marked ${DSTATE[v][0].toLowerCase()} · the Super User sees it (concept)`); };
-  const [f, setF] = useState("All");
-  const open = TASKS.filter((t) => t.state !== "Completed");
-  const show = TASKS.filter((t) => f === "All" || (f === "Open" ? t.state === "In progress" || t.state === "Not started" || t.state === "Overdue" : f === "To verify" ? t.state === "Awaiting your verification" : t.state === "Completed"));
-  const count = (st) => TASKS.filter((t) => t.state === st).length;
+  // when anything was last seen for each task, looking back a week
+  const seen = useMemo(() => Object.fromEntries(TASKS.map((t) => { for (let x = NOWH; x > NOWH - 168; x -= 0.25) if (t.evidence.some((e) => (e.fn(x) || 0) > 0)) return [t.id, x]; return [t.id, null]; })), [TASKS.length]);
+  const cat = (t) => t.state === "Completed" ? "done" : t.state === "Awaiting your verification" ? "verify" : t.state === "Overdue" ? "overdue"
+    : NOWH - t.assigned > 48 && (seen[t.id] == null || NOWH - seen[t.id] > 48) ? "quiet" : "track";
+  const [f, setF] = useState(null);
+  const [q, setQ] = useState("");
+  const all = TASKS.map((t) => ({ t, k: cat(t) })).sort((x, y) => TORDER.indexOf(x.k) - TORDER.indexOf(y.k) || x.t.final - y.t.final);
+  const n = (k) => all.filter((x) => x.k === k).length;
+  const list = all.filter((x) => (!f || x.k === f) && `${x.t.id} ${x.t.title} ${x.t.who} ${x.t.host}`.toLowerCase().includes(q.toLowerCase()));
+  const pg = usePaged(list, 8, (f || "") + q);
+  const PIP = { Passed: { background: "var(--text)", border: "1.5px solid var(--text)" }, Pending: { background: "transparent", border: "1.5px solid var(--text-4)" }, Failed: { background: "var(--med)", border: "1.5px solid var(--med)" } };
+  const due = (t, k) => k === "done" ? ["Closed", `${dayOf(t.final)} ${hhmm(t.final)}`, "var(--text-3)"] : k === "verify" ? ["Handed in", `was due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--text)"]
+    : NOWH > t.final ? [`${span(NOWH - t.final)} late`, `was due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--crit)"] : [`${span(t.final - NOWH)} left`, `due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--text)"];
+  const note = (t, k) => { const d = t.evidence.filter((e) => e.st === "Passed").length, ls = seen[t.id];
+    return k === "quiet" ? (ls == null ? "nothing seen since it was given" : `nothing seen for ${span(NOWH - ls)}`) : `${d} of ${t.evidence.length} target${t.evidence.length === 1 ? "" : "s"} found`; };
   return html`<${React.Fragment}>
-    ${mine.length && me ? html`<section className="panel">
-      <div className="phd"><div className="pt">From the Super User<small>given to you · say how far it has got · only the Super User closes it</small></div><${Pager} p=${fpg} what="tasks" /></div>
-      ${fpg.items.map((t) => { const others = Object.keys(t.st).filter((a) => a !== me && t.st[a] !== "sent");
-        const fresh = t.st[me] === "sent";
-        return html`<div key=${t.id} id=${"dt-" + t.id} className=${"drow" + (fresh ? " fresh" : "")} style=${{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.2fr) 90px auto" }}>
-          <span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${fresh ? html`<span className="tag" style=${{ "--c": "var(--accent)", marginRight: 8 }}>New<//>` : null}${t.title}</span>
-          <span className="cut t3" style=${{ fontSize: 12.5 }}>${Object.keys(t.st).length === 1 ? "given to you alone" : others.length ? others.map((a) => `${a}: ${DSTATE[t.st[a]][0].toLowerCase()}`).join(" · ") : "no other Admin has opened it"}</span>
-          <span className="mono" style=${{ fontSize: 12, color: t.due < NOWH ? "var(--crit)" : "var(--text-3)", textAlign: "right", whiteSpace: "nowrap" }}>${dueText(t.due)}</span>
-          <${Segmented} size="small" value=${t.st[me] === "sent" ? null : t.st[me]} onChange=${(v) => setMy(t.id, v)} options=${[{ value: "seen", label: "Seen" }, { value: "ongoing", label: "Ongoing" }, { value: "done", label: "Done" }]} />
+    <div className="tcards">
+      ${["verify", "overdue", "quiet", "track"].map((k) => { const on = f === k, c = TCAT[k];
+        return html`<div key=${k} className=${"panel tcard" + (on ? " on" : "")} style=${{ "--c": c.c }} role="button" tabIndex="0" aria-pressed=${on} onClick=${() => setF(on ? null : k)} onKeyDown=${(e) => e.key === "Enter" && setF(on ? null : k)}>
+          <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className="t3">${ic(c.icon)}</span><span className="t2">${c.w}</span><span className="sp" />${on ? html`<span className="t3" style=${{ fontSize: 11.5 }}>showing · click to clear</span>` : null}</div>
+          <div style=${{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2, color: "var(--text)" }}>${fmt(n(k))}</div>
+          <div className="t3" style=${{ fontSize: 12 }}>${c.d}</div>
         </div>`; })}
-    </section>` : null}
-    <section className="panel" style=${{ minHeight: 600, display: "flex", flexDirection: "column" }}>
-      <div className="phd">
-        <div className="pt">Tasks<small>click a task to open it</small></div>
-        <div className="row">
-          <${Segmented} size="small" value=${f} onChange=${setF} options=${["All", "Open", "To verify", "Completed"]} />
-          <${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => { const el = document.getElementById("task-text"); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); } }}>New task<//>
+    </div>
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <section className="panel" style=${{ minWidth: 0 }}>
+        <div className="phd">
+          <div className="pt">${f ? TCAT[f].w : "All tasks"}<small>${f ? html`<span>${fmt(list.length)} · <a onClick=${() => setF(null)}>show all ${fmt(all.length)}</a></span>` : `${fmt(all.length)} · what needs you comes first`}</small></div>
+          <div className="row">
+            <${Pager} p=${pg} />
+            <${Input} size="small" allowClear placeholder="Find a task or person" prefix=${ic("SearchOutlined")} value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ width: 190 }} />
+            <${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("tasks", "new")}>New task<//>
+          </div>
         </div>
+        ${!all.length ? html`<${Empty} icon="CheckSquareOutlined" title="No tasks yet" text="Describe a piece of work in plain words. The system proposes who, what done looks like and when; nothing is created until you confirm it." act="New task" onAct=${() => go("tasks", "new")} h=${200} />`
+          : !list.length ? html`<div className="t3" style=${{ padding: 16 }}>Nothing here${q ? ` matches “${q}”` : ""}.</div>` : null}
+        <div style=${{ minHeight: pg.pages > 1 ? 8 * 61 : 0 }}>
+        ${pg.items.map(({ t, k }) => { const c = TCAT[k], [d1, d2, dc] = due(t, k);
+          return html`<div key=${t.id} className="trow" role="button" tabIndex="0" onClick=${() => go("tasks", t.id)} onKeyDown=${(e) => e.key === "Enter" && go("tasks", t.id)}>
+            <div style=${{ minWidth: 0 }}>
+              <div className="cut" style=${{ fontWeight: 500, fontSize: 13.5, color: k === "done" ? "var(--text-3)" : "var(--text)" }} title=${t.title}>${t.title}</div>
+              <div className="t3 cut" style=${{ fontSize: 12 }}><span className="st" style=${{ "--c": c.c, marginRight: 8 }}><i />${c.w}</span><span className="mono">${t.id}</span> · ${t.who} on <span className="mono">${t.host}</span>${t.by !== me ? ` · from ${t.by === "You" ? "the Super User" : t.by}` : ""}</div>
+            </div>
+            <div className="trow-line">
+              <div className="row" style=${{ gap: 8, flexWrap: "nowrap", marginBottom: 2 }}>
+                <span className="row" style=${{ gap: 4, flexWrap: "nowrap" }} title=${t.evidence.map((e) => `${targetOf(e).name}: ${FOUND[e.st][0].toLowerCase()}`).join("\n")}>${t.evidence.slice(0, 4).map((e, j) => html`<i key=${j} style=${{ width: 8, height: 8, borderRadius: "50%", display: "inline-block", ...PIP[e.st] }} />`)}${t.evidence.length > 4 ? html`<span className="t3" style=${{ fontSize: 10 }}>+${t.evidence.length - 4}</span>` : null}</span>
+                <span className="cut" style=${{ fontSize: 12, color: "var(--text-3)" }}>${note(t, k)}</span>
+              </div>
+            </div>
+            <div style=${{ textAlign: "right", whiteSpace: "nowrap" }}><div className="mono" style=${{ color: dc, fontSize: 12.5 }}>${d1}</div><div className="t3" style=${{ fontSize: 11.5 }}>${d2}</div></div>
+          </div>`; })}
+        </div>
+        ${all.length ? html`<div className="leg" style=${{ padding: "10px 14px", borderTop: "1px solid var(--border)" }}>
+          <span><i style=${{ width: 8, height: 8, borderRadius: "50%", background: "var(--text)" }} />target found</span><span><i style=${{ width: 8, height: 8, borderRadius: "50%", border: "1.5px solid var(--text-4)", background: "transparent" }} />not seen yet</span>
+          <span><i style=${{ width: 8, height: 8, borderRadius: "50%", background: "var(--med)" }} />missing at the deadline</span>
+        </div>` : null}
+      </section>
+      <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+        ${me ? html`<section className="panel">
+          <div className="phd"><div className="pt">From the Super User<small>only they close these</small></div><${Pager} p=${fpg} /></div>
+          ${!mine.length ? html`<div className="t3" style=${{ padding: 14, fontSize: 12.5 }}>Nothing given to you. Work the Super User gives your department appears here, and you say how far it has got.</div>` : null}
+          ${fpg.items.map((t) => { const fresh = t.st[me] === "sent";
+            return html`<div key=${t.id} id=${"dt-" + t.id} style=${{ padding: "10px 14px", borderBottom: "1px solid var(--grid)", background: fresh ? "var(--accent-soft)" : "transparent" }}>
+              <div className="row" style=${{ flexWrap: "nowrap" }}>${fresh ? html`<span className="tag" style=${{ "--c": "var(--accent)" }}>New<//>` : null}<span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${t.title}</span></div>
+              <div className="row" style=${{ marginTop: 6, flexWrap: "nowrap" }}>
+                <span className="mono" style=${{ fontSize: 12, color: t.due < NOWH ? "var(--crit)" : "var(--text-3)" }}>${dueText(t.due)}</span><span className="sp" />
+                <${Segmented} size="small" value=${t.st[me] === "sent" ? null : t.st[me]} onChange=${(v) => setMy(t.id, v)} options=${[{ value: "seen", label: "Seen" }, { value: "ongoing", label: "Ongoing" }, { value: "done", label: "Done" }]} />
+              </div></div>`; })}
+        </section>` : null}
+        <section className="panel">
+          <div className="phd"><div className="pt">How a task is checked</div></div>
+          <div className="pbd" style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+            ${[["AimOutlined", "What done looks like", "Each task names its targets: a file to create or change, a folder, a program to use. You confirm them when you give it."],
+               ["EyeOutlined", "Signs of progress", "The machine's own file events and program activity show the work happening. Open but idle never counts."],
+               ["FieldTimeOutlined", "Quiet", "Under way with nothing seen for two days, so you can ask early, not at the deadline."],
+               ["CheckCircleOutlined", "You close it", "The system reports what it found and never closes a task. Complete or Incomplete is yours."]].map(([i, h, d]) => html`<div key=${h} className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}>
+                <span className="t3" style=${{ marginTop: 2 }}>${ic(i)}</span><div><div style=${{ fontWeight: 500 }}>${h}</div><div className="t3" style=${{ fontSize: 12.5 }}>${d}</div></div></div>`)}
+          </div>
+        </section>
       </div>
-      <div style=${{ flex: 1 }}>
-        <${Table} size="middle" pagination=${PG} dataSource=${show.map((x) => ({ ...x, key: x.id }))} onRow=${(r) => ({ onClick: () => go("tasks", r.id), className: "clickrow" })}
-          locale=${{ emptyText: "No tasks here." }} columns=${[
-          { title: "ID", dataIndex: "id", width: 76, render: (x) => html`<a className="mono">${x}</a>` },
-          { title: "Task", dataIndex: "title", render: (v, r) => html`<span style=${{ color: r.state === "Completed" ? "var(--text-3)" : "inherit" }}>${v}</span>` },
-          { title: "Assignee", width: 200, render: (r) => html`<span className="cut" title=${`${r.who} · ${r.host}`}>${r.who} <span className="mono t3">${r.host}</span></span>` },
-          { title: "Assigned by", dataIndex: "by", width: 120, render: (v) => html`<span className="t2">${v}</span>` },
-          { title: "Status", dataIndex: "state", width: 200, render: (st) => html`<span className="st" style=${{ "--c": TSTATE[st] }}><i />${st}</span>` },
-          { title: "Checks passed", width: 130, render: (r) => { const d = r.evidence.filter((e) => e.st === "Passed").length; return html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Bar} v=${d} max=${r.evidence.length} w=${60} c=${d === r.evidence.length ? "var(--ok)" : "var(--s1)"} /><span className="mono">${d}/${r.evidence.length}</span></div>`; } },
-          { title: "Final deadline", width: 150, align: "right", render: (r) => r.state === "Completed" || r.state === "Awaiting your verification" ? html`<span className="mono t3">${dayOf(r.final)} ${hhmm(r.final)}</span>` : html`<span className="mono" style=${{ color: r.final < NOWH ? "var(--crit)" : "inherit" }}>${r.final < NOWH ? span(NOWH - r.final) + " overdue" : span(r.final - NOWH) + " left"}</span>` },
-        ]} />
-      </div>
-      <div className="row t3" style=${{ padding: "10px 14px", borderTop: "1px solid var(--border)", fontSize: 12 }}>
-        <span>${TASKS.length} tasks this week</span><span>·</span><span>${open.length} open</span><span>·</span>
-        <span style=${{ color: "var(--s3)" }}>${count("Awaiting your verification")} waiting for your verification</span><span>·</span>
-        <span style=${{ color: "var(--crit)" }}>${count("Overdue")} overdue</span><span>·</span><span>${count("Completed")} completed</span>
-      </div>
-    </section>
-    <${NewTask} />
+    </div>
   <//>`;
 }
 
 // ============================================================== FLOWS
-function Topology() {
-  const ref = useRef(null), w = Math.max(640, useWidth(ref, 900));
-  const nw = 200, nh = 62;
-  const src = { x: 10, y: 92 }, st = { x: w * 0.38 - nw / 2, y: 92 }, d1 = { x: w - nw - 10, y: 24 }, d2 = { x: w - nw - 10, y: 160 };
-  const edge = (a, b) => `M${a.x + nw} ${a.y + nh / 2}C${(a.x + nw + b.x) / 2} ${a.y + nh / 2} ${(a.x + nw + b.x) / 2} ${b.y + nh / 2} ${b.x} ${b.y + nh / 2}`;
-  const node = (p, title, lines, tone) => html`<g>
-    <rect x=${p.x} y=${p.y} width=${nw} height=${nh} rx="5" style=${{ fill: tone ? "color-mix(in srgb, var(--crit) 8%, var(--surface))" : "var(--surface)", stroke: tone || "var(--border-strong)" }} />
-    <text x=${p.x + 12} y=${p.y + 20} fontSize="12.5" fontWeight="600" style=${{ fill: tone || "var(--text)", fontFamily: /^[A-Z]{3}-/.test(title) ? "var(--mono)" : "var(--sans)" }}>${title}</text>
-    ${lines.map((l, i) => html`<text key=${i} x=${p.x + 12} y=${p.y + 37 + i * 14} fontSize="11" style=${{ fill: tone && i === 0 ? tone : "var(--text-3)", fontFamily: "var(--mono)" }}>${l}</text>`)}
-  </g>`;
-  const lab = (x, y, t, c) => html`<text x=${x} y=${y} textAnchor="middle" fontSize="11" style=${{ fill: c || "var(--text-3)", paintOrder: "stroke", stroke: "var(--surface)", strokeWidth: 4 }}>${t}</text>`;
-  return html`<div ref=${ref} className="scroll-x"><svg width=${w} height="244" style=${{ display: "block" }}>
-    <path d=${edge(src, st)} fill="none" style=${{ stroke: "var(--s2)" }} strokeWidth="3" />
-    <path d=${edge(st, d1)} fill="none" style=${{ stroke: "var(--s2)" }} strokeWidth="2.5" />
-    <path d=${edge(st, d2)} fill="none" style=${{ stroke: "var(--crit)" }} strokeWidth="1.5" strokeDasharray="5 4" />
-    ${lab((src.x + nw + st.x) / 2, src.y + nh / 2 - 8, "150 files · 24h")}
-    ${lab((st.x + nw + d1.x) / 2, (st.y + d1.y) / 2 + nh / 2 - 6, "38 files · last 13:02")}
-    ${lab((st.x + nw + d2.x) / 2, (st.y + d2.y) / 2 + nh / 2 + 16, "paused · 112 queued", "var(--crit)")}
-    ${node(src, "OPS-07", ["/weekly/", "native watcher"])}
-    ${node(st, "Categorize", ["by file type", "4 categories"])}
-    ${node(d1, "LOG-01", ["/weekly/", "in sync · lag 4s"])}
-    ${node(d2, "LOG-01", ["destination path missing", "/archive/ · since Tue 16:10"], "var(--crit)")}
-  </svg></div>`;
-}
 // ---------------------------------------------------------------- the flow builder
 const FLOW_HOSTS = [...MACHINES.map((m) => ({ host: m.host, sub: `${m.user || "no user"} · ${DBY[m.dept].name}`, dept: m.dept, offline: m.status === "offline" })), { host: "ADM-01", sub: "Your workstation · Super User", dept: "su" }];
 const FHOST = Object.fromEntries(FLOW_HOSTS.map((h) => [h.host, h]));
-const FOLDER_HINTS = ["/documents/", "/reports/", "/exports/", "/archive/", "/payroll/", "/intake/", "/weekly/"];
+const FOLDER_HINTS = ["/documents/", "/reports/", "/exports/", "/archive/", "/payroll/", "/payroll-pdf/", "/intake/", "/weekly/"];
 const STAGE_OPS = { Transform: ["Rename by date", "Convert to PDF", "Compress to ZIP"], Categorize: ["Sort by file type", "Sort by month"] };
+// Flows chain: a flow's destination can be another flow's source, so a folder can be both. A flow with
+// several destinations can feed a further flow from any of them. Every change is checked for a loop along
+// the whole chain before it is saved (flow-natural-combo.md, Cycle Prevention).
 const EXISTING_FLOWS = [
-  { name: "payroll", src: ["OPS-01", "/payroll/"], dests: [["FIN-01", "/payroll/"]] },
-  { name: "weekly", src: ["OPS-07", "/weekly/"], dests: [["LOG-01", "/weekly/"], ["LOG-01", "/archive/"]] },
-  { name: "intake", src: ["OPS-03", "/intake/"], dests: [["FIN-02", "/intake/"]] },
+  { name: "payroll", by: "R. Mensah", srcs: [["OPS-01", "/payroll/"]], dests: [["FIN-01", "/payroll/"]], stages: [{ kind: "Transform", op: "Rename by date", scope: "all" }],
+    st: "Active", files: 64, last: "13:11", fn: (t) => (working(t) ? 3 + 7 * sm(1, t, 3) : 0) },
+  { name: "payroll-pdf", by: "K. Boateng", srcs: [["FIN-01", "/payroll/"]], dests: [["FIN-02", "/payroll-pdf/"], ["FIN-02", "/archive/"]], stages: [{ kind: "Transform", op: "Convert to PDF", scope: "all" }],
+    st: "Active", files: 41, last: "13:12", fn: (t) => (working(t) ? 2 + 5 * sm(4, t, 3) : 0) },
+  { name: "weekly", by: "R. Mensah", srcs: [["OPS-07", "/weekly/"]], dests: [["LOG-01", "/weekly/"], ["LOG-01", "/archive/"]], stages: [{ kind: "Categorize", op: "Sort by file type", scope: "all" }],
+    st: "Degraded", paused: [1], files: 38, last: "13:02", fn: (t) => (working(t) ? 2 + 5 * sm(2, t, 3) : 0) },
+  { name: "weekly-digest", by: "A. Quaye", srcs: [["LOG-01", "/weekly/"]], dests: [["OPS-02", "/reports/"]], stages: [{ kind: "Transform", op: "Compress to ZIP", scope: "all" }],
+    st: "Active", files: 5, last: "12:05", fn: (t) => (working(t) && hod(t) > 11.9 && hod(t) < 12.2 ? 3 : 0) },
+  { name: "intake", by: "R. Mensah", srcs: [["OPS-03", "/intake/"]], dests: [["?K. Boateng", "picks a folder"]], stages: [],
+    st: "Waiting for a folder", asked: "Tue 10:40", files: 0, last: "—", fn: () => 0 },
+  { name: "budget-review", by: "R. Mensah", srcs: [["WS-OPS-A1", "/reports/budget/"]], dests: [["?Super User", "picks a folder"]], stages: [{ kind: "Transform", op: "Convert to PDF", scope: "all" }],
+    st: "Waiting for a folder", asked: "Today 10:20", files: 0, last: "—", fn: () => 0 },
+  // two sources: where weekly-digest delivers, and a plain folder
+  { name: "ops-pack", by: "R. Mensah", srcs: [["OPS-02", "/reports/"], ["OPS-05", "/exports/"]], dests: [["WS-OPS-A1", "/packs/"]], stages: [{ kind: "Transform", op: "Compress to ZIP", scope: "all" }],
+    st: "Active", files: 7, last: "12:30", fn: (t) => (working(t) && hod(t) > 12.2 && hod(t) < 12.6 ? 2 : 0) },
 ];
+// A destination outside what the creator manages is not picked by the creator: they ask its owner (the Super
+// User, or another Admin), who picks a folder on their own workstation. Asking is the consent. The Super User
+// manages everything, so their flows can run between any two machines without asking anyone.
+const askOf = (d) => (d[0][0] === "?" ? d[0].slice(1) : null);
+const placeTxt = (d) => (askOf(d) ? `${askOf(d)} picks a folder` : d.join(" "));
+// requests other people sent to the person at this console
+const FLOW_ASKS = [
+  { id: "FR-31", name: "month-end", from: "K. Boateng", to: "R. Mensah", src: ["FIN-01", "/month-end/"], stages: ["Compress to ZIP"], note: "Month-end packs, for your ops review on the 5th.", asked: "Today 11:40" },
+];
+const FBY = Object.fromEntries(EXISTING_FLOWS.map((x) => [x.name, x]));
+const pkey = (h, p) => `${h} ${p}`;
+// which flows feed this one (their destination is its source), and which it feeds
+// a flow has one or more sources: plain folders, or folders other flows deliver to
+const fedBy = (x) => EXISTING_FLOWS.filter((y) => y !== x && y.dests.some((d) => x.srcs.some((s) => pkey(...s) === pkey(...d))));
+const feeds = (x) => EXISTING_FLOWS.filter((y) => y !== x && x.dests.some((d) => y.srcs.some((s) => pkey(...s) === pkey(...d))));
+const deliveredBy = (k) => EXISTING_FLOWS.filter((x) => x.dests.some((d) => !askOf(d) && pkey(...d) === k));
 const DEST_SOFT_LIMIT = 8;
 function consentFor(src, dst) {
   const a = FHOST[src], b = FHOST[dst];
@@ -1936,85 +2204,147 @@ function consentFor(src, dst) {
   const adm = DBY[b.dept].admins[0];
   return { label: "Into " + DBY[b.dept].name, who: adm || "you (no Admin in " + DBY[b.dept].name + ")" };
 }
+// the path files would take from one folder onwards, through existing flows (and the new one), if it reaches `to`
+function chainPath(from, to, extra, ignore) {
+  const edges = [...EXISTING_FLOWS.filter((x) => x.name !== ignore).flatMap((x) => x.srcs.flatMap((s) => x.dests.map((d) => [pkey(...s), pkey(...d), x.name]))), ...extra];
+  const seen = new Set([from]), q = [[from, []]];
+  while (q.length) { const [k, path] = q.shift(); if (k === to) return path;
+    edges.filter((e) => e[0] === k && !seen.has(e[1])).forEach((e) => { seen.add(e[1]); q.push([e[1], [...path, e]]); }); }
+  return null;
+}
 function preflight(f) {
   const out = [];
-  const same = (x, y) => x[0] === y[0] && x[1] === y[1];
-  const src = [f.src, f.srcPath];
+  const srcs = (f.srcs || []).filter((s) => s[0] && s[1]).map((s) => pkey(s[0], s[1]));
+  const mine = f.dests.filter((d) => d.host && d.path && d.host[0] !== "?").flatMap((d) => srcs.map((s) => [s, pkey(d.host, d.path), f.name || "this flow"]));
+  if (new Set(srcs).size < srcs.length) out.push(["bad", "Two sources are the same folder."]);
   f.dests.forEach((d, i) => {
-    const dd = [d.host, d.path];
-    if (!d.host || !d.path) return;
-    if (same(dd, src)) out.push(["bad", `Destination ${i + 1} is the source itself.`]);
-    EXISTING_FLOWS.forEach((x) => {
-      if (x.dests.some((y) => same(y, dd))) out.push(["warn", `${d.host} ${d.path} is already written by the ${x.name} flow. Two flows writing one folder can overwrite each other.`]);
-      if (same(x.src, dd) && x.dests.some((y) => same(y, src))) out.push(["bad", `This would make a loop with the ${x.name} flow: ${d.host} ${d.path} already sends back to ${f.src} ${f.srcPath}.`]);
-    });
+    if (!d.host || !d.path || d.host[0] === "?") return;  // a folder someone is still to pick cannot clash or loop yet
+    const dd = pkey(d.host, d.path);
+    if (srcs.includes(dd)) out.push(["bad", `Destination ${i + 1} is one of the sources.`]);
+    EXISTING_FLOWS.forEach((x) => { if (x.name !== f.editing && x.dests.some((y) => pkey(...y) === dd)) out.push(["warn", `${d.host} ${d.path} is already written by the ${x.name} flow. Two flows writing one folder can overwrite each other.`]); });
+    srcs.forEach((s) => { const back = dd !== s && chainPath(dd, s, mine, f.editing);
+      if (back) out.push(["bad", `This would make a loop: files sent to ${d.host} ${d.path} come back to ${s} through ${back.map((e) => e[2]).filter((v, j, a) => a.indexOf(v) === j).join(" → ")}.`]); });
     if (FHOST[d.host] && FHOST[d.host].offline) out.push(["warn", `${d.host} is offline. Its branch starts when it is back.`]);
   });
   const keys = f.dests.map((d) => d.host + d.path);
   if (new Set(keys).size < keys.length) out.push(["bad", "Two destinations are the same folder."]);
   return out;
 }
+// The flow being built, left to right: its sources (several merge into one), the shared steps, then the
+// destinations (several make it branch). f.srcs are [machine, folder, flow it continues or null].
 function FlowPreview({ f }) {
   const ref = useRef(null), w = Math.max(560, useWidth(ref, 900));
   const shared = f.stages.filter((s0) => s0.scope === "all");
-  const nd = Math.max(1, f.dests.length), rowH = 66, H = Math.max(110, nd * rowH + 24), nw = 168, nh = 48;
-  const cols = 2 + shared.length, gapX = (w - nw - 8) / (cols - 1), X = (c) => 4 + c * gapX, midY = H / 2;
-  const dy = (i) => (nd === 1 ? midY : 12 + rowH / 2 + i * rowH);
+  const srcs = f.srcs.length ? f.srcs : [["", "", null]];
+  const ns = srcs.length, nd = Math.max(1, f.dests.length), rowH = 66, H = Math.max(110, Math.max(ns, nd) * rowH + 24), nw = 168, nh = 48;
+  const join = ns > 1 ? 1 : 0, cols = 2 + shared.length + join, gapX = (w - nw - 8) / (cols - 1), X = (c) => 4 + c * gapX, midY = H / 2;
+  const dy = (i) => (nd === 1 ? midY : H / 2 - ((nd - 1) * rowH) / 2 + i * rowH), sy = (i) => (ns === 1 ? midY : H / 2 - ((ns - 1) * rowH) / 2 + i * rowH);
   const node = (x, y, title, sub, tone, key) => html`<g key=${key}>
-    <rect x=${x} y=${y - nh / 2} width=${nw} height=${nh} rx="5" style=${{ fill: tone === "empty" ? "transparent" : "var(--surface)", stroke: tone === "bad" ? "var(--crit)" : "var(--border-strong)" }} strokeDasharray=${tone === "empty" ? "4 3" : "0"} />
-    <text x=${x + 10} y=${y - 4} fontSize="12" fontWeight="600" style=${{ fill: tone === "empty" ? "var(--text-4)" : "var(--text)", fontFamily: /^[A-Z]{3}-/.test(title) ? "var(--mono)" : "var(--sans)" }}>${title}</text>
-    <text x=${x + 10} y=${y + 12} fontSize="11" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${sub}</text></g>`;
-  const edge = (x1, y1, x2, y2, k, dash) => html`<path key=${k} d=${`M${x1} ${y1}C${(x1 + x2) / 2} ${y1} ${(x1 + x2) / 2} ${y2} ${x2} ${y2}`} fill="none" style=${{ stroke: "var(--s2)" }} strokeWidth="2" strokeDasharray=${dash ? "4 4" : "0"} />`;
-  const lastX = X(cols - 2) + nw, destX = X(cols - 1);
+    <rect x=${x} y=${y - nh / 2} width=${nw} height=${nh} rx="5" style=${{ fill: tone === "empty" ? "transparent" : tone === "ask" ? "color-mix(in srgb, var(--med) 7%, var(--surface))" : "var(--surface)", stroke: tone === "bad" ? "var(--crit)" : tone === "ask" ? "var(--med)" : "var(--border-strong)" }} strokeDasharray=${tone === "empty" || tone === "ask" ? "4 3" : "0"} />
+    <text x=${x + 10} y=${y - 4} fontSize="12" fontWeight="600" style=${{ fill: tone === "empty" ? "var(--text-4)" : "var(--text)", fontFamily: /^[A-Z]{2,3}-/.test(title) ? "var(--mono)" : "var(--sans)" }}>${title}</text>
+    <text x=${x + 10} y=${y + 12} fontSize="11" style=${{ fill: tone === "ask" ? "var(--med)" : "var(--text-3)", fontFamily: tone === "ask" ? "var(--sans)" : "var(--mono)" }}>${sub}</text></g>`;
+  const edge = (x1, y1, x2, y2, k, dash, c) => html`<path key=${k} d=${`M${x1} ${y1}C${(x1 + x2) / 2} ${y1} ${(x1 + x2) / 2} ${y2} ${x2} ${y2}`} fill="none" style=${{ stroke: c || "var(--s2)" }} strokeWidth="2" strokeDasharray=${dash ? "4 4" : "0"} />`;
+  // where the sources meet: a small merge point when there are several
+  const mx = join ? X(1) + nw / 2 : null, firstStage = 1 + join;
+  const lastX = shared.length ? X(firstStage + shared.length - 1) + nw : join ? mx : X(0) + nw, destX = X(cols - 1);
   return html`<div ref=${ref} className="scroll-x"><svg width=${w} height=${H} style=${{ display: "block" }}>
-    ${shared.map((st, i) => edge(X(i) + nw, midY, X(i + 1), midY, "e" + i))}
+    ${join ? srcs.map((s, i) => edge(X(0) + nw, sy(i), mx, midY, "sj" + i, !s[0])) : null}
+    ${shared.length ? edge(join ? mx : X(0) + nw, midY, X(firstStage), midY, "js") : null}
+    ${shared.map((st, i) => (i ? edge(X(firstStage + i - 1) + nw, midY, X(firstStage + i), midY, "e" + i) : null))}
     ${(f.dests.length ? f.dests : [{}]).map((d, i) => { const branch = f.stages.filter((st) => st.scope === i);
       return html`<g key=${"d" + i}>
-        ${edge(lastX, midY, destX, dy(i), "de" + i, !d.host)}
+        ${edge(lastX, midY, destX, dy(i), "de" + i, !d.host || d.path === "picks a folder", d.path === "picks a folder" ? "var(--med)" : null)}
         ${branch.length ? html`<text x=${(lastX + destX) / 2} y=${(midY + dy(i)) / 2 - 6} textAnchor="middle" fontSize="11" style=${{ fill: "var(--s3)", paintOrder: "stroke", stroke: "var(--surface)", strokeWidth: 4 }}>${branch.map((b) => b.op).join(" · ")}</text>` : null}
-        ${node(destX, dy(i), d.host || "Destination", d.host ? (d.path || "pick a folder") : "not set", d.host ? "" : "empty", "dn" + i)}
+        ${node(destX, dy(i), d.host || "Destination", d.host ? (d.path || "pick a folder") : "not set", !d.host ? "empty" : d.path === "picks a folder" ? "ask" : "", "dn" + i)}
       </g>`; })}
-    ${node(X(0), midY, f.src || "Source", f.src ? f.srcPath || "pick a folder" : "not set", f.src ? "" : "empty", "src")}
-    ${shared.map((st, i) => node(X(i + 1), midY, st.op, st.kind + " · every destination", "", "st" + i))}
+    ${join ? html`<circle cx=${mx} cy=${midY} r="5" style=${{ fill: "var(--s2)" }}><title>The sources meet here</title></circle>` : null}
+    ${srcs.map((s, i) => node(X(0), sy(i), s[0] || "Source", s[0] ? fitEnd((s[1] || "pick a folder") + (s[2] ? ` · ${s[2]}` : ""), 24) : "not set", s[0] ? "" : "empty", "src" + i))}
+    ${shared.map((st, i) => node(X(firstStage + i), midY, st.op, st.kind, "", "st" + i))}
   </svg></div>`;
 }
-function NewFlow({ go }) {
-  const blank = { name: "", src: "", srcPath: "", when: "Real time", stages: [], dests: [{ host: "", path: "" }] };
-  const [f, setF] = useState(blank);
+function NewFlow({ go, me, edit }) {
+  // a source is a folder on a machine you manage, or a folder another flow already delivers to; a flow can have several
+  const blank = { name: "", srcs: [{ mode: "dir", host: "", path: "" }], when: "Real time", stages: [], dests: [{ mode: "mine", host: "", path: "" }] };
+  // An Admin sends only between machines they manage; anywhere else, they ask the owner, who picks the folder.
+  // The Super User manages everything, so (at their own level) any machine is theirs to pick.
+  const ws = me && ADMIN_INFO[me] ? ADMIN_INFO[me].ws : null;
+  const managed = me ? [...(ws ? [{ value: ws, label: `${ws} · your workstation` }] : []), ...MACHINES.map((m) => ({ value: m.host, label: `${m.host} · ${m.user || "no user"}${m.status === "offline" ? " · offline" : ""}` }))]
+    : FLOW_HOSTS.map((h) => ({ value: h.host, label: `${h.host} · ${h.sub}${h.offline ? " · offline" : ""}` }));
+  const people = [{ value: "Super User", label: "Super User · on ADM-01" }, ...Object.entries(ADMIN_INFO).filter(([n]) => n !== me).map(([n, a]) => ({ value: n, label: `${n} · Admin, ${DBY[a.dept] ? DBY[a.dept].name : a.dept}` }))];
+  // existing flows that already deliver somewhere, to take as a source; a flow with several branches says which
+  const flowOpts = EXISTING_FLOWS.filter((x) => x.dests.some((d) => !askOf(d))).map((x) => ({ value: x.name, label: `${x.name} · by ${x.by}` }));
+  const branchesOf = (n) => (FBY[n] ? FBY[n].dests.filter((d) => !askOf(d)) : []);
+  // the wizard's state for an existing flow: as itself when editing it, or as a copy to start from
+  const fromFlow = (x, copy) => ({ name: copy ? "Copy of " + x.name : x.name, when: "Real time", stages: x.stages.map((st) => ({ ...st })),
+    srcs: x.srcs.map((s) => { const up = deliveredBy(pkey(...s))[0]; return up ? { mode: "flow", flow: up.name, branch: branchesOf(up.name).findIndex((d) => pkey(...d) === pkey(...s)) } : { mode: "dir", host: s[0], path: s[1] }; }),
+    dests: x.dests.map((d) => (askOf(d) ? { mode: "ask", who: askOf(d), note: "" } : { mode: "mine", host: d[0], path: d[1] })) });
+  const [f, setF] = useState(() => (edit && FBY[edit] ? fromFlow(FBY[edit], false) : blank));
   const [step, setStep] = useState(0);
   const [modal, modalCtx] = Modal.useModal();
   const leave = () => go("flows");
   // stopping is always one click away; if anything has been set, it asks first
-  const cancel = () => (step === 0 && !f.src && !f.srcPath && f.dests.every((d) => !d.host && !d.path) && !f.stages.length) ? leave() : modal.confirm({ title: "Stop creating this flow?", content: "Nothing has been saved. What you have set so far is discarded.", okText: "Discard", okButtonProps: { danger: true }, cancelText: "Keep going", onOk: leave });
+  const cancel = () => (!edit && step === 0 && f.srcs.every((s) => !s.host && !s.path && !s.flow) && f.dests.every((d) => !d.host && !d.path) && !f.stages.length) ? leave()
+    : modal.confirm({ title: edit ? `Stop editing ${edit}?` : "Stop creating this flow?", content: edit ? "Your changes are discarded. The flow keeps running as it was." : "Nothing has been saved. What you have set so far is discarded.", okText: "Discard", okButtonProps: { danger: true }, cancelText: "Keep going", onOk: leave });
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
+  const setSrc = (i, patch) => setF((x) => ({ ...x, srcs: x.srcs.map((s, j) => (j === i ? { ...s, ...patch } : s)) }));
   const setDest = (i, patch) => setF((x) => ({ ...x, dests: x.dests.map((d, j) => (j === i ? { ...d, ...patch } : d)) }));
   const setStage = (i, patch) => setF((x) => ({ ...x, stages: x.stages.map((st, j) => (j === i ? { ...st, ...patch } : st)) }));
   const load = (name) => {
     if (name === "blank") { setF(blank); setStep(0); return; }
-    const x = EXISTING_FLOWS.find((e) => e.name === name);
-    setF({ name: "Copy of " + name, src: x.src[0], srcPath: x.src[1], when: "Real time", stages: name === "payroll" ? [{ kind: "Transform", op: "Rename by date", scope: "all" }] : name === "weekly" ? [{ kind: "Categorize", op: "Sort by file type", scope: "all" }] : [], dests: x.dests.map(([h, pth]) => ({ host: h, path: pth })) });
+    setF(fromFlow(FBY[name], true));
     setStep(0);
   };
-  const okDests = f.dests.filter((d) => d.host && d.path);
-  const checks = preflight(f), bad = checks.filter((c) => c[0] === "bad");
-  const consents = okDests.map((d) => ({ d, c: consentFor(f.src, d.host) })).filter((x) => x.c.who);
+  // each source as [machine, folder, flow it continues]
+  const rsrc = f.srcs.map((s) => { if (s.mode === "flow") { const d = branchesOf(s.flow)[s.branch || 0]; return d ? [d[0], d[1], s.flow] : ["", "", null]; }
+    const up = s.host && s.path ? deliveredBy(pkey(s.host, s.path)) : []; return [s.host, s.path, up.length ? up[0].name : null]; });
+  // a destination someone is asked to pick stands in as "?<who>" until they pick it
+  const ff = { ...f, editing: edit, srcs: rsrc, dests: f.dests.map((d) => (d.mode === "ask" ? { host: d.who ? "?" + d.who : "", path: d.who ? "picks a folder" : "" } : d)) };
+  const okDests = ff.dests.filter((d) => d.host && d.path);
+  // editing: a destination taken away that another flow reads from leaves that flow with nothing new
+  const lost = edit ? FBY[edit].dests.filter((d) => !askOf(d) && !ff.dests.some((x) => x.host && pkey(x.host, x.path) === pkey(...d)))
+    .flatMap((d) => EXISTING_FLOWS.filter((y) => y.name !== edit && y.srcs.some((s) => pkey(...s) === pkey(...d))).map((y) => ["warn", `${y.name} takes its files from ${d.join(" ")}, which ${edit} would stop delivering to. ${y.name} would get nothing new.`])) : [];
+  const checks = [...preflight(ff), ...lost], bad = checks.filter((c) => c[0] === "bad");
+  const asks = f.dests.filter((d) => d.mode === "ask" && d.who);
   const stepProblem = [
-    !f.src ? "Pick the source machine." : !f.srcPath ? "Pick the source folder." : null,
+    rsrc.some((s) => !s[0] || !s[1]) ? (rsrc.length > 1 ? "Finish or remove the empty source." : "Pick where the files come from.") : null,
     null,
-    !okDests.length ? "Add at least one destination with a folder." : f.dests.some((d) => !d.host || !d.path) ? "Finish or remove the empty destination." : null,
+    !okDests.length ? "Add at least one destination." : ff.dests.some((d) => !d.host || !d.path) ? "Finish or remove the empty destination." : null,
     bad.length ? "Fix the problems above first." : null,
   ];
-  const STEPS = [{ title: "Source", desc: "Where files come from" }, { title: "Along the way", desc: "What happens to them" }, { title: "Destinations", desc: "Where they go" }, { title: "Check & create", desc: "Pre-flight and consent" }];
+  const STEPS = [{ title: "Sources", desc: "Where files come from" }, { title: "Along the way", desc: "What happens to them" }, { title: "Destinations", desc: "Where they go" }, { title: "Check & create", desc: "Checks and requests" }];
   const head = (t, d) => html`<div style=${{ marginBottom: 22 }}><div style=${{ fontSize: 18, fontWeight: 600 }}>${t}</div><div className="t3" style=${{ marginTop: 2 }}>${d}</div></div>`;
-  const hostOpts = (exclude) => FLOW_HOSTS.filter((h) => h.host !== exclude).map((h) => ({ value: h.host, label: `${h.host} · ${h.sub}${h.offline ? " · offline" : ""}` }));
+  const hostOpts = (exclude) => managed.filter((h) => h.value !== exclude);
   const folderOpts = FOLDER_HINTS.map((v) => ({ value: v }));
+  const num = (i) => html`<span className="mono" style=${{ width: 22, height: 22, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 12, flex: "none" }}>${i + 1}</span>`;
   let body;
   if (step === 0) body = html`<div>
-    ${head("Where do the files come from?", "One machine and one folder. Files only ever flow away from here; nothing is copied back.")}
-    <div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <${Field} label="Machine"><${Select} id="nf-src" showSearch optionFilterProp="label" value=${f.src || undefined} placeholder="Pick a machine" style=${{ width: 340, maxWidth: "100%" }} options=${hostOpts()} onChange=${set("src")} /><//>
-      <${Field} label="Folder"><${AutoComplete} id="nf-src-path" value=${f.srcPath} placeholder="/documents/" style=${{ width: 340, maxWidth: "100%" }} options=${folderOpts} onChange=${set("srcPath")} /><//>
-      <${Field} label="Copy files"><${Radio.Group} value=${f.when} onChange=${(e) => set("when")(e.target.value)} options=${["Real time", "On a schedule", "Only when I run it"]} /><//>
+    ${head("Where do the files come from?", "One source or several. Each is a folder on a machine you manage, or an existing flow, so this one carries on with whatever that flow delivers. Files from every source go the same way; nothing is copied back.")}
+    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+      ${f.srcs.map((s, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
+        <div className="row" style=${{ gap: 10 }}>
+          ${num(i)}
+          <${Segmented} size="small" value=${s.mode} onChange=${(v) => setSrc(i, { mode: v })} options=${[{ value: "dir", label: "A folder" }, { value: "flow", label: "An existing flow" }]} />
+          <span className="sp" />
+          <${Button} size="small" type="text" icon=${ic("CloseOutlined")} aria-label="Remove source" disabled=${f.srcs.length === 1} onClick=${() => setF((x) => ({ ...x, srcs: x.srcs.filter((_, j) => j !== i) }))} />
+        </div>
+        <div style=${{ marginTop: 10, marginLeft: 32 }}>
+          ${s.mode === "flow"
+            ? html`<div className="row" style=${{ gap: 10 }}>
+                <${Select} showSearch optionFilterProp="label" value=${s.flow || undefined} placeholder="Pick a flow" style=${{ width: 280, maxWidth: "100%" }} options=${flowOpts} onChange=${(v) => setSrc(i, { flow: v, branch: 0 })} />
+                ${branchesOf(s.flow).length > 1 ? html`<${Select} value=${s.branch || 0} style=${{ width: 280, maxWidth: "100%" }} options=${branchesOf(s.flow).map((d, j) => ({ value: j, label: `Its branch to ${d.join(" ")}` }))} onChange=${(v) => setSrc(i, { branch: v })} />` : null}
+              </div>`
+            : html`<div className="row" style=${{ gap: 10 }}>
+                <${Select} showSearch optionFilterProp="label" value=${s.host || undefined} placeholder="Machine" style=${{ width: 280, maxWidth: "100%" }} options=${hostOpts()} onChange=${(v) => setSrc(i, { host: v })} />
+                <${AutoComplete} value=${s.path} placeholder="Folder" style=${{ width: 200 }} options=${folderOpts} onChange=${(v) => setSrc(i, { path: v })} />
+              </div>`}
+          ${rsrc[i][2] ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${s.mode === "flow" ? "Carries on" : "This folder is where"} <b style=${{ fontWeight: 500, color: "var(--text-2)" }}>${rsrc[i][2]}</b> ${s.mode === "flow" ? "after it delivers to" : "delivers, so this flow carries on from it:"} <span className="mono">${rsrc[i][0]} ${rsrc[i][1]}</span>${s.mode === "flow" ? ". Whatever arrives there is passed on by this flow." : "."}</div>` : null}
+        </div>
+      </div>`)}
+      <div className="row">
+        <${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, srcs: [...x.srcs, { mode: "dir", host: "", path: "" }] }))}>Add a source<//>
+        <span className="t3" style=${{ fontSize: 12 }}>${f.srcs.length} source${f.srcs.length === 1 ? "" : "s"}${f.srcs.length > 1 ? ", merged into one flow" : ""}</span>
+      </div>
+      <div style=${{ marginTop: 6 }}><${Field} label="Copy files"><${Radio.Group} value=${f.when} onChange=${(e) => set("when")(e.target.value)} options=${["Real time", "On a schedule", "Only when I run it"]} /><//></div>
       <div className="t3" style=${{ fontSize: 12, marginLeft: 142 }}>${f.when === "Real time" ? "A file is copied the moment it changes, from the machine's own file events." : f.when === "On a schedule" ? "Changed files are copied together, every hour." : "Nothing moves until someone presses Run on the flow."}</div>
     </div>
   </div>`;
@@ -2033,51 +2363,62 @@ function NewFlow({ go }) {
         <div className="row" style=${{ marginTop: 10, gap: 8 }}>
           <span className="t3" style=${{ fontSize: 12.5 }}>Applies to</span>
           <${Segmented} size="small" value=${st.scope === "all" ? "all" : "one"} onChange=${(v) => setStage(i, { scope: v === "all" ? "all" : 0 })} options=${[{ value: "all", label: "Every destination (before the split)" }, { value: "one", label: "One destination" }]} />
-          ${st.scope !== "all" ? html`<${Select} size="small" value=${st.scope} style=${{ width: 200 }} options=${f.dests.map((d, j) => ({ value: j, label: d.host ? `${d.host} ${d.path}` : `Destination ${j + 1}` }))} onChange=${(v) => setStage(i, { scope: v })} />` : null}
+          ${st.scope !== "all" ? html`<${Select} size="small" value=${st.scope} style=${{ width: 200 }} options=${f.dests.map((d, j) => ({ value: j, label: d.mode === "ask" ? (d.who ? `${d.who} picks a folder` : `Destination ${j + 1}`) : d.host ? `${d.host} ${d.path}` : `Destination ${j + 1}` }))} onChange=${(v) => setStage(i, { scope: v })} />` : null}
         </div>
       </div>`)}
       <div className="row"><${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Transform", op: "Rename by date", scope: "all" }] }))}>Add a step<//></div>
     </div>
   </div>`;
   else if (step === 2) body = html`<div>
-    ${head("Where should the files go?", "Each destination gets its own copy of every file. Two or more destinations make the flow branch.")}
+    ${head("Where should the files go?", me ? "Each destination gets its own copy of every file. A machine you manage needs nobody to agree. For anywhere else, ask the person it belongs to, the Super User or another Admin, and they pick the folder on their own workstation." : "Each destination gets its own copy of every file. You manage every machine, so any of them can be picked without asking.")}
     <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-      ${f.dests.map((d, i) => { const c = d.host ? consentFor(f.src, d.host) : null;
-        return html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
+      ${f.dests.map((d, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
           <div className="row" style=${{ gap: 10 }}>
             <span className="mono" style=${{ width: 22, height: 22, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 12 }}>${i + 1}</span>
-            <${Select} showSearch optionFilterProp="label" value=${d.host || undefined} placeholder="Machine" style=${{ width: 280, maxWidth: "100%" }} options=${hostOpts(f.src)} onChange=${(v) => setDest(i, { host: v })} />
-            <${AutoComplete} value=${d.path} placeholder="Folder" style=${{ width: 200 }} options=${folderOpts} onChange=${(v) => setDest(i, { path: v })} />
+            ${me ? html`<${Segmented} size="small" value=${d.mode} onChange=${(v) => setDest(i, { mode: v })} options=${[{ value: "mine", label: "A machine you manage" }, { value: "ask", label: "Ask someone to pick" }]} />` : null}
             <span className="sp" />
             <${Button} size="small" type="text" icon=${ic("CloseOutlined")} aria-label="Remove destination" disabled=${f.dests.length === 1} onClick=${() => setF((x) => ({ ...x, dests: x.dests.filter((_, j) => j !== i), stages: x.stages.filter((st) => st.scope !== i).map((st) => (typeof st.scope === "number" && st.scope > i ? { ...st, scope: st.scope - 1 } : st)) }))} />
           </div>
-          ${c ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8, marginLeft: 32 }}>${c.label}${c.who ? html` · <span style=${{ color: "var(--med)" }}>${c.who} has to agree first</span>` : " · no consent needed"}</div>` : null}
-        </div>`; })}
+          ${d.mode === "ask" ? html`<div style=${{ marginTop: 10, marginLeft: 32, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="row" style=${{ gap: 10 }}>
+                <${Select} showSearch optionFilterProp="label" value=${d.who || undefined} placeholder="Who should pick the folder?" style=${{ width: 300, maxWidth: "100%" }} options=${people} onChange=${(v) => setDest(i, { who: v })} />
+                <${Input} value=${d.note || ""} onChange=${(e) => setDest(i, { note: e.target.value })} placeholder="A line for them: what this is for (optional)" style=${{ flex: 1, minWidth: 200 }} />
+              </div>
+              <div className="t3" style=${{ fontSize: 12.5 }}>${d.who ? html`<b style=${{ fontWeight: 500, color: "var(--text-2)" }}>${d.who}</b> is asked to pick a folder on their own workstation. Picking it is how they agree; this branch starts the moment they do, and they can decline.` : "The Super User, above you, or an Admin in any department."}</div>
+            </div>`
+            : html`<div style=${{ marginTop: 10, marginLeft: 32 }}>
+              <div className="row" style=${{ gap: 10 }}>
+                <${Select} showSearch optionFilterProp="label" value=${d.host || undefined} placeholder="Machine" style=${{ width: 280, maxWidth: "100%" }} options=${hostOpts()} onChange=${(v) => setDest(i, { host: v })} />
+                <${AutoComplete} value=${d.path} placeholder="Folder" style=${{ width: 200 }} options=${folderOpts} onChange=${(v) => setDest(i, { path: v })} />
+              </div>
+              ${d.host ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${me ? "You manage it, so nobody has to agree." : "You manage every machine, so nobody has to agree."}</div>` : null}
+            </div>`}
+        </div>`)}
       <div className="row">
-        <${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, dests: [...x.dests, { host: "", path: "" }] }))}>Add a destination<//>
+        <${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, dests: [...x.dests, { mode: "mine", host: "", path: "" }] }))}>Add a destination<//>
         <span className="t3" style=${{ fontSize: 12 }}>${f.dests.length} destination${f.dests.length === 1 ? "" : "s"}${f.dests.length > 1 ? ", so the flow branches" : ""}</span>
       </div>
       ${f.dests.length > DEST_SOFT_LIMIT ? html`<div className="decide" style=${{ "--c": "var(--med)" }}>That is a lot of destinations. Every file is copied ${f.dests.length} times and each copy is checked on its own. Consider splitting this into two flows.</div>` : null}
     </div>
   </div>`;
   else body = html`<div>
-    ${head("Check it and create it", "These checks run against the one file index before anything is copied.")}
-    <${Field} label="Name"><${Input} id="nf-name" value=${f.name} onChange=${(e) => set("name")(e.target.value)} placeholder=${f.srcPath ? f.srcPath.replace(/\//g, "") || "my-flow" : "my-flow"} style=${{ maxWidth: 320 }} /><//>
+    ${head(edit ? "Check it and save it" : "Check it and create it", edit ? "The checks run again against every other flow and the one file index. The flow keeps running as it was until you save." : "These checks run against the one file index before anything is copied.")}
+    <${Field} label="Name"><${Input} id="nf-name" value=${f.name} onChange=${(e) => set("name")(e.target.value)} placeholder=${rsrc[0] && rsrc[0][1] ? rsrc[0][1].replace(/\//g, "") || "my-flow" : "my-flow"} style=${{ maxWidth: 320 }} /><//>
     <div style=${{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18 }}>
-      ${[["No loop back to the source", !checks.some((c) => /loop/.test(c[1]))], ["No folder written by two flows", !checks.some((c) => /already written/.test(c[1]))], ["Every destination is a different folder", !checks.some((c) => /same folder|source itself/.test(c[1]))]]
+      ${[["No loop back to a source, along the whole chain", !checks.some((c) => /loop/.test(c[1]))], ["No folder written by two flows", !checks.some((c) => /already written/.test(c[1]))], ["Every source and destination is a different folder", !checks.some((c) => /same folder|one of the sources/.test(c[1]))]]
         .map(([t, ok]) => html`<div key=${t} className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ color: ok ? "var(--ok)" : "var(--crit)" }}>${ic(ok ? "CheckCircleFilled" : "CloseCircleFilled")}</span><span>${t}</span></div>`)}
       ${checks.map(([k, msg], i) => html`<div key=${i} className="decide" style=${{ "--c": k === "bad" ? "var(--crit)" : "var(--med)", fontSize: 12.5 }}>${msg}</div>`)}
-      ${consents.length ? html`<div className="decide" style=${{ "--c": "var(--s1)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>Consent needed.</b> ${consents.map((x) => `${x.c.who} for ${x.d.host}`).join(", ")}. The flow is created now and starts when they agree.</div>` : null}
+      ${asks.length ? html`<div className="decide" style=${{ "--c": "var(--med)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>Waiting on ${asks.map((d) => d.who).join(" and ")}.</b> The flow is created now. ${asks.length === 1 ? "They are" : "Each is"} asked to pick a folder on their own workstation, and that branch starts when they do. The rest starts straight away.</div>` : null}
     </div>
   </div>`;
   const canNext = !stepProblem[step];
-  return html`<div style=${{ maxWidth: 1000, width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
+  return html`<div style=${{ width: "100%", display: "flex", flexDirection: "column", gap: 14 }}>
     ${modalCtx}
-    <div className="row" style=${{ flexWrap: "nowrap", overflowX: "auto" }}><span className="t3" style=${{ flex: "none" }}>Start from</span>
-      <${Segmented} defaultValue="blank" onChange=${load} options=${[{ value: "blank", label: "Blank" }, ...EXISTING_FLOWS.map((x) => ({ value: x.name, label: "Copy of " + x.name }))]} /></div>
     <section className="panel" style=${{ padding: "14px 16px" }}>
-      <div className="row" style=${{ marginBottom: 6 }}><span className="t3" style=${{ fontSize: 12 }}>The flow so far</span><span className="sp" /><span className="t3" style=${{ fontSize: 12 }}>Laid out left to right automatically. Files only move in one direction.</span></div>
-      <${FlowPreview} f=${f} />
+      <div className="row" style=${{ marginBottom: 6 }}><span style=${{ fontWeight: 600 }}>The flow so far</span><span className="t3" style=${{ fontSize: 12 }}>files only move left to right</span><span className="sp" />
+        ${edit ? html`<span className="t3" style=${{ fontSize: 12 }}>editing <b style=${{ fontWeight: 600, color: "var(--text)" }}>${edit}</b> · it keeps running as it was until you save</span>`
+          : html`<${Select} size="small" allowClear showSearch placeholder="Start from a copy of a flow" style=${{ width: 240 }} options=${EXISTING_FLOWS.map((x) => ({ value: x.name, label: "Copy of " + x.name }))} onChange=${(v) => load(v || "blank")} />`}</div>
+      <${FlowPreview} f=${{ ...ff, dests: ff.dests.map((d) => (d.host && d.host[0] === "?" ? { host: d.host.slice(1), path: "picks a folder" } : d)) }} />
     </section>
     <section className="panel wizard" style=${{ maxWidth: "none" }}>
       <div className="row" style=${{ padding: "20px 28px", borderBottom: "1px solid var(--border)", flexWrap: "nowrap", alignItems: "flex-start", gap: 20 }}>
@@ -2089,46 +2430,287 @@ function NewFlow({ go }) {
         <span className="t3" style=${{ fontSize: 12.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>${stepProblem[step] || ""}</span>
         <span className="sp" />
         ${step > 0 ? html`<${Button} onClick=${() => setStep(step - 1)}>Back<//>` : null}
-        ${step < 3 ? html`<${Button} type="primary" disabled=${!canNext} onClick=${() => setStep(step + 1)}>Next: ${STEPS[step + 1].title}<//>`
-          : html`<${Button} type="primary" disabled=${!canNext} onClick=${() => { toast(consents.length ? "Flow created; waiting for consent (concept)" : "Flow created and running (concept)"); go("flows"); }}>Create flow<//>`}
+        ${step < 3 ? html`<${Button} type=${edit ? "default" : "primary"} disabled=${!canNext} onClick=${() => setStep(step + 1)}>Next: ${STEPS[step + 1].title}<//>` : null}
+        ${edit ? html`<${Button} type="primary" disabled=${stepProblem.some(Boolean)} title=${stepProblem.find(Boolean) || ""} onClick=${() => { toast(asks.length ? `Saved ${edit}; ${asks.map((d) => d.who).join(" and ")} asked to pick a folder (concept)` : `Saved ${edit} · checks passed, recorded in the audit log (concept)`); go("flows"); }}>Save changes<//>`
+          : step === 3 ? html`<${Button} type="primary" disabled=${!canNext} onClick=${() => { toast(asks.length ? `Flow created; ${asks.map((d) => d.who).join(" and ")} asked to pick a folder (concept)` : "Flow created and running (concept)"); go("flows"); }}>Create flow<//>` : null}
       </div>
     </section>
   </div>`;
 }
 
-function Flows({ go }) {
+// Every flow on one map. Each folder appears once; an arrow is a flow. A folder that receives files from one
+// flow and is the source of another shows the chain as it is: files keep moving, one way, left to right.
+const FNW = 184, FNH = 44;
+function FlowMap({ flows, sel, onSel, inside }) {
+  const ref = useRef(null), w0 = useWidth(ref, 900);
+  const L = useMemo(() => {
+    const places = {}, add = (h, p) => { const k = pkey(h, p); return places[k] || (places[k] = { k, h, p, depth: 0 }); };
+    flows.forEach((x) => { x.srcs.forEach((s) => add(...s)); x.dests.forEach((d) => add(...d)); });
+    for (let i = 0; i < 8; i++) flows.forEach((x) => x.srcs.forEach((sv) => { const s = places[pkey(...sv)]; x.dests.forEach((d) => { const t = places[pkey(...d)]; if (t.depth < s.depth + 1) t.depth = s.depth + 1; }); }));
+    // a flow's sources stand in one column: a plain folder lines up with a source another flow delivers to
+    const fedIn = new Set(flows.flatMap((x) => x.dests.map((d) => pkey(...d))));
+    flows.forEach((x) => { const md = Math.max(...x.srcs.map((s) => places[pkey(...s)].depth)); x.srcs.forEach((s) => { const p = places[pkey(...s)]; if (!fedIn.has(p.k)) p.depth = md; }); });
+    const parent = {}; Object.keys(places).forEach((k) => { parent[k] = k; });
+    const find = (k) => { while (parent[k] !== k) k = parent[k]; return k; };
+    flows.forEach((x) => x.srcs.forEach((s) => x.dests.forEach((d) => { parent[find(pkey(...d))] = find(pkey(...s)); })));
+    const comps = {}; Object.values(places).forEach((p) => { (comps[find(p.k)] = comps[find(p.k)] || []).push(p); });
+    const maxDepth = Math.max(1, ...Object.values(places).map((p) => p.depth));
+    let y = 6; const out = [];
+    Object.values(comps).forEach((ps) => {
+      const cols = {}; ps.forEach((p) => { (cols[p.depth] = cols[p.depth] || []).push(p); });
+      const rows = Math.max(...Object.values(cols).map((c) => c.length));
+      Object.values(cols).forEach((c) => c.forEach((p, i) => { p.row = i; p.y = y + i * 62 + ((rows - c.length) * 62) / 2; }));
+      out.push({ ps, y, h: rows * 62 }); y += rows * 62 + 22;
+    });
+    return { places, comps: out, maxDepth, H: y - 16 };
+  }, [flows.map((x) => x.name).join()]);
+  const colW = Math.max(250, (w0 - FNW - 16) / L.maxDepth), w = Math.max(w0, 8 + L.maxDepth * colW + FNW + 8);
+  const X = (p) => 8 + p.depth * colW;
+  const related = sel ? new Set([sel, ...fedBy(FBY[sel]).map((x) => x.name), ...feeds(FBY[sel]).map((x) => x.name)]) : null;
+  const op = (x) => (!sel ? 1 : x.name === sel ? 1 : related.has(x.name) ? 0.6 : 0.16);
+  const tone = (x, j) => ((x.paused || []).includes(j) ? ["var(--crit)", "5 4"] : askOf(x.dests[j]) ? ["var(--med)", "5 4"] : ["var(--s2)", "0"]);
+  return html`<div ref=${ref} className="scroll-x"><svg width=${w} height=${L.H} style=${{ display: "block" }}>
+    ${flows.map((x) => { const s = L.places[pkey(...x.srcs[0])];
+      return html`<g key=${x.name} style=${{ opacity: op(x), cursor: "pointer" }} onClick=${() => onSel(x.name)}>
+        ${x.srcs.flatMap((sv, si) => { const s0 = L.places[pkey(...sv)];
+          return x.dests.map((d, j) => { const t = L.places[pkey(...d)], x1 = X(s0) + FNW, y1 = s0.y + FNH / 2, x2 = X(t), y2 = t.y + FNH / 2, m = (x1 + x2) / 2, [c, dash] = tone(x, j);
+          return html`<g key=${si + "-" + j}><path d=${`M${x1} ${y1}C${m} ${y1} ${m} ${y2} ${x2 - 6} ${y2}`} fill="none" style=${{ stroke: c }} strokeWidth=${sel === x.name ? 2.5 : 2} strokeDasharray=${dash} />
+            <path d=${`M${x2 - 7} ${y2 - 4}L${x2} ${y2}L${x2 - 7} ${y2 + 4}Z`} style=${{ fill: c }} /></g>`; }); })}
+        ${(() => { const t = L.places[pkey(...x.dests[0])], lx = (X(s) + FNW + X(t)) / 2, ly = (s.y + t.y) / 2 + FNH / 2 - 7;
+          return html`<text x=${lx} y=${ly} textAnchor="middle" fontSize="11.5" style=${{ fill: "var(--text)", fontWeight: 600, paintOrder: "stroke", stroke: "var(--surface)", strokeWidth: 5 }}>${x.name}<tspan style=${{ fill: "var(--text-3)", fontWeight: 400 }}>${x.stages.length ? " · " + x.stages.map((st) => st.op).join(", ") : ""}</tspan></text>`; })()}
+      </g>`; })}
+    ${Object.values(L.places).map((p) => { const who = p.h[0] === "?" ? p.h.slice(1) : null, out = !who && !inside.has(p.h), dept = (FHOST[p.h] && DBY[FHOST[p.h].dept]) || null;
+      const dim = sel && ![...FBY[sel].srcs, ...FBY[sel].dests].some((q) => pkey(...q) === p.k) && ![...fedBy(FBY[sel]), ...feeds(FBY[sel])].some((y) => [...y.srcs, ...y.dests].some((q) => pkey(...q) === p.k));
+      if (who) return html`<g key=${p.k} style=${{ opacity: dim ? 0.3 : 1 }}>
+        <rect x=${X(p)} y=${p.y} width=${FNW} height=${FNH} rx="5" style=${{ fill: "color-mix(in srgb, var(--med) 7%, var(--surface))", stroke: "var(--med)" }} strokeDasharray="4 3" />
+        <text x=${X(p) + 10} y=${p.y + 18} fontSize="12" fontWeight="600" style=${{ fill: "var(--text)" }}>${who}</text>
+        <text x=${X(p) + 10} y=${p.y + 34} fontSize="11" style=${{ fill: "var(--med)" }}>asked to pick a folder</text>
+      </g>`;
+      return html`<g key=${p.k} style=${{ opacity: dim ? 0.3 : 1 }}>
+        <rect x=${X(p)} y=${p.y} width=${FNW} height=${FNH} rx="5" style=${{ fill: "var(--surface)", stroke: "var(--border-strong)" }} strokeDasharray=${out ? "4 3" : "0"} />
+        <text x=${X(p) + 10} y=${p.y + 18} fontSize="12" fontWeight="600" style=${{ fill: out ? "var(--text-3)" : "var(--text)", fontFamily: "var(--mono)" }}>${p.h}${out && dept ? html`<tspan style=${{ fontFamily: "var(--sans)", fontWeight: 400, fontSize: 11 }}> · ${dept.name}</tspan>` : null}</text>
+        <text x=${X(p) + 10} y=${p.y + 34} fontSize="11" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${fitEnd(p.p, 24)}</text>
+      </g>`; })}
+  </svg></div>`;
+}
+function Flows({ go, me }) {
+  const [sel, setSel] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const asks = FLOW_ASKS.filter((r) => r.to === me);
+  const myWs = me && ADMIN_INFO[me] ? ADMIN_INFO[me].ws : null;
   if (!MACHINES.length) return html`<${Panel} flush title="Flows" extra=${html`<${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("flows", "new")}>New flow<//>`}>
-    <${Empty} icon="BranchesOutlined" title="No flows yet" text="A flow copies files one way, from one machine to others. It needs machines first." h=${160} /><//>`;
-  const flows = [
-    { key: "payroll", name: "payroll", route: "OPS-01 → FIN-01", st: "Active", files: 64, last: "13:11", lag: "2s", conflicts: 0, fn: (t) => (working(t) ? 3 + 7 * sm(1, t, 3) : 0) },
-    { key: "weekly", name: "weekly", route: "OPS-07 → LOG-01 (2 branches)", st: "Degraded", files: 38, last: "13:02", lag: "4s", conflicts: 1, fn: (t) => (working(t) ? 2 + 5 * sm(2, t, 3) : 0) },
-    { key: "intake", name: "intake", route: "OPS-03 → FIN-02", st: "Waiting for consent", files: 0, last: "—", lag: "—", conflicts: 0, fn: () => 0 },
-  ];
-  const FS = { Active: "var(--ok)", Degraded: "var(--high)", "Waiting for consent": "var(--med)" };
-  const log = [["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /weekly/", "Synced", "4be1…77c0"], ["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /archive/", "Queued", "4be1…77c0"], ["12:41", "weekly", "report.xlsx", "LOG-01 /weekly/", "Conflict, kept as report-modified.xlsx", "9c07…a1e4"], ["12:40", "weekly", "routes-w40.csv", "LOG-01 /weekly/", "Synced", "1d2e…0b9f"], ["11:47", "payroll", "timesheet-0930.xlsx", "FIN-01 /payroll/", "Synced", "77aa…c310"]];
+    <${Empty} icon="BranchesOutlined" title="No flows yet" text="A flow copies files one way, from one machine to others. A folder a flow delivers to can be the source of the next one. It needs machines first." h=${160} /><//>`;
+  // the department's flows, and every flow chained to them, even across a department line
+  const inside = new Set([...MACHINES.map((m) => m.host), ...Object.values(ADMIN_INFO).filter((a) => DEPTS.some((d) => d.id === a.dept)).map((a) => a.ws)]);
+  const touches = (x) => [...x.srcs, ...x.dests].some((q) => inside.has(q[0]));
+  const names = new Set(EXISTING_FLOWS.filter(touches).map((x) => x.name));
+  for (let i = 0; i < 4; i++) [...names].forEach((n) => [...fedBy(FBY[n]), ...feeds(FBY[n])].forEach((y) => names.add(y.name)));
+  const flows = EXISTING_FLOWS.filter((x) => names.has(x.name));
+  // the map shows one flow and only that flow: the first until another is picked in the table
+  const cur = sel && FBY[sel] && names.has(sel) ? sel : flows[0].name, X0 = FBY[cur];
+  const onMap = [X0];
+  const FS = { Active: "var(--ok)", Degraded: "var(--high)", "Waiting for a folder": "var(--med)" };
+  const log = [["13:12", "payroll-pdf", "timesheet-0930.pdf", "FIN-02 /payroll-pdf/", "Synced", "51c9…02aa"], ["13:11", "payroll", "timesheet-0930.xlsx", "FIN-01 /payroll/", "Synced", "77aa…c310"],
+    ["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /weekly/", "Synced", "4be1…77c0"], ["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /archive/", "Queued", "4be1…77c0"],
+    ["12:41", "weekly", "report.xlsx", "LOG-01 /weekly/", "Conflict, kept as report-modified.xlsx", "9c07…a1e4"], ["12:30", "ops-pack", "pack-0930.zip", "WS-OPS-A1 /packs/", "Synced", "a7f2…5e10"], ["12:05", "weekly-digest", "weekly-w40.zip", "OPS-02 /reports/", "Synced", "e310…9b4d"]]
+    .filter((l) => l[1] === cur);
+  const link = (y) => html`<a key=${y.name} onClick=${(e) => { e.stopPropagation(); setSel(y.name); }}>${y.name}</a>`;
+  const degraded = onMap.filter((x) => (x.paused || []).length);
   return html`<${React.Fragment}>
-    <${Panel} flush title="Flows" extra=${html`<${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("flows", "new")}>New flow<//>`}>
-      <${Table} size="small" pagination=${PG} dataSource=${flows} rowClassName=${(r) => (r.key === "weekly" ? "sel" : "")} columns=${[
-        { title: "Flow", dataIndex: "name", width: 100, render: (v) => html`<b style=${{ fontWeight: 500 }}>${v}</b>` },
-        { title: "Route", dataIndex: "route", render: (v) => html`<span className="mono">${v}</span>` },
-        { title: "Status", dataIndex: "st", width: 180, render: (s) => html`<span className="st" style=${{ "--c": FS[s] }}><i />${s}</span>` },
-        { title: "Throughput, 24h", width: 160, render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Spark} fn=${r.fn} c="var(--s2)" w=${80} /><span className="mono">${r.files}</span></div>` },
-        { title: "Last sync", dataIndex: "last", width: 90, render: (v) => html`<span className="mono">${v}</span>` },
-        { title: "Lag", dataIndex: "lag", width: 60, render: (v) => html`<span className="mono">${v}</span>` },
-        { title: "Conflicts", dataIndex: "conflicts", width: 90, align: "right", render: (v) => html`<span className="mono" style=${{ color: v ? "var(--med)" : "inherit" }}>${v}</span>` },
-      ]} />
+    ${asks.map((r) => { const a = answers[r.id] || {};
+      return html`<div key=${r.id} className="askbar" role="status">
+        <span style=${{ color: "var(--accent)", flex: "none" }}>${ic("InboxOutlined")}</span>
+        <span className="askbar-t" title=${r.note ? `“${r.note}”` : undefined}><b style=${{ fontWeight: 600 }}>${r.from}</b> wants to send you files with <b style=${{ fontWeight: 600 }}>${r.name}</b> <span className="t3">from <span className="mono">${r.src.join(" ")}</span>${r.stages.length ? ` · ${r.stages.join(", ")}` : ""} · ${r.asked.toLowerCase()}</span></span>
+        ${a.done ? html`<span className="st" style=${{ "--c": a.done === "yes" ? "var(--ok)" : "var(--text-4)", flex: "none" }}><i />${a.done === "yes" ? html`Accepted · to <span className="mono">${myWs} ${a.path}</span>` : `Declined · ${r.from} is told`}</span><${Button} size="small" type="text" onClick=${() => setAnswers({ ...answers, [r.id]: {} })}>Undo<//>`
+          : html`<${AutoComplete} size="small" value=${a.path} onChange=${(v) => setAnswers({ ...answers, [r.id]: { ...a, path: v } })} placeholder=${`Folder on ${myWs || "your workstation"}`} options=${FOLDER_HINTS.map((v) => ({ value: v }))} style=${{ width: 200, flex: "none" }} />
+            <${Button} size="small" onClick=${() => { setAnswers({ ...answers, [r.id]: { done: "no" } }); toast(`Declined · ${r.from} is told (concept)`); }}>Decline<//>
+            <${Button} size="small" type="primary" disabled=${!a.path} onClick=${() => { setAnswers({ ...answers, [r.id]: { ...a, done: "yes" } }); toast(`Accepted · ${r.name} copies to ${myWs} ${a.path} (concept)`); }}>Accept<//>`}
+      </div>`; })}
+    <${Panel} title=${cur} sub=${`by ${X0.by} · ${X0.st.toLowerCase()} · pick another flow in the table below`} extra=${html`<${Tooltip} title=${X0.by === me ? "" : `Made by ${X0.by}. Only they, or the Super User, can change it.`}><span><${Button} size="small" icon=${ic("EditOutlined")} disabled=${X0.by !== me} onClick=${() => go("flows", "edit-" + cur)}>Edit<//></span><//><${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("flows", "new")}>New flow<//>`}>
+      <${FlowMap} flows=${onMap} sel=${cur} onSel=${setSel} inside=${inside} />
+      <div className="leg" style=${{ marginTop: 8 }}>
+        ${(() => { const js = X0.dests.map((d, j) => j), paused = (X0.paused || []).length, asked = X0.dests.some(askOf), copying = js.some((j) => !(X0.paused || []).includes(j) && !askOf(X0.dests[j]));
+          const other = [...X0.srcs, ...X0.dests].some((q) => !askOf(q) && !inside.has(q[0]));
+          return html`${copying ? html`<span><i style=${{ "--c": "var(--s2)", height: 2 }} />copying</span>` : null}${paused ? html`<span><i style=${{ "--c": "var(--crit)", height: 2 }} />branch paused</span>` : null}${asked ? html`<span><i style=${{ "--c": "var(--med)", height: 2 }} />waiting for someone to pick a folder</span>` : null}${other ? html`<span><i className="sq" style=${{ "--c": "transparent", border: "1px dashed var(--border-strong)" }} />another department's folder</span>` : null}`; })()}
+      </div>
+      ${degraded.map((x) => html`<div key=${x.name} className="decide" style=${{ "--c": "var(--crit)", marginTop: 12, fontSize: 12.5 }}>
+        <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ minWidth: 0 }}><b style=${{ fontWeight: 600 }}>${x.name}:</b> the branch to <span className="mono">${x.dests[x.paused[0]].join(" ")}</span> paused on Tue 16:10 when the folder disappeared. Files queue and nothing is lost.${feeds(x).length ? ` ${feeds(x).map((y) => y.name).join(", ")} still receives from the other branch.` : ""}</span>
+          <span className="sp" /><${Button} size="small" onClick=${() => toast("Created the folder; branch resumed (concept)")}>Create missing path<//><${Button} size="small" onClick=${() => toast("Retrying (concept)")}>Retry branch<//></div></div>`)}
     <//>
-    <${Panel} title="weekly · topology" sub="1 of 2 branches paused" extra=${html`<${Button} size="small" onClick=${() => toast("Created /archive/ on LOG-01; branch resumed (concept)")}>Create missing path<//><${Button} size="small" onClick=${() => toast("Retrying (concept)")}>Retry branch<//>`}>
-      <${Topology} />
-      <div className="t3" style=${{ fontSize: 12 }}>The /archive/ branch paused on Tue 16:10 when the folder disappeared from LOG-01. Files queue and nothing is lost. It resumes on its own when the path exists again.</div>
+    <${Panel} flush title=${`${flows.length} flows`} sub="click one to show it on the map">
+      <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${flows.map((x) => ({ ...x, key: x.name }))} rowClassName=${(r) => "clickrow" + (r.name === cur ? " sel" : "")} onRow=${(r) => ({ onClick: () => setSel(r.name) })} columns=${[
+        { title: "Flow", width: 150, render: (r) => html`<span className="nowrap" style=${{ fontWeight: 600, fontSize: 13 }}>${r.name}</span>` },
+        { title: "Chain", width: 220, render: (r) => { const a = fedBy(r), b = feeds(r);
+          return a.length || b.length ? html`<span className="nowrap" style=${{ fontSize: 12.5 }}>${a.length ? html`<span className="t3">fed by </span>` : null}${a.map(link)}${a.length && b.length ? html`<span className="t3"> · </span>` : null}${b.length ? html`<span className="t3">feeds </span>` : null}${b.map(link)}</span>` : html`<span className="t4">on its own</span>`; } },
+        { title: "By", width: 110, render: (r) => html`<span className="t2 nowrap">${r.by}</span>` },
+        { title: "Status", width: 190, render: (r) => html`<span className="st" style=${{ "--c": FS[r.st] }} title=${r.asked ? `Asked ${r.asked.toLowerCase()}` : undefined}><i />${r.st}</span>` },
+        { title: "Last copy", width: 90, align: "right", render: (r) => html`<span className="mono">${r.last}</span>` },
+      ]} /></div>
     <//>
-    <${Panel} title="Sync log" sub="latest" flush>
-      <${Table} size="small" pagination=${PG} dataSource=${log.map((l, i) => ({ key: i, l }))} columns=${[
-        { title: "Time", width: 70, render: (r) => html`<span className="mono t3">${r.l[0]}</span>` }, { title: "Flow", width: 80, render: (r) => r.l[1] },
+    <${Panel} title="Sync log" sub=${`latest · ${cur}`} flush>
+      <${Table} size="small" pagination=${PG} locale=${{ emptyText: "Nothing copied yet." }} dataSource=${log.map((l, i) => ({ key: i, l }))} columns=${[
+        { title: "Time", width: 70, render: (r) => html`<span className="mono t3">${r.l[0]}</span>` }, { title: "Flow", width: 120, render: (r) => r.l[1] },
         { title: "File", render: (r) => html`<span className="mono">${r.l[2]}</span>` }, { title: "Destination", render: (r) => html`<span className="mono">${r.l[3]}</span>` },
         { title: "Result", render: (r) => html`<span style=${{ color: r.l[4].startsWith("Conflict") ? "var(--med)" : r.l[4] === "Queued" ? "var(--crit)" : "inherit" }}>${r.l[4]}</span>` },
         { title: "SHA-256", width: 110, render: (r) => html`<span className="mono t3">${r.l[5]}</span>` }]} />
     <//>
+  <//>`;
+}
+
+// ============================================================== RESTRICTED
+// Marking replaces the old /restricted/ folder: a file or folder is marked where it already is, so nobody
+// copies anything into a special place and people keep working on the file they always used. The mark
+// keeps it to its machine or to its exact place; a copy found anywhere else becomes an issue.
+// What the file index has seen on a machine, as folders and files to pick from. A sample; the product
+// reads it from the index, and a machine's later idle sweep fills in what was not seen yet.
+function indexTree(host) {
+  const m = MBY[host], adm = Object.entries(ADMIN_INFO).find(([, a]) => a.ws === host);
+  const spec = adm
+    ? [["C:", [["Finance", ["budget-2026.xlsx", "forecast-q4.xlsx", "suppliers.xlsx", ["Invoices", ["invoices-q3.csv", "invoices-q2.csv", "credit-notes.xlsx"]]]],
+          ["HR", [["Payroll", ["salaries.csv", "overtime-sep.csv", "pension.xlsx"]], ["Reviews", ["reviews-2026.docx", "reviews-2025.docx"]], ["Contracts", ["staff-contract-template.docx", "nda-template.docx"]]]],
+          ["Users", [[adm[0].replace(/\W+/g, ""), [["Documents", ["headcount-plan-2027.xlsx", "notes.docx", "ops-review-sep.pptx"]], ["Desktop", ["todo.txt"]], ["Downloads", ["vendor-quote.pdf"]]]]]]]],
+        ["D:", [["Board", ["minutes-2026-09.docx", "minutes-2026-08.docx", "strategy-2027.pptx"]], ["Archive", ["2024-accounts.zip", "2025-accounts.zip"]]]]]
+    : [["C:", [["Users", [[(m && m.user) || "Public", [["Documents", ["report.xlsx", "notes.docx", ["Contracts", ["supplier-contracts-2026.pdf"]]]], ["Desktop", ["todo.txt"]], ["Downloads", ["setup-printer.exe"]]]]]]]]];
+  const marked = MARKS.filter((k) => k.host === host);
+  const mk = (parent, item) => { const dir = Array.isArray(item), name = dir ? item[0] : item, path = parent + name + (dir ? "\\" : "");
+    const own = marked.find((k) => k.path === path), under = marked.find((k) => k.kind === "folder" && k.path !== path && path.startsWith(k.path));
+    return { key: path, name, isLeaf: !dir, own, under, disableCheckbox: !!(own || under), icon: ic(dir ? "FolderOutlined" : "FileOutlined"), children: dir ? item[1].map((c) => mk(path, c)) : undefined }; };
+  return spec.map((d) => mk("", d));
+}
+const leavesUnder = (nodes, key) => { let n = 0; const walk = (xs, inside) => xs.forEach((x) => { const hit = inside || x.key === key; if (x.isLeaf && hit) n++; if (x.children) walk(x.children, hit); }); walk(nodes, false); return n; };
+const findNode = (nodes, key) => { for (const x of nodes) { if (x.key === key) return x; const c = x.children && findNode(x.children, key); if (c) return c; } return null; };
+const addMark = (k) => { (FULL.MARKS || MARKS).push(k); if (FULL.MARKS && MARKS !== FULL.MARKS) MARKS.push(k); };
+const dropMark = (id) => { [FULL.MARKS, MARKS].forEach((a) => { if (!a) return; const j = a.findIndex((k) => k.id === id); if (j >= 0) a.splice(j, 1); }); };
+// Marking is one decision with one setting, so it is a page of its own (Restricted / Mark files), not steps:
+// your workstation's files on the left, with room to browse; what you ticked, and where it may be, on the right.
+function MarkPage({ go, me }) {
+  const info = ADMIN_INFO[me], host = info ? info.ws : undefined;
+  const [checked, setChecked] = useState([]);
+  const [keep, setKeep] = useState("machine");
+  const [q, setQ] = useState("");
+  const tree = useMemo(() => (host ? indexTree(host) : []), [host]);
+  // a search keeps every match and the folders leading to it
+  const filt = (nodes) => nodes.map((n) => { const kids = n.children ? filt(n.children) : null; if (n.name.toLowerCase().includes(q.toLowerCase())) return n; return kids && kids.length ? { ...n, children: kids } : null; }).filter(Boolean);
+  const shown = q.trim() ? filt(tree) : tree;
+  const picked = checked.map((k) => findNode(tree, k)).filter(Boolean);
+  const covers = (x) => (x.isLeaf ? 1 : leavesUnder(tree, x.key));
+  const nFiles = picked.reduce((a, x) => a + covers(x), 0), nDirs = picked.filter((x) => !x.isLeaf).length;
+  const mark = () => {
+    picked.forEach((x, j) => addMark({ id: `M-${900 + (FULL.MARKS || MARKS).length + j}`, kind: x.isLeaf ? "file" : "folder", name: x.name, host, path: x.key, keep, by: me, at: "Today", dept: info.dept, files: covers(x), versions: 1 }));
+    toast(`Marked ${picked.length === 1 ? picked[0].name : `${picked.length} items`} restricted · nothing was moved (concept)`); go("restricted");
+  };
+  if (!host) return html`<${Panel} title="Mark files"><${Empty} icon="DesktopOutlined" title="You have no workstation registered" text="Files are marked where they are, on your own workstation. Once it is registered, its files appear here." act="Back to Restricted" onAct=${() => go("restricted")} /><//>`;
+  return html`<div className="g c-84" style=${{ alignItems: "start" }}>
+    <section className="panel" style=${{ minWidth: 0 }}>
+      <div className="phd"><div className="pt">Files on <span className="mono">${host}</span><small>your workstation · tick what to mark</small></div>
+        <${Input} size="small" allowClear placeholder="Find a file or folder" prefix=${ic("SearchOutlined")} value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ width: 240 }} /></div>
+      <div className="mtree" style=${{ padding: "8px 10px", height: 560, overflow: "auto" }}>
+        ${shown.length ? html`<${A.Tree} key=${q} checkable checkStrictly showIcon defaultExpandAll=${!!q.trim()} defaultExpandedKeys=${q.trim() ? undefined : tree.flatMap((d) => [d.key, ...(d.children || []).filter((c) => !c.isLeaf).map((c) => c.key)])} selectable=${false} treeData=${shown} checkedKeys=${checked} onCheck=${(c) => setChecked(c.checked || c)}
+          titleRender=${(n) => html`<span style=${{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}><span className=${n.isLeaf ? "mono" : ""} style=${{ fontSize: 13 }}>${n.name}</span>
+            ${!n.isLeaf ? html`<span className="t4" style=${{ fontSize: 11.5 }}>${fmt(leavesUnder(tree, n.key))} files</span>` : null}
+            ${n.own ? html`<${Tag} c="var(--accent)">marked<//>` : n.under ? html`<span className="t4" style=${{ fontSize: 11.5 }}>covered by its folder</span>` : null}</span>`} />`
+          : html`<div className="t3" style=${{ padding: 8 }}>Nothing on ${host} matches “${q}”.</div>`}
+      </div>
+      <div className="t3" style=${{ fontSize: 12, padding: "10px 14px", borderTop: "1px solid var(--border)" }}>Only what the file index has seen is listed; the rest appears after the machine's next idle sweep. Only your own files can be marked: what is on someone else's machine is theirs to mark.</div>
+    </section>
+    <section className="panel" style=${{ position: "sticky", top: 64, minWidth: 0 }}>
+      <div className="phd"><div className="pt">To mark<small>${picked.length ? `${nDirs ? `${nDirs} folder${nDirs === 1 ? "" : "s"} and ` : ""}${picked.length - nDirs ? `${picked.length - nDirs} file${picked.length - nDirs === 1 ? "" : "s"}, ` : ""}${fmt(nFiles)} files in all` : "nothing ticked yet"}</small></div></div>
+      <div style=${{ maxHeight: 280, overflow: "auto" }}>
+        ${picked.length ? picked.map((x) => html`<div key=${x.key} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "8px 14px", borderBottom: "1px solid var(--grid)" }}>
+            <span className="t3">${ic(x.isLeaf ? "FileOutlined" : "FolderOutlined")}</span>
+            <div style=${{ minWidth: 0, flex: 1 }}><div className="cut" style=${{ fontWeight: 500 }}>${x.name}</div><div className="mono t3 cut" style=${{ fontSize: 11.5 }} title=${x.key}>${x.key}</div></div>
+            <span className="t3" style=${{ fontSize: 12, whiteSpace: "nowrap" }}>${x.isLeaf ? "1 file" : `${fmt(covers(x))} files`}</span>
+            <${Button} size="small" type="text" icon=${ic("CloseOutlined")} aria-label=${"Remove " + x.name} onClick=${() => setChecked(checked.filter((k) => k !== x.key))} />
+          </div>`)
+          : html`<div className="t3" style=${{ padding: 14, fontSize: 12.5 }}>Tick files or folders on the left. A folder covers everything in it, and anything added to it later.</div>`}
+      </div>
+      <div className="pbd" style=${{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px solid var(--border)" }}>
+        <div className="nt-h" style=${{ marginBottom: 2 }}>Where ${picked.length === 1 ? "it is" : "they are"} allowed</div>
+        <div style=${{ display: "grid", gap: 8 }} role="radiogroup">
+          <${Choice} on=${keep === "machine"} icon="DesktopOutlined" title="Only on your workstation" desc="Moving or copying on it is fine. A copy on any other machine is caught." onClick=${() => setKeep("machine")} />
+          <${Choice} on=${keep === "path"} icon="AimOutlined" title="Only where it is now" desc="A copy anywhere else is caught, even elsewhere on your workstation." onClick=${() => setKeep("path")} />
+        </div>
+      </div>
+      <div className="row" style=${{ padding: "12px 14px", borderTop: "1px solid var(--border)" }}>
+        <span className="t3" style=${{ fontSize: 12 }}>Nothing is moved or copied.</span><span className="sp" />
+        <${Button} onClick=${() => go("restricted")}>Cancel<//><${Button} type="primary" disabled=${!picked.length} onClick=${mark}>Mark restricted<//>
+      </div>
+    </section>
+  </div>`;
+}
+function MarkDetail({ k, onClose, me, refresh, go }) {
+  const [modal, modalCtx] = Modal.useModal();
+  if (!k) return html`<${Drawer} open=${false} onClose=${onClose} />`;
+  const cs = copiesOf(k);
+  const unmark = () => modal.confirm({ title: `Unmark ${k.name}?`, okText: "Unmark", okButtonProps: { danger: true }, cancelText: "Keep it marked",
+    content: `Copies of ${k.kind === "folder" ? "the files in it" : "it"} are no longer looked for.${cs.length ? ` The ${cs.length === 1 ? "copy" : `${cs.length} copies`} already found stay${cs.length === 1 ? "s" : ""} an issue until resolved.` : ""} The audit log records that you did it.`,
+    onOk: () => { dropMark(k.id); onClose(); refresh(); toast(`Unmarked ${k.name} · recorded (concept)`); } });
+  const row = (label, v) => html`<div className="kv" style=${{ gridTemplateColumns: "130px minmax(0, 1fr)" }}><span className="t3">${label}</span><span style=${{ minWidth: 0, overflowWrap: "anywhere" }}>${v}</span></div>`;
+  return html`<${Drawer} open=${true} onClose=${onClose} width=${520} title=${html`<span className="row" style=${{ gap: 8, flexWrap: "nowrap" }}>${ic(k.kind === "folder" ? "FolderOutlined" : "FileProtectOutlined")}<span className="cut">${k.name}</span></span>`}
+    footer=${html`<div className="row"><span className="sp" /><${Button} danger onClick=${unmark}>Unmark<//></div>`}>
+    ${modalCtx}
+    <div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div>
+        ${row("Where", html`<span className="mono">${k.path}</span><span className="t3"> on your workstation, </span><span className="mono">${k.host}</span>`)}
+        ${row("Covers", k.kind === "folder" ? `${fmt(k.files)} files, and any added later` : "This one file")}
+        ${row("Allowed", html`<div><${Segmented} size="small" value=${k.keep} onChange=${(v) => { k.keep = v; refresh(); toast(`Now kept to ${KEEP[v][0].toLowerCase()} · recorded (concept)`); }} options=${[{ value: "machine", label: KEEP.machine[0] }, { value: "path", label: KEEP.path[0] }]} />
+          <div className="t3" style=${{ fontSize: 12, marginTop: 4 }}>${KEEP[k.keep][1]}</div></div>`)}
+        ${row("Marked", k.at)}
+        ${row("Recognised by", k.kind === "folder" ? `Content. ${fmt(k.versions)} versions across its files are remembered, so an edit never lets an older copy through.` : `Content. ${fmt(k.versions)} version${k.versions === 1 ? "" : "s"} remembered, so an edit never lets an older copy through.`)}
+      </div>
+      <div><div className="nt-h">Copies found elsewhere</div>
+        ${cs.length ? cs.slice(0, 6).map((i) => html`<div key=${i.id} className="irow" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto", padding: "8px 0" }} role="button" tabIndex="0" onClick=${() => { onClose(); go("issues", i.id); }}>
+            <i style=${{ background: SEV[i.sev].c }} /><span className="ttl"><span className="mono">${i.host}</span> <span className="t3">· ${i.d.folder}</span></span><span className="mono t3">${dur(NOWH - i.at)} ago</span></div>`)
+          : html`<div className="t3">None. ${k.kind === "folder" ? "Every file in it is" : "It is"} only where it is allowed.</div>`}
+        ${cs.length > 6 ? html`<${More} n=${cs.length - 6} what="copies" onClick=${() => { onClose(); go("issues"); }} />` : null}
+      </div>
+    </div>
+  <//>`;
+}
+function Restricted({ go, me }) {
+  const [, bump] = useState(0); const refresh = () => bump((n) => n + 1);
+  const [q, setQ] = useState(""); const [kind, setKind] = useState("All");
+  const [sel, setSel] = useState(null);
+  // only what the person at this console marked, on their own workstation
+  const info = ADMIN_INFO[me], ws = info ? info.ws : null, mine = myMarks();
+  const copies = myCopies().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at);
+  const leaked = mine.filter((k) => copiesOf(k).length).length, nF = mine.filter((k) => k.kind === "folder").length, cov = mine.reduce((a, k) => a + k.files, 0);
+  const rows = mine.filter((k) => (kind === "All" || (kind === "Files") === (k.kind === "file")) && `${k.name} ${k.path}`.toLowerCase().includes(q.toLowerCase()))
+    .map((k) => ({ ...k, key: k.id, n: copiesOf(k).length })).sort((a, b) => b.n - a.n);
+  const open = () => go("restricted", "mark");
+  return html`<${React.Fragment}>
+    <div className="kpis">
+      <${Kpi} none=${!mine.length} nv=${"0"} nt="Nothing marked yet" label="You have marked" value=${fmt(mine.length)} delta=${`${fmt(mine.length - nF)} files and ${fmt(nF)} folders, covering ${fmt(cov)} files`} />
+      <${Kpi} none=${!mine.length} nv=${"0"} nt="Nothing marked yet" label="Only where they belong" value=${fmt(mine.length - leaked)} unit=${"/ " + fmt(mine.length)} delta=${leaked ? `${leaked} with a copy somewhere else` : "Every one"} dc=${leaked ? "var(--crit)" : "var(--ok)"} />
+      <${Kpi} none=${!mine.length} nv=${"0"} nt="None found" label="Copies found elsewhere" value=${fmt(copies.length)} delta=${copies.length ? "Each one is an open issue" : "None found"} dc=${copies.length ? "var(--crit)" : undefined} fn=${(t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0)} sc="var(--crit)" max=${3} />
+    </div>
+    <${Panel} title="Copies found elsewhere" sub="a copy of one of your marked files, somewhere it is not allowed · worst first" flush extra=${copies.length ? html`<${Button} size="small" type="link" onClick=${() => go("issues")}>All issues<//>` : null}>
+      ${!copies.length ? html`<${Empty} icon="CheckOutlined" title="Every file you marked is where it belongs" text="When a copy of one turns up anywhere it is not allowed, it appears here and as an issue. It is never deleted for you." h=${96} />` : null}
+      ${copies.slice(0, 5).map((i) => { const k = markOf(i), a = NOWH - i.at;
+        return html`<div key=${i.id} className="irow" style=${{ gridTemplateColumns: "8px minmax(0, 1.2fr) minmax(0, 1fr) 64px" }} role="button" tabIndex="0" onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)}>
+          <i style=${{ background: SEV[i.sev].c }} />
+          <span style=${{ minWidth: 0 }}><span className="ttl mono" style=${{ display: "block" }}>${i.subject}</span><span className="t3" style=${{ fontSize: 12 }}>on <span className="mono">${i.host}</span> · ${i.d.folder}</span></span>
+          <span className="t3 cut" style=${{ fontSize: 12 }} title=${k ? k.path : ""}>${k ? (k.keep === "machine" ? "allowed only on your workstation" : `allowed only at ${k.path}`) : ""}</span>
+          <span className="mono" style=${{ color: a > i.sla ? "var(--crit)" : "var(--text-3)", textAlign: "right" }}>${a > 24 ? Math.floor(a / 24) + "d" : dur(a)}</span>
+        </div>`; })}
+      ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${copies.length - 5} what="copies" onClick=${() => go("issues")} /></div>` : null}
+    <//>
+    <${Panel} flush title=${`${fmt(mine.length)} marked`} sub=${ws ? html`on <span className="mono">${ws}</span>, your workstation · click one to see it, change where it is allowed, or unmark it` : null} extra=${html`
+      <${Segmented} size="small" value=${kind} onChange=${setKind} options=${["All", "Files", "Folders"]} />
+      <${Input} size="small" allowClear placeholder="Filter by name or path" prefix=${ic("SearchOutlined")} value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ width: 200 }} />
+      <${Button} size="small" type="primary" icon=${ic("PlusOutlined")} disabled=${!ws} onClick=${open}>Mark files or folders<//>`}>
+      ${!mine.length ? html`<${Empty} icon="FileProtectOutlined" title="You have not marked anything" text="Pick a file or folder on your workstation and mark it. It stays where it is and you keep using it; a copy anywhere else is caught." act=${ws ? "Mark files or folders" : null} onAct=${open} h=${140} />`
+        : html`<div className="scroll-x"><${Table} size="middle" pagination=${PG} dataSource=${rows} locale=${{ emptyText: "Nothing matches." }} onRow=${(r) => ({ onClick: () => setSel(r.id), className: "clickrow" })} columns=${[
+          { title: "Name", render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}><span className="t3" style=${{ marginTop: 2 }}>${ic(r.kind === "folder" ? "FolderOutlined" : "FileOutlined")}</span>
+              <div style=${{ minWidth: 0 }}><a style=${{ fontWeight: 500, fontSize: 13 }}>${r.name}</a><div className="mono t3 cut" style=${{ fontSize: 11.5, maxWidth: 340 }} title=${r.path}>${r.path}</div></div></div>` },
+          { title: "Allowed", width: 170, render: (r) => html`<${Tooltip} title=${KEEP[r.keep][1]}><span className="t2">${KEEP[r.keep][0]}</span><//>` },
+          { title: "Covers", width: 100, align: "right", render: (r) => html`<span className="t2">${r.kind === "folder" ? `${fmt(r.files)} files` : "1 file"}</span>` },
+          { title: "Marked", width: 100, render: (r) => html`<span className="t2">${r.at}</span>` },
+          { title: "Now", width: 170, render: (r) => (r.n ? html`<span className="st" style=${{ "--c": "var(--crit)" }}><i />${r.n === 1 ? "A copy elsewhere" : `${fmt(r.n)} copies elsewhere`}</span>` : html`<span className="st" style=${{ "--c": "var(--ok)" }}><i />Only where it belongs</span>`) },
+        ]} /></div>`}
+      <div className="t3" style=${{ fontSize: 12, padding: "10px 14px", borderTop: "1px solid var(--border)" }}>A mark keeps a file where it is: nothing is moved, and the people who use it keep working on it. A copy is never deleted for you; you decide on its issue.</div>
+    <//>
+    <${MarkDetail} k=${mine.find((k) => k.id === sel)} onClose=${() => setSel(null)} me=${me} refresh=${refresh} go=${go} />
   <//>`;
 }
 
@@ -2140,7 +2722,7 @@ const RULES = [
     actions: [["Take a screenshot", 30, 14, 14, 0, 0, 3], ["Snapshot USB contents", 60, 14, 13, 0, 1, 38], ["Log event", 10, 14, 14, 0, 0, 1]],
     by: "R. Mensah", created: "12 Sep", edited: "20 Sep", last: "13:05", perDay: [3, 0, 0, 2, 4, 2, 3], res: ["var(--ok)", "All 3 actions succeeded"],
     changes: [["20 Sep", "R. Mensah", "Added the action Log event"], ["15 Sep", "R. Mensah", "Snapshot USB contents timeout 30s → 60s"], ["12 Sep", "R. Mensah", "Created the rule"]] },
-  { id: "restricted", name: "Restricted file on a worker machine", kind: "Event", when: "a file tagged restricted appears on a worker machine", detect: "Global file index, reported instantly",
+  { id: "restricted", name: "Restricted file copied where it isn't allowed", kind: "Event", when: "a copy of a restricted file appears anywhere but where it was marked", detect: "Global file index, reported instantly",
     scope: "All machines", hosts: MACHINES.map((m) => m.host),
     actions: [["Notify the Admin", 10, 2, 2, 0, 0, 1], ["Take a screenshot", 30, 2, 2, 0, 0, 3]],
     by: "You", created: "3 Sep", edited: "3 Sep", last: "10:04", perDay: [0, 0, 0, 0, 0, 0, 2], res: ["var(--ok)", "Both actions succeeded"],
@@ -2384,7 +2966,7 @@ function RuleDetail({ id, go }) {
     </div>
   <//>`;
 }
-const EVENTS = ["A USB storage device is inserted", "A restricted file appears on a worker machine", "A user signs in", "A user signs out", "The machine goes idle", "A program starts", "A file changes in a folder"];
+const EVENTS = ["A USB storage device is inserted", "A restricted file is copied somewhere it isn't allowed", "A user signs in", "A user signs out", "The machine goes idle", "A program starts", "A file changes in a folder"];
 // The rule builder has no action list of its own: every step is an entry from the action library
 // (ACTION_LIB, on the Actions page), plus its settings. A new custom action appears here as soon as it is saved.
 const NOTIFY_WHO = ["the Admin", "the Super User", "R. Mensah", "A. Quaye", "K. Boateng"];
@@ -3039,7 +3621,7 @@ function Reports() {
 // operational console, narrowed to that Admin's department, under "Super User in charge".
 const FULL = {};
 function applyScope(dept) {
-  if (!FULL.MACHINES) Object.assign(FULL, { MACHINES, ISSUES, LANES, AUDIT, DEPTS, TASKS });
+  if (!FULL.MACHINES) Object.assign(FULL, { MACHINES, ISSUES, LANES, AUDIT, DEPTS, TASKS, MARKS });
   const inD = (h) => !dept || (MBY[h] && MBY[h].dept === dept);
   MACHINES = FULL.MACHINES.filter((m) => inD(m.host));
   ISSUES = FULL.ISSUES.filter((i) => inD(i.host));
@@ -3047,6 +3629,7 @@ function applyScope(dept) {
   AUDIT = FULL.AUDIT.filter((e) => inD(e.host));
   DEPTS = FULL.DEPTS.filter((d) => !dept || d.id === dept);
   TASKS = FULL.TASKS.filter((t) => inD(t.host));
+  MARKS = FULL.MARKS.filter((k) => !dept || k.dept === dept);
 }
 const ADMIN_INFO = {
   "R. Mensah": { dept: "ops", ws: "WS-OPS-A1", now: "Inside OPS-04 since 12:58", busy: true },
@@ -4110,14 +4693,16 @@ function EnterConsole({ admin, onClose, onEnter }) {
   <//>`;
 }
 
+// The Admin's core areas lead the menu as their own group.
 const NAV_ADMIN = [
-  ["Monitor", [["overview", "Overview", "DashboardOutlined"], ["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["sessions", "Sessions", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
-  ["Work", [["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["flows", "Flows", "BranchesOutlined"], ["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
+  ["Core", [["overview", "Overview", "DashboardOutlined"], ["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["flows", "Flows", "BranchesOutlined"], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true]]],
+  ["Monitor", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["sessions", "Sessions", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
+  ["Automate", [["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
   ["Govern", [["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
 ];
 const NAV_SU = [["", [["monitor", "Monitor", "DashboardOutlined"], ["work", "Work", "InboxOutlined", () => suQueue().length, true], ["govern", "Govern", "ApartmentOutlined"]]]];
 const SU_PARENT = { monitor: "monitor", dept: "monitor", sessions: "monitor", audit: "monitor", machines: "monitor", work: "work", issues: "work", tasks: "work", rollout: "work", govern: "govern", reports: "govern" };
-const TITLES = { monitor: ["Monitor", "The organisation from above · hover for detail, click a screen to look closer"], work: ["Work", "What is waiting on you, and nobody else"], govern: ["Govern", "How the organisation is set up"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
+const TITLES = { monitor: ["Monitor", "The organisation from above · hover for detail, click a screen to look closer"], work: ["Work", "What is waiting on you, and nobody else"], govern: ["Govern", "How the organisation is set up"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
 function Palette({ go, close, nav }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
   useEffect(() => { r.current && r.current.focus(); }, []);
@@ -4179,6 +4764,7 @@ function App() {
   const [entering, setEntering] = useState(null);
   const now = useNow(1000);
   applyScope(level ? level.dept : null);
+  ME = level ? level.admin : null;
   const nav = level ? NAV_ADMIN : NAV_SU;
   const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)));
   const page = allowed.has(rawPage) ? rawPage : level ? "overview" : "monitor";
@@ -4207,8 +4793,9 @@ function App() {
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
   else if (page === "sessions") body = html`<${Sessions} />`;
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
-  else if (page === "tasks") body = sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} />`;
-  else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} />` : html`<${Flows} go=${go} />`;
+  else if (page === "tasks") body = sub === "new" ? html`<${NewTask} go=${go} />` : sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} />`;
+  else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : html`<${Flows} go=${go} me=${level && level.admin} />`;
+  else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${level && level.admin} />` : html`<${Restricted} go=${go} me=${level && level.admin} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && ABY[sub] ? html`<${ActionDetail} key=${sub} id=${sub} go=${go} />` : html`<${Actions} go=${go} />`;
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : sub && RBY[sub] ? html`<${RuleDetail} id=${sub} go=${go} />` : html`<${Automation} go=${go} />`;
   else if (page === "rollout") body = html`<${Rollout} />`;
@@ -4218,23 +4805,25 @@ function App() {
   const parent = !level && SU_PARENT[page] && SU_PARENT[page] !== page ? SU_PARENT[page] : null;
   const crumbSub = sub && page === "machines" ? html`<a onClick=${() => go("machines")}>Machines</a><span>/</span><b className="mono">${sub}</b>`
     : sub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span><b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>`
-    : sub && page === "flows" ? html`<a onClick=${() => go("flows")}>Flows</a><span>/</span><b>New flow</b>`
+    : sub && page === "flows" ? html`<a onClick=${() => go("flows")}>Flows</a><span>/</span><b>${sub.startsWith("edit-") ? "Edit " + sub.slice(5) : "New flow"}</b>`
     : sub && page === "automation" ? html`<a onClick=${() => go(page)}>Automation</a><span>/</span>${sub.startsWith("edit-") && RBY[sub.slice(5)] ? html`<a onClick=${() => go("automation", sub.slice(5))}>${RBY[sub.slice(5)].name}</a><span>/</span><b>Edit</b>` : html`<b>${sub === "new" ? "New rule" : RBY[sub] ? RBY[sub].name : sub}</b>`}`
-    : sub && page === "tasks" ? html`<a onClick=${() => go(page)}>Tasks</a><span>/</span><b className="mono">${sub}</b>`
+    : sub && page === "restricted" ? html`<a onClick=${() => go(page)}>Restricted</a><span>/</span><b>Mark files</b>`
+    : sub && page === "tasks" ? html`<a onClick=${() => go(page)}>Tasks</a><span>/</span>${sub === "new" ? html`<b>New task</b>` : html`<b className="mono">${sub}</b>`}`
     : html`<b>${title}</b>`;
   const crumb = html`${parent ? html`<a onClick=${() => go(parent)}>${TITLES[parent][0]}</a><span>/</span>` : null}${crumbSub}`;
   const heldFor = level ? Math.floor((now - level.since) / 1000) : 0;
   return html`<${ConfigProvider} theme=${cfg} renderEmpty=${() => html`<div className="t3" style=${{ padding: "22px 0", fontSize: 12.5, textAlign: "center" }}>Nothing here yet.</div>`}>
     <div className="app">
       <aside className="side">
-        ${level ? html`<div className="org" style=${{ paddingBottom: 6 }}><span className="av" style=${{ width: 26, height: 26, background: "color-mix(in srgb, var(--crit) 14%, transparent)", color: "var(--crit)" }}>${initials(level.admin)}</span>
-            <div className="orgtxt" title=${`${level.admin} · ${deptName(level.dept)}`}><div style=${{ fontWeight: 600 }}>${level.admin}'s console</div><div className="t3" style=${{ fontSize: 11.5 }}>${deptName(level.dept)} · you as Super User</div></div></div>`
+        ${level ? html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
+            <div className="orgtxt" title=${deptName(level.dept)}><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>${deptName(level.dept)}</div></div></div>`
           : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} department${(FULL.DEPTS || DEPTS).length === 1 ? "" : "s"}</div></div></div>`}
-        ${nav.map(([g, xs]) => html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}
-          ${xs.map(([id, l, icon, cnt, hot]) => { const on = page === id || (!level && SU_PARENT[page] === id);
+        ${nav.map(([g, xs]) => {
+          const items = xs.map(([id, l, icon, cnt, hot]) => { const on = page === id || (!level && SU_PARENT[page] === id), n = typeof cnt === "function" ? cnt() : cnt;
             return html`<div key=${id} className=${"nav" + (on ? " on" : "") + (level ? "" : " big")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
-            ${ic(icon)}<span>${l}</span>${(() => { const n = typeof cnt === "function" ? cnt() : cnt; return n ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null; })()}</div>`; })}<//>`)}
+            ${ic(icon)}<span>${l}</span>${n ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null}</div>`; });
+          return html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}${items}<//>`; })}
         <div className="side-foot">
           ${level ? html`<${Button} danger block icon=${ic("LogoutOutlined")} onClick=${leave}>Leave console<//>` : null}
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
@@ -4271,7 +4860,7 @@ function App() {
           <${Segmented} size="small" value=${th.mode} onChange=${th.setMode} options=${[{ value: "system", icon: ic("DesktopOutlined"), title: "System" }, { value: "light", icon: ic("SunOutlined"), title: "Light" }, { value: "dark", icon: ic("MoonOutlined"), title: "Dark" }]} />
         </header>
         <main className="content">
-          ${!sub || !["machines", "tasks", "automation", "flows", "actions"].includes(page) ? html`<div className="ph1"><div><h1>${title}</h1>${subtitle ? html`<div className="sub">${subtitle}</div>` : null}</div></div>` : null}
+          ${!sub || !["machines", "tasks", "automation", "flows", "actions", "restricted"].includes(page) ? html`<div className="ph1"><div><h1>${title}</h1>${subtitle ? html`<div className="sub">${subtitle}</div>` : null}</div></div>` : null}
           ${body}
         </main>
       </div>
@@ -4284,6 +4873,6 @@ function App() {
 // Empty: the first day. No departments, no machines, nothing has happened. Everything is built first
 // and then emptied, so every list on every page is seen at zero.
 if (EMPTY) Object.values(ADMIN_INFO).forEach((a) => { a.busy = false; a.now = "At their desk"; });
-if (EMPTY) [DEPTS, MACHINES, ISSUES, LANES, TASKS, AUDIT, DECISIONS, SU_ONLY_REPORTS, DEPT_TASKS, MANUAL_RUNS, RULES, RUNS, ALL_RUNS, LIVE_POOL].forEach((a) => { a.length = 0; });
+if (EMPTY) [DEPTS, MACHINES, ISSUES, LANES, TASKS, AUDIT, MARKS, DECISIONS, SU_ONLY_REPORTS, DEPT_TASKS, MANUAL_RUNS, RULES, RUNS, ALL_RUNS, LIVE_POOL].forEach((a) => { a.length = 0; });
 ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 </script>
