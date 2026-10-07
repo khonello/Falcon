@@ -17,8 +17,8 @@ checking which components a Super User can actually reach.
 |---|---|---|
 | A. Same level: Super User page → Super User page | 27 places | fine |
 | B. Across levels, by explicit traversal | 3 places | fine: this is the only allowed way |
-| C. Across levels, without traversal | 16 places | **breaks the rule** |
-| D. Broken: goes nowhere | 1 place | **bug** |
+| C. Across levels, without traversal | 16 places | **broke the rule**: fixed, see *Fixed* below |
+| D. Broken: goes nowhere | 1 place | **bug**: fixed |
 
 Two Admin-level pages leak into the Super User's level without traversal:
 
@@ -119,7 +119,35 @@ These components contain navigation but are drawn nowhere, so nobody can click t
 `DeptAdmins`, `IssueFlow`, `DeptTable`, and the *Structure* part of `Govern` (only its *Routing* part is shown, on
 Reports). They should be deleted or brought back on purpose.
 
-## Proposed fixes (to decide)
+## Fixed (7 Oct 2026, concept version 155)
+
+All of C and D are closed. At the Super User's level the router no longer opens `machines` or `issues`
+(`suRoute`, used by every `go(...)` and by an address typed in), so a link added later cannot leak either:
+
+| Asked for | Opens instead |
+|---|---|
+| a machine | **Registry**, with that machine picked. Its board offers *Work on it in X's console* (traversal, landing on that machine in the console); a department with no Admin says there is no console to work in. |
+| a copy of a file the Super User marked | **Restricted**, with that file picked and that copy picked on the *Where it is* chart. The board under the chart deals with it: *Ask … to delete it*, *Delete this copy* (asks first), *Allow it on …* (with a reason). Clicking a copy card or a row in *Copies found elsewhere* picks it there too. |
+| any other issue | **that department's page**, with the issue picked in a board under *Open issues*: *Handle it in X's console* (traversal, landing on that issue in the console), or *Decide it on Overview* when the department has no Admin |
+| the machine list, the issue list | Registry; Departments |
+
+Also changed:
+
+- `SU_PARENT` keeps only `dept` and `sessions`, which draw Super User pages.
+- The links that pointed at the machine page now say where they go: *See it in Registry* on Access and Audit log;
+  the machine tiles, the fleet map, the *Today* chart and the decision pictures open Registry.
+- **Search** at the Super User's level offers pages, machines (to Registry), issues (routed as above) and
+  departments; *Run action on a machine…* is gone (an Admin's console has it).
+- **Traversal can now land somewhere:** `enter(admin, { page, sub })` opens *Enter X's console?* as before, and after
+  block or end opens that page and item inside the console instead of its Overview.
+
+Checked by opening the old leak addresses: `#machines/OPS-03` lands on Registry with OPS-03 picked;
+`#issues/INC-1054` on Restricted, Payroll archive, OPS-03 copy picked; `#issues/INC-1041` on Operations with the issue
+picked and *Handle it in R. Mensah's / A. Quaye's console*; `#issues/UPD-0318` on Logistics with *Decide it on
+Overview*. Inside R. Mensah's console, `#issues/INC-1041` still opens his issue workbench. The traversal buttons were
+not click-tested headless.
+
+## Proposed fixes (as written before they were applied)
 
 1. **A machine, at the Super User's level, opens in Registry** with that machine picked: its board already shows
    department, user, address, version, key and last seen. Working on the machine (run an action, enter its
