@@ -1159,7 +1159,7 @@ function MachineDetail({ host, range, go }) {
         <span className="sp" />
         ${m.held === "You"
           ? html`<${Button} size="small" onClick=${() => toast("Back in OPS-07 (concept)")}>Return to it<//><${Button} size="small" danger onClick=${() => toast("Left " + m.host + "; " + m.user + " has it back (concept)")}>Leave session<//>`
-          : html`<${Button} size="small" danger onClick=${() => toast(m.held + "'s session ended (concept)")}>End their session<//>`}
+          : null}
       </div>` : null}
       <div className="meta" style=${{ marginTop: 14 }}>
         ${[["User", m.user || "—"], ["Department", DBY[m.dept].name], ["Version", m.ver], ["IP address", m.ip], ["OS", "Windows 11 Pro 23H2"], ["Agent uptime", m.status === "offline" ? "—" : "6d 4h"], ["Last check-in", m.seen > 0.1 ? dur(m.seen) + " ago" : "seconds ago"], ["Admins", DBY[m.dept].admins.join(", ") || "None"]].map(([k, v]) => html`<div key=${k}><div className="k">${k}</div><div className=${"v" + (k === "Version" || k === "IP address" ? " mono" : "")}>${v}</div></div>`)}
@@ -5557,6 +5557,8 @@ function DepartmentsPage({ go, enter, open }) {
 }
 // Sessions, at both levels: the Super User sees every machine; an Admin's console sees its department's (LANES is
 // already scoped there), the assisted access that touched it, and opens a machine's own page instead of Registry.
+// A session here is only seen, never blocked or ended: that is the step before entering (Session Blocking), and it
+// lives in the entering confirmation. Your own session you can leave.
 function AccessPage({ go, open, me }) {
   const [sel, setSel] = useOpen(me ? "sessions" : "access", open);
   const [q, setQ] = useState("");
@@ -5585,7 +5587,7 @@ function AccessPage({ go, open, me }) {
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!x} onClose=${() => setSel(null)} title=${x ? `${x.b[3]} on ${x.host}` : ""}
       facts=${x ? [["Kind", OCC[x.b[2]].w], ["From", hhmm(x.b[0])], ["Until", x.b[1] >= NOWH ? "now" : hhmm(x.b[1])], ["Owner locked out", ownerOf(x.host)], ["Department", MBY[x.host] ? deptNameOf(MBY[x.host].dept) : "—"], ...(x.b[4] ? [["Flag", html`<span style=${{ color: "var(--crit)" }}>Outside working hours</span>`]] : [])] : []}
-      actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? (me ? html`<${Button} onClick=${() => go("machines", x.host)}>Open ${x.host}'s page →<//>` : html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry →<//>`) : null} />
+      actions=${x ? html`${x.b[1] >= NOWH && x.b[3] === "You" ? html`<${Button} onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : null}${me ? html`<${Button} onClick=${() => go("machines", x.host)}>Open ${x.host}'s page →<//>` : html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry →<//>`}` : null} />
     <${Occupancy} />
   <//>`;
 }

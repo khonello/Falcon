@@ -315,6 +315,13 @@ facts, *Switched on*, *Test on one machine* and *Edit* in its header, and the la
 works is what the rule editor shows; Outcomes and Runs today are what the *Problems today* rail already says. Runs per
 day stays as the page's one chart.
 
+**No block or end on its own (concept version 161).** Blocking or ending someone's session is only ever the step
+before entering it (hierarchy-system-design.md, *Session Blocking*), so it lives in the confirmation that entering
+asks. Sessions, Access and a machine's own page no longer offer *Block it* or *End their session*: in a console the
+session listed is often the Admin's own, which the Super User already blocked to be there, or a peer's, which an Admin
+may never end. A session board now offers *Leave the session* when it is yours, and the machine's page (Registry at the
+Super User's level).
+
 Core follows the same order (list, then the board of the item you clicked or the most relevant one): Tasks shows how far
 each Admin told has got (Given, Seen, Under way, Done, Completed by you; the most urgent task by default), with the
 facts and the decision (Not done yet / Complete, or Remind them) under the chart; Restricted shows where a marked file
