@@ -48,6 +48,12 @@ This sweep lists every click in the concept (version 156) that changes the page,
 | Tasks, Flows, Restricted, Rules | *New task*, *New flow*, *Edit*, *Mark files*, *New rule*, editors' Cancel and Save | editors and back | ok | |
 | Everywhere | sidebar, path, Search, *Leave console* | | ok | |
 
+**Done (concept version 157):** every change in the table above. A re-run of the sweep at the Super User's level
+finds only frame links, links that name their page and end in "→", traversals that ask first, and editors' own
+buttons. The fleet map is shared with the Admin's Overview, so its pin-in-place card (with *Open OPS-03's page →*
+there) already applies in the console too. Not click-tested headless: the pinned card, the expanding *Worth a look*
+row, the Handling and By department filters, the full copies rail, a picked pattern.
+
 ## Admin's console
 
 The console's pages still use the older list-then-page pattern: a row opens the item's own page. Under the rule a row

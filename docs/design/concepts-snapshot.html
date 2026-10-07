@@ -901,8 +901,11 @@ function tileFor(m, by) {
   // CPU is clamped into the same four bands as status, so one legend reads every view
   return v == null ? "offline" : v >= 90 ? "crit" : v >= 75 ? "high" : v >= 60 ? "watch" : "quiet";
 }
-function HostMap({ by, onOpen, onMore }) {
+// A click pins a machine's card in place; only the card's own link, which names the page, leaves the page
+// (docs/design/click-in-place.md).
+function HostMap({ by, onOpen, openLabel, onMore, moreLabel }) {
   const [hov, setHov] = useState(null);
+  const [pin, setPin] = useState(null);
   const legend = by === "Status" ? [["quiet", "Healthy"], ["watch", "Worth a look"], ["high", "High"], ["crit", "Critical"], ["offline", "Offline"]]
     : by === "Version" ? [["quiet", "1.4.2 (current)"], ["watch", "One version behind"], ["high", "Two or more behind"], ["offline", "Offline"]]
     : by === "Check-in" ? [["quiet", "Within the last minute"], ["high", "Over an hour ago"]]
@@ -918,33 +921,36 @@ function HostMap({ by, onOpen, onMore }) {
             ${!ms.length ? html`<span className="t3" style=${{ fontSize: 12.5 }}>No machines yet. They appear here as they are registered.</span>` : null}
             ${pk.shown.map((m) => { const t = look(m);
               return html`<div key=${m.host} className="hm-tile" tabIndex="0" role="button" aria-label=${`${m.host}, ${STATUS[m.status].w}`}
-                style=${{ background: t.bg, color: t.fg, border: t.border || "1px solid transparent", position: "relative" }}
-                onMouseEnter=${() => setHov(m)} onMouseLeave=${() => setHov(null)} onFocus=${() => setHov(m)} onBlur=${() => setHov(null)} onClick=${() => onOpen(m.host)}>
+                style=${{ background: t.bg, color: t.fg, border: t.border || "1px solid transparent", position: "relative", boxShadow: pin === m.host ? "0 0 0 2px var(--text-2)" : "none" }}
+                onMouseEnter=${() => setHov(m)} onMouseLeave=${() => setHov(null)} onFocus=${() => setHov(m)} onBlur=${() => setHov(null)} onClick=${() => setPin(pin === m.host ? null : m.host)}>
                 <span style=${{ fontSize: tileFs(m.host) }}>${tileNo(m.host)}</span>
                 ${t.dot ? html`<i style=${{ position: "absolute", right: 4, top: 4, width: 7, height: 7, borderRadius: "50%", background: t.dot }} />` : null}
               </div>`; })}
-            ${pk.rest ? html`<div className="hm-tile" role="button" tabIndex="0" title="All machines" onClick=${() => onMore && onMore()} style=${{ border: "1px dashed var(--border-strong)", color: "var(--text-3)", fontSize: 11 }}>+${pk.rest}</div>` : null}
+            ${pk.rest ? html`<div className="hm-tile" title=${`${pk.rest} more in ${d.name}, none of them worse than these`} style=${{ border: "1px dashed var(--border-strong)", color: "var(--text-3)", fontSize: 11, cursor: "default" }}>+${pk.rest}</div>` : null}
           </div>
         </div>`; })}
-      ${DEPTS.length > 3 ? html`<div><${More} n=${DEPTS.length - 3} what="departments" onClick=${() => onMore && onMore()} /></div>` : null}
+      ${DEPTS.length > 3 ? html`<div><${More} n=${DEPTS.length - 3} what=${"departments " + (moreLabel || "")} onClick=${() => onMore && onMore()} /></div>` : null}
     </div>
     <div className="leg" style=${{ marginTop: 12, alignItems: "center" }}>
       ${by === "CPU" ? html`<span>CPU right now:</span>` : null}${legend.map(([k, w]) => html`<span key=${k}>${sw(k)}${w}</span>`)}
     </div>
-    ${hov ? (() => {
+    ${hov || pin ? ((hov) => {
       // the tooltip speaks for the view you are in: its first line is this view's band, in this view's words
       const k = tileFor(hov, by), band = (legend.find((x) => x[0] === k) || [k, STATUS[hov.status].w])[1];
       const cpu = metric(hov.host, "cpu", NOWH), mem = metric(hov.host, "mem", NOWH), disk = metric(hov.host, "disk", NOWH);
       const rows = [["CPU", "CPU", cpu == null ? "—" : cpu.toFixed(0) + "%"], ["Memory", null, mem == null ? "—" : mem.toFixed(0) + "%"], ["Disk", null, disk == null ? "—" : disk.toFixed(0) + "%"],
         ["Version", "Version", hov.ver], ["Check-in", "Check-in", hov.seen > 0.1 ? dur(hov.seen) + " ago" : "seconds ago"]];
-      return html`<div className="tt" style=${{ right: 0, top: 0, minWidth: 230 }}>
+      return html`<div className="tt" style=${{ right: 0, top: 0, minWidth: 230, pointerEvents: pin === hov.host ? "auto" : "none" }}>
         <div className="row" style=${{ flexWrap: "nowrap" }}><b className="mono" style=${{ fontSize: 13 }}>${hov.host}</b><span className="sp" />${sw(k)}<span style=${{ color: TILE[k].fg === "#fff" ? "var(--crit)" : TILE[k].fg }}>${band}</span></div>
         <div className="t2" style=${{ margin: "4px 0 6px" }}>${hov.user || "No one signed in"} · ${DBY[hov.dept].name}</div>
         ${rows.map(([lab, view, v]) => html`<div key=${lab} className="row" style=${{ flexWrap: "nowrap", fontWeight: view === by ? 600 : 400, color: view === by ? "var(--text)" : "var(--text-2)" }}><span className="t3" style=${{ width: 64 }}>${lab}</span><span className="mono">${v}</span></div>`)}
         ${by === "Status"
           ? (hov.note ? html`<div style=${{ marginTop: 6, color: TILE[k].fg === "#fff" ? "var(--crit)" : TILE[k].fg }}>${hov.note}</div>` : null)
           : html`<div className="t3" style=${{ marginTop: 6, fontSize: 12 }}>Overall health: ${HEALTH[hov.status][1]}${hov.note ? " · " + hov.note : ""}</div>`}
-      </div>`; })() : null}
+        ${pin === hov.host ? html`<div className="row" style=${{ marginTop: 8, paddingTop: 6, borderTop: "1px solid var(--border)", flexWrap: "nowrap" }}>
+          ${onOpen ? html`<a onClick=${() => onOpen(hov.host)}>${openLabel ? openLabel(hov.host) : "Open →"}</a>` : null}<span className="sp" /><a className="t3" onClick=${() => setPin(null)}>Close</a></div>`
+          : html`<div className="t4" style=${{ marginTop: 6, fontSize: 11.5 }}>Click the tile to keep this open</div>`}
+      </div>`; })(hov || MBY[pin]) : null}
   </div>`;
 }
 // a filter carried from the Overview into the Audit log, read once when the Audit log opens
@@ -981,7 +987,7 @@ function Overview({ range, go }) {
     </div>
     <div className="g c-75">
       <${Panel} title="Fleet" sub=${`${MACHINES.length} machines, ${DEPTS.length} department${DEPTS.length === 1 ? "" : "s"}`} extra=${html`<${Segmented} size="small" value=${by} onChange=${setBy} options=${["Status", "CPU", "Version", "Check-in"]} />`}>
-        <${HostMap} by=${by} onOpen=${(h) => go("machines", h)} onMore=${() => go("machines")} />
+        <${HostMap} by=${by} onOpen=${(h) => go("machines", h)} openLabel=${(h) => `Open ${h}'s page →`} onMore=${() => go("machines")} moreLabel="on Machines →" />
       <//>
       <${Panel} title="Open issues" sub="by severity" flush extra=${html`<${Button} size="small" type="link" onClick=${() => go("issues")}>View all<//>`}>
         ${!ISSUES.length ? html`<${Empty} icon="CheckOutlined" title="Nothing open" text="Violations, unanswered pings, deviations and stuck updates appear here, worst first." />` : null}
@@ -3575,8 +3581,8 @@ const initials = (n) => n.split(/[ .]+/).filter(Boolean).map((x) => x[0]).join("
 function MiniTiles({ ms, go }) {
   const pk = pickShown(ms, 14);
   return html`<div className="row" style=${{ gap: 3, flexWrap: "nowrap" }}>${pk.shown.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
-    return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`} onClick=${(e) => { e.stopPropagation(); go("registry", m.host); }}
-      style=${{ position: "relative", width: 18, height: 18, borderRadius: 3, background: t.bg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none"), cursor: "pointer" }}>
+    return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`}
+      style=${{ position: "relative", width: 18, height: 18, borderRadius: 3, background: t.bg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none"), cursor: "default" }}>
       ${t.dot ? html`<i style=${{ position: "absolute", right: -2, top: -2, width: 6, height: 6, borderRadius: "50%", background: t.dot, boxShadow: "0 0 0 1.5px var(--surface)" }} />` : null}</span>`; })}
     ${pk.rest ? html`<span className="t3 mono" style=${{ fontSize: 11, marginLeft: 3 }} title="none of them worse than these">+${pk.rest}</span>` : null}</div>`;
 }
@@ -3863,7 +3869,7 @@ function DayLanes({ rows, go, lane = 56, verdictW = 136, slots }) {
           ${pr.odd.map((o, h) => (o ? html`<rect key=${"o" + h} x=${X(h)} y=${y0} width=${X(Math.min(h + 1, NOWH)) - X(h)} height=${lane} style=${{ fill: "var(--med)", opacity: 0.16 }}><title>${String(h).padStart(2, "0")}:00 · unusual for this hour · ${pr.today[h]} of ${pr.total} machines in use</title></rect>` : null))}
           <path d=${area} style=${{ fill: "var(--s6)", opacity: 0.32 }} />
           <path d=${line} fill="none" style=${{ stroke: "var(--s6)" }} strokeWidth="1.5" strokeLinejoin="round" />
-          ${pr.pins.map((p0, k) => html`<g key=${k} style=${{ cursor: "pointer" }} onClick=${() => go && go("audit")}>
+          ${pr.pins.map((p0, k) => html`<g key=${k}>
             <line x1=${X(p0.t)} x2=${X(p0.t)} y1=${y0 + 9} y2=${y0 + lane - 4} style=${{ stroke: p0.c }} strokeWidth="1.25" />
             <circle cx=${X(p0.t)} cy=${y0 + 8} r=${lane > 40 ? 5 : 4} style=${{ fill: p0.c, stroke: "var(--surface)" }} strokeWidth="1.5"><title>${p0.text}</title></circle></g>`)}
           ${R > 0 ? html`<text x=${L + pw + 14} y=${y0 + lane / 2 + 4} fontSize="12" style=${{ fill: pr.verdict[1] }}>${pr.verdict[0]}</text>` : null}
@@ -4120,8 +4126,8 @@ function GateTiles({ big, go }) {
   return html`<div>
     <div className="row" style=${{ alignItems: "baseline", gap: 8 }}><b style=${{ fontSize: 22, fontWeight: 600 }}>${fmt(on)}</b><span className="t3">of ${fmt(all.length)} machines on 1.4.2</span><span className="sp" /><span style=${{ color: "var(--med)" }}>${fmt(behind.length)} holding the gate</span></div>
     <div style=${{ margin: "10px 0 14px" }}>${bar(14)}</div>
-    <div className="row" style=${{ gap: 6 }}>${shown.map((m) => html`<span key=${m.host} onClick=${() => go && go("machines", m.host)} title=${`${m.host} · ${m.user || "no user"} · ${m.ver}`}
-        style=${{ cursor: "pointer", height: 28, padding: "0 8px", borderRadius: 4, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 11.5, border: "1.5px dashed var(--med)", color: "var(--med)", whiteSpace: "nowrap" }}>${fitMid(m.host, 16)}<span className="t3">${m.ver}</span></span>`)}
+    <div className="row" style=${{ gap: 6 }}>${shown.map((m) => html`<span key=${m.host} title=${`${m.host} · ${m.user || "no user"} · ${m.ver}`}
+        style=${{ cursor: "default", height: 28, padding: "0 8px", borderRadius: 4, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 11.5, border: "1.5px dashed var(--med)", color: "var(--med)", whiteSpace: "nowrap" }}>${fitMid(m.host, 16)}<span className="t3">${m.ver}</span></span>`)}
       <${More} n=${behind.length - shown.length} what="holding it" /></div>
   </div>`;
 }
@@ -4170,7 +4176,7 @@ function VersionColumns({ big, go, d }) {
         return html`<div key=${v} className="vcol">
           <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}><span className="mono" style=${{ fontWeight: 600 }}>${v}</span><span className="t3" style=${{ fontSize: 11, whiteSpace: "nowrap" }}>${fmt(ms.length)} · ${v === "1.4.2" ? "current" : i === 0 ? "2 behind" : "1 behind"}</span></div>
           <div style=${{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>${ms.slice(0, cap).map((m) => { const me = m.host === focus;
-            return html`<span key=${m.host} title=${`${m.host} · ${m.user || ""}`} onClick=${() => go && go("machines", m.host)} style=${{ cursor: "pointer", height: 30, padding: "0 7px", borderRadius: 4, display: "inline-grid", placeItems: "center", fontFamily: "var(--mono)", fontSize: 11,
+            return html`<span key=${m.host} title=${`${m.host} · ${m.user || ""}`} style=${{ cursor: "default", height: 30, padding: "0 7px", borderRadius: 4, display: "inline-grid", placeItems: "center", fontFamily: "var(--mono)", fontSize: 11,
               background: me ? "color-mix(in srgb, var(--crit) 12%, var(--surface))" : v === "1.4.2" ? "color-mix(in srgb, var(--s2) 14%, var(--surface))" : "color-mix(in srgb, var(--med) 14%, var(--surface))",
               border: me ? "1.5px dashed var(--crit)" : "1px solid transparent", color: me ? "var(--crit)" : v === "1.4.2" ? "var(--s2)" : "var(--med)", whiteSpace: "nowrap", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>${fitMid(m.host, 14)}</span>`; })}
             ${more > 0 ? html`<span className="more" style=${{ height: 30 }}>+${more}</span>` : null}</div>
@@ -4728,7 +4734,7 @@ function DeptToday({ d, ms, go }) {
         <line x1=${L} x2=${L + pw} y1=${strip + 8} y2=${strip + 8} style=${{ stroke: "var(--border-strong)" }} />
         ${lanes.map(({ m, blocks }, i) => { const y = top + i * rowH, k = HEALTH[m.status][0], t = TILE[k];
           return html`<g key=${m.host}>
-            <g style=${{ cursor: "pointer" }} onClick=${() => go("registry", m.host)}>
+            <g>
               <rect x="0" y=${y + 7} width="11" height="11" rx="2" style=${{ fill: t.bg === "transparent" ? "var(--surface)" : t.bg, stroke: k === "quiet" || k === "watch" || k === "offline" ? "var(--border-strong)" : "none" }} strokeDasharray=${k === "offline" ? "2 2" : "0"} />
               ${t.dot ? html`<circle cx="11" cy=${y + 7} r="3" style=${{ fill: t.dot, stroke: "var(--surface)" }} strokeWidth="1" />` : null}
               <text x="18" y=${y + 16.5} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${fitMid(m.host, 13)}<title>${m.host} · </title><title>${m.user || "no user"} · ${HEALTH[m.status][1]}</title></text>
@@ -4740,7 +4746,7 @@ function DeptToday({ d, ms, go }) {
             ${blocks.length === 0 ? html`<text x=${L + 6} y=${y + 16.5} fontSize="11" style=${{ fill: "var(--text-4)" }}>nobody signed in today</text>`
               : !blocks.some((x) => inView(x[0], x[1])) ? html`<text x=${L + 6} y=${y + 16.5} fontSize="11" style=${{ fill: "var(--text-4)" }}>nobody signed in during these hours</text>` : null}
           </g>`; })}
-        ${pr.pins.filter((p0) => p0.t >= a && p0.t < b).map((p0, k) => html`<g key=${"p" + k} style=${{ cursor: "pointer" }} onClick=${() => go("audit")}>
+        ${pr.pins.filter((p0) => p0.t >= a && p0.t < b).map((p0, k) => html`<g key=${"p" + k}>
           <line x1=${X(p0.t)} x2=${X(p0.t)} y1="9" y2=${H - 22} style=${{ stroke: p0.c }} strokeWidth="1" strokeDasharray="2 3" opacity="0.7" />
           <circle cx=${X(p0.t)} cy="8" r="5" style=${{ fill: p0.c, stroke: "var(--surface)" }} strokeWidth="1.5"><title>${p0.text}</title></circle></g>`)}
         ${ticks.map((h) => html`<text key=${h} x=${X(h)} y=${H - 6} textAnchor=${h === a ? "start" : h === b ? "end" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
@@ -4798,7 +4804,7 @@ function DeptPage({ id, go, enter }) {
             <span style=${{ position: "relative" }}><span className="av" style=${{ width: 40, height: 40, fontSize: 14 }}>${initials(a)}</span>
               <i style=${{ position: "absolute", right: 0, bottom: 0, width: 11, height: 11, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
             <div style=${{ flex: 1, minWidth: 0 }}><div style=${{ fontWeight: 600 }}>${a}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a].busy ? ADMIN_INFO[a].now.replace(/^Inside/, "inside").replace(/ since.*$/, "") : "at their desk"}</div></div>
-            <${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a)}>Enter<//>
+            <${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a)}>Enter →<//>
           </div>`)}</div>`
           : html`<div style=${{ textAlign: "center", padding: "6px 0" }}>
               <span className="av" style=${{ width: 48, height: 48, fontSize: 18, background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)" }}>${ic("UserAddOutlined")}</span>
@@ -4811,9 +4817,9 @@ function DeptPage({ id, go, enter }) {
     </div>
     <${ItemBoard} open=${!!it} picked=${!!isel} title=${it ? it.title : ""} sub=${isel ? "the one you picked" : "the worst open issue · click another to see it here"}
       facts=${it ? [["What", it.subject], ["Machine", html`<span className="mono">${it.host}</span>`], ["Found", devWhen(it.at)], ["Severity", SEV[it.sev].w], ["With", d.admins.length ? listNames(d.admins) : html`<span style=${{ color: "var(--crit)" }}>nobody · no Admin</span>`]] : []}
-      actions=${!it ? null : mineCopy ? html`<${Button} type="primary" onClick=${() => go("issues", it.id)}>Deal with it on Restricted<//>`
-        : d.admins.length ? d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a, { page: "issues", sub: it.id })}>Handle it in ${a}'s console<//>`)
-        : html`<${Button} type="primary" onClick=${() => go("overview")}>Decide it on Overview<//>`}>
+      actions=${!it ? null : mineCopy ? html`<${Button} type="primary" onClick=${() => go("issues", it.id)}>Deal with it on Restricted →<//>`
+        : d.admins.length ? d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a, { page: "issues", sub: it.id })}>Handle it in ${a}'s console →<//>`)
+        : html`<${Button} type="primary" onClick=${() => go("overview")}>Decide it on Overview →<//>`}>
       <div className="t3" style=${{ fontSize: 12.5 }}>${mineCopy ? "A copy of a file you marked: it is yours to deal with, on Restricted, without entering anyone's console." : d.admins.length ? "Issues are worked in the department's own console. Entering it asks to block or end that Admin's session first." : `${d.name} has no Admin, so its issues wait on you as decisions on Overview.`}</div>
     <//>
     <${DeptToday} key=${d.id} d=${d} ms=${x.ms} go=${go} />
@@ -4986,7 +4992,7 @@ function DevDrawer({ d, onClose, go, picked }) {
     <div style=${{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: "18px 36px", alignItems: "start" }}>
       <div className="row" style=${{ gridColumn: "1 / -1" }}><${Sev} s=${d.sev} /><span className="tag" style=${{ "--c": "var(--text-3)" }}>${ic(K[1])} ${K[0]}</span><span className="st" style=${{ "--c": o[1] }}><i />${o[0]}</span><span className="mono t3">${d.id}</span></div>
       <div>
-        ${kv("Rule", html`<a onClick=${() => { onClose(); go("rules", d.rule); }}>${r.name}</a> <span className="t3">· ${r.locked ? "built in" : "set by you"}</span>`)}
+        ${kv("Rule", html`<span>${r.name} <span className="t3">· ${r.locked ? "built in" : "set by you"} · </span><a onClick=${() => { onClose(); go("rules", d.rule); }}>See the rule →</a></span>`)}
         ${kv("Expected", d.expected)}
         ${kv("What happened", d.happened)}
         ${kv("Who", html`<b style=${{ fontWeight: 500 }}>${d.who}</b> <span className="t3">· ${d.whoSub}</span>`)}
@@ -5037,7 +5043,7 @@ function Accountability({ go, open }) {
         icon=${(r) => WHOKIND[r.kind][1]} name=${{ title: "Deviation", text: (r) => r.short, line: (r) => RULE_BY(r.rule).name }}
         cols=${[{ title: "Who", text: (r) => r.who }, { title: "Severity", width: 110, text: (r) => SEV[r.sev].w }, { title: "When", width: 120, text: (r) => devWhen(r.at) }]}
         now=${(r) => (r.out === "open" ? ["Open", "bad"] : r.out === "escalated" ? ["Escalated", "bad"] : r.out === "dismissed" ? ["Dismissed", "wait"] : [OUTC[r.out][0], "good"])}
-        empty=${!DEVIATIONS.length ? html`<${Empty} icon="EyeOutlined" title="No deviations yet" text="When a rule is broken, the record appears here: what was expected, what happened, who, when, and what came of it." act="See the rules" onAct=${() => go("rules")} h=${200} />` : null} />
+        empty=${!DEVIATIONS.length ? html`<${Empty} icon="EyeOutlined" title="No deviations yet" text="When a rule is broken, the record appears here: what was expected, what happened, who, when, and what came of it." act="See the rules →" onAct=${() => go("rules")} h=${200} />` : null} />
       <${RailPanel} title="Rules broken" sub="this week · click one to filter" more="rules"
         items=${broken.map(({ r, n, open: o }) => ({ key: r.id, title: r.name, line: `${o} open · ${r.locked ? "built in" : "set by you"}`, right: fmt(n), c: o ? "var(--crit)" : "var(--ok)", on: rule === r.id, onClick: () => setRule(rule === r.id ? null : r.id) }))}
         empty=${html`<${Empty} icon="CheckOutlined" title="Every rule kept this week" text="Rules that were broken show here, most often first." h=${200} />`} />
@@ -5062,7 +5068,10 @@ function Rules({ go, sub }) {
   useDT();
   const editor = !!sub && (sub === "new" || sub.startsWith("from-") || sub.startsWith("edit-"));
   const [q, setQ] = useState("");
-  const [sel, setSel] = useOpen("rules", !editor ? sub : null);
+  const [sel, setSel0] = useOpen("rules", !editor ? sub : null);
+  // a pattern not in use yet is picked in place: its shape shows in the board, with a button that opens the editor
+  const [tp, setTp] = useState(null);
+  const setSel = (id) => { setTp(null); setSel0(id); };
   if (editor) return html`<${RuleBuilder} key=${sub} sub=${sub} go=${go} />`;
   const all = RULES_ALL(), mx = Math.max(1, ...all.map((r) => weekDevs(r.id).length));
   const rows = all.filter((r) => `${r.name} ${ruleSentence(r)}`.toLowerCase().includes(q.toLowerCase()));
@@ -5083,17 +5092,22 @@ function Rules({ go, sub }) {
         cols=${[{ title: "Set by", width: 110, text: (x) => (x.locked ? "Built in" : "You") }, { title: "Applies to", width: 190, text: ruleScope },
           { title: "This week", width: 150, bar: (x) => ({ v: weekDevs(x.id).length, max: mx, text: `${fmt(weekDevs(x.id).length)} broken` }) }]}
         now=${(x) => (x.locked ? ["Always on", "good"] : x.on ? ["On", "good"] : ["Off", "wait"])} />
-      <${RailPanel} title="Start from a pattern" sub="click one to build a rule from it" more="patterns"
-        items=${TEMPLATES.map((t) => ({ key: t.id, title: t.name, line: `${SHAPES[t.state.shape].w}${t.uses ? ` · in use as ${t.uses}` : ""}`, c: t.uses ? "var(--ok)" : "var(--text-4)", onClick: () => (t.uses ? setSel(t.uses) : go("rules", "from-" + t.id)) }))} empty=${null} />
+      <${RailPanel} title="Start from a pattern" sub="click one to see its pattern below" more="patterns"
+        items=${TEMPLATES.map((t) => ({ key: t.id, title: t.name, line: `${SHAPES[t.state.shape].w}${t.uses ? ` · in use as ${t.uses}` : ""}`, c: t.uses ? "var(--ok)" : "var(--text-4)", on: tp === t.id, onClick: () => (t.uses ? setSel(t.uses) : (setSel0(null), setTp(t.id))) }))} empty=${null} />
     </div>
-    ${g ? (() => { const gn = weekDevs(g.id).length;
+    ${tp ? (() => { const T0p = TEMPLATES.find((x) => x.id === tp);
+      return html`<${Panel} title=${html`<span>The pattern · <span style=${{ fontWeight: 500 }}>${T0p.name}</span></span>`} sub="a pattern not in use yet · the dashed branch is where a deviation is noted"
+        extra=${html`<${Button} size="small" onClick=${() => setTp(null)}>Close<//><${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("rules", "from-" + T0p.id)}>Build a rule from it<//>`}>
+        <${PatternGraph} s=${{ ...blankPattern, ...T0p.state, resp: { ...blankPattern.resp } }} />
+        <div className="t3" style=${{ fontSize: 12.5, marginTop: 10 }}>${T0p.d}</div><//>`; })()
+    : g ? (() => { const gn = weekDevs(g.id).length;
       // A click in the list selects; this board is the rule's whole page: its pattern, its facts and what can be
       // done to it. No drawer opens over the pattern.
       return html`<${Panel} title=${html`<span>The pattern · <span style=${{ fontWeight: 500 }}>${g.name}</span></span>`}
       sub=${r ? "the rule you picked · the dashed branch is where a deviation is noted" : "the rule you set most recently · click a rule to see its pattern"}
       extra=${html`${!g.locked ? html`<${Button} size="small" onClick=${() => { dtChange(() => { g.on = !g.on; }); toast(`${g.name} ${g.on ? "on" : "off"}. Earlier deviations stay on the record (concept)`); }}>${g.on ? "Switch off" : "Switch on"}<//>
           <${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => go("rules", "edit-" + g.id)}>Edit<//>` : html`<span className="t3" style=${{ fontSize: 12 }}>${ic("LockOutlined")} Built in · read only</span>`}
-        <${Button} size="small" type="primary" disabled=${!gn} onClick=${() => { ACC_PRESET = { rule: g.id }; go("accountability"); }}>See its deviations<//>`}>
+        <${Button} size="small" type="primary" disabled=${!gn} onClick=${() => { ACC_PRESET = { rule: g.id }; go("accountability"); }}>See its deviations in Accountability →<//>`}>
       <${PatternGraph} s=${toPattern(g)} />
       <div className="row" style=${{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", gap: 28, alignItems: "flex-start" }}>
         ${[["The rule", ruleSentence(g)], ["Applies to", ruleScope(g)], ["Set by", g.locked ? "Built into Falcon · always on" : `You, ${g.since}${g.on ? "" : " · switched off"}`], ["This week", gn ? `${fmt(gn)} deviation${gn === 1 ? "" : "s"}` : "Kept"]]
@@ -5269,11 +5283,16 @@ function WaitList({ onOpen }) {
 // The worst open deviations, as rows. A row opens the record on Accountability.
 function WorthList({ go }) {
   useDT();
+  // a row opens in place under itself; only the link, which names Accountability, leaves the page
+  const [x, setX] = useState(null);
   const open = openDevs(), shown = open.slice(0, 6), see = (id) => { ACC_PRESET = id ? { open: id } : null; go("accountability"); };
   if (!open.length) return html`<${Empty} icon="CheckOutlined" title="Nothing worth a look" text="When a rule is broken, the worst open deviations appear here." h=${180} />`;
-  return html`<div>${shown.map((d) => html`<div key=${d.id} className="irow" role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto 76px" }} onClick=${() => see(d.id)} onKeyDown=${(e) => e.key === "Enter" && see(d.id)}>
-      <i style=${{ background: SEV[d.sev].c }} /><span className="ttl" title=${d.short}>${d.short}</span><span className="t3 cut" style=${{ fontSize: 12, maxWidth: 110 }}>${d.who}</span><span className="mono t3" style=${{ textAlign: "right", fontSize: 11.5 }}>${devWhen(d.at).replace("Today ", "")}</span></div>`)}
-    ${open.length > shown.length ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${open.length - shown.length} what="open" onClick=${() => see(null)} /></div>` : null}</div>`;
+  return html`<div>${shown.map((d) => html`<${React.Fragment} key=${d.id}><div className=${"irow" + (x === d.id ? " on" : "")} role="button" tabIndex="0" aria-expanded=${x === d.id} style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto 76px" }} onClick=${() => setX(x === d.id ? null : d.id)} onKeyDown=${(e) => e.key === "Enter" && setX(x === d.id ? null : d.id)}>
+      <i style=${{ background: SEV[d.sev].c }} /><span className="ttl" title=${d.short}>${d.short}</span><span className="t3 cut" style=${{ fontSize: 12, maxWidth: 110 }}>${d.who}</span><span className="mono t3" style=${{ textAlign: "right", fontSize: 11.5 }}>${devWhen(d.at).replace("Today ", "")}</span></div>
+    ${x === d.id ? html`<div style=${{ padding: "8px 14px 12px 32px", borderBottom: "1px solid var(--grid)", background: "var(--surface-2)", fontSize: 12.5, display: "flex", flexDirection: "column", gap: 3 }}>
+      <div><span className="t3">Expected </span>${d.expected}</div><div><span className="t3">What happened </span>${d.happened}</div>
+      <div style=${{ marginTop: 4 }}><a onClick=${() => see(d.id)}>Open in Accountability →</a></div></div>` : null}<//>`)}
+    ${open.length > shown.length ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${open.length - shown.length} what="open in Accountability →" onClick=${() => see(null)} /></div>` : null}</div>`;
 }
 // Who runs each department: Admin chips, or an empty seat to fill. A chip enters that Admin's console.
 function DeptAdmins({ go, enter }) {
@@ -5430,6 +5449,8 @@ function RestrictedSU({ go, open }) {
   const [, bump] = useState(0); const refresh = () => bump((n) => n + 1);
   const [sel, setSel0] = useState(open || null);
   const setSel = (id) => { setSel0(id); keepOpen("restricted", id); };
+  // the rail lists the worst five; "+N more" lists them all in place
+  const [allCopies, setAllCopies] = useState(false);
   // the copy picked on the board; a copy opened from elsewhere arrives picked
   const [copy, setCopy] = useState(() => { const p0 = COPY_PRESET; COPY_PRESET = null; return p0; });
   const [q, setQ] = useState("");
@@ -5455,11 +5476,11 @@ function RestrictedSU({ go, open }) {
         now=${(r) => (r.n ? [r.n === 1 ? "A copy elsewhere" : `${fmt(r.n)} copies elsewhere`, "bad"] : ["Only where it belongs", "good"])}
         empty=${!mine.length ? html`<${Empty} icon="FileProtectOutlined" title="You have not marked anything" text="Mark a file or folder on your PC. It stays where it is and you keep using it; a copy anywhere else is caught." act=${ws ? "Mark files" : null} onAct=${() => go("restricted", "mark")} h=${200} />` : null} />
       <${Panel} title="Copies found elsewhere" sub="worst first · click one to deal with it below" flush style=${{ minHeight: LIST_H }}>
-        ${copies.length ? copies.slice(0, 5).map((i) => html`<div key=${i.id} className=${"irow" + (copy === i.id ? " on" : "")} role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto" }} onClick=${() => { const mk = markOf(i); if (mk) { setSel(mk.id); setCopy(i.id); } }} onKeyDown=${(e) => { const mk = markOf(i); if (e.key === "Enter" && mk) { setSel(mk.id); setCopy(i.id); } }}>
+        ${copies.length ? (allCopies ? copies : copies.slice(0, 5)).map((i) => html`<div key=${i.id} className=${"irow" + (copy === i.id ? " on" : "")} role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto" }} onClick=${() => { const mk = markOf(i); if (mk) { setSel(mk.id); setCopy(i.id); } }} onKeyDown=${(e) => { const mk = markOf(i); if (e.key === "Enter" && mk) { setSel(mk.id); setCopy(i.id); } }}>
             <i style=${{ background: SEV[i.sev].c }} /><span style=${{ minWidth: 0 }}><span className="ttl mono" style=${{ display: "block" }}>${i.subject}</span><span className="t3" style=${{ fontSize: 12 }}>on <span className="mono">${i.host}</span></span></span>
             <span className="mono t3" style=${{ fontSize: 11.5 }}>${dur(NOWH - i.at)} ago</span></div>`)
           : html`<${Empty} icon="CheckOutlined" title="None found" text="A copy of something you marked, found where it is not allowed, appears here. It is never deleted for you." h=${170} />`}
-        ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${copies.length - 5} what="copies" onClick=${() => { if (ME === "Super User") go("accountability"); else { ISSUE_PRESET = { type: "file" }; go("issues"); } }} /></div>` : null}
+        ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}>${allCopies ? html`<button className="more" onClick=${() => setAllCopies(false)}>Show the worst five</button>` : html`<${More} n=${copies.length - 5} what="copies" onClick=${() => setAllCopies(true)} />`}</div>` : null}
       <//>
     </div>
     ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; return k ? html`<${MarkBoard} key=${k.id} k=${k} picked=${sel === k.id} go=${go} refresh=${refresh} onUnmarked=${() => setSel(null)} copy=${copy} setCopy=${setCopy} />` : null; })()}
@@ -5474,7 +5495,8 @@ function RolloutSU({ go, open }) {
     tries: m.host === "OPS-06" ? "2, last Wed 11:20" : m.host === "LOG-02" ? "1, Mon 07:45" : "1, Tue 10:15",
     err: m.host === "OPS-06" ? "A file was in use" : m.host === "LOG-02" ? "Update share unreachable" : m.status === "offline" ? "Not checking in" : "A file was in use",
     next: m.status === "offline" ? "When it is back online" : "Next idle window", esc: m.host === "LOG-02" ? "Mon 09:30, to you" : null }));
-  const rows = behind.filter((m) => `${m.host} ${m.user || ""} ${m.dn}`.toLowerCase().includes(q.toLowerCase()));
+  const [dept, setDept] = useState(null);
+  const rows = behind.filter((m) => (!dept || m.dept === dept) && `${m.host} ${m.user || ""} ${m.dn}`.toLowerCase().includes(q.toLowerCase()));
   const on = MACHINES.length - behind.length, m = behind.find((x) => x.id === sel) || rows[0];
   const depts = FULL_DEPTS().map((d) => { const ms = MACHINES.filter((x) => x.dept === d.id); return { d, n: ms.length, ok: ms.filter((x) => x.ver === "1.4.2").length }; }).filter((x) => x.n).sort((a, b) => (a.ok / a.n) - (b.ok / b.n));
   return html`<${React.Fragment}>
@@ -5489,8 +5511,8 @@ function RolloutSU({ go, open }) {
         cols=${[{ title: "Running", width: 100, text: (x) => x.ver }, { title: "Last error", width: 230, text: (x) => x.err }, { title: "Next try", width: 190, text: (x) => x.next }]}
         now=${(x) => (x.esc ? ["Escalated to you", "bad"] : x.status === "offline" ? ["Offline", "bad"] : ["Retrying", "wait"])}
         empty=${!behind.length ? html`<${Empty} icon="CheckOutlined" title="Every machine runs 1.4.2" text="Nothing holds the next version back. Approve it when it is ready." h=${140} />` : null} />
-      <${RailPanel} title="By department" sub="on 1.4.2 · furthest behind first" more="departments"
-        items=${depts.map((x) => ({ key: x.d.id, title: x.d.name, line: `${fmt(x.ok)} of ${fmt(x.n)} on 1.4.2${x.d.admins.length ? "" : " · no Admin"}`, right: `${Math.round((x.ok / x.n) * 100)}%`, c: x.ok === x.n ? "var(--ok)" : "var(--crit)", onClick: () => go("departments", x.d.id) }))}
+      <${RailPanel} title="By department" sub="on 1.4.2 · furthest behind first · click one to filter the list" more="departments"
+        items=${depts.map((x) => ({ key: x.d.id, title: x.d.name, line: `${fmt(x.ok)} of ${fmt(x.n)} on 1.4.2${x.d.admins.length ? "" : " · no Admin"}`, right: `${Math.round((x.ok / x.n) * 100)}%`, c: x.ok === x.n ? "var(--ok)" : "var(--crit)", on: dept === x.d.id, onClick: () => setDept(dept === x.d.id ? null : x.d.id) }))}
         empty=${html`<${Empty} icon="ApartmentOutlined" title="No machines yet" text="Each department's progress appears here." h=${200} />`} />
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!m} onClose=${() => setSel(null)} title=${m ? m.host : ""}
@@ -5528,7 +5550,7 @@ function AuditSU({ range, go, open }) {
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!e} onClose=${() => setSel(null)} title=${e ? e.what : ""}
       facts=${e ? [["When", e.t >= 0 && e.t < 24 ? "Today " + hhmm(e.t) : `${dayOf(e.t)} ${hhmm(e.t)}`], ["Who", e.actor], ["Machine", html`<span className="mono">${e.host}</span>`], ["Kind", KINDS[e.kind].w]] : []}
-      actions=${e && MBY[e.host] ? html`<${Button} onClick=${() => go("registry", e.host)}>See it in Registry<//>` : null} />
+      actions=${e && MBY[e.host] ? html`<${Button} onClick=${() => go("registry", e.host)}>See it in Registry →<//>` : null} />
     <${Panel} title="Events over time" sub=${brush ? `selected ${fmtT(brush[0], range)} – ${hhmm(brush[1])}` : "drag across the chart to narrow the list"} extra=${brush ? html`<${Button} size="small" onClick=${() => setBrush(null)}>Clear selection<//>` : null}>
       <${EventHistogram} entries=${AUDIT.filter((x) => !kind || x.kind === kind)} range=${range} brush=${brush} onBrush=${setBrush} height=${150} />
     <//>
@@ -5568,9 +5590,9 @@ function DepartmentsPage({ go, enter, open }) {
     <${ItemBoard} picked=${!!sel} open=${!!d} onClose=${() => setSel(null)} title=${d ? d.name : ""}
       facts=${d ? [["Admins", d.admins.length ? listNames(d.admins, 3) : html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`], ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
         ["Open issues", d.iss.length ? `${fmt(d.iss.length)}${d.crit ? ` · ${d.crit} critical` : ""}` : "None"], ["Reports handled in", st.mtta || "—"], ["On 1.4.2", `${fmt(d.ok)} of ${fmt(d.ms.length)}`]] : []}
-      actions=${d ? html`${d.admins.length ? d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} onClick=${() => enter(a)}>Enter ${a}'s console<//>`) : html`<${Button} type="primary" onClick=${() => go("overview")}>Appoint an Admin<//>`}<${Button} type=${d.admins.length ? "primary" : "default"} onClick=${() => go("dept", d.id)}>Department page<//>` : null}>
+      actions=${d ? html`${d.admins.length ? d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} onClick=${() => enter(a)}>Enter ${a}'s console →<//>`) : null}<${Button} type="primary" onClick=${() => go("dept", d.id)}>${d.admins.length ? "Department page →" : "Appoint one on its page →"}<//>` : null}>
       ${d ? html`<div><div className="nt-h">Machines</div><${MiniTiles} ms=${d.ms} go=${go} /></div>
-        <div><div className="nt-h">Worst open issues</div>${d.iss.length ? d.iss.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]).slice(0, 5).map((i) => html`<div key=${i.id} className="irow" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto", padding: "7px 0" }} role="button" tabIndex="0" onClick=${() => go("issues", i.id)}>
+        <div><div className="nt-h">Worst open issues</div>${d.iss.length ? d.iss.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]).slice(0, 5).map((i) => html`<div key=${i.id} className="irow" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto", padding: "7px 0", cursor: "default" }}>
           <i style=${{ background: SEV[i.sev].c }} /><span className="ttl">${i.title}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${i.host}</span></div>`) : html`<div className="t3">Nothing open.</div>`}</div>` : null}
     <//>
     <${OrgDay} go=${go} />
@@ -5601,7 +5623,7 @@ function AccessPage({ go, open }) {
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!x} onClose=${() => setSel(null)} title=${x ? `${x.b[3]} on ${x.host}` : ""}
       facts=${x ? [["Kind", OCC[x.b[2]].w], ["From", hhmm(x.b[0])], ["Until", x.b[1] >= NOWH ? "now" : hhmm(x.b[1])], ["Owner locked out", ownerOf(x.host)], ["Department", MBY[x.host] ? deptNameOf(MBY[x.host].dept) : "—"], ...(x.b[4] ? [["Flag", html`<span style=${{ color: "var(--crit)" }}>Outside working hours</span>`]] : [])] : []}
-      actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry<//>` : null} />
+      actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry →<//>` : null} />
     <${Occupancy} />
   <//>`;
 }
@@ -5673,7 +5695,7 @@ function Registry({ go, enter, open }) {
       facts=${m ? [["Department", m.dn], ["Signed in", m.user || "No one"], ["IP address", html`<span className="mono">${m.ip}</span>`], ["Version", m.ver], ["Key", `no. ${m.gen}`], ["Last seen", m.seen > 0.1 ? dur(m.seen) + " ago" : "now"]]
         : ac ? [["Role", ac.role], ["Department", ac.dept], ["Workstation", html`<span className="mono">${ac.ws}</span>`], ["Key", `no. ${ac.gen}`], ["Now", ac.now]] : []}
       actions=${m ? html`${(() => { const ad = (DBY[m.dept] || { admins: [] }).admins;
-        return ad.length ? html`<${Button} icon=${ic("LoginOutlined")} onClick=${() => enter(ad[0], { page: "machines", sub: m.host })}>Work on it in ${ad[0]}'s console<//>`
+        return ad.length ? html`<${Button} icon=${ic("LoginOutlined")} onClick=${() => enter(ad[0], { page: "machines", sub: m.host })}>Work on it in ${ad[0]}'s console →<//>`
           : html`<${Tooltip} title=${`${m.dn} has no Admin, so there is no console to work on it in. Appoint one first.`}><span><${Button} disabled>No Admin to work on it<//></span><//>`; })()}<${Button} type="primary" danger onClick=${() => rekey(m.host)}>Make a new key<//>`
         : ac ? html`${ac.role === "Admin" ? html`<${Button} danger onClick=${() => toast(`Removed ${ac.name} (concept)`)}>Stop being an Admin<//>` : null}<${Button} type="primary" danger onClick=${() => rekey(ac.name === "You" ? "your account" : ac.name)}>Make a new key<//>` : null} />
     <${Panel} flush title="Refused connections" sub="tried to connect this week without a valid key · click one to see it below">
@@ -5700,7 +5722,8 @@ function ReportsSU({ go, enter, open }) {
   const state = (r) => (r.addressed ? "done" : owner(r) === "dept" ? "dept" : "you");
   const took = R.filter((r) => r.addressed && r.addressed.took).map((r) => r.addressed.took).sort((a, b) => a - b), med = took.length ? took[took.length >> 1] : null;
   const order = { you: 0, dept: 1, done: 2 };
-  const rows = R.filter((r) => (!view || state(r) === view) && `${r.cat} ${r.what} ${r.host} ${deptNameOf(r.dept)}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => order[state(a)] - order[state(b)]);
+  const [dept, setDept] = useState(null);
+  const rows = R.filter((r) => (!view || state(r) === view) && (!dept || r.dept === dept) && `${r.cat} ${r.what} ${r.host} ${deptNameOf(r.dept)}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => order[state(a)] - order[state(b)]);
   const depts = FULL_DEPTS().filter((d) => d.admins.length).map((d) => { const mine = R.filter((r) => r.dept === d.id && owner(r) === "dept"), done = mine.filter((r) => r.addressed && r.addressed.took), t = done.map((r) => r.addressed.took).sort((a, b) => a - b);
     return { d, wait: mine.filter((r) => !r.addressed).length, done: done.length, med: t.length ? t[t.length >> 1] : null }; }).sort((a, b) => b.wait - a.wait);
   const r = R.find((x) => x.id === sel) || rows[0];
@@ -5717,8 +5740,8 @@ function ReportsSU({ go, enter, open }) {
         cols=${[{ title: "What", width: 260, text: (x) => x.what }, { title: "Goes to", width: 170, text: (x) => (owner(x) === "dept" ? `You and ${deptNameOf(x.dept)}` : "You only") }, { title: "Written", width: 110, text: written }]}
         now=${(x) => (state(x) === "done" ? [`Addressed · ${x.addressed.by}`, "good"] : state(x) === "dept" ? ["With the department", "wait"] : ["Waiting on you", "bad"])}
         empty=${!R.length ? html`<${Empty} icon="FileTextOutlined" title="No reports yet" text="The system writes a report when something needs a person. Each one, where it went and how fast it was dealt with appears here." h=${200} />` : null} />
-      <${RailPanel} title="Handling" sub="how fast each department deals with its reports" more="departments"
-        items=${depts.map((x) => ({ key: x.d.id, title: x.d.name, line: `${x.wait} waiting · ${x.done} addressed`, right: x.med == null ? "—" : mins(x.med), c: x.med != null && x.med > 60 ? "var(--med)" : "var(--ok)", onClick: () => go("departments", x.d.id) }))}
+      <${RailPanel} title="Handling" sub="how fast each department deals with its reports · click one to filter the list" more="departments"
+        items=${depts.map((x) => ({ key: x.d.id, title: x.d.name, line: `${x.wait} waiting · ${x.done} addressed`, right: x.med == null ? "—" : mins(x.med), c: x.med != null && x.med > 60 ? "var(--med)" : "var(--ok)", on: dept === x.d.id, onClick: () => setDept(dept === x.d.id ? null : x.d.id) }))}
         empty=${html`<${Empty} icon="ApartmentOutlined" title="No department handles reports yet" text="Route a kind of report to a department with an Admin, below." h=${200} />`} />
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!r} onClose=${() => setSel(null)} title=${r ? r.cat : ""}
@@ -5740,20 +5763,20 @@ function SUOverview({ go }) {
   return html`<${React.Fragment}>
     <div className="kpis">
       <${Kpi} label="Waiting on you" value=${fmt(Q.length)} delta=${Q.length ? `${urgent} urgent` : "Nothing waiting"} dc=${urgent ? "var(--crit)" : undefined} fn=${(t) => Math.max(1, Math.round(Q.length * (0.5 + 0.5 * sm(9, t, 0.15))))} sc="var(--s6)" />
-      <${Kpi} onClick=${() => go("accountability")} label="Open deviations" value=${fmt(open.length)} delta=${open.length ? `${hi} critical or high` : "Every rule kept"} dc=${hi ? "var(--crit)" : undefined} fn=${(t) => Math.round(open.length * (0.55 + 0.45 * sm(5, t, 0.2)))} sc="var(--s6)" />
+      <${Kpi} label="Open deviations" value=${fmt(open.length)} delta=${open.length ? `${hi} critical or high` : "Every rule kept"} dc=${hi ? "var(--crit)" : undefined} fn=${(t) => Math.round(open.length * (0.55 + 0.45 * sm(5, t, 0.2)))} sc="var(--s6)" />
       <${Kpi} none=${none} nv=${"0"} nt="No machines yet" label="Machines online" value=${fmt(ms.length - off.length)} unit=${"/ " + fmt(ms.length)} delta=${off.length ? `${off.length === 1 ? off[0].host + " is" : fmt(off.length) + " are"} offline` : "All online"} fn=${(t) => ms.length - (off.length && t >= 2.52 ? off.length : 0)} max=${ms.length} sc="var(--s6)" />
-      <${Kpi} onClick=${() => go("rollout")} none=${none} nt="No machines yet" label="On current version" value=${none ? "—" : String(Math.round(((ms.length - bh) / ms.length) * 100))} unit="%" delta=${bh ? `${fmt(bh)} holding 1.4.3 back` : "1.4.3 can be approved"} dc=${bh ? "var(--med)" : undefined} fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} max=${11} sc="var(--s6)" />
+      <${Kpi} none=${none} nt="No machines yet" label="On current version" value=${none ? "—" : String(Math.round(((ms.length - bh) / ms.length) * 100))} unit="%" delta=${bh ? `${fmt(bh)} holding 1.4.3 back` : "1.4.3 can be approved"} dc=${bh ? "var(--med)" : undefined} fn=${(t) => Math.min(9, Math.max(0, Math.round((t + 140) / 15)))} max=${11} sc="var(--s6)" />
     </div>
     <div className="g c-75">
-      <${Panel} title="Fleet" sub=${`${fmt(ms.length)} machines · click one to open it`} extra=${html`<${Segmented} size="small" value=${by} onChange=${setBy} options=${["Status", "CPU", "Version", "Check-in"]} />`}>
-        ${none ? html`<${Empty} icon="DesktopOutlined" title="No machines yet" text="Machines appear here by department as they are registered." act="Open Registry" onAct=${() => go("registry")} h=${220} />` : html`<${HostMap} by=${by} onOpen=${(h) => go("registry", h)} onMore=${() => go("departments")} />`}
+      <${Panel} title="Fleet" sub=${`${fmt(ms.length)} machines · click one to see its card`} extra=${html`<${Segmented} size="small" value=${by} onChange=${setBy} options=${["Status", "CPU", "Version", "Check-in"]} />`}>
+        ${none ? html`<${Empty} icon="DesktopOutlined" title="No machines yet" text="Machines appear here by department as they are registered." act="Open Registry →" onAct=${() => go("registry")} h=${220} />` : html`<${HostMap} by=${by} onOpen=${(h) => go("registry", h)} openLabel=${(h) => `See ${h} in Registry →`} onMore=${() => go("departments")} moreLabel="on Departments →" />`}
       <//>
       <${Panel} title="Waiting on you" sub="click one to decide it" flush>
         <${WaitList} onOpen=${setDec} />
       <//>
     </div>
     <div className="g c-75">
-      <${Panel} title="Deviations, 7 days" sub="by severity · broken rules with someone to ask" extra=${html`<${Button} size="small" type="link" onClick=${() => go("accountability")}>Accountability<//>`}>
+      <${Panel} title="Deviations, 7 days" sub="by severity · broken rules with someone to ask" extra=${html`<${Button} size="small" type="link" onClick=${() => go("accountability")}>Accountability →<//>`}>
         ${DEVIATIONS.length ? html`<${DayBars} series=${days} height=${214} />` : html`<${Empty} icon="BarChartOutlined" title="No deviations yet" text="Each day's broken rules, by severity." h=${170} />`}
       <//>
       <${Panel} title="Worth a look" sub="worst open first" flush>
