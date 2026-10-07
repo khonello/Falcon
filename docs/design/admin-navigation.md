@@ -28,7 +28,7 @@ something, and confirmations are not navigation and are left out.
 | A. Same level: Admin page → Admin page (own department) | 32 rows below (some group several links) | fine, except 4 marked ⚠ |
 | B. Up: to the Super User's level | 2 places | fine: explicit |
 | C. Down: into a worker's PC | 2 kinds | one fine, one ⚠ |
-| D. Breaks a rule or goes wrong | 9 | **to fix** |
+| D. Breaks a rule or goes wrong | 9 | **fixed**, see *Fixed* below |
 | E. Out of the app (concept only) | 2 | not product |
 
 ## A. Same level (Admin page → Admin page)
@@ -115,7 +115,31 @@ Drawn nowhere inside the console, so not reachable there: every Super User page 
 Access, Registry, Reports, Rules, Rollout, Audit log and the Super User's Overview, Tasks, Flows), and the unused
 components listed in su-navigation.md.
 
-## Proposed fixes (to decide)
+## Fixed (7 Oct 2026, concept version 156)
+
+| # | Now |
+|---|---|
+| D1 | Inside a console, *+N more copies* opens Issues with *Restricted file* already picked in its type filter. At the Super User's level it still opens Accountability. |
+| D2 | A rule's *On* lists only this department's machines, and says so: "7 of its 11 machines are in this department; the rest belong to others." *Test on one machine* uses one of them. |
+| D3 | The console refuses another department's machine, issue or task by address, and another person's flow or the Super User's rule in the editor. It opens the list (or the rule's page) with a bar: *That is not this console's.* and why, e.g. "FIN-01 belongs to Finance, so it does not open in this console." |
+| D4 | On a rule the Super User set, *Edit* and *Enabled* are disabled (on the rule page and in the Automation list), with the reason on hover; *Owner* reads "Super User", not "You". A custom action the Super User wrote has *Edit script* disabled the same way. |
+| D5 | *Enter … and look yourself* and *Look into it first* ask the same question as the machine page's *Enter session* (one shared `enterSessionConfirm`), before anything happens. |
+| D6 | *Edit script* opens the editor filled in with that action (name, description, language, script, limit), titled *Edit …*, with *Save changes*; Cancel and Save return to the action. Address `#actions/edit-<id>`. |
+| D7 | Search's action is *Run an action once…*, opening Actions. |
+| D8 | The machine page says *The copy of restricted files on OPS-03 →* (or *The 2 copies …*), opening Issues narrowed to restricted files on that machine, with an *on OPS-03 ×* tag to widen it; with none, it says so and links nowhere. |
+| D9 | Search offers *Leave your session on …* only for sessions held by the person at this console. |
+
+Checked in R. Mensah's console (Operations): `#automation/daily` (machine list, disabled Edit, Owner Super
+User), `#automation/edit-daily`, `#machines/FIN-01`, `#flows/edit-payroll-pdf`, `#issues/UPD-0318` (refused, with
+the bar), `#actions/edit-mapdrive` (his own, editor filled in), `#actions/temp` (the Super User's, *Edit script*
+disabled), `#automation` (the Super User's rules' *Enabled* greyed). The Super User's Overview and Restricted still
+draw as before. Not exercised headless, read in the code only: D1 (needs more than five copies), D5's confirmation,
+D8 (on the machine page's Files tab), D7 and D9 (in Search).
+
+Still to decide, not navigation: an organisation-wide rule's *Firings*, *Each action* and *Runs today* still count
+and name runs on other departments' machines as plain text (e.g. "Check disk health · FIN-01 · Failed").
+
+## Proposed fixes (as written before they were applied)
 
 1. **D1:** inside a console, *+N more copies* opens Issues showing restricted-file issues only (a type filter carried
    in, like Overview's *Show in audit log*).
