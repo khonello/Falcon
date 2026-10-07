@@ -1062,6 +1062,15 @@ function MachineList({ go }) {
     <div className="t3" style=${{ fontSize: 12, padding: "10px 14px", borderTop: "1px solid var(--border)" }}>Memory, processes, files and the full history are on each machine's page.</div>
   <//>`;
 }
+// Entering a worker's PC, wherever it is started from (machine page, an issue): the same check every time, who is in
+// it now and whether they are ended, so the issue page cannot skip Session Blocking (admin-navigation.md D5).
+const enterSessionConfirm = (m, onOk) => ({
+  title: m.held ? `End ${m.held}'s session and enter ${m.host}?` : `Enter ${m.host}?`,
+  content: m.held ? `${m.held} is in this machine now and is not warned first. ${m.user} stays locked out while you are in.` : m.user ? `${m.user} is signed in and is locked out while you are in. You get 30 minutes, and can extend them.` : "No one is signed in. You get 30 minutes, and can extend them.",
+  okText: m.held ? "End and enter" : "Enter", okButtonProps: { danger: !!m.held }, cancelText: "Cancel", onOk,
+});
+// Issues can be opened already narrowed (a type, a machine), from Restricted or a machine page
+let ISSUE_PRESET = null;
 function MachineDetail({ host, range, go }) {
   const m = MBY[host];
   const marks = host === "OPS-07" ? [{ t: 10.03, label: "budget-2026.xlsx detected", c: "var(--crit)" }, { t: 10.7, label: "You entered", c: "var(--accent)" }, { t: 8.92, label: "Lock the screen ran", c: "var(--s3)" }]
@@ -1069,12 +1078,7 @@ function MachineDetail({ host, range, go }) {
     : host === "LOG-02" ? [{ t: 2.23, label: "A. Quaye entered", c: "var(--s3)" }, { t: 2.52, label: "Went offline", c: "var(--crit)" }] : [];
   const events = AUDIT.filter((e) => e.host === host).slice(-12).reverse();
   const [modal, modalCtx] = Modal.useModal();
-  const enter = () => modal.confirm({
-    title: m.held ? `End ${m.held}'s session and enter ${m.host}?` : `Enter ${m.host}?`,
-    content: m.held ? `${m.held} is in this machine now and is not warned first. ${m.user} stays locked out while you are in.` : m.user ? `${m.user} is signed in and is locked out while you are in. You get 30 minutes, and can extend them.` : "No one is signed in. You get 30 minutes, and can extend them.",
-    okText: m.held ? "End and enter" : "Enter", okButtonProps: { danger: !!m.held }, cancelText: "Cancel",
-    onOk: () => toast(`Entered ${m.host} (concept)`),
-  });
+  const enter = () => modal.confirm(enterSessionConfirm(m, () => toast(`Entered ${m.host} (concept)`)));
   const procs = [["EXCEL.EXE", 6120, 18.2, 412, "Ama"], ["explorer.exe", 4408, 1.1, 96, "Ama"], ["falcon-worker.exe", 2284, 0.6, 58, "SYSTEM"], ["msedge.exe", 7712, 4.9, 380, "Ama"], ["OUTLOOK.EXE", 5120, 2.2, 210, "Ama"], ["svchost.exe", 1032, 0.4, 24, "SYSTEM"]];
   const tabs = [
     { key: "metrics", label: "Metrics", children: html`<div className="g c-66">
@@ -1094,7 +1098,8 @@ function MachineDetail({ host, range, go }) {
     { key: "files", label: "Files", children: html`<${Panel}><div className="g c-66">
       <div><div className="t3" style=${{ marginBottom: 8 }}>Indexed files</div>
         ${[["Shared with everyone", 120, "var(--s6)"], ["Department files", 41, "var(--s2)"], ["Marked restricted here", MARKS.filter((k) => k.host === host).reduce((a, k) => a + k.files, 0), "var(--accent)"], ["Copies of restricted files", ISSUES.filter((i) => i.type === "file" && i.host === host).length, "var(--crit)"]].map(([k, v, c]) => html`<div key=${k} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0" }}><span style=${{ width: 190 }}>${k}</span><${Bar} v=${v} max=${120} c=${c} w=${140} /><span className="mono" style=${{ color: c === "var(--crit)" && v ? "var(--crit)" : "inherit" }}>${v}</span></div>`)}
-        <div style=${{ marginTop: 6 }}><a onClick=${() => go("restricted")}>Restricted files ${ic("ArrowRightOutlined")}</a></div></div>
+        ${(() => { const n0 = ISSUES.filter((i) => i.type === "file" && i.host === host).length;
+          return html`<div style=${{ marginTop: 6 }}>${n0 ? html`<a onClick=${() => { ISSUE_PRESET = { type: "file", host }; go("issues"); }}>${n0 === 1 ? "The copy" : `The ${n0} copies`} of restricted files on ${host} ${ic("ArrowRightOutlined")}</a>` : html`<span className="t3">No copy of a restricted file is on ${host}.</span>`}</div>`; })()}</div>
       <div><div className="t3" style=${{ marginBottom: 8 }}>Index coverage</div><div className="row"><span style=${{ fontSize: 22, fontWeight: 600 }}>98.6%</span><span className="t3">last idle sweep 06:12 · 4,210 files · native watcher active</span></div></div>
     </div><//>` },
   ];
@@ -1352,14 +1357,17 @@ function IssueTimeline({ it, extra }) {
     <span><span style=${{ fontWeight: 500 }}>${who}</span> <span className="t2">${what}</span></span></div>`)}</div>`;
 }
 function Issues({ sel, go }) {
+  const [modal, modalCtx] = Modal.useModal();
+  const [preset] = useState(() => { const p0 = ISSUE_PRESET; ISSUE_PRESET = null; return p0 || {}; });
+  const [hf, setHf] = useState(preset.host || null);
   const [state, setState] = useState(ISTATE0);
   const [pick, setPick] = useState({});
   const [input, setInput] = useState({});
   const [notify, setNotify] = useState(true);
   const id = sel && ISSUES.find((i) => i.id === sel) ? sel : ISSUES[0] ? ISSUES[0].id : null;
   const it = ISSUES.find((i) => i.id === id), stt = it && state[id], play = it && buildPlay(it), T = it && ISSUE_TYPES[it.type];
-  const [tf, setTf] = useState("all");
-  const opg = usePaged(ISSUES.filter((i) => (tf === "all" || i.type === tf) && state[i.id].status !== "Resolved"), 10, tf);
+  const [tf, setTf] = useState(preset.type || "all");
+  const opg = usePaged(ISSUES.filter((i) => (tf === "all" || i.type === tf) && (!hf || i.host === hf) && state[i.id].status !== "Resolved"), 10, tf + (hf || ""));
   if (!it) return html`<${Panel} title="Issues"><div className="t3">Nothing is open in this department.</div><//>`;
   const opt = play.options.find((o) => o.key === (pick[id] || play.options[0].key));
   const age = NOWH - it.at, late = age > it.sla && stt.status !== "Resolved";
@@ -1368,14 +1376,16 @@ function Issues({ sel, go }) {
   const upd = (f) => setState((x) => ({ ...x, [id]: { ...x[id], ...f(x[id]) } }));
   const val = input[id + opt.key] || "";
   const missing = (opt.need === "reason" || opt.need === "message") && !val.trim() ? (opt.need === "reason" ? "Write a reason first." : "Write a message first.") : opt.need === "pick" && !val ? "Pick one first." : null;
-  const act = () => {
+  // entering the machine from an issue goes through the same check as the machine page
+  const act = () => (opt.key === "enter" || opt.key === "look") ? modal.confirm(enterSessionConfirm(MBY[it.host], doAct)) : doAct();
+  const doAct = () => {
     const extra = opt.need === "pick" ? `: ${val}` : "";
     const lines = [[nowT(), opt.log + extra + (opt.need === "reason" ? `: “${val.trim()}”` : "")]];
     if (play.notify && notify && opt.done === "Resolved") lines.push([nowT(), `Told ${play.notify} what happened and why`]);
     upd((x) => ({ status: opt.done, log: [...x.log, ...lines], msg: opt.need === "message" ? val.trim() : x.msg, how: opt.title }));
     toast(`${opt.verb}: done (concept)`);
   };
-  const shown = ISSUES.filter((i) => tf === "all" || i.type === tf);
+  const shown = ISSUES.filter((i) => (tf === "all" || i.type === tf) && (!hf || i.host === hf));
   const open = shown.filter((i) => state[i.id].status !== "Resolved"), done = shown.filter((i) => state[i.id].status === "Resolved");
   const row = (i) => { const a = NOWH - i.at, ss = state[i.id].status, res = ss === "Resolved";
     return html`<div key=${i.id} className=${"irow" + (i.id === id ? " on" : "")} role="button" tabIndex="0" onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)} title=${SEV[i.sev].w} style=${{ opacity: res ? 0.6 : 1 }}>
@@ -1391,8 +1401,8 @@ function Issues({ sel, go }) {
         ${[["Detected", it.at < 0 ? `${dayOf(it.at)} ${hhmm(it.at)}` : `Today ${hhmm(it.at)}`], ["Target time", it.sla + " h"], ["Department", DBY[MBY[it.host].dept].name], ["Routed to", MBY[it.host].dept === "log" ? "Super User only" : "Super User, " + DBY[MBY[it.host].dept].name], ["Type", T.label], ["Comes from", T.from], ["ID", it.id]]
           .map(([k, v]) => html`<div key=${k}><div className="k">${k}</div><div className="v">${v}</div></div>`)}</div>` },
   ];
-  return html`<div className="g c-48">
-    <${Panel} flush title=${`${open.length} open`} extra=${html`<${Pager} p=${opg} /><${Select} size="small" value=${tf} onChange=${setTf} style=${{ width: 160 }} options=${[{ value: "all", label: "All types" }, ...Object.keys(ISSUE_TYPES).map((k) => ({ value: k, label: `${ISSUE_TYPES[k].label} · ${ISSUES.filter((i) => i.type === k).length}` }))]} />`}>
+  return html`<${React.Fragment}>${modalCtx}<div className="g c-48">
+    <${Panel} flush title=${`${open.length} open`} extra=${html`${hf ? html`<span className="tag" style=${{ "--c": "var(--text-3)" }}>on ${hf} <a style=${{ marginLeft: 4 }} onClick=${() => setHf(null)} aria-label="Show every machine">${ic("CloseOutlined")}</a></span>` : null}<${Pager} p=${opg} /><${Select} size="small" value=${tf} onChange=${setTf} style=${{ width: 160 }} options=${[{ value: "all", label: "All types" }, ...Object.keys(ISSUE_TYPES).map((k) => ({ value: k, label: `${ISSUE_TYPES[k].label} · ${ISSUES.filter((i) => i.type === k).length}` }))]} />`}>
       ${open.length + done.length === 0 ? html`<div className="t3" style=${{ padding: 14 }}>No issues of this type.</div>` : null}
       ${opg.items.map(row)}
       ${done.length ? html`<div className="t3" style=${{ padding: "10px 14px 6px", fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", background: "var(--surface-2)", borderBottom: "1px solid var(--grid)" }}>Done today · ${done.length}</div>${done.slice(0, 5).map(row)}${done.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${done.length - 5} what="done today" onClick=${() => go("audit")} /></div>` : null}` : null}
@@ -1453,7 +1463,7 @@ function Issues({ sel, go }) {
         <div style=${{ padding: "4px 16px 12px" }}><${Tabs} key=${it.id} size="small" items=${tabs} /></div>
       </section>
     </div>
-  </div>`;
+  </div><//>`;
 }
 
 // ============================================================== TASKS
@@ -2744,7 +2754,7 @@ function Automation({ go }) {
   return html`<${React.Fragment}>
     <${Panel} flush title="Rules" sub="click a rule to see how it is set up" extra=${html`<${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("automation", "new")}>New rule<//>`}>
       <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${RULES.map((r) => ({ ...r, key: r.id }))} onRow=${(r) => ({ onClick: () => go("automation", r.id), className: "clickrow" })} columns=${[
-        { title: "Enabled", width: 76, align: "center", render: (r) => html`<span onClick=${(e) => e.stopPropagation()}><${Checkbox} checked=${on[r.id]} aria-label=${"Enable " + r.name} onChange=${(e) => { setOn({ ...on, [r.id]: e.target.checked }); toast(`${r.name} ${e.target.checked ? "enabled" : "disabled"} (concept)`); }} /></span>` },
+        { title: "Enabled", width: 76, align: "center", render: (r) => html`<span onClick=${(e) => e.stopPropagation()} title=${r.by === "You" ? "Set by the Super User. Only they can switch it." : ""}><${Checkbox} disabled=${r.by === "You"} checked=${on[r.id]} aria-label=${"Enable " + r.name} onChange=${(e) => { setOn({ ...on, [r.id]: e.target.checked }); toast(`${r.name} ${e.target.checked ? "enabled" : "disabled"} (concept)`); }} /></span>` },
         { title: "Rule", render: (r) => html`<div><a style=${{ fontWeight: 500 }}>${r.name}</a><div className="t2" style=${{ fontSize: 12 }}>${sentence(r)}</div></div>` },
         { title: "Trigger", width: 100, render: (r) => html`<${Tag} c=${KINDC[r.kind]}>${r.kind}<//>` },
         { title: "Fired, 7 days", width: 130, render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><svg width="70" height="20" style=${{ display: "block" }}>${r.perDay.map((v, i) => html`<rect key=${i} x=${i * 10} y=${20 - Math.max(1, (v / 4) * 18)} width="7" height=${Math.max(1, (v / 4) * 18)} style=${{ fill: v ? "var(--s3)" : "var(--surface-3)" }} />`)}</svg><span className="mono">${r.perDay.reduce((a, b) => a + b, 0)}</span></div>` },
@@ -2796,7 +2806,11 @@ function RuleDetail({ id, go }) {
   const allRuns = fires.flatMap((f) => f.runs);
   const problems = allRuns.filter((x) => x.outcome !== "Success").length;
   const shown = showAll ? fires : fires.slice(0, 6);
-  const tm = r.hosts.map((h) => MBY[h]).filter(Boolean);
+  // an Admin's console is one department: an organisation-wide rule shows only that department's machines here
+  const allM = r.hosts.map((h) => MBY[h]).filter(Boolean), inD = new Set(MACHINES.map((m) => m.host));
+  const tm = allM.filter((m) => inD.has(m.host)), elsewhere = allM.length - tm.length;
+  // a rule the Super User set is theirs: seen here, not changed or switched (admin-navigation.md D4)
+  const su = r.by === "You", owner = su ? "Super User" : r.by;
   return html`<${React.Fragment}>
     <div className="panel" style=${{ padding: 16 }}>
       <div className="row" style=${{ justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -2805,13 +2819,13 @@ function RuleDetail({ id, go }) {
           <div className="t2" style=${{ marginTop: 3 }}>${sentence(r)}</div>
         </div>
         <div className="row">
-          <${Checkbox} checked=${on} onChange=${(e) => { setOn(e.target.checked); toast(`${r.name} ${e.target.checked ? "enabled" : "disabled"} (concept)`); }}>Enabled<//>
-          <${Button} onClick=${() => toast("Ran once on " + r.hosts[0] + " (concept)")}>Test on one machine<//>
-          <${Button} type="primary" icon=${ic("EditOutlined")} onClick=${() => go("automation", "edit-" + id)}>Edit<//>
+          <${Tooltip} title=${su ? "Set by the Super User. Only they can switch it." : ""}><span><${Checkbox} disabled=${su} checked=${on} onChange=${(e) => { setOn(e.target.checked); toast(`${r.name} ${e.target.checked ? "enabled" : "disabled"} (concept)`); }}>Enabled<//></span><//>
+          <${Button} disabled=${!tm.length} onClick=${() => toast("Ran once on " + tm[0].host + " (concept)")}>Test on one machine<//>
+          <${Tooltip} title=${su ? "Set by the Super User for the whole organisation. Only they can change it; start a copy of your own from New rule." : ""}><span><${Button} type="primary" icon=${ic("EditOutlined")} disabled=${su} onClick=${() => go("automation", "edit-" + id)}>Edit<//></span><//>
         </div>
       </div>
       <div className="row" style=${{ marginTop: 14, gap: 28 }}>
-        ${[["Status", html`<span className="st" style=${{ "--c": on ? "var(--ok)" : "var(--text-4)" }}><i />${on ? "Enabled" : "Disabled"}</span>`], ["Last fired", `Today ${r.last}`], ["Fired, 7 days", fires.length], ["Action runs, 7 days", allRuns.length], ["Problems, 7 days", html`<span style=${{ color: problems ? "var(--med)" : "inherit" }}>${problems}</span>`], ["Owner", r.by]]
+        ${[["Status", html`<span className="st" style=${{ "--c": on ? "var(--ok)" : "var(--text-4)" }}><i />${on ? "Enabled" : "Disabled"}</span>`], ["Last fired", `Today ${r.last}`], ["Fired, 7 days", fires.length], ["Action runs, 7 days", allRuns.length], ["Problems, 7 days", html`<span style=${{ color: problems ? "var(--med)" : "inherit" }}>${problems}</span>`], ["Owner", owner]]
           .map(([k, v]) => html`<div key=${k}><div className="t3" style=${{ fontSize: 12 }}>${k}</div><div style=${{ fontWeight: 500, fontSize: 15 }}>${v}</div></div>`)}
       </div>
     </div>
@@ -2822,7 +2836,7 @@ function RuleDetail({ id, go }) {
           <div style=${{ fontSize: 14, fontWeight: 500 }}>${r.when.charAt(0).toUpperCase() + r.when.slice(1)}</div>
         <//>
         <${Arrow} />
-        <${FlowStep} icon="DesktopOutlined" label="On" c="var(--s1)" foot=${tm.some((m) => m.status === "offline") ? "LOG-02 is offline. The rule applies again when it is back." : `${tm.length} machines, all online`}>
+        <${FlowStep} icon="DesktopOutlined" label="On" c="var(--s1)" foot=${`${elsewhere ? `${fmt(tm.length)} of its ${fmt(allM.length)} machines are in this department; the rest belong to others. ` : ""}${tm.some((m) => m.status === "offline") ? `${tm.filter((m) => m.status === "offline").map((m) => m.host).join(", ")} offline; the rule applies again when back.` : `${fmt(tm.length)} machine${tm.length === 1 ? "" : "s"}, all online`}`}>
           <div style=${{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>${r.scope === "All machines" ? "Every machine" : r.scope}</div>
           <div className="row" style=${{ gap: 4 }}>${pickShown(tm, 8).shown.map((m) => html`<a key=${m.host} className="tag mono" style=${{ "--c": m.status === "offline" ? "var(--text-4)" : "var(--text-3)" }} onClick=${() => go("machines", m.host)}>${m.host}</a>`)}${tm.length > 8 ? html`<${More} n=${tm.length - 8} what="machines" onClick=${() => go("machines")} />` : null}</div>
         <//>
@@ -3253,7 +3267,7 @@ function ActionDetail({ id, go }) {
           <div><div style=${{ fontSize: 19, fontWeight: 600 }}>${a.name}</div><div className="t2">${a.desc}</div></div>
         </div>
         <div className="row">
-          ${a.cat === "Custom" ? html`<${Button} icon=${ic("EditOutlined")} onClick=${() => go("actions", "new")}>Edit script<//>` : null}
+          ${a.cat === "Custom" ? html`<${Tooltip} title=${a.by === "You" ? "Written by the Super User. Only they can change it." : ""}><span><${Button} icon=${ic("EditOutlined")} disabled=${a.by === "You"} onClick=${() => go("actions", "edit-" + a.id)}>Edit script<//></span><//>` : null}
           <${Button} type="primary" icon=${ic("CaretRightOutlined")} onClick=${() => setRunA(a)}>Run once<//>
         </div>
       </div>
@@ -3306,18 +3320,19 @@ function checkScript(lang, src) {
   let depth = 0; for (const ch of src) { if (ch === "{") depth++; if (ch === "}") depth--; }
   return { compiles: depth === 0, used: [...new Set(used)], bad: [...new Set(bad)] };
 }
-function NewAction({ go }) {
-  const [name, setName] = useState("");
-  const [lang, setLang] = useState("Python");
-  const [src, setSrc] = useState("import os\nimport requests\n\n# write what the action does\nprint(os.environ[\"COMPUTERNAME\"])\n");
-  const [limit, setLimit] = useState(60);
-  const [desc, setDesc] = useState("");
+// New custom action, or (with from) editing one: the same form, filled in with that action's script
+function NewAction({ go, from }) {
+  const [name, setName] = useState(from ? from.name : "");
+  const [lang, setLang] = useState(from ? from.lang : "Python");
+  const [src, setSrc] = useState(from ? from.script : "import os\nimport requests\n\n# write what the action does\nprint(os.environ[\"COMPUTERNAME\"])\n");
+  const [limit, setLimit] = useState(from ? from.limit : 60);
+  const [desc, setDesc] = useState(from ? from.desc : "");
   const chk = checkScript(lang, src);
   const ok = chk.compiles && !chk.bad.length && name.trim();
   const switchLang = (l) => { setLang(l); setSrc(l === "Python" ? "import os\n\nprint(os.environ[\"COMPUTERNAME\"])\n" : "$name = $env:COMPUTERNAME\nWrite-Output $name\n"); };
   return html`<div style=${{ maxWidth: 1000, width: "100%", margin: "0 auto" }} className="g c-84">
     <section className="panel" style=${{ minWidth: 0 }}>
-      <div className="phd"><div className="pt">New custom action<small>a script the worker client runs on a machine</small></div></div>
+      <div className="phd"><div className="pt">${from ? `Edit ${from.name}` : "New custom action"}<small>a script the worker client runs on a machine${from ? " · rules that use it get the new version from their next run" : ""}</small></div></div>
       <div className="pbd" style=${{ display: "flex", flexDirection: "column", gap: 16 }}>
         <${Field} label="Name"><${Input} id="na-name" value=${name} onChange=${(e) => setName(e.target.value)} placeholder="e.g. Clear the print queue" style=${{ maxWidth: 360 }} /><//>
         <${Field} label="What it does"><${Input} id="na-desc" value=${desc} onChange=${(e) => setDesc(e.target.value)} placeholder="One line, shown in the library and when someone runs it" /><//>
@@ -3330,9 +3345,9 @@ function NewAction({ go }) {
         <${Field} label="Time limit"><${InputNumber} min=${1} max=${3600} value=${limit} onChange=${(v) => setLimit(v || 1)} style=${{ width: 100 }} /><span className="t3">seconds. Over it, the run is ended and counted as timed out.</span><//>
       </div>
       <div className="row" style=${{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
-        <span className="sp" /><${Button} onClick=${() => go("actions")}>Cancel<//>
+        <span className="sp" /><${Button} onClick=${() => go("actions", from ? from.id : undefined)}>Cancel<//>
         <${Button} disabled=${!ok} onClick=${() => toast("Ran once on OPS-03 (concept)")}>Test on one machine<//>
-        <${Button} type="primary" disabled=${!ok} onClick=${() => { toast("Saved to the library (concept)"); go("actions"); }}>Save action<//>
+        <${Button} type="primary" disabled=${!ok} onClick=${() => { toast(from ? "Saved · checked again on each machine when it arrives (concept)" : "Saved to the library (concept)"); go("actions", from ? from.id : undefined); }}>${from ? "Save changes" : "Save action"}<//>
       </div>
     </section>
     <section className="panel" style=${{ position: "sticky", top: 64, alignSelf: "start", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -5444,7 +5459,7 @@ function RestrictedSU({ go, open }) {
             <i style=${{ background: SEV[i.sev].c }} /><span style=${{ minWidth: 0 }}><span className="ttl mono" style=${{ display: "block" }}>${i.subject}</span><span className="t3" style=${{ fontSize: 12 }}>on <span className="mono">${i.host}</span></span></span>
             <span className="mono t3" style=${{ fontSize: 11.5 }}>${dur(NOWH - i.at)} ago</span></div>`)
           : html`<${Empty} icon="CheckOutlined" title="None found" text="A copy of something you marked, found where it is not allowed, appears here. It is never deleted for you." h=${170} />`}
-        ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${copies.length - 5} what="copies" onClick=${() => go("accountability")} /></div>` : null}
+        ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${copies.length - 5} what="copies" onClick=${() => { if (ME === "Super User") go("accountability"); else { ISSUE_PRESET = { type: "file" }; go("issues"); } }} /></div>` : null}
       <//>
     </div>
     ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; return k ? html`<${MarkBoard} key=${k.id} k=${k} picked=${sel === k.id} go=${go} refresh=${refresh} onUnmarked=${() => setSel(null)} copy=${copy} setCopy=${setCopy} />` : null; })()}
@@ -5790,10 +5805,11 @@ function Palette({ go, close, nav, su }) {
     ...nav.flatMap(([, xs]) => xs.map(([id, l, icon]) => ({ g: "Go to", l, icon, run: () => go(id) }))),
     ...MACHINES.map((m) => ({ g: "Machines", l: m.host, sub: `${m.user || "no user"} · ${STATUS[m.status].w}`, icon: "DesktopOutlined", mono: true, run: () => go("machines", m.host) })),
     ...ISSUES.map((x) => ({ g: "Issues", l: `${x.id} ${x.title}`, sub: `${x.host} · ${x.subject}`, icon: "AlertOutlined", run: () => go("issues", x.id) })),
-    { g: "Actions", l: "Leave session on OPS-07", sub: "Ama gets her machine back", icon: "LogoutOutlined", run: () => toast("Left OPS-07 (concept)") },
+    // only sessions the person at this console holds
+    ...MACHINES.filter((m) => m.held === (su ? "You" : ME)).map((m) => ({ g: "Actions", l: `Leave your session on ${m.host}`, sub: m.user ? `${m.user} gets the machine back` : "nobody is waiting for it", icon: "LogoutOutlined", run: () => toast(`Left ${m.host} (concept)`) })),
     // a Super User runs an action from an Admin's console, through traversal; search offers departments instead
     ...(su ? (FULL.DEPTS || DEPTS).map((d) => ({ g: "Departments", l: d.name, sub: d.admins.length ? listNames(d.admins) : "no Admin", icon: "ApartmentOutlined", run: () => go("dept", d.id) }))
-      : [{ g: "Actions", l: "Run action on a machine…", icon: "PlayCircleOutlined", run: () => go("automation") }]),
+      : [{ g: "Actions", l: "Run an action once…", sub: "pick it on Actions, then Run once", icon: "PlayCircleOutlined", run: () => go("actions") }]),
   ];
   // at most five per group; the rest are counted, and a sharper query finds them
   const PAL_GO = su ? { Machines: "registry", Issues: "departments", Departments: "departments" } : { Machines: "machines", Issues: "issues" };
@@ -5850,7 +5866,23 @@ function App() {
   const now = useNow(1000);
   applyScope(level ? level.dept : null);
   ME = level ? level.admin : "Super User";
-  const [rawPage, sub] = level ? [rawPage0, sub0] : suRoute(rawPage0, sub0);
+  let [rawPage, sub] = level ? [rawPage0, sub0] : suRoute(rawPage0, sub0);
+  // an Admin's console is one department, and does not change what the Super User owns: an address, a bookmark or a
+  // link that points elsewhere opens the list instead, and says why (admin-navigation.md D3, D4)
+  let refused = null;
+  if (level && sub) {
+    const deptOf = (h) => ((FULL.DEPTS || DEPTS).find((d) => d.id === (MBY[h] || {}).dept) || { name: "another department" }).name;
+    const fl = rawPage === "flows" && sub.startsWith("edit-") ? FBY[sub.slice(5)] : null;
+    const ru = rawPage === "automation" && sub.startsWith("edit-") ? RBY[sub.slice(5)] : null;
+    const isu = rawPage === "issues" ? (FULL.ISSUES || ISSUES).find((i) => i.id === sub) : null;
+    const tk = rawPage === "tasks" ? (FULL.TASKS || TASKS).find((t) => t.id === sub) : null;
+    if (rawPage === "machines" && MBY[sub] && !MACHINES.some((m) => m.host === sub)) refused = `${sub} belongs to ${deptOf(sub)}, so it does not open in this console.`;
+    else if (fl && fl.by !== level.admin) refused = `The ${fl.name} flow was made by ${fl.by === "Super User" ? "the Super User" : fl.by}. Only they, or the Super User, can change it.`;
+    else if (ru && ru.by === "You") refused = `${ru.name} was set by the Super User for the whole organisation. Only they can change it.`;
+    else if (isu && !ISSUES.includes(isu)) refused = `${isu.id} is about ${isu.host}, which belongs to ${deptOf(isu.host)}.`;
+    else if (tk && !TASKS.includes(tk)) refused = `${tk.id} is for ${tk.host}, which belongs to ${deptOf(tk.host)}.`;
+    if (refused) sub = rawPage === "automation" && ru ? ru.id : null;
+  }
   const nav = level ? NAV_ADMIN : NAV_SU;
   const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)));
   const page = allowed.has(rawPage) ? rawPage : "overview";
@@ -5884,7 +5916,7 @@ function App() {
   else if (page === "tasks") body = !level && (!sub || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${GivenToDepts} go=${go} open=${sub} />` : sub === "new" ? html`<${NewTask} go=${go} />` : sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} />`;
   else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : level ? html`<${Flows} go=${go} me=${level && level.admin} />` : html`<${FlowsSU} go=${go} open=${FBY[sub] ? sub : null} />`;
   else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} />`;
-  else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && ABY[sub] ? html`<${ActionDetail} key=${sub} id=${sub} go=${go} />` : html`<${Actions} go=${go} />`;
+  else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : sub && ABY[sub] ? html`<${ActionDetail} key=${sub} id=${sub} go=${go} />` : html`<${Actions} go=${go} />`;
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : sub && RBY[sub] ? html`<${RuleDetail} id=${sub} go=${go} />` : html`<${Automation} go=${go} />`;
   else if (page === "rollout") body = level ? html`<${Rollout} />` : html`<${RolloutSU} go=${go} open=${sub} />`;
   else if (page === "audit") body = level ? html`<${Audit} range=${range} />` : html`<${AuditSU} range=${range} go=${go} open=${sub} />`;
@@ -5894,7 +5926,7 @@ function App() {
   const openSub = !!sub && (page === "restricted" ? sub !== "mark" : !level && ((page === "tasks" && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || ["departments", "accountability", "reports", "access", "registry", "rollout", "audit"].includes(page) || (page === "rules" && !/^(new|from-|edit-)/.test(sub))));
   const csub = openSub ? null : sub;
   const crumbSub = csub && page === "machines" ? html`<a onClick=${() => go("machines")}>Machines</a><span>/</span><b className="mono">${sub}</b>`
-    : sub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span><b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>`
+    : sub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span>${sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<a onClick=${() => go("actions", sub.slice(5))}>${ABY[sub.slice(5)].name}</a><span>/</span><b>Edit</b>` : html`<b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>`}`
     : csub && page === "flows" ? html`<a onClick=${() => go("flows")}>Flows</a><span>/</span><b>${sub.startsWith("edit-") ? "Edit " + sub.slice(5) : "New flow"}</b>`
     : sub && page === "automation" ? html`<a onClick=${() => go(page)}>Automation</a><span>/</span>${sub.startsWith("edit-") && RBY[sub.slice(5)] ? html`<a onClick=${() => go("automation", sub.slice(5))}>${RBY[sub.slice(5)].name}</a><span>/</span><b>Edit</b>` : html`<b>${sub === "new" ? "New rule" : RBY[sub] ? RBY[sub].name : sub}</b>`}`
     : csub && page === "rules" ? html`<a onClick=${() => go("rules")}>Rules</a><span>/</span><b>${csub === "new" || csub.startsWith("from-") ? "New rule" : "Edit " + RULE_BY(csub.replace(/^edit-/, "")).name}</b>`
@@ -5952,6 +5984,7 @@ function App() {
         </header>
         <main className="content">
           ${!csub || !["machines", "tasks", "automation", "flows", "actions", "restricted", "rules"].includes(page) ? html`<div className="ph1"><div><h1>${title}</h1>${subtitle ? html`<div className="sub">${subtitle}</div>` : null}</div></div>` : null}
+          ${refused ? html`<div className="gate"><span style=${{ fontSize: 16 }}>${ic("StopOutlined")}</span><div><b style=${{ fontWeight: 600 }}>That is not this console's.</b> <span className="t2">${refused}</span></div></div>` : null}
           ${body}
         </main>
       </div>
