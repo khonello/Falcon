@@ -213,10 +213,10 @@ there, so a click may change the page only when:
    path back (*Flows / New flow*) and Cancel returns where you were.
 
 Everything else acts in place: rows, tiles, figures, chart marks, rail items and names select, filter, highlight, or
-show the item in the board under the list. A name is not a link to another page unless it says so with "→".
+show the item in the panel beside the list. A name is not a link to another page unless it says so with "→".
 
 One page is kept because a board cannot hold it: a machine's own page (charts, processes, sessions, files), reached
-only by *Open OPS-03's page →* in that machine's board.
+only by *Open OPS-03's page →* beside the machine in the list.
 
 ### Leaving the Super User's level
 
@@ -241,16 +241,52 @@ flows in the organisation; apply it in Organisation and Govern where it fits). I
      grey bar with its figure beside it (files covered, files copied, time used).
   3. **Now:** a dot and a few words. Green when it is fine, red when someone has to act, grey when it is waiting.
 - **Colour** is spent only in the Now dot. No coloured text, rings or badges in the other columns.
-- **Rows:** a row selects the item; the board under the list shows it. No per-row buttons; Edit lives in the board.
+- **Rows:** a row selects the item; the panel beside the list shows it. No per-row buttons; Edit lives in that panel.
 - **Empty:** the panel keeps its size and says what will appear there, with the primary action as a button.
 
-The **rail** beside a list (Ready to complete, Copies found elsewhere) is a short list of rows: a coloured mark, the title,
-one grey line under it and a time on the right; up to six, then "+N more"; same starting height as the list.
+The **rail** that used to sit beside a list is gone (7 Oct 2026, below): that place now holds the item you picked.
+
+## The item beside its list (decided 7 Oct 2026)
+
+Replaces the board under the list. A click in a list showed the item in a board under it, which on a laptop screen
+starts below the fold: you clicked and nothing visibly changed. Now the item shows **beside the list**, at once:
+
+- **Right of the list:** the picked item (the first, or the one that needs you most, until you pick), at the list's
+  height: its facts as label and value rows, any short sections under them (a copy's actions, a task's verdict, the
+  last firings), and its actions at the foot. Long details scroll inside it; the page never grows. In the concept it is
+  one component, `SidePanel`, so every page reads the same.
+- **Below the list, full width:** the drawings, charts and logs of the same item (Where it is, the flow drawn, a task's
+  targets, a rule's pattern, an issue's timeline, a machine's day, an action's script and runs), or the page's one
+  chart. Each says "the same … as on the right".
+- **What the rails became:** a rail that filtered became a figure in the strip or a pick in the list's header; a rail
+  that was its own list became a switch on the list (*Sessions | Assisted access*), or part of the item on the right.
+- **The list header keeps one line:** its controls keep their width and a long subtitle is cut short.
+
+| Page | Right of the list | Below the list | Where the rail went |
+|---|---|---|---|
+| Tasks (Super User) | the task: department, told, deadline, where it stands; Complete / Not done yet; Edit | How far it has got | *Ready to complete* is the strip figure |
+| Tasks (console) | the task: who, when, the verdict (Incomplete / Complete at the foot), history | Targets | *From the Super User* is a switch on the list; Seen / Ongoing / Done on the right |
+| Restricted | the mark: where it is allowed (change), its copies, and Ask / Delete / Allow for the copy picked; Unmark | Where it is | *Copies found elsewhere* is a strip figure that filters the list |
+| Flows | the flow: from, to, along the way, files; a paused branch's fixes; Edit | the flow drawn; Sync log | — |
+| Machines (console) | the machine: health, who is inside, version, CPU, disk; Enter session, Open its page → | its last 24 hours | *Sessions held now* is *Someone inside* on the list |
+| Sessions / Access | the session, or the assisted access picked | Machine occupancy | *Assisted access* is a switch on the list |
+| Issues (console) | the issue: owner, what to do and its button | its timeline and details | *Types* is a pick in the list header |
+| Automation (console) | the rule: when, on, do, last firings; Switched on, Test, Edit | Runs per day | *Problems this week* is a strip figure that filters |
+| Actions (console) | the action: used by, outcomes; Edit script, Run once | its script and recent runs (by hand too) | *Run by hand* is in each action's recent runs |
+| Departments | the department: Admins, machines, worst issues; Enter X's console →, Department page → | Machines in use today | *Admins*: their consoles are entered from the department |
+| Department page | the issue picked; Handle it in X's console → | Admins, then Today | — |
+| Accountability | the deviation and what came of it | Around it: the timeline and what the record shows; Deviations per day | *Rules broken* is a pick in the list header |
+| Registry | the machine, account or refused connection | — | *Accounts* and *Refused* are a switch on the list |
+| Rules | the rule (Switch, Edit, See its deviations →) or the pattern (Build a rule from it) | the pattern drawn | *Start from a pattern* is a switch on the list |
+| Rollout | the machine; Retry now (and Leave it out at the Super User's level) | Machines on 1.4.2 | *By department* is a pick in the list header |
+| Audit log | the event | Events over time | *Kinds* is a pick in the list header |
+| Reports | the report; Mark addressed | Where reports go (Super User) | *Handling* / *Kinds* is a pick in the list header |
 
 ## Organisation and Govern, as built in the concept (6 Oct 2026)
 
-Every page, top to bottom: a strip of four plain figures, the standard list container with a rail beside it, the board
-of the selected item (remembered in the address), then at most one visual. Strip figures that are also filters are
+Every page, top to bottom: a strip of four plain figures, the standard list container with the selected item beside it
+(remembered in the address), then at most one visual. (Until 7 Oct 2026 a rail sat beside the list and the item in a
+board under it; the table below keeps the rails as they were, and *The item beside its list* says where each went.) Strip figures that are also filters are
 marked "filter".
 
 The visual sits below the board, full width, and shows the page's own thing: either a change over time the rows cannot
