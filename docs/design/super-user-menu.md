@@ -200,6 +200,24 @@ The page and the item selected on it are navigation state, not a moment:
   before it is closed with changes in it.
 - The concept shows the same thing with the address: `#tasks/D-14`, `#restricted/M-9`, `#flows/weekly`.
 
+### A click stays on its page (decided 7 Oct 2026)
+
+Applies to every page at every level. A sudden change of page makes you work out where you are and how you got
+there, so a click may change the page only when:
+
+1. it is the **sidebar**, the **path** at the top (*Departments / Operations*), or **Search** (Ctrl K): moving is their
+   whole job;
+2. **its words name where it goes**: *Department page →*, *See it in Registry →*, *Show in audit log →*, *Enter
+   R. Mensah's console*. Such a link ends in "→" everywhere, so it reads the same on every page;
+3. it is a **create or edit button that opens a full editor** (*New flow*, *Edit*, *Mark files*); the editor keeps the
+   path back (*Flows / New flow*) and Cancel returns where you were.
+
+Everything else acts in place: rows, tiles, figures, chart marks, rail items and names select, filter, highlight, or
+show the item in the board under the list. A name is not a link to another page unless it says so with "→".
+
+One page is kept because a board cannot hold it: a machine's own page (charts, processes, sessions, files), reached
+only by *Open OPS-03's page →* in that machine's board.
+
 ### Leaving the Super User's level
 
 Going from a Super User page into an Admin's console happens only through traversal: *Enter X's console*, which asks
