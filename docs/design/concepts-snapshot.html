@@ -3957,7 +3957,7 @@ function reportOwner(r) {
   const d = (FULL.DEPTS || DEPTS).find((x) => x.id === r.dept);
   if (REPORT_CATS[r.cat].fixed) return "fixed";
   if (!d || !d.admins.length) return "noadmin";
-  if (!(routingNow()[r.cat] || []).includes(r.dept)) return "unrouted";
+  if (!(routingNow()[r.cat] || []).includes(r.dept) || r.stay) return "unrouted";
   return "dept";
 }
 const deptNameOf = (id) => ((FULL.DEPTS || DEPTS).find((x) => x.id === id) || { name: id }).name;
@@ -5699,34 +5699,56 @@ function ReportsSU({ go, enter, open, me }) {
   <//>`;
 }
 // how many of a kind wait on the Super User under a routing: those no department with an Admin can take
+// how many of a kind wait on the Super User under a routing: those no department with an Admin can take, and those
+// kept with the Super User when the kind was routed after they were written
 const routeWaits = (c, rt) => { const dby = Object.fromEntries(FULL_DEPTS().map((d) => [d.id, d]));
-  return reportsNow().filter((r) => r.cat === c && !r.addressed && (REPORT_CATS[c].fixed || !((rt[c] || []).includes(r.dept) && dby[r.dept] && dby[r.dept].admins.length))).length; };
+  return reportsNow().filter((r) => r.cat === c && !r.addressed && (REPORT_CATS[c].fixed || r.stay || !((rt[c] || []).includes(r.dept) && dby[r.dept] && dby[r.dept].admins.length))).length; };
+// when each kind's routing was last changed in this session (the concept has no history before it)
+const ROUTE_AT = {};
+// A kind's routing, under the report on the right. Saved, it reads as a sentence with one button to change it;
+// changing it shows the department pick, what it does to what waits on you, and Save, which asks first.
 function RoutingSide({ c, kinds = [], onKind, follows }) {
   useDT();
   const [modal, modalCtx] = Modal.useModal();
   const fixed = !!REPORT_CATS[c].fixed, depts = FULL_DEPTS(), dby = Object.fromEntries(depts.map((d) => [d.id, d]));
   const saved = fixed ? [] : routingNow()[c] || [];
-  const [on, setOn] = useState(saved);
-  const n = reportsNow().filter((r) => r.cat === c).length;
+  const [ed, setEd] = useState(false), [on, setOn] = useState(saved), [moveOld, setMoveOld] = useState(true);
+  const R = reportsNow(), n = R.filter((x) => x.cat === c).length;
   const changed = !fixed && (on.length !== saved.length || on.some((x) => !saved.includes(x)));
-  const w0 = routeWaits(c, routingNow()), w1 = fixed ? w0 : routeWaits(c, { ...routingNow(), [c]: on });
-  const dead = on.filter((id) => dby[id] && !dby[id].admins.length), add = on.filter((x) => !saved.includes(x)), drop = saved.filter((x) => !on.includes(x));
+  const add = on.filter((x) => !saved.includes(x)), drop = saved.filter((x) => !on.includes(x)), live = (id) => dby[id] && dby[id].admins.length;
+  // waiting on the Super User now, that the added departments could take; and what the dropped ones leave
+  const movable = R.filter((x) => x.cat === c && !x.addressed && !x.stay && add.includes(x.dept) && live(x.dept));
+  const back = R.filter((x) => x.cat === c && !x.addressed && !x.stay && drop.includes(x.dept) && live(x.dept));
+  const w0 = routeWaits(c, routingNow()), wNew = routeWaits(c, { ...routingNow(), [c]: on }), w1 = fixed ? w0 : wNew + (moveOld ? 0 : movable.length);
+  const dead = on.filter((id) => dby[id] && !dby[id].admins.length);
+  const goesTo = (ids) => (ids.length ? `You and ${listNames(ids.map(deptNameOf), 3)}` : "You only");
+  const cancel = () => { setOn(saved); setEd(false); setMoveOld(true); };
   const save = () => modal.confirm({ title: `Change where ${c.toLowerCase()} reports go?`, okText: "Save", cancelText: "Keep editing",
-    content: `${add.length ? `${listNames(add.map(deptNameOf))} start${add.length === 1 ? "s" : ""} getting them. ` : ""}${drop.length ? `${listNames(drop.map(deptNameOf))} stop${drop.length === 1 ? "s" : ""} getting them. ` : ""}Reports already written stay where they went. Recorded in the audit log.`,
-    onOk: () => { dtChange(() => { routingNow()[c] = [...on]; }); toast(`${c} routing saved · recorded in the audit log (concept)`); } });
-  return html`<${React.Fragment}>${modalCtx}<${SidePanel} h=${null} title="Where this kind goes" sub=${changed ? "changed, not saved yet" : follows ? "the kind of the report above" : "the kind you picked"}
-    facts=${[["Kind", html`<${Select} size="small" value=${c} onChange=${onKind} style=${{ width: "100%" }} popupMatchSelectWidth=${false} options=${kinds.map((k) => ({ value: k, label: k }))} />`], ["What writes it", REPORT_CATS[c].desc], ["This week", `${fmt(n)} report${n === 1 ? "" : "s"}`],
-      ["Waiting on you", html`<span style=${{ color: w1 ? "var(--crit)" : "inherit" }}>${w0 !== w1 ? html`<span className="t3 mono">${fmt(w0)} → </span>` : null}${w1 ? fmt(w1) : "None"}</span>`]]}
-    actions=${fixed ? null : html`<${Button} disabled=${!changed} onClick=${() => setOn(saved)}>Discard<//><${Button} type="primary" disabled=${!changed} onClick=${save}>Save<//>`}>
-    <div><div className="nt-h">Goes to</div>
-      ${fixed ? html`<div className="t2">You only.</div><div className="t3" style=${{ fontSize: 12.5, marginTop: 4 }}>${ic("LockOutlined")} Never shared: a department would be judging its own Admin.</div>`
-        : html`<div className="t2" style=${{ marginBottom: 8 }}>You, always, and the Admins of:</div>
+    content: [add.length ? `${listNames(add.map(deptNameOf))} start${add.length === 1 ? "s" : ""} getting them${movable.length ? (moveOld ? `, with the ${movable.length} already waiting on you` : `; the ${movable.length} already waiting stay with you`) : ""}.` : "",
+      drop.length ? `${listNames(drop.map(deptNameOf))} stop${drop.length === 1 ? "s" : ""} getting them${back.length ? `; the ${back.length} not yet addressed come back to you` : ""}.` : "", "Recorded in the audit log."].filter(Boolean).join(" "),
+    onOk: () => { const keep = moveOld ? [] : movable; dtChange(() => { keep.forEach((x) => { x.stay = true; }); routingNow()[c] = [...on]; ROUTE_AT[c] = NOWH + (Date.now() - T0) / 3.6e6; });
+      setEd(false); setMoveOld(true); toast(`${c} routing saved · recorded in the audit log (concept)`); } });
+  const kindPick = html`<${Select} size="small" value=${c} disabled=${ed && changed} onChange=${onKind} style=${{ width: "100%" }} popupMatchSelectWidth=${false} options=${kinds.map((k) => ({ value: k, label: k }))} />`;
+  const notLive = saved.filter((id) => !live(id));
+  return html`<${React.Fragment}>${modalCtx}<${SidePanel} h=${null} title="Where this kind goes" sub=${ed ? (changed ? "changed, not saved yet" : "changing") : follows ? "the kind of the report above" : "the kind you picked"}
+    facts=${[["Kind", kindPick], ["What writes it", REPORT_CATS[c].desc], ["This week", `${fmt(n)} report${n === 1 ? "" : "s"}`],
+      ...(ed ? [] : [["Goes to", fixed ? "You only, always" : html`<b style=${{ fontWeight: 500 }}>${goesTo(saved)}</b>`], ["Set", fixed ? "Built in · never shared" : ROUTE_AT[c] != null ? `by you, today ${hhmm(ROUTE_AT[c])}` : "by you"]]),
+      ["Waiting on you", html`<span style=${{ color: w1 ? "var(--crit)" : "inherit" }}>${ed && w0 !== w1 ? html`<span className="t3 mono">${fmt(w0)} → </span>` : null}${w1 ? fmt(w1) : "None"}</span>`]]}
+    actions=${fixed ? null : ed ? html`<${Button} onClick=${cancel}>Cancel<//><${Button} type="primary" disabled=${!changed} onClick=${save}>Save<//>`
+      : html`<${Button} icon=${ic("EditOutlined")} onClick=${() => { setOn(saved); setEd(true); }}>Change who gets it<//>`}>
+    ${fixed ? html`<div className="t3" style=${{ fontSize: 12.5 }}>${ic("LockOutlined")} Never shared: a department would be judging its own Admin.</div>`
+      : !ed ? html`<div className="t3" style=${{ fontSize: 12.5 }}>${saved.length ? `Every new ${c.toLowerCase()} report reaches you and ${listNames(saved.map(deptNameOf), 3)} as it is written; their Admins can address it.` : `Every ${c.toLowerCase()} report comes only to you.`}
+          ${notLive.length ? html`<div style=${{ color: "var(--med)", marginTop: 6 }}>${ic("WarningOutlined")} ${listNames(notLive.map(deptNameOf))} ${notLive.length === 1 ? "has" : "have"} no Admin, so those still come only to you.</div>` : null}</div>`
+      : html`<div><div className="nt-h">Goes to</div>
+          <div className="t2" style=${{ marginBottom: 8 }}>You, always, and the Admins of:</div>
           <${Select} mode="multiple" showSearch optionFilterProp="label" maxTagCount="responsive" allowClear placeholder="no department yet, only you" value=${on} onChange=${setOn} style=${{ width: "100%" }}
             options=${depts.map((d) => ({ value: d.id, label: d.admins.length ? d.name : `${d.name} · no Admin` }))} aria-label=${`Departments whose Admins also get ${c} reports`} />
           ${on.length < depts.length ? html`<a style=${{ fontSize: 12, display: "inline-block", marginTop: 6 }} onClick=${() => setOn(depts.map((d) => d.id))}>every department</a>` : null}
           ${dead.length ? html`<div style=${{ fontSize: 12, color: "var(--med)", marginTop: 8 }}>${ic("WarningOutlined")} ${listNames(dead.map(deptNameOf))} ${dead.length === 1 ? "has" : "have"} no Admin, so ${dead.length === 1 ? "its" : "their"} reports of this kind still come only to you.</div>` : null}
-          <div className="t3" style=${{ fontSize: 12, marginTop: 10 }}>Their Admins can then address it, so it stops waiting on you. A change applies to new reports.</div>`}
-    </div>
+          ${movable.length ? html`<div style=${{ marginTop: 10 }}><${Checkbox} checked=${moveOld} onChange=${(e) => setMoveOld(e.target.checked)}>Also send the ${movable.length} already waiting on you to ${listNames([...new Set(movable.map((x) => deptNameOf(x.dept)))])}<//>
+            <div className="t3" style=${{ fontSize: 12, marginTop: 2, paddingLeft: 24 }}>${moveOld ? "They stop waiting on you; you still see them." : "They stay with you; only new ones go."}</div></div>` : null}
+          ${back.length ? html`<div className="t3" style=${{ fontSize: 12, marginTop: 10 }}>The ${back.length} not yet addressed in ${listNames([...new Set(back.map((x) => deptNameOf(x.dept)))])} come back to you.</div>` : null}
+        </div>`}
   <//><//>`;
 }
 function ReportsHere({ me, sel, setSel, written }) {

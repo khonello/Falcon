@@ -379,6 +379,13 @@ goes*, built the same way, for that report's kind (a *Kind* pick at its top reac
 no report this week). It holds the department pick with *every department*, the no-Admin warning, the "5 → 0 waiting
 on you" preview, and Discard / Save, which asks first and names what changes. *About an Admin* says you only.
 
+Saved, the panel reads as a statement: *Goes to* (You and Operations and Finance), *Set* (by you, and when), *Waiting on
+you*, one plain line on what that means, and one button, *Change who gets it*, which opens the picker with Cancel and
+Save. Routing is a standing rule for the kind (hierarchy-system-design.md, Report Routing), not a decision per report.
+Adding a department while reports of that kind are already waiting on you offers *Also send the N already waiting
+on you to Finance* (ticked): untick it and those stay with you, only new ones go. Removing a department brings back
+what it has not addressed.
+
 ### Where it is (Restricted, decided 7 Oct 2026)
 
 A chart of fixed size, whatever the number of copies:
