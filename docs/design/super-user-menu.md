@@ -270,6 +270,31 @@ with neither gets none; pages are not given a chart for symmetry.
 
 The rule editor uses the full-page shell with the pattern diagram as a band above it; built-in rules open read-only.
 
+### The same pattern in an Admin's console (decided 7 Oct 2026)
+
+The Super User traverses into an Admin's console and the Admin uses it every day, so both levels read the same way:
+**Overview** has four figure cards; **every other page** has the strip of four figures, the standard list with a rail
+beside it, the board of the selected item, and at most one visual. Scoped to the department throughout; nothing the
+Super User alone decides (routing, approving a version, leaving a machine out of the gate) appears in the console.
+
+| Admin page | Strip | List | Rail | Board | Visual |
+|---|---|---|---|---|---|
+| Overview | Waiting on you, Open issues, Machines online, Sessions held now (four cards) | | | | Fleet, Open issues, Event volume, Live activity |
+| Tasks | To verify, Overdue, Quiet, On track (filters) | Tasks: who, targets found, deadline | From the Super User | the task whole | |
+| Restricted | as the Super User's | Marked files | Copies found elsewhere | Where it is | |
+| Flows | Flows, Copying, A branch paused, Files copied | Flows through the department | | the flow drawn, with its sync log | |
+| Machines | Machines, Online, Need a look, On the current version | Machines: user, version, last seen | Sessions held now | the machine, *Open its page →* | |
+| Sessions | Inside now, Non-owner today, At night, Assisted | Sessions today | Assisted access | the session | Machine occupancy |
+| Issues | Open, Waiting, Past target, Done today | Issues: machine, type, age | Types (filters) | *What to do*, the timeline | |
+| Automation | Rules, Switched on, Fired this week, Problems this week | Rules: trigger, fired, last fired | Problems today | the rule whole | Runs per day |
+| Actions | Actions, Custom, Runs this week, Problems this week | Library: kind, used by, limit | Run by hand | the action whole | |
+| Rollout | Current version, Running it, Holding the next back, Failed installs | Holding the gate | By department | the machine | Machines on the version |
+| Audit log | as the Super User's | | Kinds (filters) | the event | Events over time |
+| Reports | Waiting in your department, Gone to the Super User, Addressed, Typical time | Reports routed here | Kinds (filters) | the report, *Mark addressed* | |
+
+The console's menu keeps its own groups (Core, Monitor, Automate, Govern) with Core in the Super User's order:
+Overview, Tasks, Restricted, Flows.
+
 Core follows the same order (list, then the board of the item you clicked or the most relevant one): Tasks shows how far
 each Admin told has got (Given, Seen, Under way, Done, Completed by you; the most urgent task by default), with the
 facts and the decision (Not done yet / Complete, or Remind them) under the chart; Restricted shows where a marked file
