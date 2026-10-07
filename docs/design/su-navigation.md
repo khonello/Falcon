@@ -113,6 +113,16 @@ machine page opens Restricted.
 |---|---|---|
 | **Search** (Ctrl K) | *Run action on a machine…* | asks for `automation`, which a Super User cannot open; the router falls back to **Overview** without a word |
 
+## Out of the app (concept only; added 7 Oct 2026, missed in the first pass)
+
+| Where | What |
+|---|---|
+| sidebar, *Console Kit ↗* | opens another artifact in a new tab |
+| sidebar, *sample: empty · small · large · absurd* | reloads the page with another sample |
+
+Neither belongs to the product. Found while auditing the Admin's console ([admin-navigation.md](admin-navigation.md)),
+which also checks the console frame (`App`) that this first pass read only for its Super User parts.
+
 ## Not counted
 
 These components contain navigation but are drawn nowhere, so nobody can click them: `LookCloser`, `AdminWeek`,
