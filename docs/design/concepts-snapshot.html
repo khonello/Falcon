@@ -2788,24 +2788,9 @@ function Automation({ go, open }) {
         items=${today.map((x, i) => ({ key: i, title: `${x[1]} on ${x[2]}`, line: x[0] === "manual" ? "run by hand" : RBY[x[0]].name, right: hhmm(x[3]), c: OUT[x[6]], on: x[0] !== "manual" && cur && cur.id === x[0], onClick: x[0] !== "manual" ? () => setSel(x[0]) : null }))}
         empty=${html`<${Empty} icon="CheckCircleOutlined" title="Nothing went wrong today" text="A run that fails, or runs out of time, shows here." h=${200} />`} />
     </div>
-    ${cur ? html`<${RuleDetail} key=${cur.id} id=${cur.id} go=${go} />` : null}
-    <div className="g c-84">
-      <${Panel} title="Runs per day" sub="all rules · last 7 days · by outcome" extra=${html`<div className="leg">${outs.map(([k]) => html`<span key=${k}><i className="sq" style=${{ "--c": OUT[k] }} />${k}</span>`)}</div>`}>
-        ${ALL_RUNS.length ? html`<${DayBars} series=${outs.map(([k, v]) => ({ name: k, c: OUT[k], v }))} height=${170} />` : html`<${Empty} icon="BarChartOutlined" title="No runs yet" text="Every run of every rule, by day and by outcome." h=${170} />`}
-      <//>
-      <${Panel} title="Outcomes" sub=${`all rules · last 7 days · ${ALL_RUNS.length ? tot : 0} runs`}>
-        ${!ALL_RUNS.length ? html`<${Empty} icon="PieChartOutlined" title="Nothing to count" text="Success, failed, timed out and stopped are counted apart." h=${120} />` : null}
-        <div style=${{ display: ALL_RUNS.length ? "block" : "none" }}>
-        <div style=${{ display: "flex", height: 10, borderRadius: 3, overflow: "hidden", gap: 2 }}>${outs.map(([k, v]) => html`<span key=${k} style=${{ flex: v.reduce((a, b) => a + b, 0), background: OUT[k] }} />`)}</div>
-        <div style=${{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-          ${outs.map(([k, v]) => { const n = v.reduce((a, b) => a + b, 0); return html`<div key=${k} className="row" style=${{ flexWrap: "nowrap" }}><span className="st" style=${{ "--c": OUT[k] }}><i />${k}</span><span className="sp" /><span className="mono">${n}</span><span className="mono t3" style=${{ width: 44, textAlign: "right" }}>${((n / tot) * 100).toFixed(1)}%</span></div>`; })}
-        </div>
-        <div className="t3" style=${{ fontSize: 12, marginTop: 12 }}>A timeout is not an error: the action ran until its limit and was ended. They are counted apart.</div>
-        </div>
-      <//>
-    </div>
-    <${Panel} title="Runs today" sub=${`${latest.length} actions from rules or by hand · newest first, problems on top`} flush>
-      <${RunsTable} rows=${latest} go=${go} showRule=${true} pageSize=${10} onRule=${(id) => { setSel(id); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+    ${cur ? html`<${RuleDetail} key=${cur.id} id=${cur.id} go=${go} picked=${sel === cur.id} />` : null}
+    <${Panel} title="Runs per day" sub="all rules · last 7 days · by outcome" extra=${html`<div className="leg">${outs.map(([k]) => html`<span key=${k}><i className="sq" style=${{ "--c": OUT[k] }} />${k}</span>`)}</div>`}>
+      ${ALL_RUNS.length ? html`<${DayBars} series=${outs.map(([k, v]) => ({ name: k, c: OUT[k], v }))} height=${170} />` : html`<${Empty} icon="BarChartOutlined" title="No runs yet" text="Every run of every rule, by day and by outcome." h=${170} />`}
     <//>
   <//>`;
 }
@@ -2823,105 +2808,31 @@ function OutcomeBar({ ok, fail, to, w = 120 }) {
     ${[[ok, OUT.Success], [fail, OUT.Failed], [to, OUT["Timed out"]]].filter((x) => x[0]).map(([v, c], i) => html`<span key=${i} style=${{ flex: v, background: c }} />`)}
   </div>`;
 }
-function RuleDetail({ id, go }) {
+function RuleDetail({ id, go, picked }) {
   const r = RBY[id];
   const [on, setOn] = useState(true);
   const fires = FIRINGS[id];
-  const [open, setOpen] = useState(() => new Set([0]));
-  const [showAll, setShowAll] = useState(false);
-  const toggle = (i) => setOpen((s0) => { const s1 = new Set(s0); s1.has(i) ? s1.delete(i) : s1.add(i); return s1; });
   const allRuns = fires.flatMap((f) => f.runs);
-  const problems = allRuns.filter((x) => x.outcome !== "Success").length;
-  const shown = showAll ? fires : fires.slice(0, 6);
-  // an Admin's console is one department: an organisation-wide rule shows only that department's machines here
-  const allM = r.hosts.map((h) => MBY[h]).filter(Boolean), inD = new Set(MACHINES.map((m) => m.host));
-  const tm = allM.filter((m) => inD.has(m.host)), elsewhere = allM.length - tm.length;
+  const problems = allRuns.filter((x) => x.outcome === "Failed" || x.outcome === "Timed out").length;
+  // an Admin's console is one department: an organisation-wide rule counts only that department's machines here
+  const inD = new Set(MACHINES.map((m) => m.host)), tm = r.hosts.filter((h) => inD.has(h));
   // a rule the Super User set is theirs: seen here, not changed or switched (admin-navigation.md D4)
   const su = r.by === "You", owner = su ? "Super User" : r.by;
-  return html`<${React.Fragment}>
-    <div className="panel" style=${{ padding: 16 }}>
-      <div className="row" style=${{ justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style=${{ minWidth: 0 }}>
-          <div style=${{ fontSize: 19, fontWeight: 600 }}>${r.name}</div>
-          <div className="t2" style=${{ marginTop: 3 }}>${sentence(r)}</div>
-        </div>
-        <div className="row">
-          <${Tooltip} title=${su ? "Set by the Super User. Only they can switch it." : ""}><span><${Checkbox} disabled=${su} checked=${on} onChange=${(e) => { setOn(e.target.checked); toast(`${r.name} ${e.target.checked ? "enabled" : "disabled"} (concept)`); }}>Enabled<//></span><//>
-          <${Button} disabled=${!tm.length} onClick=${() => toast("Ran once on " + tm[0].host + " (concept)")}>Test on one machine<//>
-          <${Tooltip} title=${su ? "Set by the Super User for the whole organisation. Only they can change it; start a copy of your own from New rule." : ""}><span><${Button} type="primary" icon=${ic("EditOutlined")} disabled=${su} onClick=${() => go("automation", "edit-" + id)}>Edit<//></span><//>
-        </div>
-      </div>
-      <div className="row" style=${{ marginTop: 14, gap: 28 }}>
-        ${[["Status", html`<span className="st" style=${{ "--c": on ? "var(--ok)" : "var(--text-4)" }}><i />${on ? "Enabled" : "Disabled"}</span>`], ["Last fired", `Today ${r.last}`], ["Fired, 7 days", fires.length], ["Action runs, 7 days", allRuns.length], ["Problems, 7 days", html`<span style=${{ color: problems ? "var(--med)" : "inherit" }}>${problems}</span>`], ["Owner", owner]]
-          .map(([k, v]) => html`<div key=${k}><div className="t3" style=${{ fontSize: 12 }}>${k}</div><div style=${{ fontWeight: 500, fontSize: 15 }}>${v}</div></div>`)}
-      </div>
-    </div>
-
-    <${Panel} title="How it works">
-      <div className="row" style=${{ alignItems: "stretch", gap: 10, flexWrap: "wrap" }}>
-        <${FlowStep} icon=${KINDI[r.kind]} label=${"When · " + r.kind} c=${KINDC[r.kind]} foot=${r.detect}>
-          <div style=${{ fontSize: 14, fontWeight: 500 }}>${r.when.charAt(0).toUpperCase() + r.when.slice(1)}</div>
-        <//>
-        <${Arrow} />
-        <${FlowStep} icon="DesktopOutlined" label="On" c="var(--s1)" foot=${`${elsewhere ? `${fmt(tm.length)} of its ${fmt(allM.length)} machines are in this department; the rest belong to others. ` : ""}${tm.some((m) => m.status === "offline") ? `${tm.filter((m) => m.status === "offline").map((m) => m.host).join(", ")} offline; the rule applies again when back.` : `${fmt(tm.length)} machine${tm.length === 1 ? "" : "s"}, all online`}`}>
-          <div style=${{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>${r.scope === "All machines" ? "Every machine" : r.scope}</div>
-          <div className="row" style=${{ gap: 4 }}>${pickShown(tm, 8).shown.map((m) => html`<span key=${m.host} className="tag mono" title=${`${m.host} · ${m.user || "no user"} · ${HEALTH[m.status][1]}`} style=${{ "--c": m.status === "offline" ? "var(--text-4)" : "var(--text-3)" }}>${m.host}</span>`)}${tm.length > 8 ? html`<span className="t3" style=${{ fontSize: 12 }}>+${fmt(tm.length - 8)} more</span>` : null}</div>
-        <//>
-        <${Arrow} />
-        <${FlowStep} icon="PlayCircleOutlined" label="Do" c="var(--s2)" foot="Each action runs on its own. One failing never stops the others.">
-          <div style=${{ display: "flex", flexDirection: "column", gap: 6 }}>
-            ${r.actions.map((a, i) => html`<div key=${a[0]} className="row" style=${{ flexWrap: "nowrap" }}><span className="mono t3" style=${{ width: 14 }}>${i + 1}</span><span style=${{ fontWeight: 500 }}>${a[0]}</span><span className="sp" /><span className="mono t3">${a[1]}s limit</span></div>`)}
-          </div>
-        <//>
-      </div>
-    <//>
-
-    <${Panel} title="Each action" sub="last 7 days" flush>
-      <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${r.actions.map((a) => ({ key: a[0], a }))} columns=${[
-        { title: "Action", render: (o) => html`<span style=${{ fontWeight: 500 }}>${o.a[0]}</span>` },
-        { title: "Runs", width: 70, align: "right", render: (o) => html`<span className="mono">${o.a[2]}</span>` },
-        { title: "Outcomes", width: 260, render: (o) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><${OutcomeBar} ok=${o.a[3]} fail=${o.a[4]} to=${o.a[5]} /><span className="t3" style=${{ fontSize: 12 }}>${o.a[4] || o.a[5] ? [o.a[5] ? `${o.a[5]} timed out` : "", o.a[4] ? `${o.a[4]} failed` : ""].filter(Boolean).join(", ") : "all succeeded"}</span></div>` },
-        { title: "Typical time, against its limit", width: 260, render: (o) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><div className="bar" style=${{ width: 120, "--c": o.a[6] / o.a[1] > 0.6 ? "var(--med)" : "var(--s1)" }}><span style=${{ width: `${(o.a[6] / o.a[1]) * 100}%` }} /></div><span className="mono">${o.a[6]}s of ${o.a[1]}s</span></div>` },
-      ]} /></div>
-    <//>
-
-    <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${Panel} title="Firings" sub=${`last 7 days · ${fires.length} · newest first`} flush>
-        ${shown.map((f, i) => { const sm0 = summarize(f.runs), isOpen = open.has(i), bad = f.runs.filter((x) => x.outcome !== "Success"), many = f.runs.length > 6;
-          const list = many ? bad : f.runs;
-          return html`<div key=${i} style=${{ borderBottom: "1px solid var(--grid)" }}>
-            <div className="frow" role="button" tabIndex="0" onClick=${() => toggle(i)} onKeyDown=${(e) => e.key === "Enter" && toggle(i)}>
-              <span className="t3" style=${{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s", display: "inline-block" }}>${ic("RightOutlined")}</span>
-              <span className="mono t3">${f.t >= 0 ? "Today " + hhmm(f.t) : dayOf(f.t) + " " + hhmm(f.t)}</span>
-              <span className="mono">${f.host}</span>
-              <span className="t2" style=${{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>${f.detail}</span>
-              <span className="row" style=${{ gap: 10, flexWrap: "nowrap", justifyContent: "flex-end" }}>${sm0.map(([k, n]) => html`<span key=${k} className="st" style=${{ "--c": OUT[k], fontSize: 12 }}><i />${k === "Success" && sm0.length === 1 ? (n === 1 ? "Succeeded" : `All ${n} succeeded`) : `${n} ${k.toLowerCase()}`}</span>`)}</span>
-            </div>
-            ${isOpen ? html`<div style=${{ padding: "2px 14px 12px 40px" }}>
-              ${list.map((x, j) => html`<div key=${j} className="row" style=${{ flexWrap: "nowrap", padding: "4px 0", fontSize: 12.5 }}>
-                <span style=${{ width: 210, flex: "none" }}>${x.action}</span><span className="mono t3" style=${{ width: 64, flex: "none" }}>${x.host}</span>
-                <div className="bar" style=${{ width: 90, flex: "none", "--c": OUT[x.outcome] }}><span style=${{ width: `${(x.sec / x.timeout) * 100}%` }} /></div>
-                <span className="mono t3" style=${{ width: 74, flex: "none" }}>${x.sec}s / ${x.timeout}s</span>
-                <span className="st" style=${{ "--c": OUT[x.outcome] }}><i />${x.outcome}${x.exit ? ` · exit ${x.exit}` : ""}</span>
-              </div>`)}
-              ${many ? html`<div className="t3" style=${{ fontSize: 12, paddingTop: 4 }}>${f.runs.length - bad.length} other runs on ${new Set(f.runs.map((x) => x.host)).size} machines succeeded.</div>` : null}
-            </div>` : null}
-          </div>`; })}
-        ${fires.length > 6 ? html`<div style=${{ padding: "8px 14px" }}><${Button} size="small" type="link" onClick=${() => setShowAll(!showAll)}>${showAll ? "Show fewer" : `Show all ${fires.length}`}<//></div>` : null}
-      <//>
-      <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
-        ${id === "cpu"
-          ? html`<${Panel} title="The condition, the last time it fired" sub="OPS-03 · today">
-              <${TimeChart} range="6h" series=${[{ name: "CPU", c: "var(--s1)", fn: (t) => metric("OPS-03", "cpu", t) }]} unit="%" yMax=${100} threshold=${90} dwell=${[12.65, 12.73]} marks=${[{ t: 12.73, label: "Fired · notified R. Mensah", c: "var(--med)" }]} height=${180} />
-              <div className="t3" style=${{ fontSize: 12, marginTop: 6 }}>Shaded: the 5 minutes above 90% the rule waits for before it fires.</div>
-            <//>`
-          : html`<${Panel} title="Fired per day" sub="last 7 days"><${DayBars} series=${[{ name: "Fired", c: KINDC[r.kind], v: r.perDay }]} height=${150} /><//>`}
-        <${Panel} title="Changes" sub="who changed this rule, and what" flush>
-          ${r.changes.map(([d, who, what], i) => html`<div key=${i} className="ev" style=${{ gridTemplateColumns: "54px 10px minmax(0, 1fr)" }}>
-            <span className="mono t3">${d}</span><i style=${{ width: 7, height: 7, borderRadius: "50%", background: i === r.changes.length - 1 ? "var(--ok)" : "var(--s6)", display: "inline-block" }} />
-            <span><span style=${{ fontWeight: 500 }}>${who}</span> <span className="t2">${what}</span></span></div>`)}
-        <//>
-      </div>
+  const when = (t) => (t >= 0 ? "Today " + hhmm(t) : dayOf(t) + " " + hhmm(t));
+  return html`<${ItemBoard} open=${true} picked=${picked} title=${r.name}
+    sub=${picked ? "the one you picked" : "the first in the list · click another to see it here"}
+    actions=${html`<${Tooltip} title=${su ? "Set by the Super User. Only they can switch it." : ""}><span><${Checkbox} disabled=${su} checked=${on} onChange=${(e) => { setOn(e.target.checked); toast(`${r.name} ${e.target.checked ? "switched on" : "switched off"} (concept)`); }}>Switched on<//></span><//>
+      <${Button} disabled=${!tm.length} onClick=${() => toast("Ran once on " + tm[0] + " (concept)")}>Test on one machine<//>
+      <${Tooltip} title=${su ? "Set by the Super User for the whole organisation. Only they can change it; start a copy of your own from New rule." : ""}><span><${Button} type="primary" icon=${ic("EditOutlined")} disabled=${su} onClick=${() => go("automation", "edit-" + id)}>Edit<//></span><//>`}
+    facts=${[["When", r.when.charAt(0).toUpperCase() + r.when.slice(1)], ["On", `${r.scope === "All machines" ? "Every machine" : r.scope} · ${fmt(tm.length)} here`], ["Do", r.actions.map((a) => a[0]).join(", ")],
+      ["Last fired", `Today ${r.last}`], ["Fired, 7 days", fmt(fires.length)], ["Problems, 7 days", html`<span style=${{ color: problems ? "var(--crit)" : "inherit" }}>${problems ? `${problems} failed or timed out` : "None"}</span>`], ["Owner", owner]]}>
+    <div><div className="nt-h">Last firings</div>
+      ${fires.slice(0, 5).map((f, i) => { const sm0 = summarize(f.runs);
+        return html`<div key=${i} className="row" style=${{ flexWrap: "nowrap", padding: "6px 0", borderBottom: "1px solid var(--grid)", fontSize: 12.5, gap: 12 }}>
+          <span className="mono t3" style=${{ width: 92, flex: "none" }}>${when(f.t)}</span><span className="mono" style=${{ width: 90, flex: "none" }}>${f.host}</span>
+          <span className="t2 cut" style=${{ minWidth: 0, flex: 1 }} title=${f.detail}>${f.detail}</span>
+          <span className="row" style=${{ gap: 10, flexWrap: "nowrap" }}>${sm0.map(([k, n]) => html`<span key=${k} className="st" style=${{ "--c": OUT[k], fontSize: 12 }}><i />${k === "Success" && sm0.length === 1 ? (n === 1 ? "Succeeded" : `All ${n} succeeded`) : `${n} ${k.toLowerCase()}`}</span>`)}</span></div>`; })}
+      ${!fires.length ? html`<div className="t3" style=${{ fontSize: 12.5 }}>It has not fired in the last 7 days.</div>` : null}
     </div>
   <//>`;
 }

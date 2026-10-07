@@ -286,7 +286,7 @@ Super User alone decides (routing, approving a version, leaving a machine out of
 | Machines | Machines, Online, Need a look, On the current version | Machines: user, version, CPU, last seen (worst first) | Sessions held now | the machine, *Open its page →* | |
 | Sessions | Inside now, Non-owner today, At night today, Assisted | Sessions today | Assisted access | the session | Machine occupancy |
 | Issues | Open, Waiting, Past target, Done today | Issues: severity, owner, age (worst first) | Types (filters) | *What to do*, the timeline | |
-| Automation | Rules, Switched on, Fired this week, Problems this week | Rules: switched on, fired, last fired | Problems today | the rule whole | Runs per day |
+| Automation | Rules, Switched on, Fired this week, Problems this week | Rules: switched on, fired, last fired | Problems today | the rule: when, on, do, its last five firings | Runs per day |
 | Actions | Actions, Custom, Runs this week, Problems this week | Library: kind, used by, limit | Run by hand | the action whole | |
 | Rollout | Current version, Running it, Holding the next back, Failed installs | Holding the gate | Versions here | the machine | Machines on the version |
 | Audit log | as the Super User's | | Kinds (filters) | the event | Events over time |
@@ -307,6 +307,13 @@ out of the address, because `#machines/OPS-03` is the machine's own page. The Ad
 (the old Flows, Sessions, Rollout, Audit and Reports) are no longer drawn. Checked in headless Edge inside R. Mensah's
 console, every page, and at the Super User's level for the shared ones; not click-tested: strip filters, rail picks,
 *Mark addressed*, the flow request answers.
+
+**Automation, trimmed (concept version 160).** The rule's board had grown into a page of its own (How it works,
+Each action, Firings, Fired per day, Changes) with three more panels under it (Runs per day, Outcomes, Runs today).
+It is now one board like every other page's: When, On, Do, last fired, fired and problems this week and the owner as
+facts, *Switched on*, *Test on one machine* and *Edit* in its header, and the last five firings under them. How it
+works is what the rule editor shows; Outcomes and Runs today are what the *Problems today* rail already says. Runs per
+day stays as the page's one chart.
 
 Core follows the same order (list, then the board of the item you clicked or the most relevant one): Tasks shows how far
 each Admin told has got (Given, Seen, Under way, Done, Completed by you; the most urgent task by default), with the
