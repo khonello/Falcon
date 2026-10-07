@@ -169,29 +169,42 @@ The rule is what makes something an accountability record.
   step? The Admin's Automation page already has a similar builder that can be reused.
 - Does **Overview** keep the line "N things worth a look" counting open deviations only? (Outcomes make "open" meaningful.)
 
-## Opening, creating and editing (decided 6 Oct 2026)
+## Opening, creating and editing (decided 6 Oct 2026, revised 7 Oct 2026)
 
-One standard across Tasks, Restricted and Flows, chosen by size:
+One standard across every Super User page, chosen by size:
 
-- **Opening anything is the side panel** (a task, a mark, a decision). A row opens it; the list stays visible behind it.
-- **Small things are created and edited in that same side panel**: New task, and a task's Edit (what needs doing, deadline);
-  a mark's Allowed switch and Unmark. Edit sits at the top of the panel, Cancel and Save at the bottom. No per-row Edit buttons.
+- **A click on a row selects it; it never opens a drawer.** The selected item shows in a **board directly under the
+  list**, whole: its facts, any sections (a chart, a timeline), and its actions in the board's header. With nothing
+  picked the board shows the first row, or the most urgent one, and says so ("the first in the list · click another to
+  see it here"). One click, one result: a drawer opened by the same click covered the board it had just updated.
+  In the concept the board is one component, `ItemBoard`, except where the page draws its own (Tasks, Restricted,
+  Rules, Flows, Accountability).
+- **Editing happens in the board:** a task's Edit turns its title and deadline into fields above its chart; a rule's
+  Switch on/off and a mark's Unmark sit in the board header.
+- **Small things are created in the side drawer**, with stacked labels and Cancel / Create at the bottom: New task,
+  Register a PC, Provision an Admin. A new key is shown once in that same drawer, which then cannot be dismissed by
+  clicking outside it.
 - **Big things get one full-page shell**: form on the left, live preview on the right, Cancel and Save in a bar fixed at the
-  bottom. Used for New flow, Edit flow and Mark files. No step-by-step wizards: a flow is one page with sections (sources,
-  along the way, destinations, name and checks).
-- **Modals only for short confirmations** (Unmark, end a session, discard a half-built flow). Never for creating or editing:
-  a modal hides the list you came from and has no room for a file tree or a diagram.
+  bottom. Used for New flow, Edit flow, Mark files and the rule editor. No step-by-step wizards.
+- **Modals only for "are you sure"** (Unmark, make a new key, end a session, discard a half-built flow, change where a
+  marked file is allowed). Never for creating or editing.
 
-### The open item is remembered
+### The selected item is remembered
 
-The page and the item open in its side panel are navigation state, not a moment:
+The page and the item selected on it are navigation state, not a moment:
 
-- In the Qt console: kept in the client's navigation state and restored on reload, reconnect or reopening the app. Opening an
-  item pushes it onto a history, so Back closes the panel or returns to the previous page. Links from elsewhere (a
-  notification, the Overview, Accountability) open the page with that item's panel already open.
+- In the Qt console: kept in the client's navigation state and restored on reload, reconnect or reopening the app.
+  Selecting an item pushes it onto a history, so Back returns to the previous selection or page. Links from elsewhere (a
+  notification, the Overview, Accountability) open the page with that item selected.
 - Saved edits live on the Engine and survive anything. Only unsaved typing in an open Edit form can be lost; the form warns
   before it is closed with changes in it.
 - The concept shows the same thing with the address: `#tasks/D-14`, `#restricted/M-9`, `#flows/weekly`.
+
+### Leaving the Super User's level
+
+Going from a Super User page into an Admin's console happens only through traversal: *Enter X's console*, which asks
+to block or end that Admin's session first. Every link on the Super User's pages, and which ones break this, is listed
+in [su-navigation.md](su-navigation.md).
 
 ## The standard list container (decided 6 Oct 2026)
 
@@ -199,7 +212,7 @@ Use it wherever a page's main job is a list of things you open (Core uses it for
 flows in the organisation; apply it in Organisation and Govern where it fits). In the concept it is one component,
 `ListPanel`, so the pages cannot drift apart.
 
-- **Frame:** one panel. Title and a short subtitle on the left of the header ("most urgent first · click one to open it");
+- **Frame:** one panel. Title and a short subtitle on the left of the header ("most urgent first · click one to see it below");
   on the right a search box ("Filter by …") and the one primary action (New task, Mark files, New flow) in blue.
 - **Size:** one fixed height (452px in the concept) whether it holds one row or a full page; six rows a page. A footer
   is always there: "1–6 of 96" on the left, the pager on the right. The rail beside it, if any, is the same height.
@@ -210,7 +223,7 @@ flows in the organisation; apply it in Organisation and Govern where it fits). I
      grey bar with its figure beside it (files covered, files copied, time used).
   3. **Now:** a dot and a few words. Green when it is fine, red when someone has to act, grey when it is waiting.
 - **Colour** is spent only in the Now dot. No coloured text, rings or badges in the other columns.
-- **Rows:** a row opens the item's side panel. No per-row buttons; Edit lives in the side panel.
+- **Rows:** a row selects the item; the board under the list shows it. No per-row buttons; Edit lives in the board.
 - **Empty:** the panel keeps its size and says what will appear there, with the primary action as a button.
 
 The **rail** beside a list (Ready to complete, Copies found elsewhere) is a short list of rows: a coloured mark, the title,
@@ -218,18 +231,19 @@ one grey line under it and a time on the right; up to six, then "+N more"; same 
 
 ## Organisation and Govern, as built in the concept (6 Oct 2026)
 
-Every page: a strip of plain figures, the standard list container with a rail beside it, at most one visual, and a side
-panel for the item (remembered in the address). Strip figures that are also filters are marked "filter".
+Every page, top to bottom: a strip of four plain figures, the standard list container with a rail beside it, the board
+of the selected item (remembered in the address), then at most one visual. Strip figures that are also filters are
+marked "filter".
 
-The visual sits below the list, full width, and shows the page's own thing: either a change over time the rows cannot
+The visual sits below the board, full width, and shows the page's own thing: either a change over time the rows cannot
 show (or that filters the list), or a diagram of the selected item (Flows: the flow; Rules: the rule's pattern). A page
 with neither gets none; pages are not given a chart for symmetry.
 
-| Page | Strip | List (row opens the side panel) | Rail | Visual (below the list) |
+| Page | Strip | List (a row selects; the board under it shows the item) | Rail | Visual (below the board) |
 |---|---|---|---|---|
 | Departments | departments, without an Admin, machines online, open issues | Departments: Admins, online, open issues; Now = No Admin / N critical / All well | Admins (click enters their console) | Machines in use today |
 | Accountability | PCs, Workers, Admins, Departments (filters) | Deviations: who, severity, when; Open / Everything | Rules broken this week (click filters) | Deviations per day, still open vs dealt with (click a day filters) |
-| Reports | waiting on you, waiting in departments, addressed (filters), typical time | Reports: what, goes to, written; Now = Waiting on you / With the department / Addressed | Handling by department | — (the routing matrix sits below) |
+| Reports | waiting on you, waiting in departments, addressed (filters), typical time | Reports: what, goes to, written; Now = Waiting on you / With the department / Addressed | Handling by department | — (Where reports go sits below) |
 | Access | inside now, non-owner sessions, at night, assisted | Sessions today: owner locked out, started, length | Assisted access | Machine occupancy today |
 | Registry | machines, checking in, accounts, refused this week | Machines: version, key, last seen; Register a PC | Accounts (Provision an Admin) | Refused connections: who tried without a valid key, why, tries, last try (a section, not a chart) |
 | Rules | rules, switched on, broken this week, kept | Rules: set by, applies to, this week; New rule | Start from a pattern | The pattern of the rule you opened, else the one set most recently (Edit sits on it) |
@@ -238,10 +252,34 @@ with neither gets none; pages are not given a chart for symmetry.
 
 The rule editor uses the full-page shell with the pattern diagram as a band above it; built-in rules open read-only.
 
-Core follows the same order (list, then the visual below it, showing the item you clicked or the most relevant one):
-Tasks shows how far each Admin told has got (Given, Seen, Under way, Done, Completed by you; the most urgent task by
-default); Restricted shows where a marked file belongs and every machine a copy turned up on (the one with most copies
-by default); Flows shows the flow diagram (the most recent by default), with its sync log under it.
+Core follows the same order (list, then the board of the item you clicked or the most relevant one): Tasks shows how far
+each Admin told has got (Given, Seen, Under way, Done, Completed by you; the most urgent task by default), with the
+facts and the decision (Not done yet / Complete, or Remind them) under the chart; Restricted shows where a marked file
+belongs and where copies turned up (the one with most copies by default); Flows shows the flow diagram (the most recent
+by default), with its sync log under it.
+
+### Where reports go (Reports, decided 7 Oct 2026)
+
+One row per kind of report, read as a sentence with a blank: the kind and one plain line on what writes it; "Goes to
+**you** and [departments ▾]" (a searchable multi-pick that holds fifty departments, with an *every department*
+shortcut); and on the right this week's count and how many are waiting on you, which previews the change as you edit
+("5 → 0 waiting on you"). A picked department with no Admin says so under the row. *About an Admin* is a locked row:
+you only. Changed rows are tinted; Save asks first and is recorded. It replaced a kinds × departments grid of dots
+that needed a legend to read and never said why you would route anything.
+
+### Where it is (Restricted, decided 7 Oct 2026)
+
+A chart of fixed size, whatever the number of copies:
+
+- **Allowed**, on the left: a plain grey box for the machine, with the rule in words under its name ("allowed anywhere
+  on this PC" or "allowed only in D:\Acquisitions\") and a *change* link that asks first and says what it means for
+  copies. Inside, one box for the marked item, the same for a file or a folder; only its icon and grey line differ
+  ("file · the original", "folder · 23 files, and any added later").
+- **Elsewhere**, at the right edge: a card per copy (machine, who was signed in, for a folder the file that was copied,
+  where, how long ago); a quiet outline, a softer dashed arrow from the original, the time in red, no fill, no blue.
+  Three slots, the most serious first, centred when fewer; the rest counted on one reserved line ("+4 more copies, less
+  serious · see them all on Issues ›"). No copies: the same frame, dashed, "No copy anywhere else".
+- The header carries only Unmark. No switch between the two rules on the board.
 
 ## Final menu at a glance
 
