@@ -279,21 +279,34 @@ Super User alone decides (routing, approving a version, leaving a machine out of
 
 | Admin page | Strip | List | Rail | Board | Visual |
 |---|---|---|---|---|---|
-| Overview | Waiting on you, Open issues, Machines online, Sessions held now (four cards) | | | | Fleet, Open issues, Event volume, Live activity |
+| Overview | Waiting on you, Machines online, Open issues, Sessions held now (four cards) | | | | Fleet, Open issues, Event volume, Live activity |
 | Tasks | To verify, Overdue, Quiet, On track (filters) | Tasks: who, targets found, deadline | From the Super User | the task whole | |
 | Restricted | as the Super User's | Marked files | Copies found elsewhere | Where it is | |
 | Flows | Flows, Copying, A branch paused, Files copied | Flows through the department | | the flow drawn, with its sync log | |
-| Machines | Machines, Online, Need a look, On the current version | Machines: user, version, last seen | Sessions held now | the machine, *Open its page →* | |
-| Sessions | Inside now, Non-owner today, At night, Assisted | Sessions today | Assisted access | the session | Machine occupancy |
-| Issues | Open, Waiting, Past target, Done today | Issues: machine, type, age | Types (filters) | *What to do*, the timeline | |
-| Automation | Rules, Switched on, Fired this week, Problems this week | Rules: trigger, fired, last fired | Problems today | the rule whole | Runs per day |
+| Machines | Machines, Online, Need a look, On the current version | Machines: user, version, CPU, last seen (worst first) | Sessions held now | the machine, *Open its page →* | |
+| Sessions | Inside now, Non-owner today, At night today, Assisted | Sessions today | Assisted access | the session | Machine occupancy |
+| Issues | Open, Waiting, Past target, Done today | Issues: severity, owner, age (worst first) | Types (filters) | *What to do*, the timeline | |
+| Automation | Rules, Switched on, Fired this week, Problems this week | Rules: switched on, fired, last fired | Problems today | the rule whole | Runs per day |
 | Actions | Actions, Custom, Runs this week, Problems this week | Library: kind, used by, limit | Run by hand | the action whole | |
-| Rollout | Current version, Running it, Holding the next back, Failed installs | Holding the gate | By department | the machine | Machines on the version |
+| Rollout | Current version, Running it, Holding the next back, Failed installs | Holding the gate | Versions here | the machine | Machines on the version |
 | Audit log | as the Super User's | | Kinds (filters) | the event | Events over time |
 | Reports | Waiting in your department, Gone to the Super User, Addressed, Typical time | Reports routed here | Kinds (filters) | the report, *Mark addressed* | |
 
 The console's menu keeps its own groups (Core, Monitor, Automate, Govern) with Core in the Super User's order:
 Overview, Tasks, Restricted, Flows.
+
+**Built (concept version 159).** Each console page is the Super User's page given the Admin's name, not a copy:
+Flows, Sessions (Access), Rollout, Audit log and Reports are drawn by the same component at both levels and narrow
+themselves in a console. In a console Flows lists the department's flows and those chained to them, answers *send you
+files* requests on top, and allows *Edit* only on the Admin's own; Sessions and Audit log open a machine's own page
+instead of Registry; Rollout has no *Approve* and no *Leave it out of the gate*, and its rail lists the versions the
+department runs; Reports lists only what is routed to the department (never a report about an Admin, never one left
+with the Super User), filters by kind, and has no *Where reports go*. Tasks, Machines, Issues, Automation and Actions
+keep their own components on the shared parts (Strip, ListPanel, RailPanel, the board). On Machines the pick stays
+out of the address, because `#machines/OPS-03` is the machine's own page. The Admin-only components these replaced
+(the old Flows, Sessions, Rollout, Audit and Reports) are no longer drawn. Checked in headless Edge inside R. Mensah's
+console, every page, and at the Super User's level for the shared ones; not click-tested: strip filters, rail picks,
+*Mark addressed*, the flow request answers.
 
 Core follows the same order (list, then the board of the item you clicked or the most relevant one): Tasks shows how far
 each Admin told has got (Given, Seen, Under way, Done, Completed by you; the most urgent task by default), with the

@@ -976,14 +976,14 @@ function Overview({ range, go }) {
   const toggleKind = (k) => setKinds(all ? [k] : kinds.includes(k) ? (kinds.length === 1 ? Object.keys(KINDS) : kinds.filter((x) => x !== k)) : [...kinds, k]);
   const sessionsHeld = MACHINES.filter((m) => m.held);
   const openT = TASKS.filter((t) => t.state !== "Completed"), verT = TASKS.filter((t) => t.state === "Awaiting your verification").length, lateT = TASKS.filter((t) => t.state === "Overdue").length;
+  // what waits on the person at this console: tasks to verify, and open issues that are theirs or nobody's
+  const mineI = ISSUES.filter((i) => i.owner === ME || i.owner === "Unassigned").length;
   const deptRows = DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
     return { key: d.id, d, total: ms.length, online: ms.filter((m) => m.status !== "offline").length, issues: ISSUES.filter((i) => MBY[i.host].dept === d.id).length,
       compliant: ms.filter((m) => m.ver === "1.4.2").length, mtta: !ms.length ? "—" : d.id === "ops" ? "42m" : d.id === "fin" ? "2h 10m" : "—" }; });
   return html`<${React.Fragment}>
     <div className="kpis">
-      <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing assigned yet" label="Tasks open" value=${fmt(openT.length)} delta=${`${verT} to verify · ${lateT} overdue`} dc=${lateT ? "var(--crit)" : verT ? "var(--s3)" : undefined} fn=${(t) => Math.max(1, Math.round(openT.length - 1 + sm(11, t, 0.15) * 2))} sc="var(--s1)" />
-      <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="No flows yet" label="Flows" value="3" delta="1 paused · 1 awaiting consent" dc="var(--high)" fn=${(t) => (working(t) ? 3 + 7 * sm(1, t, 3) : 0)} sc="var(--s2)" />
-      <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing marked yet" label="Restricted, marked by you" value=${fmt(myMarks().length)} delta=${myCopies().length ? `${myCopies().length} cop${myCopies().length === 1 ? "y" : "ies"} found elsewhere` : "All where they belong"} dc=${myCopies().length ? "var(--crit)" : "var(--ok)"} fn=${myCopies().length ? (t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0) : null} sc="var(--crit)" max=${3} />
+      <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing waiting" label="Waiting on you" value=${fmt(verT + mineI)} delta=${verT + mineI ? `${verT} task${verT === 1 ? "" : "s"} to verify · ${mineI} issue${mineI === 1 ? "" : "s"} yours` : "Nothing waiting on you"} dc=${verT + mineI ? "var(--crit)" : undefined} fn=${(t) => Math.max(1, Math.round((verT + mineI) * (0.6 + 0.4 * sm(9, t, 0.15))))} sc="var(--s6)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="No machines yet" label="Machines online" value=${String(MACHINES.filter((m) => m.status !== "offline").length)} unit=${"/ " + MACHINES.length} delta=${MACHINES.some((m) => m.status === "offline") ? "LOG-02 offline since 02:31" : "All online"} dc=${MACHINES.some((m) => m.status === "offline") ? "var(--crit)" : undefined} fn=${(t) => MACHINES.length - (MACHINES.some((m) => m.status === "offline") && t >= 2.52 ? 1 : 0)} max=${MACHINES.length} sc="var(--ok)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing open" label="Open issues" value=${String(ISSUES.length)} delta=${ISSUES.length ? ["critical", "high"].map((k) => `${ISSUES.filter((x) => x.sev === k).length} ${k}`).join(" · ") : "Nothing open"} dc=${ISSUES.some((x) => x.sev === "critical") ? "var(--crit)" : undefined} fn=${(t) => Math.max(2, Math.round(3 + (t > 9 ? 2 : 0) + (t > 10 ? 2 : 0) + sm(3, t, 0.3)))} sc="var(--crit)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nobody is inside a machine" label="Sessions held now" value=${String(sessionsHeld.length)} delta=${sessionsHeld.length ? `Longest: ${sessionsHeld[0].held === "You" ? "you" : sessionsHeld[0].held} on ${sessionsHeld[0].host}, ${dur(NOWH - sessionsHeld[0].heldFrom + (now - T0) / 3.6e6)}` : "Nobody is inside a machine"} fn=${(t) => (working(t) ? Math.round(1 + 1.4 * sm(8, t, 1.5)) : 0)} sc="var(--s3)" />
@@ -1053,38 +1053,48 @@ const HEALTH_HELP = "The most serious thing open on the machine. Healthy: nothin
 // The machines list: a click selects, and the board under the list shows the machine; its own page (charts,
 // processes, sessions, files) is reached only by "Open OPS-03's page →" (docs/design/click-in-place.md).
 function MachineList({ go }) {
-  const [q, setQ] = useState(""); const [dept, setDept] = useState("all"); const [st, setSt] = useState("all");
-  const [sel, setSel] = useState(null);
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(null);   // not in the address: #machines/OPS-03 is the machine's own page
+  const [f, setF] = useState(null);
   const [modal, modalCtx] = Modal.useModal();
   const order = { critical: 0, high: 1, warning: 2, offline: 3, healthy: 4 };
-  const rows = MACHINES.filter((m) => (dept === "all" || m.dept === dept) && (st === "all" || m.status === st) && (m.host + " " + (m.user || "")).toLowerCase().includes(q.toLowerCase())).map((m) => ({ ...m, key: m.host }));
-  const cur = rows.find((r) => r.host === sel) || rows.slice().sort((a, b) => order[a.status] - order[b.status])[0];
-  return html`<${React.Fragment}>${modalCtx}<${Panel} flush title=${`${rows.length} machines`} sub="click one to see it below" extra=${html`
-    <${Input} size="small" allowClear placeholder="Filter by host or user" prefix=${ic("SearchOutlined")} value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ width: 200 }} />
-    <${Select} size="small" value=${dept} onChange=${setDept} style=${{ width: 140 }} options=${[{ value: "all", label: "All departments" }, ...DEPTS.map((d) => ({ value: d.id, label: d.name }))]} />
-    <${Select} size="small" value=${st} onChange=${setSt} style=${{ width: 140 }} options=${[{ value: "all", label: "Any health" }, ...Object.keys(HEALTH).map((k) => ({ value: k, label: HEALTH[k][1] }))]} />
-    <${Button} size="small" icon=${ic("DownloadOutlined")} onClick=${() => toast("Exported " + rows.length + " rows (concept)")}>Export<//>`}>
-    <div className="scroll-x"><${Table} size="middle" pagination=${PG} dataSource=${rows} rowClassName=${(r) => (cur && r.host === cur.host ? "sel" : "")} onRow=${(r) => ({ onClick: () => setSel(r.host), className: "clickrow" })} columns=${[
-      { title: "Machine", width: 190, sorter: (a, b) => a.host.localeCompare(b.host), render: (r) => html`<div><span className="mono" style=${{ fontWeight: 500 }}>${r.host}</span><div className="t3 cut" style=${{ fontSize: 12, maxWidth: 220 }} title=${`${r.user || "No one signed in"} · ${DBY[r.dept].name}`}>${r.user || "No one signed in"} · ${DBY[r.dept].name}</div></div>` },
-      { title: html`<span className="row" style=${{ gap: 4, flexWrap: "nowrap" }}>Health <${Tooltip} title=${HEALTH_HELP}><span className="t4" style=${{ cursor: "help" }}>${ic("QuestionCircleOutlined")}</span><//></span>`, width: 290,
-        defaultSortOrder: "ascend", sorter: (a, b) => order[a.status] - order[b.status],
-        render: (r) => { const [k, w] = HEALTH[r.status]; return html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 9 }}><span style=${{ marginTop: 4 }}><${HealthMark} k=${k} /></span><div style=${{ minWidth: 0 }}><div style=${{ color: k === "crit" || k === "high" ? "var(--crit)" : "inherit", fontWeight: k === "quiet" ? 400 : 500 }}>${w}</div>${r.note && r.status !== "healthy" ? html`<div className="t3" style=${{ fontSize: 12 }}>${r.note}</div>` : null}</div></div>`; } },
-      { title: "Version", dataIndex: "ver", width: 90, render: (v) => html`<span className="mono" style=${{ color: v === "1.4.2" ? "inherit" : "var(--med)" }}>${v}</span>` },
-      { title: "CPU, 24 hours", width: 160, render: (r) => { const v = metric(r.host, "cpu", NOWH); return html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Spark} fn=${(t) => metric(r.host, "cpu", t)} max=${100} w=${84} c="var(--s6)" /><span className="mono" style=${{ width: 36, textAlign: "right" }}>${v == null ? "—" : v.toFixed(0) + "%"}</span></div>`; } },
-      { title: "Disk", width: 130, render: (r) => { const v = metric(r.host, "disk", NOWH); return v == null ? html`<span className="t4">—</span>` : html`<div className="row" style=${{ flexWrap: "nowrap" }}><${Bar} v=${v} w=${60} mark=${90} c=${v > 90 ? "var(--med)" : "var(--s6)"} /><span className="mono" style=${{ color: v > 90 ? "var(--med)" : "inherit" }}>${v.toFixed(0)}%</span></div>`; } },
-      { title: "Session", width: 140, render: (r) => (r.held ? html`<span className="t2">${r.held === "You" ? "You" : r.held}, ${dur(NOWH - r.heldFrom)}</span>` : html`<span className="t4">—</span>`) },
-      { title: "Last seen", width: 100, align: "right", render: (r) => html`<span className="mono" style=${{ color: r.seen > 0.1 ? "var(--crit)" : "var(--text-3)" }}>${r.seen > 0.1 ? dur(r.seen) + " ago" : "now"}</span>` },
-    ]} /></div>
-    <div className="t3" style=${{ fontSize: 12, padding: "10px 14px", borderTop: "1px solid var(--border)" }}>Memory, processes, files and the full history are on each machine's page.</div>
-  <//>
-  ${cur ? (() => { const cpu = metric(cur.host, "cpu", NOWH), disk = metric(cur.host, "disk", NOWH), [k, w] = HEALTH[cur.status];
+  const look = (m) => m.status !== "healthy";
+  const all = MACHINES.slice().sort((a, b) => order[a.status] - order[b.status] || a.host.localeCompare(b.host));
+  const rows = all.filter((m) => (!f || (f === "online" ? m.status !== "offline" : f === "look" ? look(m) : m.ver === "1.4.2")) && `${m.host} ${m.user || ""}`.toLowerCase().includes(q.toLowerCase())).map((m) => ({ ...m, id: m.host }));
+  const cur = (sel && rows.find((r) => r.host === sel)) || (sel && MBY[sel] && MACHINES.includes(MBY[sel]) ? MBY[sel] : null) || rows[0];
+  const held = MACHINES.filter((m) => m.held), off = MACHINES.filter((m) => m.status === "offline").length, behind = MACHINES.filter((m) => m.ver !== "1.4.2").length;
+  const FL = { all: "Machines", online: "Online", look: "Need a look", current: "On the current version" };
+  const board = cur ? (() => { const cpu = metric(cur.host, "cpu", NOWH), disk = metric(cur.host, "disk", NOWH), [k, w] = HEALTH[cur.status];
     return html`<${ItemBoard} open=${true} picked=${sel === cur.host} title=${cur.host} sub=${sel === cur.host ? "the one you picked" : "the one that needs you most · click another to see it here"}
       facts=${[["Health", html`<span style=${{ color: k === "crit" || k === "high" ? "var(--crit)" : "inherit" }}>${w}</span>${cur.note && cur.status !== "healthy" ? html`<span className="t3"> · ${cur.note}</span>` : null}`],
         ["Signed in", cur.user || "No one"], ["Department", DBY[cur.dept].name], ["Version", html`<span className="mono">${cur.ver}</span>`],
         ["CPU now", cpu == null ? "—" : cpu.toFixed(0) + "%"], ["Disk", disk == null ? "—" : disk.toFixed(0) + "%"],
         ["Session", cur.held ? `${cur.held === "You" ? "You" : cur.held}, ${dur(NOWH - cur.heldFrom)}` : "Nobody else is in it"], ["Last seen", cur.seen > 0.1 ? dur(cur.seen) + " ago" : "now"]]}
       actions=${html`<${Button} disabled=${cur.status === "offline" || cur.held === "You"} title=${cur.held === "You" ? "You are already in it" : cur.status === "offline" ? "The machine is offline" : ""} onClick=${() => modal.confirm(enterSessionConfirm(cur, () => toast(`Entered ${cur.host} (concept)`)))}>Enter session<//>
-        <${Button} type="primary" onClick=${() => go("machines", cur.host)}>Open ${cur.host}'s page →<//>`} />`; })() : null}<//>`;
+        <${Button} type="primary" onClick=${() => go("machines", cur.host)}>Open ${cur.host}'s page →<//>`}>
+      <div><div className="nt-h">CPU, 24 hours</div><${Spark} fn=${(t) => metric(cur.host, "cpu", t)} max=${100} w=${300} h=${40} c="var(--s6)" /></div>
+      <div className="t3" style=${{ fontSize: 12.5, alignSelf: "end" }}>Memory, processes, files and the full history are on ${cur.host}'s page.</div>
+    <//>`; })() : null;
+  return html`<${React.Fragment}>${modalCtx}
+    <${Strip} on=${f} onPick=${setF} items=${[
+      { key: "all", label: "Machines", value: fmt(MACHINES.length), delta: "in this department" },
+      { key: "online", label: "Online", value: fmt(MACHINES.length - off), unit: "/ " + fmt(MACHINES.length), delta: off ? `${fmt(off)} not checking in` : "every one", dc: off ? "var(--crit)" : undefined },
+      { key: "look", label: "Need a look", value: fmt(MACHINES.filter(look).length), delta: MACHINES.filter(look).length ? "not healthy, or offline" : "every one is healthy", dc: MACHINES.some((m) => m.status === "critical") ? "var(--crit)" : undefined },
+      { key: "current", label: "On the current version", value: fmt(MACHINES.length - behind), unit: "/ " + fmt(MACHINES.length), delta: behind ? `${fmt(behind)} still on an older one` : "every one on 1.4.2" }].map((x) => (x.key === "all" ? { ...x, key: null } : x))} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <${ListPanel} title=${f ? FL[f] : "Machines"} sub=${f ? html`<span>${fmt(rows.length)} · <a onClick=${() => setF(null)}>every machine</a></span>` : "worst first · click one to see it below"} q=${q} setQ=${setQ} placeholder="Filter by machine or person"
+        pick=${cur ? cur.host : null} onPick=${setSel} rowKey="id" rows=${rows} icon="DesktopOutlined"
+        tools=${html`<${Button} size="small" icon=${ic("DownloadOutlined")} onClick=${() => toast("Exported " + rows.length + " rows (concept)")}>Export<//>`}
+        name=${{ title: "Machine", text: (m) => m.host, line: (m) => `${m.user || "No one signed in"}${m.held ? ` · ${m.held} inside` : ""}` }}
+        cols=${[{ title: "Version", width: 90, text: (m) => m.ver }, { title: "CPU", width: 90, text: (m) => { const v = metric(m.host, "cpu", NOWH); return v == null ? "—" : v.toFixed(0) + "%"; } }, { title: "Last seen", width: 110, text: (m) => (m.seen > 0.1 ? dur(m.seen) + " ago" : "now") }]}
+        now=${(m) => { const [k, w] = HEALTH[m.status]; return [w, k === "crit" || k === "high" || k === "offline" ? "bad" : k === "watch" ? "wait" : "good"]; }}
+        empty=${!MACHINES.length ? html`<${Empty} icon="DesktopOutlined" title="No machines in this department" text="The Super User registers machines into a department. They show up here when they do." h=${200} />` : null} />
+      <${RailPanel} title="Sessions held now" sub="someone other than the owner is inside · click one to see it below" more="sessions"
+        items=${held.map((m) => ({ key: m.host, title: `${m.held === "You" ? "You" : m.held} on ${m.host}`, line: `${m.user || "nobody"} is locked out`, right: dur(NOWH - m.heldFrom), c: m.held === "You" ? "var(--accent)" : "var(--s3)", on: cur && cur.host === m.host, onClick: () => setSel(m.host) }))}
+        empty=${html`<${Empty} icon="LoginOutlined" title="Nobody else is inside a machine" text="When you or another Admin enters a machine, it shows here while the session lasts." h=${200} />`} />
+    </div>
+    ${board}
+  <//>`;
 }
 // Entering a worker's PC, wherever it is started from (machine page, an issue): the same check every time, who is in
 // it now and whether they are ended, so the issue page cannot skip Session Blocking (admin-navigation.md D5).
@@ -1376,11 +1386,15 @@ function IssueTimeline({ it, extra }) {
     : it.id === "AST-0311" ? [[9.67, "Kojo", "Pinged R. Mensah", "var(--s5)"], [10.25, "Kojo", "Pinged again", "var(--s5)"]]
     : AUDIT.filter((e) => e.host === it.host && Math.abs(e.t - it.at) < 2).slice(0, 5).map((e) => [e.t, e.actor, e.what, KINDS[e.kind].c]);
   const all = [...base, ...extra.map(([t, w]) => [t, "You", w, "var(--accent)"])];
+  if (!all.length) return html`<div className="t3" style=${{ padding: "10px 0", fontSize: 12.5 }}>Nothing recorded on ${it.host} around it yet. What you do here is added as you go.</div>`;
   return html`<div>${all.map(([t, who, what, c], i) => html`<div key=${i} className="ev" style=${{ paddingLeft: 0, paddingRight: 0 }}>
     <span className="mono t3">${t < 0 ? dayOf(t) : hhmm(t)}</span><i style=${{ width: 7, height: 7, borderRadius: "50%", background: c, display: "inline-block" }} />
     <span><span style=${{ fontWeight: 500 }}>${who}</span> <span className="t2">${what}</span></span></div>`)}</div>`;
 }
-function Issues({ sel, go }) {
+function Issues({ sel: open, go }) {
+  const [sel, setSel] = useOpen("issues", open);
+  const [q, setQ] = useState("");
+  const [sf, setSf] = useState(null);
   const [modal, modalCtx] = Modal.useModal();
   const [preset] = useState(() => { const p0 = ISSUE_PRESET; ISSUE_PRESET = null; return p0 || {}; });
   const [hf, setHf] = useState(preset.host || null);
@@ -1388,10 +1402,10 @@ function Issues({ sel, go }) {
   const [pick, setPick] = useState({});
   const [input, setInput] = useState({});
   const [notify, setNotify] = useState(true);
-  const id = sel && ISSUES.find((i) => i.id === sel) ? sel : ISSUES[0] ? ISSUES[0].id : null;
+  const firstOpen = ISSUES.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || a.at - b.at)[0];
+  const id = sel && ISSUES.find((i) => i.id === sel) ? sel : firstOpen ? firstOpen.id : null;
   const it = ISSUES.find((i) => i.id === id), stt = it && state[id], play = it && buildPlay(it), T = it && ISSUE_TYPES[it.type];
   const [tf, setTf] = useState(preset.type || "all");
-  const opg = usePaged(ISSUES.filter((i) => (tf === "all" || i.type === tf) && (!hf || i.host === hf) && state[i.id].status !== "Resolved"), 10, tf + (hf || ""));
   if (!it) return html`<${Panel} title="Issues"><div className="t3">Nothing is open in this department.</div><//>`;
   const opt = play.options.find((o) => o.key === (pick[id] || play.options[0].key));
   const age = NOWH - it.at, late = age > it.sla && stt.status !== "Resolved";
@@ -1409,15 +1423,12 @@ function Issues({ sel, go }) {
     upd((x) => ({ status: opt.done, log: [...x.log, ...lines], msg: opt.need === "message" ? val.trim() : x.msg, how: opt.title }));
     toast(`${opt.verb}: done (concept)`);
   };
-  const shown = ISSUES.filter((i) => (tf === "all" || i.type === tf) && (!hf || i.host === hf));
-  const open = shown.filter((i) => state[i.id].status !== "Resolved"), done = shown.filter((i) => state[i.id].status === "Resolved");
-  const row = (i) => { const a = NOWH - i.at, ss = state[i.id].status, res = ss === "Resolved";
-    return html`<div key=${i.id} className=${"irow" + (i.id === id ? " on" : "")} role="button" tabIndex="0" onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)} title=${SEV[i.sev].w} style=${{ opacity: res ? 0.6 : 1 }}>
-      <i style=${{ background: res ? "var(--ok)" : SEV[i.sev].c }} />
-      <span className="ttl"><span className="t4" style=${{ marginRight: 6 }} title=${ISSUE_TYPES[i.type].label}>${ic(ISSUE_TYPES[i.type].icon)}</span>${i.title}</span>
-      <span className="mono t3">${i.host}</span>
-      <span className="mono" style=${{ color: res ? "var(--ok)" : ss === "Waiting" ? "var(--s1)" : a > i.sla ? "var(--crit)" : "var(--text-3)", textAlign: "right" }}>${res ? "done" : ss === "Waiting" ? "waiting" : ago(a)}</span>
-    </div>`; };
+  const ageOf = (i) => NOWH - i.at, lateI = (i) => state[i.id].status !== "Resolved" && ageOf(i) > i.sla;
+  const SF = { open: (i) => state[i.id].status === "Open", waiting: (i) => state[i.id].status === "Waiting", late: lateI, done: (i) => state[i.id].status === "Resolved" };
+  const SFW = { open: "Open", waiting: "Waiting", late: "Past target", done: "Done today" };
+  const rows = ISSUES.filter((i) => (tf === "all" || i.type === tf) && (!hf || i.host === hf) && (sf ? SF[sf](i) : state[i.id].status !== "Resolved") && `${i.title} ${i.subject} ${i.host}`.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || a.at - b.at);
+  const cnt = (k) => ISSUES.filter(SF[k]).length;
   const tabs = [
     { key: "tl", label: "Timeline", children: html`<${IssueTimeline} it=${it} extra=${stt.log} />` },
     ...(it.id === "INC-1042" ? [{ key: "pv", label: "Where the file came from", children: html`<${Provenance} />` }] : []),
@@ -1425,19 +1436,29 @@ function Issues({ sel, go }) {
         ${[["Detected", it.at < 0 ? `${dayOf(it.at)} ${hhmm(it.at)}` : `Today ${hhmm(it.at)}`], ["Target time", it.sla + " h"], ["Department", DBY[MBY[it.host].dept].name], ["Routed to", MBY[it.host].dept === "log" ? "Super User only" : "Super User, " + DBY[MBY[it.host].dept].name], ["Type", T.label], ["Comes from", T.from], ["ID", it.id]]
           .map(([k, v]) => html`<div key=${k}><div className="k">${k}</div><div className="v">${v}</div></div>`)}</div>` },
   ];
-  return html`<${React.Fragment}>${modalCtx}<div className="g c-48">
-    <${Panel} flush title=${`${open.length} open`} extra=${html`${hf ? html`<span className="tag" style=${{ "--c": "var(--text-3)" }}>on ${hf} <a style=${{ marginLeft: 4 }} onClick=${() => setHf(null)} aria-label="Show every machine">${ic("CloseOutlined")}</a></span>` : null}<${Pager} p=${opg} /><${Select} size="small" value=${tf} onChange=${setTf} style=${{ width: 160 }} options=${[{ value: "all", label: "All types" }, ...Object.keys(ISSUE_TYPES).map((k) => ({ value: k, label: `${ISSUE_TYPES[k].label} · ${ISSUES.filter((i) => i.type === k).length}` }))]} />`}>
-      ${open.length + done.length === 0 ? html`<div className="t3" style=${{ padding: 14 }}>No issues of this type.</div>` : null}
-      ${opg.items.map(row)}
-      ${done.length ? html`<div className="t3" style=${{ padding: "10px 14px 6px", fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", background: "var(--surface-2)", borderBottom: "1px solid var(--grid)" }}>Done today · ${done.length}</div>${done.slice(0, 5).map(row)}${done.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${done.length - 5} what="done today, in Audit log →" onClick=${() => go("audit")} /></div>` : null}` : null}
-    <//>
-    <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+  return html`<${React.Fragment}>${modalCtx}
+    <${Strip} on=${sf} onPick=${setSf} items=${[
+      { key: "open", label: "Open", value: fmt(cnt("open")), delta: ISSUES.some((i) => i.sev === "critical" && SF.open(i)) ? `${ISSUES.filter((i) => i.sev === "critical" && SF.open(i)).length} critical` : "nothing critical", dc: ISSUES.some((i) => i.sev === "critical" && SF.open(i)) ? "var(--crit)" : undefined },
+      { key: "waiting", label: "Waiting", value: fmt(cnt("waiting")), delta: "on a step already taken" },
+      { key: "late", label: "Past target", value: fmt(cnt("late")), delta: cnt("late") ? "older than the time they should take" : "all within their target", dc: cnt("late") ? "var(--crit)" : undefined },
+      { key: "done", label: "Done today", value: fmt(cnt("done")), delta: "resolved here today" }]} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <${ListPanel} title=${sf ? SFW[sf] : "Open issues"} sub=${html`<span>${sf || tf !== "all" || hf ? html`${fmt(rows.length)}${tf !== "all" ? ` · ${ISSUE_TYPES[tf].label.toLowerCase()}` : ""}${hf ? ` · on ${hf}` : ""} · <a onClick=${() => { setSf(null); setTf("all"); setHf(null); }}>every open issue</a>` : "worst first · click one to see it below"}</span>`}
+        q=${q} setQ=${setQ} placeholder="Find an issue, file or machine" pick=${id} onPick=${setSel} rowKey="id" rows=${rows}
+        icon=${(i) => ISSUE_TYPES[i.type].icon} name=${{ title: "Issue", text: (i) => i.title, line: (i) => `${i.subject} · ${i.host}` }}
+        cols=${[{ title: "Severity", width: 100, text: (i) => SEV[i.sev].w }, { title: "Owner", width: 120, text: (i) => state[i.id].owner }, { title: "Age", width: 90, text: (i) => ago(ageOf(i)) }]}
+        now=${(i) => { const ss = state[i.id].status; return ss === "Resolved" ? ["Done", "good"] : ss === "Waiting" ? ["Waiting", "wait"] : lateI(i) ? ["Past its target", "bad"] : ["Open", "wait"]; }} />
+      <${RailPanel} title="Types" sub="click one to show only those" max=${8}
+        items=${Object.keys(ISSUE_TYPES).map((k) => ({ key: k, title: ISSUE_TYPES[k].label, line: `from ${ISSUE_TYPES[k].from}`, right: fmt(ISSUES.filter((i) => i.type === k && state[i.id].status !== "Resolved").length), c: tf === k ? "var(--accent)" : "var(--text-4)", on: tf === k, onClick: () => setTf(tf === k ? "all" : k) }))} empty=${null} />
+    </div>
+    <div>
+    <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0}}>
       <section className="panel" style=${{ padding: 16 }}>
         <div className="row" style=${{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "nowrap" }}>
           <div style=${{ minWidth: 0 }}>
             <div className="row"><${Sev} s=${it.sev} /><span className="tag" style=${{ "--c": "var(--text-3)" }}>${ic(T.icon)} ${T.label}</span><span className="st" style=${{ "--c": ISC[stt.status] }}><i />${stt.status}</span></div>
             <div style=${{ fontSize: 17, fontWeight: 600, marginTop: 4 }}>${it.title}</div>
-            <div className="t2" style=${{ marginTop: 2 }}><span className="mono">${it.subject}</span> on <span className="mono">${it.host}</span> <a style=${{ fontSize: 12, marginLeft: 4 }} onClick=${() => go("machines", it.host)}>Open ${it.host}'s page →</a>
+            <div className="t2" style=${{ marginTop: 2 }}><span className="mono">${it.subject}</span> on <span className="mono">${it.host}</span> <a style=${{ fontSize: 12, marginLeft: 4 }} onClick=${() => go("machines", it.host)}>Open ${it.host}'s page →</a><span className="t3">${sel === id ? "" : " · the worst open · click another in the list"}</span>
               <span className="t3"> · ${ago(age)} old</span>${late ? html`<span style=${{ color: "var(--crit)" }}> · past its ${it.sla} h target</span>` : null}</div>
           </div>
           <div className="row" style=${{ flexWrap: "nowrap" }}>
@@ -1452,6 +1473,7 @@ function Issues({ sel, go }) {
         </div>
       </section>
 
+      <div className="g c-75" style=${{ alignItems: "start" }}>
       ${stt.status === "Resolved" ? html`<section className="panel" style=${{ padding: 16, background: "color-mix(in srgb, var(--ok) 8%, var(--surface))" }}>
           <div className="row" style=${{ flexWrap: "nowrap" }}>
             <span style=${{ color: "var(--ok)", fontSize: 18 }}>${ic("CheckCircleFilled")}</span>
@@ -1482,10 +1504,10 @@ function Issues({ sel, go }) {
             </div>
           </div>
         </section>`}
-
       <section className="panel" style=${{ minWidth: 0 }}>
         <div style=${{ padding: "4px 16px 12px" }}><${Tabs} key=${it.id} size="small" items=${tabs} /></div>
       </section>
+      </div>
     </div>
   </div><//>`;
 }
@@ -2099,7 +2121,7 @@ const TORDER = ["verify", "overdue", "quiet", "track", "done"];
 function Tasks({ go, me, open }) {
   useDT();
   const mine = DEPT_TASKS.filter((t) => !t.complete && me && t.st[me] !== undefined).sort((a, b) => (a.st[me] === "sent" ? 0 : 1) - (b.st[me] === "sent" ? 0 : 1));
-  const fpg = usePaged(mine, 3);
+  const fpg = usePaged(mine, 5);
   const setMy = (id, v) => { setAdminState(id, me, v); toast(`Marked ${DSTATE[v][0].toLowerCase()} · the Super User sees it (concept)`); };
   // when anything was last seen for each task, looking back a week
   const seen = useMemo(() => Object.fromEntries(TASKS.map((t) => { for (let x = NOWH; x > NOWH - 168; x -= 0.25) if (t.evidence.some((e) => (e.fn(x) || 0) > 0)) return [t.id, x]; return [t.id, null]; })), [TASKS.length]);
@@ -2118,71 +2140,29 @@ function Tasks({ go, me, open }) {
     : NOWH > t.final ? [`${span(NOWH - t.final)} late`, `was due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--crit)"] : [`${span(t.final - NOWH)} left`, `due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--text)"];
   const note = (t, k) => { const d = t.evidence.filter((e) => e.st === "Passed").length, ls = seen[t.id];
     return k === "quiet" ? (ls == null ? "nothing seen since it was given" : `nothing seen for ${span(NOWH - ls)}`) : `${d} of ${t.evidence.length} target${t.evidence.length === 1 ? "" : "s"} found`; };
+  const SHORT = { verify: "only you can close them", overdue: "past the final deadline", quiet: "nothing seen for two days", track: "with signs of progress" };
+  const NOWK = { verify: "good", overdue: "bad", quiet: "wait", track: "good", done: "wait" };
+  const rows = list.map((x) => ({ ...x.t, k: x.k }));
   return html`<${React.Fragment}>
-    <div className="tcards">
-      ${["verify", "overdue", "quiet", "track"].map((k) => { const on = f === k, c = TCAT[k];
-        return html`<div key=${k} className=${"panel tcard" + (on ? " on" : "")} style=${{ "--c": c.c }} role="button" tabIndex="0" aria-pressed=${on} onClick=${() => setF(on ? null : k)} onKeyDown=${(e) => e.key === "Enter" && setF(on ? null : k)}>
-          <div className="row" style=${{ flexWrap: "nowrap", gap: 8 }}><span className="t3">${ic(c.icon)}</span><span className="t2">${c.w}</span><span className="sp" />${on ? html`<span className="t3" style=${{ fontSize: 11.5 }}>showing · click to clear</span>` : null}</div>
-          <div style=${{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2, color: "var(--text)" }}>${fmt(n(k))}</div>
-          <div className="t3" style=${{ fontSize: 12 }}>${c.d}</div>
-        </div>`; })}
-    </div>
+    <${Strip} on=${f} onPick=${setF} items=${["verify", "overdue", "quiet", "track"].map((k) => ({ key: k, label: TCAT[k].w, value: fmt(n(k)), delta: SHORT[k], dc: k === "overdue" && n(k) ? "var(--crit)" : undefined }))} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <section className="panel" style=${{ minWidth: 0 }}>
-        <div className="phd">
-          <div className="pt">${f ? TCAT[f].w : "All tasks"}<small>${f ? html`<span>${fmt(list.length)} · <a onClick=${() => setF(null)}>show all ${fmt(all.length)}</a></span>` : `${fmt(all.length)} · what needs you comes first · click one to see it below`}</small></div>
-          <div className="row">
-            <${Pager} p=${pg} />
-            <${Input} size="small" allowClear placeholder="Find a task or person" prefix=${ic("SearchOutlined")} value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ width: 190 }} />
-            <${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("tasks", "new")}>New task<//>
-          </div>
-        </div>
-        ${!all.length ? html`<${Empty} icon="CheckSquareOutlined" title="No tasks yet" text="Describe a piece of work in plain words. The system proposes who, what done looks like and when; nothing is created until you confirm it." act="New task" onAct=${() => go("tasks", "new")} h=${200} />`
-          : !list.length ? html`<div className="t3" style=${{ padding: 16 }}>Nothing here${q ? ` matches “${q}”` : ""}.</div>` : null}
-        <div style=${{ minHeight: pg.pages > 1 ? 8 * 61 : 0 }}>
-        ${pg.items.map(({ t, k }) => { const c = TCAT[k], [d1, d2, dc] = due(t, k);
-          return html`<div key=${t.id} className=${"trow" + (cur && cur.t.id === t.id ? " on" : "")} role="button" tabIndex="0" onClick=${() => setSel(t.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(t.id)}>
-            <div style=${{ minWidth: 0 }}>
-              <div className="cut" style=${{ fontWeight: 500, fontSize: 13.5, color: k === "done" ? "var(--text-3)" : "var(--text)" }} title=${t.title}>${t.title}</div>
-              <div className="t3 cut" style=${{ fontSize: 12 }}><span className="st" style=${{ "--c": c.c, marginRight: 8 }}><i />${c.w}</span><span className="mono">${t.id}</span> · ${t.who} on <span className="mono">${t.host}</span>${t.by !== me ? ` · from ${t.by === "You" ? "the Super User" : t.by}` : ""}</div>
-            </div>
-            <div className="trow-line">
-              <div className="row" style=${{ gap: 8, flexWrap: "nowrap", marginBottom: 2 }}>
-                <span className="row" style=${{ gap: 4, flexWrap: "nowrap" }} title=${t.evidence.map((e) => `${targetOf(e).name}: ${FOUND[e.st][0].toLowerCase()}`).join("\n")}>${t.evidence.slice(0, 4).map((e, j) => html`<i key=${j} style=${{ width: 8, height: 8, borderRadius: "50%", display: "inline-block", ...PIP[e.st] }} />`)}${t.evidence.length > 4 ? html`<span className="t3" style=${{ fontSize: 10 }}>+${t.evidence.length - 4}</span>` : null}</span>
-                <span className="cut" style=${{ fontSize: 12, color: "var(--text-3)" }}>${note(t, k)}</span>
-              </div>
-            </div>
-            <div style=${{ textAlign: "right", whiteSpace: "nowrap" }}><div className="mono" style=${{ color: dc, fontSize: 12.5 }}>${d1}</div><div className="t3" style=${{ fontSize: 11.5 }}>${d2}</div></div>
-          </div>`; })}
-        </div>
-        ${all.length ? html`<div className="leg" style=${{ padding: "10px 14px", borderTop: "1px solid var(--border)" }}>
-          <span><i style=${{ width: 8, height: 8, borderRadius: "50%", background: "var(--text)" }} />target found</span><span><i style=${{ width: 8, height: 8, borderRadius: "50%", border: "1.5px solid var(--text-4)", background: "transparent" }} />not seen yet</span>
-          <span><i style=${{ width: 8, height: 8, borderRadius: "50%", background: "var(--med)" }} />missing at the deadline</span>
-        </div>` : null}
-      </section>
-      <div style=${{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
-        ${me ? html`<section className="panel">
-          <div className="phd"><div className="pt">From the Super User<small>only they close these</small></div><${Pager} p=${fpg} /></div>
-          ${!mine.length ? html`<div className="t3" style=${{ padding: 14, fontSize: 12.5 }}>Nothing given to you. Work the Super User gives your department appears here, and you say how far it has got.</div>` : null}
-          ${fpg.items.map((t) => { const fresh = t.st[me] === "sent";
-            return html`<div key=${t.id} id=${"dt-" + t.id} style=${{ padding: "10px 14px", borderBottom: "1px solid var(--grid)", background: fresh ? "var(--accent-soft)" : "transparent" }}>
-              <div className="row" style=${{ flexWrap: "nowrap" }}>${fresh ? html`<span className="tag" style=${{ "--c": "var(--accent)" }}>New<//>` : null}<span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${t.title}</span></div>
-              <div className="row" style=${{ marginTop: 6, flexWrap: "nowrap" }}>
-                <span className="mono" style=${{ fontSize: 12, color: t.due < NOWH ? "var(--crit)" : "var(--text-3)" }}>${dueText(t.due)}</span><span className="sp" />
-                <${Segmented} size="small" value=${t.st[me] === "sent" ? null : t.st[me]} onChange=${(v) => setMy(t.id, v)} options=${[{ value: "seen", label: "Seen" }, { value: "ongoing", label: "Ongoing" }, { value: "done", label: "Done" }]} />
-              </div></div>`; })}
-        </section>` : null}
-        <section className="panel">
-          <div className="phd"><div className="pt">How a task is checked</div></div>
-          <div className="pbd" style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-            ${[["AimOutlined", "What done looks like", "Each task names its targets: a file to create or change, a folder, a program to use. You confirm them when you give it."],
-               ["EyeOutlined", "Signs of progress", "The machine's own file events and program activity show the work happening. Open but idle never counts."],
-               ["FieldTimeOutlined", "Quiet", "Under way with nothing seen for two days, so you can ask early, not at the deadline."],
-               ["CheckCircleOutlined", "You close it", "The system reports what it found and never closes a task. Complete or Incomplete is yours."]].map(([i, h, d]) => html`<div key=${h} className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}>
-                <span className="t3" style=${{ marginTop: 2 }}>${ic(i)}</span><div><div style=${{ fontWeight: 500 }}>${h}</div><div className="t3" style=${{ fontSize: 12.5 }}>${d}</div></div></div>`)}
-          </div>
-        </section>
-      </div>
+      <${ListPanel} title=${f ? TCAT[f].w : "Tasks"} sub=${f ? html`<span>${fmt(list.length)} · <a onClick=${() => setF(null)}>every task</a></span>` : "what needs you first · click one to see it below"}
+        q=${q} setQ=${setQ} placeholder="Find a task or person" action=${{ label: "New task", onClick: () => go("tasks", "new") }} pick=${cur ? cur.t.id : null} onPick=${setSel} rowKey="id" rows=${rows}
+        icon="CheckSquareOutlined" name=${{ title: "Task", text: (r) => r.title, line: (r) => `${r.id} · ${r.who} on ${r.host}${r.by !== me ? ` · from ${r.by === "You" ? "the Super User" : r.by}` : ""}` }}
+        cols=${[{ title: "Targets", width: 160, bar: (r) => { const d0 = r.evidence.filter((e) => e.st === "Passed").length; return { v: d0, max: Math.max(1, r.evidence.length), text: `${d0} of ${r.evidence.length} found` }; } },
+          { title: "Deadline", width: 150, text: (r) => due(r, r.k)[0] }]}
+        now=${(r) => [TCAT[r.k].w, NOWK[r.k]]}
+        empty=${!all.length ? html`<${Empty} icon="CheckSquareOutlined" title="No tasks yet" text="Describe a piece of work in plain words. The system proposes who, what done looks like and when; nothing is created until you confirm it." act="New task" onAct=${() => go("tasks", "new")} h=${200} />` : null} />
+      <${Panel} title="From the Super User" sub="only they close these" flush style=${{ minHeight: LIST_H }} extra=${html`<${Pager} p=${fpg} />`}>
+        ${!mine.length ? html`<${Empty} icon="InboxOutlined" title="Nothing given to you" text="Work the Super User gives your department appears here, and you say how far it has got." h=${200} />` : null}
+        ${fpg.items.map((t) => { const fresh = t.st[me] === "sent";
+          return html`<div key=${t.id} id=${"dt-" + t.id} style=${{ padding: "10px 14px", borderBottom: "1px solid var(--grid)", background: fresh ? "var(--accent-soft)" : "transparent" }}>
+            <div className="row" style=${{ flexWrap: "nowrap" }}>${fresh ? html`<span className="tag" style=${{ "--c": "var(--accent)" }}>New<//>` : null}<span className="cut" style=${{ fontWeight: 500 }} title=${t.title}>${t.title}</span></div>
+            <div className="row" style=${{ marginTop: 6, flexWrap: "nowrap" }}>
+              <span className="mono" style=${{ fontSize: 12, color: t.due < NOWH ? "var(--crit)" : "var(--text-3)" }}>${dueText(t.due)}</span><span className="sp" />
+              <${Segmented} size="small" value=${t.st[me] === "sent" ? null : t.st[me]} onChange=${(v) => setMy(t.id, v)} options=${[{ value: "seen", label: "Seen" }, { value: "ongoing", label: "Ongoing" }, { value: "done", label: "Done" }]} />
+            </div></div>`; })}
+      <//>
     </div>
     ${cur ? html`<${TaskDetail} key=${cur.t.id} id=${cur.t.id} go=${go} picked=${sel === cur.t.id} />` : null}
   <//>`;
@@ -2783,17 +2763,31 @@ function Automation({ go, open }) {
   const outs = [["Success", [32, 0, 0, 27, 32, 28, 34]], ["Failed", [0, 0, 0, 1, 1, 0, 1]], ["Timed out", [0, 0, 0, 0, 1, 1, 1]], ["Stopped by you", [0, 0, 0, 0, 0, 0, 1]]];
   const tot = outs.reduce((a, o) => a + o[1].reduce((x, y) => x + y, 0), 0);
   const latest = RUNS.slice().sort((a, b) => b[3] - a[3] || (a[6] === "Success") - (b[6] === "Success"));
+  const [q, setQ] = useState("");
+  const fired = RULES.reduce((t, r) => t + r.perDay.reduce((a, b) => a + b, 0), 0), probs = outs.filter(([k]) => k === "Failed" || k === "Timed out").reduce((t, [, v]) => t + v.reduce((a, b) => a + b, 0), 0);
+  const suN = RULES.filter((r) => r.by === "You").length, onN = RULES.filter((r) => on[r.id]).length;
+  const rows = RULES.filter((r) => `${r.name} ${r.when}`.toLowerCase().includes(q.toLowerCase()));
+  const today = latest.filter((x) => x[6] === "Failed" || x[6] === "Timed out");
   return html`<${React.Fragment}>
-    <${Panel} flush title="Rules" sub="click a rule to see it below" extra=${html`<${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("automation", "new")}>New rule<//>`}>
-      <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${RULES.map((r) => ({ ...r, key: r.id }))} rowClassName=${(r) => (cur && r.id === cur.id ? "sel" : "")} onRow=${(r) => ({ onClick: () => setSel(r.id), className: "clickrow" })} columns=${[
-        { title: "Enabled", width: 76, align: "center", render: (r) => html`<span onClick=${(e) => e.stopPropagation()} title=${r.by === "You" ? "Set by the Super User. Only they can switch it." : ""}><${Checkbox} disabled=${r.by === "You"} checked=${on[r.id]} aria-label=${"Enable " + r.name} onChange=${(e) => { setOn({ ...on, [r.id]: e.target.checked }); toast(`${r.name} ${e.target.checked ? "enabled" : "disabled"} (concept)`); }} /></span>` },
-        { title: "Rule", render: (r) => html`<div><span style=${{ fontWeight: 500 }}>${r.name}</span><div className="t2" style=${{ fontSize: 12 }}>${sentence(r)}</div></div>` },
-        { title: "Trigger", width: 100, render: (r) => html`<${Tag} c=${KINDC[r.kind]}>${r.kind}<//>` },
-        { title: "Fired, 7 days", width: 130, render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><svg width="70" height="20" style=${{ display: "block" }}>${r.perDay.map((v, i) => html`<rect key=${i} x=${i * 10} y=${20 - Math.max(1, (v / 4) * 18)} width="7" height=${Math.max(1, (v / 4) * 18)} style=${{ fill: v ? "var(--s3)" : "var(--surface-3)" }} />`)}</svg><span className="mono">${r.perDay.reduce((a, b) => a + b, 0)}</span></div>` },
-        { title: "Last fired", dataIndex: "last", width: 90, render: (v) => html`<span className="mono">${v}</span>` },
-        { title: "Last run", width: 260, render: (r) => html`<span className="st" style=${{ "--c": r.res[0] }}><i />${r.res[1]}</span>` },
-      ]} /></div>
-    <//>
+    <${Strip} items=${[
+      { label: "Rules", value: fmt(RULES.length), delta: suN ? `${suN} set by the Super User` : "all made in this department" },
+      { label: "Switched on", value: fmt(onN), unit: "/ " + fmt(RULES.length), delta: onN === RULES.length ? "every one" : `${RULES.length - onN} switched off` },
+      { label: "Fired this week", value: fmt(fired), delta: "each firing runs the rule's actions" },
+      { label: "Problems this week", value: fmt(probs), delta: probs ? "failed or ran out of time" : "every run succeeded", dc: probs ? "var(--crit)" : undefined }]} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <${ListPanel} title="Rules" sub="what runs on its own here · click one to see it below" q=${q} setQ=${setQ} placeholder="Find a rule"
+        action=${{ label: "New rule", onClick: () => go("automation", "new") }} pick=${cur ? cur.id : null} onPick=${setSel} rowKey="id" rows=${rows}
+        icon=${(r) => (r.kind === "Event" ? "ThunderboltOutlined" : r.kind === "Schedule" ? "ClockCircleOutlined" : "DashboardOutlined")}
+        name=${{ title: "Rule", text: (r) => r.name, line: (r) => `${r.kind} · ${r.by === "You" ? "by the Super User" : "by " + r.by}` }}
+        cols=${[{ title: "On", width: 60, render: (r) => html`<span onClick=${(e) => e.stopPropagation()} title=${r.by === "You" ? "Set by the Super User. Only they can switch it." : ""}><${Checkbox} disabled=${r.by === "You"} checked=${on[r.id]} aria-label=${"Enable " + r.name} onChange=${(e) => { setOn({ ...on, [r.id]: e.target.checked }); toast(`${r.name} ${e.target.checked ? "switched on" : "switched off"} (concept)`); }} /></span>` },
+          { title: "Fired, 7 days", width: 130, bar: (r) => { const n = r.perDay.reduce((a, b) => a + b, 0); return { v: n, max: Math.max(1, ...RULES.map((y) => y.perDay.reduce((a, b) => a + b, 0))), text: fmt(n) }; } },
+          { title: "Last fired", width: 100, text: (r) => r.last }]}
+        now=${(r) => [!on[r.id] ? "Switched off" : r.res[1], !on[r.id] ? "wait" : r.res[0] === "var(--ok)" ? "good" : "bad"]} nowTitle="Last run"
+        empty=${!RULES.length ? html`<${Empty} icon="ThunderboltOutlined" title="No rules yet" text="A rule watches for something on the department's machines and runs actions when it happens." act="New rule" onAct=${() => go("automation", "new")} h=${200} />` : null} />
+      <${RailPanel} title="Problems today" sub="click one to see its rule below" more="in Runs today, below"
+        items=${today.map((x, i) => ({ key: i, title: `${x[1]} on ${x[2]}`, line: x[0] === "manual" ? "run by hand" : RBY[x[0]].name, right: hhmm(x[3]), c: OUT[x[6]], on: x[0] !== "manual" && cur && cur.id === x[0], onClick: x[0] !== "manual" ? () => setSel(x[0]) : null }))}
+        empty=${html`<${Empty} icon="CheckCircleOutlined" title="Nothing went wrong today" text="A run that fails, or runs out of time, shows here." h=${200} />`} />
+    </div>
     ${cur ? html`<${RuleDetail} key=${cur.id} id=${cur.id} go=${go} />` : null}
     <div className="g c-84">
       <${Panel} title="Runs per day" sub="all rules · last 7 days · by outcome" extra=${html`<div className="leg">${outs.map(([k]) => html`<span key=${k}><i className="sq" style=${{ "--c": OUT[k] }} />${k}</span>`)}</div>`}>
@@ -3203,35 +3197,32 @@ function Actions({ go, open }) {
   const [cat, setCat] = useState("All");
   const [runA, setRunA] = useState(null);
   const [sel, setSel] = useOpen("actions", open);
-  const rows = ACTION_LIB.filter((a) => cat === "All" || a.cat === cat);
+  const [q, setQ] = useState("");
+  const rows = ACTION_LIB.filter((a) => (cat === "All" || a.cat === cat) && `${a.name} ${a.desc}`.toLowerCase().includes(q.toLowerCase()));
   const cur = ABY[sel] || rows[0];
+  const week = ALL_RUNS.filter((x) => x.t >= -144), bad = week.filter((x) => x.outcome === "Failed" || x.outcome === "Timed out");
+  const byName = (n) => ACTION_LIB.find((a) => a.names.includes(n));
+  const hand = MANUAL_RUNS.slice().sort((a, b) => b.t - a.t);
+  const lastOf = (a) => runsOf(a)[0];
   return html`<${React.Fragment}>
-    <${Panel} flush title="Action library" sub="what rules can do, and what you can run by hand · click one to see it below" extra=${html`
-      <${Segmented} size="small" value=${cat} onChange=${setCat} options=${["All", "Control", "Monitoring", "Custom"].map((c) => ({ value: c, label: c === "All" ? `All ${ACTION_LIB.length}` : `${c} ${ACTION_LIB.filter((a) => a.cat === c).length}` }))} />
-      <${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("actions", "new")}>New custom action<//>`}>
-      <div className="scroll-x"><${Table} size="middle" pagination=${PG} dataSource=${rows.map((a) => ({ ...a, key: a.id }))} rowClassName=${(r) => (cur && r.id === cur.id ? "sel" : "")} onRow=${(r) => ({ onClick: () => setSel(r.id), className: "clickrow" })} columns=${[
-        { title: "Action", render: (a) => html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}>
-            <span style=${{ width: 26, height: 26, borderRadius: 5, flex: "none", display: "grid", placeItems: "center", background: `color-mix(in srgb, ${CATC[a.cat]} 12%, transparent)`, color: CATC[a.cat] }}>${ic(CATI[a.cat])}</span>
-            <div style=${{ minWidth: 0 }}><span style=${{ fontWeight: 500 }}>${a.name}</span>${a.lang ? html`<span className="tag" style=${{ "--c": "var(--text-3)", marginLeft: 6 }}>${a.lang}<//>` : null}<div className="t3" style=${{ fontSize: 12 }}>${a.desc}</div></div></div>` },
-        { title: "Kind", width: 110, render: (a) => html`<span className="t2">${a.cat}</span>` },
-        { title: "Used by", width: 220, render: (a) => { const u = usedBy(a);
-          if (!u.length) return html`<span className="t4">No rules</span>`;
-          // one rule is named; more than one is counted, with every name on hover and on the action's page
-          return u.length === 1 ? html`<span className="t2">${u[0].name}</span>`
-            : html`<${Tooltip} title=${html`<div>${u.map((r) => html`<div key=${r.id}>${r.name}</div>`)}</div>`}><span className="t2" style=${{ cursor: "help" }}><b style=${{ fontWeight: 500, color: "var(--text)" }}>${u.length} rules</b> · ${u[0].name}, +${u.length - 1}</span><//>`; } },
-        { title: "Runs, 7 days", width: 110, align: "right", render: (a) => html`<span className="mono">${runsOf(a).length}</span>` },
-        { title: "Time limit", width: 90, align: "right", render: (a) => html`<span className="mono t2">${a.limit}s</span>` },
-        { title: "", width: 110, align: "right", render: (a) => html`<span onClick=${(e) => e.stopPropagation()}><${Button} size="small" icon=${ic("CaretRightOutlined")} onClick=${() => setRunA(a)}>Run once<//></span>` },
-      ]} /></div>
-    <//>
+    <${Strip} on=${cat === "All" ? null : cat} onPick=${(k) => setCat(k || "All")} items=${[
+      { label: "Actions", value: fmt(ACTION_LIB.length), delta: `${ACTION_LIB.filter((a) => a.cat === "Control").length} control · ${ACTION_LIB.filter((a) => a.cat === "Monitoring").length} monitoring` },
+      { key: "Custom", label: "Custom", value: fmt(ACTION_LIB.filter((a) => a.cat === "Custom").length), delta: "scripts written here" },
+      { label: "Runs this week", value: fmt(week.length), delta: `${fmt(week.filter((x) => !x.rule).length)} by hand` },
+      { label: "Problems this week", value: fmt(bad.length), delta: bad.length ? "failed or ran out of time" : "every run succeeded", dc: bad.length ? "var(--crit)" : undefined }]} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <${ListPanel} title=${cat === "All" ? "Action library" : cat + " actions"} sub=${cat === "All" ? "what rules can do, and what you can run by hand · click one to see it below" : html`<span>${fmt(rows.length)} · <a onClick=${() => setCat("All")}>every action</a></span>`}
+        q=${q} setQ=${setQ} placeholder="Find an action" action=${{ label: "New custom action", onClick: () => go("actions", "new") }}
+        pick=${cur ? cur.id : null} onPick=${setSel} rowKey="id" rows=${rows} icon=${(a) => CATI[a.cat]}
+        name=${{ title: "Action", text: (a) => a.name + (a.lang ? ` · ${a.lang}` : ""), line: (a) => a.desc }}
+        cols=${[{ title: "Used by", width: 120, text: (a) => { const n = usedBy(a).length; return n ? `${n} rule${n === 1 ? "" : "s"}` : "No rules"; } },
+          { title: "Runs, 7 days", width: 100, text: (a) => fmt(runsOf(a).length) }, { title: "Time limit", width: 90, text: (a) => a.limit + "s" }]}
+        now=${(a) => { const x = lastOf(a); return !x ? ["Not run yet", "wait"] : [x.outcome, x.outcome === "Success" ? "good" : x.outcome === "Stopped by you" ? "wait" : "bad"]; }} nowTitle="Last run" />
+      <${RailPanel} title="Run by hand" sub="runs that did not come from a rule · click one to see its action" more="runs by hand, in each action's runs"
+        items=${hand.map((x, i) => { const a = byName(x.action); return { key: i, title: `${x.action} on ${x.host}`, line: `${x.by === "You" ? "the Super User" : x.by} · ${x.outcome.toLowerCase()}`, right: x.t >= 0 ? hhmm(x.t) : dayOf(x.t), c: OUT[x.outcome], on: a && cur && a.id === cur.id, onClick: a ? () => setSel(a.id) : null }; })}
+        empty=${html`<${Empty} icon="CaretRightOutlined" title="Nothing run by hand" text="An action run once, outside any rule, shows here." h=${200} />`} />
+    </div>
     ${cur ? html`<${ActionDetail} key=${cur.id} id=${cur.id} go=${go} />` : null}
-    <${Panel} title="Run by hand" sub="last 7 days · runs that did not come from a rule" flush>
-      <div className="scroll-x"><${Table} size="small" pagination=${PG} dataSource=${MANUAL_RUNS.slice().sort((a, b) => b.t - a.t).map((x, i) => ({ key: i, x }))} columns=${[
-        { title: "When", width: 110, render: (o) => html`<span className="mono t3">${o.x.t >= 0 ? "Today " + hhmm(o.x.t) : dayOf(o.x.t) + " " + hhmm(o.x.t)}</span>` },
-        { title: "Action", render: (o) => o.x.action }, { title: "By", width: 120, render: (o) => o.x.by },
-        { title: "Machine", width: 90, render: (o) => html`<span className="mono">${o.x.host}</span>` },
-        { title: "Outcome", width: 140, render: (o) => html`<span className="st" style=${{ "--c": OUT[o.x.outcome] }}><i />${o.x.outcome}</span>` }]} /></div>
-    <//>
     <${RunOnce} a=${runA} onClose=${() => setRunA(null)} />
   <//>`;
 }
@@ -5344,32 +5335,50 @@ const FLOW_LOG = [["13:12", "payroll-pdf", "timesheet-0930.pdf", "FIN-02 /payrol
   ["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /weekly/", "Synced"], ["13:02", "weekly", "manifest-0930.pdf", "LOG-01 /archive/", "Queued"], ["12:41", "weekly", "report.xlsx", "LOG-01 /weekly/", "Conflict, kept as report-modified.xlsx"],
   ["12:30", "ops-pack", "pack-0930.zip", "WS-OPS-A1 /packs/", "Synced"], ["11:40", "board-pack", "minutes-2026-09.pdf", "WS-OPS-A1 /board/", "Synced"], ["11:40", "board-pack", "minutes-2026-09.pdf", "WS-FIN-A1 /board/", "Synced"], ["12:05", "weekly-digest", "weekly-w40.zip", "OPS-02 /reports/", "Synced"]];
 const FSC = { Active: "var(--ok)", Degraded: "var(--high)", "Waiting for a folder": "var(--med)" };
-function FlowsSU({ go, open }) {
+// Flows, at both levels: the Super User sees every flow; an Admin's console sees the flows that touch the department
+// (and any chained to them), can edit only their own, and answers requests to send them files.
+function FlowsSU({ go, open, me }) {
   const [sel, setSel0] = useState(open || null);
+  const [answers, setAnswers] = useState({});
+  const asks = me ? FLOW_ASKS.filter((r) => r.to === me) : [];
+  const myWs = me && ADMIN_INFO[me] ? ADMIN_INFO[me].ws : null;
   const setSel = (id) => { setSel0(id); keepOpen("flows", id); };
   const [fq, setFq] = useState("");
   if (!MACHINES.length) return html`<${Panel} flush title="Flows" extra=${html`<${Button} size="small" type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("flows", "new")}>New flow<//>`}>
     <${Empty} icon="BranchesOutlined" title="No flows yet" text="A flow copies files one way, from one machine to others. It needs machines first." h=${160} /><//>`;
-  const flows = EXISTING_FLOWS, recent = flows.filter((x) => x.last !== "—").sort((x, y) => y.last.localeCompare(x.last))[0] || flows[0];
-  const cur = sel && FBY[sel] ? sel : recent.name, X0 = FBY[cur];
+  const scope = (() => { if (!me) return null; const inside0 = new Set([...MACHINES.map((m) => m.host), ...Object.values(ADMIN_INFO).filter((a) => DEPTS.some((d) => d.id === a.dept)).map((a) => a.ws)]);
+    const names = new Set(EXISTING_FLOWS.filter((x) => [...x.srcs, ...x.dests].some((q) => inside0.has(q[0]))).map((x) => x.name));
+    for (let i = 0; i < 4; i++) [...names].forEach((n) => [...fedBy(FBY[n]), ...feeds(FBY[n])].forEach((y) => names.add(y.name))); return names; })();
+  const flows = scope ? EXISTING_FLOWS.filter((x) => scope.has(x.name)) : EXISTING_FLOWS, recent = flows.filter((x) => x.last !== "—").sort((x, y) => y.last.localeCompare(x.last))[0] || flows[0];
+  const who = me || "Super User", byName = (b) => (b === who ? "You" : b === "Super User" ? "the Super User" : b);
+  const cur = sel && FBY[sel] && (!scope || scope.has(sel)) ? sel : recent.name, X0 = FBY[cur], canEdit = !me || X0.by === me;
   const inside = new Set([...FLOW_HOSTS.map((h) => h.host), ...Object.values(ADMIN_INFO).map((a) => a.ws)]);
   const log = FLOW_LOG.filter((l) => l[1] === cur), paused = (X0.paused || []).length;
-  const nAct = flows.filter((x) => x.st === "Active").length, nDeg = flows.filter((x) => x.st === "Degraded").length, nWait = flows.length - nAct - nDeg, mineN = flows.filter((x) => x.by === "Super User").length;
+  const nAct = flows.filter((x) => x.st === "Active").length, nDeg = flows.filter((x) => x.st === "Degraded").length, nWait = flows.length - nAct - nDeg, mineN = flows.filter((x) => x.by === who).length;
   return html`<${React.Fragment}>
+    ${asks.map((r) => { const a = answers[r.id] || {};
+      return html`<div key=${r.id} className="askbar" role="status">
+        <span style=${{ color: "var(--accent)", flex: "none" }}>${ic("InboxOutlined")}</span>
+        <span className="askbar-t" title=${r.note ? `“${r.note}”` : undefined}><b style=${{ fontWeight: 600 }}>${r.from}</b> wants to send you files with <b style=${{ fontWeight: 600 }}>${r.name}</b> <span className="t3">from <span className="mono">${r.src.join(" ")}</span>${r.stages.length ? ` · ${r.stages.join(", ")}` : ""} · ${r.asked.toLowerCase()}</span></span>
+        ${a.done ? html`<span className="st" style=${{ "--c": a.done === "yes" ? "var(--ok)" : "var(--text-4)", flex: "none" }}><i />${a.done === "yes" ? html`Accepted · to <span className="mono">${myWs} ${a.path}</span>` : `Declined · ${r.from} is told`}</span><${Button} size="small" type="text" onClick=${() => setAnswers({ ...answers, [r.id]: {} })}>Undo<//>`
+          : html`<${AutoComplete} size="small" value=${a.path} onChange=${(v) => setAnswers({ ...answers, [r.id]: { ...a, path: v } })} placeholder=${`Folder on ${myWs || "your workstation"}`} options=${FOLDER_HINTS.map((v) => ({ value: v }))} style=${{ width: 200, flex: "none" }} />
+            <${Button} size="small" onClick=${() => { setAnswers({ ...answers, [r.id]: { done: "no" } }); toast(`Declined · ${r.from} is told (concept)`); }}>Decline<//>
+            <${Button} size="small" type="primary" disabled=${!a.path} onClick=${() => { setAnswers({ ...answers, [r.id]: { ...a, done: "yes" } }); toast(`Accepted · ${r.name} copies to ${myWs} ${a.path} (concept)`); }}>Accept<//>`}
+      </div>`; })}
     <${Strip} items=${[
       { label: "Flows", value: fmt(flows.length), delta: mineN ? `${fmt(mineN)} made by you` : "none made by you" },
       { label: "Copying", value: fmt(nAct), unit: "/ " + fmt(flows.length), delta: nWait ? `${fmt(nWait)} waiting for a folder` : "every flow" },
       { label: "A branch paused", value: fmt(nDeg), delta: nDeg ? "files queue until it is fixed" : "none", dc: nDeg ? "var(--crit)" : undefined },
       { label: "Files copied", value: fmt(flows.reduce((t, x) => t + x.files, 0)), delta: "by every flow, since each began" }]} />
-    <${ListPanel} title="All flows in the organisation" sub="whoever made them · click one to show it on the map"
+    <${ListPanel} title=${me ? "Flows through this department" : "All flows in the organisation"} sub=${me ? "made here, or chained to one that is · click one to see it below" : "whoever made them · click one to see it below"}
       q=${fq} setQ=${setFq} placeholder="Filter by flow or machine" action=${{ label: "New flow", onClick: () => go("flows", "new") }} pick=${cur} onPick=${setSel} rowKey="name"
       rows=${flows.map((x) => ({ ...x, path: `${x.srcs.map((y) => y[0]).join(" + ")} → ${[...new Set(x.dests.map((d) => (askOf(d) ? askOf(d) + " picks" : d[0])))].join(", ")}` })).filter((x) => `${x.name} ${x.path} ${x.by}`.toLowerCase().includes(fq.toLowerCase()))}
       icon="BranchesOutlined" name=${{ title: "Flow", text: (r) => r.name, line: (r) => r.path }}
-      cols=${[{ title: "Created by", text: (r) => (r.by === "Super User" ? "You" : r.by) },
+      cols=${[{ title: "Created by", text: (r) => (r.by === who ? "You" : r.by) },
         { title: "Files copied", width: 150, bar: (r) => ({ v: r.files, max: Math.max(1, ...flows.map((x) => x.files)), text: `${fmt(r.files)} files` }) }]}
       now=${(r) => (r.st === "Active" ? ["Copying", "good"] : r.st === "Degraded" ? ["A branch is paused", "bad"] : ["Waiting for a folder", "wait"])} />
-    <${Panel} title=${cur} sub=${`created by ${X0.by} · ${X0.st.toLowerCase()} · last copy ${X0.last}${!sel ? " · the most recent · click another in the list" : ""}`}
-      extra=${html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => go("flows", "edit-" + cur)}>Edit<//>`}>
+    <${Panel} title=${cur} sub=${`created by ${byName(X0.by)} · ${X0.st.toLowerCase()} · last copy ${X0.last}${!sel ? " · the most recent · click another in the list" : ""}`}
+      extra=${html`<${Tooltip} title=${canEdit ? "" : `Made by ${byName(X0.by)}. Only they, or the Super User, can change it.`}><span><${Button} size="small" icon=${ic("EditOutlined")} disabled=${!canEdit} onClick=${() => go("flows", "edit-" + cur)}>Edit<//></span><//>`}>
       <${FlowPreview} f=${{ srcs: X0.srcs.map((x) => { const up = deliveredBy(pkey(...x))[0]; return [x[0], x[1], up ? up.name : null]; }),
         stages: X0.stages.map((st) => ({ ...st })), dests: X0.dests.map((d) => (askOf(d) ? { host: askOf(d), path: "picks a folder" } : { host: d[0], path: d[1] })) }} />
       <div className="leg" style=${{ marginTop: 8 }}><span><i style=${{ "--c": "var(--s2)", height: 2 }} />copying</span>${X0.stages.length ? html`<span>${X0.stages.length} step${X0.stages.length === 1 ? "" : "s"} along the way: ${X0.stages.map((st) => st.op).join(", ")}</span>` : html`<span>copied as they are</span>`}${paused ? html`<span><i style=${{ "--c": "var(--crit)", height: 2 }} />branch paused</span>` : null}${X0.dests.some(askOf) ? html`<span><i style=${{ "--c": "var(--med)", height: 2 }} />waiting for someone to pick a folder</span>` : null}</div>
@@ -5520,7 +5529,9 @@ function RestrictedSU({ go, open }) {
 }
 
 // ---------------------------------------------------------------- Govern: Rollout and the Audit log, on the same standard
-function RolloutSU({ go, open }) {
+// Rollout, at both levels. In an Admin's console MACHINES is the department's; approving a version and leaving a
+// machine out of the gate are the Super User's, so the console retries and says who approves.
+function RolloutSU({ go, open, me }) {
   const [sel, setSel] = useOpen("rollout", open);
   const [q, setQ] = useState("");
   const behind = MACHINES.filter((m) => m.ver !== "1.4.2").map((m) => ({ ...m, id: m.host, dn: deptNameOf(m.dept),
@@ -5533,30 +5544,33 @@ function RolloutSU({ go, open }) {
   const depts = FULL_DEPTS().map((d) => { const ms = MACHINES.filter((x) => x.dept === d.id); return { d, n: ms.length, ok: ms.filter((x) => x.ver === "1.4.2").length }; }).filter((x) => x.n).sort((a, b) => (a.ok / a.n) - (b.ok / b.n));
   return html`<${React.Fragment}>
     <${Strip} items=${[
-      { label: "Current version", value: "1.4.2", delta: "approved 26 Sep by you" },
+      { label: "Current version", value: "1.4.2", delta: me ? "approved 26 Sep by the Super User" : "approved 26 Sep by you" },
       { label: "Running it", value: fmt(on), unit: "/ " + fmt(MACHINES.length), delta: MACHINES.length ? `${Math.round((on / Math.max(1, MACHINES.length)) * 100)}% of machines` : "" },
-      { label: "Holding 1.4.3 back", value: fmt(behind.length), delta: behind.length ? "1.4.3 is ready and waits on them" : "1.4.3 can be approved", dc: behind.length ? "var(--crit)" : "var(--ok)" },
-      { label: "Failed installs, 7 days", value: MACHINES.length ? "3" : "0", delta: MACHINES.length ? "OPS-06 twice, LOG-02 once" : "none" }]} />
+      { label: "Holding 1.4.3 back", value: fmt(behind.length), delta: behind.length ? (me ? "from this department" : "1.4.3 is ready and waits on them") : me ? "none from this department" : "1.4.3 can be approved", dc: behind.length ? "var(--crit)" : "var(--ok)" },
+      (() => { const f = [["OPS-06", 2, "twice"], ["LOG-02", 1, "once"]].filter(([h]) => MBY[h] && MACHINES.includes(MBY[h])), n = f.reduce((t, x) => t + x[1], 0);
+        return { label: "Failed installs, 7 days", value: fmt(n), delta: n ? f.map((x) => `${x[0]} ${x[2]}`).join(", ") : "none" }; })()]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <${ListPanel} title="Holding the gate" sub="machines not yet on 1.4.2 · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter by machine or department"
         pick=${sel} onPick=${setSel} rowKey="id" rows=${rows} icon="DesktopOutlined" name=${{ title: "Machine", text: (x) => x.host, line: (x) => `${x.user || "No one signed in"} · ${x.dn}` }}
         cols=${[{ title: "Running", width: 100, text: (x) => x.ver }, { title: "Last error", width: 230, text: (x) => x.err }, { title: "Next try", width: 190, text: (x) => x.next }]}
         now=${(x) => (x.esc ? ["Escalated to you", "bad"] : x.status === "offline" ? ["Offline", "bad"] : ["Retrying", "wait"])}
         empty=${!behind.length ? html`<${Empty} icon="CheckOutlined" title="Every machine runs 1.4.2" text="Nothing holds the next version back. Approve it when it is ready." h=${140} />` : null} />
-      <${RailPanel} title="By department" sub="on 1.4.2 · furthest behind first · click one to filter the list" more="departments"
+      ${me ? html`<${RailPanel} title="Versions here" sub="what this department's machines run"
+        items=${[...new Set(MACHINES.map((x) => x.ver))].sort().reverse().map((v) => { const ms = MACHINES.filter((x) => x.ver === v); return { key: v, title: v, line: listNames(ms.map((x) => x.host), 4), right: `${fmt(ms.length)} machine${ms.length === 1 ? "" : "s"}`, c: v === "1.4.2" ? "var(--ok)" : "var(--crit)" }; })}
+        empty=${html`<${Empty} icon="DesktopOutlined" title="No machines here" text="The versions the department's machines run appear here." h=${200} />`} />` : html`<${RailPanel} title="By department" sub="on 1.4.2 · furthest behind first · click one to filter the list" more="departments"
         items=${depts.map((x) => ({ key: x.d.id, title: x.d.name, line: `${fmt(x.ok)} of ${fmt(x.n)} on 1.4.2${x.d.admins.length ? "" : " · no Admin"}`, right: `${Math.round((x.ok / x.n) * 100)}%`, c: x.ok === x.n ? "var(--ok)" : "var(--crit)", on: dept === x.d.id, onClick: () => setDept(dept === x.d.id ? null : x.d.id) }))}
-        empty=${html`<${Empty} icon="ApartmentOutlined" title="No machines yet" text="Each department's progress appears here." h=${200} />`} />
+        empty=${html`<${Empty} icon="ApartmentOutlined" title="No machines yet" text="Each department's progress appears here." h=${200} />`} />`}
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!m} onClose=${() => setSel(null)} title=${m ? m.host : ""}
       facts=${m ? [["Running", m.ver], ["Should run", "1.4.2"], ["Attempts", m.tries], ["Last error", m.err], ["Escalated", m.esc || "No"], ["Next try", m.next], ["Department", m.dn]] : []}
-      actions=${m ? html`<${Button} onClick=${() => toast(`Left ${m.host} out of the 1.4.3 gate, with your reason (concept)`)}>Leave it out of the gate<//><${Button} type="primary" disabled=${m.status === "offline"} onClick=${() => toast(`Retrying on ${m.host} (concept)`)}>Retry now<//>` : null} />
+      actions=${m ? html`${me ? null : html`<${Button} onClick=${() => toast(`Left ${m.host} out of the 1.4.3 gate, with your reason (concept)`)}>Leave it out of the gate<//>`}<${Button} type="primary" disabled=${m.status === "offline"} onClick=${() => toast(`Retrying on ${m.host} (concept)`)}>Retry now<//>` : null} />
     <${Panel} title="Machines on 1.4.2" sub="since it was approved · the gap to the goal is the machines holding 1.4.3 back"
-      extra=${html`<${Tooltip} title=${behind.length ? "A version is approved only when every machine runs the one before it." : ""}><span><${Button} size="small" type="primary" disabled=${!!behind.length} onClick=${() => toast("Approved 1.4.3 (concept)")}>Approve 1.4.3<//></span><//>`}>
+      extra=${me ? html`<span className="t3" style=${{ fontSize: 12 }}>The Super User approves 1.4.3 once every machine runs 1.4.2</span>` : html`<${Tooltip} title=${behind.length ? "A version is approved only when every machine runs the one before it." : ""}><span><${Button} size="small" type="primary" disabled=${!!behind.length} onClick=${() => toast("Approved 1.4.3 (concept)")}>Approve 1.4.3<//></span><//>`}>
       ${MACHINES.length ? html`<${Adoption} />` : html`<${Empty} icon="CloudUploadOutlined" title="No machines yet" text="How many machines run the current version, day by day." h=${220} />`}
     <//>
   <//>`;
 }
-function AuditSU({ range, go, open }) {
+function AuditSU({ range, go, open, me }) {
   const [sel, setSel] = useOpen("audit", open);
   const [kind, setKind] = useState(null);
   const [brush, setBrush] = useState(null);
@@ -5582,7 +5596,7 @@ function AuditSU({ range, go, open }) {
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!e} onClose=${() => setSel(null)} title=${e ? e.what : ""}
       facts=${e ? [["When", e.t >= 0 && e.t < 24 ? "Today " + hhmm(e.t) : `${dayOf(e.t)} ${hhmm(e.t)}`], ["Who", e.actor], ["Machine", html`<span className="mono">${e.host}</span>`], ["Kind", KINDS[e.kind].w]] : []}
-      actions=${e && MBY[e.host] ? html`<${Button} onClick=${() => go("registry", e.host)}>See it in Registry →<//>` : null} />
+      actions=${e && MBY[e.host] ? (me ? (MACHINES.includes(MBY[e.host]) ? html`<${Button} onClick=${() => go("machines", e.host)}>Open ${e.host}'s page →<//>` : null) : html`<${Button} onClick=${() => go("registry", e.host)}>See it in Registry →<//>`) : null} />
     <${Panel} title="Events over time" sub=${brush ? `selected ${fmtT(brush[0], range)} – ${hhmm(brush[1])}` : "drag across the chart to narrow the list"} extra=${brush ? html`<${Button} size="small" onClick=${() => setBrush(null)}>Clear selection<//>` : null}>
       <${EventHistogram} entries=${AUDIT.filter((x) => !kind || x.kind === kind)} range=${range} brush=${brush} onBrush=${setBrush} height=${150} />
     <//>
@@ -5630,32 +5644,37 @@ function DepartmentsPage({ go, enter, open }) {
     <${OrgDay} go=${go} />
   <//>`;
 }
-function AccessPage({ go, open }) {
-  const [sel, setSel] = useOpen("access", open);
+// Sessions, at both levels: the Super User sees every machine; an Admin's console sees its department's (LANES is
+// already scoped there), the assisted access that touched it, and opens a machine's own page instead of Registry.
+function AccessPage({ go, open, me }) {
+  const [sel, setSel] = useOpen(me ? "sessions" : "access", open);
   const [q, setQ] = useState("");
   const all = LANES.flatMap((l) => l.blocks.map((b, i) => ({ id: `${l.host}:${i}`, host: l.host, b })).filter((x) => x.b[2] !== "own"));
   const rows = all.filter((x) => `${x.host} ${x.b[3]}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (b.b[1] >= NOWH) - (a.b[1] >= NOWH) || b.b[0] - a.b[0]);
   const ownerOf = (h) => (laneOf(h).blocks.find((x) => x[2] === "own") || [0, 0, 0, MBY[h] && MBY[h].user ? MBY[h].user : "nobody"])[3];
   const x = all.find((y) => y.id === sel) || rows[0];
+  const dn = me && ADMIN_INFO[me] ? deptNameOf(ADMIN_INFO[me].dept) : null;
+  const assist = dn ? ASSIST.filter((a) => a.from === dn || a.wdept === dn) : ASSIST, nights = all.filter((y) => y.b[4]);
   return html`<${React.Fragment}>
     <${Strip} items=${[
       { label: "Inside a machine now", value: fmt(all.filter((y) => y.b[1] >= NOWH).length), delta: all.filter((y) => y.b[1] >= NOWH).map((y) => `${y.b[3] === "You" ? "you" : y.b[3]} on ${y.host}`).slice(0, 2).join(" · ") },
       { label: "Non-owner sessions today", value: fmt(all.length) },
-      { label: "At night, this week", value: "3", delta: "all A. Quaye, on Logistics machines", dc: "var(--crit)" },
-      { label: "Assisted access, this week", value: fmt(ASSIST.length), delta: `${ASSIST.filter((a) => a.from !== a.wdept).length} across departments` }]} />
+      me ? { label: "At night, today", value: fmt(nights.length), delta: nights.length ? [...new Set(nights.map((y) => y.b[3]))].join(", ") : "nobody went in after hours", dc: nights.length ? "var(--crit)" : undefined }
+        : { label: "At night, this week", value: "3", delta: "all A. Quaye, on Logistics machines", dc: "var(--crit)" },
+      { label: "Assisted access, this week", value: fmt(assist.length), delta: `${assist.filter((a) => a.from !== a.wdept).length} across departments` }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <${ListPanel} title="Sessions today" sub="someone other than the owner, inside a machine · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter by machine or person"
         pick=${sel} onPick=${setSel} rowKey="id" rows=${rows} icon="LoginOutlined" name=${{ title: "Session", text: (y) => `${y.b[3]} on ${y.host}`, line: (y) => `${OCC[y.b[2]].w} · ${MBY[y.host] ? deptNameOf(MBY[y.host].dept) : ""}` }}
         cols=${[{ title: "Owner locked out", text: (y) => ownerOf(y.host) }, { title: "Started", width: 100, text: (y) => hhmm(y.b[0]) }, { title: "Length", width: 100, text: (y) => dur(Math.min(y.b[1], NOWH) - y.b[0]) }]}
         now=${(y) => (y.b[4] ? [y.b[1] >= NOWH ? "Inside now · at night" : "Ended · at night", "bad"] : y.b[1] >= NOWH ? ["Inside now", "good"] : ["Ended", "wait"])}
         empty=${!all.length ? html`<${Empty} icon="LoginOutlined" title="Nobody else has been inside a machine today" text="When an Admin enters a machine or someone is let in, the session appears here." h=${200} />` : null} />
-      <${RailPanel} title="Assisted access" sub="who was let in, and who asked" more="sessions"
-        items=${ASSIST.map((a) => ({ key: a.id, title: `${a.helper} on ${a.machine}`, line: `${a.worker} asked · ${a.from !== a.wdept ? "across departments" : a.wdept} · ${lc(a.end)}`, right: devWhen(a.at).replace("Today ", ""), c: a.from !== a.wdept ? "var(--s3)" : "var(--s2)" }))}
+      <${RailPanel} title="Assisted access" sub=${me ? "let in here, or helping elsewhere" : "who was let in, and who asked"} more="sessions"
+        items=${assist.map((a) => ({ key: a.id, title: `${a.helper} on ${a.machine}`, line: `${a.worker} asked · ${a.from !== a.wdept ? "across departments" : a.wdept} · ${lc(a.end)}`, right: devWhen(a.at).replace("Today ", ""), c: a.from !== a.wdept ? "var(--s3)" : "var(--s2)" }))}
         empty=${html`<${Empty} icon="TeamOutlined" title="Nobody has been let in" text="When a worker accepts help from an Admin, it appears here." h=${200} />`} />
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!x} onClose=${() => setSel(null)} title=${x ? `${x.b[3]} on ${x.host}` : ""}
       facts=${x ? [["Kind", OCC[x.b[2]].w], ["From", hhmm(x.b[0])], ["Until", x.b[1] >= NOWH ? "now" : hhmm(x.b[1])], ["Owner locked out", ownerOf(x.host)], ["Department", MBY[x.host] ? deptNameOf(MBY[x.host].dept) : "—"], ...(x.b[4] ? [["Flag", html`<span style=${{ color: "var(--crit)" }}>Outside working hours</span>`]] : [])] : []}
-      actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry →<//>` : null} />
+      actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? (me ? html`<${Button} onClick=${() => go("machines", x.host)}>Open ${x.host}'s page →<//>` : html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry →<//>`) : null} />
     <${Occupancy} />
   <//>`;
 }
@@ -5745,7 +5764,9 @@ function Registry({ go, enter, open }) {
   <//>`;
 }
 // Reports for the Super User: the list, then how they are routed, then how fast departments handle them.
-function ReportsSU({ go, enter, open }) {
+// Reports, at both levels. In an Admin's console: only what is routed to the department (never a report about an
+// Admin, never one left with the Super User), kinds as the rail, and no routing panel, which is the Super User's.
+function ReportsSU({ go, enter, open, me }) {
   useDT();
   const [sel, setSel] = useOpen("reports", open);
   const [view, setView] = useState(null);
@@ -5760,6 +5781,7 @@ function ReportsSU({ go, enter, open }) {
     return { d, wait: mine.filter((r) => !r.addressed).length, done: done.length, med: t.length ? t[t.length >> 1] : null }; }).sort((a, b) => b.wait - a.wait);
   const r = R.find((x) => x.id === sel) || rows[0];
   const written = (x) => x.when || (x.at != null ? devWhen(x.at) : "this week");
+  if (me) return html`<${ReportsHere} me=${me} sel=${sel} setSel=${setSel} written=${written} />`;
   return html`<${React.Fragment}>
     <${Strip} on=${view} onPick=${setView} items=${[
       { key: "you", label: "Waiting on you", value: fmt(R.filter((x) => state(x) === "you").length), delta: "nobody below you can take them", dc: R.some((x) => state(x) === "you") ? "var(--crit)" : undefined },
@@ -5781,6 +5803,38 @@ function ReportsSU({ go, enter, open }) {
         ["Addressed", r.addressed ? `${r.addressed.by}${r.addressed.took ? ` · took ${mins(r.addressed.took)}` : ""}` : "Not yet"]] : []}
       actions=${r && !r.addressed ? html`${owner(r) === "dept" ? html`<${Button} onClick=${() => toast(`Prompted ${listNames(DBY[r.dept] ? DBY[r.dept].admins : [])} (concept)`)}>Prompt the department<//>` : null}<${Button} type="primary" onClick=${() => { dtChange(() => { r.addressed = { by: "You" }; }); toast("Marked addressed · recorded with your name (concept)"); }}>Mark addressed<//>` : null} />
     <${Govern} part="routing" go=${go} enter=${enter} />
+  <//>`;
+}
+function ReportsHere({ me, sel, setSel, written }) {
+  const [view, setView] = useState(null), [cat, setCat] = useState(null), [q, setQ] = useState("");
+  const dept = ADMIN_INFO[me].dept, R = reportsNow().filter((r) => r.dept === dept);
+  const mine = R.filter((r) => reportOwner(r) === "dept"), gone = R.filter((r) => reportOwner(r) === "unrouted" || reportOwner(r) === "noadmin");
+  const st = (r) => (r.addressed ? "done" : "wait");
+  const took = mine.filter((r) => r.addressed && r.addressed.took).map((r) => r.addressed.took).sort((a, b) => a - b), med = took.length ? took[took.length >> 1] : null;
+  const rows = mine.filter((r) => (!view || st(r) === view) && (!cat || r.cat === cat) && `${r.cat} ${r.what} ${r.host}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (st(a) === "done") - (st(b) === "done"));
+  const r = mine.find((x) => x.id === sel) || rows[0];
+  const cats = Object.keys(REPORT_CATS).filter((k) => !REPORT_CATS[k].fixed && (routingNow()[k] || []).includes(dept));
+  return html`<${React.Fragment}>
+    <${Strip} on=${view} onPick=${setView} items=${[
+      { key: "wait", label: "Waiting in your department", value: fmt(mine.filter((x) => !x.addressed).length), delta: "you or another Admin here addresses them", dc: mine.some((x) => !x.addressed) ? "var(--crit)" : undefined },
+      { label: "Gone to the Super User", value: fmt(gone.length), delta: "not routed here · only they see them" },
+      { key: "done", label: "Addressed", value: fmt(mine.filter((x) => x.addressed).length), delta: "this week" },
+      { label: "Typical time to address", value: med == null ? "—" : mins(med), delta: "target 1 hour", dc: med > 60 ? "var(--med)" : undefined }]} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <${ListPanel} title="Reports routed here" sub=${view || cat ? html`<span>${fmt(rows.length)}${cat ? ` · ${cat.toLowerCase()}` : ""} · <a onClick=${() => { setView(null); setCat(null); }}>every report</a></span>` : "waiting first · click one to see it below"}
+        q=${q} setQ=${setQ} placeholder="Filter by kind or machine" pick=${r ? r.id : null} onPick=${setSel} rowKey="id" rows=${rows}
+        icon=${(x) => REPORT_CATS[x.cat].icon} name=${{ title: "Report", text: (x) => x.cat, line: (x) => `${x.id} · ${x.host}` }}
+        cols=${[{ title: "What", width: 300, text: (x) => x.what }, { title: "Written", width: 120, text: written }]}
+        now=${(x) => (x.addressed ? [`Addressed · ${x.addressed.by}`, "good"] : ["Waiting", "bad"])}
+        empty=${!mine.length ? html`<${Empty} icon="FileTextOutlined" title="Nothing is routed here yet" text="The Super User decides which kinds of report reach this department. Those that do appear here, for any Admin here to address." h=${200} />` : null} />
+      <${RailPanel} title="Kinds" sub="routed here · click one to show only it" max=${7}
+        items=${cats.map((k) => ({ key: k, title: k, line: REPORT_CATS[k].desc, right: fmt(mine.filter((x) => x.cat === k && !x.addressed).length), c: cat === k ? "var(--accent)" : "var(--text-4)", on: cat === k, onClick: () => setCat(cat === k ? null : k) }))}
+        empty=${html`<${Empty} icon="FileTextOutlined" title="No kind is routed here" text="Every report from this department goes to the Super User only, for now." h=${200} />`} />
+    </div>
+    <${ItemBoard} picked=${!!sel} open=${!!r} title=${r ? r.cat : ""}
+      facts=${r ? [["What", r.what], ["Source", html`<span className="mono">${r.host}</span>`], ["Written", written(r)], ["Goes to", `The Super User and ${deptNameOf(dept)}`],
+        ["Addressed", r.addressed ? `${r.addressed.by}${r.addressed.took ? ` · took ${mins(r.addressed.took)}` : ""}` : "Not yet"]] : []}
+      actions=${r && !r.addressed ? html`<${Button} type="primary" onClick=${() => { dtChange(() => { r.addressed = { by: me }; }); toast(`Marked addressed · recorded as ${me} (concept)`); }}>Mark addressed<//>` : null} />
   <//>`;
 }
 // The Overview: what is waiting on you, the fleet, and this week's deviations. Everything opens something.
@@ -5823,7 +5877,7 @@ function SUOverview({ go }) {
 
 // The Admin's core areas lead the menu as their own group.
 const NAV_ADMIN = [
-  ["Core", [["overview", "Overview", "DashboardOutlined"], ["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["flows", "Flows", "BranchesOutlined"], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true]]],
+  ["Core", [["overview", "Overview", "DashboardOutlined"], ["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"]]],
   ["Monitor", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["sessions", "Sessions", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
   ["Automate", [["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
   ["Govern", [["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
@@ -5966,19 +6020,19 @@ function App() {
   else if (page === "dept") body = html`<${DeptPage} key=${sub} id=${(FULL.DEPTS || DEPTS).some((d) => d.id === sub) ? sub : "ops"} go=${go} enter=${enter} />`;
   else if (page === "overview") body = level ? html`<${Overview} range=${range} go=${go} />` : html`<${SUOverview} go=${go} />`;
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
-  else if (page === "sessions" || page === "access") body = level ? html`<${Sessions} />` : html`<${AccessPage} go=${go} open=${sub} />`;
+  else if (page === "sessions" || page === "access") body = html`<${AccessPage} go=${go} open=${sub} me=${level ? level.admin : null} />`;
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
   else if (page === "tasks") body = !level && (!sub || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${GivenToDepts} go=${go} open=${sub} />` : sub === "new" ? html`<${NewTask} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
-  else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : level ? html`<${Flows} go=${go} me=${level && level.admin} />` : html`<${FlowsSU} go=${go} open=${FBY[sub] ? sub : null} />`;
+  else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : html`<${FlowsSU} go=${go} me=${level ? level.admin : null} open=${FBY[sub] ? sub : null} />`;
   else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : html`<${Automation} go=${go} open=${sub && RBY[sub] ? sub : null} />`;
-  else if (page === "rollout") body = level ? html`<${Rollout} />` : html`<${RolloutSU} go=${go} open=${sub} />`;
-  else if (page === "audit") body = level ? html`<${Audit} range=${range} />` : html`<${AuditSU} range=${range} go=${go} open=${sub} />`;
-  else body = level ? html`<${Reports} />` : html`<${ReportsSU} go=${go} enter=${enter} open=${sub} />`;
+  else if (page === "rollout") body = html`<${RolloutSU} go=${go} open=${sub} me=${level ? level.admin : null} />`;
+  else if (page === "audit") body = html`<${AuditSU} range=${range} go=${go} open=${sub} me=${level ? level.admin : null} />`;
+  else body = html`<${ReportsSU} go=${go} enter=${enter} open=${sub} me=${level ? level.admin : null} />`;
   const usesRange = (level ? ["overview", "machines", "audit"] : ["machines", "audit"]).includes(page);
   const parent = !level && SU_PARENT[page] && SU_PARENT[page] !== page ? SU_PARENT[page] : null;
-  const openSub = !!sub && (page === "restricted" ? sub !== "mark" : (level && ((page === "tasks" && TASKS.some((t) => t.id === sub)) || (page === "automation" && !!RBY[sub]) || (page === "actions" && !!ABY[sub]))) || !level && ((page === "tasks" && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || ["departments", "accountability", "reports", "access", "registry", "rollout", "audit"].includes(page) || (page === "rules" && !/^(new|from-|edit-)/.test(sub))));
+  const openSub = !!sub && (page === "restricted" ? sub !== "mark" : (level && ((page === "flows" && !!FBY[sub]) || (page === "tasks" && TASKS.some((t) => t.id === sub)) || (page === "automation" && !!RBY[sub]) || (page === "actions" && !!ABY[sub]))) || !level && ((page === "tasks" && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || ["departments", "accountability", "reports", "access", "registry", "rollout", "audit"].includes(page) || (page === "rules" && !/^(new|from-|edit-)/.test(sub))));
   const csub = openSub ? null : sub;
   const crumbSub = csub && page === "machines" ? html`<a onClick=${() => go("machines")}>Machines</a><span>/</span><b className="mono">${sub}</b>`
     : csub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span>${sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<a onClick=${() => go("actions", sub.slice(5))}>${ABY[sub.slice(5)].name}</a><span>/</span><b>Edit</b>` : html`<b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>`}`
