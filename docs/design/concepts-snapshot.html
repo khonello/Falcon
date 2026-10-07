@@ -290,7 +290,20 @@ a { color: var(--accent); text-decoration: none; }
 .rcell { width: 34px; height: 30px; border-radius: 6px; border: 1px solid transparent; background: transparent; display: grid; place-items: center; cursor: pointer; padding: 0; }
 .rcell:hover { background: var(--surface-3); }
 .rcell.changed { border: 1.5px dashed var(--accent); background: var(--accent-soft); }
+/* a copy of a marked file, as a card with what can be done to it as plain words */
+.ccard { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+.cacts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 12.5px; }
 .dotc.locked { display: inline-grid; place-items: center; width: 18px; height: 18px; font-size: 9px; color: #fff; }
+/* Where reports go: one row per kind, read as a sentence with a blank */
+.rrow { display: grid; grid-template-columns: 22px minmax(180px, 1.1fr) minmax(0, 1.7fr) 150px; gap: 14px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--grid); }
+.rrow:first-child { border-top: 0; }
+.rrow.changed { background: var(--accent-soft); }
+.rrow-i { font-size: 15px; align-self: start; margin-top: 2px; }
+.rrow-s { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.rrow-all { font-size: 12px; white-space: nowrap; }
+.rrow-warn { flex-basis: 100%; font-size: 12px; color: var(--med); }
+.rrow-n { text-align: right; white-space: nowrap; }
+@media (max-width: 900px) { .rrow { grid-template-columns: 22px minmax(0, 1fr); } .rrow-s, .rrow-n { grid-column: 2; text-align: left; } }
 .wrow { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(80px, 1fr) 90px 14px; gap: 16px; align-items: center; padding: 11px 16px; border-top: 1px solid var(--border); cursor: pointer; }
 .wrow:first-child { border-top: 0; }
 .wrow:hover { background: var(--surface-2); }
@@ -626,9 +639,30 @@ if (LARGE) { const nm = ["Contracts", "salaries-2026.csv", "Tender evaluations",
   DEPTS.filter((d) => d.admins.length && !["ops", "fin"].includes(d.id)).forEach((d, k) => { for (let j = 0; j < (ABSURD ? 14 : 3); j++) { const n = k * 7 + j, nmx = nm[n % nm.length], folder = !nmx.includes("."), root = `C:\\${d.name.replace(/\W+/g, "")}\\`;
     MARKS.push({ id: `M-${100 + n}`, kind: folder ? "folder" : "file", name: nmx, host: `WS-${d.id.toUpperCase()}-A${(n % d.admins.length) + 1}`, path: root + nmx + (folder ? "\\" : ""), keep: n % 2 ? "path" : "machine",
       by: d.admins[n % d.admins.length], at: `${1 + (n % 28)} Sep`, dept: d.id, files: folder ? 5 + (n % 60) : 1, versions: 1 + (n % 20) }); } }); }
+// More of the Super User's own marks, so the Restricted board can be seen in every shape: a file and a folder,
+// kept to the PC or to the exact place, with no copy, one copy, or several.
+MARKS.push(
+  { id: "M-10", kind: "file", name: "board-minutes-2026-09.docx", host: "ADM-01", path: "D:\\Board\\minutes\\board-minutes-2026-09.docx", keep: "machine", by: "Super User", at: "29 Sep", dept: "su", files: 1, versions: 4 },
+  { id: "M-11", kind: "folder", name: "Acquisitions", host: "ADM-01", path: "D:\\Acquisitions\\", keep: "path", by: "Super User", at: "12 Sep", dept: "su", files: 23, versions: 61 },
+  { id: "M-12", kind: "file", name: "strategy-2027.pptx", host: "ADM-01", path: "C:\\Users\\SuperUser\\Documents\\strategy-2027.pptx", keep: "path", by: "Super User", at: "24 Sep", dept: "su", files: 1, versions: 9 },
+  { id: "M-13", kind: "folder", name: "Payroll archive", host: "ADM-01", path: "E:\\Archive\\Payroll\\", keep: "machine", by: "Super User", at: "5 Sep", dept: "su", files: 412, versions: 1240 },
+  { id: "M-14", kind: "folder", name: "Legal", host: "ADM-01", path: "C:\\Legal\\", keep: "path", by: "Super User", at: "19 Sep", dept: "su", files: 58, versions: 97 });
+const suCopy = (id, sev, host, file, folder, at, mark) => ({ id, sev, type: "file", title: "Restricted file copied where it isn't allowed", subject: file, host, at, owner: "You", sla: 1, state: "Open", kind: "violation", d: { file, folder, size: "—", mark } });
+if (MBY["FIN-01"]) ISSUES.push(
+  suCopy("INC-1050", "high", "FIN-01", "board-minutes-2026-09.docx", "C:\\Users\\Afi\\Downloads", 11.4, "M-10"),
+  suCopy("INC-1051", "critical", "OPS-02", "loi-northline.pdf", "C:\\Users\\Public\\Shared", 8.75, "M-11"),
+  suCopy("INC-1052", "high", "LOG-01", "valuation-model.xlsx", "C:\\Users\\Esi\\Desktop\\new folder", -20.5, "M-11"),
+  suCopy("INC-1053", "medium", "OPS-05", "strategy-2027.pptx", "C:\\Users\\Nana\\Documents", -50, "M-12"),
+  suCopy("INC-1054", "high", "OPS-03", "payroll-2025-12.csv", "C:\\Users\\Yaw\\Documents\\old", 7.9, "M-13"),
+  suCopy("INC-1055", "high", "FIN-02", "payroll-2025-11.csv", "C:\\Users\\Kofi\\Desktop", 6.2, "M-13"),
+  suCopy("INC-1056", "medium", "OPS-06", "payroll-2025-10.csv", "D:\\Backup\\Kwame", -30, "M-13"),
+  suCopy("INC-1057", "medium", "OPS-01", "payroll-2025-09.csv", "C:\\Users\\Kojo\\Documents", -40, "M-13"),
+  suCopy("INC-1058", "low", "FIN-01", "payroll-2025-08.csv", "C:\\Users\\Afi\\Archive", -60, "M-13"),
+  suCopy("INC-1059", "low", "OPS-04", "payroll-2025-07.csv", "C:\\Users\\Adjoa\\Desktop", -75, "M-13"),
+  suCopy("INC-1060", "low", "LOG-01", "payroll-2025-06.csv", "C:\\Users\\Esi\\Downloads", -90, "M-13"));
 const copiesOf = (k) => ISSUES.filter((i) => i.type === "file" && i.d.mark === k.id);
 const markOf = (i) => (FULL.MARKS || MARKS).find((k) => k.id === i.d.mark);
-const KEEP = { machine: ["Your PC", "anywhere on it, nowhere else"], path: ["Exactly where it is", "a copy anywhere else is caught, even elsewhere on your PC"] };
+const KEEP = { machine: ["Anywhere on the PC", "anywhere on it, nowhere else"], path: ["Only in its place", "a copy anywhere else is caught, even elsewhere on your PC"] };
 // the person at this console (set by App); Restricted shows only what they marked
 let ME = null;
 const myMarks = () => MARKS.filter((k) => k.by === ME);
@@ -2597,81 +2631,6 @@ function MarkPage({ go, me }) {
     </section>`}
     problem=${picked.length ? null : "Tick at least one file or folder."} note="Nothing is moved or copied." onCancel=${() => go("restricted")} saveLabel="Mark restricted" onSave=${mark} />`;
 }
-function MarkDetail({ k, onClose, me, refresh, go }) {
-  const [modal, modalCtx] = Modal.useModal();
-  if (!k) return html`<${Drawer} open=${false} onClose=${onClose} />`;
-  const cs = copiesOf(k);
-  const unmark = () => modal.confirm({ title: `Unmark ${k.name}?`, okText: "Unmark", okButtonProps: { danger: true }, cancelText: "Keep it marked",
-    content: `Copies of ${k.kind === "folder" ? "the files in it" : "it"} are no longer looked for.${cs.length ? ` The ${cs.length === 1 ? "copy" : `${cs.length} copies`} already found stay${cs.length === 1 ? "s" : ""} an issue until resolved.` : ""} The audit log records that you did it.`,
-    onOk: () => { dropMark(k.id); onClose(); refresh(); toast(`Unmarked ${k.name} · recorded (concept)`); } });
-  const row = (label, v) => html`<div className="kv" style=${{ gridTemplateColumns: "130px minmax(0, 1fr)" }}><span className="t3">${label}</span><span style=${{ minWidth: 0, overflowWrap: "anywhere" }}>${v}</span></div>`;
-  return html`<${Drawer} open=${true} onClose=${onClose} width=${520} title=${html`<span className="row" style=${{ gap: 8, flexWrap: "nowrap" }}>${ic(k.kind === "folder" ? "FolderOutlined" : "FileProtectOutlined")}<span className="cut">${k.name}</span></span>`}
-    footer=${html`<div className="row"><span className="sp" /><${Button} danger onClick=${unmark}>Unmark<//></div>`}>
-    ${modalCtx}
-    <div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div>
-        ${row("Where", html`<span className="mono">${k.path}</span><span className="t3"> on your PC, </span><span className="mono">${k.host}</span>`)}
-        ${row("Covers", k.kind === "folder" ? `${fmt(k.files)} files, and any added later` : "This one file")}
-        ${row("Allowed", html`<div><${Segmented} size="small" value=${k.keep} onChange=${(v) => { k.keep = v; refresh(); toast(`Now kept to ${KEEP[v][0].toLowerCase()} · recorded (concept)`); }} options=${[{ value: "machine", label: KEEP.machine[0] }, { value: "path", label: KEEP.path[0] }]} />
-          <div className="t3" style=${{ fontSize: 12, marginTop: 4 }}>${KEEP[k.keep][1]}</div></div>`)}
-        ${row("Marked", k.at)}
-        ${row("Recognised by", k.kind === "folder" ? `Content. ${fmt(k.versions)} versions across its files are remembered, so an edit never lets an older copy through.` : `Content. ${fmt(k.versions)} version${k.versions === 1 ? "" : "s"} remembered, so an edit never lets an older copy through.`)}
-      </div>
-      <div><div className="nt-h">Copies found elsewhere</div>
-        ${cs.length ? cs.slice(0, 6).map((i) => html`<div key=${i.id} className="irow" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto", padding: "8px 0" }} role="button" tabIndex="0" onClick=${() => { onClose(); go("issues", i.id); }}>
-            <i style=${{ background: SEV[i.sev].c }} /><span className="ttl"><span className="mono">${i.host}</span> <span className="t3">· ${i.d.folder}</span></span><span className="mono t3">${dur(NOWH - i.at)} ago</span></div>`)
-          : html`<div className="t3">None. ${k.kind === "folder" ? "Every file in it is" : "It is"} only where it is allowed.</div>`}
-        ${cs.length > 6 ? html`<${More} n=${cs.length - 6} what="copies" onClick=${() => { onClose(); go("issues"); }} />` : null}
-      </div>
-    </div>
-  <//>`;
-}
-function Restricted({ go, me }) {
-  const [, bump] = useState(0); const refresh = () => bump((n) => n + 1);
-  const [q, setQ] = useState(""); const [kind, setKind] = useState("All");
-  const [sel, setSel] = useState(null);
-  // only what the person at this console marked, on their own workstation
-  const info = infoOf(me), ws = info ? info.ws : null, mine = myMarks();
-  const copies = myCopies().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at);
-  const leaked = mine.filter((k) => copiesOf(k).length).length, nF = mine.filter((k) => k.kind === "folder").length, cov = mine.reduce((a, k) => a + k.files, 0);
-  const rows = mine.filter((k) => (kind === "All" || (kind === "Files") === (k.kind === "file")) && `${k.name} ${k.path}`.toLowerCase().includes(q.toLowerCase()))
-    .map((k) => ({ ...k, key: k.id, n: copiesOf(k).length })).sort((a, b) => b.n - a.n);
-  const open = () => go("restricted", "mark");
-  return html`<${React.Fragment}>
-    <div className="kpis">
-      <${Kpi} none=${!mine.length} nv=${"0"} nt="Nothing marked yet" label="You have marked" value=${fmt(mine.length)} delta=${`${fmt(mine.length - nF)} file${mine.length - nF === 1 ? "" : "s"} and ${fmt(nF)} folder${nF === 1 ? "" : "s"}, covering ${fmt(cov)} file${cov === 1 ? "" : "s"}`} />
-      <${Kpi} none=${!mine.length} nv=${"0"} nt="Nothing marked yet" label="Only where they belong" value=${fmt(mine.length - leaked)} unit=${"/ " + fmt(mine.length)} delta=${leaked ? `${leaked} with a copy somewhere else` : "Every one"} dc=${leaked ? "var(--crit)" : "var(--ok)"} />
-      <${Kpi} none=${!mine.length} nv=${"0"} nt="None found" label="Copies found elsewhere" value=${fmt(copies.length)} delta=${copies.length ? "Each one is an open issue" : "None found"} dc=${copies.length ? "var(--crit)" : undefined} fn=${copies.length ? (t) => (t > 10.03 ? 2 : t > 9.5 ? 1 : 0) : null} sc="var(--crit)" max=${3} />
-    </div>
-    <${Panel} title="Copies found elsewhere" sub="a copy of one of your marked files, somewhere it is not allowed · worst first" flush extra=${copies.length ? html`<${Button} size="small" type="link" onClick=${() => go("issues")}>All issues<//>` : null}>
-      ${!copies.length ? html`<${Empty} icon="CheckOutlined" title="Every file you marked is where it belongs" text="When a copy of one turns up anywhere it is not allowed, it appears here and as an issue. It is never deleted for you." h=${96} />` : null}
-      ${copies.slice(0, 5).map((i) => { const k = markOf(i), a = NOWH - i.at;
-        return html`<div key=${i.id} className="irow" style=${{ gridTemplateColumns: "8px minmax(0, 1.2fr) minmax(0, 1fr) 64px" }} role="button" tabIndex="0" onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)}>
-          <i style=${{ background: SEV[i.sev].c }} />
-          <span style=${{ minWidth: 0 }}><span className="ttl mono" style=${{ display: "block" }}>${i.subject}</span><span className="t3" style=${{ fontSize: 12 }}>on <span className="mono">${i.host}</span> · ${i.d.folder}</span></span>
-          <span className="t3 cut" style=${{ fontSize: 12 }} title=${k ? k.path : ""}>${k ? (k.keep === "machine" ? "allowed only on your PC" : `allowed only at ${k.path}`) : ""}</span>
-          <span className="mono" style=${{ color: a > i.sla ? "var(--crit)" : "var(--text-3)", textAlign: "right" }}>${a > 24 ? Math.floor(a / 24) + "d" : dur(a)}</span>
-        </div>`; })}
-      ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${copies.length - 5} what="copies" onClick=${() => go("issues")} /></div>` : null}
-    <//>
-    <${Panel} flush title=${`${fmt(mine.length)} marked`} sub=${ws ? html`on <span className="mono">${ws}</span>, your PC · click one to see it, change where it is allowed, or unmark it` : null} extra=${html`
-      <${Segmented} size="small" value=${kind} onChange=${setKind} options=${["All", "Files", "Folders"]} />
-      <${Input} size="small" allowClear placeholder="Filter by name or path" prefix=${ic("SearchOutlined")} value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ width: 200 }} />
-      <${Button} size="small" type="primary" icon=${ic("PlusOutlined")} disabled=${!ws} onClick=${open}>Mark files or folders<//>`}>
-      ${!mine.length ? html`<${Empty} icon="FileProtectOutlined" title="You have not marked anything" text="Pick a file or folder on your PC and mark it. It stays where it is and you keep using it; a copy anywhere else is caught." act=${ws ? "Mark files or folders" : null} onAct=${open} h=${140} />`
-        : html`<div className="scroll-x"><${Table} size="middle" pagination=${PG} dataSource=${rows} locale=${{ emptyText: "Nothing matches." }} onRow=${(r) => ({ onClick: () => setSel(r.id), className: "clickrow" })} columns=${[
-          { title: "Name", render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}><span className="t3" style=${{ marginTop: 2 }}>${ic(r.kind === "folder" ? "FolderOutlined" : "FileOutlined")}</span>
-              <div style=${{ minWidth: 0 }}><a style=${{ fontWeight: 500, fontSize: 13 }}>${r.name}</a><div className="mono t3 cut" style=${{ fontSize: 11.5, maxWidth: 340 }} title=${r.path}>${r.path}</div></div></div>` },
-          { title: "Allowed", width: 170, render: (r) => html`<${Tooltip} title=${KEEP[r.keep][1]}><span className="t2">${KEEP[r.keep][0]}</span><//>` },
-          { title: "Covers", width: 100, align: "right", render: (r) => html`<span className="t2">${r.kind === "folder" ? `${fmt(r.files)} files` : "1 file"}</span>` },
-          { title: "Marked", width: 100, render: (r) => html`<span className="t2">${r.at}</span>` },
-          { title: "Now", width: 170, render: (r) => (r.n ? html`<span className="st" style=${{ "--c": "var(--crit)" }}><i />${r.n === 1 ? "A copy elsewhere" : `${fmt(r.n)} copies elsewhere`}</span>` : html`<span className="st" style=${{ "--c": "var(--ok)" }}><i />Only where it belongs</span>`) },
-        ]} /></div>`}
-      <div className="t3" style=${{ fontSize: 12, padding: "10px 14px", borderTop: "1px solid var(--border)" }}>A mark keeps a file where it is: nothing is moved, and the people who use it keep working on it. A copy is never deleted for you; you decide on its issue.</div>
-    <//>
-    <${MarkDetail} k=${mine.find((k) => k.id === sel)} onClose=${() => setSel(null)} me=${me} refresh=${refresh} go=${go} />
-  <//>`;
-}
 
 // ============================================================== AUTOMATION
 // Seven days run Fri..Thu (index 6 is today). Every count below is consistent with every other one.
@@ -4048,9 +4007,12 @@ const SU_QUEUE = DECISIONS;
 // never routed -- waits on the Super User. Next to it, the decisions only they can make: approve a version,
 // give a department an Admin, call a department's task complete. Nothing else is on Work.
 const REPORT_CATS = {
-  "Restricted file": { icon: "FileProtectOutlined", sev: "high" }, "Flow failed": { icon: "BranchesOutlined", sev: "medium" },
-  "Listener report": { icon: "MessageOutlined", sev: "low" }, "Update stuck": { icon: "CloudSyncOutlined", sev: "high" },
-  "Deviation": { icon: "WarningOutlined", sev: "medium" }, "About an Admin": { icon: "EyeOutlined", sev: "medium", fixed: true },
+  "Restricted file": { icon: "FileProtectOutlined", sev: "high", desc: "A copy of a marked file turned up somewhere it is not allowed." },
+  "Flow failed": { icon: "BranchesOutlined", sev: "medium", desc: "A flow stopped copying, or one of its branches paused." },
+  "Listener report": { icon: "MessageOutlined", sev: "low", desc: "Something a listener on a help channel wrote down." },
+  "Update stuck": { icon: "CloudSyncOutlined", sev: "high", desc: "A machine failed to update and went past the retry limit." },
+  "Deviation": { icon: "WarningOutlined", sev: "medium", desc: "A machine showed something it was not registered with, like another name." },
+  "About an Admin": { icon: "EyeOutlined", sev: "medium", fixed: true, desc: "An Admin's own conduct, such as entering machines at night." },
 };
 let ROUTING = null;
 const routingNow = () => ROUTING || (ROUTING = JSON.parse(JSON.stringify(ROUTING0)));
@@ -4292,24 +4254,6 @@ function TaskPath({ t }) {
     <circle cx=${X(4)} cy=${top + (adm.length * rh) / 2} r="9" style=${{ fill: anyDone ? "color-mix(in srgb, var(--ok) 18%, var(--surface))" : "var(--surface)", stroke: anyDone ? "var(--ok)" : "var(--text-4)" }} strokeWidth="1.75" />
   </svg></div>`;
 }
-// One marked file or folder: where it belongs on the left, every machine a copy turned up on to the right.
-function CopyMap({ k, ws }) {
-  const ref = useRef(null), w = Math.max(560, useWidth(ref, 900));
-  const cs = copiesOf(k).sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at), shown = cs.slice(0, 5), more = cs.length - shown.length;
-  const nw = 250, nh = 50, gap = 12, H = Math.max(1, shown.length) * (nh + gap) + (more ? 22 : 0) + 4, x2 = w - nw - 4, y0 = H / 2 - (more ? 11 : 0);
-  const node = (x, y, title, sub, tone, key) => html`<g key=${key}><rect x=${x} y=${y - nh / 2} width=${nw} height=${nh} rx="5" style=${{ fill: tone === "bad" ? "color-mix(in srgb, var(--crit) 7%, var(--surface))" : tone === "ok" ? "color-mix(in srgb, var(--ok) 7%, var(--surface))" : "var(--surface)", stroke: tone === "bad" ? "var(--crit)" : tone === "ok" ? "var(--ok)" : "var(--border)" }} />
-    <text x=${x + 12} y=${y - 4} fontSize="12" fontWeight="600" style=${{ fill: "var(--text)" }}>${fitEnd(title, 34)}<title>${title}</title></text>
-    <text x=${x + 12} y=${y + 13} fontSize="11" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${fitEnd(sub, 38)}<title>${sub}</title></text></g>`;
-  return html`<div ref=${ref} className="scroll-x"><svg width=${w} height=${H} style=${{ display: "block" }} role="img" aria-label="Where it belongs and where copies were found">
-    ${shown.map((i, j) => { const y = j * (nh + gap) + nh / 2 + 2, m = (4 + nw + x2) / 2;
-      return html`<g key=${i.id}><path d=${`M${4 + nw} ${y0}C${m} ${y0} ${m} ${y} ${x2 - 6} ${y}`} fill="none" style=${{ stroke: "var(--crit)" }} strokeWidth="1.75" strokeDasharray="5 4" />
-        <path d=${`M${x2 - 7} ${y - 4}L${x2} ${y}L${x2 - 7} ${y + 4}Z`} style=${{ fill: "var(--crit)" }} />
-        ${node(x2, y, `Copy on ${i.host}`, `${i.d.folder || ""} · ${dur(NOWH - i.at)} ago`, "bad", i.id)}</g>`; })}
-    ${node(4, y0, `${k.name} · your PC`, k.path, cs.length ? "" : "ok", "home")}
-    ${!cs.length ? html`<text x=${4 + nw + 24} y=${y0 + 4} fontSize="12" style=${{ fill: "var(--ok)" }}>No copy anywhere else. It is only where it belongs.</text>` : null}
-    ${more ? html`<text x=${x2} y=${H - 6} fontSize="11.5" style=${{ fill: "var(--text-3)" }}>and ${more} more ${more === 1 ? "copy" : "copies"}</text>` : null}
-  </svg></div>`;
-}
 function GivenToDepts({ go, open: open0 }) {
   useDT();
   // what a department task needs from you decides where it sits, as on the Admin's Tasks page
@@ -4333,7 +4277,7 @@ function GivenToDepts({ go, open: open0 }) {
     <${Strip} on=${f} onPick=${setF} items=${Object.entries(DCAT).map(([k, [w]]) => { const n = open.filter((t) => catOf(t) === k).length;
       return { key: k, label: w, value: fmt(n), delta: k === "late" && n ? "past the deadline" : k === "verify" && n ? "only you can complete" : "", dc: k === "late" && n ? "var(--crit)" : undefined }; })} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title=${f ? DCAT[f][0] : "Given to departments"} sub=${f ? html`<span>${fmt(dtasks.length)} · <a onClick=${() => setF(null)}>show all ${fmt(open.length)}</a></span>` : "most urgent first · click one to open it"}
+      <${ListPanel} title=${f ? DCAT[f][0] : "Given to departments"} sub=${f ? html`<span>${fmt(dtasks.length)} · <a onClick=${() => setF(null)}>show all ${fmt(open.length)}</a></span>` : "most urgent first · click one to see it below"}
         q=${tq} setQ=${setTq} placeholder="Filter by task or department" action=${{ label: "New task", onClick: () => setNewT(blankT) }} pick=${pick} onPick=${setPick} rowKey="id"
         rows=${dtasks.map((t) => ({ ...t, dn: ((FULL.DEPTS || DEPTS).find((x) => x.id === t.dept) || { name: t.dept }).name })).filter((t) => `${t.title} ${t.dn} ${t.id}`.toLowerCase().includes(tq.toLowerCase()))}
         icon="CheckSquareOutlined" name=${{ title: "Task", text: (r) => r.title, line: (r) => `${r.id} · ${r.dn}` }}
@@ -4350,10 +4294,7 @@ function GivenToDepts({ go, open: open0 }) {
         ${waiting.length > 6 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${waiting.length - 6} what="ready" onClick=${() => setF("verify")} /></div>` : null}
       <//>
     </div>
-    ${(() => { const t = DEPT_TASKS.find((x) => x.id === pick) || open[0]; if (!t) return null; const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === t.dept);
-      return html`<${Panel} title=${html`<span>How far it has got · <span style=${{ fontWeight: 500 }}>${t.title}</span></span>`}
-        sub=${`${dd ? dd.name : t.dept} · ${dueText(t.due)}${pick === t.id ? "" : " · the most urgent · click a task to see its own"}`}><${TaskPath} t=${t} /><//>`; })()}
-    <${TaskDrawer} key=${pick || "none"} t=${DEPT_TASKS.find((x) => x.id === pick)} onClose=${() => setPick(null)} />
+    ${(() => { const t = DEPT_TASKS.find((x) => x.id === pick && !x.complete) || open[0]; return t ? html`<${TaskBoard} key=${t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} />` : null; })()}
     <${Drawer} open=${!!newT} onClose=${() => setNewT(null)} width=${480} title="Give a department a task"
       footer=${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept), miss = !newT.text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : newT.who === "some" && !newT.some.length ? "Pick at least one Admin." : null;
         return html`<div className="row"><span className="t3" style=${{ fontSize: 12 }}>${miss || ""}</span><span className="sp" /><${Button} onClick=${() => setNewT(null)}>Cancel<//>
@@ -4427,6 +4368,16 @@ function RailPanel({ title, sub, items, empty, more, extra, minHeight = LIST_H, 
   <//>`;
 }
 // The side panel for one item: its facts, any sections, and its actions at the bottom.
+// The board under a list (decided 7 Oct 2026): a click in the list selects, and the selected item shows here,
+// whole, with its actions in the header. With nothing picked it shows the first item. No drawer covers the page.
+function ItemBoard({ open, picked, title, sub, extra, facts = [], children, actions }) {
+  if (!open) return null;
+  return html`<${Panel} title=${html`<span>${title}</span>`} sub=${sub || (picked ? "the one you picked" : "the first in the list · click another to see it here")}
+    extra=${actions || extra ? html`${extra || null}${actions || null}` : null}>
+    ${facts.length ? html`<div style=${{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "12px 24px" }}>${facts.map(([k, v]) => html`<div key=${k} style=${{ minWidth: 0 }}><div className="t3" style=${{ fontSize: 12 }}>${k}</div><div style=${{ fontSize: 13, overflowWrap: "anywhere" }}>${v}</div></div>`)}</div>` : null}
+    ${children ? html`<div style=${{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "18px 36px", marginTop: facts.length ? 16 : 0, paddingTop: facts.length ? 14 : 0, borderTop: facts.length ? "1px solid var(--border)" : 0 }}>${children}</div>` : null}
+  <//>`;
+}
 function InfoDrawer({ open, onClose, title, extra, facts = [], children, actions }) {
   return html`<${Drawer} open=${!!open} onClose=${onClose} width=${480} title=${open ? html`<span className="cut">${title}</span>` : ""} extra=${open ? extra || null : null}
     footer=${open && actions ? html`<div className="row" style=${{ flexWrap: "wrap" }}><span className="sp" />${actions}</div>` : null}>
@@ -4473,43 +4424,42 @@ function DeptTaskTimeline({ tasks, onPick, sel, slots }) {
   </svg>
   <div className="leg" style=${{ marginTop: 6 }}>${DSTEP.map((k) => html`<span key=${k}><i className="sq" style=${{ "--c": "transparent", border: `2.5px solid ${DSTATE[k][1]}`, borderRadius: "50%" }} />${DSTATE[k][0]}</span>`)}<span><i style=${{ "--c": "var(--crit)", width: 2, height: 10 }} />Now</span></div></div>`;
 }
-// One department task, whole: where each Admin has got, and the decision only the Super User makes.
-function TaskDrawer({ t, onClose }) {
+// One department task, whole, under the list (7 Oct 2026): the chart of where each Admin has got, then the
+// facts and the decision only the Super User makes. A click in the list selects; no drawer opens over it.
+function TaskBoard({ t, picked, onDone }) {
   const [note, setNote] = useState("");
   const [ed, setEd] = useState(false);
-  const [title, setTitle] = useState(t ? t.title : "");
-  const [due, setDue] = useState(t ? t.due : 0);
-  if (!t) return html`<${Drawer} open=${false} onClose=${onClose} />`;
+  const [title, setTitle] = useState(t.title);
+  const [due, setDue] = useState(t.due);
   const base = dayjs("2026-10-01T00:00:00");
-  const saveEdit = () => { dtChange(() => { t.title = title.trim(); t.due = due; }); setEd(false); toast(`Saved · ${listNames(Object.keys(t.st))} ${Object.keys(t.st).length === 1 ? "is" : "are"} told (concept)`); };
   const d = (FULL.DEPTS || DEPTS).find((x) => x.id === t.dept) || { name: t.dept, admins: [] }, stt = taskState(t), late = t.due < NOWH;
   const at = (h) => (h >= 0 && h < 24 ? "Today " + hhmm(h) : `${dayOf(h)} ${hhmm(h)}`);
-  const complete = () => { dtChange(() => { t.complete = true; }); toast("Marked complete, with your name and the time (concept)"); onClose(); };
-  const back = () => { dtChange(() => { t.st = Object.fromEntries(Object.entries(t.st).map(([a0, v]) => [a0, v === "done" ? "ongoing" : v])); }); toast(`Sent back to ${d.name} as ongoing (concept)`); onClose(); };
-  return html`<${Drawer} open=${true} onClose=${onClose} width=${480} title=${html`<span className="cut" title=${t.title}>${ed ? "Edit task" : t.title}</span>`}
-    extra=${!ed && stt !== "complete" ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => { setTitle(t.title); setDue(t.due); setEd(true); }}>Edit<//>` : null}
-    footer=${ed ? html`<div className="row"><span className="t3" style=${{ fontSize: 12 }}>${title.trim() ? "The Admins told see the change." : "Say what needs doing."}</span><span className="sp" /><${Button} onClick=${() => setEd(false)}>Cancel<//><${Button} type="primary" disabled=${!title.trim()} onClick=${saveEdit}>Save<//></div>` : null}>
-    ${ed ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <div><div className="nt-h">What needs doing</div><${Input.TextArea} id="te-text" autoSize=${{ minRows: 3, maxRows: 6 }} maxLength=${280} showCount value=${title} onChange=${(e) => setTitle(e.target.value)} /></div>
-        <div><div className="nt-h">Deadline</div><${DatePicker} id="te-due" showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${base.add(due * 60, "minute")} onChange=${(v) => v && setDue(v.diff(base, "minute") / 60)} /></div>
-        <div className="t3" style=${{ fontSize: 12.5 }}>Given to ${d.name}: ${listNames(Object.keys(t.st))}. Where each Admin has got stays as it is.</div>
-      </div>` : html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div>
-        ${[["Department", d.name], ["Given", at(t.at)], ["Deadline", html`<span style=${{ color: late ? "var(--crit)" : "inherit" }}>${at(t.due)} · ${dueText(t.due)}</span>`], ["Where it stands", html`<span style=${{ color: DSTATE[stt === "complete" ? "done" : stt][1] }}>${stt === "complete" ? "Complete" : DSTATE[stt][0]}</span>`]]
-          .map(([k, v]) => html`<div key=${k} className="kv" style=${{ gridTemplateColumns: "118px minmax(0, 1fr)" }}><span className="t3">${k}</span><span>${v}</span></div>`)}
-      </div>
-      <div><div className="nt-h">Each Admin told</div>
-        ${Object.keys(t.st).map((a0) => html`<div key=${a0} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--grid)" }}>
-          <span className="av" style=${{ boxShadow: `0 0 0 2px ${DSTATE[t.st[a0]][1]}` }}>${initials(a0)}</span><span className="cut" style=${{ flex: 1 }}>${a0}</span>
-          <span style=${{ color: DSTATE[t.st[a0]][1], fontSize: 12.5 }}>${DSTATE[t.st[a0]][0]}</span><span className="mono t3" style=${{ fontSize: 12, width: 84, textAlign: "right" }}>${t.when[a0] != null ? at(t.when[a0]) : "—"}</span></div>`)}
-      </div>
-      ${stt === "done" ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div className="nt-h" style=${{ marginBottom: 0 }}>Your decision</div>
-          <${Input.TextArea} id="td-note" value=${note} onChange=${(e) => setNote(e.target.value)} placeholder="A note for them, if you send it back" autoSize=${{ minRows: 2, maxRows: 4 }} />
-          <div className="row"><span className="sp" /><${Button} disabled=${!note.trim()} onClick=${back}>Not done yet<//><${Button} type="primary" onClick=${complete}>Complete<//></div></div>`
-        : stt === "complete" ? html`<div className="decide" style=${{ "--c": "var(--ok)" }}>Completed by you.</div>`
-        : html`<div className="row"><span className="t3" style=${{ fontSize: 12.5 }}>Nobody has marked it done yet.</span><span className="sp" /><${Button} onClick=${() => toast(`Reminded ${listNames(Object.keys(t.st))} (concept)`)}>Remind them<//></div>`}
-    </div>`}
+  const told = listNames(Object.keys(t.st));
+  const saveEdit = () => { dtChange(() => { t.title = title.trim(); t.due = due; }); setEd(false); toast(`Saved · ${told} ${Object.keys(t.st).length === 1 ? "is" : "are"} told (concept)`); };
+  const complete = () => { dtChange(() => { t.complete = true; }); toast("Marked complete, with your name and the time (concept)"); onDone(); };
+  const back = () => { dtChange(() => { t.st = Object.fromEntries(Object.entries(t.st).map(([a0, v]) => [a0, v === "done" ? "ongoing" : v])); }); setNote(""); toast(`Sent back to ${d.name} as ongoing (concept)`); };
+  const fact = (k, v) => html`<div><div className="t3" style=${{ fontSize: 12 }}>${k}</div><div style=${{ fontSize: 13 }}>${v}</div></div>`;
+  return html`<${Panel} title=${html`<span>How far it has got · <span style=${{ fontWeight: 500 }}>${t.title}</span></span>`}
+    sub=${`${d.name} · ${dueText(t.due)}${picked ? "" : " · the most urgent · click a task to see its own"}`}
+    extra=${stt === "complete" ? null : ed ? html`<${Button} size="small" onClick=${() => setEd(false)}>Cancel<//><${Button} size="small" type="primary" disabled=${!title.trim()} onClick=${saveEdit}>Save<//>`
+      : html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => { setTitle(t.title); setDue(t.due); setEd(true); }}>Edit<//>`}>
+    ${ed ? html`<div className="row" style=${{ alignItems: "flex-start", gap: 14, marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid var(--border)" }}>
+        <div style=${{ flex: "1 1 320px" }}><div className="nt-h">What needs doing</div><${Input.TextArea} id="te-text" autoSize=${{ minRows: 2, maxRows: 5 }} maxLength=${280} showCount value=${title} onChange=${(e) => setTitle(e.target.value)} /></div>
+        <div><div className="nt-h">Deadline</div><${DatePicker} id="te-due" showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${base.add(due * 60, "minute")} onChange=${(v) => v && setDue(v.diff(base, "minute") / 60)} />
+          <div className="t3" style=${{ fontSize: 12, marginTop: 6, maxWidth: 260 }}>${told} see the change. Where each has got stays as it is.</div></div>
+      </div>` : null}
+    <${TaskPath} t=${t} />
+    <div className="row" style=${{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", gap: 28, alignItems: "flex-start" }}>
+      ${fact("Given", at(t.at))}
+      ${fact("Deadline", html`<span style=${{ color: late ? "var(--crit)" : "inherit" }}>${at(t.due)} · ${dueText(t.due)}</span>`)}
+      ${fact("Where it stands", html`<span style=${{ color: DSTATE[stt === "complete" ? "done" : stt][1] }}>${stt === "complete" ? "Complete" : DSTATE[stt][0]}</span>`)}
+      <span className="sp" />
+      ${stt === "done" ? html`<div className="row" style=${{ flexWrap: "nowrap", gap: 8, flex: "0 1 520px" }}>
+          <${Input} id="td-note" size="small" value=${note} onChange=${(e) => setNote(e.target.value)} placeholder="A note for them, if you send it back" />
+          <${Button} size="small" disabled=${!note.trim()} onClick=${back}>Not done yet<//><${Button} size="small" type="primary" onClick=${complete}>Complete<//></div>`
+        : stt === "complete" ? html`<span style=${{ color: "var(--ok)" }}>${ic("CheckCircleFilled")} Completed by you</span>`
+        : html`<div className="row" style=${{ gap: 10 }}><span className="t3" style=${{ fontSize: 12.5 }}>Nobody has marked it done yet.</span><${Button} size="small" onClick=${() => toast(`Reminded ${told} (concept)`)}>Remind them<//></div>`}
+    </div>
   <//>`;
 }
 function Work({ go, single }) {
@@ -4607,7 +4557,6 @@ function Govern({ go, enter, part }) {
   const [confirming, setConfirming] = useState(false);
   const changes = [];
   Object.keys(draft).forEach((c) => depts.forEach((d) => { const was = saved[c].includes(d.id), now = draft[c].includes(d.id); if (was !== now) changes.push({ c, d, on: now }); }));
-  const toggle = (c, id) => setDraft({ ...draft, [c]: draft[c].includes(id) ? draft[c].filter((x) => x !== id) : [...draft[c], id] });
   return html`<${React.Fragment}>
     ${show("structure") ? html`<section className="panel">
       <div className="phd"><div className="pt">Structure<small>click a department to open it · click an Admin for what you can do</small></div><${Pager} p=${dp} what="departments" /></div>
@@ -4645,31 +4594,44 @@ function Govern({ go, enter, part }) {
       </div>
       <div className="leg" style=${{ padding: "0 16px 14px" }}><span><i className="sq" style=${{ "--c": "var(--ok)", borderRadius: "50%" }} />at their desk</span><span><i className="sq" style=${{ "--c": "var(--s3)", borderRadius: "50%" }} />inside a machine</span></div>
     </section>` : null}
-    ${show("routing") ? html`<section className="panel">
-      <div className="phd"><div className="pt">Where reports go<small>click a cell to route a kind of report to a department · every Admin there sees it · you always do</small></div>
-        ${changes.length ? html`<div className="row"><span className="t2" style=${{ fontSize: 12 }}>${changes.length} change${changes.length > 1 ? "s" : ""} not saved</span><${Button} size="small" onClick=${() => setDraft(saved)}>Discard<//><${Button} size="small" type="primary" onClick=${() => setConfirming(true)}>Save routing<//></div>` : null}</div>
-      <div className="scroll-x"><div className="rgrid" style=${{ gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${depts.length + 1}, minmax(88px, 1fr))` }}>
-        <span />
-        <span className="rh">You</span>
-        ${depts.map((d) => html`<span key=${d.id} className="rh" style=${{ color: d.admins.length ? undefined : "var(--crit)" }} title=${`${d.name} · ${d.admins.length ? d.admins.join(", ") : "No Admin to receive them"}`}><span>${d.name}</span></span>`)}
-        ${Object.keys(draft).map((c) => html`<${React.Fragment} key=${c}>
-          <span className="rc">${c}</span>
-          <span className="rd"><span className="dotc on locked" title="You always receive every report">${ic("LockOutlined")}</span></span>
-          ${depts.map((d) => { const on = draft[c].includes(d.id), dead = on && !d.admins.length, changed = saved[c].includes(d.id) !== on;
-            return html`<span key=${d.id} className="rd"><button className=${"rcell" + (changed ? " changed" : "")} onClick=${() => toggle(c, d.id)}
-              aria-pressed=${on} aria-label=${`${c} to ${d.name}: ${on ? "routed" : "not routed"}`} title=${dead ? "Routed, but nobody there to read it" : on ? "Routed · click to stop" : "Not routed · click to route"}>
-              <span className=${"dotc" + (on ? " on" : "") + (dead ? " dead" : "")} /></button></span>`; })}
-        <//>`)}
-        ${depts.length ? html`<${React.Fragment}>
-          <span className="rc" title="Never routed: the department would be judging its own Admin">About an Admin</span>
-          <span className="rd"><span className="dotc on locked" title="Only you receive these">${ic("LockOutlined")}</span></span>
-          ${depts.map((d) => html`<span key=${d.id} className="rd" title="Never routed: the department would be judging its own Admin"><span className="t4" style=${{ fontSize: 12 }}>—</span></span>`)}
-        <//>` : null}
-      </div>
-      </div>
-      ${!depts.length ? html`<div className="t3" style=${{ padding: "10px 14px 0", fontSize: 12.5 }}>Each department becomes a column here once it exists. Until then every report comes to you.</div>` : null}
-      <div className="leg" style=${{ padding: "10px 14px" }}><span><span className="dotc on" /> routed</span><span><span className="dotc dead" /> routed, nobody there</span><span><span className="dotc" /> not routed</span><span><span className="rcell changed" style=${{ width: 18, height: 18, display: "inline-grid" }} /> changed, not saved</span></div>
-    </section>` : null}
+    ${show("routing") ? (() => {
+      // One row per kind of report, read as a sentence: it goes to you and the departments picked. A department's
+      // Admins can then address that kind, so it stops waiting on you; the right-hand figure shows that, live.
+      const R = reportsNow(), dby = Object.fromEntries(depts.map((d) => [d.id, d]));
+      const waits = (c, rt) => R.filter((r) => r.cat === c && !r.addressed && !((rt[c] || []).includes(r.dept) && dby[r.dept] && dby[r.dept].admins.length)).length;
+      const opts = depts.map((d) => ({ value: d.id, label: d.admins.length ? d.name : `${d.name} · no Admin` }));
+      const nAdm = R.filter((r) => REPORT_CATS[r.cat].fixed).length;
+      return html`<section className="panel">
+      <div className="phd"><div className="pt">Where reports go<small>you get every report · add a department and its Admins can deal with that kind too, so it stops waiting on you</small></div>
+        ${changes.length ? html`<div className="row"><span className="t2" style=${{ fontSize: 12 }}>${changes.length} change${changes.length > 1 ? "s" : ""} not saved</span><${Button} size="small" onClick=${() => setDraft(saved)}>Discard<//><${Button} size="small" type="primary" onClick=${() => setConfirming(true)}>Save<//></div>` : null}</div>
+      ${!depts.length ? html`<${Empty} icon="ApartmentOutlined" title="Every report comes to you for now" text="Once a department exists, you can pick here which kinds of report its Admins deal with." h=${120} />` : html`<div>
+        ${Object.keys(draft).map((c) => { const C = REPORT_CATS[c], on = draft[c], changed = depts.some((d) => saved[c].includes(d.id) !== on.includes(d.id));
+          const dead = on.filter((id) => dby[id] && !dby[id].admins.length), n = R.filter((r) => r.cat === c).length, w0 = waits(c, saved), w1 = waits(c, draft);
+          return html`<div key=${c} className=${"rrow" + (changed ? " changed" : "")}>
+            <span className="t3 rrow-i">${ic(C.icon)}</span>
+            <div style=${{ minWidth: 0 }}><div style=${{ fontWeight: 600 }}>${c}</div><div className="t3" style=${{ fontSize: 12 }}>${C.desc}</div></div>
+            <div className="rrow-s">
+              <span className="t2 nowrap">Goes to <b style=${{ fontWeight: 600, color: "var(--text)" }}>you</b> and</span>
+              <${Select} mode="multiple" size="small" showSearch optionFilterProp="label" maxTagCount="responsive" allowClear placeholder="no department yet, only you"
+                value=${on} onChange=${(v) => setDraft({ ...draft, [c]: v })} options=${opts} style=${{ flex: "1 1 200px", minWidth: 0 }} aria-label=${`Departments whose Admins also get ${c} reports`} />
+              ${on.length < depts.length ? html`<a className="rrow-all" onClick=${() => setDraft({ ...draft, [c]: depts.map((d) => d.id) })}>every department</a>` : null}
+              ${dead.length ? html`<div className="rrow-warn">${ic("WarningOutlined")} ${listNames(dead.map(deptNameOf))} ${dead.length === 1 ? "has" : "have"} no Admin, so ${dead.length === 1 ? "its" : "their"} ${c.toLowerCase()} reports still come only to you.</div>` : null}
+            </div>
+            <div className="rrow-n">
+              <div><b className="mono" style=${{ fontWeight: 500 }}>${fmt(n)}</b> <span className="t3" style=${{ fontSize: 12 }}>this week</span></div>
+              <div style=${{ fontSize: 12, color: w1 ? "var(--crit)" : "var(--text-3)" }}>${w0 !== w1 ? html`<span className="t3 mono">${fmt(w0)} → </span>` : null}${w1 ? `${fmt(w1)} waiting on you` : "none waiting on you"}</div>
+            </div>
+          </div>`; })}
+        <div className="rrow">
+          <span className="t3 rrow-i">${ic(REPORT_CATS["About an Admin"].icon)}</span>
+          <div style=${{ minWidth: 0 }}><div style=${{ fontWeight: 600 }}>About an Admin</div><div className="t3" style=${{ fontSize: 12 }}>${REPORT_CATS["About an Admin"].desc}</div></div>
+          <div className="rrow-s"><span className="t2 nowrap">Goes to <b style=${{ fontWeight: 600, color: "var(--text)" }}>you</b> only</span>
+            <span className="t3" style=${{ fontSize: 12 }}>${ic("LockOutlined")} never shared: a department would be judging its own Admin</span></div>
+          <div className="rrow-n"><div><b className="mono" style=${{ fontWeight: 500 }}>${fmt(nAdm)}</b> <span className="t3" style=${{ fontSize: 12 }}>this week</span></div><div className="t3" style=${{ fontSize: 12 }}>yours to judge</div></div>
+        </div>
+      </div>`}
+      <div className="t3" style=${{ fontSize: 12, padding: "10px 16px", borderTop: "1px solid var(--border)" }}>A change applies to new reports; ones already written stay where they went. Saving is recorded in the audit log.</div>
+    </section>`; })() : null}
     ${show("handling") ? html`<section className="panel">
       <div className="phd"><div className="pt">How departments handle their reports<small>this week · only you see this · reports you route stay theirs to address</small></div><${Pager} p=${hp} what="departments" /></div>
       ${(() => { const R = reportsNow().filter((r) => reportOwner(r) === "dept");
@@ -4985,18 +4947,18 @@ const OUT_HELP = {
   escalated: ["Flag it for review in the audit log. It stays on the record as escalated.", "What should be looked at? Recorded with the outcome."],
   dismissed: ["It was not a real deviation, for example a wrong reading. It is no longer counted.", "Why is it not one? Recorded with the outcome."],
 };
-function DevDrawer({ d, onClose, go }) {
+function DevDrawer({ d, onClose, go, picked }) {
   const [kind, setKind] = useState("explained");
   const [txt, setTxt] = useState("");
-  if (!d) return html`<${Drawer} open=${false} onClose=${onClose} />`;
+  if (!d) return null;
   const r = RULE_BY(d.rule), K = WHOKIND[d.kind], o = OUTC[d.out];
   const nowT = () => NOWH + (Date.now() - T0) / 3.6e6;
   const record = () => { dtChange(() => { d.out = kind; d.note = txt.trim(); d.by = "You"; d.when = nowT(); }); toast(`${OUTC[kind][0]} · recorded with your name (concept)`); };
   const reopen = () => { dtChange(() => { d.out = "open"; d.note = undefined; d.by = undefined; d.when = undefined; }); setTxt(""); toast("Reopened (concept)"); };
   const kv = (label, v) => html`<div className="kv" style=${{ gridTemplateColumns: "118px minmax(0, 1fr)" }}><span className="t3">${label}</span><span style=${{ minWidth: 0, overflowWrap: "anywhere" }}>${v}</span></div>`;
-  return html`<${Drawer} open=${true} onClose=${onClose} width=${560} title=${html`<span className="cut" title=${d.short}>${d.short}</span>`}>
-    <div style=${{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div className="row"><${Sev} s=${d.sev} /><span className="tag" style=${{ "--c": "var(--text-3)" }}>${ic(K[1])} ${K[0]}</span><span className="st" style=${{ "--c": o[1] }}><i />${o[0]}</span><span className="mono t3">${d.id}</span></div>
+  return html`<${Panel} title=${html`<span>${d.short}</span>`} sub=${picked ? "the one you picked" : "the most serious in the list · click another to see it here"}>
+    <div style=${{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: "18px 36px", alignItems: "start" }}>
+      <div className="row" style=${{ gridColumn: "1 / -1" }}><${Sev} s=${d.sev} /><span className="tag" style=${{ "--c": "var(--text-3)" }}>${ic(K[1])} ${K[0]}</span><span className="st" style=${{ "--c": o[1] }}><i />${o[0]}</span><span className="mono t3">${d.id}</span></div>
       <div>
         ${kv("Rule", html`<a onClick=${() => { onClose(); go("rules", d.rule); }}>${r.name}</a> <span className="t3">· ${r.locked ? "built in" : "set by you"}</span>`)}
         ${kv("Expected", d.expected)}
@@ -5038,12 +5000,12 @@ function Accountability({ go, open }) {
   const pool = DEVIATIONS.filter((d) => day != null ? Math.floor(d.at / 24) === day : oc === "all" || d.out === "open");
   const list = pool.filter((d) => (!kind || d.kind === kind) && (!rule || d.rule === rule) && `${d.short} ${d.who} ${d.host || ""} ${RULE_BY(d.rule).name}`.toLowerCase().includes(q.toLowerCase())).sort(devSortKey);
   const broken = RULES_ALL().map((r) => { const ds = weekDevs(r.id); return { r, n: ds.length, open: ds.filter((d) => d.out === "open").length }; }).filter((x) => x.n).sort((a, b) => b.n - a.n);
-  const dev = DEVIATIONS.find((d) => d.id === sel);
+  const dev = DEVIATIONS.find((d) => d.id === sel) || list[0];
   return html`<${React.Fragment}>
     <${Strip} on=${kind} onPick=${setKind} items=${Object.keys(WHOKIND).map((k) => { const o = DEVIATIONS.filter((d) => d.kind === k && d.out === "open"), hi = o.filter((d) => d.sev === "critical" || d.sev === "high").length;
       return { key: k, label: `${WHOKIND[k][0]}s`, value: fmt(o.length), delta: o.length ? (hi ? `${hi} critical or high` : "open") : "none open", dc: hi ? "var(--crit)" : undefined }; })} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title=${day != null ? `Deviations ${day === 0 ? "today" : day === -1 ? "yesterday" : "on " + dayOf(day * 24)}` : rule ? RULE_BY(rule).name : oc === "open" ? "Open deviations" : "Every deviation"} sub=${day != null ? html`<span>open and dealt with · <a onClick=${() => setDay(null)}>every day</a></span>` : rule ? html`<span>broken this week · <a onClick=${() => setRule(null)}>every rule</a></span>` : "most serious first · click one to open it"}
+      <${ListPanel} title=${day != null ? `Deviations ${day === 0 ? "today" : day === -1 ? "yesterday" : "on " + dayOf(day * 24)}` : rule ? RULE_BY(rule).name : oc === "open" ? "Open deviations" : "Every deviation"} sub=${day != null ? html`<span>open and dealt with · <a onClick=${() => setDay(null)}>every day</a></span>` : rule ? html`<span>broken this week · <a onClick=${() => setRule(null)}>every rule</a></span>` : "most serious first · click one to see it below"}
         tools=${day != null ? null : html`<${Segmented} size="small" value=${oc} onChange=${setOc} options=${[{ value: "open", label: "Open" }, { value: "all", label: "Everything" }]} />`}
         q=${q} setQ=${setQ} placeholder="Filter by person, machine or rule" pick=${sel} onPick=${setSel} rowKey="id" rows=${list}
         icon=${(r) => WHOKIND[r.kind][1]} name=${{ title: "Deviation", text: (r) => r.short, line: (r) => RULE_BY(r.rule).name }}
@@ -5054,8 +5016,8 @@ function Accountability({ go, open }) {
         items=${broken.map(({ r, n, open: o }) => ({ key: r.id, title: r.name, line: `${o} open · ${r.locked ? "built in" : "set by you"}`, right: fmt(n), c: o ? "var(--crit)" : "var(--ok)", on: rule === r.id, onClick: () => setRule(rule === r.id ? null : r.id) }))}
         empty=${html`<${Empty} icon="CheckOutlined" title="Every rule kept this week" text="Rules that were broken show here, most often first." h=${200} />`} />
     </div>
+    <${DevDrawer} key=${dev ? dev.id : "none"} picked=${!!sel} d=${dev} onClose=${() => setSel(null)} go=${go} />
     <${Panel} title="Deviations per day" sub="this week · click a day to show only it in the list" extra=${day != null ? html`<${Button} size="small" onClick=${() => setDay(null)}>Every day<//>` : null}><${DevDays} day=${day} onDay=${setDay} /><//>
-    <${DevDrawer} key=${sel || "none"} d=${dev} onClose=${() => setSel(null)} go=${go} />
   <//>`;
 }
 // ---------------------------------------------------------------- Rules
@@ -5089,7 +5051,7 @@ function Rules({ go, sub }) {
       { label: "Broken this week", value: fmt(all.filter((x) => weekDevs(x.id).length).length), delta: `${fmt(all.reduce((t, x) => t + weekDevs(x.id).length, 0))} deviations`, dc: all.some((x) => weekDevs(x.id).length) ? "var(--crit)" : undefined },
       { label: "Kept all week", value: fmt(all.filter((x) => !weekDevs(x.id).length).length) }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Rules" sub="the standard every deviation is measured against · click one to open it" q=${q} setQ=${setQ} placeholder="Filter rules"
+      <${ListPanel} title="Rules" sub="the standard every deviation is measured against · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter rules"
         action=${{ label: "New rule", onClick: () => go("rules", "new") }} pick=${sel} onPick=${setSel} rowKey="id" rows=${rows}
         icon=${(x) => SHAPES[x.shape].icon} name=${{ title: "Rule", text: (x) => x.name, line: (x) => SHAPES[x.shape].w }}
         cols=${[{ title: "Set by", width: 110, text: (x) => (x.locked ? "Built in" : "You") }, { title: "Applies to", width: 190, text: ruleScope },
@@ -5098,17 +5060,21 @@ function Rules({ go, sub }) {
       <${RailPanel} title="Start from a pattern" sub="click one to build a rule from it" more="patterns"
         items=${TEMPLATES.map((t) => ({ key: t.id, title: t.name, line: `${SHAPES[t.state.shape].w}${t.uses ? ` · in use as ${t.uses}` : ""}`, c: t.uses ? "var(--ok)" : "var(--text-4)", onClick: () => (t.uses ? setSel(t.uses) : go("rules", "from-" + t.id)) }))} empty=${null} />
     </div>
-    ${g ? html`<${Panel} title=${html`<span>The pattern · <span style=${{ fontWeight: 500 }}>${g.name}</span></span>`}
-      sub=${r ? "the rule you opened · the dashed branch is where a deviation is noted" : "the rule you set most recently · click a rule to see its pattern"}
-      extra=${!g.locked ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => go("rules", "edit-" + g.id)}>Edit<//>` : html`<span className="t3" style=${{ fontSize: 12 }}>Built in · read only</span>`}>
-      <${PatternGraph} s=${toPattern(g)} /><//>` : null}
-    <${InfoDrawer} open=${!!r} onClose=${() => setSel(null)} title=${r ? r.name : ""}
-      extra=${r && !r.locked ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => go("rules", "edit-" + r.id)}>Edit<//>` : null}
-      facts=${r ? [["Kind", SHAPES[r.shape].w], ["The rule", ruleSentence(r)], ["Applies to", ruleScope(r)], ["Set by", r.locked ? "Built into Falcon · always on" : `You, ${r.since}`], ["This week", n ? `${fmt(n)} deviation${n === 1 ? "" : "s"}` : "Kept"]] : []}
-      actions=${r ? html`${!r.locked ? html`<${Button} onClick=${() => { dtChange(() => { r.on = !r.on; }); toast(`${r.name} ${r.on ? "on" : "off"}. Earlier deviations stay on the record (concept)`); }}>${r.on ? "Switch off" : "Switch on"}<//>` : null}
-        <${Button} type="primary" disabled=${!n} onClick=${() => { ACC_PRESET = { rule: r.id }; go("accountability"); }}>See its deviations<//>` : null}>
-      ${r && r.locked ? html`<div className="t3" style=${{ fontSize: 12.5 }}>Built-in rules are listed so every deviation points to a rule. You can see them, but not change or switch them off.</div>` : null}
-    <//>
+    ${g ? (() => { const gn = weekDevs(g.id).length;
+      // A click in the list selects; this board is the rule's whole page: its pattern, its facts and what can be
+      // done to it. No drawer opens over the pattern.
+      return html`<${Panel} title=${html`<span>The pattern · <span style=${{ fontWeight: 500 }}>${g.name}</span></span>`}
+      sub=${r ? "the rule you picked · the dashed branch is where a deviation is noted" : "the rule you set most recently · click a rule to see its pattern"}
+      extra=${html`${!g.locked ? html`<${Button} size="small" onClick=${() => { dtChange(() => { g.on = !g.on; }); toast(`${g.name} ${g.on ? "on" : "off"}. Earlier deviations stay on the record (concept)`); }}>${g.on ? "Switch off" : "Switch on"}<//>
+          <${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => go("rules", "edit-" + g.id)}>Edit<//>` : html`<span className="t3" style=${{ fontSize: 12 }}>${ic("LockOutlined")} Built in · read only</span>`}
+        <${Button} size="small" type="primary" disabled=${!gn} onClick=${() => { ACC_PRESET = { rule: g.id }; go("accountability"); }}>See its deviations<//>`}>
+      <${PatternGraph} s=${toPattern(g)} />
+      <div className="row" style=${{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", gap: 28, alignItems: "flex-start" }}>
+        ${[["The rule", ruleSentence(g)], ["Applies to", ruleScope(g)], ["Set by", g.locked ? "Built into Falcon · always on" : `You, ${g.since}${g.on ? "" : " · switched off"}`], ["This week", gn ? `${fmt(gn)} deviation${gn === 1 ? "" : "s"}` : "Kept"]]
+          .map(([k0, v]) => html`<div key=${k0} style=${{ minWidth: 0, maxWidth: k0 === "The rule" ? 420 : 260 }}><div className="t3" style=${{ fontSize: 12 }}>${k0}</div><div style=${{ fontSize: 13, color: k0 === "This week" && gn ? "var(--crit)" : "inherit" }}>${v}</div></div>`)}
+      </div>
+      ${g.locked ? html`<div className="t3" style=${{ fontSize: 12, marginTop: 10 }}>Built-in rules are listed so every deviation points to a rule. You can see them, but not change or switch them off.</div>` : null}
+    <//>`; })() : null}
   <//>`;
 }
 // The pattern, left to right: what starts it, what is expected, the branch to a deviation, and what happens then.
@@ -5341,29 +5307,104 @@ function FlowsSU({ go, open }) {
     <//>
   <//>`;
 }
+// The selected mark as a picture (6 Oct 2026): on the left the zone it is allowed in, drawn as a boundary
+// (the whole machine, or the one folder on it); on the right everywhere else, with a card for each copy found
+// there. Nothing found keeps the same shape. A copy card opens its issue.
+function CopyMap({ k, go, onChangeKeep }) {
+  const ref = useRef(null), w = Math.max(620, useWidth(ref, 900));
+  const cs = copiesOf(k).sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at), shown = cs.slice(0, 3), more = cs.length - shown.length;
+  const mine = k.host === (infoOf(ME) || {}).ws, whole = k.keep === "machine";
+  const ch = 58, cg = 10, top = 30, rows = 3, H = top + rows * (ch + cg) + 24;
+  const zw = Math.min(340, Math.round(w * 0.38)), zx = 2, zy = top, zh = rows * (ch + cg) - cg;
+  const fx = zx + 22, fw = zw - 44, fh = 50, fy = zy + zh / 2 - fh / 2 + 14, fmid = fy + fh / 2;
+  const cardW = Math.max(300, Math.min(400, Math.round(w * 0.34))), ex = Math.max(zx + zw + 90, w - cardW - 2);
+  const fill = (c, p) => `color-mix(in srgb, ${c} ${p}%, var(--surface))`;
+  const cy = (j) => top + j * (ch + cg) + ((rows - shown.length) * (ch + cg)) / 2;
+  // the rule, said in words inside the box: one drawing whatever the setting, so nothing has to be decoded
+  const where = k.kind === "folder" ? k.path : k.path.replace(/[^\\]+$/, "");
+  const rule = whole ? `allowed anywhere on ${mine ? "this PC" : k.host}` : `allowed only in ${fitEnd(where, Math.floor((zw - 90) / 6.2))}`;
+  return html`<div ref=${ref} className="scroll-x"><svg width=${w} height=${H} style=${{ display: "block" }} role="img" aria-label=${`Where ${k.name} may be, and where copies were found`}>
+    <text x=${zx} y="14" fontSize="11" fontWeight="600" letterSpacing="0.06em" style=${{ fill: "var(--text-3)" }}>ALLOWED</text>
+    <text x=${ex} y="14" fontSize="11" fontWeight="600" letterSpacing="0.06em" style=${{ fill: "var(--text-3)" }}>ELSEWHERE</text>
+    <rect x=${zx} y=${zy} width=${zw} height=${zh} rx="10" style=${{ fill: "var(--surface-2)", stroke: "var(--border-strong)" }} strokeWidth="1.25" />
+    <text x=${zx + 14} y=${zy + 22} fontSize="12" fontWeight="600" style=${{ fill: "var(--text)", fontFamily: "var(--mono)" }}>${k.host}<tspan style=${{ fontFamily: "var(--sans)", fontWeight: 400, fill: "var(--text-3)" }}>${mine ? "  · your PC" : ""}</tspan></text>
+    <text x=${zx + 14} y=${zy + 40} fontSize="11.5" style=${{ fill: "var(--text-2)" }}>${rule}<title>${whole ? "" : where}</title></text>
+    ${onChangeKeep ? html`<text x=${zx + zw - 14} y=${zy + 40} textAnchor="end" fontSize="11.5" style=${{ fill: "var(--text-3)", cursor: "pointer", textDecoration: "underline" }} onClick=${onChangeKeep}>change</text>` : null}
+    <rect x=${fx} y=${fy} width=${fw} height=${fh} rx="6" style=${{ fill: "var(--surface)", stroke: "var(--border-strong)" }} strokeWidth="1.25" />
+    <path d=${k.kind === "folder" ? `M${fx + 12} ${fmid - 6}h6l2 2h8v11h-16z` : `M${fx + 14} ${fmid - 9}h8l4 4v14h-12z M${fx + 22} ${fmid - 9}v4h4`} fill="none" style=${{ stroke: "var(--text-2)" }} strokeWidth="1.3" strokeLinejoin="round" />
+    <text x=${fx + 38} y=${fmid - 3} fontSize="12.5" fontWeight="600" style=${{ fill: "var(--text)" }}>${fitEnd(k.name, Math.floor((fw - 50) / 7))}<title>${k.name}</title></text>
+    <text x=${fx + 38} y=${fmid + 13} fontSize="11" style=${{ fill: "var(--text-3)" }}>${k.kind === "folder" ? `folder · ${fmt(k.files)} files, and any added later` : "file · the original"}</text>
+    ${shown.map((i, j) => { const y = cy(j) + ch / 2, x1 = fx + fw, m = (x1 + ex) / 2;
+      return html`<path key=${"e" + i.id} d=${`M${x1} ${fmid}C${m} ${fmid} ${m} ${y} ${ex - 7} ${y}`} fill="none" style=${{ stroke: "color-mix(in srgb, var(--crit) 55%, transparent)" }} strokeWidth="1.25" strokeDasharray="4 4" />
+        <path key=${"a" + i.id} d=${`M${ex - 7} ${y - 3.5}L${ex} ${y}L${ex - 7} ${y + 3.5}Z`} style=${{ fill: "color-mix(in srgb, var(--crit) 55%, transparent)" }} />`; })}
+    ${shown.map((i, j) => { const y = cy(j), m = MBY[i.host] || {};
+      return html`<g key=${i.id} style=${{ cursor: "pointer" }} onClick=${() => go("issues", i.id)}>
+        <rect x=${ex} y=${y} width=${cardW} height=${ch} rx="7" style=${{ fill: "var(--surface)", stroke: "color-mix(in srgb, var(--crit) 45%, var(--border-strong))" }} strokeWidth="1" />
+        <text x=${ex + 14} y=${y + 21} fontSize="12.5" fontWeight="600" style=${{ fill: "var(--text)", fontFamily: "var(--mono)" }}>${i.host}<tspan style=${{ fontFamily: "var(--sans)", fontWeight: 400, fill: "var(--text-3)" }}>  ${m.user ? `· ${m.user} was signed in` : "· nobody signed in"}</tspan></text>
+        <text x=${ex + 14} y=${y + 39} fontSize="11" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${k.kind === "folder" ? html`<tspan style=${{ fill: "var(--text)" }}>${fitEnd(i.d.file, 26)}</tspan><tspan> in </tspan>` : null}${fitEnd(i.d.folder || "", Math.floor((cardW - 110) / 6.4) - (k.kind === "folder" ? Math.min(26, i.d.file.length) + 4 : 0))}<title>${k.kind === "folder" ? i.d.file + " in " : ""}${i.d.folder}</title></text>
+        <text x=${ex + cardW - 14} y=${y + 21} textAnchor="end" fontSize="11" style=${{ fill: "var(--crit)" }}>${dur(NOWH - i.at)} ago</text>
+        <text x=${ex + cardW - 14} y=${y + 39} textAnchor="end" fontSize="11" style=${{ fill: "var(--text-3)" }}>open issue ›</text>
+      </g>`; })}
+    ${!shown.length ? html`<g>
+      <rect x=${ex} y=${zy} width=${cardW} height=${zh} rx="10" style=${{ fill: "transparent", stroke: "var(--border-strong)" }} strokeWidth="1.25" strokeDasharray="5 4" />
+      <text x=${ex + cardW / 2} y=${zy + zh / 2 - 2} textAnchor="middle" fontSize="13" fontWeight="600" style=${{ fill: "var(--accent)" }}>No copy anywhere else</text>
+      <text x=${ex + cardW / 2} y=${zy + zh / 2 + 16} textAnchor="middle" fontSize="11.5" style=${{ fill: "var(--text-3)" }}>watched on every machine, by content</text>
+    </g>` : null}
+    ${more ? html`<text x=${ex} y=${H - 6} fontSize="11.5" style=${{ fill: "var(--accent)", cursor: "pointer" }} onClick=${() => go("issues")}>+${fmt(more)} more ${more === 1 ? "copy" : "copies"}, less serious · see them all on Issues ›</text>` : null}
+  </svg></div>`;
+}
+// The selected mark's board: the picture, the setting and Unmark in its header, the quiet facts under it.
+function MarkBoard({ k, picked, go, refresh, onUnmarked }) {
+  const [modal, modalCtx] = Modal.useModal();
+  const n = copiesOf(k).length;
+  const unmark = () => modal.confirm({ title: `Unmark ${k.name}?`, okText: "Unmark", okButtonProps: { danger: true }, cancelText: "Keep it marked",
+    content: `Copies of ${k.kind === "folder" ? "the files in it" : "it"} are no longer looked for.${n ? ` The ${n === 1 ? "copy" : `${n} copies`} already found stay${n === 1 ? "s" : ""} an issue until resolved.` : ""} The audit log records that you did it.`,
+    onOk: () => { dropMark(k.id); onUnmarked(); refresh(); toast(`Unmarked ${k.name} · recorded (concept)`); } });
+  // changing where it is allowed is asked in plain words, saying what it means for copies
+  const where = k.kind === "folder" ? k.path : k.path.replace(/[^\\]+$/, "");
+  const changeKeep = () => { const toWhole = k.keep !== "machine";
+    modal.confirm({ title: toWhole ? `Allow ${k.name} anywhere on ${k.host}?` : `Allow ${k.name} only in ${where}?`, okText: "Change it", cancelText: "Keep it as it is",
+      content: toWhole ? `Moving or copying it to another place on ${k.host} will no longer be reported. A copy on any other machine still is.` : `A copy anywhere outside ${where} will be reported, even somewhere else on ${k.host}.`,
+      onOk: () => { k.keep = toWhole ? "machine" : "path"; refresh(); toast(`${k.name} is now allowed ${toWhole ? "anywhere on " + k.host : "only in " + where} · recorded (concept)`); } }); };
+  return html`<${Panel} title=${html`<span>Where it is · <span style=${{ fontWeight: 500 }}>${k.name}</span></span>`}
+    sub=${`${n ? `${n} cop${n === 1 ? "y" : "ies"} found elsewhere` : "only where it belongs"}${picked ? "" : " · the one with most copies · pick another in the list"}`}
+    extra=${html`${modalCtx}<${Button} size="small" danger onClick=${unmark}>Unmark<//>`}>
+    <${CopyMap} k=${k} go=${go} onChangeKeep=${changeKeep} />
+    <div className="row" style=${{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)", fontSize: 12, gap: 18 }}>
+      <span className="t3"><span className="mono">${k.path}</span></span>
+      <span className="t3">Marked ${k.at}</span>
+      <${Tooltip} title=${`Matched by content. ${fmt(k.versions)} version${k.versions === 1 ? " is" : "s are"} remembered, so editing the original never lets an older copy through.`}><span className="t3" style=${{ cursor: "help" }}>${ic("InfoCircleOutlined")} How copies are recognised</span><//>
+    </div>
+  <//>`;
+}
+// One Restricted page for the Super User and for an Admin: only what the person at this console marked.
 function RestrictedSU({ go, open }) {
   const [, bump] = useState(0); const refresh = () => bump((n) => n + 1);
   const [sel, setSel0] = useState(open || null);
   const setSel = (id) => { setSel0(id); keepOpen("restricted", id); };
   const [q, setQ] = useState("");
+  const [modal, modalCtx] = Modal.useModal();
   const info = infoOf(ME), ws = info ? info.ws : null, mine = myMarks();
   const copies = myCopies().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at);
   const leaked = mine.filter((k) => copiesOf(k).length).length, nF = mine.filter((k) => k.kind === "folder").length, cov = mine.reduce((n, k) => n + k.files, 0), mx = Math.max(1, ...mine.map((k) => k.files));
   const rows = mine.filter((k) => `${k.name} ${k.path}`.toLowerCase().includes(q.toLowerCase())).map((k) => ({ ...k, key: k.id, n: copiesOf(k).length })).sort((a, b) => b.n - a.n);
   return html`<${React.Fragment}>
+    ${modalCtx}
     <${Strip} items=${[
       { label: "Files and folders marked", value: fmt(mine.length), delta: !mine.length ? "" : `${fmt(mine.length - nF)} file${mine.length - nF === 1 ? "" : "s"}, ${fmt(nF)} folder${nF === 1 ? "" : "s"} · ${leaked ? `${leaked} with a copy elsewhere` : "all where they belong"}`, dc: leaked ? "var(--crit)" : undefined },
-      { label: "Files protected in all", value: fmt(cov), delta: "marked files, plus every file inside a marked folder" },
-      { label: "Copies found elsewhere", value: fmt(copies.length), delta: copies.length ? "each one is an open issue" : "none", dc: copies.length ? "var(--crit)" : undefined }]} />
+      { label: "Files protected in all", value: fmt(cov), delta: "counting what is inside folders" },
+      { label: "Copies found elsewhere", value: fmt(copies.length), delta: copies.length ? "each one is an open issue" : "none", dc: copies.length ? "var(--crit)" : undefined },
+      ...(() => { const hs0 = [...new Set(copies.map((i) => i.host))];
+        return [{ label: "Machines holding a copy", value: fmt(hs0.length), unit: "/ " + fmt(MACHINES.length), delta: hs0.length ? listNames(hs0, 2) : "none", dc: hs0.length ? "var(--crit)" : undefined }]; })()]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Marked files" sub=${ws ? html`on <span className="mono">${ws}</span>, your PC · click one to open it` : null}
+      <${ListPanel} title="Marked files" sub=${ws ? html`on <span className="mono">${ws}</span>, your PC · click one to see it below` : null}
         q=${q} setQ=${setQ} placeholder="Filter by name or path" action=${{ label: "Mark files", disabled: !ws, onClick: () => go("restricted", "mark") }} pick=${sel} onPick=${setSel} rowKey="id" rows=${rows}
         icon=${(r) => (r.kind === "folder" ? "FolderOutlined" : "FileOutlined")} name=${{ title: "Name", text: (r) => r.name, line: (r) => r.path }}
         cols=${[{ title: "Allowed", render: (r) => html`<${Tooltip} title=${KEEP[r.keep][1]}><span className="t2">${KEEP[r.keep][0]}</span><//>` },
           { title: "Covers", width: 150, bar: (r) => ({ v: r.files, max: mx, text: r.kind === "folder" ? `${fmt(r.files)} files` : "1 file" }) }]}
         now=${(r) => (r.n ? [r.n === 1 ? "A copy elsewhere" : `${fmt(r.n)} copies elsewhere`, "bad"] : ["Only where it belongs", "good"])}
         empty=${!mine.length ? html`<${Empty} icon="FileProtectOutlined" title="You have not marked anything" text="Mark a file or folder on your PC. It stays where it is and you keep using it; a copy anywhere else is caught." act=${ws ? "Mark files" : null} onAct=${() => go("restricted", "mark")} h=${200} />` : null} />
-      <${Panel} title="Copies found elsewhere" sub="worst first" flush style=${{ minHeight: LIST_H }}>
+      <${Panel} title="Copies found elsewhere" sub="worst first · click one to open its issue" flush style=${{ minHeight: LIST_H }}>
         ${copies.length ? copies.slice(0, 5).map((i) => html`<div key=${i.id} className="irow" role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto" }} onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)}>
             <i style=${{ background: SEV[i.sev].c }} /><span style=${{ minWidth: 0 }}><span className="ttl mono" style=${{ display: "block" }}>${i.subject}</span><span className="t3" style=${{ fontSize: 12 }}>on <span className="mono">${i.host}</span></span></span>
             <span className="mono t3" style=${{ fontSize: 11.5 }}>${dur(NOWH - i.at)} ago</span></div>`)
@@ -5371,10 +5412,7 @@ function RestrictedSU({ go, open }) {
         ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${copies.length - 5} what="copies" onClick=${() => go("accountability")} /></div>` : null}
       <//>
     </div>
-    ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; if (!k) return null; const n = copiesOf(k).length;
-      return html`<${Panel} title=${html`<span>Where it is · <span style=${{ fontWeight: 500 }}>${k.name}</span></span>`}
-        sub=${`${n ? `${n} cop${n === 1 ? "y" : "ies"} found elsewhere` : "only where it belongs"}${sel === k.id ? "" : " · the one with most copies · click one to see its own"}`}><${CopyMap} k=${k} ws=${ws} /><//>`; })()}
-    <${MarkDetail} k=${mine.find((k) => k.id === sel)} onClose=${() => setSel(null)} me=${ME} refresh=${refresh} go=${go} />
+    ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; return k ? html`<${MarkBoard} key=${k.id} k=${k} picked=${sel === k.id} go=${go} refresh=${refresh} onUnmarked=${() => setSel(null)} />` : null; })()}
   <//>`;
 }
 
@@ -5387,7 +5425,7 @@ function RolloutSU({ go, open }) {
     err: m.host === "OPS-06" ? "A file was in use" : m.host === "LOG-02" ? "Update share unreachable" : m.status === "offline" ? "Not checking in" : "A file was in use",
     next: m.status === "offline" ? "When it is back online" : "Next idle window", esc: m.host === "LOG-02" ? "Mon 09:30, to you" : null }));
   const rows = behind.filter((m) => `${m.host} ${m.user || ""} ${m.dn}`.toLowerCase().includes(q.toLowerCase()));
-  const on = MACHINES.length - behind.length, m = behind.find((x) => x.id === sel);
+  const on = MACHINES.length - behind.length, m = behind.find((x) => x.id === sel) || rows[0];
   const depts = FULL_DEPTS().map((d) => { const ms = MACHINES.filter((x) => x.dept === d.id); return { d, n: ms.length, ok: ms.filter((x) => x.ver === "1.4.2").length }; }).filter((x) => x.n).sort((a, b) => (a.ok / a.n) - (b.ok / b.n));
   return html`<${React.Fragment}>
     <${Strip} items=${[
@@ -5396,7 +5434,7 @@ function RolloutSU({ go, open }) {
       { label: "Holding 1.4.3 back", value: fmt(behind.length), delta: behind.length ? "1.4.3 is ready and waits on them" : "1.4.3 can be approved", dc: behind.length ? "var(--crit)" : "var(--ok)" },
       { label: "Failed installs, 7 days", value: MACHINES.length ? "3" : "0", delta: MACHINES.length ? "OPS-06 twice, LOG-02 once" : "none" }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Holding the gate" sub="machines not yet on 1.4.2 · click one to open it" q=${q} setQ=${setQ} placeholder="Filter by machine or department"
+      <${ListPanel} title="Holding the gate" sub="machines not yet on 1.4.2 · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter by machine or department"
         pick=${sel} onPick=${setSel} rowKey="id" rows=${rows} icon="DesktopOutlined" name=${{ title: "Machine", text: (x) => x.host, line: (x) => `${x.user || "No one signed in"} · ${x.dn}` }}
         cols=${[{ title: "Running", width: 100, text: (x) => x.ver }, { title: "Last error", width: 230, text: (x) => x.err }, { title: "Next try", width: 190, text: (x) => x.next }]}
         now=${(x) => (x.esc ? ["Escalated to you", "bad"] : x.status === "offline" ? ["Offline", "bad"] : ["Retrying", "wait"])}
@@ -5405,13 +5443,13 @@ function RolloutSU({ go, open }) {
         items=${depts.map((x) => ({ key: x.d.id, title: x.d.name, line: `${fmt(x.ok)} of ${fmt(x.n)} on 1.4.2${x.d.admins.length ? "" : " · no Admin"}`, right: `${Math.round((x.ok / x.n) * 100)}%`, c: x.ok === x.n ? "var(--ok)" : "var(--crit)", onClick: () => go("departments", x.d.id) }))}
         empty=${html`<${Empty} icon="ApartmentOutlined" title="No machines yet" text="Each department's progress appears here." h=${200} />`} />
     </div>
+    <${ItemBoard} picked=${!!sel} open=${!!m} onClose=${() => setSel(null)} title=${m ? m.host : ""}
+      facts=${m ? [["Running", m.ver], ["Should run", "1.4.2"], ["Attempts", m.tries], ["Last error", m.err], ["Escalated", m.esc || "No"], ["Next try", m.next], ["Department", m.dn]] : []}
+      actions=${m ? html`<${Button} onClick=${() => toast(`Left ${m.host} out of the 1.4.3 gate, with your reason (concept)`)}>Leave it out of the gate<//><${Button} type="primary" disabled=${m.status === "offline"} onClick=${() => toast(`Retrying on ${m.host} (concept)`)}>Retry now<//>` : null} />
     <${Panel} title="Machines on 1.4.2" sub="since it was approved · the gap to the goal is the machines holding 1.4.3 back"
       extra=${html`<${Tooltip} title=${behind.length ? "A version is approved only when every machine runs the one before it." : ""}><span><${Button} size="small" type="primary" disabled=${!!behind.length} onClick=${() => toast("Approved 1.4.3 (concept)")}>Approve 1.4.3<//></span><//>`}>
       ${MACHINES.length ? html`<${Adoption} />` : html`<${Empty} icon="CloudUploadOutlined" title="No machines yet" text="How many machines run the current version, day by day." h=${220} />`}
     <//>
-    <${InfoDrawer} open=${!!m} onClose=${() => setSel(null)} title=${m ? m.host : ""}
-      facts=${m ? [["Running", m.ver], ["Should run", "1.4.2"], ["Attempts", m.tries], ["Last error", m.err], ["Escalated", m.esc || "No"], ["Next try", m.next], ["Department", m.dn]] : []}
-      actions=${m ? html`<${Button} onClick=${() => toast(`Left ${m.host} out of the 1.4.3 gate, with your reason (concept)`)}>Leave it out of the gate<//><${Button} type="primary" disabled=${m.status === "offline"} onClick=${() => toast(`Retrying on ${m.host} (concept)`)}>Retry now<//>` : null} />
   <//>`;
 }
 function AuditSU({ range, go, open }) {
@@ -5421,7 +5459,7 @@ function AuditSU({ range, go, open }) {
   const [q, setQ] = useState("");
   const R = RANGES[range], base = AUDIT.filter((e) => e.t >= R.a);
   const shown = base.filter((e) => (!kind || e.kind === kind) && (!brush || (e.t >= brush[0] && e.t < brush[1])) && `${e.what} ${e.actor} ${e.host}`.toLowerCase().includes(q.toLowerCase())).slice().reverse().map((e) => ({ ...e, rid: String(e.id) }));
-  const e = sel != null ? base.find((x) => String(x.id) === String(sel)) : null;
+  const e = (sel != null ? base.find((x) => String(x.id) === String(sel)) : null) || shown[0];
   const when = (t) => (t >= 0 && t < 24 ? hhmm(t) : `${dayOf(t)} ${hhmm(t)}`);
   return html`<${React.Fragment}>
     <${Strip} items=${[
@@ -5430,7 +5468,7 @@ function AuditSU({ range, go, open }) {
       { label: "Violations", value: fmt(base.filter((x) => x.kind === "violation").length), delta: "restricted files found elsewhere", dc: base.some((x) => x.kind === "violation") ? "var(--crit)" : undefined },
       { label: "Kept for", value: "90", unit: "days", delta: "the oldest go in 3 days" }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title=${kind ? KINDS[kind].w : "Everything that happened"} sub=${`${fmt(shown.length)} · newest first · click one to open it`} q=${q} setQ=${setQ} placeholder="Filter by what, who or machine"
+      <${ListPanel} title=${kind ? KINDS[kind].w : "Everything that happened"} sub=${`${fmt(shown.length)} · newest first · click one to see it below`} q=${q} setQ=${setQ} placeholder="Filter by what, who or machine"
         action=${{ label: "Export", icon: "DownloadOutlined", plain: true, onClick: () => toast(`Exported ${shown.length} entries as CSV (concept)`) }} pick=${sel != null ? String(sel) : null} onPick=${setSel} rowKey="rid" rows=${shown}
         icon="HistoryOutlined" name=${{ title: "What happened", text: (x) => x.what, line: (x) => `${x.actor} · ${x.host}` }}
         cols=${[{ title: "When", width: 120, text: (x) => when(x.t) }]} nowTitle="Kind" now=${(x) => [KINDS[x.kind].w, KINDS[x.kind].c]}
@@ -5438,12 +5476,12 @@ function AuditSU({ range, go, open }) {
       <${RailPanel} title="Kinds" sub="in this period · click one to show only it" max=${7}
         items=${Object.keys(KINDS).map((k) => ({ key: k, title: KINDS[k].w, right: fmt(base.filter((x) => x.kind === k).length), c: KINDS[k].c, on: kind === k, onClick: () => setKind(kind === k ? null : k) }))} empty=${null} />
     </div>
+    <${ItemBoard} picked=${!!sel} open=${!!e} onClose=${() => setSel(null)} title=${e ? e.what : ""}
+      facts=${e ? [["When", e.t >= 0 && e.t < 24 ? "Today " + hhmm(e.t) : `${dayOf(e.t)} ${hhmm(e.t)}`], ["Who", e.actor], ["Machine", html`<span className="mono">${e.host}</span>`], ["Kind", KINDS[e.kind].w]] : []}
+      actions=${e && MBY[e.host] ? html`<${Button} onClick=${() => go("machines", e.host)}>Open the machine<//>` : null} />
     <${Panel} title="Events over time" sub=${brush ? `selected ${fmtT(brush[0], range)} – ${hhmm(brush[1])}` : "drag across the chart to narrow the list"} extra=${brush ? html`<${Button} size="small" onClick=${() => setBrush(null)}>Clear selection<//>` : null}>
       <${EventHistogram} entries=${AUDIT.filter((x) => !kind || x.kind === kind)} range=${range} brush=${brush} onBrush=${setBrush} height=${150} />
     <//>
-    <${InfoDrawer} open=${!!e} onClose=${() => setSel(null)} title=${e ? e.what : ""}
-      facts=${e ? [["When", e.t >= 0 && e.t < 24 ? "Today " + hhmm(e.t) : `${dayOf(e.t)} ${hhmm(e.t)}`], ["Who", e.actor], ["Machine", html`<span className="mono">${e.host}</span>`], ["Kind", KINDS[e.kind].w]] : []}
-      actions=${e && MBY[e.host] ? html`<${Button} onClick=${() => go("machines", e.host)}>Open the machine<//>` : null} />
   <//>`;
 }
 
@@ -5457,7 +5495,7 @@ function DepartmentsPage({ go, enter, open }) {
     .sort((a, b) => a.rank - b.rank);
   const rows = all.filter((d) => `${d.name} ${d.admins.join(" ")}`.toLowerCase().includes(q.toLowerCase()));
   const admins = Object.entries(ADMIN_INFO).filter(([, a]) => depts.some((d) => d.id === a.dept));
-  const d = all.find((x) => x.id === sel), st = d ? deptStats(d) : null;
+  const d = all.find((x) => x.id === sel) || rows[0], st = d ? deptStats(d) : null;
   return html`<${React.Fragment}>
     <${Strip} items=${[
       { label: "Departments", value: fmt(depts.length), delta: `${fmt(admins.length)} Admins between them` },
@@ -5465,7 +5503,7 @@ function DepartmentsPage({ go, enter, open }) {
       { label: "Machines online", value: fmt(MACHINES.length - off), unit: "/ " + fmt(MACHINES.length), delta: off ? `${fmt(off)} offline` : "all online" },
       { label: "Open issues", value: fmt(ISSUES.length), delta: `${ISSUES.filter((i) => i.sev === "critical").length} critical`, dc: ISSUES.some((i) => i.sev === "critical") ? "var(--crit)" : undefined }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Departments" sub="what needs you first · click one to open it" q=${q} setQ=${setQ} placeholder="Filter by department or Admin"
+      <${ListPanel} title="Departments" sub="what needs you first · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter by department or Admin"
         action=${{ label: "New department", onClick: () => toast("New department (concept)") }} pick=${sel} onPick=${setSel} rowKey="id" rows=${rows}
         icon="ApartmentOutlined" name=${{ title: "Department", text: (r) => r.name, line: (r) => `${fmt(r.ms.length)} machine${r.ms.length === 1 ? "" : "s"}` }}
         cols=${[{ title: "Admins", text: (r) => (r.admins.length ? listNames(r.admins) : "None") },
@@ -5477,8 +5515,7 @@ function DepartmentsPage({ go, enter, open }) {
         items=${admins.map(([n, a]) => ({ key: n, title: n, line: `${deptNameOf(a.dept)} · ${a.busy ? a.now.replace(/^Inside/, "inside").replace(/ since.*$/, "") : "at their desk"}`, right: a.ws, c: a.busy ? "var(--s3)" : "var(--ok)", onClick: () => enter(n) }))}
         empty=${html`<${Empty} icon="UserOutlined" title="No Admins yet" text="Each Admin appears here once appointed to a department." h=${200} />`} />
     </div>
-    <${OrgDay} go=${go} />
-    <${InfoDrawer} open=${!!d} onClose=${() => setSel(null)} title=${d ? d.name : ""}
+    <${ItemBoard} picked=${!!sel} open=${!!d} onClose=${() => setSel(null)} title=${d ? d.name : ""}
       facts=${d ? [["Admins", d.admins.length ? listNames(d.admins, 3) : html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`], ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
         ["Open issues", d.iss.length ? `${fmt(d.iss.length)}${d.crit ? ` · ${d.crit} critical` : ""}` : "None"], ["Reports handled in", st.mtta || "—"], ["On 1.4.2", `${fmt(d.ok)} of ${fmt(d.ms.length)}`]] : []}
       actions=${d ? html`${d.admins.length ? d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} onClick=${() => enter(a)}>Enter ${a}'s console<//>`) : html`<${Button} type="primary" onClick=${() => go("overview")}>Appoint an Admin<//>`}<${Button} type=${d.admins.length ? "primary" : "default"} onClick=${() => go("dept", d.id)}>Department page<//>` : null}>
@@ -5486,6 +5523,7 @@ function DepartmentsPage({ go, enter, open }) {
         <div><div className="nt-h">Worst open issues</div>${d.iss.length ? d.iss.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]).slice(0, 5).map((i) => html`<div key=${i.id} className="irow" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto", padding: "7px 0" }} role="button" tabIndex="0" onClick=${() => go("issues", i.id)}>
           <i style=${{ background: SEV[i.sev].c }} /><span className="ttl">${i.title}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${i.host}</span></div>`) : html`<div className="t3">Nothing open.</div>`}</div>` : null}
     <//>
+    <${OrgDay} go=${go} />
   <//>`;
 }
 function AccessPage({ go, open }) {
@@ -5494,7 +5532,7 @@ function AccessPage({ go, open }) {
   const all = LANES.flatMap((l) => l.blocks.map((b, i) => ({ id: `${l.host}:${i}`, host: l.host, b })).filter((x) => x.b[2] !== "own"));
   const rows = all.filter((x) => `${x.host} ${x.b[3]}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (b.b[1] >= NOWH) - (a.b[1] >= NOWH) || b.b[0] - a.b[0]);
   const ownerOf = (h) => (laneOf(h).blocks.find((x) => x[2] === "own") || [0, 0, 0, MBY[h] && MBY[h].user ? MBY[h].user : "nobody"])[3];
-  const x = all.find((y) => y.id === sel);
+  const x = all.find((y) => y.id === sel) || rows[0];
   return html`<${React.Fragment}>
     <${Strip} items=${[
       { label: "Inside a machine now", value: fmt(all.filter((y) => y.b[1] >= NOWH).length), delta: all.filter((y) => y.b[1] >= NOWH).map((y) => `${y.b[3] === "You" ? "you" : y.b[3]} on ${y.host}`).slice(0, 2).join(" · ") },
@@ -5502,7 +5540,7 @@ function AccessPage({ go, open }) {
       { label: "At night, this week", value: "3", delta: "all A. Quaye, on Logistics machines", dc: "var(--crit)" },
       { label: "Assisted access, this week", value: fmt(ASSIST.length), delta: `${ASSIST.filter((a) => a.from !== a.wdept).length} across departments` }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Sessions today" sub="someone other than the owner, inside a machine · click one to open it" q=${q} setQ=${setQ} placeholder="Filter by machine or person"
+      <${ListPanel} title="Sessions today" sub="someone other than the owner, inside a machine · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter by machine or person"
         pick=${sel} onPick=${setSel} rowKey="id" rows=${rows} icon="LoginOutlined" name=${{ title: "Session", text: (y) => `${y.b[3]} on ${y.host}`, line: (y) => `${OCC[y.b[2]].w} · ${MBY[y.host] ? deptNameOf(MBY[y.host].dept) : ""}` }}
         cols=${[{ title: "Owner locked out", text: (y) => ownerOf(y.host) }, { title: "Started", width: 100, text: (y) => hhmm(y.b[0]) }, { title: "Length", width: 100, text: (y) => dur(Math.min(y.b[1], NOWH) - y.b[0]) }]}
         now=${(y) => (y.b[4] ? [y.b[1] >= NOWH ? "Inside now · at night" : "Ended · at night", "bad"] : y.b[1] >= NOWH ? ["Inside now", "good"] : ["Ended", "wait"])}
@@ -5511,10 +5549,10 @@ function AccessPage({ go, open }) {
         items=${ASSIST.map((a) => ({ key: a.id, title: `${a.helper} on ${a.machine}`, line: `${a.worker} asked · ${a.from !== a.wdept ? "across departments" : a.wdept} · ${lc(a.end)}`, right: devWhen(a.at).replace("Today ", ""), c: a.from !== a.wdept ? "var(--s3)" : "var(--s2)" }))}
         empty=${html`<${Empty} icon="TeamOutlined" title="Nobody has been let in" text="When a worker accepts help from an Admin, it appears here." h=${200} />`} />
     </div>
-    <${Occupancy} />
-    <${InfoDrawer} open=${!!x} onClose=${() => setSel(null)} title=${x ? `${x.b[3]} on ${x.host}` : ""}
+    <${ItemBoard} picked=${!!sel} open=${!!x} onClose=${() => setSel(null)} title=${x ? `${x.b[3]} on ${x.host}` : ""}
       facts=${x ? [["Kind", OCC[x.b[2]].w], ["From", hhmm(x.b[0])], ["Until", x.b[1] >= NOWH ? "now" : hhmm(x.b[1])], ["Owner locked out", ownerOf(x.host)], ["Department", MBY[x.host] ? deptNameOf(MBY[x.host].dept) : "—"], ...(x.b[4] ? [["Flag", html`<span style=${{ color: "var(--crit)" }}>Outside working hours</span>`]] : [])] : []}
       actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? html`<${Button} onClick=${() => go("machines", x.host)}>Open the machine<//>` : null} />
+    <${Occupancy} />
   <//>`;
 }
 const newKey = () => Array.from({ length: 32 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
@@ -5523,16 +5561,16 @@ function KeyModal({ spec, onClose }) {
   const [step, setStep] = useState(0), [name, setName] = useState(""), [dept, setDept] = useState(undefined), [key, setKey] = useState(newKey);
   const sig = spec ? spec.mode + (spec.subject || "") : "";
   useEffect(() => { if (spec) { setStep(spec.mode === "rekey" ? 1 : 0); setName(""); setDept(undefined); setKey(newKey()); } }, [sig]);
-  if (!spec) return html`<${Modal} open=${false} />`;
+  if (!spec) return html`<${Drawer} open=${false} />`;
   const rk = spec.mode === "rekey", pc = spec.mode === "pc", who = rk ? spec.subject : name.trim();
   const title = rk ? `New key for ${spec.subject}` : pc ? "Register a PC" : "Provision an Admin";
-  return html`<${Modal} open=${true} onCancel=${onClose} title=${title} width=${520}
+  return html`<${Drawer} open=${true} onClose=${onClose} title=${title} width=${480} maskClosable=${step === 0}
     footer=${step === 0 ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${onClose}>Cancel<//><${Button} type="primary" disabled=${!name.trim() || !dept} onClick=${() => { setStep(1); toast(`${name.trim()} registered, recorded in the audit log (concept)`); }}>${pc ? "Register" : "Provision"}<//></div>`
       : html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${onClose}>I have saved it<//></div>`}>
-    ${step === 0 ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <${Field} label=${pc ? "Machine name" : "Name"}><${Input} id="rg-name" value=${name} onChange=${(e) => setName(e.target.value)} placeholder=${pc ? "OPS-08" : "J. Owusu"} style=${{ maxWidth: 260 }} /><//>
-        <${Field} label="Department"><${Select} id="rg-dept" showSearch optionFilterProp="label" value=${dept} onChange=${setDept} placeholder="Which department?" style=${{ width: 260 }} options=${FULL_DEPTS().map((d) => ({ value: d.id, label: d.name }))} /><//>
-        <div className="t3" style=${{ fontSize: 12.5 }}>${pc ? "The machine joins the department and shows up in its fleet. It gets a key, shown once." : "They get a console and a key, shown once. The department's reports start reaching them once you route them."}</div>
+    ${step === 0 ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div><div className="nt-h">${pc ? "Machine name" : "Name"}</div><${Input} id="rg-name" value=${name} onChange=${(e) => setName(e.target.value)} placeholder=${pc ? "OPS-08" : "J. Owusu"} /></div>
+        <div><div className="nt-h">Department</div><${Select} id="rg-dept" showSearch optionFilterProp="label" value=${dept} onChange=${setDept} placeholder="Which department?" style=${{ width: "100%" }} options=${FULL_DEPTS().map((d) => ({ value: d.id, label: d.name }))} /></div>
+        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>${pc ? "The machine joins the department and shows up in its fleet. It gets a key, shown once." : "They get a console and a key, shown once. The department's reports start reaching them once you route them."}</div>
       </div>`
       : html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="t2">${rk ? `The old key for ${spec.subject} stops working at once.` : `${who} is registered.`} Copy this into ${rk || pc ? "the machine's Worker Client settings" : "their Operator Client settings"}.</div>
@@ -5556,7 +5594,7 @@ function Registry({ go, open }) {
     ...Object.entries(ADMIN_INFO).filter(([, a]) => FULL_DEPTS().some((d) => d.id === a.dept)).map(([n, a]) => ({ id: "acct:" + n, name: n, role: "Admin", dept: deptNameOf(a.dept), ws: a.ws, gen: 1 + (hs(n) % 3), now: a.now }))];
   const rows = MACHINES.map((m) => ({ ...m, id: m.host, gen: GEN[m.host] || 1, dn: deptNameOf(m.dept) })).filter((m) => `${m.host} ${m.user || ""} ${m.dn}`.toLowerCase().includes(q.toLowerCase()));
   const door = REFUSED.find((y) => y.id === sel);
-  const m = sel && MBY[sel] ? rows.find((y) => y.id === sel) || { ...MBY[sel], gen: GEN[sel] || 1, dn: deptNameOf(MBY[sel].dept) } : null, ac = accts.find((y) => y.id === sel);
+  const m = sel && MBY[sel] ? rows.find((y) => y.id === sel) || { ...MBY[sel], gen: GEN[sel] || 1, dn: deptNameOf(MBY[sel].dept) } : (sel ? null : rows[0]), ac = accts.find((y) => y.id === sel);
   const rekey = (n) => modal.confirm({ title: `Make a new key for ${n}?`, content: "The old key stops working at once. Whatever uses it has to be given the new one, which is shown once.", okText: "Make a new key", okButtonProps: { danger: true }, cancelText: "Keep the old one", onOk: () => setSpec({ mode: "rekey", subject: n }) });
   const off = MACHINES.filter((y) => y.status === "offline").length;
   return html`<${React.Fragment}>
@@ -5567,16 +5605,26 @@ function Registry({ go, open }) {
       { label: "Accounts", value: fmt(accts.length), delta: "you and every Admin" },
       { label: "Refused this week", value: fmt(REFUSED.length), delta: REFUSED.length ? `${fmt(REFUSED.reduce((t, y) => t + y.tries, 0))} tries without a valid key` : "nothing tried without a key", dc: REFUSED.some((y) => y.tone === "bad") ? "var(--crit)" : undefined }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Machines" sub="every machine has a key made here · click one to open it" q=${q} setQ=${setQ} placeholder="Filter by machine, person or department"
+      <${ListPanel} title="Machines" sub="every machine has a key made here · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter by machine, person or department"
         action=${{ label: "Register a PC", onClick: () => setSpec({ mode: "pc" }) }} pick=${sel} onPick=${setSel} rowKey="id" rows=${rows}
         icon="DesktopOutlined" name=${{ title: "Machine", text: (y) => y.host, line: (y) => `${y.user || "No one signed in"} · ${y.dn}` }}
         cols=${[{ title: "Version", width: 100, text: (y) => y.ver }, { title: "Key", width: 90, text: (y) => `no. ${y.gen}` }, { title: "Last seen", width: 120, text: (y) => (y.seen > 0.1 ? dur(y.seen) + " ago" : "now") }]}
         now=${(y) => (y.status === "offline" ? ["Not checking in", "bad"] : y.ver !== "1.4.2" ? ["A version behind", "wait"] : ["Checking in", "good"])}
         empty=${!MACHINES.length ? html`<${Empty} icon="DesktopOutlined" title="No machines yet" text="Register a PC to give it a department and a key. It shows up here and in its department." act="Register a PC" onAct=${() => setSpec({ mode: "pc" })} h=${200} />` : null} />
-      <${RailPanel} title="Accounts" sub="click one for its key" more="accounts" extra=${html`<${Button} size="small" onClick=${() => setSpec({ mode: "admin" })}>Provision an Admin<//>`}
+      <${RailPanel} title="Accounts" sub="click one to see it below" more="accounts" extra=${html`<${Button} size="small" onClick=${() => setSpec({ mode: "admin" })}>Provision an Admin<//>`}
         items=${accts.map((a) => ({ key: a.id, title: a.name, line: `${a.role} · ${a.dept}`, right: `key ${a.gen}`, c: a.role === "Super User" ? "var(--accent)" : "var(--s3)", on: sel === a.id, onClick: () => setSel(a.id) }))} empty=${null} />
     </div>
-    <${Panel} flush title="Refused connections" sub="tried to connect this week without a valid key · click one to open it">
+    <${ItemBoard} picked=${!!sel} open=${!!door} onClose=${() => setSel(null)} title=${door ? door.host : ""}
+      facts=${door ? [["Address", html`<span className="mono">${door.ip}</span>`], ["Refused because", door.why[0].toUpperCase() + door.why.slice(1)], ["Tries this week", fmt(door.tries)], ["Last try", door.last]] : []}
+      actions=${door ? html`<${Button} onClick=${() => toast(`Blocked ${door.ip} (concept)`)}>Block this address<//>${door.why.startsWith("not registered") ? html`<${Button} type="primary" onClick=${() => setSpec({ mode: "pc" })}>Register this PC<//>` : html`<${Button} type="primary" danger onClick=${() => rekey(door.host.replace("Claims to be ", ""))}>Make a new key<//>`}` : null}>
+      ${door ? html`<div className="t2" style=${{ fontSize: 13 }}>${door.say}</div>` : null}
+    <//>
+    <${ItemBoard} picked=${!!sel} open=${!!(m || ac)} onClose=${() => setSel(null)} title=${m ? m.host : ac ? ac.name : ""}
+      facts=${m ? [["Department", m.dn], ["Signed in", m.user || "No one"], ["IP address", html`<span className="mono">${m.ip}</span>`], ["Version", m.ver], ["Key", `no. ${m.gen}`], ["Last seen", m.seen > 0.1 ? dur(m.seen) + " ago" : "now"]]
+        : ac ? [["Role", ac.role], ["Department", ac.dept], ["Workstation", html`<span className="mono">${ac.ws}</span>`], ["Key", `no. ${ac.gen}`], ["Now", ac.now]] : []}
+      actions=${m ? html`<${Button} onClick=${() => go("machines", m.host)}>Open its page<//><${Button} type="primary" danger onClick=${() => rekey(m.host)}>Make a new key<//>`
+        : ac ? html`${ac.role === "Admin" ? html`<${Button} danger onClick=${() => toast(`Removed ${ac.name} (concept)`)}>Stop being an Admin<//>` : null}<${Button} type="primary" danger onClick=${() => rekey(ac.name === "You" ? "your account" : ac.name)}>Make a new key<//>` : null} />
+    <${Panel} flush title="Refused connections" sub="tried to connect this week without a valid key · click one to see it below">
       ${REFUSED.length ? html`<div className="scroll-x"><${Table} size="middle" pagination=${false} dataSource=${REFUSED.map((y) => ({ ...y, key: y.id }))}
         rowClassName=${(y) => "clickrow" + (y.id === sel ? " sel" : "")} onRow=${(y) => ({ onClick: () => setSel(y.id) })} columns=${[
         { title: "Who tried", render: (y) => html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}><span className="t3" style=${{ marginTop: 2 }}>${ic("StopOutlined")}</span>
@@ -5587,16 +5635,6 @@ function Registry({ go, open }) {
         { title: "Now", width: 220, render: (y) => html`<span className="st nowrap" style=${{ "--c": y.tone === "bad" ? "var(--crit)" : "var(--text-4)" }}><i />${y.now}</span>` }]} /></div>`
       : html`<${Empty} icon="SafetyOutlined" title="Nothing was refused this week" text="A machine that tries to connect without a valid key is turned away and shows here: one nobody registered, one with an old key, or one using another machine's name." h=${150} />`}
     <//>
-    <${InfoDrawer} open=${!!door} onClose=${() => setSel(null)} title=${door ? door.host : ""}
-      facts=${door ? [["Address", html`<span className="mono">${door.ip}</span>`], ["Refused because", door.why[0].toUpperCase() + door.why.slice(1)], ["Tries this week", fmt(door.tries)], ["Last try", door.last]] : []}
-      actions=${door ? html`<${Button} onClick=${() => toast(`Blocked ${door.ip} (concept)`)}>Block this address<//>${door.why.startsWith("not registered") ? html`<${Button} type="primary" onClick=${() => setSpec({ mode: "pc" })}>Register this PC<//>` : html`<${Button} type="primary" danger onClick=${() => rekey(door.host.replace("Claims to be ", ""))}>Make a new key<//>`}` : null}>
-      ${door ? html`<div className="t2" style=${{ fontSize: 13 }}>${door.say}</div>` : null}
-    <//>
-    <${InfoDrawer} open=${!!(m || ac)} onClose=${() => setSel(null)} title=${m ? m.host : ac ? ac.name : ""}
-      facts=${m ? [["Department", m.dn], ["Signed in", m.user || "No one"], ["IP address", html`<span className="mono">${m.ip}</span>`], ["Version", m.ver], ["Key", `no. ${m.gen}`], ["Last seen", m.seen > 0.1 ? dur(m.seen) + " ago" : "now"]]
-        : ac ? [["Role", ac.role], ["Department", ac.dept], ["Workstation", html`<span className="mono">${ac.ws}</span>`], ["Key", `no. ${ac.gen}`], ["Now", ac.now]] : []}
-      actions=${m ? html`<${Button} onClick=${() => go("machines", m.host)}>Open its page<//><${Button} type="primary" danger onClick=${() => rekey(m.host)}>Make a new key<//>`
-        : ac ? html`${ac.role === "Admin" ? html`<${Button} danger onClick=${() => toast(`Removed ${ac.name} (concept)`)}>Stop being an Admin<//>` : null}<${Button} type="primary" danger onClick=${() => rekey(ac.name === "You" ? "your account" : ac.name)}>Make a new key<//>` : null} />
     <${KeyModal} spec=${spec} onClose=${() => setSpec(null)} />
   <//>`;
 }
@@ -5613,7 +5651,7 @@ function ReportsSU({ go, enter, open }) {
   const rows = R.filter((r) => (!view || state(r) === view) && `${r.cat} ${r.what} ${r.host} ${deptNameOf(r.dept)}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => order[state(a)] - order[state(b)]);
   const depts = FULL_DEPTS().filter((d) => d.admins.length).map((d) => { const mine = R.filter((r) => r.dept === d.id && owner(r) === "dept"), done = mine.filter((r) => r.addressed && r.addressed.took), t = done.map((r) => r.addressed.took).sort((a, b) => a - b);
     return { d, wait: mine.filter((r) => !r.addressed).length, done: done.length, med: t.length ? t[t.length >> 1] : null }; }).sort((a, b) => b.wait - a.wait);
-  const r = R.find((x) => x.id === sel);
+  const r = R.find((x) => x.id === sel) || rows[0];
   const written = (x) => x.when || (x.at != null ? devWhen(x.at) : "this week");
   return html`<${React.Fragment}>
     <${Strip} on=${view} onPick=${setView} items=${[
@@ -5622,7 +5660,7 @@ function ReportsSU({ go, enter, open }) {
       { key: "done", label: "Addressed", value: fmt(R.filter((x) => x.addressed).length), delta: "this week" },
       { label: "Typical time to address", value: med == null ? "—" : mins(med), delta: "target 1 hour", dc: med > 60 ? "var(--med)" : undefined }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Reports" sub="what waits on you first · click one to open it" q=${q} setQ=${setQ} placeholder="Filter by kind, machine or department"
+      <${ListPanel} title="Reports" sub="what waits on you first · click one to see it below" q=${q} setQ=${setQ} placeholder="Filter by kind, machine or department"
         pick=${sel} onPick=${setSel} rowKey="id" rows=${rows} icon=${(x) => REPORT_CATS[x.cat].icon} name=${{ title: "Report", text: (x) => x.cat, line: (x) => `${x.id} · ${x.host}` }}
         cols=${[{ title: "What", width: 260, text: (x) => x.what }, { title: "Goes to", width: 170, text: (x) => (owner(x) === "dept" ? `You and ${deptNameOf(x.dept)}` : "You only") }, { title: "Written", width: 110, text: written }]}
         now=${(x) => (state(x) === "done" ? [`Addressed · ${x.addressed.by}`, "good"] : state(x) === "dept" ? ["With the department", "wait"] : ["Waiting on you", "bad"])}
@@ -5631,11 +5669,11 @@ function ReportsSU({ go, enter, open }) {
         items=${depts.map((x) => ({ key: x.d.id, title: x.d.name, line: `${x.wait} waiting · ${x.done} addressed`, right: x.med == null ? "—" : mins(x.med), c: x.med != null && x.med > 60 ? "var(--med)" : "var(--ok)", onClick: () => go("departments", x.d.id) }))}
         empty=${html`<${Empty} icon="ApartmentOutlined" title="No department handles reports yet" text="Route a kind of report to a department with an Admin, below." h=${200} />`} />
     </div>
-    <${Govern} part="routing" go=${go} enter=${enter} />
-    <${InfoDrawer} open=${!!r} onClose=${() => setSel(null)} title=${r ? r.cat : ""}
+    <${ItemBoard} picked=${!!sel} open=${!!r} onClose=${() => setSel(null)} title=${r ? r.cat : ""}
       facts=${r ? [["What", r.what], ["Source", html`<span className="mono">${r.host}</span> · ${deptNameOf(r.dept)}`], ["Written", written(r)], ["Goes to", owner(r) === "dept" ? `You and ${deptNameOf(r.dept)}` : owner(r) === "fixed" ? "You only · never routed, it is about an Admin" : owner(r) === "noadmin" ? `You only · ${deptNameOf(r.dept)} has no Admin` : `You only · not routed to ${deptNameOf(r.dept)}`],
         ["Addressed", r.addressed ? `${r.addressed.by}${r.addressed.took ? ` · took ${mins(r.addressed.took)}` : ""}` : "Not yet"]] : []}
       actions=${r && !r.addressed ? html`${owner(r) === "dept" ? html`<${Button} onClick=${() => toast(`Prompted ${listNames(DBY[r.dept] ? DBY[r.dept].admins : [])} (concept)`)}>Prompt the department<//>` : null}<${Button} type="primary" onClick=${() => { dtChange(() => { r.addressed = { by: "You" }; }); toast("Marked addressed · recorded with your name (concept)"); }}>Mark addressed<//>` : null} />
+    <${Govern} part="routing" go=${go} enter=${enter} />
   <//>`;
 }
 // The Overview: what is waiting on you, the fleet, and this week's deviations. Everything opens something.
@@ -5784,7 +5822,7 @@ function App() {
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
   else if (page === "tasks") body = !level && (!sub || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${GivenToDepts} go=${go} open=${sub} />` : sub === "new" ? html`<${NewTask} go=${go} />` : sub && TASKS.find((t) => t.id === sub) ? html`<${TaskDetail} id=${sub} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} />`;
   else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : level ? html`<${Flows} go=${go} me=${level && level.admin} />` : html`<${FlowsSU} go=${go} open=${FBY[sub] ? sub : null} />`;
-  else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : level ? html`<${Restricted} go=${go} me=${ME} />` : html`<${RestrictedSU} go=${go} open=${sub} />`;
+  else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && ABY[sub] ? html`<${ActionDetail} key=${sub} id=${sub} go=${go} />` : html`<${Actions} go=${go} />`;
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : sub && RBY[sub] ? html`<${RuleDetail} id=${sub} go=${go} />` : html`<${Automation} go=${go} />`;
   else if (page === "rollout") body = level ? html`<${Rollout} />` : html`<${RolloutSU} go=${go} open=${sub} />`;
@@ -5792,7 +5830,7 @@ function App() {
   else body = level ? html`<${Reports} />` : html`<${ReportsSU} go=${go} enter=${setEntering} open=${sub} />`;
   const usesRange = (level ? ["overview", "machines", "audit"] : ["machines", "audit"]).includes(page);
   const parent = !level && SU_PARENT[page] && SU_PARENT[page] !== page ? SU_PARENT[page] : null;
-  const openSub = !level && !!sub && ((page === "tasks" && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || (page === "restricted" && sub !== "mark") || ["departments", "accountability", "reports", "access", "registry", "rollout", "audit"].includes(page) || (page === "rules" && !/^(new|from-|edit-)/.test(sub)));
+  const openSub = !!sub && (page === "restricted" ? sub !== "mark" : !level && ((page === "tasks" && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || ["departments", "accountability", "reports", "access", "registry", "rollout", "audit"].includes(page) || (page === "rules" && !/^(new|from-|edit-)/.test(sub))));
   const csub = openSub ? null : sub;
   const crumbSub = csub && page === "machines" ? html`<a onClick=${() => go("machines")}>Machines</a><span>/</span><b className="mono">${sub}</b>`
     : sub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span><b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>`
