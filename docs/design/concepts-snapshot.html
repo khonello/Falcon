@@ -5665,7 +5665,7 @@ function ReportsSU({ go, enter, open, me }) {
   const took = R.filter((r) => r.addressed && r.addressed.took).map((r) => r.addressed.took).sort((a, b) => a - b), med = took.length ? took[took.length >> 1] : null;
   const order = { you: 0, dept: 1, done: 2 };
   const [dept, setDept] = useState(null);
-  const [tab, setTab] = useState("reports"), [kc, setKc] = useState(null);
+  const [kc, setKc] = useState(null);
   const rows = R.filter((r) => (!view || state(r) === view) && (!dept || r.dept === dept) && `${r.cat} ${r.what} ${r.host} ${deptNameOf(r.dept)}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => order[state(a)] - order[state(b)]);
   const depts = FULL_DEPTS().filter((d) => d.admins.length).map((d) => { const mine = R.filter((r) => r.dept === d.id && owner(r) === "dept"), done = mine.filter((r) => r.addressed && r.addressed.took), t = done.map((r) => r.addressed.took).sort((a, b) => a - b);
     return { d, wait: mine.filter((r) => !r.addressed).length, done: done.length, med: t.length ? t[t.length >> 1] : null }; }).sort((a, b) => b.wait - a.wait);
@@ -5674,8 +5674,7 @@ function ReportsSU({ go, enter, open, me }) {
   if (me) return html`<${ReportsHere} me=${me} sel=${sel} setSel=${setSel} written=${written} />`;
   // where each kind goes: one row per kind; a kind's Admins can address it, so it stops waiting on you
   const kinds = [...new Set([...Object.keys(routingNow()), ...Object.keys(REPORT_CATS).filter((k) => REPORT_CATS[k].fixed)])].map((id) => ({ id }));
-  const kcur = kinds.find((x) => x.id === kc) || kinds[0];
-  const tabSw = html`<${Segmented} size="small" value=${tab} onChange=${setTab} options=${[{ value: "reports", label: "Reports" }, { value: "route", label: "Where they go" }]} />`;
+  const kcur = kinds.find((x) => x.id === kc) || (r && kinds.find((x) => x.id === r.cat)) || kinds[0];
   return html`<${React.Fragment}>
     <${Strip} on=${view} onPick=${setView} items=${[
       { key: "you", label: "Waiting on you", value: fmt(R.filter((x) => state(x) === "you").length), delta: "nobody below you can take them", dc: R.some((x) => state(x) === "you") ? "var(--crit)" : undefined },
@@ -5683,21 +5682,24 @@ function ReportsSU({ go, enter, open, me }) {
       { key: "done", label: "Addressed", value: fmt(R.filter((x) => x.addressed).length), delta: "this week" },
       { label: "Typical time to address", value: med == null ? "—" : mins(med), delta: "target 1 hour", dc: med > 60 ? "var(--med)" : undefined }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      ${tab === "route" ? html`<${ListPanel} title="Where reports go" sub="you get every report · click a kind to change who else does" tools=${tabSw}
-          pick=${kcur.id} onPick=${setKc} rowKey="id" rows=${kinds} icon=${(x) => REPORT_CATS[x.id].icon} name=${{ title: "Kind of report", text: (x) => x.id, line: (x) => REPORT_CATS[x.id].desc }}
-          cols=${[{ title: "Goes to", width: 230, text: (x) => (REPORT_CATS[x.id].fixed ? "You only, always" : (routingNow()[x.id] || []).length ? `You and ${listNames(routingNow()[x.id].map(deptNameOf))}` : "You only") },
-            { title: "This week", width: 90, text: (x) => fmt(R.filter((y) => y.cat === x.id).length) }]}
-          now=${(x) => { const w = routeWaits(x.id, routingNow()); return REPORT_CATS[x.id].fixed ? ["Yours to judge", "wait"] : w ? [`${w} waiting on you`, "bad"] : ["None waiting on you", "good"]; }} />`
-        : html`<${ListPanel} title="Reports" sub="waiting on you first · click one to see it on the right" q=${q} setQ=${setQ} placeholder="Filter by kind or machine"
-        tools=${html`${tabSw}<${Select} size="small" value=${dept || "all"} onChange=${(v) => setDept(v === "all" ? null : v)} style=${{ width: 160 }} popupMatchSelectWidth=${false} options=${[{ value: "all", label: "Every department" }, ...depts.map((x) => ({ value: x.d.id, label: `${x.d.name} · ${x.wait} waiting · ${x.med == null ? "—" : mins(x.med)}` }))]} />`}
-        pick=${sel} onPick=${setSel} rowKey="id" rows=${rows} icon=${(x) => REPORT_CATS[x.cat].icon} name=${{ title: "Report", text: (x) => x.cat, line: (x) => `${x.id} · ${x.host}` }}
+      <${ListPanel} title="Reports" sub="waiting on you first · click one to see it on the right" q=${q} setQ=${setQ} placeholder="Filter by kind or machine"
+        tools=${html`<${Select} size="small" value=${dept || "all"} onChange=${(v) => setDept(v === "all" ? null : v)} style=${{ width: 160 }} popupMatchSelectWidth=${false} options=${[{ value: "all", label: "Every department" }, ...depts.map((x) => ({ value: x.d.id, label: `${x.d.name} · ${x.wait} waiting · ${x.med == null ? "—" : mins(x.med)}` }))]} />`}
+        pick=${sel} onPick=${(id) => { setSel(id); setKc(null); }} rowKey="id" rows=${rows} icon=${(x) => REPORT_CATS[x.cat].icon} name=${{ title: "Report", text: (x) => x.cat, line: (x) => `${x.id} · ${x.host}` }}
         cols=${[{ title: "What", width: 260, text: (x) => x.what }, { title: "Goes to", width: 170, text: (x) => (owner(x) === "dept" ? `You and ${deptNameOf(x.dept)}` : "You only") }, { title: "Written", width: 110, text: written }]}
         now=${(x) => (state(x) === "done" ? [`Addressed · ${x.addressed.by}`, "good"] : state(x) === "dept" ? ["With the department", "wait"] : ["Waiting on you", "bad"])}
-        empty=${!R.length ? html`<${Empty} icon="FileTextOutlined" title="No reports yet" text="The system writes a report when something needs a person. Each one, where it went and how fast it was dealt with appears here." h=${200} />` : null} />`}
-      ${tab === "route" ? html`<${RoutingSide} key=${kcur.id} c=${kcur.id} />` : r ? html`<${SidePanel} title=${r.cat} sub=${sel ? "the one you picked" : "the first in the list · click another"}
+        empty=${!R.length ? html`<${Empty} icon="FileTextOutlined" title="No reports yet" text="The system writes a report when something needs a person. Each one, where it went and how fast it was dealt with appears here." h=${200} />` : null} />
+      ${r ? html`<${SidePanel} title=${r.cat} sub=${sel ? "the one you picked" : "the first in the list · click another"}
       facts=${r ? [["What", r.what], ["Source", html`<span className="mono">${r.host}</span> · ${deptNameOf(r.dept)}`], ["Written", written(r)], ["Goes to", owner(r) === "dept" ? `You and ${deptNameOf(r.dept)}` : owner(r) === "fixed" ? "You only · never routed, it is about an Admin" : owner(r) === "noadmin" ? `You only · ${deptNameOf(r.dept)} has no Admin` : `You only · not routed to ${deptNameOf(r.dept)}`],
         ["Addressed", r.addressed ? `${r.addressed.by}${r.addressed.took ? ` · took ${mins(r.addressed.took)}` : ""}` : "Not yet"]] : []}
       actions=${r && !r.addressed ? html`${owner(r) === "dept" ? html`<${Button} onClick=${() => toast(`Prompted ${listNames(DBY[r.dept] ? DBY[r.dept].admins : [])} (concept)`)}>Prompt the department<//>` : null}<${Button} type="primary" onClick=${() => { dtChange(() => { r.addressed = { by: "You" }; }); toast("Marked addressed · recorded with your name (concept)"); }}>Mark addressed<//>` : null} />` : html`<${SidePanel} empty=${html`<${Empty} icon="FileTextOutlined" title="Nothing picked" text="Pick a report in the list." h=${200} />`} />`}
+    </div>
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <${ListPanel} title="Where reports go" sub=${kc ? "the kind you picked · click another to change who gets it" : "showing the kind of the report you picked above · click a kind to change who gets it"}
+          pick=${kcur.id} onPick=${setKc} rowKey="id" rows=${kinds} icon=${(x) => REPORT_CATS[x.id].icon} name=${{ title: "Kind of report", text: (x) => x.id, line: (x) => REPORT_CATS[x.id].desc }}
+          cols=${[{ title: "Goes to", width: 230, text: (x) => (REPORT_CATS[x.id].fixed ? "You only, always" : (routingNow()[x.id] || []).length ? `You and ${listNames(routingNow()[x.id].map(deptNameOf))}` : "You only") },
+            { title: "This week", width: 90, text: (x) => fmt(R.filter((y) => y.cat === x.id).length) }]}
+          now=${(x) => { const w = routeWaits(x.id, routingNow()); return REPORT_CATS[x.id].fixed ? ["Yours to judge", "wait"] : w ? [`${w} waiting on you`, "bad"] : ["None waiting on you", "good"]; }} />
+      <${RoutingSide} key=${kcur.id} c=${kcur.id} />
     </div>
   <//>`;
 }
