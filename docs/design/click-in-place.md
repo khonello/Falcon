@@ -81,6 +81,15 @@ reached by *Open OPS-03's page →*.
 | | *Enter session* | asks first | ok | |
 | Flows, Restricted, Sessions, Rollout, Audit log, Reports | | | ok: already in place, or no links | |
 
+**Done (concept version 158):** every change in the table above. Tasks, Machines, Automation and Actions each select
+in place and show the item whole in a board under the list (the task's targets and verdict, the machine's facts
+with *Enter session* and *Open OPS-03's page →*, the rule's *How it works* and firings, the action's script and runs);
+their addresses (`#tasks/T-208`, `#automation/usb`, `#actions/temp`) now pick the item on the list page instead of
+opening a separate page. A re-run of the sweep in R. Mensah's console finds only frame links, links that name their
+page and end in "→", and editors' own buttons; picking an issue on Issues stays on Issues. Checked in headless Edge:
+Tasks, Machines, Automation, Actions and the Overview inside the console. Not click-tested: the row selections
+themselves, the Overview's expanding issue rows, a rule picked from *Runs today*.
+
 ## Count
 
 Rows in the tables above (a row can hold several clicks of one kind):
