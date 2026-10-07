@@ -3560,7 +3560,7 @@ const initials = (n) => n.split(/[ .]+/).filter(Boolean).map((x) => x[0]).join("
 function MiniTiles({ ms, go }) {
   const pk = pickShown(ms, 14);
   return html`<div className="row" style=${{ gap: 3, flexWrap: "nowrap" }}>${pk.shown.map((m) => { const k = HEALTH[m.status][0], t = TILE[k];
-    return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`} onClick=${(e) => { e.stopPropagation(); go("machines", m.host); }}
+    return html`<span key=${m.host} title=${`${m.host} · ${HEALTH[m.status][1]}${m.note && m.status !== "healthy" ? " · " + m.note : ""}`} onClick=${(e) => { e.stopPropagation(); go("registry", m.host); }}
       style=${{ position: "relative", width: 18, height: 18, borderRadius: 3, background: t.bg, border: t.border || (k === "quiet" || k === "watch" ? "1px solid var(--border-strong)" : "none"), cursor: "pointer" }}>
       ${t.dot ? html`<i style=${{ position: "absolute", right: -2, top: -2, width: 6, height: 6, borderRadius: "50%", background: t.dot, boxShadow: "0 0 0 1.5px var(--surface)" }} />` : null}</span>`; })}
     ${pk.rest ? html`<span className="t3 mono" style=${{ fontSize: 11, marginLeft: 3 }} title="none of them worse than these">+${pk.rest}</span>` : null}</div>`;
@@ -4713,7 +4713,7 @@ function DeptToday({ d, ms, go }) {
         <line x1=${L} x2=${L + pw} y1=${strip + 8} y2=${strip + 8} style=${{ stroke: "var(--border-strong)" }} />
         ${lanes.map(({ m, blocks }, i) => { const y = top + i * rowH, k = HEALTH[m.status][0], t = TILE[k];
           return html`<g key=${m.host}>
-            <g style=${{ cursor: "pointer" }} onClick=${() => go("machines", m.host)}>
+            <g style=${{ cursor: "pointer" }} onClick=${() => go("registry", m.host)}>
               <rect x="0" y=${y + 7} width="11" height="11" rx="2" style=${{ fill: t.bg === "transparent" ? "var(--surface)" : t.bg, stroke: k === "quiet" || k === "watch" || k === "offline" ? "var(--border-strong)" : "none" }} strokeDasharray=${k === "offline" ? "2 2" : "0"} />
               ${t.dot ? html`<circle cx="11" cy=${y + 7} r="3" style=${{ fill: t.dot, stroke: "var(--surface)" }} strokeWidth="1" />` : null}
               <text x="18" y=${y + 16.5} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${fitMid(m.host, 13)}<title>${m.host} · </title><title>${m.user || "no user"} · ${HEALTH[m.status][1]}</title></text>
@@ -4751,6 +4751,10 @@ function DeptPage({ id, go, enter }) {
   const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id);
   const [who, setWho] = useState(null);
   const x = deptStats(d);
+  // an issue opened from elsewhere arrives picked; the board under the panels shows it
+  const [isel, setIsel] = useState(() => { const p0 = DEPT_ISSUE_PRESET; DEPT_ISSUE_PRESET = null; return p0; });
+  const it = x.iss.find((i) => i.id === isel) || x.iss[0];
+  const mineCopy = !!it && it.type === "file" && (markOf(it) || {}).by === "Super User";
   // six issues and three Admins at a time; the panels keep their height whatever the department holds
   const ip = usePaged(x.iss, 6, id), ap = usePaged(d.admins, 3, id);
   const ledK = WORSTK(x.ms), ledC = ledK === "none" ? "var(--text-4)" : ledK === "quiet" ? "var(--ok)" : ledK === "watch" ? "var(--med)" : ledK === "offline" ? "var(--text-4)" : "var(--crit)";
@@ -4762,10 +4766,10 @@ function DeptPage({ id, go, enter }) {
         <${Button} size="small" onClick=${() => toast(`Nudged ${d.admins.join(" and ") || "nobody"} (concept)`)}>Nudge ${d.admins.length ? d.admins[0] : ""}<//></span>` : null}
     </div>
     <div className="g c-75" style=${{ alignItems: "stretch" }}>
-      <${Panel} title="Open issues" sub="worst first" flush extra=${html`<${Pager} p=${ip} />`}>
+      <${Panel} title="Open issues" sub="worst first · click one to see it below" flush extra=${html`<${Pager} p=${ip} />`}>
         <div style=${{ minHeight: ip.pages > 1 ? 6 * 37 : 0 }}>
         ${x.iss.length ? ip.items.map((i) => { const a = NOWH - i.at;
-          return html`<div key=${i.id} className="irow" role="button" tabIndex="0" onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)}>
+          return html`<div key=${i.id} className=${"irow" + (it && it.id === i.id ? " on" : "")} role="button" tabIndex="0" onClick=${() => setIsel(i.id)} onKeyDown=${(e) => e.key === "Enter" && setIsel(i.id)}>
             <i style=${{ background: SEV[i.sev].c }} />
             <span className="ttl">${i.title} <span className="t3">· ${i.subject}</span></span>
             <span className="mono t3">${i.host}</span>
@@ -4790,6 +4794,13 @@ function DeptPage({ id, go, enter }) {
               </div></div>`}
       <//>
     </div>
+    <${ItemBoard} open=${!!it} picked=${!!isel} title=${it ? it.title : ""} sub=${isel ? "the one you picked" : "the worst open issue · click another to see it here"}
+      facts=${it ? [["What", it.subject], ["Machine", html`<span className="mono">${it.host}</span>`], ["Found", devWhen(it.at)], ["Severity", SEV[it.sev].w], ["With", d.admins.length ? listNames(d.admins) : html`<span style=${{ color: "var(--crit)" }}>nobody · no Admin</span>`]] : []}
+      actions=${!it ? null : mineCopy ? html`<${Button} type="primary" onClick=${() => go("issues", it.id)}>Deal with it on Restricted<//>`
+        : d.admins.length ? d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a, { page: "issues", sub: it.id })}>Handle it in ${a}'s console<//>`)
+        : html`<${Button} type="primary" onClick=${() => go("overview")}>Decide it on Overview<//>`}>
+      <div className="t3" style=${{ fontSize: 12.5 }}>${mineCopy ? "A copy of a file you marked: it is yours to deal with, on Restricted, without entering anyone's console." : d.admins.length ? "Issues are worked in the department's own console. Entering it asks to block or end that Admin's session first." : `${d.name} has no Admin, so its issues wait on you as decisions on Overview.`}</div>
+    <//>
     <${DeptToday} key=${d.id} d=${d} ms=${x.ms} go=${go} />
   <//>`;
 }
@@ -5310,7 +5321,7 @@ function FlowsSU({ go, open }) {
 // The selected mark as a picture (6 Oct 2026): on the left the zone it is allowed in, drawn as a boundary
 // (the whole machine, or the one folder on it); on the right everywhere else, with a card for each copy found
 // there. Nothing found keeps the same shape. A copy card opens its issue.
-function CopyMap({ k, go, onChangeKeep }) {
+function CopyMap({ k, go, onChangeKeep, copy, onPick, acted = {} }) {
   const ref = useRef(null), w = Math.max(620, useWidth(ref, 900));
   const cs = copiesOf(k).sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at), shown = cs.slice(0, 3), more = cs.length - shown.length;
   const mine = k.host === (infoOf(ME) || {}).ws, whole = k.keep === "machine";
@@ -5338,25 +5349,34 @@ function CopyMap({ k, go, onChangeKeep }) {
       return html`<path key=${"e" + i.id} d=${`M${x1} ${fmid}C${m} ${fmid} ${m} ${y} ${ex - 7} ${y}`} fill="none" style=${{ stroke: "color-mix(in srgb, var(--crit) 55%, transparent)" }} strokeWidth="1.25" strokeDasharray="4 4" />
         <path key=${"a" + i.id} d=${`M${ex - 7} ${y - 3.5}L${ex} ${y}L${ex - 7} ${y + 3.5}Z`} style=${{ fill: "color-mix(in srgb, var(--crit) 55%, transparent)" }} />`; })}
     ${shown.map((i, j) => { const y = cy(j), m = MBY[i.host] || {};
-      return html`<g key=${i.id} style=${{ cursor: "pointer" }} onClick=${() => go("issues", i.id)}>
-        <rect x=${ex} y=${y} width=${cardW} height=${ch} rx="7" style=${{ fill: "var(--surface)", stroke: "color-mix(in srgb, var(--crit) 45%, var(--border-strong))" }} strokeWidth="1" />
+      return html`<g key=${i.id} style=${{ cursor: "pointer", opacity: acted[i.id] ? 0.55 : 1 }} onClick=${() => onPick && onPick(i.id)}>
+        <rect x=${ex} y=${y} width=${cardW} height=${ch} rx="7" style=${{ fill: "var(--surface)", stroke: copy === i.id ? "var(--text-2)" : "color-mix(in srgb, var(--crit) 45%, var(--border-strong))" }} strokeWidth=${copy === i.id ? 1.75 : 1} />
         <text x=${ex + 14} y=${y + 21} fontSize="12.5" fontWeight="600" style=${{ fill: "var(--text)", fontFamily: "var(--mono)" }}>${i.host}<tspan style=${{ fontFamily: "var(--sans)", fontWeight: 400, fill: "var(--text-3)" }}>  ${m.user ? `· ${m.user} was signed in` : "· nobody signed in"}</tspan></text>
         <text x=${ex + 14} y=${y + 39} fontSize="11" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${k.kind === "folder" ? html`<tspan style=${{ fill: "var(--text)" }}>${fitEnd(i.d.file, 26)}</tspan><tspan> in </tspan>` : null}${fitEnd(i.d.folder || "", Math.floor((cardW - 110) / 6.4) - (k.kind === "folder" ? Math.min(26, i.d.file.length) + 4 : 0))}<title>${k.kind === "folder" ? i.d.file + " in " : ""}${i.d.folder}</title></text>
         <text x=${ex + cardW - 14} y=${y + 21} textAnchor="end" fontSize="11" style=${{ fill: "var(--crit)" }}>${dur(NOWH - i.at)} ago</text>
-        <text x=${ex + cardW - 14} y=${y + 39} textAnchor="end" fontSize="11" style=${{ fill: "var(--text-3)" }}>open issue ›</text>
+        <text x=${ex + cardW - 14} y=${y + 39} textAnchor="end" fontSize="11" style=${{ fill: "var(--text-3)" }}>${acted[i.id] ? "dealt with" : copy === i.id ? "picked" : "deal with it ›"}</text>
       </g>`; })}
     ${!shown.length ? html`<g>
       <rect x=${ex} y=${zy} width=${cardW} height=${zh} rx="10" style=${{ fill: "transparent", stroke: "var(--border-strong)" }} strokeWidth="1.25" strokeDasharray="5 4" />
       <text x=${ex + cardW / 2} y=${zy + zh / 2 - 2} textAnchor="middle" fontSize="13" fontWeight="600" style=${{ fill: "var(--accent)" }}>No copy anywhere else</text>
       <text x=${ex + cardW / 2} y=${zy + zh / 2 + 16} textAnchor="middle" fontSize="11.5" style=${{ fill: "var(--text-3)" }}>watched on every machine, by content</text>
     </g>` : null}
-    ${more ? html`<text x=${ex} y=${H - 6} fontSize="11.5" style=${{ fill: "var(--accent)", cursor: "pointer" }} onClick=${() => go("issues")}>+${fmt(more)} more ${more === 1 ? "copy" : "copies"}, less serious · see them all on Issues ›</text>` : null}
+    ${more ? html`<text x=${ex} y=${H - 6} fontSize="11.5" style=${{ fill: "var(--text-3)" }}>+${fmt(more)} more ${more === 1 ? "copy" : "copies"}, less serious · all listed in Copies found elsewhere</text>` : null}
   </svg></div>`;
 }
 // The selected mark's board: the picture, the setting and Unmark in its header, the quiet facts under it.
-function MarkBoard({ k, picked, go, refresh, onUnmarked }) {
+function MarkBoard({ k, picked, go, refresh, onUnmarked, copy, setCopy }) {
   const [modal, modalCtx] = Modal.useModal();
   const n = copiesOf(k).length;
+  // a copy is dealt with here, on the board: ask whoever was signed in to delete it, delete it, or allow it there
+  const [acted, setActed] = useState({});
+  const [allowing, setAllowing] = useState(false);
+  const [why, setWhy] = useState("");
+  const cs0 = copiesOf(k), c = cs0.find((i) => i.id === copy);
+  const del = (i) => modal.confirm({ title: `Delete the copy on ${i.host}?`, okText: "Delete copy", okButtonProps: { danger: true }, cancelText: "Keep it",
+    content: `Only the copy in ${i.d.folder} on ${i.host} is deleted. ${k.name} on ${k.host} is not touched.`,
+    onOk: () => { setActed({ ...acted, [i.id]: `Deleted from ${i.host}` }); toast(`Deleted the copy on ${i.host} · recorded (concept)`); } });
+  const pick = (id) => { setCopy(id); setAllowing(false); setWhy(""); };
   const unmark = () => modal.confirm({ title: `Unmark ${k.name}?`, okText: "Unmark", okButtonProps: { danger: true }, cancelText: "Keep it marked",
     content: `Copies of ${k.kind === "folder" ? "the files in it" : "it"} are no longer looked for.${n ? ` The ${n === 1 ? "copy" : `${n} copies`} already found stay${n === 1 ? "s" : ""} an issue until resolved.` : ""} The audit log records that you did it.`,
     onOk: () => { dropMark(k.id); onUnmarked(); refresh(); toast(`Unmarked ${k.name} · recorded (concept)`); } });
@@ -5369,7 +5389,20 @@ function MarkBoard({ k, picked, go, refresh, onUnmarked }) {
   return html`<${Panel} title=${html`<span>Where it is · <span style=${{ fontWeight: 500 }}>${k.name}</span></span>`}
     sub=${`${n ? `${n} cop${n === 1 ? "y" : "ies"} found elsewhere` : "only where it belongs"}${picked ? "" : " · the one with most copies · pick another in the list"}`}
     extra=${html`${modalCtx}<${Button} size="small" danger onClick=${unmark}>Unmark<//>`}>
-    <${CopyMap} k=${k} go=${go} onChangeKeep=${changeKeep} />
+    <${CopyMap} k=${k} go=${go} onChangeKeep=${changeKeep} copy=${c ? c.id : null} onPick=${pick} acted=${acted} />
+    ${cs0.length ? html`<div className="row" style=${{ marginTop: 10, minHeight: 44, padding: "8px 12px", borderRadius: 6, background: "var(--surface-2)", gap: 14, flexWrap: "wrap" }}>
+      ${!c ? html`<span className="t3" style=${{ fontSize: 12.5 }}>Click a copy to deal with it: ask whoever was signed in to delete it, delete it, or allow it there.</span>`
+        : html`<span style=${{ minWidth: 0 }}><b className="mono" style=${{ fontWeight: 600 }}>${c.host}</b> <span className="t3">· ${c.d.file} in </span><span className="mono t3">${c.d.folder}</span></span>
+          <span className="sp" />
+          ${acted[c.id] ? html`<span style=${{ color: "var(--ok)", fontSize: 12.5 }}>${ic("CheckOutlined")} ${acted[c.id]}</span>`
+            : allowing ? html`<span className="row" style=${{ gap: 8, flexWrap: "nowrap" }}><${Input} size="small" autoFocus style=${{ width: 280 }} value=${why} onChange=${(e) => setWhy(e.target.value)} placeholder=${`Why may it be on ${c.host}? Recorded with it.`} />
+                <${Button} size="small" onClick=${() => { setAllowing(false); setWhy(""); }}>Cancel<//>
+                <${Button} size="small" type="primary" disabled=${!why.trim()} onClick=${() => { setActed({ ...acted, [c.id]: `Allowed on ${c.host}: “${why.trim()}”` }); setAllowing(false); setWhy(""); toast(`Allowed on ${c.host} · recorded (concept)`); }}>Allow it<//></span>`
+            : html`<span className="row" style=${{ gap: 16, fontSize: 12.5 }}>
+                ${(MBY[c.host] || {}).user && (MBY[c.host] || {}).status !== "offline" ? html`<a onClick=${() => { setActed({ ...acted, [c.id]: `Asked ${MBY[c.host].user} to delete it · closes on its own when the copy is gone` }); toast(`Asked ${MBY[c.host].user} (concept)`); }}>Ask ${MBY[c.host].user} to delete it</a>` : null}
+                <a onClick=${() => del(c)}>Delete this copy</a>
+                <a onClick=${() => setAllowing(true)}>Allow it on ${c.host}</a></span>`}`}
+    </div>` : null}
     <div className="row" style=${{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)", fontSize: 12, gap: 18 }}>
       <span className="t3"><span className="mono">${k.path}</span></span>
       <span className="t3">Marked ${k.at}</span>
@@ -5382,6 +5415,8 @@ function RestrictedSU({ go, open }) {
   const [, bump] = useState(0); const refresh = () => bump((n) => n + 1);
   const [sel, setSel0] = useState(open || null);
   const setSel = (id) => { setSel0(id); keepOpen("restricted", id); };
+  // the copy picked on the board; a copy opened from elsewhere arrives picked
+  const [copy, setCopy] = useState(() => { const p0 = COPY_PRESET; COPY_PRESET = null; return p0; });
   const [q, setQ] = useState("");
   const [modal, modalCtx] = Modal.useModal();
   const info = infoOf(ME), ws = info ? info.ws : null, mine = myMarks();
@@ -5404,15 +5439,15 @@ function RestrictedSU({ go, open }) {
           { title: "Covers", width: 150, bar: (r) => ({ v: r.files, max: mx, text: r.kind === "folder" ? `${fmt(r.files)} files` : "1 file" }) }]}
         now=${(r) => (r.n ? [r.n === 1 ? "A copy elsewhere" : `${fmt(r.n)} copies elsewhere`, "bad"] : ["Only where it belongs", "good"])}
         empty=${!mine.length ? html`<${Empty} icon="FileProtectOutlined" title="You have not marked anything" text="Mark a file or folder on your PC. It stays where it is and you keep using it; a copy anywhere else is caught." act=${ws ? "Mark files" : null} onAct=${() => go("restricted", "mark")} h=${200} />` : null} />
-      <${Panel} title="Copies found elsewhere" sub="worst first · click one to open its issue" flush style=${{ minHeight: LIST_H }}>
-        ${copies.length ? copies.slice(0, 5).map((i) => html`<div key=${i.id} className="irow" role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto" }} onClick=${() => go("issues", i.id)} onKeyDown=${(e) => e.key === "Enter" && go("issues", i.id)}>
+      <${Panel} title="Copies found elsewhere" sub="worst first · click one to deal with it below" flush style=${{ minHeight: LIST_H }}>
+        ${copies.length ? copies.slice(0, 5).map((i) => html`<div key=${i.id} className=${"irow" + (copy === i.id ? " on" : "")} role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto" }} onClick=${() => { const mk = markOf(i); if (mk) { setSel(mk.id); setCopy(i.id); } }} onKeyDown=${(e) => { const mk = markOf(i); if (e.key === "Enter" && mk) { setSel(mk.id); setCopy(i.id); } }}>
             <i style=${{ background: SEV[i.sev].c }} /><span style=${{ minWidth: 0 }}><span className="ttl mono" style=${{ display: "block" }}>${i.subject}</span><span className="t3" style=${{ fontSize: 12 }}>on <span className="mono">${i.host}</span></span></span>
             <span className="mono t3" style=${{ fontSize: 11.5 }}>${dur(NOWH - i.at)} ago</span></div>`)
           : html`<${Empty} icon="CheckOutlined" title="None found" text="A copy of something you marked, found where it is not allowed, appears here. It is never deleted for you." h=${170} />`}
         ${copies.length > 5 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${copies.length - 5} what="copies" onClick=${() => go("accountability")} /></div>` : null}
       <//>
     </div>
-    ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; return k ? html`<${MarkBoard} key=${k.id} k=${k} picked=${sel === k.id} go=${go} refresh=${refresh} onUnmarked=${() => setSel(null)} />` : null; })()}
+    ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; return k ? html`<${MarkBoard} key=${k.id} k=${k} picked=${sel === k.id} go=${go} refresh=${refresh} onUnmarked=${() => setSel(null)} copy=${copy} setCopy=${setCopy} />` : null; })()}
   <//>`;
 }
 
@@ -5478,7 +5513,7 @@ function AuditSU({ range, go, open }) {
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!e} onClose=${() => setSel(null)} title=${e ? e.what : ""}
       facts=${e ? [["When", e.t >= 0 && e.t < 24 ? "Today " + hhmm(e.t) : `${dayOf(e.t)} ${hhmm(e.t)}`], ["Who", e.actor], ["Machine", html`<span className="mono">${e.host}</span>`], ["Kind", KINDS[e.kind].w]] : []}
-      actions=${e && MBY[e.host] ? html`<${Button} onClick=${() => go("machines", e.host)}>Open the machine<//>` : null} />
+      actions=${e && MBY[e.host] ? html`<${Button} onClick=${() => go("registry", e.host)}>See it in Registry<//>` : null} />
     <${Panel} title="Events over time" sub=${brush ? `selected ${fmtT(brush[0], range)} – ${hhmm(brush[1])}` : "drag across the chart to narrow the list"} extra=${brush ? html`<${Button} size="small" onClick=${() => setBrush(null)}>Clear selection<//>` : null}>
       <${EventHistogram} entries=${AUDIT.filter((x) => !kind || x.kind === kind)} range=${range} brush=${brush} onBrush=${setBrush} height=${150} />
     <//>
@@ -5551,7 +5586,7 @@ function AccessPage({ go, open }) {
     </div>
     <${ItemBoard} picked=${!!sel} open=${!!x} onClose=${() => setSel(null)} title=${x ? `${x.b[3]} on ${x.host}` : ""}
       facts=${x ? [["Kind", OCC[x.b[2]].w], ["From", hhmm(x.b[0])], ["Until", x.b[1] >= NOWH ? "now" : hhmm(x.b[1])], ["Owner locked out", ownerOf(x.host)], ["Department", MBY[x.host] ? deptNameOf(MBY[x.host].dept) : "—"], ...(x.b[4] ? [["Flag", html`<span style=${{ color: "var(--crit)" }}>Outside working hours</span>`]] : [])] : []}
-      actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? html`<${Button} onClick=${() => go("machines", x.host)}>Open the machine<//>` : null} />
+      actions=${x && x.b[1] >= NOWH ? (x.b[3] === "You" ? html`<${Button} type="primary" onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : html`<${Button} onClick=${() => toast("Blocked (concept)")}>Block it<//><${Button} type="primary" danger onClick=${() => toast("Session ended (concept)")}>End their session<//>`) : x ? html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry<//>` : null} />
     <${Occupancy} />
   <//>`;
 }
@@ -5584,7 +5619,7 @@ const REFUSED = EMPTY ? [] : [
   { id: "door:FIN-NEW", host: "FIN-NEW", ip: "10.20.6.40", why: "not registered", tries: 14, last: "Today 08:12", tone: "wait", now: "Waiting to be registered", say: "A machine nobody registered keeps trying to connect. If it belongs to Finance, register it; it gets a key and stops being refused." },
   { id: "door:OPS-05", host: "OPS-05", ip: "10.20.4.15", why: "key no. 1, replaced by no. 2 on 2 Oct", tries: 6, last: "Today 11:40", tone: "wait", now: "Old key still in use", say: "Something on OPS-05 still has the key that was replaced. Give it the new key, or make another one if you are not sure where the old one went." },
   { id: "door:10.20.9.201", host: "Claims to be LOG-02", ip: "10.20.9.201", why: "wrong key for LOG-02, from an address LOG-02 never uses", tries: 3, last: "Yesterday 22:10", tone: "bad", now: "Someone may have its name", say: "A machine claimed to be LOG-02 with a key that does not match, from an address LOG-02 has never used. Make LOG-02 a new key and block the address until you know who it is." }];
-function Registry({ go, open }) {
+function Registry({ go, enter, open }) {
   const [sel, setSel] = useOpen("registry", open);
   const [spec, setSpec] = useState(null);
   const [q, setQ] = useState("");
@@ -5622,7 +5657,9 @@ function Registry({ go, open }) {
     <${ItemBoard} picked=${!!sel} open=${!!(m || ac)} onClose=${() => setSel(null)} title=${m ? m.host : ac ? ac.name : ""}
       facts=${m ? [["Department", m.dn], ["Signed in", m.user || "No one"], ["IP address", html`<span className="mono">${m.ip}</span>`], ["Version", m.ver], ["Key", `no. ${m.gen}`], ["Last seen", m.seen > 0.1 ? dur(m.seen) + " ago" : "now"]]
         : ac ? [["Role", ac.role], ["Department", ac.dept], ["Workstation", html`<span className="mono">${ac.ws}</span>`], ["Key", `no. ${ac.gen}`], ["Now", ac.now]] : []}
-      actions=${m ? html`<${Button} onClick=${() => go("machines", m.host)}>Open its page<//><${Button} type="primary" danger onClick=${() => rekey(m.host)}>Make a new key<//>`
+      actions=${m ? html`${(() => { const ad = (DBY[m.dept] || { admins: [] }).admins;
+        return ad.length ? html`<${Button} icon=${ic("LoginOutlined")} onClick=${() => enter(ad[0], { page: "machines", sub: m.host })}>Work on it in ${ad[0]}'s console<//>`
+          : html`<${Tooltip} title=${`${m.dn} has no Admin, so there is no console to work on it in. Appoint one first.`}><span><${Button} disabled>No Admin to work on it<//></span><//>`; })()}<${Button} type="primary" danger onClick=${() => rekey(m.host)}>Make a new key<//>`
         : ac ? html`${ac.role === "Admin" ? html`<${Button} danger onClick=${() => toast(`Removed ${ac.name} (concept)`)}>Stop being an Admin<//>` : null}<${Button} type="primary" danger onClick=${() => rekey(ac.name === "You" ? "your account" : ac.name)}>Make a new key<//>` : null} />
     <${Panel} flush title="Refused connections" sub="tried to connect this week without a valid key · click one to see it below">
       ${REFUSED.length ? html`<div className="scroll-x"><${Table} size="middle" pagination=${false} dataSource=${REFUSED.map((y) => ({ ...y, key: y.id }))}
@@ -5694,7 +5731,7 @@ function SUOverview({ go }) {
     </div>
     <div className="g c-75">
       <${Panel} title="Fleet" sub=${`${fmt(ms.length)} machines · click one to open it`} extra=${html`<${Segmented} size="small" value=${by} onChange=${setBy} options=${["Status", "CPU", "Version", "Check-in"]} />`}>
-        ${none ? html`<${Empty} icon="DesktopOutlined" title="No machines yet" text="Machines appear here by department as they are registered." act="Open Registry" onAct=${() => go("registry")} h=${220} />` : html`<${HostMap} by=${by} onOpen=${(h) => go("machines", h)} onMore=${() => go("departments")} />`}
+        ${none ? html`<${Empty} icon="DesktopOutlined" title="No machines yet" text="Machines appear here by department as they are registered." act="Open Registry" onAct=${() => go("registry")} h=${220} />` : html`<${HostMap} by=${by} onOpen=${(h) => go("registry", h)} onMore=${() => go("departments")} />`}
       <//>
       <${Panel} title="Waiting on you" sub="click one to decide it" flush>
         <${WaitList} onOpen=${setDec} />
@@ -5727,9 +5764,26 @@ const NAV_SU = [
   ["Organisation", [["departments", "Departments", "ApartmentOutlined"], ["accountability", "Accountability", "EyeOutlined", () => DEVIATIONS.filter((d) => d.out === "open").length, true], ["access", "Access", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["registry", "Registry", "DesktopOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
   ["Govern", [["rules", "Rules", "SafetyCertificateOutlined"], ["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"]]],
 ];
-const SU_PARENT = { dept: "departments", machines: "registry", issues: "departments", sessions: "access" };
+// Super User level only (docs/design/su-navigation.md): a machine or an issue never opens the Admin's own page. A
+// machine opens in Registry; a copy of one of your own marked files opens on Restricted with the copy picked; any other
+// issue opens on its department's page. Working on either in an Admin's console goes through traversal.
+let DEPT_ISSUE_PRESET = null, COPY_PRESET = null;
+function suRoute(p, s) {
+  if (p === "machines") return ["registry", s && MBY[s] ? s : null];
+  if (p === "issues") {
+    const i = s ? (FULL.ISSUES || ISSUES).find((x) => x.id === s) : null;
+    if (!i) return ["departments", null];
+    const k = i.type === "file" ? markOf(i) : null;
+    if (k && k.by === "Super User") { COPY_PRESET = i.id; return ["restricted", k.id]; }
+    const m = MBY[i.host];
+    if (!m) return ["departments", null];
+    DEPT_ISSUE_PRESET = i.id; return ["dept", m.dept];
+  }
+  return [p, s];
+}
+const SU_PARENT = { dept: "departments", sessions: "access" };
 const TITLES = { departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"], accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"], access: ["Access", "Who is inside which machine, and who was let in"], registry: ["Registry", "Machines and accounts · register, re-key, provision"], rules: ["Rules", "The standard the organisation is measured against"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
-function Palette({ go, close, nav }) {
+function Palette({ go, close, nav, su }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
   useEffect(() => { r.current && r.current.focus(); }, []);
   const items = [
@@ -5737,10 +5791,12 @@ function Palette({ go, close, nav }) {
     ...MACHINES.map((m) => ({ g: "Machines", l: m.host, sub: `${m.user || "no user"} · ${STATUS[m.status].w}`, icon: "DesktopOutlined", mono: true, run: () => go("machines", m.host) })),
     ...ISSUES.map((x) => ({ g: "Issues", l: `${x.id} ${x.title}`, sub: `${x.host} · ${x.subject}`, icon: "AlertOutlined", run: () => go("issues", x.id) })),
     { g: "Actions", l: "Leave session on OPS-07", sub: "Ama gets her machine back", icon: "LogoutOutlined", run: () => toast("Left OPS-07 (concept)") },
-    { g: "Actions", l: "Run action on a machine…", icon: "PlayCircleOutlined", run: () => go("automation") },
+    // a Super User runs an action from an Admin's console, through traversal; search offers departments instead
+    ...(su ? (FULL.DEPTS || DEPTS).map((d) => ({ g: "Departments", l: d.name, sub: d.admins.length ? listNames(d.admins) : "no Admin", icon: "ApartmentOutlined", run: () => go("dept", d.id) }))
+      : [{ g: "Actions", l: "Run action on a machine…", icon: "PlayCircleOutlined", run: () => go("automation") }]),
   ];
   // at most five per group; the rest are counted, and a sharper query finds them
-  const PAL_GO = { Machines: "machines", Issues: "issues" };
+  const PAL_GO = su ? { Machines: "registry", Issues: "departments", Departments: "departments" } : { Machines: "machines", Issues: "issues" };
   const list = (() => { const seen = {}, out = [], extra = {};
     items.filter((x) => (x.l + " " + (x.sub || "") + " " + x.g).toLowerCase().includes(q.toLowerCase())).forEach((x) => {
       seen[x.g] = (seen[x.g] || 0) + 1; if (seen[x.g] <= 5 || x.g === "Go to") out.push(x); else extra[x.g] = (extra[x.g] || 0) + 1; });
@@ -5784,18 +5840,23 @@ function App() {
   const th = useTheme();
   const [level, setLevel] = useState(null);   // null: the Super User's own level; else { admin, dept, since, how }
   const parse = () => { const [p, s0] = (location.hash.slice(1) || "overview").split("/"); return [TITLES[p] ? p : "overview", s0 ? decodeURIComponent(s0) : null]; };
-  const [[rawPage, sub], setRoute] = useState(parse);
+  const [[rawPage0, sub0], setRoute] = useState(parse);
   const [range, setRange] = useState("24h");
   const [pal, setPal] = useState(false);
   const [entering, setEntering] = useState(null);
+  // traversal: enter an Admin's console, optionally landing on one machine or issue in it
+  const [enterTo, setEnterTo] = useState(null);
+  const enter = (a, to) => { setEntering(a); setEnterTo(to || null); };
   const now = useNow(1000);
   applyScope(level ? level.dept : null);
   ME = level ? level.admin : "Super User";
+  const [rawPage, sub] = level ? [rawPage0, sub0] : suRoute(rawPage0, sub0);
   const nav = level ? NAV_ADMIN : NAV_SU;
   const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)));
   const page = allowed.has(rawPage) ? rawPage : "overview";
-  const go = (p, s0) => { setRoute([p, s0 || null]); try { history.replaceState(null, "", "#" + p + (s0 ? "/" + encodeURIComponent(s0) : "")); } catch (e) {} if (p !== page || p !== "issues") window.scrollTo(0, 0); };
-  const enterConsole = (admin, how) => { setEntering(null); setLevel({ admin, dept: ADMIN_INFO[admin].dept, since: Date.now(), how }); go("overview"); toast(`${how === "end" ? "Ended" : "Blocked"} ${admin}'s session. You are in their console.`); };
+  const goRaw = (p, s0) => { setRoute([p, s0 || null]); try { history.replaceState(null, "", "#" + p + (s0 ? "/" + encodeURIComponent(s0) : "")); } catch (e) {} if (p !== page || p !== "issues") window.scrollTo(0, 0); };
+  const go = (p0, s00) => { const [p, s0] = level ? [p0, s00] : suRoute(p0, s00 || null); goRaw(p, s0); };
+  const enterConsole = (admin, how) => { setEntering(null); setLevel({ admin, dept: ADMIN_INFO[admin].dept, since: Date.now(), how }); goRaw(enterTo ? enterTo.page : "overview", enterTo ? enterTo.sub : null); setEnterTo(null); toast(`${how === "end" ? "Ended" : "Blocked"} ${admin}'s session. You are in their console.`); };
   const leave = () => { const d = level.dept, a = level.admin; setLevel(null); go("dept", d); toast(`Left ${a}'s console. Their session is back.`); };
   useEffect(() => { const k = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPal((v) => !v); } };
     const h = () => setRoute(parse());
@@ -5811,11 +5872,11 @@ function App() {
   const title = page === "dept" ? deptName(sub) : title0, subtitle = page === "dept" ? "" : level && page === "overview" ? `${deptName(level.dept)} · as ${level.admin} sees it` : !level && page === "overview" ? "What needs you, and how the organisation is doing" : !level && page === "tasks" ? "Work you give departments, and how far each has got" : !level && page === "flows" ? "Every flow in the organisation · you can send between any two machines" : subtitle0;
   const secs = Math.floor(((now - T0) / 1000) % 15);
   let body;
-  if (page === "departments") body = html`<${DepartmentsPage} go=${go} enter=${setEntering} open=${sub} />`;
+  if (page === "departments") body = html`<${DepartmentsPage} go=${go} enter=${enter} open=${sub} />`;
   else if (page === "accountability") body = html`<${Accountability} go=${go} open=${sub} />`;
   else if (page === "rules") body = html`<${Rules} go=${go} sub=${sub} />`;
-  else if (page === "registry") body = html`<${Registry} go=${go} open=${sub} />`;
-  else if (page === "dept") body = html`<${DeptPage} key=${sub} id=${(FULL.DEPTS || DEPTS).some((d) => d.id === sub) ? sub : "ops"} go=${go} enter=${setEntering} />`;
+  else if (page === "registry") body = html`<${Registry} go=${go} enter=${enter} open=${sub} />`;
+  else if (page === "dept") body = html`<${DeptPage} key=${sub} id=${(FULL.DEPTS || DEPTS).some((d) => d.id === sub) ? sub : "ops"} go=${go} enter=${enter} />`;
   else if (page === "overview") body = level ? html`<${Overview} range=${range} go=${go} />` : html`<${SUOverview} go=${go} />`;
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
   else if (page === "sessions" || page === "access") body = level ? html`<${Sessions} />` : html`<${AccessPage} go=${go} open=${sub} />`;
@@ -5827,7 +5888,7 @@ function App() {
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : sub && RBY[sub] ? html`<${RuleDetail} id=${sub} go=${go} />` : html`<${Automation} go=${go} />`;
   else if (page === "rollout") body = level ? html`<${Rollout} />` : html`<${RolloutSU} go=${go} open=${sub} />`;
   else if (page === "audit") body = level ? html`<${Audit} range=${range} />` : html`<${AuditSU} range=${range} go=${go} open=${sub} />`;
-  else body = level ? html`<${Reports} />` : html`<${ReportsSU} go=${go} enter=${setEntering} open=${sub} />`;
+  else body = level ? html`<${Reports} />` : html`<${ReportsSU} go=${go} enter=${enter} open=${sub} />`;
   const usesRange = (level ? ["overview", "machines", "audit"] : ["machines", "audit"]).includes(page);
   const parent = !level && SU_PARENT[page] && SU_PARENT[page] !== page ? SU_PARENT[page] : null;
   const openSub = !!sub && (page === "restricted" ? sub !== "mark" : !level && ((page === "tasks" && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || ["departments", "accountability", "reports", "access", "registry", "rollout", "audit"].includes(page) || (page === "rules" && !/^(new|from-|edit-)/.test(sub))));
@@ -5895,7 +5956,7 @@ function App() {
         </main>
       </div>
     </div>
-    ${pal ? html`<${Palette} go=${go} nav=${nav} close=${() => setPal(false)} />` : null}
+    ${pal ? html`<${Palette} go=${go} nav=${nav} su=${!level} close=${() => setPal(false)} />` : null}
     <${EnterConsole} admin=${entering} onClose=${() => setEntering(null)} onEnter=${enterConsole} />
     <${Toast} />
   <//>`;
