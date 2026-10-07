@@ -280,7 +280,7 @@ starts below the fold: you clicked and nothing visibly changed. Now the item sho
 | Rules | the rule (Switch, Edit, See its deviations →) or the pattern (Build a rule from it) | the pattern drawn | *Start from a pattern* is a switch on the list |
 | Rollout | the machine; Retry now (and Leave it out at the Super User's level) | Machines on 1.4.2 | *By department* is a pick in the list header |
 | Audit log | the event | Events over time | *Kinds* is a pick in the list header |
-| Reports | the report; Mark addressed | Where reports go (Super User) | *Handling* / *Kinds* is a pick in the list header |
+| Reports | the report; Mark addressed. In *Where they go*: the kind's routing, with Save | — | *Handling* / *Kinds* is a pick in the list header; *Where reports go* is a switch on the list (Super User) |
 
 ## Organisation and Govern, as built in the concept (6 Oct 2026)
 
@@ -372,6 +372,11 @@ shortcut); and on the right this week's count and how many are waiting on you, w
 ("5 → 0 waiting on you"). A picked department with no Admin says so under the row. *About an Admin* is a locked row:
 you only. Changed rows are tinted; Save asks first and is recorded. It replaced a kinds × departments grid of dots
 that needed a legend to read and never said why you would route anything.
+
+**As a view of the list (7 Oct 2026).** Six tall rows under the reports list were bulky. *Where they go* is now a switch
+on the Reports list: one line per kind (who gets it, this week, how many wait on you), and the kind picked shows its
+routing on the right: the department pick with *every department*, the no-Admin warning, the "2 → 0 waiting on you"
+preview, and Discard / Save, which asks first and names what changes. *About an Admin* is a row that says you only.
 
 ### Where it is (Restricted, decided 7 Oct 2026)
 
