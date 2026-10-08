@@ -1068,7 +1068,7 @@ function MachineList({ go }) {
   const all = MACHINES.slice().sort((a, b) => order[a.status] - order[b.status] || a.host.localeCompare(b.host));
   const [inside0, setInside0] = useState(false);
   const rows = all.filter((m) => (!f || (f === "online" ? m.status !== "offline" : f === "look" ? look(m) : m.ver === "1.4.2")) && (!inside0 || m.held) && `${m.host} ${m.user || ""}`.toLowerCase().includes(q.toLowerCase())).map((m) => ({ ...m, id: m.host }));
-  const cur = (sel && rows.find((r) => r.host === sel)) || (sel && MBY[sel] && MACHINES.includes(MBY[sel]) ? MBY[sel] : null) || rows[0];
+  const cur = (sel && rows.find((r) => r.host === sel)) || rows[0];
   const held = MACHINES.filter((m) => m.held), off = MACHINES.filter((m) => m.status === "offline").length, behind = MACHINES.filter((m) => m.ver !== "1.4.2").length;
   const FL = { all: "Machines", online: "Online", look: "Need a look", current: "On the current version" };
   const side = cur ? (() => { const cpu = metric(cur.host, "cpu", NOWH), disk = metric(cur.host, "disk", NOWH), [k, w] = HEALTH[cur.status];
@@ -2101,7 +2101,7 @@ const TORDER = ["verify", "overdue", "quiet", "track", "done"];
 function Tasks({ go, me, open }) {
   useDT();
   const mine = DEPT_TASKS.filter((t) => !t.complete && me && t.st[me] !== undefined).sort((a, b) => (a.st[me] === "sent" ? 0 : 1) - (b.st[me] === "sent" ? 0 : 1));
-  const setMy = (id, v) => { setAdminState(id, me, v); toast(`Marked ${DSTATE[v][0].toLowerCase()} · the Super User sees it (concept)`); };
+  const setMy = (id, v) => { setSuSel(id); setAdminState(id, me, v); toast(`Marked ${DSTATE[v][0].toLowerCase()} · the Super User sees it (concept)`); };
   // when anything was last seen for each task, looking back a week
   const seen = useMemo(() => Object.fromEntries(TASKS.map((t) => { for (let x = NOWH; x > NOWH - 168; x -= 0.25) if (t.evidence.some((e) => (e.fn(x) || 0) > 0)) return [t.id, x]; return [t.id, null]; })), [TASKS.length]);
   const cat = (t) => t.state === "Completed" ? "done" : t.state === "Awaiting your verification" ? "verify" : t.state === "Overdue" ? "overdue"
@@ -2113,7 +2113,7 @@ function Tasks({ go, me, open }) {
   const n = (k) => all.filter((x) => x.k === k).length;
   const list = all.filter((x) => (!f || x.k === f) && `${x.t.id} ${x.t.title} ${x.t.who} ${x.t.host}`.toLowerCase().includes(q.toLowerCase()));
   const pg = usePaged(list, 8, (f || "") + q);
-  const cur = all.find((x) => x.t.id === sel) || list[0];
+  const cur = list.find((x) => x.t.id === sel) || list[0];
   const PIP = { Passed: { background: "var(--text)", border: "1.5px solid var(--text)" }, Pending: { background: "transparent", border: "1.5px solid var(--text-4)" }, Failed: { background: "var(--med)", border: "1.5px solid var(--med)" } };
   const due = (t, k) => k === "done" ? ["Closed", `${dayOf(t.final)} ${hhmm(t.final)}`, "var(--text-3)"] : k === "verify" ? ["Handed in", `was due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--text)"]
     : NOWH > t.final ? [`${span(NOWH - t.final)} late`, `was due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--crit)"] : [`${span(t.final - NOWH)} left`, `due ${dayOf(t.final)} ${hhmm(t.final)}`, "var(--text)"];
@@ -2741,7 +2741,7 @@ function DayBars({ series, height = 150 }) {
 // Automation: a click on a rule (or on a rule's name in Runs today) selects it, and the rule shows whole under the list.
 function Automation({ go, open }) {
   const [sel, setSel] = useOpen("automation", open);
-  const cur = RBY[sel] || RULES[0];
+  let cur = RBY[sel] || RULES[0];
   const [on, setOn] = useState({ usb: true, restricted: true, cpu: true, daily: true });
   const outs = [["Success", [32, 0, 0, 27, 32, 28, 34]], ["Failed", [0, 0, 0, 1, 1, 0, 1]], ["Timed out", [0, 0, 0, 0, 1, 1, 1]], ["Stopped by you", [0, 0, 0, 0, 0, 0, 1]]];
   const tot = outs.reduce((a, o) => a + o[1].reduce((x, y) => x + y, 0), 0);
@@ -2752,6 +2752,7 @@ function Automation({ go, open }) {
   const fired = RULES.reduce((t, r) => t + r.perDay.reduce((a, b) => a + b, 0), 0), probs = outs.filter(([k]) => k === "Failed" || k === "Timed out").reduce((t, [, v]) => t + v.reduce((a, b) => a + b, 0), 0);
   const suN = RULES.filter((r) => r.by === "You").length, onN = RULES.filter((r) => on[r.id]).length;
   const rows = RULES.filter((r) => (!pf || hasProb(r)) && `${r.name} ${r.when}`.toLowerCase().includes(q.toLowerCase()));
+  if (!rows.includes(cur)) cur = rows[0];
   return html`<${React.Fragment}>
     <${Strip} on=${pf ? "probs" : null} onPick=${(k) => setPf(!!k)} items=${[
       { label: "Rules", value: fmt(RULES.length), delta: suN ? `${suN} set by the Super User` : "all made in this department" },
@@ -3091,7 +3092,7 @@ function Actions({ go, open }) {
   const [sel, setSel] = useOpen("actions", open);
   const [q, setQ] = useState("");
   const rows = ACTION_LIB.filter((a) => (cat === "All" || a.cat === cat) && `${a.name} ${a.desc}`.toLowerCase().includes(q.toLowerCase()));
-  const cur = ABY[sel] || rows[0];
+  const cur = rows.find((a) => a.id === sel) || rows[0];
   const week = ALL_RUNS.filter((x) => x.t >= -144), bad = week.filter((x) => x.outcome === "Failed" || x.outcome === "Timed out");
   const byName = (n) => ACTION_LIB.find((a) => a.names.includes(n));
   const hand = MANUAL_RUNS.slice().sort((a, b) => b.t - a.t);
@@ -4206,10 +4207,10 @@ function GivenToDepts({ go, open: open0 }) {
           { title: "Deadline", width: 150, bar: (r) => ({ v: Math.max(0, Math.min(1, (NOWH - r.at) / Math.max(1, r.due - r.at))), max: 1, text: dueText(r.due) }) }]}
         now=${(r) => { const k = catOf(r); return k === "verify" ? ["Ready to complete", "good"] : k === "late" ? ["Past its deadline", "bad"] : k === "unseen" ? ["Not seen yet", "wait"] : ["Under way", "good"]; }}
         empty=${!open.length ? html`<${Empty} icon="CheckSquareOutlined" title="Nothing given to a department" text="A task goes to a department's Admins. They say how far it has got; only you call it complete." act="New task" onAct=${() => setNewT(blankT)} h=${200} />` : null} />
-      ${(() => { const t = DEPT_TASKS.find((x) => x.id === pick && !x.complete) || open[0]; return t ? html`<${TaskBoard} key=${"s" + t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="side" />`
+      ${(() => { const t = dtasks.find((x) => x.id === pick) || dtasks[0]; return t ? html`<${TaskBoard} key=${"s" + t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="side" />`
         : html`<${SidePanel} empty=${html`<${Empty} icon="CheckSquareOutlined" title="Nothing given" text="Give a department a task; it shows here when you pick it." h=${200} />`} />`; })()}
     </div>
-    ${(() => { const t = DEPT_TASKS.find((x) => x.id === pick && !x.complete) || open[0]; return t ? html`<${TaskBoard} key=${t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="chart" />` : null; })()}
+    ${(() => { const t = dtasks.find((x) => x.id === pick) || dtasks[0]; return t ? html`<${TaskBoard} key=${t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="chart" />` : null; })()}
     <${Drawer} open=${!!newT} onClose=${() => setNewT(null)} width=${480} title="Give a department a task"
       footer=${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept), miss = !newT.text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : newT.who === "some" && !newT.some.length ? "Pick at least one Admin." : null;
         return html`<div className="row"><span className="t3" style=${{ fontSize: 12 }}>${miss || ""}</span><span className="sp" /><${Button} onClick=${() => setNewT(null)}>Cancel<//>
@@ -4934,7 +4935,7 @@ function Accountability({ go, open }) {
   const pool = DEVIATIONS.filter((d) => day != null ? Math.floor(d.at / 24) === day : oc === "all" || d.out === "open");
   const list = pool.filter((d) => (!kind || d.kind === kind) && (!rule || d.rule === rule) && `${d.short} ${d.who} ${d.host || ""} ${RULE_BY(d.rule).name}`.toLowerCase().includes(q.toLowerCase())).sort(devSortKey);
   const broken = RULES_ALL().map((r) => { const ds = weekDevs(r.id); return { r, n: ds.length, open: ds.filter((d) => d.out === "open").length }; }).filter((x) => x.n).sort((a, b) => b.n - a.n);
-  const dev = DEVIATIONS.find((d) => d.id === sel) || list[0];
+  const dev = list.find((d) => d.id === sel) || list[0];
   return html`<${React.Fragment}>
     <${Strip} on=${kind} onPick=${setKind} items=${Object.keys(WHOKIND).map((k) => { const o = DEVIATIONS.filter((d) => d.kind === k && d.out === "open"), hi = o.filter((d) => d.sev === "critical" || d.sev === "high").length;
       return { key: k, label: `${WHOKIND[k][0]}s`, value: fmt(o.length), delta: o.length ? (hi ? `${hi} critical or high` : "open") : "none open", dc: hi ? "var(--crit)" : undefined }; })} />
@@ -5409,10 +5410,10 @@ function RestrictedSU({ go, open }) {
           { title: "Covers", width: 150, bar: (r) => ({ v: r.files, max: mx, text: r.kind === "folder" ? `${fmt(r.files)} files` : "1 file" }) }]}
         now=${(r) => (r.n ? [r.n === 1 ? "A copy elsewhere" : `${fmt(r.n)} copies elsewhere`, "bad"] : ["Only where it belongs", "good"])}
         empty=${!mine.length ? html`<${Empty} icon="FileProtectOutlined" title="You have not marked anything" text="Mark a file or folder on your PC. It stays where it is and you keep using it; a copy anywhere else is caught." act=${ws ? "Mark files" : null} onAct=${() => go("restricted", "mark")} h=${200} />` : null} />
-      ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; return k ? html`<${MarkSide} key=${k.id} k=${k} picked=${sel === k.id} refresh=${refresh} onUnmarked=${() => setSel(null)} copy=${copy} setCopy=${setCopy} acted=${acted} setActed=${setActed} />`
+      ${(() => { const k = mine.find((x) => x.id === (rows.find((y) => y.id === sel) || rows[0] || {}).id); return k ? html`<${MarkSide} key=${k.id} k=${k} picked=${sel === k.id} refresh=${refresh} onUnmarked=${() => setSel(null)} copy=${copy} setCopy=${setCopy} acted=${acted} setActed=${setActed} />`
         : html`<${SidePanel} empty=${html`<${Empty} icon="FileProtectOutlined" title="Nothing picked" text="Pick a marked file or folder in the list." h=${200} />`} />`; })()}
     </div>
-    ${(() => { const k = mine.find((x) => x.id === sel) || rows[0]; return k ? html`<${MarkBoard} key=${k.id} k=${k} picked=${sel === k.id} go=${go} refresh=${refresh} onUnmarked=${() => setSel(null)} copy=${copy} setCopy=${setCopy} acted=${acted} />` : null; })()}
+    ${(() => { const k = mine.find((x) => x.id === (rows.find((y) => y.id === sel) || rows[0] || {}).id); return k ? html`<${MarkBoard} key=${k.id} k=${k} picked=${sel === k.id} go=${go} refresh=${refresh} onUnmarked=${() => setSel(null)} copy=${copy} setCopy=${setCopy} acted=${acted} />` : null; })()}
   <//>`;
 }
 
@@ -5428,7 +5429,7 @@ function RolloutSU({ go, open, me }) {
     next: m.status === "offline" ? "When it is back online" : "Next idle window", esc: m.host === "LOG-02" ? "Mon 09:30, to you" : null }));
   const [dept, setDept] = useState(null);
   const rows = behind.filter((m) => (!dept || m.dept === dept) && `${m.host} ${m.user || ""} ${m.dn}`.toLowerCase().includes(q.toLowerCase()));
-  const on = MACHINES.length - behind.length, m = behind.find((x) => x.id === sel) || rows[0];
+  const on = MACHINES.length - behind.length, m = rows.find((x) => x.id === sel) || rows[0];
   const depts = FULL_DEPTS().map((d) => { const ms = MACHINES.filter((x) => x.dept === d.id); return { d, n: ms.length, ok: ms.filter((x) => x.ver === "1.4.2").length }; }).filter((x) => x.n).sort((a, b) => (a.ok / a.n) - (b.ok / b.n));
   return html`<${React.Fragment}>
     <${Strip} items=${[
@@ -5461,7 +5462,7 @@ function AuditSU({ range, go, open, me }) {
   const [q, setQ] = useState("");
   const R = RANGES[range], base = AUDIT.filter((e) => e.t >= R.a);
   const shown = base.filter((e) => (!kind || e.kind === kind) && (!brush || (e.t >= brush[0] && e.t < brush[1])) && `${e.what} ${e.actor} ${e.host}`.toLowerCase().includes(q.toLowerCase())).slice().reverse().map((e) => ({ ...e, rid: String(e.id) }));
-  const e = (sel != null ? base.find((x) => String(x.id) === String(sel)) : null) || shown[0];
+  const e = (sel != null ? shown.find((x) => String(x.id) === String(sel)) : null) || shown[0];
   const when = (t) => (t >= 0 && t < 24 ? hhmm(t) : `${dayOf(t)} ${hhmm(t)}`);
   return html`<${React.Fragment}>
     <${Strip} items=${[
@@ -5496,7 +5497,7 @@ function DepartmentsPage({ go, enter, open }) {
     .sort((a, b) => a.rank - b.rank);
   const rows = all.filter((d) => `${d.name} ${d.admins.join(" ")}`.toLowerCase().includes(q.toLowerCase()));
   const admins = Object.entries(ADMIN_INFO).filter(([, a]) => depts.some((d) => d.id === a.dept));
-  const d = all.find((x) => x.id === sel) || rows[0], st = d ? deptStats(d) : null;
+  const d = rows.find((x) => x.id === sel) || rows[0], st = d ? deptStats(d) : null;
   return html`<${React.Fragment}>
     <${Strip} items=${[
       { label: "Departments", value: fmt(depts.length), delta: `${fmt(admins.length)} Admins between them` },
@@ -5535,7 +5536,7 @@ function AccessPage({ go, open, me }) {
   const rows = all.filter((x) => `${x.host} ${x.b[3]}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (b.b[1] >= NOWH) - (a.b[1] >= NOWH) || b.b[0] - a.b[0]);
   const ownerOf = (h) => (laneOf(h).blocks.find((x) => x[2] === "own") || [0, 0, 0, MBY[h] && MBY[h].user ? MBY[h].user : "nobody"])[3];
   const [tab, setTab] = useState("sessions"), [aSel0, setASel0] = useState(null);
-  const x = all.find((y) => y.id === sel) || rows[0];
+  const x = rows.find((y) => y.id === sel) || rows[0];
   const dn = me && ADMIN_INFO[me] ? deptNameOf(ADMIN_INFO[me].dept) : null;
   const assist = dn ? ASSIST.filter((a) => a.from === dn || a.wdept === dn) : ASSIST, nights = all.filter((y) => y.b[4]);
   const aSel = assist.find((a) => a.id === aSel0) || assist[0];
@@ -5669,7 +5670,7 @@ function ReportsSU({ go, enter, open, me }) {
   const rows = R.filter((r) => (!view || state(r) === view) && (!dept || r.dept === dept) && `${r.cat} ${r.what} ${r.host} ${deptNameOf(r.dept)}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => order[state(a)] - order[state(b)]);
   const depts = FULL_DEPTS().filter((d) => d.admins.length).map((d) => { const mine = R.filter((r) => r.dept === d.id && owner(r) === "dept"), done = mine.filter((r) => r.addressed && r.addressed.took), t = done.map((r) => r.addressed.took).sort((a, b) => a - b);
     return { d, wait: mine.filter((r) => !r.addressed).length, done: done.length, med: t.length ? t[t.length >> 1] : null }; }).sort((a, b) => b.wait - a.wait);
-  const r = R.find((x) => x.id === sel) || rows[0];
+  const r = rows.find((x) => x.id === sel) || rows[0];
   const written = (x) => x.when || (x.at != null ? devWhen(x.at) : "this week");
   if (me) return html`<${ReportsHere} me=${me} sel=${sel} setSel=${setSel} written=${written} />`;
   // where each kind goes: one row per kind; a kind's Admins can address it, so it stops waiting on you
@@ -5692,7 +5693,7 @@ function ReportsSU({ go, enter, open, me }) {
       ${r ? html`<${SidePanel} h=${null} title=${r.cat} sub=${sel ? "the one you picked" : "the first in the list · click another"}
       facts=${r ? [["What", r.what], ["Source", html`<span className="mono">${r.host}</span> · ${deptNameOf(r.dept)}`], ["Written", written(r)], ["Goes to", owner(r) === "dept" ? `You and ${deptNameOf(r.dept)}` : owner(r) === "fixed" ? "You only · never routed, it is about an Admin" : owner(r) === "noadmin" ? `You only · ${deptNameOf(r.dept)} has no Admin` : `You only · not routed to ${deptNameOf(r.dept)}`],
         ["Addressed", r.addressed ? `${r.addressed.by}${r.addressed.took ? ` · took ${mins(r.addressed.took)}` : ""}` : "Not yet"]] : []}
-      actions=${r && !r.addressed ? html`${owner(r) === "dept" ? html`<${Button} onClick=${() => toast(`Prompted ${listNames(DBY[r.dept] ? DBY[r.dept].admins : [])} (concept)`)}>Prompt the department<//>` : null}<${Button} type="primary" onClick=${() => { dtChange(() => { r.addressed = { by: "You" }; }); toast("Marked addressed · recorded with your name (concept)"); }}>Mark addressed<//>` : null} />` : html`<${SidePanel} empty=${html`<${Empty} icon="FileTextOutlined" title="Nothing picked" text="Pick a report in the list." h=${200} />`} />`}
+      actions=${r && !r.addressed ? html`${owner(r) === "dept" ? html`<${Button} onClick=${() => toast(`Prompted ${listNames(DBY[r.dept] ? DBY[r.dept].admins : [])} (concept)`)}>Prompt the department<//>` : null}<${Button} type="primary" onClick=${() => { setSel(r.id); dtChange(() => { r.addressed = { by: "You" }; }); toast("Marked addressed · recorded with your name (concept)"); }}>Mark addressed<//>` : null} />` : html`<${SidePanel} empty=${html`<${Empty} icon="FileTextOutlined" title="Nothing picked" text="Pick a report in the list." h=${200} />`} />`}
         <${RoutingSide} key=${kcur.id} c=${kcur.id} kinds=${kinds.map((x) => x.id)} onKind=${setKc} follows=${!kc && r && r.cat === kcur.id} />
       </div>
     </div>
@@ -5758,7 +5759,7 @@ function ReportsHere({ me, sel, setSel, written }) {
   const st = (r) => (r.addressed ? "done" : "wait");
   const took = mine.filter((r) => r.addressed && r.addressed.took).map((r) => r.addressed.took).sort((a, b) => a - b), med = took.length ? took[took.length >> 1] : null;
   const rows = mine.filter((r) => (!view || st(r) === view) && (!cat || r.cat === cat) && `${r.cat} ${r.what} ${r.host}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (st(a) === "done") - (st(b) === "done"));
-  const r = mine.find((x) => x.id === sel) || rows[0];
+  const r = rows.find((x) => x.id === sel) || rows[0];
   const cats = Object.keys(REPORT_CATS).filter((k) => !REPORT_CATS[k].fixed && (routingNow()[k] || []).includes(dept));
   return html`<${React.Fragment}>
     <${Strip} on=${view} onPick=${setView} items=${[
@@ -5777,7 +5778,7 @@ function ReportsHere({ me, sel, setSel, written }) {
       ${r ? html`<${SidePanel} title=${r.cat} sub=${sel ? "the one you picked" : "the first in the list · click another"}
       facts=${r ? [["What", r.what], ["Source", html`<span className="mono">${r.host}</span>`], ["Written", written(r)], ["Goes to", `The Super User and ${deptNameOf(dept)}`],
         ["Addressed", r.addressed ? `${r.addressed.by}${r.addressed.took ? ` · took ${mins(r.addressed.took)}` : ""}` : "Not yet"]] : []}
-      actions=${r && !r.addressed ? html`<${Button} type="primary" onClick=${() => { dtChange(() => { r.addressed = { by: me }; }); toast(`Marked addressed · recorded as ${me} (concept)`); }}>Mark addressed<//>` : null} />` : html`<${SidePanel} empty=${html`<${Empty} icon="FileTextOutlined" title="Nothing picked" text="Pick a report in the list." h=${200} />`} />`}
+      actions=${r && !r.addressed ? html`<${Button} type="primary" onClick=${() => { setSel(r.id); dtChange(() => { r.addressed = { by: me }; }); toast(`Marked addressed · recorded as ${me} (concept)`); }}>Mark addressed<//>` : null} />` : html`<${SidePanel} empty=${html`<${Empty} icon="FileTextOutlined" title="Nothing picked" text="Pick a report in the list." h=${200} />`} />`}
     </div>
   <//>`;
 }

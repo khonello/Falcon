@@ -90,6 +90,37 @@ page and end in "→", and editors' own buttons; picking an issue on Issues stay
 Tasks, Machines, Automation, Actions and the Overview inside the console. Not click-tested: the row selections
 themselves, the Overview's expanding issue rows, a rule picked from *Runs today*.
 
+## Click-through (8 Oct 2026, concept version 168)
+
+The interactions the sweeps above only read in the code were clicked in headless Edge, driven over its debugging
+protocol: 64 steps, both levels, each checking what the page shows afterwards. **64 of 64 pass.**
+
+- **Super User:** the fleet tile's pinned card, a *Worth a look* row opening in place; Restricted (a row, the *Copies
+  found elsewhere* filter, a copy's Ask / Delete / Allow, *change* and *Unmark* asking first); Tasks (a row, the
+  *Ready to complete* filter, Edit, Complete); Flows (a row and its drawing, a paused branch's fixes); Departments (a
+  row, *Enter R. Mensah's console*, *Block and enter*, *Leave*); the department page's issue; Accountability (a row,
+  *Everything*, *Record* needing a line); Access (a row, *Assisted access*); Registry (*Accounts*, *Refused*, *Make a new
+  key* asking first, *Register a PC*); Rules (a rule, *Patterns*); Rollout; Audit log; Reports (a report moving the
+  routing to its kind, *Change who gets it*, removing Finance, Save asking first, the saved statement, adding Finance
+  back with *Also send the … already waiting*, unticking it, *Mark addressed*).
+- **R. Mensah's console:** an Overview issue opening in place; Machines (*Someone inside*, a row, *Enter session*
+  asking first, *Open its page →*); Tasks (*Incomplete*, *From the Super User*, marking Done); Flows (*Decline*, someone
+  else's flow not editable); Sessions; Issues (a row, *Allow* asking for a reason); Automation (*Problems this week*, the
+  Super User's rule not editable); Actions (*Run once*); Restricted; Audit log; Reports (*Mark addressed*); Rollout (no
+  *Leave it out*, no *Approve*).
+
+**Found and fixed by it:**
+
+1. A filter could hide the item on the right while the panel kept showing it (Tasks: *Ready to complete* listed one
+   task, the panel another). On every list page the panel now shows a row the list shows.
+2. Acting on the item shown by default (the first row) moved it down the list and the panel jumped to another item:
+   *Mark addressed* on Reports, marking a Super User's task on the console's Tasks. The item acted on now stays shown.
+3. While fixing 1, Restricted's panel briefly read the list's copy of a mark, so *change* would not have stuck; it
+   reads the mark itself again.
+
+Not covered: Issues still shows a picked issue when the strip or type filter hides it (it is picked before the list is
+built); typing into fields and picking from dropdowns was not scripted.
+
 ## Count
 
 Rows in the tables above (a row can hold several clicks of one kind):
