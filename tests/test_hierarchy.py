@@ -7,9 +7,7 @@ time limit + extension, display-name non-propagation, report routing, assisted a
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime
-
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from engine.database import _now
 from engine.hierarchy import traversal
@@ -310,9 +308,9 @@ async def test_about_admin_reports_reach_the_super_user_only_and_updates_route_b
     assert [r["category"] for r in (await su.ok("reports.list"))["reports"]] == ["about_admin"]
     assert "report.new" in su.push_types(await su.drain_pushes())
     assert (await a1.ok("reports.list"))["reports"] == []
-    assert traversal.outside_working_hours("06:00-18:00", datetime(2026, 10, 9, 2, 14)) is True
-    assert traversal.outside_working_hours("06:00-18:00", datetime(2026, 10, 9, 10, 0)) is False
-    assert traversal.outside_working_hours("22:00-06:00", datetime(2026, 10, 9, 23, 0)) is False
+    assert traversal.outside_working_hours("06:00-18:00", datetime(2026, 10, 9, 2, 14, tzinfo=timezone.utc)) is True
+    assert traversal.outside_working_hours("06:00-18:00", datetime(2026, 10, 9, 10, 0, tzinfo=timezone.utc)) is False
+    assert traversal.outside_working_hours("22:00-06:00", datetime(2026, 10, 9, 23, 0, tzinfo=timezone.utc)) is False
 
 
 # --- alerts -------------------------------------------------------------------------------------
