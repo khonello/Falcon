@@ -93,23 +93,20 @@ service inside that person's session.
     - the soft/final deadline events reused with the one deadline
 
     Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
-20. **What an action returned, kept with the run** (concept, 9 Oct 2026; docs/design/super-user-menu.md, *What a run
-    returned*). The console shows each run's output on Actions (*Recent runs*, a click opens it), in *Run once* (each
-    machine as it finishes) and on Automation (a firing's runs). Today `control.execution_output` streams text into an
-    in-memory tail (`_outputs`, the last chunks only), lost on restart and never stored with the run.
-    - **Store the output with the execution:** a bounded text column or table (e.g. the first and last 64 KB), plus a
-      one-line `summary` the action can set (`C: 92% full`, `36 running · EXCEL.EXE uses the most memory`).
-    - **Structured results:** built-in monitoring actions return rows (running programs, a USB device's files) as JSON,
-      not printed text, so the console can draw a table.
-    - **Screenshots carry their picture** (the PHASES.md item "carry a screen picture to the Operator Client"): the
-      Worker sends the image (downscaled, compressed; base64 inside a size cap, or a separate upload message), the
-      Engine stores it with the execution, and a handler returns it on request, never pushed to every console.
-    - **Who may see it:** the run's department's Admins and the Super User; every view of a screenshot is recorded in
-      the audit log. Kept 90 days, then dropped with the audit retention job.
-    *Found:* the concept's Actions, Run once and Automation pages.
-
 ## Done inline (for the record)
 
+- **What an action returned, kept with the run** (was #20, done 9 Oct 2026). A script (built-in or Custom) marks
+  what it returns with lines the Worker strips from the text: `FALCON:summary <line>`, `FALCON:result <json>`,
+  `FALCON:image <path>`. `control.execution_result` now stores the text (first and last 64 KB), the summary (on
+  `action_executions.summary`, so every list has it) and the rows (`execution_outputs`, migration 014); the built-in
+  monitoring actions return rows and a summary ("321 running · EXCEL.EXE uses the most memory"). Screenshots: the old
+  PowerShell capture was blocked by Windows Defender as malicious, so `worker_client/screenshot.py` captures with GDI
+  through ctypes, scales to 1600 px wide and fits 2 MB as PNG (stdlib only); the Worker sends it as
+  `control.execution_image` before the result. `control.execution` returns output, result, `has_image`, `expired`;
+  `control.execution_image_get` returns the picture (the run's department's Admins and the Super User, every view
+  audited). After 90 days the audit retention job clears text, rows and picture (rows stay). TUI: `exec <id>`,
+  `exec picture <id> <file>`. Still to do with packaging: under the Windows service the capture must run in the
+  person's session as a helper. *Test:* `test_control_updates.py`, `test_worker_client.py` (executor).
 - **A typical day for each level** (was #3, done 9 Oct 2026). `control.metrics` now also stores one sample per machine
   every 10 minutes in `metric_samples` (migration 013, never deleted); `control.levels` adds `typical`: the rolling
   7-day p10-p90 of processor, memory and idle across the same machines, with the sample count and since when (null

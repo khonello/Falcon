@@ -399,6 +399,30 @@ Join table — an Event triggers one or more Actions, each executing independent
 | `output_log_path` | TEXT NULLABLE | Where stdout/output was captured, per the reference project's tail-by-file-growth pattern (Implementation Spec §7.3) |
 | `started_at` | TIMESTAMP NOT NULL | |
 | `ended_at` | TIMESTAMP NULLABLE | |
+| `summary` | TEXT NULLABLE | One line the action set (`FALCON:summary ...`), e.g. "C: 92% full" (migration 014) |
+
+### `execution_outputs`
+What a run returned (migration 014). Kept 90 days, then cleared (set to NULL, `cleared_at` set) by the audit retention job; the row stays so a run can say its output expired.
+
+| Column | Type | Notes |
+|---|---|---|
+| `execution_id` | INTEGER PK FK → action_executions.id | |
+| `output` | TEXT NULLABLE | The printed text, first and last 64 KB |
+| `result` | JSONB NULLABLE | Rows (or any JSON) a monitoring action returned (`FALCON:result ...`), up to 512 KB |
+| `recorded_at` | TIMESTAMP NOT NULL | |
+| `cleared_at` | TIMESTAMP NULLABLE | When retention cleared it |
+
+### `execution_images`
+The picture a run took (a screenshot), at most 2 MB, JPEG or PNG (migration 014). Returned only on request (`control.execution_image_get`) to the run's department's Admins and the Super User; every view is audited (`execution.image_viewed`). Cleared after 90 days like `execution_outputs`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `execution_id` | INTEGER PK FK → action_executions.id | |
+| `mime` | TEXT NOT NULL | `image/jpeg` or `image/png` |
+| `data` | BYTEA NULLABLE | NULL once cleared |
+| `bytes` | INTEGER NOT NULL | |
+| `captured_at` | TIMESTAMP NOT NULL | |
+| `cleared_at` | TIMESTAMP NULLABLE | |
 
 ---
 

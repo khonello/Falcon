@@ -2,7 +2,8 @@
 
     Engine -> action.execute {execution_id, action, timeout_s}
     we    -> control.execution_output {execution_id, chunk}     (streamed as the log grows)
-    we    -> control.execution_result {execution_id, status, exit_code, output_log_path}
+    we    -> control.execution_image {execution_id, mime, data}     (a picture the run took, if any)
+    we    -> control.execution_result {execution_id, status, exit_code, output_log_path, output, summary, result}
     Engine -> action.terminate {execution_id}                   (manual stop, by id)
 
 Scripts (Custom Actions, and built-ins implemented as scripts) run DETACHED from the request
@@ -19,6 +20,8 @@ tampering in transit. No sandboxing: accountability is the audit trail (spec 7.3
 from __future__ import annotations
 
 import asyncio
+import base64
+import contextlib
 import json
 import logging
 import os
@@ -49,18 +52,26 @@ BUILTIN_SCRIPTS: dict[str, str] = {
         "import json, psutil\n"
         "rows=[{'pid':p.pid,'name':p.info['name'],'rss':p.info['memory_info'].rss if p.info['memory_info'] else None}"
         " for p in psutil.process_iter(['name','memory_info'])]\n"
-        "print(json.dumps(sorted(rows, key=lambda r: -(r['rss'] or 0))[:50]))\n"),
+        "rows=sorted(rows, key=lambda r: -(r['rss'] or 0))\n"
+        "print(f'FALCON:summary {len(rows)} running' + (f\" · {rows[0]['name']} uses the most memory\" if rows else ''))\n"
+        "print('FALCON:result ' + json.dumps(rows[:50]))\n"),
     "system_metrics": (
-        "import json, psutil\n"
-        "print(json.dumps({'cpu': psutil.cpu_percent(interval=0.5), 'memory': psutil.virtual_memory().percent,"
-        " 'disk': psutil.disk_usage('/').percent}))\n"),
-    "idle_time": "from worker_client import idle\nprint(idle.idle_seconds())\n",
+        "import json, os, psutil\n"
+        "m={'cpu': psutil.cpu_percent(interval=0.5), 'memory': psutil.virtual_memory().percent,"
+        " 'disk': psutil.disk_usage(os.environ.get('SystemDrive','') + os.sep).percent}\n"
+        "print(f\"FALCON:summary processor {m['cpu']:.0f}% · memory {m['memory']:.0f}% · disk {m['disk']:.0f}% full\")\n"
+        "print('FALCON:result ' + json.dumps(m))\n"),
+    "idle_time": (
+        "from worker_client import idle\ns=idle.idle_seconds() or 0\n"
+        "print(f'FALCON:summary idle {int(s)//60} min')\nprint(s)\n"),
     "file_activity": (
         "import os, sys, json, time\np=sys.argv[1]\nout=[]\n"
         "for d,_,fs in os.walk(p):\n  for f in fs:\n    fp=os.path.join(d,f)\n"
         "    try: st=os.stat(fp)\n    except OSError: continue\n"
         "    out.append({'path':fp,'size':st.st_size,'mtime':time.strftime('%Y-%m-%d %H:%M',time.localtime(st.st_mtime))})\n"
-        "print(json.dumps(sorted(out,key=lambda r:r['mtime'],reverse=True)[:100]))\n"),
+        "out=sorted(out,key=lambda r:r['mtime'],reverse=True)\n"
+        "print(f'FALCON:summary {len(out)} files' + (f\" · latest {out[0]['mtime']}\" if out else ''))\n"
+        "print('FALCON:result ' + json.dumps(out[:100]))\n"),
     "snapshot_file": (
         "import hashlib, shutil, sys, os, json, time\np=sys.argv[1]\n"
         "h=hashlib.sha256(open(p,'rb').read()).hexdigest()\n"
@@ -81,17 +92,11 @@ BUILTIN_SCRIPTS: dict[str, str] = {
         "for part in psutil.disk_partitions(all=False):\n"
         "  if 'removable' in part.opts.lower() or part.fstype=='' :\n"
         "    try: out[part.mountpoint]=os.listdir(part.mountpoint)[:200]\n    except OSError: pass\n"
-        "print(json.dumps(out))\n"),
-    "screenshot": (
-        "import sys, subprocess, time, os\n"
-        "if sys.platform!='win32': sys.exit('screenshot: unsupported on this platform in v1')\n"
-        "out=os.path.join(os.environ.get('TEMP','.'), 'falcon-shot-'+time.strftime('%Y%m%d%H%M%S')+'.png')\n"
-        "ps=('Add-Type -AssemblyName System.Windows.Forms,System.Drawing; '\n"
-        "    '$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; '\n"
-        "    '$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height; '\n"
-        "    '$g=[System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Location,[System.Drawing.Point]::Empty,$b.Size); '\n"
-        "    f\"$bmp.Save('{out}')\")\n"
-        "subprocess.run(['powershell','-NoProfile','-Command',ps],check=True)\nprint(out)\n"),
+        "rows=[{'drive':d,'name':n} for d,ns in out.items() for n in ns]\n"
+        "print(f'FALCON:summary {len(out)} removable drive(s) · {len(rows)} items')\n"
+        "print('FALCON:result ' + json.dumps(rows))\n"),
+    # stdlib GDI capture, scaled down to fit the Engine's 2 MB (worker_client/screenshot.py)
+    "screenshot": "import sys\nfrom worker_client import screenshot\nsys.exit(screenshot.main())\n",
     "lock_session": "import sys, ctypes\nif sys.platform=='win32': ctypes.windll.user32.LockWorkStation()\nprint('locked')\n",
     "shutdown": "import sys, subprocess\nsubprocess.run(['shutdown','/s','/t','30'] if sys.platform=='win32' else ['shutdown','-h','+1'])\nprint('shutdown scheduled')\n",
     "reboot": "import sys, subprocess\nsubprocess.run(['shutdown','/r','/t','30'] if sys.platform=='win32' else ['shutdown','-r','+1'])\nprint('reboot scheduled')\n",
@@ -100,6 +105,50 @@ BUILTIN_ARGS: dict[str, list[str]] = {
     "file_activity": ["path"], "snapshot_file": ["path"], "rename_file": ["path", "new_name"], "restore_file": ["path"],
     "kill_process": ["name"], "start_process": ["command"], "notify": ["message"],
 }
+
+
+# What a run returned, besides its printed text: a script (built-in or Custom) prints these lines.
+#   FALCON:summary <one line>      what the console shows beside the run ("C: 92% full")
+#   FALCON:result <json>           rows (or any JSON) the console draws as a table
+#   FALCON:image <path>            a picture the run took; sent to the Engine, then removed here
+MARK = "FALCON:"
+OUTPUT_KEEP = 64 * 1024
+
+
+@dataclass
+class Returned:
+    output: str = ""
+    summary: str | None = None
+    result: Any = None
+    image: str | None = None
+
+
+def read_returned(text: str) -> Returned:
+    """Split a run's log into its text and the marked lines; the last of each mark wins. A result
+    that is not valid JSON is left in the text, unparsed."""
+    got = Returned()
+    kept = []
+    for line in text.splitlines():
+        if line.startswith(MARK + "summary "):
+            got.summary = line[len(MARK) + 8:].strip()[:300] or None
+        elif line.startswith(MARK + "image "):
+            got.image = line[len(MARK) + 6:].strip() or None
+        elif line.startswith(MARK + "result "):
+            try:
+                got.result = json.loads(line[len(MARK) + 7:])
+            except ValueError:
+                kept.append(line)
+        else:
+            kept.append(line)
+    got.output = "\n".join(kept).strip("\n")
+    return got
+
+
+def head_and_tail(text: str) -> str:
+    """The first and last 64 KB of a run's text -- what the Engine keeps of it."""
+    if len(text) <= 2 * OUTPUT_KEEP:
+        return text
+    return f"{text[:OUTPUT_KEEP]}\n... {len(text) - 2 * OUTPUT_KEEP} characters left out ...\n{text[-OUTPUT_KEEP:]}"
 
 
 @dataclass
@@ -206,7 +255,7 @@ class Executor:
                 offset = size
                 text = chunk.decode("utf-8", errors="replace")
                 for line in text.splitlines():
-                    if line.strip():
+                    if line.strip() and not line.startswith(MARK):
                         await self.report("control.execution_output", {"execution_id": run.execution_id, "chunk": line[:2000]})
         except asyncio.CancelledError:
             pass
@@ -227,12 +276,29 @@ class Executor:
         if run.tail_task:
             run.tail_task.cancel()
         self.running.pop(run.execution_id, None)
-        tail = ""
+        text = ""
         try:
-            tail = run.log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
+            text = run.log_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             pass
-        await self._finish(run.execution_id, status, exit_code=run.process.returncode, log_path=run.log_path, output=tail)
+        returned = read_returned(text)
+        if returned.image:
+            await self._send_image(run.execution_id, returned.image)
+        await self._finish(run.execution_id, status, exit_code=run.process.returncode, log_path=run.log_path,
+                           output=returned.output, summary=returned.summary, result=returned.result)
+
+    async def _send_image(self, execution_id: int, path: str) -> None:
+        """The picture a run took goes up before its result, then the file is removed from this PC."""
+        try:
+            data = await asyncio.to_thread(Path(path).read_bytes)
+            mime = "image/png" if path.lower().endswith(".png") else "image/jpeg"
+            await self.report("control.execution_image", {"execution_id": execution_id, "mime": mime,
+                                                          "data": base64.b64encode(data).decode("ascii")})
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not send the picture of execution %s: %s", execution_id, exc)
+        finally:
+            with contextlib.suppress(OSError):
+                os.remove(path)
 
     async def _kill(self, run: Running) -> None:
         proc = run.process
@@ -249,10 +315,14 @@ class Executor:
             pass
 
     async def _finish(self, execution_id: int, status: str, *, exit_code: int | None = None,
-                      log_path: Path | None = None, output: str = "", error: str | None = None) -> None:
+                      log_path: Path | None = None, output: str = "", error: str | None = None,
+                      summary: str | None = None, result: Any = None) -> None:
         payload: dict[str, Any] = {"execution_id": execution_id, "status": status, "exit_code": exit_code,
                                    "output_log_path": str(log_path) if log_path else None,
-                                   "output": (error or output)[-4000:] if (error or output) else None}
+                                   "output": head_and_tail(error or output) if (error or output) else None,
+                                   "summary": summary or (error.splitlines()[0][:300] if error else None)}
+        if result is not None:
+            payload["result"] = result
         try:
             await self.report("control.execution_result", payload)
         except Exception as exc:  # noqa: BLE001

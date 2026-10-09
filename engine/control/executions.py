@@ -17,6 +17,9 @@ the worker never reports on (timeout + grace).
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import logging
 from collections import deque
 from datetime import datetime, timedelta, timezone
@@ -40,10 +43,23 @@ log = logging.getLogger(__name__)
 
 GRACE_SECONDS = 15
 OUTPUT_CHUNKS_KEPT = 200
+OUTPUT_KEEP = 64 * 1024            # stored output: this much from the start and this much from the end
+RESULT_MAX = 512 * 1024            # a structured result bigger than this (as JSON) is not kept
+SUMMARY_MAX = 300
+IMAGE_MAX = 2 * 1024 * 1024        # a screenshot's picture, after the worker downscales it
+IMAGE_TYPES = ("image/jpeg", "image/png")
 
-# execution_id -> streamed output chunks (the worker keeps the full log file; this is the live
-# tail the Dashboard shows). Bounded; not persisted -- output_log_path is the durable record.
+# execution_id -> streamed output chunks: the live tail while a run is going. What a run returned
+# is stored with it when it finishes (control.execution_result); this is only the view until then.
 _outputs: dict[int, deque[str]] = {}
+
+
+def bound_output(text: str) -> str:
+    """The first and last OUTPUT_KEEP characters, with how much was left out between them."""
+    if len(text) <= 2 * OUTPUT_KEEP:
+        return text
+    cut = len(text) - 2 * OUTPUT_KEEP
+    return f"{text[:OUTPUT_KEEP]}\n... {cut} characters left out ...\n{text[-OUTPUT_KEEP:]}"
 
 
 def reset_state() -> None:
@@ -147,7 +163,9 @@ async def execution_output(ctx: Context, payload: dict[str, Any]) -> dict[str, A
 @handler("control.execution_result")
 async def execution_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Worker reports {"execution_id", "status": "success"|"failed"|"timeout"|"terminated",
-    "exit_code"?, "output_log_path"?, "output"?}."""
+    "exit_code"?, "output_log_path"?, "output"?, "summary"?, "result"?}. What the run returned is
+    stored with it: `output` bounded to its first and last 64 KB, `summary` one line, `result` the
+    rows a monitoring action returns (any JSON, up to 512 KB)."""
     require_account(ctx)
     execution_id = int_field(payload, "execution_id")
     ex = await _own_execution(ctx, execution_id)
@@ -157,19 +175,79 @@ async def execution_result(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     status = "terminated" if reported in ("timeout", "terminated") else reported
     reason = {"timeout": "timeout", "terminated": "manual"}.get(reported)
     exit_code = payload.get("exit_code")
-    await ctx.engine.db.control.finish_execution(execution_id, status, terminated_reason=reason,
-                                                 output_log_path=payload.get("output_log_path"),
-                                                 exit_code=int(exit_code) if exit_code is not None else None)
-    ctx.engine.scheduler.cancel(f"execution.{execution_id}.guard")
+    summary = " ".join(str(payload.get("summary") or "").split())[:SUMMARY_MAX] or None
+    streamed = _outputs.get(execution_id)
     if payload.get("output"):
-        _outputs.setdefault(execution_id, deque(maxlen=OUTPUT_CHUNKS_KEPT)).append(str(payload["output"]))
+        output = bound_output(str(payload["output"]))
+    else:                                   # an older worker sends no text: keep what streamed in
+        output = "\n".join(streamed) if streamed else None
+    result = payload.get("result")
+    if result is not None and len(json.dumps(result)) > RESULT_MAX:
+        log.warning("execution %s: result over %s bytes not kept", execution_id, RESULT_MAX)
+        result = None
+    db = ctx.engine.db
+    await db.control.finish_execution(execution_id, status, terminated_reason=reason,
+                                      output_log_path=payload.get("output_log_path"),
+                                      exit_code=int(exit_code) if exit_code is not None else None, summary=summary)
+    if output is not None or result is not None:
+        await db.control.save_output(execution_id, output, result)
+    ctx.engine.scheduler.cancel(f"execution.{execution_id}.guard")
+    _outputs.pop(execution_id, None)
     await ctx.engine.audit.record(ctx, "action.finished", target_type="execution", target_id=execution_id,
                                   detail={"status": status, "reason": reason, "exit_code": payload.get("exit_code")})
     action = await ctx.engine.db.control.action(ex["action_id"])
     if action:
         await _notify_dashboard(ctx.engine, action, {"execution_id": execution_id, "status": status,
-                                                     "terminated_reason": reason, "exit_code": payload.get("exit_code")})
+                                                     "terminated_reason": reason, "exit_code": payload.get("exit_code"),
+                                                     "summary": summary})
     return {"recorded": True, "status": status}
+
+
+@handler("control.execution_image")
+async def execution_image(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Worker sends the picture a run took (a screenshot), before its result: {"execution_id",
+    "mime": "image/jpeg"|"image/png", "data": base64}, downscaled by the worker to at most 2 MB.
+    Stored with the run; never pushed -- a console asks for it (control.execution_image_get)."""
+    require_account(ctx)
+    execution_id = int_field(payload, "execution_id")
+    await _own_execution(ctx, execution_id)
+    mime = str_field(payload, "mime", choices=IMAGE_TYPES)
+    try:
+        data = base64.b64decode(str(payload.get("data", "")), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ProtocolError(ErrorCode.INVALID, "data must be base64") from exc
+    if not data:
+        raise ProtocolError(ErrorCode.INVALID, "data is empty")
+    if len(data) > IMAGE_MAX:
+        raise ProtocolError(ErrorCode.INVALID, f"picture is {len(data)} bytes; at most {IMAGE_MAX}")
+    await ctx.engine.db.control.save_image(execution_id, mime, data)
+    return {"accepted": True, "bytes": len(data)}
+
+
+async def _execution_in_scope(ctx: Context, execution_id: int) -> dict[str, Any]:
+    """The run's department's Admins and the Super User may see what it returned."""
+    ident = require_role(ctx, "super_user", "admin")
+    ex = await ctx.engine.db.control.execution(execution_id)
+    if ex is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such execution")
+    pc = await ctx.engine.db.accounts.pc(ex["target_pc_id"])
+    require_department_scope(ident, pc["department_id"] if pc else None)
+    return ex
+
+
+@handler("control.execution_image_get")
+async def execution_image_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"execution_id"} -> the picture the run took, as base64. Every view is audited."""
+    execution_id = int_field(payload, "execution_id")
+    await _execution_in_scope(ctx, execution_id)
+    img = await ctx.engine.db.control.image(execution_id)
+    if img is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "this run took no picture")
+    if img["data"] is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "this run's picture has expired (kept 90 days)")
+    await ctx.engine.audit.record(ctx, "execution.image_viewed", target_type="execution", target_id=execution_id)
+    return {"execution_id": execution_id, "mime": img["mime"], "bytes": img["bytes"],
+            "captured_at": img["captured_at"].isoformat(), "data": base64.b64encode(img["data"]).decode("ascii")}
 
 
 @handler("control.terminate")
@@ -191,15 +269,18 @@ async def terminate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("control.execution")
 async def execution(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """One execution with its live output tail."""
-    ident = require_role(ctx, "super_user", "admin")
+    """One execution and what it returned: `output` (the stored text as lines; while it runs, the
+    live tail), `result` (rows from a monitoring action, or null), `summary` and `has_image` on the
+    execution row, and `expired` once retention has cleared them."""
     execution_id = int_field(payload, "execution_id")
-    ex = await ctx.engine.db.control.execution(execution_id)
-    if ex is None:
-        raise ProtocolError(ErrorCode.NOT_FOUND, "no such execution")
-    pc = await ctx.engine.db.accounts.pc(ex["target_pc_id"])
-    require_department_scope(ident, pc["department_id"] if pc else None)
-    return {"execution": row(ex), "output": list(_outputs.get(execution_id, []))}
+    ex = await _execution_in_scope(ctx, execution_id)
+    stored = await ctx.engine.db.control.output(execution_id)
+    if stored is None:
+        return {"execution": row(ex), "output": list(_outputs.get(execution_id, [])), "result": None,
+                "expired": False}
+    text = stored["output"]
+    return {"execution": row(ex), "output": text.splitlines() if text else [], "result": stored["result"],
+            "expired": stored["cleared_at"] is not None}
 
 
 @handler("control.dashboard")

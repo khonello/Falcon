@@ -950,6 +950,10 @@ class AssistanceRepo(_Repo):
 # 9. Control, Events, Monitoring, Actions
 # ============================================================================================
 
+# A run that kept a picture still in retention (migration 014).
+_HAS_IMAGE = "EXISTS (SELECT 1 FROM execution_images i WHERE i.execution_id = e.id AND i.data IS NOT NULL) AS has_image"
+
+
 class ControlRepo(_Repo):
     # -- levels over time --------------------------------------------------------------------------
 
@@ -1060,7 +1064,8 @@ class ControlRepo(_Repo):
 
     async def last_executions_for_action(self, action_id: int, limit: int = 5) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT * FROM action_executions WHERE action_id = $1 ORDER BY started_at DESC LIMIT $2", action_id, limit)
+            "SELECT e.*, " + _HAS_IMAGE + " FROM action_executions e WHERE e.action_id = $1 "
+            "ORDER BY e.started_at DESC LIMIT $2", action_id, limit)
 
     async def pending_executions(self) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -1086,15 +1091,49 @@ class ControlRepo(_Repo):
             "VALUES ($1, $2, $3) RETURNING id", action_id, event_id, pc_id)
 
     async def finish_execution(self, execution_id: int, status: str, *, terminated_reason: str | None = None,
-                               output_log_path: str | None = None, exit_code: int | None = None) -> None:
+                               output_log_path: str | None = None, exit_code: int | None = None,
+                               summary: str | None = None) -> None:
         await self._exec(
             "UPDATE action_executions SET status = $2, terminated_reason = $3, "
-            "output_log_path = COALESCE($4, output_log_path), exit_code = $5, ended_at = now() "
+            "output_log_path = COALESCE($4, output_log_path), exit_code = $5, summary = $6, ended_at = now() "
             "WHERE id = $1 AND status = 'pending'",
-            execution_id, status, terminated_reason, output_log_path, exit_code)
+            execution_id, status, terminated_reason, output_log_path, exit_code, summary)
 
     async def execution(self, execution_id: int) -> dict[str, Any] | None:
-        return await self._one("SELECT * FROM action_executions WHERE id = $1", execution_id)
+        return await self._one("SELECT e.*, " + _HAS_IMAGE + " FROM action_executions e WHERE e.id = $1",
+                               execution_id)
+
+    # -- what a run returned (migration 014) -----------------------------------------------------
+
+    async def save_output(self, execution_id: int, output: str | None, result: Any) -> None:
+        await self._exec(
+            "INSERT INTO execution_outputs (execution_id, output, result) VALUES ($1, $2, $3) "
+            "ON CONFLICT (execution_id) DO UPDATE SET output = EXCLUDED.output, result = EXCLUDED.result, "
+            "recorded_at = now()", execution_id, output, result)
+
+    async def output(self, execution_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM execution_outputs WHERE execution_id = $1", execution_id)
+
+    async def save_image(self, execution_id: int, mime: str, data: bytes) -> None:
+        await self._exec(
+            "INSERT INTO execution_images (execution_id, mime, data, bytes) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (execution_id) DO UPDATE SET mime = EXCLUDED.mime, data = EXCLUDED.data, "
+            "bytes = EXCLUDED.bytes, captured_at = now(), cleared_at = NULL", execution_id, mime, data, len(data))
+
+    async def image(self, execution_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM execution_images WHERE execution_id = $1", execution_id)
+
+    async def clear_outputs_older_than(self, days: int) -> int:
+        """Retention for what runs returned: the text, rows and picture are cleared (set to NULL);
+        the run rows and these rows stay, so a run still says it had output that has expired."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            a = await conn.execute(
+                "UPDATE execution_outputs SET output = NULL, result = NULL, cleared_at = now() "
+                "WHERE cleared_at IS NULL AND recorded_at < now() - make_interval(days => $1)", days)
+            b = await conn.execute(
+                "UPDATE execution_images SET data = NULL, cleared_at = now() "
+                "WHERE cleared_at IS NULL AND captured_at < now() - make_interval(days => $1)", days)
+        return int(a.split()[-1]) + int(b.split()[-1])
 
     async def live_executions(self) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -1105,7 +1144,8 @@ class ControlRepo(_Repo):
         """What one automation's actions did, newest first, named for reading: the action's name and
         type, the machine's hostname."""
         return await self._fetch(
-            "SELECT e.*, a.name AS action_name, a.builtin_type, a.action_kind, p.hostname "
+            "SELECT e.*, a.name AS action_name, a.builtin_type, a.action_kind, p.hostname, "
+            + _HAS_IMAGE + " "
             "FROM action_executions e JOIN actions a ON a.id = e.action_id LEFT JOIN pcs p ON p.id = e.target_pc_id "
             "WHERE e.triggered_by_event_definition_id = $1 ORDER BY e.started_at DESC LIMIT $2", event_id, limit)
 

@@ -11,6 +11,7 @@ approval gate, department rollout, escalation past the threshold, aggregate heal
 from __future__ import annotations
 
 import asyncio
+import base64
 from datetime import datetime, timedelta, timezone
 
 from engine.control import events, executions
@@ -78,6 +79,25 @@ async def test_event_fires_actions_independently_with_timeout_and_termination(en
                                              "exit_code": 0, "output_log_path": "C:/logs/1.log"})
     ex2 = await a1.ok("control.execution", {"execution_id": by_type["usb_contents"]})
     assert ex2["execution"]["status"] == "success" and ex2["output"] == ["E:/file1.txt"]
+    # What a run returned is kept with it: a picture (asked for, audited, size-capped, its own
+    # department and the Super User only) and, after 90 days, cleared but still said to have been.
+    pic = base64.b64encode(b"PNG fake").decode()
+    assert await w1.err("control.execution_image", {"execution_id": by_type["usb_contents"], "mime": "image/gif",
+                                                    "data": pic}) == "invalid"
+    big = base64.b64encode(b"x" * (executions.IMAGE_MAX + 1)).decode()
+    assert await w1.err("control.execution_image", {"execution_id": by_type["usb_contents"], "mime": "image/png",
+                                                    "data": big}) == "invalid"
+    await w1.ok("control.execution_image", {"execution_id": by_type["usb_contents"], "mime": "image/png", "data": pic})
+    assert (await a1.ok("control.execution_image_get", {"execution_id": by_type["usb_contents"]}))["data"] == pic
+    a2 = await connect("cid-a2")
+    assert await a2.err("control.execution_image_get", {"execution_id": by_type["usb_contents"]}) == "forbidden"
+    assert await a1.err("control.execution_image_get", {"execution_id": by_type["screenshot"]}) == "not_found"
+    viewed = await engine.db.audit.recent(limit=5)
+    assert any(r["action_type"] == "execution.image_viewed" for r in viewed)
+    assert await engine.db.control.clear_outputs_older_than(0) == 2
+    gone = await a1.ok("control.execution", {"execution_id": by_type["usb_contents"]})
+    assert gone["expired"] is True and gone["output"] == [] and gone["execution"]["has_image"] is False
+    assert await a1.err("control.execution_image_get", {"execution_id": by_type["usb_contents"]}) == "not_found"
     statuses = [p.payload for p in await a1.drain_pushes() if p.type == "action.status"]
     assert {s["execution_id"] for s in statuses} >= set(by_type.values())
 

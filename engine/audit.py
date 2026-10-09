@@ -61,4 +61,8 @@ class AuditTrail:
             return 0
         purged = await self.db.audit.purge_older_than(self.retention_days)
         log.info("audit retention: purged %s entries older than %sd", purged, self.retention_days)
+        # What runs returned (output, rows, screenshots) expires on the same clock.
+        cleared = await self.db.control.clear_outputs_older_than(self.retention_days)
+        if cleared:
+            log.info("audit retention: cleared %s run outputs older than %sd", cleared, self.retention_days)
         return purged

@@ -172,10 +172,28 @@ async def dashboard(ctx: ShellContext, args: Args) -> str:
     return "\n".join(lines)
 
 
-@command("exec", usage="<execution_id>", help_="One execution with its output tail")
+@command("exec", usage="<execution_id>", help_="One execution and what it returned (text, rows, whether it took a picture)")
 async def exec_(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.execution", {"execution_id": args.get_int(0, "execution_id")})
-    return kv(res["execution"]) + "\n\noutput:\n" + ("\n".join(res["output"]) or "(none)")
+    out = kv(res["execution"])
+    if res.get("expired"):
+        return out + "\n\nwhat it returned has expired (kept 90 days)"
+    result = res.get("result")
+    if isinstance(result, list) and result and all(isinstance(r, dict) for r in result):
+        out += "\n\nrows:\n" + table(result, list(result[0]))
+    elif result is not None:
+        out += "\n\nresult:\n" + (kv(result) if isinstance(result, dict) else str(result))
+    return out + "\n\noutput:\n" + ("\n".join(res["output"]) or "(none)")
+
+
+@command("exec", "picture", "<execution_id> <file>", "Save the picture a run took (a screenshot); the view is audited")
+async def exec_picture(ctx: ShellContext, args: Args) -> str:
+    import base64
+
+    res = await ctx.call("control.execution_image_get", {"execution_id": args.get_int(0, "execution_id")})
+    path = Path(args.get(1, "file"))
+    path.write_bytes(base64.b64decode(res["data"]))
+    return f"saved {res['bytes']} bytes ({res['mime']}, taken {res['captured_at']}) to {path}"
 
 
 @command("terminate", usage="<execution_id>", help_="Stop a running action by execution id")

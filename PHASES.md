@@ -261,7 +261,9 @@ Known gaps, all deliberate and written down in `docs/UI-COMPONENTS.md`:
 
 ## Engine work the approved UI now depends on — agreed 25 Sep 2026, "to be done later"
 
-- **Carry a screen picture to the Operator Client.** Board `DP07` draws the held session with a picture
+- [x] **Carry a screen picture to the Operator Client** (done 9 Oct 2026, ENGINE-GAPS was #20: the `screenshot` Action
+  captures with GDI through ctypes, scales to fit 2 MB, and sends it as `control.execution_image`; the Engine keeps it
+  with the run and `control.execution_image_get` returns it on request, audited). Board `DP07` draws the held session with a picture
   of the Admin's screen, approved by the user with the gap understood. Today `engine/control/actions.py`
   declares a `screenshot` Action and `worker_client/executor.py` implements it, but it writes a PNG to the
   worker's own disk and returns the *path* — nothing carries the bytes. Three pieces: the Action returning

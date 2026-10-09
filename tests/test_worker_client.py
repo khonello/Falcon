@@ -9,6 +9,7 @@ metrics and program signals, update attempts.
 from __future__ import annotations
 
 import asyncio
+import base64
 import inspect
 from pathlib import Path
 
@@ -146,7 +147,24 @@ async def test_executor_runs_custom_and_builtin_actions_with_timeout_and_termina
         metrics = (await admin.call("control.action_create", {"kind": "monitoring", "builtin_type": "system_metrics", "timeout_s": 20}))["action"]
         ex6 = (await admin.call("control.action_run", {"action_id": metrics["id"], "pc_id": org["w1_pc"]}))["execution_id"]
         assert await _wait(lambda: svc.executor.completed.get(ex6) == "success", timeout=15)
-        assert '"cpu"' in "".join((await admin.call("control.execution", {"execution_id": ex6}))["output"])
+        view6 = await admin.call("control.execution", {"execution_id": ex6})
+        assert set(view6["result"]) == {"cpu", "memory", "disk"} and view6["output"] == []
+        assert view6["execution"]["summary"].startswith("processor ")
+
+        # What a Custom Action returned: its summary, rows and a picture, kept with the run.
+        shows = (await admin.call("control.action_create", {
+            "kind": "custom", "name": "shows", "language": "python", "timeout_s": 20,
+            "script": "import os, tempfile\np = os.path.join(tempfile.gettempdir(), 'falcon-test-pic.png')\n"
+                      "open(p, 'wb').write(b'not really a png')\nprint('working')\n"
+                      "print('FALCON:summary 2 rows')\nprint('FALCON:result [{\"a\": 1}, {\"a\": 2}]')\n"
+                      "print('FALCON:image ' + p)\n"}))["action"]
+        ex8 = (await admin.call("control.action_run", {"action_id": shows["id"], "pc_id": org["w1_pc"]}))["execution_id"]
+        assert await _wait(lambda: svc.executor.completed.get(ex8) == "success", timeout=15)
+        view8 = await admin.call("control.execution", {"execution_id": ex8})
+        assert view8["output"] == ["working"] and view8["result"] == [{"a": 1}, {"a": 2}]
+        assert view8["execution"]["summary"] == "2 rows" and view8["execution"]["has_image"] is True
+        pic = await admin.call("control.execution_image_get", {"execution_id": ex8})
+        assert base64.b64decode(pic["data"]) == b"not really a png" and pic["mime"] == "image/png"
         off = (await admin.call("control.action_create", {"kind": "control", "builtin_type": "shutdown", "timeout_s": 5}))["action"]
         ex7 = (await admin.call("control.action_run", {"action_id": off["id"], "pc_id": org["w1_pc"]}))["execution_id"]
         assert await _wait(lambda: svc.executor.completed.get(ex7) == "failed", timeout=10)
