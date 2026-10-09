@@ -342,6 +342,17 @@ When each reader first opened a report (migration 012), so a board can tell *new
 
 ## 9. Control, Events, Monitoring & Actions
 
+### `metric_samples`
+A machine's levels over time (migration 013): one row per machine every 10 minutes from `control.metrics`, so `control.levels` can give the rolling 7-day p10–p90 of each metric -- the "typical day" a threshold is drawn against. Never deleted; read by time range only.
+
+| Column | Type | Notes |
+|---|---|---|
+| `pc_id` | INTEGER FK → pcs.id NOT NULL | |
+| `sampled_at` | TIMESTAMP NOT NULL | Indexed |
+| `cpu`, `memory` | REAL NOT NULL | Percent |
+| `idle_s` | REAL NOT NULL | Seconds since the person's last input |
+| PK(`pc_id`, `sampled_at`) | | |
+
 ### `event_definitions`
 | Column | Type | Notes |
 |---|---|---|

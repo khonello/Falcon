@@ -32,6 +32,7 @@ no ordering dependency, no output piping (v1). Task deadlines arrive here as
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -73,6 +74,9 @@ FILE_OP_TO_EVENT = {"create": "file.created", "modify": "file.modified", "move":
 
 # pc_id -> latest metrics {cpu, memory, idle_s, at}
 _metrics: dict[int, dict[str, Any]] = {}
+# One stored sample per machine this often; the rest of control.metrics only updates `_metrics`.
+METRIC_SAMPLE_SECONDS = 600
+_last_sampled: dict[int, float] = {}
 # definition id -> last fired (UTC); also tracks one-shot / recurring time events
 _last_fired: dict[int, datetime] = {}
 # (definition id, pc_id) -> when a threshold first became true (for duration_s)
@@ -82,6 +86,7 @@ _threshold_since: dict[tuple[int, int], datetime] = {}
 def reset_state() -> None:
     """Forget in-memory state (Engine start; tests). Durable state lives in the database."""
     _metrics.clear()
+    _last_sampled.clear()
     _last_fired.clear()
     _threshold_since.clear()
 
@@ -423,8 +428,14 @@ async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_account(ctx)
     if ident.pc_id is None:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
-    _metrics[ident.pc_id] = {"cpu": float(payload.get("cpu", 0)), "memory": float(payload.get("memory", 0)),
-                             "idle_s": float(payload.get("idle_s", 0)), "at": datetime.now(timezone.utc).isoformat()}
+    m = {"cpu": float(payload.get("cpu", 0)), "memory": float(payload.get("memory", 0)),
+         "idle_s": float(payload.get("idle_s", 0)), "at": datetime.now(timezone.utc).isoformat()}
+    _metrics[ident.pc_id] = m
+    now = time.monotonic()
+    last = _last_sampled.get(ident.pc_id)
+    if ctx.engine.db.connected and (last is None or now - last >= METRIC_SAMPLE_SECONDS):
+        _last_sampled[ident.pc_id] = now
+        await ctx.engine.db.control.add_metric_sample(ident.pc_id, m["cpu"], m["memory"], m["idle_s"])
     return {"accepted": True}
 
 
@@ -466,8 +477,10 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 
 @handler("control.levels")
 async def levels(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Where the machines' own levels sit right now -- the range a threshold is drawn against, so a
-    line is set clear of a normal day. {"pc_ids"?} (default: the caller's department)."""
+    """Where the machines' own levels sit -- the range a threshold is drawn against, so a line is set
+    clear of a normal day. {"pc_ids"?} (default: the caller's department). `cpu`/`memory`/`idle_s`
+    are the min-max right now; `typical` is the rolling 7-day p10-p90 of each from stored samples
+    (null until any are stored), with how many samples and since when."""
     ident = require_role(ctx, "super_user", "admin")
     wanted = payload.get("pc_ids")
     if wanted:
@@ -482,4 +495,12 @@ async def levels(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         vals = [float(m.get(key, 0)) for m in seen]
         return [min(vals), max(vals)] if vals else None
 
-    return {"machines": len(seen), "cpu": span("cpu"), "memory": span("memory"), "idle_s": span("idle_s")}
+    typical = None
+    if ctx.engine.db.connected:
+        t = await ctx.engine.db.control.typical_levels(None if not wanted and ident.role == "super_user"
+                                                       else sorted(scope))
+        if t.get("samples"):
+            typical = {"samples": t["samples"], "machines": t["machines"], "since": t["since"].isoformat(),
+                       **{k: [round(v, 1) for v in t[k]] for k in ("cpu", "memory", "idle_s")}}
+    return {"machines": len(seen), "cpu": span("cpu"), "memory": span("memory"), "idle_s": span("idle_s"),
+            "typical": typical}

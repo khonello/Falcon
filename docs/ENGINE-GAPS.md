@@ -22,8 +22,6 @@ service inside that person's session.
 2. **A file being opened cannot be seen.** `file.accessed` exists as an event type but nothing produces it
    (the watcher sees create/modify/move/copy/delete only). The UI no longer offers "is opened"; either
    detect reads (Windows auditing / a minifilter is heavy) or drop the type. *Found:* Automation (AU08).
-3. **No "normal" level history.** `control.levels` gives the range the machines sit in *now*; the slider's
-   band would be truer as a typical day (e.g. a rolling 7-day p10-p90 per metric). *Found:* AU09.
 4. **Built-in actions ignore settings the design asks for** (Actions, AU06). The page offers only what works:
    - `lock_session` locks at once and ignores `duration_s`; no message is shown. The design wants "lock it for
      15 min" with a message (a Worker overlay that holds the lock, then releases it).
@@ -112,6 +110,11 @@ service inside that person's session.
 
 ## Done inline (for the record)
 
+- **A typical day for each level** (was #3, done 9 Oct 2026). `control.metrics` now also stores one sample per machine
+  every 10 minutes in `metric_samples` (migration 013, never deleted); `control.levels` adds `typical`: the rolling
+  7-day p10-p90 of processor, memory and idle across the same machines, with the sample count and since when (null
+  until a sample exists). The min-max of now stays. TUI: `levels`.
+  *Test:* `test_control_updates.py` (levels: a second report inside the interval is not stored).
 - **A report keeps its words and each reader's "seen"** (was #7, done 9 Oct 2026). `reports.summary` holds the
   sentence `emit()` was given (migration 012); `reports.list` returns it with `seen_at` (this reader's first open,
   theirs alone) and `addressed_at`. `reports.seen {report_ids}` marks reports the reader can see; the first open is

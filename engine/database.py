@@ -951,6 +951,24 @@ class AssistanceRepo(_Repo):
 # ============================================================================================
 
 class ControlRepo(_Repo):
+    # -- levels over time --------------------------------------------------------------------------
+
+    async def add_metric_sample(self, pc_id: int, cpu: float, memory: float, idle_s: float) -> None:
+        await self._exec(
+            "INSERT INTO metric_samples (pc_id, cpu, memory, idle_s) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT DO NOTHING", pc_id, cpu, memory, idle_s)
+
+    async def typical_levels(self, pc_ids: list[int] | None, days: int = 7) -> dict[str, Any]:
+        """The p10-p90 of each metric over the last `days`, across the given machines (None: all)."""
+        row = await self._one(
+            "SELECT count(*) AS samples, count(DISTINCT pc_id) AS machines, min(sampled_at) AS since, "
+            "percentile_cont(ARRAY[0.1, 0.9]) WITHIN GROUP (ORDER BY cpu) AS cpu, "
+            "percentile_cont(ARRAY[0.1, 0.9]) WITHIN GROUP (ORDER BY memory) AS memory, "
+            "percentile_cont(ARRAY[0.1, 0.9]) WITHIN GROUP (ORDER BY idle_s) AS idle_s "
+            "FROM metric_samples WHERE sampled_at >= now() - make_interval(days => $1) "
+            "AND ($2::int[] IS NULL OR pc_id = ANY($2::int[]))", days, pc_ids)
+        return row or {"samples": 0}
+
     # -- events ----------------------------------------------------------------------------------
 
     async def create_event(self, created_by: int, condition_type: str, condition_spec: dict[str, Any]) -> int:

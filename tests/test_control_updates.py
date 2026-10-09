@@ -224,6 +224,12 @@ async def test_a_tier_is_matched_and_what_an_automation_did_is_read_back(engine,
     await w1.ok("control.metrics", {"cpu": 30, "memory": 50, "idle_s": 5})
     lv = await a1.ok("control.levels")
     assert lv["machines"] == 1 and lv["cpu"] == [30.0, 30.0]
+    # ...and a typical day from the stored samples (one per machine per interval; the next report
+    # inside the interval is not stored)
+    await w1.ok("control.metrics", {"cpu": 90, "memory": 50, "idle_s": 5})
+    typical = (await a1.ok("control.levels"))["typical"]
+    assert typical["samples"] == 1 and typical["cpu"] == [30.0, 30.0] and typical["machines"] == 1
+    assert (await a1.ok("control.levels", {"pc_ids": [org["w2_pc"]]}))["typical"] is None
 
 
 async def test_a_time_automation_runs_its_actions_on_its_machines(engine, org, connect):

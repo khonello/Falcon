@@ -139,12 +139,18 @@ async def event_history(ctx: ShellContext, args: Args) -> str:
     return "\n".join(lines)
 
 
-@command("levels", usage="[pcs=3,4]", help_="Where the machines' processor, memory and idle levels sit right now")
+@command("levels", usage="[pcs=3,4]", help_="Where the machines' processor, memory and idle levels sit: now, and a typical day")
 async def levels(ctx: ShellContext, args: Args) -> str:
     pcs = args.opt("pcs")
     res = await ctx.call("control.levels", {"pc_ids": [int(x) for x in pcs.split(",") if x]} if pcs else {})
-    return kv({"machines reporting": res["machines"], "processor %": res["cpu"], "memory %": res["memory"],
-               "idle seconds": res["idle_s"]})
+    out = kv({"machines reporting": res["machines"], "processor %": res["cpu"], "memory %": res["memory"],
+              "idle seconds": res["idle_s"]})
+    t = res.get("typical")
+    if not t:
+        return out + "\n\ntypical day: no samples yet"
+    return out + "\n\n" + kv({"typical day (p10-p90, 7 days)": f"{t['samples']} samples from {t['machines']} "
+                                                              f"machines since {t['since']}",
+                              "processor %": t["cpu"], "memory %": t["memory"], "idle seconds": t["idle_s"]})
 
 
 @command("dashboard", help_="Operational view: enabled automations, last fired, recent executions, live runs")
