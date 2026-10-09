@@ -248,6 +248,27 @@ async def test_report_routing_is_additive_and_views_are_super_user_only(engine, 
     assert view[0]["report_id"] == rid and view[0]["addressed_by_department_id"] == org["fin"]
 
 
+async def test_a_report_keeps_its_words_and_each_reader_sees_it_alone(engine, org, connect):
+    from engine.hierarchy import reports
+
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")      # Finance
+    a2 = await connect("cid-a2")      # HR
+    await su.ok("reports.routing_set", {"category": "flow_failure", "department_ids": [org["fin"]]})
+    rid = await reports.emit(engine, "flow_failure", source_table="flow_sync_log", source_id=3,
+                             summary="Payroll sync stopped: the destination is full")
+    row = (await a1.ok("reports.list"))["reports"][0]
+    assert row["summary"] == "Payroll sync stopped: the destination is full" and row["seen_at"] is None
+
+    assert (await a1.ok("reports.seen", {"report_ids": [rid]}))["seen"] == [rid]
+    assert (await a1.ok("reports.seen", {"report_ids": [rid]}))["seen"] == []        # first open kept
+    assert (await a1.ok("reports.list"))["reports"][0]["seen_at"] is not None
+    assert (await su.ok("reports.list"))["reports"][0]["seen_at"] is None            # seen is per reader
+    assert await a2.err("reports.seen", {"report_ids": [rid]}) == "not_found"         # not routed to HR
+    assert await su.err("reports.seen", {"report_ids": []}) == "invalid"
+    assert (await su.ok("reports.seen", {"report_ids": [rid]}))["seen"] == [rid]
+
+
 async def test_routing_a_department_with_or_without_earlier_reports(engine, org, connect):
     from engine.hierarchy import reports
 

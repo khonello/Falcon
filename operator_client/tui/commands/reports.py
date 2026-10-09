@@ -9,7 +9,14 @@ from operator_client.tui.shell import Args, ShellContext, UsageError, command
 @command("reports", help_="Reports you can see: everything (Super User) or your routed pane (Admin)")
 async def reports(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("reports.list")
-    return table(res["reports"], ["id", "category", "source_table", "source_id", "generated_at", "addressed_at"])
+    return table(res["reports"], ["id", "category", "summary", "generated_at", "seen_at", "addressed_at"])
+
+
+@command("report", "seen", "<report_id>[,<report_id>...]", "Mark reports seen by you (new -> seen, yours only)")
+async def report_seen(ctx: ShellContext, args: Args) -> str:
+    ids = [int(x) for x in args.get(0, "report_id").split(",") if x]
+    res = await ctx.call("reports.seen", {"report_ids": ids})
+    return f"seen now: {res['seen'] or 'none (already seen)'}"
 
 
 @command("report", "mark", "<report_id>", "Mark a routed report addressed (Admin); Super User's copy is untouched")

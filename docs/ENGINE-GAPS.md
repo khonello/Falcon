@@ -36,11 +36,6 @@ service inside that person's session.
    machine).
 6. **Rename a file's new name is free text** and `rename_file` runs on every machine the action targets with one
    path; a per-machine path (from `file_index`, by hash or name) would be truer. *Found:* AU06.
-7. **A report keeps no words and no "seen".** `reports` stores category + source pointer + time; the summary
-   passed to `emit()` is only logged and pushed. The Reports page rebuilds the sentence by reading the source
-   (violations, flows) and falls back to a generic line for the rest (listener, cross-department, update,
-   deviation). Store the summary (or resolve every source in `reports.list`), and add a per-reader "seen" so the
-   board's new / seen / addressed can be told apart. *Found:* Reports (RP03).
 9. **Resources: "where it should be" and "a file's journey"** (RS03) have no data. The first needs files marked
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
@@ -117,6 +112,11 @@ service inside that person's session.
 
 ## Done inline (for the record)
 
+- **A report keeps its words and each reader's "seen"** (was #7, done 9 Oct 2026). `reports.summary` holds the
+  sentence `emit()` was given (migration 012); `reports.list` returns it with `seen_at` (this reader's first open,
+  theirs alone) and `addressed_at`. `reports.seen {report_ids}` marks reports the reader can see; the first open is
+  kept. Reports written before 012 have an empty summary. TUI: `report seen <ids>`.
+  *Test:* `test_hierarchy.py::test_a_report_keeps_its_words_and_each_reader_sees_it_alone`.
 - **Listeners from any department** (was #8, done 9 Oct 2026). `assistance.listener_candidates {channel_id}` lists
   every active Admin in every department, less the channel's two parties and those the caller already added, named
   as the caller names them; only a party may ask. TUI: `listen who <channel_id>`.

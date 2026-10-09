@@ -771,28 +771,42 @@ class FlowsRepo(_Repo):
 # ============================================================================================
 
 class ReportsRepo(_Repo):
-    async def write(self, category: str, source_table: str, source_id: int) -> int:
-        """Written once. Visibility is decided at read time. Never touches
+    async def write(self, category: str, source_table: str, source_id: int, summary: str = "") -> int:
+        """Written once, with its sentence. Visibility is decided at read time. Never touches
         report_addressed_views."""
         if source_table not in POLYMORPHIC_TABLES:
             raise ValueError(f"unknown report source table {source_table!r}")
         return await self._val(
-            "INSERT INTO reports (category, source_table, source_id) VALUES ($1, $2, $3) RETURNING id",
-            category, source_table, source_id)
+            "INSERT INTO reports (category, source_table, source_id, summary) VALUES ($1, $2, $3, $4) RETURNING id",
+            category, source_table, source_id, summary)
 
-    async def all(self, limit: int = 500) -> list[dict[str, Any]]:
+    # Per reader: when this reader first opened the report, and when anyone addressed it.
+    _READER_COLS = (
+        "(SELECT s.seen_at FROM report_seen s WHERE s.report_id = r.id AND s.account_id = $1) AS seen_at, "
+        "(SELECT max(v.addressed_at) FROM report_addressed_views v WHERE v.report_id = r.id) AS addressed_at")
+
+    async def all(self, reader_id: int, limit: int = 500) -> list[dict[str, Any]]:
         """Super User's view: everything, unconditionally, never filtered by routing."""
-        return await self._fetch("SELECT * FROM reports ORDER BY generated_at DESC LIMIT $1", limit)
+        return await self._fetch(
+            f"SELECT r.*, {self._READER_COLS} FROM reports r ORDER BY r.generated_at DESC LIMIT $2",
+            reader_id, limit)
 
-    async def routed_to_department(self, department_id: int, limit: int = 500) -> list[dict[str, Any]]:
+    async def routed_to_department(self, department_id: int, reader_id: int | None = None,
+                                   limit: int = 500) -> list[dict[str, Any]]:
         """An Admin's pane: only categories routed to their department, with addressed state. A
         department routed without the earlier reports sees only those written since it was routed."""
         return await self._fetch(
-            "SELECT r.*, (SELECT max(v.addressed_at) FROM report_addressed_views v WHERE v.report_id = r.id) "
-            "  AS addressed_at "
+            f"SELECT r.*, {self._READER_COLS} "
             "FROM reports r JOIN report_routing_config c ON c.category = r.category "
-            "WHERE c.routed_department_id = $1 AND (c.includes_earlier OR r.generated_at >= c.configured_at) "
-            "ORDER BY r.generated_at DESC LIMIT $2", department_id, limit)
+            "WHERE c.routed_department_id = $2 AND (c.includes_earlier OR r.generated_at >= c.configured_at) "
+            "ORDER BY r.generated_at DESC LIMIT $3", reader_id, department_id, limit)
+
+    async def mark_seen(self, report_ids: list[int], account_id: int) -> list[int]:
+        """First open only: a report already seen keeps its first time. Returns the ids newly seen."""
+        rows = await self._fetch(
+            "INSERT INTO report_seen (report_id, account_id) SELECT unnest($1::int[]), $2 "
+            "ON CONFLICT DO NOTHING RETURNING report_id", report_ids, account_id)
+        return sorted(r["report_id"] for r in rows)
 
     async def routing_config(self) -> list[dict[str, Any]]:
         return await self._fetch(

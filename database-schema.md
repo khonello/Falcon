@@ -301,6 +301,7 @@ The single table every "surfaced to Super User" event throughout the whole syste
 | `source_table` | TEXT NOT NULL | Which table the underlying event lives in (`'resource_violations'`, `'flow_sync_log'`, etc.) |
 | `source_id` | INTEGER NOT NULL | The row id in that table — a polymorphic reference, deliberately not a strict FK, since no relational database can cleanly FK a column across a variable target table. Postgres's table inheritance or a `CHECK`-per-partition approach could reduce this tradeoff later, but is not necessary for v1 — enforced in the Engine's data-access layer instead |
 | `generated_at` | TIMESTAMP NOT NULL | |
+| `summary` | TEXT NOT NULL DEFAULT '' | The sentence `emit()` was given, kept so a list can show it without resolving every source (migration 012) |
 
 **Super User always sees every row here, unconditionally — no query ever filters `reports` by routing for a Super User's own view.**
 
@@ -326,6 +327,16 @@ The Super-User-only View — **structurally incapable of being a Report**, by de
 | `report_id` | INTEGER FK → reports.id NOT NULL | |
 | `addressed_by_account_id` | INTEGER FK → accounts.id NOT NULL | |
 | `addressed_at` | TIMESTAMP NOT NULL | |
+
+### `report_seen`
+When each reader first opened a report (migration 012), so a board can tell *new* from *seen* from *addressed*. Per reader, never shared: one Admin opening a report does not make it seen for another. Neither a Report nor part of the Super User's View.
+
+| Column | Type | Notes |
+|---|---|---|
+| `report_id` | INTEGER FK → reports.id NOT NULL | |
+| `account_id` | INTEGER FK → accounts.id NOT NULL | The reader |
+| `seen_at` | TIMESTAMP NOT NULL | The first open; later opens keep it |
+| PK(`report_id`, `account_id`) | | |
 
 ---
 

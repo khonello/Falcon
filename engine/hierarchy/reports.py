@@ -45,13 +45,13 @@ FIXED_CATEGORIES = frozenset({"about_admin"})
 
 async def emit(engine: Engine, category: str, *, source_table: str, source_id: int,
                summary: str) -> int:
-    """Write once; visibility is decided at read time from `report_routing_config`. The push
+    """Write once, with its sentence; visibility is decided at read time from `report_routing_config`. The push
     goes to every Super User connection and to Admins of departments the category routes to."""
     assert category in CATEGORIES, category
     if not engine.db.connected:
         log.info("REPORT (no db) %s: %s", category, summary)
         return 0
-    report_id = await engine.db.reports.write(category, source_table, source_id)
+    report_id = await engine.db.reports.write(category, source_table, source_id, summary)
     log.info("REPORT %s #%s: %s", category, report_id, summary)
     routed = set(await engine.db.reports.departments_for_category(category))
     await engine.broadcast(
@@ -66,14 +66,34 @@ async def emit(engine: Engine, category: str, *, source_table: str, source_id: i
 @handler("reports.list")
 async def list_reports(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Super User: everything, unconditionally. Admin: only categories routed to their
-    department (the routed pane). Workers have no reports."""
+    department (the routed pane). Workers have no reports. Each row carries its `summary`, when
+    this reader first opened it (`seen_at`, theirs alone) and when anyone addressed it."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     if ident.role == "super_user":
-        found = await db.reports.all()
+        found = await db.reports.all(ident.account_id)
     else:
-        found = await db.reports.routed_to_department(ident.department_id)
+        found = await db.reports.routed_to_department(ident.department_id, ident.account_id)
     return {"reports": rows(found)}
+
+
+@handler("reports.seen")
+async def seen(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"report_ids": [int]}. The reader opened these reports: new becomes seen, for them only.
+    Only reports the reader can see; the first open is the one kept. Not audited (reading is not
+    acting); addressing is."""
+    ident = require_role(ctx, "super_user", "admin")
+    ids = payload.get("report_ids")
+    if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
+        raise ProtocolError(ErrorCode.INVALID, "report_ids must be a non-empty list of ids")
+    db = ctx.engine.db
+    if ident.role == "super_user":
+        visible = {r["id"] for r in await db.reports.all(ident.account_id, limit=100000)}
+    else:
+        visible = {r["id"] for r in await db.reports.routed_to_department(ident.department_id, limit=100000)}
+    if hidden := set(ids) - visible:
+        raise ProtocolError(ErrorCode.NOT_FOUND, f"reports {sorted(hidden)} are not yours to see")
+    return {"seen": await db.reports.mark_seen(sorted(set(ids)), ident.account_id)}
 
 
 @handler("reports.mark")
