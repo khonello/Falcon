@@ -3806,147 +3806,6 @@ function Work({ go, single }) {
 }
 const ROUTING0 = { "Restricted file": ["ops", "fin", "log"], "Flow failed": ["ops", "fin"], "Listener report": ["ops"], "Update stuck": ["ops", "fin", "log"], "Deviation": ["ops", "fin", "log"] };
 const FULL_DEPTS = () => FULL.DEPTS || DEPTS;
-// The department's day on one clock: the department's activity as a strip, and under it, on exactly the
-// same hours, who was on each machine. A pin and the session it belongs to line up vertically.
-function DeptToday({ d, ms, go }) {
-  const ref = useRef(null), w = useWidth(ref);
-  const [view, setView] = useState("Chart");
-  const [hov, setHov] = useState(null);
-  const [span, setSpan] = useState("Working hours");
-  const [frame, setFrame] = useState([6, 18]);
-  const full = span === "24 hours", a = full ? 0 : frame[0], b = full ? 24 : frame[1];
-  const hosts = new Set(ms.map((m) => m.host)), pr = useMemo(() => hostsProfile(hosts), [d.id]);
-  const allLanes = useMemo(() => {
-    const l0 = ms.map((m, k) => ({ m, k, blocks: laneOf(m.host).blocks }));
-    // machines with something to see come first: a flag, someone other than the owner, or a health problem
-    const note = (x) => (pr.pins.some((p0) => p0.text.includes(x.m.host)) || x.blocks.some((b0) => b0[2] !== "own") ? 0 : rankM(x.m) < 4 ? 1 : 2);
-    return l0.sort((a0, b0) => note(a0) - note(b0) || a0.k - b0.k); }, [d.id]);
-  const lp = usePaged(allLanes, 12, d.id), lanes = lp.items;
-  const L = 112, R = 12, strip = 22, rowH = 26, top = strip + 16, H = top + (lp.pages > 1 ? 12 : lanes.length) * rowH + 24;
-  const pw = Math.max(100, w - L - R), X = (h) => L + ((Math.max(a, Math.min(b, h)) - a) / (b - a)) * pw;
-  const stepH = b - a > 14 ? 3 : b - a > 8 ? 2 : 1;
-  const ticks = []; for (let h = Math.ceil(a / stepH) * stepH; h <= b; h += stepH) ticks.push(h);
-  const inView = (t0, t1) => t1 > a && t0 < b;
-  // what the frame leaves out is said, never silently dropped
-  // a session that was itself flagged is named once, as a flagged session
-  const hiddenS = full ? [] : allLanes.flatMap(({ m, blocks }) => blocks.filter((x) => !inView(x[0], x[1])).map((x) => `${x[3]} on ${m.host} at ${hhmm(x[0])}${x[4] ? ", outside working hours" : ""}`));
-  const hiddenP = full ? [] : pr.pins.filter((p0) => (p0.t < a || p0.t >= b) && !/outside working hours/.test(p0.text));
-  const hours = Array.from({ length: 25 }, (_, k) => ({ value: k, label: String(k).padStart(2, "0") + ":00" }));
-  const rows = [{ key: d.id, label: d.name, hosts }];
-  return html`<${Panel} title="Today" sub="who was on each machine, with what was flagged" extra=${html`${view === "Chart" ? html`<${Pager} p=${lp} what="machines" /><span className="t3" style=${{ fontSize: 12, marginLeft: 6 }}>Working hours</span>
-      <${Select} size="small" value=${frame[0]} style=${{ width: 82 }} options=${hours.filter((h) => h.value < frame[1])} onChange=${(v) => setFrame([v, frame[1]])} aria-label="Working day starts" />
-      <span className="t3">to</span>
-      <${Select} size="small" value=${frame[1]} style=${{ width: 82 }} options=${hours.filter((h) => h.value > frame[0])} onChange=${(v) => setFrame([frame[0], v])} aria-label="Working day ends" />
-      <${Segmented} size="small" value=${span} onChange=${setSpan} options=${["Working hours", "24 hours"]} />` : null}
-      <${Segmented} size="small" value=${view} onChange=${setView} options=${["Chart", "Report"]} />`}>
-    ${view === "Report" ? html`<div>
-        <${DayReport} rows=${rows} />
-        <div className="report" style=${{ fontSize: 13.5 }}>${lanes.flatMap(({ m, blocks }) => blocks.filter((b) => b[2] !== "own").map((b, k) => html`<div key=${m.host + k}><b style=${{ fontWeight: 500 }}>${b[3]}</b> was on <span className="mono">${m.host}</span> from ${hhmm(b[0])} to ${b[1] >= NOWH ? "now" : hhmm(b[1])}${b[4] ? html`<span style=${{ color: "var(--med)" }}>, outside working hours</span>` : null}.</div>`))}</div>
-      </div>`
-    : !ms.length ? html`<${Empty} icon="LoginOutlined" title="No machines yet" text="Each machine in the department gets a row here: who was on it, and what was flagged." h=${150} />`
-    : html`<div ref=${ref} style=${{ position: "relative" }}>
-      <svg width=${w} height=${H} style=${{ display: "block" }} onMouseLeave=${() => setHov(null)}>
-        ${full ? html`<g>
-          <rect x=${X(0)} y="0" width=${X(frame[0]) - X(0)} height=${H - 22} style=${{ fill: "var(--surface-3)" }} opacity="0.5" />
-          <rect x=${X(frame[1])} y="0" width=${X(24) - X(frame[1])} height=${H - 22} style=${{ fill: "var(--surface-3)" }} opacity="0.5" />
-        </g>` : null}
-        ${ticks.map((h) => html`<line key=${"g" + h} x1=${X(h)} x2=${X(h)} y1="0" y2=${H - 22} style=${{ stroke: "var(--grid)" }} />`)}
-        <text x="0" y="12" fontSize="11.5" style=${{ fill: "var(--text-3)" }}>Flagged</text>
-        ${pr.odd.map((o, h) => (o && inView(h, h + 1) ? html`<rect key=${"o" + h} x=${X(h)} y="0" width=${X(Math.min(h + 1, NOWH)) - X(h)} height=${H - 22} style=${{ fill: "var(--med)", opacity: 0.12 }}><title>${String(h).padStart(2, "0")}:00 · unusual for this hour</title></rect>` : null))}
-        <line x1=${L} x2=${L + pw} y1=${strip + 8} y2=${strip + 8} style=${{ stroke: "var(--border-strong)" }} />
-        ${lanes.map(({ m, blocks }, i) => { const y = top + i * rowH, k = HEALTH[m.status][0], t = TILE[k];
-          return html`<g key=${m.host}>
-            <g>
-              <rect x="0" y=${y + 7} width="11" height="11" rx="2" style=${{ fill: t.bg === "transparent" ? "var(--surface)" : t.bg, stroke: k === "quiet" || k === "watch" || k === "offline" ? "var(--border-strong)" : "none" }} strokeDasharray=${k === "offline" ? "2 2" : "0"} />
-              ${t.dot ? html`<circle cx="11" cy=${y + 7} r="3" style=${{ fill: t.dot, stroke: "var(--surface)" }} strokeWidth="1" />` : null}
-              <text x="18" y=${y + 16.5} fontSize="11.5" style=${{ fill: "var(--text-2)", fontFamily: "var(--mono)" }}>${fitMid(m.host, 13)}<title>${m.host} · </title><title>${m.user || "no user"} · ${HEALTH[m.status][1]}</title></text>
-            </g>
-            <line x1=${L} x2=${L + pw} y1=${y + rowH} y2=${y + rowH} style=${{ stroke: "var(--grid)" }} />
-            ${blocks.filter((x) => inView(x[0], x[1])).map((b, j) => html`<rect key=${j} x=${X(b[0])} y=${y + 7} width=${Math.max(3, X(b[1]) - X(b[0]))} height="12" rx="2"
-              style=${{ fill: OCC[b[2]].c, stroke: b[4] ? "var(--med)" : "none" }} strokeWidth="2"
-              onMouseEnter=${() => setHov({ x: X(b[0]), y: y + rowH, text: `${m.host} · ${b[3]} · ${OCC[b[2]].w} · ${hhmm(b[0])}–${b[1] >= NOWH ? "now" : hhmm(b[1])}` })} onMouseLeave=${() => setHov(null)} />`)}
-            ${blocks.length === 0 ? html`<text x=${L + 6} y=${y + 16.5} fontSize="11" style=${{ fill: "var(--text-4)" }}>nobody signed in today</text>`
-              : !blocks.some((x) => inView(x[0], x[1])) ? html`<text x=${L + 6} y=${y + 16.5} fontSize="11" style=${{ fill: "var(--text-4)" }}>nobody signed in during these hours</text>` : null}
-          </g>`; })}
-        ${pr.pins.filter((p0) => p0.t >= a && p0.t < b).map((p0, k) => html`<g key=${"p" + k}>
-          <line x1=${X(p0.t)} x2=${X(p0.t)} y1="9" y2=${H - 22} style=${{ stroke: p0.c }} strokeWidth="1" strokeDasharray="2 3" opacity="0.7" />
-          <circle cx=${X(p0.t)} cy="8" r="5" style=${{ fill: p0.c, stroke: "var(--surface)" }} strokeWidth="1.5"><title>${p0.text}</title></circle></g>`)}
-        ${ticks.map((h) => html`<text key=${h} x=${X(h)} y=${H - 6} textAnchor=${h === a ? "start" : h === b ? "end" : "middle"} fontSize="10.5" style=${{ fill: "var(--text-3)", fontFamily: "var(--mono)" }}>${String(h % 24).padStart(2, "0")}:00</text>`)}
-        ${NOWH > a && NOWH < b ? html`<line x1=${X(NOWH)} x2=${X(NOWH)} y1="0" y2=${H - 22} style=${{ stroke: "var(--crit)" }} strokeWidth="1.25"><title>now · ${hhmm(NOWH)}</title></line>` : null}
-      </svg>
-      ${hov ? html`<div className="tt" style=${{ left: Math.min(hov.x, w - 300), top: hov.y }}>${hov.text}</div>` : null}
-      ${hiddenS.length || hiddenP.length ? html`<div className="row" style=${{ marginTop: 10, padding: "8px 10px", borderRadius: 5, background: "color-mix(in srgb, var(--med) 10%, transparent)", flexWrap: "nowrap" }}>
-        <span style=${{ color: "var(--med)" }}>${ic("EyeInvisibleOutlined")}</span>
-        <span style=${{ minWidth: 0 }}><b style=${{ fontWeight: 600 }}>${[hiddenS.length ? `${hiddenS.length} session${hiddenS.length === 1 ? "" : "s"}` : null, hiddenP.length ? `${hiddenP.length} flag${hiddenP.length === 1 ? "" : "s"}` : null].filter(Boolean).join(" and ")} outside this view:</b> <span className="t2">${[...hiddenS, ...hiddenP.map((p0) => p0.text)].slice(0, 3).join(", ")}${hiddenS.length + hiddenP.length > 3 ? `, and ${hiddenS.length + hiddenP.length - 3} more` : ""}</span></span>
-        <span className="sp" /><${Button} size="small" onClick=${() => setSpan("24 hours")}>Show 24 hours<//>
-      </div>` : null}
-      <div className="leg" style=${{ marginTop: 8 }}>
-        <span><i className="sq" style=${{ "--c": "color-mix(in srgb, var(--med) 30%, transparent)" }} />unusual hour</span>
-        <span><i className="sq" style=${{ "--c": "var(--crit)", borderRadius: "50%" }} />needs someone</span>
-        <span><i className="sq" style=${{ "--c": "var(--med)", borderRadius: "50%" }} />unusual</span>
-        ${Object.keys(OCC).map((k0) => html`<span key=${k0}><i className="sq" style=${{ "--c": OCC[k0].c }} />${OCC[k0].w.toLowerCase()}</span>`)}
-        ${full ? html`<span><i className="sq" style=${{ "--c": "var(--surface-3)" }} />outside ${hhmm(frame[0])}–${hhmm(frame[1])}</span>` : null}
-      </div>
-    </div>`}
-  <//>`;
-}
-function DeptPage({ id, go, enter }) {
-  const d = (FULL.DEPTS || DEPTS).find((x) => x.id === id);
-  const [who, setWho] = useState(null);
-  const x = deptStats(d);
-  // an issue opened from elsewhere arrives picked; the board under the panels shows it
-  const [isel, setIsel] = useState(() => { const p0 = DEPT_ISSUE_PRESET; DEPT_ISSUE_PRESET = null; return p0; });
-  const it = x.iss.find((i) => i.id === isel) || x.iss[0];
-  const mineCopy = !!it && it.type === "file" && (markOf(it) || {}).by === "Super User";
-  // six issues and three Admins at a time; the panels keep their height whatever the department holds
-  const ip = usePaged(x.iss, 6, id), ap = usePaged(d.admins, 3, id);
-  const ledK = WORSTK(x.ms), ledC = ledK === "none" ? "var(--text-4)" : ledK === "quiet" ? "var(--ok)" : ledK === "watch" ? "var(--med)" : ledK === "offline" ? "var(--text-4)" : "var(--crit)";
-  return html`<${React.Fragment}>
-    <div className="row" style=${{ gap: 10 }}>
-      <span style=${{ width: 10, height: 10, borderRadius: "50%", background: ledC, boxShadow: `0 0 0 4px color-mix(in srgb, ${ledC} 20%, transparent)` }} />
-      ${[["DesktopOutlined", `${x.online}/${x.ms.length}`, "online"], ["AlertOutlined", x.iss.length, "open issues"], ["CloudUploadOutlined", `${x.ok}/${x.ms.length}`, "on 1.4.2"], ["FieldTimeOutlined", x.mtta || "—", "to handle a report"]].map(([i, v, k]) => html`<span key=${k} className="adm" style=${{ paddingLeft: 10 }} title=${k}><span className="t3">${ic(i)}</span><b style=${{ fontWeight: 600 }}>${v}</b><span className="t3" style=${{ fontSize: 12 }}>${k}</span></span>`)}
-      ${x.slow ? html`<span className="row" style=${{ gap: 6 }}><span style=${{ color: "var(--med)", fontSize: 12 }}>over the 1-hour target</span>
-        <${Button} size="small" onClick=${() => toast(`Nudged ${d.admins.join(" and ") || "nobody"} (concept)`)}>Nudge ${d.admins.length ? d.admins[0] : ""}<//></span>` : null}
-    </div>
-    <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${Panel} title="Open issues" sub="worst first · click one to see it on the right" flush style=${{ minHeight: LIST_H }} extra=${html`<${Pager} p=${ip} />`}>
-        <div style=${{ minHeight: ip.pages > 1 ? 6 * 37 : 0 }}>
-        ${x.iss.length ? ip.items.map((i) => { const a = NOWH - i.at;
-          return html`<div key=${i.id} className=${"irow" + (it && it.id === i.id ? " on" : "")} role="button" tabIndex="0" onClick=${() => setIsel(i.id)} onKeyDown=${(e) => e.key === "Enter" && setIsel(i.id)}>
-            <i style=${{ background: SEV[i.sev].c }} />
-            <span className="ttl">${i.title} <span className="t3">· ${i.subject}</span></span>
-            <span className="mono t3">${i.host}</span>
-            <span className="mono" style=${{ color: a > i.sla ? "var(--crit)" : "var(--text-3)", textAlign: "right" }}>${a > 24 ? Math.floor(a / 24) + "d" : dur(a)}</span>
-          </div>`; })
-          : html`<div className="t3" style=${{ padding: 14 }}>${ic("CheckOutlined")} Nothing open in ${d.name}.</div>`}
-        </div>
-      <//>
-      ${it ? html`<${SidePanel} title=${it.title} sub=${isel ? "the one you picked" : "the worst open · click another"}
-      facts=${it ? [["What", it.subject], ["Machine", html`<span className="mono">${it.host}</span>`], ["Found", devWhen(it.at)], ["Severity", SEV[it.sev].w], ["With", d.admins.length ? listNames(d.admins) : html`<span style=${{ color: "var(--crit)" }}>nobody · no Admin</span>`]] : []}
-      actions=${!it ? null : mineCopy ? html`<${Button} type="primary" onClick=${() => go("issues", it.id)}>Deal with it on Restricted →<//>`
-        : d.admins.length ? d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a, { page: "issues", sub: it.id })}>Handle it in ${a}'s console →<//>`)
-        : html`<${Button} type="primary" onClick=${() => go("overview")}>Decide it on Overview →<//>`}>
-      <div className="t3" style=${{ fontSize: 12.5 }}>${mineCopy ? "A copy of a file you marked: it is yours to deal with, on Restricted, without entering anyone's console." : d.admins.length ? "Issues are worked in the department's own console. Entering it asks to block or end that Admin's session first." : `${d.name} has no Admin, so its issues wait on you as decisions on Overview.`}</div>
-      <//>` : html`<${SidePanel} empty=${html`<${Empty} icon="CheckOutlined" title=${`Nothing open in ${d.name}`} text="Issues from its machines show here when there are any." h=${200} />`} />`}
-    </div>
-    <${Panel} title="Admins" extra=${html`<${Pager} p=${ap} />`}>
-      ${d.admins.length ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>${ap.items.map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 12 }} title=${ADMIN_INFO[a].now}>
-          <span style=${{ position: "relative" }}><span className="av" style=${{ width: 40, height: 40, fontSize: 14 }}>${initials(a)}</span>
-            <i style=${{ position: "absolute", right: 0, bottom: 0, width: 11, height: 11, borderRadius: "50%", background: ADMIN_INFO[a].busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
-          <div style=${{ flex: 1, minWidth: 0 }}><div style=${{ fontWeight: 600 }}>${a}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a].busy ? ADMIN_INFO[a].now.replace(/^Inside/, "inside").replace(/ since.*$/, "") : "at their desk"}</div></div>
-          <${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(a)}>Enter →<//>
-        </div>`)}</div>`
-        : html`<div style=${{ textAlign: "center", padding: "6px 0" }}>
-            <span className="av" style=${{ width: 48, height: 48, fontSize: 18, background: "transparent", border: "1.5px dashed var(--crit)", color: "var(--crit)" }}>${ic("UserAddOutlined")}</span>
-            <div style=${{ fontWeight: 600, color: "var(--crit)", margin: "8px 0 10px" }}>Empty seat</div>
-            <div className="row" style=${{ justifyContent: "center" }}>
-              <${Select} value=${who || undefined} placeholder="Pick someone" style=${{ width: 200 }} options=${["A. Quaye", "K. Boateng", "Esi (promote)"].map((v) => ({ value: v, label: v }))} onChange=${setWho} />
-              <${Button} type="primary" disabled=${!who} onClick=${() => toast("Assigned " + who + " (concept)")}>Assign<//>
-            </div></div>`}
-    <//>
-    <${DeptToday} key=${d.id} d=${d} ms=${x.ms} go=${go} />
-  <//>`;
-}
 // Entering an Admin's console: the design requires blocking or ending their session first.
 function EnterConsole({ admin, onClose, onEnter }) {
   const [how, setHow] = useState("block");
@@ -4658,10 +4517,15 @@ function AuditSU({ range, go, open, me }) {
   <//>`;
 }
 
-// ---------------------------------------------------------------- Departments, Access, Registry
+// Departments: everything about a department is here, on the right of the list; there is no separate department page.
+// The panel's one button is the department's next step: assign an Admin, enter its Admin's console, or pick whose.
 function DepartmentsPage({ go, enter, open }) {
   const [sel, setSel] = useOpen("departments", open);
-  const [adm, setAdm] = useState(null), [aq, setAq] = useState("");   // the department whose Admins the drawer lists
+  // the Admins drawer: which department, and where entering should land (an issue picked below, or the Overview)
+  const [adm, setAdm] = useState(null), [aq, setAq] = useState("");
+  const [asg, setAsg] = useState(null), [who, setWho] = useState(undefined);   // the Assign an Admin drawer
+  // an issue opened from elsewhere arrives open in its department's Worst open issues
+  const [isel, setIsel] = useState(() => { const p0 = DEPT_ISSUE_PRESET; DEPT_ISSUE_PRESET = null; return p0; });
   const [q, setQ] = useState("");
   const depts = FULL_DEPTS(), off = MACHINES.filter((m) => m.status === "offline").length;
   const all = depts.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id), iss = ISSUES.filter((i) => MBY[i.host] && MBY[i.host].dept === d.id);
@@ -4669,7 +4533,18 @@ function DepartmentsPage({ go, enter, open }) {
     .sort((a, b) => a.rank - b.rank);
   const rows = all.filter((d) => `${d.name} ${d.admins.join(" ")}`.toLowerCase().includes(q.toLowerCase()));
   const admins = Object.entries(ADMIN_INFO).filter(([, a]) => depts.some((d) => d.id === a.dept));
-  const d = rows.find((x) => x.id === sel) || rows[0], st = d ? deptStats(d) : null;
+  const d = rows.find((x) => x.id === sel) || (sel ? all.find((x) => x.id === sel) : null) || rows[0], st = d ? deptStats(d) : null;
+  // worst first; an issue that arrived picked is shown even if it is not among the worst five
+  const worst = d ? (() => { const w = d.iss.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]).slice(0, 5), it0 = d.iss.find((i) => i.id === isel);
+    return it0 && !w.includes(it0) ? [it0, ...w.slice(0, 4)] : w; })() : [];
+  const issueActs = (i) => { const mineCopy = i.type === "file" && (markOf(i) || {}).by === "Super User", to = { page: "issues", sub: i.id };
+    return mineCopy ? html`<a onClick=${() => go("issues", i.id)}>Deal with it on Restricted →</a>`
+      : !d.admins.length ? html`<a onClick=${() => go("overview")}>Decide it on Overview →</a>`
+      : d.admins.length === 1 ? html`<a onClick=${() => enter(d.admins[0], to)}>Handle it in ${d.admins[0]}'s console →</a>`
+      : html`<a onClick=${() => setAdm({ id: d.id, to })}>Handle it in an Admin's console…</a>`; };
+  const main = !d ? null : !d.admins.length ? html`<${Button} type="primary" icon=${ic("UserAddOutlined")} onClick=${() => { setWho(undefined); setAsg(d.id); }}>Assign an Admin<//>`
+    : d.admins.length === 1 ? html`<${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(d.admins[0])}>Enter ${d.admins[0]}'s console →<//>`
+    : html`<${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => setAdm({ id: d.id })}>Enter a console…<//>`;
   return html`<${React.Fragment}>
     <${Strip} items=${[
       { label: "Departments", value: fmt(depts.length), delta: `${fmt(admins.length)} Admins between them` },
@@ -4678,7 +4553,7 @@ function DepartmentsPage({ go, enter, open }) {
       { label: "Open issues", value: fmt(ISSUES.length), delta: `${ISSUES.filter((i) => i.sev === "critical").length} critical`, dc: ISSUES.some((i) => i.sev === "critical") ? "var(--crit)" : undefined }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <${ListPanel} title="Departments" sub="what needs you first · click one to see it on the right" q=${q} setQ=${setQ} placeholder="Filter by department or Admin"
-        action=${{ label: "New department", onClick: () => toast("New department (concept)") }} pick=${sel} onPick=${setSel} rowKey="id" rows=${rows}
+        action=${{ label: "New department", onClick: () => toast("New department (concept)") }} pick=${d ? d.id : null} onPick=${(id) => { setSel(id); setIsel(null); }} rowKey="id" rows=${rows}
         icon="ApartmentOutlined" name=${{ title: "Department", text: (r) => r.name, line: (r) => `${fmt(r.ms.length)} machine${r.ms.length === 1 ? "" : "s"}` }}
         cols=${[{ title: "Admins", text: (r) => (r.admins.length ? listNames(r.admins) : "None") },
           { title: "Online", width: 150, bar: (r) => ({ v: r.online, max: Math.max(1, r.ms.length), text: `${fmt(r.online)}/${fmt(r.ms.length)}` }) },
@@ -4686,26 +4561,47 @@ function DepartmentsPage({ go, enter, open }) {
         now=${(r) => (!r.admins.length ? ["No Admin", "bad"] : r.crit ? [`${r.crit} critical`, "bad"] : r.high ? [`${r.high} high`, "bad"] : r.online < r.ms.length ? [`${r.ms.length - r.online} offline`, "wait"] : ["All well", "good"])}
         empty=${!depts.length ? html`<${Empty} icon="ApartmentOutlined" title="No departments yet" text="Create a department, then give it an Admin and its machines." act="New department" onAct=${() => toast("New department (concept)")} h=${200} />` : null} />
       ${d ? html`<${SidePanel} title=${d.name} sub=${sel ? "the one you picked" : "needs you most · click another"}
-        facts=${[["Admins", d.admins.length ? html`<span>${d.admins.length <= 2 ? d.admins.join(" and ") : `${d.admins.slice(0, 2).join(", ")} and ${fmt(d.admins.length - 2)} more`} · <a style=${{ whiteSpace: "nowrap" }} onClick=${() => setAdm(d.id)}>See all</a></span>` : html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`], ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
+        facts=${[["Admins", !d.admins.length ? html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`
+            : d.admins.length === 1 ? d.admins[0]
+            : html`<div style=${{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}><span className="cut" style=${{ maxWidth: "100%" }} title=${d.admins[0]}>${d.admins[0]}</span>
+                <${Button} size="small" icon=${ic("TeamOutlined")} onClick=${() => setAdm({ id: d.id })}>All ${fmt(d.admins.length)} Admins<//></div>`],
+          ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
           ["Open issues", d.iss.length ? `${fmt(d.iss.length)}${d.crit ? ` · ${d.crit} critical` : ""}` : "None"], ["Reports handled in", st.mtta || "—"], ["On 1.4.2", `${fmt(d.ok)} of ${fmt(d.ms.length)}`]]}
-        actions=${html`<${Button} type="primary" onClick=${() => go("dept", d.id)}>${d.admins.length ? "Department page →" : "Appoint one on its page →"}<//>`}>
+        actions=${main}>
+        <div><div className="nt-h">Worst open issues</div>${worst.length ? worst.map((i) => { const on = isel === i.id;
+          return html`<div key=${i.id} style=${{ borderBottom: "1px solid var(--grid)" }}>
+            <div className="row" role="button" tabIndex="0" onClick=${() => setIsel(on ? null : i.id)} onKeyDown=${(e) => e.key === "Enter" && setIsel(on ? null : i.id)}
+              style=${{ flexWrap: "nowrap", gap: 8, padding: "6px 0", fontSize: 12.5, cursor: "pointer" }}>
+              <i style=${{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: SEV[i.sev].c }} /><span className="cut" style=${{ flex: 1, fontWeight: on ? 500 : 400 }}>${i.title}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${i.host}</span></div>
+            ${on ? html`<div style=${{ padding: "0 0 10px 15px", fontSize: 12.5, display: "flex", flexDirection: "column", gap: 3 }}>
+              <div><span className="t3">What </span>${i.subject}</div><div><span className="t3">Found </span>${devWhen(i.at)} · ${SEV[i.sev].w}</div>
+              <div style=${{ marginTop: 3 }}>${issueActs(i)}</div></div>` : null}</div>`; }) : html`<div className="t3">Nothing open.</div>`}</div>
         <div><div className="nt-h">Machines</div><${MiniTiles} ms=${d.ms} go=${go} /></div>
-        <div><div className="nt-h">Worst open issues</div>${d.iss.length ? d.iss.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]).slice(0, 5).map((i) => html`<div key=${i.id} className="row" style=${{ flexWrap: "nowrap", gap: 8, padding: "5px 0", fontSize: 12.5 }}>
-          <i style=${{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: SEV[i.sev].c }} /><span className="cut" style=${{ flex: 1 }}>${i.title}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${i.host}</span></div>`) : html`<div className="t3">Nothing open.</div>`}</div>
       <//>` : html`<${SidePanel} empty=${html`<${Empty} icon="ApartmentOutlined" title="Nothing picked" text="Pick a department in the list." h=${200} />`} />`}
     </div>
-    ${(() => { const dd = all.find((x) => x.id === adm); const list = dd ? dd.admins.filter((a) => a.toLowerCase().includes(aq.toLowerCase())) : [];
-      return html`<${Drawer} open=${!!dd} onClose=${() => { setAdm(null); setAq(""); }} width=${440} title=${dd ? `Admins · ${dd.name}` : ""}>
+    ${(() => { const dd = adm ? all.find((x) => x.id === adm.id) : null; const list = dd ? dd.admins.filter((a) => a.toLowerCase().includes(aq.toLowerCase())) : [];
+      const shut = () => { setAdm(null); setAq(""); };
+      return html`<${Drawer} open=${!!dd} onClose=${shut} width=${440} title=${dd ? (adm.to ? `Whose console · ${dd.name}` : `Admins · ${dd.name}`) : ""}>
         ${dd ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="t3" style=${{ fontSize: 12.5 }}>${fmt(dd.admins.length)} Admin${dd.admins.length === 1 ? "" : "s"}. Entering one's console asks first to block or end their session.</div>
+          <div className="t3" style=${{ fontSize: 12.5 }}>${fmt(dd.admins.length)} Admin${dd.admins.length === 1 ? "" : "s"}.${adm.to ? " The issue opens in the console you enter." : ""} Entering one's console asks first to block or end their session.</div>
           ${dd.admins.length > 6 ? html`<${Input} allowClear placeholder="Find an Admin" prefix=${ic("SearchOutlined")} value=${aq} onChange=${(e) => setAq(e.target.value)} />` : null}
           <div>${list.map((a) => { const info = ADMIN_INFO[a] || {}; return html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--grid)" }}>
             <span style=${{ position: "relative", flex: "none" }}><span className="av" style=${{ width: 30, height: 30, fontSize: 11 }}>${initials(a)}</span>
               <i style=${{ position: "absolute", right: -1, bottom: -1, width: 9, height: 9, borderRadius: "50%", background: info.busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
             <span style=${{ minWidth: 0, flex: 1 }}><span className="cut" style=${{ display: "block", fontWeight: 500 }} title=${a}>${a}</span>
               <span className="t3 cut" style=${{ display: "block", fontSize: 12 }}>${info.busy ? info.now.replace(/^Inside/, "inside").replace(/ since.*$/, "") : "at their desk"}${info.ws ? " · " + info.ws : ""}</span></span>
-            <${Button} size="small" onClick=${() => { setAdm(null); setAq(""); enter(a); }}>Enter →<//></div>`; })}
+            <${Button} size="small" onClick=${() => { const to = adm.to; shut(); enter(a, to); }}>Enter →<//></div>`; })}
             ${!list.length ? html`<div className="t3" style=${{ padding: "10px 0" }}>No Admin by that name.</div>` : null}</div>
+        </div>` : null}
+      <//>`; })()}
+    ${(() => { const dd = asg ? all.find((x) => x.id === asg) : null;
+      const pool = dd ? [...Object.keys(ADMIN_INFO).filter((a) => ADMIN_INFO[a].dept !== dd.id).map((a) => ({ value: a, label: `${a} · Admin in ${deptNameOf(ADMIN_INFO[a].dept)}, as well` })),
+        ...dd.ms.filter((m) => m.user).map((m) => ({ value: m.user + " (promote)", label: `${m.user} · works on ${m.host}, promote to Admin` }))] : [];
+      return html`<${Drawer} open=${!!dd} onClose=${() => setAsg(null)} width=${420} title=${dd ? `Assign an Admin · ${dd.name}` : ""}
+        footer=${dd ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setAsg(null)}>Cancel<//><${Button} type="primary" disabled=${!who} onClick=${() => { setAsg(null); toast(`${who.replace(" (promote)", "")} is ${dd.name}'s Admin · its reports start reaching them once routed (concept)`); }}>Assign<//></div>` : null}>
+        ${dd ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div><div className="nt-h">Who</div><${Select} id="asg-who" showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Pick someone" value=${who} onChange=${setWho} options=${pool} /></div>
+          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>Until ${dd.name} has an Admin, everything from it comes to you: its reports, stuck updates and help requests. An Admin from another department can look after it as well; promoting a worker gives them a console and a key, shown once.</div>
         </div>` : null}
       <//>`; })()}
     <${OrgDay} go=${go} />
@@ -5198,6 +5094,7 @@ const NAV_SU = [
 // issue opens on its department's page. Working on either in an Admin's console goes through traversal.
 let DEPT_ISSUE_PRESET = null, COPY_PRESET = null;
 function suRoute(p, s) {
+  if (p === "dept") return ["departments", s];   // there is no separate department page
   if (p === "machines") return ["registry", s && MBY[s] ? s : null];
   if (p === "issues") {
     const i = s ? (FULL.ISSUES || ISSUES).find((x) => x.id === s) : null;
@@ -5206,7 +5103,7 @@ function suRoute(p, s) {
     if (k && k.by === "Super User") { COPY_PRESET = i.id; return ["restricted", k.id]; }
     const m = MBY[i.host];
     if (!m) return ["departments", null];
-    DEPT_ISSUE_PRESET = i.id; return ["dept", m.dept];
+    DEPT_ISSUE_PRESET = i.id; return ["departments", m.dept];
   }
   return [p, s];
 }
@@ -5323,7 +5220,6 @@ function App() {
   else if (page === "rules") body = html`<${Rules} go=${go} sub=${sub} />`;
   else if (page === "registry") body = html`<${Registry} go=${go} enter=${enter} open=${sub} />`;
   else if (page === "messages") body = html`<${Messages} me=${ME} open=${sub} />`;
-  else if (page === "dept") body = html`<${DeptPage} key=${sub} id=${(FULL.DEPTS || DEPTS).some((d) => d.id === sub) ? sub : "ops"} go=${go} enter=${enter} />`;
   else if (page === "overview") body = level ? html`<${Overview} range=${range} go=${go} />` : html`<${SUOverview} go=${go} />`;
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
   else if (page === "sessions" || page === "access") body = html`<${AccessPage} go=${go} open=${sub} me=${level ? level.admin : null} />`;

@@ -280,8 +280,8 @@ starts below the fold: you clicked and nothing visibly changed. Now the item sho
 | Issues (console) | the issue: owner, what to do and its button | its timeline and details | *Types* is a pick in the list header |
 | Automation (console) | the rule: when, on, do, last firings; Switched on, Test, Edit | Runs per day | *Problems this week* is a strip figure that filters |
 | Actions (console) | the action: used by, outcomes; Edit script, Run once | its script and recent runs (by hand too) | *Run by hand* is in each action's recent runs |
-| Departments | the department: its Admins in one line ("R. Mensah, A. Quaye and 38 more") with *See all*, machines, worst issues; Department page → | Machines in use today | *Admins*: *See all* opens a drawer listing every Admin (searchable past six), each with *Enter →*, which asks first |
-| Department page | the issue picked; Handle it in X's console → | Admins, then Today | — |
+| Departments | the department: its Admin (one name; with several, *All N Admins* opens the drawer), worst open issues (a click opens one in place with *Handle it in X's console →*), machines; the foot is its next step: *Assign an Admin*, *Enter R. Mensah's console →*, or *Enter a console…* | Machines in use today | *Admins*: a drawer lists every Admin (searchable past six), each with *Enter →*, which asks first |
+| ~~Department page~~ | removed 9 Oct 2026: everything it held is on Departments; `#dept/<id>`, leaving a console and an issue elsewhere land on Departments with that department picked (an issue arrives open in Worst open issues) | | |
 | Accountability | the deviation and what came of it | Around it: the timeline and what the record shows; Deviations per day | *Rules broken* is a pick in the list header |
 | Registry | the machine, account or refused connection | — | *Accounts* and *Refused* are a switch on the list |
 | Rules | the rule (Switch, Edit, See its deviations →) or the pattern (Build a rule from it) | the pattern drawn | *Start from a pattern* is a switch on the list |
