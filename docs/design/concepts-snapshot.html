@@ -4563,8 +4563,8 @@ function DepartmentsPage({ go, enter, open }) {
       ${d ? html`<${SidePanel} title=${d.name} sub=${sel ? "the one you picked" : "needs you most · click another"}
         facts=${[["Admins", !d.admins.length ? html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`
             : d.admins.length === 1 ? d.admins[0]
-            : html`<div style=${{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}><span className="cut" style=${{ maxWidth: "100%" }} title=${d.admins[0]}>${d.admins[0]}</span>
-                <${Button} size="small" icon=${ic("TeamOutlined")} onClick=${() => setAdm({ id: d.id })}>All ${fmt(d.admins.length)} Admins<//></div>`],
+            : html`<div className="row" style=${{ flexWrap: "nowrap", gap: 10 }}><span className="cut" style=${{ minWidth: 0, flex: "0 1 auto" }} title=${d.admins[0]}>${d.admins[0]}</span>
+                <${Button} size="small" style=${{ flex: "none" }} icon=${ic("TeamOutlined")} onClick=${() => setAdm({ id: d.id })}>All ${fmt(d.admins.length)} Admins<//></div>`],
           ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
           ["Open issues", d.iss.length ? `${fmt(d.iss.length)}${d.crit ? ` · ${d.crit} critical` : ""}` : "None"], ["Reports handled in", st.mtta || "—"], ["On 1.4.2", `${fmt(d.ok)} of ${fmt(d.ms.length)}`]]}
         actions=${main}>
