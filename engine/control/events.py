@@ -181,8 +181,14 @@ async def fire(engine: Engine, definition: dict[str, Any], pc_id: int, data: dic
     # A time event belongs to no one machine (pc_id 0): its actions run on each machine the event covers.
     if pc_id:
         targets = [pc_id]
+    elif definition["condition_spec"].get("pc_ids"):
+        targets = list(definition["condition_spec"]["pc_ids"])
     else:
-        targets = list(definition["condition_spec"].get("pc_ids") or sorted(await _dept_pcs(engine, definition) or ()))
+        # No machines named: the creator's department, or for the Super User's organisation-wide
+        # automation every department's machines (it has no department of its own).
+        dept = await _dept_pcs(engine, definition)
+        targets = sorted(dept) if dept is not None else [
+            p["id"] for p in await engine.db.accounts.list_pcs() if p["department_id"] is not None]
     for action in await engine.db.control.actions_for_event(definition["id"]):
         for target in targets:
             # Each Action independently: a failure to dispatch one never blocks the next.
@@ -279,13 +285,35 @@ def _parse_spec(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     return EVENT_TYPES[etype], {"type": etype, "pc_ids": [int(p) for p in pc_ids] if pc_ids else None, "match": match}
 
 
-async def _load_event_in_scope(ctx: Context, event_id: int) -> dict[str, Any]:
+async def _load_event_in_scope(ctx: Context, event_id: int, *, write: bool = True) -> dict[str, Any]:
+    """An Admin reaches their department's automations. The Super User's organisation-wide ones
+    that reach the department can be read there (write=False), never changed or switched."""
     ev = await ctx.engine.db.control.event(event_id)
     if ev is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such event")
     creator = await ctx.engine.db.accounts.by_id(ev["created_by_account_id"])
-    require_department_scope(ctx.identity, creator["department_id"] if creator else None)
+    ident = ctx.identity
+    if ident.role == "admin" and creator is not None and creator["role"] == "super_user":
+        if write:
+            raise ProtocolError(ErrorCode.FORBIDDEN, "set by the Super User; only they can change it")
+        if ident.department_id is None or not await _reaches_department(ctx.engine, ev, ident.department_id):
+            raise ProtocolError(ErrorCode.FORBIDDEN, "outside your department")
+        return ev
+    require_department_scope(ident, creator["department_id"] if creator else None)
     return ev
+
+
+async def _reaches_department(engine: Engine, ev: dict[str, Any], department_id: int) -> bool:
+    """An organisation-wide automation reaches a department when it names no machines (every PC)
+    or names at least one of the department's."""
+    ids = (ev["condition_spec"] or {}).get("pc_ids")
+    if not ids:
+        return True
+    return bool(set(ids) & await department_pc_ids(engine, department_id))
+
+
+async def department_pc_ids(engine: Engine, department_id: int) -> set[int]:
+    return {p["id"] for p in await engine.db.accounts.pcs_in_department(department_id)}
 
 
 @handler("control.event_create")
@@ -323,7 +351,7 @@ async def event_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     attached set (display order = list order)."""
     require_role(ctx, "super_user", "admin")
     event_id = int_field(payload, "event_id")
-    ev = await _load_event_in_scope(ctx, event_id)
+    ev = await _load_event_in_scope(ctx, event_id, write=True)
     db = ctx.engine.db
     spec = None
     if "match" in payload or "pc_ids" in payload:
@@ -352,7 +380,7 @@ async def event_delete(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Disables (never deletes); executions keep their reference."""
     require_role(ctx, "super_user", "admin")
     event_id = int_field(payload, "event_id")
-    await _load_event_in_scope(ctx, event_id)
+    await _load_event_in_scope(ctx, event_id, write=True)
     await ctx.engine.db.control.update_event(event_id, enabled=False)
     await ctx.engine.audit.record(ctx, "event.disabled", target_type="event_definitions", target_id=event_id)
     return {"event_id": event_id, "enabled": False}
@@ -366,6 +394,9 @@ async def event_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         else await db.control.events_in_department(ident.department_id)
     out = []
     for d in rows(defs):
+        # In a console, the Super User's automations are shown and marked read-only.
+        d["org_wide"] = bool(d.get("org_wide"))
+        d["read_only"] = ident.role == "admin" and d["org_wide"]
         d["actions"] = rows(await db.control.actions_for_event(d["id"]))
         d["last_fired_at"] = last_fired(d["id"])
         out.append(d)
@@ -402,10 +433,13 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     """What one automation did: each firing (when, which machine, what set it off) with the runs of its
     actions on that machine beneath it -- the AU04 "What it did" card. A run belongs to the latest
     firing on the same machine that precedes it."""
-    require_role(ctx, "super_user", "admin")
+    ident = require_role(ctx, "super_user", "admin")
     event_id = int_field(payload, "event_id")
-    await _load_event_in_scope(ctx, event_id)
+    await _load_event_in_scope(ctx, event_id, write=False)
     db = ctx.engine.db
+    # An Admin sees what the automation did on their department's machines only: an organisation-wide
+    # one counts just those, and a firing across many machines says how many of them it reached.
+    mine = await department_pc_ids(ctx.engine, ident.department_id) if ident.role == "admin" else None
     firings = []
     for f in await db.control.event_firings(event_id):
         detail = f["detail"] or {}
@@ -413,11 +447,17 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         firings.append({"at": f["occurred_at"].isoformat(), "pc_id": detail.get("pc_id"), "hostname": f["hostname"],
                         "subject": data.get("name") or data.get("process") or None, "runs": []})
     for ex in rows(await db.control.executions_for_event(event_id)):
+        if mine is not None and ex["target_pc_id"] not in mine:
+            continue
         started = datetime.fromisoformat(ex["started_at"])
         for firing in firings:                                  # newest first: the first earlier one wins
             if firing["pc_id"] in (ex["target_pc_id"], 0) and datetime.fromisoformat(firing["at"]) <= started:
                 firing["runs"].append(ex)
                 break
+    if mine is not None:
+        firings = [f for f in firings if f["pc_id"] in mine or (not f["pc_id"] and f["runs"])]
+    for f in firings:
+        f["machines"] = len({ex["target_pc_id"] for ex in f["runs"]}) if not f["pc_id"] else 1
     today = datetime.now(timezone.utc).date()
     fired_today = sum(1 for f in firings if datetime.fromisoformat(f["at"]).date() == today)
     running = [ex for f in firings for ex in f["runs"] if ex["status"] == "pending"]

@@ -311,7 +311,8 @@ The single table every "surfaced to Super User" event throughout the whole syste
 | `category` | TEXT NOT NULL | |
 | `routed_department_id` | INTEGER FK → departments.id NOT NULL | |
 | `configured_by_account_id` | INTEGER FK → accounts.id NOT NULL | Must be role = 'super_user' |
-| `configured_at` | TIMESTAMP NOT NULL | |
+| `configured_at` | TIMESTAMP NOT NULL | When this department was routed; kept while it stays routed |
+| `includes_earlier` | BOOLEAN NOT NULL DEFAULT TRUE | The department also sees reports of the category written before `configured_at` (migration 010) |
 | UNIQUE(`category`, `routed_department_id`) | | |
 
 *A department with multiple Admins: this table routes to the **department**, not one Admin — resolving which Admins see a routed report is a query joining `reports` → `report_routing_config` → `accounts WHERE department_id = ... AND role = 'admin'`, deliberately not a `routed_admin_id` column, per Report Routing's explicit "every Admin in the department" resolution.*

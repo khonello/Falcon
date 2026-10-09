@@ -768,28 +768,48 @@ class ReportsRepo(_Repo):
         return await self._fetch("SELECT * FROM reports ORDER BY generated_at DESC LIMIT $1", limit)
 
     async def routed_to_department(self, department_id: int, limit: int = 500) -> list[dict[str, Any]]:
-        """An Admin's pane: only categories routed to their department, with addressed state."""
+        """An Admin's pane: only categories routed to their department, with addressed state. A
+        department routed without the earlier reports sees only those written since it was routed."""
         return await self._fetch(
             "SELECT r.*, (SELECT max(v.addressed_at) FROM report_addressed_views v WHERE v.report_id = r.id) "
             "  AS addressed_at "
             "FROM reports r JOIN report_routing_config c ON c.category = r.category "
-            "WHERE c.routed_department_id = $1 ORDER BY r.generated_at DESC LIMIT $2", department_id, limit)
+            "WHERE c.routed_department_id = $1 AND (c.includes_earlier OR r.generated_at >= c.configured_at) "
+            "ORDER BY r.generated_at DESC LIMIT $2", department_id, limit)
 
     async def routing_config(self) -> list[dict[str, Any]]:
         return await self._fetch(
             "SELECT c.*, d.name AS department_name FROM report_routing_config c "
             "JOIN departments d ON d.id = c.routed_department_id ORDER BY c.category, d.name")
 
-    async def set_routing(self, category: str, department_ids: list[int], configured_by: int) -> None:
-        """Replace the routed departments for a category (additive to Super User's view)."""
+    async def set_routing(self, category: str, department_ids: list[int], configured_by: int,
+                          includes_earlier: bool = True) -> dict[str, list[int]]:
+        """Set the routed departments for a category (additive to Super User's view). Departments
+        already routed keep their row, so when they were routed and whether they see earlier reports
+        stay as they were; `includes_earlier` applies to departments added now. Returns what changed."""
         async with self.pool.acquire() as conn, conn.transaction():
-            # Routing config is configuration, not history: replacing it is not a "removal" of
+            before = {r["routed_department_id"] for r in await conn.fetch(
+                "SELECT routed_department_id FROM report_routing_config WHERE category = $1", category)}
+            wanted = set(department_ids)
+            added, removed = sorted(wanted - before), sorted(before - wanted)
+            # Routing config is configuration, not history: removing a row is not a "removal" of
             # a system record, so a DELETE here is acceptable and the change is audited.
-            await conn.execute("DELETE FROM report_routing_config WHERE category = $1", category)
-            for dept in department_ids:
+            if removed:
                 await conn.execute(
-                    "INSERT INTO report_routing_config (category, routed_department_id, configured_by_account_id) "
-                    "VALUES ($1, $2, $3)", category, dept, configured_by)
+                    "DELETE FROM report_routing_config WHERE category = $1 AND routed_department_id = ANY($2::int[])",
+                    category, removed)
+            for dept in added:
+                await conn.execute(
+                    "INSERT INTO report_routing_config (category, routed_department_id, configured_by_account_id, "
+                    "includes_earlier) VALUES ($1, $2, $3, $4)", category, dept, configured_by, includes_earlier)
+            return {"added": added, "removed": removed}
+
+    async def earlier_unaddressed(self, category: str) -> int:
+        """Reports of a category written so far that nobody has marked addressed: what adding a
+        department with its earlier reports hands to that department's Admins."""
+        return await self._val(
+            "SELECT count(*) FROM reports r WHERE r.category = $1 AND NOT EXISTS "
+            "(SELECT 1 FROM report_addressed_views v WHERE v.report_id = r.id)", category)
 
     async def departments_for_category(self, category: str) -> list[int]:
         rows = await self._fetch(
@@ -923,7 +943,9 @@ class ControlRepo(_Repo):
                                 created_by: int | None = None, enabled_only: bool = True) -> list[dict[str, Any]]:
         """`event_type` filters on condition_spec->>'type' (e.g. 'usb.inserted')."""
         return await self._fetch(
-            "SELECT * FROM event_definitions WHERE ($1::text IS NULL OR condition_type = $1) "
+            "SELECT e.*, EXISTS (SELECT 1 FROM accounts c WHERE c.id = e.created_by_account_id "
+            "AND c.role = 'super_user') AS org_wide FROM event_definitions e "
+            "WHERE ($1::text IS NULL OR condition_type = $1) "
             "AND ($2::text IS NULL OR condition_spec->>'type' = $2) "
             "AND ($3::int IS NULL OR created_by_account_id = $3) AND (NOT $4 OR enabled) ORDER BY id",
             condition_type, event_type, created_by, enabled_only)
@@ -975,9 +997,17 @@ class ControlRepo(_Repo):
             "WHERE a.archived_at IS NULL AND c.department_id = $1 ORDER BY a.action_kind, a.id", department_id)
 
     async def events_in_department(self, department_id: int, *, enabled_only: bool = False) -> list[dict[str, Any]]:
+        """The department's own automations, and the Super User's organisation-wide ones that reach
+        it: no machine list (every PC), or a list naming at least one of its machines. `org_wide`
+        marks the Super User's, which the department may see but not change."""
         return await self._fetch(
-            "SELECT e.* FROM event_definitions e JOIN accounts c ON c.id = e.created_by_account_id "
-            "WHERE c.department_id = $1 AND (NOT $2 OR e.enabled) ORDER BY e.id", department_id, enabled_only)
+            "SELECT e.*, (c.role = 'super_user') AS org_wide FROM event_definitions e "
+            "JOIN accounts c ON c.id = e.created_by_account_id "
+            "WHERE (NOT $2 OR e.enabled) AND (c.department_id = $1 OR (c.role = 'super_user' AND ("
+            "  jsonb_typeof(e.condition_spec->'pc_ids') IS DISTINCT FROM 'array' OR EXISTS ("
+            "    SELECT 1 FROM jsonb_array_elements_text(e.condition_spec->'pc_ids') x "
+            "    JOIN pcs p ON p.id = x::int WHERE p.department_id = $1)))) "
+            "ORDER BY e.id", department_id, enabled_only)
 
     async def last_executions_for_action(self, action_id: int, limit: int = 5) -> list[dict[str, Any]]:
         return await self._fetch(

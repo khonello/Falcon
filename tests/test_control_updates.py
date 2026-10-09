@@ -243,6 +243,57 @@ async def test_a_time_automation_runs_its_actions_on_its_machines(engine, org, c
 
 
 
+async def test_a_super_user_automation_is_seen_from_a_department_by_its_own_machines(engine, org, connect):
+    """An organisation-wide automation (the Super User's, no machines named) runs on every
+    department's machines. A department's Admin sees it read-only, and what it did there counts
+    only their machines: HR's Admin never sees Finance's runs."""
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")      # Finance: FIN-ADM, FIN-01, FIN-02
+    a2 = await connect("cid-a2")      # HR: HR-ADM
+    log_ = (await su.ok("control.action_create", {"kind": "control", "builtin_type": "notify", "timeout_s": 5, "params": {"message": "m"},
+                                                  "name": "Log it"}))["action"]
+    past = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    ev = (await su.ok("control.event_create", {"type": "time.scheduled", "match": {"at": past},
+                                               "action_ids": [log_["id"]]}))["event"]
+    assert await events.evaluate_polled(engine) == 1
+    runs = await engine.db.control.executions_for_event(ev["id"])
+    fin = {org["a1_pc"], org["w1_pc"], org["w2_pc"]}
+    assert {r["target_pc_id"] for r in runs} == fin | {org["a2_pc"]}       # every department's machines
+
+    # Both departments see it, marked read-only; neither can change or switch it.
+    for admin in (a1, a2):
+        listed = {e["id"]: e for e in (await admin.ok("control.event_list"))["events"]}
+        assert listed[ev["id"]]["org_wide"] and listed[ev["id"]]["read_only"]
+        assert await admin.err("control.event_update", {"event_id": ev["id"], "enabled": False}) == "forbidden"
+        assert await admin.err("control.event_delete", {"event_id": ev["id"]}) == "forbidden"
+    su_list = {e["id"]: e for e in (await su.ok("control.event_list"))["events"]}
+    assert su_list[ev["id"]]["org_wide"] and not su_list[ev["id"]]["read_only"]
+
+    # What it did, from each department: only its own machines, and how many of them it reached.
+    hist_fin = await a1.ok("control.event_history", {"event_id": ev["id"]})
+    assert {r["target_pc_id"] for f in hist_fin["firings"] for r in f["runs"]} == fin
+    assert hist_fin["firings"][0]["machines"] == 3
+    hist_hr = await a2.ok("control.event_history", {"event_id": ev["id"]})
+    assert {r["target_pc_id"] for f in hist_hr["firings"] for r in f["runs"]} == {org["a2_pc"]}
+    assert hist_hr["firings"][0]["machines"] == 1
+    hist_su = await su.ok("control.event_history", {"event_id": ev["id"]})
+    assert hist_su["firings"][0]["machines"] == 4
+
+    # The dashboard: HR's live runs are HR's only.
+    dash = await a2.ok("control.dashboard")
+    assert {x["target_pc_id"] for x in dash["live"]} <= {org["a2_pc"]}
+    mine = next(a for a in dash["automations"] if a["event"]["id"] == ev["id"])
+    assert mine["event"]["read_only"]
+    assert {r["target_pc_id"] for a in mine["actions"] for r in a["recent"]} <= {org["a2_pc"]}
+
+    # One naming only Finance's machines does not reach HR at all.
+    only_fin = (await su.ok("control.event_create", {"type": "time.scheduled", "match": {"at": past},
+                                                     "pc_ids": [org["w1_pc"]], "action_ids": [log_["id"]]}))["event"]
+    assert only_fin["id"] in {e["id"] for e in (await a1.ok("control.event_list"))["events"]}
+    assert only_fin["id"] not in {e["id"] for e in (await a2.ok("control.event_list"))["events"]}
+    assert await a2.err("control.event_history", {"event_id": only_fin["id"]}) == "forbidden"
+
+
 async def test_the_shelves_count_files_per_tier_in_the_department(engine, org, connect):
     """RS03: an Admin's shelves are their workstation's tiers, each with how many files sit on it."""
     a1 = await connect("cid-a1")

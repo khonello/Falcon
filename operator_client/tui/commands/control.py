@@ -83,7 +83,8 @@ async def action_run(ctx: ShellContext, args: Args) -> str:
 async def events(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.event_list")
     rows = [{"id": e["id"], "type": e["condition_spec"].get("type"), "mechanism": e["condition_type"],
-             "enabled": e["enabled"], "pcs": e["condition_spec"].get("pc_ids") or "dept",
+             "enabled": e["enabled"], "pcs": e["condition_spec"].get("pc_ids") or ("all" if e.get("org_wide") else "dept"),
+             "set_by": "super user (read-only)" if e.get("read_only") else "super user" if e.get("org_wide") else "department",
              "match": e["condition_spec"].get("match"), "actions": [a["name"] or a["id"] for a in e["actions"]],
              "last_fired": e.get("last_fired_at")} for e in res["events"]]
     return table(rows, width=36) + "\n\ntypes: " + ", ".join(sorted(res["types"]))
@@ -130,7 +131,8 @@ async def event_history(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.event_history", {"event_id": args.get_int(0, "event_id")})
     lines = [f"event {res['event_id']}: fired {res['fired_today']} time(s) today, {len(res['running'])} running"]
     for f in res["firings"]:
-        lines.append(f"\n{f['at']}  {f['hostname'] or '-'}" + (f"  {f['subject']}" if f["subject"] else ""))
+        where = f["hostname"] or (f"{f['machines']} machine(s)" if f.get("machines") else "-")
+        lines.append(f"\n{f['at']}  {where}" + (f"  {f['subject']}" if f["subject"] else ""))
         for r in f["runs"]:
             reason = f" ({r['terminated_reason']})" if r.get("terminated_reason") else ""
             lines.append(f"  ├─ {r['action_name'] or r['builtin_type']} -> {r['status']}{reason}  [exec {r['id']}]")

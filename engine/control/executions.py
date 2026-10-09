@@ -211,17 +211,25 @@ async def dashboard(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
+    # An Admin's view is the department's machines: the Super User's automations that reach it are
+    # included (read-only), and runs and live executions elsewhere are left out.
+    mine = None
     if ident.role == "super_user":
         defs = await db.control.event_definitions(enabled_only=True)
     else:
         defs = await db.control.events_in_department(ident.department_id, enabled_only=True)
+        mine = await ev.department_pc_ids(ctx.engine, ident.department_id)
+    here = (lambda r: True) if mine is None else (lambda r: r["target_pc_id"] in mine)
     out = []
     for d in defs:
         actions = []
         for a in await db.control.actions_for_event(d["id"]):
-            recent = await db.control.last_executions_for_action(a["id"])
+            recent = [r for r in await db.control.last_executions_for_action(a["id"], limit=50) if here(r)][:5]
             actions.append({"action": row(a), "recent": [
                 {**(row(r) or {}), "output": list(_outputs.get(r["id"], []))[-5:]} for r in recent]})
-        out.append({"event": row(d), "last_fired_at": ev.last_fired(d["id"]), "actions": actions})
-    live = [row(x) for x in await db.control.live_executions()]
+        event = row(d)
+        if mine is not None:
+            event["read_only"] = bool(d.get("org_wide"))
+        out.append({"event": event, "last_fired_at": ev.last_fired(d["id"]), "actions": actions})
+    live = [row(x) for x in await db.control.live_executions() if here(x)]
     return {"automations": out, "live": live}

@@ -22,14 +22,23 @@ async def report_mark(ctx: ShellContext, args: Args) -> str:
 async def routing(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("reports.routing_get")
     return "categories: " + ", ".join(res["categories"]) + "\n\n" + table(res["routing"], ["category", "department_name",
-                                                                                          "routed_department_id", "configured_at"])
+                                                                                          "routed_department_id", "configured_at", "includes_earlier"])
 
 
-@command("routing", "set", "<category> [dept_ids,...]", "Route a report category to departments (empty = none)")
+@command("routing", "set", "<category> [dept_ids,...] [earlier=no]",
+         "Route a report category to departments (empty = none); earlier=no: added ones get only new reports")
 async def routing_set(ctx: ShellContext, args: Args) -> str:
     ids = [int(x) for x in args.positional[1].split(",") if x] if len(args.positional) > 1 else []
-    res = await ctx.call("reports.routing_set", {"category": args.get(0, "category"), "department_ids": ids})
-    return f"{res['category']} -> departments {res['department_ids'] or 'none (Super User only)'}"
+    earlier = (args.opt("earlier") or "yes").lower() not in ("no", "false", "0", "off")
+    res = await ctx.call("reports.routing_set", {"category": args.get(0, "category"), "department_ids": ids,
+                                                 "include_earlier": earlier})
+    line = f"{res['category']} -> departments {res['department_ids'] or 'none (Super User only)'}"
+    if res["added"]:
+        line += f"\nadded {res['added']}: " + (f"with the {res['earlier_unaddressed']} earlier unaddressed"
+                                                if res["include_earlier"] else "new reports only")
+    if res["removed"]:
+        line += f"\nremoved {res['removed']}"
+    return line
 
 
 @command("addressed", help_="The Super-User-only View: who addressed which report, when")

@@ -247,6 +247,48 @@ async def test_report_routing_is_additive_and_views_are_super_user_only(engine, 
     assert view[0]["report_id"] == rid and view[0]["addressed_by_department_id"] == org["fin"]
 
 
+async def test_routing_a_department_with_or_without_earlier_reports(engine, org, connect):
+    from engine.hierarchy import reports
+
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")      # Finance
+    a2 = await connect("cid-a2")      # HR
+    old = await reports.emit(engine, "update_status", source_table="flow_sync_log", source_id=1, summary="old")
+
+    # Finance is added with the earlier reports (the default): it sees the one already written.
+    res = await su.ok("reports.routing_set", {"category": "update_status", "department_ids": [org["fin"]]})
+    assert res["added"] == [org["fin"]] and res["removed"] == [] and res["earlier_unaddressed"] == 1
+    assert [r["id"] for r in (await a1.ok("reports.list"))["reports"]] == [old]
+
+    # HR is added for new reports only: the old one stays the Super User's (and Finance's).
+    res = await su.ok("reports.routing_set", {"category": "update_status", "department_ids": [org["fin"], org["hr"]],
+                                              "include_earlier": False})
+    assert res["added"] == [org["hr"]] and res["earlier_unaddressed"] == 0
+    assert (await a2.ok("reports.list"))["reports"] == []
+    new = await reports.emit(engine, "update_status", source_table="flow_sync_log", source_id=2, summary="new")
+    assert [r["id"] for r in (await a2.ok("reports.list"))["reports"]] == [new]
+    # Finance kept what it had: re-saving the category did not reset it to "new only".
+    assert sorted(r["id"] for r in (await a1.ok("reports.list"))["reports"]) == [old, new]
+    routing = {r["routed_department_id"]: r for r in (await su.ok("reports.routing_get"))["routing"]}
+    assert routing[org["fin"]]["includes_earlier"] is True and routing[org["hr"]]["includes_earlier"] is False
+
+    # Finance addresses the old one, then is removed: it no longer sees the category, and the
+    # Super User's View still says Finance addressed it.
+    await a1.ok("reports.mark", {"report_id": old})
+    res = await su.ok("reports.routing_set", {"category": "update_status", "department_ids": [org["hr"]]})
+    assert res["removed"] == [org["fin"]] and res["added"] == []
+    assert (await a1.ok("reports.list"))["reports"] == []
+    assert (await su.ok("reports.addressed_view"))["addressed"][0]["report_id"] == old
+    # An empty list sends the category back to the Super User only.
+    await su.ok("reports.routing_set", {"category": "update_status", "department_ids": []})
+    assert (await a2.ok("reports.list"))["reports"] == []
+    assert len((await su.ok("reports.list"))["reports"]) == 2
+    assert await su.err("reports.routing_set", {"category": "update_status", "department_ids": [],
+                                                "include_earlier": "no"}) == "invalid"
+    audit = [e for e in (await su.ok("audit.recent", {"limit": 20}))["entries"] if e["action_type"] == "report_routing.set"]
+    assert audit and {"added", "removed", "include_earlier"} <= set(audit[0]["detail"])
+
+
 # --- alerts -------------------------------------------------------------------------------------
 
 async def test_alerts_are_role_filtered_and_pushed(engine, org, connect):

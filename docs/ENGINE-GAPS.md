@@ -115,26 +115,24 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
       so a failure past the threshold reaches that PC's Admin (§9.5). Today routing starts empty.
 
     *Raised:* by the user, from the concept's Work page.
-18. **Routing a kind of report, with what already waits** (concept, 8–9 Oct 2026; docs/design/super-user-menu.md,
-    *Where reports go*). Routing stays a standing rule per kind (hierarchy-system-design.md, Report Routing); the
-    concept edits one kind at a time, under the report picked.
-    - **One kind per save:** `reports.routing_set` already takes one category and its departments; the console
-      sends one call per Save. Nothing new, but the handler must accept an empty list (back to "you only").
-    - **Reports already waiting:** routing applies to reports written after the change. Adding a department
-      offers *Also send the N already waiting on you to Finance* (ticked by default). The Engine needs a way to
-      route existing unaddressed reports of that kind from that department, e.g. a `move_waiting: true` flag on
-      `reports.routing_set` that re-resolves their recipients, recorded in the audit log with the change. Unticked,
-      they stay the Super User's only (today's behaviour).
-    - **Removing a department:** the reports of that kind it has not addressed come back to the Super User only;
-      ones it addressed stay addressed. The *addressed* View is untouched (it is Super-User-only by design).
-    *Raised:* by the user, from the concept's Reports page.
-19. **A Super User rule seen from a department's console counts only that department** (concept, 9 Oct 2026). An
-    organisation-wide rule's firings, run outcomes, "fired this week" and "problems this week" in an Admin's
-    Automation page must be filtered to the department's machines (a scheduled run names how many machines it
-    reached there). Whatever query feeds `control.firings` / the rule's run summary takes the viewer's department
-    scope, like every other console list. *Found:* the concept's console Automation page.
-
 ## Done inline (for the record)
+
+- **Routing a kind of report, with or without what came before** (was #18, done 9 Oct 2026). A routed department used
+  to see every report of the category, however old: visibility is read-time. `report_routing_config` gains
+  `includes_earlier` (migration 010); `reports.routing_set` takes `include_earlier` (default true, the old
+  behaviour) for the departments it adds, keeps the rows of departments already routed (so when each was routed and
+  what it sees survive later edits), and answers `added`, `removed` and `earlier_unaddressed`. An empty list sends
+  the category back to the Super User only; a removed department stops seeing it, and what it addressed stays in the
+  Super User's View. Audited with all of it. TUI: `routing set <category> [ids] [earlier=no]`.
+  *Test:* `test_routing_a_department_with_or_without_earlier_reports`.
+- **A Super User automation seen from a department** (was #19, done 9 Oct 2026). An Admin could not see the Super
+  User's organisation-wide automations at all. Now `control.event_list` and `control.dashboard` include those that
+  reach the department (no machines named, or one of its machines named), marked `org_wide` / `read_only`;
+  `control.event_update` and `control.event_delete` refuse them (FORBIDDEN); `control.event_history` counts runs on the
+  department's machines only and says how many machines each firing reached (`machines`). Two more found on the way:
+  the dashboard sent an Admin every running action in the organisation (now the department's only), and a Super
+  User's timed automation with no machines named ran on none (it now runs on every department's machines).
+  *Test:* `test_a_super_user_automation_is_seen_from_a_department_by_its_own_machines`.
 
 - `control.event_history`, `control.levels`, `match.tier`, and time events firing on machine 0 (Automation).
 - `flow.list` shapes and hostnames, `index.folders` (Flows).

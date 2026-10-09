@@ -98,20 +98,34 @@ async def routing_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("reports.routing_set")
 async def routing_set(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User only. {"category": str, "department_ids": [..]} -- replaces the routed
-    departments for that category. Additive to Super User's own visibility, always."""
+    """Super User only. {"category": str, "department_ids": [..], "include_earlier": bool = true}
+    -- sets the routed departments for that category, one category per call; an empty list sends
+    it back to the Super User only. Additive to Super User's own visibility, always.
+
+    `include_earlier` applies to departments added by this call: true, they also see the reports
+    of this category already written (and can address the ones nobody has); false, only reports
+    written from now on. Departments already routed keep what they had. A department removed stops
+    seeing the category; what it addressed stays recorded in the Super User's View."""
     ident = require_role(ctx, "super_user")
     category = str_field(payload, "category", choices=CATEGORIES)
     dept_ids = payload.get("department_ids")
     if not isinstance(dept_ids, list):
         raise ProtocolError(ErrorCode.INVALID, "department_ids must be a list")
-    dept_ids = [int(d) for d in dept_ids]
+    dept_ids = sorted({int(d) for d in dept_ids})
+    include_earlier = payload.get("include_earlier", True)
+    if not isinstance(include_earlier, bool):
+        raise ProtocolError(ErrorCode.INVALID, "include_earlier must be true or false")
     known = {d["id"] for d in await ctx.engine.db.accounts.list_departments()}
     if unknown := set(dept_ids) - known:
         raise ProtocolError(ErrorCode.NOT_FOUND, f"unknown departments {sorted(unknown)}")
-    await ctx.engine.db.reports.set_routing(category, dept_ids, ident.account_id)
-    await ctx.engine.audit.record(ctx, "report_routing.set", detail={"category": category, "departments": dept_ids})
-    return {"category": category, "department_ids": dept_ids}
+    db = ctx.engine.db
+    changed = await db.reports.set_routing(category, dept_ids, ident.account_id, include_earlier)
+    earlier = await db.reports.earlier_unaddressed(category) if changed["added"] and include_earlier else 0
+    await ctx.engine.audit.record(ctx, "report_routing.set", detail={
+        "category": category, "departments": dept_ids, "added": changed["added"], "removed": changed["removed"],
+        "include_earlier": include_earlier, "earlier_unaddressed": earlier})
+    return {"category": category, "department_ids": dept_ids, **changed, "include_earlier": include_earlier,
+            "earlier_unaddressed": earlier}
 
 
 @handler("reports.addressed_view")
