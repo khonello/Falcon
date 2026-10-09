@@ -115,6 +115,24 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
       so a failure past the threshold reaches that PC's Admin (§9.5). Today routing starts empty.
 
     *Raised:* by the user, from the concept's Work page.
+18. **Routing a kind of report, with what already waits** (concept, 8–9 Oct 2026; docs/design/super-user-menu.md,
+    *Where reports go*). Routing stays a standing rule per kind (hierarchy-system-design.md, Report Routing); the
+    concept edits one kind at a time, under the report picked.
+    - **One kind per save:** `reports.routing_set` already takes one category and its departments; the console
+      sends one call per Save. Nothing new, but the handler must accept an empty list (back to "you only").
+    - **Reports already waiting:** routing applies to reports written after the change. Adding a department
+      offers *Also send the N already waiting on you to Finance* (ticked by default). The Engine needs a way to
+      route existing unaddressed reports of that kind from that department, e.g. a `move_waiting: true` flag on
+      `reports.routing_set` that re-resolves their recipients, recorded in the audit log with the change. Unticked,
+      they stay the Super User's only (today's behaviour).
+    - **Removing a department:** the reports of that kind it has not addressed come back to the Super User only;
+      ones it addressed stay addressed. The *addressed* View is untouched (it is Super-User-only by design).
+    *Raised:* by the user, from the concept's Reports page.
+19. **A Super User rule seen from a department's console counts only that department** (concept, 9 Oct 2026). An
+    organisation-wide rule's firings, run outcomes, "fired this week" and "problems this week" in an Admin's
+    Automation page must be filtered to the department's machines (a scheduled run names how many machines it
+    reached there). Whatever query feeds `control.firings` / the rule's run summary takes the viewer's department
+    scope, like every other console list. *Found:* the concept's console Automation page.
 
 ## Done inline (for the record)
 

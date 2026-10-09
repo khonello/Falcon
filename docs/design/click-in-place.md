@@ -118,8 +118,22 @@ protocol: 64 steps, both levels, each checking what the page shows afterwards. *
 3. While fixing 1, Restricted's panel briefly read the list's copy of a mark, so *change* would not have stuck; it
    reads the mark itself again.
 
-Not covered: Issues still shows a picked issue when the strip or type filter hides it (it is picked before the list is
-built); typing into fields and picking from dropdowns was not scripted.
+**Second pass (9 Oct 2026, concept version 169): 78 of 78.** Added typing and dropdowns: a copy allowed with a
+written reason, an outcome recorded with a line, a new task typed and given to Finance, the Reports department pick,
+the routing *Kind* pick, the Audit log kind pick, the console's Issues type pick, typing in Registry's and Machines'
+filters, resolving an issue with a reason. Also checked: Overview's *Worth a look* counting the whole week, and a Super
+User rule in the console counting only that department's machines.
+
+**Found and fixed by it:**
+
+4. Issues kept showing a picked issue that a filter hid; it now moves to the first listed one like every other page.
+5. Recording an outcome on Accountability, resolving an issue, or marking a report addressed while a filter hides
+   addressed ones took the item out of the list and the panel jumped to another, so you never saw what you had just
+   recorded. The item you just acted on now stays shown until you pick another.
+6. Removing 35 unused components (the console's old Flows, Sessions, Rollout, Audit and Reports, Routing, Govern, the
+   rail and board parts and helpers only they used) also took out a helper still in use, written on one line; the
+   department page and Accountability went blank. Caught by loading every page with errors captured; redone so a
+   one-line helper takes only its own line. Every page at both levels now loads without an error.
 
 ## Count
 

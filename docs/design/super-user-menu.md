@@ -162,12 +162,19 @@ The rule is what makes something an accountability record.
 - **Editing can show its effect before saving** (idea): "raising this limit would have cleared 14 of the 19 deviations this month",
   from data already on the Accountability page.
 
-## Open questions
+## Decided (9 Oct 2026, were open questions)
 
-- Does **Registry** stay in the menu or move behind a Settings entry? (Rarely used, so it could sit low.)
-- Does the first concept include the full graph builder, or only the template library and the active list, with the builder as a later
-  step? The Admin's Automation page already has a similar builder that can be reused.
-- Does **Overview** keep the line "N things worth a look" counting open deviations only? (Outcomes make "open" meaningful.)
+- **Registry stays in the menu**, under Organisation. Refused connections are a security signal one click away, and
+  registering a PC is ordinary Super User work.
+- **Rules ship with the patterns and the fill-in builder**: start from a pattern (follow-up, limit, never), fill in its
+  blanks, see it drawn. No free-form graph in the first version. How a rule is stored stays undecided until the Engine
+  pass (CLAUDE.md, spec §10, schema §12).
+- **Overview's *Worth a look* counts every deviation this week**, not only open ones: open ones first, then the ones
+  dealt with, each saying what came of it. The figure beside it reads *Deviations this week* with how many are still
+  open.
+- **The Super User's Overview keeps its deviations chart** (*Deviations, 7 days*, by severity). The Admin's Overview
+  keeps *Event volume*: different roles, different chart. The Super User's full event stream is on Audit log
+  (*Events over time*).
 
 ## Opening, creating and editing (decided 6 Oct 2026, revised 7 Oct 2026)
 

@@ -136,8 +136,10 @@ disabled), `#automation` (the Super User's rules' *Enabled* greyed). The Super U
 draw as before. Not exercised headless, read in the code only: D1 (needs more than five copies), D5's confirmation,
 D8 (on the machine page's Files tab), D7 and D9 (in Search).
 
-Still to decide, not navigation: an organisation-wide rule's *Firings*, *Each action* and *Runs today* still count
-and name runs on other departments' machines as plain text (e.g. "Check disk health · FIN-01 · Failed").
+Since fixed (9 Oct 2026, not navigation): an organisation-wide rule seen in a console counted runs on other
+departments' machines (*Last firings* read "1 timed out, 1 failed, 20 succeeded", FIN-01 among them). Its firings,
+outcomes, *Fired this week*, *Problems this week* and *Runs per day* now count the department's machines only; a
+scheduled run says how many of them it reached ("7 machines"). Engine side: docs/ENGINE-GAPS.md #19.
 
 ## Proposed fixes (as written before they were applied)
 
