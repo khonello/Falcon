@@ -2558,7 +2558,7 @@ function RuleDetail({ id, go, picked }) {
       ${fires.slice(0, 5).map((f, i) => { const sm0 = summarize(f.runs), on = openF === i;
         const shown = f.runs.slice().sort((x, y) => (x.outcome === "Success") - (y.outcome === "Success")).slice(0, 6);
         return html`<div key=${i} style=${{ padding: "7px 0", borderBottom: "1px solid var(--grid)", fontSize: 12.5 }}>
-          <div className="row" role="button" onClick=${() => setOpenF(on ? null : i)} style=${{ flexWrap: "nowrap", gap: 10, cursor: "pointer" }}><span className="mono t3">${when(f.t)}</span><span className="mono">${f.host}</span><span className="sp" />
+          <div className="row" role="button" onClick=${(e) => { const el = e.currentTarget; setOpenF(on ? null : i); if (!on) setTimeout(() => el.scrollIntoView({ block: "start", behavior: "smooth" }), 60); }} style=${{ flexWrap: "nowrap", gap: 10, cursor: "pointer" }}><span className="mono t3">${when(f.t)}</span><span className="mono">${f.host}</span><span className="sp" />
             ${sm0.map(([k, n]) => html`<span key=${k} className="st" style=${{ "--c": OUT[k], fontSize: 12 }}><i />${k === "Success" && sm0.length === 1 ? (n === 1 ? "Succeeded" : `All ${n} succeeded`) : `${n} ${k.toLowerCase()}`}</span>`)}</div>
           <div className="t3 cut" title=${f.detail}>${f.detail}</div>
           ${on ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 10, padding: "8px 0 4px 10px", borderLeft: "2px solid var(--border)", marginTop: 6 }}>
