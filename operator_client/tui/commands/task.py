@@ -158,8 +158,10 @@ async def task_create(ctx: ShellContext, args: Args) -> str:
 @command("tasks", usage="[all]", help_="Tasks you assigned / are assigned (`all` includes completed)")
 async def tasks(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("task.list", {"include_completed": args.flag("all")})
+    for t in res["tasks"]:
+        t["checks"] = f"{t.get('checks_passed', 0)}/{t.get('checks_total', 0)}"
     return table(res["tasks"], ["id", "status", "assigner_name", "assignee_name", "description_raw",
-                                "verification_mode", "final_deadline_at"], width=48)
+                                "checks", "verification_mode", "final_deadline_at"], width=48)
 
 
 @command("task", None, "<task_id>", "Show a task with its verification stack and expectation signals")

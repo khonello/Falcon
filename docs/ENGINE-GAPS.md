@@ -48,9 +48,6 @@ service inside that person's session.
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
    out of the page until then.
-11. **A task's verification state is not in `task.list`.** Work's "Yours" wants "both checks passed · verify"
-    on the card; today that needs `task.get` per task. A per-task `checks_passed / checks_total` in the list
-    would do. *Found:* WK03.
 12. **A client PC's live state is thin** (level 4, CP03). `control.levels` gives processor, memory and idle from the
     Worker's last metrics report (in memory, lost on restart); the design also wants **what is in front** (the
     foreground program and its document) and a machine that is **not reachable** refused at `hierarchy.traverse`
@@ -123,6 +120,9 @@ service inside that person's session.
 
 ## Done inline (for the record)
 
+- **A task's checks in `task.list`** (was #11, done 9 Oct 2026). Every task row carries `checks_total` and
+  `checks_passed`, so a list can say "2 of 3 checks passed" without a `task.get` per task; the TUI's `tasks` shows
+  them as a `checks` column. *Test:* `test_task.py` (the list carries 0 of 2 after create).
 - **An Admin belongs to one department** (was #13, closed 9 Oct 2026, the user's decision). Kept: assigning an Admin
   to a department without one means a new Admin account, or promoting one of its workers. The concept's "an Admin
   from another department, as well" option is removed.

@@ -504,8 +504,12 @@ class TasksRepo(_Repo):
             item.get("proposed_filename"), item.get("proposed_path"), linked_id,
             item.get("program_name"), item.get("populated_by", "llm"))
 
+    # checks_passed / checks_total travel with every task row, so a list shows "2 of 3 checks passed" without a
+    # task.get per task (Work's "Yours").
     _TASK_COLS = ("t.*, a.bound_pc_id AS assignee_pc_id, a.department_id AS assignee_department_id, "
-                  "a.role AS assignee_role")
+                  "a.role AS assignee_role, "
+                  "(SELECT count(*) FROM verification_items v WHERE v.task_id = t.id) AS checks_total, "
+                  "(SELECT count(*) FROM verification_items v WHERE v.task_id = t.id AND v.status = 'passed') AS checks_passed")
     _TASK_FROM = "FROM tasks t JOIN accounts a ON a.id = t.assignee_account_id"
 
     async def get(self, task_id: int) -> dict[str, Any] | None:

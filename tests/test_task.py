@@ -204,6 +204,9 @@ async def test_create_rules_and_full_lifecycle(engine, org, connect):
         assert (await c.ok("task.get", {"task_id": tid}))["task"]["id"] == tid
     assert await w2.err("task.get", {"task_id": tid}) == "not_found"
     assert [t["id"] for t in (await w1.ok("task.list"))["tasks"]] == [tid]
+    # the list carries each task's checks, so "0 of 2 checks passed" needs no task.get
+    listed = (await a1.ok("task.list"))["tasks"][0]
+    assert (listed["checks_total"], listed["checks_passed"]) == (2, 0)
 
     # Only the assignee starts; only the assigner verifies; the assignee never can.
     assert await a1.err("task.start", {"task_id": tid}) == "not_found"
