@@ -422,6 +422,11 @@ asks of unanswered pings; the pulse stops when everything is answered.
   for the higher party (an Admin with a worker, the Super User with an Admin), asked first. *Add a listener* (Admins
   only) once it is open: you see who you added, the other party is not told; a listener reads it as it happens and
   cannot write.
+- **Listeners open in a drawer** (the user, 9 Oct 2026; was a dropdown). The panel says who you added in a line
+  ("A. Quaye reads it silently. Ama is not told.") beside a button, *Add listeners* or *Listeners · N*. The drawer:
+  what a listener is; *Listening now* (each with their department, whether they are at their desk, how many
+  conversations they already listen on, and Remove); *Add an Admin*, searchable, grouped by department with your own
+  first (Engine: `assistance.listener_candidates`, every department's Admins).
 - A help request is no longer an issue: it lives here. The console's Overview counts pings with *Waiting on you*.
 
 ## The session window (an Admin's console, decided 9 Oct 2026)

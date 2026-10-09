@@ -4654,13 +4654,13 @@ function DepartmentsPage({ go, enter, open }) {
         </div>` : null}
       <//>`; })()}
     ${(() => { const dd = asg ? all.find((x) => x.id === asg) : null;
-      const pool = dd ? [...Object.keys(ADMIN_INFO).filter((a) => ADMIN_INFO[a].dept !== dd.id).map((a) => ({ value: a, label: `${a} · Admin in ${deptNameOf(ADMIN_INFO[a].dept)}, as well` })),
-        ...dd.ms.filter((m) => m.user).map((m) => ({ value: m.user + " (promote)", label: `${m.user} · works on ${m.host}, promote to Admin` }))] : [];
+      // An Admin belongs to one department (decided 9 Oct 2026): only this department's workers can be promoted.
+      const pool = dd ? dd.ms.filter((m) => m.user).map((m) => ({ value: m.user + " (promote)", label: `${m.user} · works on ${m.host}, promote to Admin` })) : [];
       return html`<${Drawer} open=${!!dd} onClose=${() => setAsg(null)} width=${420} title=${dd ? `Assign an Admin · ${dd.name}` : ""}
         footer=${dd ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setAsg(null)}>Cancel<//><${Button} type="primary" disabled=${!who} onClick=${() => { setAsg(null); toast(`${who.replace(" (promote)", "")} is ${dd.name}'s Admin · its reports start reaching them once routed (concept)`); }}>Assign<//></div>` : null}>
         ${dd ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div><div className="nt-h">Who</div><${Select} id="asg-who" showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Pick someone" value=${who} onChange=${setWho} options=${pool} /></div>
-          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>Until ${dd.name} has an Admin, everything from it comes to you: its reports, stuck updates and help requests. An Admin from another department can look after it as well; promoting a worker gives them a console and a key, shown once.</div>
+          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>Until ${dd.name} has an Admin, everything from it comes to you: its reports, stuck updates and help requests. Promoting one of its workers gives them a console and a key, shown once; an Admin belongs to one department.</div>
         </div>` : null}
       <//>`; })()}
     <${OrgDay} go=${go} />
@@ -4965,6 +4965,7 @@ function Messages({ me, open }) {
   const [sel, setSel] = useOpen("messages", open);
   const [f, setF] = useState(null), [q, setQ] = useState("");
   const [draft, setDraft] = useState({}), [newPing, setNewPing] = useState(null);
+  const [lis, setLis] = useState(null), [lq, setLq] = useState("");
   const [modal, modalCtx] = Modal.useModal();
   const mine = CHANNELS.filter((c) => chVisible(c, me));
   const order = { you: 0, them: 1, listen: 2, closed: 3 };
@@ -4985,6 +4986,7 @@ function Messages({ me, open }) {
     content: `Only you can close it. ${chOther(x, me)} cannot write in it again; a new ping opens a new one. It stays in the audit log.`,
     onOk: () => { setSel(x.id); msgChange(() => { x.status = "closed"; x.closedAt = nowH(); }); toast("Closed · recorded (concept)"); } });
   const addListener = (x, who) => { setSel(x.id); msgChange(() => { x.listeners = { ...x.listeners, [me]: [...(x.listeners[me] || []), who] }; }); toast(`${who} is listening · ${chOther(x, me)} is not told (concept)`); };
+  const dropListener = (x, who) => { msgChange(() => { x.listeners = { ...x.listeners, [me]: (x.listeners[me] || []).filter((a) => a !== who) }; }); toast(`${who} no longer reads it (concept)`); };
   const ping = (who) => { const ex = mine.find((x) => chParty(x, me) && chOther(x, me) === who && x.status !== "closed");
     if (ex) { setNewPing(null); return ex.status === "ping" && ex.by === (ex.lo === me ? "lo" : "hi") ? pingAgain(ex) : (setSel(ex.id), toast(`You already have a conversation with ${who}`)); }
     const lo = who === "Super User" || ADMIN_INFO[who] && me !== "Super User" ? me : who, hi = lo === me ? who : me;
@@ -5012,7 +5014,6 @@ function Messages({ me, open }) {
     </div>`; };
   const side = !c ? html`<${SidePanel} empty=${html`<${Empty} icon="MessageOutlined" title="No conversations yet" text=${me === "Super User" ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."} h=${200} />`} />`
     : (() => { const st = chState(c, me), party = !st[2].startsWith("listen"), added = c.listeners[me] || [];
-      const admins = Object.keys(ADMIN_INFO).filter((a) => a !== c.lo && a !== c.hi && !added.includes(a));
       return html`<${SidePanel} title=${title(c)} sub=${party ? whoLine(chOther(c, me)) : "you are listening"}
         facts=${[["Now", html`<span className="st" style=${{ "--c": st[1] === "bad" ? "var(--crit)" : st[1] === "good" ? "var(--ok)" : "var(--text-4)" }}><i />${st[0]}</span>`],
           ["Started by", `${c.by === "lo" ? c.lo : c.hi}, ${atH(c.pings[0])}`], ["Who closes it", c.hi === me ? "You" : c.hi],
@@ -5020,9 +5021,10 @@ function Messages({ me, open }) {
         actions=${party && c.status !== "closed" ? html`${c.status === "ping" && chReceiver(c) !== me ? html`<${Button} onClick=${() => pingAgain(c)}>Ping again<//>` : null}
           ${c.status === "open" && c.hi === me ? html`<${Button} danger onClick=${() => close(c)}>Close<//>` : null}` : null}>
         ${thread(c)}
-        ${party && c.status === "open" ? html`<div><div className="nt-h">Add a listener</div>
-          <${Select} size="small" style=${{ width: "100%" }} placeholder="An Admin who reads it silently" value=${null} onChange=${(v) => addListener(c, v)} options=${admins.map((a) => ({ value: a, label: `${a} · ${deptNameOf(ADMIN_INFO[a].dept)}` }))} />
-          <div className="t3" style=${{ fontSize: 12, marginTop: 6 }}>Only Admins. You see who you added; ${chOther(c, me)} is not told.</div></div>` : null}
+        ${party && c.status === "open" ? html`<div><div className="nt-h">Listeners</div>
+          <div className="row" style=${{ gap: 10, flexWrap: "nowrap" }}>
+            <span className="t3" style=${{ fontSize: 12.5, flex: 1, minWidth: 0 }}>${added.length ? `${listNames(added)} ${added.length === 1 ? "reads" : "read"} it silently. ${chOther(c, me)} is not told.` : `Admins you add read it silently. ${chOther(c, me)} is not told.`}</span>
+            <${Button} id="lis-open" type="primary" ghost icon=${ic("TeamOutlined")} onClick=${() => { setLq(""); setLis(c.id); }}>${added.length ? `Listeners · ${added.length}` : "Add listeners"}<//></div></div>` : null}
       <//>`; })();
   return html`<${React.Fragment}>${modalCtx}
     <${Strip} on=${f} onPick=${setF} items=${[
@@ -5040,6 +5042,33 @@ function Messages({ me, open }) {
         empty=${!mine.length ? html`<${Empty} icon="MessageOutlined" title="No conversations yet" text="A ping asks for attention; answering it opens a conversation, one message each way at a time." act="New ping" onAct=${() => setNewPing({ who: undefined })} h=${200} />` : null} />
       ${side}
     </div>
+    ${(() => { const x = lis ? CHANNELS.find((y) => y.id === lis) : null; if (!x) return html`<${Drawer} open=${false} />`;
+      const other = chOther(x, me), added = x.listeners[me] || [];
+      const listensOn = (a) => CHANNELS.filter((y) => y.status === "open" && Object.values(y.listeners).some((xs) => xs.includes(a))).length;
+      const pool = Object.keys(ADMIN_INFO).filter((a) => a !== x.lo && a !== x.hi && !added.includes(a) && `${a} ${deptNameOf(ADMIN_INFO[a].dept)}`.toLowerCase().includes(lq.toLowerCase()));
+      const depts = [...new Set(pool.map((a) => ADMIN_INFO[a].dept))].sort((a, b) => (a === (ADMIN_INFO[me] || {}).dept ? -1 : b === (ADMIN_INFO[me] || {}).dept ? 1 : deptNameOf(a).localeCompare(deptNameOf(b))));
+      const person = (a, act) => { const info = ADMIN_INFO[a] || {}, n0 = listensOn(a);
+        return html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--grid)" }}>
+          <span style=${{ position: "relative", flex: "none" }}><span className="av" style=${{ width: 30, height: 30, fontSize: 11 }}>${initials(a)}</span>
+            <i style=${{ position: "absolute", right: -1, bottom: -1, width: 9, height: 9, borderRadius: "50%", background: info.busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
+          <span style=${{ minWidth: 0, flex: 1 }}><span className="cut" style=${{ display: "block", fontWeight: 500 }} title=${a}>${a}</span>
+            <span className="t3 cut" style=${{ display: "block", fontSize: 12 }}>Admin, ${deptNameOf(info.dept)} · ${info.busy ? "inside a machine" : "at their desk"}${n0 ? ` · listens on ${n0}` : ""}</span></span>
+          ${act}</div>`; };
+      return html`<${Drawer} open=${true} onClose=${() => setLis(null)} width=${460} title=${`Listeners · you and ${other}`}
+        footer=${html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${() => setLis(null)}>Done<//></div>`}>
+        <div style=${{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>A listener is an Admin who reads this conversation as it happens and cannot write in it. ${other} is not told. You see only the listeners you added; ${other} may have added their own.</div>
+          <div><div className="nt-h">Listening now · ${fmt(added.length)}</div>
+            ${added.length ? added.map((a) => person(a, html`<${Button} size="small" onClick=${() => dropListener(x, a)}>Remove<//>`))
+              : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nobody you added. Pick an Admin below.</div>`}</div>
+          <div><div className="nt-h">Add an Admin</div>
+            <${Input} allowClear placeholder="Find an Admin or a department" prefix=${ic("SearchOutlined")} value=${lq} onChange=${(e) => setLq(e.target.value)} />
+            ${depts.map((d) => html`<div key=${d} style=${{ marginTop: 10 }}>
+              <div className="t3" style=${{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em" }}>${deptNameOf(d)}${d === (ADMIN_INFO[me] || {}).dept ? " · your department" : ""}</div>
+              ${pool.filter((a) => ADMIN_INFO[a].dept === d).map((a) => person(a, html`<${Button} size="small" type="primary" ghost onClick=${() => addListener(x, a)}>Add<//>`))}</div>`)}
+            ${!pool.length ? html`<div className="t3" style=${{ padding: "10px 0", fontSize: 12.5 }}>${lq ? "No Admin by that name." : "Every Admin already listens."}</div>` : null}</div>
+        </div>
+      <//>`; })()}
     <${Drawer} open=${!!newPing} onClose=${() => setNewPing(null)} width=${420} title="Ping someone"
       footer=${newPing ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setNewPing(null)}>Cancel<//><${Button} type="primary" disabled=${!newPing.who} onClick=${() => ping(newPing.who)}>Ping<//></div>` : null}>
       ${newPing ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
