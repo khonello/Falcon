@@ -3725,8 +3725,8 @@ function ListPanel({ title, sub, q, setQ, placeholder, action, rows, pick, onPic
 // The item beside its list (trial, 7 Oct 2026): a click in the list shows the item here at once, at the list's height,
 // with its facts as label/value rows, any short sections under them, and its actions at the foot. Charts and drawings
 // of the same item stay below the list, full width.
-function SidePanel({ title, sub, facts = [], children, foot, actions, empty, h = LIST_H }) {
-  return html`<${Panel} flush className="sidep" title=${title} sub=${sub} style=${h == null ? undefined : { height: h }}>
+function SidePanel({ title, sub, facts = [], children, foot, actions, extra, empty, h = LIST_H }) {
+  return html`<${Panel} flush className="sidep" title=${title} sub=${sub} extra=${extra} style=${h == null ? undefined : { height: h }}>
     ${empty || html`<div style=${{ flex: 1, minHeight: 0, overflowY: "auto", padding: "2px 16px 14px" }}>
       ${facts.map(([k, v]) => html`<div key=${k} className="kv" style=${{ gridTemplateColumns: "116px minmax(0, 1fr)" }}><span className="t3">${k}</span><span style=${{ minWidth: 0, overflowWrap: "anywhere" }}>${v}</span></div>`)}
       ${children ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 16, marginTop: facts.length ? 14 : 0 }}>${children}</div>` : null}
@@ -4962,7 +4962,7 @@ const atH = (t) => (t >= 0 && t < 24 ? hhmm(t) : `${dayOf(t)} ${hhmm(t)}`);
 // who someone is, in a line
 const whoLine = (name) => name === "Super User" ? "the Super User" : ADMIN_INFO[name] ? `Admin, ${deptNameOf(ADMIN_INFO[name].dept)}` : (() => { const m = (FULL.MACHINES || MACHINES).find((x) => x.user === name); return m ? `on ${m.host}` : "a worker"; })();
 
-const MSG_H = 452 + 56 * 2;   // Messages lists two more rows, and the conversation gets the room
+const MSG_H = 452 + 56 * 2 + 64;   // Messages lists two more rows; the conversation panel stands a little taller than the list
 function Messages({ me, open }) {
   useDT();
   const [sel, setSel] = useOpen("messages", open);
@@ -5008,7 +5008,7 @@ function Messages({ me, open }) {
       ${listening ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 10 }}>${ic("EyeOutlined")} You are listening. You read it as it happens; you cannot write in it. Only ${Object.keys(x.listeners).filter((k) => x.listeners[k].includes(me)).join(" and ")} knows you are here.</div>`
         : x.status === "closed" ? null
         : x.status === "ping" && receiver !== me ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 10 }}>A ping is only "I need you". ${chOther(x, me)} sees it, bright and pulsing, until they answer; you can ping again.</div>`
-        : turn === me || (x.status === "ping" && receiver === me) ? html`<div style=${{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+        : turn === me || (x.status === "ping" && receiver === me) ? html`<div style=${{ marginTop: 22, paddingTop: 14, borderTop: "1px solid var(--grid)", display: "flex", flexDirection: "column", gap: 8 }}>
             <${Input.TextArea} id=${"msg-" + x.id} value=${draft[x.id] || ""} onChange=${(e) => setDraft({ ...draft, [x.id]: e.target.value })} autoSize=${{ minRows: 2, maxRows: 5 }}
               placeholder=${x.status === "ping" ? `Answer ${chOther(x, me)}. You write first; then you take turns.` : `Write to ${chOther(x, me)}. One message, then it is their turn.`} />
             <div className="row"><span className="t3" style=${{ fontSize: 12 }}>${x.status === "ping" ? "Answering opens the conversation." : "Your turn."}</span><span className="sp" />
@@ -5024,8 +5024,8 @@ function Messages({ me, open }) {
         foot=${party && c.status === "open" ? html`<div className="row" style=${{ gap: 10, flexWrap: "nowrap" }}>
             <span style=${{ flex: 1, minWidth: 0, fontSize: 12.5 }}><span className="t3">${ic("TeamOutlined")} Listeners · </span>${added.length ? html`${listNames(added)} <span className="t3">${added.length === 1 ? "reads" : "read"} it silently; ${chOther(c, me)} is not told.</span>` : html`<span className="t3">none. Admins you add read it silently; ${chOther(c, me)} is not told.</span>`}</span>
             <${Button} id="lis-open" type="primary" ghost icon=${ic("TeamOutlined")} onClick=${() => { setLq(""); setLis(c.id); }}>${added.length ? `Listeners · ${added.length}` : "Add listeners"}<//></div>` : null}
-        actions=${party && c.status !== "closed" ? html`${c.status === "ping" && chReceiver(c) !== me ? html`<${Button} onClick=${() => pingAgain(c)}>Ping again<//>` : null}
-          ${c.status === "open" && c.hi === me ? html`<${Button} danger onClick=${() => close(c)}>Close<//>` : null}` : null}>
+        extra=${party && c.status === "open" && c.hi === me ? html`<${Tooltip} title="Close the conversation"><${Button} id="ch-close" size="small" type="text" danger aria-label="Close the conversation" icon=${ic("CloseCircleOutlined")} onClick=${() => close(c)} /><//>` : null}
+        actions=${party && c.status === "ping" && chReceiver(c) !== me ? html`<${Button} onClick=${() => pingAgain(c)}>Ping again<//>` : null}>
         ${thread(c)}
       <//>`; })();
   return html`<${React.Fragment}>${modalCtx}

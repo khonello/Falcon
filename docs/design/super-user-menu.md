@@ -429,7 +429,10 @@ asks of unanswered pings; the pulse stops when everything is answered.
   first (Engine: `assistance.listener_candidates`, every department's Admins).
 - **Room for the conversation** (the user, 9 Oct 2026): Messages' list and panel are two rows taller than other
   pages (8 conversations a page), and the listeners line sits in a fixed strip at the foot of the panel, above Close,
-  so it never scrolls away with the thread (`SidePanel foot`).
+  so it never scrolls away with the thread (`SidePanel foot`). The panel stands a little taller than the list; the
+  reply box sits apart from the last message (space and a hairline); **Close is an icon in the panel's header**
+  (a tooltip names it, and it still asks first); *Ping again* stays at the foot, and a ping you have not answered
+  shows no empty button bar.
 - A help request is no longer an issue: it lives here. The console's Overview counts pings with *Waiting on you*.
 
 ## The session window (an Admin's console, decided 9 Oct 2026)
