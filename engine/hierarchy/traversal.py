@@ -165,6 +165,21 @@ async def tree(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"viewer": {"account_id": ident.account_id, "role": ident.role}, "departments": out}
 
 
+def outside_working_hours(hours: str, now: datetime | None = None) -> bool:
+    """`hours` is "HH:MM-HH:MM" in the Engine host's local time; a span that crosses midnight is allowed."""
+    try:
+        start_s, end_s = hours.split("-")
+        sh, sm = (int(x) for x in start_s.strip().split(":"))
+        eh, em = (int(x) for x in end_s.strip().split(":"))
+    except ValueError:
+        log.warning("FALCON_WORKING_HOURS %r is not HH:MM-HH:MM; treating every hour as working", hours)
+        return False
+    t = (now or datetime.now(timezone.utc).astimezone()).time()   # the Engine host's local time
+    minutes, a, b = t.hour * 60 + t.minute, sh * 60 + sm, eh * 60 + em
+    inside = a <= minutes < b if a <= b else (minutes >= a or minutes < b)
+    return not inside
+
+
 @handler("hierarchy.traverse")
 async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Enter a target PC's session. {"pc_id": int, "force": bool}
@@ -215,6 +230,12 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     assert session is not None
     await ctx.engine.audit.record(ctx, "session.traversed", target_type="session", target_id=session_id,
                                   detail={"pc_id": pc_id, "forced": force, "deadline_at": deadline.isoformat()})
+    if ident.role == "admin" and outside_working_hours(ctx.engine.settings.working_hours):
+        # An Admin's own conduct is reported to the Super User only (category about_admin, never routable).
+        from engine.hierarchy import reports
+
+        await reports.emit(ctx.engine, "about_admin", source_table="sessions", source_id=session_id,
+                           summary=f"An Admin entered {target['hostname']} outside working hours")
     names = await db.accounts.display_names_for(target["bound_account_id"] or ident.account_id, [ident.account_id])
     view = _session_view(session, names)
     await ctx.engine.push_to_pc(pc_id, "session.blocked", view)

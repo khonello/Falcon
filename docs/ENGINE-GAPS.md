@@ -4,6 +4,14 @@ The GUI rebuild (step 3 onwards) keeps UI and Engine work apart: whatever a page
 the Worker Client that is not there is written here and fixed in one pass later. Mundane, simple fixes are
 done inline and are not listed. Each entry: what is missing, why it matters, where it was found.
 
+**How the Worker reaches the OS** (decided 9 Oct 2026). Nobody using a machine needs to be a Windows administrator;
+Falcon's Admin is its own role. The Worker Client runs as a Windows service under the system account, installed once
+with admin rights (Phase 9 packaging, as any management agent), and does the OS-level work from there: kernel event
+tracing (ETW) for file opens and process starts, process and USB and network state, no Windows audit policy to switch
+on by hand. Windows keeps services out of the signed-in person's desktop (session 0), so whatever must draw on their
+screen or capture it -- the lock overlay, messages, screenshots -- runs as the Worker's helper windows, started by the
+service inside that person's session.
+
 ## Open
 
 1. **The Worker Client relays no OS signals.** `control.signal` accepts `usb.inserted/removed`,
@@ -40,10 +48,6 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
    out of the page until then.
-10. **A Super User cannot watch every channel.** `assistance.channels` returns only channels the caller is a
-    party to or listens on; Work's "Help, watched" (WK03) wants every open channel across departments (read-only,
-    never taking part), with whose turn it is. The page shows the channels the Super User listens on plus help
-    across departments under way (from sessions). *Found:* Work (WK03).
 11. **A task's verification state is not in `task.list`.** Work's "Yours" wants "both checks passed · verify"
     on the card; today that needs `task.get` per task. A per-task `checks_passed / checks_total` in the list
     would do. *Found:* WK03.
@@ -52,10 +56,6 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
     foreground program and its document) and a machine that is **not reachable** refused at `hierarchy.traverse`
     (the Engine keeps no online state, so a held session on a switched-off machine looks like any other).
     *Found:* level 4.
-13. **An Admin belongs to one department.** DG01's "Assign an Admin to Logistics" picks an existing Admin
-    ("A. Quaye · Operations · already governs 14 machines"); the schema gives an account one `department_id`, so
-    assigning would move them. The page offers "Give it an Admin" (a new Admin account and workstation) until an
-    Admin can govern more than one department -- a decision, not only a query. *Found:* dialogs (DG01).
 14. **The Worker's windows are built; three wait for their triggers** (WR01). `worker_client.windows` has all
     five (blocked, message, locked, ask, task), and the service already opens *blocked* (from the lockout) and
     *task* (on `task.assigned`, with Start). *Message* and *locked* need `notify` / `lock_session` to open them
@@ -106,15 +106,6 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
     - the soft/final deadline events reused with the one deadline
 
     Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
-17. **A report category about an Admin, which can never be routed** (the user, 2 Oct 2026). An Admin's own
-    behaviour, such as entering a machine at 2 a.m., is reported only to the Super User. Routing it to the
-    department would have the Admin judge themselves.
-    - **Engine:** a fixed category, `about_admin`, whose `reports.routing_set` is refused (`FORBIDDEN`). The
-      reports are emitted by the session code when an Admin enters outside working hours.
-    - **Default routing for update escalations:** *Update stuck* is routed to every department by default,
-      so a failure past the threshold reaches that PC's Admin (§9.5). Today routing starts empty.
-
-    *Raised:* by the user, from the concept's Work page.
 20. **What an action returned, kept with the run** (concept, 9 Oct 2026; docs/design/super-user-menu.md, *What a run
     returned*). The console shows each run's output on Actions (*Recent runs*, a click opens it), in *Run once* (each
     machine as it finishes) and on Automation (a firing's runs). Today `control.execution_output` streams text into an
@@ -132,6 +123,18 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
 
 ## Done inline (for the record)
 
+- **An Admin belongs to one department** (was #13, closed 9 Oct 2026, the user's decision). Kept: assigning an Admin
+  to a department without one means a new Admin account, or promoting one of its workers. The concept's "an Admin
+  from another department, as well" option is removed.
+- **The Super User watching every channel** (was #10, closed 9 Oct 2026, the user's decision). Not built: a channel
+  is between two people, and a third party reads it only as a Listener added by a party (an Admin). The Super User's
+  Messages page shows their own conversations with Admins.
+- **A report category about an Admin, never routed; update escalations routed by default** (was #17, done 9 Oct
+  2026). `about_admin` is a fixed category: `reports.routing_set` refuses it (FORBIDDEN) and `reports.routing_get`
+  lists it under `fixed`. An Admin entering a machine outside working hours (`FALCON_WORKING_HOURS`, default
+  06:00-18:00, the Engine host's local time; a span may cross midnight) raises one, to the Super User only. New
+  departments start with `update_status` routed to them, and migration 011 gives existing departments the same
+  default. *Test:* `test_about_admin_reports_reach_the_super_user_only_and_updates_route_by_default`.
 - **Routing a kind of report, with or without what came before** (was #18, done 9 Oct 2026). A routed department used
   to see every report of the category, however old: visibility is read-time. `report_routing_config` gains
   `includes_earlier` (migration 010); `reports.routing_set` takes `include_earlier` (default true, the old

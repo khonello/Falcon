@@ -6,6 +6,9 @@ time limit + extension, display-name non-propagation, report routing, assisted a
 
 from __future__ import annotations
 
+import dataclasses
+from datetime import datetime
+
 from datetime import timedelta
 
 from engine.database import _now
@@ -253,40 +256,63 @@ async def test_routing_a_department_with_or_without_earlier_reports(engine, org,
     su = await connect("cid-su")
     a1 = await connect("cid-a1")      # Finance
     a2 = await connect("cid-a2")      # HR
-    old = await reports.emit(engine, "update_status", source_table="flow_sync_log", source_id=1, summary="old")
+    old = await reports.emit(engine, "deviation", source_table="flow_sync_log", source_id=1, summary="old")
 
     # Finance is added with the earlier reports (the default): it sees the one already written.
-    res = await su.ok("reports.routing_set", {"category": "update_status", "department_ids": [org["fin"]]})
+    res = await su.ok("reports.routing_set", {"category": "deviation", "department_ids": [org["fin"]]})
     assert res["added"] == [org["fin"]] and res["removed"] == [] and res["earlier_unaddressed"] == 1
     assert [r["id"] for r in (await a1.ok("reports.list"))["reports"]] == [old]
 
     # HR is added for new reports only: the old one stays the Super User's (and Finance's).
-    res = await su.ok("reports.routing_set", {"category": "update_status", "department_ids": [org["fin"], org["hr"]],
+    res = await su.ok("reports.routing_set", {"category": "deviation", "department_ids": [org["fin"], org["hr"]],
                                               "include_earlier": False})
     assert res["added"] == [org["hr"]] and res["earlier_unaddressed"] == 0
     assert (await a2.ok("reports.list"))["reports"] == []
-    new = await reports.emit(engine, "update_status", source_table="flow_sync_log", source_id=2, summary="new")
+    new = await reports.emit(engine, "deviation", source_table="flow_sync_log", source_id=2, summary="new")
     assert [r["id"] for r in (await a2.ok("reports.list"))["reports"]] == [new]
     # Finance kept what it had: re-saving the category did not reset it to "new only".
     assert sorted(r["id"] for r in (await a1.ok("reports.list"))["reports"]) == [old, new]
-    routing = {r["routed_department_id"]: r for r in (await su.ok("reports.routing_get"))["routing"]}
+    routing = {r["routed_department_id"]: r for r in (await su.ok("reports.routing_get"))["routing"] if r["category"] == "deviation"}
     assert routing[org["fin"]]["includes_earlier"] is True and routing[org["hr"]]["includes_earlier"] is False
 
     # Finance addresses the old one, then is removed: it no longer sees the category, and the
     # Super User's View still says Finance addressed it.
     await a1.ok("reports.mark", {"report_id": old})
-    res = await su.ok("reports.routing_set", {"category": "update_status", "department_ids": [org["hr"]]})
+    res = await su.ok("reports.routing_set", {"category": "deviation", "department_ids": [org["hr"]]})
     assert res["removed"] == [org["fin"]] and res["added"] == []
     assert (await a1.ok("reports.list"))["reports"] == []
     assert (await su.ok("reports.addressed_view"))["addressed"][0]["report_id"] == old
     # An empty list sends the category back to the Super User only.
-    await su.ok("reports.routing_set", {"category": "update_status", "department_ids": []})
+    await su.ok("reports.routing_set", {"category": "deviation", "department_ids": []})
     assert (await a2.ok("reports.list"))["reports"] == []
     assert len((await su.ok("reports.list"))["reports"]) == 2
-    assert await su.err("reports.routing_set", {"category": "update_status", "department_ids": [],
+    assert await su.err("reports.routing_set", {"category": "deviation", "department_ids": [],
                                                 "include_earlier": "no"}) == "invalid"
     audit = [e for e in (await su.ok("audit.recent", {"limit": 20}))["entries"] if e["action_type"] == "report_routing.set"]
     assert audit and {"added", "removed", "include_earlier"} <= set(audit[0]["detail"])
+
+
+async def test_about_admin_reports_reach_the_super_user_only_and_updates_route_by_default(engine, org, connect):
+    from engine.hierarchy import traversal
+
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")
+    # every department starts with update escalations routed to it
+    routing = (await su.ok("reports.routing_get"))
+    assert {r["routed_department_id"] for r in routing["routing"] if r["category"] == "update_status"} == {org["fin"], org["hr"]}
+    assert routing["fixed"] == ["about_admin"]
+    # an Admin's own conduct can never be routed
+    assert await su.err("reports.routing_set", {"category": "about_admin", "department_ids": [org["fin"]]}) == "forbidden"
+    # an Admin entering a machine outside working hours is reported, to the Super User only
+    engine.settings = dataclasses.replace(engine.settings, working_hours="00:00-00:00")   # every entry is outside
+    await su.drain_pushes()
+    await a1.ok("hierarchy.traverse", {"pc_id": org["w1_pc"]})
+    assert [r["category"] for r in (await su.ok("reports.list"))["reports"]] == ["about_admin"]
+    assert "report.new" in su.push_types(await su.drain_pushes())
+    assert (await a1.ok("reports.list"))["reports"] == []
+    assert traversal.outside_working_hours("06:00-18:00", datetime(2026, 10, 9, 2, 14)) is True
+    assert traversal.outside_working_hours("06:00-18:00", datetime(2026, 10, 9, 10, 0)) is False
+    assert traversal.outside_working_hours("22:00-06:00", datetime(2026, 10, 9, 23, 0)) is False
 
 
 # --- alerts -------------------------------------------------------------------------------------

@@ -218,9 +218,16 @@ class AccountsRepo(_Repo):
     # -- departments / pcs -------------------------------------------------------------------
 
     async def create_department(self, name: str, created_by_account_id: int) -> int:
-        return await self._val(
-            "INSERT INTO departments (name, created_by_account_id) VALUES ($1, $2) RETURNING id",
-            name, created_by_account_id)
+        """A new department starts with update escalations routed to it (spec 9.5): a failure past the
+        threshold reaches that PC's Admins, not only the Super User. The Super User can change it later."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            dept_id = await conn.fetchval(
+                "INSERT INTO departments (name, created_by_account_id) VALUES ($1, $2) RETURNING id",
+                name, created_by_account_id)
+            await conn.execute(
+                "INSERT INTO report_routing_config (category, routed_department_id, configured_by_account_id) "
+                "VALUES ('update_status', $1, $2) ON CONFLICT DO NOTHING", dept_id, created_by_account_id)
+            return dept_id
 
     async def list_departments(self) -> list[dict[str, Any]]:
         return await self._fetch("SELECT id, name, created_at FROM departments ORDER BY name")

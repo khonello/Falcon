@@ -29,6 +29,9 @@ class Settings:
     # Traversal Time Limit (Hierarchy -> Session Blocking): fixed, extendable on request.
     traversal_limit_minutes: int = 30
     traversal_extension_minutes: int = 15
+    # Working hours, local time on the Engine host: an Admin entering a machine outside them is reported to the
+    # Super User only (report category about_admin).
+    working_hours: str = "06:00-18:00"
     # Update escalation threshold (open item 10.4): count-based, tunable.
     update_escalation_failures: int = 3
     # Polled/evaluated Events (thresholds, idle, time) are checked on this interval.
@@ -66,6 +69,7 @@ class Settings:
             traversal_extension_minutes=int(
                 os.environ.get("FALCON_TRAVERSAL_EXTENSION_MINUTES", cls.traversal_extension_minutes)
             ),
+            working_hours=os.environ.get("FALCON_WORKING_HOURS", cls.working_hours),
             update_escalation_failures=int(
                 os.environ.get("FALCON_UPDATE_ESCALATION_FAILURES", cls.update_escalation_failures)
             ),

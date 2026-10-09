@@ -36,7 +36,11 @@ CATEGORIES = (
     "cross_department_assistance",
     "update_status",
     "deviation",
+    "about_admin",
 )
+# Never routable: an Admin's own conduct reaches the Super User only; routing it would have the
+# department judge its own Admin.
+FIXED_CATEGORIES = frozenset({"about_admin"})
 
 
 async def emit(engine: Engine, category: str, *, source_table: str, source_id: int,
@@ -93,7 +97,8 @@ async def mark(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("reports.routing_get")
 async def routing_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     require_role(ctx, "super_user")
-    return {"categories": list(CATEGORIES), "routing": rows(await ctx.engine.db.reports.routing_config())}
+    return {"categories": list(CATEGORIES), "fixed": sorted(FIXED_CATEGORIES),
+            "routing": rows(await ctx.engine.db.reports.routing_config())}
 
 
 @handler("reports.routing_set")
@@ -108,6 +113,8 @@ async def routing_set(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     seeing the category; what it addressed stays recorded in the Super User's View."""
     ident = require_role(ctx, "super_user")
     category = str_field(payload, "category", choices=CATEGORIES)
+    if category in FIXED_CATEGORIES:
+        raise ProtocolError(ErrorCode.FORBIDDEN, f"{category} reports go to the Super User only and cannot be routed")
     dept_ids = payload.get("department_ids")
     if not isinstance(dept_ids, list):
         raise ProtocolError(ErrorCode.INVALID, "department_ids must be a list")
