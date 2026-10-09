@@ -427,6 +427,9 @@ asks of unanswered pings; the pulse stops when everything is answered.
   what a listener is; *Listening now* (each with their department, whether they are at their desk, how many
   conversations they already listen on, and Remove); *Add an Admin*, searchable, grouped by department with your own
   first (Engine: `assistance.listener_candidates`, every department's Admins).
+- **Room for the conversation** (the user, 9 Oct 2026): Messages' list and panel are two rows taller than other
+  pages (8 conversations a page), and the listeners line sits in a fixed strip at the foot of the panel, above Close,
+  so it never scrolls away with the thread (`SidePanel foot`).
 - A help request is no longer an issue: it lives here. The console's Overview counts pings with *Waiting on you*.
 
 ## The session window (an Admin's console, decided 9 Oct 2026)

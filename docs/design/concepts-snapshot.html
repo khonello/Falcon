@@ -3700,7 +3700,8 @@ const LIST_ROWS = 6, LIST_H = 452;
 // grows with rows. Columns: the item (icon, name, and one small grey mono line under it), up to three plain
 // columns in quiet grey (a bar column has a grey bar and its figure), then "Now": a dot and a few words, green
 // when fine, red when someone has to act, grey when waiting. A row opens the side panel; there is no per-row button.
-function ListPanel({ title, sub, q, setQ, placeholder, action, rows, pick, onPick, rowKey = "key", icon, name, cols = [], now, nowTitle = "Now", empty, tools }) {
+function ListPanel({ title, sub, q, setQ, placeholder, action, rows, pick, onPick, rowKey = "key", icon, name, cols = [], now, nowTitle = "Now", empty, tools, more = 0 }) {
+  const LIST_ROWS = 6 + more, LIST_H = 452 + 56 * more;
   const NOWC = { good: "var(--ok)", bad: "var(--crit)", wait: "var(--text-4)" };
   const [pg, setPg] = useState(1);
   const pages = Math.max(1, Math.ceil(rows.length / LIST_ROWS)), at = Math.min(pg, pages);
@@ -3724,12 +3725,13 @@ function ListPanel({ title, sub, q, setQ, placeholder, action, rows, pick, onPic
 // The item beside its list (trial, 7 Oct 2026): a click in the list shows the item here at once, at the list's height,
 // with its facts as label/value rows, any short sections under them, and its actions at the foot. Charts and drawings
 // of the same item stay below the list, full width.
-function SidePanel({ title, sub, facts = [], children, actions, empty, h = LIST_H }) {
+function SidePanel({ title, sub, facts = [], children, foot, actions, empty, h = LIST_H }) {
   return html`<${Panel} flush className="sidep" title=${title} sub=${sub} style=${h == null ? undefined : { height: h }}>
     ${empty || html`<div style=${{ flex: 1, minHeight: 0, overflowY: "auto", padding: "2px 16px 14px" }}>
       ${facts.map(([k, v]) => html`<div key=${k} className="kv" style=${{ gridTemplateColumns: "116px minmax(0, 1fr)" }}><span className="t3">${k}</span><span style=${{ minWidth: 0, overflowWrap: "anywhere" }}>${v}</span></div>`)}
       ${children ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 16, marginTop: facts.length ? 14 : 0 }}>${children}</div>` : null}
     </div>
+    ${foot ? html`<div style=${{ flex: "none", padding: "10px 16px 12px", borderTop: "1px solid var(--border)" }}>${foot}</div>` : null}
     ${actions ? html`<div className="row" style=${{ padding: "10px 16px", borderTop: "1px solid var(--border)", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>${actions}</div>` : null}`}
   <//>`;
 }
@@ -4960,6 +4962,7 @@ const atH = (t) => (t >= 0 && t < 24 ? hhmm(t) : `${dayOf(t)} ${hhmm(t)}`);
 // who someone is, in a line
 const whoLine = (name) => name === "Super User" ? "the Super User" : ADMIN_INFO[name] ? `Admin, ${deptNameOf(ADMIN_INFO[name].dept)}` : (() => { const m = (FULL.MACHINES || MACHINES).find((x) => x.user === name); return m ? `on ${m.host}` : "a worker"; })();
 
+const MSG_H = 452 + 56 * 2;   // Messages lists two more rows, and the conversation gets the room
 function Messages({ me, open }) {
   useDT();
   const [sel, setSel] = useOpen("messages", open);
@@ -5012,19 +5015,18 @@ function Messages({ me, open }) {
               <${Button} type="primary" disabled=${!(draft[x.id] || "").trim()} onClick=${() => send(x)}>${x.status === "ping" ? "Answer" : "Send"}<//></div></div>`
         : html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 10 }}>${ic("LockOutlined")} ${chOther(x, me)}'s turn. You can write again once they answer.</div>`}
     </div>`; };
-  const side = !c ? html`<${SidePanel} empty=${html`<${Empty} icon="MessageOutlined" title="No conversations yet" text=${me === "Super User" ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."} h=${200} />`} />`
+  const side = !c ? html`<${SidePanel} h=${MSG_H} empty=${html`<${Empty} icon="MessageOutlined" title="No conversations yet" text=${me === "Super User" ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."} h=${200} />`} />`
     : (() => { const st = chState(c, me), party = !st[2].startsWith("listen"), added = c.listeners[me] || [];
-      return html`<${SidePanel} title=${title(c)} sub=${party ? whoLine(chOther(c, me)) : "you are listening"}
+      return html`<${SidePanel} h=${MSG_H} title=${title(c)} sub=${party ? whoLine(chOther(c, me)) : "you are listening"}
         facts=${[["Now", html`<span className="st" style=${{ "--c": st[1] === "bad" ? "var(--crit)" : st[1] === "good" ? "var(--ok)" : "var(--text-4)" }}><i />${st[0]}</span>`],
           ["Started by", `${c.by === "lo" ? c.lo : c.hi}, ${atH(c.pings[0])}`], ["Who closes it", c.hi === me ? "You" : c.hi],
-          ...(party && c.status === "open" ? [["Listeners you added", added.length ? listNames(added) : "None"]] : [])]}
+          ]}
+        foot=${party && c.status === "open" ? html`<div className="row" style=${{ gap: 10, flexWrap: "nowrap" }}>
+            <span style=${{ flex: 1, minWidth: 0, fontSize: 12.5 }}><span className="t3">${ic("TeamOutlined")} Listeners · </span>${added.length ? html`${listNames(added)} <span className="t3">${added.length === 1 ? "reads" : "read"} it silently; ${chOther(c, me)} is not told.</span>` : html`<span className="t3">none. Admins you add read it silently; ${chOther(c, me)} is not told.</span>`}</span>
+            <${Button} id="lis-open" type="primary" ghost icon=${ic("TeamOutlined")} onClick=${() => { setLq(""); setLis(c.id); }}>${added.length ? `Listeners · ${added.length}` : "Add listeners"}<//></div>` : null}
         actions=${party && c.status !== "closed" ? html`${c.status === "ping" && chReceiver(c) !== me ? html`<${Button} onClick=${() => pingAgain(c)}>Ping again<//>` : null}
           ${c.status === "open" && c.hi === me ? html`<${Button} danger onClick=${() => close(c)}>Close<//>` : null}` : null}>
         ${thread(c)}
-        ${party && c.status === "open" ? html`<div><div className="nt-h">Listeners</div>
-          <div className="row" style=${{ gap: 10, flexWrap: "nowrap" }}>
-            <span className="t3" style=${{ fontSize: 12.5, flex: 1, minWidth: 0 }}>${added.length ? `${listNames(added)} ${added.length === 1 ? "reads" : "read"} it silently. ${chOther(c, me)} is not told.` : `Admins you add read it silently. ${chOther(c, me)} is not told.`}</span>
-            <${Button} id="lis-open" type="primary" ghost icon=${ic("TeamOutlined")} onClick=${() => { setLq(""); setLis(c.id); }}>${added.length ? `Listeners · ${added.length}` : "Add listeners"}<//></div></div>` : null}
       <//>`; })();
   return html`<${React.Fragment}>${modalCtx}
     <${Strip} on=${f} onPick=${setF} items=${[
@@ -5035,7 +5037,7 @@ function Messages({ me, open }) {
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <${ListPanel} title=${f ? { you: "Waiting on you", them: "Waiting on them", listen: "Listening", closed: "Closed" }[f] : "Conversations"} sub="waiting on you first · click one to see it on the right"
         q=${q} setQ=${setQ} placeholder="Find a person or a word" action=${{ label: "New ping", onClick: () => setNewPing({ who: undefined }) }}
-        pick=${c ? c.id : null} onPick=${setSel} rowKey="id" rows=${rows} icon=${(x) => (chListening(x, me) ? "EyeOutlined" : x.status === "ping" ? "BellOutlined" : "MessageOutlined")}
+        more=${2} pick=${c ? c.id : null} onPick=${setSel} rowKey="id" rows=${rows} icon=${(x) => (chListening(x, me) ? "EyeOutlined" : x.status === "ping" ? "BellOutlined" : "MessageOutlined")}
         name=${{ title: "With", text: title, line: (x) => { const last = x.msgs[x.msgs.length - 1]; return last ? `${last[1] === me ? "You" : last[1]}: ${last[2]}` : `${x.pings.length === 1 ? "a ping" : x.pings.length + " pings"}, no answer yet`; } }}
         cols=${[{ title: "Pings", width: 70, text: (x) => fmt(x.pings.length) }, { title: "Last", width: 100, text: (x) => atH(lastAt(x)) }]}
         now=${(x) => { const st = chState(x, me); return [st[0], st[1]]; }}
