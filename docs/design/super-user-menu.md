@@ -440,6 +440,19 @@ by entering that Admin's console first.
 - Screenshot stays a Monitoring action (one-off, usable in rules). Video calls are out: talking to workers is
   Messages.
 
+## What a run returned (an Admin's console, decided 9 Oct 2026)
+
+Every run of an action shows what it returned, in three forms: **text** (what it printed: most built-ins and every
+custom script), a **list** (running programs, the files on a USB device), or a **picture** (a screenshot: a thumbnail,
+opened whole with a click). A one-line summary sits wherever runs are listed; the whole output opens in place.
+
+- **Actions:** *Recent runs* has a *Result* column (the summary); a click on a run opens its output under it.
+- **Run once:** each machine's line gets its summary as it finishes; a click opens the output.
+- **Automation:** a firing in the rule's *Last firings* opens to each action's result (problems first), so "USB device
+  inserted" shows the screenshot it took and the device's files.
+- A screenshot says who can see it: the department's Admins and the Super User, and every view is recorded. Kept 90
+  days. Engine side: docs/ENGINE-GAPS.md #20.
+
 ## Final menu at a glance
 
 ```

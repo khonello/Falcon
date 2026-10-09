@@ -2540,6 +2540,7 @@ function RuleDetail({ id, go, picked }) {
   const r = RBY[id];
   const [on, setOn] = useState(true);
   const fires = firingsHere(id);
+  const [openF, setOpenF] = useState(null);   // the firing opened to show what its actions returned
   const allRuns = fires.flatMap((f) => f.runs);
   const problems = allRuns.filter((x) => x.outcome === "Failed" || x.outcome === "Timed out").length;
   // an Admin's console is one department: an organisation-wide rule counts only that department's machines here
@@ -2553,12 +2554,18 @@ function RuleDetail({ id, go, picked }) {
       <${Tooltip} title=${su ? "Set by the Super User for the whole organisation. Only they can change it; start a copy of your own from New rule." : ""}><span><${Button} type="primary" icon=${ic("EditOutlined")} disabled=${su} onClick=${() => go("automation", "edit-" + id)}>Edit<//></span><//>`}
     facts=${[["When", r.when.charAt(0).toUpperCase() + r.when.slice(1)], ["On", `${r.scope === "All machines" ? "Every machine" : r.scope} · ${fmt(tm.length)} here`], ["Do", r.actions.map((a) => a[0]).join(", ")],
       ["Last fired", fires[0] ? when(fires[0].t) : "Not this week"], ["Fired, 7 days", fmt(fires.length)], ["Problems, 7 days", html`<span style=${{ color: problems ? "var(--crit)" : "inherit" }}>${problems ? `${problems} failed or timed out` : "None"}</span>`], ["Owner", owner]]}>
-    <div><div className="nt-h">Last firings</div>
-      ${fires.slice(0, 5).map((f, i) => { const sm0 = summarize(f.runs);
+    <div><div className="nt-h">Last firings · click one to see what each action returned</div>
+      ${fires.slice(0, 5).map((f, i) => { const sm0 = summarize(f.runs), on = openF === i;
+        const shown = f.runs.slice().sort((x, y) => (x.outcome === "Success") - (y.outcome === "Success")).slice(0, 6);
         return html`<div key=${i} style=${{ padding: "7px 0", borderBottom: "1px solid var(--grid)", fontSize: 12.5 }}>
-          <div className="row" style=${{ flexWrap: "nowrap", gap: 10 }}><span className="mono t3">${when(f.t)}</span><span className="mono">${f.host}</span><span className="sp" />
+          <div className="row" role="button" onClick=${() => setOpenF(on ? null : i)} style=${{ flexWrap: "nowrap", gap: 10, cursor: "pointer" }}><span className="mono t3">${when(f.t)}</span><span className="mono">${f.host}</span><span className="sp" />
             ${sm0.map(([k, n]) => html`<span key=${k} className="st" style=${{ "--c": OUT[k], fontSize: 12 }}><i />${k === "Success" && sm0.length === 1 ? (n === 1 ? "Succeeded" : `All ${n} succeeded`) : `${n} ${k.toLowerCase()}`}</span>`)}</div>
-          <div className="t3 cut" title=${f.detail}>${f.detail}</div></div>`; })}
+          <div className="t3 cut" title=${f.detail}>${f.detail}</div>
+          ${on ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 10, padding: "8px 0 4px 10px", borderLeft: "2px solid var(--border)", marginTop: 6 }}>
+            ${shown.map((x, j) => { const out = runOutput(x.action, x.host, x.outcome, f.t, x.exit);
+              return html`<div key=${j}><div className="row" style=${{ flexWrap: "nowrap", gap: 8, marginBottom: 4 }}><span style=${{ fontWeight: 500 }}>${x.action}</span><span className="mono t3">${x.host}</span><span className="sp" /><span className="st" style=${{ "--c": OUT[x.outcome], fontSize: 12 }}><i />${x.outcome}</span></div>
+                <${RunOutput} out=${out} /></div>`; })}
+            ${f.runs.length > shown.length ? html`<div className="t3" style=${{ fontSize: 12 }}>${f.runs.length - shown.length} more runs on other machines succeeded.</div>` : null}</div>` : null}</div>`; })}
       ${!fires.length ? html`<div className="t3" style=${{ fontSize: 12.5 }}>It has not fired in the last 7 days.</div>` : null}
     </div>
   <//>`;
@@ -2863,6 +2870,51 @@ function Actions({ go, open }) {
     <${RunOnce} a=${runA} onClose=${() => setRunA(null)} />
   <//>`;
 }
+// What a run returned. Three kinds, each shown its own way: text (what it printed: most built-ins and every custom
+// script), a list (programs, files on a USB device), or a picture (a screenshot). A one-line summary goes in lists of
+// runs; the whole output opens in place. Kept with the run for 90 days, like the audit log (docs/ENGINE-GAPS.md).
+const shotUrl = (host, t) => { const m = MBY[host] || {}, title = (SCREENS[host] || ["Documents - File Explorer"])[0];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d3557"/><stop offset="1" stop-color="#2f5d84"/></linearGradient></defs>
+    <rect width="640" height="400" fill="url(#g)"/><rect x="60" y="40" width="420" height="270" rx="6" fill="#fff"/><rect x="60" y="40" width="420" height="24" rx="6" fill="${/Excel/.test(title) ? "#1f6e43" : "#3a3a3a"}"/>
+    <text x="72" y="57" font-family="Segoe UI, sans-serif" font-size="12" fill="#fff">${title}</text>
+    ${Array.from({ length: 10 }, (_, i) => `<rect x="72" y="${78 + i * 22}" width="${180 + ((i * 53) % 200)}" height="9" rx="2" fill="#d9dde3"/>`).join("")}
+    <rect y="372" width="640" height="28" fill="rgba(10,14,22,.85)"/><rect x="10" y="379" width="14" height="14" rx="3" fill="#4d8dff"/>
+    <text x="600" y="391" font-family="Consolas, monospace" font-size="11" fill="#dfe6f2" text-anchor="end">${hhmm(((t % 24) + 24) % 24)}</text>
+    <text x="320" y="355" font-family="Segoe UI, sans-serif" font-size="11" fill="rgba(255,255,255,.7)" text-anchor="middle">${host}${m.user ? " · " + m.user : ""}</text></svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg); };
+function runOutput(action, host, outcome, t, exit) {
+  const n = (k) => hs(host + action + k), name = (action || "").toLowerCase(), m = MBY[host] || {};
+  if (outcome === "Timed out") return { kind: "text", summary: "Ended at its time limit", text: `Started ${hhmm(((t % 24) + 24) % 24)} on ${host}.\nStill running at the time limit, so it was ended. Counted as timed out, not failed.\nOutput so far:\n  scanning…` };
+  if (outcome === "Failed") return { kind: "text", summary: name.includes("disk") ? "Could not read the disk's health" : name.includes("map") ? "The share did not answer" : "Exited with an error",
+    text: name.includes("disk") ? "Get-PhysicalDisk : Access is denied.\nexit code 1" : name.includes("map") ? "System error 53 has occurred.\nThe network path was not found.\nexit code 2" : `Error on ${host}.\nexit code ${exit || 1}` };
+  if (outcome === "Stopped by you") return { kind: "text", summary: "Stopped by hand", text: `Stopped from the console before it finished.\nWhat it did until then is kept.` };
+  if (name.includes("screenshot")) return { kind: "image", summary: `Screenshot of ${host} · 1920×1080`, src: shotUrl(host, t) };
+  if (name.includes("usb")) { const files = ["Q3-invoices.xlsx", "payroll-2025-09.csv", "IMG_2041.jpg", "IMG_2042.jpg", "notes.docx", "setup.exe", "budget-2026.xlsx", "minutes.pdf", "photos.zip", "contract-draft.docx"].slice(0, 4 + (n(1) % 7));
+    return { kind: "list", summary: `${files.length} files on the device${files.includes("budget-2026.xlsx") ? " · one is marked restricted" : ""}`, cols: ["File", "Size"],
+      rows: files.map((f, i) => [f, `${(((n(i) % 900) + 20) / 10).toFixed(1)} MB`]) }; }
+  if (name.includes("running programs")) { const ps = ["EXCEL.EXE", "msedge.exe", "OUTLOOK.EXE", "Teams.exe", "explorer.exe", "WINWORD.EXE", "OneDrive.exe", "AcroRd32.exe", "notepad.exe"].slice(0, 5 + (n(2) % 5));
+    return { kind: "list", summary: `${ps.length + 30} running · ${ps[0]} uses the most memory`, cols: ["Program", "Memory"], rows: ps.map((p, i) => [p, `${Math.round(900 / (i + 1) + (n(i) % 60))} MB`]) }; }
+  if (name.includes("disk")) { const pct = 60 + (n(3) % 35); return { kind: "text", summary: `C: ${pct}% full · health OK`, text: `Drive C:  ${pct}% used (${Math.round(pct * 2.38)} of 238 GB)\nHealth:   Healthy (SMART OK)\nTemp:     ${32 + (n(4) % 9)} °C` }; }
+  if (name.includes("temp")) { const k = 200 + (n(5) % 1800); return { kind: "text", summary: `Removed ${fmt(k)} files · ${(k / 600).toFixed(1)} GB`, text: `Removed ${fmt(k)} files from C:\\Windows\\Temp and the users' temp folders.\n${n(6) % 12} files were in use and left alone.` }; }
+  if (name.includes("lock")) return { kind: "text", summary: `Locked · ${m.user || "nobody"} signed back in later`, text: `Locked the session at ${hhmm(((t % 24) + 24) % 24)}.\n${m.user || "Nobody"} signed back in as usual.` };
+  if (name.includes("message") || name.includes("notify")) return { kind: "text", summary: name.includes("notify") ? "Delivered to the console" : `Shown to ${m.user || "the screen"} · closed after ${1 + (n(7) % 4)} min`, text: name.includes("notify") ? "Delivered at once to every Admin in the department." : `Shown on ${host} at ${hhmm(((t % 24) + 24) % 24)}.\n${m.user || "Nobody"} closed it.` };
+  if (name.includes("log event")) return { kind: "text", summary: "Written to the audit log", text: `Recorded on ${host} at ${hhmm(((t % 24) + 24) % 24)}.` };
+  if (name.includes("map")) return { kind: "text", summary: "S: mapped to \\\\files\\shared", text: "Drive S: now points to \\\\files\\shared.\nThe command completed successfully." };
+  if (name.includes("restart")) return { kind: "text", summary: "Restarted after a 2-minute warning", text: "Warned the user, waited 2 minutes, restarted.\nBack online 1 minute later." };
+  return { kind: "text", summary: "Finished", text: "Finished with no output." };
+}
+function RunOutput({ out, host }) {
+  if (!out) return null;
+  return html`<div style=${{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+    ${out.kind === "image" ? html`<div><${A.Image} width=${240} src=${out.src} alt=${out.summary} style=${{ borderRadius: 4, border: "1px solid var(--border)" }} />
+        <div className="t3" style=${{ fontSize: 12, marginTop: 4 }}>Click to see it whole. Only the department's Admins and the Super User can see it; every view is recorded.</div></div>`
+      : out.kind === "list" ? html`<div style=${{ border: "1px solid var(--border)", borderRadius: 5, overflow: "hidden", maxWidth: 420 }}>
+          <div className="row t3" style=${{ flexWrap: "nowrap", padding: "5px 10px", fontSize: 11.5, background: "var(--surface-2)" }}><span style=${{ flex: 1 }}>${out.cols[0]}</span><span>${out.cols[1]}</span></div>
+          ${out.rows.slice(0, 8).map(([x0, y0], i) => html`<div key=${i} className="row" style=${{ flexWrap: "nowrap", padding: "4px 10px", fontSize: 12.5, borderTop: "1px solid var(--grid)" }}><span className="mono cut" style=${{ flex: 1 }}>${x0}</span><span className="mono t3">${y0}</span></div>`)}
+          ${out.rows.length > 8 ? html`<div className="t3" style=${{ padding: "4px 10px", fontSize: 12 }}>+${out.rows.length - 8} more</div>` : null}</div>`
+      : html`<pre className="mono" style=${{ margin: 0, padding: "8px 10px", background: "var(--surface-2)", borderRadius: 5, fontSize: 12, lineHeight: 1.55, whiteSpace: "pre-wrap", maxHeight: 160, overflow: "auto" }}>${out.text}</pre>`}
+  </div>`;
+}
 // Run an action once: choose machines, read the cost, run, then watch each machine finish.
 function RunOnce({ a, onClose }) {
   const [scope, setScope] = useState("pick");
@@ -2870,8 +2922,8 @@ function RunOnce({ a, onClose }) {
   const [hosts, setHosts] = useState(["OPS-03"]);
   const [limit, setLimit] = useState(30);
   const [msg, setMsg] = useState("");
-  const [run, setRun] = useState(null);
-  useEffect(() => { if (a) { setRun(null); setLimit(a.limit); setScope("pick"); setHosts(["OPS-03"]); setMsg(""); } }, [a && a.id]);
+  const [run, setRun] = useState(null), [openH, setOpenH] = useState(null);
+  useEffect(() => { if (a) { setRun(null); setOpenH(null); setLimit(a.limit); setScope("pick"); setHosts(["OPS-03"]); setMsg(""); } }, [a && a.id]);
   const targets = scope === "all" ? MACHINES : scope === "dept" ? MACHINES.filter((m) => m.dept === dept) : MACHINES.filter((m) => hosts.includes(m.host));
   const online = targets.filter((m) => m.status !== "offline");
   const withUser = online.filter((m) => m.user).length;
@@ -2887,7 +2939,7 @@ function RunOnce({ a, onClose }) {
   const missing = scope === "pick" && !hosts.length ? "Pick at least one machine." : a && a.param === "message" && !msg.trim() ? "Write the message." : null;
   return html`<${Drawer} open=${!!a} onClose=${onClose} width=${560} title=${a ? `Run once · ${a.name}` : ""}
     footer=${a ? html`<div className="row" style=${{ justifyContent: "flex-end" }}>
-      ${run ? html`<span className="t3" style=${{ fontSize: 12 }}>${done} of ${run.length} finished</span><span className="sp" /><${Button} onClick=${onClose}>Close<//>`
+      ${run ? html`<span className="t3" style=${{ fontSize: 12 }}>${done} of ${run.length} finished · click a machine to see what it returned</span><span className="sp" /><${Button} onClick=${onClose}>Close<//>`
         : html`<span className="t3" style=${{ fontSize: 12 }}>${missing || `Runs on ${online.length} machine${online.length === 1 ? "" : "s"} with a ${limit}s time limit`}</span><span className="sp" />
           <${Button} onClick=${onClose}>Cancel<//><${Button} type="primary" danger=${!!a.risky} disabled=${!!missing || !online.length} onClick=${start}>Run on ${online.length}<//>`}
     </div>` : null}>
@@ -2912,11 +2964,16 @@ function RunOnce({ a, onClose }) {
         ${["Success", "Failed", "Skipped"].map((k) => { const n = run.filter((x) => x.st === k).length; return n ? html`<span key=${k} style=${{ flex: n, background: RS[k] }} />` : null; })}
         <span style=${{ flex: run.length - done }} />
       </div>
-      ${run.map((x) => html`<div key=${x.host} className="row" style=${{ flexWrap: "nowrap", padding: "8px 0", borderBottom: "1px solid var(--grid)" }}>
-        <span className="mono" style=${{ width: 70 }}>${x.host}</span>
-        <span className="st" style=${{ "--c": RS[x.st] }}><i className=${x.st === "Running" ? "breathe" : ""} />${x.st}${x.st === "Skipped" ? " · offline" : x.st === "Failed" ? " · exit 1" : ""}</span>
-        <span className="sp" /><span className="mono t3">${x.sec ? x.sec + "s" : x.st === "Running" ? "…" : ""}</span>
-      </div>`)}
+      ${run.map((x) => { const fin = x.st === "Success" || x.st === "Failed", out = fin ? runOutput(a.name, x.host, x.st, NOWH, x.st === "Failed" ? 1 : 0) : null, on = openH === x.host;
+        return html`<div key=${x.host} style=${{ borderBottom: "1px solid var(--grid)" }}>
+        <div className="row" role=${fin ? "button" : null} onClick=${fin ? () => setOpenH(on ? null : x.host) : null} style=${{ flexWrap: "nowrap", padding: "8px 0", cursor: fin ? "pointer" : "default" }}>
+          <span className="mono" style=${{ width: 70, flex: "none" }}>${x.host}</span>
+          <span className="st" style=${{ "--c": RS[x.st], flex: "none" }}><i className=${x.st === "Running" ? "breathe" : ""} />${x.st}${x.st === "Skipped" ? " · offline" : x.st === "Failed" ? " · exit 1" : ""}</span>
+          ${out ? html`<span className="t3 cut" style=${{ fontSize: 12, minWidth: 0, flex: 1 }} title=${out.summary}>${out.summary}</span>` : html`<span className="sp" />`}
+          <span className="mono t3" style=${{ flex: "none" }}>${x.sec ? x.sec + "s" : x.st === "Running" ? "…" : ""}</span>${fin ? html`<span className="t4" style=${{ transform: on ? "rotate(90deg)" : "none", flex: "none" }}>${ic("RightOutlined")}</span>` : null}
+        </div>
+        ${on ? html`<div style=${{ padding: "0 0 12px 78px" }}><${RunOutput} out=${out} /></div>` : null}
+      </div>`; })}
     </div>` : null}
   <//>`;
 }
@@ -2933,13 +2990,15 @@ function ActionDetail({ id, go, part }) {
         <span className="st" style=${{ "--c": "var(--ok)" }}><i />Compiles</span><span className="st" style=${{ "--c": "var(--ok)" }}><i />Only standard and Windows-native imports</span><span className="t3">Runs without a sandbox, with the worker client's rights</span>
       </div>
     <//>` : null}
-    <${Panel} title=${`Recent runs · ${a.name}`} sub=${`${runs.length} in the last 7 days, from rules and by hand`} flush>
+    <${Panel} title=${`Recent runs · ${a.name}`} sub=${`${runs.length} in the last 7 days, from rules and by hand · click one to see what it returned`} flush>
       <div className="scroll-x"><${Table} size="small" pagination=${{ pageSize: 8, size: "small", showSizeChanger: false }} locale=${{ emptyText: "No runs this week." }} dataSource=${runs.map((x, i) => ({ key: i, x }))} columns=${[
         { title: "When", width: 110, render: (o) => html`<span className="mono t3">${o.x.t >= 0 ? "Today " + hhmm(o.x.t) : dayOf(o.x.t) + " " + hhmm(o.x.t)}</span>` },
         { title: "From", render: (o) => (o.x.rule ? html`<span>${RBY[o.x.rule].name}</span>` : html`<span className="t2">By hand · ${o.x.by}</span>`) },
         { title: "Machine", width: 90, render: (o) => html`<span className="mono">${o.x.host}</span>` },
         { title: "Time taken", width: 190, render: (o) => html`<div className="row" style=${{ flexWrap: "nowrap" }}><div className="bar" style=${{ width: 80, "--c": OUT[o.x.outcome] }}><span style=${{ width: `${Math.min(100, (o.x.sec / o.x.timeout) * 100)}%` }} /></div><span className="mono">${o.x.sec}s / ${o.x.timeout}s</span></div>` },
-        { title: "Outcome", width: 140, render: (o) => html`<span className="st" style=${{ "--c": OUT[o.x.outcome] }}><i />${o.x.outcome}</span>` }]} /></div>
+        { title: "Result", render: (o) => html`<span className="t2 cut" style=${{ display: "block", maxWidth: 260 }}>${runOutput(o.x.action, o.x.host, o.x.outcome, o.x.t, o.x.exit).summary}</span>` },
+        { title: "Outcome", width: 140, render: (o) => html`<span className="st" style=${{ "--c": OUT[o.x.outcome] }}><i />${o.x.outcome}</span>` }]}
+        expandable=${{ expandRowByClick: true, expandedRowRender: (o) => html`<${RunOutput} out=${runOutput(o.x.action, o.x.host, o.x.outcome, o.x.t, o.x.exit)} />` }} rowClassName=${() => "clickrow"} /></div>
     <//>
   <//>`;
   const probs = runs.filter((x) => x.outcome === "Failed" || x.outcome === "Timed out").length;

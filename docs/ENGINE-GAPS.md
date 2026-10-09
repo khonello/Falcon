@@ -115,6 +115,21 @@ done inline and are not listed. Each entry: what is missing, why it matters, whe
       so a failure past the threshold reaches that PC's Admin (§9.5). Today routing starts empty.
 
     *Raised:* by the user, from the concept's Work page.
+20. **What an action returned, kept with the run** (concept, 9 Oct 2026; docs/design/super-user-menu.md, *What a run
+    returned*). The console shows each run's output on Actions (*Recent runs*, a click opens it), in *Run once* (each
+    machine as it finishes) and on Automation (a firing's runs). Today `control.execution_output` streams text into an
+    in-memory tail (`_outputs`, the last chunks only), lost on restart and never stored with the run.
+    - **Store the output with the execution:** a bounded text column or table (e.g. the first and last 64 KB), plus a
+      one-line `summary` the action can set (`C: 92% full`, `36 running · EXCEL.EXE uses the most memory`).
+    - **Structured results:** built-in monitoring actions return rows (running programs, a USB device's files) as JSON,
+      not printed text, so the console can draw a table.
+    - **Screenshots carry their picture** (the PHASES.md item "carry a screen picture to the Operator Client"): the
+      Worker sends the image (downscaled, compressed; base64 inside a size cap, or a separate upload message), the
+      Engine stores it with the execution, and a handler returns it on request, never pushed to every console.
+    - **Who may see it:** the run's department's Admins and the Super User; every view of a screenshot is recorded in
+      the audit log. Kept 90 days, then dropped with the audit retention job.
+    *Found:* the concept's Actions, Run once and Automation pages.
+
 ## Done inline (for the record)
 
 - **Routing a kind of report, with or without what came before** (was #18, done 9 Oct 2026). A routed department used
