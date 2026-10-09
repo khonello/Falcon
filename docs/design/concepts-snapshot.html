@@ -64,6 +64,15 @@ a { color: var(--accent); text-decoration: none; }
 .nav.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 .nav .cnt { margin-left: auto; font-size: 11.5px; color: var(--text-3); font-family: var(--mono); }
 .nav .cnt.hot { color: var(--crit); font-weight: 500; }
+/* unanswered pings: bright, bold, pulsing, until everything is answered (resource-assistance-combo.md, Ping) */
+.nav .cnt.pulse { color: #fff; background: var(--crit); border-radius: 9px; padding: 0 6px; font-weight: 600; animation: falcon-pulse 1.6s ease-in-out infinite; }
+@keyframes falcon-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--crit) 60%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }
+@media (prefers-reduced-motion: reduce) { .nav .cnt.pulse { animation: none; } }
+.bubble { max-width: 86%; padding: 7px 11px; border-radius: 10px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.bubble.mine { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+.bubble.theirs { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
+.sess-screen { position: relative; aspect-ratio: 16 / 10; width: 100%; border-radius: 6px; overflow: hidden; background: linear-gradient(135deg, #1d3557, #26496e 55%, #2f5d84); border: 1px solid var(--border-strong); user-select: none; }
+.sess-full .sess-screen { aspect-ratio: auto; height: calc(100vh - 170px); }
 .side-foot > span { white-space: nowrap; }
 .side-foot { margin-top: auto; padding: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
 
@@ -605,8 +614,6 @@ let ISSUES = [
     d: { cur: "1.4.0", target: "1.4.2", attempts: "1, Mon 07:45", err: "Could not reach the update share" } },
   { id: "INC-1041", sev: "high", type: "file", title: "Restricted file copied where it isn't allowed", subject: "salaries.csv", host: "OPS-03", at: 9.5, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
     d: { file: "salaries.csv", folder: "C:\\Users\\Yaw\\Desktop", size: "212 KB", mark: "M-2" } },
-  { id: "AST-0311", sev: "medium", type: "help", title: "Help request not answered", subject: "Kojo · 2 pings", host: "OPS-01", at: 9.67, owner: "R. Mensah", sla: 2, state: "Open", kind: "assistance",
-    d: { who: "Kojo", pings: ["09:40", "10:15"] } },
   { id: "DEV-0087", sev: "medium", type: "deviation", title: "Certificate hostname mismatch", subject: "presented WS-OPS-05", host: "OPS-05", at: 9.18, owner: "R. Mensah", sla: 8, state: "Open", kind: "deviation",
     d: { what: "certificate", expected: "OPS-05", presented: "WS-OPS-05", fp: "5c:1e:…:a9" } },
   { id: "FLW-0012", sev: "low", type: "flow", title: "Flow waiting for a folder", subject: "intake → K. Boateng", host: "OPS-03", at: -44, owner: "K. Boateng", sla: 72, state: "Waiting", kind: "flow",
@@ -983,13 +990,13 @@ function Overview({ range, go }) {
   const sessionsHeld = MACHINES.filter((m) => m.held);
   const openT = TASKS.filter((t) => t.state !== "Completed"), verT = TASKS.filter((t) => t.state === "Awaiting your verification").length, lateT = TASKS.filter((t) => t.state === "Overdue").length;
   // what waits on the person at this console: tasks to verify, and open issues that are theirs or nobody's
-  const mineI = ISSUES.filter((i) => i.owner === ME || i.owner === "Unassigned").length;
+  const mineI = ISSUES.filter((i) => i.owner === ME || i.owner === "Unassigned").length + msgWaiting();
   const deptRows = DEPTS.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id);
     return { key: d.id, d, total: ms.length, online: ms.filter((m) => m.status !== "offline").length, issues: ISSUES.filter((i) => MBY[i.host].dept === d.id).length,
       compliant: ms.filter((m) => m.ver === "1.4.2").length, mtta: !ms.length ? "—" : d.id === "ops" ? "42m" : d.id === "fin" ? "2h 10m" : "—" }; });
   return html`<${React.Fragment}>
     <div className="kpis">
-      <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing waiting" label="Waiting on you" value=${fmt(verT + mineI)} delta=${verT + mineI ? `${verT} task${verT === 1 ? "" : "s"} to verify · ${mineI} issue${mineI === 1 ? "" : "s"} yours` : "Nothing waiting on you"} dc=${verT + mineI ? "var(--crit)" : undefined} fn=${(t) => Math.max(1, Math.round((verT + mineI) * (0.6 + 0.4 * sm(9, t, 0.15))))} sc="var(--s6)" />
+      <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing waiting" label="Waiting on you" value=${fmt(verT + mineI)} delta=${verT + mineI ? `${verT} to verify · ${mineI - msgWaiting()} issue${mineI - msgWaiting() === 1 ? "" : "s"} · ${msgWaiting()} ping${msgWaiting() === 1 ? "" : "s"}` : "Nothing waiting on you"} dc=${verT + mineI ? "var(--crit)" : undefined} fn=${(t) => Math.max(1, Math.round((verT + mineI) * (0.6 + 0.4 * sm(9, t, 0.15))))} sc="var(--s6)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="No machines yet" label="Machines online" value=${String(MACHINES.filter((m) => m.status !== "offline").length)} unit=${"/ " + MACHINES.length} delta=${MACHINES.some((m) => m.status === "offline") ? "LOG-02 offline since 02:31" : "All online"} dc=${MACHINES.some((m) => m.status === "offline") ? "var(--crit)" : undefined} fn=${(t) => MACHINES.length - (MACHINES.some((m) => m.status === "offline") && t >= 2.52 ? 1 : 0)} max=${MACHINES.length} sc="var(--ok)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nothing open" label="Open issues" value=${String(ISSUES.length)} delta=${ISSUES.length ? ["critical", "high"].map((k) => `${ISSUES.filter((x) => x.sev === k).length} ${k}`).join(" · ") : "Nothing open"} dc=${ISSUES.some((x) => x.sev === "critical") ? "var(--crit)" : undefined} fn=${(t) => Math.max(2, Math.round(3 + (t > 9 ? 2 : 0) + (t > 10 ? 2 : 0) + sm(3, t, 0.3)))} sc="var(--crit)" />
       <${Kpi} none=${!MACHINES.length} nv=${"0"} nt="Nobody is inside a machine" label="Sessions held now" value=${String(sessionsHeld.length)} delta=${sessionsHeld.length ? `Longest: ${sessionsHeld[0].held === "You" ? "you" : sessionsHeld[0].held} on ${sessionsHeld[0].host}, ${dur(NOWH - sessionsHeld[0].heldFrom + (now - T0) / 3.6e6)}` : "Nobody is inside a machine"} fn=${(t) => (working(t) ? Math.round(1 + 1.4 * sm(8, t, 1.5)) : 0)} sc="var(--s3)" />
@@ -1077,7 +1084,7 @@ function MachineList({ go }) {
         ["Signed in", cur.user || "No one"], ["Inside it", cur.held ? `${cur.held === "You" ? "You" : cur.held}, ${dur(NOWH - cur.heldFrom)}` : "Nobody else"],
         ["Version", html`<span className="mono" style=${{ color: cur.ver === "1.4.2" ? "inherit" : "var(--med)" }}>${cur.ver}</span>`], ["CPU now", cpu == null ? "—" : cpu.toFixed(0) + "%"], ["Disk", disk == null ? "—" : disk.toFixed(0) + "%"],
         ["Last seen", cur.seen > 0.1 ? dur(cur.seen) + " ago" : "now"], ["IP address", html`<span className="mono">${cur.ip}</span>`]]}
-      actions=${html`<${Button} disabled=${cur.status === "offline" || cur.held === "You"} title=${cur.held === "You" ? "You are already in it" : cur.status === "offline" ? "The machine is offline" : ""} onClick=${() => modal.confirm(enterSessionConfirm(cur, () => toast(`Entered ${cur.host} (concept)`)))}>Enter session<//>
+      actions=${html`<${Button} disabled=${cur.status === "offline" || cur.held === "You"} title=${cur.held === "You" ? "You are already in it" : cur.status === "offline" ? "The machine is offline" : ""} onClick=${() => modal.confirm(enterSessionConfirm(cur, () => openSession(cur.host)))}>Enter session<//>
         <${Button} type="primary" onClick=${() => go("machines", cur.host)}>Open its page →<//>`} />`; })()
     : html`<${SidePanel} empty=${html`<${Empty} icon="DesktopOutlined" title="Nothing to show" text="Pick a machine in the list." h=${200} />`} />`;
   return html`<${React.Fragment}>${modalCtx}
@@ -1117,7 +1124,7 @@ function MachineDetail({ host, range, go }) {
     : host === "LOG-02" ? [{ t: 2.23, label: "A. Quaye entered", c: "var(--s3)" }, { t: 2.52, label: "Went offline", c: "var(--crit)" }] : [];
   const events = AUDIT.filter((e) => e.host === host).slice(-12).reverse();
   const [modal, modalCtx] = Modal.useModal();
-  const enter = () => modal.confirm(enterSessionConfirm(m, () => toast(`Entered ${m.host} (concept)`)));
+  const enter = () => modal.confirm(enterSessionConfirm(m, () => openSession(m.host)));
   const procs = [["EXCEL.EXE", 6120, 18.2, 412, "Ama"], ["explorer.exe", 4408, 1.1, 96, "Ama"], ["falcon-worker.exe", 2284, 0.6, 58, "SYSTEM"], ["msedge.exe", 7712, 4.9, 380, "Ama"], ["OUTLOOK.EXE", 5120, 2.2, 210, "Ama"], ["svchost.exe", 1032, 0.4, 24, "SYSTEM"]];
   const tabs = [
     { key: "metrics", label: "Metrics", children: html`<div className="g c-66">
@@ -1163,7 +1170,7 @@ function MachineDetail({ host, range, go }) {
           <span className="t2"> since ${hhmm(m.heldFrom)} · ${dur(NOWH - m.heldFrom)}. ${m.user} can't use it until ${m.held === "You" ? "you leave" : "they leave"}.</span></span>
         <span className="sp" />
         ${m.held === "You"
-          ? html`<${Button} size="small" onClick=${() => toast("Back in OPS-07 (concept)")}>Return to it<//><${Button} size="small" danger onClick=${() => toast("Left " + m.host + "; " + m.user + " has it back (concept)")}>Leave session<//>`
+          ? html`<${Button} size="small" type="primary" onClick=${() => openSession(m.host)}>Return to it<//><${Button} size="small" danger onClick=${() => toast("Left " + m.host + "; " + m.user + " has it back (concept)")}>Leave session<//>`
           : null}
       </div>` : null}
       <div className="meta" style=${{ marginTop: 14 }}>
@@ -4729,7 +4736,7 @@ function AccessPage({ go, open, me }) {
           : html`<${SidePanel} empty=${html`<${Empty} icon="TeamOutlined" title="Nothing picked" text="Pick an assisted session in the list." h=${200} />`} />`)
         : x ? html`<${SidePanel} title=${`${x.b[3]} on ${x.host}`} sub=${sel ? "the one you picked" : "the first in the list · click another"}
           facts=${x ? [["Kind", OCC[x.b[2]].w], ["From", hhmm(x.b[0])], ["Until", x.b[1] >= NOWH ? "now" : hhmm(x.b[1])], ["Owner locked out", ownerOf(x.host)], ["Department", MBY[x.host] ? deptNameOf(MBY[x.host].dept) : "—"], ...(x.b[4] ? [["Flag", html`<span style=${{ color: "var(--crit)" }}>Outside working hours</span>`]] : [])] : []}
-          actions=${x ? html`${x.b[1] >= NOWH && x.b[3] === "You" ? html`<${Button} onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : null}${me ? html`<${Button} onClick=${() => go("machines", x.host)}>Open ${x.host}'s page →<//>` : html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry →<//>`}` : null} />` : html`<${SidePanel} empty=${html`<${Empty} icon="LoginOutlined" title="Nothing picked" text="Pick a session in the list." h=${200} />`} />`}
+          actions=${x ? html`${x.b[1] >= NOWH && x.b[3] === "You" ? html`${me ? html`<${Button} type="primary" onClick=${() => openSession(x.host)}>Return to it<//>` : null}<${Button} onClick=${() => toast("Left the session (concept)")}>Leave the session<//>` : null}${me ? html`<${Button} onClick=${() => go("machines", x.host)}>Open ${x.host}'s page →<//>` : html`<${Button} onClick=${() => go("registry", x.host)}>See it in Registry →<//>`}` : null} />` : html`<${SidePanel} empty=${html`<${Empty} icon="LoginOutlined" title="Nothing picked" text="Pick a session in the list." h=${200} />`} />`}
     </div>
     <${Occupancy} />
   <//>`;
@@ -4947,6 +4954,180 @@ function ReportsHere({ me, sel, setSel, written }) {
   <//>`;
 }
 // The Overview: what is waiting on you, the fleet, and this week's deviations. Everything opens something.
+// ---------------------------------------------------------------- Messages (Help Ping & Message Channel)
+// One row per conversation between a lower and a higher party: Worker -> Admin, or Admin -> Super User. It starts as a
+// ping (attention only, repeatable); the person pinged answers first, which opens the channel; then one message each
+// way at a time. Only the higher party closes it. Either party may add Admins as Listeners: the one who adds them sees
+// them, the other party is not told (resource-assistance-combo.md). Times are hours from today's midnight.
+let CHANNELS = EMPTY ? [] : [
+  { id: "CH-21", lo: "Kojo", loAt: "OPS-01", hi: "R. Mensah", by: "lo", pings: [9.67, 10.25], msgs: [], status: "ping", listeners: {} },
+  { id: "CH-20", lo: "Ama", loAt: "OPS-07", hi: "R. Mensah", by: "hi", pings: [8.9], status: "open", listeners: { "R. Mensah": ["A. Quaye"] },
+    msgs: [[9.0, "R. Mensah", "Is budget-2026.xlsx still open on your PC? It should not be there."], [9.25, "Ama", "It was sent to me to read before the meeting. I closed it."],
+      [10.1, "R. Mensah", "Thanks. Please delete your copy; it is marked to stay on WS-OPS-A1."]] },
+  { id: "CH-18", lo: "R. Mensah", loAt: "WS-OPS-A1", hi: "Super User", by: "lo", pings: [11.5], status: "open", listeners: {},
+    msgs: [[11.7, "Super User", "What do you need?"], [12.1, "R. Mensah", "Can Update stuck reports for Operations come to us too? Two have waited on you since Wednesday."]] },
+  { id: "CH-17", lo: "K. Boateng", loAt: "WS-FIN-A1", hi: "Super User", by: "lo", pings: [12.6, 13.0], msgs: [], status: "ping", listeners: {} },
+  { id: "CH-16", lo: "Afi", loAt: "FIN-01", hi: "K. Boateng", by: "lo", pings: [10.4], status: "open", listeners: { "K. Boateng": ["R. Mensah"] },
+    msgs: [[10.5, "K. Boateng", "Go ahead, Afi."], [10.6, "Afi", "Someone on my team keeps taking my files off the shared drive and renaming them."]] },
+  { id: "CH-15", lo: "Yaw", loAt: "OPS-03", hi: "R. Mensah", by: "lo", pings: [-20.5], status: "closed", closedAt: -19.4, listeners: {},
+    msgs: [[-20.4, "R. Mensah", "What is it, Yaw?"], [-20.1, "Yaw", "The printer on the second floor will not take my jobs."], [-19.5, "R. Mensah", "Fixed: it was paused. Try again."]] },
+];
+const chParty = (c, me) => c.lo === me || c.hi === me;
+const chListening = (c, me) => !chParty(c, me) && Object.values(c.listeners).some((xs) => xs.includes(me));
+const chVisible = (c, me) => chParty(c, me) || chListening(c, me);
+const chOther = (c, me) => (c.lo === me ? c.hi : c.lo);
+const chReceiver = (c) => (c.by === "lo" ? c.hi : c.lo);
+const chTurn = (c) => { if (c.status !== "open") return null; const last = c.msgs[c.msgs.length - 1]; return last ? chOther(c, last[1]) : chReceiver(c); };
+// where a conversation stands for the person looking at it
+const chState = (c, me) => chListening(c, me) ? ["Listening", "wait", "listen"]
+  : c.status === "closed" ? ["Closed", "good", "closed"]
+  : c.status === "ping" ? (chReceiver(c) === me ? [`Pinged you${c.pings.length > 1 ? " " + c.pings.length + " times" : ""}`, "bad", "you"] : ["Waiting for an answer", "wait", "them"])
+  : chTurn(c) === me ? ["Your turn", "bad", "you"] : ["Their turn", "wait", "them"];
+const msgWaiting = () => CHANNELS.filter((c) => chVisible(c, ME) && chState(c, ME)[2] === "you").length;
+const msgChange = (fn) => dtChange(fn);
+const nowH = () => NOWH + (Date.now() - T0) / 3.6e6;
+const atH = (t) => (t >= 0 && t < 24 ? hhmm(t) : `${dayOf(t)} ${hhmm(t)}`);
+// who someone is, in a line
+const whoLine = (name) => name === "Super User" ? "the Super User" : ADMIN_INFO[name] ? `Admin, ${deptNameOf(ADMIN_INFO[name].dept)}` : (() => { const m = (FULL.MACHINES || MACHINES).find((x) => x.user === name); return m ? `on ${m.host}` : "a worker"; })();
+
+function Messages({ me, open }) {
+  useDT();
+  const [sel, setSel] = useOpen("messages", open);
+  const [f, setF] = useState(null), [q, setQ] = useState("");
+  const [draft, setDraft] = useState({}), [newPing, setNewPing] = useState(null);
+  const [modal, modalCtx] = Modal.useModal();
+  const mine = CHANNELS.filter((c) => chVisible(c, me));
+  const order = { you: 0, them: 1, listen: 2, closed: 3 };
+  const lastAt = (c) => Math.max(...c.pings, ...c.msgs.map((m) => m[0]), c.closedAt || -999);
+  const rows = mine.filter((c) => (!f || chState(c, me)[2] === f) && `${c.lo} ${c.hi} ${c.msgs.map((m) => m[2]).join(" ")}`.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => order[chState(a, me)[2]] - order[chState(b, me)[2]] || lastAt(b) - lastAt(a));
+  const c = rows.find((x) => x.id === sel) || (sel ? mine.find((x) => x.id === sel) : null) || rows[0];
+  const n = (k) => mine.filter((x) => chState(x, me)[2] === k).length;
+  // who this console may ping: an Admin pings their workers and the Super User; the Super User pings Admins
+  const canPing = me === "Super User" ? Object.keys(ADMIN_INFO).filter((a) => FULL_DEPTS().some((d) => d.id === ADMIN_INFO[a].dept))
+    : ["Super User", ...MACHINES.filter((m) => m.user).map((m) => m.user)];
+  const title = (x) => (chListening(x, me) ? `${x.lo} and ${x.hi}` : chOther(x, me));
+  const send = (x) => { const text = (draft[x.id] || "").trim(); if (!text) return;
+    setSel(x.id); msgChange(() => { x.msgs = [...x.msgs, [nowH(), me, text]]; if (x.status === "ping") x.status = "open"; }); setDraft({ ...draft, [x.id]: "" });
+    toast(x.msgs.length === 1 ? `Answered ${chOther(x, me)} · the channel is open (concept)` : `Sent · now ${chOther(x, me)}'s turn (concept)`); };
+  const pingAgain = (x) => { setSel(x.id); msgChange(() => { x.pings = [...x.pings, nowH()]; }); toast(`Pinged ${chOther(x, me)} again (concept)`); };
+  const close = (x) => modal.confirm({ title: `Close the conversation with ${chOther(x, me)}?`, okText: "Close it", cancelText: "Keep it open",
+    content: `Only you can close it. ${chOther(x, me)} cannot write in it again; a new ping opens a new one. It stays in the audit log.`,
+    onOk: () => { setSel(x.id); msgChange(() => { x.status = "closed"; x.closedAt = nowH(); }); toast("Closed · recorded (concept)"); } });
+  const addListener = (x, who) => { setSel(x.id); msgChange(() => { x.listeners = { ...x.listeners, [me]: [...(x.listeners[me] || []), who] }; }); toast(`${who} is listening · ${chOther(x, me)} is not told (concept)`); };
+  const ping = (who) => { const ex = mine.find((x) => chParty(x, me) && chOther(x, me) === who && x.status !== "closed");
+    if (ex) { setNewPing(null); return ex.status === "ping" && ex.by === (ex.lo === me ? "lo" : "hi") ? pingAgain(ex) : (setSel(ex.id), toast(`You already have a conversation with ${who}`)); }
+    const lo = who === "Super User" || ADMIN_INFO[who] && me !== "Super User" ? me : who, hi = lo === me ? who : me;
+    const m = (FULL.MACHINES || MACHINES).find((x) => x.user === lo), at = ADMIN_INFO[lo] ? ADMIN_INFO[lo].ws : m ? m.host : "";
+    const id = "CH-" + (30 + CHANNELS.length);
+    msgChange(() => { CHANNELS = [{ id, lo, loAt: at, hi, by: lo === me ? "lo" : "hi", pings: [nowH()], msgs: [], status: "ping", listeners: {} }, ...CHANNELS]; });
+    setNewPing(null); setSel(id); toast(`Pinged ${who} · they see it until they answer (concept)`); };
+  const thread = (x) => { const st = chState(x, me), listening = st[2] === "listen", turn = chTurn(x), receiver = chReceiver(x);
+    return html`<div>
+      <div className="nt-h">${x.status === "ping" ? "Pinged" : "The conversation"}</div>
+      <div style=${{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="t3" style=${{ fontSize: 12, alignSelf: "center" }}>${x.by === "lo" ? x.lo : x.hi} pinged ${x.pings.map(atH).join(", ")}</div>
+        ${x.msgs.map(([t, who, text], k) => html`<div key=${k} className=${"bubble " + (who === me ? "mine" : "theirs")} title=${atH(t)}>${who !== me ? html`<div className="t3" style=${{ fontSize: 11, marginBottom: 2 }}>${who} · ${atH(t)}</div>` : null}${text}</div>`)}
+        ${x.status === "closed" ? html`<div className="t3" style=${{ fontSize: 12, alignSelf: "center", marginTop: 4 }}>Closed by ${x.hi === me ? "you" : x.hi} · ${atH(x.closedAt)}</div>` : null}
+      </div>
+      ${listening ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 10 }}>${ic("EyeOutlined")} You are listening. You read it as it happens; you cannot write in it. Only ${Object.keys(x.listeners).filter((k) => x.listeners[k].includes(me)).join(" and ")} knows you are here.</div>`
+        : x.status === "closed" ? null
+        : x.status === "ping" && receiver !== me ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 10 }}>A ping is only "I need you". ${chOther(x, me)} sees it, bright and pulsing, until they answer; you can ping again.</div>`
+        : turn === me || (x.status === "ping" && receiver === me) ? html`<div style=${{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            <${Input.TextArea} id=${"msg-" + x.id} value=${draft[x.id] || ""} onChange=${(e) => setDraft({ ...draft, [x.id]: e.target.value })} autoSize=${{ minRows: 2, maxRows: 5 }}
+              placeholder=${x.status === "ping" ? `Answer ${chOther(x, me)}. You write first; then you take turns.` : `Write to ${chOther(x, me)}. One message, then it is their turn.`} />
+            <div className="row"><span className="t3" style=${{ fontSize: 12 }}>${x.status === "ping" ? "Answering opens the conversation." : "Your turn."}</span><span className="sp" />
+              <${Button} type="primary" disabled=${!(draft[x.id] || "").trim()} onClick=${() => send(x)}>${x.status === "ping" ? "Answer" : "Send"}<//></div></div>`
+        : html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 10 }}>${ic("LockOutlined")} ${chOther(x, me)}'s turn. You can write again once they answer.</div>`}
+    </div>`; };
+  const side = !c ? html`<${SidePanel} empty=${html`<${Empty} icon="MessageOutlined" title="No conversations yet" text=${me === "Super User" ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."} h=${200} />`} />`
+    : (() => { const st = chState(c, me), party = !st[2].startsWith("listen"), added = c.listeners[me] || [];
+      const admins = Object.keys(ADMIN_INFO).filter((a) => a !== c.lo && a !== c.hi && !added.includes(a));
+      return html`<${SidePanel} title=${title(c)} sub=${party ? whoLine(chOther(c, me)) : "you are listening"}
+        facts=${[["Now", html`<span className="st" style=${{ "--c": st[1] === "bad" ? "var(--crit)" : st[1] === "good" ? "var(--ok)" : "var(--text-4)" }}><i />${st[0]}</span>`],
+          ["Started by", `${c.by === "lo" ? c.lo : c.hi}, ${atH(c.pings[0])}`], ["Who closes it", c.hi === me ? "You" : c.hi],
+          ...(party && c.status === "open" ? [["Listeners you added", added.length ? listNames(added) : "None"]] : [])]}
+        actions=${party && c.status !== "closed" ? html`${c.status === "ping" && chReceiver(c) !== me ? html`<${Button} onClick=${() => pingAgain(c)}>Ping again<//>` : null}
+          ${c.status === "open" && c.hi === me ? html`<${Button} danger onClick=${() => close(c)}>Close<//>` : null}` : null}>
+        ${thread(c)}
+        ${party && c.status === "open" ? html`<div><div className="nt-h">Add a listener</div>
+          <${Select} size="small" style=${{ width: "100%" }} placeholder="An Admin who reads it silently" value=${null} onChange=${(v) => addListener(c, v)} options=${admins.map((a) => ({ value: a, label: `${a} · ${deptNameOf(ADMIN_INFO[a].dept)}` }))} />
+          <div className="t3" style=${{ fontSize: 12, marginTop: 6 }}>Only Admins. You see who you added; ${chOther(c, me)} is not told.</div></div>` : null}
+      <//>`; })();
+  return html`<${React.Fragment}>${modalCtx}
+    <${Strip} on=${f} onPick=${setF} items=${[
+      { key: "you", label: "Waiting on you", value: fmt(n("you")), delta: n("you") ? "pinged you, or your turn" : "nothing waiting", dc: n("you") ? "var(--crit)" : undefined },
+      { key: "them", label: "Waiting on them", value: fmt(n("them")), delta: "your ping, or their turn" },
+      { key: "listen", label: "Listening", value: fmt(n("listen")), delta: "read only, as it happens" },
+      { key: "closed", label: "Closed", value: fmt(n("closed")), delta: "this week" }]} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <${ListPanel} title=${f ? { you: "Waiting on you", them: "Waiting on them", listen: "Listening", closed: "Closed" }[f] : "Conversations"} sub="waiting on you first · click one to see it on the right"
+        q=${q} setQ=${setQ} placeholder="Find a person or a word" action=${{ label: "New ping", onClick: () => setNewPing({ who: undefined }) }}
+        pick=${c ? c.id : null} onPick=${setSel} rowKey="id" rows=${rows} icon=${(x) => (chListening(x, me) ? "EyeOutlined" : x.status === "ping" ? "BellOutlined" : "MessageOutlined")}
+        name=${{ title: "With", text: title, line: (x) => { const last = x.msgs[x.msgs.length - 1]; return last ? `${last[1] === me ? "You" : last[1]}: ${last[2]}` : `${x.pings.length === 1 ? "a ping" : x.pings.length + " pings"}, no answer yet`; } }}
+        cols=${[{ title: "Pings", width: 70, text: (x) => fmt(x.pings.length) }, { title: "Last", width: 100, text: (x) => atH(lastAt(x)) }]}
+        now=${(x) => { const st = chState(x, me); return [st[0], st[1]]; }}
+        empty=${!mine.length ? html`<${Empty} icon="MessageOutlined" title="No conversations yet" text="A ping asks for attention; answering it opens a conversation, one message each way at a time." act="New ping" onAct=${() => setNewPing({ who: undefined })} h=${200} />` : null} />
+      ${side}
+    </div>
+    <${Drawer} open=${!!newPing} onClose=${() => setNewPing(null)} width=${420} title="Ping someone"
+      footer=${newPing ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setNewPing(null)}>Cancel<//><${Button} type="primary" disabled=${!newPing.who} onClick=${() => ping(newPing.who)}>Ping<//></div>` : null}>
+      ${newPing ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div><div className="nt-h">Who</div><${Select} id="ping-who" showSearch style=${{ width: "100%" }} placeholder="Pick a person" value=${newPing.who} onChange=${(v) => setNewPing({ who: v })}
+          options=${canPing.map((p) => ({ value: p, label: `${p} · ${whoLine(p)}` }))} /></div>
+        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>A ping carries no message: it only says you need them. They see it, bright and pulsing, until they answer; their answer opens the conversation.</div>
+      </div>` : null}
+    <//>
+  <//>`;
+}
+
+// ---------------------------------------------------------------- the session window (an Admin's console)
+// Entering a machine's session opens its screen here: See (watch; the worker keeps working and is told) or See and
+// control (mouse and keyboard; the worker is locked out). One window, full screen if wanted; Leave ends the session.
+let SESSION = null; const SESS_SUBS = new Set();
+const openSession = (host) => { SESSION = { host, since: Date.now(), mins: 30, mode: "control", full: false }; SESS_SUBS.forEach((f0) => f0()); };
+const sessChange = (patch) => { SESSION = patch ? { ...SESSION, ...patch } : null; SESS_SUBS.forEach((f0) => f0()); };
+const SCREENS = { "OPS-01": ["reconciliation.xlsx - Excel", "sheet"], "OPS-07": ["budget-2026.xlsx - Excel", "sheet"], "OPS-03": ["salaries.csv - Notepad", "text"], "OPS-04": ["Inbox - Outlook", "mail"] };
+function SessionWindow() {
+  const [, bump] = useState(0);
+  useEffect(() => { const f0 = () => bump((k) => k + 1); SESS_SUBS.add(f0); const t = setInterval(f0, 1000); return () => { SESS_SUBS.delete(f0); clearInterval(t); }; }, []);
+  if (!SESSION) return null;
+  const S = SESSION, m = MBY[S.host] || { host: S.host, user: null }, who = m.user || "Nobody", me = ME;
+  const left = Math.max(0, S.mins * 60 - Math.floor((Date.now() - S.since) / 1000)), mmss = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  const [winTitle, kind] = SCREENS[S.host] || ["Documents - File Explorer", "files"], control = S.mode === "control";
+  const body = kind === "sheet" ? html`<div style=${{ display: "grid", gridTemplateColumns: "34px repeat(6, 1fr)", fontSize: 11, fontFamily: "var(--mono)", color: "#333" }}>
+      ${Array.from({ length: 7 * 9 }, (_, k) => { const rr = Math.floor(k / 7), cc = k % 7; return html`<div key=${k} style=${{ borderRight: "1px solid #e3e3e3", borderBottom: "1px solid #e3e3e3", padding: "3px 6px", background: rr === 0 || cc === 0 ? "#f3f3f3" : "#fff", color: rr === 0 || cc === 0 ? "#777" : "#222" }}>${rr === 0 ? (cc ? "ABCDEF"[cc - 1] : "") : cc === 0 ? rr : (rr * 37 + cc * 113) % 9000 + 100}</div>`; })}</div>`
+    : html`<div style=${{ padding: 14, fontSize: 12.5, color: "#333", fontFamily: kind === "text" ? "var(--mono)" : "inherit", lineHeight: 1.7 }}>${kind === "mail" ? "Inbox · 14 unread\nRe: Q3 figures\nLeave forms for October\nPrinter on the second floor" : kind === "text" ? "name,role,salary\nY. Mensah,Clerk,2400\nA. Owusu,Lead,3900\n…" : "Documents\n  Reports\n  Invoices\n  Q3"}</div>`;
+  return html`<${Modal} open=${true} footer=${null} closable=${false} width=${S.full ? "100vw" : "min(1180px, 96vw)"} centered=${!S.full}
+    style=${S.full ? { top: 0, maxWidth: "100vw", paddingBottom: 0 } : undefined} className=${S.full ? "sess-full" : ""} title=${null}>
+    <div className="row" style=${{ flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+      <span style=${{ color: "var(--accent)" }}>${ic("DesktopOutlined")}</span><b className="mono" style=${{ fontSize: 15 }}>${S.host}</b><span className="t3">${who === "Nobody" ? "nobody signed in" : who + "'s session"}</span>
+      <${Segmented} size="small" value=${S.mode} onChange=${(v) => { sessChange({ mode: v }); toast(v === "control" ? `Your mouse and keyboard are on ${S.host} · ${who} is locked out (concept)` : `Watching only · ${who} can use ${S.host} again (concept)`); }}
+        options=${[{ value: "see", label: "See" }, { value: "control", label: "See and control" }]} />
+      <span className="sp" />
+      <span className="mono" style=${{ color: left < 300 ? "var(--crit)" : "var(--text-2)" }}>${mmss} left</span>
+      <${Button} size="small" onClick=${() => { sessChange({ mins: S.mins + 30 }); toast("30 more minutes · recorded (concept)"); }}>Extend<//>
+      <${Button} size="small" icon=${ic(S.full ? "FullscreenExitOutlined" : "FullscreenOutlined")} onClick=${() => sessChange({ full: !S.full })}>${S.full ? "Smaller" : "Full screen"}<//>
+      <${Button} size="small" onClick=${() => { sessChange(null); toast(`Still in ${S.host} · Return to it from the machine (concept)`); }}>Back to the console<//>
+      <${Button} size="small" danger onClick=${() => { sessChange(null); toast(`Left ${S.host}${m.user ? " · " + m.user + " has it back" : ""} (concept)`); }}>Leave<//>
+    </div>
+    <div className="sess-screen" style=${{ cursor: control ? "default" : "not-allowed" }}>
+      <div style=${{ position: "absolute", left: "8%", top: "8%", width: "64%", height: "70%", background: "#fff", borderRadius: 6, boxShadow: "0 10px 30px rgba(0,0,0,.35)", overflow: "hidden" }}>
+        <div style=${{ height: 28, background: kind === "sheet" ? "#1f6e43" : kind === "mail" ? "#0f5fae" : "#3a3a3a", color: "#fff", fontSize: 12, display: "flex", alignItems: "center", padding: "0 10px" }}>${winTitle}<span style=${{ marginLeft: "auto", letterSpacing: 6 }}>– ▢ ✕</span></div>
+        ${body}
+      </div>
+      <svg width="18" height="24" viewBox="0 0 18 24" style=${{ position: "absolute", left: "46%", top: "44%" }}><path d="M1 1L1 19L6 14.5L9.5 22L12.5 20.7L9 13.4L16 13.4Z" fill="#fff" stroke="#000" strokeWidth="1.2" /></svg>
+      <div style=${{ position: "absolute", left: 0, right: 0, bottom: 0, height: 34, background: "rgba(10,14,22,.82)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", color: "#dfe6f2", fontSize: 12 }}>
+        <span style=${{ width: 16, height: 16, borderRadius: 3, background: "#4d8dff" }} /><span>${winTitle.split(" - ")[1] || "Explorer"}</span><span style=${{ marginLeft: "auto" }} className="mono">${hhmm(NOWH)}</span></div>
+      <div style=${{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", padding: "4px 12px", borderRadius: 14, fontSize: 12, color: "#fff", background: control ? "rgba(91,140,255,.92)" : "rgba(40,44,52,.88)" }}>
+        ${control ? html`${ic("AimOutlined")} Your mouse and keyboard are on ${S.host}` : html`${ic("EyeOutlined")} Watching only · your mouse and keyboard do not reach ${S.host}`}</div>
+    </div>
+    <div className="row" style=${{ marginTop: 10, fontSize: 12.5, gap: 18, flexWrap: "wrap" }}>
+      <span className="t2">${ic("UserOutlined")} ${who === "Nobody" ? "Nobody is signed in to see anything." : control ? `${who} is locked out and sees: "${me} is working on this PC."` : `${who} keeps working and sees a bar: "${me} is viewing your screen."`}</span>
+      <span className="t3">Only one session at a time on ${S.host}; nobody else can enter while you are in. Recorded in the audit log.</span>
+    </div>
+  <//>`;
+}
 function SUOverview({ go }) {
   useDT();
   const [by, setBy] = useState("Status");
@@ -4986,14 +5167,14 @@ function SUOverview({ go }) {
 
 // The Admin's core areas lead the menu as their own group.
 const NAV_ADMIN = [
-  ["Core", [["overview", "Overview", "DashboardOutlined"], ["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"]]],
+  ["Core", [["overview", "Overview", "DashboardOutlined"], ["messages", "Messages", "MessageOutlined", () => msgWaiting(), true, true], ["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"]]],
   ["Monitor", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["sessions", "Sessions", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
   ["Automate", [["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
   ["Govern", [["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
 ];
 // The Super User's menu has the same shape as the Admin's: the core areas first, then running the organisation.
 const NAV_SU = [
-  ["Core", [["overview", "Overview", "DashboardOutlined", () => suQueue().length, true], ["tasks", "Tasks", "CheckSquareOutlined", () => DEPT_TASKS.filter((t) => !t.complete && taskState(t) === "done").length, true], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"]]],
+  ["Core", [["overview", "Overview", "DashboardOutlined", () => suQueue().length, true], ["messages", "Messages", "MessageOutlined", () => msgWaiting(), true, true], ["tasks", "Tasks", "CheckSquareOutlined", () => DEPT_TASKS.filter((t) => !t.complete && taskState(t) === "done").length, true], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"]]],
   ["Organisation", [["departments", "Departments", "ApartmentOutlined"], ["accountability", "Accountability", "EyeOutlined", () => DEVIATIONS.filter((d) => d.out === "open").length, true], ["access", "Access", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["registry", "Registry", "DesktopOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
   ["Govern", [["rules", "Rules", "SafetyCertificateOutlined"], ["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"]]],
 ];
@@ -5015,7 +5196,7 @@ function suRoute(p, s) {
   return [p, s];
 }
 const SU_PARENT = { dept: "departments", sessions: "access" };
-const TITLES = { departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"], accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"], access: ["Access", "Who is inside which machine, and who was let in"], registry: ["Registry", "Machines and accounts · register, re-key, provision"], rules: ["Rules", "The standard the organisation is measured against"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
+const TITLES = { messages: ["Messages", "Pings and the conversations they open, one message each way at a time"], departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"], accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"], access: ["Access", "Who is inside which machine, and who was let in"], registry: ["Registry", "Machines and accounts · register, re-key, provision"], rules: ["Rules", "The standard the organisation is measured against"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
 function Palette({ go, close, nav, su }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
   useEffect(() => { r.current && r.current.focus(); }, []);
@@ -5126,6 +5307,7 @@ function App() {
   else if (page === "accountability") body = html`<${Accountability} go=${go} open=${sub} />`;
   else if (page === "rules") body = html`<${Rules} go=${go} sub=${sub} />`;
   else if (page === "registry") body = html`<${Registry} go=${go} enter=${enter} open=${sub} />`;
+  else if (page === "messages") body = html`<${Messages} me=${ME} open=${sub} />`;
   else if (page === "dept") body = html`<${DeptPage} key=${sub} id=${(FULL.DEPTS || DEPTS).some((d) => d.id === sub) ? sub : "ops"} go=${go} enter=${enter} />`;
   else if (page === "overview") body = level ? html`<${Overview} range=${range} go=${go} />` : html`<${SUOverview} go=${go} />`;
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
@@ -5161,9 +5343,9 @@ function App() {
           : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} department${(FULL.DEPTS || DEPTS).length === 1 ? "" : "s"}</div></div></div>`}
         ${nav.map(([g, xs]) => {
-          const items = xs.map(([id, l, icon, cnt, hot]) => { const on = page === id || (!level && SU_PARENT[page] === id), n = typeof cnt === "function" ? cnt() : cnt;
+          const items = xs.map(([id, l, icon, cnt, hot, pulse]) => { const on = page === id || (!level && SU_PARENT[page] === id), n = typeof cnt === "function" ? cnt() : cnt;
             return html`<div key=${id} className=${"nav" + (on ? " on" : "")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
-            ${ic(icon)}<span>${l}</span>${n ? html`<span className=${"cnt" + (hot ? " hot" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null}</div>`; });
+            ${ic(icon)}<span>${l}</span>${n ? html`<span className=${"cnt" + (hot ? " hot" : "") + (pulse ? " pulse" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null}</div>`; });
           return html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}${items}<//>`; })}
         <div className="side-foot">
           ${level ? html`<${Button} danger block icon=${ic("LogoutOutlined")} onClick=${leave}>Leave console<//>` : null}
@@ -5209,6 +5391,7 @@ function App() {
     </div>
     ${pal ? html`<${Palette} go=${go} nav=${nav} su=${!level} close=${() => setPal(false)} />` : null}
     <${EnterConsole} admin=${entering} onClose=${() => setEntering(null)} onEnter=${enterConsole} />
+    ${level ? html`<${SessionWindow} />` : null}
     <${Toast} />
   <//>`;
 }

@@ -407,10 +407,43 @@ A chart of fixed size, whatever the number of copies:
   serious · see them all on Issues ›"). No copies: the same frame, dashed, "No copy anywhere else".
 - The header carries only Unmark. No switch between the two rules on the board.
 
+## Messages (both consoles, decided 9 Oct 2026)
+
+Help Ping & Message Channel (resource-assistance-combo.md) gets its own menu item, second in Core, at both levels:
+in an Admin's console the conversations with their workers and with the Super User; in the Super User's, the ones
+with Admins. It is the one menu item whose count **pulses** (bright, bold) while anything waits on you, as the design
+asks of unanswered pings; the pulse stops when everything is answered.
+
+- **Strip:** Waiting on you (pinged you, or your turn), Waiting on them, Listening, Closed this week (all filters).
+- **List:** one row per conversation, with the last message under the name; *New ping* opens a drawer to pick who (an
+  Admin: their workers and the Super User; the Super User: Admins). A ping carries no message.
+- **Right:** the thread. The person pinged answers first, which opens it; then one message each way: the box is there
+  only on your turn ("Kojo's turn. You can write again once they answer."). *Ping again* while unanswered; *Close* only
+  for the higher party (an Admin with a worker, the Super User with an Admin), asked first. *Add a listener* (Admins
+  only) once it is open: you see who you added, the other party is not told; a listener reads it as it happens and
+  cannot write.
+- A help request is no longer an issue: it lives here. The console's Overview counts pings with *Waiting on you*.
+
+## The session window (an Admin's console, decided 9 Oct 2026)
+
+Remote control is not an action and not a menu item: it is what entering a machine's session is
+(implementation-spec.md: mouse and keyboard during a traversal session). *Enter session* (Machines, the machine's
+page) asks first as before and then opens the machine's screen in a window over the console; *Return to it* (the
+machine's page, your session on Sessions) opens it again. Only in an Admin's console: the Super User reaches a machine
+by entering that Admin's console first.
+
+- **See and control** (the default, the design's session): your mouse and keyboard are on the machine; the worker is
+  locked out and sees "R. Mensah is working on this PC".
+- **See** (proposed, to confirm): watching only; the worker keeps working and sees a bar "R. Mensah is viewing your
+  screen". Either way it is a session: one at a time per machine, nobody else enters, recorded.
+- Time left with *Extend*, *Full screen*, *Back to the console* (the session stays yours), *Leave*.
+- Screenshot stays a Monitoring action (one-off, usable in rules). Video calls are out: talking to workers is
+  Messages.
+
 ## Final menu at a glance
 
 ```
-Core          Overview · Tasks · Restricted · Flows
+Core          Overview · Messages · Tasks · Restricted · Flows
 Organisation  Departments (with the Admin roster) · Accountability · Access · Registry · Reports
 Govern        Rules · Rollout · Audit log
 ```
