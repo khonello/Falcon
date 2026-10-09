@@ -104,6 +104,10 @@ async def test_ping_channel_lock_close_and_listeners(engine, org, connect):
     assert await w2.err("assistance.channel", {"channel_id": chan}) == "forbidden"
 
     # Listeners: W1 adds A2 (HR); A1 cannot see W1's listener; A2 hears messages live.
+    # who can be added: Admins of every department (HR's A2 too), never the parties; only a party may ask
+    cands = (await w1.ok("assistance.listener_candidates", {"channel_id": chan}))["candidates"]
+    assert [c["account_id"] for c in cands] == [org["a2"]] and cands[0]["department_name"] == "HR"
+    assert await w2.err("assistance.listener_candidates", {"channel_id": chan}) == "forbidden"
     assert await w1.err("assistance.add_listener", {"channel_id": chan, "admin_account_id": org["w2"]}) == "invalid"
     assert await w1.err("assistance.add_listener", {"channel_id": chan, "admin_account_id": org["a1"]}) == "invalid"
     added = await w1.ok("assistance.add_listener", {"channel_id": chan, "admin_account_id": org["a2"]})

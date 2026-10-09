@@ -41,9 +41,6 @@ service inside that person's session.
    (violations, flows) and falls back to a generic line for the rest (listener, cross-department, update,
    deviation). Store the summary (or resolve every source in `reports.list`), and add a per-reader "seen" so the
    board's new / seen / addressed can be told apart. *Found:* Reports (RP03).
-8. **A Listener can only be chosen from the Admin's own department.** `hierarchy.tree` for an Admin holds their
-   department, so "Add a listener" offers only their fellow Admins; the design's "HR is listening" needs a list
-   of active Admins across departments (names by the requester's grants). *Found:* Assistance (AS03).
 9. **Resources: "where it should be" and "a file's journey"** (RS03) have no data. The first needs files marked
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
@@ -120,6 +117,10 @@ service inside that person's session.
 
 ## Done inline (for the record)
 
+- **Listeners from any department** (was #8, done 9 Oct 2026). `assistance.listener_candidates {channel_id}` lists
+  every active Admin in every department, less the channel's two parties and those the caller already added, named
+  as the caller names them; only a party may ask. TUI: `listen who <channel_id>`.
+  *Test:* `test_resource_assistance.py` (HR's Admin offered to a Finance worker).
 - **A task's checks in `task.list`** (was #11, done 9 Oct 2026). Every task row carries `checks_total` and
   `checks_passed`, so a list can say "2 of 3 checks passed" without a `task.get` per task; the TUI's `tasks` shows
   them as a `checks` column. *Test:* `test_task.py` (the list carries 0 of 2 after create).

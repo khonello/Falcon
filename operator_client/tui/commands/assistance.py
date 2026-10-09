@@ -83,6 +83,12 @@ async def listen(ctx: ShellContext, args: Args) -> str:
     return "listener added" if res["added"] else "already listening"
 
 
+@command("listen", "who", "<channel_id>", "Admins you could add as a Listener, from every department")
+async def listen_who(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("assistance.listener_candidates", {"channel_id": args.get_int(0, "channel_id")})
+    return bullet(f"{c['name']} · {c['department_name']} (account {c['account_id']})" for c in res["candidates"]) or "nobody to add"
+
+
 @command("listeners", usage="<channel_id>", help_="Listeners YOU added to a channel")
 async def listeners(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("assistance.my_listeners", {"channel_id": args.get_int(0, "channel_id")})

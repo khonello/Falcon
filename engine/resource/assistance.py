@@ -223,6 +223,24 @@ async def add_listener(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"channel_id": channel_id, "listener_account_id": admin_id, "added": inserted}
 
 
+@handler("assistance.listener_candidates")
+async def listener_candidates(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"channel_id"} -- who a party may add as a Listener: every active Admin in every department (the
+    design's "HR is listening"), except the channel's two parties and those the caller already added. Names are
+    the caller's own (display names never cross relationship layers)."""
+    ident = require_account(ctx)
+    channel_id = int_field(payload, "channel_id")
+    channel = await _load_channel(ctx, channel_id)
+    if ident.account_id not in _channel_parties(channel):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only the channel's two parties add Listeners")
+    db = ctx.engine.db
+    added = {l["listener_account_id"] for l in await db.assistance.listeners_added_by(channel_id, ident.account_id)}
+    found = [a for a in await db.accounts.active_admins() if a["id"] not in _channel_parties(channel) and a["id"] not in added]
+    names = await db.accounts.display_names_for(ident.account_id, [a["id"] for a in found])
+    return {"candidates": [{"account_id": a["id"], "name": names.get(a["id"]), "department_id": a["department_id"],
+                            "department_name": a["department_name"]} for a in found]}
+
+
 @handler("assistance.my_listeners")
 async def my_listeners(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Only the Listeners the caller added -- never the other party's."""

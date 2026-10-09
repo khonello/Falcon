@@ -194,6 +194,12 @@ class AccountsRepo(_Repo):
     async def list_all(self) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._ACCOUNT_COLS} {self._ACCOUNT_FROM} ORDER BY a.id")
 
+    async def active_admins(self) -> list[dict[str, Any]]:
+        """Every active Admin, in every department: who may be added as a Listener."""
+        return await self._fetch(
+            f"SELECT {self._ACCOUNT_COLS} {self._ACCOUNT_FROM} WHERE a.role = 'admin' AND a.status = 'active' "
+            "ORDER BY d.name, a.id")
+
     async def list_department(self, department_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
             f"SELECT {self._ACCOUNT_COLS} {self._ACCOUNT_FROM} WHERE a.department_id = $1 ORDER BY a.id",
