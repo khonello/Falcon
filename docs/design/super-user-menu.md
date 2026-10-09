@@ -280,7 +280,7 @@ starts below the fold: you clicked and nothing visibly changed. Now the item sho
 | Issues (console) | the issue: owner, what to do and its button | its timeline and details | *Types* is a pick in the list header |
 | Automation (console) | the rule: when, on, do, last firings; Switched on, Test, Edit | Runs per day | *Problems this week* is a strip figure that filters |
 | Actions (console) | the action: used by, outcomes; Edit script, Run once | its script and recent runs (by hand too) | *Run by hand* is in each action's recent runs |
-| Departments | the department: Admins, machines, worst issues; Enter X's console →, Department page → | Machines in use today | *Admins*: their consoles are entered from the department |
+| Departments | the department: its Admins in one line ("R. Mensah, A. Quaye and 38 more") with *See all*, machines, worst issues; Department page → | Machines in use today | *Admins*: *See all* opens a drawer listing every Admin (searchable past six), each with *Enter →*, which asks first |
 | Department page | the issue picked; Handle it in X's console → | Admins, then Today | — |
 | Accountability | the deviation and what came of it | Around it: the timeline and what the record shows; Deviations per day | *Rules broken* is a pick in the list header |
 | Registry | the machine, account or refused connection | — | *Accounts* and *Refused* are a switch on the list |

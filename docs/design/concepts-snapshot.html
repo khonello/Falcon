@@ -4661,6 +4661,7 @@ function AuditSU({ range, go, open, me }) {
 // ---------------------------------------------------------------- Departments, Access, Registry
 function DepartmentsPage({ go, enter, open }) {
   const [sel, setSel] = useOpen("departments", open);
+  const [adm, setAdm] = useState(null), [aq, setAq] = useState("");   // the department whose Admins the drawer lists
   const [q, setQ] = useState("");
   const depts = FULL_DEPTS(), off = MACHINES.filter((m) => m.status === "offline").length;
   const all = depts.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id), iss = ISSUES.filter((i) => MBY[i.host] && MBY[i.host].dept === d.id);
@@ -4685,14 +4686,28 @@ function DepartmentsPage({ go, enter, open }) {
         now=${(r) => (!r.admins.length ? ["No Admin", "bad"] : r.crit ? [`${r.crit} critical`, "bad"] : r.high ? [`${r.high} high`, "bad"] : r.online < r.ms.length ? [`${r.ms.length - r.online} offline`, "wait"] : ["All well", "good"])}
         empty=${!depts.length ? html`<${Empty} icon="ApartmentOutlined" title="No departments yet" text="Create a department, then give it an Admin and its machines." act="New department" onAct=${() => toast("New department (concept)")} h=${200} />` : null} />
       ${d ? html`<${SidePanel} title=${d.name} sub=${sel ? "the one you picked" : "needs you most · click another"}
-        facts=${[["Admins", d.admins.length ? listNames(d.admins, 3) : html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`], ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
+        facts=${[["Admins", d.admins.length ? html`<span>${d.admins.length <= 2 ? d.admins.join(" and ") : `${d.admins.slice(0, 2).join(", ")} and ${fmt(d.admins.length - 2)} more`} · <a style=${{ whiteSpace: "nowrap" }} onClick=${() => setAdm(d.id)}>See all</a></span>` : html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`], ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
           ["Open issues", d.iss.length ? `${fmt(d.iss.length)}${d.crit ? ` · ${d.crit} critical` : ""}` : "None"], ["Reports handled in", st.mtta || "—"], ["On 1.4.2", `${fmt(d.ok)} of ${fmt(d.ms.length)}`]]}
-        actions=${html`${d.admins.slice(0, 2).map((a) => html`<${Button} key=${a} onClick=${() => enter(a)}>Enter ${a}'s console →<//>`)}<${Button} type="primary" onClick=${() => go("dept", d.id)}>${d.admins.length ? "Department page →" : "Appoint one on its page →"}<//>`}>
+        actions=${html`<${Button} type="primary" onClick=${() => go("dept", d.id)}>${d.admins.length ? "Department page →" : "Appoint one on its page →"}<//>`}>
         <div><div className="nt-h">Machines</div><${MiniTiles} ms=${d.ms} go=${go} /></div>
         <div><div className="nt-h">Worst open issues</div>${d.iss.length ? d.iss.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]).slice(0, 5).map((i) => html`<div key=${i.id} className="row" style=${{ flexWrap: "nowrap", gap: 8, padding: "5px 0", fontSize: 12.5 }}>
           <i style=${{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: SEV[i.sev].c }} /><span className="cut" style=${{ flex: 1 }}>${i.title}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${i.host}</span></div>`) : html`<div className="t3">Nothing open.</div>`}</div>
       <//>` : html`<${SidePanel} empty=${html`<${Empty} icon="ApartmentOutlined" title="Nothing picked" text="Pick a department in the list." h=${200} />`} />`}
     </div>
+    ${(() => { const dd = all.find((x) => x.id === adm); const list = dd ? dd.admins.filter((a) => a.toLowerCase().includes(aq.toLowerCase())) : [];
+      return html`<${Drawer} open=${!!dd} onClose=${() => { setAdm(null); setAq(""); }} width=${440} title=${dd ? `Admins · ${dd.name}` : ""}>
+        ${dd ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="t3" style=${{ fontSize: 12.5 }}>${fmt(dd.admins.length)} Admin${dd.admins.length === 1 ? "" : "s"}. Entering one's console asks first to block or end their session.</div>
+          ${dd.admins.length > 6 ? html`<${Input} allowClear placeholder="Find an Admin" prefix=${ic("SearchOutlined")} value=${aq} onChange=${(e) => setAq(e.target.value)} />` : null}
+          <div>${list.map((a) => { const info = ADMIN_INFO[a] || {}; return html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--grid)" }}>
+            <span style=${{ position: "relative", flex: "none" }}><span className="av" style=${{ width: 30, height: 30, fontSize: 11 }}>${initials(a)}</span>
+              <i style=${{ position: "absolute", right: -1, bottom: -1, width: 9, height: 9, borderRadius: "50%", background: info.busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
+            <span style=${{ minWidth: 0, flex: 1 }}><span className="cut" style=${{ display: "block", fontWeight: 500 }} title=${a}>${a}</span>
+              <span className="t3 cut" style=${{ display: "block", fontSize: 12 }}>${info.busy ? info.now.replace(/^Inside/, "inside").replace(/ since.*$/, "") : "at their desk"}${info.ws ? " · " + info.ws : ""}</span></span>
+            <${Button} size="small" onClick=${() => { setAdm(null); setAq(""); enter(a); }}>Enter →<//></div>`; })}
+            ${!list.length ? html`<div className="t3" style=${{ padding: "10px 0" }}>No Admin by that name.</div>` : null}</div>
+        </div>` : null}
+      <//>`; })()}
     <${OrgDay} go=${go} />
   <//>`;
 }
