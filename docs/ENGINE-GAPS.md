@@ -38,11 +38,6 @@ service inside that person's session.
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
    out of the page until then.
-12. **A client PC's live state is thin** (level 4, CP03). `control.levels` gives processor, memory and idle from the
-    Worker's last metrics report (in memory, lost on restart); the design also wants **what is in front** (the
-    foreground program and its document) and a machine that is **not reachable** refused at `hierarchy.traverse`
-    (the Engine keeps no online state, so a held session on a switched-off machine looks like any other).
-    *Found:* level 4.
 14. **The Worker's windows are built; three wait for their triggers** (WR01). `worker_client.windows` has all
     five (blocked, message, locked, ask, task), and the service already opens *blocked* (from the lockout) and
     *task* (on `task.assigned`, with Start). *Message* and *locked* need `notify` / `lock_session` to open them
@@ -95,6 +90,15 @@ service inside that person's session.
     Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
 ## Done inline (for the record)
 
+- **A machine's live state** (was #12, done 9 Oct 2026). Online means the machine's client holds an authenticated
+  connection now (`Engine.online_pc_ids()`); `pcs.last_seen_at` (migration 015) records when it connected or dropped,
+  and consoles get `pc.presence {pc_id, online}`. `hierarchy.traverse` refuses a machine that is not connected
+  (`unavailable`, "FIN-02 is not reachable (last seen ...)"; `FALCON_REFUSE_UNREACHABLE=0` turns it off).
+  `hierarchy.tree` rows carry `online` and `last_seen_at`; `hierarchy.pc_state {pc_id}` gives reachable, last seen,
+  the latest levels and **what is in front**: the Worker now adds `foreground {program, title}` to `control.metrics`
+  (`worker_client/foreground.py`, ctypes; under the Windows service this moves into the person's-session helper).
+  TUI: `tree` shows online/offline, `pc state <pc_id>`.
+  *Test:* `test_hierarchy.py::test_a_machine_that_is_not_connected_cannot_be_entered_and_says_since_when`.
 - **What an action returned, kept with the run** (was #20, done 9 Oct 2026). A script (built-in or Custom) marks
   what it returns with lines the Worker strips from the text: `FALCON:summary <line>`, `FALCON:result <json>`,
   `FALCON:image <path>`. `control.execution_result` now stores the text (first and last 64 KB), the summary (on

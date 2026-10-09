@@ -149,11 +149,14 @@ async def tree(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     accounts = await db.accounts.list_all()
     active = {s["pc_id"]: s for s in await db.sessions.list_active()}
     names = await db.accounts.display_names_for(ident.account_id, [a["id"] for a in accounts])
+    online = ctx.engine.online_pc_ids()
 
     def account_view(a: dict[str, Any]) -> dict[str, Any]:
         session = active.get(a["bound_pc_id"])
+        seen = a.get("last_seen_at")
         return {"account_id": a["id"], "role": a["role"], "name": names.get(a["id"]), "status": a["status"],
                 "pc_id": a["bound_pc_id"], "hostname": a["hostname"], "pc_type": a["pc_type"],
+                "online": a["bound_pc_id"] in online, "last_seen_at": seen.isoformat() if seen else None,
                 "session": _session_view(session, names) if session else None}
 
     out = []
@@ -200,6 +203,14 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     require_department_scope(ident, target["department_id"])
     if target["id"] == ident.pc_id:
         raise ProtocolError(ErrorCode.INVALID, "that is your own pc")
+    if ctx.engine.settings.refuse_unreachable and pc_id not in ctx.engine.online_pc_ids():
+        seen = target["last_seen_at"]
+        raise ProtocolError(ErrorCode.UNAVAILABLE, f"{target['hostname']} is not reachable"
+                            + (f" (last seen {seen.isoformat(timespec='minutes')})" if seen else " (never connected)"))
+    if ctx.engine.settings.refuse_unreachable and pc_id not in ctx.engine.online_pc_ids():
+        seen = target.get("last_seen_at")
+        raise ProtocolError(ErrorCode.UNAVAILABLE, f"{target['hostname']} is not reachable"
+                            + (f" (last seen {seen.isoformat(timespec='minutes')})" if seen else " (never connected)"))
 
     active = await db.sessions.active_for_pc(pc_id)
     if active is not None:
@@ -286,6 +297,27 @@ async def extend_session(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     await ctx.engine.push_to_pc(session["pc_id"], "session.extended",
                                 {"session_id": session_id, "deadline_at": new_deadline.isoformat()})
     return {"deadline_at": new_deadline.isoformat(), "extended_count": session["extended_count"] + 1}
+
+
+@handler("hierarchy.pc_state")
+async def pc_state(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """A machine's live state, what a console shows for it (level 4). {"pc_id"} -> whether it is
+    reachable now and when it was last seen, its latest levels and the program in front (from its
+    client's last metrics report; null while it has not reported since the Engine started)."""
+    from engine.control import events
+
+    ident = require_role(ctx, "super_user", "admin")
+    pc_id = int_field(payload, "pc_id")
+    target = await ctx.engine.db.accounts.pc(pc_id)
+    if target is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
+    require_department_scope(ident, target["department_id"])
+    m = events.latest_metrics(pc_id)
+    seen = target["last_seen_at"]
+    return {"pc_id": pc_id, "hostname": target["hostname"], "online": pc_id in ctx.engine.online_pc_ids(),
+            "last_seen_at": seen.isoformat() if seen else None,
+            "levels": {k: m[k] for k in ("cpu", "memory", "idle_s", "at")} if m else None,
+            "foreground": m.get("foreground") if m else None}
 
 
 @handler("hierarchy.session_state")

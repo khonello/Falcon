@@ -143,6 +143,7 @@ class Engine:
         from engine.hierarchy import traversal
 
         await traversal.claim_native_session(self, conn.ctx)
+        await self._presence(conn, online=True)
 
     async def on_disconnect(self, conn: Connection) -> None:
         """A dropped connection mid-traversal is NOT special-cased: the Engine-side session
@@ -156,6 +157,25 @@ class Engine:
 
             await assisted_access.clear_offers_for(self, conn.ctx.identity.account_id)
             await self.audit.record(conn.ctx, "auth.disconnected")
+            await self._presence(conn, online=False)
+
+    def online_pc_ids(self) -> set[int]:
+        """Machines reachable now: those whose client holds an authenticated connection."""
+        return {c.ctx.identity.pc_id for c in self.connections
+                if c.authenticated and c.ctx.identity.pc_id is not None}
+
+    async def _presence(self, conn: Connection, *, online: bool) -> None:
+        """Record when the machine was last seen and tell the consoles that look after it."""
+        ident = conn.ctx.identity
+        if ident.pc_id is None or ident.role == "super_user":
+            return
+        if not online and ident.pc_id in self.online_pc_ids():
+            return                                  # another connection from the same machine is still up
+        if self.db.connected:
+            await self.db.accounts.touch_pc(ident.pc_id)
+        payload = {"pc_id": ident.pc_id, "online": online}
+        await self.push_to_role("super_user", "pc.presence", payload)
+        await self.push_to_role("admin", "pc.presence", payload, department_id=ident.department_id)
 
     async def broadcast(self, type_: str, payload: dict[str, Any] | None = None, *,
                         predicate: Any = None) -> None:

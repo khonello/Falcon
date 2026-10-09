@@ -422,14 +422,23 @@ async def signal(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"accepted": True, "fired": fired}
 
 
+def latest_metrics(pc_id: int) -> dict[str, Any] | None:
+    """The machine's last metrics report (in memory since the Engine started)."""
+    return _metrics.get(pc_id)
+
+
 @handler("control.metrics")
 async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Worker client reports state for polled events: {"cpu": %, "memory": %, "idle_s": n}."""
+    """Worker client reports state for polled events: {"cpu": %, "memory": %, "idle_s": n, "foreground"?: {"program", "title"}}."""
     ident = require_account(ctx)
     if ident.pc_id is None:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
     m = {"cpu": float(payload.get("cpu", 0)), "memory": float(payload.get("memory", 0)),
          "idle_s": float(payload.get("idle_s", 0)), "at": datetime.now(timezone.utc).isoformat()}
+    fg = payload.get("foreground")
+    if isinstance(fg, dict) and fg.get("program"):
+        # The program in front and its window title (usually the document), as the client saw it.
+        m["foreground"] = {"program": str(fg["program"])[:120], "title": str(fg.get("title") or "")[:300]}
     _metrics[ident.pc_id] = m
     now = time.monotonic()
     last = _last_sampled.get(ident.pc_id)

@@ -32,6 +32,8 @@ class Settings:
     # Working hours, local time on the Engine host: an Admin entering a machine outside them is reported to the
     # Super User only (report category about_admin).
     working_hours: str = "06:00-18:00"
+    # Entering a machine whose client is not connected is refused (Hierarchy -> traversal).
+    refuse_unreachable: bool = True
     # Update escalation threshold (open item 10.4): count-based, tunable.
     update_escalation_failures: int = 3
     # Polled/evaluated Events (thresholds, idle, time) are checked on this interval.
@@ -70,6 +72,8 @@ class Settings:
                 os.environ.get("FALCON_TRAVERSAL_EXTENSION_MINUTES", cls.traversal_extension_minutes)
             ),
             working_hours=os.environ.get("FALCON_WORKING_HOURS", cls.working_hours),
+            refuse_unreachable=os.environ.get("FALCON_REFUSE_UNREACHABLE", "1").strip().lower()
+            not in ("0", "false", "no", "off"),
             update_escalation_failures=int(
                 os.environ.get("FALCON_UPDATE_ESCALATION_FAILURES", cls.update_escalation_failures)
             ),

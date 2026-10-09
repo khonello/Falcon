@@ -178,7 +178,7 @@ class _Repo:
 class AccountsRepo(_Repo):
     _ACCOUNT_COLS = ("a.id, a.role, a.department_id, a.bound_pc_id, a.self_display_name, "
                      "a.status, a.assistance_available, a.created_at, "
-                     "p.hostname, p.pc_type, p.client_id, p.key_generation, d.name AS department_name")
+                     "p.hostname, p.pc_type, p.client_id, p.key_generation, p.last_seen_at, d.name AS department_name")
     _ACCOUNT_FROM = ("FROM accounts a LEFT JOIN pcs p ON p.id = a.bound_pc_id "
                      "LEFT JOIN departments d ON d.id = a.department_id")
 
@@ -251,9 +251,14 @@ class AccountsRepo(_Repo):
 
     async def pc(self, pc_id: int) -> dict[str, Any] | None:
         return await self._one(
-            "SELECT p.id, p.hostname, p.department_id, p.pc_type, p.client_id, p.key_generation, a.id AS bound_account_id, "
+            "SELECT p.id, p.hostname, p.department_id, p.pc_type, p.client_id, p.key_generation, p.last_seen_at, "
+            "a.id AS bound_account_id, "
             "a.role AS bound_role FROM pcs p LEFT JOIN accounts a ON a.bound_pc_id = p.id AND a.status = 'active' "
             "WHERE p.id = $1", pc_id)
+
+    async def touch_pc(self, pc_id: int) -> None:
+        """The machine's client connected or dropped just now."""
+        await self._exec("UPDATE pcs SET last_seen_at = now() WHERE id = $1", pc_id)
 
     async def pcs_in_department(self, department_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -785,7 +790,7 @@ class ReportsRepo(_Repo):
         "(SELECT s.seen_at FROM report_seen s WHERE s.report_id = r.id AND s.account_id = $1) AS seen_at, "
         "(SELECT max(v.addressed_at) FROM report_addressed_views v WHERE v.report_id = r.id) AS addressed_at")
 
-    async def all(self, reader_id: int, limit: int = 500) -> list[dict[str, Any]]:
+    async def all(self, reader_id: int | None = None, limit: int = 500) -> list[dict[str, Any]]:
         """Super User's view: everything, unconditionally, never filtered by routing."""
         return await self._fetch(
             f"SELECT r.*, {self._READER_COLS} FROM reports r ORDER BY r.generated_at DESC LIMIT $2",

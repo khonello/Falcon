@@ -56,6 +56,7 @@ Implements Display Names' **non-propagation rule**: a name set at one relationsh
 | `department_id` | INTEGER FK → departments.id, NULLABLE | NULL for an Admin's or Super User's own workstation if modeled outside department scope |
 | `pc_type` | TEXT NOT NULL CHECK (`pc_type` IN ('super_user_workstation','admin_workstation','client_pc')) | |
 | `created_at` | TIMESTAMP NOT NULL | |
+| `last_seen_at` | TIMESTAMP NULLABLE | When its client last connected or dropped (migration 015). Whether it is reachable *now* is the Engine's live connection list, not a column |
 
 ---
 

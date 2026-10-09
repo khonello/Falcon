@@ -1,6 +1,6 @@
 """Periodic reporting the Engine cannot observe on its own.
 
-  * control.metrics {cpu, memory, idle_s}          -- for polled Events (thresholds, idle)
+  * control.metrics {cpu, memory, idle_s, foreground} -- polled Events, and what is in front (level 4)
   * task.program_signal {task_id, item_id, ...}     -- Expectation evidence for Program targets:
     running, active (CPU in the last interval), rss_bytes, open_files, present (installed)
 
@@ -18,6 +18,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from worker_client import idle
+from worker_client.foreground import foreground
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +94,14 @@ class Signals:
         ps = _psutil()
         cpu = ps.cpu_percent(interval=None) if ps else 0.0
         mem = ps.virtual_memory().percent if ps else 0.0
-        await self.report("control.metrics", {"cpu": cpu, "memory": mem, "idle_s": idle.idle_seconds() or 0.0})
+        payload: dict[str, Any] = {"cpu": cpu, "memory": mem, "idle_s": idle.idle_seconds() or 0.0}
+        try:
+            front = foreground()
+        except OSError:
+            front = None
+        if front:
+            payload["foreground"] = front
+        await self.report("control.metrics", payload)
 
     async def report_programs(self) -> int:
         n = 0

@@ -6,6 +6,7 @@ time limit + extension, display-name non-propagation, report routing, assisted a
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 from datetime import datetime, timedelta, timezone
 
@@ -309,6 +310,38 @@ async def test_routing_a_department_with_or_without_earlier_reports(engine, org,
                                                 "include_earlier": "no"}) == "invalid"
     audit = [e for e in (await su.ok("audit.recent", {"limit": 20}))["entries"] if e["action_type"] == "report_routing.set"]
     assert audit and {"added", "removed", "include_earlier"} <= set(audit[0]["detail"])
+
+
+async def test_a_machine_that_is_not_connected_cannot_be_entered_and_says_since_when(engine, org, connect):
+    engine.settings = dataclasses.replace(engine.settings, refuse_unreachable=True)
+    a1 = await connect("cid-a1")
+    su = await connect("cid-su")
+    assert await a1.err("hierarchy.traverse", {"pc_id": org["w1_pc"]}) == "unavailable"     # never connected
+    state = await a1.ok("hierarchy.pc_state", {"pc_id": org["w1_pc"]})
+    assert state["online"] is False and state["last_seen_at"] is None and state["levels"] is None
+
+    w1 = await connect("cid-w1")
+    assert "pc.presence" in a1.push_types(await a1.drain_pushes(), presence=True)
+    await w1.ok("control.metrics", {"cpu": 12, "memory": 40, "idle_s": 3,
+                                    "foreground": {"program": "EXCEL.EXE", "title": "budget.xlsx - Excel"}})
+    state = await a1.ok("hierarchy.pc_state", {"pc_id": org["w1_pc"]})
+    assert state["online"] is True and state["last_seen_at"] and state["levels"]["cpu"] == 12.0
+    assert state["foreground"] == {"program": "EXCEL.EXE", "title": "budget.xlsx - Excel"}
+    tree = (await a1.ok("hierarchy.tree"))["departments"][0]
+    assert next(w for w in tree["workers"] if w["pc_id"] == org["w1_pc"])["online"] is True
+    entered = (await a1.ok("hierarchy.traverse", {"pc_id": org["w1_pc"], "force": True}))["session"]
+    await a1.ok("hierarchy.end_session", {"session_id": entered["session_id"]})
+
+    await w1.close()
+    for _ in range(50):
+        if org["w1_pc"] not in engine.online_pc_ids():
+            break
+        await asyncio.sleep(0.05)
+    assert await a1.err("hierarchy.traverse", {"pc_id": org["w1_pc"]}) == "unavailable"
+    assert (await a1.ok("hierarchy.pc_state", {"pc_id": org["w1_pc"]}))["last_seen_at"]
+    a2 = await connect("cid-a2")
+    assert await a2.err("hierarchy.pc_state", {"pc_id": org["w1_pc"]}) == "forbidden"
+    assert await su.ok("hierarchy.pc_state", {"pc_id": org["w1_pc"]})
 
 
 async def test_about_admin_reports_reach_the_super_user_only_and_updates_route_by_default(engine, org, connect):

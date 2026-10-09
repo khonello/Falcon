@@ -122,8 +122,10 @@ class Client:
         out, self.pushes = self.pushes, []
         return out
 
-    def push_types(self, pushes: list[Envelope]) -> list[str]:
-        return [p.type for p in pushes if p.type]
+    def push_types(self, pushes: list[Envelope], *, presence: bool = False) -> list[str]:
+        """Push types in order. `pc.presence` (a machine's client came or went) arrives whenever a test
+        connects a worker, so it is left out unless asked for."""
+        return [p.type for p in pushes if p.type and (presence or p.type != "pc.presence")]
 
     async def close(self) -> None:
         self.writer.close()
@@ -140,7 +142,8 @@ async def engine() -> Engine:
     derived from TEST_MASTER_SECRET (see `key_for`)."""
     assert TEST_DB_URL
     eng = Engine(Settings(host="127.0.0.1", port=0, database_url=TEST_DB_URL, dev_plaintext=True,
-                          master_secret=TEST_MASTER_SECRET))
+                          master_secret=TEST_MASTER_SECRET,
+                          refuse_unreachable=False))   # most tests enter machines with no worker running
     await eng.db.connect()
     await _wipe_and_migrate(eng.db)
     await eng.db.close()

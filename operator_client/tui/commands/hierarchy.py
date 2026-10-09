@@ -22,11 +22,27 @@ async def tree(ctx: ShellContext, args: Args) -> str:
         lines.append(f"{d['name']}  (department {d['department_id']})")
         for a in d["admins"]:
             lines.append(f"  ADMIN  {a['name']:<24} account {a['account_id']:<3} pc {a['pc_id']:<3} {a['hostname']:<12} "
-                         f"{_session_line(a['session'])}")
+                         f"{_online(a)} {_session_line(a['session'])}")
         for w in d["workers"]:
             lines.append(f"    WORKER {w['name']:<22} account {w['account_id']:<3} pc {w['pc_id']:<3} {w['hostname']:<12} "
-                         f"{_session_line(w['session'])}")
+                         f"{_online(w)} {_session_line(w['session'])}")
     return "\n".join(lines) or "(no departments)"
+
+
+def _online(a: dict) -> str:
+    return "online " if a.get("online") else "offline"
+
+
+@command("pc", "state", "<pc_id>", "A machine's live state: reachable, last seen, levels, the program in front")
+async def pc_state(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("hierarchy.pc_state", {"pc_id": args.get_int(0, "pc_id")})
+    lv, fg = res["levels"] or {}, res["foreground"] or {}
+    return "\n".join([
+        f"{res['hostname']} (pc {res['pc_id']}): {'online' if res['online'] else 'not reachable'}"
+        + (f", last seen {res['last_seen_at']}" if res["last_seen_at"] else ", never connected"),
+        f"levels: processor {lv['cpu']}%, memory {lv['memory']}%, idle {lv['idle_s']}s (at {lv['at']})" if lv
+        else "levels: none reported since the Engine started",
+        f"in front: {fg['program']} -- {fg['title']}" if fg else "in front: nothing reported"])
 
 
 @command("traverse", usage="<pc_id> [force]",
