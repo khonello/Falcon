@@ -527,3 +527,20 @@ def test_the_windows_notifier_hears_windows_messages():
     finally:
         n.stop()
     assert not n._thread.is_alive()
+
+
+async def test_the_worker_reports_what_runs_and_what_is_installed(engine, org, tmp_path: Path):
+    svc = await _start(engine, tmp_path, "cid-w1", [])
+    admin = await _admin(engine)
+    try:
+        import sys
+
+        async def reported():
+            res = await admin.call("control.programs", {"pc_ids": [org["w1_pc"]]})
+            return res["reporting"] == 1 and (sys.platform != "win32" or len(res["installed"]) > 0)
+        assert await _wait(reported, timeout=15)
+        res = await admin.call("control.programs", {"pc_ids": [org["w1_pc"]]})
+        assert any("python" in r["name"].lower() for r in res["running"])        # this very test process
+    finally:
+        await admin.close()
+        await svc.stop()

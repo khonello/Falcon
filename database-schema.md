@@ -343,6 +343,15 @@ When each reader first opened a report (migration 012), so a board can tell *new
 
 ## 9. Control, Events, Monitoring & Actions
 
+### `pc_programs`
+The programs installed on a machine, as its Worker last reported them (migration 016): what "Start a program" is picked from. What is *running* is kept in memory only (`engine/control/inventory.py`), like the levels.
+
+| Column | Type | Notes |
+|---|---|---|
+| `pc_id` | INTEGER PK FK → pcs.id | One row per machine, replaced on each report |
+| `programs` | JSONB NOT NULL | `[{"name", "command"}]` -- `command` is the program to run, or null when only the name is known |
+| `reported_at` | TIMESTAMP NOT NULL | |
+
 ### `metric_samples`
 A machine's levels over time (migration 013): one row per machine every 10 minutes from `control.metrics`, so `control.levels` can give the rolling 7-day p10–p90 of each metric -- the "typical day" a threshold is drawn against. Never deleted; read by time range only.
 

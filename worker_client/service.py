@@ -21,6 +21,7 @@ from common.connection import ConnectionError_, EngineConnection, EngineError
 from worker_client.config import WorkerConfig
 from worker_client.executor import Executor
 from worker_client.flowsync import FlowSync
+from worker_client.inventory import Inventory
 from worker_client.lockout import Lockout
 from worker_client.ossignals import OsSignals
 from worker_client.signals import Signals
@@ -44,6 +45,7 @@ class WorkerService:
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
         self.ossignals = OsSignals(self.call)
+        self.inventory = Inventory(self.call)
         self._native_watch = native_watch
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
         self.watcher = Watcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
@@ -69,6 +71,7 @@ class WorkerService:
         await self.watcher.start()
         await self.signals.start()
         await self.ossignals.start(native=self._native_watch)
+        await self.inventory.start()
         await self._refresh_tasks()
         if self.config.windows:
             await self._start_tray()
@@ -85,6 +88,7 @@ class WorkerService:
         await self.watcher.stop()
         await self.signals.stop()
         await self.ossignals.stop()
+        await self.inventory.stop()
         await self.updater.stop()
         await self.executor.shutdown()
         if self.conn:

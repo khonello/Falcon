@@ -155,6 +155,17 @@ async def levels(ctx: ShellContext, args: Args) -> str:
                               "processor %": t["cpu"], "memory %": t["memory"], "idle seconds": t["idle_s"]})
 
 
+@command("programs", usage="[pcs=3,4]", help_="What runs and what is installed: pick a program for Close / Start, don't type it")
+async def programs(ctx: ShellContext, args: Args) -> str:
+    pcs = args.opt("pcs")
+    res = await ctx.call("control.programs", {"pc_ids": [int(x) for x in pcs.split(",") if x]} if pcs else {})
+    out = [f"running (on {res['reporting']} of {res['machines']} machines reporting):"]
+    out.append(table(res["running"][:25], ["name", "machines"]) if res["running"] else "  nothing reported yet")
+    out.append("\ninstalled:")
+    out.append(table(res["installed"][:40], ["name", "machines", "command"], width=48) if res["installed"] else "  nothing reported yet")
+    return "\n".join(out)
+
+
 @command("dashboard", help_="Operational view: enabled automations, last fired, recent executions, live runs")
 async def dashboard(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.dashboard")

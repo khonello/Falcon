@@ -36,10 +36,6 @@ part is recorded for later, not built.
    not written: both attempts to write it in this session were stopped by a safety classifier, so it needs to be
    written another way (by hand, or in a session where the writing is not blocked). Until then an automation on
    "is opened" saves and never fires. *Found:* Automation (AU08).
-5. **Nothing to pick programs from** (Actions, AU06). "Close a program" should be picked from what runs (and
-   say "open on 5 machines"), "Start a program" from what is installed on that machine. Today they are typed
-   names. Needs a process/installed-programs inventory from the Worker (a `process_list`-style snapshot kept per
-   machine).
 6. **Rename a file's new name is free text** and `rename_file` runs on every machine the action targets with one
    path; a per-machine path (from `file_index`, by hash or name) would be truer. *Found:* AU06.
 9. **Resources: "where it should be" and "a file's journey"** (RS03) have no data. The first needs files marked
@@ -92,6 +88,16 @@ part is recorded for later, not built.
 
     Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
 ## Done inline (for the record)
+
+- **Programs are picked, not typed** (was #5, done 10 Oct 2026). The Worker reports what runs (the process table
+  grouped by program: name, how many, memory; every minute) and what is installed (Windows' own lists, read from the
+  registry -- the Uninstall keys and App Paths -- with the program to start where it is known; on connect and every
+  six hours): `control.inventory`. `control.programs {pc_ids?}` gives a console both, one row per program with how
+  many machines it is on ("open on 5 machines"), most widespread first, scoped to the caller's department (the Super
+  User: every machine); with one machine named it is exactly what is installed there. Installed programs are kept
+  in `pc_programs` (migration 016); what runs is in memory and refilled within a minute after a restart. TUI:
+  `programs [pcs=..]`. On this machine: 141 running programs, 96 installed (57 with a path to start).
+  *Test:* `test_control_updates.py`, `test_worker_client.py`.
 
 - **Actions that act on the person's screen, and a way to ask for help** (was #4 and #14, done 10 Oct 2026).
   `notify` takes `message` and `stay_s` (0 or absent: stays until the person closes it); `lock_session` takes

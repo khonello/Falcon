@@ -7,7 +7,8 @@ The automation layer. Lives at the Admin interface; Super User traverses in.
                       checked by the Scheduler; fires attached Actions independently
     executions     -- per-run lifecycle: dispatch to worker client, timeout, manual termination, output,
                       Dashboard operational view
+    inventory      -- what runs and what is installed on each machine (pick a program, don't type it)
     custom_actions -- validation of PowerShell/Python scripts (stdlib + Windows-native only)
 """
 
-from engine.control import actions, custom_actions, events, executions  # noqa: F401
+from engine.control import actions, custom_actions, events, executions, inventory  # noqa: F401

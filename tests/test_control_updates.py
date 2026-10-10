@@ -379,3 +379,34 @@ async def test_built_in_actions_take_the_settings_the_design_asks_for(engine, or
     upd = await a1.ok("control.action_update", {"action_id": lock["id"], "params": {"duration_s": 1800}})
     assert upd["action"]["timeout_seconds"] == 1830
     assert await a1.err("control.action_update", {"action_id": lock["id"], "params": {"duration_s": -5}}) == "invalid"
+
+
+async def test_programs_are_picked_from_what_runs_and_what_is_installed(engine, org, connect):
+    a1 = await connect("cid-a1")
+    a2 = await connect("cid-a2")
+    w1 = await connect("cid-w1")
+    w2 = await connect("cid-w2")
+    await w1.ok("control.inventory", {"running": [{"name": "EXCEL.EXE", "count": 2, "memory": 500},
+                                                  {"name": "chrome.exe", "count": 9, "memory": 900}],
+                                      "installed": [{"name": "Microsoft Excel", "command": "C:/Office/EXCEL.EXE"},
+                                                    {"name": "Notepad", "command": None}]})
+    await w2.ok("control.inventory", {"running": [{"name": "excel.exe", "count": 1, "memory": 100}],
+                                      "installed": [{"name": "Microsoft Excel", "command": None}]})
+    res = await a1.ok("control.programs")
+    running = {r["name"].lower(): r for r in res["running"]}
+    assert running["excel.exe"]["machines"] == 2 and sorted(running["excel.exe"]["pc_ids"]) == sorted([org["w1_pc"], org["w2_pc"]])
+    assert running["chrome.exe"]["machines"] == 1 and res["reporting"] == 2
+    assert res["running"][0]["name"].lower() == "excel.exe"                       # most widespread first
+    excel = next(i for i in res["installed"] if i["name"] == "Microsoft Excel")
+    assert excel["machines"] == 2 and excel["command"] == "C:/Office/EXCEL.EXE"   # a command found anywhere is kept
+    # one machine: only what is installed there
+    one = await a1.ok("control.programs", {"pc_ids": [org["w1_pc"]]})
+    assert sorted(i["name"] for i in one["installed"]) == ["Microsoft Excel", "Notepad"]
+    # scope: HR's Admin sees none of Finance's machines; a worker may not ask at all
+    assert (await a2.ok("control.programs"))["running"] == []
+    assert await a2.err("control.programs", {"pc_ids": [org["w1_pc"]]}) == "forbidden"
+    assert await w1.err("control.programs") == "forbidden"
+    # the list is replaced, never grown; junk is dropped
+    await w1.ok("control.inventory", {"running": [{"name": ""}, "junk", {"name": "calc.exe"}]})
+    assert [r["name"] for r in (await a1.ok("control.programs", {"pc_ids": [org["w1_pc"]]}))["running"]] == ["calc.exe"]
+    assert len((await a1.ok("control.programs", {"pc_ids": [org["w1_pc"]]}))["installed"]) == 2   # untouched

@@ -62,9 +62,10 @@ class Engine:
         # In-memory registries (offers, transfers, live outputs, polled state) belong to one
         # Engine process; a fresh Engine starts clean.
         from engine.control import executions as control_executions
+        from engine.control import inventory as control_inventory
         from engine.hierarchy import assisted_access
 
-        for mod in (control_events, control_executions, flow_sync, assisted_access):
+        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
 

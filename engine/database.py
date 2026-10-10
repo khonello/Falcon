@@ -960,6 +960,16 @@ _HAS_IMAGE = "EXISTS (SELECT 1 FROM execution_images i WHERE i.execution_id = e.
 
 
 class ControlRepo(_Repo):
+    # -- installed programs (migration 016) --------------------------------------------------------
+
+    async def save_programs(self, pc_id: int, programs: list[dict[str, Any]]) -> None:
+        await self._exec(
+            "INSERT INTO pc_programs (pc_id, programs) VALUES ($1, $2) "
+            "ON CONFLICT (pc_id) DO UPDATE SET programs = EXCLUDED.programs, reported_at = now()", pc_id, programs)
+
+    async def programs_for(self, pc_ids: list[int]) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT pc_id, programs, reported_at FROM pc_programs WHERE pc_id = ANY($1::int[])", pc_ids)
+
     # -- levels over time --------------------------------------------------------------------------
 
     async def add_metric_sample(self, pc_id: int, cpu: float, memory: float, idle_s: float) -> None:
