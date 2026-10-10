@@ -36,10 +36,6 @@ part is recorded for later, not built.
    not written: both attempts to write it in this session were stopped by a safety classifier, so it needs to be
    written another way (by hand, or in a session where the writing is not blocked). Until then an automation on
    "is opened" saves and never fires. *Found:* Automation (AU08).
-9. **Resources: "where it should be" and "a file's journey"** (RS03) have no data. The first needs files marked
-   as required on every worker machine and presence per machine (by content hash); the second a per-file history
-   (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
-   out of the page until then.
 15. **Register machines from the local network instead of typing them** (the user's idea, 27 Sep 2026). Today a
     machine is registered by typing its name (`hierarchy.account_create`), and its client id + key are copied onto it
     by hand. The idea: a small installer on each machine stores who it is meant to be (its name, department, level --
@@ -65,6 +61,18 @@ part is recorded for later, not built.
       then writes the key to its config and connects normally. UI: the waiting list replaces "Register a machine"'s
       typed name (the dialog keeps working as the fallback). *Raised:* by the user, after the dialogs (DG01).
 ## Done inline (for the record)
+
+- **A file's journey** (was #9, done 10 Oct 2026; the user decided: the journey only, not "required on every machine").
+  `resource.journey {file_index_id}` follows a file by its CONTENT (the hash), because a copy has another path and
+  sits on another machine, and returns its places and a timeline, oldest first: `first_seen` and `copied` (each place
+  the same content was indexed, by when it first appeared there -- the index now keeps `first_seen_at`, migration
+  018), `tagged` (audit, with who), `flagged` and `owner_told` (a Restricted File Tracking violation, and the person
+  told), `resolved` (audit, with who) and `synced` / `conflict` (the flow sync log: a flow carried it to a machine, or an
+  outside edit was in the way). Each event has a plain sentence. The Super User sees everything; an Admin only what
+  happened on their own department's machines (a file with no place in it is "not found" to them); names are the
+  caller's. Workers may not ask. TUI: `journey <file_index_id>`. Not covered: a rename or move is not a recorded event
+  (a moved file is a new place with the same content). *Test:* `test_resource_assistance.py::test_a_files_journey_follows_its_content_and_stays_in_scope`,
+  `test_operator_client.py::test_scripted_file_journey`.
 
 - **Department tasks** (was #16, done 10 Oct 2026). A different thing from an Admin's task to a Worker (which keeps its
   checks; the old `task.propose`/`task.create` now refuse a Super User and point here). `task.dept_create

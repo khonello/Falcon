@@ -148,3 +148,53 @@ async def test_a_person_can_ask_who_they_may_ask_for_help(engine, org, connect):
     assert (await su.ok("assistance.my_admins"))["admins"] == []
     ping = await w1.ok("assistance.ping", {"to_account_id": org["a1"]})
     assert ping["ping_id"]
+
+
+async def test_a_files_journey_follows_its_content_and_stays_in_scope(engine, org, connect):
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")
+    a2 = await connect("cid-a2")
+    w1 = await connect("cid-w1")
+    w2 = await connect("cid-w2")
+    r = await a1.ok("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/salaries.xlsx", "hash": "SECRET"}})
+    origin = r["file_index_id"]
+    await su.ok("resource.tag", {"file_index_id": origin, "tag": "restricted"})
+    copy = await w1.ok("index.event", {"event": {"op": "copy", "path": "C:/Downloads/salaries-copy.xlsx", "hash": "SECRET"}})
+    violation = (await w1.ok("resource.violations"))["violations"][0]
+    await w1.ok("resource.resolve", {"violation_id": violation["id"]})
+    await a2.ok("index.event", {"event": {"op": "copy", "path": "C:/Users/hr/Desktop/sal.xlsx", "hash": "SECRET"}})
+    # a flow carried it to FIN-02 (the sync log is what a flow writes; here it is written directly)
+    pool = engine.db.pool
+    flow = await pool.fetchval("INSERT INTO flows (created_by_account_id, source_pc_id, source_path, consent_status) "
+                               "VALUES ($1, $2, 'C:/out', 'not_required') RETURNING id", org["a1"], org["a1_pc"])
+    dest = await pool.fetchval("INSERT INTO flow_destinations (flow_id, destination_pc_id, destination_path, owner_account_id, "
+                               "pre_flight_check_status) VALUES ($1, $2, 'D:/inbox', $3, 'passed') RETURNING id",
+                               flow, org["w2_pc"], org["w2"])
+    await pool.execute("INSERT INTO flow_sync_log (flow_destination_id, content_hash, written_by, written_path) "
+                       "VALUES ($1, 'SECRET', 'flow_sync', 'D:/inbox/salaries.xlsx')", dest)
+
+    # The Super User sees the whole journey, oldest first, from any copy of the file
+    full = await su.ok("resource.journey", {"file_index_id": copy["file_index_id"]})
+    kinds = [e["kind"] for e in full["events"]]
+    assert kinds[0] == "first_seen" and full["events"][0]["hostname"] == "FIN-ADM"
+    assert {"copied", "tagged", "flagged", "owner_told", "resolved", "synced"} <= set(kinds)
+    assert kinds.index("flagged") < kinds.index("owner_told") < kinds.index("resolved")
+    assert [e["at"] for e in full["events"]] == sorted(e["at"] for e in full["events"])
+    assert {p["hostname"] for p in full["places"]} == {"FIN-ADM", "FIN-01", "HR-ADM"}
+    tagged = next(e for e in full["events"] if e["kind"] == "tagged")
+    assert tagged["who"] and "restricted" in tagged["text"]
+    assert next(e for e in full["events"] if e["kind"] == "synced")["hostname"] == "FIN-02"
+    assert next(e for e in full["events"] if e["kind"] == "owner_told")["who"]            # who was told, as the caller names them
+
+    # An Admin sees only their own department's machines: Finance does not read HR's copy, HR does not read Finance's
+    fin = await a1.ok("resource.journey", {"file_index_id": origin})
+    assert {p["hostname"] for p in fin["places"]} == {"FIN-ADM", "FIN-01"}
+    assert "HR-ADM" not in {e["hostname"] for e in fin["events"]}
+    hr = await a2.ok("resource.journey", {"file_index_id": origin})
+    assert {p["hostname"] for p in hr["places"]} == {"HR-ADM"} and all(e["hostname"] == "HR-ADM" for e in hr["events"])
+    # a file with no place in the Admin's department is not theirs to read; a worker may not ask at all
+    lone = await a1.ok("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/only-fin.docx", "hash": "ONLY"}})
+    assert await a2.err("resource.journey", {"file_index_id": lone["file_index_id"]}) == "not_found"
+    assert await a1.err("resource.journey", {"file_index_id": 99999}) == "not_found"
+    assert await w2.err("resource.journey", {"file_index_id": origin}) == "forbidden"
+    assert len((await a1.ok("resource.journey", {"file_index_id": lone["file_index_id"]}))["events"]) == 1

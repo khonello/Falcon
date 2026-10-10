@@ -116,6 +116,7 @@ The single shared index consumed by Task (Verification, collision checks), Flow 
 | `resource_tag_scope_department_id` | INTEGER FK → departments.id, NULLABLE | Only meaningful when `resource_tag = 'worker_dept'` |
 | `indexed_via` | TEXT NOT NULL CHECK (`indexed_via` IN ('event','idle_sweep')) | Which of the two population mechanisms recorded this entry (Implementation Spec §6.2) |
 | `last_seen_at` | TIMESTAMP NOT NULL | |
+| `first_seen_at` | TIMESTAMP NOT NULL DEFAULT now() | When the index first saw the file where it is; set once, never changed by later events (migration 018) -- what a file's journey is ordered by |
 | UNIQUE(`pc_id`, `path`) | | |
 
 ---

@@ -405,7 +405,7 @@ class SessionsRepo(_Repo):
 
 class FileIndexRepo(_Repo):
     _COLS = ("id, pc_id, path, filename, content_hash, resource_tag, resource_tag_scope_department_id, "
-             "indexed_via, last_seen_at")
+             "indexed_via, last_seen_at, first_seen_at")
 
     async def upsert(self, pc_id: int, path: str, filename: str, content_hash: str | None,
                      resource_tag: str | None, scope_department_id: int | None,
@@ -432,6 +432,13 @@ class FileIndexRepo(_Repo):
         return await self._fetch(
             f"SELECT {self._COLS} FROM file_index WHERE lower(filename) = lower($1) "
             "AND ($2::int[] IS NULL OR pc_id = ANY($2)) ORDER BY pc_id, path", filename, pc_ids)
+
+    async def same_content(self, file_index_id: int) -> list[dict[str, Any]]:
+        """Every place the same content has been indexed (this row included), earliest first -- the places a file's
+        journey is made of. A file with no hash yet is only itself."""
+        return await self._fetch(
+            f"SELECT {self._COLS} FROM file_index WHERE id = $1 OR (content_hash IS NOT NULL AND content_hash = "
+            "(SELECT content_hash FROM file_index WHERE id = $1)) ORDER BY first_seen_at, id", file_index_id)
 
     async def folders(self, pc_id: int, limit: int = 500) -> list[dict[str, Any]]:
         """The folders the index knows on one machine, each with how many files it holds -- what a person picks from
@@ -830,6 +837,15 @@ class FlowsRepo(_Repo):
         if not pc_ids:
             return {}
         return {r["id"]: r["hostname"] for r in await self._fetch("SELECT id, hostname FROM pcs WHERE id = ANY($1::int[])", pc_ids)}
+
+    async def syncs_for_content(self, content_hash: str) -> list[dict[str, Any]]:
+        """Every time a flow carried this content: which flow, to which machine and path, and whether an outside
+        edit was in the way."""
+        return await self._fetch(
+            "SELECT l.id, l.written_by, l.written_by_account_id, l.conflict_resolved, l.occurred_at, l.written_path, "
+            "d.flow_id, d.destination_pc_id, d.destination_path, f.source_pc_id, f.source_path "
+            "FROM flow_sync_log l JOIN flow_destinations d ON d.id = l.flow_destination_id "
+            "JOIN flows f ON f.id = d.flow_id WHERE l.content_hash = $1 ORDER BY l.occurred_at, l.id", content_hash)
 
     async def history(self, flow_id: int, limit: int = 200) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -1267,6 +1283,13 @@ class AuditRepo(_Repo):
             "AND ($3::text IS NULL OR action_type LIKE $3 || '%') ORDER BY occurred_at DESC LIMIT $1",
             limit, actor_account_id, action_prefix)
 
+    async def for_targets(self, target_type: str, target_ids: list[str], action_types: list[str]) -> list[dict[str, Any]]:
+        """Audit rows about given targets of given kinds, oldest first (target ids are stored as text)."""
+        return await self._fetch(
+            "SELECT id, actor_account_id, action_type, target_type, target_id, detail, occurred_at FROM audit_log "
+            "WHERE target_type = $1 AND target_id = ANY($2::text[]) AND action_type = ANY($3::text[]) "
+            "ORDER BY occurred_at, id", target_type, target_ids, action_types)
+
     async def write_deviation(self, entry: dict[str, Any]) -> int:
         return await self._val(
             "INSERT INTO deviation_log (expectation, observed_account_id, observed_pc_id, detail, "
@@ -1409,6 +1432,11 @@ class ResourceRepo(_Repo):
             "SELECT v.*, f.path, f.filename, p.department_id FROM resource_violations v "
             "JOIN file_index f ON f.id = v.file_index_id JOIN pcs p ON p.id = v.found_on_pc_id WHERE v.id = $1",
             violation_id)
+
+    async def violations_for_files(self, file_index_ids: list[int]) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT v.*, p.hostname, p.department_id FROM resource_violations v JOIN pcs p ON p.id = v.found_on_pc_id "
+            "WHERE v.file_index_id = ANY($1::int[]) ORDER BY v.detected_at", file_index_ids)
 
     async def list_violations(self, *, department_id: int | None = None, account_id: int | None = None,
                               unresolved_only: bool = True) -> list[dict[str, Any]]:

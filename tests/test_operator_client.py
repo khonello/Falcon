@@ -221,3 +221,20 @@ async def test_scripted_department_task(engine, org, tmp_path: Path):
     back = await run_script(_cfg(engine, tmp_path, "cid-su"), [
         "connect", "dtask reopen 1 The 2024 folder is still missing", "dtask 1", "dtask complete 1"])
     assert "ongoing" in back[1] and "2024 folder" in back[2] and "complete" in back[3]
+
+
+async def test_scripted_file_journey(engine, org, tmp_path: Path):
+    a1 = await engine_event(engine, org)
+    out = await run_script(_cfg(engine, tmp_path, "cid-su"), ["connect", f"journey {a1}"])
+    assert "salaries.xlsx" in out[1] and "first_seen" in out[1] and "First known on FIN-ADM" in out[1]
+
+
+async def engine_event(engine, org) -> int:
+    conn = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"))
+    await conn.connect()
+    try:
+        res = await conn.call("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/salaries.xlsx",
+                                                          "hash": "SECRET"}})
+        return res["file_index_id"]
+    finally:
+        await conn.close()

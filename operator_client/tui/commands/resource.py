@@ -32,3 +32,13 @@ async def tag(ctx: ShellContext, args: Args) -> str:
 async def shelves(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("resource.shelves")
     return "\n".join(f"{s['folder']:<12} {s['files']} file(s)" for s in res["shelves"])
+
+
+@command("journey", usage="<file_index_id>",
+         help_="A file's journey: where its content has been and what was done about it, oldest first")
+async def journey(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("resource.journey", {"file_index_id": args.get_int(0, "file_index_id")})
+    f = res["file"]
+    head = f"{f['filename']}  (tag: {f['tag'] or 'none'})  on {len(res['places'])} place(s)"
+    lines = [f"{e['at'][:16].replace('T', ' ')}  {e['kind']:<10} {e['text']}" for e in res["events"]]
+    return "\n".join([head, ""] + lines)
