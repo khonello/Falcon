@@ -208,3 +208,16 @@ def test_deadline_phrases_resolve_mechanically():
     assert resolve_phrase("2026-10-01T09:00:00+00:00", now) == datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)
     assert resolve_phrase("by Monday or Wednesday", now) is None
     assert resolve_phrase("when you can", now) is None
+
+
+async def test_scripted_department_task(engine, org, tmp_path: Path):
+    su = await run_script(_cfg(engine, tmp_path, "cid-su"), [
+        "connect", f"dtask give {org['fin']} due=2099-01-02T17:00 Move the tender files to the archive", "dtasks"])
+    assert su[1].startswith("task 1 'Move the tender files to the archive' for Finance: told") and "told 1 Admin(s)" in su[1]
+    admin = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+        "connect", "dtasks", "dtask mark 1 seen", "dtask mark 1 done", "dtask 1"])
+    assert "1 not yet seen by you" in admin[1]
+    assert "you: seen" in admin[2] and "you: done" in admin[3] and "done" in admin[4]
+    back = await run_script(_cfg(engine, tmp_path, "cid-su"), [
+        "connect", "dtask reopen 1 The 2024 folder is still missing", "dtask 1", "dtask complete 1"])
+    assert "ongoing" in back[1] and "2024 folder" in back[2] and "complete" in back[3]

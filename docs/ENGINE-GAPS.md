@@ -64,28 +64,21 @@ part is recorded for later, not built.
       the pre-auth gate in `connection.py`. Worker: an `--enroll` first-run mode that requests, shows the code, waits,
       then writes the key to its config and connects normally. UI: the waiting list replaces "Register a machine"'s
       typed name (the dialog keeps working as the fallback). *Raised:* by the user, after the dialogs (DG01).
-16. **Department tasks from the Super User have no checks, and can go to several Admins** (the user, 2 Oct 2026).
-    Today `task.create` from a Super User needs one Admin account (`engine/task/tasks.py:45`) and carries
-    a verification stack like any task. The decision is that a Super User's task is given to a **department**,
-    with a **deadline** and **no checks and no expectations**, because such work is rarely a file or a program.
-    - **Who is told:** every Admin in the department by default, or only the ones the Super User picks.
-    - **What each of them does:** marks it *seen*, *ongoing* or *done*. The task stands at the furthest any of
-      them has got.
-    - **Who closes it:** only the Super User who gave it calls it complete, or sends it back as ongoing with a
-      note that every Admin on it sees.
-
-    Needs:
-    - a `department_tasks` row (department, title, deadline, assigner, created, completed) and a
-      `department_task_admins` row per Admin told (state, state time). The state time is the record of when it
-      was seen.
-    - handlers `task.dept_create`, `task.dept_mark {seen|ongoing|done}` (Admin, own row only),
-      `task.dept_complete` / `task.dept_reopen` (the assigner only), and `task.dept_list`
-    - a push to each Admin told, which the console turns into the strip across every page until they mark it
-      seen
-    - the soft/final deadline events reused with the one deadline
-
-    Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
 ## Done inline (for the record)
+
+- **Department tasks** (was #16, done 10 Oct 2026). A different thing from an Admin's task to a Worker (which keeps its
+  checks; the old `task.propose`/`task.create` now refuse a Super User and point here). `task.dept_create
+  {department_id, title, deadline_at, admin_ids?}` tells every Admin in the department, or only the ones picked
+  (a department with no Admin is refused); `task.dept_mark {task_id, state: seen|ongoing|done}` is an Admin's own row
+  only; the task *stands at* the furthest any Admin has got; `task.dept_complete` and `task.dept_reopen {note}` are the
+  Super User who gave it only (reopen sends everyone who had finished back to ongoing, and every Admin on it gets the
+  note); `task.dept_list` (the Super User: all; an Admin: the ones they were told, their own row only, and `unseen`
+  for the strip across every page until they mark it seen) and `task.dept_get`. Pushes: `task.dept_assigned`,
+  `task.dept_updated` (to the Super User), `task.dept_completed`, `task.dept_reopened`, `task.dept_deadline`. The one
+  deadline is armed on create and on Engine start, and fires the `task.deadline_final` event (data `dept_task_id`).
+  Tables `department_tasks`, `department_task_admins`, `department_task_notes` (migration 017). TUI: `dtask give|mark|
+  complete|reopen`, `dtasks`, `dtask <id>`. *Test:* `test_task.py::test_a_department_task_is_not_an_admins_task`,
+  `test_operator_client.py::test_scripted_department_task`.
 
 - **A file action finds its file on each machine** (was #6, done 10 Oct 2026). `rename_file`, `restore_file` and
   `snapshot_file` name their file one of three ways: `path` (the same path on every machine, as before),

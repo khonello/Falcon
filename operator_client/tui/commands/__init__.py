@@ -3,6 +3,7 @@
 from operator_client.tui.commands import (  # noqa: F401
     assistance,
     control,
+    dept_tasks,
     flow,
     hierarchy,
     reports,

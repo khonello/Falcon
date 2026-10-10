@@ -255,14 +255,14 @@ async def test_deadline_fires_as_event_and_pushes_indicator(engine, org, connect
     assert audit and audit[0]["target_id"] == str(res["task"]["id"])
 
 
-async def test_super_user_assigns_to_admin_only(engine, org, connect):
+async def test_the_super_user_gives_departments_tasks_not_admin_style_ones(engine, org, connect):
+    """Tasks with checks go from an Admin to a Worker. The Super User gives a department a task instead
+    (task.dept_create, tested in test_a_department_task_is_not_an_admins_task), so the old call refuses them."""
     su = await connect("cid-su")
-    assert await su.err("task.create", {"assignee_account_id": org["w1"], "description": "x",
-                                        "verification_mode": "none", "confirm_none": True}) == "forbidden"
-    res = await su.ok("task.create", {"assignee_account_id": org["a1"], "description": "department task",
-                                      "verification_mode": "none", "confirm_none": True})
-    assert res["task"]["assignee_account_id"] == org["a1"]
-    assert len((await su.ok("task.list"))["tasks"]) == 1
+    for assignee in (org["w1"], org["a1"]):
+        assert await su.err("task.create", {"assignee_account_id": assignee, "description": "x",
+                                            "verification_mode": "none", "confirm_none": True}) == "forbidden"
+    assert (await su.ok("task.list"))["tasks"] == []
 
 
 async def test_folders_are_offered_to_pick_never_typed(engine, org, connect):
@@ -277,3 +277,75 @@ async def test_folders_are_offered_to_pick_never_typed(engine, org, connect):
     assert by["C:/docs/q3"]["files"] == 2 and by["C:/docs/q3"]["name"] == "q3" and "C:/raw" in by
     a2 = await connect("cid-a2")
     assert await a2.err("index.folders", {"pc_id": org["w1_pc"]}) == "forbidden"
+
+
+async def test_a_department_task_is_not_an_admins_task(engine, org, connect):
+    """The Super User gives a department a task: no checks, one deadline, a state per Admin told, the task standing
+    at the furthest any has got, and only the Super User closes it or sends it back. Admin -> Worker tasks keep theirs."""
+    from datetime import datetime, timedelta, timezone
+
+    acc = engine.db.accounts
+    pc = await acc.create_pc("FIN-ADM2", org["fin"], "admin_workstation", "cid-a1b")
+    a1b = await acc.create("admin", org["fin"], pc)
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")
+    a1_2 = await connect("cid-a1b")
+    a2 = await connect("cid-a2")
+    due = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+
+    # the old call is for an Admin's task to a Worker; the Super User gives a department a task instead
+    assert await su.err("task.propose", {"description": "d", "assignee_account_id": org["a1"]}) == "forbidden"
+    for bad in ({"department_id": org["fin"], "title": "x"}, {"department_id": 999, "title": "x", "deadline_at": due},
+                {"department_id": org["fin"], "title": "  ", "deadline_at": due},
+                {"department_id": org["fin"], "title": "x", "deadline_at": due, "admin_ids": [org["a2"]]}):
+        assert await su.err("task.dept_create", bad) in ("invalid", "not_found"), bad
+    assert await a1.err("task.dept_create", {"department_id": org["fin"], "title": "x", "deadline_at": due}) == "forbidden"
+
+    made = await su.ok("task.dept_create", {"department_id": org["fin"], "title": "Move last year's tender files to the archive",
+                                            "deadline_at": due})
+    task = made["task"]
+    assert task["told"] == 2 and task["standing"] == "told" and {a["state"] for a in task["admins"]} == {"told"}
+    for w in (a1, a1_2):
+        assert "task.dept_assigned" in w.push_types(await w.drain_pushes())
+    assert a2.push_types(await a2.drain_pushes()) == []                          # HR's Admin is not told
+
+    # an Admin sees the task and only their own row; the strip counts what is unseen
+    mine = await a1.ok("task.dept_list")
+    assert mine["unseen"] == 1 and [t["id"] for t in mine["tasks"]] == [task["id"]]
+    assert [a["account_id"] for a in mine["tasks"][0]["admins"]] == [org["a1"]]
+    assert (await a2.ok("task.dept_list"))["tasks"] == [] and await a2.err("task.dept_get", {"task_id": task["id"]}) == "not_found"
+
+    # marking: own row only, the task stands at the furthest any Admin has got
+    assert await a2.err("task.dept_mark", {"task_id": task["id"], "state": "seen"}) == "not_found"
+    assert await a1.err("task.dept_mark", {"task_id": task["id"], "state": "told"}) == "invalid"
+    seen = (await a1.ok("task.dept_mark", {"task_id": task["id"], "state": "seen"}))["task"]
+    assert seen["my_state"] == "seen" and seen["standing"] == "seen"
+    assert (await a1.ok("task.dept_list"))["unseen"] == 0
+    upd = [p for p in await su.drain_pushes() if p.type == "task.dept_updated"]
+    assert upd and upd[0].payload["state"] == "seen"
+    await a1_2.ok("task.dept_mark", {"task_id": task["id"], "state": "done"})
+    assert (await a1.ok("task.dept_get", {"task_id": task["id"]}))["task"]["standing"] == "done"     # the furthest
+    seen_by_su = (await su.ok("task.dept_get", {"task_id": task["id"]}))["task"]
+    assert sorted(a["state"] for a in seen_by_su["admins"]) == ["done", "seen"] and all(a["seen_at"] for a in seen_by_su["admins"])
+
+    # only the Super User who gave it closes or reopens it; an Admin saying done does not close it
+    assert await a1.err("task.dept_complete", {"task_id": task["id"]}) == "forbidden"
+    back = (await su.ok("task.dept_reopen", {"task_id": task["id"], "note": "The 2024 folder is still missing."}))["task"]
+    assert back["standing"] == "seen" or back["standing"] == "ongoing"
+    assert sorted(a["state"] for a in back["admins"]) == ["ongoing", "seen"]       # the one who was done is ongoing again
+    for w in (a1, a1_2):
+        sent = [p for p in await w.drain_pushes() if p.type == "task.dept_reopened"]
+        assert sent and "2024 folder" in sent[0].payload["note"]                   # every Admin on it sees the note
+    assert (await a1.ok("task.dept_get", {"task_id": task["id"]}))["task"]["notes"][0]["text"].startswith("The 2024")
+    assert await su.err("task.dept_reopen", {"task_id": task["id"], "note": " "}) == "invalid"
+    done = (await su.ok("task.dept_complete", {"task_id": task["id"]}))["task"]
+    assert done["standing"] == "complete" and done["completed_at"]
+    assert "task.dept_completed" in a1.push_types(await a1.drain_pushes())
+    assert await a1.err("task.dept_mark", {"task_id": task["id"], "state": "done"}) == "conflict"
+    assert (await su.ok("task.dept_list"))["tasks"] == [] and len((await su.ok("task.dept_list", {"include_completed": True}))["tasks"]) == 1
+
+    # told only some: the Super User picks
+    one = (await su.ok("task.dept_create", {"department_id": org["fin"], "title": "Count the licences", "deadline_at": due,
+                                            "admin_ids": [a1b]}))["task"]
+    assert one["told"] == 1 and (await a1.ok("task.dept_list"))["tasks"] == []
+    assert [t["id"] for t in (await a1_2.ok("task.dept_list"))["tasks"]] == [one["id"]]

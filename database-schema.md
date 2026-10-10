@@ -179,6 +179,17 @@ Soft signals, per target — deliberately a separate table from `verification_it
 
 ---
 
+### Department tasks (migration 017)
+What the Super User gives a **department** -- a different thing from the Admin → Worker `tasks` above, which keep their verification stack. No checks and no expectations (such work is rarely a file or a program), one deadline, a state per Admin told. The task *stands at* the furthest any Admin has got; only the Super User who gave it completes it or sends it back.
+
+**`department_tasks`**: `id`, `department_id` FK, `assigner_account_id` FK (the Super User), `title`, `deadline_at`, `created_at`, `completed_at` NULLABLE.
+
+**`department_task_admins`** (PK `task_id`, `account_id`): one row per Admin told. `state` ∈ told / seen / ongoing / done, `state_at` (when it last changed), `seen_at` (the first time it was marked at all -- the record of when it was seen).
+
+**`department_task_notes`**: `id`, `task_id`, `by_account_id`, `text`, `at` -- the notes sent with a task going back; every Admin on it sees them.
+
+---
+
 ## 5. Flow
 
 ### `flows`

@@ -27,7 +27,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 # Legal targets for polymorphic references. Extend deliberately, never ad hoc.
 POLYMORPHIC_TABLES = frozenset({
     "accounts", "departments", "pcs", "sessions", "assisted_access_requests", "file_index",
-    "tasks", "verification_items", "manual_verifications", "flows", "flow_destinations",
+    "tasks", "department_tasks", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts",
@@ -69,6 +69,7 @@ class Database:
         self.sessions = SessionsRepo(self)
         self.file_index = FileIndexRepo(self)
         self.tasks = TasksRepo(self)
+        self.department_tasks = DepartmentTasksRepo(self)
         self.flows = FlowsRepo(self)
         self.reports = ReportsRepo(self)
         self.assistance = AssistanceRepo(self)
@@ -612,6 +613,72 @@ class TasksRepo(_Repo):
 # ============================================================================================
 # 5. Flow
 # ============================================================================================
+
+class DepartmentTasksRepo(_Repo):
+    """Tasks the Super User gives a department (migration 017): no checks, one deadline, a state per Admin told."""
+
+    async def create(self, department_id: int, assigner_id: int, title: str, deadline_at: datetime,
+                     admin_ids: list[int]) -> int:
+        async with self.pool.acquire() as conn, conn.transaction():
+            task_id = await conn.fetchval(
+                "INSERT INTO department_tasks (department_id, assigner_account_id, title, deadline_at) "
+                "VALUES ($1, $2, $3, $4) RETURNING id", department_id, assigner_id, title, deadline_at)
+            for admin_id in admin_ids:
+                await conn.execute(
+                    "INSERT INTO department_task_admins (task_id, account_id) VALUES ($1, $2)", task_id, admin_id)
+            return task_id
+
+    async def get(self, task_id: int) -> dict[str, Any] | None:
+        return await self._one(
+            "SELECT t.*, d.name AS department_name FROM department_tasks t "
+            "JOIN departments d ON d.id = t.department_id WHERE t.id = $1", task_id)
+
+    async def list(self, *, department_id: int | None = None, account_id: int | None = None,
+                   include_completed: bool = False) -> list[dict[str, Any]]:
+        """Newest first. `account_id` limits to the tasks that Admin was told."""
+        return await self._fetch(
+            "SELECT t.*, d.name AS department_name FROM department_tasks t "
+            "JOIN departments d ON d.id = t.department_id "
+            "WHERE ($1::int IS NULL OR t.department_id = $1) "
+            "AND ($2::int IS NULL OR EXISTS (SELECT 1 FROM department_task_admins a "
+            "                                WHERE a.task_id = t.id AND a.account_id = $2)) "
+            "AND ($3 OR t.completed_at IS NULL) ORDER BY t.created_at DESC, t.id DESC",
+            department_id, account_id, include_completed)
+
+    async def admins(self, task_ids: list[int]) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT a.task_id, a.account_id, a.state, a.state_at, a.seen_at FROM department_task_admins a "
+            "WHERE a.task_id = ANY($1::int[]) ORDER BY a.task_id, a.account_id", task_ids)
+
+    async def mark(self, task_id: int, account_id: int, state: str) -> bool:
+        """The Admin's own row only. First `seen` is remembered. False if that Admin was not told."""
+        status = await self._exec(
+            "UPDATE department_task_admins SET state = $3, state_at = now(), seen_at = COALESCE(seen_at, now()) "
+            "WHERE task_id = $1 AND account_id = $2", task_id, account_id, state)
+        return status.endswith("1")
+
+    async def complete(self, task_id: int) -> None:
+        await self._exec("UPDATE department_tasks SET completed_at = now() WHERE id = $1", task_id)
+
+    async def send_back(self, task_id: int, by_account_id: int, note: str) -> None:
+        """Open again (if it was completed), every Admin who had finished is ongoing again, and the note is kept."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            await conn.execute("UPDATE department_tasks SET completed_at = NULL WHERE id = $1", task_id)
+            await conn.execute(
+                "UPDATE department_task_admins SET state = 'ongoing', state_at = now() "
+                "WHERE task_id = $1 AND state = 'done'", task_id)
+            await conn.execute(
+                "INSERT INTO department_task_notes (task_id, by_account_id, text) VALUES ($1, $2, $3)",
+                task_id, by_account_id, note)
+
+    async def notes(self, task_ids: list[int]) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT id, task_id, by_account_id, text, at FROM department_task_notes "
+            "WHERE task_id = ANY($1::int[]) ORDER BY at, id", task_ids)
+
+    async def open_tasks(self) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM department_tasks WHERE completed_at IS NULL")
+
 
 class FlowsRepo(_Repo):
     async def create(self, flow: dict[str, Any], destinations: list[dict[str, Any]],
