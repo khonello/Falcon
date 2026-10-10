@@ -12,6 +12,10 @@ on by hand. Windows keeps services out of the signed-in person's desktop (sessio
 screen or capture it -- the lock overlay, messages, screenshots -- runs as the Worker's helper windows, started by the
 service inside that person's session.
 
+**Packaging and installation are on hold** (the user, 10 Oct 2026): nothing here starts them until the project is given
+a clear green flag (PHASES.md, Phase 9). Where an item below mentions the service, the session or an installer, that
+part is recorded for later, not built.
+
 ## Open
 
 1. **OS signals from the Worker: native for drives, sign-ins and the network; programs still compared** (9-10 Oct

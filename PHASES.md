@@ -236,6 +236,11 @@ Known gaps, all deliberate and written down in `docs/UI-COMPONENTS.md`:
 
 ## Phase 9 — Packaging and deployment (after Phase 8)
 
+> **On hold (the user, 10 Oct 2026): nothing in this phase starts -- no installers, no frozen exes, no service install,
+> no bundled interpreter -- until the project is given a clear green flag.** The Engine work in `docs/ENGINE-GAPS.md`
+> carries on first. Items there that only packaging can finish (the Worker's windows, tray, screenshot and foreground
+> reader running inside the signed-in person's session under a Windows service) are recorded, not started.
+
 - [ ] Worker Client: bundled pinned interpreter + frozen service (spec 4.3), installed as a Windows service; the install package carries the derived key + pinned cert from Phase 5
 - [ ] Worker Overlay exe + Dialog exe frozen with the same toolchain (designed in Phase 7)
 - [ ] Remote mouse/keyboard during traversal (input channel Engine ↔ Worker; deferred from Phase 4)
