@@ -14,15 +14,18 @@ service inside that person's session.
 
 ## Open
 
-1. **OS signals from the Worker: all built except a file being opened** (9-10 Oct 2026; was "relays no OS signals").
-   Built and tested: the Engine tells a machine which signals its automations wait for (`control.signal_interest`,
-   and `control.interest_changed` when one is created, changed or disabled); `worker_client/ossignals.py` watches
-   only those and relays them through `control.signal`: `usb.inserted/removed` (removable drives),
-   `network.connected/disconnected` (interfaces up or down), `program.launched/exited` (the process table, with a
-   program match applied on the Worker so nothing is sent that would be dropped) and `user.login/logout` (signed-in
-   sessions). Each is the difference between two looks a few seconds apart; the first look is only a baseline. Open:
-   the same signals from native Windows notifications (instant instead of every 3 s), and **#2 below**.
-   *Found:* Automation (AU08), 27 Sep 2026.
+1. **OS signals from the Worker: native for drives, sign-ins and the network; programs still compared** (9-10 Oct
+   2026). Built and tested: the Engine tells a machine which signals its automations wait for
+   (`control.signal_interest`, and `control.interest_changed` when one is created, changed or disabled);
+   `worker_client/ossignals.py` watches only those and relays them through `control.signal`:
+   `usb.inserted/removed`, `network.connected/disconnected`, `program.launched/exited` (a program match is applied on
+   the Worker) and `user.login/logout`. Each signal is the difference between two looks; the first is a baseline.
+   **Native:** `worker_client/winnotify.py` (ctypes) is a hidden message window that Windows tells when a drive or
+   volume arrives or leaves and when anyone signs in, out or locks, plus `NotifyIpInterfaceChange` for the network;
+   each only nudges the watcher to look at once, so a missed notification costs one safety-net look (30 s) and never a
+   wrong signal. **Open:** programs are still found by comparing the process table every 3 s, so a program that
+   starts and ends inside 3 s is missed; catching every one needs the kernel's process events (same family as #2, and
+   the same blocker). *Found:* Automation (AU08), 27 Sep 2026.
 2. **A file being opened cannot be seen** (the Engine half is done: `file.accessed` is relayable and part of the
    interest list). What is missing is the Worker producing it. The decision (the user, 9 Oct 2026): from Windows' own
    kernel file events, with no audit policy switched on by hand, in the Worker service (system account). That code is
@@ -99,7 +102,8 @@ service inside that person's session.
   asks `assistance.my_admins` (new: a Worker's department Admins, an Admin's Super User), opens the ask window
   (one button per Admin -- a ping carries no message, so there is no text box any more) and sends
   `assistance.ping`. TUI: `action add control notify message=.. stay_s=..`, `lock_session duration_s=..`,
-  `reboot delay_s=..`; `actions` lists the optional settings. Still for Phase 9: under the Windows service these
+  `reboot delay_s=..`; `actions` lists the optional settings. **A lock also blocks the keyboard and mouse at the OS level** (`BlockInput`) while its
+  window holds; Windows ends the block if the process dies and Ctrl+Alt+Del always overrides it. Still for Phase 9: under the Windows service these
   windows and the tray must be started inside the person's session (a service has no desktop).
   *Test:* `test_control_updates.py`, `test_worker_client.py`, `test_resource_assistance.py`.
 

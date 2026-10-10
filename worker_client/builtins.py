@@ -8,6 +8,7 @@ as arguments in the order of executor.BUILTIN_ARGS; an empty argument means "not
   lock_session   duration_s, message the screen locked behind the "Locked by your Admin" window for duration_s
   reboot/shutdown delay_s, message   the warning before it happens (default 30 s), with the message beside it
 
+A lock covers the screen with the window AND blocks the keyboard and mouse at the OS level while it holds.
 The windows are the Worker's own (worker_client.windows). Without them (a headless install) notify says so in
 its summary and lock_session falls back to locking the workstation once.
 """
@@ -28,6 +29,17 @@ def available() -> bool:
     """The windows can be shown: installed, and the Worker is configured to show them (it says so in the
     environment it starts each action with)."""
     return os.environ.get("FALCON_WORKER_WINDOWS", "1") != "0" and _installed()
+
+
+def _block_input(on: bool) -> bool:
+    """Block (or release) the keyboard and mouse at the OS level while a lock holds. Windows ends the block by
+    itself if this process dies, and Ctrl+Alt+Del always overrides it, so a person is never stranded. False when
+    this is not Windows or Windows refuses."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    return bool(ctypes.windll.user32.BlockInput(bool(on)))
 
 
 def _num(argv: list[str], i: int) -> int:
@@ -91,13 +103,17 @@ def lock(argv: list[str]) -> int:
         _mark("locked once (no windows installed, so no timer)")
         return 0
     proc = _window("locked", {"message": message, "until": until.isoformat()})
+    blocked = _block_input(True)
     try:
         time.sleep(max(duration, 0))
     finally:
+        if blocked:
+            _block_input(False)
         _wait(proc, 1)
         if proc.poll() is None:
             proc.kill()
-    _mark(f"locked for {duration // 60} min" if duration >= 60 and duration % 60 == 0 else f"locked for {duration} s")
+    length = f"{duration // 60} min" if duration >= 60 and duration % 60 == 0 else f"{duration} s"
+    _mark(f"locked for {length}" + ("" if blocked else " (screen covered; keyboard and mouse were not blocked)"))
     return 0
 
 

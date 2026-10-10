@@ -21,7 +21,9 @@ log = logging.getLogger(__name__)
 
 Reporter = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 
-INTERVAL_SECONDS = 3.0
+INTERVAL_SECONDS = 3.0           # how often to look when Windows cannot tell us (and always for programs)
+SAFETY_SECONDS = 30.0            # with native notifications the look is only a safety net
+SETTLE_SECONDS = 0.5             # a moment after Windows says "changed", for the drive list to catch up
 WATCHED = ("usb.inserted", "usb.removed", "network.connected", "network.disconnected",
            "program.launched", "program.exited", "user.login", "user.logout")
 
@@ -109,15 +111,41 @@ class OsSignals:
         self.interest: dict[str, list[dict[str, Any]]] = {}
         self._base: dict[str, Any] = {}
         self._task: asyncio.Task[None] | None = None
+        self._loop_ref: asyncio.AbstractEventLoop | None = None
+        self._wake = asyncio.Event()
+        self._notifier: Any = None
+        self.native = False               # Windows is telling us about drives, sessions and the network
 
-    async def start(self) -> None:
+    async def start(self, *, native: bool = True) -> None:
+        self._loop_ref = asyncio.get_running_loop()
+        if native:
+            from worker_client.winnotify import WindowsNotifier
+
+            self._notifier = WindowsNotifier(self.nudge)
+            self.native = self._notifier.start()
+            if not self.native:
+                self._notifier = None
         self._task = asyncio.create_task(self._loop())
 
     async def stop(self) -> None:
+        if self._notifier is not None:
+            self._notifier.stop()
+            self._notifier = None
         if self._task:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)
             self._task = None
+
+    def nudge(self, group: str = "") -> None:
+        """Windows says something changed (any thread): look now instead of waiting for the next interval."""
+        if self._loop_ref is not None:
+            self._loop_ref.call_soon_threadsafe(self._wake.set)
+
+    def _interval(self) -> float:
+        """Native notifications cover drives, sessions and the network; programs are still looked at often."""
+        if self.native and not any(t in self.interest for t in ("program.launched", "program.exited")):
+            return SAFETY_SECONDS
+        return self.interval
 
     async def refresh(self) -> None:
         """Ask the Engine what matters on this machine (on connect, and when told it changed)."""
@@ -173,7 +201,12 @@ class OsSignals:
 
     async def _loop(self) -> None:
         while True:
-            await asyncio.sleep(self.interval)
+            try:
+                await asyncio.wait_for(self._wake.wait(), self._interval())
+                self._wake.clear()
+                await asyncio.sleep(SETTLE_SECONDS)
+            except asyncio.TimeoutError:
+                pass
             try:
                 await self.tick()
             except Exception as exc:  # noqa: BLE001

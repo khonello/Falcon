@@ -44,6 +44,7 @@ class WorkerService:
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
         self.ossignals = OsSignals(self.call)
+        self._native_watch = native_watch
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
         self.watcher = Watcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
                                hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
@@ -67,7 +68,7 @@ class WorkerService:
         await self._connect(forever=True)
         await self.watcher.start()
         await self.signals.start()
-        await self.ossignals.start()
+        await self.ossignals.start(native=self._native_watch)
         await self._refresh_tasks()
         if self.config.windows:
             await self._start_tray()

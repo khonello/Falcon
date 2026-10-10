@@ -419,11 +419,13 @@ def test_the_screen_builtins_use_their_settings(monkeypatch, capsys):
     assert "closed by the person" in capsys.readouterr().out
 
     # a lock holds its window for the whole duration, then releases the screen
-    slept = []
+    slept, blocks = [], []
+    monkeypatch.setattr(b, "_block_input", lambda on: blocks.append(on) or True)
     monkeypatch.setattr(b.time, "sleep", lambda s: slept.append(s))
     monkeypatch.setattr(b, "_window", lambda kind, spec: shown.append((kind, spec)) or Fake(False))
     b.lock(["900", "In a meeting"])
     assert slept == [900] and shown[-1][0] == "locked" and shown[-1][1]["message"] == "In a meeting"
+    assert blocks == [True, False]                  # input blocked for the lock, released after it
     assert "locked for 15 min" in capsys.readouterr().out
 
 
@@ -471,3 +473,57 @@ async def test_asking_for_help_from_the_tray_pings_the_admin_with_no_message(eng
     finally:
         await admin.close()
         await svc.stop()
+
+
+async def test_a_windows_notification_makes_the_watcher_look_at_once(monkeypatch):
+    """A drive arriving is reported the moment Windows says so, not at the next interval (here a minute away)."""
+    from worker_client import ossignals
+
+    sent = []
+
+    async def report(type_, payload):
+        sent.append((type_, payload))
+        return {}
+
+    watcher = ossignals.OsSignals(report, interval=60.0)
+    looks = iter([{}, {"E:\\": "E:"}])
+    monkeypatch.setattr(ossignals, "drives", lambda: next(looks))
+    watcher.set_interest({"usb.inserted": [{}]})
+    await watcher.start(native=False)
+    try:
+        await watcher.tick()                      # the baseline
+        watcher.nudge("drives")                   # what Windows' notification does, from its own thread
+        for _ in range(40):
+            if sent:
+                break
+            await asyncio.sleep(0.1)
+        assert sent == [("control.signal", {"type": "usb.inserted", "data": {"device": "E:\\", "path": "E:\\"}})]
+    finally:
+        await watcher.stop()
+
+
+def test_the_windows_notifier_hears_windows_messages():
+    import ctypes
+    import sys
+    import time
+
+    import pytest
+
+    if sys.platform != "win32":
+        pytest.skip("Windows only")
+    from worker_client import winnotify as w
+
+    got: list[str] = []
+    n = w.WindowsNotifier(got.append)
+    assert n.start() is True and n._hwnd
+    try:
+        ctypes.windll.user32.PostMessageW(n._hwnd, w.WM_DEVICECHANGE, w.DBT_DEVNODES_CHANGED, 0)
+        ctypes.windll.user32.PostMessageW(n._hwnd, w.WM_WTSSESSION_CHANGE, 5, 1)
+        for _ in range(30):
+            if {"drives", "sessions"} <= set(got):
+                break
+            time.sleep(0.1)
+        assert {"drives", "sessions"} <= set(got)
+    finally:
+        n.stop()
+    assert not n._thread.is_alive()
