@@ -67,6 +67,11 @@ EVENT_TYPES: dict[str, str] = {
     "time.scheduled": "polled", "time.recurring": "polled",
 }
 
+# The native signals the Worker relays from the OS itself (control.signal). Opening a file is one of
+# them: nothing the index keeps changes, so it cannot come through index.event.
+OS_SIGNALS = frozenset({"usb.inserted", "usb.removed", "user.login", "user.logout", "program.launched",
+                        "program.exited", "network.connected", "network.disconnected", "file.accessed"})
+
 TIER_TAGS = {"admin": "admin", "restricted": "restricted", "workers": "worker_dept", "common": "common"}
 
 FILE_OP_TO_EVENT = {"create": "file.created", "modify": "file.modified", "move": "file.moved",
@@ -347,6 +352,8 @@ async def event_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await db.control.update_event(event_id, enabled=False)
     await ctx.engine.audit.record(ctx, "event.created", target_type="event_definitions", target_id=event_id,
                                   detail={"type": spec["type"], "actions": action_ids})
+    if spec["type"] in OS_SIGNALS:
+        await interest_changed(ctx.engine)
     return {"event": row(await db.control.event(event_id))}
 
 
@@ -377,6 +384,8 @@ async def event_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         for seq, aid in enumerate(wanted, start=1):
             await db.control.attach_action(event_id, aid, seq)
     await ctx.engine.audit.record(ctx, "event.updated", target_type="event_definitions", target_id=event_id)
+    if ev["condition_spec"].get("type") in OS_SIGNALS:
+        await interest_changed(ctx.engine)
     return {"event": row(await db.control.event(event_id))}
 
 
@@ -385,9 +394,11 @@ async def event_delete(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Disables (never deletes); executions keep their reference."""
     require_role(ctx, "super_user", "admin")
     event_id = int_field(payload, "event_id")
-    await _load_event_in_scope(ctx, event_id, write=True)
+    ev = await _load_event_in_scope(ctx, event_id, write=True)
     await ctx.engine.db.control.update_event(event_id, enabled=False)
     await ctx.engine.audit.record(ctx, "event.disabled", target_type="event_definitions", target_id=event_id)
+    if ev["condition_spec"].get("type") in OS_SIGNALS:
+        await interest_changed(ctx.engine)
     return {"event_id": event_id, "enabled": False}
 
 
@@ -411,15 +422,45 @@ async def event_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("control.signal")
 async def signal(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Worker client relays a native OS signal: {"type": "usb.inserted", "data": {...}}.
-    file.* signals come through the index instead (index.event) and are refused here."""
+    Only the OS signals (OS_SIGNALS) come this way; the other file.* changes come through the index
+    (index.event), since opening a file changes nothing the index keeps."""
     ident = require_account(ctx)
     etype = str_field(payload, "type")
-    if EVENT_TYPES.get(etype) != "native_pushed" or etype.startswith(("file.", "task.", "flow.", "resource.")):
+    if etype not in OS_SIGNALS:
         raise ProtocolError(ErrorCode.INVALID, f"{etype!r} is not a relayable native signal")
     if ident.pc_id is None:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
     fired = await on_signal(ctx.engine, ident.pc_id, etype, payload.get("data") or {})
     return {"accepted": True, "fired": fired}
+
+
+async def interest_for_pc(engine: Engine, pc_id: int) -> dict[str, list[dict[str, Any]]]:
+    """Which OS signals an enabled automation reaching this machine waits for, with each one's
+    `match` block -- so the Worker watches (and sends) only what something will act on."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    if not engine.db.connected:
+        return out
+    for etype in sorted(OS_SIGNALS):
+        for definition in await engine.db.control.event_definitions(event_type=etype):
+            spec = definition["condition_spec"]
+            if _pc_in_scope(spec, pc_id, await _dept_pcs(engine, definition)):
+                out.setdefault(etype, []).append(spec.get("match") or {})
+    return out
+
+
+async def interest_changed(engine: Engine) -> None:
+    """Tell every connected machine to ask again (an automation was created, changed or disabled)."""
+    await engine.broadcast("control.interest_changed", {}, predicate=lambda c: c.ctx.identity.pc_id is not None)
+
+
+@handler("control.signal_interest")
+async def signal_interest(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Worker: {} -> {"interest": {type: [match, ...]}} for this machine. Asked on connect and on
+    every `control.interest_changed` push."""
+    ident = require_account(ctx)
+    if ident.pc_id is None:
+        raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
+    return {"interest": await interest_for_pc(ctx.engine, ident.pc_id)}
 
 
 def latest_metrics(pc_id: int) -> dict[str, Any] | None:

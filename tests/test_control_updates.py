@@ -330,3 +330,27 @@ async def test_the_shelves_count_files_per_tier_in_the_department(engine, org, c
     assert shelves == {"restricted": 1, "workers": 0, "common": 2}
     w1 = await connect("cid-w1")
     assert await w1.err("resource.shelves") == "forbidden"
+
+
+async def test_a_machine_watches_only_the_os_signals_an_automation_waits_for(engine, org, connect):
+    """The Worker asks which OS signals matter on its machine (and their match blocks), is told to ask
+    again when an automation changes, and relays a file being opened like any other OS signal."""
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1")
+    w2 = await connect("cid-w2")
+    assert (await w1.ok("control.signal_interest"))["interest"] == {}
+    note = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "notify", "timeout_s": 5,
+                                                  "params": {"message": "opened"}}))["action"]
+    ev = (await a1.ok("control.event_create", {"type": "file.accessed", "pc_ids": [org["w1_pc"]],
+                                               "match": {"path_prefix": "C:/Finance"},
+                                               "action_ids": [note["id"]]}))["event"]
+    assert "control.interest_changed" in w1.push_types(await w1.drain_pushes())
+    assert (await w1.ok("control.signal_interest"))["interest"] == {"file.accessed": [{"path_prefix": "C:/Finance"}]}
+    assert (await w2.ok("control.signal_interest"))["interest"] == {}          # named machines only
+    res = await w1.ok("control.signal", {"type": "file.accessed",
+                                         "data": {"path": "C:/Finance/budget.xlsx", "process": "EXCEL.EXE"}})
+    assert res["fired"] == 1
+    assert (await w1.ok("control.signal", {"type": "file.accessed", "data": {"path": "C:/Other/x.txt"}}))["fired"] == 0
+    await a1.ok("control.event_delete", {"event_id": ev["id"]})
+    assert "control.interest_changed" in w1.push_types(await w1.drain_pushes())
+    assert (await w1.ok("control.signal_interest"))["interest"] == {}
