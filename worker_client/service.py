@@ -22,6 +22,7 @@ from worker_client.config import WorkerConfig
 from worker_client.executor import Executor
 from worker_client.flowsync import FlowSync
 from worker_client.lockout import Lockout
+from worker_client.ossignals import OsSignals
 from worker_client.signals import Signals
 from worker_client.updater import Updater
 from worker_client.watcher import Watcher
@@ -42,6 +43,7 @@ class WorkerService:
         self.executor = Executor(self.call, allow_power=allow_power)
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
+        self.ossignals = OsSignals(self.call)
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
         self.watcher = Watcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
                                hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
@@ -63,6 +65,7 @@ class WorkerService:
         await self._connect(forever=True)
         await self.watcher.start()
         await self.signals.start()
+        await self.ossignals.start()
         await self._refresh_tasks()
         log.info("worker service up as pc %s (account %s)", self.identity.pc_id, self.identity.account_id)
 
@@ -72,6 +75,7 @@ class WorkerService:
             self._reconnect_task.cancel()
         await self.watcher.stop()
         await self.signals.stop()
+        await self.ossignals.stop()
         await self.updater.stop()
         await self.executor.shutdown()
         if self.conn:
@@ -116,6 +120,7 @@ class WorkerService:
             self.lockout.block(st["pc_session"])
         else:
             self.lockout.release()
+        await self.ossignals.refresh()
         cur = await self.call("updates.current")
         if cur.get("version") and cur["version"]["version_string"] != VERSION:
             self.updater.on_available({"version": cur["version"]["version_string"]})
@@ -151,6 +156,8 @@ class WorkerService:
                 await self.flowsync.on_apply(payload)
             elif type_ == "flow.resolve_conflict":
                 await self.flowsync.on_resolve_conflict(payload)
+            elif type_ == "control.interest_changed":
+                await self.ossignals.refresh()
             elif type_ == "update.available":
                 self.updater.on_available(payload)
             elif type_ in ("task.assigned", "task.completed", "task.incomplete"):

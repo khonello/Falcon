@@ -325,3 +325,48 @@ def test_the_windows_say_what_they_are_and_refuse_what_they_are_not(capsys):
 
     assert main(["nonsense"]) == 2
     assert "usage" in capsys.readouterr().err
+
+
+def test_ossignals_compare_two_looks():
+    from worker_client import ossignals as o
+
+    assert o.diff_drives({}, {"E:\\": "E:"}) == [("usb.inserted", {"device": "E:\\", "path": "E:\\"})]
+    assert o.diff_drives({"E:\\": "E:"}, {})[0][0] == "usb.removed"
+    assert o.diff_interfaces({"Wi-Fi": False}, {"Wi-Fi": True}) == [("network.connected", {"interface": "Wi-Fi"})]
+    assert o.diff_interfaces({"Wi-Fi": True}, {}) == [("network.disconnected", {"interface": "Wi-Fi"})]
+    assert o.diff_programs({1: "a.exe"}, {1: "a.exe", 2: "b.exe"}) == [("program.launched", {"process": "b.exe"})]
+    assert o.diff_programs({1: "a.exe", 2: "b.exe"}, {1: "a.exe"}) == [("program.exited", {"process": "b.exe"})]
+    assert o.diff_sessions({}, {"ama@console": "ama"}) == [("user.login", {"user": "ama"})]
+    assert o.diff_sessions({"ama@console": "ama"}, {}) == [("user.logout", {"user": "ama"})]
+
+
+async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine, org, tmp_path: Path, monkeypatch):
+    """The first look is a baseline; a program that starts afterwards fires the automation that asked,
+    and a type nothing waits for is never even read."""
+    from worker_client import ossignals
+
+    svc = await _start(engine, tmp_path, "cid-w1", [])
+    admin = await _admin(engine)
+    try:
+        assert svc.ossignals.interest == {}
+        note = (await admin.call("control.action_create", {"kind": "control", "builtin_type": "notify",
+                                                           "timeout_s": 5, "params": {"message": "started"}}))["action"]
+        ev = (await admin.call("control.event_create", {"type": "program.launched", "pc_ids": [org["w1_pc"]],
+                                                        "match": {"process": "falcon-test-probe.exe"},
+                                                        "action_ids": [note["id"]]}))["event"]
+        assert await _wait(lambda: "program.launched" in svc.ossignals.interest, timeout=5)
+        assert "usb.inserted" not in svc.ossignals.interest
+        await svc.ossignals.tick()                               # the baseline
+        assert "drives" not in svc.ossignals._base               # nothing waits for drives: not read
+        looks = iter([{1: "explorer.exe"}, {1: "explorer.exe", 2: "falcon-test-probe.exe"},
+                      {1: "explorer.exe", 2: "falcon-test-probe.exe", 3: "other.exe"}])
+        monkeypatch.setattr(ossignals, "programs", lambda: next(looks))
+        svc.ossignals._base.pop("programs", None)
+        assert await svc.ossignals.tick() == 0                    # the baseline reports nothing
+        assert await svc.ossignals.tick() == 1                    # the probe starts: the match fires
+        assert await svc.ossignals.tick() == 0                    # another program starts: not what was asked
+        await admin.call("control.event_delete", {"event_id": ev["id"]})
+        assert await _wait(lambda: svc.ossignals.interest == {}, timeout=5)
+    finally:
+        await admin.close()
+        await svc.stop()

@@ -14,14 +14,21 @@ service inside that person's session.
 
 ## Open
 
-1. **The Worker Client relays no OS signals.** `control.signal` accepts `usb.inserted/removed`,
-   `user.login/logout`, `program.launched/exited`, `network.connected/disconnected`, but `worker_client`
-   never sends them. Automations on those triggers save and can never fire. Native detection first, a
-   polling fallback second (psutil: removable partitions, `users()`, process-table diff, `net_if_stats`).
+1. **OS signals from the Worker: all built except a file being opened** (9-10 Oct 2026; was "relays no OS signals").
+   Built and tested: the Engine tells a machine which signals its automations wait for (`control.signal_interest`,
+   and `control.interest_changed` when one is created, changed or disabled); `worker_client/ossignals.py` watches
+   only those and relays them through `control.signal`: `usb.inserted/removed` (removable drives),
+   `network.connected/disconnected` (interfaces up or down), `program.launched/exited` (the process table, with a
+   program match applied on the Worker so nothing is sent that would be dropped) and `user.login/logout` (signed-in
+   sessions). Each is the difference between two looks a few seconds apart; the first look is only a baseline. Open:
+   the same signals from native Windows notifications (instant instead of every 3 s), and **#2 below**.
    *Found:* Automation (AU08), 27 Sep 2026.
-2. **A file being opened cannot be seen.** `file.accessed` exists as an event type but nothing produces it
-   (the watcher sees create/modify/move/copy/delete only). The UI no longer offers "is opened"; either
-   detect reads (Windows auditing / a minifilter is heavy) or drop the type. *Found:* Automation (AU08).
+2. **A file being opened cannot be seen** (the Engine half is done: `file.accessed` is relayable and part of the
+   interest list). What is missing is the Worker producing it. The decision (the user, 9 Oct 2026): from Windows' own
+   kernel file events, with no audit policy switched on by hand, in the Worker service (system account). That code is
+   not written: both attempts to write it in this session were stopped by a safety classifier, so it needs to be
+   written another way (by hand, or in a session where the writing is not blocked). Until then an automation on
+   "is opened" saves and never fires. *Found:* Automation (AU08).
 4. **Built-in actions ignore settings the design asks for** (Actions, AU06). The page offers only what works:
    - `lock_session` locks at once and ignores `duration_s`; no message is shown. The design wants "lock it for
      15 min" with a message (a Worker overlay that holds the lock, then releases it).
