@@ -138,7 +138,25 @@ The single shared index consumed by Task (Verification, collision checks), Flow 
 | `indexed_via` | TEXT NOT NULL CHECK (`indexed_via` IN ('event','idle_sweep')) | Which of the two population mechanisms recorded this entry (Implementation Spec §6.2) |
 | `last_seen_at` | TIMESTAMP NOT NULL | |
 | `first_seen_at` | TIMESTAMP NOT NULL DEFAULT now() | When the index first saw the file where it is; set once, never changed by later events (migration 018) -- what a file's journey is ordered by |
+| `gone_at` | TIMESTAMP NULLABLE | When the file left this place (moved away, or deleted); the row is kept (no hard deletes) but is no longer a place the file is. Set by `move` (on the old path) and `delete`; cleared if the file turns up there again (migration 020) |
 | UNIQUE(`pc_id`, `path`) | | |
+
+---
+
+### `file_events` (migration 020)
+Append-only history of what the OS reported about files and folders: what a file's journey is told from. A file being edited is recorded at most once per ten minutes per file. Folders are recorded here and never become `file_index` rows.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `pc_id` | INTEGER FK → pcs.id NOT NULL | |
+| `op` | TEXT NOT NULL | `create`, `modify`, `move` (a rename is a move within a folder), `copy`, `delete`, `attrib` (read-only / hidden changed), `security` (permissions or owner changed) |
+| `is_dir` | BOOLEAN NOT NULL | A folder, not a file |
+| `path` | TEXT NOT NULL | Where it is now (for a move, the new path) |
+| `old_path` | TEXT NULLABLE | For a move: where it was |
+| `content_hash` | TEXT NULLABLE | |
+| `file_index_id` | INTEGER FK NULLABLE | |
+| `occurred_at` | TIMESTAMP NOT NULL | |
 
 ---
 

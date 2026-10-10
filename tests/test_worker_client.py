@@ -92,7 +92,10 @@ async def test_watcher_feeds_the_index_and_task_expectations(engine, org, tmp_pa
         assert await _wait(lambda: svc.watcher.events_reported >= 2)
         (docs / "notes.txt").unlink()
         assert await _wait(lambda: svc.watcher.events_reported >= 3)
-        assert len(await engine.db.file_index.by_name("notes.txt")) == 1
+        # the row is kept (no hard deletes) but marked as gone: it is no longer a place the file is
+        assert await engine.db.file_index.by_name("notes.txt") == []
+        kept = await engine.db.pool.fetchrow("SELECT gone_at FROM file_index WHERE filename = 'notes.txt'")
+        assert kept is not None and kept["gone_at"] is not None
         # Manual sweep reports every remaining file in batches.
         for i in range(3):
             (docs / f"f{i}.txt").write_text(str(i), encoding="utf-8")
@@ -592,3 +595,78 @@ async def test_a_new_worker_registers_itself_by_asking_and_then_runs(engine, org
         assert "refused" in str(ended.value) and "not ours" in str(ended.value) and cfg2.client_key == ""
     finally:
         await admin.close()
+
+
+async def _events(engine, pc_id: int) -> list[tuple[str, bool, str, str | None]]:
+    rows = await engine.db.pool.fetch("SELECT op, is_dir, path, old_path FROM file_events WHERE pc_id = $1 ORDER BY id", pc_id)
+    return [(r["op"], r["is_dir"], r["path"].replace("\\", "/").rsplit("/", 1)[-1],
+             r["old_path"].replace("\\", "/").rsplit("/", 1)[-1] if r["old_path"] else None) for r in rows]
+
+
+async def test_the_worker_reports_renames_moves_attributes_and_folders_as_the_os_emits_them(engine, org, tmp_path: Path):
+    """Native watcher (the OS's own directory notifications): a rename and a move carry where the file was, a
+    read-only flag is not mistaken for an edit, and folders are reported too."""
+    import os
+    import stat
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    svc = WorkerService(_cfg(engine, tmp_path, "cid-w1", [str(docs)]), native_watch=True)
+    svc.executor.log_dir = tmp_path / "exec"
+    svc.executor.log_dir.mkdir()
+    await svc.start()
+    try:
+        assert svc.watcher.mode == "native"
+        f = docs / "budget.xlsx"
+        f.write_text("numbers", encoding="utf-8")
+        await asyncio.sleep(1.0)
+        f.rename(docs / "budget-old.xlsx")                                  # a rename
+        (docs / "archive").mkdir()                                          # a folder is made
+        await asyncio.sleep(1.0)
+        (docs / "budget-old.xlsx").rename(docs / "archive" / "budget-old.xlsx")      # a move into it
+        await asyncio.sleep(1.0)
+        os.chmod(docs / "archive" / "budget-old.xlsx", stat.S_IREAD)                # attributes, content untouched
+        await asyncio.sleep(1.0)
+        os.chmod(docs / "archive" / "budget-old.xlsx", stat.S_IWRITE | stat.S_IREAD)
+        (docs / "archive").rename(docs / "archive2")                        # a folder is renamed
+        await asyncio.sleep(1.0)
+        got = await _events_wait(engine, org["w1_pc"], lambda ev: any(e[0] == "attrib" for e in ev)
+                                 and any(e[0] == "move" and e[1] for e in ev))
+        assert ("create", False, "budget.xlsx", None) in got
+        assert ("move", False, "budget-old.xlsx", "budget.xlsx") in got                    # the rename knows where it was
+        assert ("move", False, "budget-old.xlsx", "budget-old.xlsx") in got                # and so does the move
+        assert ("create", True, "archive", None) in got                                    # folders are reported
+        assert ("move", True, "archive2", "archive") in got
+        assert any(e[0] == "attrib" and e[2] == "budget-old.xlsx" for e in got)           # a flag, not an edit
+        # the index: only where the file is now
+        here = await engine.db.file_index.by_name("budget-old.xlsx")
+        assert len(here) == 1 and "archive" in here[0]["path"]
+        gone = await engine.db.pool.fetch("SELECT path FROM file_index WHERE gone_at IS NOT NULL")
+        assert len(gone) >= 2                                                              # the places it has left
+    finally:
+        await svc.stop()
+
+
+async def _events_wait(engine, pc_id: int, ok, timeout: float = 15.0):
+    ev = []
+    for _ in range(int(timeout / 0.3)):
+        ev = await _events(engine, pc_id)
+        if ok(ev):
+            return ev
+        await asyncio.sleep(0.3)
+    return ev
+
+
+async def test_the_polling_watcher_tells_a_move_from_a_delete_and_a_create(engine, org, tmp_path: Path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "plan.docx").write_text("the plan", encoding="utf-8")
+    svc = await _start(engine, tmp_path, "cid-w1", [str(docs)])         # polling: native_watch is off
+    try:
+        assert svc.watcher.mode == "polling"
+        (docs / "plan.docx").rename(docs / "plan-v2.docx")
+        got = await _events_wait(engine, org["w1_pc"], lambda ev: any(e[0] == "move" for e in ev))
+        assert ("move", False, "plan-v2.docx", "plan.docx") in got
+        assert not any(e[0] == "delete" for e in got)                  # not a delete followed by a create
+    finally:
+        await svc.stop()

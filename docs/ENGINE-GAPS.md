@@ -56,6 +56,25 @@ part is recorded for later, not built.
   `test_worker_client.py::test_a_new_worker_registers_itself_by_asking_and_then_runs`,
   `test_operator_client.py::test_scripted_enrollment`.
 
+- **Everything the OS reports about files, recorded and used** (follow-up to #9, done 10 Oct 2026; the user: the OS emits
+  move, rename and more, so cover what it emits rather than being narrow). *The gap that was there:* the Worker already
+  sent a move with `old_path`, but the Engine used only the new path -- a move looked like a new file, the old place
+  stayed in the index as if the file were still there, and a delete left no mark. *Now:* the Engine uses `old_path`,
+  marks a place a file has left as `gone_at` (row kept) and keeps an append-only `file_events` history (migration 020) of
+  create, move/rename, copy, delete, edit (once per ten minutes per file), **attribute changes** (read-only, hidden) and
+  **permission/owner changes**, for files and for **folders** (created, moved/renamed, deleted; never index rows). The
+  Worker's watcher (`worker_client/watcher.py`, `fsmeta.py`) tells a content edit from an attribute flip or a
+  permission change by comparing two looks of the file (size and last write; attribute flags; a hash of owner, group
+  and access list read with `GetFileSecurityW`), reports folder events, and in the polling fallback tells a move from a
+  delete plus a create by the file's own identity (verified on this machine: read-only flag -> `attrib`, edit ->
+  `modify`, an ACL change -> `security`, real renames/moves/folder events through the native watcher). The journey now
+  shows renamed, moved, edited, attributes changed, permissions changed and deleted. Automations can wait on the new
+  signals: `file.attributes_changed`, `file.permissions_changed`, `folder.created`, `folder.moved`, `folder.deleted`
+  (a move's signal carries `old_path`). Flow, Resource and Task still hear only content changes. A place a file has
+  left no longer counts as a collision, a copy elsewhere, a search hit or a folder entry. *Still open:* a file being
+  *opened* (#2: the kernel trace, blocked); a folder renamed above a file is not followed into that file's journey; the
+  polling fallback sees no folders or permissions; `file_events` has no retention job yet. *Test:*
+  `test_worker_client.py` (real filesystem: native and polling), `test_resource_assistance.py` (journey, automations).
 - **A file's journey** (was #9, done 10 Oct 2026; the user decided: the journey only, not "required on every machine").
   `resource.journey {file_index_id}` follows a file by its CONTENT (the hash), because a copy has another path and
   sits on another machine, and returns its places and a timeline, oldest first: `first_seen` and `copied` (each place

@@ -56,6 +56,8 @@ log = logging.getLogger(__name__)
 EVENT_TYPES: dict[str, str] = {
     "file.created": "native_pushed", "file.modified": "native_pushed", "file.moved": "native_pushed",
     "file.copied": "native_pushed", "file.deleted": "native_pushed", "file.accessed": "native_pushed",
+    "file.attributes_changed": "native_pushed", "file.permissions_changed": "native_pushed",
+    "folder.created": "native_pushed", "folder.moved": "native_pushed", "folder.deleted": "native_pushed",
     "usb.inserted": "native_pushed", "usb.removed": "native_pushed",
     "user.login": "native_pushed", "user.logout": "native_pushed",
     "program.launched": "native_pushed", "program.exited": "native_pushed",
@@ -75,7 +77,9 @@ OS_SIGNALS = frozenset({"usb.inserted", "usb.removed", "user.login", "user.logou
 TIER_TAGS = {"admin": "admin", "restricted": "restricted", "workers": "worker_dept", "common": "common"}
 
 FILE_OP_TO_EVENT = {"create": "file.created", "modify": "file.modified", "move": "file.moved",
-                    "copy": "file.copied", "delete": "file.deleted"}
+                    "copy": "file.copied", "delete": "file.deleted", "attrib": "file.attributes_changed",
+                    "security": "file.permissions_changed"}
+FOLDER_OP_TO_EVENT = {"create": "folder.created", "move": "folder.moved", "delete": "folder.deleted"}
 
 # pc_id -> latest metrics {cpu, memory, idle_s, at}
 _metrics: dict[int, dict[str, Any]] = {}
@@ -105,12 +109,13 @@ def install(engine: Engine) -> None:
     """file.* events come straight from the Global File Index stream."""
 
     async def on_file(event: dict[str, Any]) -> None:
-        etype = FILE_OP_TO_EVENT.get(event["op"])
+        etype = (FOLDER_OP_TO_EVENT if event.get("is_dir") else FILE_OP_TO_EVENT).get(event["op"])
         if etype:
+            tag = None if event.get("is_dir") else await _file_tag(engine, event)
             await on_signal(engine, event["pc_id"], etype, {"path": event["path"], "name": event.get("name"),
-                                                            "hash": event.get("hash"),
-                                                            "tag": await _file_tag(engine, event)})
-    engine.file_index.subscribe(on_file)
+                                                            "hash": event.get("hash"), "old_path": event.get("old_path"),
+                                                            "tag": tag})
+    engine.file_index.subscribe(on_file, every_op=True)
 
 
 async def _file_tag(engine: Engine, event: dict[str, Any]) -> str | None:

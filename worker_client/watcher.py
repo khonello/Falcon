@@ -2,7 +2,12 @@
 
 Two mechanisms, same wire shape (`index.event` / `index.sweep_batch`):
   * native: `watchdog` (ReadDirectoryChangesW / inotify) when installed -- no polling cost;
-  * polling fallback: rescan the watched roots every `poll_seconds`, diff (size, mtime).
+  * polling fallback: rescan the watched roots every `poll_seconds`, diff (size, mtime, attributes, file identity).
+
+What is reported: a file created, edited, moved or renamed (with where it was), copied, deleted; a change of its
+attributes (read-only, hidden) or of who may open it (permissions/owner), told apart from a content edit by comparing
+two looks (fsmeta.py); and the same for FOLDERS (created, moved/renamed, deleted -- `is_dir`). The polling fallback
+cannot see permissions or folders.
 
 Plus the opportunistic full sweep: once the user has been idle long enough, walk every root
 and report entries in batches, checking idleness between batches and stopping the instant
@@ -23,7 +28,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-from worker_client import idle
+from worker_client import fsmeta, idle
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +60,8 @@ class Watcher:
         self.hash_limit = hash_limit
         self.idle_after = idle_after
         self.native = native
-        self._snapshot: dict[str, tuple[int, float]] = {}
+        self._snapshot: dict[str, tuple[int, float, int, int]] = {}      # path -> (size, mtime, identity, attributes)
+        self._meta: dict[str, fsmeta.Meta] = {}      # what each file looked like last time, to tell kinds of change apart
         self._tasks: list[asyncio.Task[None]] = []
         self._observer: Any = None
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -106,16 +112,12 @@ class Watcher:
 
         class Handler(FileSystemEventHandler):
             def on_any_event(self, event: Any) -> None:
-                if getattr(event, "is_directory", False):
-                    return
                 kind = event.event_type  # created|modified|moved|deleted|closed
-                op = {"created": "create", "modified": "modify", "moved": "move", "deleted": "delete",
-                      "closed": "modify"}.get(kind)
-                if op is None or loop is None:
+                if kind not in ("created", "modified", "moved", "deleted", "closed") or loop is None:
                     return
-                path = str(getattr(event, "dest_path", "") or event.src_path)
-                old = str(event.src_path) if op == "move" else None
-                asyncio.run_coroutine_threadsafe(watcher.report_event(op, path, old_path=old), loop)
+                asyncio.run_coroutine_threadsafe(
+                    watcher.on_fs_event(kind, str(event.src_path), str(getattr(event, "dest_path", "") or ""),
+                                        bool(getattr(event, "is_directory", False))), loop)
 
         try:
             self._observer = Observer()
@@ -129,10 +131,46 @@ class Watcher:
             self._observer = None
             return False
 
+    async def on_fs_event(self, kind: str, src: str, dest: str, is_dir: bool) -> None:
+        """One OS event, turned into what the Engine is told. A folder: created, moved/renamed, deleted (its edits are
+        noise). A file: created, moved/renamed (with where it was), deleted -- and a "modified" is looked at to see
+        whether the content changed, the attributes did, or who may open it did."""
+        if is_dir:
+            op = {"created": "create", "moved": "move", "deleted": "delete"}.get(kind)
+            if op:
+                await self.report_event(op, dest or src, old_path=src if op == "move" else None, is_dir=True)
+            return
+        if kind == "created":
+            await self._remember(src)
+            await self.report_event("create", src)
+        elif kind == "moved":
+            self._meta.pop(src, None)
+            await self._remember(dest)
+            await self.report_event("move", dest, old_path=src)
+        elif kind == "deleted":
+            self._meta.pop(src, None)
+            await self.report_event("delete", src)
+        else:                                            # modified (or closed after a write)
+            now = await asyncio.to_thread(fsmeta.meta, src)
+            before = self._meta.get(src)
+            if now is None:
+                return                                   # it is already gone; the delete will follow
+            self._meta[src] = now
+            for op in (["modify"] if before is None else fsmeta.changes(before, now)):
+                await self.report_event(op, src)
+
+    async def _remember(self, path: str) -> None:
+        now = await asyncio.to_thread(fsmeta.meta, path)
+        if now is not None:
+            self._meta[path] = now
+            if len(self._meta) > 50000:                  # bounded: forget the oldest looks
+                for old in list(self._meta)[:5000]:
+                    self._meta.pop(old, None)
+
     # --- polling fallback -----------------------------------------------------------------------
 
-    def _scan(self) -> dict[str, tuple[int, float]]:
-        seen: dict[str, tuple[int, float]] = {}
+    def _scan(self) -> dict[str, tuple[int, float, int, int]]:
+        seen: dict[str, tuple[int, float, int, int]] = {}
         for root in self.roots:
             for dirpath, _dirs, files in os.walk(root):
                 for name in files:
@@ -141,32 +179,47 @@ class Watcher:
                         st = os.stat(p)
                     except OSError:
                         continue
-                    seen[p] = (st.st_size, st.st_mtime)
+                    attrs = int(getattr(st, "st_file_attributes", st.st_mode))
+                    seen[p] = (st.st_size, st.st_mtime, st.st_ino, attrs)
         return seen
 
     async def _poll_loop(self) -> None:
         while True:
             await asyncio.sleep(self.poll_seconds)
             current = await asyncio.to_thread(self._scan)
+            created = [p for p in current if p not in self._snapshot]
+            gone = {p: self._snapshot[p] for p in self._snapshot if p not in current}
+            for path in created:
+                # the same file identity that just vanished elsewhere: it was moved or renamed, not deleted and created
+                old = next((g for g, sig in gone.items() if sig[2] and sig[2] == current[path][2]), None)
+                if old is not None:
+                    gone.pop(old)
+                    await self.report_event("move", path, old_path=old)
+                else:
+                    await self.report_event("create", path)
             for path, sig in current.items():
                 before = self._snapshot.get(path)
                 if before is None:
-                    await self.report_event("create", path)
-                elif before != sig:
+                    continue
+                if before[:2] != sig[:2]:
                     await self.report_event("modify", path)
-            for path in set(self._snapshot) - set(current):
+                if before[3] != sig[3]:
+                    await self.report_event("attrib", path)
+            for path in gone:
                 await self.report_event("delete", path)
             self._snapshot = current
 
     # --- reporting ------------------------------------------------------------------------------
 
-    async def report_event(self, op: str, path: str, *, old_path: str | None = None) -> None:
+    async def report_event(self, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False) -> None:
         digest = None
-        if op != "delete":
+        if op not in ("delete", "attrib", "security") and not is_dir:        # the content did not change in the last two
             digest = await asyncio.to_thread(hash_file, Path(path), self.hash_limit)
         event: dict[str, Any] = {"op": op, "path": path, "name": os.path.basename(path), "hash": digest}
         if old_path:
             event["old_path"] = old_path
+        if is_dir:
+            event["is_dir"] = True
         try:
             await self.report("index.event", {"event": event})
             self.events_reported += 1

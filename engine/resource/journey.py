@@ -5,11 +5,17 @@ A file is followed by its CONTENT (the hash), because a copy has a different pat
 The timeline is built from what the Engine already records:
 
   * first_seen / copied   the file index: each place the same content was indexed, by when it first appeared there
+  * moved / renamed       the history of file events: it left one place for another (a rename is a move within a folder)
+  * deleted               the history: it was removed from a machine
+  * edited                the history: its content changed (recorded at most once per ten minutes per file)
+  * attributes_changed, permissions_changed
+                          the history: read-only / hidden changed, or who may open it changed, with the content untouched
   * tagged                the audit trail (resource.tagged), with who classified it
   * flagged, owner_told   a Restricted File Tracking violation: found where it should not be, and the person told
   * resolved              the audit trail (resource.violation_resolved), with who
   * synced, conflict      the flow sync log: a flow carried it to another machine, or an outside edit was in the way
 
+A folder being renamed above the file is not followed (the file's own path did not change event by event).
 Scope: the Super User sees the whole journey. An Admin sees only what happened on their own department's machines (a
 copy elsewhere is not theirs to read), and a file with no place in their department is "not found" to them.
 Names are the caller's (Display Names are never shared across namers).
@@ -17,6 +23,7 @@ Names are the caller's (Display Names are never shared across namers).
 
 from __future__ import annotations
 
+import posixpath
 from typing import Any
 
 from engine.dispatch import Context, handler
@@ -32,10 +39,21 @@ def _iso(value: Any) -> str | None:
     return value.isoformat() if value is not None else None
 
 
+def _norm(path: str) -> str:
+    return path.replace("\\", "/")
+
+
+def _folder_and_name(path: str) -> tuple[str, str]:
+    folder, name = posixpath.split(_norm(path))
+    return folder.lower(), name
+
+
 @handler("resource.journey")
 async def journey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"file_index_id"} -> {"file", "places": [...], "events": [{at, kind, pc_id, hostname, path, who, text}]}.
-    Events are oldest first. `kind` is first_seen, copied, tagged, flagged, owner_told, resolved, synced or conflict."""
+    Events are oldest first. `kind` is first_seen, copied, moved, renamed, deleted, edited, attributes_changed,
+    permissions_changed, tagged, flagged, owner_told, resolved, synced or conflict. Each place says whether it is still
+    there (`gone_at` is when the file left it)."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     file_id = int_field(payload, "file_index_id")
@@ -67,12 +85,45 @@ async def journey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             people.add(who_id)
         raw.append((at, {"kind": kind, "pc_id": pc_id, "path": path, "who_id": who_id, "text": text}))
 
-    for i, p in enumerate(places):                       # earliest first
+    # What the OS reported happened to these places (and the places they came from, through any chain of moves)
+    where = {(p["pc_id"], p["path"]) for p in places}
+    history: list[dict[str, Any]] = []
+    for _ in range(6):
+        history = await db.file_index.events_for_paths(sorted(where))
+        before = len(where)
+        where |= {(h["pc_id"], h["old_path"]) for h in history if h["op"] == "move" and h["old_path"] and not h["is_dir"]}
+        if len(where) == before:
+            break
+    history = [h for h in history if not h["is_dir"] and mine(await pc_of(h["pc_id"]))]
+    moved_to = {(h["pc_id"], h["path"]) for h in history if h["op"] == "move"}
+
+    origin_done = False
+    for p in places:                                     # earliest first
+        if (p["pc_id"], p["path"]) in moved_to:
+            continue                                     # it got here by a move, which the history tells below
         host = (await pc_of(p["pc_id"]) or {}).get("hostname", "a machine")
-        if i == 0:
+        if not origin_done:
+            origin_done = True
             add(p["first_seen_at"], "first_seen", p["pc_id"], p["path"], f"First known on {host}: {p['path']}")
         else:
             add(p["first_seen_at"], "copied", p["pc_id"], p["path"], f"A copy appeared on {host}: {p['path']}")
+    for h in history:
+        host = (await pc_of(h["pc_id"]) or {}).get("hostname", "a machine")
+        op = h["op"]
+        if op == "move" and h["old_path"]:
+            (of, on), (nf, nn) = _folder_and_name(h["old_path"]), _folder_and_name(h["path"])
+            if of == nf:
+                add(h["occurred_at"], "renamed", h["pc_id"], h["path"], f"Renamed on {host}: {on} to {nn}")
+            else:
+                add(h["occurred_at"], "moved", h["pc_id"], h["path"], f"Moved on {host}: {h['old_path']} to {h['path']}")
+        elif op == "delete":
+            add(h["occurred_at"], "deleted", h["pc_id"], h["path"], f"Deleted from {host}: {h['path']}")
+        elif op == "modify":
+            add(h["occurred_at"], "edited", h["pc_id"], h["path"], f"Edited on {host}: {h['path']}")
+        elif op == "attrib":
+            add(h["occurred_at"], "attributes_changed", h["pc_id"], h["path"], f"Attributes changed on {host}: {h['path']}")
+        elif op == "security":
+            add(h["occurred_at"], "permissions_changed", h["pc_id"], h["path"], f"Who may open it changed on {host}: {h['path']}")
 
     for a in await db.audit.for_targets("file_index", [str(i) for i in by_id], ["resource.tagged"]):
         p = by_id[int(a["target_id"])]

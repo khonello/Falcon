@@ -406,7 +406,7 @@ class SessionsRepo(_Repo):
 
 class FileIndexRepo(_Repo):
     _COLS = ("id, pc_id, path, filename, content_hash, resource_tag, resource_tag_scope_department_id, "
-             "indexed_via, last_seen_at, first_seen_at")
+             "indexed_via, last_seen_at, first_seen_at, gone_at")
 
     async def upsert(self, pc_id: int, path: str, filename: str, content_hash: str | None,
                      resource_tag: str | None, scope_department_id: int | None,
@@ -420,19 +420,51 @@ class FileIndexRepo(_Repo):
             "resource_tag = COALESCE(EXCLUDED.resource_tag, file_index.resource_tag), "
             "resource_tag_scope_department_id = COALESCE(EXCLUDED.resource_tag_scope_department_id, "
             "                                            file_index.resource_tag_scope_department_id), "
-            "indexed_via = EXCLUDED.indexed_via, last_seen_at = now() RETURNING id",
+            "indexed_via = EXCLUDED.indexed_via, last_seen_at = now(), gone_at = NULL RETURNING id",
             pc_id, path, filename, content_hash, resource_tag, scope_department_id, indexed_via)
 
     async def get(self, file_index_id: int) -> dict[str, Any] | None:
         return await self._one(f"SELECT {self._COLS} FROM file_index WHERE id = $1", file_index_id)
 
-    async def by_path(self, pc_id: int, path: str) -> dict[str, Any] | None:
-        return await self._one(f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND path = $2", pc_id, path)
+    async def by_path(self, pc_id: int, path: str, *, present_only: bool = False) -> dict[str, Any] | None:
+        """The row at a place. `present_only`: only if the file is still there (a place it has left is not a collision)."""
+        return await self._one(
+            f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND path = $2 AND (NOT $3 OR gone_at IS NULL)",
+            pc_id, path, present_only)
 
     async def by_name(self, filename: str, *, pc_ids: list[int] | None = None) -> list[dict[str, Any]]:
         return await self._fetch(
-            f"SELECT {self._COLS} FROM file_index WHERE lower(filename) = lower($1) "
+            f"SELECT {self._COLS} FROM file_index WHERE lower(filename) = lower($1) AND gone_at IS NULL "
             "AND ($2::int[] IS NULL OR pc_id = ANY($2)) ORDER BY pc_id, path", filename, pc_ids)
+
+    async def mark_gone(self, pc_id: int, path: str) -> int | None:
+        """The file left this place (moved away, or deleted). The row stays (no hard deletes); returns its id."""
+        return await self._val(
+            "UPDATE file_index SET gone_at = now() WHERE pc_id = $1 AND path = $2 AND gone_at IS NULL RETURNING id",
+            pc_id, path)
+
+    async def record_event(self, pc_id: int, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False,
+                           content_hash: str | None = None, file_index_id: int | None = None) -> bool:
+        """Append to the history of what happened to files and folders. A file being edited is recorded at most
+        once per ten minutes (every save would bury the rest). False when it was coalesced away."""
+        if op == "modify" and not is_dir and await self._val(
+                "SELECT EXISTS (SELECT 1 FROM file_events WHERE pc_id = $1 AND path = $2 AND op = 'modify' "
+                "AND occurred_at > now() - interval '10 minutes')", pc_id, path):
+            return False
+        await self._exec(
+            "INSERT INTO file_events (pc_id, op, is_dir, path, old_path, content_hash, file_index_id) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7)", pc_id, op, is_dir, path, old_path, content_hash, file_index_id)
+        return True
+
+    async def events_for_paths(self, places: list[tuple[int, str]]) -> list[dict[str, Any]]:
+        """Every recorded event that touches any of these (pc, path) places, as the file's new path or its old one."""
+        if not places:
+            return []
+        return await self._fetch(
+            "SELECT id, pc_id, op, is_dir, path, old_path, content_hash, occurred_at FROM file_events e "
+            "WHERE EXISTS (SELECT 1 FROM unnest($1::int[], $2::text[]) AS p(pc, pth) "
+            "              WHERE e.pc_id = p.pc AND (e.path = p.pth OR e.old_path = p.pth)) ORDER BY occurred_at, id",
+            [p[0] for p in places], [p[1] for p in places])
 
     async def same_content(self, file_index_id: int) -> list[dict[str, Any]]:
         """Every place the same content has been indexed (this row included), earliest first -- the places a file's
@@ -446,17 +478,19 @@ class FileIndexRepo(_Repo):
         instead of typing a path. Derived from indexed file paths (the index holds files, not directories)."""
         return await self._fetch(
             "SELECT regexp_replace(replace(path, chr(92), '/'), '/[^/]*$', '') AS folder, count(*) AS files "
-            "FROM file_index WHERE pc_id = $1 GROUP BY 1 ORDER BY 1 LIMIT $2", pc_id, limit)
+            "FROM file_index WHERE pc_id = $1 AND gone_at IS NULL GROUP BY 1 ORDER BY 1 LIMIT $2", pc_id, limit)
 
     async def tier_counts(self, department_id: int | None) -> list[dict[str, Any]]:
         """How many indexed files sit on each tier: across a department's machines, or everywhere (None)."""
         return await self._fetch(
             "SELECT f.resource_tag AS tag, count(*) AS files FROM file_index f JOIN pcs p ON p.id = f.pc_id "
-            "WHERE f.resource_tag IS NOT NULL AND ($1::int IS NULL OR p.department_id = $1) GROUP BY 1",
+            "WHERE f.resource_tag IS NOT NULL AND f.gone_at IS NULL AND ($1::int IS NULL OR p.department_id = $1) GROUP BY 1",
             department_id)
 
     async def by_hash(self, content_hash: str) -> list[dict[str, Any]]:
-        return await self._fetch(f"SELECT {self._COLS} FROM file_index WHERE content_hash = $1", content_hash)
+        """Every place this content is NOW (a place it has left does not count)."""
+        return await self._fetch(
+            f"SELECT {self._COLS} FROM file_index WHERE content_hash = $1 AND gone_at IS NULL", content_hash)
 
     async def set_tag(self, file_index_id: int, resource_tag: str | None, scope_department_id: int | None) -> None:
         await self._exec(
@@ -467,12 +501,13 @@ class FileIndexRepo(_Repo):
         """Indexed entries below a directory on a PC (case-insensitive, slash-agnostic)."""
         prefix = directory.replace("\\", "/").rstrip("/").lower() + "/"
         return await self._fetch(
-            f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 "
+            f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND gone_at IS NULL "
             "AND starts_with(lower(replace(path, '\\', '/')), $2) ORDER BY path LIMIT $3", pc_id, prefix, limit)
 
     async def tagged(self, tags: tuple[str, ...] = ("admin", "restricted")) -> list[dict[str, Any]]:
         return await self._fetch(
-            f"SELECT {self._COLS} FROM file_index WHERE resource_tag = ANY($1::text[]) AND content_hash IS NOT NULL",
+            f"SELECT {self._COLS} FROM file_index WHERE resource_tag = ANY($1::text[]) AND content_hash IS NOT NULL "
+            "AND gone_at IS NULL",
             list(tags))
 
     async def search(self, query: str, *, allowed_tags: list[tuple[str, int | None]],
@@ -482,7 +517,7 @@ class FileIndexRepo(_Repo):
         tag_names = [t for t, _ in allowed_tags]
         dept_scopes = [d for t, d in allowed_tags if t == "worker_dept" and d is not None]
         return await self._fetch(
-            f"SELECT {self._COLS} FROM file_index WHERE filename ILIKE '%' || $1 || '%' AND ("
+            f"SELECT {self._COLS} FROM file_index WHERE filename ILIKE '%' || $1 || '%' AND gone_at IS NULL AND ("
             " resource_tag IS NULL"
             " OR (resource_tag <> 'worker_dept' AND resource_tag = ANY($2::text[]))"
             " OR (resource_tag = 'worker_dept' AND resource_tag_scope_department_id = ANY($3::int[]))"

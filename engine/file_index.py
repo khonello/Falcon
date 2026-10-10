@@ -10,8 +10,13 @@ Tracks: name, location, content hash, and a Resource access tag
 (`admin` | `restricted` | `worker_dept` + scope department | `common`).
 
 Wire shape of one entry/event (what worker clients send):
-    {"op": "create|modify|move|copy|delete", "path": "C:/.../report.docx", "name": "report.docx",
-     "hash": "<sha256>"?, "old_path": "..."?, "resource_tag": "common"?, "scope_department_id": 3?}
+    {"op": "create|modify|move|copy|delete|attrib|security", "path": "C:/.../report.docx", "name": "report.docx",
+     "hash": "<sha256>"?, "old_path": "..."?, "is_dir": true?, "resource_tag": "common"?, "scope_department_id": 3?}
+
+`move` covers a rename (same folder) and a move; `old_path` is where it was. `attrib` and `security` are a change of
+file attributes (read-only, hidden) and of permissions/owner, with the content untouched. Folders (`is_dir`) are
+history and signals only: they are never rows in the index. Everything is recorded in `file_events`; a place a file has
+left (moved away, deleted) is marked `gone_at`, the row kept.
 """
 
 from __future__ import annotations
@@ -31,7 +36,10 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 ACCESS_TAGS = ("admin", "restricted", "worker_dept", "common")  # file_index.resource_tag
-OPS = ("create", "modify", "move", "copy", "delete")
+OPS = ("create", "modify", "move", "copy", "delete", "attrib", "security")
+# What Flow, Resource compliance and Task verification care about: the content of a file, or where it is. A change of
+# attributes or permissions, or anything to a folder, is for the history and for automations only.
+CONTENT_OPS = frozenset({"create", "modify", "move", "copy", "delete"})
 
 
 class FileIndex:
@@ -40,21 +48,40 @@ class FileIndex:
         # Modules interested in file events (Flow sync trigger, Resource compliance, Task
         # expectation) subscribe here rather than defining their own detection.
         self._subscribers: list[Any] = []
+        self._observers: list[Any] = []
 
-    def subscribe(self, callback: Any) -> None:
-        """callback(event: dict) -> Awaitable[None]. Called for every ingested file event,
-        after the index row is written, with `file_index_id` and `pc_id` added."""
-        self._subscribers.append(callback)
+    def subscribe(self, callback: Any, *, every_op: bool = False) -> None:
+        """callback(event: dict) -> Awaitable[None]. Called for every ingested file event that is about a file's
+        content or place (CONTENT_OPS), after the index row is written, with `file_index_id` and `pc_id` added.
+        `every_op=True` also hears attribute and permission changes and everything that happens to folders -- for
+        automations, which can wait on any of them."""
+        (self._observers if every_op else self._subscribers).append(callback)
 
     async def ingest_event(self, pc_id: int, event: dict[str, Any]) -> int | None:
         entry = _normalize(event)
-        file_index_id: int | None = None
-        if entry["op"] != "delete":
-            file_index_id = await self._upsert(pc_id, entry, "event")
-        # A delete keeps the row (no hard deletes; the hash may reappear elsewhere) but the
-        # subscribers still learn about it.
-        for cb in self._subscribers:
-            await cb({"pc_id": pc_id, "file_index_id": file_index_id, **entry})
+        db = self.db.file_index
+        op, path = entry["op"], entry["path"]
+        file_index_id: int | None = None          # what subscribers are told (None for a delete, as before)
+        known_id: int | None = None               # what the history refers to
+        if entry["is_dir"]:
+            pass                                  # a folder is history and a signal, never an index row
+        elif op == "delete":
+            known_id = await db.mark_gone(pc_id, path)       # the row is kept (no hard deletes), marked as gone
+        elif op in ("attrib", "security"):
+            row = await db.by_path(pc_id, path)              # nothing about the content changed: not re-indexed
+            known_id = row["id"] if row else None
+        else:
+            file_index_id = known_id = await self._upsert(pc_id, entry, "event")
+            if op == "move" and entry.get("old_path"):
+                await db.mark_gone(pc_id, str(entry["old_path"]))    # it left its old place: this used to be forgotten
+        await db.record_event(pc_id, op, path, old_path=entry.get("old_path"), is_dir=entry["is_dir"],
+                              content_hash=entry.get("hash"), file_index_id=known_id)
+        full = {"pc_id": pc_id, "file_index_id": file_index_id, **entry}
+        if op in CONTENT_OPS and not entry["is_dir"]:
+            for cb in self._subscribers:
+                await cb(full)
+        for cb in self._observers:
+            await cb(full)
         return file_index_id
 
     async def ingest_sweep_batch(self, pc_id: int, entries: list[dict[str, Any]]) -> int:
@@ -87,7 +114,7 @@ class FileIndex:
         """Flow Pre-Flight Collision Check: existing indexed content at a destination path."""
         if pc_id is None:
             return None  # remote storage is not indexed
-        return await self.db.file_index.by_path(pc_id, path)
+        return await self.db.file_index.by_path(pc_id, path, present_only=True)
 
     async def restricted_copies(self, content_hash: str) -> list[dict[str, Any]]:
         """Resource Restricted File Tracking: every location a hash appears."""
@@ -110,6 +137,7 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
         "name": str(event.get("name") or PurePath(path).name),
         "hash": event.get("hash"),
         "old_path": event.get("old_path"),
+        "is_dir": bool(event.get("is_dir")),
         "resource_tag": tag,
         "scope_department_id": event.get("scope_department_id"),
     }

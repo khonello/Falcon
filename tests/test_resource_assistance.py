@@ -198,3 +198,62 @@ async def test_a_files_journey_follows_its_content_and_stays_in_scope(engine, or
     assert await a1.err("resource.journey", {"file_index_id": 99999}) == "not_found"
     assert await w2.err("resource.journey", {"file_index_id": origin}) == "forbidden"
     assert len((await a1.ok("resource.journey", {"file_index_id": lone["file_index_id"]}))["events"]) == 1
+
+
+async def test_a_files_journey_includes_renames_moves_deletes_and_what_the_os_reports_besides(engine, org, connect):
+    """The Worker tells the Engine where a file was (`old_path`); the Engine records it, marks the place the file left, and the
+    journey tells it: renamed, moved, edited, attributes and permissions changed, deleted -- never a ghost 'copy'."""
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")
+    ev = lambda **e: a1.ok("index.event", {"event": e})
+    first = await ev(op="create", path="C:/Finance/budget.xlsx", hash="H1")
+    await ev(op="move", path="C:/Finance/budget-old.xlsx", old_path="C:/Finance/budget.xlsx", hash="H1")        # a rename
+    await ev(op="modify", path="C:/Finance/budget-old.xlsx", hash="H1")
+    await ev(op="attrib", path="C:/Finance/budget-old.xlsx")                                                   # read-only
+    await ev(op="security", path="C:/Finance/budget-old.xlsx")                                                 # who may open it
+    last = await ev(op="move", path="D:/Archive/budget-old.xlsx", old_path="C:/Finance/budget-old.xlsx", hash="H1")
+    await ev(op="delete", path="D:/Archive/budget-old.xlsx")
+
+    # a folder is history and a signal, never an index row
+    folder = await ev(op="move", path="C:/Finance2", old_path="C:/Finance", is_dir=True)
+    assert folder["file_index_id"] is None
+    assert await engine.db.pool.fetchval("SELECT count(*) FROM file_index WHERE path LIKE 'C:/Finance2%'") == 0
+
+    j = await su.ok("resource.journey", {"file_index_id": last["file_index_id"]})
+    kinds = [e["kind"] for e in j["events"]]
+    assert kinds == ["first_seen", "renamed", "edited", "attributes_changed", "permissions_changed", "moved", "deleted"], kinds
+    texts = {e["kind"]: e["text"] for e in j["events"]}
+    assert "budget.xlsx to budget-old.xlsx" in texts["renamed"] and "D:/Archive/budget-old.xlsx" in texts["moved"]
+    assert "copied" not in kinds                                                    # the moved-to rows are not copies
+    assert [p["path"] for p in j["places"]] == ["C:/Finance/budget.xlsx", "C:/Finance/budget-old.xlsx", "D:/Archive/budget-old.xlsx"]
+    assert all(p["gone_at"] for p in j["places"])                                   # it has left them all (deleted last)
+    # asked from the first place too: the same journey
+    assert [e["kind"] for e in (await su.ok("resource.journey", {"file_index_id": first["file_index_id"]}))["events"]] == kinds
+
+    # a place the file has left is not a file that is there: no name collision, no copy elsewhere, not found by search
+    assert await engine.file_index.name_collisions("budget.xlsx") == []
+    assert await engine.file_index.path_collision(org["a1_pc"], "C:/Finance/budget.xlsx") is None
+    assert await engine.db.file_index.by_hash("H1") == []
+    # ...and it counts again if it turns up there again (the row is the same one, no longer gone)
+    await ev(op="create", path="C:/Finance/budget.xlsx", hash="H1")
+    assert len(await engine.db.file_index.by_hash("H1")) == 1
+
+
+async def test_automations_can_wait_on_attribute_permission_and_folder_changes(engine, org, connect):
+    a1 = await connect("cid-a1")
+    note = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "notify", "timeout_s": 5,
+                                                  "params": {"message": "changed"}}))["action"]
+    wanted = ("file.attributes_changed", "file.permissions_changed", "folder.created", "folder.moved", "folder.deleted")
+    for etype in wanted:
+        await a1.ok("control.event_create", {"type": etype, "pc_ids": [org["a1_pc"]], "action_ids": [note["id"]]})
+    await a1.drain_pushes()
+    sent = [{"op": "attrib", "path": "C:/x/a.txt"}, {"op": "security", "path": "C:/x/a.txt"},
+            {"op": "create", "path": "C:/x/new", "is_dir": True},
+            {"op": "move", "path": "C:/x/new2", "old_path": "C:/x/new", "is_dir": True},
+            {"op": "delete", "path": "C:/x/new2", "is_dir": True}]
+    for e in sent:
+        await a1.ok("index.event", {"event": e})
+    fired = [p.payload["type"] for p in await a1.drain_pushes() if p.type == "event.fired"]
+    assert sorted(fired) == sorted(wanted)
+    # an edit of attributes or permissions, or anything to a folder, does not reach Flow, Resource or Task (content only)
+    assert await engine.db.pool.fetchval("SELECT count(*) FROM resource_violations") == 0
