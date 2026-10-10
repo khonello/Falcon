@@ -92,6 +92,19 @@ class EngineConnection:
     def on_push(self, handler: PushHandler) -> None:
         self._push_handlers.append(handler)
 
+    async def open(self) -> None:
+        """Connect WITHOUT the handshake: for a machine that has no key yet and may only ask to be registered
+        (`enroll.request`, `enroll.wait`). Everything else is refused by the Engine until `connect()` has authenticated."""
+        ssl_ctx = self._ssl_context()
+        self._reader, self._writer = await asyncio.open_connection(
+            self.host, self.port, ssl=ssl_ctx, server_hostname=self.host if ssl_ctx else None)
+        self._closed = False
+        loop = asyncio.get_running_loop()
+        self._challenge = loop.create_future()
+        self._push_queue = asyncio.Queue()
+        self._push_task = asyncio.create_task(self._push_loop())
+        self._reader_task = asyncio.create_task(self._read_loop())
+
     async def connect(self) -> Identity:
         ssl_ctx = self._ssl_context()
         self._reader, self._writer = await asyncio.open_connection(

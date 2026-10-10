@@ -2,7 +2,7 @@
 
 The first thing the Engine does on a new connection is issue the auth challenge (unless
 FALCON_DEV_BYPASS_AUTH). Until `auth.respond` succeeds, only `auth.*` and `system.*` requests
-are accepted.
+are accepted, plus the two a machine asking to be registered needs (`enroll.request`, `enroll.wait`).
 """
 
 from __future__ import annotations
@@ -33,6 +33,8 @@ log = logging.getLogger(__name__)
 
 MAX_LINE_BYTES = 4 * 1024 * 1024  # generous: Custom Action scripts and file-sweep batches
 PRE_AUTH_PREFIXES = ("auth.", "system.")
+# The two requests a machine with no key yet may make: asking to be registered, and collecting the answer.
+PRE_AUTH_TYPES = frozenset({"enroll.request", "enroll.wait"})
 
 
 class Connection:
@@ -45,6 +47,7 @@ class Connection:
         self.ctx = Context(engine=engine, connection=self)
         self.authenticated = False
         self.pending_nonce: str | None = None
+        self.enrollment_id: int | None = None      # set when this connection asked to be registered
         self._write_lock = asyncio.Lock()
 
     # --- outbound -------------------------------------------------------------------------------
@@ -104,7 +107,7 @@ class Connection:
             return
 
         assert env.id is not None and env.type is not None
-        if not self.authenticated and not env.type.startswith(PRE_AUTH_PREFIXES):
+        if not self.authenticated and not env.type.startswith(PRE_AUTH_PREFIXES) and env.type not in PRE_AUTH_TYPES:
             await self.send(error_response(env.id, ErrorCode.UNAUTHENTICATED))
             return
 

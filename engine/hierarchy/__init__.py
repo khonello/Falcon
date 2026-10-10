@@ -18,6 +18,7 @@ from engine.hierarchy import (  # noqa: F401
     assisted_access,
     auditing,
     display_names,
+    enrollment,
     reports,
     traversal,
 )

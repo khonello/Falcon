@@ -239,3 +239,30 @@ async def assist_status(ctx: ShellContext, args: Args) -> str:
         "\n(offer pending)" if res["pending_offer"] else "")
 
 
+
+
+@command("enroll", help_="Machines waiting to be registered (the code is on the machine's own screen, not here)")
+async def enroll_list(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("enroll.list")
+    rows_ = [{"id": r["id"], "machine": r["hostname"], "asked for": r["requested_department_name"] or "no department",
+              "as": r["requested_level"], "os": r["os"], "since": r["created_at"]} for r in res["requests"]]
+    return table(rows_, ["id", "machine", "asked for", "as", "os", "since"]) if rows_ else "(nothing waiting)"
+
+
+@command("enroll", "confirm", "<id> <code> [dept=<id>] [level=worker|admin]",
+         "Confirm a waiting machine by typing the code it shows; the key goes only to that machine")
+async def enroll_confirm(ctx: ShellContext, args: Args) -> str:
+    payload: dict = {"enrollment_id": args.get_int(0, "id"), "code": args.get(1, "code")}
+    if args.opt("dept"):
+        payload["department_id"] = int(args.opt("dept"))  # type: ignore[arg-type]
+    if args.opt("level"):
+        payload["level"] = args.opt("level")
+    res = await ctx.call("enroll.confirm", payload)
+    return f"{res['hostname']} registered as a {res['role']} (account {res['account_id']}, pc {res['pc_id']}); it collects its own key"
+
+
+@command("enroll", "refuse", "<id> [reason...]", "Refuse a waiting machine")
+async def enroll_refuse(ctx: ShellContext, args: Args) -> str:
+    reason = args.rest(1, "reason") if len(args.positional) > 1 else ""
+    await ctx.call("enroll.refuse", {"enrollment_id": args.get_int(0, "id"), "reason": reason})
+    return "refused"

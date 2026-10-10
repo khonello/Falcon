@@ -36,31 +36,25 @@ part is recorded for later, not built.
    not written: both attempts to write it in this session were stopped by a safety classifier, so it needs to be
    written another way (by hand, or in a session where the writing is not blocked). Until then an automation on
    "is opened" saves and never fires. *Found:* Automation (AU08).
-15. **Register machines from the local network instead of typing them** (the user's idea, 27 Sep 2026). Today a
-    machine is registered by typing its name (`hierarchy.account_create`), and its client id + key are copied onto it
-    by hand. The idea: a small installer on each machine stores who it is meant to be (its name, department, level --
-    worker / Admin workstation, and anything else registration needs); the Engine finds those machines on the local
-    network and registers them. It works, with two changes so a stranger on the network cannot let itself in:
-
-    - **The machine asks; the Engine does not hunt.** Scanning subnets is unreliable across VLANs and needs the Engine to
-      reach into every machine. Instead the installed agent (already the Worker Client) finds the Engine -- the address
-      from the install package, or a UDP broadcast / mDNS answer on the LAN -- and opens an unauthenticated
-      `enroll.request` over TLS (the Engine's certificate is pinned in the package): `{hostname, requested department,
-      requested level, os, mac}`. Only `auth.*`, `system.*` and this one request are allowed before the handshake.
-    - **What it says about itself is a request, never a grant** (propose, never silently resolve). Requests land in a
-      "Waiting to be registered" list -- on the department page for its Admin, and on Must see for the Super User. A
-      person confirms each one (department, level, and who uses it), or refuses it. An Admin can only confirm workers
-      in their own department; an Admin workstation needs the Super User. Nothing registers itself.
-    - **Pairing, so the right machine gets the key.** The agent shows a short code on its own screen (a Worker window,
-      "Registering this machine · code 4 7 2 9"); the person confirming types that code. On a match the Engine
-      creates the account + PC and sends the client id + key back over the agent's open enrollment connection -- no
-      one copies a key by hand, and a machine that is not really in front of someone cannot finish.
-    - Engine: `enroll.request` (pre-auth, rate-limited, audited), `enroll.list` / `enroll.confirm {code, department_id,
-      role}` / `enroll.refuse`, an `enrollments` table (pending / confirmed / refused / expired after e.g. 24 h), and
-      the pre-auth gate in `connection.py`. Worker: an `--enroll` first-run mode that requests, shows the code, waits,
-      then writes the key to its config and connects normally. UI: the waiting list replaces "Register a machine"'s
-      typed name (the dialog keeps working as the fallback). *Raised:* by the user, after the dialogs (DG01).
 ## Done inline (for the record)
+
+- **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine
+  host:port --ca engine.crt --enroll [--department ID] [--level worker|admin]`: it asks (`enroll.request`, one of only
+  two requests accepted before the handshake, the other being `enroll.wait`), shows a four-digit code on its own screen
+  (console and a Worker window), and waits. Nothing registers itself: the request waits in `enrollments` (migration
+  019) and the Super User sees all of them, an Admin the ones for their department (`enroll.list`, with no code in it).
+  Whoever confirms types the code (`enroll.confirm {enrollment_id, code, department_id?, level?}`); an Admin confirms
+  only Workers in their own department, an Admin workstation needs the Super User; five wrong codes refuse it; it can
+  be refused (`enroll.refuse`) and expires after 24 h. The account and PC are made by the same `provision()` as
+  `hierarchy.account_create`. The machine is nudged (`enroll.decided`) and collects its client id and key with its
+  token, once, ever (`collected` afterwards -- an Admin rekeys); they are written into its config and it carries on as a
+  Worker. The confirmer never receives the key. Asks are rate-limited to five waiting per address and 100 in all, and
+  audited (`enroll.requested/confirmed/refused/collected`). TUI: `enroll`, `enroll confirm <id> <code>`, `enroll
+  refuse <id>`. The typed-name registration still works as the fallback. Not built (the console, not the Engine):
+  the "Waiting to be registered" list on the department page and Must see. The Worker finds the Engine from the install
+  package's address (`--engine`); a LAN broadcast to find it without one is not built. *Test:* `tests/test_enrollment.py`,
+  `test_worker_client.py::test_a_new_worker_registers_itself_by_asking_and_then_runs`,
+  `test_operator_client.py::test_scripted_enrollment`.
 
 - **A file's journey** (was #9, done 10 Oct 2026; the user decided: the journey only, not "required on every machine").
   `resource.journey {file_index_id}` follows a file by its CONTENT (the hash), because a copy has another path and

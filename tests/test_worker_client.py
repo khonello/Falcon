@@ -13,6 +13,8 @@ import base64
 import inspect
 from pathlib import Path
 
+import pytest
+
 from common.connection import EngineConnection
 from tests.conftest import key_for, requires_db
 from worker_client.config import WorkerConfig
@@ -544,3 +546,49 @@ async def test_the_worker_reports_what_runs_and_what_is_installed(engine, org, t
     finally:
         await admin.close()
         await svc.stop()
+
+
+async def test_a_new_worker_registers_itself_by_asking_and_then_runs(engine, org, tmp_path: Path):
+    from worker_client.enroll import EnrollmentEnded, enroll
+
+    cfg = _cfg(engine, tmp_path, "", [])
+    cfg.client_id, cfg.client_key = "", ""
+    screen: list[str] = []
+    admin = await _admin(engine)
+    try:
+        task = asyncio.create_task(enroll(cfg, department_id=org["fin"], show=screen.append, poll=0.3, hostname="LOBBY-PC"))
+        assert await _wait(lambda: any("Code" in line for line in screen), timeout=10)
+        code = next(line for line in screen if "Code" in line).split("Code")[1].replace(" ", "").strip()
+        waiting = (await admin.call("enroll.list"))["requests"]
+        assert [(r["hostname"], r["requested_department_id"]) for r in waiting] == [("LOBBY-PC", org["fin"])]
+        done = await admin.call("enroll.confirm", {"enrollment_id": waiting[0]["id"], "code": code})
+        got = await asyncio.wait_for(task, 15)
+        assert got["client_id"] and got["pc_id"] == done["pc_id"] and "Registered" in screen[-1]
+        assert cfg.client_id == got["client_id"] and cfg.client_key == got["client_key"]            # written into the config
+        from worker_client.config import WorkerConfig
+        assert WorkerConfig.load(cfg.path).client_key == got["client_key"]                          # and saved to disk
+
+        # and it runs as an ordinary Worker with what it was given
+        cfg.metrics_seconds = 0.5
+        svc = WorkerService(cfg, native_watch=False)
+        svc.executor.log_dir = tmp_path / "exec-new"
+        svc.executor.log_dir.mkdir()
+        await svc.start()
+        try:
+            assert svc.identity.role == "worker" and svc.identity.department_id == org["fin"]
+        finally:
+            await svc.stop()
+
+        # a refused request ends in plain words and writes no key
+        cfg2 = _cfg(engine, tmp_path, "", [])
+        cfg2.client_id, cfg2.client_key = "", ""
+        screen2: list[str] = []
+        task2 = asyncio.create_task(enroll(cfg2, department_id=org["fin"], show=screen2.append, poll=0.3, hostname="STRAY-PC"))
+        assert await _wait(lambda: any("Code" in line for line in screen2), timeout=10)
+        pending = (await admin.call("enroll.list"))["requests"]
+        await admin.call("enroll.refuse", {"enrollment_id": pending[0]["id"], "reason": "not ours"})
+        with pytest.raises(EnrollmentEnded) as ended:
+            await asyncio.wait_for(task2, 15)
+        assert "refused" in str(ended.value) and "not ours" in str(ended.value) and cfg2.client_key == ""
+    finally:
+        await admin.close()

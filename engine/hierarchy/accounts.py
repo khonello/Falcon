@@ -50,6 +50,18 @@ async def departments(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"departments": rows(await ctx.engine.db.accounts.list_departments())}
 
 
+async def provision(engine: Any, role: str, department_id: int | None, hostname: str) -> dict[str, Any]:
+    """An account and its PC together (one account <-> one PC), with a new client id and its key. Shared by
+    `hierarchy.account_create` and by confirming an enrollment, so a machine provisioned either way is the same."""
+    client_id = secrets.token_urlsafe(16)
+    db = engine.db
+    async with db.pool.acquire() as conn, conn.transaction():
+        pc_id = await db.accounts.create_pc(hostname, department_id, PC_TYPE_FOR_ROLE[role], client_id)
+        account_id = await db.accounts.create(role, department_id, pc_id)
+    return {"account_id": account_id, "pc_id": pc_id, "client_id": client_id,
+            "client_key": engine.client_key(client_id), "role": role}
+
+
 @handler("hierarchy.account_create")
 async def account_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"role": str, "department_id": int?, "hostname": str} -- provisions the account AND its
@@ -65,16 +77,11 @@ async def account_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
         raise ProtocolError(ErrorCode.FORBIDDEN, f"{ident.role} cannot create a {role}")
     if department_id is not None:
         require_department_scope(ident, department_id)
-    client_id = secrets.token_urlsafe(16)
-    db = ctx.engine.db
-    async with db.pool.acquire() as conn, conn.transaction():
-        pc_id = await db.accounts.create_pc(hostname, department_id, PC_TYPE_FOR_ROLE[role], client_id)
-        account_id = await db.accounts.create(role, department_id, pc_id)
-    await ctx.engine.audit.record(ctx, "account.created", target_type="accounts", target_id=account_id,
-                                  detail={"role": role, "department_id": department_id, "pc_id": pc_id})
+    made = await provision(ctx.engine, role, department_id, hostname)
+    await ctx.engine.audit.record(ctx, "account.created", target_type="accounts", target_id=made["account_id"],
+                                  detail={"role": role, "department_id": department_id, "pc_id": made["pc_id"]})
     # client_id + client_key go into the install package; the Engine keeps neither key nor copy.
-    return {"account_id": account_id, "pc_id": pc_id, "client_id": client_id,
-            "client_key": ctx.engine.client_key(client_id), "role": role}
+    return made
 
 
 @handler("hierarchy.account_offboard")

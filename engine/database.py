@@ -27,7 +27,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 # Legal targets for polymorphic references. Extend deliberately, never ad hoc.
 POLYMORPHIC_TABLES = frozenset({
     "accounts", "departments", "pcs", "sessions", "assisted_access_requests", "file_index",
-    "tasks", "department_tasks", "verification_items", "manual_verifications", "flows", "flow_destinations",
+    "tasks", "department_tasks", "enrollments", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts",
@@ -70,6 +70,7 @@ class Database:
         self.file_index = FileIndexRepo(self)
         self.tasks = TasksRepo(self)
         self.department_tasks = DepartmentTasksRepo(self)
+        self.enrollments = EnrollmentsRepo(self)
         self.flows = FlowsRepo(self)
         self.reports = ReportsRepo(self)
         self.assistance = AssistanceRepo(self)
@@ -620,6 +621,63 @@ class TasksRepo(_Repo):
 # ============================================================================================
 # 5. Flow
 # ============================================================================================
+
+class EnrollmentsRepo(_Repo):
+    """Machines asking to be registered (migration 019). Requests, never grants."""
+
+    async def create(self, code: str, token_hash: str, hostname: str, os_name: str | None, mac: str | None,
+                     department_id: int | None, level: str, peer: str | None, expires_at: datetime) -> int:
+        return await self._val(
+            "INSERT INTO enrollments (code, token_hash, hostname, os, mac, requested_department_id, requested_level, "
+            "peer, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+            code, token_hash, hostname, os_name, mac, department_id, level, peer, expires_at)
+
+    async def get(self, enrollment_id: int) -> dict[str, Any] | None:
+        return await self._one(
+            "SELECT e.*, d.name AS requested_department_name FROM enrollments e "
+            "LEFT JOIN departments d ON d.id = e.requested_department_id WHERE e.id = $1", enrollment_id)
+
+    async def by_token(self, token_hash: str) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM enrollments WHERE token_hash = $1", token_hash)
+
+    async def pending(self, *, department_id: int | None = None) -> list[dict[str, Any]]:
+        """Waiting requests, oldest first. `department_id` limits to the ones that asked for that department."""
+        return await self._fetch(
+            "SELECT e.id, e.hostname, e.os, e.mac, e.requested_department_id, e.requested_level, e.peer, e.status, "
+            "e.created_at, e.expires_at, d.name AS requested_department_name FROM enrollments e "
+            "LEFT JOIN departments d ON d.id = e.requested_department_id "
+            "WHERE e.status = 'pending' AND ($1::int IS NULL OR e.requested_department_id = $1) "
+            "ORDER BY e.created_at, e.id", department_id)
+
+    async def pending_count(self, peer: str | None = None) -> int:
+        return await self._val(
+            "SELECT count(*) FROM enrollments WHERE status = 'pending' AND ($1::text IS NULL OR peer = $1)", peer)
+
+    async def wrong_code(self, enrollment_id: int) -> int:
+        """One more wrong code; returns how many so far."""
+        return await self._val("UPDATE enrollments SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts",
+                               enrollment_id)
+
+    async def confirm(self, enrollment_id: int, by_account_id: int, account_id: int, pc_id: int) -> None:
+        await self._exec(
+            "UPDATE enrollments SET status = 'confirmed', decided_by_account_id = $2, decided_at = now(), "
+            "account_id = $3, pc_id = $4 WHERE id = $1 AND status = 'pending'", enrollment_id, by_account_id, account_id, pc_id)
+
+    async def refuse(self, enrollment_id: int, by_account_id: int | None, reason: str) -> None:
+        await self._exec(
+            "UPDATE enrollments SET status = 'refused', decided_by_account_id = $2, decided_at = now(), "
+            "refused_reason = $3 WHERE id = $1 AND status = 'pending'", enrollment_id, by_account_id, reason)
+
+    async def expire_old(self) -> int:
+        status = await self._exec("UPDATE enrollments SET status = 'expired' WHERE status = 'pending' AND expires_at < now()")
+        return int(status.split()[-1])
+
+    async def mark_delivered(self, enrollment_id: int) -> bool:
+        """The machine collected its key. True only the first time."""
+        status = await self._exec(
+            "UPDATE enrollments SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL", enrollment_id)
+        return status.endswith("1")
+
 
 class DepartmentTasksRepo(_Repo):
     """Tasks the Super User gives a department (migration 017): no checks, one deadline, a state per Admin told."""

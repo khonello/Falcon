@@ -40,6 +40,22 @@ async def _main(cfg: WorkerConfig, *, ui: bool, native: bool, allow_power: bool)
         await service.stop()
 
 
+async def _show_code(text: str) -> object:
+    """The code on this person's screen, in a Worker window, when this machine has windows."""
+    from worker_client.windows.spawn import open_window
+
+    return await open_window("message", {"text": text, "from": ""})
+
+
+async def _enroll(cfg: WorkerConfig, department_id: int | None, level: str) -> None:
+    from worker_client.enroll import EnrollmentEnded, enroll
+
+    try:
+        await enroll(cfg, department_id=department_id, level=level, window=_show_code if cfg.windows else None)
+    except EnrollmentEnded as exc:
+        sys.exit(f"not registered: {exc}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="worker_client", description="Falcon Worker Client")
     ap.add_argument("--engine", help="host:port of the Engine (remembered)")
@@ -50,6 +66,10 @@ def main() -> None:
     ap.add_argument("--config", help="config file path (default: %PROGRAMDATA%/Falcon/worker.json)")
     ap.add_argument("--watch", action="append", help="directory to watch (repeatable; remembered)")
     ap.add_argument("--ui", action="store_true", help="also run the narrow Worker TUI")
+    ap.add_argument("--enroll", action="store_true",
+                    help="first run: ask the Engine to register this machine (shows a code; an Admin confirms it)")
+    ap.add_argument("--department", type=int, help="with --enroll: the department this machine asks to join")
+    ap.add_argument("--level", choices=("worker", "admin"), default="worker", help="with --enroll: what it asks to be")
     ap.add_argument("--allow-power", action="store_true", help="allow shutdown/reboot/lock_session actions")
     ap.add_argument("--no-native-watch", action="store_true", help="force the polling watcher")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -72,8 +92,10 @@ def main() -> None:
         cfg.ca_cert = args.ca
     if args.watch:
         cfg.watch_roots = args.watch
+    if args.enroll:
+        asyncio.run(_enroll(cfg, args.department, args.level))
     if not cfg.client_id:
-        sys.exit("no client id: pass --client-id once (it is remembered)")
+        sys.exit("no client id: pass --client-id once (it is remembered), or register with --enroll")
     cfg.save()
     try:
         asyncio.run(_main(cfg, ui=args.ui, native=not args.no_native_watch, allow_power=args.allow_power))

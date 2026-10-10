@@ -60,6 +60,27 @@ Implements Display Names' **non-propagation rule**: a name set at one relationsh
 
 ---
 
+### `enrollments` (migration 019)
+A machine asking to be registered. A request, never a grant: it waits here until a person confirms it. The machine shows `code` on its own screen and whoever confirms types it; on a match the Engine creates the account + PC and the machine collects its client id and key once, with a token only it holds.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `code` | TEXT NOT NULL | Four digits, shown on the machine, never sent to the people who confirm |
+| `token_hash` | TEXT NOT NULL UNIQUE | SHA-256 of the token the machine holds; lets it (and only it) collect the key |
+| `hostname`, `os`, `mac` | TEXT | What the machine says about itself -- a request, not a fact |
+| `requested_department_id` | INTEGER FK → departments.id NULLABLE | What it asked for; the confirmer may choose another (or must, if it asked for none) |
+| `requested_level` | TEXT NOT NULL | `worker` or `admin`; an Admin workstation needs the Super User |
+| `peer` | TEXT | The address it asked from (rate limit: five waiting per address) |
+| `status` | TEXT NOT NULL | `pending` / `confirmed` / `refused` / `expired` (after 24 h) |
+| `attempts` | INTEGER NOT NULL | Wrong codes so far; five refuse the request |
+| `created_at`, `expires_at` | TIMESTAMP NOT NULL | |
+| `decided_by_account_id`, `decided_at`, `refused_reason` | | Who confirmed or refused it, when, and why |
+| `account_id`, `pc_id` | INTEGER FK NULLABLE | What confirming created |
+| `delivered_at` | TIMESTAMP NULLABLE | When the machine collected its key (once, ever) |
+
+---
+
 ## 2. Traversal & Sessions
 
 ### `sessions`

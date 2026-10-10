@@ -238,3 +238,20 @@ async def engine_event(engine, org) -> int:
         return res["file_index_id"]
     finally:
         await conn.close()
+
+
+async def test_scripted_enrollment(engine, org, tmp_path: Path):
+    from common.connection import EngineConnection as Raw
+
+    machine = Raw("127.0.0.1", engine.port, client_id="", tls=False)
+    await machine.open()
+    try:
+        asked = await machine.call("enroll.request", {"hostname": "DESK-9", "department_id": org["fin"]})
+        out = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+            "connect", "enroll", f"enroll confirm {asked['enrollment_id']} {asked['code']}", "enroll"])
+        assert "DESK-9" in out[1] and "Finance" in out[1] and "code" not in out[1].lower()
+        assert "DESK-9 registered as a worker" in out[2] and "(nothing waiting)" in out[3]
+        got = await machine.call("enroll.wait", {"token": asked["token"]})
+        assert got["status"] == "confirmed" and got["client_key"]
+    finally:
+        await machine.close()
