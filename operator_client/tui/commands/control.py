@@ -166,6 +166,19 @@ async def programs(ctx: ShellContext, args: Args) -> str:
     return "\n".join(out)
 
 
+@command("where", usage="<file name> | hash=<content hash> [pcs=3,4]",
+         help_="Where a file is on each machine, before a file action runs (each machine gets its own path)")
+async def where(ctx: ShellContext, args: Args) -> str:
+    payload: dict[str, Any] = {"find_hash": args.opt("hash")} if args.opt("hash") else {"find_name": args.get(0, "file name")}
+    if args.opt("pcs"):
+        payload["pc_ids"] = [int(x) for x in args.opt("pcs").split(",") if x]  # type: ignore[union-attr]
+    res = await ctx.call("control.file_locations", payload)
+    rows_ = [{"pc": m["pc_id"], "machine": m["hostname"], "status": m["status"], "path": "; ".join(m["paths"])}
+             for m in res["machines"]]
+    return (f"found on {res['found']}, missing on {res['missing']}, several copies on {res['several']}\n\n"
+            + table(rows_, ["pc", "machine", "status", "path"], width=60))
+
+
 @command("dashboard", help_="Operational view: enabled automations, last fired, recent executions, live runs")
 async def dashboard(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.dashboard")

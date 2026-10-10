@@ -36,8 +36,6 @@ part is recorded for later, not built.
    not written: both attempts to write it in this session were stopped by a safety classifier, so it needs to be
    written another way (by hand, or in a session where the writing is not blocked). Until then an automation on
    "is opened" saves and never fires. *Found:* Automation (AU08).
-6. **Rename a file's new name is free text** and `rename_file` runs on every machine the action targets with one
-   path; a per-machine path (from `file_index`, by hash or name) would be truer. *Found:* AU06.
 9. **Resources: "where it should be" and "a file's journey"** (RS03) have no data. The first needs files marked
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
@@ -88,6 +86,17 @@ part is recorded for later, not built.
 
     Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
 ## Done inline (for the record)
+
+- **A file action finds its file on each machine** (was #6, done 10 Oct 2026). `rename_file`, `restore_file` and
+  `snapshot_file` name their file one of three ways: `path` (the same path on every machine, as before),
+  `find_name` (a file name) or `find_hash` (a content hash); exactly one. For the last two the Engine looks the file up
+  in the file index for each machine the action runs on and sends that machine its own path
+  (`executions.locate_file`). A machine with no copy, or with several, is not guessed at: the run is recorded as failed
+  with "the file is not on this machine" or "2 copies on this machine; name the path", audited as `action.not_run`, and
+  nothing is sent. `control.file_locations {find_name|find_hash, pc_ids?}` previews it before anything runs: per
+  machine found / missing / several, with the paths. TUI: `where <name> | hash=..`, and
+  `action add control rename_file find_name=.. new_name=..`. (A department run includes the Admin's own workstation, as
+  every department run does.) *Test:* `test_control_updates.py::test_a_file_action_uses_each_machines_own_path`.
 
 - **Programs are picked, not typed** (was #5, done 10 Oct 2026). The Worker reports what runs (the process table
   grouped by program: name, how many, memory; every minute) and what is installed (Windows' own lists, read from the

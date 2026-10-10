@@ -63,7 +63,7 @@ async def inventory(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"accepted": True}
 
 
-async def _scope(ctx: Context, payload: dict[str, Any]) -> set[int]:
+async def scope_pcs(ctx: Context, payload: dict[str, Any]) -> set[int]:
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     wanted = payload.get("pc_ids")
@@ -100,7 +100,7 @@ async def programs(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"pc_ids"?} (default: the caller's department; the Super User's: every machine).
     -> {"running": [{name, machines, pc_ids}], "installed": [{name, machines, pc_ids, command}], "reporting": n}.
     `reporting` is how many of the machines in scope have reported what runs since the Engine started."""
-    scope = await _scope(ctx, payload)
+    scope = await scope_pcs(ctx, payload)
     running = {pc: _running[pc]["items"] for pc in scope if pc in _running}
     installed: dict[int, list[dict[str, Any]]] = {}
     if ctx.engine.db.connected:

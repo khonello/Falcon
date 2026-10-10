@@ -410,3 +410,58 @@ async def test_programs_are_picked_from_what_runs_and_what_is_installed(engine, 
     await w1.ok("control.inventory", {"running": [{"name": ""}, "junk", {"name": "calc.exe"}]})
     assert [r["name"] for r in (await a1.ok("control.programs", {"pc_ids": [org["w1_pc"]]}))["running"]] == ["calc.exe"]
     assert len((await a1.ok("control.programs", {"pc_ids": [org["w1_pc"]]}))["installed"]) == 2   # untouched
+
+
+async def test_a_file_action_uses_each_machines_own_path(engine, org, connect):
+    """The same file sits at different paths on different machines: the Admin names it (by name or content hash),
+    and each machine is sent the path the file index has for it. No copy, or several, is said plainly."""
+    a1 = await connect("cid-a1")
+    a2 = await connect("cid-a2")
+    w1 = await connect("cid-w1")
+    w2 = await connect("cid-w2")
+    idx = engine.db.file_index
+    await idx.upsert(org["w1_pc"], "C:/Finance/budget.xlsx", "budget.xlsx", "h-budget", None, None, "idle_sweep")
+    await idx.upsert(org["w2_pc"], "D:/Docs/Budget.xlsx", "Budget.xlsx", "h-budget", None, None, "idle_sweep")
+
+    # naming the file by name and by path at once (or by neither) is refused
+    for params in ({"new_name": "x.xlsx", "path": "C:/a.txt", "find_name": "a.txt"}, {"new_name": "x.xlsx"}):
+        assert await a1.err("control.action_create", {"kind": "control", "builtin_type": "rename_file", "timeout_s": 20,
+                                                      "params": params}) == "invalid"
+
+    where = await a1.ok("control.file_locations", {"find_name": "budget.xlsx"})
+    assert where["found"] == 2 and {m["hostname"]: m["paths"] for m in where["machines"] if m["paths"]} == {
+        "FIN-01": ["C:/Finance/budget.xlsx"], "FIN-02": ["D:/Docs/Budget.xlsx"]}
+    assert (await a1.ok("control.file_locations", {"find_hash": "h-budget"}))["found"] == 2
+    assert await a1.err("control.file_locations", {}) == "invalid"
+    assert await a2.err("control.file_locations", {"find_name": "budget.xlsx", "pc_ids": [org["w1_pc"]]}) == "forbidden"
+
+    rename = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "rename_file", "timeout_s": 20,
+                                                    "params": {"find_name": "budget.xlsx", "new_name": "budget-old.xlsx"}}))["action"]
+    assert rename["params"] == {"find_name": "budget.xlsx", "new_name": "budget-old.xlsx"}
+    await a1.ok("control.action_run", {"action_id": rename["id"], "department_id": org["fin"]})
+    sent = {}
+    for who, w in (("w1", w1), ("w2", w2)):
+        run = next(p for p in await w.drain_pushes() if p.type == "action.execute").payload
+        sent[who] = run["action"]["params"]
+    assert sent["w1"] == {"new_name": "budget-old.xlsx", "path": "C:/Finance/budget.xlsx"}      # each its own path
+    assert sent["w2"] == {"new_name": "budget-old.xlsx", "path": "D:/Docs/Budget.xlsx"}
+
+    # a second copy on FIN-01 and none on FIN-02: each is reported, neither is guessed at, nothing is sent
+    await idx.upsert(org["w1_pc"], "C:/Old/budget.xlsx", "budget.xlsx", "h-old", None, None, "idle_sweep")
+    await engine.db.pool.execute("DELETE FROM file_index WHERE pc_id = $1", org["w2_pc"])
+    await a1.ok("control.action_run", {"action_id": rename["id"], "department_id": org["fin"]})
+    assert [p for w in (w1, w2) for p in await w.drain_pushes() if p.type == "action.execute"] == []
+    runs = {}
+    for r in await engine.db.control.last_executions_for_action(rename["id"], limit=10):    # newest first
+        runs.setdefault(r["target_pc_id"], r)
+    assert runs[org["w1_pc"]]["status"] == "failed" and "2 copies" in runs[org["w1_pc"]]["summary"]
+    assert runs[org["w2_pc"]]["status"] == "failed" and "not on this machine" in runs[org["w2_pc"]]["summary"]
+    where = await a1.ok("control.file_locations", {"find_name": "budget.xlsx"})
+    assert (where["found"], where["missing"], where["several"]) == (0, 2, 1)     # FIN-02 and the Admin's own PC have none
+
+    # a plain path still goes to every machine unchanged
+    fixed = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "restore_file", "timeout_s": 20,
+                                                   "params": {"path": "C:/Same/everywhere.txt"}}))["action"]
+    await a1.ok("control.action_run", {"action_id": fixed["id"], "pc_id": org["w1_pc"]})
+    assert next(p for p in await w1.drain_pushes() if p.type == "action.execute").payload["action"]["params"] == {
+        "path": "C:/Same/everywhere.txt"}

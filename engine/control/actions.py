@@ -31,8 +31,8 @@ BUILTIN: dict[str, dict[str, Any]] = {
     "screenshot": {"category": "control", "params": []},
     "notify": {"category": "control", "params": ["message"], "optional": ["stay_s"]},
     "lock_session": {"category": "control", "params": ["duration_s"], "optional": ["message"]},
-    "rename_file": {"category": "control", "params": ["path", "new_name"]},
-    "restore_file": {"category": "control", "params": ["path"]},
+    "rename_file": {"category": "control", "params": ["new_name"], "optional": ["path", "find_name", "find_hash"]},
+    "restore_file": {"category": "control", "params": [], "optional": ["path", "find_name", "find_hash"]},
     "kill_process": {"category": "control", "params": ["name"]},
     "start_process": {"category": "control", "params": ["command"]},
     "shutdown": {"category": "control", "params": [], "optional": ["delay_s", "message"]},
@@ -42,7 +42,7 @@ BUILTIN: dict[str, dict[str, Any]] = {
     "system_metrics": {"category": "monitoring", "params": []},
     "file_activity": {"category": "monitoring", "params": ["path"]},
     "idle_time": {"category": "monitoring", "params": []},
-    "snapshot_file": {"category": "monitoring", "params": ["path"]},
+    "snapshot_file": {"category": "monitoring", "params": [], "optional": ["path", "find_name", "find_hash"]},
     "usb_contents": {"category": "monitoring", "params": []},
 }
 
@@ -51,6 +51,11 @@ BUILTIN: dict[str, dict[str, Any]] = {
 # until the person closes it). lock_session: `duration_s` (how long the screen stays locked) and an optional
 # `message`. reboot/shutdown: `delay_s` (the warning before it happens: 60 or 300 as offered; any 0-3600) and a
 # `message`.
+# Actions that work on one file name it one of three ways: `path` (the same path on every machine), `find_name` (a file
+# name) or `find_hash` (a content hash). The last two are looked up in the file index for each machine the action runs
+# on, so every machine gets its own path (executions.resolve_file).
+FILE_ACTIONS = frozenset({"rename_file", "restore_file", "snapshot_file"})
+LOCATORS = ("path", "find_name", "find_hash")
 DELAY_MAX = 3600
 SETTLE_SECONDS = 30      # a run needs this much beyond a lock's or message's own length to finish and report
 
@@ -62,6 +67,11 @@ def check_params(builtin_type: str, params: dict[str, Any]) -> dict[str, Any]:
     if unknown := sorted(set(params) - known):
         raise ProtocolError(ErrorCode.INVALID, f"{builtin_type} takes {sorted(known) or 'no settings'}, not {unknown}")
     out = dict(params)
+    if builtin_type in FILE_ACTIONS:
+        given = [k for k in LOCATORS if str(out.get(k) or "").strip()]
+        if len(given) != 1:
+            raise ProtocolError(ErrorCode.INVALID, f"{builtin_type} needs exactly one of path, find_name, find_hash")
+        out = {k: v for k, v in out.items() if k not in LOCATORS or k == given[0]}
     for key in ("duration_s", "stay_s", "delay_s"):
         if key in out:
             try:

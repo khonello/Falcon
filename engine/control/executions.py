@@ -25,6 +25,7 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
+from engine.control.actions import FILE_ACTIONS, LOCATORS
 from engine.dispatch import Context, handler
 from engine.permissions import (
     int_field,
@@ -74,6 +75,25 @@ def _wire_action(action: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def locate_file(engine: Engine, params: dict[str, Any], pc_id: int) -> tuple[list[str], str]:
+    """Where a file action's file is on ONE machine, from the file index: (paths, why not one). `path` is taken as
+    given; `find_name` and `find_hash` are looked up. Exactly one path is a usable answer; none or several is not."""
+    if params.get("path"):
+        return [str(params["path"])], ""
+    if params.get("find_name"):
+        found = await engine.db.file_index.by_name(str(params["find_name"]), pc_ids=[pc_id])
+    elif params.get("find_hash"):
+        found = [f for f in await engine.db.file_index.by_hash(str(params["find_hash"])) if f["pc_id"] == pc_id]
+    else:
+        return [], "no file was named"
+    paths = sorted({f["path"] for f in found})
+    if not paths:
+        return [], "the file is not on this machine"
+    if len(paths) > 1:
+        return paths, f"{len(paths)} copies on this machine; name the path"
+    return paths, ""
+
+
 async def start(engine: Engine, action: dict[str, Any], event_id: int | None, pc_id: int, *,
                 actor: Context | None = None) -> int | None:
     """Create the execution row and dispatch to the worker client on `pc_id`, honouring the
@@ -85,8 +105,20 @@ async def start(engine: Engine, action: dict[str, Any], event_id: int | None, pc
     async def dispatch() -> int:
         execution_id = await engine.db.control.start_execution(action["id"], event_id, pc_id)
         _outputs[execution_id] = deque(maxlen=OUTPUT_CHUNKS_KEPT)
+        wire = _wire_action(action)
+        if action.get("builtin_type") in FILE_ACTIONS and not (wire["params"].get("path")):
+            # This machine's own path for the file: from the index, never one path for every machine.
+            paths, why = await locate_file(engine, wire["params"], pc_id)
+            if why:
+                await engine.db.control.finish_execution(execution_id, "failed", summary=why)
+                await engine.audit.record(actor, "action.not_run", target_type="execution", target_id=execution_id,
+                                          detail={"action_id": action["id"], "pc_id": pc_id, "why": why})
+                await _notify_dashboard(engine, action, {"execution_id": execution_id, "status": "failed",
+                                                         "summary": why})
+                return execution_id
+            wire["params"] = {**{k: v for k, v in wire["params"].items() if k not in LOCATORS}, "path": paths[0]}
         await engine.push_to_pc(pc_id, "action.execute", {
-            "execution_id": execution_id, "action": _wire_action(action), "timeout_s": action["timeout_seconds"]})
+            "execution_id": execution_id, "action": wire, "timeout_s": action["timeout_seconds"]})
         await engine.audit.record(actor, "action.started", target_type="execution", target_id=execution_id,
                                   detail={"action_id": action["id"], "event_id": event_id, "pc_id": pc_id,
                                           "delayed_s": delay})
@@ -248,6 +280,27 @@ async def execution_image_get(ctx: Context, payload: dict[str, Any]) -> dict[str
     await ctx.engine.audit.record(ctx, "execution.image_viewed", target_type="execution", target_id=execution_id)
     return {"execution_id": execution_id, "mime": img["mime"], "bytes": img["bytes"],
             "captured_at": img["captured_at"].isoformat(), "data": base64.b64encode(img["data"]).decode("ascii")}
+
+
+@handler("control.file_locations")
+async def file_locations(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Before a file action runs: where its file is on each machine. {"find_name"|"find_hash", "pc_ids"?} (default: the
+    caller's department; the Super User's: every machine) -> {"machines": [{pc_id, hostname, status, paths}],
+    "found", "missing", "several"} with status "found" (one copy: that machine gets its own path), "missing" (the action
+    will report 'not on this machine') or "several" (it will ask to be told the path)."""
+    from engine.control.inventory import scope_pcs
+
+    params = {k: payload[k] for k in ("find_name", "find_hash") if payload.get(k)}
+    if len(params) != 1:
+        raise ProtocolError(ErrorCode.INVALID, "give exactly one of find_name, find_hash")
+    machines = []
+    for pc_id in sorted(await scope_pcs(ctx, payload)):
+        paths, why = await locate_file(ctx.engine, params, pc_id)
+        pc = await ctx.engine.db.accounts.pc(pc_id)
+        status = "found" if not why else "several" if paths else "missing"
+        machines.append({"pc_id": pc_id, "hostname": pc["hostname"] if pc else None, "status": status, "paths": paths})
+    count = lambda st: sum(1 for m in machines if m["status"] == st)
+    return {"machines": machines, "found": count("found"), "missing": count("missing"), "several": count("several")}
 
 
 @handler("control.terminate")
