@@ -137,3 +137,14 @@ async def test_ping_channel_lock_close_and_listeners(engine, org, connect):
     await a1.ok("assistance.message", {"channel_id": opened2["channel_id"], "body": "status?"})
     assert await w1.err("assistance.close_channel", {"channel_id": opened2["channel_id"]}) == "forbidden"
     await a1.ok("assistance.close_channel", {"channel_id": opened2["channel_id"]})
+
+
+async def test_a_person_can_ask_who_they_may_ask_for_help(engine, org, connect):
+    w1 = await connect("cid-w1")
+    a1 = await connect("cid-a1")
+    su = await connect("cid-su")
+    assert [a["account_id"] for a in (await w1.ok("assistance.my_admins"))["admins"]] == [org["a1"]]
+    assert [a["role"] for a in (await a1.ok("assistance.my_admins"))["admins"]] == ["super_user"]
+    assert (await su.ok("assistance.my_admins"))["admins"] == []
+    ping = await w1.ok("assistance.ping", {"to_account_id": org["a1"]})
+    assert ping["ping_id"]

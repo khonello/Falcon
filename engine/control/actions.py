@@ -29,14 +29,14 @@ SCRIPT_LANGUAGES = ("powershell", "python")
 BUILTIN: dict[str, dict[str, Any]] = {
     # control
     "screenshot": {"category": "control", "params": []},
-    "notify": {"category": "control", "params": ["message"]},
-    "lock_session": {"category": "control", "params": ["duration_s"]},
+    "notify": {"category": "control", "params": ["message"], "optional": ["stay_s"]},
+    "lock_session": {"category": "control", "params": ["duration_s"], "optional": ["message"]},
     "rename_file": {"category": "control", "params": ["path", "new_name"]},
     "restore_file": {"category": "control", "params": ["path"]},
     "kill_process": {"category": "control", "params": ["name"]},
     "start_process": {"category": "control", "params": ["command"]},
-    "shutdown": {"category": "control", "params": []},
-    "reboot": {"category": "control", "params": []},
+    "shutdown": {"category": "control", "params": [], "optional": ["delay_s", "message"]},
+    "reboot": {"category": "control", "params": [], "optional": ["delay_s", "message"]},
     # monitoring
     "process_list": {"category": "monitoring", "params": []},
     "system_metrics": {"category": "monitoring", "params": []},
@@ -45,6 +45,45 @@ BUILTIN: dict[str, dict[str, Any]] = {
     "snapshot_file": {"category": "monitoring", "params": ["path"]},
     "usb_contents": {"category": "monitoring", "params": []},
 }
+
+
+# Settings the design asks for (Actions, AU06). notify: `message`, and `stay_s` (seconds it stays up; absent or 0 =
+# until the person closes it). lock_session: `duration_s` (how long the screen stays locked) and an optional
+# `message`. reboot/shutdown: `delay_s` (the warning before it happens: 60 or 300 as offered; any 0-3600) and a
+# `message`.
+DELAY_MAX = 3600
+SETTLE_SECONDS = 30      # a run needs this much beyond a lock's or message's own length to finish and report
+
+
+def check_params(builtin_type: str, params: dict[str, Any]) -> dict[str, Any]:
+    """The built-in's settings, checked and cleaned (whole numbers, short text). Raises INVALID."""
+    spec = BUILTIN[builtin_type]
+    known = set(spec["params"]) | set(spec.get("optional", []))
+    if unknown := sorted(set(params) - known):
+        raise ProtocolError(ErrorCode.INVALID, f"{builtin_type} takes {sorted(known) or 'no settings'}, not {unknown}")
+    out = dict(params)
+    for key in ("duration_s", "stay_s", "delay_s"):
+        if key in out:
+            try:
+                out[key] = int(out[key])
+            except (TypeError, ValueError) as exc:
+                raise ProtocolError(ErrorCode.INVALID, f"{key} must be a whole number of seconds") from exc
+    if "duration_s" in out and out["duration_s"] <= 0:
+        raise ProtocolError(ErrorCode.INVALID, "duration_s must be positive")
+    if "stay_s" in out and out["stay_s"] < 0:
+        raise ProtocolError(ErrorCode.INVALID, "stay_s must be 0 (until closed) or more")
+    if "delay_s" in out and not 0 <= out["delay_s"] <= DELAY_MAX:
+        raise ProtocolError(ErrorCode.INVALID, f"delay_s must be between 0 and {DELAY_MAX}")
+    if "message" in out:
+        out["message"] = str(out["message"]).strip()[:500]
+        if builtin_type == "notify" and not out["message"]:
+            raise ProtocolError(ErrorCode.INVALID, "message must not be empty")
+    return out
+
+
+def run_length(params: dict[str, Any]) -> int:
+    """How long a run lasts by its own settings (a lock, a message that stays up, a restart's warning)."""
+    return max(int(params.get("duration_s") or 0), int(params.get("stay_s") or 0), int(params.get("delay_s") or 0))
 
 
 def parse_timing(raw: Any) -> dict[str, Any]:
@@ -120,6 +159,8 @@ async def action_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         missing = [p for p in spec["params"] if p not in params]
         if missing:
             raise ProtocolError(ErrorCode.INVALID, f"missing params: {', '.join(missing)}")
+        params = check_params(builtin_type, params)
+        timeout_s = max(timeout_s, run_length(params) + SETTLE_SECONDS)     # never cut a lock short
         action_id = await db.control.create_action(
             ident.account_id, kind, timeout_s, builtin_type=builtin_type, name=name or builtin_type,
             description=payload.get("description"), params=params, timing=timing)
@@ -144,9 +185,15 @@ async def action_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     timeout_s = int_field(payload, "timeout_s", required=False)
     if timeout_s is not None and timeout_s <= 0:
         raise ProtocolError(ErrorCode.INVALID, "timeout_s must be positive")
+    params = payload.get("params")
+    if params is not None and action["action_kind"] != "custom":
+        if not isinstance(params, dict):
+            raise ProtocolError(ErrorCode.INVALID, "params must be an object")
+        params = check_params(action["builtin_type"], params)
+        timeout_s = max(timeout_s or action["timeout_seconds"], run_length(params) + SETTLE_SECONDS)
     await ctx.engine.db.control.update_action(
         action_id, timeout_seconds=timeout_s, custom_script=str(script) if script is not None else None,
-        name=payload.get("name"), description=payload.get("description"), params=payload.get("params"),
+        name=payload.get("name"), description=payload.get("description"), params=params,
         timing=parse_timing(payload["timing"]) if "timing" in payload else None)
     await ctx.engine.audit.record(ctx, "action.updated", target_type="actions", target_id=action_id)
     return {"action": row(await ctx.engine.db.control.action(action_id))}

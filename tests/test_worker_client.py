@@ -370,3 +370,104 @@ async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine
     finally:
         await admin.close()
         await svc.stop()
+
+
+def test_the_screen_builtins_use_their_settings(monkeypatch, capsys):
+    from worker_client import builtins as b
+
+    # a restart or shutdown: the warning before it happens, with the message beside it
+    ran = []
+    monkeypatch.setattr(b.subprocess, "run", lambda cmd, check=False: ran.append(cmd))
+    monkeypatch.setattr(b.sys, "platform", "win32")
+    assert b.power("reboot", ["300", "Updates tonight"]) == 0
+    assert ran[-1] == ["shutdown", "/r", "/t", "300", "/c", "Updates tonight"]
+    b.power("shutdown", [])
+    assert ran[-1][:4] == ["shutdown", "/s", "/t", "30"]
+    monkeypatch.setattr(b.sys, "platform", "linux")
+    b.power("reboot", ["90", ""])
+    assert ran[-1] == ["shutdown", "-r", "+2"]
+    assert "FALCON:summary reboot in 90 s" in capsys.readouterr().out
+
+    # a message with no windows installed says so instead of pretending it was shown
+    monkeypatch.setattr(b, "available", lambda: False)
+    b.notify(["Back up your files", "30"])
+    out = capsys.readouterr().out
+    assert "NOTIFY: Back up your files" in out and "not shown" in out
+
+    # a message that stays up for stay_s seconds is taken down after it; one the person closes is not
+    class Fake:
+        def __init__(self, ends):
+            self.ends, self.killed = ends, False
+        def wait(self, timeout=None):
+            if not self.ends:
+                raise b.subprocess.TimeoutExpired("w", timeout)
+        def terminate(self):
+            self.killed = True
+        def poll(self):
+            return 0 if self.ends else None
+        def kill(self):
+            self.killed = True
+
+    monkeypatch.setattr(b, "available", lambda: True)
+    shown = []
+    monkeypatch.setattr(b, "_window", lambda kind, spec: shown.append((kind, spec)) or Fake(False))
+    b.notify(["Meeting soon", "20"])
+    assert shown[-1] == ("message", {"text": "Meeting soon", "from": ""})
+    assert "taken down after 20 s" in capsys.readouterr().out
+    monkeypatch.setattr(b, "_window", lambda kind, spec: Fake(True))
+    b.notify(["Read this", ""])
+    assert "closed by the person" in capsys.readouterr().out
+
+    # a lock holds its window for the whole duration, then releases the screen
+    slept = []
+    monkeypatch.setattr(b.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(b, "_window", lambda kind, spec: shown.append((kind, spec)) or Fake(False))
+    b.lock(["900", "In a meeting"])
+    assert slept == [900] and shown[-1][0] == "locked" and shown[-1][1]["message"] == "In a meeting"
+    assert "locked for 15 min" in capsys.readouterr().out
+
+
+async def test_asking_for_help_from_the_tray_pings_the_admin_with_no_message(engine, org, tmp_path: Path, monkeypatch):
+    from worker_client.windows import spawn
+
+    shown = []
+
+    class Handle:
+        def __init__(self, answer):
+            self._answer = answer
+
+        async def answer(self):
+            return self._answer
+
+        def close(self):
+            pass
+
+    async def fake_open(kind, spec):
+        shown.append((kind, spec))
+        return Handle({"to": spec["admins"][0]["account_id"]} if kind == "ask" else {"seen": True})
+
+    monkeypatch.setattr(spawn, "open_window", fake_open)
+    svc = await _start(engine, tmp_path, "cid-w1", [])
+    admin = await _admin(engine)
+    try:
+        await svc.ask_for_help()
+        kinds = [k for k, _ in shown]
+        assert kinds == ["ask", "message"]                                   # who to ask, then "Asked ..."
+        assert shown[0][1]["admins"][0]["account_id"] == org["a1"]
+        assert "Asked" in shown[1][1]["text"]
+        status = await admin.call("assistance.ping_status")
+        assert status["unaddressed"] == 1 and status["pings"][0]["sender_account_id"] == org["w1"]
+        # closing the window without choosing sends nothing
+        shown.clear()
+
+        async def closed(kind, spec):
+            shown.append((kind, spec))
+            return Handle(None)
+
+        monkeypatch.setattr(spawn, "open_window", closed)
+        await svc.ask_for_help()
+        assert [k for k, _ in shown] == ["ask"]
+        assert (await admin.call("assistance.ping_status"))["unaddressed"] == 1
+    finally:
+        await admin.close()
+        await svc.stop()

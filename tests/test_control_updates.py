@@ -354,3 +354,28 @@ async def test_a_machine_watches_only_the_os_signals_an_automation_waits_for(eng
     await a1.ok("control.event_delete", {"event_id": ev["id"]})
     assert "control.interest_changed" in w1.push_types(await w1.drain_pushes())
     assert (await w1.ok("control.signal_interest"))["interest"] == {}
+
+
+async def test_built_in_actions_take_the_settings_the_design_asks_for(engine, org, connect):
+    a1 = await connect("cid-a1")
+
+    def make(builtin, params, timeout=5):
+        return a1.call("control.action_create", {"kind": "control", "builtin_type": builtin, "timeout_s": timeout,
+                                                 "params": params})
+
+    ok = (await make("notify", {"message": "  Back up your files  ", "stay_s": "45"})).result["action"]
+    assert ok["params"] == {"message": "Back up your files", "stay_s": 45}
+    assert ok["timeout_seconds"] == 5 + 70          # 45 s on screen + settling: a run is never cut short
+    lock = (await make("lock_session", {"duration_s": 900, "message": "Meeting"})).result["action"]
+    assert lock["timeout_seconds"] == 930
+    reboot = (await make("reboot", {"delay_s": 300, "message": "Updates"})).result["action"]
+    assert reboot["params"]["delay_s"] == 300 and reboot["timeout_seconds"] == 330
+    assert (await make("reboot", {})).result["action"]["params"] == {}                      # all optional
+
+    for builtin, params in [("notify", {"message": "  "}), ("notify", {"message": "x", "stay_s": -1}),
+                            ("notify", {"message": "x", "stay_s": "soon"}), ("lock_session", {"duration_s": 0}),
+                            ("reboot", {"delay_s": 99999}), ("reboot", {"colour": "red"})]:
+        assert (await make(builtin, params)).error["code"] == "invalid", (builtin, params)
+    upd = await a1.ok("control.action_update", {"action_id": lock["id"], "params": {"duration_s": 1800}})
+    assert upd["action"]["timeout_seconds"] == 1830
+    assert await a1.err("control.action_update", {"action_id": lock["id"], "params": {"duration_s": -5}}) == "invalid"

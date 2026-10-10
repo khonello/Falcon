@@ -89,6 +89,23 @@ async def search(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"results": rows(results)}
 
 
+@handler("assistance.my_admins")
+async def my_admins(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Who the caller may ask for help: a Worker's Admins (their own department's), an Admin's Super User.
+    -> {"admins": [{"account_id", "name"}]}, named as the caller names them. What the Worker's "ask for
+    help" window offers; a ping carries no message, so this is all it needs."""
+    ident = require_account(ctx)
+    db = ctx.engine.db
+    me = await db.accounts.by_id(ident.account_id)
+    if me is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such account")
+    people = [a for a in await db.accounts.list_all() if a["status"] == "active" and superior_of(me, a) is not None
+              and a["id"] != me["id"] and RANK[a["role"]] > RANK[me["role"]]]
+    names = await db.accounts.display_names_for(ident.account_id, [a["id"] for a in people])
+    return {"admins": [{"account_id": a["id"], "name": names.get(a["id"]) or a.get("hostname") or "your Admin",
+                        "role": a["role"]} for a in people]}
+
+
 @handler("assistance.ping")
 async def ping(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"to_account_id": int}. Receiver must be the caller's direct superior or subordinate.

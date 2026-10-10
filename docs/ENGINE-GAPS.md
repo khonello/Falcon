@@ -29,12 +29,6 @@ service inside that person's session.
    not written: both attempts to write it in this session were stopped by a safety classifier, so it needs to be
    written another way (by hand, or in a session where the writing is not blocked). Until then an automation on
    "is opened" saves and never fires. *Found:* Automation (AU08).
-4. **Built-in actions ignore settings the design asks for** (Actions, AU06). The page offers only what works:
-   - `lock_session` locks at once and ignores `duration_s`; no message is shown. The design wants "lock it for
-     15 min" with a message (a Worker overlay that holds the lock, then releases it).
-   - `notify` only prints `NOTIFY: ...` to the run's output; the design wants a message on their screen that
-     stays up "until closed" or for N seconds (the Worker Dialog helper).
-   - `reboot` / `shutdown` always warn 30 s; the design lets the Admin pick 1 or 5 min.
 5. **Nothing to pick programs from** (Actions, AU06). "Close a program" should be picked from what runs (and
    say "open on 5 machines"), "Start a program" from what is installed on that machine. Today they are typed
    names. Needs a process/installed-programs inventory from the Worker (a `process_list`-style snapshot kept per
@@ -45,11 +39,6 @@ service inside that person's session.
    as required on every worker machine and presence per machine (by content hash); the second a per-file history
    (tagged, copied, flagged, owner told) drawn from the audit trail and `file_index` by hash. Both cells are left
    out of the page until then.
-14. **The Worker's windows are built; three wait for their triggers** (WR01). `worker_client.windows` has all
-    five (blocked, message, locked, ask, task), and the service already opens *blocked* (from the lockout) and
-    *task* (on `task.assigned`, with Start). *Message* and *locked* need `notify` / `lock_session` to open them
-    instead of printing (item 4), and *ask* needs a way for the person to open it (a tray icon or shortcut) that
-    sends `assistance.ping` with the message. Frozen Overlay/Dialog exes are Phase 9 packaging. *Found:* WR01.
 15. **Register machines from the local network instead of typing them** (the user's idea, 27 Sep 2026). Today a
     machine is registered by typing its name (`hierarchy.account_create`), and its client id + key are copied onto it
     by hand. The idea: a small installer on each machine stores who it is meant to be (its name, department, level --
@@ -96,6 +85,23 @@ service inside that person's session.
 
     Admin → Worker tasks keep their checks. *Raised:* by the user, from the concept's Work page.
 ## Done inline (for the record)
+
+- **Actions that act on the person's screen, and a way to ask for help** (was #4 and #14, done 10 Oct 2026).
+  `notify` takes `message` and `stay_s` (0 or absent: stays until the person closes it); `lock_session` takes
+  `duration_s` and an optional `message` (the "Locked by your Admin" window for that long, then the screen is
+  released); `reboot`/`shutdown` take `delay_s` (0-3600; the console offers 60 or 300) and a `message` beside the
+  warning. The Engine checks the settings (`control.action_create/update`) and raises the run's timeout to the
+  action's own length plus 30 s, so a lock is never cut short. The Worker runs them through the same detached
+  path (`worker_client/builtins.py`), opening the message and locked windows, and says in the run's summary what
+  happened ("closed by the person", "taken down after 20 s", "locked for 15 min"). Without PySide6 or with
+  windows off, notify says "not shown" and a lock falls back to locking the workstation once. *Ask for help:* a
+  tray icon (`worker_client/windows/tray.py`, started by the service) prints `ask` when clicked; the service
+  asks `assistance.my_admins` (new: a Worker's department Admins, an Admin's Super User), opens the ask window
+  (one button per Admin -- a ping carries no message, so there is no text box any more) and sends
+  `assistance.ping`. TUI: `action add control notify message=.. stay_s=..`, `lock_session duration_s=..`,
+  `reboot delay_s=..`; `actions` lists the optional settings. Still for Phase 9: under the Windows service these
+  windows and the tray must be started inside the person's session (a service has no desktop).
+  *Test:* `test_control_updates.py`, `test_worker_client.py`, `test_resource_assistance.py`.
 
 - **A machine's live state** (was #12, done 9 Oct 2026). Online means the machine's client holds an authenticated
   connection now (`Engine.online_pc_ids()`); `pcs.last_seen_at` (migration 015) records when it connected or dropped,

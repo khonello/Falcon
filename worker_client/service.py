@@ -40,7 +40,7 @@ class WorkerService:
         self.conn: EngineConnection | None = None
         self.identity: Any = None
         self.lockout = Lockout(lock_workstation=config.lock_workstation_on_block)
-        self.executor = Executor(self.call, allow_power=allow_power)
+        self.executor = Executor(self.call, allow_power=allow_power, windows=config.windows)
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
         self.ossignals = OsSignals(self.call)
@@ -55,6 +55,8 @@ class WorkerService:
         self.pushes_handled = 0
         # the Worker's windows (WR01, TK07): the block overlay follows the lockout; a new task opens its window
         self._overlay: Any = None
+        self._tray: Any = None
+        self._tray_task: asyncio.Task[None] | None = None
         self._window_tasks: set[asyncio.Task[None]] = set()
         if config.windows:
             self.lockout.on_change(self._on_block_changed)
@@ -67,12 +69,18 @@ class WorkerService:
         await self.signals.start()
         await self.ossignals.start()
         await self._refresh_tasks()
+        if self.config.windows:
+            await self._start_tray()
         log.info("worker service up as pc %s (account %s)", self.identity.pc_id, self.identity.account_id)
 
     async def stop(self) -> None:
         self._stopping = True
         if self._reconnect_task:
             self._reconnect_task.cancel()
+        if self._tray_task:
+            self._tray_task.cancel()
+        if self._tray is not None:
+            self._tray.close()
         await self.watcher.stop()
         await self.signals.stop()
         await self.ossignals.stop()
@@ -220,6 +228,50 @@ class WorkerService:
                 await self.call("task.start", {"task_id": task_id})
             except (EngineError, ConnectionError_) as exc:
                 log.warning("starting task %s failed: %s", task_id, exc)
+
+    async def _start_tray(self) -> None:
+        """The tray icon a person uses to ask their Admin for help; each click arrives as a line on its stdout."""
+        from worker_client.windows.spawn import open_tray
+
+        self._tray = await open_tray()
+        if self._tray is not None:
+            self._tray_task = asyncio.create_task(self._tray_loop())
+
+    async def _tray_loop(self) -> None:
+        assert self._tray is not None and self._tray.proc.stdout is not None
+        while True:
+            line = (await self._tray.proc.stdout.readline()).decode("utf-8", "replace").strip()
+            if not line:
+                return                                   # the icon closed
+            if line == "no-tray":
+                log.warning("this machine has no notification area; the ask-for-help icon is not shown")
+                return
+            if line == "ask":
+                self._spawn(self.ask_for_help())
+
+    async def ask_for_help(self) -> None:
+        """The person chose to ask for help: say who they can ask, let them pick, send the ping. A ping carries
+        no message -- whoever they ask sees it, answers, and writes first."""
+        from worker_client.windows.spawn import open_window
+
+        try:
+            admins = (await self.call("assistance.my_admins"))["admins"]
+            if not admins:
+                handle = await open_window("message", {"text": "There is no Admin to ask yet.", "from": ""})
+                if handle is not None:
+                    await handle.answer()
+                return
+            handle = await open_window("ask", {"admins": admins})
+            answer = await handle.answer() if handle is not None else None
+            if not answer or answer.get("to") is None:
+                return
+            await self.call("assistance.ping", {"to_account_id": int(answer["to"])})
+            name = next((a["name"] for a in admins if a["account_id"] == int(answer["to"])), "your Admin")
+            done = await open_window("message", {"text": f"Asked {name}. They will write to you when they can.", "from": ""})
+            if done is not None:
+                await done.answer()
+        except (EngineError, ConnectionError_) as exc:
+            log.warning("asking for help failed: %s", exc)
 
     async def _refresh_tasks(self) -> None:
         try:

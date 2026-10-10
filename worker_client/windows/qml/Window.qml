@@ -133,23 +133,19 @@ Window {
                 Row {
                     spacing: 8
                     Glyph { name: "ping"; size: 14; color: win.dim; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "Ask " + (spec.to || "your Admin") + " for help"; color: win.ink
-                           font.family: win.sans; font.pixelSize: 14; font.bold: true }
+                    Text { text: spec.admins && spec.admins.length > 1 ? "Ask for help" : "Ask " + (spec.to || "your Admin") + " for help"
+                           color: win.ink; font.family: win.sans; font.pixelSize: 14; font.bold: true }
                 }
-                Rectangle {
-                    width: parent.width; height: 64; radius: 6; color: win.pane
-                    border.width: 1; border.color: askText.activeFocus ? win.accent : win.edge
-                    TextEdit { id: askText; anchors.fill: parent; anchors.margins: 10; wrapMode: TextEdit.Wrap
-                               color: win.ink; font.family: win.sans; font.pixelSize: 13; text: spec.draft || "" }
-                    Text { visible: askText.text === ""; x: 10; y: 10; text: "What do you need?"; color: win.faint
-                           font.family: win.sans; font.pixelSize: 13 }
-                }
-                Item {
-                    width: parent.width; height: 32
-                    Text { anchors.verticalCenter: parent.verticalCenter; text: "One message, then wait for their reply."
-                           color: win.faint; font.family: win.sans; font.pixelSize: 11 }
-                    Act { anchors.right: parent.right; text: "Send"; primary: true; enabled: askText.text.trim() !== ""
-                             onClicked: answer.give({ message: askText.text.trim() }) }
+                // A ping carries no message: it says "I need you". Whoever you ask sees it, answers, and writes first.
+                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.dim; font.family: win.sans; font.pixelSize: 13
+                       text: "They will see that you need them, and write to you when they can. You do not have to say anything now." }
+                Flow {
+                    width: parent.width; spacing: 8
+                    Repeater {
+                        model: spec.admins || []
+                        Act { text: (spec.admins.length > 1 ? "Ask " : "Ask ") + modelData.name; primary: spec.admins.length === 1
+                              onClicked: answer.give({ to: modelData.account_id }) }
+                    }
                 }
             }
 

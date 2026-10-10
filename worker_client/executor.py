@@ -86,7 +86,7 @@ BUILTIN_SCRIPTS: dict[str, str] = {
         "for p in psutil.process_iter(['name']):\n  if (p.info['name'] or '').lower()==name:\n    p.terminate(); n+=1\n"
         "print(f'terminated {n} process(es)')\n"),
     "start_process": "import subprocess, sys, shlex\nsubprocess.Popen(shlex.split(sys.argv[1]))\nprint('started')\n",
-    "notify": "import sys\nprint('NOTIFY: ' + sys.argv[1])\n",
+    "notify": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.notify(sys.argv[1:]))\n",
     "usb_contents": (
         "import json, psutil, os\nout={}\n"
         "for part in psutil.disk_partitions(all=False):\n"
@@ -97,13 +97,14 @@ BUILTIN_SCRIPTS: dict[str, str] = {
         "print('FALCON:result ' + json.dumps(rows))\n"),
     # stdlib GDI capture, scaled down to fit the Engine's 2 MB (worker_client/screenshot.py)
     "screenshot": "import sys\nfrom worker_client import screenshot\nsys.exit(screenshot.main())\n",
-    "lock_session": "import sys, ctypes\nif sys.platform=='win32': ctypes.windll.user32.LockWorkStation()\nprint('locked')\n",
-    "shutdown": "import sys, subprocess\nsubprocess.run(['shutdown','/s','/t','30'] if sys.platform=='win32' else ['shutdown','-h','+1'])\nprint('shutdown scheduled')\n",
-    "reboot": "import sys, subprocess\nsubprocess.run(['shutdown','/r','/t','30'] if sys.platform=='win32' else ['shutdown','-r','+1'])\nprint('reboot scheduled')\n",
+    "lock_session": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.lock(sys.argv[1:]))\n",
+    "shutdown": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.power('shutdown', sys.argv[1:]))\n",
+    "reboot": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.power('reboot', sys.argv[1:]))\n",
 }
 BUILTIN_ARGS: dict[str, list[str]] = {
     "file_activity": ["path"], "snapshot_file": ["path"], "rename_file": ["path", "new_name"], "restore_file": ["path"],
-    "kill_process": ["name"], "start_process": ["command"], "notify": ["message"],
+    "kill_process": ["name"], "start_process": ["command"], "notify": ["message", "stay_s"],
+    "lock_session": ["duration_s", "message"], "shutdown": ["delay_s", "message"], "reboot": ["delay_s", "message"],
 }
 
 
@@ -162,8 +163,10 @@ class Running:
 
 
 class Executor:
-    def __init__(self, report: Reporter, *, log_dir: Path | None = None, allow_power: bool = False) -> None:
+    def __init__(self, report: Reporter, *, log_dir: Path | None = None, allow_power: bool = False,
+                 windows: bool = True) -> None:
         self.report = report
+        self.windows = windows            # the Worker's windows (messages, the lock) may be shown on this PC
         self.log_dir = log_dir or Path(tempfile.gettempdir()) / "falcon-worker" / "executions"
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.allow_power = allow_power
@@ -189,7 +192,8 @@ class Executor:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv, stdout=log_file, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                cwd=str(self.log_dir), env={**os.environ, "PYTHONPATH": _repo_root(), "PYTHONIOENCODING": "utf-8"})
+                cwd=str(self.log_dir), env={**os.environ, "PYTHONPATH": _repo_root(), "PYTHONIOENCODING": "utf-8",
+                     "FALCON_WORKER_WINDOWS": "1" if self.windows else "0"})
         except (OSError, ValueError) as exc:
             log_file.close()
             await self._finish(execution_id, "failed", error=f"could not start: {exc}")

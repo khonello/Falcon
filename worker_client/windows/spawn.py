@@ -49,6 +49,16 @@ async def open_window(kind: str, spec: dict[str, Any]) -> WindowHandle | None:
     return WindowHandle(proc)
 
 
+async def open_tray() -> WindowHandle | None:
+    """Start the tray icon (the person's way of asking for help); None on a headless install."""
+    if not available():
+        return None
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-m", "worker_client.windows.tray",
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    return WindowHandle(proc)
+
+
 def task_spec(task: dict[str, Any]) -> dict[str, Any]:
     """A task as the assignee reads it (TK07): what, when it is due, and the signs that will show the work."""
     text = str(task.get("description_raw") or "")

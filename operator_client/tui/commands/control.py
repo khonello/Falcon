@@ -15,7 +15,9 @@ from operator_client.tui.shell import Args, ShellContext, UsageError, command
 async def actions(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.action_list")
     out = ["built-in:"]
-    out.append(bullet(f"{k} ({v['category']}) params: {', '.join(v['params']) or '-'}" for k, v in res["builtin"].items()))
+    out.append(bullet(f"{k} ({v['category']}) params: {', '.join(v['params']) or '-'}"
+                      + (f"  optional: {', '.join(v['optional'])}" if v.get("optional") else "")
+                      for k, v in res["builtin"].items()))
     for kind in ("control", "monitoring", "custom"):
         out.append(f"\n{kind}:")
         out.append(table(res["actions"][kind], ["id", "name", "builtin_type", "params", "timeout_seconds", "timing",
@@ -24,7 +26,7 @@ async def actions(ctx: ShellContext, args: Args) -> str:
 
 
 @command("action", "add", "<control|monitoring> <builtin_type> [timeout=<s>] [name=..] [delay=<s>] [<param>=<value> ...]",
-         "Create a built-in action")
+         "Create a built-in action (e.g. notify message=\"Back up\" stay_s=60; lock_session duration_s=900 message=..; reboot delay_s=300)")
 async def action_add(ctx: ShellContext, args: Args) -> str:
     kind = args.get(0, "control|monitoring")
     builtin = args.get(1, "builtin_type")
