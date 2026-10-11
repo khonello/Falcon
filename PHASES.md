@@ -34,7 +34,7 @@ deployment** → **8 human passes (on the installed thing)** → **10 hardening 
 | 4 | The Worker's five windows exist (QML, `python -m worker_client.windows <kind>`) but only as source run from a venv — no frozen exes; no remote mouse/keyboard during traversal | A worker machine cannot be given a Python environment; the windows have to ship as executables | **Phase 9** (with the frozen toolchain) |
 | 5 | Not hardened: no load/scale run (many departments/PCs), no security review of unsandboxed Custom Actions, no log rotation / service wrappers, Linux Engine verified but never deployed | Unknown behaviour under real load; ops story missing | **Phase 10** (hardening + ops) |
 | 6 | LLM is a 1.7B model doing list-picks and verbatim extractions only (29/32 on the held-out benchmark; the graph settles the rest mechanically) | Fine as a "proposal assistant"; must not be pitched as AI understanding tasks — every output is surfaced for confirmation, never committed | note for sales; a 4B behind the same graph is the next lever if accuracy is challenged |
-| 7 | GUI rebuilt in the Ant Design idiom (Route B): 14 pages, Super User and Admin as two shells, the component inventory and the pages that use it, the Worker's windows on the same palette | Being worked on. It is finished when the user says so, and nothing after it starts first | **Phase 7** — in progress |
+| 7 | GUI rebuilt to the published concept (11 Oct): both levels page by page, the session window, bound to the Engine's console handlers; what the Engine cannot do yet is drawn disabled with its reason | Being worked on. It is finished when the user says so, and nothing after it starts first | **Phase 7** — in progress |
 
 ---
 
@@ -193,35 +193,37 @@ idiom** — familiar beats distinctive — in the same PySide6/QML client. `docs
 building and the rules that govern it (25 of them, each written when it was decided); 
 `docs/UI-COMPONENTS.md` is the build list and what has been done against it.
 
-Built so far:
+**11 Oct 2026: the QML is the published concept** (the "Falcon Concepts" artifact, which the user
+decides from; `docs/design/concepts-snapshot.html` is its copy). The 30 Sep Ant-idiom wave and its kit
+are gone; every page below was built from the concept and checked against it by screenshot.
 
-- [x] Tokens (`Theme.qml`), the frameless shell, and the 14 pages: Overview, Departments, People,
-  Machines, Tasks, Flows, Automation, Actions, Assistance, Resources, Reports, Rollout, Record,
-  Settings
-- [x] **Super User and Admin are two shells, not one.** The Admin has all fourteen areas; the Super
-  User has eight and reaches the rest by traversing into an Admin, at which point the console is that
-  Admin's console — `viewThroughSession` on, the red "Super User in charge" banner up
-- [x] The whole antd component inventory in `operator_client/gui/qml/` (~90 files), and the pages
-  using it: row menus, row selection and a bulk bar, toggles in rows, tabs, steps, transfer, tree,
-  timeline, result, popconfirm, notification, sider counts
-- [x] Falcon's own: SessionBanner, MachineCell, DayTimeline (24h default, the night shaded),
-  FleetGrid, FlowGraph, ScriptPanel
-- [x] The Worker Client's five windows on the same palette
-- [x] `KitView.qml` — the kit drawn in itself, for judging it (`scripts/preview.py --view kit`)
-- [x] `scripts/preview.py` — every page with sample data and no Engine (`--role`, `--view`, `--open`,
-  `--inside`)
-- [x] 28 GUI tests (`tests/test_operator_gui.py`), the level taken as a fixture
+- [x] Tokens (`Theme.qml`: light and dark, system/light/dark switch remembered), IBM Plex bundled
+  (`gui/fonts/`), the frameless shell: sider with counts, crumb, Ctrl K palette, range, Live, the
+  "new task from the Super User" strip, toasts
+- [x] **Two levels.** The Admin's console: Overview, Messages, Tasks (+ New task), Restricted (+ Mark
+  files), Flows (+ editor), Machines (+ a machine's page), Sessions, Issues, Automation (+ editor),
+  Actions (+ editor), Rollout, Audit log, Reports. The Super User's own level: Overview (the decision
+  queue, decided in a drawer), Messages, Tasks given to departments, Restricted, Flows, Departments,
+  Accountability, Access, Registry, Reports (+ routing), Rules, Rollout, Audit log. The Super User
+  enters an Admin's console (block or end first) and the console is then that Admin's
+- [x] The session window: entering a worker's machine opens it over the console (Extend, Full
+  screen, Back to the console, Leave)
+- [x] Bound to the Engine's console handlers where they exist — `issues.*` (Issues acts through
+  `issues.get`/`issues.act`, Take it, Send it up), `marks.*` (Restricted, Mark files, Unmark, change
+  where a mark allows), `machines.list`/`machines.get` (keys, addresses, agent versions, the readings
+  drawn over the range, processes), `audit.events` — each falling back to the older handlers
+- [x] `scripts/preview.py` — every page with the concept's sample data and no Engine (`admin`,
+  `inside`, `<page>/<sub>`, `--shot`, `--in/--do/--at`); the sample is `scripts/preview_data.py`
+- [x] 44 GUI tests (`tests/test_operator_gui.py`): both levels, every page loading without a QML
+  warning, the Engine-backed pages, no TapHandler anywhere, colours named only in `Theme.qml`
 
-Known gaps, all deliberate and written down in `docs/UI-COMPONENTS.md`:
+What the concept shows and the Engine cannot do yet is drawn disabled, with the reason on it:
 
-- [ ] No Flow **stage** editor and no automation **condition** builder — the JSON shapes of a stage's
-  `config` and of `condition_spec` are on the explicitly-deferred list (spec §10)
-- [ ] No report-routing UI (`reports.routing_set`, deferred)
-- [ ] A proposed task item cannot be edited by hand (`used_with_file` points at another item by index;
-  removing one silently breaks the link)
-- [ ] `assistance.search`, adding a Listener, and tagging a file by hand still go through the TUI
-- [ ] Several kit components are built but not yet used by a page (Popover, Collapse, Suggest,
-  TreeSelect, Upload, Secret, Level, Statistic)
+- [ ] Rules you set (the rule store) — only the four built-in rules are listed; no rule editor yet
+- [ ] Recording what came of a deviation (explained / accepted / escalated / dismissed)
+- [ ] Promoting a worker to Admin; blocking a refused address
+- [ ] The worker's screen in the session window, and See / See and control
+- [ ] Issues with no machine (a department-level issue) are not drawn yet
 
 ---
 

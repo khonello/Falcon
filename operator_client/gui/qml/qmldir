@@ -4,3 +4,10 @@ singleton Msg 1.0 Msg.qml
 singleton Task 1.0 Task.qml
 singleton Sync 1.0 Sync.qml
 singleton Doing 1.0 Doing.qml
+singleton Nav 1.0 Nav.qml
+singleton Time 1.0 Time.qml
+singleton Fleet 1.0 Fleet.qml
+singleton Kinds 1.0 Kinds.qml
+singleton Auto 1.0 Auto.qml
+singleton Desk 1.0 Desk.qml
+singleton Rules 1.0 Rules.qml

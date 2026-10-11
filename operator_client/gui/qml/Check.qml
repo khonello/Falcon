@@ -6,6 +6,8 @@ Item {
     id: root
     property bool checked: false
     property bool partial: false          // some of the rows, not all
+    property bool controlled: false       // the owner sets `checked` from its data; a click only asks
+    opacity: enabled ? 1 : 0.5
     property string text: ""
     signal toggled(bool checked)
 
@@ -29,14 +31,14 @@ Item {
             visible: root.checked && !root.partial
             name: "check"
             size: 12
-            color: Theme.onDark
+            color: Theme.inverse
         }
         Rectangle {
             anchors.centerIn: parent
             visible: root.partial
             width: 8
             height: 2
-            color: Theme.onDark
+            color: Theme.inverse
         }
     }
     Txt {
@@ -46,13 +48,13 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: root.text
         visible: root.text !== ""
-        font.pixelSize: Theme.fSmall
+        font.pixelSize: Theme.fBody
     }
     MouseArea {
         id: hov
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: { root.checked = !root.checked; root.partial = false; root.toggled(root.checked) }
+        onClicked: { var v = !root.checked; if (!root.controlled) { root.checked = v; root.partial = false } root.toggled(v) }
     }
 }

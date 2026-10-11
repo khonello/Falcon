@@ -17,7 +17,7 @@ Rectangle {
     Txt {
         anchors.centerIn: parent
         text: Theme.initials(root.name)
-        color: root.muted ? Theme.mid : Theme.onDark
+        color: root.muted ? Theme.mid : Theme.inverse
         font.pixelSize: Math.round(root.size * 0.42)
         strong: true
     }

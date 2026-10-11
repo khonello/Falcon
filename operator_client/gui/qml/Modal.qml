@@ -2,14 +2,15 @@ import QtQuick
 import QtQuick.Controls.Basic
 import "."
 
-// A FORM, OR AN ACT WITH A COST NAMED BEFORE THE VERB (docs/UI.md). Centred and modal: it is the one
-// place the console stops you. It does not scroll -- a form needing more room than this is a page.
+// A dialog: the one place the console stops you. A title, the body, and the buttons at the foot on
+// the right. `footer` takes the buttons; with none, the foot is not drawn.
 Popup {
     id: root
     property string title: ""
     property string subtitle: ""
     default property alias body: content.data
     property alias footer: foot.data
+    property int pad: 24
 
     // A popup lives in the Overlay, not in the page that declared it, so leaving that page does not
     // take it with it. `page` ties it back: when the page goes, so does this.
@@ -23,7 +24,7 @@ Popup {
     parent: Overlay.overlay
     anchors.centerIn: Overlay.overlay
     width: 520
-    height: head.height + content.implicitHeight + 2 * Theme.s4 + foot.height
+    height: head.height + content.childrenRect.height + 2 * 8 + footBar.height + 8
     padding: 0
     modal: true
     dim: true
@@ -35,32 +36,27 @@ Popup {
     background: Rectangle {
         radius: Theme.radiusLg
         color: Theme.surface
+        border.width: Theme.dark ? 1 : 0
+        border.color: Theme.border
         // nothing pressed inside this dialog may reach the page behind it
         MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; hoverEnabled: true }
     }
-    Overlay.modal: Rectangle { color: Qt.rgba(0, 0, 0, 0.35) }
+    Overlay.modal: Rectangle { color: Theme.scrim }
 
     Item {
         id: head
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 56
-
+        height: 52
         Column {
             anchors.left: parent.left
-            anchors.leftMargin: Theme.s5
+            anchors.leftMargin: root.pad
             anchors.right: shut.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
-            Txt { width: parent.width; text: root.title; strong: true; font.pixelSize: Theme.fLead }
-            Txt {
-                width: parent.width
-                text: root.subtitle
-                tone: "mid"
-                font.pixelSize: Theme.fSmall
-                visible: text !== ""
-            }
+            Txt { width: parent.width; text: root.title; font.weight: Font.DemiBold; font.pixelSize: Theme.fLead }
+            Txt { width: parent.width; text: root.subtitle; color: Theme.text3; font.pixelSize: Theme.fSmall; visible: text !== "" }
         }
         Btn {
             id: shut
@@ -68,7 +64,7 @@ Popup {
             small: true
             iconName: "close"
             anchors.right: parent.right
-            anchors.rightMargin: Theme.s3
+            anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             onClicked: root.close()
         }
@@ -77,19 +73,26 @@ Popup {
     Column {
         id: content
         anchors.top: head.bottom
+        anchors.topMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: Theme.s5
-        anchors.rightMargin: Theme.s5
-        spacing: Theme.s4
+        anchors.leftMargin: root.pad
+        anchors.rightMargin: root.pad
+        spacing: 12
     }
 
     Item {
-        id: foot
+        id: footBar
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 56
-        Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Theme.split }
+        height: foot.children.length ? 60 : 12
+        Row {
+            id: foot
+            anchors.right: parent.right
+            anchors.rightMargin: root.pad
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 8
+        }
     }
 }

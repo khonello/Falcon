@@ -1,7 +1,7 @@
-"""The console's first slice: the QML loads, the shell is there, and the Record page reads what the
-Engine answers (docs/UI.md, docs/UI-COMPONENTS.md).
+"""The console, built to the published concept: the shell at both levels, every page loading clean, and
+the pages that turn what the Engine answers into something a person reads.
 
-Runs offscreen on pytest-asyncio's loop; skipped without PySide6. The Engine is not needed — the
+Runs offscreen on pytest-asyncio's loop; skipped without PySide6. The Engine is not needed -- the
 bridge's connection is the only thing faked, exactly as `scripts/preview.py` does it.
 """
 
@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -19,136 +21,56 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 from PySide6.QtCore import QCoreApplication, QMetaObject, QObject, Qt
 from PySide6.QtQml import QJSValue
 
-from common.connection import EngineError
 from operator_client.core import LocalConfig
-from operator_client.gui.app import create
+from operator_client.gui.app import QML_DIR, create
 
-AUDIT = [
-    {"occurred_at": "2026-09-29T13:11:00+00:00", "actor_name": "R. Mensah", "summary": "Left OPS-03",
-     "target_hostname": "OPS-03", "action": "session.ended"},
-    {"occurred_at": "2026-09-29T10:02:00+00:00", "actor_name": "System",
-     "summary": "budget-2026.xlsx found on a worker machine", "target_hostname": "OPS-07",
-     "action": "resource.violation"},
-    {"occurred_at": "2026-09-29T09:11:00+00:00", "actor_name": "System",
-     "summary": "Hostname did not match the certificate", "target_hostname": "OPS-05",
-     "action": "deviation.hostname"},
-]
+
+def _ago(hours: float) -> str:
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
 
 
 TREE = [
-    {"department_id": 1, "name": "Operations", "admins": [{"account_id": 7, "name": "R. Mensah"}],
-     "workers": [{"pc_id": 1, "hostname": "OPS-01", "name": "Kojo", "session": {"occupied_via": "native"}},
-                 {"pc_id": 2, "hostname": "OPS-02", "name": "Efua", "session": None}]},
-    {"department_id": 2, "name": "Logistics", "admins": [], "workers": []},
+    {"department_id": 1, "name": "Operations", "admins": [{"account_id": 7, "name": "R. Mensah", "online": True}],
+     "workers": [{"pc_id": 1, "account_id": 21, "hostname": "OPS-01", "name": "Kojo", "session": {"occupied_via": "native"}},
+                 {"pc_id": 2, "account_id": 22, "hostname": "OPS-02", "name": "Efua", "session": None}]},
+    {"department_id": 2, "name": "Logistics", "admins": [],
+     "workers": [{"pc_id": 3, "account_id": 23, "hostname": "LOG-01", "name": "Esi", "session": None}]},
+]
+
+DEVIATIONS = [
+    {"id": 87, "expectation": "account_bound_to_one_pc", "observed_pc_id": 1, "observed_account_id": 21,
+     "detail": {"expected_hostname": "OPS-01", "announced_hostname": "WS-OPS-01"}, "surfaced_to_account_id": 21,
+     "resolved_at": None, "detected_at": _ago(2)},
+    {"id": 80, "expectation": "account_bound_to_one_pc", "observed_pc_id": 2, "observed_account_id": 22,
+     "detail": {"expected_hostname": "OPS-02", "announced_hostname": "OPS-02-OLD"}, "surfaced_to_account_id": 22,
+     "resolved_at": _ago(20), "detected_at": _ago(30)},
+]
+
+REFUSED = [
+    {"id": 1, "action": "auth.failed", "target_id": "abc", "occurred_at": _ago(1),
+     "detail": {"reason": "challenge failed", "peer": "('10.20.9.201', 50012)"}},
+    {"id": 2, "action": "auth.failed", "target_id": "abc", "occurred_at": _ago(3),
+     "detail": {"reason": "challenge failed", "peer": "('10.20.9.201', 50013)"}},
+    {"id": 3, "action": "auth.failed", "target_id": "zzz", "occurred_at": _ago(2),
+     "detail": {"reason": "client_id is not provisioned or its account is not active", "peer": "('10.20.6.40', 1)"}},
 ]
 
 
-TASKS = [
-    {"id": 1, "description_raw": "Reconcile the Q3 invoices", "assignee_name": "R. Mensah",
-     "assigner_name": "You", "status": "in_progress", "verification_mode": "stack",
-     "soft_deadline_at": None, "final_deadline_at": "2026-09-20T16:00:00+00:00"},
-    {"id": 2, "description_raw": "Walk the new starter through it", "assignee_name": "R. Mensah",
-     "assigner_name": "You", "status": "active", "verification_mode": "none",
-     "soft_deadline_at": None, "final_deadline_at": None},
-]
-
-PROPOSAL = {
-    "llm_available": True, "needs_assigner": True, "collisions": [], "proposed_split": [],
-    "flags": ["deadline_ambiguous"], "soft_deadline": None,
-    "final_deadline": "2026-10-03T16:00:00+00:00",
-    "items": [{"target_type": "file", "intent": "update", "name": "reconciliation.xlsx",
-               "path": None, "populated_by": "llm", "status": "pending"}],
-}
-
-
-FLOWS = [
-    {"id": 1, "source_hostname": "OPS-01", "source_path": "C:/work/payroll", "status": "active",
-     "pause_reason": None, "consent_status": "not_required", "stages": [],
-     "destinations": [{"id": 1, "destination_hostname": "FIN-01",
-                       "destination_path": "C:/shared/payroll", "suggestion": None, "last_sync": None}]},
-    {"id": 2, "source_hostname": "OPS-07", "source_path": "C:/reports", "status": "paused",
-     "pause_reason": "destination:path_missing", "consent_status": "granted", "stages": [],
-     "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else.",
-     "destinations": []},
-    {"id": 3, "source_hostname": "OPS-03", "source_path": "C:/intake", "status": "paused",
-     "pause_reason": "consent:pending", "consent_status": "pending", "stages": [],
-     "destinations": []},
-]
-
-
-BUILTIN = {
-    "notify": {"category": "control", "params": ["message"]},
-    "lock_session": {"category": "control", "params": ["duration_s"]},
-    "usb_contents": {"category": "monitoring", "params": []},
-}
-
-LIBRARY = {
-    "control": [{"id": 1, "action_kind": "control", "builtin_type": "lock_session",
-                 "name": "Lock the screen", "timeout_seconds": 30}],
-    "monitoring": [{"id": 3, "action_kind": "monitoring", "builtin_type": "usb_contents",
-                    "name": "List what is on the USB", "timeout_seconds": 60}],
-    "custom": [{"id": 4, "action_kind": "custom", "name": "Clear the temp folder",
-                "custom_script_language": "python", "timeout_seconds": 120,
-                "custom_script": "import os\n"}],
-}
-
-EVENTS = [
-    {"id": 1, "enabled": True, "last_fired_at": None,
-     "condition_spec": {"type": "usb.inserted", "pc_ids": None, "match": {}},
-     "actions": [{"id": 3, "action_kind": "monitoring", "builtin_type": "usb_contents",
-                  "name": "List what is on the USB", "timeout_seconds": 60}]},
-    {"id": 2, "enabled": False, "last_fired_at": None,
-     "condition_spec": {"type": "threshold.cpu", "pc_ids": [1, 3], "match": {}},
-     "actions": []},
-]
-
-
-CHANNELS = [
-    # account 1 is the viewer (the _Identity below), and it is the superior on both
-    {"id": 1, "initiator_account_id": 21, "superior_account_id": 1, "turn": "superior",
-     "initiator_name": "Ama", "opened_at": "2026-09-29T09:40:00+00:00", "closed_at": None},
-    {"id": 2, "initiator_account_id": 22, "superior_account_id": 1, "turn": "sender",
-     "initiator_name": "Efua", "opened_at": "2026-09-28T14:05:00+00:00", "closed_at": None},
-    {"id": 3, "initiator_account_id": 23, "superior_account_id": 1, "turn": "sender",
-     "initiator_name": "Yaw", "opened_at": "2026-09-27T11:00:00+00:00",
-     "closed_at": "2026-09-27T11:40:00+00:00"},
-]
-
-REPORTS = [
-    {"id": 1, "category": "resource_violation", "source_table": "resource_violations",
-     "source_id": 1, "generated_at": "2026-09-29T10:02:00+00:00", "addressed_at": None},
-    {"id": 2, "category": "flow_failure", "source_table": "flow_destinations", "source_id": 2,
-     "generated_at": "2026-09-29T08:44:00+00:00", "addressed_at": "2026-09-29T09:10:00+00:00"},
-]
-
-
-def _at(hhmm: str) -> str:
-    """An ISO time on whatever day the test runs, since the timeline draws today."""
-    from datetime import datetime
-
-    # local wall-clock on purpose: the timeline draws the day as the person in front of it sees it
-    return datetime.now().replace(hour=int(hhmm[:2]), minute=int(hhmm[3:]),  # noqa: DTZ005
-                                  second=0, microsecond=0).isoformat()
-
-
-DAY = [
-    {"session_id": 1, "pc_id": 1, "hostname": "OPS-01", "occupant_name": "Kojo",
-     "occupied_via": "native", "entered_at": _at("08:12"), "ended_at": _at("17:30")},
-    {"session_id": 2, "pc_id": 22, "hostname": "LOG-02", "occupant_name": "A. Quaye",
-     "occupied_via": "traversal", "entered_at": _at("02:14"), "ended_at": _at("03:02")},
-    {"session_id": 3, "pc_id": 11, "hostname": "FIN-02", "occupant_name": "A. Quaye",
-     "occupied_via": "assisted", "entered_at": _at("10:41"), "ended_at": _at("11:20")},
-]
+ISSUE = {"id": 41, "code": "I-41", "type": "file", "severity": "critical", "title": "Restricted file copied where it isn't allowed",
+         "subject": "budget-2026.xlsx", "pc_id": 1, "host": "OPS-01", "department_id": 1, "opened_at": _ago(2), "past_target": True,
+         "owner": {"account_id": 7, "name": "R. Mensah", "you": True}, "state": "open", "label": "Open", "escalated": False}
 
 
 class _Identity:
-    """What the handshake returned. The role is the whole point: the console is a different product
-    at each level, so a test has to say which one it is looking at."""
+    """What the handshake returned. The role is the whole point: the console is a different product at
+    each level, so a test has to say which one it is looking at."""
 
-    client_id, account_id, pc_id, department_id = "test", 1, 1, 1
+    client_id, account_id, pc_id, department_id = "test", 7, 101, 1
 
     def __init__(self, role: str = "admin") -> None:
         self.role = role
+        if role == "super_user":
+            self.account_id, self.pc_id, self.department_id = 1, 100, None
 
 
 class _Connection:
@@ -160,62 +82,35 @@ class _Connection:
     async def call(self, type_: str, payload: dict) -> dict:
         await asyncio.sleep(0)
         self.seen.append((type_, payload))
-        if type_ == "hierarchy.pc_register":
-            return {"pc_id": 9, "client_id": "abc123", "client_key": "0f" * 32}
-        if type_ == "task.list":
-            return {"tasks": TASKS}
-        if type_ == "task.propose":
-            return PROPOSAL
-        if type_ == "task.create":
-            return {"task": {"id": 5}}
-        if type_ == "flow.list":
-            return {"flows": FLOWS}
-        if type_ == "control.action_list":
-            return {"builtin": BUILTIN, "actions": LIBRARY}
-        if type_ == "control.event_list":
-            return {"events": EVENTS, "types": {"usb.inserted": "native_pushed",
-                                                "threshold.cpu": "polled"}}
-        if type_ == "control.event_history":
-            return {"firings": []}
-        if type_ == "hierarchy.sessions_today":
-            return {"sessions": DAY}
-        if type_ == "assistance.channels":
-            return {"channels": CHANNELS}
-        if type_ == "assistance.ping_status":
-            return {"pings": [{"ping_id": 5, "from_name": "Kojo", "count": 2}]}
-        if type_ == "resource.shelves":
-            return {"shelves": [{"folder": "Resources/Admin", "tag": "admin", "files": 1}]}
-        if type_ == "reports.list":
-            return {"reports": REPORTS}
-        if type_ == "reports.addressed_view":
-            return {"views": []}
-        if type_ == "updates.current":
-            return {}
-        if type_ == "flow.create":
-            # the Engine refuses a destination that already holds files, unless it is confirmed
-            if not payload.get("confirm_collisions"):
-                raise EngineError("conflict", "destination path collides with existing content: "
-                                              "D:/handover (3 files) -- change the path or pass "
-                                              "confirm_collisions=true", type_)
-            return {"flow": {"id": 9}, "consent_pending": False, "collisions_confirmed": []}
-        if type_ == "audit.recent":
-            return {"entries": AUDIT}
         if type_ == "hierarchy.tree":
             return {"departments": TREE}
-        if type_ == "updates.rollout_health":
-            return {"version": {"version_string": "1.4.2"},
-                    "pcs_behind": [{"pc_id": 2, "hostname": "OPS-02", "escalated": True}]}
-        if type_ == "resource.violations":
-            # the second one is on a PC outside this tree, so it is a Resources row and not a
-            # Machines state -- which is exactly how the two pages differ
-            return {"violations": [
-                {"violation_id": 1, "found_on_pc_id": 1, "hostname": "OPS-01",
-                 "filename": "budget-2026.xlsx", "resource_tag": "restricted",
-                 "detected_at": "2026-09-29T10:02:00+00:00", "resolved_at": None},
-                {"violation_id": 2, "found_on_pc_id": 99, "hostname": "OPS-09",
-                 "filename": "salaries.csv", "resource_tag": "admin",
-                 "detected_at": "2026-09-26T15:12:00+00:00",
-                 "resolved_at": "2026-09-26T16:00:00+00:00"}]}
+        if type_ == "audit.deviations":
+            return {"deviations": [d for d in DEVIATIONS if payload.get("include_resolved") or not d["resolved_at"]]}
+        if type_ == "audit.recent":
+            return {"entries": REFUSED if payload.get("prefix") == "auth.failed" else []}
+        if type_ == "machines.list":
+            return {"machines": [{"pc_id": 1, "hostname": "OPS-01", "key_generation": 2, "ip": "10.20.4.11",
+                                  "owner": {"account_id": 21, "name": "Kojo"}, "version": "1.4.2"}]}
+        if type_ == "issues.list":
+            return {"issues": [ISSUE], "summary": {"open": 1, "waiting": 0, "past_target": 1, "done_today": 3, "mine": 1}}
+        if type_ == "issues.get":
+            return {"issue": ISSUE, "detail": {}, "lead": "A copy of budget-2026.xlsx is on OPS-01.", "facts": [["File", "budget-2026.xlsx"]],
+                    "why": [], "timeline": [{"at": _ago(2), "who": "System", "what": "Raised", "kind": "raised", "you": False}],
+                    "options": [{"key": "allow", "title": "Allow it on OPS-01 too", "desc": "", "verb": "Allow it", "done": "Resolved", "need": "reason"}]}
+        if type_ == "issues.act":
+            return {"issue": {**ISSUE, "state": "resolved"}, "done": "ok"}
+        if type_ == "marks.list":
+            return {"marks": [{"id": 3, "kind": "folder", "name": "Payroll", "pc_id": 101, "host": "WS-OPS-A1", "path": "C:/HR/Payroll", "keep": "path",
+                               "files": 24, "versions": 30, "copies": 1, "by": {"account_id": 7, "you": True}}],
+                    "summary": {"marks": 1, "files": 24, "copies": 1, "with_copies": 1}}
+        if type_ == "marks.get":
+            return {"mark": {"id": 3}, "copies": [{"issue_id": 41, "severity": "high", "host": "OPS-01", "file": "salaries.csv",
+                                                   "folder": "C:/Users/Kojo", "signed_in": "Kojo", "opened_at": _ago(2)}]}
+        if type_ == "enroll.list":
+            return {"requests": []}
+        if type_ == "hierarchy.traverse":
+            return {"session": {"session_id": 9, "pc_id": payload["pc_id"], "occupied_via": "traversal",
+                                "entered_at": _ago(0), "deadline_at": (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()}}
         return {}
 
     async def close(self) -> None:
@@ -224,20 +119,20 @@ class _Connection:
 
 @pytest.fixture
 def console(tmp_path: Path):
-    """A factory: `console(role)` gives (window, bridge) at that level, torn down after."""
+    """A factory: `console(role)` gives (window, bridge, warnings) at that level, torn down after."""
     made = []
 
     def build(role: str = "admin"):
         cfg = LocalConfig(path=tmp_path / f"{role}.json", engine_host="127.0.0.1", engine_port=1,
                           client_id="", tls=False)
         _app, qml, bridge = create(cfg)
+        warnings: list[str] = []
+        qml.warnings.connect(lambda ws: warnings.extend(w.toString() for w in ws))
         made.append(qml)
         win = qml.rootObjects()[0]
         bridge.conn = _Connection()
         bridge.state.set_identity(_Identity(role), "test")
-        # `connected` is emitted by the test that wants data: the views answer it with falcon.call,
-        # which needs a running asyncio loop, and a sync test has none.
-        return win, bridge
+        return win, bridge, warnings
 
     yield build
     for qml in made:
@@ -245,25 +140,12 @@ def console(tmp_path: Path):
         qml.deleteLater()
 
 
-@pytest.fixture
-def gui(console):
-    """The Admin's console: where every operating feature lives, so it is most tests' subject."""
-    return console("admin")
-
-
-@pytest.fixture
-def boss(console):
-    """The Super User's console: governance only, until they traverse into an Admin."""
-    return console("super_user")
-
-
 def prop(obj: QObject, name: str):
     v = obj.property(name)
     return v.toVariant() if isinstance(v, QJSValue) else v
 
 
-def _pump(seconds: float = 0.4) -> None:
-    """Turn Qt's loop for a while, asserting nothing -- for letting a click be delivered."""
+def _pump(seconds: float = 0.2) -> None:
     import time
 
     app = QCoreApplication.instance()
@@ -272,582 +154,182 @@ def _pump(seconds: float = 0.4) -> None:
         app.processEvents()
 
 
-def _spin(cond, timeout: float = 2.0) -> None:
-    """Qt's own loop, turned by hand. These tests run on asyncio, so a transition only advances if
-    somebody pumps the Qt events -- and a drawer sliding out is a transition."""
-    import time
-
-    app = QCoreApplication.instance()
-    end = time.monotonic() + timeout
-    while time.monotonic() < end:
-        app.processEvents()
-        if cond():
-            return
-    raise AssertionError("condition not met in time")
-
-
 async def _wait(cond, timeout: float = 4.0) -> None:
     for _ in range(int(timeout / 0.05)):
+        QCoreApplication.instance().processEvents()
         if cond():
             return
         await asyncio.sleep(0.05)
     raise AssertionError("condition not met in time")
 
 
-def test_the_shell_is_the_console(gui):
-    """Sider, header, content -- and the window's own chrome, because it is frameless: the app draws
-    minimise, maximise and close itself, so it does not also wear Windows'."""
-    win, _ = gui
+async def _open(win, bridge, view: str, name: str) -> QObject:
+    bridge.connected.emit()
+    win.setProperty("view", view)
+    await _wait(lambda: win.findChild(QObject, name) is not None)
+    return win.findChild(QObject, name)
+
+
+ADMIN_MENU = ["overview", "messages", "tasks", "restricted", "flows", "machines", "sessions", "issues",
+              "automation", "actions", "rollout", "audit", "reports"]
+SU_MENU = ["overview", "messages", "tasks", "restricted", "flows", "departments", "accountability", "access",
+           "registry", "reports", "rules", "rollout", "audit"]
+
+
+async def test_the_shell_is_the_console(console):
+    """Sider, top bar, content -- and the window's own chrome, because it is frameless."""
+    win, _, _ = console("admin")
     assert win.title() == "Falcon"
     assert bool(win.flags() & Qt.WindowType.FramelessWindowHint)
-
-    for name in ("sideMenu", "crumb", "recordView", "recordTable",
-                 "winMinimize", "winMaximize", "winClose"):
+    for name in ("sideMenu", "crumb", "page", "themeSwitch", "winMinimize", "winMaximize", "winClose"):
         assert win.findChild(QObject, name) is not None, name
-
-    # the Admin is where every operating feature lives, so their sider is the whole console
-    menu = win.findChild(QObject, "sideMenu")
-    keys = [e["key"] for e in prop(menu, "entries")]
-    assert keys[0] == "overview" and keys[-1] == "settings" and len(keys) == 14
+    assert prop(win, "menuKeys") == ADMIN_MENU
 
 
-OPERATING = ("machines", "flows", "automation", "actions", "assistance", "resources")
-
-
-def test_the_super_user_governs_and_does_not_operate(boss):
-    """hierarchy-system-design.md: the Super User observes hierarchy health, audits, maintains
-    oversight -- and "does not perform day-to-day operations". Those live at the Admin, and the Super
-    User reaches them by traversing in, at which point the console IS that Admin's console."""
-    win, bridge = boss
-    menu = win.findChild(QObject, "sideMenu")
-
-    keys = [e["key"] for e in prop(menu, "entries")]
-    assert keys == ["overview", "departments", "people", "tasks", "reports",
-                    "rollout", "record", "settings"]
-    assert not [k for k in keys if k in OPERATING]
-    assert prop(win, "lookingThrough") is False
+async def test_the_super_user_has_their_own_level_and_enters_an_admin_s(console):
+    """The Super User's own level is the organisation; operating happens inside an Admin's console, and
+    there the console IS that Admin's console, answered by the Engine as that Admin."""
+    win, bridge, _ = console("super_user")
+    assert prop(win, "menuKeys") == SU_MENU
     assert bridge.viewThroughSession is False
 
-    # inside an Admin: the operating areas appear, and the Engine is asked to answer as that Admin
-    bridge.state.set_session({"session_id": 4, "pc_id": 7, "hostname": "ADM-01",
-                              "occupied_via": "traversal", "super_user_banner": True,
-                              "entered_at": "2026-09-30T09:00:00+00:00"})
-    assert prop(win, "lookingThrough") is True
+    bridge.state.set_session({"session_id": 4, "pc_id": 101, "occupied_via": "traversal", "super_user_banner": True,
+                              "entered_at": _ago(0)})
+    assert prop(win, "menuKeys") == ADMIN_MENU
     assert bridge.viewThroughSession is True
-    keys = [e["key"] for e in prop(menu, "entries")]
-    assert len(keys) == 14 and all(k in keys for k in OPERATING)
 
-    # and the banner names who is in charge, which is the point of it being red
-    banner = win.findChild(QObject, "sessionBanner")
-    assert banner.property("visible") is True
-    assert banner.property("inCharge") is True
-
-    # step back out and the console is a governance shell again, off the page that was theirs
-    win.setProperty("view", "flows")
-    bridge.state.set_session(None)
-    assert prop(win, "view") == "overview"
-    assert [e["key"] for e in prop(menu, "entries")] == ["overview", "departments", "people",
-                                                         "tasks", "reports", "rollout", "record",
-                                                         "settings"]
-
-
-def test_the_tokens_are_the_one_place_a_colour_is_named(gui):
-    """Ant Design 6's values, with Falcon's two rationed status hues (docs/UI.md)."""
-    win, _ = gui
-    table = win.findChild(QObject, "recordTable")
-    assert table is not None
-    # the page and its table exist before anything is fetched, and the table says it is loading
-    assert table.property("loading") is True
-
-
-async def test_the_record_reads_what_the_engine_answers(gui):
-    """The Record is the most table-shaped page, and the one the idiom is proved on: rows come from
-    `audit.recent`, and the kind of each is named rather than left as a handler's type."""
-    win, bridge = gui
-    view = win.findChild(QObject, "recordView")
-    table = win.findChild(QObject, "recordTable")
-    bridge.connected.emit()                      # the views refetch, now that there is a loop
-
-    await _wait(lambda: len(prop(view, "rows") or []) == len(AUDIT))
-    rows = prop(view, "rows")
-    assert [r["at"] for r in rows] == ["13:11", "10:02", "09:11"]
-    assert rows[0]["who"] == "R. Mensah" and rows[0]["subject"] == "OPS-03"
-
-    # only the two that need a person carry a hue; a session is neutral
-    assert [r["kind"] for r in rows] == ["session", "violation", "deviation"]
-    assert table.property("loading") is False
-
-    # the table pages, sorts and filters over those rows without touching the Engine again
-    assert len(prop(table, "filtered")) == 3
-    table.setProperty("activeFilters", {"kind": "violation"})
-    assert [r["kind"] for r in prop(table, "filtered")] == ["violation"]
-
-
-async def test_machines_names_every_state_and_only_two_carry_a_hue(gui):
-    """One place decides what a machine's state is, so every page agrees: a file out of place and an
-    update past the limit need somebody; free, at the PC and entered do not."""
-    win, bridge = gui
-    win.setProperty("view", "machines")
-    view = win.findChild(QObject, "machinesView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "machines") or []) == 2)
-    by_host = {m["host"]: m for m in prop(view, "machines")}
-    assert by_host["OPS-01"]["state"] == "danger" and by_host["OPS-01"]["line"] == "a file out of place"
-    assert by_host["OPS-02"]["state"] == "danger" and by_host["OPS-02"]["line"] == "update past the limit"
-    assert prop(view, "needing") == 2
-
-
-async def test_a_department_with_nobody_governing_it_says_so(gui):
-    """The one condition on that page that needs an act, and the only red on it."""
-    win, bridge = gui
-    win.setProperty("view", "departments")
-    view = win.findChild(QObject, "departmentsView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 2)
-    rows = {r["name"]: r for r in prop(view, "rows")}
-    assert rows["Operations"]["governed"] == "R. Mensah" and rows["Operations"]["admins"] == 1
-    assert rows["Logistics"]["governed"] == "nobody" and rows["Logistics"]["stateWord"] == "nobody governs it"
-    assert prop(view, "ungoverned") == 1
-
-
-def test_the_crumb_follows_the_view(gui):
-    """Derived, never set: a crumb that has to be remembered gets forgotten."""
-    win, _ = gui
-    assert prop(win, "crumbs") == ["Falcon", "Overview"]
-    win.setProperty("view", "machines")
-    assert prop(win, "crumbs") == ["Falcon", "Machines"]
-
-
-async def test_registering_a_machine_is_one_form(gui):
-    """The form says what is missing before the Engine is asked, and the key that comes back is shown
-    once -- so the modal has a second half rather than closing on success."""
-    win, bridge = gui
-    win.setProperty("view", "machines")
-    modal = win.findChild(QObject, "registerModal")
-    toast = win.findChild(QObject, "toast")
-    assert modal is not None and toast is not None
-    bridge.connected.emit()
-    await _wait(lambda: len(prop(win.findChild(QObject, "machinesView"), "machines") or []) == 2)
-
-    modal.setProperty("visible", True)             # opening it resets the form
-    assert prop(modal, "hostname") == "" and prop(modal, "valid") is False
-
-    # nothing entered: the form answers, and nothing is sent
-    before = len(bridge.conn.seen)
-    QMetaObject.invokeMethod(modal, "submit")
-    assert prop(modal, "tried") is True
-    assert "hostname" in prop(modal, "hostnameProblem")
-    assert "department" in prop(modal, "departmentProblem")
-    assert len(bridge.conn.seen) == before
-
-    # a Super User workstation belongs to no department, so that row is not asked for
-    modal.setProperty("kind", "super_user_workstation")
-    assert prop(modal, "needsDepartment") is False and prop(modal, "departmentProblem") == ""
-    modal.setProperty("kind", "client_pc")
-
-    modal.setProperty("hostname", "OPS 08")
-    assert "spaces" in prop(modal, "hostnameProblem")
-    modal.setProperty("hostname", "OPS-08")
-    modal.setProperty("departmentId", 1)
-    assert prop(modal, "valid") is True
-
-    QMetaObject.invokeMethod(modal, "submit")
-    await _wait(lambda: prop(modal, "done") is not None)
-    assert ("hierarchy.pc_register",
-            {"hostname": "OPS-08", "pc_type": "client_pc", "department_id": 1}) in bridge.conn.seen
-    assert prop(modal, "done")["client_key"] == "0f" * 32
-    assert prop(modal, "busy") is False and prop(modal, "problem") == ""
-    assert prop(toast, "count") == 1               # "OPS-08 registered", said once
-
-
-async def test_a_task_that_is_past_its_deadline_says_so(gui):
-    """One place decides a task's state, and the only red on the page is a deadline that went by."""
-    win, bridge = gui
-    win.setProperty("view", "tasks")
-    view = win.findChild(QObject, "tasksView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 2)
-    rows = {r["what"]: r for r in prop(view, "rows")}
-    assert rows["Reconcile the Q3 invoices"]["stateWord"] == "late"
-    assert rows["Reconcile the Q3 invoices"]["stateTone"] == "danger"
-    assert rows["Walk the new starter through it"]["stateWord"] == "not started"
-    assert rows["Walk the new starter through it"]["checks"] == "nothing to check"
-    assert prop(view, "late") == 1
-
-
-async def test_a_proposal_is_read_before_it_is_committed(gui):
-    """Propose, never silently resolve: task.propose commits nothing, and the modal will not send
-    task.create until the assigner has seen what came back."""
-    win, bridge = gui
-    win.setProperty("view", "tasks")
-    modal = win.findChild(QObject, "newTaskModal")
-    assert modal is not None
-    bridge.connected.emit()
-
-    modal.setProperty("visible", True)
-    QMetaObject.invokeMethod(modal, "propose")          # nothing entered
-    assert prop(modal, "proposal") is None
-    assert "who" in prop(modal, "whoProblem")
-
-    modal.setProperty("assigneeId", 7)
-    modal.setProperty("description", "Reconcile the Q3 invoices in reconciliation.xlsx")
-    QMetaObject.invokeMethod(modal, "propose")
-    await _wait(lambda: prop(modal, "proposal") is not None)
-
-    sent = [t for t, _ in bridge.conn.seen]
-    assert "task.propose" in sent and "task.create" not in sent    # read first, commit second
-    assert prop(modal, "keepStack") is True
-
-    QMetaObject.invokeMethod(modal, "commit")
-    await _wait(lambda: any(t == "task.create" for t, _ in bridge.conn.seen))
-    payload = [p for t, p in bridge.conn.seen if t == "task.create"][-1]
-    assert payload["verification_mode"] == "stack" and len(payload["items"]) == 1
-    assert payload["final_deadline_at"] == "2026-10-03T16:00:00+00:00"
-    assert "confirm_none" not in payload
-
-
-async def test_nothing_to_check_has_to_be_said_on_purpose(gui):
-    """The Engine refuses verification_mode 'none' without an explicit confirm, and the console sends
-    that confirm only because a person picked it from the list."""
-    win, bridge = gui
-    win.setProperty("view", "tasks")
-    modal = win.findChild(QObject, "newTaskModal")
-    bridge.connected.emit()
-
-    modal.setProperty("visible", True)
-    modal.setProperty("assigneeId", 7)
-    modal.setProperty("description", "Walk the new starter through the console")
-    QMetaObject.invokeMethod(modal, "propose")
-    await _wait(lambda: prop(modal, "proposal") is not None)
-
-    modal.setProperty("keepStack", False)
-    modal.setProperty("keepFinal", False)
-    QMetaObject.invokeMethod(modal, "commit")
-    await _wait(lambda: any(t == "task.create" for t, _ in bridge.conn.seen))
-    payload = [p for t, p in bridge.conn.seen if t == "task.create"][-1]
-    assert payload["verification_mode"] == "none" and payload["confirm_none"] is True
-    assert "items" not in payload and "final_deadline_at" not in payload
-
-
-async def test_a_stopped_flow_says_the_engine_s_own_sentence(gui):
-    """The Engine already writes the suggestion for a failure; the console never invents its own, and
-    a flow still waiting on consent is amber, not red -- nobody has done anything wrong."""
-    win, bridge = gui
-    win.setProperty("view", "flows")
-    view = win.findChild(QObject, "flowsView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 3)
-    rows = {r["flow_id"]: r for r in prop(view, "rows")}
-    assert rows[1]["stateWord"] == "running" and rows[1]["stateTone"] == ""
-    assert rows[2]["stateWord"] == "stopped" and rows[2]["stateTone"] == "danger"
-    assert rows[2]["line"] == FLOWS[1]["suggestion"]
-    assert rows[3]["stateWord"] == "waiting" and rows[3]["stateTone"] == "warn"
-    assert prop(view, "stopped") == 1
-
-
-async def test_a_destination_that_already_holds_files_is_a_question(gui):
-    """The Engine refuses that once and says so; the console turns the refusal into the cost, and only
-    a person's answer sends it again with the confirm."""
-    win, bridge = gui
-    win.setProperty("view", "flows")
-    modal = win.findChild(QObject, "newFlowModal")
-    confirm = win.findChild(QObject, "collisionConfirm")
-    assert modal is not None and confirm is not None
-    bridge.connected.emit()
-
-    modal.setProperty("visible", True)
-    modal.setProperty("sourcePcId", 1)
-    modal.setProperty("sourcePath", "C:/work/payroll")
-    modal.setProperty("targets", [{"pc_id": 21, "path": "D:/handover"}])
-    assert prop(modal, "valid") is True
-
-    QMetaObject.invokeMethod(modal, "create")
-    await _wait(lambda: confirm.property("visible") is True)
-    assert "not backed up" in prop(confirm, "cost") or "files in that folder" in prop(confirm, "cost")
-    sent = [p for t, p in bridge.conn.seen if t == "flow.create"]
-    assert len(sent) == 1 and "confirm_collisions" not in sent[0]   # refused, and not retried on its own
-
-    QMetaObject.invokeMethod(modal, "createAnyway")   # what the confirm does
-    await _wait(lambda: len([p for t, p in bridge.conn.seen if t == "flow.create"]) == 2)
-    assert [p for t, p in bridge.conn.seen if t == "flow.create"][-1]["confirm_collisions"] is True
-
-
-async def test_an_action_is_named_the_way_a_person_says_it(gui):
-    """`lock_session` is a wire identifier. One place turns it into words, so the library, the drawer
-    and an automation's sentence cannot drift apart."""
-    win, bridge = gui
-    win.setProperty("view", "actions")
-    view = win.findChild(QObject, "actionsView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 3)
-    rows = {r["name"]: r for r in prop(view, "rows")}
-    assert rows["Lock the screen"]["kind"] == "control"
-    assert rows["Clear the temp folder"]["kind"] == "custom"
-    assert rows["List what is on the USB"]["timeout"] == "60s"
-
-
-async def test_an_automation_reads_as_one_sentence(gui):
-    """When something happens, on these machines, run these -- and a rule with nothing attached says
-    so in amber, because it notices and then does nothing."""
-    win, bridge = gui
+    # step back out from an Admin-only page: it is not a page of this level, so the Overview opens
     win.setProperty("view", "automation")
-    view = win.findChild(QObject, "automationView")
+    bridge.state.set_session(None)
+    assert prop(win, "menuKeys") == SU_MENU
+    assert prop(win, "where") == "overview"
+
+
+async def test_the_super_user_never_opens_an_admin_s_page(console):
+    """A machine opens in Registry and a session in Access (docs/design/su-navigation.md)."""
+    win, _, _ = console("super_user")
+    win.setProperty("view", "machines/OPS-01")
+    assert prop(win, "where") == "registry/OPS-01"
+    win.setProperty("view", "sessions")
+    assert prop(win, "where") == "access"
+
+
+PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [
+    ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
+    ("admin", "restricted/mark"), ("admin", "machines/OPS-01")]
+
+
+@pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])
+async def test_every_page_loads_clean(console, role, view):
+    """A QML error anywhere on a page leaves the Loader empty or prints a warning; either fails here."""
+    win, bridge, warnings = console(role)
     bridge.connected.emit()
+    win.setProperty("view", view)
+    loader = win.findChild(QObject, "page")
+    await _wait(lambda: loader.property("item") is not None)
+    for _ in range(6):
+        await asyncio.sleep(0.05)
+        _pump(0.05)
+    assert loader.property("item") is not None
+    assert not warnings, "\n".join(warnings)
 
-    await _wait(lambda: len(prop(view, "rows") or []) == 2)
-    rows = {r["event_id"]: r for r in prop(view, "rows")}
-    assert rows[1]["when"] == "a USB goes in" and rows[1]["where"] == "every machine"
-    assert rows[1]["then"] == "List what is on the USB" and rows[1]["stateWord"] == "on"
-    assert rows[2]["where"] == "2 machines" and rows[2]["then"] == "nothing yet"
-    assert rows[2]["stateTone"] == "warn" and rows[2]["polled"] is True
-    assert prop(view, "idle") == 1
+
+async def test_a_department_without_an_admin_comes_first(console):
+    """The one condition on Departments that needs the Super User: its reports come to them."""
+    win, bridge, _ = console("super_user")
+    view = await _open(win, bridge, "departments", "departmentsView")
+    await _wait(lambda: len(prop(view, "all") or []) == 2)
+    assert [d["name"] for d in prop(view, "all")] == ["Logistics", "Operations"]
+    assert prop(view, "d")["name"] == "Logistics"
 
 
-async def test_a_script_is_read_before_it_is_sent(gui):
-    """Custom Actions are validated three times -- here, at the Engine, and again on the worker. The
-    first one is so the refusal reads as a review rather than a rejection."""
-    win, bridge = gui
-    win.setProperty("view", "actions")
-    modal = win.findChild(QObject, "newActionModal")
+async def test_a_deviation_is_a_record_against_a_rule(console):
+    """The Engine logs `account_bound_to_one_pc`; the page reads it against the built-in rule it departs
+    from, with what was expected beside what happened, and the open one before the one dealt with."""
+    win, bridge, _ = console("super_user")
+    view = await _open(win, bridge, "accountability", "accountabilityView")
+    await _wait(lambda: len(prop(view, "all") or []) == 2)
+    dev = prop(view, "dev")
+    assert dev["rule"] == "B-4" and dev["out"] == "open"
+    assert dev["expected"] == "The certificate names OPS-01"
+    assert dev["happened"] == "The certificate names WS-OPS-01"
+    assert [d["id"] for d in prop(view, "list")] == ["87"]          # open only, by default
+    view.setProperty("oc", "all")
+    assert [d["id"] for d in prop(view, "list")] == ["87", "80"]
+
+
+async def test_refused_connections_are_one_row_per_key(console):
+    """Every failed handshake is audited; the Registry folds them into who kept trying, and why."""
+    win, bridge, _ = console("super_user")
+    view = await _open(win, bridge, "registry", "registryView")
+    await _wait(lambda: len(prop(view, "doors") or []) == 2)
+    doors = {d["client"]: d for d in prop(view, "doors")}
+    assert doors["abc"]["tries"] == 2 and doors["abc"]["why"] == "wrong key" and doors["abc"]["ip"] == "10.20.9.201"
+    assert doors["zzz"]["why"] == "not registered"
+    rows = prop(view, "rows")
+    assert next(r for r in rows if r["id"] == "OPS-01")["gen"] == 2
+
+
+async def test_the_built_in_rules_are_listed_and_locked(console):
+    """Every deviation points to a rule; the ones Falcon enforces are listed, and none can be edited."""
+    win, bridge, _ = console("super_user")
+    view = await _open(win, bridge, "rules", "rulesView")
+    rules = prop(view, "all")
+    assert [r["id"] for r in rules] == ["B-1", "B-2", "B-3", "B-4"]
+    assert all(r["locked"] for r in rules)
+
+
+async def test_entering_a_worker_s_machine_opens_its_session_window(console):
+    """One window over the console; Back to the console keeps the session, the window comes back with the
+    next entry."""
+    win, bridge, _ = console("admin")
     bridge.connected.emit()
-
-    modal.setProperty("visible", True)
-    modal.setProperty("kind", "custom")
-    modal.setProperty("actionName", "Fetch the thing")
-    modal.setProperty("script", "import requests\nrequests.get('http://example.com')\n")
-    QMetaObject.invokeMethod(modal, "check")
-    assert prop(modal, "scriptProblems"), "a third-party import should not pass"
-    assert prop(modal, "valid") is False
-
-    modal.setProperty("script", "import os\nprint(os.getcwd())\n")
-    QMetaObject.invokeMethod(modal, "check")
-    assert prop(modal, "scriptProblems") == []
-    assert prop(modal, "valid") is True
+    window = win.findChild(QObject, "sessionWindow")
+    assert window.property("visible") is False
+    ok, _ = await bridge.request("hierarchy.traverse", {"pc_id": 1})
+    assert ok
+    await _wait(lambda: window.property("visible") is True)
 
 
-async def test_a_drawer_leaves_with_the_page_that_opened_it(gui):
-    """A popup lives in the window's overlay, not in the page that declared it, so leaving the page
-    used to leave the drawer sitting over the next one."""
-    win, bridge = gui
-    win.setProperty("view", "machines")
-    view = win.findChild(QObject, "machinesView")
-    drawer = win.findChild(QObject, "machineDrawer")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "machines") or []) == 2)
-    drawer.setProperty("visible", True)
-    assert drawer.property("visible") is True
-
-    win.setProperty("view", "tasks")
-    _spin(lambda: drawer.property("visible") is False)     # it slides out, so turn the loop
-
-
-async def test_a_channel_says_whose_turn_it_is(gui):
-    """A Message Channel takes turns, and the Engine sends the turn as a word plus the two parties --
-    the console works out whose it is rather than waiting for a field that does not exist."""
-    win, bridge = gui
-    win.setProperty("view", "assistance")
-    view = win.findChild(QObject, "assistanceView")
-    reply = win.findChild(QObject, "replyBox")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 3)
-    rows = {r["channel_id"]: r for r in prop(view, "rows")}
-    assert rows[1]["stateWord"] == "your turn" and rows[1]["stateTone"] == "warn"
-    assert rows[2]["stateWord"] == "waiting on them" and rows[2]["mineNow"] is False
-    assert rows[3]["stateWord"] == "closed" and rows[3]["open"] is False
-    assert prop(view, "waiting") == 1
-
-    # the turn is the state of the box, not a sentence about a rule
-    view.setProperty("chosen", rows[2])
-    assert reply.property("enabled") is False
-    view.setProperty("chosen", rows[1])
-    assert reply.property("enabled") is True
+async def test_the_engine_s_issues_are_the_issues_and_a_choice_is_its_act(console):
+    """issues.list replaces the issues the console used to read from the records; what an issue means and what can be
+    done about it are issues.get's answer, and choosing is issues.act -- with the reason the option asks for."""
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "issues", "issuesView")
+    await _wait(lambda: [r.get("iid") for r in prop(view, "rows") or []] == [41])
+    await _wait(lambda: (prop(view, "play") or {}).get("lead") == "A copy of budget-2026.xlsx is on OPS-01.")
+    assert [o["key"] for o in prop(view, "play")["options"]] == ["allow"]
+    assert prop(view, "missing") == "Write a reason first."
+    view.setProperty("input", {"I-41allow": "Approved for the audit"})
+    assert prop(view, "missing") == ""
+    QMetaObject.invokeMethod(view, "act")
+    await _wait(lambda: any(t == "issues.act" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "issues.act")
+    assert sent == {"issue_id": 41, "key": "allow", "reason": "Approved for the audit"}
 
 
-async def test_a_file_on_the_wrong_shelf_is_the_only_red_on_resources(gui):
-    """Which shelf a file sits on is who may have it, so a violation is a file on the wrong shelf --
-    and one already sorted is neutral, because nobody has to do anything about it."""
-    win, bridge = gui
-    win.setProperty("view", "resources")
-    view = win.findChild(QObject, "resourcesView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 2)
-    rows = {r["file"]: r for r in prop(view, "rows")}
-    assert rows["budget-2026.xlsx"]["stateTone"] == "danger"
-    assert rows["budget-2026.xlsx"]["tier"] == "Named people only"
-    assert rows["salaries.csv"]["stateTone"] == "" and rows["salaries.csv"]["resolved"] is True
-    assert prop(view, "loose") == 1
+async def test_marks_are_the_person_s_own_and_their_copies_are_issues(console):
+    """marks.list is what you marked; marks.get gives a mark's copies, each an issue to deal with."""
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "restricted", "restrictedView")
+    await _wait(lambda: len((prop(view, "cur") or {}).get("copies") or []) == 1)
+    cur = prop(view, "cur")
+    assert cur["name"] == "Payroll" and cur["keep"] == "path" and cur["files"] == 24
+    assert cur["copies"][0]["iid"] == 41 and cur["copies"][0]["user"] == "Kojo"
+    assert prop(view, "copiesN") == 1
 
 
-async def test_the_super_user_gets_no_addressed_column(boss):
-    """`addressed` is written to a separate table and is an Admin's act. The Super User sees every
-    report regardless of routing, so a state column there would always read "open" and mean nothing."""
-    win, bridge = boss
-    win.setProperty("view", "reports")
-    view = win.findChild(QObject, "reportsView")
-    table = win.findChild(QObject, "reportsTable")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 2)
-    assert prop(view, "boss") is True
-    assert [c["title"] for c in prop(table, "columns")] == ["What", "Written from", "When"]
-    assert prop(view, "rows")[0]["what"] == "A file turned up where it should not"
+QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))
 
 
-async def test_the_gate_holds_while_anything_is_behind(boss):
-    """N and N+1, never more: the next version cannot be approved while a machine is still behind, so
-    the button is off and the page says why rather than letting the Engine refuse it."""
-    win, bridge = boss
-    win.setProperty("view", "rollout")
-    view = win.findChild(QObject, "rolloutView")
-    approve = win.findChild(QObject, "approveVersion")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 1)
-    assert prop(view, "clear") is False
-    assert approve.property("enabled") is False
-    row = prop(view, "rows")[0]
-    assert row["stateWord"] == "past the limit" and row["stateTone"] == "danger"
+def test_nothing_clickable_uses_a_taphandler():
+    """A TapHandler reacts to a press over its item even when a dialog sits on top of it (CLAUDE.md)."""
+    offenders = [f.name for f in QML_FILES if re.search(r"^\s*TapHandler\s*\{", f.read_text(encoding="utf-8"), re.MULTILINE)]
+    assert not offenders
 
 
-async def test_the_overview_is_a_list_of_acts(gui):
-    """Not a dashboard. Every line is something a person has to do, said in the words of what it is,
-    and it opens the page where it gets done. Nothing counts a number that is already fine."""
-    win, bridge = gui
-    win.setProperty("view", "overview")
-    view = win.findChild(QObject, "overviewView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "needs") or []) >= 5)
-    needs = prop(view, "needs")
-    assert [n["where"] for n in needs][:4] == ["assistance", "resources", "flows", "tasks"]
-    assert needs[0]["what"] == "1 person asked for you"
-    assert [n["where"] for n in needs].count("rollout") >= 1
-    assert all(n["why"] for n in needs), "every line says why it matters"
-    # the ones that can wait are amber, the ones that cannot are red
-    assert {n["tone"] for n in needs} <= {"danger", "warn"}
-
-
-async def test_a_person_without_a_status_has_not_left(gui):
-    """A row that does not carry a status is not evidence that somebody was offboarded -- only an
-    explicit non-active status is."""
-    win, bridge = gui
-    win.setProperty("view", "people")
-    view = win.findChild(QObject, "peopleView")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "rows") or []) == 3)
-    rows = {r["name"]: r for r in prop(view, "rows")}
-    assert rows["R. Mensah"]["role"] == "Admin" and rows["R. Mensah"]["department"] == "Operations"
-    assert rows["Kojo"]["stateWord"] == "signed in"        # it has a session
-    assert rows["Efua"]["stateWord"] == "not signed in"    # no session, but not gone either
-
-
-async def test_the_night_is_shaded_and_never_cropped(gui):
-    """24 hours is the default span, on purpose: an entry at 02:14 is exactly the thing somebody is
-    looking for, and a 6-to-6 chart would simply not draw it. 6 to 6 is a switch, and it does crop --
-    which is the point of making it a choice rather than the default."""
-    win, bridge = gui
-    win.setProperty("view", "machines")
-    view = win.findChild(QObject, "machinesView")
-    day = win.findChild(QObject, "machinesDay")
-    assert day is not None
-    bridge.connected.emit()
-
-    view.setProperty("look", "day")
-    await _wait(lambda: len(prop(day, "lanes") or []) == 3)
-    hosts = [lane["host"] for lane in prop(day, "lanes")]
-    assert hosts == ["FIN-02", "LOG-02", "OPS-01"]          # sorted, one lane per machine
-    assert prop(day, "fromHour") == 0 and prop(day, "toHour") == 24
-
-    night = next(lane for lane in prop(day, "lanes") if lane["host"] == "LOG-02")
-    assert round(night["bars"][0]["from"], 1) == 2.2 and night["bars"][0]["via"] == "traversal"
-
-    # the working-day window drops it, and that is the switch saying so
-    view.setProperty("fromHour", 6)
-    await _wait(lambda: len(prop(day, "lanes") or []) == 2)
-    assert "LOG-02" not in [lane["host"] for lane in prop(day, "lanes")]
-    assert prop(day, "toHour") == 18
-
-    # a bar that starts before the window is clipped to it, not dropped
-    view.setProperty("fromHour", 0)
-    await _wait(lambda: len(prop(day, "lanes") or []) == 3)
-
-
-async def test_the_fleet_grid_groups_by_department(gui):
-    """The table is the default answer; the grid is for when a table stops being scannable, and it
-    says one thing per machine because that is all that survives at this size."""
-    win, bridge = gui
-    win.setProperty("view", "machines")
-    view = win.findChild(QObject, "machinesView")
-    grid = win.findChild(QObject, "machinesGrid")
-    bridge.connected.emit()
-
-    await _wait(lambda: len(prop(view, "machines") or []) == 2)
-    view.setProperty("look", "grid")
-    groups = prop(grid, "groups")
-    assert [g["name"] for g in groups] == ["Operations"]
-    assert [m["host"] for m in groups[0]["machines"]] == ["OPS-01", "OPS-02"]
-
-
-def test_the_session_banner_empties_as_the_clock_runs(gui):
-    """One row, only when you are actually inside somebody's machine, with a real bar for the clock --
-    not a stripe, and not a picture of one moment."""
-    win, _ = gui
-    banner = win.findChild(QObject, "sessionBanner")
-    assert banner is not None
-    assert banner.property("visible") is False          # nothing is held, so it is not there
-
-    from datetime import datetime, timedelta
-
-    now = datetime.now()  # noqa: DTZ005 -- the banner reads the clock on this machine
-    banner.setProperty("since", (now - timedelta(minutes=10)).isoformat())
-    banner.setProperty("until", (now + timedelta(minutes=10)).isoformat())
-    assert 0.4 < prop(banner, "remaining") < 0.6       # halfway through
-    assert 9 <= prop(banner, "minutes") <= 11
-
-
-def test_a_floating_popup_consumes_its_own_clicks(gui):
-    """A popup that floats over the page is not modal, so whatever it does not swallow is delivered
-    to the item underneath -- and on a table that is a row, and a row opens a drawer.
-
-    This is structural on purpose. A TapHandler reacts to a press without consuming it; a MouseArea
-    consumes it. So every floating popup in the kit answers with MouseAreas, and this walks them to
-    say so -- a coordinate-level click test could not be made to fail on the old code offscreen, so
-    it would have been a test that proved nothing.
-    """
-    win, _ = gui
-    win.setProperty("view", "record")
-    field = win.findChild(QObject, "recordRange")           # the date range: two months and a list
-    assert field is not None
-
-    areas = [c for c in field.findChildren(QObject)
-             if "MouseArea" in c.metaObject().className()]
-    assert areas, "the date popup must answer with MouseAreas, not TapHandlers"
-
-    # and the popup's own background takes anything the contents did not
-    fills = [a for a in areas if a.property("width") and a.property("width") > 300]
-    assert fills, "the popup needs one MouseArea across it, for the gaps between its controls"
-
-
-def test_the_whole_kit_instantiates(gui):
-    """The kit board draws every component the console is made of, so loading it is the cheapest
-    check that none of them is broken -- a QML error anywhere in it leaves the Loader with no item.
-
-    It is reached only from the preview script; it is not an area of the console.
-    """
-    win, _ = gui
-    loader = win.findChild(QObject, "kitView")
-    assert loader is not None
-    assert loader.property("item") is None, "it costs nothing until it is asked for"
-
-    win.setProperty("view", "kit")
-    assert prop(win, "view") == "kit", "the shell lets the board through, though it is not an area"
-    assert loader.property("item") is not None, "a QML error anywhere in the kit shows up here"
+def test_colours_are_named_only_in_the_theme():
+    """Theme.qml is the one place a colour is named, so light and dark stay one decision."""
+    pattern = re.compile(r"\"#[0-9a-fA-F]{3,8}\"|Qt\.rgba\(|'#[0-9a-fA-F]{3,8}'")
+    offenders = [f.name for f in QML_FILES if f.name != "Theme.qml" and pattern.search(f.read_text(encoding="utf-8"))]
+    assert not offenders

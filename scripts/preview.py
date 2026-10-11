@@ -20,9 +20,9 @@ sys.path.insert(0, str(ROOT))
 WORDS = [a for a in sys.argv[1:] if not a.startswith("-")]
 ROLE = "admin" if "admin" in WORDS else "super_user"
 INSIDE = "inside" in WORDS
-AREAS = ("overview", "departments", "people", "machines", "tasks", "flows", "automation", "actions",
-         "assistance", "resources", "reports", "rollout", "record", "settings", "kit")
-VIEW = next((w for w in WORDS if w in AREAS), "")
+AREAS = ("overview", "messages", "tasks", "restricted", "flows", "machines", "sessions", "issues", "automation",
+         "actions", "rollout", "audit", "reports", "departments", "accountability", "access", "registry", "rules")
+VIEW = next((w for w in WORDS if w.split("/")[0] in AREAS), "")
 if "--role" in sys.argv:                        # the older spelling, still used by the shot scripts
     ROLE = sys.argv[sys.argv.index("--role") + 1]
 if "--view" in sys.argv:
@@ -39,6 +39,9 @@ from PySide6.QtCore import QSize, QTimer
 
 from operator_client.core.config import LocalConfig
 from operator_client.gui import app as gui_app
+
+sys.path.insert(0, str(ROOT / "scripts"))
+import preview_data
 
 # --- the sample organisation ---------------------------------------------------------------------
 PEOPLE = ["R. Mensah", "A. Quaye", "K. Boateng", "You", "System", "Automation"]
@@ -300,13 +303,13 @@ ANSWERS = {
 
 
 class FakeIdentity:
-    """What the handshake would have returned. `--role admin` to see the Admin's console, which is a
-    different product: the Super User's is a governance shell until they traverse into an Admin."""
+    """What the handshake would have returned. `--role admin` to see the Admin's console (R. Mensah,
+    Operations); the Super User's is a governance shell until they enter an Admin's console."""
     client_id = "preview"
-    account_id = 1
+    account_id = 7 if ROLE == "admin" else 1
     role = ROLE
-    pc_id = 1
-    department_id = 1
+    pc_id = 101 if ROLE == "admin" else 100
+    department_id = 1 if ROLE == "admin" else None
 
 
 class StubConnection:
@@ -316,7 +319,9 @@ class StubConnection:
 
     async def call(self, type_: str, payload: dict) -> dict:
         await asyncio.sleep(0)
-        return ANSWERS.get(type_, {})
+        # the console concept's own sample first, then the older answers
+        got = preview_data.answer(type_, payload or {}, ROLE, FakeIdentity.account_id, FakeIdentity.department_id)
+        return got if got is not None else ANSWERS.get(type_, {})
 
     async def close(self) -> None:
         return None
@@ -347,6 +352,22 @@ def main() -> int:
         name = sys.argv[sys.argv.index("--open") + 1]
         from PySide6.QtCore import QObject
         QTimer.singleShot(700, lambda: win.findChild(QObject, name).setProperty("visible", True))
+    if "--do" in sys.argv:                        # run JavaScript in one component's scope, to show a state
+        js = sys.argv[sys.argv.index("--do") + 1]
+        name = sys.argv[sys.argv.index("--in") + 1] if "--in" in sys.argv else ""
+
+        def run_js() -> None:
+            from PySide6.QtCore import QObject
+            from PySide6.QtQml import QQmlExpression
+            target = win.findChild(QObject, name) if name else win
+            if target is None:
+                print("preview: no object named", name)
+                return
+            expr = QQmlExpression(engine.contextForObject(target), target, js)
+            expr.evaluate()
+            if expr.hasError():
+                print("preview --do:", expr.error().toString())
+        QTimer.singleShot(int(sys.argv[sys.argv.index("--at") + 1]) if "--at" in sys.argv else 900, run_js)
     app.aboutToQuit.connect(loop.stop)       # qasync raises if the Qt loop stops under a pending await
 
     if not SHOT:
@@ -359,7 +380,7 @@ def main() -> int:
         if ROLE != "admin" and not INSIDE and VIEW == "":
             print("  A Super User governs and does not operate, so this is eight areas. Machines,")
             print("  Flows, Automation, Actions, Assistance and Resources are an Admin's.")
-            print("  Try:  preview.py admin      preview.py inside      preview.py kit")
+            print("  Try:  preview.py admin      preview.py inside      preview.py registry")
         print("  Close the window to quit.")
         with loop:
             loop.run_forever()

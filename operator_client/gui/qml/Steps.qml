@@ -1,73 +1,59 @@
 import QtQuick
 import "."
 
-// WHERE YOU ARE IN SOMETHING THAT HAS AN ORDER. Only where the order is real -- a proposal that must
-// be read before it is committed, a flow that must be described before it is checked. Never as
-// decoration on a form that is one page.
+// WHERE YOU ARE IN SOMETHING THAT HAS AN ORDER: a numbered circle per step with its title and one
+// line under it, a line between them. A done step shows a tick; one left with a problem is red. A click
+// goes to that step. steps: [{title, desc, error?}] or strings.
 Item {
     id: root
-    property var steps: []                // [string]
+    property var steps: []
     property int current: 0
-
-    implicitHeight: 32
+    property bool clickable: true
+    signal picked(int index)
+    readonly property var items: steps.map(function (s) { return typeof s === "object" ? s : { title: s, desc: "" } })
+    implicitHeight: 46
 
     Row {
         anchors.fill: parent
-        spacing: 0
-
         Repeater {
-            model: root.steps
+            model: root.items
             delegate: Item {
+                id: st
                 required property var modelData
                 required property int index
                 readonly property bool done: index < root.current
                 readonly property bool here: index === root.current
-                width: root.width / root.steps.length
+                readonly property bool err: !!modelData.error
+                width: root.width / root.items.length
                 height: root.height
-
                 Rectangle {
                     id: pip
-                    width: 22
-                    height: 22
-                    radius: 11
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: parent.here ? Theme.primary : parent.done ? Theme.primarySoft : Theme.fillStrong
-
-                    Txt {
-                        anchors.centerIn: parent
-                        visible: !parent.parent.done
-                        text: String(index + 1)
-                        color: parent.parent.here ? Theme.onDark : Theme.mid
-                        font.pixelSize: 11
-                        strong: true
-                    }
-                    Icon {
-                        anchors.centerIn: parent
-                        visible: parent.parent.done
-                        name: "check"
-                        size: 13
-                        color: Theme.primary
-                    }
+                    width: 26; height: 26; radius: 13
+                    color: st.here ? Theme.accent : st.err ? Theme.surface : st.done ? Theme.surface : Theme.surface3
+                    border.width: st.done || st.err ? 1 : 0
+                    border.color: st.err ? Theme.crit : Theme.accent
+                    Txt { anchors.centerIn: parent; visible: !st.done || st.err; text: st.err ? "!" : String(index + 1); elide: Text.ElideNone
+                          color: st.here ? Theme.inverse : st.err ? Theme.crit : Theme.text3; font.pixelSize: 12; font.weight: Font.Medium }
+                    Icon { anchors.centerIn: parent; visible: st.done && !st.err; name: "check"; size: 13; color: Theme.accent }
                 }
-                Txt {
-                    anchors.left: pip.right
-                    anchors.leftMargin: Theme.s2
-                    anchors.right: rule.left
-                    anchors.rightMargin: Theme.s2
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: modelData
-                    tone: parent.here ? "ink" : "mid"
-                    strong: parent.here
-                    font.pixelSize: Theme.fSmall
+                Column {
+                    x: 34
+                    width: parent.width - 34
+                    spacing: 1
+                    Row {
+                        width: parent.width
+                        spacing: 8
+                        Txt { id: tt; text: st.modelData.title; elide: Text.ElideNone; font.weight: st.here ? Font.Medium : Font.Normal
+                              color: st.err ? Theme.crit : st.here || st.done ? Theme.text : Theme.text3; topPadding: 3 }
+                        Rectangle { visible: index < root.items.length - 1; width: Math.max(0, parent.width - tt.width - 16); height: 1; y: 13; color: st.done ? Theme.accent : Theme.border }
+                    }
+                    Txt { text: st.modelData.desc || ""; visible: text !== ""; color: Theme.text3; font.pixelSize: 12; width: parent.width - 10 }
                 }
-                Rectangle {
-                    id: rule
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: index === root.steps.length - 1 ? 0 : Theme.s4
-                    height: 1
-                    color: Theme.split
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: root.clickable
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.picked(index)
                 }
             }
         }

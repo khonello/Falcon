@@ -415,6 +415,19 @@ class FalconBridge(QObject):
         except OSError as exc:
             return f"__error__:{exc}"
 
+    @Slot(str, str, result=str)
+    def saveText(self, path: str, text: str) -> str:
+        """Write `text` to `path` (a file URL from a save dialog, or a plain path): "" or why it failed."""
+        from PySide6.QtCore import QUrl
+
+        local = QUrl(path).toLocalFile() if path.startswith("file:") else path
+        try:
+            with open(local, "w", encoding="utf-8", newline="") as f:
+                f.write(text)
+            return ""
+        except OSError as exc:
+            return str(exc)
+
     @Slot(str, str, result="QVariant")
     def validateScript(self, language: str, source: str) -> Any:
         from common.custom_actions import validate

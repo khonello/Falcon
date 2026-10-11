@@ -91,7 +91,7 @@ Item {
                     anchors.centerIn: parent
                     visible: parent.real
                     text: parent.real ? String(parent.dayNum) : ""
-                    color: (parent.isFrom || parent.isTo) ? Theme.onDark : Theme.ink
+                    color: (parent.isFrom || parent.isTo) ? Theme.inverse : Theme.ink
                     font.pixelSize: Theme.fSmall
                 }
                 // MouseArea, not TapHandler: this grid floats over the page in a popup, and a

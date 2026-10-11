@@ -1,43 +1,51 @@
 import QtQuick
 import "."
 
-// RULE 4: anything destructive or costly names the cost before the verb. The verb is the button;
-// the cost is the sentence above it, and it is written in what actually happens to a person.
+// A confirmation: the question as the title, what actually happens to a person under it, then Cancel
+// and the act. One per page is enough: `ask({title, text, ok, cancel, danger}, onOk)`.
 Modal {
     id: root
+    objectName: "confirm"
     property string cost: ""
     property string verb: "Yes"
+    property string cancelText: "Cancel"
     property bool destructive: false
+    property var okFn: null
     signal accepted()
 
     width: 440
 
-    Txt {
+    function ask(o, fn) {
+        title = o.title || ""
+        cost = o.text || ""
+        verb = o.ok || "Yes"
+        cancelText = o.cancel || "Cancel"
+        destructive = !!o.danger
+        okFn = fn || null
+        open()
+    }
+
+    Row {
         width: parent.width
-        text: root.cost
-        tone: "mid"
-        wrapMode: Text.WordWrap
-        elide: Text.ElideNone
+        spacing: 12
+        Icon { name: "info"; size: 20; color: root.destructive ? Theme.crit : Theme.med }
+        Txt {
+            width: parent.width - 32
+            text: root.cost
+            color: Theme.text2
+            wrapMode: Text.WordWrap
+            elide: Text.ElideNone
+        }
     }
 
     footer: [
+        Btn { text: root.cancelText; onClicked: root.close() },
         Btn {
-            text: "Cancel"
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: yes.left
-            anchors.rightMargin: Theme.s2
-            onClicked: root.close()
-        },
-        Btn {
-            id: yes
             objectName: "confirmYes"
             kind: "primary"
             danger: root.destructive
             text: root.verb
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.s5
-            onClicked: { root.close(); root.accepted() }
+            onClicked: { var f = root.okFn; root.close(); root.accepted(); if (f) f() }
         }
     ]
 }

@@ -1,46 +1,53 @@
 import QtQuick
 import "."
 
-// What would be here, and the one way to make one. A zero is a result, not an absence.
-Column {
+// Zero is a state, not an absence. Where a list or a chart has nothing, it keeps its place and size
+// and says what will appear there and, when there is one, the first step towards it.
+Item {
     id: root
-    property string text: "Nothing here yet"
-    property string hint: ""
-    property string action: ""
-    signal actionTriggered()
+    property string icon: "inbox"
+    property string title: "Nothing here yet"
+    property string text: ""
+    property string act: ""
+    property int h: 120
+    signal acted()
 
-    spacing: Theme.s2
-    Item {
-        width: parent.width
-        height: 44
-        Icon {
-            anchors.centerIn: parent
-            name: "folder"
-            size: 30
-            color: Theme.quiet
+    implicitWidth: 320
+    implicitHeight: h
+
+    Row {
+        anchors.verticalCenter: parent.verticalCenter
+        x: 20
+        width: parent.width - 40
+        spacing: 14
+        Rectangle {
+            width: 34; height: 34; radius: 6
+            color: Theme.alpha(Theme.text3, 0.12)
+            anchors.verticalCenter: parent.verticalCenter
+            Icon { anchors.centerIn: parent; name: root.icon; size: 16; color: Theme.text3 }
         }
-    }
-    Txt { width: parent.width; text: root.text; tone: "mid"; horizontalAlignment: Text.AlignHCenter }
-    Txt {
-        width: parent.width
-        visible: root.hint !== ""
-        text: root.hint
-        tone: "quiet"
-        font.pixelSize: Theme.fSmall
-        horizontalAlignment: Text.AlignHCenter
-    }
-    Item {
-        width: parent.width
-        height: root.action === "" ? 0 : btn.height + Theme.s2
-        visible: root.action !== ""
+        Column {
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width - 48 - (btn.visible ? btn.width + 14 : 0)
+            spacing: 3
+            Txt { text: root.title; font.weight: Font.DemiBold; width: parent.width; elide: Text.ElideRight }
+            Txt {
+                visible: root.text !== ""
+                text: root.text
+                color: Theme.text3
+                font.pixelSize: 12
+                width: parent.width
+                wrapMode: Text.WordWrap
+                elide: Text.ElideNone
+            }
+        }
         Btn {
             id: btn
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            kind: "primary"
+            visible: root.act !== ""
             small: true
-            text: root.action
-            onClicked: root.actionTriggered()
+            text: root.act
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: root.acted()
         }
     }
 }

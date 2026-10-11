@@ -1,56 +1,40 @@
 import QtQuick
 import "."
 
-// TWO OR THREE KINDS OF THING ABOUT ONE SUBJECT. Not navigation: everything behind these tabs is the
-// same row you opened. If a tab would need its own address, it is a page.
+// Tabs: a row of labels with the current one underlined in the accent, and a hairline under the row.
+// tabs: [{key, label}] or strings. The page shows whatever matches `current`.
 Item {
     id: root
-    property var tabs: []                 // [{key, label, count}]
-    property string current: ""
-    signal picked(string key)
+    property var tabs: []
+    property var current: null
+    signal picked(var key)
+    readonly property var items: tabs.map(function (t) { return typeof t === "object" ? t : { key: t, label: t } })
+    implicitHeight: 38
+    implicitWidth: row.implicitWidth
 
-    implicitHeight: 36
-
+    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
     Row {
-        id: strip
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        spacing: Theme.s4
-
+        id: row
+        height: parent.height
+        spacing: 24
         Repeater {
-            model: root.tabs
+            model: root.items
             delegate: Item {
                 required property var modelData
-                readonly property bool on: modelData.key === root.current
-                width: label.implicitWidth + (badge.visible ? badge.width + Theme.s1 : 0)
-                height: 35
-
+                readonly property bool on: root.current === modelData.key
+                width: lbl.implicitWidth
+                height: row.height
                 Txt {
-                    id: label
-                    anchors.left: parent.left
+                    id: lbl
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.label
-                    tone: parent.on ? "accent" : th.containsMouse ? "ink" : "mid"
-                    strong: parent.on
-                    font.pixelSize: Theme.fBody
+                    color: on ? Theme.accent : area.containsMouse ? Theme.accent : Theme.text
+                    font.weight: on ? Font.Medium : Font.Normal
+                    elide: Text.ElideNone
                 }
-                Count {
-                    id: badge
-                    anchors.left: label.right
-                    anchors.leftMargin: Theme.s1
-                    anchors.verticalCenter: parent.verticalCenter
-                    value: modelData.count || 0
-                    tone: "danger"
-                }
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 2
-                    color: Theme.primary
-                    visible: parent.on
-                }
+                Rectangle { visible: on; anchors.bottom: parent.bottom; width: parent.width; height: 2; color: Theme.accent }
                 MouseArea {
-                    id: th
+                    id: area
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -58,12 +42,5 @@ Item {
                 }
             }
         }
-    }
-    Rectangle {
-        anchors.bottom: parent.bottom
-        width: parent.width
-        height: 1
-        color: Theme.split
-        z: -1
     }
 }

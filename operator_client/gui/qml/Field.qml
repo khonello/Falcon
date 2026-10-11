@@ -8,19 +8,23 @@ TextField {
     property string iconName: ""
 
     implicitHeight: Theme.control
-    leftPadding: (iconName === "" ? Theme.s3 : Theme.s5 + Theme.s2)
-    rightPadding: Theme.s3
+    leftPadding: (iconName === "" ? 10 : Theme.s5 + Theme.s2)
+    rightPadding: 10
+    topPadding: 0
+    bottomPadding: 0
+    verticalAlignment: TextInput.AlignVCenter
+    selectionColor: Theme.alpha(Theme.accent, 0.3)
     font.family: Theme.sans
     font.pixelSize: Theme.fBody
-    color: Theme.ink
+    color: Theme.text
     selectByMouse: true
-    placeholderTextColor: Theme.quiet
+    placeholderTextColor: Theme.text4
 
     background: Rectangle {
-        radius: Theme.radius
-        color: root.enabled ? Theme.surface : Theme.fill
+        radius: Theme.radiusSm
+        color: root.enabled ? Theme.surface : Theme.surface2
         border.width: 1
-        border.color: root.activeFocus ? Theme.primary : root.hovered ? Theme.primaryHover : Theme.border
+        border.color: root.activeFocus || root.hovered ? Theme.accent : Theme.borderStrong
         Behavior on border.color { ColorAnimation { duration: Theme.durFast } }
     }
     Icon {

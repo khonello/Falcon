@@ -1,22 +1,34 @@
 import QtQuick
 import "."
 
-// A status word. Colour comes from the ladder and the word is always present -- never colour alone.
+// A short label on a tint of its own colour. `c` is the colour; no colour is quiet grey. `tone` is the
+// older spelling (warn | danger | accent | ok) and still works.
 Rectangle {
     id: root
     property string text: ""
-    property string tone: ""                 // "" = neutral; warn | danger | accent
+    property string tone: ""
+    property color c: tone !== "" ? Theme.tone(tone) : Theme.text3
+    property string iconName: ""
+    property bool mono: false
 
-    implicitWidth: label.implicitWidth + 2 * Theme.s2
-    implicitHeight: 22
-    radius: Theme.radiusSm
-    color: root.tone === "" ? Theme.fillStrong : Theme.toneSoft(root.tone)
+    implicitWidth: row.implicitWidth + 12
+    implicitHeight: 20
+    radius: 3
+    color: Theme.alpha(c, 0.12)
 
-    Txt {
-        id: label
+    Row {
+        id: row
         anchors.centerIn: parent
-        text: root.text
-        tone: root.tone === "" ? "mid" : root.tone
-        font.pixelSize: Theme.fSmall
+        spacing: 4
+        Icon { visible: root.iconName !== ""; name: root.iconName; size: 12; color: root.c; anchors.verticalCenter: parent.verticalCenter }
+        Txt {
+            text: root.text
+            color: root.tone === "" && root.c === Theme.text3 ? Theme.text2 : root.c
+            font.pixelSize: 11
+            font.weight: Font.Medium
+            mono: root.mono
+            elide: Text.ElideNone
+            anchors.verticalCenter: parent.verticalCenter
+        }
     }
 }

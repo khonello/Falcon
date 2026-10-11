@@ -30,7 +30,7 @@ Item {
             id: label
             anchors.centerIn: parent
             text: root.text
-            color: Theme.onDark
+            color: Theme.inverse
             font.pixelSize: 11
         }
     }

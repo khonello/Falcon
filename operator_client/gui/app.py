@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QSize, QTimer, QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
@@ -24,6 +24,7 @@ from operator_client.gui.bridge import FalconBridge
 log = logging.getLogger(__name__)
 
 QML_DIR = Path(__file__).parent / "qml"
+FONT_DIR = Path(__file__).parent / "fonts"
 
 
 def application() -> QGuiApplication:
@@ -33,6 +34,13 @@ def application() -> QGuiApplication:
     app.setApplicationName("Falcon Operator Client")
     app.setOrganizationName("Falcon")
     QQuickStyle.setStyle("Basic")
+    # IBM Plex, as the concept sets it, bundled with the client (OFL, fonts/OFL.txt): a console that
+    # falls back to whatever the machine has stops looking like the thing that was decided.
+    for f in sorted(FONT_DIR.glob("*.ttf")):
+        QFontDatabase.addApplicationFont(str(f))
+    font = QFont("IBM Plex Sans")
+    font.setPixelSize(13)
+    app.setFont(font)
     return app
 
 
