@@ -465,3 +465,15 @@ async def test_a_file_action_uses_each_machines_own_path(engine, org, connect):
     await a1.ok("control.action_run", {"action_id": fixed["id"], "pc_id": org["w1_pc"]})
     assert next(p for p in await w1.drain_pushes() if p.type == "action.execute").payload["action"]["params"] == {
         "path": "C:/Same/everywhere.txt"}
+
+
+async def test_a_process_can_be_ended_by_pid_or_a_program_by_name_never_both(engine, org, connect):
+    a1 = await connect("cid-a1")
+
+    def make(params):
+        return a1.call("control.action_create", {"kind": "control", "builtin_type": "kill_process", "timeout_s": 10, "params": params})
+
+    assert (await make({"pid": "6120"})).result["action"]["params"] == {"pid": 6120}
+    assert (await make({"name": "notepad.exe"})).result["action"]["params"] == {"name": "notepad.exe"}
+    for bad in ({}, {"name": "x", "pid": 5000}, {"pid": "abc"}, {"pid": 4}):
+        assert (await make(bad)).error["code"] == "invalid", bad

@@ -33,7 +33,7 @@ BUILTIN: dict[str, dict[str, Any]] = {
     "lock_session": {"category": "control", "params": ["duration_s"], "optional": ["message"]},
     "rename_file": {"category": "control", "params": ["new_name"], "optional": ["path", "find_name", "find_hash"]},
     "restore_file": {"category": "control", "params": [], "optional": ["path", "find_name", "find_hash"]},
-    "kill_process": {"category": "control", "params": ["name"]},
+    "kill_process": {"category": "control", "params": [], "optional": ["name", "pid"]},
     "start_process": {"category": "control", "params": ["command"]},
     "shutdown": {"category": "control", "params": [], "optional": ["delay_s", "message"]},
     "reboot": {"category": "control", "params": [], "optional": ["delay_s", "message"]},
@@ -67,6 +67,18 @@ def check_params(builtin_type: str, params: dict[str, Any]) -> dict[str, Any]:
     if unknown := sorted(set(params) - known):
         raise ProtocolError(ErrorCode.INVALID, f"{builtin_type} takes {sorted(known) or 'no settings'}, not {unknown}")
     out = dict(params)
+    if builtin_type == "kill_process":
+        given = [k for k in ("name", "pid") if str(out.get(k) or "").strip()]
+        if len(given) != 1:
+            raise ProtocolError(ErrorCode.INVALID, "kill_process needs exactly one of name (a program) or pid (one process)")
+        if "pid" in given:
+            try:
+                out["pid"] = int(out["pid"])
+            except (TypeError, ValueError) as exc:
+                raise ProtocolError(ErrorCode.INVALID, "pid must be a whole number") from exc
+            if out["pid"] <= 4:
+                raise ProtocolError(ErrorCode.INVALID, "that pid belongs to the system")
+        out = {k: v for k, v in out.items() if k not in ("name", "pid") or k == given[0]}
     if builtin_type in FILE_ACTIONS:
         given = [k for k in LOCATORS if str(out.get(k) or "").strip()]
         if len(given) != 1:

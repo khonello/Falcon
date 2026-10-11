@@ -57,6 +57,10 @@ Implements Display Names' **non-propagation rule**: a name set at one relationsh
 | `pc_type` | TEXT NOT NULL CHECK (`pc_type` IN ('super_user_workstation','admin_workstation','client_pc')) | |
 | `created_at` | TIMESTAMP NOT NULL | |
 | `last_seen_at` | TIMESTAMP NULLABLE | When its client last connected or dropped (migration 015). Whether it is reachable *now* is the Engine's live connection list, not a column |
+| `last_ip` | TEXT NULLABLE | The address the Engine last saw it connect from (migration 021) |
+| `os` | TEXT NULLABLE | What it runs on, as its agent said at connect (migration 021) |
+| `agent_version` | TEXT NULLABLE | The Worker build it runs, as it said at connect -- what a console compares with the approved version (migration 021) |
+| `agent_started_at` | TIMESTAMP NULLABLE | When its agent started (the machine's agent uptime) (migration 021) |
 
 ---
 
@@ -412,6 +416,8 @@ A machine's levels over time (migration 013): one row per machine every 10 minut
 | `sampled_at` | TIMESTAMP NOT NULL | Indexed |
 | `cpu`, `memory` | REAL NOT NULL | Percent |
 | `idle_s` | REAL NOT NULL | Seconds since the person's last input |
+| `disk` | REAL NULLABLE | How full the system drive is, percent (migration 021) |
+| `net_kbps` | REAL NULLABLE | Data received since the previous report, KB/s (migration 021) |
 | PK(`pc_id`, `sampled_at`) | | |
 
 ### `event_definitions`
@@ -501,6 +507,8 @@ One table, every combo writes to it — this is deliberate, matching "one log, o
 | `target_id` | INTEGER NULLABLE | |
 | `detail` | TEXT NULLABLE | Serialized (JSON) — free-form context specific to `action_type` |
 | `occurred_at` | TIMESTAMP NOT NULL | |
+| `pc_id` | INTEGER FK → pcs.id NULLABLE | The machine the event concerns, when there is one (migration 021); older rows have none |
+| `department_id` | INTEGER FK → departments.id NULLABLE | The department it concerns -- what an Admin's view of the log is scoped by (migration 021) |
 
 **Retention:** a scheduled job deletes rows where `occurred_at < now() - 90 days`, flat across every `action_type` — no per-category tiering in v1 (Hierarchy §Audit & Logging → Retention). This job is the one piece of "automatic deletion" anywhere in this schema, and it is explicitly time-based and universal, never triggered by content or category.
 

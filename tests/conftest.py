@@ -122,10 +122,14 @@ class Client:
         out, self.pushes = self.pushes, []
         return out
 
-    def push_types(self, pushes: list[Envelope], *, presence: bool = False) -> list[str]:
-        """Push types in order. `pc.presence` (a machine's client came or went) arrives whenever a test
-        connects a worker, so it is left out unless asked for."""
-        return [p.type for p in pushes if p.type and (presence or p.type != "pc.presence")]
+    # Pushes every test would otherwise have to expect: a machine's client coming or going (`pc.presence`) and each audit
+    # entry as it is recorded (`audit.event`). Left out unless asked for.
+    NOISE = frozenset({"pc.presence", "audit.event"})
+
+    def push_types(self, pushes: list[Envelope], *, presence: bool = False, everything: bool = False) -> list[str]:
+        """Push types in order; the always-arriving ones (NOISE) are left out unless asked for."""
+        return [p.type for p in pushes if p.type and (everything or presence and p.type == "pc.presence"
+                                                      or p.type not in self.NOISE)]
 
     async def close(self) -> None:
         self.writer.close()
@@ -156,16 +160,17 @@ async def engine() -> Engine:
 
 @pytest.fixture
 async def connect(engine: Engine):
-    """connect(client_id, hostname=None) -> authenticated Client. Closes all on teardown."""
+    """connect(client_id, hostname=None, hello=None) -> authenticated Client. `hello` is what the machine says about
+    itself (version, os, started_at). Closes all on teardown."""
     clients: list[Client] = []
 
-    async def _connect(client_id: str, hostname: str | None = None) -> Client:
+    async def _connect(client_id: str, hostname: str | None = None, hello: dict[str, Any] | None = None) -> Client:
         reader, writer = await asyncio.open_connection("127.0.0.1", engine.port)
         c = Client(reader, writer)
         challenge = await c.recv()
         assert challenge.type == "auth.challenge"
         await c.ok("auth.respond", {"client_id": client_id, "hmac": answer(client_id, challenge.payload["nonce"]),
-                                    "hostname": hostname})
+                                    "hostname": hostname, **(hello or {})})
         clients.append(c)
         return c
 

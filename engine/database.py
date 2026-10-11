@@ -254,9 +254,28 @@ class AccountsRepo(_Repo):
     async def pc(self, pc_id: int) -> dict[str, Any] | None:
         return await self._one(
             "SELECT p.id, p.hostname, p.department_id, p.pc_type, p.client_id, p.key_generation, p.last_seen_at, "
-            "a.id AS bound_account_id, "
+            "p.last_ip, p.os, p.agent_version, p.agent_started_at, a.id AS bound_account_id, "
             "a.role AS bound_role FROM pcs p LEFT JOIN accounts a ON a.bound_pc_id = p.id AND a.status = 'active' "
             "WHERE p.id = $1", pc_id)
+
+    async def set_agent(self, pc_id: int, *, ip: str | None, os: str | None, version: str | None,
+                        started_at: datetime | None) -> None:
+        """What a machine's agent said when it connected. A field it did not say is left as it was."""
+        await self._exec(
+            "UPDATE pcs SET last_ip = COALESCE($2, last_ip), os = COALESCE($3, os), agent_version = COALESCE($4, agent_version), "
+            "agent_started_at = COALESCE($5, agent_started_at) WHERE id = $1", pc_id, ip, os, version, started_at)
+
+    async def fleet(self, *, department_id: int | None = None, pc_id: int | None = None) -> list[dict[str, Any]]:
+        """Every machine with what a console shows first: its department, its person, its agent, and who is in it now."""
+        return await self._fetch(
+            "SELECT p.id, p.hostname, p.department_id, d.name AS department_name, p.pc_type, p.key_generation, p.last_seen_at, "
+            "p.last_ip, p.os, p.agent_version, p.agent_started_at, a.id AS account_id, "
+            "s.id AS session_id, s.occupant_account_id, s.occupied_via, s.entered_at AS session_entered_at "
+            "FROM pcs p LEFT JOIN departments d ON d.id = p.department_id "
+            "LEFT JOIN accounts a ON a.bound_pc_id = p.id AND a.status = 'active' "
+            "LEFT JOIN sessions s ON s.pc_id = p.id AND s.ended_at IS NULL "
+            "WHERE ($1::int IS NULL OR p.department_id = $1) AND ($2::int IS NULL OR p.id = $2) "
+            "ORDER BY d.name NULLS LAST, p.hostname", department_id, pc_id)
 
     async def touch_pc(self, pc_id: int) -> None:
         """The machine's client connected or dropped just now."""
@@ -331,6 +350,12 @@ class SessionsRepo(_Repo):
 
     async def list_active(self) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE s.ended_at IS NULL ORDER BY s.pc_id")
+
+    async def for_pc(self, pc_id: int, since: datetime) -> list[dict[str, Any]]:
+        """Sessions on one machine that were open at or after `since`, newest first."""
+        return await self._fetch(
+            "SELECT * FROM sessions WHERE pc_id = $1 AND (ended_at IS NULL OR ended_at >= $2) ORDER BY entered_at DESC",
+            pc_id, since)
 
     async def list_since(self, since: datetime, *, department_id: int | None = None) -> list[dict[str, Any]]:
         """Every session that was open at any point since `since` -- ended ones included. The day's
@@ -436,6 +461,15 @@ class FileIndexRepo(_Repo):
         return await self._fetch(
             f"SELECT {self._COLS} FROM file_index WHERE lower(filename) = lower($1) AND gone_at IS NULL "
             "AND ($2::int[] IS NULL OR pc_id = ANY($2)) ORDER BY pc_id, path", filename, pc_ids)
+
+    async def summary_for_pc(self, pc_id: int) -> dict[str, Any]:
+        """What the index holds on one machine: how many files, by tier, and when it last looked."""
+        rows = await self._fetch(
+            "SELECT resource_tag, count(*)::int AS n, max(last_seen_at) AS last FROM file_index "
+            "WHERE pc_id = $1 AND gone_at IS NULL GROUP BY 1", pc_id)
+        by_tag = {(r["resource_tag"] or "untagged"): r["n"] for r in rows}
+        last = max((r["last"] for r in rows), default=None)
+        return {"indexed": sum(by_tag.values()), "by_tag": by_tag, "last_indexed_at": last.isoformat() if last else None}
 
     async def mark_gone(self, pc_id: int, path: str) -> int | None:
         """The file left this place (moved away, or deleted). The row stays (no hard deletes); returns its id."""
@@ -1148,10 +1182,18 @@ class ControlRepo(_Repo):
 
     # -- levels over time --------------------------------------------------------------------------
 
-    async def add_metric_sample(self, pc_id: int, cpu: float, memory: float, idle_s: float) -> None:
+    async def add_metric_sample(self, pc_id: int, cpu: float, memory: float, idle_s: float, disk: float | None = None,
+                                net_kbps: float | None = None) -> None:
         await self._exec(
-            "INSERT INTO metric_samples (pc_id, cpu, memory, idle_s) VALUES ($1, $2, $3, $4) "
-            "ON CONFLICT DO NOTHING", pc_id, cpu, memory, idle_s)
+            "INSERT INTO metric_samples (pc_id, cpu, memory, idle_s, disk, net_kbps) VALUES ($1, $2, $3, $4, $5, $6) "
+            "ON CONFLICT DO NOTHING", pc_id, cpu, memory, idle_s, disk, net_kbps)
+
+    async def metric_series(self, pc_id: int, since: datetime, until: datetime, bucket_minutes: int) -> list[dict[str, Any]]:
+        """One machine's levels over time: the mean of each metric per bucket (what the machine page draws)."""
+        return await self._fetch(
+            "SELECT date_bin(make_interval(mins => $4), sampled_at, TIMESTAMPTZ '2000-01-01') AS at, avg(cpu)::real AS cpu, "
+            "avg(memory)::real AS memory, avg(disk)::real AS disk, avg(net_kbps)::real AS net_kbps FROM metric_samples "
+            "WHERE pc_id = $1 AND sampled_at >= $2 AND sampled_at < $3 GROUP BY 1 ORDER BY 1", pc_id, since, until, bucket_minutes)
 
     async def typical_levels(self, pc_ids: list[int] | None, days: int = 7) -> dict[str, Any]:
         """The p10-p90 of each metric over the last `days`, across the given machines (None: all)."""
@@ -1359,15 +1401,15 @@ class ControlRepo(_Repo):
 # ============================================================================================
 
 class AuditRepo(_Repo):
-    async def write(self, entry: dict[str, Any]) -> None:
+    async def write(self, entry: dict[str, Any]) -> int:
         target_type = entry.get("target_type")
         if target_type is not None and target_type not in POLYMORPHIC_TABLES:
             raise ValueError(f"unknown audit target type {target_type!r}")
-        await self._exec(
-            "INSERT INTO audit_log (actor_account_id, action_type, target_type, target_id, detail, occurred_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6)",
+        return await self._val(
+            "INSERT INTO audit_log (actor_account_id, action_type, target_type, target_id, detail, occurred_at, "
+            "pc_id, department_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
             entry.get("actor_account_id"), entry["action"], target_type, entry.get("target_id"),
-            entry.get("detail") or {}, entry.get("at") or _now())
+            entry.get("detail") or {}, entry.get("at") or _now(), entry.get("pc_id"), entry.get("department_id"))
 
     async def recent(self, *, limit: int = 200, actor_account_id: int | None = None,
                      action_prefix: str | None = None) -> list[dict[str, Any]]:
@@ -1375,6 +1417,57 @@ class AuditRepo(_Repo):
             "SELECT * FROM audit_log WHERE ($2::int IS NULL OR actor_account_id = $2) "
             "AND ($3::text IS NULL OR action_type LIKE $3 || '%') ORDER BY occurred_at DESC LIMIT $1",
             limit, actor_account_id, action_prefix)
+
+    # -- the console's reading of the trail (engine/console/feed.py) --------------------------------
+
+    @staticmethod
+    def _scope_sql(first: int, kinds: list[str] | None, pc_id: int | None, department_id: int | None,
+                   actor: int | None, before_id: int | None) -> tuple[str, list[Any]]:
+        """WHERE clauses (numbered from `first`) and their arguments for the filters a console can ask for."""
+        from engine.console.feed import _like_patterns
+
+        sql, args = [], []
+
+        def add(clause: str, *vals: Any) -> None:
+            n = first + len(args)
+            sql.append(clause.format(*[f"${n + i}" for i in range(len(vals))]))
+            args.extend(vals)
+
+        if kinds:
+            exact, like = _like_patterns(kinds)
+            add("(action_type = ANY({0}::text[]) OR action_type LIKE ANY({1}::text[]))", exact, like)
+        if pc_id is not None:
+            add("pc_id = {0}", pc_id)
+        if department_id is not None:
+            add("(department_id = {0} OR actor_account_id IN (SELECT id FROM accounts WHERE department_id = {0}))", department_id)
+        if actor is not None:
+            add("actor_account_id = {0}", actor)
+        if before_id is not None:
+            add("id < {0}", before_id)
+        return "".join(f" AND {c}" for c in sql), args
+
+    async def feed(self, *, since: datetime, until: datetime, kinds: list[str] | None, pc_id: int | None,
+                   department_id: int | None, actor_account_id: int | None, before_id: int | None,
+                   limit: int) -> list[dict[str, Any]]:
+        extra, args = self._scope_sql(4, kinds, pc_id, department_id, actor_account_id, before_id)
+        return await self._fetch(
+            "SELECT id, actor_account_id, action_type, target_type, target_id, detail, occurred_at, pc_id, department_id "
+            f"FROM audit_log WHERE occurred_at >= $1 AND occurred_at < $2{extra} ORDER BY id DESC LIMIT $3",
+            since, until, limit, *args)
+
+    async def counts(self, *, since: datetime, until: datetime, bucket_minutes: int, pc_id: int | None,
+                     department_id: int | None) -> list[dict[str, Any]]:
+        extra, args = self._scope_sql(4, None, pc_id, department_id, None, None)
+        return await self._fetch(
+            "SELECT date_bin(make_interval(mins => $3), occurred_at, TIMESTAMPTZ '2000-01-01') AS bucket, action_type, "
+            f"count(*)::int AS n FROM audit_log WHERE occurred_at >= $1 AND occurred_at < $2{extra} GROUP BY 1, 2 ORDER BY 1",
+            since, until, bucket_minutes, *args)
+
+    async def distinct_actors(self, *, since: datetime, until: datetime, pc_id: int | None, department_id: int | None) -> int:
+        extra, args = self._scope_sql(3, None, pc_id, department_id, None, None)
+        return await self._val(
+            "SELECT count(DISTINCT actor_account_id)::int FROM audit_log WHERE occurred_at >= $1 AND occurred_at < $2 "
+            f"AND actor_account_id IS NOT NULL{extra}", since, until, *args)
 
     async def for_targets(self, target_type: str, target_ids: list[str], action_types: list[str]) -> list[dict[str, Any]]:
         """Audit rows about given targets of given kinds, oldest first (target ids are stored as text)."""

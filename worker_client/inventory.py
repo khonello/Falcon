@@ -43,6 +43,25 @@ def running() -> list[dict[str, Any]]:
     return sorted(groups.values(), key=lambda g: (-g["memory"], g["name"].lower()))
 
 
+def processes(limit: int = 80) -> list[dict[str, Any]]:
+    """The machine's processes as a console lists them: pid, name, processor share, memory (MB) and who runs it -- the
+    heaviest first. Not grouped: ending one needs its pid."""
+    try:
+        import psutil
+    except ImportError:
+        return []
+    rows = []
+    for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_info", "username"]):
+        info = p.info
+        if not info.get("name"):
+            continue
+        mem = info["memory_info"].rss if info.get("memory_info") else 0
+        user = (info.get("username") or "").split("\\")[-1]
+        rows.append({"pid": info["pid"], "name": info["name"], "cpu": round(info.get("cpu_percent") or 0.0, 1),
+                     "memory_mb": round(mem / 1048576), "user": user})
+    return sorted(rows, key=lambda r: (-r["cpu"], -r["memory_mb"]))[:limit]
+
+
 def _exe_path(value: str) -> str | None:
     """A program path out of a registry value such as '"C:\\App\\app.exe",0' or 'C:\\App\\app.exe /arg'."""
     text = os.path.expandvars(value.strip())
@@ -128,6 +147,7 @@ class Inventory:
 
     async def start(self) -> None:
         self._tasks = [asyncio.create_task(self._every(self.running_seconds, "running", running)),
+                       asyncio.create_task(self._every(self.running_seconds, "processes", processes)),
                        asyncio.create_task(self._every(self.installed_seconds, "installed", installed))]
 
     async def stop(self) -> None:

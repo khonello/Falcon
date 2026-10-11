@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import logging
 import secrets
+from datetime import datetime
 from typing import Any
 
 from engine.dispatch import Context, Identity, handler
@@ -99,6 +100,25 @@ async def _fail(ctx: Context, client_id: str, reason: str) -> None:
     raise ProtocolError(ErrorCode.UNAUTHENTICATED, "authentication failed")
 
 
+async def _remember_agent(ctx: Context, payload: dict[str, Any]) -> None:
+    """What the machine says about itself (the Worker's version, the OS, when the agent started) and the address the
+    Engine saw it come from: kept on the PC so a console can show them. The client's word, the Engine's address."""
+    pc_id = ctx.identity.pc_id if ctx.identity else None
+    if pc_id is None or not ctx.engine.db.connected:
+        return
+    peer = getattr(ctx.connection, "peer", None)
+    started = None
+    try:
+        raw = payload.get("started_at")
+        started = datetime.fromisoformat(str(raw)) if raw else None
+    except ValueError:
+        started = None
+    await ctx.engine.db.accounts.set_agent(pc_id, ip=str(peer[0]) if peer else None,
+                                           os=(str(payload["os"])[:120] if payload.get("os") else None),
+                                           version=(str(payload["version"])[:40] if payload.get("version") else None),
+                                           started_at=started)
+
+
 @handler("auth.respond")
 async def auth_respond(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     client_id = str(payload.get("client_id", ""))
@@ -126,6 +146,7 @@ async def auth_respond(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             mismatch = await _announce_hostname(ctx, account, payload.get("hostname"))
             ctx.identity = _identity_of(account, client_id)
     conn.authenticated = True
+    await _remember_agent(ctx, payload)
     await ctx.engine.audit.record(ctx, "auth.connected", target_type="client", target_id=client_id)
     await ctx.engine.on_connected(conn)
     ident = ctx.identity

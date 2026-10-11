@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -70,6 +72,7 @@ class Signals:
         self.program_seconds = program_seconds
         self._tasks: list[asyncio.Task[None]] = []
         self.watch_programs: dict[tuple[int, int], str] = {}  # (task_id, item_id) -> program name
+        self._net_last: tuple[float, int] | None = None      # (time, bytes received) at the last metrics report
 
     async def start(self) -> None:
         self._tasks = [asyncio.create_task(self._metrics_loop()), asyncio.create_task(self._program_loop())]
@@ -95,6 +98,8 @@ class Signals:
         cpu = ps.cpu_percent(interval=None) if ps else 0.0
         mem = ps.virtual_memory().percent if ps else 0.0
         payload: dict[str, Any] = {"cpu": cpu, "memory": mem, "idle_s": idle.idle_seconds() or 0.0}
+        extra = await asyncio.to_thread(self._disk_and_network)
+        payload.update(extra)
         try:
             front = foreground()
         except OSError:
@@ -102,6 +107,26 @@ class Signals:
         if front:
             payload["foreground"] = front
         await self.report("control.metrics", payload)
+
+    def _disk_and_network(self) -> dict[str, float]:
+        """How full the system drive is, and what came in over the network since the last report (KB/s)."""
+        ps = _psutil()
+        out: dict[str, float] = {}
+        if ps is None:
+            return out
+        try:
+            root = os.environ.get("SystemDrive", "C:") + os.sep if os.name == "nt" else "/"
+            out["disk"] = float(ps.disk_usage(root).percent)
+        except OSError:
+            pass
+        try:
+            now, got = time.monotonic(), ps.net_io_counters().bytes_recv
+            if self._net_last is not None and now > self._net_last[0]:
+                out["net_kbps"] = max(0.0, (got - self._net_last[1]) / 1024 / (now - self._net_last[0]))
+            self._net_last = (now, got)
+        except OSError:
+            pass
+        return out
 
     async def report_programs(self) -> int:
         n = 0

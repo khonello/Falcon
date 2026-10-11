@@ -81,10 +81,12 @@ BUILTIN_SCRIPTS: dict[str, str] = {
     "restore_file": (
         "import glob, shutil, sys, os\np=sys.argv[1]\nsnaps=sorted(glob.glob(p+'.snapshot-*'))\n"
         "if not snaps: sys.exit('no snapshot for '+p)\nshutil.copy2(snaps[-1], p)\nprint('restored from '+snaps[-1])\n"),
+    # by program name (every process of it) or by pid (one process, picked from a machine's process list)
     "kill_process": (
-        "import psutil, sys\nname=sys.argv[1].lower()\nn=0\n"
-        "for p in psutil.process_iter(['name']):\n  if (p.info['name'] or '').lower()==name:\n    p.terminate(); n+=1\n"
-        "print(f'terminated {n} process(es)')\n"),
+        "import psutil, sys\nname=sys.argv[1].lower()\npid=int(sys.argv[2]) if len(sys.argv)>2 and sys.argv[2].strip() else 0\nn=0\n"
+        "for p in psutil.process_iter(['name']):\n"
+        "  if (pid and p.pid==pid) or (not pid and name and (p.info['name'] or '').lower()==name):\n    p.terminate(); n+=1\n"
+        "print(f'FALCON:summary ended {n} process(es)')\n"),
     "start_process": "import subprocess, sys, shlex\nsubprocess.Popen(shlex.split(sys.argv[1]))\nprint('started')\n",
     "notify": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.notify(sys.argv[1:]))\n",
     "usb_contents": (
@@ -103,7 +105,7 @@ BUILTIN_SCRIPTS: dict[str, str] = {
 }
 BUILTIN_ARGS: dict[str, list[str]] = {
     "file_activity": ["path"], "snapshot_file": ["path"], "rename_file": ["path", "new_name"], "restore_file": ["path"],
-    "kill_process": ["name"], "start_process": ["command"], "notify": ["message", "stay_s"],
+    "kill_process": ["name", "pid"], "start_process": ["command"], "notify": ["message", "stay_s"],
     "lock_session": ["duration_s", "message"], "shutdown": ["delay_s", "message"], "reboot": ["delay_s", "message"],
 }
 

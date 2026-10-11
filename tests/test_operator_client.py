@@ -255,3 +255,12 @@ async def test_scripted_enrollment(engine, org, tmp_path: Path):
         assert got["status"] == "confirmed" and got["client_key"]
     finally:
         await machine.close()
+
+
+async def test_scripted_fleet_machine_and_events(engine, org, tmp_path: Path):
+    out = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+        "connect", f"traverse {org['w1_pc']}", "machines", f"machine {org['w1_pc']} 1h", "feed kind=session n=5", "feed summary"])
+    assert "3 machines" in out[2] and "FIN-01" in out[2]
+    assert "FIN-01" in out[3] and "sessions:" in out[3] and "events:" in out[3]
+    assert "Entered FIN-01" in out[4] and "session" in out[4]
+    assert "events" in out[5] and "session" in out[5]

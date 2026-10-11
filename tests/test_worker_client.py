@@ -670,3 +670,24 @@ async def test_the_polling_watcher_tells_a_move_from_a_delete_and_a_create(engin
         assert not any(e[0] == "delete" for e in got)                  # not a delete followed by a create
     finally:
         await svc.stop()
+
+
+async def test_the_worker_says_what_it_is_and_reports_disk_network_and_processes(engine, org, tmp_path: Path):
+    from worker_client.service import VERSION
+
+    svc = await _start(engine, tmp_path, "cid-w1", [])
+    admin = await _admin(engine)
+    try:
+        async def reported():
+            res = await admin.call("machines.get", {"pc_id": org["w1_pc"]})
+            m = res["machine"]
+            return bool(m["disk"] is not None and res["processes"] and m["os"])
+        assert await _wait(reported, timeout=15)
+        res = await admin.call("machines.get", {"pc_id": org["w1_pc"]})
+        m = res["machine"]
+        assert m["version"] == VERSION and m["online"] and m["agent_started_at"] and 0 <= m["disk"] <= 100
+        assert any("python" in p["name"].lower() for p in res["processes"]["items"])    # this very test process, with its pid
+        assert all(isinstance(p["pid"], int) for p in res["processes"]["items"])
+    finally:
+        await admin.close()
+        await svc.stop()

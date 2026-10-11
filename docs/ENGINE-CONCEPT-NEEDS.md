@@ -54,4 +54,20 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
 
 ## Done
 
-(moved here as each lands)
+- **WP1 Machines and events** (11 Oct 2026). `machines.list {department_id?}` is the fleet: each machine with its health
+  (healthy / warning / high / critical / offline -- the most serious thing open on it, read from Issues once WP2 lands),
+  its person (named for the caller), who is inside it and how (an Admin's session, assisted access), version and whether
+  it is behind the approved one, address, OS, last seen, and its latest levels; `summary` counts them.
+  `machines.get {pc_id, range: 1h|6h|24h|7d}` is the machine's page: the same facts, four series (processor, memory, disk,
+  network), the process list (pid, processor, memory, user -- as the machine last reported it), its sessions over the last
+  week, what the file index holds on it by tier, and its last events. The Worker now says its version, OS and start time when it
+  connects (`auth.respond` carries them; the Engine adds the address it saw), reports disk fullness and network throughput with its
+  metrics, and sends a pid-level process list every minute. `kill_process` takes a `pid` (one process, picked from that list) or a
+  program `name`, never both. *The audit trail as events:* every audit row now carries the machine and department it concerns;
+  `audit.events {since?, until?, kinds?, pc_id?, department_id?, actor_account_id?, before_id?, limit?}` returns events with a
+  kind, one plain sentence, the machine and the person (named the way the caller names people; an Admin sees only their own
+  department's); `audit.summary` gives counts per kind and over time buckets; `audit.export` gives the CSV (and is itself
+  recorded); and every event is **pushed live** (`audit.event`) to the Super User and to the Admins of the department it concerns,
+  named for each viewer. Kinds: session, action, flow, assistance, rollout, deviation, violation (the concept's seven) and task,
+  report, admin, system. A logged deviation is now also an audit event. TUI: `machines`, `machine <pc> [range]`, `feed`,
+  `feed summary`, `feed export`. *Test:* `tests/test_console_machines.py`, `test_worker_client.py`, `test_operator_client.py`.

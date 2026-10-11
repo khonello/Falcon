@@ -61,7 +61,7 @@ class Identity:
 class EngineConnection:
     def __init__(self, host: str, port: int, *, client_id: str, tls: bool = True,
                  ca_cert: str | Path | None = None, derived_key: bytes | str | None = None,
-                 hostname: str | None = None, request_timeout: float = 30.0) -> None:
+                 hostname: str | None = None, request_timeout: float = 30.0, hello: dict[str, Any] | None = None) -> None:
         self.host = host
         self.port = port
         self.client_id = client_id
@@ -70,6 +70,7 @@ class EngineConnection:
         # The provisioned client key (hex from the install package, or raw bytes).
         self.derived_key = bytes.fromhex(derived_key) if isinstance(derived_key, str) and derived_key else (derived_key or None)
         self.hostname = hostname or socket.gethostname()
+        self.hello = hello or {}        # what this client says about itself when it authenticates (version, os, ...)
         self.request_timeout = request_timeout
         self.identity: Identity | None = None
         self._reader: asyncio.StreamReader | None = None
@@ -122,7 +123,7 @@ class EngineConnection:
             nonce = ""
         answer = self._answer(nonce)
         result = await self.call("auth.respond", {"client_id": self.client_id, "hmac": answer,
-                                                  "hostname": self.hostname})
+                                                  "hostname": self.hostname, **self.hello})
         self.auth_result = result             # what the Engine said back, e.g. a hostname it did not expect
         self.identity = Identity(client_id=self.client_id, account_id=result.get("account_id"),
                                  role=result.get("role"), pc_id=result.get("pc_id"),

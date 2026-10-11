@@ -14,6 +14,7 @@ from typing import Any
 
 # Importing the combo packages registers their handlers.
 import engine.auth
+import engine.console
 import engine.control
 import engine.flow
 import engine.hierarchy
@@ -37,6 +38,7 @@ class Engine:
         self.settings = settings
         self.db = Database(settings.database_url)
         self.audit = AuditTrail(self.db, settings.audit_retention_days)
+        self.audit.engine = self
         self.file_index = FileIndex(self.db)
         self.scheduler = Scheduler(self)
         self.llm = LocalLLM(settings.llm_backend, model_path=settings.llm_model_path,

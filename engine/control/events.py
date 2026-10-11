@@ -481,6 +481,9 @@ async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
     m = {"cpu": float(payload.get("cpu", 0)), "memory": float(payload.get("memory", 0)),
          "idle_s": float(payload.get("idle_s", 0)), "at": datetime.now(timezone.utc).isoformat()}
+    for key in ("disk", "net_kbps"):                       # newer Workers; an older one simply leaves them out
+        if isinstance(payload.get(key), (int, float)):
+            m[key] = float(payload[key])
     fg = payload.get("foreground")
     if isinstance(fg, dict) and fg.get("program"):
         # The program in front and its window title (usually the document), as the client saw it.
@@ -490,7 +493,8 @@ async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     last = _last_sampled.get(ident.pc_id)
     if ctx.engine.db.connected and (last is None or now - last >= METRIC_SAMPLE_SECONDS):
         _last_sampled[ident.pc_id] = now
-        await ctx.engine.db.control.add_metric_sample(ident.pc_id, m["cpu"], m["memory"], m["idle_s"])
+        await ctx.engine.db.control.add_metric_sample(ident.pc_id, m["cpu"], m["memory"], m["idle_s"], m.get("disk"),
+                                                      m.get("net_kbps"))
     return {"accepted": True}
 
 

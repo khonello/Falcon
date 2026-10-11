@@ -26,10 +26,27 @@ INSTALLED_MAX = 1500
 
 # pc_id -> {"at": iso, "items": [{"name", "count", "memory"}]}
 _running: dict[int, dict[str, Any]] = {}
+# pc_id -> {"at": iso, "items": [{"pid", "name", "cpu", "memory_mb", "user"}]}: the machine page's process list
+_processes: dict[int, dict[str, Any]] = {}
+PROCESSES_MAX = 120
 
 
 def reset_state() -> None:
     _running.clear()
+    _processes.clear()
+
+
+def processes_of(pc_id: int) -> dict[str, Any] | None:
+    return _processes.get(pc_id)
+
+
+def _clean_processes(raw: Any) -> list[dict[str, Any]]:
+    out = []
+    for item in (raw if isinstance(raw, list) else [])[:PROCESSES_MAX]:
+        if isinstance(item, dict) and item.get("name") and isinstance(item.get("pid"), int):
+            out.append({"pid": item["pid"], "name": str(item["name"])[:NAME_MAX], "cpu": float(item.get("cpu") or 0),
+                        "memory_mb": int(item.get("memory_mb") or 0), "user": str(item.get("user") or "")[:60]})
+    return out
 
 
 def _clean_running(raw: Any) -> list[dict[str, Any]]:
@@ -58,6 +75,8 @@ async def inventory(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
     if "running" in payload:
         _running[ident.pc_id] = {"at": datetime.now(timezone.utc).isoformat(), "items": _clean_running(payload["running"])}
+    if "processes" in payload:
+        _processes[ident.pc_id] = {"at": datetime.now(timezone.utc).isoformat(), "items": _clean_processes(payload["processes"])}
     if "installed" in payload and ctx.engine.db.connected:
         await ctx.engine.db.control.save_programs(ident.pc_id, _clean_installed(payload["installed"]))
     return {"accepted": True}

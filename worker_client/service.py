@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import datetime, timezone
 from typing import Any
 
 from common.connection import ConnectionError_, EngineConnection, EngineError
@@ -38,6 +39,7 @@ Notifier = Callable[[str, dict[str, Any]], Awaitable[None]]
 class WorkerService:
     def __init__(self, config: WorkerConfig, *, native_watch: bool = True, allow_power: bool = False) -> None:
         self.config = config
+        self.started_at = datetime.now(timezone.utc).isoformat()
         self.conn: EngineConnection | None = None
         self.identity: Any = None
         self.lockout = Lockout(lock_workstation=config.lock_workstation_on_block)
@@ -94,6 +96,13 @@ class WorkerService:
         if self.conn:
             await self.conn.close()
 
+    def hello(self) -> dict[str, Any]:
+        """What this machine says about itself when it connects: the Worker's version, the OS, and when the agent started."""
+        import platform
+
+        return {"version": VERSION, "os": f"{platform.system()} {platform.release()} {platform.version()}".strip(),
+                "started_at": self.started_at}
+
     def on_notify(self, fn: Notifier) -> None:
         self.notifiers.append(fn)
 
@@ -109,7 +118,7 @@ class WorkerService:
         while True:
             conn = EngineConnection(self.config.engine_host, self.config.engine_port, client_id=self.config.client_id,
                                     tls=self.config.tls, ca_cert=self.config.ca_cert,
-                                    derived_key=self.config.client_key or None)
+                                    derived_key=self.config.client_key or None, hello=self.hello())
             conn.on_push(self._on_push)
             conn.on_disconnect = self._on_disconnect
             try:
