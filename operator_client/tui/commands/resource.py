@@ -42,3 +42,45 @@ async def journey(ctx: ShellContext, args: Args) -> str:
     head = f"{f['filename']}  (tag: {f['tag'] or 'none'})  on {len(res['places'])} place(s)"
     lines = [f"{e['at'][:16].replace('T', ' ')}  {e['kind']:<10} {e['text']}" for e in res["events"]]
     return "\n".join([head, ""] + lines)
+
+
+@command("marks", usage="[all|department]", help_="Restricted marks: files and folders marked where they are")
+async def marks_list(ctx: ShellContext, args: Args) -> str:
+    scope = args.positional[0] if args.positional and args.positional[0] in ("all", "department") else "mine"
+    res = await ctx.call("marks.list", {"scope": scope})
+    rows = [{"id": m["id"], "code": m["code"], "kind": m["kind"], "name": m["name"], "on": m["host"], "allowed": m["keep_label"],
+             "files": m["files"], "versions": m["versions"], "copies": m["copies"], "worst": m["worst"] or ""} for m in res["marks"]]
+    s = res["summary"]
+    return (f"{s['marks']} marks, {s['files']} files, {s['copies']} copies found elsewhere\n\n"
+            + (table(rows, ["id", "code", "kind", "name", "on", "allowed", "files", "versions", "copies", "worst"]) if rows else "(none)"))
+
+
+@command("mark", usage="<path> [<path>...] [keep=machine|path]", help_="Mark files or folders restricted, where they are (nothing is moved)")
+async def mark_create(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("marks.create", {"paths": list(args.positional), "keep": args.opt("keep") or "machine"})
+    return "\n".join(f"{m['code']} {m['kind']} {m['name']} on {m['host']}: {m['files']} file(s), kept to {m['keep_label'].lower()}" for m in res["marks"]) \
+        + (f"\n{res['copies_found']} copy(ies) already elsewhere" if res["copies_found"] else "")
+
+
+@command("mark", "show", "<mark_id>", "One mark: where it is allowed, its copies, and what changing it would do")
+async def mark_show(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("marks.get", {"mark_id": args.get_int(0, "mark_id")})
+    m, ch = res["mark"], res["change"]
+    out = [f"{m['code']} {m['name']} on {m['host']}: {m['keep_label']}, {m['files']} file(s), {m['versions']} version(s)"]
+    out.append("copies elsewhere:\n" + (table([{"issue": c["code"], "severity": c["severity"], "on": c["host"], "file": c["file"],
+                                               "signed in": c["signed_in"] or "", "state": c["label"]} for c in res["copies"]],
+                                              ["issue", "severity", "on", "file", "signed in", "state"]) if res["copies"] else "  none"))
+    out.append(f"if kept to {ch['keep_label'].lower()}: {ch['effect']['would_flag']} more would be caught, {ch['effect']['would_clear']} would stop being caught")
+    return "\n".join(out)
+
+
+@command("mark", "keep", "<mark_id> machine|path", "Change where a mark allows its content")
+async def mark_keep(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("marks.change_keep", {"mark_id": args.get_int(0, "mark_id"), "keep": args.get(1, "machine|path")})
+    return f"{res['mark']['code']} is now kept to {res['mark']['keep_label'].lower()}: {res['flagged']} caught, {res['cleared']} cleared"
+
+
+@command("mark", "remove", "<mark_id>", "Stop restricting a file or folder (its open copy issues close)")
+async def mark_remove(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("marks.unmark", {"mark_id": args.get_int(0, "mark_id")})
+    return f"unmarked; {res['copies_closed']} copy issue(s) closed"

@@ -284,3 +284,20 @@ async def test_scripted_issues(engine, org, tmp_path: Path):
     assert "1 open" in out[1] and "INC-1001" in out[1]
     assert "can do:" in out[2] and "ask" in out[2] and "allow" in out[2] and "timeline:" in out[2]
     assert "Waiting" in out[3] and "lines in its timeline" in out[4] and "Resolved" in out[5] and "1 done today" in out[6]
+
+
+async def test_scripted_marks(engine, org, tmp_path: Path):
+    from common.connection import EngineConnection as Raw
+
+    a1 = Raw("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"), hostname="FIN-ADM")
+    await a1.connect()
+    try:
+        await a1.call("index.event", {"event": {"op": "create", "path": "C:/Finance/budget.xlsx", "hash": "B1"}})
+        out = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+            "connect", "mark C:/Finance/budget.xlsx keep=path", "marks", "mark show 1", "mark keep 1 machine", "mark remove 1", "marks"])
+    finally:
+        await a1.close()
+    assert "M-1 file budget.xlsx on FIN-ADM: 1 file(s), kept to only in its place" in out[1]
+    assert "1 marks, 1 files" in out[2] and "budget.xlsx" in out[2]
+    assert "copies elsewhere:" in out[3] and "none" in out[3] and "if kept to anywhere on the pc" in out[3]
+    assert "now kept to anywhere on the pc" in out[4] and "unmarked" in out[5] and "0 marks" in out[6]

@@ -90,3 +90,16 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   issues. TUI: `issues`, `issue <id>`, `issue act|take|give|free|escalate|note`. *Not yet:* assigning an Admin from an issue
   (WP6), the Super User's decisions built on issues (WP5), the rule that every issue also points at (WP4). *Test:*
   `tests/test_console_issues.py`, `test_worker_client.py`, `test_operator_client.py`.
+
+
+- **WP3 Restricted marks** (11 Oct 2026). A file or folder is marked where it already is, on the marker's own workstation
+  (`marks.create {paths, keep: machine|path}`; `marks.tree` lists what the index holds on your workstation to pick from): kept to the
+  machine (anywhere on that PC, nowhere else) or to its place (a copy anywhere else is caught, even elsewhere on the same PC). A folder
+  covers every file in it and any added later; the mark remembers **every version's hash**, so an edited original never lets an older copy
+  slip through. Every file event is checked: a copy where its mark does not allow it is flagged -- a violation and report as before and a
+  file issue the marker owns (critical when it left the original's department, high on another machine of the same department, medium
+  elsewhere on the same machine) -- and copies already elsewhere are found at marking time. `marks.list {scope: mine|department|all}`,
+  `marks.get` (the mark, its copies with who is signed in, this week's resolved ones, and what changing where it is allowed would do),
+  `marks.keep_effect`, `marks.change_keep` (copies now allowed close, newly caught ones are raised), `marks.unmark` (open copy issues close;
+  history kept). The per-copy decisions are the issue plays: ask the person, delete this copy, allow it here too. TUI: `marks`, `mark`,
+  `mark show|keep|remove`. *Test:* `tests/test_console_marks.py`, `test_operator_client.py`.

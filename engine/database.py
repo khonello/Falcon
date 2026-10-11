@@ -27,7 +27,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 # Legal targets for polymorphic references. Extend deliberately, never ad hoc.
 POLYMORPHIC_TABLES = frozenset({
     "accounts", "departments", "pcs", "sessions", "assisted_access_requests", "file_index",
-    "tasks", "department_tasks", "enrollments", "issues", "verification_items", "manual_verifications", "flows", "flow_destinations",
+    "tasks", "department_tasks", "enrollments", "issues", "resource_marks", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts",
@@ -72,6 +72,7 @@ class Database:
         self.department_tasks = DepartmentTasksRepo(self)
         self.enrollments = EnrollmentsRepo(self)
         self.issues = IssuesRepo(self)
+        self.marks = MarksRepo(self)
         self.flows = FlowsRepo(self)
         self.reports = ReportsRepo(self)
         self.assistance = AssistanceRepo(self)
@@ -480,6 +481,17 @@ class FileIndexRepo(_Repo):
         last = max((r["last"] for r in rows), default=None)
         return {"indexed": sum(by_tag.values()), "by_tag": by_tag, "last_indexed_at": last.isoformat() if last else None}
 
+    async def under(self, pc_id: int, folder: str, limit: int = 20000) -> list[dict[str, Any]]:
+        """Every file the index holds below a folder on one machine (present ones only), slash-agnostic and case-insensitive."""
+        prefix = folder.replace("\\", "/").rstrip("/").lower() + "/"
+        return await self._fetch(
+            f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND gone_at IS NULL "
+            "AND starts_with(lower(replace(path, chr(92), '/')), $2) ORDER BY path LIMIT $3", pc_id, prefix, limit)
+
+    async def present_on_pc(self, pc_id: int, limit: int = 5000) -> list[dict[str, Any]]:
+        return await self._fetch(
+            f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND gone_at IS NULL ORDER BY path LIMIT $2", pc_id, limit)
+
     async def mark_gone(self, pc_id: int, path: str) -> int | None:
         """The file left this place (moved away, or deleted). The row stays (no hard deletes); returns its id."""
         return await self._val(
@@ -699,6 +711,69 @@ class TasksRepo(_Repo):
 # ============================================================================================
 # 5. Flow
 # ============================================================================================
+
+class MarksRepo(_Repo):
+    """Restricted marks (migration 023): a file or folder marked where it is, and every version's hash."""
+
+    _COLS = ("m.id, m.kind, m.name, m.pc_id, m.path, m.keep, m.by_account_id, m.department_id, m.created_at, m.unmarked_at, "
+             "p.hostname, (SELECT count(*)::int FROM resource_mark_hashes h WHERE h.mark_id = m.id) AS versions")
+    _FROM = "FROM resource_marks m JOIN pcs p ON p.id = m.pc_id"
+
+    async def create(self, kind: str, name: str, pc_id: int, path: str, keep: str, by_account_id: int,
+                     department_id: int | None) -> int:
+        return await self._val(
+            "INSERT INTO resource_marks (kind, name, pc_id, path, keep, by_account_id, department_id) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", kind, name, pc_id, path, keep, by_account_id, department_id)
+
+    async def get(self, mark_id: int) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._COLS} {self._FROM} WHERE m.id = $1", mark_id)
+
+    async def list(self, *, by_account_id: int | None = None, department_id: int | None = None,
+                   include_unmarked: bool = False) -> list[dict[str, Any]]:
+        return await self._fetch(
+            f"SELECT {self._COLS} {self._FROM} WHERE ($1::int IS NULL OR m.by_account_id = $1) "
+            "AND ($2::int IS NULL OR m.department_id = $2) AND ($3 OR m.unmarked_at IS NULL) ORDER BY m.created_at DESC, m.id DESC",
+            by_account_id, department_id, include_unmarked)
+
+    async def active_on_pc(self, pc_id: int) -> list[dict[str, Any]]:
+        return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE m.pc_id = $1 AND m.unmarked_at IS NULL", pc_id)
+
+    async def active_with_hash(self, content_hash: str) -> list[dict[str, Any]]:
+        return await self._fetch(
+            f"SELECT {self._COLS} {self._FROM} WHERE m.unmarked_at IS NULL AND EXISTS "
+            "(SELECT 1 FROM resource_mark_hashes h WHERE h.mark_id = m.id AND h.content_hash = $1)", content_hash)
+
+    async def add_hash(self, mark_id: int, content_hash: str, source_path: str) -> bool:
+        """A version of a marked file. True when it is a new one."""
+        return await self._val(
+            "INSERT INTO resource_mark_hashes (mark_id, content_hash, source_path) VALUES ($1, $2, $3) "
+            "ON CONFLICT DO NOTHING RETURNING 1", mark_id, content_hash, source_path) is not None
+
+    async def hashes(self, mark_id: int) -> list[str]:
+        return [r["content_hash"] for r in await self._fetch("SELECT content_hash FROM resource_mark_hashes WHERE mark_id = $1", mark_id)]
+
+    async def unmark(self, mark_id: int, by_account_id: int) -> bool:
+        return await self._val(
+            "UPDATE resource_marks SET unmarked_at = now(), unmarked_by_account_id = $2 WHERE id = $1 AND unmarked_at IS NULL RETURNING id",
+            mark_id, by_account_id) is not None
+
+    async def set_keep(self, mark_id: int, keep: str) -> None:
+        await self._exec("UPDATE resource_marks SET keep = $2 WHERE id = $1 AND unmarked_at IS NULL", mark_id, keep)
+
+    async def copy_issues(self, mark_id: int, *, include_resolved_since: datetime | None = None) -> list[dict[str, Any]]:
+        """The issues for copies of this mark's content found where it is not allowed."""
+        return await self._fetch(
+            "SELECT i.id, i.code, i.severity, i.state, i.label, i.pc_id, i.opened_at, i.resolved_at, i.resolution, i.detail, p.hostname, "
+            "p.department_id FROM issues i JOIN pcs p ON p.id = i.pc_id WHERE i.type = 'file' AND (i.detail->'mark'->>'id')::int = $1 "
+            "AND (i.state <> 'resolved' OR ($2::timestamptz IS NOT NULL AND i.resolved_at >= $2)) "
+            "ORDER BY CASE i.severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, i.opened_at DESC",
+            mark_id, include_resolved_since)
+
+    async def resolve_open_copies(self, mark_id: int) -> list[int]:
+        rows = await self._fetch(
+            "SELECT id FROM issues WHERE type = 'file' AND state <> 'resolved' AND (detail->'mark'->>'id')::int = $1", mark_id)
+        return [r["id"] for r in rows]
+
 
 class IssuesRepo(_Repo):
     """Issues: what an Admin works (migration 022). One open issue per cause; nothing is deleted."""

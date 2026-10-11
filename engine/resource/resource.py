@@ -132,11 +132,22 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
         return
     if await db.resource.open_violation_for_file(entry["id"]):
         return  # already flagged; the same file keeps being ignored until resolved
+    await flag_copy(engine, pc, entry, tag, origin)
+
+
+async def flag_copy(engine: Engine, pc: dict[str, Any], entry: dict[str, Any], tag: str, origin: dict[str, Any] | None,
+                    mark: dict[str, Any] | None = None) -> int | None:
+    """A restricted file where it is not allowed: record the violation, write the report, raise the issue, tell the person and fire
+    the event. Returns the violation id, or None when it is allowed there (a person allowed it, with a reason), already flagged, or
+    nobody uses the machine. `mark` is the restricted mark the copy was recognised by, when it was."""
+    db = engine.db
+    if await db.resource.open_violation_for_file(entry["id"]):
+        return None
     if await db.resource.is_allowed(pc["id"], entry["path"], entry.get("content_hash")):
-        return  # a person allowed it here, with a reason: not reported again
+        return None  # a person allowed it here, with a reason: not reported again
     surfaced_to = pc["bound_account_id"]
     if surfaced_to is None:
-        return
+        return None
     violation_id = await db.resource.record_violation(entry["id"], tag, pc["id"], "event", surfaced_to)
     await engine.audit.record(None, "resource.violation", target_type="resource_violations", target_id=violation_id,
                               detail={"path": entry["path"], "tag": tag, "pc_id": pc["id"]})
@@ -145,7 +156,7 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
                                    summary=f"{tag} file {entry['filename']} found on {pc['hostname']}")
     if report_id:
         await db.resource.attach_report(violation_id, report_id)
-    await _raise_issue(engine, pc, entry, tag, origin, violation_id)
+    await _raise_issue(engine, pc, entry, tag, origin, violation_id, mark)
     await engine.push_to_account(surfaced_to, "resource.violation", {
         "violation_id": violation_id, "path": entry["path"], "tag": tag,
         "message": f"'{entry['filename']}' is a {tag} file and is not permitted on this PC. It is being ignored "
@@ -154,29 +165,37 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
 
     await events.on_signal(engine, pc["id"], "resource.violation",
                            {"violation_id": violation_id, "path": entry["path"], "tag": tag})
+    return violation_id
 
 
 async def _raise_issue(engine: Engine, pc: dict[str, Any], entry: dict[str, Any], tag: str, origin: dict[str, Any] | None,
-                       violation_id: int) -> None:
+                       violation_id: int, mark: dict[str, Any] | None = None) -> None:
     """A copy where it is not allowed is an issue for the department it is in. Critical when it left the original's department,
     high on another machine of the same department (or when there is no original to compare with), medium elsewhere on the
     same machine."""
     from engine.console import issues
 
     severity = "high"
-    if origin is not None:
-        origin_pc = await engine.db.accounts.pc(origin["pc_id"])
-        if origin["pc_id"] == pc["id"]:
+    origin_pc_id = mark["pc_id"] if mark else (origin["pc_id"] if origin else None)
+    if origin_pc_id is not None:
+        origin_pc = await engine.db.accounts.pc(origin_pc_id)
+        if origin_pc_id == pc["id"]:
             severity = "medium"
         elif origin_pc and origin_pc["department_id"] != pc["department_id"]:
             severity = "critical"
+    mark_detail: dict[str, Any] = {}
+    if mark:
+        by = await engine.db.accounts.display_names_for(pc["bound_account_id"] or mark["by_account_id"], [mark["by_account_id"]])
+        mark_detail = {"mark": {"id": mark["id"], "code": f"M-{mark['id']}", "host": mark["hostname"], "path": mark["path"],
+                                "keep": mark["keep"], "kind": mark["kind"], "name": mark["name"], "by": by.get(mark["by_account_id"]),
+                                "by_account_id": mark["by_account_id"]}}
     folder = entry["path"].replace("\\", "/").rsplit("/", 1)[0] if "/" in entry["path"].replace("\\", "/") else ""
     await issues.raise_issue(
         engine, type_="file", severity=severity, title="Restricted file copied where it isn't allowed", subject=entry["filename"],
         pc_id=pc["id"], source_table="resource_violations", source_id=violation_id,
         detail={"file": entry["filename"], "folder": folder, "path": entry["path"], "tag": tag, "hash": entry.get("content_hash"),
-                "violation_id": violation_id, "file_index_id": entry["id"],
-                "origin_pc_id": origin["pc_id"] if origin else None})
+                "violation_id": violation_id, "file_index_id": entry["id"], "origin_pc_id": origin_pc_id, **mark_detail},
+        owner_account_id=mark["by_account_id"] if mark else None)
 
 
 async def ignored_files(engine: Engine, pc_id: int) -> set[int]:

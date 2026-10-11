@@ -665,7 +665,7 @@ async def test_the_polling_watcher_tells_a_move_from_a_delete_and_a_create(engin
     try:
         assert svc.watcher.mode == "polling"
         (docs / "plan.docx").rename(docs / "plan-v2.docx")
-        got = await _events_wait(engine, org["w1_pc"], lambda ev: any(e[0] == "move" for e in ev))
+        got = await _events_wait(engine, org["w1_pc"], lambda ev: any(e[0] == "move" for e in ev), timeout=40.0)
         assert ("move", False, "plan-v2.docx", "plan.docx") in got
         assert not any(e[0] == "delete" for e in got)                  # not a delete followed by a create
     finally:

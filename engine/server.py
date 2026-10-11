@@ -63,6 +63,9 @@ class Engine:
         from engine.console import issues as console_issues
 
         console_issues.install(self)
+        from engine.console import marks as console_marks
+
+        console_marks.install(self)
 
         # In-memory registries (offers, transfers, live outputs, polled state) belong to one
         # Engine process; a fresh Engine starts clean.

@@ -313,6 +313,11 @@ Resource's tier folders (`admin`, `restricted`, `workers`, `common`) are represe
 
 ---
 
+### Restricted marks (migration 023)
+A file or folder marked **where it already is**, on the marker's own workstation; nothing is moved or copied. **`resource_marks`**: `kind` (file / folder), `name`, `pc_id`, `path`, `keep` (`machine`: anywhere on that PC, nowhere else; `path`: only in its place), `by_account_id`, `department_id`, `created_at`, `unmarked_at`/`unmarked_by_account_id` (unmarking never deletes). A folder's mark covers every file inside and any added later. **`resource_mark_hashes`** (PK `mark_id`, `content_hash`): every version of every marked file by content, with the path it was seen at -- so editing the original never lets an older copy slip through. A copy where the mark does not allow it becomes an issue (`issues.detail.mark`) and a `resource_violations` row, as before.
+
+---
+
 ## 7. Assistance (Ping, Message Channel, Listeners)
 
 ### `pings`

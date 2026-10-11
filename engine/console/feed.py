@@ -115,6 +115,9 @@ def sentence(action: str, d: dict[str, Any], host: str | None, names: dict[int, 
         return f"Copy of restricted {d.get('path', 'file')} found{on}"
     if action == "resource.violation_resolved":
         return f"A restricted copy was put right{on}"
+    if action.startswith("mark."):
+        return {"mark.created": f"Marked {d.get('path', 'a file')} restricted", "mark.changed": f"Changed where a restricted mark is allowed{on}",
+                "mark.removed": f"Stopped restricting {d.get('path', 'a file')}"}.get(action, _words(action))
     if action == "resource.tagged":
         return f"Marked a file as {d.get('tag', 'restricted')}{on}"
     if action == "deviation.logged":
