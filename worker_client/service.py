@@ -178,6 +178,9 @@ class WorkerService:
                 await self.flowsync.on_apply(payload)
             elif type_ == "flow.resolve_conflict":
                 await self.flowsync.on_resolve_conflict(payload)
+            elif type_ == "issue.ask_delete":
+                if self.config.windows:
+                    self._spawn(self._ask_to_delete(payload))
             elif type_ == "control.interest_changed":
                 await self.ossignals.refresh()
             elif type_ == "update.available":
@@ -225,6 +228,17 @@ class WorkerService:
             self._overlay = handle
         elif handle is not None:
             handle.close()
+
+    async def _ask_to_delete(self, payload: dict[str, Any]) -> None:
+        """An Admin asks this person to delete a restricted copy: which file, where, and why. The issue closes by itself
+        when the copy is gone."""
+        from worker_client.windows.spawn import open_window
+
+        text = (f"Please delete {payload.get('file')}"
+                + (f" from {payload['folder']}" if payload.get("folder") else "") + f". {payload.get('why') or ''}").strip()
+        handle = await open_window("message", {"text": text, "from": "your Admin"})
+        if handle is not None:
+            await handle.answer()
 
     async def _show_task(self, task_id: int) -> None:
         """A task given to this person: its window, and Start if they choose to (never Complete)."""

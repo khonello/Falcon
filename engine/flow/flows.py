@@ -23,6 +23,7 @@ returned reactively. `flow.resume` clears it.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
@@ -291,6 +292,20 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                              {"flow_id": flow_id, "destination_path": d["destination_path"],
                                               "creator_account_id": ident.account_id,
                                               "creator_name": names.get(ident.account_id)})
+        from engine.console import issues
+
+        first = pending[0]
+        who = await ctx.engine.db.accounts.display_names_for(ident.account_id, [first["owner_account_id"]])
+        dest_pc = await ctx.engine.db.accounts.pc(first["destination_pc_id"]) if first.get("destination_pc_id") else None
+        src_pc = await ctx.engine.db.accounts.pc(source_pc_id)
+        await issues.raise_issue(
+            ctx.engine, type_="flow", severity="low", title="Flow waiting for a folder",
+            subject=f"{src['hostname']} -> {who.get(first['owner_account_id'])}", pc_id=source_pc_id, source_table="flow_consent", source_id=flow_id,
+            owner_account_id=first["owner_account_id"], state="waiting", label="Waiting",
+            detail={"flow_id": flow_id, "from": f"{src_pc['hostname'] if src_pc else ''} {source_path}".strip(),
+                    "to": f"{dest_pc['hostname'] if dest_pc else 'remote storage'} {first['destination_path']}",
+                    "consent_by": who.get(first["owner_account_id"]), "consent_account_id": first["owner_account_id"],
+                    "destination_pc_id": first.get("destination_pc_id"), "asked_at": datetime.now(timezone.utc).isoformat()})
     await ctx.engine.audit.record(ctx, "flow.created", target_type="flows", target_id=flow_id,
                                   detail={"source_pc_id": source_pc_id, "destinations": len(dests),
                                           "consent_pending": [d["owner_account_id"] for d in pending],
@@ -320,6 +335,9 @@ async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await db.flows.set_status(flow_id, "inactive", "consent:denied")
     await ctx.engine.audit.record(ctx, "flow.consent", target_type="flows", target_id=flow_id,
                                   detail={"granted": granted})
+    from engine.console import issues
+
+    await issues.resolve_source(ctx.engine, "flow_consent", flow_id, "Agreed" if granted else "Declined")
     await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.consent_answered",
                                      {"flow_id": flow_id, "granted": granted, "by_account_id": ident.account_id})
     return {"flow_id": flow_id, "granted": granted}
@@ -385,6 +403,9 @@ async def delete(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await _load_owned(ctx, flow_id)
     await ctx.engine.db.flows.set_status(flow_id, "inactive", "deleted")
     await ctx.engine.audit.record(ctx, "flow.deleted", target_type="flows", target_id=flow_id)
+    from engine.console import issues
+
+    await issues.resolve_source(ctx.engine, "flow_consent", flow_id, "The flow was removed")
     return {"flow_id": flow_id, "status": "inactive"}
 
 

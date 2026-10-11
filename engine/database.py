@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 # Legal targets for polymorphic references. Extend deliberately, never ad hoc.
 POLYMORPHIC_TABLES = frozenset({
     "accounts", "departments", "pcs", "sessions", "assisted_access_requests", "file_index",
-    "tasks", "department_tasks", "enrollments", "verification_items", "manual_verifications", "flows", "flow_destinations",
+    "tasks", "department_tasks", "enrollments", "issues", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts",
@@ -71,6 +71,7 @@ class Database:
         self.tasks = TasksRepo(self)
         self.department_tasks = DepartmentTasksRepo(self)
         self.enrollments = EnrollmentsRepo(self)
+        self.issues = IssuesRepo(self)
         self.flows = FlowsRepo(self)
         self.reports = ReportsRepo(self)
         self.assistance = AssistanceRepo(self)
@@ -276,6 +277,14 @@ class AccountsRepo(_Repo):
             "LEFT JOIN sessions s ON s.pc_id = p.id AND s.ended_at IS NULL "
             "WHERE ($1::int IS NULL OR p.department_id = $1) AND ($2::int IS NULL OR p.id = $2) "
             "ORDER BY d.name NULLS LAST, p.hostname", department_id, pc_id)
+
+    async def rename_pc(self, pc_id: int, hostname: str) -> None:
+        await self._exec("UPDATE pcs SET hostname = $2 WHERE id = $1", pc_id, hostname)
+
+    async def quiet_pcs(self, seen_before: datetime) -> list[dict[str, Any]]:
+        """Machines that have connected before and were last seen before `seen_before` (the ones that went quiet)."""
+        return await self._fetch(
+            "SELECT id, hostname, last_seen_at FROM pcs WHERE last_seen_at IS NOT NULL AND last_seen_at < $1", seen_before)
 
     async def touch_pc(self, pc_id: int) -> None:
         """The machine's client connected or dropped just now."""
@@ -690,6 +699,103 @@ class TasksRepo(_Repo):
 # ============================================================================================
 # 5. Flow
 # ============================================================================================
+
+class IssuesRepo(_Repo):
+    """Issues: what an Admin works (migration 022). One open issue per cause; nothing is deleted."""
+
+    _COLS = ("i.id, i.code, i.type, i.severity, i.title, i.subject, i.pc_id, i.department_id, i.opened_at, i.owner_account_id, "
+             "i.target_hours, i.state, i.label, i.detail, i.source_table, i.source_id, i.escalated_at, i.resolved_at, "
+             "i.resolved_by_account_id, i.resolution, p.hostname, d.name AS department_name")
+    _FROM = "FROM issues i LEFT JOIN pcs p ON p.id = i.pc_id LEFT JOIN departments d ON d.id = i.department_id"
+    _PREFIX: ClassVar[dict[str, str]] = {"file": "INC", "update": "UPD", "deviation": "DEV", "flow": "FLW", "offline": "OFF"}
+
+    async def raise_(self, issue: dict[str, Any]) -> tuple[int, bool]:
+        """(id, created). A cause that already has an open issue returns that one, created False."""
+        src_t, src_id = issue.get("source_table"), issue.get("source_id")
+        if src_t is not None:
+            found = await self._val(
+                "SELECT id FROM issues WHERE source_table = $1 AND source_id = $2 AND state <> 'resolved'", src_t, src_id)
+            if found:
+                return found, False
+        issue_id = await self._val(
+            "INSERT INTO issues (type, severity, title, subject, pc_id, department_id, owner_account_id, target_hours, state, "
+            "label, detail, source_table, source_id, escalated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) "
+            "RETURNING id", issue["type"], issue["severity"], issue["title"], issue.get("subject") or "", issue.get("pc_id"),
+            issue.get("department_id"), issue.get("owner_account_id"), issue.get("target_hours") or 24, issue.get("state") or "open",
+            issue.get("label"), issue.get("detail") or {}, src_t, src_id, issue.get("escalated_at"))
+        await self._exec("UPDATE issues SET code = $2 WHERE id = $1", issue_id,
+                         f"{self._PREFIX[issue['type']]}-{1000 + issue_id:04d}")
+        return issue_id, True
+
+    async def get(self, issue_id: int) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._COLS} {self._FROM} WHERE i.id = $1", issue_id)
+
+    async def by_source(self, source_table: str, source_id: int) -> dict[str, Any] | None:
+        """The open issue a cause raised, if there is one."""
+        return await self._one(
+            f"SELECT {self._COLS} {self._FROM} WHERE i.source_table = $1 AND i.source_id = $2 AND i.state <> 'resolved'",
+            source_table, source_id)
+
+    async def list(self, *, department_id: int | None = None, pc_id: int | None = None, type_: str | None = None,
+                   owner_account_id: int | None = None, include_resolved_since: datetime | None = None,
+                   open_only: bool = False, limit: int = 1000) -> list[dict[str, Any]]:
+        """Open and waiting issues, and (when asked) the ones resolved since a time -- worst first."""
+        return await self._fetch(
+            f"SELECT {self._COLS} {self._FROM} WHERE ($1::int IS NULL OR i.department_id = $1) AND ($2::int IS NULL OR i.pc_id = $2) "
+            "AND ($3::text IS NULL OR i.type = $3) AND ($4::int IS NULL OR i.owner_account_id = $4) "
+            "AND (i.state <> 'resolved' OR (NOT $5 AND $6::timestamptz IS NOT NULL AND i.resolved_at >= $6)) "
+            "ORDER BY (i.state = 'resolved'), CASE i.severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, "
+            "i.opened_at LIMIT $7", department_id, pc_id, type_, owner_account_id, open_only, include_resolved_since, limit)
+
+    async def open_for_pcs(self, pc_ids: list[int]) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT id, pc_id, severity, title, subject FROM issues WHERE pc_id = ANY($1::int[]) AND state <> 'resolved'", pc_ids)
+
+    async def log(self, issue_id: int, kind: str, text: str, actor_account_id: int | None = None) -> None:
+        await self._exec("INSERT INTO issue_log (issue_id, kind, text, actor_account_id) VALUES ($1, $2, $3, $4)",
+                         issue_id, kind, text, actor_account_id)
+
+    async def entries(self, issue_id: int) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT id, at, actor_account_id, kind, text FROM issue_log WHERE issue_id = $1 ORDER BY at, id",
+                                 issue_id)
+
+    async def set_state(self, issue_id: int, state: str, label: str | None = None) -> None:
+        await self._exec("UPDATE issues SET state = $2, label = $3 WHERE id = $1 AND state <> 'resolved'", issue_id, state, label)
+
+    async def set_severity(self, issue_id: int, severity: str, title: str | None = None, subject: str | None = None) -> None:
+        await self._exec("UPDATE issues SET severity = $2, title = COALESCE($3, title), subject = COALESCE($4, subject) "
+                         "WHERE id = $1 AND state <> 'resolved'", issue_id, severity, title, subject)
+
+    async def set_detail(self, issue_id: int, patch: dict[str, Any]) -> None:
+        await self._exec("UPDATE issues SET detail = detail || $2::jsonb WHERE id = $1", issue_id, patch)
+
+    async def assign(self, issue_id: int, owner_account_id: int | None) -> None:
+        await self._exec("UPDATE issues SET owner_account_id = $2 WHERE id = $1 AND state <> 'resolved'", issue_id, owner_account_id)
+
+    async def escalate(self, issue_id: int, owner_account_id: int | None) -> None:
+        await self._exec("UPDATE issues SET escalated_at = COALESCE(escalated_at, now()), owner_account_id = $2 "
+                         "WHERE id = $1 AND state <> 'resolved'", issue_id, owner_account_id)
+
+    async def file_issues_at(self, pc_id: int, path: str) -> list[dict[str, Any]]:
+        """Open file issues for a copy at this place (slash-agnostic, case-insensitive)."""
+        return await self._fetch(
+            "SELECT id FROM issues WHERE type = 'file' AND state <> 'resolved' AND pc_id = $1 "
+            "AND lower(replace(detail->>'path', chr(92), '/')) = lower(replace($2, chr(92), '/'))", pc_id, path)
+
+    async def open_of_type(self, pc_id: int, type_: str) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT id FROM issues WHERE pc_id = $1 AND type = $2 AND state <> 'resolved'", pc_id, type_)
+
+    async def by_execution(self, execution_id: int) -> dict[str, Any] | None:
+        """The open issue a run was started for."""
+        return await self._one(
+            f"SELECT {self._COLS} {self._FROM} WHERE i.state <> 'resolved' AND i.detail->'executions' @> to_jsonb($1::int)", execution_id)
+
+    async def resolve(self, issue_id: int, resolution: str, by_account_id: int | None) -> bool:
+        """False when it was already resolved (so a cause that clears itself and a person resolving it do not both count)."""
+        return await self._val(
+            "UPDATE issues SET state = 'resolved', label = 'Resolved', resolved_at = now(), resolved_by_account_id = $3, "
+            "resolution = $2 WHERE id = $1 AND state <> 'resolved' RETURNING id", issue_id, resolution, by_account_id) is not None
+
 
 class EnrollmentsRepo(_Repo):
     """Machines asking to be registered (migration 019). Requests, never grants."""
@@ -1514,6 +1620,13 @@ class UpdatesRepo(_Repo):
             "LEFT JOIN pc_version_status s ON s.pc_id = p.id "
             "WHERE s.current_version_id IS DISTINCT FROM $1 ORDER BY p.department_id, p.hostname", version_id)
 
+    async def exclude_from_gate(self, pc_id: int, for_version: str, reason: str, by_account_id: int) -> None:
+        """Leave a machine out of the gate to a version: it can be approved without it. One row per machine and version."""
+        await self._exec(
+            "INSERT INTO gate_exclusions (pc_id, for_version, reason, by_account_id) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (pc_id, for_version) DO UPDATE SET reason = EXCLUDED.reason, by_account_id = EXCLUDED.by_account_id, at = now()",
+            pc_id, for_version, reason, by_account_id)
+
     async def approve_version(self, version_string: str, approved_by: int) -> int:
         return await self._val(
             "INSERT INTO versions (version_string, approved_by_account_id) VALUES ($1, $2) RETURNING id",
@@ -1636,6 +1749,19 @@ class ResourceRepo(_Repo):
     async def resolve(self, violation_id: int) -> None:
         await self._exec("UPDATE resource_violations SET resolved_at = now() WHERE id = $1 AND resolved_at IS NULL",
                          violation_id)
+
+    async def allow(self, pc_id: int, path: str, content_hash: str | None, by_account_id: int, reason: str,
+                    mark_id: int | None = None) -> int:
+        """A place a restricted file's content may be, with the reason: it is not reported there again."""
+        return await self._val(
+            "INSERT INTO restricted_allowances (pc_id, path, content_hash, mark_id, reason, by_account_id) "
+            "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id", pc_id, path, content_hash, mark_id, reason, by_account_id)
+
+    async def is_allowed(self, pc_id: int, path: str, content_hash: str | None) -> bool:
+        return bool(await self._val(
+            "SELECT EXISTS (SELECT 1 FROM restricted_allowances WHERE pc_id = $1 AND "
+            "(lower(replace(path, chr(92), '/')) = lower(replace($2, chr(92), '/')) "
+            " OR ($3::text IS NOT NULL AND content_hash = $3)))", pc_id, path, content_hash))
 
     async def ignored_file_ids(self, pc_id: int) -> set[int]:
         """Files on a PC currently ignored by the system: unresolved violations."""

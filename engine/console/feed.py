@@ -27,10 +27,10 @@ KIND_TYPES: dict[str, tuple[str, ...]] = {
     "assistance": ("assistance.",),
     "rollout": ("update.",),
     "deviation": ("deviation.",),
-    "violation": ("resource.violation", "resource.violation_resolved", "mark.", "issue."),
+    "violation": ("resource.violation", "resource.violation_resolved", "mark."),
     "task": ("task.",),
     "report": ("report.", "report_routing."),
-    "admin": ("account.", "pc.", "department.", "display_name.", "enroll.", "alert.", "audit.", "rule.", "registry."),
+    "admin": ("account.", "pc.", "department.", "display_name.", "enroll.", "alert.", "audit.", "rule.", "registry.", "issue."),
     "system": ("auth.",),
 }
 

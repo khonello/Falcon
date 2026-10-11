@@ -164,6 +164,17 @@ Append-only history of what the OS reported about files and folders: what a file
 
 ---
 
+### Issues (migration 022)
+The tickets an Admin works. Raised from what the system already records (a restricted copy, a failed update, a machine that presented another name, a flow waiting for consent, a machine that went quiet) and resolved when the cause goes away or a person acts on it. A help request is not one: it lives in Messages.
+
+**`issues`**: `id`, `code` (INC-1042, UPD-, DEV-, FLW-, OFF-), `type` (file / update / deviation / flow / offline), `severity` (critical / high / medium / low), `title`, `subject`, `pc_id`, `department_id`, `opened_at`, `owner_account_id` NULLABLE (NULL = unassigned; any Admin of the department may take it, the Super User when `escalated_at` is set), `target_hours`, `state` (open / waiting / resolved), `label` ("Retrying", "Escalated", ...), `detail` JSONB (what the page shows: file, folder, versions, flow, names), `source_table`/`source_id` (what raised it; a partial unique index allows one open issue per cause), `escalated_at`, `resolved_at`, `resolved_by_account_id`, `resolution`. Nothing is deleted.
+
+**`issue_log`**: `issue_id`, `at`, `actor_account_id` NULLABLE (NULL = the system), `kind`, `text` -- an issue's own timeline.
+
+**`restricted_allowances`**: a place a restricted file's content may be, with the reason ("Allow it here too"); the same content or path there is not reported again. **`gate_exclusions`**: a machine left out of the gate to a version (`for_version` is `next` until the version is approved), with the reason; WP7 reads it when approving.
+
+---
+
 ## 4. Task
 
 ### `tasks`

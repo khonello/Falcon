@@ -87,6 +87,12 @@ BUILTIN_SCRIPTS: dict[str, str] = {
         "for p in psutil.process_iter(['name']):\n"
         "  if (pid and p.pid==pid) or (not pid and name and (p.info['name'] or '').lower()==name):\n    p.terminate(); n+=1\n"
         "print(f'FALCON:summary ended {n} process(es)')\n"),
+    # a restricted copy removed from where it is not allowed (an issue's "Delete this copy"); one file, never a folder
+    "delete_file": (
+        "import os, sys\np=sys.argv[1]\n"
+        "if os.path.isdir(p): sys.exit('that is a folder, not a file')\n"
+        "if not os.path.exists(p): print('FALCON:summary already gone'); sys.exit(0)\n"
+        "os.remove(p)\nprint('FALCON:summary deleted '+os.path.basename(p))\n"),
     "start_process": "import subprocess, sys, shlex\nsubprocess.Popen(shlex.split(sys.argv[1]))\nprint('started')\n",
     "notify": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.notify(sys.argv[1:]))\n",
     "usb_contents": (
@@ -105,7 +111,7 @@ BUILTIN_SCRIPTS: dict[str, str] = {
 }
 BUILTIN_ARGS: dict[str, list[str]] = {
     "file_activity": ["path"], "snapshot_file": ["path"], "rename_file": ["path", "new_name"], "restore_file": ["path"],
-    "kill_process": ["name", "pid"], "start_process": ["command"], "notify": ["message", "stay_s"],
+    "kill_process": ["name", "pid"], "delete_file": ["path"], "start_process": ["command"], "notify": ["message", "stay_s"],
     "lock_session": ["duration_s", "message"], "shutdown": ["delay_s", "message"], "reboot": ["delay_s", "message"],
 }
 

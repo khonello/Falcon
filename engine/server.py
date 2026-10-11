@@ -60,6 +60,9 @@ class Engine:
         expectation.install(self)
         flow_sync.install(self)
         control_events.install(self)
+        from engine.console import issues as console_issues
+
+        console_issues.install(self)
 
         # In-memory registries (offers, transfers, live outputs, polled state) belong to one
         # Engine process; a fresh Engine starts clean.
@@ -147,6 +150,10 @@ class Engine:
 
         await traversal.claim_native_session(self, conn.ctx)
         await self._presence(conn, online=True)
+        if conn.ctx.identity.pc_id is not None:
+            from engine.console import issues
+
+            await issues.on_connected(self, conn.ctx.identity.pc_id)
 
     async def on_disconnect(self, conn: Connection) -> None:
         """A dropped connection mid-traversal is NOT special-cased: the Engine-side session

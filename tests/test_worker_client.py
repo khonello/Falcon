@@ -691,3 +691,48 @@ async def test_the_worker_says_what_it_is_and_reports_disk_network_and_processes
     finally:
         await admin.close()
         await svc.stop()
+
+
+async def test_the_worker_shows_the_ask_to_delete_a_copy_and_retries_an_update_now(engine, org, tmp_path: Path, monkeypatch):
+    from worker_client.windows import spawn
+
+    shown = []
+
+    class Handle:
+        async def answer(self):
+            return {"seen": True}
+
+        def close(self):
+            pass
+
+    async def fake_open(kind, spec):
+        shown.append((kind, spec))
+        return Handle()
+
+    monkeypatch.setattr(spawn, "open_window", fake_open)
+    cfg = _cfg(engine, tmp_path, "cid-w1", [])
+    cfg.windows = True
+    svc = WorkerService(cfg, native_watch=False)
+    svc.executor.log_dir = tmp_path / "exec"
+    svc.executor.log_dir.mkdir()
+    monkeypatch.setattr(svc, "_start_tray", lambda: asyncio.sleep(0))
+    await svc.start()
+    admin = await _admin(engine)
+    try:
+        tried = []
+
+        async def attempt(*, force=False):
+            tried.append(force)
+            return False
+
+        monkeypatch.setattr(svc.updater, "attempt", attempt)
+        await admin.call("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/s.xlsx", "hash": "S"}})
+        await svc.call("index.event", {"event": {"op": "copy", "path": "C:/Users/ama/Desktop/s-copy.xlsx", "hash": "S"}})
+        issue = (await admin.call("issues.list"))["issues"][0]
+        await admin.call("issues.act", {"issue_id": issue["id"], "key": "ask"})
+        assert await _wait(lambda: any(k == "message" and "Please delete s-copy.xlsx" in s["text"] for k, s in shown), timeout=10)
+        await svc._on_push("update.available", {"version": "9.9.9", "now": True})
+        assert await _wait(lambda: tried == [True], timeout=5)
+    finally:
+        await admin.close()
+        await svc.stop()

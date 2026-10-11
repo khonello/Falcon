@@ -71,3 +71,22 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   named for each viewer. Kinds: session, action, flow, assistance, rollout, deviation, violation (the concept's seven) and task,
   report, admin, system. A logged deviation is now also an audit event. TUI: `machines`, `machine <pc> [range]`, `feed`,
   `feed summary`, `feed export`. *Test:* `tests/test_console_machines.py`, `test_worker_client.py`, `test_operator_client.py`.
+
+- **WP2 Issues** (11 Oct 2026). The ticket entity (migration 022) and `engine/console/issues.py` + `plays.py`. *Raised* from what is
+  already recorded: a restricted copy (resource violation; critical when it left the original's department, high on another machine
+  of the same department, medium on the same machine), an update that failed (low "One version behind", high "past the escalation
+  limit" at the threshold; clears when it lands), a machine that presented another name (the deviation log; clears when it presents its
+  registered name again), a flow waiting for consent (owner: the destination's owner; clears on agree, decline or removal), and a
+  machine that went quiet (a sweep every minute: only machines that have connected before; medium after a day; clears when it
+  connects). Owner: the one person named when raised, else the department's only Admin, else unassigned; a department with no Admin
+  escalates to the Super User. `issues.list` (strip figures: open, waiting, past target, done today, mine), `issues.get` (lead, facts,
+  *what can be done* with the reasons something cannot, timeline = the issue's own log merged with what the audit trail shows on
+  the machine), `issues.act`, `issues.assign` (take, give, hand back), `issues.escalate`, `issues.note`; pushes `issue.raised`,
+  `issue.resolved`, `issue.escalated`. *Plays:* **file** -- ask the person (a message on their screen; the issue closes when the copy is
+  gone), delete this copy (a real run of the new `delete_file` built-in on that machine; clears the issue when it succeeds), allow it
+  here too (reason required, remembered); **update** -- retry when idle / when back online, retry now (the Worker retries at once),
+  leave it out of the next version's gate (reason required); **deviation** -- accept the presented name (renames the machine) or put it
+  back; **flow** -- remind, send somewhere the Admin manages (edits the flow), withdraw. A machine's health is now read from its open
+  issues. TUI: `issues`, `issue <id>`, `issue act|take|give|free|escalate|note`. *Not yet:* assigning an Admin from an issue
+  (WP6), the Super User's decisions built on issues (WP5), the rule that every issue also points at (WP4). *Test:*
+  `tests/test_console_issues.py`, `test_worker_client.py`, `test_operator_client.py`.

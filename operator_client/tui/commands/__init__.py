@@ -7,6 +7,7 @@ from operator_client.tui.commands import (  # noqa: F401
     dept_tasks,
     flow,
     hierarchy,
+    issues,
     reports,
     resource,
     system,

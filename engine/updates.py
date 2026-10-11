@@ -115,11 +115,33 @@ async def report_status(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     await ctx.engine.audit.record(ctx, "update.attempt", target_type="pc_version_status", target_id=ident.pc_id,
                                   detail={"version": version, "succeeded": succeeded,
                                           "failures": st["attempt_failure_count"]})
+    from engine.console import issues
+
+    cur = await db.updates.current_version()
+    if succeeded and cur is not None and (rv is None or rv["id"] == cur["id"] or v["id"] == cur["id"]):
+        await issues.resolve_source(ctx.engine, "pc_version_status", ident.pc_id, f"Now on {version}")
+    elif not succeeded:
+        await issues.raise_issue(
+            ctx.engine, type_="update", severity="low", title="One version behind", subject=f"{running or 'unknown'} -> {version}",
+            pc_id=ident.pc_id, source_table="pc_version_status", source_id=ident.pc_id, state="waiting", label="Retrying",
+            detail={"current": running, "target": version, "attempts": st["attempt_failure_count"],
+                    "last_attempt_at": st["last_attempt_at"].isoformat() if st.get("last_attempt_at") else None})
+        found = await db.issues.by_source("pc_version_status", ident.pc_id)
+        if found:
+            await db.issues.set_detail(found["id"], {"attempts": st["attempt_failure_count"], "target": version,
+                                                     "current": running or found["detail"].get("current")})
     escalated = False
     threshold = ctx.engine.settings.update_escalation_failures
     if not succeeded and st["attempt_failure_count"] >= threshold and st["escalated_at"] is None:
         await db.updates.mark_escalated(ident.pc_id)
         escalated = True
+        found = await db.issues.by_source("pc_version_status", ident.pc_id)
+        if found:
+            await db.issues.set_severity(found["id"], "high", "Update past the escalation limit", f"{running or 'unknown'} -> {version}")
+            admins = [a for a in await db.accounts.active_admins() if a["department_id"] == ident.department_id]
+            if not admins:
+                await db.issues.escalate(found["id"], None)
+            await db.issues.log(found["id"], "escalated", f"Failed {st['attempt_failure_count']} times: past the limit")
         await reports.emit(ctx.engine, "update_status", source_table="pc_version_status", source_id=st["id"],
                            summary=f"update to {version} failed {st['attempt_failure_count']}x on pc {ident.pc_id}")
         await ctx.engine.push_to_role("admin", "update.escalated",

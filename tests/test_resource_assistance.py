@@ -32,7 +32,7 @@ async def test_tags_tracking_violation_and_ignore(engine, org, connect):
                                               "hash": "SECRET"}})
     pushed = next(p for p in await w1.drain_pushes() if p.type == "resource.violation")
     assert pushed.payload["tag"] == "restricted" and "ignored" in pushed.payload["message"]
-    assert su.push_types(await su.drain_pushes()) == ["report.new"]
+    assert su.push_types(await su.drain_pushes()) == ["report.new", "issue.raised"]
     viol = (await w1.ok("resource.violations"))["violations"]
     assert len(viol) == 1 and viol[0]["file_index_id"] == v["file_index_id"] and viol[0]["report_id"]
     assert len((await a1.ok("resource.violations"))["violations"]) == 1            # own department

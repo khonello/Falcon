@@ -118,10 +118,11 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
 
     # 2. Restricted File Tracking: does this content match an admin/restricted file elsewhere?
     tag, scope = entry["resource_tag"], entry["resource_tag_scope_department_id"]
+    origin = None
     if tag is None and entry.get("content_hash"):
         for other in await db.file_index.by_hash(entry["content_hash"]):
             if other["id"] != entry["id"] and other["resource_tag"] in TRACKED_BY_HASH:
-                tag, scope = other["resource_tag"], None
+                tag, scope, origin = other["resource_tag"], None, other
                 break
     if tag is None:
         return
@@ -131,6 +132,8 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
         return
     if await db.resource.open_violation_for_file(entry["id"]):
         return  # already flagged; the same file keeps being ignored until resolved
+    if await db.resource.is_allowed(pc["id"], entry["path"], entry.get("content_hash")):
+        return  # a person allowed it here, with a reason: not reported again
     surfaced_to = pc["bound_account_id"]
     if surfaced_to is None:
         return
@@ -142,6 +145,7 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
                                    summary=f"{tag} file {entry['filename']} found on {pc['hostname']}")
     if report_id:
         await db.resource.attach_report(violation_id, report_id)
+    await _raise_issue(engine, pc, entry, tag, origin, violation_id)
     await engine.push_to_account(surfaced_to, "resource.violation", {
         "violation_id": violation_id, "path": entry["path"], "tag": tag,
         "message": f"'{entry['filename']}' is a {tag} file and is not permitted on this PC. It is being ignored "
@@ -150,6 +154,29 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
 
     await events.on_signal(engine, pc["id"], "resource.violation",
                            {"violation_id": violation_id, "path": entry["path"], "tag": tag})
+
+
+async def _raise_issue(engine: Engine, pc: dict[str, Any], entry: dict[str, Any], tag: str, origin: dict[str, Any] | None,
+                       violation_id: int) -> None:
+    """A copy where it is not allowed is an issue for the department it is in. Critical when it left the original's department,
+    high on another machine of the same department (or when there is no original to compare with), medium elsewhere on the
+    same machine."""
+    from engine.console import issues
+
+    severity = "high"
+    if origin is not None:
+        origin_pc = await engine.db.accounts.pc(origin["pc_id"])
+        if origin["pc_id"] == pc["id"]:
+            severity = "medium"
+        elif origin_pc and origin_pc["department_id"] != pc["department_id"]:
+            severity = "critical"
+    folder = entry["path"].replace("\\", "/").rsplit("/", 1)[0] if "/" in entry["path"].replace("\\", "/") else ""
+    await issues.raise_issue(
+        engine, type_="file", severity=severity, title="Restricted file copied where it isn't allowed", subject=entry["filename"],
+        pc_id=pc["id"], source_table="resource_violations", source_id=violation_id,
+        detail={"file": entry["filename"], "folder": folder, "path": entry["path"], "tag": tag, "hash": entry.get("content_hash"),
+                "violation_id": violation_id, "file_index_id": entry["id"],
+                "origin_pc_id": origin["pc_id"] if origin else None})
 
 
 async def ignored_files(engine: Engine, pc_id: int) -> set[int]:
@@ -202,6 +229,9 @@ async def resolve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await ctx.engine.db.resource.resolve(violation_id)
     await ctx.engine.audit.record(ctx, "resource.violation_resolved", target_type="resource_violations",
                                   target_id=violation_id)
+    from engine.console import issues
+
+    await issues.resolve_source(ctx.engine, "resource_violations", violation_id, "Put right", by=ctx)
     return {"violation_id": violation_id, "resolved": True}
 
 

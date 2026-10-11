@@ -264,3 +264,23 @@ async def test_scripted_fleet_machine_and_events(engine, org, tmp_path: Path):
     assert "FIN-01" in out[3] and "sessions:" in out[3] and "events:" in out[3]
     assert "Entered FIN-01" in out[4] and "session" in out[4]
     assert "events" in out[5] and "session" in out[5]
+
+
+async def test_scripted_issues(engine, org, tmp_path: Path):
+    from common.connection import EngineConnection as Raw
+
+    w1 = Raw("127.0.0.1", engine.port, client_id="cid-w1", tls=False, derived_key=key_for("cid-w1"), hostname="FIN-01")
+    await w1.connect()
+    a1 = Raw("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"), hostname="FIN-ADM")
+    await a1.connect()
+    try:
+        await a1.call("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/s.xlsx", "hash": "S"}})
+        await w1.call("index.event", {"event": {"op": "copy", "path": "C:/Users/ama/Desktop/s-copy.xlsx", "hash": "S"}})
+        out = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+            "connect", "issues type=file", "issue 1", "issue act 1 ask", "issue note 1 Spoke to her", "issue act 1 allow reason=audit", "issues type=file"])
+    finally:
+        await w1.close()
+        await a1.close()
+    assert "1 open" in out[1] and "INC-1001" in out[1]
+    assert "can do:" in out[2] and "ask" in out[2] and "allow" in out[2] and "timeline:" in out[2]
+    assert "Waiting" in out[3] and "lines in its timeline" in out[4] and "Resolved" in out[5] and "1 done today" in out[6]

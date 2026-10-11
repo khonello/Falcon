@@ -43,6 +43,7 @@ BUILTIN: dict[str, dict[str, Any]] = {
     "file_activity": {"category": "monitoring", "params": ["path"]},
     "idle_time": {"category": "monitoring", "params": []},
     "snapshot_file": {"category": "monitoring", "params": [], "optional": ["path", "find_name", "find_hash"]},
+    "delete_file": {"category": "control", "params": [], "optional": ["path", "find_name", "find_hash"]},
     "usb_contents": {"category": "monitoring", "params": []},
 }
 
@@ -54,7 +55,7 @@ BUILTIN: dict[str, dict[str, Any]] = {
 # Actions that work on one file name it one of three ways: `path` (the same path on every machine), `find_name` (a file
 # name) or `find_hash` (a content hash). The last two are looked up in the file index for each machine the action runs
 # on, so every machine gets its own path (executions.resolve_file).
-FILE_ACTIONS = frozenset({"rename_file", "restore_file", "snapshot_file"})
+FILE_ACTIONS = frozenset({"rename_file", "restore_file", "snapshot_file", "delete_file"})
 LOCATORS = ("path", "find_name", "find_hash")
 DELAY_MAX = 3600
 SETTLE_SECONDS = 30      # a run needs this much beyond a lock's or message's own length to finish and report

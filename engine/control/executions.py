@@ -225,6 +225,9 @@ async def execution_result(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         await db.control.save_output(execution_id, output, result)
     ctx.engine.scheduler.cancel(f"execution.{execution_id}.guard")
     _outputs.pop(execution_id, None)
+    from engine.console import issues
+
+    await issues.on_execution(ctx.engine, execution_id, status, summary)
     await ctx.engine.audit.record(ctx, "action.finished", target_type="execution", target_id=execution_id,
                                   detail={"status": status, "reason": reason, "exit_code": payload.get("exit_code")})
     action = await ctx.engine.db.control.action(ex["action_id"])

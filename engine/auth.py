@@ -81,11 +81,22 @@ async def _announce_hostname(ctx: Context, account: dict[str, Any], announced_ho
     """Hostname mismatch is a *deviation* (hierarchy-system-design → System Expectations): logged
     and surfaced, the connection proceeds as the provisioned identity. The key proves the install
     package; the hostname says where it is being used from."""
+    if announced_hostname and account["hostname"] and announced_hostname == account["hostname"] and account["bound_pc_id"]:
+        from engine.console import issues
+
+        await issues.resolve_source(ctx.engine, "hostname_mismatch", account["bound_pc_id"], "It presented its registered name again")
     if announced_hostname and account["hostname"] and announced_hostname != account["hostname"]:
-        await ctx.engine.audit.deviation(
+        deviation_id = await ctx.engine.audit.deviation(
             "account_bound_to_one_pc", surfaced_to_account_id=account["id"],
             observed_account_id=account["id"], observed_pc_id=account["bound_pc_id"],
             detail={"expected_hostname": account["hostname"], "announced_hostname": announced_hostname})
+        if account["bound_pc_id"] and deviation_id is not None:
+            from engine.console import issues
+
+            await issues.raise_issue(
+                ctx.engine, type_="deviation", severity="medium", title="Machine presented another name", subject=f"presented {announced_hostname}",
+                pc_id=account["bound_pc_id"], source_table="hostname_mismatch", source_id=account["bound_pc_id"],
+                detail={"what": "name", "expected": account["hostname"], "presented": announced_hostname, "deviation_id": deviation_id})
         # said back to the client too, so the person at it is told -- surfaced, never silently tolerated
         return {"expected": account["hostname"], "announced": announced_hostname}
     return None

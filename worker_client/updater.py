@@ -38,11 +38,14 @@ class Updater:
         self._task: asyncio.Task[None] | None = None
 
     def on_available(self, payload: dict[str, Any]) -> None:
+        """An update is waiting. `now` (an Admin chose *Retry now*) tries at once instead of waiting for an idle moment."""
         version = str(payload.get("version", ""))
         if version and version != self.running_version:
             self.pending = version
-            log.info("update %s available; will attempt when idle", version)
-            if self._task is None or self._task.done():
+            log.info("update %s available; will attempt %s", version, "now" if payload.get("now") else "when idle")
+            if payload.get("now"):
+                asyncio.create_task(self.attempt(force=True))
+            elif self._task is None or self._task.done():
                 self._task = asyncio.create_task(self._loop())
 
     async def stop(self) -> None:
