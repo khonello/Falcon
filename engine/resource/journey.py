@@ -48,6 +48,12 @@ def _folder_and_name(path: str) -> tuple[str, str]:
     return folder.lower(), name
 
 
+def _under(path: str, folder: str) -> str | None:
+    """What is left of `path` below `folder` (with its own separator), or None when it is not inside it."""
+    p, f = path.replace("\\", "/").lower(), folder.replace("\\", "/").lower().rstrip("/")
+    return path[len(folder.rstrip("/\\")):] if f and p.startswith(f + "/") else None
+
+
 @handler("resource.journey")
 async def journey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"file_index_id"} -> {"file", "places": [...], "events": [{at, kind, pc_id, hostname, path, who, text}]}.
@@ -87,15 +93,27 @@ async def journey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
     # What the OS reported happened to these places (and the places they came from, through any chain of moves)
     where = {(p["pc_id"], p["path"]) for p in places}
+    folder_moves = await db.file_index.folder_moves(sorted({p["pc_id"] for p in places}))
+    applied: dict[int, dict[str, Any]] = {}           # folder moves that carried one of these places with them
+    carried: set[tuple[int, str]] = set()             # places the same file reached by its folder moving, not by being copied
+    known = set(where)
     history: list[dict[str, Any]] = []
-    for _ in range(6):
+    for _ in range(8):
         history = await db.file_index.events_for_paths(sorted(where))
         before = len(where)
         where |= {(h["pc_id"], h["old_path"]) for h in history if h["op"] == "move" and h["old_path"] and not h["is_dir"]}
+        for fm in folder_moves:                        # a place under a folder that was moved or renamed was, before it, under the old folder
+            for pc_id, path in list(where):
+                rest = _under(path, fm["path"]) if pc_id == fm["pc_id"] else None
+                if rest is not None:
+                    where.add((pc_id, fm["old_path"] + rest))
+                    applied[fm["id"]] = fm
+                    if (pc_id, fm["old_path"] + rest) in known:
+                        carried.add((pc_id, path))
         if len(where) == before:
             break
     history = [h for h in history if not h["is_dir"] and mine(await pc_of(h["pc_id"]))]
-    moved_to = {(h["pc_id"], h["path"]) for h in history if h["op"] == "move"}
+    moved_to = {(h["pc_id"], h["path"]) for h in history if h["op"] == "move"} | carried
 
     origin_done = False
     for p in places:                                     # earliest first
@@ -107,6 +125,12 @@ async def journey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             add(p["first_seen_at"], "first_seen", p["pc_id"], p["path"], f"First known on {host}: {p['path']}")
         else:
             add(p["first_seen_at"], "copied", p["pc_id"], p["path"], f"A copy appeared on {host}: {p['path']}")
+    for fm in applied.values():
+        if mine(await pc_of(fm["pc_id"])):
+            host = (await pc_of(fm["pc_id"]) or {}).get("hostname", "a machine")
+            (of, on), (nf, nn) = _folder_and_name(fm["old_path"]), _folder_and_name(fm["path"])
+            text = f"Its folder was renamed on {host}: {on} to {nn}" if of == nf else f"Its folder was moved on {host}: {fm['old_path']} to {fm['path']}"
+            add(fm["occurred_at"], "folder_renamed" if of == nf else "folder_moved", fm["pc_id"], fm["path"], text)
     for h in history:
         host = (await pc_of(h["pc_id"]) or {}).get("hostname", "a machine")
         op = h["op"]

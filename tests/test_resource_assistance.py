@@ -257,3 +257,21 @@ async def test_automations_can_wait_on_attribute_permission_and_folder_changes(e
     assert sorted(fired) == sorted(wanted)
     # an edit of attributes or permissions, or anything to a folder, does not reach Flow, Resource or Task (content only)
     assert await engine.db.pool.fetchval("SELECT count(*) FROM resource_violations") == 0
+
+
+async def test_a_folder_renamed_above_a_file_is_in_the_files_journey(engine, org, connect):
+    """No event names the file when its folder is renamed; the journey follows it by the folder's own move."""
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")
+    ev = lambda **e: a1.ok("index.event", {"event": e})
+    await ev(op="create", path="C:/Docs/plans/a.txt", hash="H2")
+    await ev(op="modify", path="C:/Docs/plans/a.txt", hash="H2")
+    await ev(op="move", path="C:/Papers", old_path="C:/Docs", is_dir=True)                    # the folder is renamed: the OS says nothing of the file
+    later = await ev(op="create", path="C:/Papers/plans/a.txt", hash="H2")                      # the next look finds it under the new name
+    await ev(op="modify", path="C:/Papers/plans/a.txt", hash="H2")
+
+    j = await su.ok("resource.journey", {"file_index_id": later["file_index_id"]})
+    kinds = [e["kind"] for e in j["events"]]
+    assert kinds[0] == "first_seen" and "folder_renamed" in kinds and "copied" not in kinds, kinds
+    assert kinds.count("edited") == 2 and kinds.index("folder_renamed") < len(kinds) - 1
+    assert next(e for e in j["events"] if e["kind"] == "folder_renamed")["text"].endswith("Docs to Papers")

@@ -72,7 +72,7 @@ part is recorded for later, not built.
   signals: `file.attributes_changed`, `file.permissions_changed`, `folder.created`, `folder.moved`, `folder.deleted`
   (a move's signal carries `old_path`). Flow, Resource and Task still hear only content changes. A place a file has
   left no longer counts as a collision, a copy elsewhere, a search hit or a folder entry. *Still open:* a file being
-  *opened* (#2: the kernel trace, blocked); a folder renamed above a file is not followed into that file's journey; the
+  *opened* (#2: the kernel trace, blocked); a folder renamed above a file is now followed into that file's journey (12 Oct 2026: the journey says "Its folder was renamed/moved" and does not count the same file under the new folder as a copy); the
   polling fallback sees no folders or permissions; `file_events` has no retention job yet. *Test:*
   `test_worker_client.py` (real filesystem: native and polling), `test_resource_assistance.py` (journey, automations).
 - **A file's journey** (was #9, done 10 Oct 2026; the user decided: the journey only, not "required on every machine").
@@ -215,3 +215,6 @@ part is recorded for later, not built.
 - **The session window under the Windows service** (12 Oct 2026, WP9). `worker_client/screenstream.py` captures the screen and applies input from the Worker process itself, which is right while the
   Worker runs in the person's session. As a Windows service (packaging, on hold) it runs in session 0, whose desktop is empty, so capture and input move into the person's-session helper like the
   `screenshot` built-in and the foreground reading: the Engine side (`session.screen`, `session.frame`, `session.input`) does not change.
+
+- **Waiting on the user** (12 Oct 2026). (1) `file_events` has no retention job: the invariant is that the 90-day `audit_log` purge is the only hard delete, so purging this second history needs a decision. (2) A file being
+  *opened* (kernel trace) and program starts caught at once were refused by the safety classifier and not retried; the 3-second look (and the native hooks that exist) stays.

@@ -551,6 +551,12 @@ class FileIndexRepo(_Repo):
             "              WHERE e.pc_id = p.pc AND (e.path = p.pth OR e.old_path = p.pth)) ORDER BY occurred_at, id",
             [p[0] for p in places], [p[1] for p in places])
 
+    async def folder_moves(self, pc_ids: list[int]) -> list[dict[str, Any]]:
+        """Folders moved or renamed on these machines (a file inside one has moved with it, though no event names the file)."""
+        return await self._fetch(
+            "SELECT id, pc_id, path, old_path, occurred_at FROM file_events WHERE is_dir AND op = 'move' AND old_path IS NOT NULL "
+            "AND pc_id = ANY($1::int[]) ORDER BY occurred_at, id", pc_ids)
+
     async def same_content(self, file_index_id: int) -> list[dict[str, Any]]:
         """Every place the same content has been indexed (this row included), earliest first -- the places a file's
         journey is made of. A file with no hash yet is only itself."""
