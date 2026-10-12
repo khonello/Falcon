@@ -393,3 +393,8 @@ async def test_scripted_session_window(engine, org, tmp_path: Path):
     assert "entered" in out[1] and "picture on (see)" in out[2] and "saved 4x2" in out[3] and shot.read_bytes()[:4] == b"\x89PNG"
     assert "only looking" in out[4]
     assert "now control" in out[5] and "clicked" in out[6] and "typed" in out[7] and "picture off" in out[8]
+
+
+async def test_scripted_find(engine, org, tmp_path: Path):
+    out = await run_script(_cfg(engine, tmp_path, "cid-su"), ["connect", "find fin-0", "find zzzz"])
+    assert "FIN-01" in out[1] and "machine" in out[1] and "nothing found" in out[2]

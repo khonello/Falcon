@@ -180,3 +180,7 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   wheel, key, text; at most 200 a call; control mode only) and the Worker applies it with `SendInput`. It all ends with the session -- left, ended by a superior, expired -- or when either
   connection drops. Start, stop, mode changes and how long it lasted are audited; input itself is not. TUI: `traverse ... mode=`, `screen start|stop|shot|mode|click|type`.
   *Test:* `tests/test_console_screens.py`, `test_worker_client.py` (input plan, streamer, lockout), `test_operator_client.py`.
+
+- **WP10 Search** (12 Oct 2026). `search.find {q, kinds?, limit?}` is Ctrl K: machines (hostname), people (by the name the caller gives them -- never across other people's naming), tasks (their text),
+  flows (source path), issues (code, title, machine), rules (name, code) and departments, each result with a title, a line of context, its department and the `page` the console opens it on. An Admin is shown their
+  own department's only. Under two letters finds nothing. TUI: `find <text> [kind=..]`. *Test:* `tests/test_console_search.py`, `test_operator_client.py`.

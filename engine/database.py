@@ -79,6 +79,7 @@ class Database:
         self.decisions = DecisionsRepo(self)
         self.overview = OverviewRepo(self)
         self.registry = RegistryRepo(self)
+        self.search = SearchRepo(self)
         self.assistance = AssistanceRepo(self)
         self.control = ControlRepo(self)
         self.audit = AuditRepo(self)
@@ -1450,6 +1451,40 @@ class ReportsRepo(_Repo):
             "SELECT v.*, r.category, a.department_id AS addressed_by_department_id "
             "FROM report_addressed_views v JOIN reports r ON r.id = v.report_id "
             "JOIN accounts a ON a.id = v.addressed_by_account_id ORDER BY v.addressed_at DESC LIMIT $1", limit)
+
+
+class SearchRepo(_Repo):
+    """What Search looks through. `$2` is the department an Admin is limited to (NULL: all)."""
+
+    _SQL: ClassVar[dict[str, str]] = {
+        "machine": "SELECT 'machine' AS kind, p.id, p.hostname AS title, COALESCE(d.name, 'Head office') AS sub, p.department_id, 'machines' AS page FROM pcs p "
+                   "LEFT JOIN departments d ON d.id = p.department_id WHERE p.hostname ILIKE '%' || $1 || '%' AND ($2::int IS NULL OR p.department_id = $2) "
+                   "ORDER BY p.hostname LIMIT $3",
+        "task": "SELECT 'task' AS kind, t.id, left(t.description_raw, 90) AS title, 'task' AS sub, a.department_id, 'tasks' AS page FROM tasks t "
+                "JOIN accounts a ON a.id = t.assignee_account_id WHERE t.description_raw ILIKE '%' || $1 || '%' AND ($2::int IS NULL OR a.department_id = $2) "
+                "ORDER BY t.id DESC LIMIT $3",
+        "flow": "SELECT 'flow' AS kind, f.id, f.source_path AS title, 'from ' || p.hostname AS sub, p.department_id, 'flows' AS page FROM flows f "
+                "JOIN pcs p ON p.id = f.source_pc_id WHERE f.source_path ILIKE '%' || $1 || '%' AND ($2::int IS NULL OR p.department_id = $2) ORDER BY f.id DESC LIMIT $3",
+        "issue": "SELECT 'issue' AS kind, i.id, i.title AS title, COALESCE(i.code, '') || ' · ' || i.subject AS sub, i.department_id, 'issues' AS page FROM issues i "
+                 "WHERE (i.title ILIKE '%' || $1 || '%' OR i.subject ILIKE '%' || $1 || '%' OR i.code ILIKE '%' || $1 || '%') AND ($2::int IS NULL OR i.department_id = $2) "
+                 "ORDER BY (i.state = 'resolved'), i.opened_at DESC LIMIT $3",
+        "rule": "SELECT 'rule' AS kind, r.id, r.name AS title, r.code AS sub, NULL::int AS department_id, 'rules' AS page FROM rules r "
+                "WHERE (r.name ILIKE '%' || $1 || '%' OR r.code ILIKE '%' || $1 || '%') AND ($2::int IS NULL OR TRUE) ORDER BY r.id LIMIT $3",
+        "department": "SELECT 'department' AS kind, d.id, d.name AS title, 'department' AS sub, d.id AS department_id, 'departments' AS page FROM departments d "
+                      "WHERE d.name ILIKE '%' || $1 || '%' AND ($2::int IS NULL OR d.id = $2) ORDER BY d.name LIMIT $3",
+    }
+
+    async def find(self, q: str, kinds: list[str], department_id: int | None, limit: int) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for kind in kinds:
+            if kind in self._SQL:
+                out += await self._fetch(self._SQL[kind], q, department_id, limit)
+        return out
+
+    async def accounts(self, department_id: int | None) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT a.id, a.role, a.department_id, d.name AS department_name FROM accounts a LEFT JOIN departments d ON d.id = a.department_id "
+            "WHERE a.status = 'active' AND ($1::int IS NULL OR a.department_id = $1)", department_id)
 
 
 class RegistryRepo(_Repo):
