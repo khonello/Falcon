@@ -805,3 +805,147 @@ def test_the_lockout_tells_viewing_from_blocking():
     assert not lock.is_blocked and blocked[-1] is None and viewed[-1]["occupant_name"] == "R. Mensah"
     lock.release()
     assert lock.viewing_by is None and viewed[-1] is None
+
+
+def _utf16(text: str) -> bytes:
+    return text.encode("utf-16-le") + b"\x00\x00"
+
+
+def test_etw_payloads_are_read_the_way_windows_lays_them_out():
+    import struct
+
+    from worker_client.etw import basename, drive_path, file_open, process_start, utf16z
+
+    start = struct.pack("<IQIII", 4242, 0, 100, 1, 0) + _utf16("\\Device\\HarddiskVolume3\\Program Files\\Microsoft Office\\EXCEL.EXE")
+    assert process_start(start) == (4242, "EXCEL.EXE") and process_start(b"short") is None
+    assert process_start(struct.pack("<IQIII", 1, 0, 0, 0, 0) + b"\x00\x00") is None
+    assert basename("C:/a/b\\c.txt") == "c.txt" and utf16z(_utf16("hi") + b"junk", 0) == "hi" and utf16z(b"", 4) == ""
+
+    opened = struct.pack("<QQIIII", 1, 2, 7, 0x40, 0x80, 3) + _utf16("\\Device\\HarddiskVolume3\\Users\\ama\\salaries.xlsx")
+    assert file_open(opened) == ("\\Device\\HarddiskVolume3\\Users\\ama\\salaries.xlsx", 0x40) and file_open(opened[:20]) is None
+    devices = {"\\device\\harddiskvolume3": "C:"}
+    assert drive_path("\\Device\\HarddiskVolume3\\Users\\ama\\salaries.xlsx", devices) == "C:\\Users\\ama\\salaries.xlsx"
+    assert drive_path("\\Device\\NamedPipe\\x", devices) is None and drive_path("\\Device\\HarddiskVolume33\\x", devices) is None
+
+
+def test_the_file_matcher_only_matches_what_an_automation_named():
+    from worker_client.etw import FileMatcher
+
+    m = FileMatcher()
+    assert not m.active and not m.matches("C:\\anything")
+    m.set([{"path_prefix": "C:/Users/ama/Documents"}, {"name_suffix": ".XLSX"}, {"tier": "restricted"}])
+    assert m.active and m.unfiltered_skipped == 1                          # a tier alone cannot be decided here
+    assert m.matches("c:\\users\\AMA\\documents\\a.txt") and m.matches("D:\\x\\Budget.xlsx") and not m.matches("D:\\x\\budget.txt")
+
+
+def test_the_etw_watcher_tells_programs_and_opens_once_and_ignores_itself_and_folders():
+    import os
+    import struct
+
+    from worker_client.etw import EtwWatcher
+
+    seen: list = []
+    w = EtwWatcher(lambda t, d: seen.append((t, d)))
+    w.files.set([{"name_suffix": ".xlsx"}])
+    w._devices = {"\\device\\harddiskvolume3": "C:"}
+    start = lambda pid, name: struct.pack("<IQIII", pid, 0, 1, 1, 0) + _utf16("\\Device\\HarddiskVolume3\\Windows\\" + name)
+    w._on_process(1, 10, start(10, "notepad.exe"))
+    w._on_process(1, os.getpid(), start(os.getpid(), "python.exe"))          # itself: never reported
+    w._on_process(2, 10, b"")
+    w._on_process(2, 11, b"")                                                # a stop for a program we never saw start says nothing
+    assert seen == [("program.launched", {"process": "notepad.exe"}), ("program.exited", {"process": "notepad.exe"})]
+
+    seen.clear()
+    opened = lambda path, options=0x40: struct.pack("<QQIIII", 1, 2, 7, options, 0, 3) + _utf16("\\Device\\HarddiskVolume3\\" + path)
+    w._on_file(12, 10, opened("Users\\ama\\budget.xlsx"))
+    w._on_file(12, 10, opened("Users\\ama\\budget.xlsx"))                    # the same open, seen twice within moments: told once
+    w._on_file(12, 10, opened("Users\\ama\\notes.txt"))                      # not named by any automation
+    w._on_file(12, 10, opened("Users\\ama\\Sheets.xlsx", options=0x1))        # a folder
+    w._on_file(12, os.getpid(), opened("Users\\ama\\other.xlsx"))             # itself
+    w._on_file(11, 10, opened("Users\\ama\\late.xlsx"))                      # not a create
+    assert seen == [("file.accessed", {"path": "C:\\Users\\ama\\budget.xlsx", "name": "budget.xlsx", "process": ""})]
+
+
+async def test_the_os_signals_relay_what_the_trace_reports_and_stop_looking_for_programs_when_it_is_live():
+    from worker_client.ossignals import OsSignals
+
+    sent: list = []
+
+    async def report(type_, payload):
+        sent.append(payload)
+        return {}
+
+    class FakeEtw:
+        programs_live = True
+
+        def stop(self):
+            pass
+
+    sig = OsSignals(report)
+    await sig.start(native=False)
+    sig.etw = FakeEtw()
+    sig._drain_task = asyncio.create_task(sig._drain())
+    sig.set_interest({"program.launched": [{"process": "excel.exe"}], "file.accessed": [{"path_prefix": "C:/x"}]})
+    sig._from_trace("program.launched", {"process": "EXCEL.EXE"})
+    sig._from_trace("program.launched", {"process": "notepad.exe"})           # nobody waits for it
+    sig._from_trace("file.accessed", {"path": "C:\\x\\a.txt"})
+    for _ in range(50):
+        if len(sent) >= 2:
+            break
+        await asyncio.sleep(0.02)
+    assert [(s["type"], s["data"].get("process") or s["data"].get("path")) for s in sent] == [("program.launched", "EXCEL.EXE"), ("file.accessed", "C:\\x\\a.txt")]
+    assert await sig.tick() == 0                                              # the look is skipped for programs: the trace already said
+    sig._drain_task.cancel()
+    await sig.stop()
+
+
+def test_a_real_trace_starts_when_this_process_may_and_says_why_when_it_may_not():
+    import ctypes
+    import sys
+
+    from worker_client.etw import EtwWatcher
+
+    if sys.platform != "win32":
+        pytest.skip("Windows only")
+    w = EtwWatcher(lambda t, d: None)
+    try:
+        live = w.want_programs(True)
+        if ctypes.windll.shell32.IsUserAnAdmin():
+            assert live and w.programs_live
+        else:
+            assert not live and ("elevated" in w.errors["programs"] or "Performance Log" in w.errors["programs"])
+    finally:
+        w.stop()
+    assert not w.programs_live
+
+
+async def test_the_desktop_helper_answers_one_json_line_at_a_time_and_ends_cleanly():
+    from worker_client.userhelper import HelperInput, UserHelper
+
+    helper = UserHelper()
+    try:
+        assert await helper.start() and helper.running
+        assert await helper.request({"cmd": "ping"}) == {"ok": True}
+        assert (await helper.request({"cmd": "bogus"}))["ok"] is False
+        assert (await helper.request({"cmd": "input", "events": [{"t": "move", "x": 0, "y": 0}]})) == {"ok": True, "planned": 0}      # not controlling: nothing applied
+        shot = await helper.request({"cmd": "capture", "width": 320})
+        assert "ok" in shot and (not shot["ok"] or shot["png_b64"])                                                                # a picture, or why there is none
+        keep = HelperInput(helper)
+        assert keep.apply([{"t": "move", "x": 0, "y": 0}]) == 0                                                                    # input only while controlling
+    finally:
+        await helper.stop()
+    assert not helper.running
+
+
+def test_a_program_is_started_on_the_desktop_only_from_a_service_and_never_crashes_otherwise():
+    import sys
+
+    from worker_client import winsession
+    from worker_client.executor import Executor
+
+    if sys.platform != "win32":
+        pytest.skip("Windows only")
+    assert winsession.in_service_session() is False                        # this test runs in a person's session, not session 0
+    assert winsession.spawn_in_user_session([sys.executable, "-c", "pass"]) is None          # only the system account may take someone's token: refused, logged, no crash
+    assert Executor._on_desktop({"builtin_type": "screenshot"}) and Executor._on_desktop({"builtin_type": "notify"})
+    assert not Executor._on_desktop({"builtin_type": "kill_process"}) and not Executor._on_desktop({"kind": "custom", "builtin_type": "screenshot"})

@@ -27,15 +27,21 @@ part is recorded for later, not built.
    **Native:** `worker_client/winnotify.py` (ctypes) is a hidden message window that Windows tells when a drive or
    volume arrives or leaves and when anyone signs in, out or locks, plus `NotifyIpInterfaceChange` for the network;
    each only nudges the watcher to look at once, so a missed notification costs one safety-net look (30 s) and never a
-   wrong signal. **Open:** programs are still found by comparing the process table every 3 s, so a program that
-   starts and ends inside 3 s is missed; catching every one needs the kernel's process events (same family as #2, and
-   the same blocker). *Found:* Automation (AU08), 27 Sep 2026.
-2. **A file being opened cannot be seen** (the Engine half is done: `file.accessed` is relayable and part of the
-   interest list). What is missing is the Worker producing it. The decision (the user, 9 Oct 2026): from Windows' own
-   kernel file events, with no audit policy switched on by hand, in the Worker service (system account). That code is
-   not written: both attempts to write it in this session were stopped by a safety classifier, so it needs to be
-   written another way (by hand, or in a session where the writing is not blocked). Until then an automation on
-   "is opened" saves and never fires. *Found:* Automation (AU08).
+   wrong signal. **Instant programs (done 12 Oct 2026):** `worker_client/etw.py` starts a real-time ETW session on
+   Microsoft-Windows-Kernel-Process only while an automation waits for `program.launched` / `program.exited`, so every
+   start and stop is seen the moment Windows creates or ends the process, including one that lives under 3 s; the
+   3-second comparison stays as the fallback and is skipped while the trace is live (nothing is said twice). Windows lets
+   only an elevated process, or a member of "Performance Log Users", start a trace: the Worker service (system account)
+   can; run as an ordinary user it says so once and keeps the fallback. `python scripts/etw_check.py` shows it working
+   from an elevated prompt. *Found:* Automation (AU08), 27 Sep 2026.
+2. **A file being opened (done 12 Oct 2026)** (the Engine half was done earlier: `file.accessed` is relayable and part of
+   the interest list). The Worker now produces it, as decided (the user, 9 Oct 2026): from Windows' own kernel file events
+   (`Microsoft-Windows-Kernel-File`, create events), no audit policy switched on by hand, in the Worker service (system
+   account). `worker_client/etw.py` filters inside the trace callback by the paths and suffixes automations named, so
+   the flood of every open on the machine never leaves the Worker; folders, Falcon's own opens and the several creates
+   of one open are dropped; a rule that names only a resource tier cannot be decided on the Worker and is not watched
+   live (it says so in the log). The kernel's `\Device\HarddiskVolumeN` paths are turned into drive letters.
+   Without the privilege to trace it stays unavailable (the log says why). *Found:* Automation (AU08).
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine
@@ -218,3 +224,9 @@ part is recorded for later, not built.
 
 - **Waiting on the user** (12 Oct 2026). (1) `file_events` has no retention job: the invariant is that the 90-day `audit_log` purge is the only hard delete, so purging this second history needs a decision. (2) A file being
   *opened* (kernel trace) and program starts caught at once were refused by the safety classifier and not retried; the 3-second look (and the native hooks that exist) stays.
+
+- **The Worker as a service reaches the person's desktop by itself** (12 Oct 2026). `worker_client/winsession.py` starts a program on the signed-in person's desktop from the service
+  (`WTSGetActiveConsoleSessionId`, `WTSQueryUserToken`, `CreateProcessAsUserW`, desktop `winsta0\default`, stdin/stdout pipes): the Worker's windows and tray, the desktop built-ins
+  (`screenshot`, `notify`, `lock_session`, `start_process`, through `worker_client.runlogged`, which writes their output to the log the service reads) and a small helper
+  (`worker_client/helper.py`, `userhelper.py`) that captures the screen and applies the console's input for the session window. Run as an ordinary user, none of it is used and a refusal
+  never crashes anything. Nothing about the desktop needs setting up by hand. *Not exercised here:* the service-account path itself (this machine has no service installed; packaging is on hold).

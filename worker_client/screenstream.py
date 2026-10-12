@@ -47,9 +47,10 @@ def capture_png(width: int) -> tuple[int, int, int, int, bytes]:
 
 
 class ScreenStreamer:
-    def __init__(self, report: Reporter, *, capture: Capture = capture_png) -> None:
+    def __init__(self, report: Reporter, *, capture: Capture = capture_png, acapture: Callable[[int], Awaitable[tuple[int, int, int, int, bytes]]] | None = None) -> None:
         self.report = report
         self.capture = capture
+        self.acapture = acapture                    # taken on the person's desktop by the helper, when the Worker is a service
         self._tasks: dict[int, asyncio.Task[None]] = {}
 
     @property
@@ -77,7 +78,7 @@ class ScreenStreamer:
             while True:
                 began = time.monotonic()
                 try:
-                    sw, sh, w, h, png = await asyncio.to_thread(self.capture, width)
+                    sw, sh, w, h, png = await self.acapture(width) if self.acapture else await asyncio.to_thread(self.capture, width)
                 except Exception as exc:  # noqa: BLE001 -- no desktop to capture (locked, or a service's empty one): say so once and stop
                     log.warning("the screen could not be captured: %s", exc)
                     return

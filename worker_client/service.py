@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from common.connection import ConnectionError_, EngineConnection, EngineError
+from worker_client import winsession
 from worker_client.config import WorkerConfig
 from worker_client.executor import Executor
 from worker_client.flowsync import FlowSync
@@ -28,6 +29,7 @@ from worker_client.ossignals import OsSignals
 from worker_client.screenstream import RemoteInput, ScreenStreamer
 from worker_client.signals import Signals
 from worker_client.updater import Updater
+from worker_client.userhelper import HelperInput, UserHelper
 from worker_client.watcher import Watcher
 
 log = logging.getLogger(__name__)
@@ -48,8 +50,11 @@ class WorkerService:
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
         self.ossignals = OsSignals(self.call)
-        self.screens = ScreenStreamer(self.call)             # a superior who entered this machine looking at it
-        self.remote_input = RemoteInput()                    # ... and, in control mode, using it
+        # a superior who entered this machine looking at it, and in control mode using it. As a service (session 0, no screen) both are done by a helper on
+        # the signed-in person's desktop; otherwise in this process.
+        self.helper = UserHelper() if winsession.in_service_session() else None
+        self.screens = ScreenStreamer(self.call, acapture=self.helper.capture if self.helper else None)
+        self.remote_input: Any = HelperInput(self.helper) if self.helper else RemoteInput()
         self.inventory = Inventory(self.call)
         self._native_watch = native_watch
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
@@ -94,6 +99,8 @@ class WorkerService:
             self._tray.close()
         await self.screens.shutdown()
         self.remote_input.stop()
+        if self.helper is not None:
+            await self.helper.stop()
         await self.watcher.stop()
         await self.signals.stop()
         await self.ossignals.stop()

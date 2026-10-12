@@ -10,6 +10,7 @@ import logging
 import sys
 from typing import Any
 
+from worker_client import winsession
 from worker_client.windows import available
 
 log = logging.getLogger(__name__)
@@ -35,6 +36,13 @@ class WindowHandle:
             self.proc.terminate()
 
 
+async def _launch(argv: list[str]) -> Any:
+    """Start a window program where the person can see it: on their desktop when the Worker is a service (session 0 has no screen), plainly otherwise."""
+    if winsession.in_service_session():
+        return await asyncio.get_running_loop().run_in_executor(None, winsession.spawn_in_user_session, argv)
+    return await asyncio.create_subprocess_exec(*argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+
+
 async def open_window(kind: str, spec: dict[str, Any]) -> WindowHandle | None:
     """Show one window; None when this machine has no window support (the headless install), said once."""
     global _warned
@@ -43,20 +51,16 @@ async def open_window(kind: str, spec: dict[str, Any]) -> WindowHandle | None:
             log.warning("the Worker's windows need the worker-ui extra (PySide6); running without them")
             _warned = True
         return None
-    proc = await asyncio.create_subprocess_exec(
-        sys.executable, "-m", "worker_client.windows", kind, json.dumps(spec),
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-    return WindowHandle(proc)
+    proc = await _launch([sys.executable, "-m", "worker_client.windows", kind, json.dumps(spec)])
+    return WindowHandle(proc) if proc is not None else None
 
 
 async def open_tray() -> WindowHandle | None:
     """Start the tray icon (the person's way of asking for help); None on a headless install."""
     if not available():
         return None
-    proc = await asyncio.create_subprocess_exec(
-        sys.executable, "-m", "worker_client.windows.tray",
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-    return WindowHandle(proc)
+    proc = await _launch([sys.executable, "-m", "worker_client.windows.tray"])
+    return WindowHandle(proc) if proc is not None else None
 
 
 def task_spec(task: dict[str, Any]) -> dict[str, Any]:

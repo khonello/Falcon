@@ -114,13 +114,19 @@ class OsSignals:
         self._loop_ref: asyncio.AbstractEventLoop | None = None
         self._wake = asyncio.Event()
         self._notifier: Any = None
+        self.etw: Any = None                  # instant program starts and file opens (worker_client/etw.py), when Windows lets this process trace
+        self._live: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue(maxsize=2000)
+        self._drain_task: asyncio.Task[None] | None = None
         self.native = False               # Windows is telling us about drives, sessions and the network
 
     async def start(self, *, native: bool = True) -> None:
         self._loop_ref = asyncio.get_running_loop()
         if native:
+            from worker_client.etw import EtwWatcher
             from worker_client.winnotify import WindowsNotifier
 
+            self.etw = EtwWatcher(self._from_trace)
+            self._drain_task = asyncio.create_task(self._drain())
             self._notifier = WindowsNotifier(self.nudge)
             self.native = self._notifier.start()
             if not self.native:
@@ -128,6 +134,12 @@ class OsSignals:
         self._task = asyncio.create_task(self._loop())
 
     async def stop(self) -> None:
+        if self.etw is not None:
+            await asyncio.to_thread(self.etw.stop)
+        if self._drain_task:
+            self._drain_task.cancel()
+            await asyncio.gather(self._drain_task, return_exceptions=True)
+            self._drain_task = None
         if self._notifier is not None:
             self._notifier.stop()
             self._notifier = None
@@ -143,7 +155,8 @@ class OsSignals:
 
     def _interval(self) -> float:
         """Native notifications cover drives, sessions and the network; programs are still looked at often."""
-        if self.native and not any(t in self.interest for t in ("program.launched", "program.exited")):
+        programs = any(t in self.interest for t in ("program.launched", "program.exited"))
+        if self.native and (not programs or (self.etw is not None and self.etw.programs_live)):
             return SAFETY_SECONDS
         return self.interval
 
@@ -151,6 +164,37 @@ class OsSignals:
         """Ask the Engine what matters on this machine (on connect, and when told it changed)."""
         res = await self.report("control.signal_interest", {})
         self.set_interest(res.get("interest") or {})
+        await self._apply_etw()
+
+    async def _apply_etw(self) -> None:
+        """Start (or stop) the instant traces for what is wanted now. Where Windows will not let this process trace, the look every few seconds stays."""
+        if self.etw is None:
+            return
+        wants_programs = any(t in self.interest for t in ("program.launched", "program.exited"))
+        await asyncio.to_thread(self.etw.want_programs, wants_programs)
+        await asyncio.to_thread(self.etw.want_files, self.interest.get("file.accessed") or [])
+
+    def _from_trace(self, etype: str, data: dict[str, Any]) -> None:
+        """From the trace's thread: queue the event for the loop (a full queue drops it: a flood is not worth the memory)."""
+        loop = self._loop_ref
+        if loop is not None:
+            loop.call_soon_threadsafe(self._offer, etype, data)
+
+    def _offer(self, etype: str, data: dict[str, Any]) -> None:
+        try:
+            self._live.put_nowait((etype, data))
+        except asyncio.QueueFull:
+            pass
+
+    async def _drain(self) -> None:
+        while True:
+            etype, data = await self._live.get()
+            if not self.wanted(etype, data):
+                continue
+            try:
+                await self.report("control.signal", {"type": etype, "data": data})
+            except Exception as exc:  # noqa: BLE001
+                log.warning("could not relay %s: %s", etype, exc)
 
     def set_interest(self, interest: dict[str, list[dict[str, Any]]]) -> None:
         self.interest = interest
@@ -183,6 +227,8 @@ class OsSignals:
         for group, types in self._groups().items():
             if not any(t in self.interest for t in types):
                 continue
+            if group == "programs" and self.etw is not None and self.etw.programs_live:
+                continue                                  # Windows tells us at once; looking as well would say everything twice
             read, diff = readers[group]
             now = await asyncio.to_thread(read)
             before = self._base.get(group)

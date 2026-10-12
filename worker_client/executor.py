@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from common.custom_actions import validate
+from worker_client import winsession
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +110,9 @@ BUILTIN_SCRIPTS: dict[str, str] = {
     "shutdown": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.power('shutdown', sys.argv[1:]))\n",
     "reboot": "import sys\nfrom worker_client import builtins\nsys.exit(builtins.power('reboot', sys.argv[1:]))\n",
 }
+# What shows something to the person, takes a picture of their screen, or starts a program on it: run on their desktop when the Worker is a service.
+DESKTOP_BUILTINS = frozenset({"screenshot", "notify", "lock_session", "start_process"})
+
 BUILTIN_ARGS: dict[str, list[str]] = {
     "file_activity": ["path"], "snapshot_file": ["path"], "rename_file": ["path", "new_name"], "restore_file": ["path"],
     "kill_process": ["name", "pid"], "delete_file": ["path"], "start_process": ["command"], "notify": ["message", "stay_s"],
@@ -197,6 +201,20 @@ class Executor:
         argv = [a.replace("{script}", str(script_path)) for a in argv]
         log_path = self.log_dir / f"{execution_id}.log"
         log_file = await asyncio.to_thread(open, log_path, "wb")  # handed to the subprocess
+        if self._on_desktop(action) and winsession.in_service_session():
+            # a service has no screen: what must be seen or touched runs on the signed-in person's desktop (worker_client/winsession.py)
+            proc = await asyncio.get_running_loop().run_in_executor(
+                None, winsession.spawn_in_user_session, [sys.executable, "-m", "worker_client.runlogged", str(log_path), *argv])
+            log_file.close()
+            if proc is None:
+                await self._finish(execution_id, "failed", error="Nobody is signed in at this machine, so there is no screen to do this on")
+                return
+            run = Running(execution_id=execution_id, process=proc, log_path=log_path)
+            self.running[execution_id] = run
+            run.tail_task = asyncio.create_task(self._tail(run))
+            asyncio.create_task(self._wait(run, timeout))
+            log.info("execution %s started on the person's desktop: %s", execution_id, action.get("name") or action.get("builtin_type"))
+            return
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv, stdout=log_file, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -223,6 +241,11 @@ class Executor:
         return True
 
     # --- internals ------------------------------------------------------------------------------
+
+    @staticmethod
+    def _on_desktop(action: dict[str, Any]) -> bool:
+        """Built-ins that show something or take a picture, or start a program the person is to see."""
+        return action.get("kind") != "custom" and str(action.get("builtin_type") or "") in DESKTOP_BUILTINS
 
     def _prepare(self, action: dict[str, Any]) -> tuple[list[str], str]:
         kind = action.get("kind")
