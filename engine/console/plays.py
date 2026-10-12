@@ -155,6 +155,16 @@ async def _update(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[A
         options.append(_opt("wait", "Retry when it is back online", f"The update runs as soon as {host} checks in again.", "Keep waiting", "Waiting"))
     options.append(_opt("exclude", "Leave it out of the next version's gate", f"The next version can then be approved without {host}. It stays on "
                         f"{d.get('current') or 'its version'} until it updates.", "Leave it out", "Resolved", need="reason"))
+    if ctx.identity.role == "super_user" and issue["department_id"] is not None:
+        db = ctx.engine.db
+        if not any(a["department_id"] == issue["department_id"] for a in await db.accounts.active_admins()):
+            fleet = await db.accounts.fleet(department_id=issue["department_id"])
+            workers = [m for m in fleet if m["account_id"] and m["pc_type"] == "client_pc"]
+            names = await db.accounts.display_names_for(ctx.identity.account_id, [m["account_id"] for m in workers]) if workers else {}
+            options.append(_opt("admin", f"Give {issue['department_name']} an Admin, and this with it",
+                                "A Worker there is promoted; the new Admin owns this from now on, and the next one.", "Promote", "Assigned",
+                                pick=[{"value": m["account_id"], "label": f"{names.get(m['account_id']) or m['hostname']} ({m['hostname']})"} for m in workers],
+                                hint="Promoting gives them an Admin workstation and a new key, shown once."))
     return lead, facts, options, why
 
 
@@ -166,6 +176,14 @@ async def _do_update(ctx: Context, issue: dict[str, Any], key: str, payload: dic
         return await _wait(ctx, issue, "Retrying", f"Asked {host} to retry the update now")
     if key in ("idle", "wait"):
         return await _wait(ctx, issue, "Retrying", f"Left {host} to retry when {'idle' if key == 'idle' else 'it is back online'}")
+    if key == "admin":
+        account_id = payload.get("account_id")
+        if not isinstance(account_id, int):
+            raise ProtocolError(ErrorCode.INVALID, "pick who to promote (account_id)")
+        made = await dispatch(ctx, "hierarchy.admin_promote", {"account_id": account_id})
+        await db.issues.assign(issue["id"], account_id)
+        await db.issues.log(issue["id"], "acted", "Promoted a Worker to Admin of the department, who now owns this", who)
+        return {"state": issue["state"], "label": "Assigned", "promoted": made}
     reason = _reason(payload)
     await db.updates.exclude_from_gate(issue["pc_id"], "next", reason, who)
     await db.issues.log(issue["id"], "acted", f"Left {host} out of the next version's gate: {reason}", who)

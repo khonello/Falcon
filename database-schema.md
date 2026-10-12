@@ -191,6 +191,9 @@ The standard the organisation is measured against, and what was measured. A **ru
 
 **`accounts.hours_limited`**: the Super User limiting an Admin to working hours; traversal into a machine outside them is refused.
 
+### Blocked addresses (migration 026)
+**`blocked_addresses`**: an address the Super User refuses at the door -- the connection is closed before the challenge, and the try is still written to the trail as an `auth.failed` (reason "address blocked"), so the Registry shows that it keeps trying. `address`, `reason`, who and when, and `lifted_at` / `lifted_by_account_id` when it is let back (never deleted; a partial unique index allows one open block per address). **`auth.failed`** rows now carry `kind` (unknown / wrong_key / old_key / stale / blocked), `address`, `claimed_name` (what the machine said it was), and, when the client id is one of ours, `pc_id`, `machine`, `key_generation`, `same_address` (whether that machine has been seen from this address) and, for an old key, `old_generation`.
+
 ---
 
 ## 4. Task

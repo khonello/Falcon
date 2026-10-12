@@ -153,6 +153,33 @@ async def admin_promote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
             "client_key": ctx.engine.client_key(subject["client_id"], generation)}
 
 
+@handler("hierarchy.admin_demote")
+async def admin_demote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"account_id"} -- Super User only. An Admin stops being one: they stay in the department as a Worker on the same machine, which gets a new key (returned
+    once) and stops being an Admin workstation. Their session is ended, the issues they owned go back to the department's pool, and if they were the last
+    Admin the department is left with an empty seat (watched like any other)."""
+    require_role(ctx, "super_user")
+    account_id = int_field(payload, "account_id")
+    db = ctx.engine.db
+    subject = await db.accounts.by_id(account_id)
+    if subject is None or subject["role"] != "admin" or subject["status"] != "active":
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such active Admin")
+    from engine.hierarchy import traversal
+
+    session = await db.sessions.active_for_account(account_id)
+    if session is not None and session["occupied_via"] != "native":
+        await traversal.end_session(ctx.engine, session, "superior_ended", actor=ctx)
+    generation = await db.accounts.demote(account_id)
+    await ctx.engine.audit.record(ctx, "account.demoted", target_type="accounts", target_id=account_id,
+                                  detail={"department_id": subject["department_id"], "pc_id": subject["bound_pc_id"], "key_generation": generation})
+    for conn in list(ctx.engine.connections):
+        if conn.ctx.identity is not None and conn.ctx.identity.pc_id == subject["bound_pc_id"]:
+            conn.writer.close()
+    await seat_watch(ctx.engine, subject["department_id"], subject["department_name"] or "A department")
+    return {"account_id": account_id, "role": "worker", "department_id": subject["department_id"], "pc_id": subject["bound_pc_id"],
+            "client_id": subject["client_id"], "key_generation": generation, "client_key": ctx.engine.client_key(subject["client_id"], generation)}
+
+
 @handler("hierarchy.admin_limit")
 async def admin_limit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"account_id", "on": bool} -- Super User only. Limit an Admin to working hours (they cannot enter a machine outside them), or lift it."""

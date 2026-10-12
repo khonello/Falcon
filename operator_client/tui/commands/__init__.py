@@ -10,6 +10,7 @@ from operator_client.tui.commands import (  # noqa: F401
     hierarchy,
     issues,
     overview,
+    registry,
     reports,
     resource,
     system,

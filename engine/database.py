@@ -78,6 +78,7 @@ class Database:
         self.reports = ReportsRepo(self)
         self.decisions = DecisionsRepo(self)
         self.overview = OverviewRepo(self)
+        self.registry = RegistryRepo(self)
         self.assistance = AssistanceRepo(self)
         self.control = ControlRepo(self)
         self.audit = AuditRepo(self)
@@ -232,6 +233,15 @@ class AccountsRepo(_Repo):
             pc_id = await conn.fetchval("UPDATE accounts SET role = 'admin' WHERE id = $1 RETURNING bound_pc_id", account_id)
             return await conn.fetchval(
                 "UPDATE pcs SET pc_type = 'admin_workstation', key_generation = key_generation + 1 WHERE id = $1 RETURNING key_generation", pc_id)
+
+    async def demote(self, account_id: int) -> int:
+        """An Admin stops being one: the account becomes a Worker of the same department, their machine a client PC with a new key
+        (returned: the generation), the issues they owned go back to the department, any limit on them is lifted."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            pc_id = await conn.fetchval("UPDATE accounts SET role = 'worker', hours_limited = FALSE WHERE id = $1 RETURNING bound_pc_id", account_id)
+            await conn.execute("UPDATE issues SET owner_account_id = NULL WHERE owner_account_id = $1 AND state <> 'resolved'", account_id)
+            return await conn.fetchval(
+                "UPDATE pcs SET pc_type = 'client_pc', key_generation = key_generation + 1 WHERE id = $1 RETURNING key_generation", pc_id)
 
     async def set_self_name(self, account_id: int, label: str | None) -> None:
         await self._exec("UPDATE accounts SET self_display_name = $2 WHERE id = $1", account_id, label)
@@ -1435,6 +1445,41 @@ class ReportsRepo(_Repo):
             "SELECT v.*, r.category, a.department_id AS addressed_by_department_id "
             "FROM report_addressed_views v JOIN reports r ON r.id = v.report_id "
             "JOIN accounts a ON a.id = v.addressed_by_account_id ORDER BY v.addressed_at DESC LIMIT $1", limit)
+
+
+class RegistryRepo(_Repo):
+    """Blocked addresses, the refused connections the audit trail holds, and the accounts list."""
+
+    async def blocked_set(self) -> set[str]:
+        return {r["address"] for r in await self._fetch("SELECT address FROM blocked_addresses WHERE lifted_at IS NULL")}
+
+    async def blocked(self) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM blocked_addresses WHERE lifted_at IS NULL ORDER BY at DESC")
+
+    async def block(self, address: str, reason: str, by_account_id: int) -> bool:
+        """False when it was blocked already."""
+        got = await self._val(
+            "INSERT INTO blocked_addresses (address, reason, by_account_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING id",
+            address, reason, by_account_id)
+        return got is not None
+
+    async def unblock(self, address: str, by_account_id: int) -> bool:
+        status = await self._exec(
+            "UPDATE blocked_addresses SET lifted_at = now(), lifted_by_account_id = $2 WHERE address = $1 AND lifted_at IS NULL", address, by_account_id)
+        return status.endswith("1")
+
+    async def refused(self, since: datetime) -> list[dict[str, Any]]:
+        """Refused connections since a time, newest first (the trail's `auth.failed` rows)."""
+        return await self._fetch(
+            "SELECT id, target_id AS client_id, detail, occurred_at FROM audit_log WHERE action_type = 'auth.failed' AND occurred_at >= $1 "
+            "ORDER BY occurred_at DESC LIMIT 5000", since)
+
+    async def account_rows(self, *, department_id: int | None, roles: list[str]) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT a.id, a.role, a.department_id, d.name AS department_name, a.status, a.hours_limited, a.bound_pc_id, p.hostname, p.key_generation, "
+            "p.last_seen_at FROM accounts a LEFT JOIN departments d ON d.id = a.department_id LEFT JOIN pcs p ON p.id = a.bound_pc_id "
+            "WHERE a.status = 'active' AND a.role = ANY($2::text[]) AND ($1::int IS NULL OR a.department_id = $1) "
+            "ORDER BY d.name NULLS FIRST, a.role, a.id", department_id, roles)
 
 
 class DecisionsRepo(_Repo):

@@ -337,3 +337,12 @@ async def test_scripted_overview_board_and_decisions(engine, org, tmp_path: Path
     assert "reports:deviation" in out[3] and "route" in out[3]
     assert "Routed" in out[4] and "1 still waiting" in out[4]                       # the client's own name mismatch has no department to route to
     assert "reports:deviation" in out[5] and "Finance" in out[6] and "HR" in out[6]
+
+
+async def test_scripted_registry_and_department_page(engine, org, tmp_path: Path):
+    out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
+        "connect", "accounts", "refused", "block 10.9.9.9 keeps_guessing", "blocked", "unblock 10.9.9.9", f"department {org['hr']}", f"admin demote {org['a2']}", f"department {org['hr']}"])
+    assert "FIN-ADM" in out[1] and "HR-ADM" in out[1] and "You" in out[1]
+    assert "Nothing was refused." in out[2] and "10.9.9.9 is blocked" in out[3] and "keeps_guessing" in out[4] and "no longer blocked" in out[5]
+    assert "HR: " in out[6] and "HR-ADM" in out[6]
+    assert "is a Worker again" in out[7] and "NO ADMIN" in out[8] and "could be promoted" in out[8]

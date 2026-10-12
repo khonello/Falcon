@@ -14,6 +14,7 @@ what the console can *do* goes through the combo's own handlers.
     issues    -- the tickets an Admin works: raised from what the system records, resolved when the cause goes
     plays     -- what can be done about an issue (the options, and doing them)
     overview  -- the Overviews' figures, the reports board, and the Super User's decisions
+    registry  -- accounts, refused connections and blocked addresses, and a department's page
 """
 
 from engine.console import (  # noqa: F401
@@ -24,5 +25,6 @@ from engine.console import (  # noqa: F401
     machines,
     marks,
     overview,
+    registry,
     rules,
 )

@@ -140,3 +140,15 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   (traversal refuses a limited Admin outside working hours). The version gate decision plugs in through `overview.CARD_SOURCES` / `DECIDERS` and
   arrives with WP7. TUI: `overview`, `departments-board`, `board`, `decisions`, `decide`, `promote`, `admin limit`. *Test:*
   `tests/test_console_overview.py`, `test_operator_client.py`.
+
+- **WP6 Registry and Departments** (12 Oct 2026). `registry.accounts {department_id?, roles?}` (the Super User and every Admin; key number, workstation,
+  signed in), `registry.refused {days?}` (one row per who-tried / from-where: the name it claimed, address, why -- not registered, the key that was
+  replaced, a wrong key for a machine from an address it never uses --, tries, first / last try, whether blocked, and the advice: register, rekey, block,
+  unblock), `registry.block` / `unblock` / `blocked` (an address is refused before the challenge; the try is still counted; never your own address).
+  `auth.failed` now records the address, the claimed name, the machine the client id belongs to and which key number was used. `departments.get`
+  is a department's page (Admins, `vacant`, machines with health, worst issues, reports handling, open work, Workers who could be promoted).
+  `hierarchy.admin_demote` is *Stop being an Admin* (the account stays as a Worker on the same machine, which gets a new key; the issues they owned
+  go back to the department; an empty seat is watched). The update issue in a department with no Admin has the play `admin` (promote a Worker there
+  and assign the issue to them). *Not done, on purpose:* giving a department an Admin from another department -- an Admin belongs to one department,
+  so the seat decision draws it disabled with the reason. TUI: `accounts`, `refused`, `block`, `unblock`, `blocked`, `department`, `admin demote`.
+  *Test:* `tests/test_console_registry.py`, `test_operator_client.py`.

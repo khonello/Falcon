@@ -110,12 +110,19 @@ async def _announce_hostname(ctx: Context, account: dict[str, Any], announced_ho
     return None
 
 
-async def _fail(ctx: Context, client_id: str, reason: str) -> None:
-    """Audit and refuse. The reason to the client is deliberately uniform (no oracle)."""
-    log.warning("auth failed for client_id=%r from %s: %s", client_id, ctx.connection.peer, reason)
+async def _fail(ctx: Context, client_id: str, reason: str, *, kind: str = "other", claimed: str | None = None,
+                account: dict[str, Any] | None = None, **more: Any) -> None:
+    """Audit and refuse. The reason to the client is deliberately uniform (no oracle); the trail keeps what the Registry shows: the
+    address, the name the machine claimed, which machine the client id belongs to (if any), and why (`kind`: unknown, wrong_key, old_key,
+    stale)."""
+    peer = ctx.connection.peer
+    log.warning("auth failed for client_id=%r from %s: %s", client_id, peer, reason)
     if ctx.engine.db.connected:
-        await ctx.engine.db.audit.write({"action": "auth.failed", "target_type": "client", "target_id": client_id,
-                                         "detail": {"reason": reason, "peer": str(ctx.connection.peer)}})
+        detail: dict[str, Any] = {"reason": reason, "kind": kind, "peer": str(peer), "address": str(peer[0]) if peer else None,
+                                  "claimed_name": (str(claimed)[:120] if claimed else None), **more}
+        if account is not None:
+            detail.update(pc_id=account["bound_pc_id"], machine=account["hostname"], key_generation=account.get("key_generation") or 1)
+        await ctx.engine.db.audit.write({"action": "auth.failed", "target_type": "client", "target_id": client_id, "detail": detail})
     raise ProtocolError(ErrorCode.UNAUTHENTICATED, "authentication failed")
 
 
@@ -147,21 +154,28 @@ async def auth_respond(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         ctx.identity = await load_identity(ctx, client_id, payload.get("hostname"))
     else:
         if conn.pending_nonce is None:
-            await _fail(ctx, client_id, "no outstanding challenge (already used or never issued)")
+            await _fail(ctx, client_id, "no outstanding challenge (already used or never issued)", kind="stale", claimed=payload.get("hostname"))
         nonce, conn.pending_nonce = conn.pending_nonce, None
         if not engine.db.connected:
             # Protocol-only runs (no database): there is nobody to be, but the challenge must still be
             # answered with the key derived for the claimed client_id.
             if not verify(engine.master_secret, client_id, nonce, str(payload.get("hmac", ""))):
-                await _fail(ctx, client_id, "challenge failed")
+                await _fail(ctx, client_id, "challenge failed", kind="wrong_key", claimed=payload.get("hostname"))
             ctx.identity = Identity(client_id=client_id)
         else:
             account = await engine.db.accounts.by_client_id(client_id)
             if account is None:
-                await _fail(ctx, client_id, "client_id is not provisioned or its account is not active")
-            if not verify(engine.master_secret, client_id, nonce, str(payload.get("hmac", "")),
-                          account.get("key_generation") or 1):
-                await _fail(ctx, client_id, "challenge failed")
+                await _fail(ctx, client_id, "client_id is not provisioned or its account is not active", kind="unknown", claimed=payload.get("hostname"))
+            generation = account.get("key_generation") or 1
+            presented = str(payload.get("hmac", ""))
+            if not verify(engine.master_secret, client_id, nonce, presented, generation):
+                old = next((g for g in range(1, generation) if verify(engine.master_secret, client_id, nonce, presented, g)), None)
+                pc = await engine.db.accounts.pc(account["bound_pc_id"]) if account["bound_pc_id"] else None
+                address = str(conn.peer[0]) if conn.peer else None
+                await _fail(ctx, client_id, "challenge failed" if old is None else f"the key replaced by no. {generation} (no. {old}) was used",
+                            kind="wrong_key" if old is None else "old_key", claimed=payload.get("hostname"), account=account,
+                            same_address=(pc["last_ip"] == address) if pc and pc["last_ip"] else None,
+                            **({"old_generation": old} if old is not None else {}))
             mismatch = await _announce_hostname(ctx, account, payload.get("hostname"))
             ctx.identity = _identity_of(account, client_id)
     conn.authenticated = True

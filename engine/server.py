@@ -47,6 +47,7 @@ class Engine:
         # Generated once on the Engine host, never transmitted (spec 8.2). Loaded in start().
         self.master_secret: bytes | None = settings.master_secret
         self._server: asyncio.base_events.Server | None = None
+        self.blocked_addresses: set[str] = set()      # refused at the door (Registry); loaded in start()
 
         # Every consumer of file events subscribes to the one index -- no per-combo detection.
         from engine.control import events as control_events
@@ -87,6 +88,8 @@ class Engine:
             self.master_secret = load_or_create(self.settings.secret_path)
         await self.db.connect()
         await self.db.migrate()
+        if self.db.connected:
+            self.blocked_addresses = await self.db.registry.blocked_set()
         await self.scheduler.start()
         from engine.task import dept_tasks, tasks
 
@@ -145,7 +148,19 @@ class Engine:
         if task is not None:
             self._conn_tasks.add(task)
             task.add_done_callback(self._conn_tasks.discard)
+        peer = writer.get_extra_info("peername")
+        if peer and str(peer[0]) in self.blocked_addresses:
+            await self._refuse_blocked(str(peer[0]), writer)
+            return
         await Connection(self, reader, writer).serve()
+
+    async def _refuse_blocked(self, address: str, writer: asyncio.StreamWriter) -> None:
+        """A blocked address is closed on before the challenge. The try is still recorded, so the Registry shows it keeps trying."""
+        log.warning("refused a connection from blocked address %s", address)
+        if self.db.connected:
+            await self.db.audit.write({"action": "auth.failed", "target_type": "client", "target_id": "",
+                                       "detail": {"reason": "address blocked", "kind": "blocked", "peer": address, "address": address}})
+        writer.close()
 
     async def on_connected(self, conn: Connection) -> None:
         """After a successful handshake: a Worker or Admin occupies its own PC natively."""
