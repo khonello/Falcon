@@ -30,7 +30,7 @@ KIND_TYPES: dict[str, tuple[str, ...]] = {
     "violation": ("resource.violation", "resource.violation_resolved", "mark."),
     "task": ("task.",),
     "report": ("report.", "report_routing."),
-    "admin": ("account.", "pc.", "department.", "display_name.", "enroll.", "alert.", "audit.", "rule.", "registry.", "issue."),
+    "admin": ("account.", "admin.", "pc.", "department.", "display_name.", "enroll.", "alert.", "audit.", "rule.", "registry.", "issue."),
     "system": ("auth.",),
 }
 

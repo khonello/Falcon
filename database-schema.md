@@ -184,6 +184,13 @@ The standard the organisation is measured against, and what was measured. A **ru
 
 **`rule_watches`**: a *follow* rule being watched -- opened when its trigger happens, `due_at` = then + `within`; `state` open / kept / broken, and the deviation it produced.
 
+### Where a report came from, and the Super User's decisions (migration 025)
+**`reports`** gains `pc_id`, `department_id` and `about_account_id`, written with the report from its source (`ReportsRepo.locate`): the machine, the department it counts against, and for a report about an Admin's conduct, the Admin -- and then the department is the Admin's own, not the machine's. The department is what decides who may take a report: its Admins when the category is routed there, the Super User when nobody below can (about an Admin, no Admin in the department, or the category not routed there). Handling time is `report_addressed_views.addressed_at - reports.generated_at`.
+
+**`su_decisions`**: the Super User's answer to a decision that is theirs alone and was put aside (`wait`, `later`, `fine`): `decision_key`, `option_key`, `note`, who, when, `until_at` (a decision put aside comes back after a day unless it is for good). A decision that is acted on needs no row; what it did is its record.
+
+**`accounts.hours_limited`**: the Super User limiting an Admin to working hours; traversal into a machine outside them is refused.
+
 ---
 
 ## 4. Task

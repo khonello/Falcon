@@ -324,3 +324,16 @@ async def test_scripted_rules_and_deviations(engine, org, tmp_path: Path):
     assert "unanswered-help" in out[3] and "deviations this week" in out[4] and "B-1" in out[4]
     assert "the record shows:" in out[5] and "around it:" in out[5] and "Recorded: Restricted files stay where they are" in out[5]
     assert "D-301: Explained" in out[6] and "O-1 is off" in out[7] and "0 deviations in the last 30 days" in out[8]
+
+
+async def test_scripted_overview_board_and_decisions(engine, org, tmp_path: Path):
+    from engine.hierarchy import reports
+
+    await reports.emit(engine, "deviation", source_table="pcs", source_id=org["w1_pc"], summary="FIN-01 showed another name")
+    out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
+        "connect", "overview", "board", "decisions", "decide reports:deviation route", "decisions", "departments-board"])
+    assert "waiting on you" in out[1] and "deviations, 7 days:" in out[1]
+    assert "waiting 2" in out[2] and "unrouted" in out[2] and "handling:" in out[2]
+    assert "reports:deviation" in out[3] and "route" in out[3]
+    assert "Routed" in out[4] and "1 still waiting" in out[4]                       # the client's own name mismatch has no department to route to
+    assert "reports:deviation" in out[5] and "Finance" in out[6] and "HR" in out[6]

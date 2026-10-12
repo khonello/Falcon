@@ -127,3 +127,16 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   an Action on the machine. TUI: `rules`, `rule`, `rule add|on|off|try|library`, `deviations`, `deviation <id>`, `deviation outcome`
   (the old raw log is now `expectations`). *Test:* `tests/test_console_rules.py`, `test_operator_client.py`.
 
+- **WP5 Overviews and Reports statistics** (12 Oct 2026). A report now records where it came from (machine, department, the Admin it is about) and
+  `reports.board {days?, department_id?}` says whose each one is (`dept`, or the Super User's because it is `fixed` -- about an Admin --, `noadmin` or
+  `unrouted`), who addressed it and in how many minutes, with the strip (waiting, with the department, addressed, typical time) and per-department
+  *Handling* (all / done / waiting / to you / median). `overview.queue` is the Super User's decisions, worst first, each with its options and their
+  effects: reports nobody below can take (mark addressed, route the category, open the seat decision, leave a machine out of the next version's gate,
+  ask / limit / note an Admin), a department with no Admin (promote one of its Workers, provision a new Admin; an Admin from another department is
+  drawn disabled with the reason -- an Admin belongs to one department), a department's work called done (complete / send back). `overview.decide`
+  carries one out through the same handler the console would otherwise call. `overview.su` (four figures, deviations by day and severity, Worth a
+  look), `overview.admin` (Waiting on you, machines online, open issues, sessions held) and `overview.departments` (Admins, vacancies, machines,
+  issues, on the current version, median time to address, reports) feed both Overviews. New: `hierarchy.admin_promote`, `hierarchy.admin_limit`
+  (traversal refuses a limited Admin outside working hours). The version gate decision plugs in through `overview.CARD_SOURCES` / `DECIDERS` and
+  arrives with WP7. TUI: `overview`, `departments-board`, `board`, `decisions`, `decide`, `promote`, `admin limit`. *Test:*
+  `tests/test_console_overview.py`, `test_operator_client.py`.

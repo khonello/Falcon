@@ -201,14 +201,14 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if not can_traverse_to(ident.role, target["pc_type"]):
         raise ProtocolError(ErrorCode.FORBIDDEN, f"{ident.role} cannot traverse into a {target['pc_type']}")
     require_department_scope(ident, target["department_id"])
+    if ident.role == "admin" and outside_working_hours(ctx.engine.settings.working_hours):
+        me = await db.accounts.by_id(ident.account_id)
+        if me and me["hours_limited"]:
+            raise ProtocolError(ErrorCode.FORBIDDEN, "the Super User has limited you to working hours")
     if target["id"] == ident.pc_id:
         raise ProtocolError(ErrorCode.INVALID, "that is your own pc")
     if ctx.engine.settings.refuse_unreachable and pc_id not in ctx.engine.online_pc_ids():
         seen = target["last_seen_at"]
-        raise ProtocolError(ErrorCode.UNAVAILABLE, f"{target['hostname']} is not reachable"
-                            + (f" (last seen {seen.isoformat(timespec='minutes')})" if seen else " (never connected)"))
-    if ctx.engine.settings.refuse_unreachable and pc_id not in ctx.engine.online_pc_ids():
-        seen = target.get("last_seen_at")
         raise ProtocolError(ErrorCode.UNAVAILABLE, f"{target['hostname']} is not reachable"
                             + (f" (last seen {seen.isoformat(timespec='minutes')})" if seen else " (never connected)"))
 

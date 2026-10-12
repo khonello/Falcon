@@ -124,6 +124,52 @@ async def account_offboard(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     return {"account_id": account_id, "status": "offboarded"}
 
 
+@handler("hierarchy.admin_promote")
+async def admin_promote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"account_id"} -- Super User only. A Worker becomes an Admin of the department they already work in. Their machine becomes an
+    Admin workstation and gets a new key (returned once: the install on it must be redone with it); what was installed as a Worker's
+    stops working. A department with no Admin is how this is usually reached, but it is allowed to give a department another."""
+    require_role(ctx, "super_user")
+    account_id = int_field(payload, "account_id")
+    db = ctx.engine.db
+    subject = await db.accounts.by_id(account_id)
+    if subject is None or subject["status"] != "active":
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such active account")
+    if subject["role"] != "worker":
+        raise ProtocolError(ErrorCode.CONFLICT, f"only a Worker can be promoted (this is a {subject['role']})")
+    from engine.hierarchy import traversal
+
+    session = await db.sessions.active_for_account(account_id)
+    if session is not None and session["occupied_via"] != "native":
+        await traversal.end_session(ctx.engine, session, "superior_ended", actor=ctx)
+    generation = await db.accounts.promote(account_id)
+    await ctx.engine.audit.record(ctx, "account.promoted", target_type="accounts", target_id=account_id,
+                                  detail={"department_id": subject["department_id"], "pc_id": subject["bound_pc_id"], "key_generation": generation})
+    for conn in list(ctx.engine.connections):
+        if conn.ctx.identity is not None and conn.ctx.identity.pc_id == subject["bound_pc_id"]:
+            conn.writer.close()                  # the machine reconnects with the key it is given now
+    return {"account_id": account_id, "role": "admin", "department_id": subject["department_id"], "pc_id": subject["bound_pc_id"],
+            "client_id": subject["client_id"], "key_generation": generation,
+            "client_key": ctx.engine.client_key(subject["client_id"], generation)}
+
+
+@handler("hierarchy.admin_limit")
+async def admin_limit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"account_id", "on": bool} -- Super User only. Limit an Admin to working hours (they cannot enter a machine outside them), or lift it."""
+    require_role(ctx, "super_user")
+    account_id = int_field(payload, "account_id")
+    on = payload.get("on", True)
+    if not isinstance(on, bool):
+        raise ProtocolError(ErrorCode.INVALID, "on must be true or false")
+    subject = await ctx.engine.db.accounts.by_id(account_id)
+    if subject is None or subject["role"] != "admin" or subject["status"] != "active":
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such active Admin")
+    await ctx.engine.db.accounts.set_hours_limited(account_id, on)
+    await ctx.engine.audit.record(ctx, "admin.limited" if on else "admin.limit_lifted", target_type="accounts", target_id=account_id)
+    await ctx.engine.push_to_account(account_id, "account.limited", {"on": on, "working_hours": ctx.engine.settings.working_hours})
+    return {"account_id": account_id, "hours_limited": on}
+
+
 @handler("hierarchy.account_get")
 async def account_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")

@@ -76,6 +76,8 @@ class Database:
         self.rules = RulesRepo(self)
         self.flows = FlowsRepo(self)
         self.reports = ReportsRepo(self)
+        self.decisions = DecisionsRepo(self)
+        self.overview = OverviewRepo(self)
         self.assistance = AssistanceRepo(self)
         self.control = ControlRepo(self)
         self.audit = AuditRepo(self)
@@ -182,7 +184,7 @@ class _Repo:
 
 class AccountsRepo(_Repo):
     _ACCOUNT_COLS = ("a.id, a.role, a.department_id, a.bound_pc_id, a.self_display_name, "
-                     "a.status, a.assistance_available, a.created_at, "
+                     "a.status, a.assistance_available, a.hours_limited, a.created_at, "
                      "p.hostname, p.pc_type, p.client_id, p.key_generation, p.last_seen_at, d.name AS department_name")
     _ACCOUNT_FROM = ("FROM accounts a LEFT JOIN pcs p ON p.id = a.bound_pc_id "
                      "LEFT JOIN departments d ON d.id = a.department_id")
@@ -219,6 +221,17 @@ class AccountsRepo(_Repo):
         """Status flag only -- never DELETE (Offboarding & Deprovisioning)."""
         await self._exec(
             "UPDATE accounts SET status = 'offboarded', offboarded_at = now() WHERE id = $1", account_id)
+
+    async def set_hours_limited(self, account_id: int, on: bool) -> None:
+        await self._exec("UPDATE accounts SET hours_limited = $2 WHERE id = $1", account_id, on)
+
+    async def promote(self, account_id: int) -> int:
+        """A Worker becomes an Admin of their own department: the account and its machine change kind, and the machine gets a new key
+        (returned: the generation), so what was installed as a Worker's stops working."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            pc_id = await conn.fetchval("UPDATE accounts SET role = 'admin' WHERE id = $1 RETURNING bound_pc_id", account_id)
+            return await conn.fetchval(
+                "UPDATE pcs SET pc_type = 'admin_workstation', key_generation = key_generation + 1 WHERE id = $1 RETURNING key_generation", pc_id)
 
     async def set_self_name(self, account_id: int, label: str | None) -> None:
         await self._exec("UPDATE accounts SET self_display_name = $2 WHERE id = $1", account_id, label)
@@ -1290,9 +1303,59 @@ class ReportsRepo(_Repo):
         report_addressed_views."""
         if source_table not in POLYMORPHIC_TABLES:
             raise ValueError(f"unknown report source table {source_table!r}")
+        where = await self.locate(source_table, source_id)
+        if category == "about_admin" and where["about_account_id"] is not None:
+            # an Admin's own conduct counts against the Admin's own department, whichever machine it was on
+            who = await self._one("SELECT department_id FROM accounts WHERE id = $1", where["about_account_id"])
+            where["department_id"] = who["department_id"] if who else where["department_id"]
         return await self._val(
-            "INSERT INTO reports (category, source_table, source_id, summary) VALUES ($1, $2, $3, $4) RETURNING id",
-            category, source_table, source_id, summary)
+            "INSERT INTO reports (category, source_table, source_id, summary, pc_id, department_id, about_account_id) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+            category, source_table, source_id, summary, where["pc_id"], where["department_id"], where["about_account_id"])
+
+    _LOCATE: ClassVar[dict[str, str]] = {
+        "deviations": "SELECT d.pc_id, d.department_id, CASE WHEN d.kind = 'admin' THEN d.subject_account_id END AS about_account_id "
+                      "FROM deviations d WHERE d.id = $1",
+        "flow_destinations": "SELECT x.destination_pc_id AS pc_id, p.department_id, NULL::int AS about_account_id FROM flow_destinations x "
+                             "LEFT JOIN pcs p ON p.id = x.destination_pc_id WHERE x.id = $1",
+        "assisted_access_requests": "SELECT NULL::int AS pc_id, r.target_department_id AS department_id, NULL::int AS about_account_id "
+                                    "FROM assisted_access_requests r WHERE r.id = $1",
+        "sessions": "SELECT s.pc_id, p.department_id, s.occupant_account_id AS about_account_id FROM sessions s "
+                    "JOIN pcs p ON p.id = s.pc_id WHERE s.id = $1",
+        "message_channels": "SELECT NULL::int AS pc_id, a.department_id, NULL::int AS about_account_id FROM message_channels c "
+                            "JOIN accounts a ON a.id = c.initiator_account_id WHERE c.id = $1",
+        "resource_violations": "SELECT v.found_on_pc_id AS pc_id, p.department_id, NULL::int AS about_account_id FROM resource_violations v "
+                               "JOIN pcs p ON p.id = v.found_on_pc_id WHERE v.id = $1",
+        "pcs": "SELECT p.id AS pc_id, p.department_id, NULL::int AS about_account_id FROM pcs p WHERE p.id = $1",
+        "departments": "SELECT NULL::int AS pc_id, d.id AS department_id, NULL::int AS about_account_id FROM departments d WHERE d.id = $1",
+        "pc_version_status": "SELECT s.pc_id, p.department_id, NULL::int AS about_account_id FROM pc_version_status s "
+                             "JOIN pcs p ON p.id = s.pc_id WHERE s.id = $1",
+    }
+
+    async def locate(self, source_table: str, source_id: int) -> dict[str, Any]:
+        """Where a report's source happened: the machine, the department it counts against, and (for conduct) the Admin."""
+        sql = self._LOCATE.get(source_table)
+        found = await self._one(sql, source_id) if sql else None
+        return {"pc_id": None, "department_id": None, "about_account_id": None, **(found or {})}
+
+    async def board(self, *, since: datetime, department_id: int | None = None, routed_to: int | None = None,
+                    reader_id: int | None = None) -> list[dict[str, Any]]:
+        """Reports written since a time, each with who addressed it and when. `routed_to` limits to what a department's Admins see."""
+        return await self._fetch(
+            "SELECT r.id, r.category, r.summary, r.source_table, r.source_id, r.generated_at, r.pc_id, r.department_id, r.about_account_id, "
+            "p.hostname, d.name AS department_name, v.addressed_by_account_id, v.addressed_at, "
+            "(SELECT s.seen_at FROM report_seen s WHERE s.report_id = r.id AND s.account_id = $4) AS seen_at "
+            "FROM reports r LEFT JOIN pcs p ON p.id = r.pc_id LEFT JOIN departments d ON d.id = r.department_id "
+            "LEFT JOIN LATERAL (SELECT addressed_by_account_id, addressed_at FROM report_addressed_views w WHERE w.report_id = r.id "
+            "                   ORDER BY w.addressed_at DESC LIMIT 1) v ON TRUE "
+            "WHERE r.generated_at >= $1 AND ($2::int IS NULL OR r.department_id = $2) "
+            "AND ($3::int IS NULL OR EXISTS (SELECT 1 FROM report_routing_config c WHERE c.category = r.category AND c.routed_department_id = $3 "
+            "    AND (c.includes_earlier OR r.generated_at >= c.configured_at))) "
+            "ORDER BY r.generated_at DESC", since, department_id, routed_to, reader_id)
+
+    async def routing_pairs(self) -> set[tuple[str, int]]:
+        return {(r["category"], r["routed_department_id"]) for r in await self._fetch(
+            "SELECT category, routed_department_id FROM report_routing_config")}
 
     # Per reader: when this reader first opened the report, and when anyone addressed it.
     _READER_COLS = (
@@ -1372,6 +1435,53 @@ class ReportsRepo(_Repo):
             "SELECT v.*, r.category, a.department_id AS addressed_by_department_id "
             "FROM report_addressed_views v JOIN reports r ON r.id = v.report_id "
             "JOIN accounts a ON a.id = v.addressed_by_account_id ORDER BY v.addressed_at DESC LIMIT $1", limit)
+
+
+class DecisionsRepo(_Repo):
+    """The Super User's answers to decisions that are theirs alone (keep waiting; it was expected), so a card does not return at once."""
+
+    async def record(self, key: str, option: str, note: str | None, by_account_id: int, until_at: datetime | None = None) -> int:
+        return await self._val(
+            "INSERT INTO su_decisions (decision_key, option_key, note, by_account_id, until_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            key, option, note, by_account_id, until_at)
+
+    async def held_keys(self) -> set[str]:
+        """Decisions put aside and still within their time (no end time: for good)."""
+        return {r["decision_key"] for r in await self._fetch(
+            "SELECT DISTINCT ON (decision_key) decision_key, option_key, until_at FROM su_decisions ORDER BY decision_key, at DESC")
+            if r["option_key"] in ("wait", "later", "fine") and (r["until_at"] is None or r["until_at"] > _now())}
+
+
+class OverviewRepo(_Repo):
+    """Figures the Overviews and the Reports page add up."""
+
+    async def deviations_by_day(self, since: datetime, department_id: int | None = None) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT date_trunc('day', at) AS day, severity, count(*) AS n FROM deviations WHERE at >= $1 "
+            "AND ($2::int IS NULL OR department_id = $2) GROUP BY 1, 2 ORDER BY 1", since, department_id)
+
+    async def tasks_to_verify(self, assigner_id: int) -> int:
+        """Tasks this person gave out whose checks have all passed (or that have none and were started): theirs to close."""
+        return await self._val(
+            "SELECT count(*) FROM tasks t WHERE t.assigner_account_id = $1 AND t.status <> 'completed' AND ("
+            " (SELECT count(*) FROM verification_items v WHERE v.task_id = t.id) > 0 AND NOT EXISTS "
+            "   (SELECT 1 FROM verification_items v WHERE v.task_id = t.id AND v.status <> 'passed') "
+            " OR (t.verification_mode = 'none' AND t.status = 'in_progress'))", assigner_id)
+
+    async def sessions_held(self, department_id: int | None = None) -> int:
+        """Sessions open now that someone other than the machine's own person holds."""
+        return await self._val(
+            "SELECT count(*) FROM sessions s JOIN pcs p ON p.id = s.pc_id WHERE s.ended_at IS NULL AND s.occupied_via <> 'native' "
+            "AND ($1::int IS NULL OR p.department_id = $1)", department_id)
+
+    async def issue_handling(self, since: datetime) -> list[dict[str, Any]]:
+        """Issues resolved since a time, with the minutes it took, by department: what 'median time to address' is read from."""
+        return await self._fetch(
+            "SELECT department_id, EXTRACT(EPOCH FROM (resolved_at - opened_at)) / 60 AS minutes FROM issues "
+            "WHERE resolved_at >= $1 AND department_id IS NOT NULL", since)
+
+    async def pings_waiting(self, receiver_id: int) -> int:
+        return await self._val("SELECT count(*) FROM pings WHERE receiver_account_id = $1 AND addressed_at IS NULL", receiver_id)
 
 
 # ============================================================================================
