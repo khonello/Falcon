@@ -170,3 +170,13 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   `control.event_test {event_id, pc_id}` is *Test on one machine*: it runs the rule's actions once on a machine it applies to and is online, as a run by hand
   (not a firing). `control.event_history` now says how each run ended. An Admin sees their department's machines only. TUI: `automation`, `action board`, `runs`, `event test`,
   `event add ... name=`. *Test:* `tests/test_console_automation.py`, `test_operator_client.py`.
+
+- **WP9 Session window** (12 Oct 2026). `hierarchy.traverse` takes `mode`: `control` (default, as before: the person is locked out and told who is working on their machine) or `see`
+  (they keep working and the Worker shows a bar, "X is viewing your screen", that never takes a click). `session.screen {session_id, action: start|stop, width?, fps?}` turns the picture of
+  the machine on or off for whoever entered it (a traversal only -- never an invited helper's session, never a person's own), returning the time left; the machine's Worker captures the
+  primary screen (stdlib GDI + PNG, only when it changed, at most `fps` a second, never queued) and sends `session.frame`, which the Engine passes to the viewer alone. `session.control
+  {session_id, mode}` switches see / control while the session lasts (the person is told at once; `control` also blocks their own keyboard and mouse with `BlockInput`, which Windows
+  ends if the process dies and Ctrl+Alt+Del always overrides); `session.input {session_id, events}` carries the console's mouse and keyboard as fractions of the screen (move, down, up,
+  wheel, key, text; at most 200 a call; control mode only) and the Worker applies it with `SendInput`. It all ends with the session -- left, ended by a superior, expired -- or when either
+  connection drops. Start, stop, mode changes and how long it lasted are audited; input itself is not. TUI: `traverse ... mode=`, `screen start|stop|shot|mode|click|type`.
+  *Test:* `tests/test_console_screens.py`, `test_worker_client.py` (input plan, streamer, lockout), `test_operator_client.py`.

@@ -736,3 +736,72 @@ async def test_the_worker_shows_the_ask_to_delete_a_copy_and_retries_an_update_n
     finally:
         await admin.close()
         await svc.stop()
+
+
+def test_the_consoles_input_becomes_send_input_steps_and_malformed_events_are_dropped():
+    from worker_client.screenstream import ABSOLUTE, KEYUP, UNICODE, WHEEL, plan
+
+    steps = plan([{"t": "move", "x": 0.5, "y": 2.0}, {"t": "down", "button": "right", "x": 0, "y": 1}, {"t": "up", "button": "left", "x": 0, "y": 0},
+                  {"t": "wheel", "delta": 99999}, {"t": "key", "vk": 0x141, "down": False}, {"t": "text", "text": "é"},
+                  {"t": "move"}, {"t": "down", "x": "no", "y": 0}, {"t": "bogus"}, {"t": "down", "button": "side", "x": 0, "y": 0}])
+    assert steps[0] == ("mouse", 0x0001 | ABSOLUTE, 32767, 65535, 0)                    # clamped to the screen
+    assert steps[1] == ("mouse", 0x0001 | ABSOLUTE | 0x0008, 0, 65535, 0) and steps[2] == ("mouse", 0x0001 | ABSOLUTE | 0x0004, 0, 0, 0)
+    assert steps[3] == ("mouse", WHEEL, 0, 0, 1200)                                      # one notch of the wheel is never more than a few at a time
+    assert steps[4] == ("key", 0x41, 0, KEYUP)                                            # the virtual-key code is one byte
+    assert steps[5:] == [("key", 0, ord("é"), UNICODE), ("key", 0, ord("é"), UNICODE | KEYUP)]    # the malformed ones produced nothing
+
+
+async def test_the_screen_streamer_sends_changed_pictures_not_faster_than_asked_and_stops_when_told():
+    from worker_client.screenstream import ScreenStreamer
+
+    sent: list[dict] = []
+    pictures = [b"one", b"one", b"two"]
+    keep = {"value": True}
+
+    async def report(type_, payload):
+        sent.append(payload)
+        return {"keep": keep["value"]}
+
+    calls = {"n": 0}
+
+    def capture(width):
+        picture = pictures[min(calls["n"], len(pictures) - 1)]
+        calls["n"] += 1
+        return 1920, 1080, width, 540, picture
+
+    streamer = ScreenStreamer(report, capture=capture)
+    streamer.start(7, 960, 5)
+    for _ in range(100):
+        if len(sent) >= 2:
+            break
+        await asyncio.sleep(0.05)
+    assert [s["session_id"] for s in sent[:2]] == [7, 7] and sent[0]["w"] == 960 and sent[0]["screen_w"] == 1920
+    assert sent[0]["png_b64"] != sent[1]["png_b64"]                                   # the unchanged second picture was not sent again
+    assert streamer.active == {7}
+    keep["value"] = False                                                              # the Engine says stop in its reply
+    for _ in range(100):
+        if not streamer.active:
+            break
+        await asyncio.sleep(0.05)
+    assert streamer.active == set()
+    streamer.start(8, 640, 1)
+    streamer.stop(8)
+    await streamer.shutdown()
+    assert streamer.active == set()
+
+
+def test_the_lockout_tells_viewing_from_blocking():
+    from worker_client.lockout import Lockout
+
+    lock = Lockout()
+    blocked, viewed = [], []
+    lock.on_change(blocked.append)
+    lock.on_view_change(viewed.append)
+    lock.view({"occupant_name": "R. Mensah"})
+    assert lock.viewing_by and not lock.is_blocked and viewed == [lock.viewing_by]
+    lock.block({"occupant_name": "R. Mensah"})                                         # control: the cover replaces the bar
+    assert lock.is_blocked and lock.viewing_by is None and viewed[-1] is None and blocked[-1]["occupant_name"] == "R. Mensah"
+    lock.view({"occupant_name": "R. Mensah"})                                          # back to looking: the cover goes, the bar returns
+    assert not lock.is_blocked and blocked[-1] is None and viewed[-1]["occupant_name"] == "R. Mensah"
+    lock.release()
+    assert lock.viewing_by is None and viewed[-1] is None

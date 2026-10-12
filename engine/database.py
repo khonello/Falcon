@@ -368,11 +368,14 @@ class AccountsRepo(_Repo):
 
 class SessionsRepo(_Repo):
     _COLS = ("s.id, s.pc_id, s.occupant_account_id, s.occupied_via, s.entered_at, s.deadline_at, "
-             "s.extended_count, s.un_evictable, s.ended_at, s.ended_reason, a.role AS occupant_role")
+             "s.extended_count, s.un_evictable, s.ended_at, s.ended_reason, s.view_mode, a.role AS occupant_role")
     _FROM = "FROM sessions s JOIN accounts a ON a.id = s.occupant_account_id"
 
     async def by_id(self, session_id: int) -> dict[str, Any] | None:
         return await self._one(f"SELECT {self._COLS} {self._FROM} WHERE s.id = $1", session_id)
+
+    async def set_view_mode(self, session_id: int, mode: str) -> None:
+        await self._exec("UPDATE sessions SET view_mode = $2 WHERE id = $1", session_id, mode)
 
     async def active_for_pc(self, pc_id: int) -> dict[str, Any] | None:
         return await self._one(

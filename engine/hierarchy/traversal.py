@@ -33,6 +33,7 @@ from engine.permissions import (
     require_account,
     require_department_scope,
     require_role,
+    str_field,
 )
 from protocol import ErrorCode, ProtocolError
 
@@ -68,6 +69,7 @@ def _session_view(s: dict[str, Any], names: dict[int, str]) -> dict[str, Any]:
         "entered_at": s["entered_at"].isoformat(),
         "deadline_at": s["deadline_at"].isoformat() if s["deadline_at"] else None,
         "extended_count": s["extended_count"],
+        "view_mode": s.get("view_mode", "control"),
         "un_evictable": s["un_evictable"],
         # Conditional Rendering / Traversal-Restricted Files apply to a traversing Admin, never
         # to Super User (Traversal Boundaries -> Super User Exemption).
@@ -90,7 +92,7 @@ async def claim_native_session(engine: Engine, ctx: Context) -> int | None:
             return active["id"]
         # Someone has traversed in: this client is blocked until that session ends.
         names = await engine.db.accounts.display_names_for(ident.account_id, [active["occupant_account_id"]])
-        await ctx.connection.push("session.blocked", _session_view(active, names))
+        await ctx.connection.push("session.viewing" if active.get("view_mode") == "see" else "session.blocked", _session_view(active, names))
         return None
     session_id = await engine.db.sessions.open(ident.pc_id, ident.account_id, "native", None, False)
     ctx.active_session_id = session_id
@@ -117,6 +119,9 @@ async def end_session(engine: Engine, session: dict[str, Any], reason: str, *,
                                       "occupant_account_id": session["occupant_account_id"],
                                       "duration_seconds": duration})
     payload = {"session_id": session["id"], "pc_id": session["pc_id"], "reason": reason}
+    from engine.console import screens
+
+    await screens.stop(engine, session["id"], "the session ended")
     await engine.push_to_account(session["occupant_account_id"], "session.ended", payload)
     if session["occupied_via"] != "native":
         # The PC's own user may re-claim; their client re-sends hierarchy.claim_native.
@@ -185,7 +190,7 @@ def outside_working_hours(hours: str, now: datetime | None = None) -> bool:
 
 @handler("hierarchy.traverse")
 async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Enter a target PC's session. {"pc_id": int, "force": bool}
+    """Enter a target PC's session. {"pc_id": int, "force": bool, "mode"?: "control" (default: the person at the machine is locked out) | "see" (they keep working and are shown a bar)}
 
     `force` = block-or-end-first; honoured only for vertical relationships and never against
     an un-evictable (Super User) occupant.
@@ -193,6 +198,7 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     pc_id = int_field(payload, "pc_id")
     force = bool(payload.get("force", False))
+    mode = str_field(payload, "mode", choices=("see", "control"), required=False) or "control"
     db = ctx.engine.db
 
     target = await db.accounts.pc(pc_id)
@@ -247,6 +253,8 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     except Conflict as exc:  # raced with another entrant
         raise ProtocolError(ErrorCode.CONFLICT, "pc became occupied; try again") from exc
     ctx.active_session_id = session_id
+    if mode != "control":
+        await db.sessions.set_view_mode(session_id, mode)
     session = await db.sessions.by_id(session_id)
     assert session is not None
     after_hours = ident.role == "admin" and outside_working_hours(ctx.engine.settings.working_hours)
@@ -260,7 +268,7 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                            summary=f"An Admin entered {target['hostname']} outside working hours")
     names = await db.accounts.display_names_for(target["bound_account_id"] or ident.account_id, [ident.account_id])
     view = _session_view(session, names)
-    await ctx.engine.push_to_pc(pc_id, "session.blocked", view)
+    await ctx.engine.push_to_pc(pc_id, "session.blocked" if mode == "control" else "session.viewing", view)
     my_names = await db.accounts.display_names_for(ident.account_id, [ident.account_id])
     return {"session": _session_view(session, my_names), "already_occupying": False}
 

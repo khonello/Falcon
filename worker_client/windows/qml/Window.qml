@@ -15,6 +15,7 @@ Window {
     id: win
 
     readonly property bool covers: kind === "blocked" || kind === "locked"
+    readonly property bool bar: kind === "viewing"      // a small notice at the top of the screen that the click goes through
 
     readonly property color pane: "#ffffff"
     readonly property color ground: "#fafafa"
@@ -33,10 +34,11 @@ Window {
     color: "transparent"
     title: "Falcon"
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | (covers ? Qt.WindowDoesNotAcceptFocus : 0)
+           | (bar ? (Qt.WindowDoesNotAcceptFocus | Qt.WindowTransparentForInput) : 0)
     width: backdrop ? 1440 : covers ? Screen.width : card.width + 48
     height: backdrop ? 900 : covers ? Screen.height : card.height + 48
-    x: backdrop || covers ? 0 : Screen.width - width - 24
-    y: backdrop || covers ? 0 : Screen.height - height - 64
+    x: backdrop || covers ? 0 : bar ? (Screen.width - width) / 2 : Screen.width - width - 24
+    y: backdrop || covers ? 0 : bar ? 0 : Screen.height - height - 64
 
     function when(iso) {
         if (!iso) return ""
@@ -65,7 +67,7 @@ Window {
 
     Rectangle {
         id: card
-        width: kind === "task" ? 460 : 360
+        width: kind === "task" ? 460 : bar ? 300 : 360
         height: body.implicitHeight + 44
         anchors.centerIn: win.covers || backdrop ? parent : undefined
         x: 24; y: 24
@@ -93,6 +95,15 @@ Window {
                        font.family: win.sans; font.pixelSize: 13
                        text: "You can use it again when they leave" + (spec.deadline_at ? ", " + win.howLong(spec.deadline_at) : "")
                              + ". You don't need to do anything." }
+            }
+
+            // --- someone is looking at your screen; you keep working -----------------------------------------
+            Row {
+                visible: kind === "viewing"
+                spacing: 8
+                Glyph { name: "shield"; size: 16; color: win.dim; anchors.verticalCenter: parent.verticalCenter }
+                Text { anchors.verticalCenter: parent.verticalCenter; color: win.ink; font.family: win.sans; font.pixelSize: 13
+                       text: (spec.occupant_name || "Your Admin") + " is viewing your screen" }
             }
 
             // --- the screen, locked --------------------------------------------------------------------------

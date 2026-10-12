@@ -14,6 +14,7 @@ from operator_client.tui.commands import (  # noqa: F401
     registry,
     reports,
     resource,
+    screen,
     system,
     task,
     updates,

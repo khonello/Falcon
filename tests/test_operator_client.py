@@ -365,3 +365,31 @@ async def test_scripted_automation_and_actions_board(engine, org, tmp_path: Path
     assert "1 rules, 1 on" in out[3] and "Tell_on_USB" in out[3] and "runs per day:" in out[3]
     assert "1 actions" in out[4] and "Tell" in out[4] and "1 rule(s)" in out[4]
     assert "0 runs" in out[5]
+
+
+async def test_scripted_session_window(engine, org, tmp_path: Path):
+    from common.connection import EngineConnection as Raw
+
+    w1 = Raw("127.0.0.1", engine.port, client_id="cid-w1", tls=False, derived_key=key_for("cid-w1"), hostname="FIN-01")
+    await w1.connect()
+    shot = tmp_path / "frame.png"
+
+    async def send_frames() -> None:
+        for _ in range(60):
+            await asyncio.sleep(0.1)
+            try:
+                await w1.call("session.frame", {"session_id": 3, "w": 4, "h": 2, "screen_w": 8, "screen_h": 4, "png_b64": "iVBORw0KGgo="})
+            except Exception:  # noqa: BLE001, S110
+                pass
+
+    try:
+        task = asyncio.create_task(send_frames())
+        out = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+            "connect", f"traverse {org['w1_pc']} force mode=see", "screen start 3", f"screen shot 3 {shot} wait=4", "screen click 3 0.5 0.5",
+            "screen mode 3 control", "screen click 3 0.5 0.5", "screen type 3 hello", "screen stop 3"])
+        task.cancel()
+    finally:
+        await w1.close()
+    assert "entered" in out[1] and "picture on (see)" in out[2] and "saved 4x2" in out[3] and shot.read_bytes()[:4] == b"\x89PNG"
+    assert "only looking" in out[4]
+    assert "now control" in out[5] and "clicked" in out[6] and "typed" in out[7] and "picture off" in out[8]

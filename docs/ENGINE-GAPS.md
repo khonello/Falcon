@@ -211,3 +211,7 @@ part is recorded for later, not built.
 - `flow.list` shapes and hostnames, `index.folders` (Flows).
 - `resource.shelves`: files per tier across the department (Resources).
 - `auth.respond` says a hostname mismatch back to the client; `hierarchy.session_state` says how long an Extend adds.
+
+- **The session window under the Windows service** (12 Oct 2026, WP9). `worker_client/screenstream.py` captures the screen and applies input from the Worker process itself, which is right while the
+  Worker runs in the person's session. As a Windows service (packaging, on hold) it runs in session 0, whose desktop is empty, so capture and input move into the person's-session helper like the
+  `screenshot` built-in and the foreground reading: the Engine side (`session.screen`, `session.frame`, `session.input`) does not change.

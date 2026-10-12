@@ -25,6 +25,7 @@ from worker_client.flowsync import FlowSync
 from worker_client.inventory import Inventory
 from worker_client.lockout import Lockout
 from worker_client.ossignals import OsSignals
+from worker_client.screenstream import RemoteInput, ScreenStreamer
 from worker_client.signals import Signals
 from worker_client.updater import Updater
 from worker_client.watcher import Watcher
@@ -47,6 +48,8 @@ class WorkerService:
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
         self.ossignals = OsSignals(self.call)
+        self.screens = ScreenStreamer(self.call)             # a superior who entered this machine looking at it
+        self.remote_input = RemoteInput()                    # ... and, in control mode, using it
         self.inventory = Inventory(self.call)
         self._native_watch = native_watch
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
@@ -60,11 +63,13 @@ class WorkerService:
         self.pushes_handled = 0
         # the Worker's windows (WR01, TK07): the block overlay follows the lockout; a new task opens its window
         self._overlay: Any = None
+        self._viewbar: Any = None
         self._tray: Any = None
         self._tray_task: asyncio.Task[None] | None = None
         self._window_tasks: set[asyncio.Task[None]] = set()
         if config.windows:
             self.lockout.on_change(self._on_block_changed)
+            self.lockout.on_view_change(self._on_view_changed)
 
     # --- lifecycle ------------------------------------------------------------------------------
 
@@ -87,6 +92,8 @@ class WorkerService:
             self._tray_task.cancel()
         if self._tray is not None:
             self._tray.close()
+        await self.screens.shutdown()
+        self.remote_input.stop()
         await self.watcher.stop()
         await self.signals.stop()
         await self.ossignals.stop()
@@ -161,10 +168,26 @@ class WorkerService:
             if type_ == "session.blocked":
                 if payload.get("pc_id") == self.identity.pc_id and payload.get("occupant_account_id") != self.identity.account_id:
                     self.lockout.block(payload)
+            elif type_ == "session.viewing":
+                if payload.get("pc_id") == self.identity.pc_id and payload.get("occupant_account_id") != self.identity.account_id:
+                    self.lockout.view(payload)
+                    self.remote_input.control(False)
             elif type_ == "session.released":
                 if payload.get("pc_id") == self.identity.pc_id:
+                    self.screens.stop()
+                    self.remote_input.control(False)
                     self.lockout.release()
                     await self._reclaim()
+            elif type_ == "screen.start":
+                self.screens.start(int(payload["session_id"]), int(payload.get("width") or 1280), int(payload.get("fps") or 2))
+                self.remote_input.control(payload.get("mode") == "control")
+            elif type_ == "screen.stop":
+                self.screens.stop(int(payload["session_id"]))
+                self.remote_input.control(False)
+            elif type_ == "screen.mode":
+                self.remote_input.control(payload.get("mode") == "control" and bool(self.screens.active))
+            elif type_ == "screen.input":
+                self.remote_input.apply(list(payload.get("events") or []))
             elif type_ == "session.ended":
                 if payload.get("session_id") == self.native_session_id:
                     self.native_session_id = None
@@ -218,6 +241,23 @@ class WorkerService:
             self._overlay = None
         if blocked_by is not None:
             self._spawn(self._open_overlay(blocked_by))
+
+    def _on_view_changed(self, viewing_by: dict[str, Any] | None) -> None:
+        """Someone is looking at this machine and the person keeps working: a small bar says who, until they leave."""
+        if self._viewbar is not None:
+            self._viewbar.close()
+            self._viewbar = None
+        if viewing_by is not None:
+            self._spawn(self._open_viewbar(viewing_by))
+
+    async def _open_viewbar(self, viewing_by: dict[str, Any]) -> None:
+        from worker_client.windows.spawn import open_window
+
+        handle = await open_window("viewing", {"occupant_name": viewing_by.get("occupant_name")})
+        if handle is not None and self.lockout.viewing_by is not None:
+            self._viewbar = handle
+        elif handle is not None:
+            handle.close()
 
     async def _open_overlay(self, blocked_by: dict[str, Any]) -> None:
         from worker_client.windows.spawn import open_window

@@ -200,6 +200,9 @@ The standard the organisation is measured against, and what was measured. A **ru
 ### Automation names (migration 028)
 **`event_definitions.name`** (nullable): the name a person gave an automation ("Snapshot a USB drive when it is inserted"); without one the console words the rule from what it watches for (`engine/console/automation.py` `when_of`). Nothing else about how a rule is stored changes. The Automation and Actions pages are read from `action_executions` (outcome: `success` / `failed` / `terminated` + `terminated_reason` timeout or manual, i.e. Success / Failed / Timed out / Stopped by you; no `triggered_by_event_definition_id` means run by hand) and from `event.fired` in the audit trail (how often a rule fired, on which machine).
 
+### How a session is entered (migration 029)
+**`sessions.view_mode`** (`see` | `control`, default `control`): entering a machine says how. `see`: the person at it keeps working and is shown a bar saying who is looking; `control`: they are locked out and told who is working on their machine (what entering always did). It can change while the session lasts and never changes who may enter. The picture of the machine and the console's mouse and keyboard are not stored: they travel as `session.frame` / `session.input` while a stream is on (`engine/console/screens.py`), and only the start, the stop, the mode changes and how long it lasted are audited.
+
 ---
 
 ## 4. Task

@@ -10,13 +10,14 @@ window and prints the person's answer as one JSON line on stdout, then exits:
     locked    "Locked by your Admin"               -- stays until the service closes it
     ask       ask your Admin for help: one message, then wait for their reply
     task      a task given to you: what it is, when it is due, what will show the work; Start -- never Complete
+    viewing   "R. Mensah is viewing your screen" -- a small bar at the top, topmost, never takes a click; stays until the service closes it
 
 PySide6 is the optional `worker-ui` extra: without it the service runs headless and says so once.
 """
 
 from __future__ import annotations
 
-KINDS = ("blocked", "message", "locked", "ask", "task")
+KINDS = ("blocked", "message", "locked", "ask", "task", "viewing")
 
 
 def available() -> bool:

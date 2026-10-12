@@ -44,6 +44,8 @@ class ClientState:
     indicators: list[Indicator] = field(default_factory=list)
     unaddressed_pings: int = 0
     recent_pushes: list[tuple[datetime, str, dict[str, Any]]] = field(default_factory=list)
+    # The latest picture of each machine we are looking at (session id -> the frame push), kept apart from recent_pushes: they are large.
+    frames: dict[int, dict[str, Any]] = field(default_factory=dict)
     _listeners: list[Listener] = field(default_factory=list, repr=False)
 
     # --- observation ----------------------------------------------------------------------------
@@ -94,16 +96,26 @@ class ClientState:
 
     async def on_push(self, type_: str, payload: dict[str, Any]) -> None:
         """Keep the persistent surfaces current. Returns nothing; UIs subscribe for redraws."""
+        if type_ == "session.frame":
+            self.frames[int(payload["session_id"])] = payload
+            self._changed()
+            return
         self.recent_pushes.append((datetime.now().astimezone(), type_, payload))
         del self.recent_pushes[:-200]
         if type_ == "session.blocked":
             if payload.get("pc_id") == self.pc_id and payload.get("occupant_account_id") != self.account_id:
                 self.blocked_by = payload
                 self.add_indicator("blocked", f"your PC is occupied by {payload.get('occupant_name')}", key="blocked")
+        elif type_ == "session.viewing":
+            if payload.get("pc_id") == self.pc_id and payload.get("occupant_account_id") != self.account_id:
+                self.blocked_by = None
+                self.clear_indicator("blocked")
+                self.add_indicator("viewed", f"{payload.get('occupant_name')} is viewing your screen", key="viewed")
         elif type_ == "session.released":
             if payload.get("pc_id") == self.pc_id:
                 self.blocked_by = None
                 self.clear_indicator("blocked")
+                self.clear_indicator("viewed")
         elif type_ == "session.ended":
             if self.session and payload.get("session_id") == self.session.get("session_id"):
                 self.session = None

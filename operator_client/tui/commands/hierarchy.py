@@ -45,10 +45,10 @@ async def pc_state(ctx: ShellContext, args: Args) -> str:
         f"in front: {fg['program']} -- {fg['title']}" if fg else "in front: nothing reported"])
 
 
-@command("traverse", usage="<pc_id> [force]",
+@command("traverse", usage="<pc_id> [force] [mode=see|control]",
          help_="Enter a PC's session. `force` = block-or-end an occupied session first (vertical only)")
 async def traverse(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("hierarchy.traverse", {"pc_id": args.get_int(0, "pc_id"), "force": args.flag("force")})
+    res = await ctx.call("hierarchy.traverse", {"pc_id": args.get_int(0, "pc_id"), "force": args.flag("force"), "mode": args.opt("mode") or "control"})
     ctx.state.set_session(res["session"])
     s = res["session"]
     note = "already occupying" if res["already_occupying"] else "entered"
