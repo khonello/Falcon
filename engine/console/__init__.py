@@ -8,6 +8,7 @@ what the console can *do* goes through the combo's own handlers.
     feed      -- the audit trail as events: a kind, a plain sentence, the machine, the person; counts; export; live push
     machines  -- the fleet with each machine's health, and one machine's page
     rules     -- the standard: built-in locked rules and the Super User's patterns (never / follow / limit)
+    automation -- the Automation and Actions pages: rules with how often they fired and how their runs ended, runs per day, a test on one machine
     deviations -- departures from a rule, with context, evidence and an outcome a person gives
     accountability -- recording them: triggers from the combos, watches on follow rules, limit counts
     marks     -- restricted marks: a file or folder marked where it is, kept to the machine or to its place
@@ -20,6 +21,7 @@ what the console can *do* goes through the combo's own handlers.
 
 from engine.console import (  # noqa: F401
     accountability,
+    automation,
     deviations,
     feed,
     issues,

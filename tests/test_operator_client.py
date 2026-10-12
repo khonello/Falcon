@@ -356,3 +356,12 @@ async def test_scripted_rollout_gate(engine, org, tmp_path: Path):
         "connect", "update stage 1.1 the_new_tray", "gate", f"update leave-out {org['w2_pc']} being_replaced", "decisions", "update approve 1.1", "update take-back 1"])
     assert "1.1 is ready" in out[1] and "next 1.1" in out[2] and "FIN-02" in out[2] and "holding 1" in out[2]
     assert "left out of the gate" in out[3] and "gate:1.1" in out[4] and "approved" in out[5] and "leaving out" in out[5]
+
+
+async def test_scripted_automation_and_actions_board(engine, org, tmp_path: Path):
+    out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
+        "connect", "action add control notify timeout=5 name=Tell message=hello", "event add usb.inserted actions=1 name=Tell_on_USB", "automation", "action board", "runs", "event test 1 1"])
+    assert "created" in out[2] or "event" in out[2]
+    assert "1 rules, 1 on" in out[3] and "Tell_on_USB" in out[3] and "runs per day:" in out[3]
+    assert "1 actions" in out[4] and "Tell" in out[4] and "1 rule(s)" in out[4]
+    assert "0 runs" in out[5]

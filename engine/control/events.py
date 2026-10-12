@@ -100,6 +100,14 @@ def reset_state() -> None:
     _threshold_since.clear()
 
 
+def outcome_of(ex: dict[str, Any]) -> str:
+    """How a run ended, in the words the console uses: Success, Failed, Timed out (it ran out of its time), Stopped by you, or Running."""
+    status = ex["status"]
+    if status == "terminated":
+        return "Timed out" if ex.get("terminated_reason") == "timeout" else "Stopped by you"
+    return {"success": "Success", "failed": "Failed"}.get(status, "Running")
+
+
 def last_fired(definition_id: int) -> str | None:
     at = _last_fired.get(definition_id)
     return at.isoformat() if at else None
@@ -350,7 +358,8 @@ async def event_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                 raise ProtocolError(ErrorCode.NOT_FOUND, f"no such pc {pc_id}")
             require_department_scope(ident, pc["department_id"])
     db = ctx.engine.db
-    event_id = await db.control.create_event(ident.account_id, condition_type, spec)
+    name = " ".join(str(payload.get("name") or "").split())[:120] or None
+    event_id = await db.control.create_event(ident.account_id, condition_type, spec, name)
     for seq, aid in enumerate(action_ids, start=1):
         await db.control.attach_action(event_id, int(aid), seq)
     if payload.get("enabled") is False:
@@ -376,7 +385,8 @@ async def event_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                   "pc_ids": payload.get("pc_ids", ev["condition_spec"].get("pc_ids"))}
         _, spec = _parse_spec(merged)
     enabled = payload.get("enabled")
-    await db.control.update_event(event_id, condition_spec=spec, enabled=None if enabled is None else bool(enabled))
+    name = " ".join(str(payload.get("name") or "").split())[:120] or None
+    await db.control.update_event(event_id, condition_spec=spec, enabled=None if enabled is None else bool(enabled), name=name)
     if "action_ids" in payload:
         from engine.control.actions import load_action_in_scope
 
@@ -519,6 +529,7 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     for ex in rows(await db.control.executions_for_event(event_id)):
         if mine is not None and ex["target_pc_id"] not in mine:
             continue
+        ex["outcome"] = outcome_of(ex)
         started = datetime.fromisoformat(ex["started_at"])
         for firing in firings:                                  # newest first: the first earlier one wins
             if firing["pc_id"] in (ex["target_pc_id"], 0) and datetime.fromisoformat(firing["at"]) <= started:

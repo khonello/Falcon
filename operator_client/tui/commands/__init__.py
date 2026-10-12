@@ -3,6 +3,7 @@
 from operator_client.tui.commands import (  # noqa: F401
     accountability,
     assistance,
+    automation,
     console,
     control,
     dept_tasks,

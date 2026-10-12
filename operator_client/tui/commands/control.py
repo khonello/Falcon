@@ -92,13 +92,13 @@ async def events(ctx: ShellContext, args: Args) -> str:
     return table(rows, width=36) + "\n\ntypes: " + ", ".join(sorted(res["types"]))
 
 
-@command("event", "add", "<type> [actions=1,2] [pcs=3,4] [match_<key>=<value> ...] [disabled]",
+@command("event", "add", "<type> [actions=1,2] [pcs=3,4] [name=..] [match_<key>=<value> ...] [disabled]",
          "Define an event; e.g. event add file.modified actions=5 match_path_prefix=C:/resources/restricted")
 async def event_add(ctx: ShellContext, args: Args) -> str:
     match = {k[6:]: _coerce(v) for k, v in args.options.items() if k.startswith("match_")}
     res = await ctx.call("control.event_create", {"type": args.get(0, "type"), "action_ids": args.opt_ints("actions") or [],
                                                  "pc_ids": args.opt_ints("pcs"), "match": match,
-                                                 "enabled": not args.flag("disabled")})
+                                                 "enabled": not args.flag("disabled"), "name": args.opt("name")})
     return f"event {res['event']['id']} ({res['event']['condition_type']}) created"
 
 

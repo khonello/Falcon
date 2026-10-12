@@ -161,3 +161,12 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   when: now|idle}` (an Admin in their department; offline machines can only be told for when they are back). The waiting version is also a Super User
   decision (wait / approve now, leaving the holders out with a reason / approve) in `overview.queue`. TUI: `gate`, `update stage|retry|leave-out|take-back|approve ... leave_out=`.
   *Test:* `tests/test_console_rollout.py`, `test_operator_client.py`.
+
+- **WP8 Automation and Actions statistics** (12 Oct 2026). `automation.board {days?}` lists the rules in scope -- the name (a new `name` on a rule, or the rule worded from what it
+  watches for), kind (Event / Schedule / Level), what it watches for and does, who set it (an organisation-wide rule is read-only in an Admin's console), on or off,
+  how often it fired and when last, how its last firing's runs ended ("All 3 succeeded", "1 failed, 1 success"), its problems -- with the strip and runs per day by
+  outcome (Success / Failed / Timed out / Stopped by you). `actions.board` is the library with the rules that use each action, runs, runs by hand, problems, the last run,
+  the time limit and each action's own days; `actions.runs {action_id?, event_id?, hand?}` the runs themselves (how long, what it said, what set it off).
+  `control.event_test {event_id, pc_id}` is *Test on one machine*: it runs the rule's actions once on a machine it applies to and is online, as a run by hand
+  (not a firing). `control.event_history` now says how each run ended. An Admin sees their department's machines only. TUI: `automation`, `action board`, `runs`, `event test`,
+  `event add ... name=`. *Test:* `tests/test_console_automation.py`, `test_operator_client.py`.

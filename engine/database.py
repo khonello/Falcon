@@ -1669,16 +1669,41 @@ class ControlRepo(_Repo):
 
     # -- events ----------------------------------------------------------------------------------
 
-    async def create_event(self, created_by: int, condition_type: str, condition_spec: dict[str, Any]) -> int:
+    async def create_event(self, created_by: int, condition_type: str, condition_spec: dict[str, Any], name: str | None = None) -> int:
         return await self._val(
-            "INSERT INTO event_definitions (created_by_account_id, condition_type, condition_spec) "
-            "VALUES ($1, $2, $3) RETURNING id", created_by, condition_type, condition_spec)
+            "INSERT INTO event_definitions (created_by_account_id, condition_type, condition_spec, name) "
+            "VALUES ($1, $2, $3, $4) RETURNING id", created_by, condition_type, condition_spec, name)
 
     async def update_event(self, event_id: int, *, condition_spec: dict[str, Any] | None = None,
-                           enabled: bool | None = None) -> None:
+                           enabled: bool | None = None, name: str | None = None) -> None:
         await self._exec(
             "UPDATE event_definitions SET condition_spec = COALESCE($2, condition_spec), "
-            "enabled = COALESCE($3, enabled) WHERE id = $1", event_id, condition_spec, enabled)
+            "enabled = COALESCE($3, enabled), name = COALESCE($4, name) WHERE id = $1", event_id, condition_spec, enabled, name)
+
+    # -- the Automation and Actions pages (engine/console/automation.py) -----------------------------
+
+    async def runs_since(self, since: datetime, *, department_id: int | None = None) -> list[dict[str, Any]]:
+        """Every run since a time, newest first, named for reading: the action, the machine, and the rule that set it off (none: by hand)."""
+        return await self._fetch(
+            "SELECT e.id, e.action_id, e.triggered_by_event_definition_id AS event_id, e.target_pc_id AS pc_id, e.status, e.terminated_reason, "
+            "e.started_at, e.ended_at, e.summary, e.exit_code, p.hostname, p.department_id, a.name AS action_name, a.action_kind, a.builtin_type, "
+            "a.timeout_seconds, " + _HAS_IMAGE + " "
+            "FROM action_executions e JOIN actions a ON a.id = e.action_id LEFT JOIN pcs p ON p.id = e.target_pc_id "
+            "WHERE e.started_at >= $1 AND ($2::int IS NULL OR p.department_id = $2) ORDER BY e.started_at DESC LIMIT 20000",
+            since, department_id)
+
+    async def firing_counts(self, since: datetime) -> list[dict[str, Any]]:
+        """How often each automation fired since a time, and on which machine, from the trail."""
+        return await self._fetch(
+            "SELECT NULLIF(target_id, '')::int AS event_id, NULLIF(detail->>'pc_id', '')::int AS pc_id, count(*) AS n, max(occurred_at) AS last "
+            "FROM audit_log WHERE action_type = 'event.fired' AND target_type = 'event' AND target_id ~ '^[0-9]+$' AND occurred_at >= $1 "
+            "GROUP BY 1, 2", since)
+
+    async def event_links(self) -> list[dict[str, Any]]:
+        """Which action is attached to which automation (for 'used by')."""
+        return await self._fetch(
+            "SELECT ea.event_definition_id AS event_id, ea.action_id, e.name AS event_name, e.condition_spec->>'type' AS event_type "
+            "FROM event_actions ea JOIN event_definitions e ON e.id = ea.event_definition_id WHERE e.enabled")
 
     async def event(self, event_id: int) -> dict[str, Any] | None:
         ev = await self._one("SELECT * FROM event_definitions WHERE id = $1", event_id)

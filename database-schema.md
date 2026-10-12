@@ -197,6 +197,9 @@ The standard the organisation is measured against, and what was measured. A **ru
 ### The rollout gate (migration 027)
 **`staged_versions`**: a version that is ready and waits for the Super User (`version_string`, `note`, who staged it and when, `approved_at` when it was approved). Staging puts nothing on any machine; the packaging pipeline (deferred) and the Super User stage the same way, through `updates.stage`. **`pc_version_log`**: which version each machine ran and since when -- one row each time a machine says it runs a version it did not run before (on connecting, or after a successful update); what *machines on the current version, day by day* is added up from. **`pc_version_status.last_error`**: what the last failed attempt said went wrong. A machine **left out of the gate** keeps its `gate_exclusions` row (022) with `for_version = 'next'` until that version is approved; the approval converts the row to the version, so it stays on record who was left out of which approval and why. A version is approved when every machine except the ones left out runs the one before it.
 
+### Automation names (migration 028)
+**`event_definitions.name`** (nullable): the name a person gave an automation ("Snapshot a USB drive when it is inserted"); without one the console words the rule from what it watches for (`engine/console/automation.py` `when_of`). Nothing else about how a rule is stored changes. The Automation and Actions pages are read from `action_executions` (outcome: `success` / `failed` / `terminated` + `terminated_reason` timeout or manual, i.e. Success / Failed / Timed out / Stopped by you; no `triggered_by_event_definition_id` means run by hand) and from `event.fired` in the audit trail (how often a rule fired, on which machine).
+
 ---
 
 ## 4. Task
