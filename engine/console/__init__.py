@@ -15,6 +15,7 @@ what the console can *do* goes through the combo's own handlers.
     plays     -- what can be done about an issue (the options, and doing them)
     overview  -- the Overviews' figures, the reports board, and the Super User's decisions
     registry  -- accounts, refused connections and blocked addresses, and a department's page
+    rollout   -- the gate to the next version: who holds it back, who was left out, adoption, retrying
 """
 
 from engine.console import (  # noqa: F401
@@ -26,5 +27,6 @@ from engine.console import (  # noqa: F401
     marks,
     overview,
     registry,
+    rollout,
     rules,
 )

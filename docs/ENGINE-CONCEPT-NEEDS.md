@@ -152,3 +152,12 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   and assign the issue to them). *Not done, on purpose:* giving a department an Admin from another department -- an Admin belongs to one department,
   so the seat decision draws it disabled with the reason. TUI: `accounts`, `refused`, `block`, `unblock`, `blocked`, `department`, `admin demote`.
   *Test:* `tests/test_console_registry.py`, `test_operator_client.py`.
+
+- **WP7 Rollout gate** (12 Oct 2026). `rollout.gate {department_id?}` is the whole Rollout page: the current version, when and by whom it was approved; the version
+  waiting (`updates.stage`); the strip (running it, holding, left out, failed installs this week and which machines); the machines holding the next approval back
+  with their state (retrying / offline / escalated / left out), attempts, last error (the Worker now says what went wrong), next try and who the escalation went to;
+  adoption day by day with who joined; `can_approve`. `updates.approve {version, leave_out?, reason?}` no longer waits for machines left out (earlier with
+  `updates.leave_out`, or named at approval with a reason) and records them against the version; `updates.take_back` puts one back; `updates.retry {pc_id,
+  when: now|idle}` (an Admin in their department; offline machines can only be told for when they are back). The waiting version is also a Super User
+  decision (wait / approve now, leaving the holders out with a reason / approve) in `overview.queue`. TUI: `gate`, `update stage|retry|leave-out|take-back|approve ... leave_out=`.
+  *Test:* `tests/test_console_rollout.py`, `test_operator_client.py`.

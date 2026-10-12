@@ -194,6 +194,9 @@ The standard the organisation is measured against, and what was measured. A **ru
 ### Blocked addresses (migration 026)
 **`blocked_addresses`**: an address the Super User refuses at the door -- the connection is closed before the challenge, and the try is still written to the trail as an `auth.failed` (reason "address blocked"), so the Registry shows that it keeps trying. `address`, `reason`, who and when, and `lifted_at` / `lifted_by_account_id` when it is let back (never deleted; a partial unique index allows one open block per address). **`auth.failed`** rows now carry `kind` (unknown / wrong_key / old_key / stale / blocked), `address`, `claimed_name` (what the machine said it was), and, when the client id is one of ours, `pc_id`, `machine`, `key_generation`, `same_address` (whether that machine has been seen from this address) and, for an old key, `old_generation`.
 
+### The rollout gate (migration 027)
+**`staged_versions`**: a version that is ready and waits for the Super User (`version_string`, `note`, who staged it and when, `approved_at` when it was approved). Staging puts nothing on any machine; the packaging pipeline (deferred) and the Super User stage the same way, through `updates.stage`. **`pc_version_log`**: which version each machine ran and since when -- one row each time a machine says it runs a version it did not run before (on connecting, or after a successful update); what *machines on the current version, day by day* is added up from. **`pc_version_status.last_error`**: what the last failed attempt said went wrong. A machine **left out of the gate** keeps its `gate_exclusions` row (022) with `for_version = 'next'` until that version is approved; the approval converts the row to the version, so it stays on record who was left out of which approval and why. A version is approved when every machine except the ones left out runs the one before it.
+
 ---
 
 ## 4. Task

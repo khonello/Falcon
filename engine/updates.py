@@ -57,24 +57,38 @@ async def approve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if await db.updates.version_by_string(version):
         raise ProtocolError(ErrorCode.CONFLICT, f"version {version} already approved")
     cur = await db.updates.current_version()
+    left_out: set[int] = {x["pc_id"] for x in await db.updates.exclusions("next")}      # machines the coming approval does not wait for
     if cur is not None:
         behind = await db.updates.pcs_behind(cur["id"])
+        chosen = payload.get("leave_out")
+        if chosen:
+            if not isinstance(chosen, list) or not all(isinstance(i, int) for i in chosen) or not set(chosen) <= {b["id"] for b in behind}:
+                raise ProtocolError(ErrorCode.INVALID, "leave_out must be machines that are behind")
+            reason = " ".join(str(payload.get("reason") or "").split())[:300]
+            if not reason:
+                raise ProtocolError(ErrorCode.INVALID, "leaving machines out of the gate needs a reason")
+            for pc_id in chosen:
+                await db.updates.exclude_from_gate(pc_id, "next", reason, ident.account_id)
+            left_out |= set(chosen)
+        behind = [b for b in behind if b["id"] not in left_out]
         if behind:
             raise ProtocolError(ErrorCode.CONFLICT,
                                 f"{len(behind)} PC(s) are not yet confirmed on {cur['version_string']}: "
                                 + ", ".join(b["hostname"] for b in behind[:5]))
     version_id = await db.updates.approve_version(version, ident.account_id)
+    await db.updates.convert_exclusions(version)
+    await db.updates.staged_done(version)
     await ctx.engine.audit.record(ctx, "update.approved", target_type="versions", target_id=version_id,
                                   detail={"version": version})
     await ctx.engine.push_to_role("admin", "update.approved", {"version_id": version_id, "version": version})
     from engine.console import accountability
 
     for pc in await db.accounts.list_pcs():          # every machine must be on it within the time the rule allows
-        if pc["department_id"] is not None:
+        if pc["department_id"] is not None and pc["id"] not in left_out:
             await accountability.watch(ctx.engine, "version", target_table=f"version:{version}", target_id=pc["id"], kind="pc",
                                        pc_id=pc["id"], department_id=pc["department_id"], label=pc["hostname"],
                                        extra={"version_id": version_id, "version": version})
-    return {"version_id": version_id, "version": version}
+    return {"version_id": version_id, "version": version, "left_out": sorted(left_out)}
 
 
 @handler("updates.rollout_department")
@@ -118,7 +132,10 @@ async def report_status(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     # unknown build (a fresh install) leaves current_version_id NULL = never confirmed, behind.
     running = str_field(payload, "running", required=False)
     rv = await db.updates.version_by_string(running) if running else None
-    st = await db.updates.record_attempt(ident.pc_id, v["id"], succeeded, rv["id"] if rv else None)
+    error = " ".join(str(payload.get("error") or "").split())[:200] or None
+    st = await db.updates.record_attempt(ident.pc_id, v["id"], succeeded, rv["id"] if rv else None, error)
+    if succeeded:
+        await db.updates.log_version(ident.pc_id, running or version)
     await ctx.engine.audit.record(ctx, "update.attempt", target_type="pc_version_status", target_id=ident.pc_id,
                                   detail={"version": version, "succeeded": succeeded,
                                           "failures": st["attempt_failure_count"]})

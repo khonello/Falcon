@@ -290,6 +290,8 @@ class AccountsRepo(_Repo):
         await self._exec(
             "UPDATE pcs SET last_ip = COALESCE($2, last_ip), os = COALESCE($3, os), agent_version = COALESCE($4, agent_version), "
             "agent_started_at = COALESCE($5, agent_started_at) WHERE id = $1", pc_id, ip, os, version, started_at)
+        if version:
+            await self.db.updates.log_version(pc_id, version)
 
     async def fleet(self, *, department_id: int | None = None, pc_id: int | None = None) -> list[dict[str, Any]]:
         """Every machine with what a console shows first: its department, its person, its agent, and who is in it now."""
@@ -2007,20 +2009,69 @@ class UpdatesRepo(_Repo):
             pc_ids, target_version_id)
 
     async def record_attempt(self, pc_id: int, version_id: int, succeeded: bool,
-                             running_version_id: int | None = None) -> dict[str, Any]:
+                             running_version_id: int | None = None, error: str | None = None) -> dict[str, Any]:
         """Upsert a PC's status after an update attempt; failure count resets on success.
         `running_version_id` (what the PC is actually on) is needed for a failed first report,
         since a status row must always carry a current version."""
         return _row(await self.pool.fetchrow(
             "INSERT INTO pc_version_status (pc_id, current_version_id, target_version_id, last_attempt_at, "
-            "attempt_failure_count) VALUES ($1, CASE WHEN $3::boolean THEN $2::int ELSE $4::int END, "
-            "CASE WHEN $3::boolean THEN NULL ELSE $2::int END, now(), CASE WHEN $3::boolean THEN 0 ELSE 1 END) "
+            "attempt_failure_count, last_error) VALUES ($1, CASE WHEN $3::boolean THEN $2::int ELSE $4::int END, "
+            "CASE WHEN $3::boolean THEN NULL ELSE $2::int END, now(), CASE WHEN $3::boolean THEN 0 ELSE 1 END, "
+            "CASE WHEN $3::boolean THEN NULL ELSE $5::text END) "
             "ON CONFLICT (pc_id) DO UPDATE SET "
             " current_version_id = CASE WHEN $3::boolean THEN $2::int ELSE pc_version_status.current_version_id END, "
             " target_version_id = CASE WHEN $3::boolean THEN NULL ELSE $2::int END, last_attempt_at = now(), "
             " attempt_failure_count = CASE WHEN $3::boolean THEN 0 ELSE pc_version_status.attempt_failure_count + 1 END, "
+            " last_error = CASE WHEN $3::boolean THEN NULL ELSE COALESCE($5::text, pc_version_status.last_error) END, "
             " escalated_at = CASE WHEN $3::boolean THEN NULL ELSE pc_version_status.escalated_at END RETURNING *",
-            pc_id, version_id, succeeded, running_version_id)) or {}
+            pc_id, version_id, succeeded, running_version_id, error)) or {}
+
+    # -- the gate (engine/console/rollout.py) ---------------------------------------------------------
+
+    async def stage(self, version: str, note: str, by_account_id: int) -> bool:
+        """A version that is ready. False when it was staged already."""
+        got = await self._val(
+            "INSERT INTO staged_versions (version_string, note, staged_by_account_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING version_string",
+            version, note, by_account_id)
+        return got is not None
+
+    async def staged(self) -> dict[str, Any] | None:
+        """The version waiting for approval (the latest staged, not yet approved)."""
+        return await self._one("SELECT * FROM staged_versions WHERE approved_at IS NULL ORDER BY staged_at DESC LIMIT 1")
+
+    async def staged_done(self, version: str) -> None:
+        await self._exec("UPDATE staged_versions SET approved_at = now() WHERE version_string = $1 AND approved_at IS NULL", version)
+
+    async def exclusions(self, for_version: str) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT x.pc_id, x.reason, x.by_account_id, x.at, p.hostname FROM gate_exclusions x JOIN pcs p ON p.id = x.pc_id "
+            "WHERE x.for_version = $1 ORDER BY x.at", for_version)
+
+    async def lift_exclusion(self, pc_id: int, for_version: str) -> bool:
+        """Put a machine back in the gate (the one row is removed: a left-out is configuration of the coming approval, and the change is audited)."""
+        return (await self._exec("DELETE FROM gate_exclusions WHERE pc_id = $1 AND for_version = $2", pc_id, for_version)).endswith("1")
+
+    async def convert_exclusions(self, version: str) -> None:
+        """The approval happened: who was left out of the coming one is now recorded against this version."""
+        await self._exec("UPDATE gate_exclusions SET for_version = $1 WHERE for_version = 'next'", version)
+
+    async def statuses(self) -> dict[int, dict[str, Any]]:
+        return {r["pc_id"]: r for r in await self._fetch("SELECT * FROM pc_version_status")}
+
+    async def log_version(self, pc_id: int, version: str) -> None:
+        """Remember which version a machine runs, when it is not the one it was last known to run."""
+        await self._exec(
+            "INSERT INTO pc_version_log (pc_id, version) SELECT $1, $2 WHERE NOT EXISTS ("
+            " SELECT 1 FROM (SELECT version FROM pc_version_log WHERE pc_id = $1 ORDER BY at DESC, id DESC LIMIT 1) l WHERE l.version = $2)", pc_id, version)
+
+    async def version_log(self, since: datetime) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT l.pc_id, l.version, l.at, p.hostname FROM pc_version_log l JOIN pcs p ON p.id = l.pc_id WHERE l.at >= $1 ORDER BY l.at, l.id", since)
+
+    async def failed_installs(self, since: datetime) -> list[dict[str, Any]]:
+        """Failed update attempts since a time, from the trail: how many, per machine."""
+        return await self._fetch(
+            "SELECT target_id::int AS pc_id, count(*) AS n, max(occurred_at) AS last FROM audit_log WHERE action_type = 'update.attempt' "
+            "AND occurred_at >= $1 AND detail->>'succeeded' = 'false' AND target_id ~ '^[0-9]+$' GROUP BY target_id::int", since)
 
     async def status_for_pc(self, pc_id: int) -> dict[str, Any] | None:
         return await self._one("SELECT * FROM pc_version_status WHERE pc_id = $1", pc_id)

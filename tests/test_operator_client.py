@@ -346,3 +346,13 @@ async def test_scripted_registry_and_department_page(engine, org, tmp_path: Path
     assert "Nothing was refused." in out[2] and "10.9.9.9 is blocked" in out[3] and "keeps_guessing" in out[4] and "no longer blocked" in out[5]
     assert "HR: " in out[6] and "HR-ADM" in out[6]
     assert "is a Worker again" in out[7] and "NO ADMIN" in out[8] and "could be promoted" in out[8]
+
+
+async def test_scripted_rollout_gate(engine, org, tmp_path: Path):
+    first = await engine.db.updates.approve_version("1.0", org["su"])
+    for key in ("su_pc", "a1_pc", "w1_pc", "a2_pc"):
+        await engine.db.updates.record_attempt(org[key], first, True, first)
+    out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
+        "connect", "update stage 1.1 the_new_tray", "gate", f"update leave-out {org['w2_pc']} being_replaced", "decisions", "update approve 1.1", "update take-back 1"])
+    assert "1.1 is ready" in out[1] and "next 1.1" in out[2] and "FIN-02" in out[2] and "holding 1" in out[2]
+    assert "left out of the gate" in out[3] and "gate:1.1" in out[4] and "approved" in out[5] and "leaving out" in out[5]

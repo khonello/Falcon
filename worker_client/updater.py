@@ -35,6 +35,7 @@ class Updater:
         self.retry_seconds = retry_seconds
         self.pending: str | None = None
         self.attempts = 0
+        self.last_error: str | None = None            # what the last failed attempt said, for the Engine to show
         self._task: asyncio.Task[None] | None = None
 
     def on_available(self, payload: dict[str, Any]) -> None:
@@ -66,6 +67,8 @@ class Updater:
         self.attempts += 1
         ok = await asyncio.to_thread(self._apply, version)
         payload = {"version": version, "succeeded": ok, "running": self.running_version}
+        if not ok and self.last_error:
+            payload["error"] = self.last_error
         try:
             await self.report("updates.report_status", payload)
         except Exception as exc:  # noqa: BLE001
@@ -76,16 +79,21 @@ class Updater:
         return ok
 
     def _apply(self, version: str) -> bool:
+        self.last_error = None
         if not self.update_command:
             log.warning("no update_command configured; update to %s cannot be applied on this PC", version)
+            self.last_error = "No way to update has been set up on this machine"
             return False
         argv = [a.replace("{version}", version) for a in shlex.split(self.update_command)]
         try:
             result = subprocess.run(argv, check=False, timeout=600, capture_output=True)
         except (OSError, subprocess.TimeoutExpired) as exc:
             log.warning("update command failed: %s", exc)
+            self.last_error = "The update took too long" if isinstance(exc, subprocess.TimeoutExpired) else f"The update could not start ({exc.__class__.__name__})"
             return False
         if result.returncode != 0:
             log.warning("update command exited %s: %s", result.returncode, result.stderr[-500:])
+            tail = result.stderr.decode("utf-8", "replace").strip().splitlines()
+            self.last_error = (tail[-1][:160] if tail else f"The update stopped with code {result.returncode}")
             return False
         return True
