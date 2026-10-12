@@ -119,7 +119,15 @@ async def ping(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such active account")
     if superior_of(me, other) is None:
         raise ProtocolError(ErrorCode.FORBIDDEN, "pings go between a subordinate and their direct superior")
+    already_waiting = await db.assistance.unaddressed_from(ident.account_id, to_id)
     ping_id = await db.assistance.ping(ident.account_id, to_id)
+    if not already_waiting and other["role"] == "admin" and me["role"] == "worker":
+        from engine.console import accountability
+
+        sender_pc = await db.accounts.pc(me["bound_pc_id"]) if me["bound_pc_id"] else None
+        await accountability.watch(ctx.engine, "help", target_table="pings", target_id=ping_id, kind="admin", account_id=to_id,
+                                   pc_id=me["bound_pc_id"], department_id=other["department_id"],
+                                   label=f"Help request from {sender_pc['hostname'] if sender_pc else 'a worker'}")
     await ctx.engine.audit.record(ctx, "assistance.ping", target_type="pings", target_id=ping_id,
                                   detail={"to_account_id": to_id})
     names = await db.accounts.display_names_for(to_id, [ident.account_id])

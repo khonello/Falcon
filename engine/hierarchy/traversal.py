@@ -220,6 +220,16 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         names = await db.accounts.display_names_for(ident.account_id, [active["occupant_account_id"]])
         view = _session_view(active, names)
         rel = relationship(ident.role, active["occupant_role"])
+        if active["un_evictable"] or rel != "vertical":
+            # a hard refusal (never a choice to force): a second session on a held machine is the thing the rule says must not happen
+            from engine.console import accountability
+
+            await accountability.never(
+                ctx.engine, "second", kind="admin" if ident.role == "admin" else "pc", subject_account_id=ident.account_id,
+                pc_id=pc_id, department_id=target["department_id"], subject_pc_id=pc_id if ident.role != "admin" else None,
+                short=f"{{who}} tried to enter {target['hostname']} while it was held", expected="One session on a machine at a time",
+                happened=f"A second session was refused on {target['hostname']}", detail={"held_by": active["occupant_account_id"]},
+                source_key=f"second:{pc_id}:{ident.account_id}:{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}")
         if active["un_evictable"]:
             raise ProtocolError(ErrorCode.CONFLICT, f"occupied by {view['occupant_name']} (un-evictable)")
         if rel != "vertical":
@@ -239,9 +249,10 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ctx.active_session_id = session_id
     session = await db.sessions.by_id(session_id)
     assert session is not None
+    after_hours = ident.role == "admin" and outside_working_hours(ctx.engine.settings.working_hours)
     await ctx.engine.audit.record(ctx, "session.traversed", target_type="session", target_id=session_id,
-                                  detail={"pc_id": pc_id, "forced": force, "deadline_at": deadline.isoformat()})
-    if ident.role == "admin" and outside_working_hours(ctx.engine.settings.working_hours):
+                                  detail={"pc_id": pc_id, "forced": force, "deadline_at": deadline.isoformat(), "outside_hours": after_hours})
+    if after_hours:
         # An Admin's own conduct is reported to the Super User only (category about_admin, never routable).
         from engine.hierarchy import reports
 

@@ -80,7 +80,7 @@ async def audit(ctx: ShellContext, args: Args) -> str:
     return table(res["entries"], ["occurred_at", "actor_name", "action_type", "target_type", "target_id", "detail"], width=60)
 
 
-@command("deviations", help_="System expectation deviations (unresolved)")
-async def deviations(ctx: ShellContext, args: Args) -> str:
+@command("expectations", help_="The raw log of system expectations that were not met (unresolved)")
+async def expectations(ctx: ShellContext, args: Args) -> str:
     return table((await ctx.call("audit.deviations"))["deviations"],
                  ["id", "expectation", "observed_account_id", "observed_pc_id", "detail", "detected_at"], width=50)

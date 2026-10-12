@@ -41,6 +41,7 @@ async def department_create(ctx: Context, payload: dict[str, Any]) -> dict[str, 
         raise ProtocolError(ErrorCode.CONFLICT, f"department {name!r} already exists") from exc
     await ctx.engine.audit.record(ctx, "department.created", target_type="departments", target_id=dept_id,
                                   detail={"name": name})
+    await seat_watch(ctx.engine, dept_id, name)
     return {"department_id": dept_id, "name": name}
 
 
@@ -48,6 +49,19 @@ async def department_create(ctx: Context, payload: dict[str, Any]) -> dict[str, 
 async def departments(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     require_role(ctx, "super_user", "admin")
     return {"departments": rows(await ctx.engine.db.accounts.list_departments())}
+
+
+async def seat_watch(engine: Any, department_id: int, name: str) -> None:
+    """A department with no Admin must get one within the time the rule allows (a new department starts without; so does one that
+    loses its last)."""
+    from datetime import datetime, timezone
+
+    from engine.console import accountability
+
+    if any(a["department_id"] == department_id for a in await engine.db.accounts.active_admins()):
+        return
+    await accountability.watch(engine, "seat", target_table=f"seat:{department_id}", target_id=int(datetime.now(timezone.utc).timestamp()),
+                               kind="dept", department_id=department_id, label=name)
 
 
 async def provision(engine: Any, role: str, department_id: int | None, hostname: str) -> dict[str, Any]:
@@ -104,6 +118,9 @@ async def account_offboard(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         await traversal.end_session(ctx.engine, session, "superior_ended", actor=ctx)
     await db.accounts.offboard(account_id)
     await ctx.engine.audit.record(ctx, "account.offboarded", target_type="accounts", target_id=account_id)
+    if subject["role"] == "admin" and subject["department_id"] is not None:
+        dept = next((d for d in await db.accounts.list_departments() if d["id"] == subject["department_id"]), None)
+        await seat_watch(ctx.engine, subject["department_id"], dept["name"] if dept else "A department")
     return {"account_id": account_id, "status": "offboarded"}
 
 

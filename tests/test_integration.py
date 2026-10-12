@@ -240,7 +240,7 @@ async def test_chain_resource_violation_fires_event_and_flow_ignores_the_file(en
         assert await _wait(violated)
         # Super User got the report; the event fired; the action ran on the worker's PC.
         await asyncio.sleep(0.5)
-        assert (await engine.db.reports.all())[0]["category"] == "resource_violation"
+        assert "resource_violation" in {r["category"] for r in await engine.db.reports.all()}
         assert await _wait(lambda: 1 in w1.executor.completed, timeout=15)
         fired = await _audit(engine, "event.fired")
         assert fired and fired[0]["detail"]["type"] == "resource.violation"

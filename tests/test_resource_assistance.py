@@ -32,11 +32,11 @@ async def test_tags_tracking_violation_and_ignore(engine, org, connect):
                                               "hash": "SECRET"}})
     pushed = next(p for p in await w1.drain_pushes() if p.type == "resource.violation")
     assert pushed.payload["tag"] == "restricted" and "ignored" in pushed.payload["message"]
-    assert su.push_types(await su.drain_pushes()) == ["report.new", "issue.raised"]
+    assert su.push_types(await su.drain_pushes()) == ["report.new", "issue.raised", "deviation.raised", "report.new"]    # the copy, its issue, the rule it broke, and that rule's report
     viol = (await w1.ok("resource.violations"))["violations"]
     assert len(viol) == 1 and viol[0]["file_index_id"] == v["file_index_id"] and viol[0]["report_id"]
     assert len((await a1.ok("resource.violations"))["violations"]) == 1            # own department
-    assert (await su.ok("reports.list"))["reports"][0]["category"] == "resource_violation"
+    assert "resource_violation" in {r["category"] for r in (await su.ok("reports.list"))["reports"]}
     # The file is still indexed (never deleted) but ignored; a repeat event does not re-flag.
     assert await engine.db.file_index.get(v["file_index_id"]) is not None
     await w1.ok("index.event", {"event": {"op": "modify", "path": "C:/Downloads/totally-not-salaries.xlsx", "hash": "SECRET"}})

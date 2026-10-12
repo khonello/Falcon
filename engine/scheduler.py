@@ -55,6 +55,7 @@ class Scheduler:
         self.every("alerts.deliver", 30.0, self._deliver_alerts)
         self.every("enroll.expire", 600.0, self._expire_enrollments)
         self.every("issues.sweep", 60.0, self._sweep_issues)
+        self.every("accountability.sweep", 60.0, self._sweep_accountability)
         for name, seconds, job in self._periodic:
             self._tasks[name] = asyncio.create_task(self._run_periodic(name, seconds, job))
         log.info("scheduler started with %d periodic jobs", len(self._periodic))
@@ -66,6 +67,11 @@ class Scheduler:
         self._tasks.clear()
 
     # --- internals ------------------------------------------------------------------------------
+
+    async def _sweep_accountability(self) -> None:
+        from engine.console import accountability
+
+        await accountability.sweep(self.engine)
 
     async def _sweep_issues(self) -> None:
         from engine.console import issues

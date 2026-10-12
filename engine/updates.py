@@ -67,6 +67,13 @@ async def approve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await ctx.engine.audit.record(ctx, "update.approved", target_type="versions", target_id=version_id,
                                   detail={"version": version})
     await ctx.engine.push_to_role("admin", "update.approved", {"version_id": version_id, "version": version})
+    from engine.console import accountability
+
+    for pc in await db.accounts.list_pcs():          # every machine must be on it within the time the rule allows
+        if pc["department_id"] is not None:
+            await accountability.watch(ctx.engine, "version", target_table=f"version:{version}", target_id=pc["id"], kind="pc",
+                                       pc_id=pc["id"], department_id=pc["department_id"], label=pc["hostname"],
+                                       extra={"version_id": version_id, "version": version})
     return {"version_id": version_id, "version": version}
 
 

@@ -301,3 +301,26 @@ async def test_scripted_marks(engine, org, tmp_path: Path):
     assert "1 marks, 1 files" in out[2] and "budget.xlsx" in out[2]
     assert "copies elsewhere:" in out[3] and "none" in out[3] and "if kept to anywhere on the pc" in out[3]
     assert "now kept to anywhere on the pc" in out[4] and "unmarked" in out[5] and "0 marks" in out[6]
+
+
+async def test_scripted_rules_and_deviations(engine, org, tmp_path: Path):
+    from common.connection import EngineConnection as Raw
+
+    a1 = Raw("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"), hostname="FIN-ADM")
+    w1 = Raw("127.0.0.1", engine.port, client_id="cid-w1", tls=False, derived_key=key_for("cid-w1"), hostname="FIN-01")
+    await a1.connect()
+    await w1.connect()
+    try:
+        await a1.call("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/s.xlsx", "hash": "S"}})
+        await w1.call("index.event", {"event": {"op": "copy", "path": "C:/Users/ama/s-copy.xlsx", "hash": "S"}})
+        out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
+            "connect", "rules", "rule add follow help answer within=60 name=Help_answered", "rule library", "deviations open",
+            "deviation 1", "deviation outcome 1 explained Approved for the audit", "rule off 5", "rule try 5 within=120"])
+    finally:
+        await a1.close()
+        await w1.close()
+    assert "4 rules" in out[1] and "locked" in out[1] and "B-1" in out[1]
+    assert "O-1" in out[2] and "within 1 hour" in out[2]
+    assert "unanswered-help" in out[3] and "deviations this week" in out[4] and "B-1" in out[4]
+    assert "the record shows:" in out[5] and "around it:" in out[5] and "Recorded: Restricted files stay where they are" in out[5]
+    assert "D-301: Explained" in out[6] and "O-1 is off" in out[7] and "0 deviations in the last 30 days" in out[8]

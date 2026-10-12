@@ -54,6 +54,14 @@ async def emit(engine: Engine, category: str, *, source_table: str, source_id: i
     report_id = await engine.db.reports.write(category, source_table, source_id, summary)
     log.info("REPORT %s #%s: %s", category, report_id, summary)
     routed = set(await engine.db.reports.departments_for_category(category))
+    from engine.console import accountability
+
+    for dept_id in routed:
+        admins = [a for a in await engine.db.accounts.active_admins() if a["department_id"] == dept_id]
+        if admins:
+            await accountability.watch(engine, "report", target_table=f"reports.{dept_id}", target_id=report_id,
+                                       kind="admin" if len(admins) == 1 else "dept", account_id=admins[0]["id"] if len(admins) == 1 else None,
+                                       department_id=dept_id, label=f"A {category.replace('_', ' ')} report")
     await engine.broadcast(
         "report.new", {"id": report_id, "category": category, "summary": summary},
         predicate=lambda c: c.ctx.identity.role == "super_user"

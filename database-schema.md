@@ -175,6 +175,17 @@ The tickets an Admin works. Raised from what the system already records (a restr
 
 ---
 
+### Rules and deviations (migration 024)
+The standard the organisation is measured against, and what was measured. A **rule** is a pattern -- what *should* happen -- of one of three shapes: *never* (the first time it happens it is a deviation), *follow* (after one thing another must follow within a time), *limit* (a count that must not go over a line in a period). Falcon's own are built in and locked (B-1 .. B-4); the Super User writes the organisation's (O-n).
+
+**`rules`**: `code`, `builtin`, `name`, `shape`, `spec` JSONB -- `{trigger?, expect?, within? (minutes), reading?, limit? {n, per: hour|day|week}, who: everyone|workers|admins|machines|depts, depts: "all"|[ids], severity?, resp: {report, admin, action, action_id?}}` (the shape the rule builder fills in; decided here, 11 Oct 2026, and kept in one place, engine/console/rules.py, so changing it is cheap), `enabled` (off stops new deviations; old ones stay), who made it.
+
+**`deviations`**: a departure someone can be asked about. `rule_snapshot` (the rule **as it was** when it happened), `severity`, `kind` (pc / worker / admin / dept) with `subject_account_id` / `subject_pc_id` / `subject_department_id`, `department_id` and `pc_id` (where), `at`, `short` (with `{who}` where a person is named: names are the reader's own), `expected`, `happened`, `value` (minutes late, or the count), `detail`, `source_key` (one deviation per rule and cause), and the outcome a person gives it: `open` / `explained` / `accepted` / `escalated` / `dismissed`, with `note` (the only explanation there is -- the system never states a cause), who and when.
+
+**`rule_watches`**: a *follow* rule being watched -- opened when its trigger happens, `due_at` = then + `within`; `state` open / kept / broken, and the deviation it produced.
+
+---
+
 ## 4. Task
 
 ### `tasks`

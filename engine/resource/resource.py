@@ -196,6 +196,15 @@ async def _raise_issue(engine: Engine, pc: dict[str, Any], entry: dict[str, Any]
         detail={"file": entry["filename"], "folder": folder, "path": entry["path"], "tag": tag, "hash": entry.get("content_hash"),
                 "violation_id": violation_id, "file_index_id": entry["id"], "origin_pc_id": origin_pc_id, **mark_detail},
         owner_account_id=mark["by_account_id"] if mark else None)
+    from engine.console import accountability
+
+    keep = (mark or {}).get("keep")
+    await accountability.never(
+        engine, "file", kind="worker", severity=severity, subject_account_id=pc["bound_account_id"], pc_id=pc["id"],
+        department_id=pc["department_id"], short=f"Copy of {entry['filename']} on {pc['hostname']}",
+        expected=("Stay on " + str(mark["hostname"]) if keep == "machine" else f"Stay in {mark['path']} on {mark['hostname']}") if mark
+        else f"Stay where a {tag} file is allowed", happened=f"A copy in {folder or 'the machine'}",
+        detail={"violation_id": violation_id, "file": entry["filename"], "path": entry["path"]}, source_key=f"violation:{violation_id}")
 
 
 async def ignored_files(engine: Engine, pc_id: int) -> set[int]:

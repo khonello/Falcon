@@ -103,3 +103,27 @@ Legend: **has** = a handler already gives it; **part** = some of it; **none** = 
   `marks.keep_effect`, `marks.change_keep` (copies now allowed close, newly caught ones are raised), `marks.unmark` (open copy issues close;
   history kept). The per-copy decisions are the issue plays: ask the person, delete this copy, allow it here too. TUI: `marks`, `mark`,
   `mark show|keep|remove`. *Test:* `tests/test_console_marks.py`, `test_operator_client.py`.
+
+- **WP4 Rules and Accountability** (11 Oct 2026). *Rules* (`rules.list/get/library/create/update/switch/try`; migration 024): the four
+  built-in rules are listed locked (B-1 restricted files stay where they are, B-2 one session per machine, B-3 machines run the approved
+  version within two days, B-4 a machine's name matches); the Super User writes organisation-wide rules of three shapes -- *never*, *follow*,
+  *limit* -- from the pattern library (restricted file leaves its folder, unanswered help request, machine past the update limit, Admin
+  outside their department, out-of-hours session). **The stored shape of a rule is decided here, as the user asked the Engine to
+  settle it** (CLAUDE.md had it deferred): `spec` JSON in `rules.spec`, documented in database-schema.md 15 and kept in
+  `engine/console/rules.py`; change it there if you disagree. An Admin reads the list ("set by the Super User"); only the Super User changes
+  it; a built-in cannot be changed or switched off; switching off stops new deviations and never deletes old ones. `rules.try` says what a
+  changed line would have done to the last month's deviations before it is saved. *Deviations* (`deviations.list/get/outcome`, Super User only):
+  every one points at its rule and keeps the rule **as it was**; carries what was expected and what happened, who or what it concerns
+  (named for the reader), the timeline around it (the audit trail on that machine) and **evidence -- facts only** (who was signed in, which
+  Admin entered and how long before it, whether an issue was open on the machine); an outcome (open / explained / accepted / escalated /
+  dismissed) where *explained* and *accepted* need the person's own note -- the system never states a cause. List: strip counts by kind,
+  per rule, per day (open vs dealt with, by severity), grouping by rule / department / person-or-machine. *Recording*
+  (`engine/console/accountability.py`): the combos tell it what happened -- a restricted copy (B-1), a machine presenting another name
+  (B-4), a session refused because the machine is held (B-2); a ping to an Admin, a report routed to a department, a version approved, a
+  department task given, a department left without an Admin open **watches** on *follow* rules that the sweep (every minute) closes as kept
+  or records as a deviation when late; *limit* rules count the audit trail (Admin entries outside working hours, assisted-access entries,
+  entries into one machine, failed sign-ins on one machine) over the rolling period, once per period. What a rule says to do is all the
+  system does: report it to the Super User (about an Admin: the Super User only), tell the department's Admin (never about an Admin), run
+  an Action on the machine. TUI: `rules`, `rule`, `rule add|on|off|try|library`, `deviations`, `deviation <id>`, `deviation outcome`
+  (the old raw log is now `expectations`). *Test:* `tests/test_console_rules.py`, `test_operator_client.py`.
+

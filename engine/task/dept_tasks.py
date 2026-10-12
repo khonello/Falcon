@@ -153,9 +153,13 @@ async def dept_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     schedule_deadline(ctx.engine, task)
     await ctx.engine.audit.record(ctx, "task.dept_created", target_type="department_tasks", target_id=task_id,
                                   detail={"department_id": department_id, "told": told, "deadline_at": deadline.isoformat()})
+    from engine.console import accountability
+
     for admin_id in told:
         await ctx.engine.push_to_account(admin_id, "task.dept_assigned",
                                          {"task_id": task_id, "title": title, "deadline_at": deadline.isoformat()})
+        await accountability.watch(ctx.engine, "task", target_table=f"dept_task:{task_id}", target_id=admin_id, kind="admin",
+                                   account_id=admin_id, department_id=department_id, label=f"Department task {task_id}")
     return {"task": (await _view(ctx, [task]))[0]}
 
 

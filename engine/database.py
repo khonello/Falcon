@@ -27,7 +27,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 # Legal targets for polymorphic references. Extend deliberately, never ad hoc.
 POLYMORPHIC_TABLES = frozenset({
     "accounts", "departments", "pcs", "sessions", "assisted_access_requests", "file_index",
-    "tasks", "department_tasks", "enrollments", "issues", "resource_marks", "verification_items", "manual_verifications", "flows", "flow_destinations",
+    "tasks", "department_tasks", "enrollments", "issues", "resource_marks", "deviations", "rules", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts",
@@ -73,6 +73,7 @@ class Database:
         self.enrollments = EnrollmentsRepo(self)
         self.issues = IssuesRepo(self)
         self.marks = MarksRepo(self)
+        self.rules = RulesRepo(self)
         self.flows = FlowsRepo(self)
         self.reports = ReportsRepo(self)
         self.assistance = AssistanceRepo(self)
@@ -712,6 +713,118 @@ class TasksRepo(_Repo):
 # 5. Flow
 # ============================================================================================
 
+class RulesRepo(_Repo):
+    """Rules (the standard) and deviations (departures from it), and the watches that catch a *follow* rule not being kept (migration 024)."""
+
+    _RULE = "id, code, builtin, name, shape, spec, enabled, created_by_account_id, created_at, updated_at"
+
+    async def rules(self) -> list[dict[str, Any]]:
+        return await self._fetch(f"SELECT {self._RULE} FROM rules ORDER BY builtin DESC, id")
+
+    async def rule(self, rule_id: int) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._RULE} FROM rules WHERE id = $1", rule_id)
+
+    async def rule_by_code(self, code: str) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._RULE} FROM rules WHERE code = $1", code)
+
+    async def create_rule(self, name: str, shape: str, spec: dict[str, Any], by_account_id: int) -> int:
+        return await self._val(
+            "INSERT INTO rules (code, name, shape, spec, created_by_account_id) VALUES ("
+            "'O-' || (SELECT coalesce(max(substring(code from 3)::int), 0) + 1 FROM rules WHERE NOT builtin), $1, $2, $3, $4) RETURNING id",
+            name, shape, spec, by_account_id)
+
+    async def update_rule(self, rule_id: int, *, name: str | None = None, spec: dict[str, Any] | None = None,
+                          enabled: bool | None = None) -> None:
+        await self._exec(
+            "UPDATE rules SET name = COALESCE($2, name), spec = COALESCE($3, spec), enabled = COALESCE($4, enabled), updated_at = now() "
+            "WHERE id = $1 AND NOT builtin", rule_id, name, spec, enabled)
+
+    async def record_deviation(self, d: dict[str, Any]) -> int | None:
+        """The deviation's id, or None when this very departure was already recorded (one per rule and source)."""
+        found = await self._val(
+            "INSERT INTO deviations (rule_id, rule_snapshot, severity, kind, subject_account_id, subject_pc_id, subject_department_id, "
+            "department_id, pc_id, at, short, expected, happened, value, detail, source_key) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) "
+            "ON CONFLICT (rule_id, source_key) WHERE source_key IS NOT NULL DO NOTHING RETURNING id",
+            d["rule_id"], d["rule_snapshot"], d["severity"], d["kind"], d.get("subject_account_id"), d.get("subject_pc_id"),
+            d.get("subject_department_id"), d.get("department_id"), d.get("pc_id"), d["at"], d["short"], d["expected"], d["happened"],
+            d.get("value"), d.get("detail") or {}, d.get("source_key"))
+        if found is not None:
+            await self._exec("UPDATE deviations SET code = 'D-' || (300 + id) WHERE id = $1", found)
+        return found
+
+    async def deviation(self, deviation_id: int) -> dict[str, Any] | None:
+        return await self._one(
+            "SELECT d.*, r.code AS rule_code, r.name AS rule_name, r.builtin AS rule_builtin, p.hostname, dp.name AS department_name "
+            "FROM deviations d JOIN rules r ON r.id = d.rule_id LEFT JOIN pcs p ON p.id = d.pc_id "
+            "LEFT JOIN departments dp ON dp.id = d.department_id WHERE d.id = $1", deviation_id)
+
+    async def deviations(self, *, since: datetime | None = None, rule_id: int | None = None, kind: str | None = None,
+                         outcome: str | None = None, department_id: int | None = None, limit: int = 1000) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT d.*, r.code AS rule_code, r.name AS rule_name, r.builtin AS rule_builtin, p.hostname, dp.name AS department_name "
+            "FROM deviations d JOIN rules r ON r.id = d.rule_id LEFT JOIN pcs p ON p.id = d.pc_id "
+            "LEFT JOIN departments dp ON dp.id = d.department_id "
+            "WHERE ($1::timestamptz IS NULL OR d.at >= $1) AND ($2::int IS NULL OR d.rule_id = $2) AND ($3::text IS NULL OR d.kind = $3) "
+            "AND ($4::text IS NULL OR d.outcome = $4) AND ($5::int IS NULL OR d.department_id = $5) "
+            "ORDER BY (d.outcome <> 'open'), CASE d.severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, d.at DESC "
+            "LIMIT $6", since, rule_id, kind, outcome, department_id, limit)
+
+    async def set_outcome(self, deviation_id: int, outcome: str, note: str | None, by_account_id: int) -> bool:
+        return await self._val(
+            "UPDATE deviations SET outcome = $2, note = $3, outcome_by_account_id = $4, outcome_at = now() WHERE id = $1 RETURNING id",
+            deviation_id, outcome, note, by_account_id) is not None
+
+    async def deviation_counts(self, since: datetime) -> list[dict[str, Any]]:
+        """Per rule: how many deviations since `since`, and how many are still open."""
+        return await self._fetch(
+            "SELECT rule_id, count(*)::int AS n, count(*) FILTER (WHERE outcome = 'open')::int AS open FROM deviations "
+            "WHERE at >= $1 GROUP BY rule_id", since)
+
+    async def deviation_days(self, since: datetime) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT date_trunc('day', at) AS day, severity, (outcome = 'open') AS is_open, count(*)::int AS n FROM deviations "
+            "WHERE at >= $1 GROUP BY 1, 2, 3 ORDER BY 1", since)
+
+    async def deviation_values(self, rule_id: int, since: datetime) -> list[float]:
+        return [r["value"] for r in await self._fetch(
+            "SELECT value FROM deviations WHERE rule_id = $1 AND at >= $2 AND value IS NOT NULL", rule_id, since)]
+
+    # -- what a follow rule looks for -----------------------------------------------------------------
+
+    async def addressed_by_department(self, report_id: int, department_id: int | None) -> datetime | None:
+        """When an Admin of this department first marked the report addressed (any Admin when there is no department)."""
+        return await self._val(
+            "SELECT min(v.addressed_at) FROM report_addressed_views v JOIN accounts a ON a.id = v.addressed_by_account_id "
+            "WHERE v.report_id = $1 AND ($2::int IS NULL OR a.department_id = $2)", report_id, department_id)
+
+    async def dept_task_seen_at(self, task_id: int, account_id: int) -> datetime | None:
+        return await self._val("SELECT seen_at FROM department_task_admins WHERE task_id = $1 AND account_id = $2", task_id, account_id)
+
+    async def first_admin_since(self, department_id: int | None, since: datetime) -> datetime | None:
+        """When the department first had an active Admin again after `since`."""
+        return await self._val(
+            "SELECT min(created_at) FROM accounts WHERE role = 'admin' AND status = 'active' AND department_id = $1 AND created_at >= $2",
+            department_id, since)
+
+    # -- watches ---------------------------------------------------------------------------------
+
+    async def open_watch(self, rule_id: int, due_at: datetime, expect: str, target_table: str, target_id: int,
+                         subject: dict[str, Any]) -> bool:
+        return await self._val(
+            "INSERT INTO rule_watches (rule_id, due_at, expect, target_table, target_id, subject) VALUES ($1, $2, $3, $4, $5, $6) "
+            "ON CONFLICT DO NOTHING RETURNING id", rule_id, due_at, expect, target_table, target_id, subject) is not None
+
+    async def watches_due(self, until: datetime) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM rule_watches WHERE state = 'open' AND due_at <= $1 ORDER BY due_at", until)
+
+    async def open_watches(self, expect: str | None = None) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM rule_watches WHERE state = 'open' AND ($1::text IS NULL OR expect = $1)", expect)
+
+    async def close_watch(self, watch_id: int, state: str, deviation_id: int | None = None) -> None:
+        await self._exec("UPDATE rule_watches SET state = $2, closed_at = now(), deviation_id = $3 WHERE id = $1", watch_id, state, deviation_id)
+
+
 class MarksRepo(_Repo):
     """Restricted marks (migration 023): a file or folder marked where it is, and every version's hash."""
 
@@ -821,6 +934,11 @@ class IssuesRepo(_Repo):
             "AND (i.state <> 'resolved' OR (NOT $5 AND $6::timestamptz IS NOT NULL AND i.resolved_at >= $6)) "
             "ORDER BY (i.state = 'resolved'), CASE i.severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, "
             "i.opened_at LIMIT $7", department_id, pc_id, type_, owner_account_id, open_only, include_resolved_since, limit)
+
+    async def open_at(self, pc_id: int, at: datetime) -> list[dict[str, Any]]:
+        """Issues that were open on a machine at a given moment."""
+        return await self._fetch(
+            "SELECT id, code FROM issues WHERE pc_id = $1 AND opened_at <= $2 AND (resolved_at IS NULL OR resolved_at >= $2)", pc_id, at)
 
     async def open_for_pcs(self, pc_ids: list[int]) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -1279,6 +1397,11 @@ class AssistanceRepo(_Repo):
             "SELECT count(*) FROM pings WHERE receiver_account_id = $1 AND addressed_at IS NULL",
             receiver_account_id)
 
+    async def unaddressed_from(self, sender_account_id: int, receiver_account_id: int) -> bool:
+        return bool(await self._val(
+            "SELECT EXISTS (SELECT 1 FROM pings WHERE sender_account_id = $1 AND receiver_account_id = $2 AND addressed_at IS NULL)",
+            sender_account_id, receiver_account_id))
+
     async def address_pings(self, receiver_account_id: int, sender_account_id: int) -> None:
         await self._exec(
             "UPDATE pings SET addressed_at = now() WHERE receiver_account_id = $1 AND sender_account_id = $2 "
@@ -1649,6 +1772,22 @@ class AuditRepo(_Repo):
         return await self._val(
             "SELECT count(DISTINCT actor_account_id)::int FROM audit_log WHERE occurred_at >= $1 AND occurred_at < $2 "
             f"AND actor_account_id IS NOT NULL{extra}", since, until, *args)
+
+    async def count_by(self, reading: str, since: datetime) -> list[dict[str, Any]]:
+        """What a *limit* rule counts, per subject, since a time: [{subject, pc_id, n}]. `reading` is one of the rule readings
+        (engine/console/rules.py READINGS); the subject is the account (or, for failed sign-ins, the machine)."""
+        sql = {
+            "outhours": "SELECT actor_account_id AS subject, NULL::int AS pc_id, count(*)::int AS n FROM audit_log a JOIN accounts c ON c.id = a.actor_account_id "
+                        "WHERE a.action_type = 'session.traversed' AND c.role = 'admin' AND (a.detail->>'outside_hours') = 'true' "
+                        "AND a.occurred_at >= $1 GROUP BY 1",
+            "crossdept": "SELECT actor_account_id AS subject, NULL::int AS pc_id, count(*)::int AS n FROM audit_log a "
+                         "WHERE a.action_type = 'assisted_access.accepted' AND a.occurred_at >= $1 GROUP BY 1",
+            "samemachine": "SELECT actor_account_id AS subject, pc_id, count(*)::int AS n FROM audit_log a JOIN accounts c ON c.id = a.actor_account_id "
+                           "WHERE a.action_type = 'session.traversed' AND c.role = 'admin' AND a.pc_id IS NOT NULL AND a.occurred_at >= $1 GROUP BY 1, 2",
+            "failedauth": "SELECT NULL::int AS subject, p.id AS pc_id, count(*)::int AS n FROM audit_log a JOIN pcs p ON p.client_id = a.target_id "
+                          "WHERE a.action_type = 'auth.failed' AND a.occurred_at >= $1 GROUP BY 2",
+        }[reading]
+        return await self._fetch(sql, since)
 
     async def for_targets(self, target_type: str, target_ids: list[str], action_types: list[str]) -> list[dict[str, Any]]:
         """Audit rows about given targets of given kinds, oldest first (target ids are stored as text)."""

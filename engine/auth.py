@@ -24,7 +24,7 @@ import hashlib
 import hmac
 import logging
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from engine.dispatch import Context, Identity, handler
@@ -97,6 +97,14 @@ async def _announce_hostname(ctx: Context, account: dict[str, Any], announced_ho
                 ctx.engine, type_="deviation", severity="medium", title="Machine presented another name", subject=f"presented {announced_hostname}",
                 pc_id=account["bound_pc_id"], source_table="hostname_mismatch", source_id=account["bound_pc_id"],
                 detail={"what": "name", "expected": account["hostname"], "presented": announced_hostname, "deviation_id": deviation_id})
+            from engine.console import accountability
+
+            await accountability.never(
+                ctx.engine, "cert", kind="pc", subject_pc_id=account["bound_pc_id"], pc_id=account["bound_pc_id"],
+                subject_department_id=account["department_id"], short="{who} presented another name",
+                expected=f"The name {account['hostname']}", happened=f"The name {announced_hostname}",
+                detail={"expected": account["hostname"], "presented": announced_hostname},
+                source_key=f"cert:{account['bound_pc_id']}:{announced_hostname}:{datetime.now(timezone.utc).date().isoformat()}")
         # said back to the client too, so the person at it is told -- surfaced, never silently tolerated
         return {"expected": account["hostname"], "announced": announced_hostname}
     return None
