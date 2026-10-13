@@ -292,6 +292,6 @@ part is recorded for later, not built.
   See `installers/README.md`. Machines register by probation, as decided: a service installed with no key asks, shows the code in the person's session (again if nobody was
   there), and keeps the key it is handed in the closed folder. An Admin's console holds no key: the service answers the Engine's challenge for it over a named pipe
   (`common/signpipe.py`). *Tested:* `tests/test_installers.py` (including, from an elevated prompt, an Admin workstation installed as a service that registers itself and
-  whose keyless console signs in), `test_signpipe.py`, `test_enrollment.py`. *Not run for real:* the Engine's installer on Linux and the Windows runtime venv with real wheels
-  (the VMs); a non-administrator Windows user opening the pipe (the VM). *Still open:* a bundled interpreter, frozen helper windows, signing, the update pipeline, and whether
+  whose keyless console signs in), `test_signpipe.py`, `test_enrollment.py`. *Run for real:* the Engine's installer on Linux (WSL), twice, with a Windows client connecting over the bundle's pinned certificate; the second run changed nothing. *Not run for real:* the Windows runtime venv with real wheels
+  and the `.deb` build (the VMs); a non-administrator Windows user opening the pipe (the VM). *Still open:* a bundled interpreter, frozen helper windows, signing, the update pipeline, and whether
   the Super User's PC is also a managed machine.

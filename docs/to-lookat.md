@@ -39,7 +39,7 @@ Last updated 13 Oct 2026.
 
 ## Installers (13 Oct 2026)
 
-- **Written and tested, not run for real on a Linux server or a clean Windows VM.** The Hyper-V pass should do, in order: the Engine's installer (Linux VM), then the Super User's,
+- **Written and tested; the Engine's installer was also run for real on Linux (WSL), twice, and removed.** Not yet on a clean machine. The Hyper-V pass should do, in order: the Engine's installer (Linux VM, with the `.deb`), then the Super User's,
   an Admin's and a person's PC (Windows VMs), confirm each registration, and try the console as a non-administrator user on the Admin workstation (the pipe's access rules).
 - **Decide:** is the Super User's PC also a managed machine (the Worker service on it)? Today the Super User's installer is the console only.
 - **Not mine, and removed from the list:** the Admin console needs no blocked bar; the overlay on the Admin's PC does it (the Admin installer puts the Worker pieces there).

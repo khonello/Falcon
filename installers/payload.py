@@ -116,6 +116,8 @@ def verify(payload: Path) -> list[str]:
     listed = set(manifest.get("files", {}))
     for f in payload.rglob("*"):
         rel = str(f.relative_to(payload)).replace("\\", "/")
+        if "__pycache__" in f.parts or f.suffix in (".pyc", ".pyo"):
+            continue                                      # Python writes these itself the first time it runs the installer from here
         if f.is_file() and rel != "manifest.json" and rel not in listed:
             problems.append(f"not in the manifest: {rel}")
     return problems

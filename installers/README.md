@@ -65,8 +65,11 @@ refused; the Engine's settings and unit; the Windows route into temporary folder
 key on upgrade, no leftover files, uninstall keeps the key); and, from an elevated prompt, the real thing: an Admin workstation installed as a
 service, which asks to be registered, is confirmed by the Super User with the code it logs, is handed its key into a folder only the system and
 administrators can read, comes online, and its keyless console is signed in by the service. `tests/test_signpipe.py`, `tests/test_enrollment.py`
-cover the pipe and the first-start registration. **Not run for real yet:** the Engine's installer on Linux (its steps and texts are tested; the
-run needs the VM) and the Windows installer's own runtime venv with real wheels.
+cover the pipe and the first-start registration. **Run for real on Linux (WSL Ubuntu, throwaway names, then removed):** the Engine's installer, all ten steps, twice: the user and folders, the
+runtime from the payload's requirements, a PostgreSQL role and database with a made password, the certificate, schema, master secret and first Super User, the bundle and
+its fingerprint, and a systemd service answering as the `falcon` user; the secret and key are `600` and the settings `640 root:falcon`; a Windows client then connected to
+it over TLS pinned to the bundle's certificate with the Super User's key, and a wrong certificate was refused; the second run kept the password, the secret and the
+Super User and issued nothing new. **Not run for real yet:** the Windows installer's own runtime venv with real wheels (the VM) and the `.deb` build (`dpkg-deb`).
 
 ## Still to do (final packaging; on hold)
 

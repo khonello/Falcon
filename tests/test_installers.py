@@ -89,6 +89,10 @@ def test_a_payload_that_was_changed_or_half_copied_is_refused(tmp_path):
     problems = payload_mod.verify(p)
     assert "changed: app/worker_client/service.py" in problems and "missing: app/worker_client/etw.py" in problems
     assert "not in the manifest: app/worker_client/extra.py" in problems
+    cache = p / "installers" / "__pycache__"
+    cache.mkdir()
+    (cache / "x.cpython-312.pyc").write_bytes(b"x")                                             # what running the installer from here leaves behind
+    assert not any("__pycache__" in x for x in payload_mod.verify(p))
     assert payload_mod.verify(tmp_path / "nowhere") == ["manifest.json is missing or unreadable"]
 
 
