@@ -61,7 +61,10 @@ def process_start(data: bytes) -> tuple[int, str] | None:
     if len(data) < 26:
         return None
     pid = struct.unpack_from("<I", data, 0)[0]
-    name = basename(utf16z(data, 24))
+    # The image name follows a few fields whose number differs between Windows versions (observed on Windows 11: 76 bytes in), and it always begins
+    # with the kernel's own device path, so it is found by that rather than at a fixed place.
+    at = data.find("\\Device\\".encode("utf-16-le"), 8)
+    name = basename(utf16z(data, at if at >= 0 else 24))
     return (pid, name) if name else None
 
 
@@ -373,7 +376,7 @@ class EtwWatcher:
         if event_id != EVENT_FILE_CREATE or pid == self._me:
             return
         got = file_open(data)
-        if got is None or got[1] & FILE_DIRECTORY_FILE:
+        if got is None or got[1] & FILE_DIRECTORY_FILE or got[0].endswith("\\"):
             return
         path = drive_path(got[0], self._devices)
         if path is None or not self.files.matches(path):
@@ -386,4 +389,16 @@ class EtwWatcher:
         if len(self._recent) > 2000:
             self._recent.clear()
         self._recent[path] = now
-        self.emit("file.accessed", {"path": path, "name": basename(path), "process": self._names.get(pid, "")})
+        self.emit("file.accessed", {"path": path, "name": basename(path), "process": self._name_of(pid)})
+
+    def _name_of(self, pid: int) -> str:
+        """Which program opened it: known from its start, or asked of Windows for a process that was already running."""
+        name = self._names.get(pid)
+        if name is None:
+            try:
+                import psutil
+
+                name = self._names[pid] = psutil.Process(pid).name()
+            except Exception:  # noqa: BLE001 -- it ended already, or may not be looked at
+                name = ""
+        return name

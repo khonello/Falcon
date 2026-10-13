@@ -20,7 +20,7 @@ from worker_client.etw import EtwWatcher
 def main() -> int:
     seconds = float(sys.argv[1]) if len(sys.argv) > 1 else 15.0
     prefix = sys.argv[2] if len(sys.argv) > 2 else "C:/Users"
-    watcher = EtwWatcher(lambda t, d: print(time.strftime("%H:%M:%S"), t, d, flush=True))
+    watcher = EtwWatcher(lambda t, d: print(time.strftime("%H:%M:%S"), t, str(d).encode("ascii", "replace").decode(), flush=True))
     programs, files = watcher.want_programs(True), watcher.want_files([{"path_prefix": prefix}])
     print(f"programs live: {programs} {watcher.errors.get('programs', '')}\nfile opens live: {files} {watcher.errors.get('files', '')}")
     if not (programs or files):
@@ -29,8 +29,8 @@ def main() -> int:
     try:
         time.sleep(seconds)
     finally:
+        got = {k: v.records for k, v in (("program records", watcher._process), ("file records", watcher._file)) if v is not None}
         watcher.stop()
-    got = {k: v.records for k, v in (("program records", watcher._process), ("file records", watcher._file)) if v is not None}
     print("stopped; records Windows delivered:", got)
     return 0
 

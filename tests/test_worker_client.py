@@ -819,6 +819,8 @@ def test_etw_payloads_are_read_the_way_windows_lays_them_out():
     start = struct.pack("<IQIII", 4242, 0, 100, 1, 0) + _utf16("\\Device\\HarddiskVolume3\\Program Files\\Microsoft Office\\EXCEL.EXE")
     assert process_start(start) == (4242, "EXCEL.EXE") and process_start(b"short") is None
     assert process_start(struct.pack("<IQIII", 1, 0, 0, 0, 0) + b"\x00\x00") is None
+    later = struct.pack("<IIIQIIIIII", 7, 6, 0, 0, 1, 3, 2, 1, 0x1000, 0x3000) + _utf16("\\Device\\HarddiskVolume3\\Windows\\System32\\taskkill.exe") + b"\x00" * 8
+    assert process_start(later) == (7, "taskkill.exe")                    # the layout seen on Windows 11: more fields before the name
     assert basename("C:/a/b\\c.txt") == "c.txt" and utf16z(_utf16("hi") + b"junk", 0) == "hi" and utf16z(b"", 4) == ""
 
     opened = struct.pack("<QQIIII", 1, 2, 7, 0x40, 0x80, 3) + _utf16("\\Device\\HarddiskVolume3\\Users\\ama\\salaries.xlsx")
