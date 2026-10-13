@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Falcon Concepts</title>
+<title>New Flow · Columns</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -437,6 +437,14 @@ a { color: var(--accent); text-decoration: none; }
   .top { padding: 8px 16px; }
   .search { min-width: 0; flex: 1; }
 }
+/* New flow draft: the three columns, in the order files move; one under another on a narrow screen */
+.nf-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.nf-col { display: flex; flex-direction: column; gap: 10px; }
+.nf-col > div > div[style] { margin-left: 0 !important; }
+.nf-col > div > .row:first-child > .mono:first-child { display: none !important; }
+.nf-col > div[style*="border"] { position: relative; padding-right: 40px !important; }
+.nf-col > div > .row:first-child > button:last-child { position: absolute; top: 12px; right: 8px; }
+@media (max-width: 1100px) { .nf-cols { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 
@@ -2215,11 +2223,7 @@ function NewFlow({ go, me, edit }) {
   const hostOpts = (exclude) => managed.filter((h) => h.value !== exclude);
   const folderOpts = FOLDER_HINTS.map((v) => ({ value: v }));
   const num = (i) => html`<span className="mono" style=${{ width: 22, height: 22, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 12, flex: "none" }}>${i + 1}</span>`;
-  const B = [];
-  B[0] = html`<div>
-    ${head("Where do the files come from?", "One source or several. Each is a folder on a machine you manage, or an existing flow, so this one carries on with whatever that flow delivers. Files from every source go the same way; nothing is copied back.")}
-    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-      ${f.srcs.map((s, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
+  const srcCard = (s, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
         <div className="row" style=${{ gap: 10 }}>
           ${num(i)}
           <${Segmented} size="small" value=${s.mode} onChange=${(v) => setSrc(i, { mode: v })} options=${[{ value: "dir", label: "A folder" }, { value: "flow", label: "An existing flow" }]} />
@@ -2238,20 +2242,8 @@ function NewFlow({ go, me, edit }) {
               </div>`}
           ${rsrc[i][2] ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${s.mode === "flow" ? "Carries on" : "This folder is where"} <b style=${{ fontWeight: 500, color: "var(--text-2)" }}>${rsrc[i][2]}</b> ${s.mode === "flow" ? "after it delivers to" : "delivers, so this flow carries on from it:"} <span className="mono">${rsrc[i][0]} ${rsrc[i][1]}</span>${s.mode === "flow" ? ". Whatever arrives there is passed on by this flow." : "."}</div>` : null}
         </div>
-      </div>`)}
-      <div className="row">
-        <${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, srcs: [...x.srcs, { mode: "dir", host: "", path: "" }] }))}>Add a source<//>
-        <span className="t3" style=${{ fontSize: 12 }}>${f.srcs.length} source${f.srcs.length === 1 ? "" : "s"}${f.srcs.length > 1 ? ", merged into one flow" : ""}</span>
-      </div>
-      <div style=${{ marginTop: 6 }}><${Field} label="Copy files"><${Radio.Group} value=${f.when} onChange=${(e) => set("when")(e.target.value)} options=${["Real time", "On a schedule", "Only when I run it"]} /><//></div>
-      <div className="t3" style=${{ fontSize: 12, marginLeft: 142 }}>${f.when === "Real time" ? "A file is copied the moment it changes, from the machine's own file events." : f.when === "On a schedule" ? "Changed files are copied together, every hour." : "Nothing moves until someone presses Run on the flow."}</div>
-    </div>
-  </div>`;
-  B[1] = html`<div>
-    ${head("Should anything happen to the files on the way?", "Optional. A step placed before the split applies to every destination; a step on one branch applies to that destination only.")}
-    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-      ${f.stages.length === 0 ? html`<div className="t3" style=${{ padding: "14px", border: "1px dashed var(--border-strong)", borderRadius: 6, textAlign: "center" }}>No steps. Files are copied exactly as they are.</div>` : null}
-      ${f.stages.map((st, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
+      </div>`;
+  const stageCard = (st, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
         <div className="row" style=${{ gap: 10 }}>
           <span className="mono" style=${{ width: 22, height: 22, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 12 }}>${i + 1}</span>
           <${Select} value=${st.kind} style=${{ width: 130 }} options=${Object.keys(STAGE_OPS).map((k) => ({ value: k, label: k }))} onChange=${(v) => setStage(i, { kind: v, op: STAGE_OPS[v][0] })} />
@@ -2264,14 +2256,8 @@ function NewFlow({ go, me, edit }) {
           <${Segmented} size="small" value=${st.scope === "all" ? "all" : "one"} onChange=${(v) => setStage(i, { scope: v === "all" ? "all" : 0 })} options=${[{ value: "all", label: "Every destination (before the split)" }, { value: "one", label: "One destination" }]} />
           ${st.scope !== "all" ? html`<${Select} size="small" value=${st.scope} style=${{ width: 200 }} options=${f.dests.map((d, j) => ({ value: j, label: d.mode === "ask" ? (d.who ? `${d.who} picks a folder` : `Destination ${j + 1}`) : d.host ? `${d.host} ${d.path}` : `Destination ${j + 1}` }))} onChange=${(v) => setStage(i, { scope: v })} />` : null}
         </div>
-      </div>`)}
-      <div className="row"><${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Transform", op: "Rename by date", scope: "all" }] }))}>Add a step<//></div>
-    </div>
-  </div>`;
-  B[2] = html`<div>
-    ${head("Where should the files go?", me ? "Each destination gets its own copy of every file. A machine you manage needs nobody to agree. For anywhere else, ask the person it belongs to, the Super User or another Admin, and they pick the folder on their own workstation." : "Each destination gets its own copy of every file. You manage every machine, so any of them can be picked without asking.")}
-    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-      ${f.dests.map((d, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
+      </div>`;
+  const destCard = (d, i) => html`<div key=${i} style=${{ border: "1px solid var(--border)", borderRadius: 6, padding: 14 }}>
           <div className="row" style=${{ gap: 10 }}>
             <span className="mono" style=${{ width: 22, height: 22, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 12 }}>${i + 1}</span>
             ${me ? html`<${Segmented} size="small" value=${d.mode} onChange=${(v) => setDest(i, { mode: v })} options=${[{ value: "mine", label: "A machine you manage" }, { value: "ask", label: "Ask someone to pick" }]} />` : null}
@@ -2292,7 +2278,42 @@ function NewFlow({ go, me, edit }) {
               </div>
               ${d.host ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${me ? "You manage it, so nobody has to agree." : "You manage every machine, so nobody has to agree."}</div>` : null}
             </div>`}
-        </div>`)}
+        </div>`;
+  const whenField = html`<div>
+      <div style=${{ marginTop: 6 }}><${Field} label="Copy files"><${Radio.Group} value=${f.when} onChange=${(e) => set("when")(e.target.value)} options=${["Real time", "On a schedule", "Only when I run it"]} /><//></div>
+      <div className="t3" style=${{ fontSize: 12, marginLeft: 142 }}>${f.when === "Real time" ? "A file is copied the moment it changes, from the machine's own file events." : f.when === "On a schedule" ? "Changed files are copied together, every hour." : "Nothing moves until someone presses Run on the flow."}</div>
+  </div>`;
+  const nameField = html`<${Field} label="Name"><${Input} id="nf-name" value=${f.name} onChange=${(e) => set("name")(e.target.value)} placeholder=${rsrc[0] && rsrc[0][1] ? rsrc[0][1].replace(/\//g, "") || "my-flow" : "my-flow"} style=${{ maxWidth: 320 }} /><//>`;
+  const checkList = html`<div style=${{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18 }}>
+      ${[["No loop back to a source, along the whole chain", !checks.some((c) => /loop/.test(c[1]))], ["No folder written by two flows", !checks.some((c) => /already written/.test(c[1]))], ["Every source and destination is a different folder", !checks.some((c) => /same folder|one of the sources/.test(c[1]))]]
+        .map(([t, ok]) => html`<div key=${t} className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ color: ok ? "var(--ok)" : "var(--crit)" }}>${ic(ok ? "CheckCircleFilled" : "CloseCircleFilled")}</span><span>${t}</span></div>`)}
+      ${checks.map(([k, msg], i) => html`<div key=${i} className="decide" style=${{ "--c": k === "bad" ? "var(--crit)" : "var(--med)", fontSize: 12.5 }}>${msg}</div>`)}
+      ${asks.length ? html`<div className="decide" style=${{ "--c": "var(--med)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>Waiting on ${asks.map((d) => d.who).join(" and ")}.</b> The flow is created now. ${asks.length === 1 ? "They are" : "Each is"} asked to pick a folder on their own workstation, and that branch starts when they do. The rest starts straight away.</div>` : null}
+    </div>`;
+  const B = [];
+  B[0] = html`<div>
+    ${head("Where do the files come from?", "One source or several. Each is a folder on a machine you manage, or an existing flow, so this one carries on with whatever that flow delivers. Files from every source go the same way; nothing is copied back.")}
+    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+      ${f.srcs.map(srcCard)}
+      <div className="row">
+        <${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, srcs: [...x.srcs, { mode: "dir", host: "", path: "" }] }))}>Add a source<//>
+        <span className="t3" style=${{ fontSize: 12 }}>${f.srcs.length} source${f.srcs.length === 1 ? "" : "s"}${f.srcs.length > 1 ? ", merged into one flow" : ""}</span>
+      </div>
+      ${whenField}
+    </div>
+  </div>`;
+  B[1] = html`<div>
+    ${head("Should anything happen to the files on the way?", "Optional. A step placed before the split applies to every destination; a step on one branch applies to that destination only.")}
+    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+      ${f.stages.length === 0 ? html`<div className="t3" style=${{ padding: "14px", border: "1px dashed var(--border-strong)", borderRadius: 6, textAlign: "center" }}>No steps. Files are copied exactly as they are.</div>` : null}
+      ${f.stages.map(stageCard)}
+      <div className="row"><${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Transform", op: "Rename by date", scope: "all" }] }))}>Add a step<//></div>
+    </div>
+  </div>`;
+  B[2] = html`<div>
+    ${head("Where should the files go?", me ? "Each destination gets its own copy of every file. A machine you manage needs nobody to agree. For anywhere else, ask the person it belongs to, the Super User or another Admin, and they pick the folder on their own workstation." : "Each destination gets its own copy of every file. You manage every machine, so any of them can be picked without asking.")}
+    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+      ${f.dests.map(destCard)}
       <div className="row">
         <${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, dests: [...x.dests, { mode: "mine", host: "", path: "" }] }))}>Add a destination<//>
         <span className="t3" style=${{ fontSize: 12 }}>${f.dests.length} destination${f.dests.length === 1 ? "" : "s"}${f.dests.length > 1 ? ", so the flow branches" : ""}</span>
@@ -2302,27 +2323,44 @@ function NewFlow({ go, me, edit }) {
   </div>`;
   B[3] = html`<div>
     ${head(edit ? "Name it and check it" : "Name it and check it", edit ? "The checks run again against every other flow and the one file index. The flow keeps running as it was until you save." : "These checks run against the one file index before anything is copied.")}
-    <${Field} label="Name"><${Input} id="nf-name" value=${f.name} onChange=${(e) => set("name")(e.target.value)} placeholder=${rsrc[0] && rsrc[0][1] ? rsrc[0][1].replace(/\//g, "") || "my-flow" : "my-flow"} style=${{ maxWidth: 320 }} /><//>
-    <div style=${{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18 }}>
-      ${[["No loop back to a source, along the whole chain", !checks.some((c) => /loop/.test(c[1]))], ["No folder written by two flows", !checks.some((c) => /already written/.test(c[1]))], ["Every source and destination is a different folder", !checks.some((c) => /same folder|one of the sources/.test(c[1]))]]
-        .map(([t, ok]) => html`<div key=${t} className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ color: ok ? "var(--ok)" : "var(--crit)" }}>${ic(ok ? "CheckCircleFilled" : "CloseCircleFilled")}</span><span>${t}</span></div>`)}
-      ${checks.map(([k, msg], i) => html`<div key=${i} className="decide" style=${{ "--c": k === "bad" ? "var(--crit)" : "var(--med)", fontSize: 12.5 }}>${msg}</div>`)}
-      ${asks.length ? html`<div className="decide" style=${{ "--c": "var(--med)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>Waiting on ${asks.map((d) => d.who).join(" and ")}.</b> The flow is created now. ${asks.length === 1 ? "They are" : "Each is"} asked to pick a folder on their own workstation, and that branch starts when they do. The rest starts straight away.</div>` : null}
-    </div>
+    ${nameField}
+    ${checkList}
   </div>`;
   const problem = stepProblem.find(Boolean);
   const save = () => { toast(edit ? (asks.length ? `Saved ${edit}; ${asks.map((d) => d.who).join(" and ")} asked to pick a folder (concept)` : `Saved ${edit} · checks passed, recorded in the audit log (concept)`)
     : asks.length ? `Flow created; ${asks.map((d) => d.who).join(" and ")} asked to pick a folder (concept)` : "Flow created and running (concept)"); go("flows"); };
-  return html`<${React.Fragment}>${modalCtx}<${EditorShell} ratio="minmax(0, 1fr) minmax(0, 1fr)"
-    left=${html`<section className="panel">${B.map((b0, i) => html`<div key=${i} style=${{ padding: "22px 24px", borderTop: i ? "1px solid var(--border)" : 0 }}>${b0}</div>`)}</section>`}
-    right=${html`<section className="panel" style=${{ padding: "14px 16px" }}>
-      <div className="row" style=${{ marginBottom: 6 }}><span style=${{ fontWeight: 600 }}>The flow so far</span><span className="t3" style=${{ fontSize: 12 }}>files only move left to right</span></div>
-      ${edit ? html`<div className="t3" style=${{ fontSize: 12, marginBottom: 8 }}>Editing <b style=${{ fontWeight: 600, color: "var(--text)" }}>${edit}</b>. It keeps running as it was until you save.</div>`
-        : html`<div style=${{ marginBottom: 8 }}><${Select} size="small" allowClear showSearch placeholder="Start from a copy of a flow" style=${{ width: 240 }} options=${EXISTING_FLOWS.map((x) => ({ value: x.name, label: "Copy of " + x.name }))} onChange=${(v) => load(v || "blank")} /></div>`}
-      <${FlowPreview} f=${{ ...ff, dests: ff.dests.map((d) => (d.host && d.host[0] === "?" ? { host: d.host.slice(1), path: "picks a folder" } : d)) }} />
-      <div className="t3" style=${{ fontSize: 12, marginTop: 8 }}>${checks.filter((c) => c[0] === "bad").length ? `${checks.filter((c) => c[0] === "bad").length} problem${checks.filter((c) => c[0] === "bad").length === 1 ? "" : "s"} to fix, listed at the bottom of the form` : "No loop, no folder written twice, every folder different"}</div>
-    </section>`}
-    problem=${problem} onCancel=${cancel} saveLabel=${edit ? "Save changes" : "Create flow"} onSave=${save} /><//>`;
+  const fp = { ...ff, dests: ff.dests.map((d) => (d.host && d.host[0] === "?" ? { host: d.host.slice(1), path: "picks a folder" } : d)) };
+  const startSel = edit ? null : html`<${Select} size="small" allowClear showSearch placeholder="Start from a copy of a flow" style=${{ width: 220 }} options=${EXISTING_FLOWS.map((x) => ({ value: x.name, label: "Copy of " + x.name }))} onChange=${(v) => load(v || "blank")} />`;
+  const nBad = checks.filter((c) => c[0] === "bad").length;
+  const checkLine = nBad ? `${nBad} problem${nBad === 1 ? "" : "s"} to fix, listed under the checks` : "No loop, no folder written twice, every folder different";
+  const addSrc = () => setF((x) => ({ ...x, srcs: [...x.srcs, { mode: "dir", host: "", path: "" }] }));
+  const addStep = () => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Transform", op: "Rename by date", scope: "all" }] }));
+  const addDest = () => setF((x) => ({ ...x, dests: [...x.dests, { mode: "mine", host: "", path: "" }] }));
+  const many = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const bar = html`<div className="edbar"><span style=${{ fontSize: 12.5, color: problem ? "var(--med)" : "var(--text-3)", minWidth: 0 }}>${problem || (asks.length ? `Waiting on ${asks.map((d) => d.who).join(" and ")} once it is created` : "Checked against every other flow and the one file index")}</span><span className="sp" />
+    <${Button} onClick=${cancel}>Cancel<//><${Button} type="primary" disabled=${!!problem} title=${problem || ""} onClick=${save}>${edit ? "Save changes" : "Create flow"}<//></div>`;
+  // DRAFT · three columns in the files' own order: Sources, Along the way, Destinations, each with its own Add. The
+  // drawing above follows them; the name, how files are copied and the checks sit under them, Create at the bottom.
+  const col = (n, title, sub, body, add) => html`<section className="panel" style=${{ minWidth: 0 }}>
+      <div className="phd"><div className="pt" style=${{ display: "flex", alignItems: "center", gap: 8 }}>${num(n - 1)}${title}<small>${sub}</small></div></div>
+      <div className="pbd nf-col">${body}<div style=${{ marginTop: 10 }}>${add}</div></div></section>`;
+  return html`<${React.Fragment}>${modalCtx}<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <${Panel} title=${edit ? `Editing ${edit}` : "The flow so far"} sub=${edit ? "it keeps running as it was until you save" : "files only move left to right"} extra=${startSel}>
+      <${FlowPreview} f=${fp} />
+    <//>
+    <div className="nf-cols">
+      ${col(1, "Sources", f.srcs.length > 1 ? `${f.srcs.length}, merged into one flow` : "a folder, or an existing flow", f.srcs.map(srcCard),
+        html`<${Button} block icon=${ic("PlusOutlined")} onClick=${addSrc}>Add a source<//>`)}
+      ${col(2, "Along the way", "optional", html`${f.stages.length ? f.stages.map(stageCard) : html`<div className="t3" style=${{ padding: 14, border: "1px dashed var(--border-strong)", borderRadius: 6, textAlign: "center" }}>No steps. Files are copied exactly as they are.</div>`}`,
+        html`<${Button} block icon=${ic("PlusOutlined")} onClick=${addStep}>Add a step<//>`)}
+      ${col(3, "Destinations", f.dests.length > 1 ? `${f.dests.length}, so the flow branches` : "each gets its own copy", html`${f.dests.map(destCard)}${f.dests.length > DEST_SOFT_LIMIT ? html`<div className="decide" style=${{ "--c": "var(--med)" }}>That is a lot of destinations. Every file is copied ${f.dests.length} times. Consider splitting this into two flows.</div>` : null}`,
+        html`<${Button} block icon=${ic("PlusOutlined")} onClick=${addDest}>Add a destination<//>`)}
+    </div>
+    <${Panel} title="Name it and check it" sub=${edit ? "the checks run again against every other flow" : "checked against the one file index before anything is copied"}>
+      <div className="g c-66" style=${{ gap: 28, alignItems: "start" }}><div>${nameField}<div style=${{ marginTop: 6 }}>${whenField}</div></div><div style=${{ marginTop: -18 }}>${checkList}</div></div>
+    <//>
+    ${bar}
+  </div><//>`;
 }
 
 // Every flow on one map. Each folder appears once; an arrow is a flow. A folder that receives files from one
