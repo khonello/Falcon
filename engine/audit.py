@@ -125,12 +125,21 @@ class AuditTrail:
         return deviation_id
 
     async def run_retention(self) -> int:
+        """The daily purge: audit entries, the file-event history and what runs returned, all older than the retention window. Says what it did and whether it
+        worked; a failure in one part is logged and does not stop the others, and never takes the Scheduler down."""
         if not self.db.connected:
             return 0
-        purged = await self.db.audit.purge_older_than(self.retention_days)
-        log.info("audit retention: purged %s entries older than %sd", purged, self.retention_days)
-        # What runs returned (output, rows, screenshots) expires on the same clock.
-        cleared = await self.db.control.clear_outputs_older_than(self.retention_days)
-        if cleared:
-            log.info("audit retention: cleared %s run outputs older than %sd", cleared, self.retention_days)
+        days = self.retention_days
+        log.info("retention: starting (keeping %d days)", days)
+        purged = 0
+        for what, job in (("audit entries", self.db.audit.purge_older_than), ("file events", self.db.audit.purge_file_events_older_than),
+                          ("run outputs", self.db.control.clear_outputs_older_than)):
+            try:
+                n = await job(days)
+            except Exception:  # noqa: BLE001 -- say so and carry on with the rest
+                log.exception("retention: FAILED to clear %s older than %d days", what, days)
+                continue
+            log.info("retention: ok, %s %s older than %d days", n, what, days)
+            if what == "audit entries":
+                purged = n
         return purged

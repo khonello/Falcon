@@ -100,3 +100,29 @@ async def test_failed_installs_say_what_went_wrong_and_adoption_counts_machines_
     [today] = second
     assert today["n"] == 1 and today["joined"] == ["FIN-01"] and today["note"] == "1.1 approved"
     assert all(h["hostname"] != "FIN-01" for h in (await su.ok("rollout.gate"))["holding"]) and (await su.ok("rollout.gate"))["strip"]["holding"] == 4
+
+
+async def test_the_file_event_history_ages_out_with_the_audit_trail_and_nothing_newer_is_touched(engine, org):
+    db = engine.db
+    await db.pool.execute("INSERT INTO file_events (pc_id, op, path, occurred_at) VALUES ($1, 'create', 'C:/old.txt', now() - interval '120 days')", org["w1_pc"])
+    await db.pool.execute("INSERT INTO file_events (pc_id, op, path, occurred_at) VALUES ($1, 'create', 'C:/new.txt', now() - interval '10 days')", org["w1_pc"])
+    await engine.audit.run_retention()
+    assert [r["path"] for r in await db.pool.fetch("SELECT path FROM file_events ORDER BY id")] == ["C:/new.txt"]
+
+
+async def test_retention_says_what_it_did_and_a_failing_part_does_not_stop_the_rest(engine, org, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO)
+    await engine.db.pool.execute("INSERT INTO file_events (pc_id, op, path, occurred_at) VALUES ($1, 'create', 'C:/old.txt', now() - interval '200 days')", org["w1_pc"])
+    await engine.audit.run_retention()
+    text = caplog.text
+    assert "retention: starting" in text and "retention: ok, 1 file events older than" in text and "retention: ok," in text and "FAILED" not in text
+
+    async def boom(days):
+        raise RuntimeError("disk full")
+
+    engine.db.audit.purge_file_events_older_than = boom
+    caplog.clear()
+    await engine.audit.run_retention()
+    assert "retention: FAILED to clear file events" in caplog.text and "retention: ok" in caplog.text            # the other parts still ran

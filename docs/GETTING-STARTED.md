@@ -77,8 +77,9 @@ On the machine that will run it (Linux or Windows; it is the only machine with a
 
    `--hostname` is the **Super User's workstation name** (not the Engine's); `--no-operator-config` because the Super
    User works from their own machine. Save the printed **client id + key** for step 2.
-4. `.env` already listens on every network interface (`FALCON_ENGINE_HOST=0.0.0.0`, port `7400`). Open **TCP 7400**
-   in the machine's firewall for the local network.
+4. `.env` already listens on every network interface (`FALCON_ENGINE_HOST=0.0.0.0`, port `7400`). `python -m engine setup`
+   opens **TCP 7400** in the Linux host's firewall when `ufw` or `firewalld` is running (as root; otherwise it prints the one
+   command to run). Any other firewall is left alone and setup says so.
 5. Start it: `environ-engine/bin/python -m engine` (as a service in production -- Phase 9 packages this).
 6. **Back up `data/master.secret`** somewhere safe and offline. Every client key derives from it; lose it and every
    machine must be registered again.

@@ -230,3 +230,7 @@ part is recorded for later, not built.
   (`screenshot`, `notify`, `lock_session`, `start_process`, through `worker_client.runlogged`, which writes their output to the log the service reads) and a small helper
   (`worker_client/helper.py`, `userhelper.py`) that captures the screen and applies the console's input for the session window. Run as an ordinary user, none of it is used and a refusal
   never crashes anything. Nothing about the desktop needs setting up by hand. *Not exercised here:* the service-account path itself (this machine has no service installed; packaging is on hold).
+
+- **File-event retention and the firewall** (13 Oct 2026). `file_events` now ages out on the audit trail's clock (`FALCON_AUDIT_RETENTION_DAYS`, 90): a file's journey reaches back as far as the trail does, and the one
+  setting governs both; the "only hard delete" invariant in CLAUDE.md names both purges. `python -m engine setup` opens the Engine's port in a running `ufw` or `firewalld` on Linux (as root, else it prints the
+  command); other firewalls are left alone and it says so; on a non-Linux machine it only says the Engine is meant for Linux. *Test:* `test_console_rollout.py`, `test_setup_firewall.py`.

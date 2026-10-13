@@ -5,8 +5,8 @@ event loop, no thread offload.
 Rules from database-schema.md 12 that the schema cannot express are enforced *here*:
   * polymorphic references (`reports.source_*`, `audit_log.target_*`) are validated against
     `POLYMORPHIC_TABLES` before insert;
-  * no hard DELETE anywhere except `AuditRepo.purge_older_than` -- every other "removal" is a
-    status/flag column;
+  * no hard DELETE anywhere except the retention purges (`AuditRepo.purge_older_than`, and the file-event history
+    `purge_file_events_older_than` on the same clock) -- every other "removal" is a status/flag column;
   * Display Names never join across namers; Listeners are listed per adder only.
 
 Repos return plain dicts (asyncpg Records converted) so callers never depend on asyncpg types.
@@ -2033,6 +2033,11 @@ class AuditRepo(_Repo):
         return await self._fetch(
             "SELECT * FROM deviation_log WHERE (NOT $1 OR resolved_at IS NULL) ORDER BY detected_at DESC",
             unresolved_only)
+
+    async def purge_file_events_older_than(self, days: int) -> int:
+        """The file-event history (what the OS said happened to files) ages out on the audit trail's clock: a file's journey reaches back as far as the trail does."""
+        status = await self._exec("DELETE FROM file_events WHERE occurred_at < now() - make_interval(days => $1)", days)
+        return int(status.split()[-1])
 
     async def purge_older_than(self, days: int) -> int:
         """The ONE hard delete in the system: flat retention, every action_type alike."""

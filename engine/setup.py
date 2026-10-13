@@ -12,6 +12,8 @@ Every step is checked first and skipped when already done, so it is safe to run 
   6. Super User   bootstrapped once on an empty database; its client id + key printed ONCE, and written into this
                   machine's Operator Client settings so it connects without typing anything
   7. local model  checked; --download-model fetches it (~1.8 GB) from Hugging Face
+  8. firewall     on Linux, the Engine's TCP port opened in the host firewall (ufw or firewalld, whichever is running; as root,
+                  else the exact command is printed). Another firewall is left alone and said so.
 
 PostgreSQL itself and the three virtual environments are installed beforehand (the user's rule).
 """
@@ -183,6 +185,52 @@ def _write_operator_config(settings: Any, engine_host: str, client_id: str, key:
 
 # --- 7. the local model --------------------------------------------------------------------------------------------
 
+def firewall_steps(port: int, which: Any, run: Any, is_root: bool) -> list[str]:
+    """What to do about the host firewall, as lines to print. `which(name)` finds a program, `run(argv)` returns (exit code, output). Pure enough to test.
+    Opens the port only in a firewall that is running and does not already allow it; never touches nftables/iptables rules it did not make."""
+    rule = f"{port}/tcp"
+    if which("ufw"):
+        code, out = run(["ufw", "status"])
+        if code == 0 and "inactive" not in out.lower():
+            if rule in out:
+                return [f"firewall (ufw): {rule} is already open"]
+            if not is_root:
+                return [f"firewall (ufw): open the port with  sudo ufw allow {rule}"]
+            code, out = run(["ufw", "allow", rule])
+            return [f"firewall (ufw): opened {rule}" if code == 0 else f"firewall (ufw): could not open {rule}: {out.strip()[:120]}"]
+    if which("firewall-cmd"):
+        code, out = run(["firewall-cmd", "--state"])
+        if code == 0 and "running" in out:
+            if run(["firewall-cmd", "--query-port", rule])[0] == 0:
+                return [f"firewall (firewalld): {rule} is already open"]
+            if not is_root:
+                return [f"firewall (firewalld): open the port with  sudo firewall-cmd --permanent --add-port={rule} && sudo firewall-cmd --reload"]
+            ok = run(["firewall-cmd", "--permanent", "--add-port", rule])[0] == 0 and run(["firewall-cmd", "--reload"])[0] == 0
+            return [f"firewall (firewalld): opened {rule}" if ok else f"firewall (firewalld): could not open {rule}"]
+    return [f"firewall: no ufw or firewalld is running here, so nothing was changed; make sure {rule} is reachable from the clients"]
+
+
+def ensure_firewall(settings: Any) -> None:
+    """Open the Engine's port where the Engine runs: Linux. Elsewhere (a Windows development machine) there is nothing to do and it says so."""
+    import os
+    import shutil
+    import subprocess
+
+    if not sys.platform.startswith("linux"):
+        say("firewall", "the Engine is meant to run on Linux; on this machine open the port by hand if clients on the network must reach it")
+        return
+
+    def run(argv: list[str]) -> tuple[int, str]:
+        try:
+            done = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return 1, str(exc)
+        return done.returncode, done.stdout + done.stderr
+
+    for line in firewall_steps(settings.port, shutil.which, run, os.geteuid() == 0):
+        say("firewall", line.split(": ", 1)[-1] if line.startswith("firewall") else line)
+
+
 def ensure_model(settings: Any, download: bool) -> None:
     if settings.llm_backend != "llamacpp" or not settings.llm_model_path:
         say("model", f"served by {settings.llm_backend} at {settings.llm_endpoint}")
@@ -233,6 +281,7 @@ def main(argv: list[str]) -> int:
     if ok and settings.database_url:
         asyncio.run(ensure_schema_and_super_user(settings, args.hostname, not args.no_operator_config, args.engine_host))
     ensure_model(settings, args.download_model)
+    ensure_firewall(settings)
     print("\nDone." if ok else "\nNot finished: the databases above come first.")
     if ok:
         print("  Start the Engine:        python -m engine")
