@@ -6,12 +6,12 @@ import "."
 // that are not seen yet. Fetched on connect, on the pushes that change them, and every 30 seconds.
 Item {
     id: root
-    property real at: Date.now()             // when the counts were last read: the top bar's "Live · Ns ago"
+    property real at: Time.now               // when the counts were last read: the top bar's "Live · Ns ago"
     property var unseenTasks: []              // department tasks given to this Admin, not yet marked seen
 
     function refresh() {
         if (!falcon.isConnected) return
-        at = Date.now()
+        at = Time.now
         var me = falcon.accountId
 
         falcon.call("hierarchy.tree", {}, function (ok, r) {

@@ -167,7 +167,7 @@ QtObject {
         rollout = ro
         version = ro && ro.version ? ro.version.version_string : ""
         sessionsToday = _parts.sessions ? (_parts.sessions.sessions || []) : []
-        at = Date.now()
+        at = Time.now
         loaded = true
     }
     property var sessionsToday: []

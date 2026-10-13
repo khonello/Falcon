@@ -630,6 +630,48 @@ def events(role: str) -> dict[str, Any]:
     return {"events": out, "types": {}}
 
 
+OUT = {"success": "Success", "failed": "Failed", "timeout": "Timed out", "terminated": "Stopped by you"}
+# runs by hand: (action, hours ago, pc, outcome, secs, who, summary)
+HAND = [(7, 3.2, 7, "terminated", 44, "You", "Stopped by hand"), (6, 26, 5, "success", 12, "R. Mensah", "Disk healthy · 61% used")]
+
+
+def all_runs() -> list[dict[str, Any]]:
+    """Every run of the week as actions.runs answers it: from rules and by hand."""
+    out = []
+    for eid, typ, _p, _m, _a, _o, _org, firings in EVENTS:
+        rule = automation_name(eid)
+        for h, pc, runs in firings:
+            for k, (a, outcome, secs) in enumerate(runs):
+                if h > 168:
+                    continue
+                host = next((m[1] for m in MACHINES if m[0] == pc), "OPS-01")
+                out.append({"run_id": eid * 1000 + int(h * 10) + k, "action_id": a, "action": LIB[a][0], "pc_id": pc, "host": host, "at": at(-h), "took_s": secs,
+                            "limit_s": LIB[a][3], "outcome": OUT[outcome], "summary": "exit code 1" if outcome == "failed" else None, "exit": 0,
+                            "has_image": False, "event_id": eid, "by": f"rule: {rule}"})
+    for i, (a, h, pc, outcome, secs, who, summ) in enumerate(HAND):
+        host = next((m[1] for m in MACHINES if m[0] == pc), "OPS-01")
+        out.append({"run_id": 90000 + i, "action_id": a, "action": LIB[a][0], "pc_id": pc, "host": host, "at": at(-h), "took_s": secs, "limit_s": LIB[a][3] if a != 7 else 120,
+                    "outcome": OUT[outcome], "summary": summ, "exit": 0, "has_image": False, "event_id": None, "by": "hand"})
+    return sorted(out, key=lambda r: r["at"], reverse=True)
+
+
+def automation_name(eid: int) -> str:
+    return {1: "USB device inserted", 2: "Restricted file copied where it isn't allowed", 3: "Sustained high CPU", 4: "Scheduled run"}.get(eid, "a rule")
+
+
+def actions_board() -> dict[str, Any]:
+    runs, out = all_runs(), []
+    for aid, (name, kind, builtin, limit) in LIB.items():
+        mine = [r for r in runs if r["action_id"] == aid]
+        used = [{"event_id": e[0], "name": automation_name(e[0])} for e in EVENTS if aid in e[4]]
+        out.append({"action_id": aid, "name": name, "kind": kind, "builtin_type": builtin, "timeout_s": limit, "used_by": used, "runs": len(mine),
+                    "by_hand": sum(1 for r in mine if r["by"] == "hand"), "problems": sum(1 for r in mine if r["outcome"] in ("Failed", "Timed out")),
+                    "last_run": {"outcome": mine[0]["outcome"], "at": mine[0]["at"], "host": mine[0]["host"]} if mine else None, "days": []})
+    return {"actions": out, "days": [], "period_days": 7,
+            "strip": {"actions": len(out), "runs": len(runs), "by_hand": sum(1 for r in runs if r["by"] == "hand"),
+                      "problems": sum(1 for r in runs if r["outcome"] in ("Failed", "Timed out"))}}
+
+
 def automation_board(role: str) -> dict[str, Any]:
     """automation.board, only what the console reads from it: who set each rule, by name."""
     return {"rules": [{"event_id": eid, "owner": "Super User" if org else "R. Mensah", "org_wide": org} for eid, _t, _p, _m, _a, _o, org, _f in EVENTS],
@@ -846,6 +888,12 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
                           "custom_script": TEMP_PY})
             acts[kind].append(a)
         return {"builtin": {}, "actions": acts}
+    if type_ == "actions.board":
+        return actions_board()
+    if type_ == "actions.runs":
+        aid = payload.get("action_id")
+        rs = [r for r in all_runs() if aid is None or r["action_id"] == aid]
+        return {"runs": rs[: int(payload.get("limit") or 50)], "total": len(rs)}
     if type_ == "automation.board":
         return automation_board(role)
     if type_ == "control.event_test":
