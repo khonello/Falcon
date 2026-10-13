@@ -46,13 +46,12 @@ DEVIATIONS = [
      "resolved_at": _ago(20), "detected_at": _ago(30)},
 ]
 
+# As `registry.refused` answers: one row per who tried and from where, with why and what to do.
 REFUSED = [
-    {"id": 1, "action": "auth.failed", "target_id": "abc", "occurred_at": _ago(1),
-     "detail": {"reason": "challenge failed", "peer": "('10.20.9.201', 50012)"}},
-    {"id": 2, "action": "auth.failed", "target_id": "abc", "occurred_at": _ago(3),
-     "detail": {"reason": "challenge failed", "peer": "('10.20.9.201', 50013)"}},
-    {"id": 3, "action": "auth.failed", "target_id": "zzz", "occurred_at": _ago(2),
-     "detail": {"reason": "client_id is not provisioned or its account is not active", "peer": "('10.20.6.40', 1)"}},
+    {"id": "door:10.20.9.201:abc", "address": "10.20.9.201", "client_id": "abc", "kind": "wrong_key", "why": "wrong key for OPS-01", "tone": "bad", "advice": "rekey",
+     "tries": 2, "last": _ago(1), "first": _ago(3), "pc_id": 1, "machine": "OPS-01", "host": "Claims to be OPS-01", "blocked": False, "say": "Give it its key again."},
+    {"id": "door:10.20.6.40:zzz", "address": "10.20.6.40", "client_id": "zzz", "kind": "unknown", "why": "not registered", "tone": "wait", "advice": "register",
+     "tries": 1, "last": _ago(2), "first": _ago(2), "pc_id": None, "machine": None, "host": "zzz", "blocked": False, "say": "Register it."},
 ]
 
 
@@ -142,8 +141,12 @@ class _Connection:
             return {"deviation": next(x for x in DEVS if x["id"] == payload["deviation_id"])}
         if type_ == "audit.deviations":
             return {"deviations": [d for d in DEVIATIONS if payload.get("include_resolved") or not d["resolved_at"]]}
+        if type_ == "registry.refused":
+            return {"refused": REFUSED, "summary": {}}
+        if type_ == "registry.block":
+            return {"address": payload["address"]}
         if type_ == "audit.recent":
-            return {"entries": REFUSED if payload.get("prefix") == "auth.failed" else []}
+            return {"entries": []}
         if type_ == "machines.list":
             return {"machines": [{"pc_id": 1, "hostname": "OPS-01", "key_generation": 2, "ip": "10.20.4.11",
                                   "owner": {"account_id": 21, "name": "Kojo"}, "version": "1.4.2"}]}
@@ -327,13 +330,17 @@ async def test_a_deviation_is_a_record_against_a_rule(console):
 
 
 async def test_refused_connections_are_one_row_per_key(console):
-    """Every failed handshake is audited; the Registry folds them into who kept trying, and why."""
+    """registry.refused groups the refused by who tried and from where; an address is blocked at the door from the page."""
     win, bridge, _ = console("super_user")
     view = await _open(win, bridge, "registry", "registryView")
     await _wait(lambda: len(prop(view, "doors") or []) == 2)
     doors = {d["client"]: d for d in prop(view, "doors")}
-    assert doors["abc"]["tries"] == 2 and doors["abc"]["why"] == "wrong key" and doors["abc"]["ip"] == "10.20.9.201"
-    assert doors["zzz"]["why"] == "not registered"
+    assert doors["abc"]["tries"] == 2 and doors["abc"]["why"] == "wrong key for OPS-01" and doors["abc"]["ip"] == "10.20.9.201"
+    assert doors["zzz"]["why"] == "not registered" and doors["zzz"]["now"] == "Waiting to be registered"
+    QMetaObject.invokeMethod(view, "block", Q_ARG("QVariant", doors["abc"]), Q_ARG("QVariant", False))     # unblocking asks nothing first
+    view.setProperty("tab", "door")
+    await _wait(lambda: any(t == "registry.unblock" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "registry.unblock") == {"address": "10.20.9.201"}
     rows = prop(view, "rows")
     assert next(r for r in rows if r["id"] == "OPS-01")["gen"] == 2
 

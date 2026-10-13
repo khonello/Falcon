@@ -3,6 +3,9 @@ import "."
 
 // REGISTRY: machines and accounts, each with a key made here, and what was refused at the door. A machine
 // asking to join (enroll.request) waits here too, until someone types the code it shows.
+//
+// From the Engine's registry (registry.accounts, registry.refused, registry.block / unblock): the refused are grouped
+// by who tried and from where, each with why and what to do; an address can be blocked at the door.
 Page {
     id: page
     objectName: "registryView"
@@ -10,14 +13,16 @@ Page {
     property string tab: typeof Nav.sub === "string" && Nav.sub.indexOf("acct:") === 0 ? "acct" : typeof Nav.sub === "string" && Nav.sub.indexOf("door:") === 0 ? "door" : "pc"
     property var sel: typeof Nav.sub === "string" && Nav.sub ? Nav.sub : null
     property var list: []          // machines.list, when the Engine has it
-    property var failed: []        // auth.failed, this week
+    property var refused: []       // registry.refused, this week
+    property var accounts: []      // registry.accounts
     property var asks: []          // enroll.list
     property string code: ""
 
     function load() {
         if (!falcon.isConnected) return
         falcon.call("machines.list", {}, function (ok, r) { page.list = ok ? (r.machines || []) : [] })
-        falcon.call("audit.recent", { prefix: "auth.failed", limit: 500 }, function (ok, r) { page.failed = ok ? (r.entries || []) : [] })
+        falcon.call("registry.refused", { days: 7 }, function (ok, r) { page.refused = ok ? (r.refused || []) : [] })
+        falcon.call("registry.accounts", {}, function (ok, r) { page.accounts = ok ? (r.accounts || []) : [] })
         falcon.call("enroll.list", {}, function (ok, r) { page.asks = ok ? (r.requests || []) : [] })
     }
     Component.onCompleted: load()
@@ -30,28 +35,41 @@ Page {
         return { id: m.host, m: m, gen: x.key_generation || null, ip: x.ip || "", ver: x.version || m.ver || "", seen: x.last_seen_at || m.seen } })
         .filter(function (y) { return (y.m.host + " " + y.m.user + " " + y.m.deptName).toLowerCase().indexOf(lp.query.toLowerCase()) >= 0 })
     readonly property var wsGen: { var o = {}; list.forEach(function (x) { if (x.owner) o[x.owner.account_id] = x }); return o }
-    readonly property var accts: [{ id: "acct:me", account: falcon.accountId, name: "You", role: "Super User", dept: "Head office", ws: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].hostname : "", pc_id: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].pc_id : (falcon.pcId || null), gen: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].key_generation : null, now: "Signed in now" }]
+    // the Super User and every Admin, as registry.accounts says them; the tree's, while it has not answered
+    readonly property var accts: accounts.length ? accounts.map(function (a) {
+            return { id: "acct:" + a.account_id, account: a.account_id, name: a.name, you: a.you, role: a.role === "super_user" ? "Super User" : a.role === "admin" ? "Admin" : "Worker",
+                     dept: a.department_name || "Head office", deptId: a.department_id, ws: a.workstation || "", pc_id: a.pc_id, gen: a.key_generation, now: a.now }
+        })
+        : [{ id: "acct:me", account: falcon.accountId, name: "You", you: true, role: "Super User", dept: "Head office", ws: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].hostname : "", pc_id: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].pc_id : (falcon.pcId || null), gen: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].key_generation : null, now: "Signed in now" }]
         .concat([].concat.apply([], Fleet.depts.map(function (d) { return d.admins.map(function (a) {
             var w = page.wsGen[a.account_id]
             return { id: "acct:" + a.account_id, account: a.account_id, name: a.name, role: "Admin", dept: d.name, deptId: d.id, ws: a.hostname || (w ? w.hostname : ""), pc_id: w ? w.pc_id : a.pc_id,
                      gen: w ? w.key_generation : null, now: a.session && a.session.occupied_via === "traversal" ? "Inside a machine" : a.online ? "At their desk" : "Not signed in" } }) })))
-    // refused: one row per key (or address) that kept failing
-    readonly property var doors: {
-        var by = {}, cut = Time.now - 7 * 86400000
-        failed.forEach(function (e) {
-            var t = Time.ms(e.occurred_at); if (t < cut) return
-            var det = e.detail || {}, peer = String(det.peer || "").replace(/^\(?'?/, "").split(/['",)]/)[0], k = String(e.target_id || peer)
-            var why = /not provisioned/.test(det.reason || "") ? "not registered" : /challenge failed/.test(det.reason || "") ? "wrong key" : (det.reason || "refused")
-            var y = by[k] || (by[k] = { id: "door:" + k, client: e.target_id || "", ip: peer, why: why, tries: 0, last: t })
-            y.tries += 1; y.last = Math.max(y.last, t)
+    // refused: one row per who tried and from where (registry.refused), with why and what to do (`advice`)
+    readonly property var doors: refused.map(function (g) {
+        return { id: g.id, host: g.host || g.address, ip: g.address, client: g.client_id || "", why: g.why, tries: g.tries, last: Time.ms(g.last), tone: g.tone,
+                 say: g.say, advice: g.advice, blocked: !!g.blocked, kind: g.kind, pc_id: g.pc_id, machine: g.machine,
+                 now: g.blocked ? "Blocked at the door" : g.tone === "bad" ? "Someone may have its name" : g.kind === "unknown" ? "Waiting to be registered" : g.kind === "old_key" ? "Has the old key" : "Refused" }
+    })
+    function block(y, on) {
+        var go = function () {
+            falcon.call(on ? "registry.block" : "registry.unblock", on ? { address: y.ip, reason: y.why } : { address: y.ip }, function (ok, r) {
+                if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
+                Msg.ok((on ? "Blocked " : "Unblocked ") + y.ip + " · recorded"); page.load()
+            })
+        }
+        if (on) confirm.ask({ title: "Block " + y.ip + "?", text: "Every connection from it is turned away before it can say who it is. The tries are still counted. A connection already open stays until it ends.",
+                              ok: "Block it", danger: true }, go)
+        else go()
+    }
+    function demote(a) {
+        confirm.ask({ title: a.name + " stops being an Admin?", text: "They keep their account as a worker on the same machine, which gets a new key. The issues they owned go back to the department.",
+                      ok: "Stop being an Admin", danger: true }, function () {
+            falcon.call("hierarchy.admin_demote", { account_id: a.account }, function (ok, r) {
+                if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
+                Msg.ok(a.name + " is a worker now · recorded"); page.load(); Fleet.refresh()
+            })
         })
-        return Object.keys(by).map(function (k) { var y = by[k]
-            y.host = y.why === "not registered" ? "An unknown key" : "A key that does not match"
-            y.tone = y.why === "wrong key" ? "bad" : "wait"
-            y.now = y.why === "wrong key" ? "Someone may have its name" : "Waiting to be registered"
-            y.say = y.why === "wrong key" ? "Something presented a registered client id with the wrong key. If a machine was re-keyed, give it the new key; if you are not sure where the old one went, make another one."
-                                          : "Something keeps trying to connect with a client id nobody registered. If it belongs here, register the PC; it gets a key and stops being refused."
-            return y }).sort(function (a, b) { return b.last - a.last })
     }
     readonly property var cur: {
         var src = tab === "acct" ? accts : tab === "door" ? doors : tab === "ask" ? asks.map(function (a) { return Object.assign({ id: "ask:" + a.id }, a) }) : rows
@@ -186,8 +204,8 @@ Page {
                  : page.tab === "pc" ? [["Department", page.cur.m.deptName], ["Signed in", page.cur.m.user || "No one"], ["IP address", page.cur.ip || "—", null, true],
                                         ["Version", page.cur.ver || "—"], ["Key", page.cur.gen ? "no. " + page.cur.gen : "—"], ["Last seen", page.cur.m.online ? "now" : Time.ago(page.cur.seen)]]
                  : page.tab === "acct" ? [["Role", page.cur.role], ["Department", page.cur.dept], ["Workstation", page.cur.ws || "—", null, true], ["Key", page.cur.gen ? "no. " + page.cur.gen : "—"], ["Now", page.cur.now]]
-                 : page.tab === "door" ? [["Address", page.cur.ip || "—", null, true], ["Client id", page.cur.client || "—", null, true], ["Refused because", page.cur.why.charAt(0).toUpperCase() + page.cur.why.slice(1)],
-                                          ["Tries this week", Theme.fmt(page.cur.tries)], ["Last try", Time.atDay(page.cur.last)]]
+                 : page.tab === "door" ? [["Address", page.cur.ip || "—", null, true], ["Refused because", page.cur.why.charAt(0).toUpperCase() + page.cur.why.slice(1)],
+                                          ["Tries this week", Theme.fmt(page.cur.tries)], ["Last try", Time.atDay(page.cur.last)]].concat(page.cur.blocked ? [["Now", "Blocked at the door", Theme.crit]] : [])
                  : [["Wants to be", page.cur.requested_level === "admin" ? "an Admin" : "a worker PC"], ["Department", Fleet.deptName(page.cur.requested_department_id) || "Not said"],
                     ["Address", page.cur.peer || "—", null, true], ["System", page.cur.os || "—"], ["Asked", Time.atDay(page.cur.created_at)], ["Expires", Time.atDay(page.cur.expires_at)]]
             Txt { visible: page.tab === "door" && page.cur !== null; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: page.cur && page.cur.say ? page.cur.say : "" }
@@ -208,14 +226,15 @@ Page {
                       tip: page.cur && page.cur.m ? page.cur.m.deptName + " has no Admin, so there is no console to work on it in. Appoint one first." : "" },
                 Btn { visible: page.tab === "pc" && page.cur !== null; kind: "primary"; danger: true; text: "Make a new key"; onClicked: page.rekey(page.cur.m.host, page.cur.m.pc_id) },
                 // an account
-                Btn { visible: page.tab === "acct" && page.cur !== null && page.cur.role === "Admin"; danger: true; text: "Stop being an Admin"
-                      onClicked: confirm.ask({ title: "Offboard " + page.cur.name + "?", text: "Their account is switched off and any session they hold is ended. Their history stays on the record.", ok: "Offboard", danger: true },
-                                             function () { var who = page.cur.name; falcon.call("hierarchy.account_offboard", { account_id: page.cur.account }, function (ok, r) { if (ok) { Msg.ok(who + " offboarded"); Fleet.refresh() } else Msg.failed(r.message || "Not offboarded") }) }) },
+                Btn { visible: page.tab === "acct" && page.cur !== null && page.cur.role === "Admin"; danger: true; text: "Stop being an Admin"; onClicked: page.demote(page.cur) },
                 Btn { visible: page.tab === "acct" && page.cur !== null; kind: "primary"; danger: true; text: "Make a new key"; enabled: !!(page.cur && page.cur.pc_id); tip: page.cur && !page.cur.pc_id ? "No workstation on record to re-key" : ""
-                      onClicked: page.rekey(page.cur.name === "You" ? "your account" : page.cur.name, page.cur.pc_id) },
+                      onClicked: page.rekey(page.cur.you ? "your account" : page.cur.name, page.cur.pc_id) },
                 // refused
-                Btn { visible: page.tab === "door" && page.cur !== null; enabled: false; tip: "Blocking an address is not built in the Engine yet"; text: "Block this address" },
-                Btn { visible: page.tab === "door" && page.cur !== null && page.cur.why === "not registered"; kind: "primary"; text: "Register this PC"; onClicked: keys.ask({ mode: "pc" }) },
+                Btn { visible: page.tab === "door" && page.cur !== null; text: page.cur && page.cur.blocked ? "Unblock this address" : "Block this address"
+                      onClicked: page.block(page.cur, !page.cur.blocked) },
+                Btn { visible: page.tab === "door" && page.cur !== null && page.cur.kind === "unknown"; kind: "primary"; text: "Register this PC"; onClicked: keys.ask({ mode: "pc" }) },
+                Btn { visible: page.tab === "door" && page.cur !== null && page.cur.kind !== "unknown" && !!page.cur.pc_id; kind: "primary"; danger: true; text: "Make a new key"
+                      onClicked: page.rekey(page.cur.machine || page.cur.host, page.cur.pc_id) },
                 // asking to join
                 Btn { visible: page.tab === "ask" && page.cur !== null; danger: true; text: "Refuse"
                       onClicked: falcon.call("enroll.refuse", { enrollment_id: page.cur.id, reason: "refused" }, function (ok, r) { if (ok) { Msg.ok("Refused"); page.load() } else Msg.failed(r.message || "Not refused") }) },

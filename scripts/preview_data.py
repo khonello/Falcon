@@ -277,6 +277,50 @@ def refused() -> dict[str, Any]:
     return {"entries": rows}
 
 
+def rollout_gate(role: str, dept_id: int | None) -> dict[str, Any]:
+    """rollout.gate as the Engine answers it (engine/console/rollout.py)."""
+    ms = [m for m in MACHINES if role != "admin" or m[4] == dept_id]
+    rows = []
+    for pc, host, user, acct, dept, online, seen in ms:
+        if host not in ("OPS-06", "LOG-02"):
+            continue
+        rows.append({"pc_id": pc, "hostname": host, "department_id": dept, "department_name": dict(DEPTS)[dept],
+                     "running": "1.4.1" if host == "OPS-06" else "1.4.0", "should_run": "1.4.2", "attempts": 2 if host == "OPS-06" else 1,
+                     "last_attempt_at": at(-50) if host == "OPS-06" else at(-77.5), "last_error": "A file was in use" if host == "OPS-06" else "Update share unreachable",
+                     "next_try": "Next idle window" if online else "When it is back online", "online": online,
+                     "state": "retrying" if host == "OPS-06" else "escalated", "escalated_at": at(-76) if host == "LOG-02" else None,
+                     "escalated_to": "you" if host == "LOG-02" else None, "left_out": None})
+    days = [("2026-09-26", 2, ["OPS-01", "OPS-02"], "1.4.2 approved"), ("2026-09-27", 5, ["OPS-03", "OPS-04", "OPS-05"], None), ("2026-09-28", 7, ["OPS-07", "FIN-01"], None),
+            ("2026-09-29", 8, ["FIN-02"], None), ("2026-09-30", 9, ["LOG-01"], None), ("2026-10-01", 9, [], None)]
+    return {"current": {"version": "1.4.2", "approved_at": at(-24 * 5), "approved_by": "You" if role == "super_user" else "the Super User"},
+            "next": {"version": "1.4.3", "staged_at": at(-20), "note": None},
+            "strip": {"running": len(ms) - len(rows), "total": len(ms), "pct": round(100 * (len(ms) - len(rows)) / max(1, len(ms))), "holding": len(rows), "left_out": 0,
+                      "failed_installs": sum(r["attempts"] for r in rows), "failed_hosts": [{"hostname": r["hostname"], "n": r["attempts"]} for r in rows]},
+            "holding": rows, "adoption": [{"day": d, "n": n, "joined": j, "note": note} for d, n, j, note in days], "can_approve": False}
+
+
+def registry_refused() -> dict[str, Any]:
+    """registry.refused as the Engine answers it (engine/console/registry.py): one row per who tried and from where."""
+    return {"refused": [
+        {"id": "door:10.20.9.201:Lg02-xk3", "address": "10.20.9.201", "client_id": "Lg02-xk3", "kind": "wrong_key", "why": "wrong key for LOG-02, from an address LOG-02 never uses",
+         "tone": "bad", "advice": "rekey", "tries": 3, "last": at(-15.2), "first": at(-15.6), "claimed_name": "LOG-02", "pc_id": 22, "machine": "LOG-02", "same_address": False,
+         "host": "Claims to be LOG-02", "blocked": False,
+         "say": "A machine claimed to be LOG-02 with a key that does not match, from an address LOG-02 has never used. Make LOG-02 a new key and block the address until you know who it is."},
+        {"id": "door:10.20.6.40:q8Zr-fin-new", "address": "10.20.6.40", "client_id": "q8Zr-fin-new", "kind": "unknown", "why": "not registered", "tone": "wait", "advice": "register",
+         "tries": 14, "last": at(-5.2), "first": at(-45.5), "claimed_name": "FIN-03", "pc_id": None, "machine": None, "same_address": None, "host": "FIN-03", "blocked": False,
+         "say": "A machine nobody registered keeps trying to connect. If it belongs to a department, register it; it gets a key and stops being refused."}],
+        "days": 7, "summary": {"groups": 2, "tries": 17, "bad": 1}}
+
+
+def registry_accounts(account: int) -> dict[str, Any]:
+    rows = [{"account_id": 1, "name": "You" if account == 1 else "the Super User", "you": account == 1, "role": "super_user", "department_id": None, "department_name": None,
+             "pc_id": 100, "workstation": "ADM-01", "key_generation": 1, "online": True, "last_seen_at": at(0), "hours_limited": False, "now": "Signed in now"}]
+    for a, n, d, pc, ws, busy in ADMINS:
+        rows.append({"account_id": a, "name": n, "you": a == account, "role": "admin", "department_id": d, "department_name": dict(DEPTS)[d], "pc_id": pc, "workstation": ws,
+                     "key_generation": 1, "online": True, "last_seen_at": at(0), "hours_limited": False, "now": "Signed in now"})
+    return {"accounts": rows, "summary": {"accounts": len(rows)}}
+
+
 def enroll_list(role: str) -> dict[str, Any]:
     return {"requests": [{"id": 4, "hostname": "OPS-08", "os": "Windows 11 Pro", "mac": "3c:52:82:aa:10:08", "peer": "10.20.4.18",
                           "requested_department_id": 1, "requested_level": "worker", "created_at": at(-0.6), "expires_at": at(23.4)}]}
@@ -699,6 +743,14 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return rollout(role, dept_id)
     if type_ == "assistance.ping_status":
         return pings(role, account)
+    if type_ == "rollout.gate":
+        return rollout_gate(role, dept_id)
+    if type_ == "registry.refused":
+        return registry_refused()
+    if type_ == "registry.accounts":
+        return registry_accounts(account)
+    if type_ in ("registry.block", "registry.unblock"):
+        return {"address": payload.get("address")}
     if type_ == "rules.list":
         return rules_list()
     if type_ == "rules.library":

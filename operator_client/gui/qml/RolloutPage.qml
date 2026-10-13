@@ -1,50 +1,89 @@
 import QtQuick
 import "."
 
-// ROLLOUT, at both levels. A version is approved only when every machine runs the one before it, so
-// the page is the machines holding the next one back: the list, the machine beside it, and how many
-// run the current version under both. In an Admin's console the machines are the department's;
-// approving and leaving a machine out of the gate are the Super User's.
+// ROLLOUT, at both levels. A version is approved only when every machine runs the one before it, so the page
+// is the machines holding the next one back: the list, the machine beside it, and how many run the current
+// version, day by day, under both. Read from rollout.gate: each machine's attempts, last error, next try and
+// escalation; who was left out and why; the version waiting; adoption since the current one was approved.
+// Leaving a machine out (with a reason) and approving are the Super User's; an Admin retries their own.
 Page {
     id: page
     objectName: "rolloutView"
 
     property string sel: Nav.sub ? String(Nav.sub) : ""
     property int dept: 0
-    property string next: ""
+    property var gate: null
+    property string reason: ""
 
-    readonly property string cur: Fleet.version || "—"
-    readonly property var behind: Fleet.machines.filter(function (m) { return m.behind })
-    readonly property var rows: behind.filter(function (m) { return (!dept || m.dept === dept) && (m.host + " " + m.user + " " + m.deptName).toLowerCase().indexOf(list.query.toLowerCase()) >= 0 })
+    function load() { if (falcon.isConnected) falcon.call("rollout.gate", {}, function (ok, r) { page.gate = ok ? r : null }) }
+    Component.onCompleted: load()
+    Connections { target: falcon
+                  function onConnected() { page.load() }
+                  function onPushReceived(type) { if (/^update/.test(type)) again.restart() } }
+    Timer { id: again; interval: 400; onTriggered: page.load() }
+
+    readonly property string cur: gate && gate.current ? gate.current.version : (Fleet.version || "—")
+    readonly property string nextV: gate && gate.next ? gate.next.version : ""
+    readonly property var holding: gate ? gate.holding || [] : []
+    readonly property var strip: gate ? gate.strip || {} : {}
+    readonly property var rows: holding.map(function (h) { var m = Fleet.byPc[h.pc_id] || {}; return Object.assign({ host: h.hostname, user: m.user || "", deptName: h.department_name || m.deptName || "" }, h) })
+        .filter(function (x) { return (!page.dept || x.department_id === page.dept) && (x.host + " " + x.user + " " + x.deptName).toLowerCase().indexOf(list.query.toLowerCase()) >= 0 })
     readonly property var m: { for (var i = 0; i < rows.length; i++) if (rows[i].host === sel) return rows[i]; return rows.length ? rows[0] : null }
-    readonly property int on: Fleet.machines.length - behind.length
-    readonly property int fails: behind.reduce(function (a, x) { return a + (x.failures || 0) }, 0)
     readonly property var depts: Fleet.depts.filter(function (d) { return d.machines.length }).map(function (d) {
         return { d: d, n: d.machines.length, ok: d.machines.filter(function (x) { return !x.behind }).length }
     }).sort(function (a, b) { return a.ok / a.n - b.ok / b.n })
+    function times(n) { return n === 1 ? "once" : n === 2 ? "twice" : n + " times" }
 
     Confirm { id: confirm; page: page }
     function retry(x) {
-        falcon.call("updates.rollout_department", Nav.boss ? { department_id: x.dept } : {}, function (ok, r) {
+        falcon.call("updates.retry", { pc_id: x.pc_id, when: "now" }, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not retried"); return }
-            Msg.ok("Retrying " + Theme.many((r.targeted || []).length, "machine") + " in " + x.deptName); Fleet.refresh()
+            Msg.ok(r.when === "now" ? x.host + " is trying now" : x.host + " tries " + r.when); page.load()
+        })
+    }
+    function leaveOut() {
+        var x = m
+        falcon.call("updates.leave_out", { pc_id: x.pc_id, reason: reason.trim() }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not left out"); return }
+            Msg.ok(x.host + " is left out of the gate · recorded"); reason = ""; leave.close(); page.load()
+        })
+    }
+    function takeBack(x) {
+        falcon.call("updates.take_back", { pc_id: x.pc_id }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
+            Msg.ok(x.host + " holds the gate again"); page.load()
         })
     }
     function approve() {
-        confirm.ask({ title: "Approve " + next.trim() + "?", ok: "Approve", text: "Every machine is told to update, department by department. The record notes that you approved it." },
-                    function () { falcon.call("updates.approve", { version: page.next.trim() }, function (ok, r) {
+        confirm.ask({ title: "Approve " + nextV + "?", ok: "Approve", text: "Every machine is told to update, department by department. The record notes that you approved it." },
+                    function () { falcon.call("updates.approve", { version: page.nextV }, function (ok, r) {
                         if (!ok) { Msg.failed(r && r.message ? r.message : "Not approved"); return }
-                        Msg.ok("Approved " + page.next.trim()); page.next = ""; Fleet.refresh() }) })
+                        Msg.ok("Approved " + page.nextV); page.load(); Fleet.refresh() }) })
+    }
+
+    Drawer {
+        id: leave
+        page: page
+        width: 420
+        title: page.m ? "Leave " + page.m.host + " out of the gate" : ""
+        note: page.reason.trim() === "" ? "Say why. It is recorded with the approval." : ""
+        footer: [ Btn { text: "Cancel"; onClicked: leave.close() },
+                  Btn { kind: "primary"; text: "Leave it out"; enabled: page.reason.trim() !== ""; onClicked: page.leaveOut() } ]
+        Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text2
+              text: (page.nextV ? page.nextV : "The next version") + " can then be approved without waiting for it. It keeps trying to update; you can put it back in the gate." }
+        TextArea2 { width: parent.width; text: page.reason; placeholder: "Why can it wait?"; onEdited: function (t) { page.reason = t } }
     }
 
     Strip {
         width: parent.width
         items: [
-            { label: "Current version", value: page.cur, delta: Fleet.rollout && Fleet.rollout.version ? "approved " + Time.at(Fleet.rollout.version.approved_at) + (Nav.boss ? " by you" : " by the Super User") : "" },
-            { label: "Running it", value: Theme.fmt(page.on), unit: "/ " + Theme.fmt(Fleet.machines.length), delta: Fleet.machines.length ? Math.round(page.on / Fleet.machines.length * 100) + "% of machines" : "" },
-            { label: "Holding the next one back", value: Theme.fmt(page.behind.length), dc: page.behind.length ? Theme.crit : Theme.ok,
-              delta: page.behind.length ? (Nav.boss ? "the next version waits on them" : "from this department") : (Nav.boss ? "the next version can be approved" : "none from this department") },
-            { label: "Failed installs", value: Theme.fmt(page.fails), delta: page.fails ? page.behind.filter(function (x) { return x.failures }).map(function (x) { return x.host + " " + (x.failures === 1 ? "once" : x.failures === 2 ? "twice" : x.failures + " times") }).join(", ") : "none" }
+            { label: "Current version", value: page.cur, delta: page.gate && page.gate.current ? "approved " + Time.day(page.gate.current.approved_at) + " by " + (page.gate.current.approved_by === "You" ? "you" : page.gate.current.approved_by || "the Super User") : "" },
+            { label: "Running it", value: Theme.fmt(page.strip.running || 0), unit: "/ " + Theme.fmt(page.strip.total || 0), delta: page.strip.pct !== undefined && page.strip.pct !== null ? page.strip.pct + "% of machines" : "" },
+            { label: "Holding " + (page.nextV || "the next one") + " back", value: Theme.fmt(page.strip.holding || 0), dc: page.strip.holding ? Theme.crit : Theme.ok,
+              delta: page.strip.holding ? (Nav.boss ? (page.nextV ? page.nextV + " is ready and waits on them" : "the next version waits on them") : "from this department")
+                                        : (Nav.boss ? (page.nextV ? page.nextV + " can be approved" : "the next version can be approved") : "none from this department") },
+            { label: "Failed installs, 7 days", value: Theme.fmt(page.strip.failed_installs || 0),
+              delta: (page.strip.failed_hosts || []).length ? page.strip.failed_hosts.map(function (f) { return f.hostname + " " + page.times(f.n) }).join(", ") : "none" }
         ]
     }
 
@@ -75,11 +114,11 @@ Page {
             nameMono: true
             nameText: function (x) { return x.host }
             nameLine: function (x) { return (x.user || "No one signed in") + " · " + x.deptName }
-            cols: [{ title: "Running", width: 100, text: function (x) { return x.ver } },
-                   { title: "Failed attempts", width: 160, text: function (x) { return x.failures ? String(x.failures) : "None yet" } },
-                   { title: "Next try", width: 180, text: function (x) { return x.online ? "Next idle window" : "When it is back online" } }]
-            now: function (x) { return x.escalated ? ["Escalated" + (Nav.boss ? " to you" : ""), "bad"] : !x.online ? ["Offline", "bad"] : ["Retrying", "wait"] }
-            showEmpty: Fleet.loaded && page.behind.length === 0
+            cols: [{ title: "Running", width: 100, text: function (x) { return x.running || "—" } },
+                   { title: "Last error", width: 230, text: function (x) { return x.last_error || "—" } },
+                   { title: "Next try", width: 190, text: function (x) { return x.state === "left_out" ? "Left out of the gate" : x.next_try } }]
+            now: function (x) { return x.state === "escalated" ? ["Escalated to " + (x.escalated_to || "you"), "bad"] : x.state === "offline" ? ["Offline", "bad"] : x.state === "left_out" ? ["Left out", "wait"] : ["Retrying", "wait"] }
+            showEmpty: page.gate !== null && page.holding.length === 0
             emptyIcon: "check"
             emptyTitle: "Every machine runs " + page.cur
             emptyText: "Nothing holds the next version back." + (Nav.boss ? " Approve it when it is ready." : "")
@@ -91,11 +130,16 @@ Page {
             emptyText: "Pick a machine in the list."
             title: page.m ? page.m.host : ""
             sub: page.m && page.sel === page.m.host ? "the one you picked" : "the first in the list · click another"
-            facts: page.m ? [["Running", page.m.ver], ["Should run", page.cur], ["Attempts", String(page.m.failures || 0) + (page.m.lastTry ? ", last " + Time.at(page.m.lastTry) : ""), null], ["Last error", "not kept by the Engine yet", Theme.text3], ["Escalated", page.m.escalated ? "Yes" + (Nav.boss ? ", to you" : ", to the Super User") : "No", page.m.escalated ? Theme.crit : null],
-                             ["Next try", page.m.online ? "Next idle window" : "When it is back online"], ["Department", page.m.deptName]] : []
+            facts: page.m ? [["Running", page.m.running || "—"], ["Should run", page.m.should_run || page.cur],
+                             ["Attempts", String(page.m.attempts || 0) + (page.m.last_attempt_at ? ", last " + Time.at(page.m.last_attempt_at) : "")],
+                             ["Last error", page.m.last_error || "None recorded"],
+                             ["Escalated", page.m.escalated_at ? Time.at(page.m.escalated_at) + ", to " + (page.m.escalated_to || "you") : "No", page.m.escalated_at ? Theme.crit : null],
+                             ["Next try", page.m.state === "left_out" ? "Left out of the gate" : page.m.next_try], ["Department", page.m.deptName]]
+                             .concat(page.m.left_out ? [["Left out", page.m.left_out.reason + " · " + Time.day(page.m.left_out.at)]] : []) : []
             actions: [
-                Btn { visible: Nav.boss; text: "Leave it out of the gate"; enabled: false; tip: "Leaving a machine out of the gate is not built in the Engine yet" },
-                Btn { kind: "primary"; text: "Retry now"; enabled: page.m !== null && page.m.online; onClicked: page.retry(page.m) }
+                Btn { visible: Nav.boss && page.m !== null && page.m.state !== "left_out"; text: "Leave it out of the gate"; onClicked: { page.reason = ""; leave.open() } },
+                Btn { visible: Nav.boss && page.m !== null && page.m.state === "left_out"; text: "Put it back in the gate"; onClicked: page.takeBack(page.m) },
+                Btn { kind: "primary"; text: "Retry now"; enabled: page.m !== null && page.m.online; tip: page.m && !page.m.online ? "It is offline: it tries when it is back" : ""; onClicked: page.retry(page.m) }
             ]
         }
     }
@@ -103,42 +147,22 @@ Page {
     Panel {
         width: parent.width
         title: "Machines on " + page.cur
-        sub: "by department · the gap to the goal is the machines holding the next version back"
+        sub: "since it was approved · the gap to the goal is the machines holding " + (page.nextV || "the next version") + " back"
         extra: [
             Txt { visible: !Nav.boss; text: "The Super User approves the next version once every machine runs " + page.cur; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter },
-            Field { visible: Nav.boss; width: 120; height: Theme.controlSm; placeholderText: "Next version"; text: page.next; onTextEdited: page.next = text },
-            Btn { visible: Nav.boss; small: true; kind: "primary"; text: "Approve"; enabled: page.behind.length === 0 && page.next.trim() !== ""
-                  tip: page.behind.length ? "A version is approved only when every machine runs the one before it." : ""; onClicked: page.approve() }
+            Btn { visible: Nav.boss; small: true; kind: "primary"; text: page.nextV ? "Approve " + page.nextV : "No version waiting"; enabled: !!(page.gate && page.gate.can_approve)
+                  tip: !page.nextV ? "A version is staged by the packaging pipeline before it can be approved." : page.strip.holding ? "A version is approved only when every machine runs the one before it." : ""
+                  onClicked: page.approve() }
         ]
         Column {
             width: parent.width
-            spacing: 12
-            Empty { visible: Fleet.machines.length === 0; width: parent.width; h: 160; icon: "cloudupload"; title: "No machines yet"; text: "How many machines run the current version." }
-            Row {
-                visible: Fleet.machines.length > 0
-                width: parent.width
-                spacing: 12
-                Txt { text: Theme.fmt(page.on); font.pixelSize: 22; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                Txt { text: "of " + Theme.fmt(Fleet.machines.length) + " machines on " + page.cur; color: Theme.text3; anchors.baseline: parent.children[0].baseline; elide: Text.ElideNone }
-            }
-            Bar { visible: Fleet.machines.length > 0; width: parent.width; thickness: 12; v: page.on; max: Math.max(1, Fleet.machines.length); c: Theme.alpha(Theme.ser2, 0.7) }
-            Repeater {
-                model: page.depts
-                Item {
-                    required property var modelData
-                    width: parent.width; height: 30
-                    Txt { width: 200; text: modelData.d.name; anchors.verticalCenter: parent.verticalCenter }
-                    Bar { x: 210; width: parent.width - 210 - 260; anchors.verticalCenter: parent.verticalCenter; v: modelData.ok; max: modelData.n; c: modelData.ok === modelData.n ? Theme.ok : Theme.med }
-                    Txt { x: parent.width - 240; width: 110; anchors.verticalCenter: parent.verticalCenter; mono: true; text: modelData.ok + " of " + modelData.n
-                          color: modelData.ok === modelData.n ? Theme.text2 : Theme.text }
-                    Txt { visible: !modelData.d.admins.length; x: parent.width - 120; anchors.verticalCenter: parent.verticalCenter; text: "no Admin"; color: Theme.crit; font.pixelSize: 12 }
-                    Btn { visible: Nav.boss && modelData.d.admins.length > 0 && modelData.ok < modelData.n; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; small: true; text: "Prompt"
-                          onClicked: falcon.call("updates.prompt_admin", { department_id: modelData.d.id }, function (ok, r) {
-                              if (!ok) { Msg.failed(r && r.message ? r.message : "Not sent"); return } Msg.ok("Prompted " + Theme.listNames(modelData.d.admins.map(function (a) { return a.name }))) }) }
-                }
-            }
-            Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                  text: "How adoption climbed day by day needs the version history the Engine keeps, which the console cannot read yet." }
+            spacing: 8
+            Empty { visible: !!page.gate && !(page.gate.adoption && page.gate.adoption.length); width: parent.width; h: 160; icon: "cloudupload"; title: "No version approved yet"; text: "How many machines run the current version, day by day." }
+            Adoption { visible: !!(page.gate && page.gate.adoption && page.gate.adoption.length > 0); width: parent.width; height: 200
+                       days: page.gate ? page.gate.adoption || [] : []; goal: page.strip.total || 0; version: page.cur }
+            Txt { visible: page.holding.length > 0; width: parent.width; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                  text: Theme.many(page.holding.length, "machine") + (page.holding.length === 1 ? " is" : " are") + " still on older versions: "
+                        + page.holding.map(function (h) { return h.hostname + " on " + (h.running || "an older one") }).join(", ") + ". The gap between the line and the goal is them." }
         }
     }
 }
