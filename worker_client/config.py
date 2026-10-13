@@ -47,6 +47,7 @@ class WorkerConfig:
     idle_sweep_after_seconds: float = 300.0   # start the full sweep after this much idle
     hash_limit_bytes: int = 64 * 1024 * 1024   # bigger files are indexed without a hash
     lock_workstation_on_block: bool = False    # Windows: LockWorkStation() when a superior enters
+    separate_programs: bool = False            # the indexer and the event tracker run as their own supervised programs (always, as a Windows service)
     windows: bool = True                       # show the Worker's windows (needs the worker-ui extra)
     update_command: str | None = None          # how to apply an update (deferred CI/CD: none yet)
     cache: dict[str, Any] = field(default_factory=dict)   # deadlines, last session state
@@ -62,7 +63,7 @@ class WorkerConfig:
             return cfg
         for key in ("engine_host", "engine_port", "client_id", "client_key", "tls", "ca_cert", "watch_roots", "poll_seconds",
                     "metrics_seconds", "idle_sweep_after_seconds", "hash_limit_bytes", "lock_workstation_on_block",
-                    "windows", "update_command", "cache"):
+                    "windows", "separate_programs", "update_command", "cache"):
             if key in data:
                 setattr(cfg, key, data[key])
         return cfg

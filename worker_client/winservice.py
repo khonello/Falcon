@@ -231,6 +231,7 @@ async def _run_worker(config: str | None, stop_event: asyncio.Event) -> None:
     cfg = WorkerConfig.load(Path(config) if config else None)
     if not cfg.client_id:
         raise SystemExit("the Worker has no client id yet: run `python -m worker_client --enroll` (or pass --client-id) once, then start the service")
+    cfg.separate_programs = True            # as a service the indexer and the event tracker are their own supervised programs
     svc = WorkerService(cfg, native_watch=True, allow_power=False)
     await svc.start()
     try:

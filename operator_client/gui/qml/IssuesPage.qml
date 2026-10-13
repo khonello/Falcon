@@ -41,7 +41,8 @@ Page {
         help: { label: "Help request", icon: "bell", from: "Assistance" },
         deviation: { label: "Deviation", icon: "warn", from: "Deviation log" },
         update: { label: "Stuck update", icon: "cloudsync", from: "Rollout" },
-        flow: { label: "Flow blocked", icon: "branches", from: "Flows" }
+        flow: { label: "Flow blocked", icon: "branches", from: "Flows" },
+        component: { label: "Part of the Worker", icon: "warn", from: "Worker" }
     })
     readonly property var rows: Fleet.issues.filter(function (i) {
         return (tf === "all" || i.type === tf) && (hf === "" || i.host === hf)

@@ -623,3 +623,9 @@ Postgres adaptations applied uniformly: identity columns for PKs, `TIMESTAMPTZ` 
 | `action_executions.exit_code` INTEGER (migration 005) | The Worker Client reports the script's exit code; the Dashboard shows it alongside success/failed/terminated. |
 | `flow_sync_log.source_relative_path`, `flow_sync_log.written_path` TEXT (migration 006) | Write attribution per file: stages relocate files at the destination, so an external edit there must be mapped back to its source file via the sync row that wrote it, not by path arithmetic. |
 | `pc_version_status.current_version_id` made nullable (migration 007) | A freshly provisioned PC runs a build that predates any approval; NULL = never confirmed on an approved version (counts as behind), so its first failed attempt can still be recorded and escalated. |
+
+### A Worker's own parts (migration 030)
+
+`issues.type` also takes `'component'`: a Worker's indexer or event tracker that keeps dying. The Worker service reports it
+(`control.component_status {component, healthy}`); one issue per machine and part (`source_table = 'component_status'`,
+`source_id = pc_id * 10 + 1 (indexer) | 2 (tracker)`), closed by the next report that says it is healthy again. Code prefix `CMP`.

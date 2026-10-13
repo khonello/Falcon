@@ -75,12 +75,15 @@ def main() -> None:
     ap.add_argument("--department", type=int, help="with --enroll: the department this machine asks to join")
     ap.add_argument("--level", choices=("worker", "admin"), default="worker", help="with --enroll: what it asks to be")
     ap.add_argument("--allow-power", action="store_true", help="allow shutdown/reboot/lock_session actions")
+    ap.add_argument("--separate", action="store_true", help="run the indexer and the event tracker as their own supervised programs (always so as a service)")
     ap.add_argument("--no-native-watch", action="store_true", help="force the polling watcher")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
     cfg = WorkerConfig.load(Path(args.config) if args.config else None)
+    if args.separate:
+        cfg.separate_programs = True
     if args.engine:
         host, _, port = args.engine.partition(":")
         cfg.engine_host = host or cfg.engine_host

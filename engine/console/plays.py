@@ -48,7 +48,7 @@ async def _person(ctx: Context, issue: dict[str, Any]) -> tuple[int | None, str 
 
 
 async def build(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any]], list[Option], list[str]]:
-    builder = {"file": _file, "update": _update, "deviation": _deviation, "flow": _flow, "offline": _offline}[issue["type"]]
+    builder = {"file": _file, "update": _update, "deviation": _deviation, "flow": _flow, "offline": _offline, "component": _component}[issue["type"]]
     return await builder(ctx, issue)
 
 
@@ -56,7 +56,7 @@ async def act(ctx: Context, issue: dict[str, Any], key: str, payload: dict[str, 
     _, _, options, _ = await build(ctx, issue)
     if key not in {o["key"] for o in options}:
         raise ProtocolError(ErrorCode.INVALID, f"{key!r} is not something that can be done about this issue now")
-    doer = {"file": _do_file, "update": _do_update, "deviation": _do_deviation, "flow": _do_flow, "offline": _do_offline}[issue["type"]]
+    doer = {"file": _do_file, "update": _do_update, "deviation": _do_deviation, "flow": _do_flow, "offline": _do_offline, "component": _do_component}[issue["type"]]
     return await doer(ctx, issue, key, payload)
 
 
@@ -271,6 +271,17 @@ async def _offline(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[
     d, host = issue["detail"], issue["hostname"] or "a machine"
     lead = f"{host} has not checked in since {d.get('last_seen_at')}."
     return lead, [["Last seen", d.get("last_seen_at")]], [], [f"{host} can only be reached once it is back online; this closes by itself then."]
+
+
+async def _component(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any]], list[Option], list[str]]:
+    d, host = issue["detail"], issue["hostname"] or "a machine"
+    part = d.get("component", "a part")
+    lead = f"On {host}, the {part} program keeps stopping. The Worker starts it again each time, and has told the Engine it is not holding."
+    return lead, [["Part", part]], [], ["Nothing here can fix it from afar. It closes by itself once the part runs steadily again."]
+
+
+async def _do_component(ctx: Context, issue: dict[str, Any], key: str, payload: dict[str, Any]) -> dict[str, Any]:
+    raise ProtocolError(ErrorCode.INVALID, "there is nothing to do about this but wait: it closes when the part runs steadily again")
 
 
 async def _do_offline(ctx: Context, issue: dict[str, Any], key: str, payload: dict[str, Any]) -> dict[str, Any]:

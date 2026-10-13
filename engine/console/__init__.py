@@ -18,12 +18,14 @@ what the console can *do* goes through the combo's own handlers.
     registry  -- accounts, refused connections and blocked addresses, and a department's page
     search    -- Ctrl K: find a machine, person, task, flow, issue, rule or department
     screens   -- the session window: a machine's screen in the console, and the console's mouse and keyboard back
+    components -- a Worker's indexer or event tracker that keeps dying, told by the Worker, an issue on that machine
     rollout   -- the gate to the next version: who holds it back, who was left out, adoption, retrying
 """
 
 from engine.console import (  # noqa: F401
     accountability,
     automation,
+    components,
     deviations,
     feed,
     issues,

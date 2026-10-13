@@ -930,7 +930,7 @@ class IssuesRepo(_Repo):
              "i.target_hours, i.state, i.label, i.detail, i.source_table, i.source_id, i.escalated_at, i.resolved_at, "
              "i.resolved_by_account_id, i.resolution, p.hostname, d.name AS department_name")
     _FROM = "FROM issues i LEFT JOIN pcs p ON p.id = i.pc_id LEFT JOIN departments d ON d.id = i.department_id"
-    _PREFIX: ClassVar[dict[str, str]] = {"file": "INC", "update": "UPD", "deviation": "DEV", "flow": "FLW", "offline": "OFF"}
+    _PREFIX: ClassVar[dict[str, str]] = {"file": "INC", "update": "UPD", "deviation": "DEV", "flow": "FLW", "offline": "OFF", "component": "CMP"}
 
     async def raise_(self, issue: dict[str, Any]) -> tuple[int, bool]:
         """(id, created). A cause that already has an open issue returns that one, created False."""

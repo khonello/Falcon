@@ -1016,7 +1016,37 @@ async def test_the_installed_worker_service_connects_to_the_engine_as_its_machin
         assert org["w1_pc"] in engine.online_pc_ids()
         pc = await engine.db.accounts.pc(org["w1_pc"])
         assert pc["agent_version"] and pc["os"] and pc["last_ip"] == "127.0.0.1"          # it said what it is, from the service
+        # as a service the indexer and the event tracker are their own programs, started again by the service if they die
+        import psutil
+
+        def parts(which):
+            return [pr for pr in psutil.process_iter(["cmdline"]) if ["-m", which] == (pr.info["cmdline"] or [])[1:3]]
+
+        for _ in range(100):
+            if parts("worker_client.indexer") and parts("worker_client.tracker"):
+                break
+            await asyncio.sleep(0.1)
+        assert parts("worker_client.indexer") and parts("worker_client.tracker")
+        old_tracker = {pr.pid for pr in parts("worker_client.tracker")}
+        for pr in parts("worker_client.tracker"):
+            pr.kill()
+        for _ in range(150):
+            if {pr.pid for pr in parts("worker_client.tracker")} - old_tracker:
+                break
+            await asyncio.sleep(0.1)
+        assert {pr.pid for pr in parts("worker_client.tracker")} - old_tracker          # a new one, started by the service
+        (tmp_path / "watched" / "seen.txt").write_text("x", encoding="utf-8")
+        for _ in range(150):
+            if await engine.db.file_index.by_name("seen.txt"):
+                break
+            await asyncio.sleep(0.1)
+        assert await engine.db.file_index.by_name("seen.txt")                              # and the indexer's report reached the Engine
         assert winservice.stop(name) == f"{name} stopped"
+        for _ in range(100):
+            if not parts("worker_client.indexer") and not parts("worker_client.tracker"):
+                break
+            await asyncio.sleep(0.1)
+        assert not parts("worker_client.indexer") and not parts("worker_client.tracker")     # they go with the service
         for _ in range(100):
             if org["w1_pc"] not in engine.online_pc_ids():
                 break

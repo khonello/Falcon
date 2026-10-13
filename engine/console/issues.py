@@ -41,8 +41,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-TARGET_HOURS = {"file": 1, "update": 24, "deviation": 8, "flow": 72, "offline": 72}
-TYPE_LABEL = {"file": "Restricted file", "update": "Stuck update", "deviation": "Deviation", "flow": "Flow blocked", "offline": "Not checking in"}
+TARGET_HOURS = {"file": 1, "update": 24, "deviation": 8, "flow": 72, "offline": 72, "component": 24}
+TYPE_LABEL = {"file": "Restricted file", "update": "Stuck update", "deviation": "Deviation", "flow": "Flow blocked", "offline": "Not checking in", "component": "Part of the Worker"}
 SEVERITIES = ("critical", "high", "medium", "low")
 OFFLINE_AFTER = timedelta(minutes=20)           # a machine quiet for this long raises an issue
 OFFLINE_MEDIUM_AFTER = timedelta(hours=24)

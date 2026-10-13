@@ -266,3 +266,13 @@ part is recorded for later, not built.
   each figure (KPI histories); the overviews show today's figure without a trend. Likewise a week of sessions and assisted access per
   department for the Departments page's day view beyond today. (6) **Flows** — see the entry above (names, files copied per flow,
   several sources, carrying on from another flow, asking someone to pick a folder, schedules).
+
+- **The indexer and the event tracker run as their own supervised programs** (13 Oct 2026; decided in `docs/PACKAGING-PLAN.md`). `worker_client/indexer.py` (the
+  file watcher and idle sweep, below-normal priority) and `worker_client/tracker.py` (the kernel trace and Windows notifications) are started by the service
+  (`childproc.Supervised`), restarted when they die (1, 2, 5, 10, 30 seconds, back to the start after a minute of steadiness) and called unhealthy after five
+  deaths in five minutes. They hold no Engine connection: what they report goes to the service over stdin/stdout and out through its one connection. Always so as
+  a Windows service; `--separate` (or `separate_programs` in the settings) elsewhere; off for tests that drive the pieces directly. An unhealthy part is told to the
+  Engine (`control.component_status`, migration 030) and is an issue on that machine ("Part of the Worker"), closed when it is steady again. *Tested:*
+  `tests/test_children.py` (real child processes: killed and restarted, still reporting; a program that cannot start becomes unhealthy; the issue raised and
+  closed), and for real as an installed service (elevated prompt): both parts run under it, a killed tracker comes back, a file the indexer saw reaches the
+  Engine, and both go when the service stops. *Not done:* the UI helper is still started by the service on demand as before (already its own program).

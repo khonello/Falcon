@@ -24,6 +24,7 @@ from worker_client.config import WorkerConfig
 from worker_client.executor import Executor
 from worker_client.flowsync import FlowSync
 from worker_client.inventory import Inventory
+from worker_client.isolated import IsolatedSignals, IsolatedWatcher
 from worker_client.lockout import Lockout
 from worker_client.ossignals import OsSignals
 from worker_client.screenstream import RemoteInput, ScreenStreamer
@@ -49,7 +50,7 @@ class WorkerService:
         self.executor = Executor(self.call, allow_power=allow_power, windows=config.windows)
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
-        self.ossignals = OsSignals(self.call)
+        self.ossignals: Any = IsolatedSignals(self.call, self._component_changed) if config.separate_programs else OsSignals(self.call)
         # a superior who entered this machine looking at it, and in control mode using it. As a service (session 0, no screen) both are done by a helper on
         # the signed-in person's desktop; otherwise in this process.
         self.helper = UserHelper() if winsession.in_service_session() else None
@@ -58,9 +59,14 @@ class WorkerService:
         self.inventory = Inventory(self.call)
         self._native_watch = native_watch
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
-        self.watcher = Watcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
-                               hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
-                               native=native_watch)
+        if config.separate_programs:
+            self.watcher: Any = IsolatedWatcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
+                                                hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
+                                                native=native_watch, on_unhealthy=self._component_changed)
+        else:
+            self.watcher = Watcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
+                                   hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
+                                   native=native_watch)
         self.notifiers: list[Notifier] = []   # the narrow UI / dialogs subscribe here
         self.native_session_id: int | None = None
         self._stopping = False
@@ -235,6 +241,16 @@ class WorkerService:
             self.native_session_id = res.get("session_id")
         except (EngineError, ConnectionError_) as exc:
             log.warning("could not re-claim the native session: %s", exc)
+
+    def _component_changed(self, name: str, healthy: bool) -> None:
+        """The indexer or the tracker started dying again and again, or recovered: the Engine is told, so someone can look."""
+        self._spawn(self._tell_component(name, healthy))
+
+    async def _tell_component(self, name: str, healthy: bool) -> None:
+        try:
+            await self.call("control.component_status", {"component": name, "healthy": healthy})
+        except Exception:  # noqa: BLE001 -- not connected right now; the log has it, and the next change tells
+            log.warning("could not tell the Engine that %s is %s", name, "healthy" if healthy else "unhealthy")
 
     # --- the Worker's windows ----------------------------------------------------------------------
 
