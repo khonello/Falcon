@@ -364,6 +364,16 @@ async def test_entering_a_worker_s_machine_opens_its_session_window(console):
     ok, _ = await bridge.request("hierarchy.traverse", {"pc_id": 1})
     assert ok
     await _wait(lambda: window.property("visible") is True)
+    # the picture is asked for as the window opens, and a frame from the machine is drawn
+    await _wait(lambda: any(t == "session.screen" and p.get("action") == "start" for t, p in bridge.conn.seen))
+    png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    bridge.pushReceived.emit("session.frame", {"session_id": 9, "seq": 1, "w": 1, "h": 1, "png_b64": png})
+    await _wait(lambda: str(window.property("frame")).startswith("data:image/png;base64,"))
+    # in control mode a click on the picture goes back to the machine
+    QMetaObject.invokeMethod(window, "push", Q_ARG("QVariant", {"t": "down", "button": "left", "x": 0.5, "y": 0.5}))
+    await _wait(lambda: any(t == "session.input" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "session.input")
+    assert sent["session_id"] == 9 and sent["events"][0]["t"] == "down"
 
 
 async def test_the_engine_s_issues_are_the_issues_and_a_choice_is_its_act(console):
