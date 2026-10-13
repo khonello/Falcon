@@ -384,7 +384,7 @@ def issues_get(iid: int, account: int) -> dict[str, Any]:
 # --- restricted marks (marks.list / marks.get / marks.tree) ------------------------------------------------------
 def marks_list(role: str, account: int) -> dict[str, Any]:
     ws, pc = ("WS-OPS-A1", 101) if account == 7 else ("ADM-01", 100)          # the console's own PC, as FakeIdentity says
-    ms = [{"id": 3, "code": "M-3", "kind": "file", "name": "budget-2026.xlsx", "pc_id": pc, "host": ws, "path": "C:/Users/R.Mensah/Finance/budget-2026.xlsx",
+    ms = [{"id": 3, "code": "M-3", "kind": "file", "name": "budget-2026.xlsx", "pc_id": pc, "host": ws, "path": "C:/Finance/budget-2026.xlsx",
            "keep": "machine", "keep_label": "Anywhere on the PC", "by": {"account_id": account, "name": "You", "you": True}, "files": 1, "versions": 13,
            "copies": 1, "worst": "critical", "created_at": at(-200)},
           {"id": 4, "code": "M-4", "kind": "folder", "name": "Payroll", "pc_id": pc, "host": ws, "path": "C:/HR/Payroll",
@@ -406,9 +406,20 @@ def marks_get(mid: int, account: int) -> dict[str, Any]:
 
 
 def marks_tree() -> dict[str, Any]:
-    folders = ["C:/Users/R.Mensah/Documents", "C:/Users/R.Mensah/Documents/Reports", "C:/Users/R.Mensah/Finance", "C:/Users/R.Mensah/Contracts",
-               "C:/HR", "C:/HR/Payroll", "C:/HR/Leave", "C:/Shared/Templates"]
-    return {"pc_id": 101, "hostname": "WS-OPS-A1", "files": [], "folders": [{"path": f, "files": 3 + (len(f) * 7) % 40} for f in folders], "truncated": False}
+    # the concept's sample: what the index has seen on the Admin's own PC, with M-3 (a file) and M-4 (a folder) marked
+    spec = ["C:/Finance/budget-2026.xlsx", "C:/Finance/forecast-q4.xlsx", "C:/Finance/suppliers.xlsx",
+            "C:/Finance/Invoices/invoices-q3.csv", "C:/Finance/Invoices/invoices-q2.csv", "C:/Finance/Invoices/credit-notes.xlsx",
+            "C:/HR/Payroll/salaries.csv", "C:/HR/Payroll/overtime-sep.csv", "C:/HR/Payroll/pension.xlsx",
+            "C:/HR/Reviews/reviews-2026.docx", "C:/HR/Reviews/reviews-2025.docx", "C:/HR/Contracts/staff-contract-template.docx", "C:/HR/Contracts/nda-template.docx",
+            "C:/Users/RMensah/Documents/headcount-plan-2027.xlsx", "C:/Users/RMensah/Documents/notes.docx", "C:/Users/RMensah/Documents/ops-review-sep.pptx",
+            "C:/Users/RMensah/Desktop/todo.txt", "C:/Users/RMensah/Downloads/vendor-quote.pdf",
+            "D:/Board/minutes-2026-09.docx", "D:/Board/minutes-2026-08.docx", "D:/Board/strategy-2027.pptx", "D:/Archive/2024-accounts.zip", "D:/Archive/2025-accounts.zip"]
+    files = [{"path": f, "name": f.rsplit("/", 1)[1], "marked": 3 if f == "C:/Finance/budget-2026.xlsx" else None,
+              "covered_by": 4 if f.startswith("C:/HR/Payroll/") else None} for f in spec]
+    folders: dict[str, int] = {}
+    for f in spec:
+        folders[f.rsplit("/", 1)[0]] = folders.get(f.rsplit("/", 1)[0], 0) + 1
+    return {"pc_id": 101, "hostname": "WS-OPS-A1", "files": files, "folders": [{"path": k, "files": n} for k, n in sorted(folders.items())], "truncated": False}
 
 
 def machines_get(pc: int, rng: str) -> dict[str, Any]:
@@ -418,7 +429,7 @@ def machines_get(pc: int, rng: str) -> dict[str, Any]:
         return [{"at": at(-hours + k * step), "v": round(max(0.0, min(100.0, base + amp * (_nz(seed + pc, k) - 0.5) * 2)), 1)} for k in range(49)]
     procs = [("EXCEL.EXE", 6.2, 412, "Kojo"), ("chrome.exe", 4.1, 880, "Kojo"), ("OUTLOOK.EXE", 1.3, 260, "Kojo"),
              ("falcon-worker.exe", 0.4, 48, "SYSTEM"), ("MsMpEng.exe", 0.9, 190, "SYSTEM"), ("explorer.exe", 0.2, 96, "Kojo")]
-    return {"machine": {"pc_id": pc}, "range": rng,
+    return {"machine": {"pc_id": pc, "ip": f"10.20.4.{10 + pc}", "os": "Windows 11 Pro 23H2", "agent_started_at": at(-77.5)}, "range": rng,
             "series": {"cpu": ser(1, 28, 22), "memory": ser(2, 61, 8), "disk": ser(3, 47, 1), "net_kbps": ser(4, 40, 35)},
             "processes": {"at": at(-0.05), "items": [{"pid": 1000 + i, "name": n, "cpu": c, "memory_mb": m, "user": u} for i, (n, c, m, u) in enumerate(procs)]},
             "sessions": [], "files": {}, "events": []}

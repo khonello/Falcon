@@ -2,98 +2,155 @@ import QtQuick
 import "."
 
 // MARK FILES. Marking is one decision with one setting, so it is a page of its own, not steps: your
-// PC's folders on the left with room to browse; what you ticked, and where it may be, on the right.
+// PC's files on the left with room to browse; what you ticked, and where it may be, on the right.
 // Only what the file index has seen is listed; only your own files can be marked.
+//
+// The left is the concept's tree: drives, folders and files from marks.tree, the drives and their first folders
+// open. A file or a folder can be ticked; ticking a folder does not tick what is in it (it covers it). What is
+// marked already is drawn faint with its tag, and what a marked folder covers says so; neither can be ticked.
 Page {
     id: page
     objectName: "markFiles"
     bare: true
 
-    property var folders: []
-    property var checked: []
+    property var files: []                // marks.tree's files: [{path, name, marked, covered_by}]
+    property var folderMarks: []          // your folder marks on this PC (marks.list): their paths
+    property var checked: []              // node keys
+    property var open: ({})               // node key -> open; unset falls back to the default (drives and their first folders)
     property string keep: "machine"
     property string q: ""
     property string host: ""
+    property bool loaded: false
 
-    property bool eng: false              // marks.tree answered: the Engine marks files and folders where they are
     property bool busy: false
-    Component.onCompleted: falcon.call("marks.tree", {}, function (ok, r) {
-        if (ok && r && r.folders) {
-            page.eng = true
-            page.host = r.hostname || ""
-            page.folders = r.folders.map(function (f) { var parts = f.path.split(/[\\\/]/).filter(function (x) { return x }); return { path: f.path, name: parts.length ? parts[parts.length - 1] : f.path, files: f.files } })
-            return
-        }
-        falcon.call("index.folders", { pc_id: falcon.pcId }, function (ok2, r2) {
-            page.folders = ok2 ? (r2.folders || []) : []
-            page.host = ok2 ? (r2.hostname || "") : ""
+    Component.onCompleted: {
+        falcon.call("marks.tree", {}, function (ok, r) {
+            page.loaded = true
+            page.files = ok && r ? r.files || [] : []
+            page.host = ok && r ? r.hostname || "" : ""
+            if (ok && r) falcon.call("marks.list", { scope: "mine" }, function (ok2, r2) {
+                page.folderMarks = ok2 ? (r2.marks || []).filter(function (k) { return k.kind === "folder" && k.pc_id === r.pc_id }).map(function (k) { return page.norm(k.path) }) : []
+            })
         })
-    })
+    }
+    function norm(p) { return String(p).replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase() }
+
+    // the tree: every file under its drive and folders. A folder's path keeps the spelling its files have, so the
+    // Engine finds it in the index as it is.
+    readonly property var tree: {
+        var roots = [], byKey = {}
+        function node(key, path, name, depth, leaf, parent) {
+            var n = byKey[key]
+            if (n) return n
+            n = { key: key, path: path, name: name, depth: depth, leaf: leaf, kids: [], own: false, under: false, n: 0 }
+            byKey[key] = n
+            ;(parent ? parent.kids : roots).push(n)
+            return n
+        }
+        files.forEach(function (f) {
+            var raw = String(f.path), sep = raw.indexOf("\\") >= 0 ? "\\" : "/"
+            var parts = raw.split(/[\\\/]/).filter(function (x) { return x !== "" })
+            var parent = null, at = ""
+            for (var i = 0; i < parts.length; i++) {
+                at = i ? at + sep + parts[i] : parts[i]
+                var leaf = i === parts.length - 1
+                var n = node(norm(at) + (leaf ? "" : "/"), at, parts[i], i, leaf, parent)
+                if (leaf) { n.own = f.marked !== null && f.marked !== undefined; n.under = f.covered_by !== null && f.covered_by !== undefined && !n.own }
+                parent = n
+            }
+        })
+        // folders: their file counts, and whether a folder mark is on them or above them
+        function walk(n, coveredAbove) {
+            if (n.leaf) { n.n = 1; if (coveredAbove) n.under = !n.own; return 1 }
+            n.own = page.folderMarks.indexOf(norm(n.path)) >= 0
+            n.under = coveredAbove && !n.own
+            n.kids.sort(function (a, b) { return a.leaf === b.leaf ? a.name.localeCompare(b.name) : a.leaf ? -1 : 1 })
+            n.n = n.kids.reduce(function (s, k) { return s + walk(k, coveredAbove || n.own) }, 0)
+            return n.n
+        }
+        roots.sort(function (a, b) { return a.name.localeCompare(b.name) })
+        roots.forEach(function (r) { walk(r, false) })
+        return { roots: roots, byKey: byKey }
+    }
+    function isOpen(n) { return open[n.key] !== undefined ? open[n.key] : n.depth <= 1 }
+    function flip(n) { var o = Object.assign({}, open); o[n.key] = !isOpen(n); open = o }
+    // the rows to draw: open folders show what is in them; a search keeps every match and the folders leading to it
+    readonly property var rows: {
+        var out = [], needle = q.trim().toLowerCase()
+        function hit(n) { return n.name.toLowerCase().indexOf(needle) >= 0 || n.kids.some(hit) }
+        function add(n) {
+            if (needle && !hit(n)) return
+            out.push(n)
+            if (!n.leaf && (needle || isOpen(n))) n.kids.forEach(add)
+        }
+        tree.roots.forEach(add)
+        return out
+    }
+    readonly property var picked: checked.map(function (k) { return page.tree.byKey[k] }).filter(function (x) { return !!x })
+    readonly property int nDirs: picked.filter(function (x) { return !x.leaf }).length
+    readonly property int nFiles: picked.reduce(function (a, x) { return a + x.n }, 0)
+    function toggle(k) { var c = checked.slice(), i = c.indexOf(k); if (i >= 0) c.splice(i, 1); else c.push(k); checked = c }
+
     function mark() {
         busy = true
-        falcon.call("marks.create", { paths: checked, keep: keep }, function (ok, r) {
+        falcon.call("marks.create", { paths: picked.map(function (x) { return x.path }), keep: keep }, function (ok, r) {
             page.busy = false
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not marked"); return }
             var n = r.copies_found || 0
-            Msg.ok(Theme.many((r.marks || []).length, "mark") + " made" + (n ? " · " + Theme.many(n, "copy") + " found elsewhere already" : " · no copy anywhere else"))
+            Msg.ok("Marked " + (page.picked.length === 1 ? page.picked[0].name : page.picked.length + " items") + " restricted · nothing was moved"
+                   + (n ? " · " + Theme.many(n, "copy") + " found elsewhere already" : ""))
             Nav.go("restricted")
         })
     }
-    // the folders as a tree: each with its depth, the path segments it is under
-    readonly property var tree: folders.slice().sort(function (a, b) { return a.path.localeCompare(b.path) })
-        // indented under the folders that are listed, and named from the nearest of them: the index lists
-        // only folders with files, so C:/Shared/Templates can come without C:/Shared
-        .map(function (f, i, all) {
-            var p = f.path.replace(/\\/g, "/"), up = all.filter(function (a) { return p.indexOf(a.path.replace(/\\/g, "/") + "/") === 0 })
-            var near = up.length ? up[up.length - 1].path.replace(/\\/g, "/") : ""
-            return Object.assign({}, f, { depth: up.length, name: near ? p.slice(near.length + 1) : p })
-        })
-        .filter(function (f) { return q === "" || f.path.toLowerCase().indexOf(q.toLowerCase()) >= 0 })
-    readonly property var picked: folders.filter(function (f) { return page.checked.indexOf(f.path) >= 0 })
-    readonly property int nFiles: picked.reduce(function (a, f) { return a + (f.files || 0) }, 0)
-    function toggle(p) { var c = checked.slice(), i = c.indexOf(p); if (i >= 0) c.splice(i, 1); else c.push(p); checked = c }
 
     EditorShell {
         width: parent.width
-        problem: !page.picked.length ? "Tick at least one folder." : !page.eng ? "This Engine marks single indexed files only; folder marks need its marks.* handlers." : page.busy ? "Marking…" : ""
+        problem: !page.picked.length ? "Tick at least one file or folder." : page.busy ? "Marking…" : ""
         onSave: page.mark()
         note: "Nothing is moved or copied."
         saveLabel: "Mark restricted"
         onCancel: Nav.go("restricted")
         leftPane: Panel {
             width: parent.width
-            height: 620
+            height: 660
             fill: true
             flush: true
             title: page.host ? "Files on " + page.host : "Files on your PC"
             sub: "your PC · tick what to mark"
-            extra: SearchBox { placeholderText: "Find a folder"; onTextChanged: page.q = text }
+            extra: SearchBox { width: 240; placeholderText: "Find a file or folder"; onTextChanged: page.q = text }
             Flickable {
                 anchors.fill: parent
-                anchors.bottomMargin: 40
+                anchors.bottomMargin: foot.height
                 contentHeight: tcol.height + 16
                 clip: true
                 Column {
                     id: tcol
                     x: 10; y: 8
                     width: parent.width - 20
-                    Txt { visible: page.folders.length === 0; text: "Nothing indexed on this PC yet. Its folders appear after the machine's next idle sweep."; color: Theme.text3; wrapMode: Text.WordWrap; width: parent.width; elide: Text.ElideNone }
+                    Txt { visible: page.loaded && page.files.length === 0; text: "Nothing indexed on this PC yet. Its files appear after the machine's next idle sweep."; color: Theme.text3; wrapMode: Text.WordWrap; width: parent.width; elide: Text.ElideNone; padding: 8 }
+                    Txt { visible: page.files.length > 0 && page.rows.length === 0; text: "Nothing on " + (page.host || "your PC") + " matches “" + page.q + "”."; color: Theme.text3; width: parent.width; padding: 8 }
                     Repeater {
-                        model: page.tree
+                        model: page.rows
                         Rectangle {
                             required property var modelData
+                            readonly property bool off: modelData.own || modelData.under
                             width: tcol.width
                             height: 28
                             radius: 4
                             color: ta.containsMouse ? Theme.surface2 : "transparent"
                             Row {
-                                x: 6 + modelData.depth * 20
-                                anchors.verticalCenter: parent.verticalCenter
+                                x: 6 + modelData.depth * 24
+                                height: parent.height
                                 spacing: 8
-                                Check { controlled: true; checked: page.checked.indexOf(modelData.path) >= 0; onToggled: page.toggle(modelData.path); anchors.verticalCenter: parent.verticalCenter }
-                                Icon { name: "folder"; size: 14; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: modelData.name; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: Theme.fmt(modelData.files || 0) + " files"; color: Theme.text4; font.pixelSize: 11; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                                Item { width: 14; height: parent.height
+                                       Icon { visible: !modelData.leaf; anchors.centerIn: parent; name: modelData.leaf ? "" : page.q.trim() || page.isOpen(modelData) ? "caretd" : "caretr"; size: 12; color: Theme.text2 }
+                                       MouseArea { enabled: !modelData.leaf; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.flip(modelData) } }
+                                Check { controlled: true; enabled: !parent.parent.off; checked: page.checked.indexOf(modelData.key) >= 0; onToggled: page.toggle(modelData.key); anchors.verticalCenter: parent.verticalCenter }
+                                Icon { name: modelData.leaf ? "file" : "folder"; size: 14; color: parent.parent.off ? Theme.text4 : Theme.text2; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { text: modelData.name; mono: modelData.leaf; color: parent.parent.off ? Theme.text4 : Theme.text; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { visible: !modelData.leaf; text: Theme.fmt(modelData.n) + (modelData.n === 1 ? " file" : " files"); color: Theme.text4; font.pixelSize: 11; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                                Tag { visible: modelData.own; text: "marked"; c: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { visible: modelData.under; text: "covered by its folder"; color: Theme.text4; font.pixelSize: 11; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
                             }
                             MouseArea { id: ta; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
                         }
@@ -101,35 +158,37 @@ Page {
                 }
             }
             Rectangle {
+                id: foot
                 anchors.bottom: parent.bottom
                 width: parent.width
-                height: 40
+                height: footText.implicitHeight + 20
                 color: "transparent"
                 Rectangle { width: parent.width; height: 1; color: Theme.border }
-                Txt { x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28; color: Theme.text3; font.pixelSize: 12
-                      text: "Only what the file index has seen is listed. Only your own files can be marked: what is on someone else's machine is theirs to mark." }
+                Txt { id: footText; x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                      text: "Only what the file index has seen is listed; the rest appears after the machine's next idle sweep. Only your own files can be marked: what is on someone else's machine is theirs to mark." }
             }
         }
         rightPane: Panel {
             width: parent.width
             flush: true
             title: "To mark"
-            sub: page.picked.length ? Theme.many(page.picked.length, "folder") + ", " + Theme.fmt(page.nFiles) + " files in all" : "nothing ticked yet"
+            sub: page.picked.length ? (page.nDirs ? Theme.many(page.nDirs, "folder") + " and " : "") + (page.picked.length - page.nDirs ? Theme.many(page.picked.length - page.nDirs, "file") + ", " : "") + Theme.fmt(page.nFiles) + " files in all"
+                                    : "nothing ticked yet"
             Column {
                 width: parent.width
                 Txt { visible: page.picked.length === 0; x: 14; topPadding: 14; bottomPadding: 14; width: parent.width - 28; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                      text: "Tick folders on the left. A folder covers everything in it, and anything added to it later." }
+                      text: "Tick files or folders on the left. A folder covers everything in it, and anything added to it later." }
                 Repeater {
                     model: page.picked
                     Rectangle {
                         required property var modelData
                         width: parent.width; height: 48; color: "transparent"
-                        Icon { x: 14; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 14; color: Theme.text3 }
+                        Icon { x: 14; anchors.verticalCenter: parent.verticalCenter; name: modelData.leaf ? "file" : "folder"; size: 14; color: Theme.text3 }
                         Column { x: 38; width: parent.width - 150; anchors.verticalCenter: parent.verticalCenter
                                  Txt { text: modelData.name; font.weight: Font.Medium; width: parent.width }
                                  Txt { text: modelData.path; mono: true; color: Theme.text3; font.pixelSize: 11; width: parent.width } }
-                        Txt { anchors.right: rm.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; text: Theme.fmt(modelData.files || 0) + " files"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                        Btn { id: rm; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "text"; iconName: "close"; onClicked: page.toggle(modelData.path) }
+                        Txt { anchors.right: rm.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; text: modelData.leaf ? "1 file" : Theme.fmt(modelData.n) + " files"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                        Btn { id: rm; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "text"; iconName: "close"; onClicked: page.toggle(modelData.key) }
                         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                     }
                 }
@@ -139,7 +198,7 @@ Page {
                     width: parent.width - 28
                     topPadding: 14; bottomPadding: 14
                     spacing: 8
-                    Txt { text: "WHERE THEY ARE ALLOWED"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
+                    Txt { text: page.picked.length === 1 ? "WHERE IT IS ALLOWED" : "WHERE THEY ARE ALLOWED"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
                     Choice { width: parent.width; on: page.keep === "machine"; icon: "desktop"; title: "Only on your PC"; desc: "Moving or copying on it is fine. A copy on any other machine is caught."; onClicked: page.keep = "machine" }
                     Choice { width: parent.width; on: page.keep === "path"; icon: "aim"; title: "Only where it is now"; desc: "A copy anywhere else is caught, even elsewhere on your PC."; onClicked: page.keep = "path" }
                 }

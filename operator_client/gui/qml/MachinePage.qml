@@ -10,6 +10,7 @@ Page {
 
     readonly property var m: Fleet.byHost[Nav.sub] || null
     property var state0: null
+    readonly property var mach: got && got.machine ? got.machine : ({})
     property var got: null                 // machines.get: its readings over the range, and what it runs
     property var events: []
     property var running: []
@@ -154,8 +155,9 @@ Page {
                 rowSpacing: 12
                 Repeater {
                     model: page.m ? [["User", page.m.user || "—"], ["Department", page.m.deptName], ["Version", page.m.ver || "—", true],
+                                     ["IP address", page.mach.ip || page.m.ip || "—", true], ["OS", page.mach.os || page.m.os || "—"],
+                                     ["Agent uptime", page.mach.agent_started_at && page.m.online ? Time.span((Time.now - Time.ms(page.mach.agent_started_at)) / 3600000) : "—"],
                                      ["Last check-in", page.m.online ? "seconds ago" : Time.ago(page.m.seen)],
-                                     ["In front", page.state0 && page.state0.foreground ? page.state0.foreground.program : "—"],
                                      ["Admins", (Fleet.dept(page.m.dept) || { admins: [] }).admins.map(function (a) { return a.name }).join(", ") || "None"]] : []
                     Column {
                         required property var modelData
@@ -189,8 +191,8 @@ Page {
                 columns: 2
                 spacing: 14
                 Repeater {
-                    model: page.got && page.got.series ? [["CPU", "cpu", "%"], ["Memory", "memory", "%"], ["Disk", "disk", "%"], ["Network", "net_kbps", " kb/s"]]
-                                                       : [["CPU", "cpu", "%"], ["Memory", "memory", "%"], ["Idle", "idle_s", " s"]]
+                    model: page.got && page.got.series ? [["CPU", "cpu", "%", Theme.ser1, 90], ["Memory", "memory", "%", Theme.ser2, null], ["Disk", "disk", "%", Theme.med, 90], ["Network in", "net_kbps", " KB/s", Theme.ser3, null]]
+                                                       : [["CPU", "cpu", "%", Theme.ser1, 90], ["Memory", "memory", "%", Theme.ser2, null], ["Idle", "idle_s", " s", Theme.ser3, null]]
                     Panel {
                         required property var modelData
                         width: (parent.width - 14) / 2
@@ -200,8 +202,8 @@ Page {
                         id: mp
                         readonly property var pts: page.got && page.got.series && page.got.series[modelData[1]] ? page.got.series[modelData[1]] : []
                         TimeChart { visible: mp.pts.length > 1; width: parent.width; height: 150; unit: modelData[2].trim()
-                                    yMax: modelData[2] === "%" ? 100 : 0; threshold: modelData[1] === "cpu" ? 90 : null
-                                    series: [{ name: modelData[0], c: Theme.ser1, pts: mp.pts.map(function (x) { return [Time.ms(x.at), x.v] }) }] }
+                                    yMax: modelData[2] === "%" ? 100 : 0; threshold: modelData[4]
+                                    series: [{ name: modelData[0], c: modelData[3], pts: mp.pts.map(function (x) { return [Time.ms(x.at), x.v] }) }] }
                         Empty { visible: mp.pts.length <= 1; width: parent.width; h: 120; icon: "linechart"; title: "No history to draw yet"
                                 text: page.got ? "Nothing reported over this range yet." : "Readings are kept by the Engine; this one does not hand them to the console." }
                     }

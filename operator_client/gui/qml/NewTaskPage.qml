@@ -160,21 +160,21 @@ Page {
                         text: page.busy ? "Reading" : !page.read ? "Read it" : page.stale ? "Check again" : "Checked"
                         onClicked: page.readIt()
                     }
+                    // the hint; while the box is empty it runs on into "use an example", as the concept's does
                     Txt {
                         anchors.verticalCenter: parent.verticalCenter
                         width: left.width - 140
                         color: Theme.text3
                         font.pixelSize: 12
+                        readonly property bool empty: !page.busy && !page.read && page.text.trim() === ""
+                        textFormat: empty ? Text.StyledText : Text.PlainText
+                        linkColor: Theme.accent
                         text: page.busy ? "The local model is reading it…"
-                              : !page.read ? (page.text.trim() === "" ? "Write what needs doing, and name who it is for." : page.foundPerson ? "It proposes what to check, and when. Nothing is created yet." : "Name who it is for: type @ to pick a person.")
+                              : empty ? "Write what needs doing, or <a href=\"x\">use an example</a>."
+                              : !page.read ? (page.foundPerson ? "It proposes what to check, and when. Nothing is created yet." : "Name who it is for: type @ to pick a person.")
                               : page.stale ? "The details below are for the previous text." : "Read by the local model."
-                    }
-                    Link {
-                        visible: !page.read && page.text.trim() === ""
-                        anchors.verticalCenter: parent.verticalCenter
-                        font.pixelSize: 12
-                        text: "Use an example"
-                        onClicked: page.text = "Have " + (page.people.length ? page.people[0].name : "Kojo") + " reconcile the Q3 invoices in Excel into reconciliation.xlsx by Friday 17:00, and write up q3-summary.docx for Finance."
+                        onLinkActivated: page.text = "Have " + (page.people.length ? page.people[0].name : "Kojo") + " reconcile the Q3 invoices in Excel into reconciliation.xlsx by Friday 17:00, and write up q3-summary.docx for Finance."
+                        HoverHandler { enabled: parent.empty; cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
                     }
                 }
 

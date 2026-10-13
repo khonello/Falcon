@@ -162,6 +162,13 @@ class _Connection:
             return {"marks": [{"id": 3, "kind": "folder", "name": "Payroll", "pc_id": 101, "host": "WS-OPS-A1", "path": "C:/HR/Payroll", "keep": "path",
                                "files": 24, "versions": 30, "copies": 1, "by": {"account_id": 7, "you": True}}],
                     "summary": {"marks": 1, "files": 24, "copies": 1, "with_copies": 1}}
+        if type_ == "marks.tree":
+            files = ["C:\\Finance\\budget-2026.xlsx", "C:\\Finance\\Invoices\\q3.csv", "C:\\HR\\Payroll\\salaries.csv", "D:\\Board\\minutes.docx"]
+            return {"pc_id": 101, "hostname": "WS-OPS-A1", "truncated": False,
+                    "files": [{"path": f, "name": f.rsplit("\\", 1)[1], "marked": 9 if "budget" in f else None,
+                               "covered_by": 3 if "Payroll" in f else None} for f in files]}
+        if type_ == "marks.create":
+            return {"marks": [], "copies_found": 0}
         if type_ == "marks.get":
             return {"mark": {"id": 3}, "copies": [{"issue_id": 41, "severity": "high", "host": "OPS-01", "file": "salaries.csv",
                                                    "folder": "C:/Users/Kojo", "signed_in": "Kojo", "opened_at": _ago(2)}]}
@@ -402,6 +409,24 @@ async def test_marks_are_the_person_s_own_and_their_copies_are_issues(console):
     assert cur["name"] == "Payroll" and cur["keep"] == "path" and cur["files"] == 24
     assert cur["copies"][0]["iid"] == 41 and cur["copies"][0]["user"] == "Kojo"
     assert prop(view, "copiesN") == 1
+
+
+async def test_marking_picks_from_the_index_as_a_tree_of_files_and_folders(console):
+    """marks.tree's files become drives, folders and files; what is marked, or covered by a marked folder, cannot be
+    ticked; a ticked folder is sent by the path its files have, so the Engine finds it in the index."""
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "restricted/mark", "markFiles")
+    await _wait(lambda: any(r["name"] == "Payroll" and r["own"] for r in prop(page, "rows") or []))
+    rows = {r["name"]: r for r in prop(page, "rows")}
+    assert [r["name"] for r in prop(page, "rows")][:4] == ["C:", "Finance", "budget-2026.xlsx", "Invoices"]
+    assert rows["C:"]["n"] == 3 and rows["Finance"]["n"] == 2
+    assert rows["budget-2026.xlsx"]["own"] and rows["Payroll"]["own"]
+    assert "q3.csv" not in rows                      # a second-level folder starts closed
+    QMetaObject.invokeMethod(page, "toggle", Q_ARG("QVariant", rows["Finance"]["key"]))
+    QMetaObject.invokeMethod(page, "mark")
+    await _wait(lambda: any(t == "marks.create" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "marks.create")
+    assert sent == {"paths": ["C:\\Finance"], "keep": "machine"}
 
 
 QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))

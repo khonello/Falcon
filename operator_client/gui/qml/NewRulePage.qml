@@ -12,7 +12,7 @@ Page {
 
     readonly property int editId: Nav.sub && String(Nav.sub).indexOf("edit-") === 0 ? Number(String(Nav.sub).slice(5)) : 0
     property int step: 0
-    property string kind: "Event"
+    property string kind: "Threshold"
     property string ev: "usb.inserted"
     property string mtr: "cpu"
     property int val: 90
@@ -61,7 +61,7 @@ Page {
     }
     function startFrom(v) {
         base = String(v); step = 0
-        if (v === "blank") { kind = "Event"; ev = "usb.inserted"; scope = "all"; hosts = []; name = ""
+        if (v === "blank") { kind = "Threshold"; ev = "usb.inserted"; mtr = "cpu"; val = 90; mins = 5; scope = "all"; hosts = []; name = ""
                              acts = lib.length ? [(lib.filter(function (x) { return x.builtin_type === "notify" })[0] || lib[0]).id] : []; return }
         var e = existing.filter(function (x) { return String(x.id) === String(v) })[0]
         if (e) { load(e); name = "Copy of " + Auto.nameOf(e) }
@@ -70,7 +70,7 @@ Page {
     readonly property var match: kind === "Threshold" ? { percent: val, duration_s: mins * 60 } : kind === "Schedule" ? { at: at, days: days } : {}
     readonly property var targets: scope === "all" ? Fleet.machines : scope === "dept" ? Fleet.inDept(dept) : Fleet.machines.filter(function (m) { return page.hosts.indexOf(m.pc_id) >= 0 })
     readonly property string whenTxt: Auto.whenOf({ condition_spec: { type: type, match: match } })
-    readonly property string whereTxt: scope === "all" ? "any machine" : scope === "dept" ? "a " + Fleet.deptName(dept) + " machine" : targets.map(function (m) { return m.host }).join(", ") || "no machines yet"
+    readonly property string whereTxt: scope === "all" ? (Nav.boss ? "any machine" : "a " + Fleet.deptName(falcon.departmentId) + " machine") : scope === "dept" ? "a " + Fleet.deptName(dept) + " machine" : targets.map(function (m) { return m.host }).join(", ") || "no machines yet"
     function actName(id) { var a = lib.filter(function (x) { return x.id === id })[0]; return a ? a.name : "an action" }
     readonly property string doTxt: acts.length ? acts.map(page.actName).join(", then ") : ""
     readonly property var problems: [kind === "Schedule" && !days.length ? "Pick at least one day." : "", targets.length ? "" : "Pick at least one machine.", acts.length ? "" : "Add at least one action.", ""]
@@ -186,7 +186,7 @@ Page {
                                 spacing: 12
                                 Repeater {
                                     model: [["Event", "thunderbolt", "Something happens", "A device is plugged in, a file appears, someone signs in. Reported the moment it happens."],
-                                            ["Threshold", "linechart", "A reading crosses a line", "CPU or memory stays above a level for a while. Checked every 30 seconds."],
+                                            ["Threshold", "linechart", "A reading crosses a line", "CPU, memory, disk or network stays above a level for a while. Checked every 30 seconds."],
                                             ["Schedule", "clock", "On a schedule", "At a time on chosen days, by the Engine's clock."]]
                                     Choice { required property var modelData; width: (parent.width - 24) / 3; on: page.kind === modelData[0]; icon: modelData[1]; title: modelData[2]; desc: modelData[3]
                                              disabled: page.editId > 0 && page.kind !== modelData[0]; onClicked: page.kind = modelData[0] }
@@ -197,7 +197,9 @@ Page {
                                        Select { width: 380; enabled: !page.editId; value: page.ev; options: page.eventChoices.map(function (t) { var w = Auto.when[t]; return { value: t, label: w.charAt(0).toUpperCase() + w.slice(1) } })
                                                 onPicked: function (v) { page.ev = v } } }
                             FieldRow { visible: page.kind === "Threshold"; label: "Reading"
-                                       Select { width: 140; enabled: !page.editId; value: page.mtr; options: [{ value: "cpu", label: "CPU" }, { value: "memory", label: "Memory" }]; onPicked: function (v) { page.mtr = v } }
+                                       Select { width: 140; enabled: !page.editId; value: page.mtr; options: [{ value: "cpu", label: "CPU" }, { value: "memory", label: "Memory" },
+                                                                                                    { value: "disk", label: "Disk · not watched by the Engine yet", disabled: true },
+                                                                                                    { value: "network", label: "Network · not watched by the Engine yet", disabled: true }]; onPicked: function (v) { page.mtr = v } }
                                        Txt { text: "above"; color: Theme.text2; anchors.verticalCenter: parent.verticalCenter }
                                        Num { width: 96; value: page.val; from: 1; to: 100; onChanged: function (v) { page.val = v } }
                                        Txt { text: "%"; color: Theme.text2; anchors.verticalCenter: parent.verticalCenter } }

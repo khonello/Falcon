@@ -14,7 +14,7 @@ Page {
     property string name: ""
     property string desc: ""
     property string lang: "python"
-    property string src: "import os\n\nprint(os.environ[\"COMPUTERNAME\"])\n"
+    property string src: "import os\n\n# write what the action does\nprint(os.environ[\"COMPUTERNAME\"])\n"
     property int limit: 60
     property var lastSaved: 0
 
@@ -33,7 +33,7 @@ Page {
         return out
     }
     readonly property bool ready: !!chk && chk.ok && name.trim() !== ""
-    function switchLang(l) { lang = l; src = l === "python" ? "import os\n\nprint(os.environ[\"COMPUTERNAME\"])\n" : "$name = $env:COMPUTERNAME\nWrite-Output $name\n" }
+    function switchLang(l) { lang = l; src = l === "python" ? "import os\n\n# write what the action does\nprint(os.environ[\"COMPUTERNAME\"])\n" : "$name = $env:COMPUTERNAME\nWrite-Output $name\n" }
     function save() {
         var p = page.editId ? { action_id: page.editId, name: name.trim(), description: desc.trim(), script: src, timeout_s: limit }
                             : { kind: "custom", name: name.trim(), description: desc.trim(), language: lang, script: src, timeout_s: limit }
@@ -109,6 +109,7 @@ Page {
                         anchors.right: parent.right
                         spacing: 8
                         Btn { text: "Cancel"; onClicked: Nav.go("actions", page.editId || null) }
+                        Btn { text: "Test on one machine"; enabled: false; tip: "The Engine runs only saved actions: save it, then run it on one machine from Actions" }
                         Btn { kind: "primary"; enabled: page.ready; text: page.editId ? "Save changes" : "Save action"; onClicked: page.save() }
                     }
                 }
