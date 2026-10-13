@@ -10,12 +10,14 @@ Page {
 
     property var events: []
     property var hist: ({})           // event id -> event_history
+    property var board: ({})          // event id -> automation.board's row: who set it, by name
     property string pf: ""
     property var sel: Nav.sub && !isNaN(Number(Nav.sub)) ? Number(Nav.sub) : null
     property int openF: -1
     property int openRun: 0
 
     function load() {
+        falcon.call("automation.board", {}, function (ok, r) { var b = {}; if (ok) (r.rules || []).forEach(function (x) { b[x.event_id] = x }); page.board = b })
         falcon.call("control.event_list", {}, function (ok, r) {
             page.events = ok ? (r.events || []) : []
             page.events.forEach(function (e) {
@@ -52,6 +54,16 @@ Page {
         return { name: k, c: Auto.outColor(k), v: v }
     })
 
+    function ownerOf(e) { var b = board[e.id]; return b && b.owner ? b.owner : e.read_only ? "the Super User" : "this department" }
+    // Test on one machine: the rule's actions once, on the first machine it applies to that is online (recorded as run by hand)
+    function test(e) {
+        var ids = (e.condition_spec || {}).pc_ids, ms = Fleet.machines.filter(function (m) { return m.online && (!ids || !ids.length || ids.indexOf(m.pc_id) >= 0) })
+        if (!ms.length) { Msg.warn("No machine it applies to is online"); return }
+        falcon.call("control.event_test", { event_id: e.id, pc_id: ms[0].pc_id }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not run"); return }
+            Msg.ok("Ran once on " + ms[0].host + " · recorded as run by hand"); again.restart()
+        })
+    }
     function toggle(e, on) {
         falcon.call("control.event_update", { event_id: e.id, enabled: on }, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
@@ -91,7 +103,7 @@ Page {
             icon: function (r) { return Auto.kindIcon(r.kindW) }
             nameTitle: "Rule"
             nameText: function (r) { return r.name }
-            nameLine: function (r) { return r.kindW + " · " + (r.read_only ? "by the Super User" : "made here") }
+            nameLine: function (r) { return r.kindW + " · by " + page.ownerOf(r) }
             cols: [{ title: "On", width: 60, check: function (r) { return r.enabled }, locked: function (r) { return !!r.read_only }, toggle: function (r, on) { page.toggle(r, on) } },
                    { title: "Fired, 7 days", width: 130, bar: function (r) { return { v: page.firings(r).length, max: page.maxFired, text: Theme.fmt(page.firings(r).length) } } },
                    { title: "Last fired", width: 100, text: function (r) { var f = page.firings(r)[0]; return f ? Time.at(f.at) : "—" } }]
@@ -119,13 +131,14 @@ Page {
             emptyText: "Pick a rule in the list."
             title: r ? r.name : ""
             sub: r && page.sel === r.id ? "the one you picked" : "the first in the list · click another"
-            facts: r ? [["When", Auto.whenOf(r).replace(/^./, function (x) { return x.toUpperCase() })], ["On", Auto.whereOf(r)], ["Do", (r.actions || []).map(function (a) { return a.name }).join(", ") || "Nothing yet"],
+            facts: r ? [["When", Auto.whenOf(r).replace(/^./, function (x) { return x.toUpperCase() })], ["On", Auto.whereFact(r)], ["Do", (r.actions || []).map(function (a) { return a.name }).join(", ") || "Nothing yet"],
                         ["Last fired", fs.length ? Time.atDay(fs[0].at) : "Not this week"], ["Fired, 7 days", Theme.fmt(fs.length)],
-                        ["Problems, 7 days", pr ? pr + " failed or timed out" : "None", pr ? Theme.crit : null], ["Owner", r.read_only ? "Super User" : "This department"]] : []
+                        ["Problems, 7 days", pr ? pr + " failed or timed out" : "None", pr ? Theme.crit : null], ["Owner", page.ownerOf(r).replace(/^./, function (x) { return x.toUpperCase() })]] : []
             actions: [
                 Item { width: sw.implicitWidth; height: Theme.control      // the actions wrap, so the switch centres in its own box
                        Check { id: sw; text: "Switched on"; controlled: true; checked: side.r !== null && side.r.enabled; enabled: side.r !== null && !side.r.read_only
                                anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { page.toggle(side.r, on) } } },
+                Btn { text: "Test on one machine"; enabled: side.r !== null && (side.r.actions || []).length > 0; onClicked: page.test(side.r) },
                 Btn { kind: "primary"; iconName: "edit"; text: "Edit"; enabled: side.r !== null && !side.r.read_only
                       tip: side.r && side.r.read_only ? "Set by the Super User for the whole organisation. Only they can change it." : ""
                       onClicked: Nav.go("automation", "edit-" + side.r.id) }

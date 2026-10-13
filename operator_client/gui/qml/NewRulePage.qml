@@ -57,7 +57,7 @@ Page {
             page.scope = s.pc_ids && s.pc_ids.length ? "pick" : "all"
             page.hosts = s.pc_ids || []
             page.acts = (e.actions || []).map(function (a) { return a.id })
-            page.name = Auto.nameOf(e)
+            page.name = e.name || ""          // a rule without a name keeps being worded from what it watches
     }
     function startFrom(v) {
         base = String(v); step = 0
@@ -88,13 +88,24 @@ Page {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not saved"); return }
             Msg.ok(page.editId ? "Changes saved" : "Rule saved and switched on"); Nav.go("automation")
         }
-        if (editId) falcon.call("control.event_update", { event_id: editId, match: match, pc_ids: pcs, action_ids: acts }, done)
-        else falcon.call("control.event_create", { type: type, match: match, pc_ids: pcs, action_ids: acts, enabled: true }, done)
+        // the name is saved with the rule (the Engine keeps it); without one the rule is worded from what it watches
+        if (editId) falcon.call("control.event_update", { event_id: editId, match: match, pc_ids: pcs, action_ids: acts, name: name.trim() }, done)
+        else falcon.call("control.event_create", { type: type, match: match, pc_ids: pcs, action_ids: acts, enabled: true, name: name.trim() }, done)
     }
+    // Test on one machine: a saved rule runs as itself (control.event_test, recorded as run by hand, not a firing);
+    // a rule not saved yet runs its actions by hand on the first machine that is online
     function testOnce() {
-        if (!targets.length || !acts.length) return
-        acts.forEach(function (a) { falcon.call("control.action_run", { action_id: a, pc_id: targets[0].pc_id }, function () {}) })
-        Msg.ok("Ran once on " + targets[0].host)
+        var on = targets.filter(function (m) { return m.online })[0]
+        if (!on || !acts.length) { Msg.warn("No machine it applies to is online"); return }
+        if (editId) {
+            falcon.call("control.event_test", { event_id: editId, pc_id: on.pc_id }, function (ok, r) {
+                if (!ok) { Msg.failed(r && r.message ? r.message : "Not run"); return }
+                Msg.ok("Ran once on " + on.host + " · recorded as run by hand")
+            })
+            return
+        }
+        acts.forEach(function (a) { falcon.call("control.action_run", { action_id: a, pc_id: on.pc_id }, function () {}) })
+        Msg.ok("Ran once on " + on.host + " · recorded as run by hand")
     }
 
     component Head: Column {
@@ -304,8 +315,7 @@ Page {
                             spacing: 14
                             Head { t: page.editId ? "Check your changes" : "Name it and check it"; d: page.editId ? "Changes apply from the next firing. The record keeps the old version." : "Saved rules are switched on straight away." }
                             FieldRow { label: "Name"
-                                       Field { width: 440; text: page.name; placeholderText: Auto.names[page.type] || "Name the rule"; onTextEdited: page.name = text }
-                                       Txt { text: "rules have no name in the Engine yet, so this is not saved"; color: Theme.text4; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
+                                       Field { width: 440; text: page.name; placeholderText: Auto.names[page.type] || "Name the rule"; onTextEdited: page.name = text } }
                             Rectangle {
                                 width: parent.width
                                 height: sent.height + 32

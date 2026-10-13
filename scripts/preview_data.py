@@ -630,6 +630,12 @@ def events(role: str) -> dict[str, Any]:
     return {"events": out, "types": {}}
 
 
+def automation_board(role: str) -> dict[str, Any]:
+    """automation.board, only what the console reads from it: who set each rule, by name."""
+    return {"rules": [{"event_id": eid, "owner": "Super User" if org else "R. Mensah", "org_wide": org} for eid, _t, _p, _m, _a, _o, org, _f in EVENTS],
+            "days": [], "strip": {}}
+
+
 def event_history(eid: int) -> dict[str, Any]:
     e = next((x for x in EVENTS if x[0] == eid), None)
     if e is None:
@@ -840,6 +846,10 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
                           "custom_script": TEMP_PY})
             acts[kind].append(a)
         return {"builtin": {}, "actions": acts}
+    if type_ == "automation.board":
+        return automation_board(role)
+    if type_ == "control.event_test":
+        return {"event_id": payload.get("event_id"), "pc_id": payload.get("pc_id"), "runs": []}
     if type_ == "control.event_list":
         return events(role)
     if type_ == "control.event_history":

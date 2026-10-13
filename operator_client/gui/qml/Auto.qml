@@ -58,6 +58,13 @@ QtObject {
         var hs = ids.map(function (p) { return Fleet.byPc[p] ? Fleet.byPc[p].host : "PC " + p })
         return hs.length > 3 ? hs.slice(0, 3).join(", ") + " and " + (hs.length - 3) + " more" : hs.join(", ")
     }
+    // where it runs, as the side panel says it: a whole department as "Operations · 7 here", else the machines
+    function whereFact(e) {
+        var ids = (e.condition_spec || {}).pc_ids
+        var d = Fleet.depts.length === 1 ? Fleet.depts[0] : null
+        if (d && (!ids || !ids.length || d.machines.every(function (m) { return ids.indexOf(m.pc_id) >= 0 }))) return d.name + " · " + d.machines.length + " here"
+        return whereOf(e).replace(/^./, function (x) { return x.toUpperCase() })
+    }
     function sentence(e) { return "When " + whenOf(e) + " on " + whereOf(e) + ", do " + (e.actions || []).map(function (a) { return a.name }).join(", ") }
 
     // a run's outcome, in the concept's four words
