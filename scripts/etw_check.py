@@ -30,7 +30,8 @@ def main() -> int:
         time.sleep(seconds)
     finally:
         watcher.stop()
-    print("stopped")
+    got = {k: v.records for k, v in (("program records", watcher._process), ("file records", watcher._file)) if v is not None}
+    print("stopped; records Windows delivered:", got)
     return 0
 
 

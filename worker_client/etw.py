@@ -146,6 +146,7 @@ class TraceSession:
         self._ok = False
         self._callback: Any = None
         self.error = ""
+        self.records = 0                  # every record Windows delivered, wanted or not: proof the trace itself works
 
     def start(self) -> bool:
         if sys.platform != "win32":
@@ -242,6 +243,7 @@ class TraceSession:
         def on_record(rec) -> None:
             try:
                 r = rec.contents
+                self.records += 1
                 data = ctypes.string_at(r.UserData, r.UserDataLength) if r.UserData and r.UserDataLength else b""
                 self.handle(r.Id, r.ProcessId, data)
             except Exception:      # never let an exception cross back into Windows
@@ -249,11 +251,29 @@ class TraceSession:
 
         self._callback = callback_type(on_record)
 
+        class TIME_ZONE_INFORMATION(ctypes.Structure):
+            _fields_ = [("Bias", wintypes.LONG), ("StandardName", wintypes.WCHAR * 32), ("StandardDate", wintypes.WORD * 8), ("StandardBias", wintypes.LONG),
+                        ("DaylightName", wintypes.WCHAR * 32), ("DaylightDate", wintypes.WORD * 8), ("DaylightBias", wintypes.LONG)]
+
+        class TRACE_LOGFILE_HEADER(ctypes.Structure):
+            _fields_ = [("BufferSize", wintypes.ULONG), ("Version", wintypes.ULONG), ("ProviderVersion", wintypes.ULONG), ("NumberOfProcessors", wintypes.ULONG),
+                        ("EndTime", ctypes.c_int64), ("TimerResolution", wintypes.ULONG), ("MaximumFileSize", wintypes.ULONG), ("LogFileMode", wintypes.ULONG),
+                        ("BuffersWritten", wintypes.ULONG), ("LogInstanceGuid", ctypes.c_ubyte * 16), ("LoggerName", ctypes.c_void_p), ("LogFileName", ctypes.c_void_p),
+                        ("TimeZone", TIME_ZONE_INFORMATION), ("BootTime", ctypes.c_int64), ("PerfFreq", ctypes.c_int64), ("StartTime", ctypes.c_int64),
+                        ("ReservedFlags", wintypes.ULONG), ("BuffersLost", wintypes.ULONG)]
+
         class EVENT_TRACE_LOGFILEW(ctypes.Structure):
             _fields_ = [("LogFileName", wintypes.LPWSTR), ("LoggerName", wintypes.LPWSTR), ("CurrentTime", ctypes.c_int64), ("BuffersRead", wintypes.ULONG),
-                        ("ProcessTraceMode", wintypes.ULONG), ("CurrentEvent", ctypes.c_byte * 88), ("LogfileHeader", ctypes.c_byte * 288),
+                        ("ProcessTraceMode", wintypes.ULONG), ("CurrentEvent", ctypes.c_byte * 88), ("LogfileHeader", TRACE_LOGFILE_HEADER),
                         ("BufferCallback", ctypes.c_void_p), ("BufferSize", wintypes.ULONG), ("Filled", wintypes.ULONG), ("EventsLost", wintypes.ULONG),
                         ("EventRecordCallback", callback_type), ("IsKernelTrace", wintypes.ULONG), ("Context", ctypes.c_void_p)]
+
+        # Windows reads these by offset: a wrong size silently moves the callback and nothing ever arrives. 64-bit sizes from the SDK headers.
+        if ctypes.sizeof(ctypes.c_void_p) == 8 and (ctypes.sizeof(TRACE_LOGFILE_HEADER) != 280 or ctypes.sizeof(EVENT_TRACE_LOGFILEW) != 448):
+            self.error = f"trace structures are the wrong size ({ctypes.sizeof(TRACE_LOGFILE_HEADER)}/{ctypes.sizeof(EVENT_TRACE_LOGFILEW)})"
+            self._control_stop()
+            self._ready.set()
+            return
 
         logfile = EVENT_TRACE_LOGFILEW()
         logfile.LoggerName = self.name
