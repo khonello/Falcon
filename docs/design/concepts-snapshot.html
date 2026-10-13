@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>New Flow · Columns</title>
+<title>Falcon Concepts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -438,8 +438,9 @@ a { color: var(--accent); text-decoration: none; }
   .search { min-width: 0; flex: 1; }
 }
 /* New flow draft: the three columns, in the order files move; one under another on a narrow screen */
-.nf-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
-.nf-col { display: flex; flex-direction: column; gap: 10px; }
+.nf-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.nf-cols > .panel { display: flex; flex-direction: column; }
+.nf-col { display: flex; flex-direction: column; gap: 10px; flex: 1; }
 .nf-col > div > div[style] { margin-left: 0 !important; }
 .nf-col > div > .row:first-child > .mono:first-child { display: none !important; }
 .nf-col > div[style*="border"] { position: relative; padding-right: 40px !important; }
@@ -2339,11 +2340,12 @@ function NewFlow({ go, me, edit }) {
   const many = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const bar = html`<div className="edbar"><span style=${{ fontSize: 12.5, color: problem ? "var(--med)" : "var(--text-3)", minWidth: 0 }}>${problem || (asks.length ? `Waiting on ${asks.map((d) => d.who).join(" and ")} once it is created` : "Checked against every other flow and the one file index")}</span><span className="sp" />
     <${Button} onClick=${cancel}>Cancel<//><${Button} type="primary" disabled=${!!problem} title=${problem || ""} onClick=${save}>${edit ? "Save changes" : "Create flow"}<//></div>`;
-  // DRAFT · three columns in the files' own order: Sources, Along the way, Destinations, each with its own Add. The
+  // Three columns in the files' own order: Sources, Along the way, Destinations, each with its own Add. The
   // drawing above follows them; the name, how files are copied and the checks sit under them, Create at the bottom.
+  // The three columns are always one height, the tallest one's, and each Add button sits on the shared bottom line.
   const col = (n, title, sub, body, add) => html`<section className="panel" style=${{ minWidth: 0 }}>
       <div className="phd"><div className="pt" style=${{ display: "flex", alignItems: "center", gap: 8 }}>${num(n - 1)}${title}<small>${sub}</small></div></div>
-      <div className="pbd nf-col">${body}<div style=${{ marginTop: 10 }}>${add}</div></div></section>`;
+      <div className="pbd nf-col">${body}<div style=${{ marginTop: "auto", paddingTop: 10 }}>${add}</div></div></section>`;
   return html`<${React.Fragment}>${modalCtx}<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
     <${Panel} title=${edit ? `Editing ${edit}` : "The flow so far"} sub=${edit ? "it keeps running as it was until you save" : "files only move left to right"} extra=${startSel}>
       <${FlowPreview} f=${fp} />
