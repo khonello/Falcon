@@ -4,14 +4,16 @@ import "."
 // ACCOUNTABILITY: where a rule was broken, who it was, and what came of it. One record whole on the right
 // (the rule, what it expected and what happened, who, when); the timeline around it and what the record
 // shows below the list; the week as bars under both. Falcon does not name a cause: a reason is recorded
-// only when a person writes one, and recording outcomes needs the Engine (`cannot`).
+// only when a person writes one.
+//
+// Read from the Engine's deviations (deviations.list / get / outcome): each points at its rule as it was, says who or
+// what it concerns, and carries the timeline and the evidence the record shows; an outcome is recorded with a note.
 Page {
     id: page
     objectName: "accountabilityView"
 
-    readonly property string cannot: "Recording what came of a deviation is not built in the Engine yet"
     property var raw: []
-    property var trail: []
+    property var got: null                 // deviations.get for the one on the right: its timeline and evidence
     property var kind: null
     property var rule: typeof Nav.sub === "string" && Nav.sub.indexOf("rule:") === 0 ? Nav.sub.slice(5) : null
     property string oc: typeof Nav.sub === "string" && Nav.sub && Nav.sub.indexOf("rule:") !== 0 ? "all" : "open"
@@ -22,31 +24,55 @@ Page {
 
     function load() {
         if (!falcon.isConnected) return
-        falcon.call("audit.deviations", { include_resolved: true }, function (ok, r) { page.raw = ok ? (r.deviations || []) : [] })
-        Kinds.load({ limit: 500 }, function (es) { page.trail = es })
+        falcon.call("deviations.list", { days: 30 }, function (ok, r) { page.raw = ok ? (r.deviations || []) : [] })
+    }
+    function loadOne() {
+        got = null
+        if (!dev) return
+        var id = dev.id
+        falcon.call("deviations.get", { deviation_id: Number(id) }, function (ok, r) { if (ok && page.dev && page.dev.id === id) page.got = r })
+    }
+    function record(outcome) {
+        var d = dev, text = note.trim()
+        falcon.call("deviations.outcome", { deviation_id: Number(d.id), outcome: outcome, note: text }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not recorded"); return }
+            Msg.ok(outcome === "open" ? "Reopened" : Rules.outcomes[outcome][0] + " · recorded with your name")
+            page.sel = d.id; page.note = ""; page.load(); page.loadOne()
+        })
     }
     Component.onCompleted: load()
     Connections { target: falcon
                   function onConnected() { page.load() }
                   function onPushReceived(type, payload) { if (type === "audit.event" && String((payload || {}).action || "").indexOf("deviation") === 0) page.load() } }
+    // the Engine's record in the page's words
+    function rec(d) {
+        return { id: String(d.id), code: d.code, rule: d.rule.code, ruleName: d.rule.name, locked: d.rule.locked, sev: d.severity, kind: d.kind,
+                 who: d.who, whoSub: d.who_sub, host: d.host, at: d.at, short: d.short, expected: d.expected, happened: d.happened,
+                 out: d.outcome, note: d.note || "", by: d.by || "", when: d.decided_at, dept: d.department_id }
+    }
 
     readonly property var sevOrd: ({ critical: 0, high: 1, medium: 2, warning: 2, low: 3 })
     function sortKey(a, b) { return page.sevOrd[a.sev] - page.sevOrd[b.sev] || Time.ms(b.at) - Time.ms(a.at) }
     function dayOf(d) { return Math.round((Time.startOfDay(Time.ms(d.at)) - Time.startOfDay(Time.now)) / 86400000) }
     function when(x) { var t = Time.ms(x); return t === null ? "—" : Time.now - t > 7 * 86400000 ? Math.round((Time.now - t) / 86400000) + " days ago" : Time.atDay(x) }
 
-    readonly property var all: raw.map(function (d) { return Rules.devRecord(d) })
+    readonly property var all: raw.map(function (d) { return page.rec(d) })
     readonly property var week: all.filter(function (d) { return Time.ms(d.at) >= Time.startOfDay(Time.now) - 6 * 86400000 })
-    readonly property var broken: Rules.all.map(function (r) { var ds = page.week.filter(function (d) { return d.rule === r.id }); return { r: r, n: ds.length } })
-                                           .filter(function (x) { return x.n }).sort(function (a, b) { return b.n - a.n })
+    readonly property var broken: {
+        var by = {}, out = []
+        page.week.forEach(function (d) { if (!by[d.rule]) { by[d.rule] = { r: { id: d.rule, name: d.ruleName }, n: 0 }; out.push(by[d.rule]) } by[d.rule].n++ })
+        return out.sort(function (a, b) { return b.n - a.n })
+    }
+    function ruleName(code) { var d = all.filter(function (x) { return x.rule === code })[0]; return d ? d.ruleName : Rules.byId(code).name }
     readonly property var list: all.filter(function (d) { return page.day !== null ? page.dayOf(d) === page.day : page.oc === "all" || d.out === "open" })
                                    .filter(function (d) { return (!page.kind || d.kind === page.kind) && (!page.rule || d.rule === page.rule)
-                                                              && (d.short + " " + d.who + " " + (d.host || "") + " " + Rules.byId(d.rule).name).toLowerCase().indexOf(lp.query.toLowerCase()) >= 0 })
+                                                              && (d.short + " " + d.who + " " + (d.host || "") + " " + d.ruleName).toLowerCase().indexOf(lp.query.toLowerCase()) >= 0 })
                                    .sort(sortKey)
     readonly property var dev: { for (var i = 0; i < list.length; i++) if (list[i].id === sel) return list[i]; return list.length ? list[0] : null }
-    readonly property var around: !dev || !dev.host ? [] : trail.filter(function (e) { return e.host === page.dev.host && Math.abs(e.t - Time.ms(page.dev.at)) <= 3 * 3600000 })
-                                                             .sort(function (a, b) { return a.t - b.t }).slice(0, 10)
-    onDevChanged: { outKind = "explained"; note = "" }
+    // the Engine's timeline around it, and the facts the record shows (never a cause)
+    readonly property var around: got && got.context ? got.context.map(function (e) { return { t: Time.ms(e.at), actor: e.who || "", what: e.what || "", kind: e.kind } }) : []
+    readonly property var evidence: got && got.evidence ? got.evidence : []
+    onDevChanged: { outKind = "explained"; note = ""; loadOne() }
 
     Strip {
         width: parent.width
@@ -65,7 +91,7 @@ Page {
             id: lp
             width: (parent.width - 14) * 8 / 12
             title: page.day !== null ? "Deviations " + (page.day === 0 ? "today" : page.day === -1 ? "yesterday" : "on " + Time.dayName(Time.now + page.day * 86400000))
-                 : page.rule ? Rules.byId(page.rule).name : page.oc === "open" ? "Open deviations" : "Every deviation"
+                 : page.rule ? page.ruleName(page.rule) : page.oc === "open" ? "Open deviations" : "Every deviation"
             sub: page.day !== null ? "open and dealt with ·" : page.rule ? "broken this week ·" : "most serious first · click one to see it on the right"
             subLink: page.day !== null ? "every day" : page.rule ? "every rule" : ""
             onSubLinkClicked: { if (page.day !== null) page.day = null; else page.rule = null }
@@ -82,7 +108,7 @@ Page {
             icon: function (r) { return Rules.whoKind[r.kind][1] }
             nameTitle: "Deviation"
             nameText: function (r) { return r.short }
-            nameLine: function (r) { return Rules.byId(r.rule).name }
+            nameLine: function (r) { return r.ruleName }
             cols: [{ title: "Who", text: function (r) { return r.who } },
                    { title: "Severity", width: 110, text: function (r) { return Fleet.sevWord(r.sev) } },
                    { title: "When", width: 120, text: function (r) { return page.when(r.at) } }]
@@ -103,8 +129,8 @@ Page {
             sub: page.dev && page.sel === page.dev.id ? "the one you picked" : "the most serious · click another"
             factLabelWidth: 118
             // at the list's height, as the concept's: what does not fit scrolls inside it
-            facts: page.dev ? [["Deviation", Fleet.sevWord(page.dev.sev) + " · D-" + page.dev.id + " · " + Rules.outcomes[page.dev.out][0], Rules.outcomes[page.dev.out][1], false, true],
-                               ["Rule", Rules.byId(page.dev.rule).name + " · built in", null, false, false, "See the rule →"],
+            facts: page.dev ? [["Deviation", Fleet.sevWord(page.dev.sev) + " · " + page.dev.code + " · " + Rules.outcomes[page.dev.out][0], Rules.outcomes[page.dev.out][1], false, true],
+                               ["Rule", page.dev.ruleName + (page.dev.locked ? " · built in" : " · set by you"), null, false, false, "See the rule →"],
                                ["Expected", page.dev.expected], ["What happened", page.dev.happened],
                                ["Who", page.dev.who + (page.dev.whoSub ? " · " + page.dev.whoSub : "")], ["When", page.when(page.dev.at)], ["Kind", Rules.whoKind[page.dev.kind][0]]] : []
             onFactLink: function (label) { if (label === "Rule") Nav.go("rules", page.dev.rule) }
@@ -126,15 +152,17 @@ Page {
                                                 escalated: "What should be looked at? Recorded with the outcome.", dismissed: "Why is it not one? Recorded with the outcome." })[page.outKind] }
                     Item { width: parent.width; height: 30
                            Txt { anchors.verticalCenter: parent.verticalCenter; width: parent.width - rb.width - 10; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                                 text: page.note.trim() ? page.cannot : "Write a line first." }
-                           Btn { id: rb; anchors.right: parent.right; kind: "primary"; enabled: false; tip: page.cannot; text: "Record " + Rules.outcomes[page.outKind][0].toLowerCase() } }
+                                 text: page.note.trim() ? "" : "Write a line first." }
+                           Btn { id: rb; anchors.right: parent.right; kind: "primary"; enabled: page.note.trim() !== ""; text: "Record " + Rules.outcomes[page.outKind][0].toLowerCase()
+                                 onClicked: page.record(page.outKind) } }
                 }
                 Rectangle {
                     visible: page.dev !== null && page.dev.out !== "open"
                     width: parent.width; height: oc.height + 20; radius: 6
                     color: page.dev ? Theme.alpha(Rules.outcomes[page.dev.out][1], 0.08) : "transparent"
                     border.color: page.dev ? Theme.alpha(Rules.outcomes[page.dev.out][1], 0.35) : "transparent"
-                    Column { id: oc; x: 12; y: 10; width: parent.width - 24; spacing: 4
+                    Btn { anchors.right: parent.right; anchors.rightMargin: 10; y: 10; small: true; text: "Reopen"; onClicked: page.record("open") }
+                    Column { id: oc; x: 12; y: 10; width: parent.width - 100; spacing: 4
                              Txt { width: parent.width; textFormat: Text.RichText
                                    text: page.dev ? "<b>" + Rules.outcomes[page.dev.out][0] + "</b> <span style='color:" + Theme.text3 + "'>· " + (page.dev.by || "the Engine") + (page.dev.when ? ", " + page.when(page.dev.when) : "") + "</span>" : "" }
                              Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text2
@@ -155,7 +183,7 @@ Page {
             Column {
                 width: (parent.width - 36) / 2
                 Txt { text: "THE TIMELINE AROUND IT"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; bottomPadding: 6 }
-                Txt { visible: page.around.length === 0; text: page.dev && page.dev.host ? "Nothing else on " + page.dev.host + " within three hours of it." : "No machine to look around."; color: Theme.text3 }
+                Txt { visible: page.around.length === 0; text: page.got ? "Nothing else in the record around it." : "Reading the record…"; color: Theme.text3 }
                 Repeater {
                     model: page.around
                     Item {
@@ -173,10 +201,7 @@ Page {
                 spacing: 4
                 Txt { text: "WHAT THE RECORD SHOWS"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; bottomPadding: 2 }
                 Repeater {
-                    model: page.dev ? [page.dev.host && Fleet.byHost[page.dev.host] && Fleet.byHost[page.dev.host].user ? Fleet.byHost[page.dev.host].user + " is the worker on " + page.dev.host + "." : null,
-                                       page.around.some(function (e) { return e.kind === "session" }) ? "Someone signed in or entered " + page.dev.host + " within three hours of it." : null,
-                                       page.all.filter(function (x) { return x.host && x.host === page.dev.host }).length > 1 ? "It is not the first on " + page.dev.host + ": " + page.all.filter(function (x) { return x.host === page.dev.host }).length + " on the record." : null]
-                                      .filter(function (x) { return x }) : []
+                    model: page.evidence
                     Row { required property var modelData; width: parent.width; spacing: 8
                           Icon { name: "eye"; size: 14; color: Theme.text3; y: 2 }
                           Txt { width: parent.width - 22; text: modelData; wrapMode: Text.WordWrap; elide: Text.ElideNone } }

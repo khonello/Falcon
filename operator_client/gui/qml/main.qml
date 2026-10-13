@@ -89,6 +89,7 @@ ApplicationWindow {
         if (p === "restricted" && s === "mark") return "MarkPage.qml"
         if (p === "flows" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewFlowPage.qml"
         if (p === "automation" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewRulePage.qml"
+        if (p === "rules" && s && (s === "new" || String(s).indexOf("edit-") === 0 || String(s).indexOf("from-") === 0)) return "RuleBuilderPage.qml"
         if (p === "actions" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewActionPage.qml"
         var f = shell.pages[p]
         return f === undefined || f === "" ? "Pending.qml" : f

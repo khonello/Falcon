@@ -18,7 +18,7 @@ import pytest
 pytest.importorskip("PySide6")
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-from PySide6.QtCore import QCoreApplication, QMetaObject, QObject, Qt
+from PySide6.QtCore import Q_ARG, QCoreApplication, QMetaObject, QObject, Qt
 from PySide6.QtQml import QJSValue
 
 from operator_client.core import LocalConfig
@@ -85,6 +85,26 @@ BOARD = [{"id": 40, "category": "update_status", "label": "Update stuck", "summa
           "addressed": {"by": "R. Mensah", "at": _ago(1), "took_minutes": 42}}]
 
 
+def _dev(i: int, outcome: str, hours: float, expected: str, happened: str) -> dict:
+    """A deviation as `deviations.list` answers it: pointed at its rule, with who or what it concerns."""
+    return {"id": i, "code": f"D-{i}", "rule": {"id": 4, "code": "B-4", "name": "A machine's certificate matches its name", "locked": True},
+            "severity": "medium", "kind": "pc", "kind_label": "PC", "who": "OPS-01", "who_sub": "Operations", "department_id": 1,
+            "department_name": "Operations", "pc_id": 1, "host": "OPS-01", "at": _ago(hours), "short": "OPS-01 presented another name",
+            "expected": expected, "happened": happened, "outcome": outcome, "note": None if outcome == "open" else "Renamed back.", "by": None, "decided_at": None}
+
+
+DEVS = [_dev(87, "open", 2, "The certificate names OPS-01", "The certificate names WS-OPS-01"),
+        _dev(80, "explained", 30, "The certificate names OPS-01", "The certificate names OPS-01-OLD")]
+
+
+# As `rules.list` answers: an organisation-wide rule of the Super User's.
+RULE = {"id": 5, "code": "O-5", "name": "Unanswered help request", "shape": "follow", "locked": False, "on": True,
+        "spec": {"trigger": "help", "expect": "answer", "within": 60, "who": "admins", "depts": "all", "severity": "medium",
+                 "resp": {"report": True, "admin": True, "action": False}},
+        "sentence": "A worker pings for help, then an Admin answers the ping within 1 hour.", "scope": "Admins, every department",
+        "set_by": "You", "since": _ago(200), "deviations_this_week": 1, "open_this_week": 1}
+
+
 class _Identity:
     """What the handshake returned. The role is the whole point: the console is a different product at
     each level, so a test has to say which one it is looking at."""
@@ -108,6 +128,18 @@ class _Connection:
         self.seen.append((type_, payload))
         if type_ == "hierarchy.tree":
             return {"departments": TREE}
+        if type_ == "rules.list":
+            return {"rules": [RULE], "summary": {}}
+        if type_ in ("rules.update", "rules.create"):
+            return {"rule": RULE}
+        if type_ == "deviations.list":
+            return {"deviations": DEVS, "summary": {}, "by_rule": [], "per_day": []}
+        if type_ == "deviations.get":
+            d = next(x for x in DEVS if x["id"] == payload["deviation_id"])
+            return {"deviation": d, "context": [{"at": d["at"], "who": "System", "what": "Recorded", "kind": "deviation"}],
+                    "evidence": ["Kojo was signed in to OPS-01 at the time."]}
+        if type_ == "deviations.outcome":
+            return {"deviation": next(x for x in DEVS if x["id"] == payload["deviation_id"])}
         if type_ == "audit.deviations":
             return {"deviations": [d for d in DEVIATIONS if payload.get("include_resolved") or not d["resolved_at"]]}
         if type_ == "audit.recent":
@@ -246,7 +278,7 @@ async def test_the_super_user_never_opens_an_admin_s_page(console):
 
 PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
-    ("admin", "restricted/mark"), ("admin", "machines/OPS-01")]
+    ("admin", "restricted/mark"), ("admin", "machines/OPS-01"), ("super_user", "rules/new"), ("super_user", "rules/edit-O-5")]
 
 
 @pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])
@@ -274,16 +306,22 @@ async def test_a_department_without_an_admin_comes_first(console):
 
 
 async def test_a_deviation_is_a_record_against_a_rule(console):
-    """The Engine logs `account_bound_to_one_pc`; the page reads it against the built-in rule it departs
-    from, with what was expected beside what happened, and the open one before the one dealt with."""
+    """The Engine's deviations: each read against its rule, what was expected beside what happened, the open one
+    before the one dealt with; the record's evidence below, and an outcome recorded with the person's note."""
     win, bridge, _ = console("super_user")
     view = await _open(win, bridge, "accountability", "accountabilityView")
     await _wait(lambda: len(prop(view, "all") or []) == 2)
     dev = prop(view, "dev")
-    assert dev["rule"] == "B-4" and dev["out"] == "open"
+    assert dev["rule"] == "B-4" and dev["out"] == "open" and dev["code"] == "D-87"
     assert dev["expected"] == "The certificate names OPS-01"
     assert dev["happened"] == "The certificate names WS-OPS-01"
     assert [d["id"] for d in prop(view, "list")] == ["87"]          # open only, by default
+    await _wait(lambda: prop(view, "evidence") == ["Kojo was signed in to OPS-01 at the time."])
+    view.setProperty("note", "A new image set the long name")
+    QMetaObject.invokeMethod(view, "record", Q_ARG("QVariant", "explained"))
+    await _wait(lambda: any(t == "deviations.outcome" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "deviations.outcome")
+    assert sent == {"deviation_id": 87, "outcome": "explained", "note": "A new image set the long name"}
     view.setProperty("oc", "all")
     assert [d["id"] for d in prop(view, "list")] == ["87", "80"]
 
@@ -391,10 +429,29 @@ async def test_a_report_says_whose_it_is_as_the_engine_decides(console):
     await _wait(lambda: len(prop(view, "rows") or []) == 2)
     rows = {r["id"]: r for r in prop(view, "rows")}
     assert rows[40]["st"] == "you" and rows[41]["st"] == "done"
-    from PySide6.QtCore import Q_ARG, Q_RETURN_ARG
+    from PySide6.QtCore import Q_RETURN_ARG
     for rid, want in ((40, "You only · Logistics has no Admin"), (41, "You and Operations")):
         out = QMetaObject.invokeMethod(view, "goesTo", Q_RETURN_ARG("QVariant"), Q_ARG("QVariant", rows[rid]))
         assert out == want
+
+
+async def test_a_rule_is_edited_in_the_engine_s_rule_store(console):
+    """The Super User's rule from rules.list opens in the builder as it was saved, and saving sends the changed
+    line to rules.update in the Engine's spec: minutes, the response, the scope."""
+    win, bridge, _ = console("super_user")
+    bridge.connected.emit()
+    win.setProperty("view", "rules/edit-O-5")
+    await _wait(lambda: win.findChild(QObject, "ruleBuilder") is not None)
+    page = win.findChild(QObject, "ruleBuilder")
+    await _wait(lambda: (prop(page, "s") or {}).get("name") == "Unanswered help request")
+    s = prop(page, "s")
+    assert s["shape"] == "follow" and s["within"] == {"n": 1, "unit": "hours"} and s["resp"]["admin"] is True
+    QMetaObject.invokeMethod(page, "set", Q_ARG("QVariant", "within"), Q_ARG("QVariant", {"n": 2, "unit": "hours"}))
+    QMetaObject.invokeMethod(page, "save")
+    await _wait(lambda: any(t == "rules.update" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "rules.update")
+    assert sent["rule_id"] == 5 and sent["within"] == 120 and sent["trigger"] == "help" and sent["expect"] == "answer"
+    assert sent["resp"] == {"report": True, "admin": True, "action": False} and sent["who"] == "admins" and sent["depts"] == "all"
 
 
 def test_nothing_clickable_uses_a_taphandler():

@@ -165,6 +165,84 @@ def deviations(role: str, dept_id: int | None, include_resolved: bool = False) -
     return {"deviations": out}
 
 
+# deviations.list / deviations.get as the Engine answers them (engine/console/deviations.py): each points at its rule
+B = {"B-1": (1, "Restricted files stay where they are"), "B-2": (2, "One session on a machine at a time"),
+     "B-3": (3, "Machines run the approved version"), "B-4": (4, "A machine's certificate matches its name")}
+DEVS = [  # id, rule, severity, kind, who, who_sub, dept, host, hours ago, short, expected, happened, outcome, note, by
+    (301, "B-1", "critical", "worker", "Ama", "OPS-07 · Operations", 1, "OPS-07", 3.3, "Copy of budget-2026.xlsx on OPS-07",
+     "Stay on WS-OPS-A1, where R. Mensah marked it", r"A copy in C:\Users\Ama\Documents", "open", None, None),
+    (302, "B-1", "high", "worker", "Yaw", "OPS-03 · Operations", 1, "OPS-03", 3.8, "Copy of salaries.csv on OPS-03",
+     r"Stay in C:\HR\Payroll on WS-OPS-A1", r"A copy in C:\Users\Yaw\Desktop", "open", None, None),
+    (287, "B-4", "medium", "pc", "OPS-05", "Operations", 1, "OPS-05", 4.1, "OPS-05 presented another name",
+     "The certificate names OPS-05", "The certificate names WS-OPS-05", "open", None, None),
+    (284, "B-3", "high", "pc", "LOG-02", "Logistics", 3, "LOG-02", 76, "LOG-02 still on 1.4.0, five days on",
+     "1.4.2 within two days of approval", "Still on 1.4.0 after five days", "open", None, None),
+    (279, "B-4", "medium", "pc", "FIN-02", "Finance", 2, "FIN-02", 54, "FIN-02 presented another name",
+     "The certificate names FIN-02", "The certificate names FIN-02.finance.local", "explained", "The new image set the long name; renamed back.", "You"),
+]
+
+
+def _dev(d):
+    i, rule, sev, kind, who, sub, dept, host, h, short, exp, hap, out, note, by = d
+    return {"id": i, "code": f"D-{i}", "rule": {"id": B[rule][0], "code": rule, "name": B[rule][1], "locked": True, "sentence_now": B[rule][1]},
+            "severity": sev, "kind": kind, "kind_label": {"pc": "PC", "worker": "Worker", "admin": "Admin", "dept": "Department"}[kind],
+            "who": who, "who_sub": sub, "department_id": dept, "department_name": dict(DEPTS)[dept], "pc_id": HOST[host][0], "host": host,
+            "at": at(-h), "value": None, "short": short, "expected": exp, "happened": hap, "outcome": out,
+            "outcome_label": out.capitalize(), "note": note, "by": by, "decided_at": at(-h + 4) if out != "open" else None}
+
+
+# rules.list / rules.library as the Engine answers them (engine/console/rules.py)
+RULES = [  # id, code, name, shape, spec, builtin, enabled, this week, open
+    (1, "B-1", "Restricted files stay where they are", "never", {"trigger": "file", "who": "everyone", "depts": "all", "severity": "high", "resp": {"report": True, "admin": True}}, True, True, 2, 2),
+    (2, "B-2", "One session on a machine at a time", "never", {"trigger": "second", "who": "everyone", "depts": "all", "severity": "medium", "resp": {"report": False, "admin": False}}, True, True, 0, 0),
+    (3, "B-3", "Machines run the approved version", "follow", {"trigger": "version", "expect": "updated", "within": 2880, "who": "machines", "depts": "all", "severity": "high", "resp": {"report": True, "admin": True}}, True, True, 1, 1),
+    (4, "B-4", "A machine's certificate matches its name", "never", {"trigger": "cert", "who": "machines", "depts": "all", "severity": "medium", "resp": {"report": True, "admin": True}}, True, True, 2, 1),
+    (5, "O-5", "Unanswered help request", "follow", {"trigger": "help", "expect": "answer", "within": 60, "who": "admins", "depts": "all", "severity": "medium", "resp": {"report": True, "admin": True}}, False, True, 1, 1),
+    (6, "O-6", "Admins stay out of machines at night", "limit", {"reading": "outhours", "limit": {"n": 0, "per": "week"}, "who": "admins", "depts": "all", "severity": "high", "resp": {"report": True, "admin": False}}, False, True, 1, 1),
+]
+SENT = {1: "A copy of a restricted file appears where it is not allowed: always a deviation.", 2: "A second session starts on a machine already in use: always a deviation.",
+        3: "A new version is approved, then the machine runs that version within 2 days.", 4: "A machine presents a name that does not match what it was registered with: always a deviation.",
+        5: "A worker pings for help, then an Admin answers the ping within 1 hour.", 6: "Admin entries outside working hours: none per week."}
+
+
+def rules_list() -> dict[str, Any]:
+    out = [{"id": i, "code": c, "name": n, "shape": sh, "locked": b, "on": True if b else en, "spec": sp, "sentence": SENT[i],
+            "scope": {"everyone": "Everyone", "machines": "Machines", "admins": "Admins"}[sp["who"]] + ", every department",
+            "set_by": "Falcon" if b else "You", "since": at(-24 * (30 - i)), "deviations_this_week": w, "open_this_week": o}
+           for i, c, n, sh, sp, b, en, w, o in RULES]
+    return {"rules": out, "summary": {"rules": len(out), "on": len(out), "broken_this_week": sum(1 for r in out if r["deviations_this_week"]), "kept": sum(1 for r in out if not r["deviations_this_week"])}}
+
+
+def rules_library() -> dict[str, Any]:
+    lib = [{"key": "restricted-leaves", "name": "Restricted file leaves its folder", "shape": "never", "summary": "A copy of a marked file appears where its mark does not allow it.",
+            "spec": {"trigger": "file", "who": "everyone", "depts": "all", "resp": {"report": True, "admin": True}}},
+           {"key": "unanswered-help", "name": "Unanswered help request", "shape": "follow", "summary": "A worker pinged for help and nobody answered in time.",
+            "spec": {"trigger": "help", "expect": "answer", "within": 60, "who": "admins", "depts": "all", "resp": {"report": True, "admin": True}}},
+           {"key": "past-update-limit", "name": "Machine past the update limit", "shape": "follow", "summary": "A machine is still not on the approved version after the time allowed.",
+            "spec": {"trigger": "version", "expect": "updated", "within": 2880, "who": "machines", "depts": "all", "resp": {"report": True, "admin": True}}},
+           {"key": "admin-outside", "name": "Admin outside their department", "shape": "limit", "summary": "An Admin entering other departments' machines more than the line allows.",
+            "spec": {"reading": "crossdept", "limit": {"n": 0, "per": "week"}, "who": "admins", "depts": "all", "resp": {"report": True, "admin": False}}},
+           {"key": "out-of-hours", "name": "Out-of-hours session", "shape": "limit", "summary": "An Admin entering machines outside working hours.",
+            "spec": {"reading": "outhours", "limit": {"n": 0, "per": "week"}, "who": "admins", "depts": "all", "resp": {"report": True, "admin": False}}}]
+    return {"patterns": lib}
+
+
+def deviations_list() -> dict[str, Any]:
+    ds = [_dev(d) for d in DEVS]
+    return {"deviations": ds, "summary": {"total": len(ds), "open": sum(1 for d in ds if d["outcome"] == "open")}, "by_rule": [], "per_day": []}
+
+
+def deviations_get(i: int) -> dict[str, Any]:
+    d = next((_dev(x) for x in DEVS if x[0] == i), None)
+    if d is None:
+        return {}
+    ctx = [{"at": at(-(next(x for x in DEVS if x[0] == i)[8]) - 0.6), "who": "Ama" if d["host"] == "OPS-07" else "Someone", "what": f"Signed in on {d['host']}", "kind": "session"},
+           {"at": at(-(next(x for x in DEVS if x[0] == i)[8]) + 0.02), "who": "Automation", "what": f"Took a screenshot of {d['host']}", "kind": "action"},
+           {"at": d["at"], "who": "System", "what": f"Recorded: {d['rule']['name']}", "kind": "deviation"}]
+    ev = [f"{d['who'] if d['kind'] == 'worker' else 'Its person'} was signed in to {d['host']} at the time.", f"No issue was open on {d['host']} at the time."]
+    return {"deviation": d, "context": sorted(ctx, key=lambda e: e["at"]), "evidence": ev}
+
+
 # --- the registry: machines with their keys, refused connections, a machine asking to join ------------------
 GEN = {"OPS-05": 2, "OPS-06": 2, "LOG-02": 3}
 
@@ -621,6 +699,18 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return rollout(role, dept_id)
     if type_ == "assistance.ping_status":
         return pings(role, account)
+    if type_ == "rules.list":
+        return rules_list()
+    if type_ == "rules.library":
+        return rules_library()
+    if type_ == "rules.try":
+        return {"deviations": 3, "would_clear": 1 if (payload.get("within") or 0) >= 90 else 0, "would_remain": 3 - (1 if (payload.get("within") or 0) >= 90 else 0), "counted": 3}
+    if type_ == "deviations.list":
+        return deviations_list()
+    if type_ == "deviations.get":
+        return deviations_get(int(payload.get("deviation_id") or 0))
+    if type_ == "deviations.outcome":
+        return {"deviation": next((_dev(x) for x in DEVS if x[0] == int(payload.get("deviation_id") or 0)), {})}
     if type_ == "audit.deviations":
         return deviations(role, dept_id, bool(payload.get("include_resolved")))
     if type_ == "hierarchy.traverse":

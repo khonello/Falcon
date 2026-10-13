@@ -23,7 +23,7 @@ Row {
         if (p === "actions" && String(s).indexOf("edit-") === 0) return [["Actions", "actions"], ["Edit", ""]]
         if (p === "restricted" && s === "mark") return [["Restricted", "restricted"], ["Mark files", ""]]
         if (p === "rules" && (s === "new" || String(s).indexOf("from-") === 0)) return [["Rules", "rules"], ["New rule", ""]]
-        if (p === "rules" && String(s).indexOf("edit-") === 0) return [["Rules", "rules"], ["Edit", ""]]
+        if (p === "rules" && String(s).indexOf("edit-") === 0) { var rr = Rules.all.filter(function (x) { return x.id === String(s).slice(5) })[0]; return [["Rules", "rules"], ["Edit " + (rr ? rr.name : String(s).slice(5)), ""]] }
         return [[t, ""]]
     }
 

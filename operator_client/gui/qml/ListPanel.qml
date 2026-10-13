@@ -23,6 +23,7 @@ Rectangle {
     property string actionIcon: "plus"
     property bool actionPlain: false
     property bool actionDisabled: false
+    property string actionTip: ""               // why the action is off, when it is
     signal action()
 
     property var rows: []
@@ -130,6 +131,7 @@ Rectangle {
                 iconName: root.actionIcon
                 text: root.actionLabel
                 enabled: !root.actionDisabled
+                tip: root.actionDisabled ? root.actionTip : ""
                 anchors.verticalCenter: parent.verticalCenter
                 onClicked: root.action()
             }
