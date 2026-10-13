@@ -43,6 +43,7 @@ Page {
         quiet: ["Quiet", "nothing seen for two days"], track: ["On track", "with signs of progress"], done: ["Completed", "closed by whoever gave it"]
     })
     readonly property var order: ["verify", "overdue", "quiet", "track", "done"]
+    readonly property bool iGaveIt: cur !== null && cur.assigner_account_id === falcon.accountId
     function items(t) { var d = detail[t.id]; return d && d.items ? d.items : [] }
     function found(t) { return items(t).filter(function (i) { return i.status === "passed" }).length }
     function lastSign(t) {
@@ -179,7 +180,8 @@ Page {
             emptyText: "Pick a task in the list."
             title: t ? t.description_raw : ""
             sub: t && page.sel === t.id ? "the one you picked" : "the first in the list · click another"
-            facts: t ? [["Task", "T-" + t.id + " · " + page.cats[t.k][0]], ["Who", t.assignee_name + (page.curHost ? " on " + page.curHost.host : "")], ["Given by", t.assigner_name],
+            facts: t ? [["Task", "T-" + t.id + " · " + (t.k === "verify" ? (page.iGaveIt ? "Awaiting your verification" : "Awaiting " + t.assigner_name + "'s verification") : page.cats[t.k][0]),
+                         t.k === "verify" ? Theme.ser3 : t.k === "overdue" ? Theme.crit : t.k === "done" ? Theme.text4 : Theme.ok, false, true], ["Who", t.assignee_name + (page.curHost ? " on " + page.curHost.host : "")], ["Given by", t.assigner_name],
                         ["Given", Time.atDay(t.created_at)], ["Started", t.started_at ? Time.atDay(t.started_at) : "Not yet"]]
                         .concat(t.soft_deadline_at ? [["Soft deadline", Time.atDay(t.soft_deadline_at), Theme.med]] : [])
                         .concat([["Final deadline", t.final_deadline_at ? Time.atDay(t.final_deadline_at) : "None", late ? Theme.crit : null],
@@ -187,8 +189,11 @@ Page {
                                   t.k === "done" ? "Closed" : t.k === "verify" ? "Yes" : t.final_deadline_at ? Time.span((Time.ms(t.final_deadline_at) - Time.now) / 3600000) : "—", late ? Theme.crit : null]]) : []
             actions: [
                 Btn { kind: "text"; text: page.curHost ? "Open " + page.curHost.host + "'s page →" : ""; visible: page.curHost !== null; onClicked: Nav.go("machines", page.curHost.host) },
-                Btn { visible: page.cur && page.cur.k !== "done" && !page.asking && page.cur.assigner_account_id === falcon.accountId; text: "Incomplete"; onClicked: page.asking = true },
-                Btn { visible: page.cur && page.cur.k !== "done" && !page.asking && page.cur.assigner_account_id === falcon.accountId; kind: "primary"; text: "Complete"; onClicked: page.verdict("complete") }
+                // only the person who gave a task closes it (the Engine refuses anyone else): for them the verdict is drawn off, with why
+                Btn { visible: page.cur && page.cur.k !== "done" && !page.asking; text: "Incomplete"; onClicked: page.asking = true
+                      enabled: page.iGaveIt; tip: page.iGaveIt ? "" : "Only " + (page.cur ? page.cur.assigner_name : "whoever gave it") + ", who gave it, can close it" },
+                Btn { visible: page.cur && page.cur.k !== "done" && !page.asking; kind: "primary"; text: "Complete"; onClicked: page.verdict("complete")
+                      enabled: page.iGaveIt; tip: page.iGaveIt ? "" : "Only " + (page.cur ? page.cur.assigner_name : "whoever gave it") + ", who gave it, can close it" }
             ]
 
             Column {

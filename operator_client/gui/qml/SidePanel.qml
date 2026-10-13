@@ -9,6 +9,7 @@ import "."
 //   facts: [[label, value, colour?, mono?, dot?]] -- a value is text; a colour tints it, or with `dot` is a
 //                                                    status: a dot of that colour before plain text (the concept's .st)
 //   facts[i][5]: a link after the value ("anywhere on ADM-01 · change"); a click says factLink(label)
+//   facts[i][6]: a quiet second line under the value (the concept's "Critical" over what it is about)
 //   default content: sections under the facts      actions: the buttons at the foot (right aligned)
 //   foot / dock: a band above the actions          extra: controls in the header
 Rectangle {
@@ -97,7 +98,7 @@ Rectangle {
                 delegate: Item {
                     required property var modelData
                     width: body.width
-                    height: Math.max(33, val.implicitHeight + 14)
+                    height: Math.max(33, val.implicitHeight + (quiet.visible ? quiet.implicitHeight + 2 : 0) + 14)
                     Txt {
                         y: 7
                         width: root.factLabelWidth          // the concept's 116px label column, then a 12px gap
@@ -125,6 +126,8 @@ Rectangle {
                         onLinkActivated: root.factLink(modelData[0])
                         HoverHandler { enabled: !!modelData[5]; cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
                     }
+                    Txt { id: quiet; visible: !!modelData[6]; x: val.x; y: val.y + val.implicitHeight + 2; width: val.width; text: modelData[6] || ""
+                          color: Theme.text3; font.pixelSize: 12; wrapMode: Text.Wrap; elide: Text.ElideNone }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }

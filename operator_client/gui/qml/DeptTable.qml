@@ -13,6 +13,22 @@ Column {
 
     function w(i) { return i < 2 ? flexW : colW[i] }
 
+    // how fast each department's reports are addressed: reports.board's median (per department for the Super User,
+    // the department's own for an Admin)
+    property var median: ({})
+    function loadMedian() {
+        falcon.call("reports.board", {}, function (ok, r) {
+            var m = {}
+            if (ok) {
+                (r.handling || []).forEach(function (h) { m[h.department_id] = h.median_minutes })
+                if (!Nav.boss && falcon.departmentId && r.strip) m[falcon.departmentId] = r.strip.typical_minutes
+            }
+            root.median = m
+        })
+    }
+    Component.onCompleted: if (falcon.isConnected) loadMedian()
+    Connections { target: falcon; function onConnected() { root.loadMedian() } }
+
     Rectangle {
         width: parent.width
         height: 36
@@ -71,7 +87,8 @@ Column {
                     Bar { width: 90; v: ok; max: Math.max(1, ms.length); c: ok === ms.length ? Theme.ok : Theme.med; anchors.verticalCenter: parent.verticalCenter }
                     Txt { text: ms.length ? Math.round(ok / ms.length * 100) + "%" : "—"; mono: true; elide: Text.ElideNone }
                 }
-                Txt { width: root.w(6); rightPadding: 12; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; text: "—"; mono: true }
+                Txt { width: root.w(6); rightPadding: 12; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; mono: true
+                      text: root.median[modelData.id] !== undefined && root.median[modelData.id] !== null ? Time.mins(root.median[modelData.id]) : "—" }
             }
             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
         }

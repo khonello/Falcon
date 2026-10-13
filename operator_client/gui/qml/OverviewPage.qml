@@ -24,7 +24,17 @@ Page {
             page.audit = es
             page.live = es.slice(0, 14)
         })
-        falcon.call("task.list", {}, function (ok, r) { page.tasks = ok ? (r.tasks || []) : [] })
+        falcon.call("task.list", {}, function (ok, r) {
+            page.tasks = ok ? (r.tasks || []) : []
+            // a task is handed in when every target is found: it waits on the person who gave it (as on Tasks)
+            page.toVerify = 0
+            page.tasks.filter(function (t) { return t.status !== "completed" }).slice(0, 50).forEach(function (t) {
+                falcon.call("task.get", { task_id: t.id }, function (ok2, r2) {
+                    var its = ok2 && r2.items ? r2.items : []
+                    if (its.length && its.every(function (i) { return i.status === "passed" })) page.toVerify += 1
+                })
+            })
+        })
     }
     // CPU right now, for the CPU view: each machine's last report
     function loadCpu() {
@@ -54,7 +64,9 @@ Page {
     readonly property var off: ms.filter(function (m) { return !m.online })
     readonly property var held: ms.filter(function (m) { return m.held !== "" })
     readonly property var iss: Fleet.issues
-    readonly property int pings: Fleet.pings.length
+    property int toVerify: 0
+    // what waits in Messages: the menu's count (people who pinged, and conversations where it is your turn)
+    readonly property int pings: Nav.counts.messages ? Nav.counts.messages.n : 0
     readonly property real since: Time.now - Time.rangeHours(Nav.range) * 3600000
     readonly property var inRange: audit.filter(function (e) { return e.t >= since })
     readonly property bool all: kinds.length === Kinds.keys.length
@@ -73,9 +85,9 @@ Page {
             label: "Waiting on you"
             none: page.ms.length === 0
             noneValue: "0"; noneText: "Nothing waiting"
-            readonly property int n: page.iss.length + page.pings
+            readonly property int n: page.toVerify + page.iss.length + page.pings
             value: Theme.fmt(n)
-            delta: n ? page.iss.length + " issue" + (page.iss.length === 1 ? "" : "s") + " · " + page.pings + " ping" + (page.pings === 1 ? "" : "s") : "Nothing waiting on you"
+            delta: n ? page.toVerify + " to verify · " + page.iss.length + " issue" + (page.iss.length === 1 ? "" : "s") + " · " + page.pings + " ping" + (page.pings === 1 ? "" : "s") : "Nothing waiting on you"
             dc: n ? Theme.crit : Theme.text3
         }
         Kpi {

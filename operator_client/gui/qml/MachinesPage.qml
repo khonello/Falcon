@@ -30,16 +30,29 @@ Page {
         for (var i = 0; i < rows.length; i++) if (rows[i].host === sel) return rows[i]
         return rows.length ? rows[0] : null
     }
-    // CPU right now: each machine's last report
-    function loadCpu() {
-        Fleet.machines.filter(function (m) { return m.online }).slice(0, 120).forEach(function (m) {
-            falcon.call("hierarchy.pc_state", { pc_id: m.pc_id }, function (ok, r) {
-                if (ok && r.levels) { var c = Object.assign({}, page.cpu); c[m.host] = r.levels.cpu; page.cpu = c }
-            })
+    // each machine's readings now, its address and what its health is about (machines.list); the one picked over
+    // the top bar's range (machines.get), drawn under the list
+    property var info: ({})
+    property var series: null
+    function loadInfo() {
+        falcon.call("machines.list", {}, function (ok, r) {
+            var m = {}, c = {}
+            if (ok) (r.machines || []).forEach(function (x) { m[x.hostname] = x; if (x.cpu !== null && x.cpu !== undefined) c[x.hostname] = x.cpu })
+            page.info = m; page.cpu = c
         })
     }
-    Component.onCompleted: loadCpu()
-    Connections { target: Fleet; function onLoadedChanged() { page.loadCpu() } }
+    function loadSeries() {
+        series = null
+        if (!cur) return
+        var host = cur.host
+        falcon.call("machines.get", { pc_id: cur.pc_id, range: Nav.range }, function (ok, r) { if (ok && page.cur && page.cur.host === host) page.series = r.series || null })
+    }
+    onCurChanged: loadSeries()
+    Component.onCompleted: loadInfo()
+    Connections { target: Fleet; function onLoadedChanged() { page.loadInfo() } }
+    Connections { target: Nav; function onRangeChanged() { page.loadSeries() } }
+    readonly property var curInfo: cur ? info[cur.host] || null : null
+    function pct(v) { return v === null || v === undefined ? "—" : Math.round(v) + "%" }
     readonly property var labels: ({ "": "Machines", online: "Online", look: "Need a look", current: "On the current version" })
 
     Confirm { id: confirm; page: page }
@@ -124,18 +137,23 @@ Page {
             title: m ? m.host : ""
             sub: m && page.sel === m.host ? "the one you picked" : "needs you most · click another"
             facts: m ? [
-                ["Health", Fleet.words[m.status] + (m.note && m.status !== "healthy" ? "\n" + m.note : ""),
-                 m.status === "critical" || m.status === "high" ? Theme.crit : null],
+                ["Health", Fleet.words[m.status], m.status === "critical" || m.status === "high" ? Theme.crit : null, false, false, "",
+                 m.status !== "healthy" ? (page.curInfo && page.curInfo.note ? page.curInfo.note : m.note) : ""],
                 ["Signed in", m.user || "No one"],
                 ["Inside it", m.held ? m.held + (m.heldFrom ? ", " + Time.dur((Time.now - Time.ms(m.heldFrom)) / 3600000) : "") : "Nobody else"],
                 ["Version", m.ver || "—", m.behind ? Theme.med : null, true],
                 ["CPU now", page.cpu[m.host] !== undefined ? Math.round(page.cpu[m.host]) + "%" : "—"],
-                ["Last seen", m.online ? "now" : Time.ago(m.seen)]
+                ["Disk", page.pct(page.curInfo ? page.curInfo.disk : null)],
+                ["Last seen", m.online ? "now" : Time.ago(m.seen)],
+                ["IP address", page.curInfo && page.curInfo.ip ? page.curInfo.ip : "—", null, true]
             ] : []
             actions: [
                 Btn {
                     text: "Enter session"
-                    enabled: side.m !== null && side.m.online
+                    // you cannot enter a machine you are already inside
+                    enabled: side.m !== null && side.m.online && !(page.curInfo && page.curInfo.held_by_you)
+                    tip: page.curInfo && page.curInfo.held_by_you ? "You are inside it now" : !side.m || side.m.online ? "" : "It is offline"
+
                     onClicked: page.enter(page.cur)
                 },
                 Btn { kind: "primary"; text: "Open its page →"; onClicked: Nav.go("machines", page.cur.host) }
@@ -144,16 +162,25 @@ Page {
     }
 
     Panel {
+        id: mchart
         visible: page.cur !== null
         width: parent.width
-        title: page.cur ? page.cur.host + " · the last 24 hours" : ""
+        title: page.cur ? page.cur.host + " · the last " + ({ "1h": "hour", "6h": "6 hours", "24h": "24 hours", "7d": "7 days" })[Nav.range] : ""
         sub: "CPU shaded, memory as the purple line · the same machine as on the right"
+        readonly property var cpuPts: page.series && page.series.cpu ? page.series.cpu.map(function (x) { return [Time.ms(x.at), x.v] }) : []
+        readonly property var memPts: page.series && page.series.memory ? page.series.memory.map(function (x) { return [Time.ms(x.at), x.v] }) : []
+        TimeChart {
+            visible: mchart.cpuPts.length > 1 || mchart.memPts.length > 1
+            width: parent.width; height: 160; unit: "%"; yMax: 100
+            series: [{ name: "CPU", c: Theme.ser6, pts: mchart.cpuPts }, { name: "Memory", c: Theme.ser3, pts: mchart.memPts }]
+        }
         Empty {
+            visible: mchart.cpuPts.length <= 1 && mchart.memPts.length <= 1
             width: parent.width
             h: 170
             icon: "linechart"
-            title: "No history to draw yet"
-            text: "The Engine keeps each machine's readings, but does not hand them to the console yet. Its readings right now are on the right."
+            title: "Nothing reported over this range yet"
+            text: "A machine reports its readings while its Worker runs. Its readings right now are on the right."
         }
     }
 }

@@ -177,7 +177,11 @@ def machines_list(role: str, dept_id: int | None) -> dict[str, Any]:
         out.append({"pc_id": pc, "hostname": host, "department_id": dept, "key_generation": GEN.get(host, 1),
                     "owner": {"account_id": acct, "name": user}, "ip": f"10.20.{dept + 3}.{10 + pc}", "online": online,
                     "version": "1.4.0" if host == "LOG-02" else "1.4.1" if host == "OPS-06" else "1.4.2",
-                    "behind": host in ("LOG-02", "OPS-06"), "last_seen_at": at(-seen)})
+                    "behind": host in ("LOG-02", "OPS-06"), "last_seen_at": at(-seen),
+                    # the readings now, as machines.list carries them from each machine's last report
+                    "cpu": round(8 + 80 * _nz(7 + pc, 3), 1) if online else None, "memory": round(40 + 40 * _nz(9 + pc, 5), 1) if online else None,
+                    "disk": round(30 + 65 * _nz(11 + pc, 2), 1) if online else None,
+                    "held_by_you": host == "OPS-07"})
     for acct, host, pc in ((1, "ADM-01", 100), (7, "ADM-OPS-01", 101), (8, "ADM-FIN-01", 102), (9, "ADM-OPS-02", 103)):
         out.append({"pc_id": pc, "hostname": host, "department_id": None, "key_generation": 1, "pc_type": "admin_workstation",
                     "owner": {"account_id": acct, "name": None}, "ip": f"10.20.1.{pc - 90}", "online": True, "version": "1.4.2", "last_seen_at": at(0)})
