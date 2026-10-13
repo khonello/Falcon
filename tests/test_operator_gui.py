@@ -72,6 +72,11 @@ FLOW = {"id": 5, "source_pc_id": 7, "source_hostname": "OPS-07", "source_path": 
                          {"id": 9, "destination_pc_id": 22, "destination_hostname": "LOG-02", "destination_path": "D:/archive", "parent_stage_id": 3}]}
 
 
+# As `assistance.ping_status` answers: one row per ping, oldest first.
+PINGS = [{"id": 5, "sender_account_id": 21, "receiver_account_id": 7, "from_name": "Kojo", "sent_at": _ago(3), "addressed_at": None},
+         {"id": 9, "sender_account_id": 21, "receiver_account_id": 7, "from_name": "Kojo", "sent_at": _ago(1), "addressed_at": None}]
+
+
 class _Identity:
     """What the handshake returned. The role is the whole point: the console is a different product at
     each level, so a test has to say which one it is looking at."""
@@ -117,6 +122,8 @@ class _Connection:
         if type_ == "marks.get":
             return {"mark": {"id": 3}, "copies": [{"issue_id": 41, "severity": "high", "host": "OPS-01", "file": "salaries.csv",
                                                    "folder": "C:/Users/Kojo", "signed_in": "Kojo", "opened_at": _ago(2)}]}
+        if type_ == "assistance.ping_status":
+            return {"unaddressed": 2, "pings": PINGS}
         if type_ == "flow.list":
             return {"flows": [FLOW]}
         if type_ == "enroll.list":
@@ -354,6 +361,17 @@ async def test_a_flow_s_steps_keep_their_names_and_their_place(console):
     assert sent["stages"] == [{"stage_type": "categorization", "parent_index": None, "config": {"op": "Sort by file type", "by": "extension"}},
                               {"stage_type": "transformation", "parent_index": 0, "config": {"op": "Compress to ZIP"}}]
     assert [d["parent_index"] for d in sent["destinations"]] == [0, 1]
+
+
+async def test_one_person_s_pings_are_one_row_with_every_time(console):
+    """The Engine answers a row per ping; two pings from Kojo are one row that says twice, answered as the first."""
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "messages", "messagesView")
+    await _wait(lambda: any(r.get("kind") == "ping" for r in (prop(view, "rows") or [])))
+    pings = [r for r in prop(view, "rows") if r["kind"] == "ping"]
+    assert len(pings) == 1
+    assert pings[0]["pings"] == 2 and pings[0]["pid"] == 5 and pings[0]["st"][0] == "Pinged you 2 times"
+    assert len(pings[0]["times"]) == 2
 
 
 def test_nothing_clickable_uses_a_taphandler():

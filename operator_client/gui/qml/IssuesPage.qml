@@ -132,7 +132,7 @@ Page {
                 page.mark(i, "Resolved", "Allowed " + i.subject + " on " + i.host + ": “" + v + "”"); Fleet.refresh(); Msg.ok("Allowed · recorded")
             })
         else if (o.key === "answer")
-            falcon.call("assistance.respond", { ping_id: i.ref.ping_id }, function (ok, r) {
+            falcon.call("assistance.respond", { ping_id: i.ref.id }, function (ok, r) {
                 if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
                 falcon.call("assistance.message", { channel_id: r.channel_id, text: v }, function (ok2, r2) {
                     page.mark(i, "Resolved", "Answered; channel open")

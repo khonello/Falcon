@@ -41,7 +41,8 @@ Item {
                 }
             }
             falcon.call("assistance.ping_status", {}, function (ok2, r2) {
-                var pings = ok2 ? (r2.pings || []).length : 0
+                // one row per ping: what waits is each person who pinged, not each ping
+                var pings = ok2 ? (r2.pings || []).map(function (p) { return p.sender_account_id }).filter(function (v, i, a) { return a.indexOf(v) === i }).length : 0
                 Nav.count("messages", n + pings, true, n + pings > 0)
             })
         })

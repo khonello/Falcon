@@ -18,6 +18,11 @@ Page {
     Timer { id: again; interval: 300; onTriggered: page.load() }
 
     function folder(p) { var x = String(p || "").replace(/[\\\/]+$/, "").split(/[\\\/]/); return x[x.length - 1] || p }
+    // who made it: you, or an Admin this console knows by name (the Engine sends the account, not the name)
+    function creator(f) {
+        if (f.created_by_account_id === falcon.accountId) return "You"
+        return f.created_by_name || Fleet.adminName(f.created_by_account_id) || "—"
+    }
     function nameOf(f) { return folder(f.source_path) + "-" + f.id }
     function stateOf(f) {
         var paused = (f.destinations || []).filter(function (d) { return d.paused_reason })
@@ -107,7 +112,7 @@ Page {
             nameTitle: "Flow"
             nameText: function (r) { return r.name }
             nameLine: function (r) { return r.path }
-            cols: [{ title: "Created by", width: 130, text: function (r) { return r.created_by_account_id === falcon.accountId ? "You" : (r.created_by_name || "—") } },
+            cols: [{ title: "Created by", width: 130, text: function (r) { return page.creator(r) } },
                    { title: "Branches", width: 150, text: function (r) { return Theme.many((r.destinations || []).length, "destination") } }]
             now: function (r) { return [r.st[0], r.st[1]] }
             showEmpty: page.flows.length === 0
@@ -126,8 +131,8 @@ Page {
             emptyText: "Pick a flow in the list."
             title: f ? f.name : ""
             sub: f && page.sel === f.key ? "the one you picked" : "the most recent · click another"
-            facts: f ? [["Created by", f.created_by_account_id === falcon.accountId ? "You" : (f.created_by_name || "—")],
-                        ["Now", f.st[0], f.st[1] === "bad" ? Theme.crit : f.st[1] === "good" ? Theme.ok : null],
+            facts: f ? [["Created by", page.creator(f)],
+                        ["Now", f.st[0], f.st[1] === "bad" ? Theme.crit : f.st[1] === "good" ? Theme.ok : Theme.text4, false, true],
                         ["Last copy", page.lastCopy(f) ? Time.atDay(page.lastCopy(f)) : "—"],
                         ["From", f.source_hostname + " " + f.source_path, null, true],
                         ["To", (f.destinations || []).map(function (d) { return (d.destination_hostname || "storage") + " " + d.destination_path }).join("\n"), null, true],

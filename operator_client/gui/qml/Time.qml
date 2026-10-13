@@ -7,8 +7,11 @@ import QtQuick
 QtObject {
     id: tm
     // the console's clock, ticking once a second; bindings that read `now` stay current
-    property real now: Date.now()
-    property Timer ticker: Timer { interval: 1000; running: true; repeat: true; onTriggered: tm.now = Date.now() }
+    property real now: Date.now() + skew
+    property Timer ticker: Timer { interval: 1000; running: true; repeat: true; onTriggered: tm.now = Date.now() + tm.skew }
+    // only the preview sets this (scripts/preview.py), so its sample day reads as the concept's 13:20
+    property real skew: 0
+    onSkewChanged: now = Date.now() + skew
 
     readonly property var days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     readonly property var months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -39,6 +42,7 @@ QtObject {
     // "Today 13:20" / "Mon 09:30"
     function atDay(x) { var v = d(x); return v ? (sameDay(v.getTime(), now) ? "Today " + hhmm(v) : at(v)) : "—" }
     function dayName(x) { var v = d(x); return v ? days[v.getDay()] : "" }
+    function day(x) { var v = d(x); return v ? v.getDate() + " " + months[v.getMonth()] : "—" }       // "5 Sep"
     function date(x) { var v = d(x); return v ? days[v.getDay()] + " " + v.getDate() + " " + months[v.getMonth()] + ", " + hhmm(v) : "—" }
 
     // a length of time in hours -> "42m", "2h 10m"

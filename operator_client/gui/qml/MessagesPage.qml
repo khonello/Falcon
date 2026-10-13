@@ -63,11 +63,21 @@ Page {
                        started: c.opened_at, last: msgs.length ? msgs[msgs.length - 1].t : Time.ms(c.closed_at || c.opened_at),
                        pings: 1, line: msgs.length ? (msgs[msgs.length - 1].mine ? "You" : msgs[msgs.length - 1].who) + ": " + msgs[msgs.length - 1].text : "no messages yet" })
         })
+        // the Engine answers one row per unanswered ping (id, sender_account_id, sent_at), oldest first: one sender's
+        // pings are one conversation-to-be, with every time it pinged (answering addresses them all)
+        var bySender = {}, senders = []
         pings.forEach(function (p) {
-            if (out.some(function (x) { return x.party && x.other === p.from_name && !x.closed })) return
-            out.push({ id: "p" + p.ping_id, pid: p.ping_id, kind: "ping", title: p.from_name, other: p.from_name, iHigh: true, party: true, msgs: [], closed: false,
-                       myTurn: true, st: ["Pinged you" + ((p.count || 1) > 1 ? " " + p.count + " times" : ""), "bad", "you"], started: p.created_at,
-                       last: Time.ms(p.created_at), pings: p.count || 1, line: ((p.count || 1) === 1 ? "a ping" : p.count + " pings") + ", no answer yet" })
+            var k = String(p.sender_account_id)
+            if (!bySender[k]) { bySender[k] = []; senders.push(k) }
+            bySender[k].push(p)
+        })
+        senders.forEach(function (k) {
+            var ps = bySender[k], first = ps[0], n0 = ps.length, name = first.from_name || "Someone"
+            if (out.some(function (x) { return x.party && x.other === name && !x.closed })) return
+            out.push({ id: "p" + first.id, pid: first.id, kind: "ping", title: name, other: name, iHigh: true, party: true, msgs: [], closed: false,
+                       myTurn: true, st: ["Pinged you" + (n0 > 1 ? " " + n0 + " times" : ""), "bad", "you"], started: first.sent_at,
+                       times: ps.map(function (p) { return p.sent_at }),
+                       last: Time.ms(ps[n0 - 1].sent_at), pings: n0, line: (n0 === 1 ? "a ping" : n0 + " pings") + ", no answer yet" })
         })
         var order = { you: 0, them: 1, listen: 2, closed: 3 }
         return out.sort(function (a, b) { return order[a.st[2]] - order[b.st[2]] || b.last - a.last })
@@ -133,7 +143,7 @@ Page {
             nameTitle: "With"
             nameText: function (x) { return x.title }
             nameLine: function (x) { return x.line }
-            cols: [{ title: "Pings", width: 70, text: function (x) { return x.kind === "ping" ? String(x.pings) : "—" } },
+            cols: [{ title: "Pings", width: 70, text: function (x) { return Theme.fmt(x.pings) } },
                    { title: "Last", width: 100, text: function (x) { return Time.at(x.last) } }]
             now: function (x) { return [x.st[0], x.st[1]] }
             showEmpty: page.rows.length === 0
@@ -154,7 +164,7 @@ Page {
             emptyText: Nav.boss ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."
             title: page.c ? page.c.title : ""
             sub: page.c ? (page.c.party ? (page.askFor.filter(function (p) { return p.name === page.c.other })[0] || { sub: "" }).sub : "you are listening") : ""
-            facts: page.c ? [["Now", page.c.st[0], page.c.st[1] === "bad" ? Theme.crit : page.c.st[1] === "good" ? Theme.ok : null],
+            facts: page.c ? [["Now", page.c.st[0], page.c.st[1] === "bad" ? Theme.crit : page.c.st[1] === "good" ? Theme.ok : Theme.text4, false, true],
                              ["Started by", (page.c.kind === "ping" ? page.c.other : page.c.iHigh ? page.c.other : "You") + ", " + Time.at(page.c.started)],
                              ["Who closes it", page.c.iHigh ? "You" : page.c.party ? page.c.other : "the higher party"]] : []
             extra: Btn {
@@ -173,7 +183,7 @@ Page {
                 spacing: 6
                 Txt { text: page.c && page.c.kind === "ping" ? "PINGED" : "THE CONVERSATION"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
                 Txt { anchors.horizontalCenter: parent.horizontalCenter; color: Theme.text3; font.pixelSize: 12
-                      text: page.c ? (page.c.kind === "ping" ? page.c.other + " pinged " + Time.at(page.c.started) : "Opened " + Time.at(page.c.started)) : "" }
+                      text: page.c ? (page.c.kind === "ping" ? page.c.other + " pinged " + page.c.times.map(function (t) { return Time.at(t) }).join(", ") : "Opened " + Time.at(page.c.started)) : "" }
                 Repeater {
                     model: page.c ? page.c.msgs : []
                     Item {

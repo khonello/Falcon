@@ -37,12 +37,17 @@ Item {
         color: Theme.surface2
         border.width: 1
         border.color: Theme.borderStrong
-        Txt { x: 14; y: 12; text: root.mark ? root.mark.host || "its machine" : ""; mono: true; font.weight: Font.DemiBold; width: parent.width - 28 }
+        // on this console's own PC the concept says so: "ADM-01 · your PC", "allowed anywhere on this PC"
+        readonly property bool mine: !!root.mark && root.mark.pc !== undefined && root.mark.pc === falcon.pcId
+        Row { x: 14; y: 12; spacing: 0
+              Txt { text: root.mark ? root.mark.host || "its machine" : ""; mono: true; font.weight: Font.DemiBold; elide: Text.ElideNone }
+              Txt { visible: parent.parent.mine; text: "  · your PC"; color: Theme.text3; elide: Text.ElideNone } }
         Row {
             x: 14; y: 30
             width: parent.width - 28
             Txt { width: parent.width - cl.width; color: Theme.text2; font.pixelSize: 12
-                  text: root.mark ? (root.mark.keep === "path" ? "allowed only in " + root.mark.path : "allowed anywhere on " + (root.mark.host || "its machine")) : "" }
+                  text: root.mark ? (root.mark.keep === "path" ? "allowed only in " + (root.mark.kind === "folder" ? root.mark.path : String(root.mark.path || "").replace(/[^\\/]+$/, ""))
+                                                   : "allowed anywhere on " + (parent.parent.mine ? "this PC" : root.mark.host || "its machine")) : "" }
             Link { id: cl; text: "change"; quiet: true; font.pixelSize: 12; font.underline: true; onClicked: root.changeKeep() }
         }
         Rectangle {

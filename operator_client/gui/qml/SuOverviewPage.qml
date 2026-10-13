@@ -17,15 +17,20 @@ Page {
     readonly property var devs: Fleet.deviations.map(function (d) {
         var m = Fleet.byPc[d.observed_pc_id], x = Rules.devRecord(d)
         return { id: x.id, short: x.short, who: m ? (m.user || m.host) : "—", at: d.detected_at, open: !d.resolved_at,
-                 expected: x.expected, happened: x.happened }
+                 sev: x.sev, out: x.out, by: x.by, note: x.note, expected: x.expected, happened: x.happened }
     }).sort(function (a, b) { return (b.open ? 1 : 0) - (a.open ? 1 : 0) || Time.ms(b.at) - Time.ms(a.at) })
     readonly property var week: devs.filter(function (d) { return Time.ms(d.at) >= Time.now - 7 * 86400000 })
-    readonly property var perDay: {
+    // each day's deviations by severity, as the concept stacks them
+    function dayOf(d) { return 6 - Math.floor((Time.startOfDay(Time.now) - Time.startOfDay(Time.ms(d.at))) / 86400000) }
+    readonly property var perDay: ["critical", "high", "medium"].map(function (k) {
         var v = [0, 0, 0, 0, 0, 0, 0]
-        week.forEach(function (d) { var k = Math.floor((Time.startOfDay(Time.now) - Time.startOfDay(Time.ms(d.at))) / 86400000); if (k >= 0 && k < 7) v[6 - k] += 1 })
-        return [{ name: "Deviations", c: Theme.med, v: v }]
-    }
+        page.week.forEach(function (d) { var i = page.dayOf(d), s = d.sev === "critical" || d.sev === "high" ? d.sev : "medium"; if (i >= 0 && i < 7 && s === k) v[i] += 1 })
+        return { name: Fleet.sevWord(k), c: Fleet.sevColor(k), v: v }
+    })
+    readonly property var dayTotals: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return page.perDay.reduce(function (a, s) { return a + s.v[i] }, 0) })
+    readonly property int hiOpen: week.filter(function (d) { return d.open && (d.sev === "critical" || d.sev === "high") }).length
     readonly property var off: Fleet.machines.filter(function (m) { return !m.online })
+    readonly property string nextVer: Fleet.rollout && Fleet.rollout.version ? Fleet.rollout.version.version_string : "the next version"
     readonly property int behind: Fleet.machines.filter(function (m) { return m.behind }).length
 
     function loadCpu() {
@@ -52,14 +57,14 @@ Page {
         readonly property real cw: (width - 42) / 4
         Kpi { width: parent.cw; label: "Waiting on you"; value: Theme.fmt(page.q.length); delta: page.q.length ? page.urgent + " urgent" : "Nothing waiting"; dc: page.urgent ? Theme.crit : Theme.text3 }
         Kpi { width: parent.cw; label: "Deviations this week"; value: Theme.fmt(page.week.length)
-              delta: page.week.length ? page.week.filter(function (d) { return d.open }).length + " still open" : "Every rule kept"
-              dc: page.week.some(function (d) { return d.open }) ? Theme.crit : Theme.text3 }
+              delta: page.week.length ? Theme.fmt(page.devs.filter(function (d) { return d.open }).length) + " still open" + (page.hiOpen ? " · " + page.hiOpen + " critical or high" : "") : "Every rule kept"
+              dc: page.hiOpen ? Theme.crit : Theme.text3; spark: page.dayTotals }
         Kpi { width: parent.cw; label: "Machines online"; none: Fleet.machines.length === 0; noneValue: "0"; noneText: "No machines yet"
               value: Theme.fmt(Fleet.machines.length - page.off.length); unit: "/ " + Theme.fmt(Fleet.machines.length)
               delta: page.off.length ? (page.off.length === 1 ? page.off[0].host + " is" : Theme.fmt(page.off.length) + " are") + " offline" : "All online"; dc: page.off.length ? Theme.crit : Theme.text3 }
         Kpi { width: parent.cw; label: "On current version"; none: Fleet.machines.length === 0; noneText: "No machines yet"
               value: String(Fleet.machines.length ? Math.round((Fleet.machines.length - page.behind) / Fleet.machines.length * 100) : 0); unit: "%"
-              delta: page.behind ? Theme.fmt(page.behind) + " holding the next version back" : "the next version can be approved"; dc: page.behind ? Theme.med : Theme.text3 }
+              delta: page.behind ? Theme.fmt(page.behind) + " holding " + page.nextVer + " back" : page.nextVer + " can be approved"; dc: page.behind ? Theme.med : Theme.text3 }
     }
 
     Row {
@@ -123,10 +128,10 @@ Page {
             width: (parent.width - 14) * 7 / 12
             height: parent.h
             title: "Deviations, 7 days"
-            sub: "broken rules with someone to ask"
+            sub: "by severity · broken rules with someone to ask"
             extra: Btn { small: true; kind: "link"; text: "Accountability →"; onClicked: Nav.go("accountability") }
             DayBars { visible: page.week.length > 0; width: parent.width; height: 214; series: page.perDay }
-            Empty { visible: page.week.length === 0; width: parent.width; h: 170; icon: "barchart"; title: "No deviations this week"; text: "Each day's broken rules." }
+            Empty { visible: page.week.length === 0; width: parent.width; h: 170; icon: "barchart"; title: "No deviations this week"; text: "Each day's broken rules, by severity." }
         }
         Panel {
             id: lp
@@ -147,9 +152,9 @@ Page {
                         Rectangle {
                             width: parent.width; height: 40
                             color: parent.on ? Theme.accentSoft : da.containsMouse ? Theme.surface2 : "transparent"
-                            Rectangle { x: 14; width: 8; height: 8; radius: 2; color: modelData.open ? Theme.med : Theme.text4; anchors.verticalCenter: parent.verticalCenter }
+                            Rectangle { x: 14; width: 8; height: 8; radius: 2; color: modelData.open ? Fleet.sevColor(modelData.sev) : Theme.text4; anchors.verticalCenter: parent.verticalCenter }
                             Txt { x: 32; width: parent.width - 220; anchors.verticalCenter: parent.verticalCenter; text: modelData.short; color: modelData.open ? Theme.text : Theme.text3 }
-                            Txt { x: parent.width - 180; width: 100; anchors.verticalCenter: parent.verticalCenter; text: modelData.open ? modelData.who : "Dealt with"; color: Theme.text3; font.pixelSize: 12 }
+                            Txt { x: parent.width - 180; width: 100; anchors.verticalCenter: parent.verticalCenter; text: modelData.open ? modelData.who : (Rules.outcomes[modelData.out] || ["Dealt with"])[0]; color: Theme.text3; font.pixelSize: 12 }
                             Txt { anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: Time.at(modelData.at); mono: true; color: Theme.text3; font.pixelSize: 11 }
                             MouseArea { id: da; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.openDev = parent.parent.on ? "" : modelData.id }
                         }
@@ -159,12 +164,16 @@ Page {
                             color: Theme.surface2
                             Column { id: ex; x: 32; y: 8; width: parent.width - 46; spacing: 3
                                      Txt { width: parent.width; font.pixelSize: 12; textFormat: Text.RichText
-                                           text: "<span style='color:" + Theme.text3 + "'>Expected </span>" + modelData.expected + "<br><span style='color:" + Theme.text3 + "'>What happened </span>" + modelData.happened }
+                                           text: "<span style='color:" + Theme.text3 + "'>Expected </span>" + modelData.expected + "<br><span style='color:" + Theme.text3 + "'>What happened </span>" + modelData.happened
+                                                 + (modelData.open ? "" : "<br><span style='color:" + Theme.text3 + "'>What came of it </span>" + (Rules.outcomes[modelData.out] || ["Dealt with"])[0]
+                                                    + (modelData.by ? " · " + modelData.by : "") + (modelData.note ? ": “" + modelData.note + "”" : "")) }
                                      Link { text: "Open in Accountability →"; font.pixelSize: 12; onClicked: Nav.go("accountability", modelData.id) } }
                         }
                         Rectangle { width: parent.width; height: 1; color: Theme.grid }
                     }
                 }
+                Item { visible: page.week.length > 6; width: parent.width; height: 38
+                       More { x: 14; anchors.verticalCenter: parent.verticalCenter; n: page.week.length - 6; what: "this week in Accountability →"; onClicked: Nav.go("accountability") } }
             }
         }
     }

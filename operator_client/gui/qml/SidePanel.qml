@@ -6,7 +6,9 @@ import "."
 // list's height, with its facts as label / value rows, any short sections under them, and its actions
 // at the foot. Charts and drawings of the same item stay below the list, full width.
 //
-//   facts: [[label, value, colour?, mono?]]       -- a value is text; a colour tints it
+//   facts: [[label, value, colour?, mono?, dot?]] -- a value is text; a colour tints it, or with `dot` is a
+//                                                    status: a dot of that colour before plain text (the concept's .st)
+//   facts[i][5]: a link after the value ("anywhere on ADM-01 · change"); a click says factLink(label)
 //   default content: sections under the facts      actions: the buttons at the foot (right aligned)
 //   foot / dock: a band above the actions          extra: controls in the header
 Rectangle {
@@ -26,6 +28,7 @@ Rectangle {
     // a band shows only when something in it does
     function anyShown(it) { for (var i = 0; i < it.children.length; i++) if (it.children[i].visible) return true; return false }
 
+    signal factLink(string label)
     property bool showEmpty: false
     property string emptyIcon: "inbox"
     property string emptyTitle: "Nothing picked"
@@ -97,22 +100,27 @@ Rectangle {
                     height: Math.max(33, val.implicitHeight + 14)
                     Txt {
                         y: 7
-                        width: root.factLabelWidth - 8
+                        width: root.factLabelWidth          // the concept's 116px label column, then a 12px gap
                         text: modelData[0]
                         color: Theme.text3
                     }
+                    readonly property bool dot: !!modelData[4] && !!modelData[2]
+                    Rectangle { visible: parent.dot; x: root.factLabelWidth + 12; y: 7 + (val.font.pixelSize * 1.5 - 7) / 2; width: 7; height: 7; radius: 3.5; color: modelData[2] || "transparent" }
                     Txt {
                         id: val
-                        x: root.factLabelWidth
+                        x: root.factLabelWidth + 12 + (parent.dot ? 13 : 0)
                         y: 7
-                        width: parent.width - root.factLabelWidth
+                        readonly property real room: parent.width - root.factLabelWidth - 12 - (parent.dot ? 13 : 0)
+                        width: modelData[5] ? Math.min(implicitWidth, room - fl.implicitWidth - 18) : room
                         text: modelData[1] === undefined || modelData[1] === null ? "—" : String(modelData[1])
-                        color: modelData[2] ? modelData[2] : Theme.text
+                        color: modelData[2] && !parent.dot ? modelData[2] : Theme.text
                         mono: !!modelData[3]
                         wrapMode: Text.Wrap
                         elide: Text.ElideNone
                         textFormat: Text.PlainText
                     }
+                    Txt { visible: !!modelData[5]; x: val.x + val.width + 4; y: 7; text: "·"; color: Theme.text3 }
+                    Link { id: fl; visible: !!modelData[5]; x: val.x + val.width + 14; y: 7; text: modelData[5] || ""; onClicked: root.factLink(modelData[0]) }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }

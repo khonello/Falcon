@@ -35,6 +35,8 @@ QtObject {
     function dept(id) { for (var i = 0; i < depts.length; i++) if (depts[i].id === id) return depts[i]; return null }
     function deptName(id) { var d = dept(id); return d ? d.name : "" }
     function byAccount(a) { for (var i = 0; i < machines.length; i++) if (machines[i].account === a) return machines[i]; return null }
+    // an Admin's name by account, from the departments this console sees ("" when it is not one of them)
+    function adminName(acc) { for (var i = 0; i < depts.length; i++) for (var j = 0; j < depts[i].admins.length; j++) if (depts[i].admins[j].account_id === acc) return depts[i].admins[j].name; return "" }
     function byUser(n) { for (var i = 0; i < machines.length; i++) if (machines[i].user === n) return machines[i]; return null }
     function inDept(id) { return machines.filter(function (m) { return m.dept === id }) }
     // every open issue, worst first then oldest first, each with its machine
@@ -95,7 +97,8 @@ QtObject {
         var behindBy = {}
         for (var b = 0; b < behind.length; b++) behindBy[behind[b].pc_id] = behind[b]
         var pingBy = {}
-        for (var p = 0; p < pg.length; p++) pingBy[pg[p].from_name] = pg[p]
+        // one row per ping, oldest first: a person's first ping, and how many they sent
+        for (var p = 0; p < pg.length; p++) { var nm = pg[p].from_name; if (pingBy[nm]) pingBy[nm].n++; else pingBy[nm] = { first: pg[p], n: 1 } }
 
         var outD = [], outM = [], bh = {}, bp = {}
         for (var i = 0; i < ds.length; i++) {
@@ -121,9 +124,9 @@ QtObject {
                         note: "A version behind" + (be.failures ? ", " + be.failures + " failed attempt" + (be.failures === 1 ? "" : "s") : ""),
                         at: be.last_attempt_at, ref: be })
                 if (w.name && pingBy[w.name])
-                    issues.push({ id: "P-" + pingBy[w.name].ping_id, sev: "warning", type: "help", title: "Help request unanswered",
-                                  subject: w.name + " · " + Theme.many(pingBy[w.name].count || 1, "ping"),
-                                  note: "Help request unanswered", at: pingBy[w.name].created_at, ref: pingBy[w.name] })
+                    issues.push({ id: "P-" + pingBy[w.name].first.id, sev: "warning", type: "help", title: "Help request unanswered",
+                                  subject: w.name + " · " + Theme.many(pingBy[w.name].n, "ping"),
+                                  note: "Help request unanswered", at: pingBy[w.name].first.sent_at, ref: pingBy[w.name].first })
                 for (var x = 0; x < dv.length; x++)
                     if (dv[x].observed_pc_id === w.pc_id) {
                         var what = String(dv[x].expectation || "deviation").replace(/[._]/g, " ")

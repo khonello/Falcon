@@ -12,6 +12,18 @@ Page {
     property string isel: ""
     property int per: 3
     property int dayPage: 1
+    property string dayView: "Chart"
+    // how fast each department's reports are dealt with: the Engine's median minutes, from reports.board's handling
+    property var handled: ({})
+    function loadHandled() {
+        falcon.call("reports.board", { days: 30 }, function (ok, r) {
+            var h = {}
+            if (ok) (r.handling || []).forEach(function (x) { h[x.department_id] = x.median_minutes })
+            page.handled = h
+        })
+    }
+    Component.onCompleted: if (falcon.isConnected) loadHandled()
+    Connections { target: falcon; function onConnected() { page.loadHandled() } }
 
     function rank(d) {
         var iss = Fleet.issues.filter(function (i) { return i.dept === d.id })
@@ -79,6 +91,7 @@ Page {
             facts: page.d ? [["Admins", !page.d.admins.length ? "None · its reports come to you" : Theme.listNames(page.d.admins.map(function (a) { return a.name })), !page.d.admins.length ? Theme.crit : null],
                              ["Machines", page.d.online + " of " + page.d.machines.length + " online"],
                              ["Open issues", page.d.iss.length ? page.d.iss.length + (page.d.crit ? " · " + page.d.crit + " critical" : "") : "None"],
+                             ["Reports handled in", page.handled[page.d.id] !== undefined && page.handled[page.d.id] !== null ? Time.mins(page.handled[page.d.id]) : "—"],
                              ["On " + (Fleet.version || "current"), page.d.ok + " of " + page.d.machines.length]] : []
             extra: Btn { visible: page.d !== null && page.d.admins.length > 1; small: true; iconName: "team"; text: "All " + (page.d ? page.d.admins.length : 0) + " Admins"; onClicked: admins.openFor(page.d, null) }
             actions: [
@@ -138,10 +151,13 @@ Page {
         sub: "how many of each department's machines had someone on them, hour by hour · amber where an hour is unusual"
         extra: [
             Pager { compact: true; current: page.dayPage; pages: Math.max(1, Math.ceil(page.all.length / page.per)); total: page.all.length; size: page.per; what: "departments"; onGo: function (p) { page.dayPage = p } },
-            Select { visible: page.all.length > 3; width: 116; small: true; value: page.per; options: [3, 6, 10].map(function (n) { return { value: n, label: n + " at a time" } }); onPicked: function (v) { page.per = v; page.dayPage = 1 } }
+            Select { visible: page.all.length > 3; width: 116; small: true; value: page.per; options: [3, 6, 10].map(function (n) { return { value: n, label: n + " at a time" } }); onPicked: function (v) { page.per = v; page.dayPage = 1 } },
+            Segmented { options: ["Chart", "Report"]; value: page.dayView; onPicked: function (v) { page.dayView = v } }
         ]
         DayLanes {
             width: parent.width
+            report: page.dayView === "Report"
+            slots: Math.ceil(page.all.length / page.per) > 1 ? page.per : 0
             rows: page.all.slice((page.dayPage - 1) * page.per, page.dayPage * page.per).map(function (d) { return { key: d.id, label: d.name, hosts: d.machines.map(function (m) { return m.host }), color: d.admins.length ? undefined : Theme.crit } })
         }
     }

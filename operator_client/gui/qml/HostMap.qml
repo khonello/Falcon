@@ -59,9 +59,13 @@ Item {
                     Txt { id: dn; text: modelData.name; font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width * 0.45) }
                     Txt {
                         width: parent.width - dn.width - 8
-                        color: modelData.admins.length ? Theme.text3 : Theme.crit
+                        color: Theme.text3
+                        textFormat: Text.StyledText
+                        // the names as the concept lists them, up to three and "and N more"; only "no Admin" is red
+                        readonly property var names: modelData.admins.map(function (a) { return a.name })
                         text: Theme.many(modelData.machines.length, "machine") + " · "
-                              + (modelData.admins.length ? Theme.listNames(modelData.admins.map(function (a) { return a.name }), 3) : "no Admin")
+                              + (names.length ? names.slice(0, 3).join(", ") + (names.length > 3 ? " and " + (names.length - 3) + " more" : "")
+                                              : "<font color='" + Theme.crit + "'>no Admin</font>")
                     }
                 }
                 Flow {

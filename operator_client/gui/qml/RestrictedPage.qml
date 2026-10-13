@@ -76,7 +76,8 @@ Page {
             return { id: String(c.issue_id), iid: c.issue_id, host: c.host, user: c.signed_in || "", folder: c.folder || c.path || "", file: c.file, at: c.opened_at,
                      sev: c.severity === "medium" ? "warning" : c.severity }
         }) : []
-        return { id: String(m.id), mid: m.id, name: m.name, kind: m.kind, host: m.host, path: m.path, keep: m.keep, files: m.files, n: m.copies, copies: cs, versions: m.versions, by: m.by }
+        return { id: String(m.id), mid: m.id, name: m.name, kind: m.kind, host: m.host, pc: m.pc_id, path: m.path, keep: m.keep, files: m.files, n: m.copies, copies: cs,
+                 versions: m.versions, by: m.by, at: m.created_at }
     }) : readVio()
     function readVio() {
         var by = {}, out = []
@@ -98,6 +99,13 @@ Page {
 
     Confirm { id: confirm; page: page }
     readonly property int copiesN: msum ? msum.copies : allCopies.length
+    // this console's own PC, by name: where its marks are
+    readonly property string myHost: { for (var i = 0; i < marks.length; i++) if (marks[i].pc === falcon.pcId) return marks[i].host
+                                       var m = Fleet.byPc[falcon.pcId]; return m ? m.host : "" }
+    readonly property int nFolders: marks.filter(function (k) { return k.kind === "folder" }).length
+    readonly property int leaked: marks.filter(function (k) { return k.n > 0 }).length
+    function where(k) { return k.kind === "folder" ? k.path : String(k.path || "").replace(/[^\\/]+$/, "") }
+    function marked(k) { return (k.at ? Time.day(k.at) : "—") + " by " + (!k.by || k.by.you ? "you" : k.by.name || "someone") }
     function allow(c) {
         falcon.call("resource.resolve", { violation_id: c.vid, reason: why.trim() }, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not allowed"); return }
@@ -111,7 +119,9 @@ Page {
         on: page.onlyCopied ? "copied" : null
         onPick: function (k) { page.onlyCopied = !!k }
         items: [
-            { label: "Files and folders marked", value: Theme.fmt(page.marks.length), delta: page.mk !== null ? "by you" : page.marks.length ? "the ones copies were found of" : "", },
+            { label: "Files and folders marked", value: Theme.fmt(page.marks.length), dc: page.leaked ? Theme.crit : undefined,
+              delta: !page.marks.length ? "" : Theme.many(page.marks.length - page.nFolders, "file") + ", " + Theme.many(page.nFolders, "folder")
+                     + " · " + (page.leaked ? page.leaked + " with a copy elsewhere" : "all where they belong") },
             { label: "Files protected in all", value: page.msum ? Theme.fmt(page.msum.files) : "—", delta: "counting what is inside folders" },
             { key: page.copiesN ? "copied" : null, label: "Copies found elsewhere", value: Theme.fmt(page.copiesN),
               delta: page.copiesN ? "click to list only those marks" : "none", dc: page.copiesN ? Theme.crit : undefined },
@@ -127,7 +137,7 @@ Page {
             id: list
             width: (parent.width - 14) * 8 / 12
             title: "Marked files"
-            sub: "on your PC · click one to see it on the right"
+            sub: (page.myHost ? "on " + page.myHost + ", your PC" : "on your PC") + " · click one to see it on the right"
             placeholder: "Filter by name or path"
             actionLabel: "Mark files"
             onAction: Nav.go("restricted", "mark")
@@ -155,8 +165,11 @@ Page {
             emptyText: "Pick a marked file or folder in the list."
             title: k ? k.name : ""
             sub: k && page.sel === k.id ? "the one you picked" : "most copies · click another"
-            facts: k ? [["Kind", k.kind === "folder" ? "Folder" : "File"], ["Allowed", k.keep === "path" ? "only in its place" : "anywhere on its PC"],
+            facts: k ? [["Kind", k.kind === "folder" ? "Folder · " + Theme.fmt(k.files) + " files" : "File"], ["On", k.host || "—", null, true], ["Path", k.path || "—", null, true],
+                        ["Allowed", k.keep === "path" ? "only in " + page.where(k) : "anywhere on " + (k.host || "its PC"), null, false, false, k.mid !== undefined ? "change" : ""],
+                        ["Marked", page.marked(k)],
                         ["Copies", k.n ? k.n + " found elsewhere" : "None, only where it belongs", k.n ? Theme.crit : null]] : []
+            onFactLink: function (label) { if (label === "Allowed") page.changeKeep() }
             actions: Btn { danger: true; text: "Unmark"; enabled: page.cur !== null && page.cur.mid !== undefined; tip: page.cur && page.cur.mid === undefined ? "This Engine cannot unmark" : ""
                            onClicked: { var k = page.cur
                                         confirm.ask({ title: "Unmark " + k.name + "?", text: "It stops being restricted. Its open copies close; the mark and its history are kept.", ok: "Unmark", danger: true },
@@ -258,10 +271,16 @@ Page {
                 onChangeKeep: page.cur && page.cur.mid !== undefined ? page.changeKeep() : Msg.warn("This Engine cannot keep a mark to one place")
             }
             Rectangle { width: parent.width; height: 1; color: Theme.border }
+            // the concept's quiet facts under the drawing: the path, when it was marked, and how copies are recognised
             Row {
                 spacing: 18
-                Txt { text: "Matched by content"; color: Theme.text3; font.pixelSize: 12 }
-                Txt { text: "Every version is remembered, so editing the original never lets an older copy through."; color: Theme.text3; font.pixelSize: 12 }
+                Txt { text: page.cur ? page.cur.path || "" : ""; mono: true; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                Txt { text: page.cur && page.cur.at ? "Marked " + Time.day(page.cur.at) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                Row { spacing: 4
+                      Icon { name: "info"; size: 12; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+                      Txt { id: how; text: "How copies are recognised"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                            Tip { text: "Matched by content. " + (page.cur && page.cur.versions ? Theme.many(page.cur.versions, "version") + (page.cur.versions === 1 ? " is" : " are") : "Every version is")
+                                        + " remembered, so editing the original never lets an older copy through." } } }
             }
         }
     }

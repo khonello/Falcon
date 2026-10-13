@@ -231,14 +231,14 @@ ANSWERS = {
     "control.event_create": {"event": {"id": 9}},
     "control.event_update": {}, "control.event_delete": {},
     "flow.list": {"flows": [
-        {"id": 1, "source_pc_id": 1, "source_hostname": "OPS-01", "source_path": "C:/work/payroll",
+        {"id": 1, "created_by_account_id": 7, "source_pc_id": 1, "source_hostname": "OPS-01", "source_path": "C:/work/payroll",
          "status": "active", "pause_reason": None, "consent_status": "not_required",
          "stages": [{"id": 1, "parent_stage_id": None, "stage_type": "transformation", "config": {"op": "Convert to PDF"}}],
          "destinations": [
              {"id": 1, "destination_pc_id": 11, "destination_hostname": "FIN-01", "parent_stage_id": 1,
               "destination_path": "C:/shared/payroll", "suggestion": None,
               "last_sync": {"synced_at": "2026-09-29T12:40:00+00:00"}}]},
-        {"id": 2, "source_pc_id": 7, "source_hostname": "OPS-07", "source_path": "C:/reports/weekly",
+        {"id": 2, "created_by_account_id": 9, "source_pc_id": 7, "source_hostname": "OPS-07", "source_path": "C:/reports/weekly",
          "status": "paused", "pause_reason": "destination:path_missing", "consent_status": "granted",
          "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else.",
          # a step before the split, and one on the branch to the archive only
@@ -251,7 +251,7 @@ ANSWERS = {
               "last_sync": None},
              {"id": 3, "destination_pc_id": None, "destination_hostname": None, "parent_stage_id": 3,
               "destination_path": "//archive/weekly", "suggestion": None, "last_sync": None}]},
-        {"id": 3, "source_pc_id": 3, "source_hostname": "OPS-03", "source_path": "C:/intake",
+        {"id": 3, "created_by_account_id": 7, "source_pc_id": 3, "source_hostname": "OPS-03", "source_path": "C:/intake",
          "status": "paused", "pause_reason": "consent:pending", "consent_status": "pending",
          "stages": [], "destinations": [
              {"id": 4, "destination_pc_id": 12, "destination_hostname": "FIN-02",
@@ -345,6 +345,11 @@ def main() -> int:
     bridge.connected.emit()
 
     win = engine.rootObjects()[0]
+    from PySide6.QtQml import QQmlExpression
+    _skew = QQmlExpression(engine.contextForObject(win), win, f"Time.skew = {preview_data.SKEW_MS}")   # the sample's 13:20
+    _skew.evaluate()
+    if _skew.hasError():
+        print("preview: clock", _skew.error().toString())
     if INSIDE:                            # a Super User looking through an Admin's session
         bridge.state.set_session({"session_id": 4, "pc_id": 7, "hostname": "ADM-01",
                                   "occupied_via": "traversal", "super_user_banner": True,
@@ -393,11 +398,13 @@ def main() -> int:
     out = Path(sys.argv[sys.argv.index("--shot") + 1]) if len(sys.argv) > sys.argv.index("--shot") + 1 \
         else ROOT / "preview.png"
     def to_design_size() -> None:
-        # after app.create's own fit_to_screen has maximised it: a shot is the design's 1440 x 900
+        # after app.create's own fit_to_screen has maximised it: a shot is the design's 1440 x 900 unless --size says
         win.showNormal()
         win.setMinimumSize(QSize(0, 0))
         win.setMaximumSize(QSize(16777215, 16777215))
-        win.resize(1440, 900)
+        # --size WxH for a taller shot, so a long page is seen whole
+        w, h = (int(v) for v in sys.argv[sys.argv.index("--size") + 1].split("x")) if "--size" in sys.argv else (1440, 900)
+        win.resize(w, h)
 
     QTimer.singleShot(500, to_design_size)
 

@@ -384,6 +384,14 @@ a { color: var(--accent); text-decoration: none; }
 .ant-table-row.sel > td { background: var(--accent-soft) !important; }
 .clickrow { cursor: pointer; }
 .lp { display: flex; flex-direction: column; }
+/* a list's table fits its panel, as the Qt console's list does: the name column takes what is left and cuts its text,
+   a 36px header, 54px rows (13 Oct 2026, with the controls back at 13px) */
+.scroll-x { overflow-x: auto; }
+.lp .ant-table-wrapper .ant-table { font-size: 13px; }
+.lp .ant-table-thead > tr > th { padding: 0 8px !important; height: 36px; font-size: 12px; }
+.lp .ant-table-tbody > tr > td { padding: 0 8px !important; height: 54px; }
+.lp .ant-table-thead > tr > th:first-child, .lp .ant-table-tbody > tr > td:first-child { padding-left: 12px !important; }
+.lp .ant-table-tbody .cut { max-width: 100% !important; }
 .lp > .pbd { flex: 1; display: flex; flex-direction: column; }
 .lp-body { flex: 1; }
 /* a list's and a side panel's header keep one line: the controls keep their width, a long subtitle is cut short */
@@ -3710,7 +3718,7 @@ function ListPanel({ title, sub, q, setQ, placeholder, action, rows, pick, onPic
   const page = rows.slice((at - 1) * LIST_ROWS, at * LIST_ROWS);
   return html`<${Panel} flush className="lp" title=${title} sub=${sub} style=${{ height: LIST_H }}
     extra=${html`${tools || null}${setQ ? html`<${Input} size="small" allowClear placeholder=${placeholder} prefix=${ic("SearchOutlined")} value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ width: 190 }} />` : null}${action ? html`<${Button} size="small" type=${action.plain ? "default" : "primary"} icon=${ic(action.icon || "PlusOutlined")} disabled=${!!action.disabled} onClick=${action.onClick}>${action.label}<//>` : null}`}>
-    ${empty ? html`<div className="lp-body" style=${{ display: "grid", placeItems: "center" }}>${empty}</div>` : html`<div className="lp-body scroll-x"><${Table} size="middle" pagination=${false} locale=${{ emptyText: "Nothing matches." }} dataSource=${page.map((r) => ({ ...r, key: r[rowKey] }))}
+    ${empty ? html`<div className="lp-body" style=${{ display: "grid", placeItems: "center" }}>${empty}</div>` : html`<div className="lp-body scroll-x"><${Table} size="middle" tableLayout="fixed" pagination=${false} locale=${{ emptyText: "Nothing matches." }} dataSource=${page.map((r) => ({ ...r, key: r[rowKey] }))}
       rowClassName=${(r) => "clickrow" + (r[rowKey] === pick ? " sel" : "")} onRow=${(r) => ({ onClick: () => onPick(r[rowKey]) })} columns=${[
       { title: name.title, render: (r) => html`<div className="row" style=${{ flexWrap: "nowrap", alignItems: "flex-start", gap: 10 }}><span className="t3" style=${{ marginTop: 2 }}>${ic(typeof icon === "function" ? icon(r) : icon)}</span>
           <div style=${{ minWidth: 0 }}><div className="cut" style=${{ fontWeight: 500, maxWidth: 360 }} title=${name.text(r)}>${name.text(r)}</div>${name.line ? html`<div className="mono t3 cut" style=${{ fontSize: 11.5, maxWidth: 360 }} title=${name.line(r)}>${name.line(r)}</div>` : null}</div></div>` },
@@ -5301,8 +5309,10 @@ function App() {
     const h = () => setRoute(parse());
     window.addEventListener("keydown", k); window.addEventListener("hashchange", h); return () => { window.removeEventListener("keydown", k); window.removeEventListener("hashchange", h); }; }, []);
   const dk = th.dark;
-  const cfg = { algorithm: [dk ? theme.darkAlgorithm : theme.defaultAlgorithm, theme.compactAlgorithm],
-    token: { colorPrimary: dk ? "#5b8cff" : "#2459d6", borderRadius: 4, fontFamily: "'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif", fontSize: 13,
+  // controls at the console's own sizes (13 Oct 2026): text 13px, controls 30px (24 small, 36 large), as the Qt console
+  // draws them. antd's compact algorithm used to shrink every control to 10px text, which nobody chose.
+  const cfg = { algorithm: [dk ? theme.darkAlgorithm : theme.defaultAlgorithm],
+    token: { colorPrimary: dk ? "#5b8cff" : "#2459d6", borderRadius: 4, fontFamily: "'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif", fontSize: 13, fontSizeSM: 12, fontSizeLG: 14, controlHeight: 30, controlHeightSM: 24, controlHeightLG: 36,
              colorBgContainer: dk ? "#12161d" : "#ffffff", colorBgElevated: dk ? "#161b23" : "#ffffff", colorBorder: dk ? "#323b48" : "#cdd2da", colorBorderSecondary: dk ? "#232a35" : "#e2e5ea",
              colorBgLayout: dk ? "#0c0f14" : "#f3f4f6", colorText: dk ? "#e4e7ed" : "#191d25", colorError: dk ? "#f2604c" : "#c8331f" },
     components: { Table: { headerBg: dk ? "#161b23" : "#f8f9fb", rowHoverBg: dk ? "#1d232d" : "#f8f9fb" } } };

@@ -12,7 +12,11 @@ import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-NOW = datetime.now(timezone.utc).astimezone()
+REAL_NOW = datetime.now(timezone.utc).astimezone()
+# the sample is laid out around the concept's 13:20, so the preview's clock reads 13:20 today whatever the real time
+# is (the preview tells the console's Time the same skew): the day's charts then look as they do in the concept
+NOW = REAL_NOW.replace(hour=13, minute=20, second=0, microsecond=0)
+SKEW_MS = (NOW - REAL_NOW).total_seconds() * 1000
 
 
 def at(hours: float) -> str:
@@ -136,11 +140,12 @@ def rollout(role: str, dept_id: int | None) -> dict[str, Any]:
 
 
 def pings(role: str, account: int) -> dict[str, Any]:
-    ps = [{"ping_id": 5, "sender_account_id": 21, "receiver_account_id": 7, "from_name": "Kojo", "count": 2,
-           "created_at": at(-3.6)}] if account == 7 or role == "admin" else []
+    # as the Engine answers: one row per ping (the pings table), oldest first; a second ping is a second row
+    def ping(i, sender, receiver, name, h):
+        return {"id": i, "sender_account_id": sender, "receiver_account_id": receiver, "from_name": name, "sent_at": at(h), "addressed_at": None}
+    ps = [ping(5, 21, 7, "Kojo", -3.6), ping(7, 21, 7, "Kojo", -3.2)] if account == 7 or role == "admin" else []
     if role == "super_user":
-        ps = [{"ping_id": 6, "sender_account_id": 8, "receiver_account_id": 1, "from_name": "K. Boateng", "count": 2,
-               "created_at": at(-0.7)}]
+        ps = [ping(6, 8, 1, "K. Boateng", -0.7), ping(8, 8, 1, "K. Boateng", -0.3)]
     return {"unaddressed": len(ps), "pings": ps, "indicator": "unaddressed_ping" if ps else None}
 
 
@@ -252,14 +257,14 @@ def issues_get(iid: int, account: int) -> dict[str, Any]:
 
 # --- restricted marks (marks.list / marks.get / marks.tree) ------------------------------------------------------
 def marks_list(role: str, account: int) -> dict[str, Any]:
-    ws = "WS-OPS-A1" if account == 7 else "ADM-01"
-    ms = [{"id": 3, "code": "M-3", "kind": "file", "name": "budget-2026.xlsx", "pc_id": 101, "host": ws, "path": "C:/Users/R.Mensah/Finance/budget-2026.xlsx",
+    ws, pc = ("WS-OPS-A1", 101) if account == 7 else ("ADM-01", 100)          # the console's own PC, as FakeIdentity says
+    ms = [{"id": 3, "code": "M-3", "kind": "file", "name": "budget-2026.xlsx", "pc_id": pc, "host": ws, "path": "C:/Users/R.Mensah/Finance/budget-2026.xlsx",
            "keep": "machine", "keep_label": "Anywhere on the PC", "by": {"account_id": account, "name": "You", "you": True}, "files": 1, "versions": 13,
            "copies": 1, "worst": "critical", "created_at": at(-200)},
-          {"id": 4, "code": "M-4", "kind": "folder", "name": "Payroll", "pc_id": 101, "host": ws, "path": "C:/HR/Payroll",
+          {"id": 4, "code": "M-4", "kind": "folder", "name": "Payroll", "pc_id": pc, "host": ws, "path": "C:/HR/Payroll",
            "keep": "path", "keep_label": "Only in its place", "by": {"account_id": account, "name": "You", "you": True}, "files": 24, "versions": 31,
            "copies": 1, "worst": "high", "created_at": at(-400)},
-          {"id": 5, "code": "M-5", "kind": "file", "name": "supplier-contracts-2026.pdf", "pc_id": 101, "host": ws, "path": "C:/Users/R.Mensah/Contracts/supplier-contracts-2026.pdf",
+          {"id": 5, "code": "M-5", "kind": "file", "name": "supplier-contracts-2026.pdf", "pc_id": pc, "host": ws, "path": "C:/Users/R.Mensah/Contracts/supplier-contracts-2026.pdf",
            "keep": "machine", "keep_label": "Anywhere on the PC", "by": {"account_id": account, "name": "You", "you": True}, "files": 1, "versions": 2,
            "copies": 0, "worst": None, "created_at": at(-90)}]
     return {"marks": ms, "summary": {"marks": 3, "files": 26, "copies": 2, "with_copies": 2}}
@@ -627,6 +632,11 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return {"pc_id": 101, "hostname": "WS-OPS-A1", "folders": [{"path": f, "name": f.split("\\")[-1], "files": 3 + (len(f) * 7) % 40} for f in fs]}
     if type_ == "reports.list":
         return reports(role, dept_id)
+    if type_ == "reports.board":
+        # only the per-department handling the Departments page reads; the Reports page reads reports.list
+        mins = {1: 42, 2: 130, 3: None}
+        return {"reports": [], "strip": {}, "categories": [],
+                "handling": [{"department_id": d, "name": n, "has_admin": d != 3, "median_minutes": mins[d]} for d, n in DEPTS] if role == "super_user" else []}
     if type_ == "reports.routing_get":
         return {"categories": list({r[1] for r in REPORTS}), "fixed": ["about_admin"],
                 "routing": [{"category": c, "routed_department_id": d, "department_name": dict(DEPTS)[d]} for c, ds in ROUTING.items() for d in ds]}
