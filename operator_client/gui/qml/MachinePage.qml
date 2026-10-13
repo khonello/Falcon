@@ -191,7 +191,7 @@ Page {
                 columns: 2
                 spacing: 14
                 Repeater {
-                    model: page.got && page.got.series ? [["CPU", "cpu", "%", Theme.ser1, 90], ["Memory", "memory", "%", Theme.ser2, null], ["Disk", "disk", "%", Theme.med, 90], ["Network in", "net_kbps", " KB/s", Theme.ser3, null]]
+                    model: page.got && page.got.series ? [["CPU", "cpu", "%", Theme.ser1, 90], ["Memory", "memory", "%", Theme.ser2, null], ["Disk", "disk", "%", Theme.ser5, 90], ["Network in", "net_kbps", " KB/s", Theme.ser3, null]]
                                                        : [["CPU", "cpu", "%", Theme.ser1, 90], ["Memory", "memory", "%", Theme.ser2, null], ["Idle", "idle_s", " s", Theme.ser3, null]]
                     Panel {
                         required property var modelData
