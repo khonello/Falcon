@@ -91,6 +91,7 @@ Item {
     Repeater {
         model: root.shared
         Node { required property var modelData; required property int index
+               z: 1                                    // over a branch's label, as the concept draws the steps last
                x: root.colX(root.firstStage + index); y: root.midY - root.nh / 2; title: modelData.op; sub: modelData.kind; }
     }
     Repeater {
@@ -99,12 +100,16 @@ Item {
             required property var modelData
             required property int index
             readonly property var branch: root.stages.filter(function (s) { return s.scope === index })
-            Txt {
+            // a branch's own steps, written on its edge with a halo of the panel's colour, as the concept's stroke
+            Rectangle {
                 visible: parent.branch.length > 0
-                x: (root.lastX + root.destX) / 2 - implicitWidth / 2
-                y: (root.midY + root.dy(index)) / 2 - 18
-                text: parent.branch.map(function (b) { return b.op }).join(" · ")
-                color: Theme.ser3; font.pixelSize: 11; elide: Text.ElideNone
+                x: (root.lastX + root.destX) / 2 - width / 2
+                y: (root.midY + root.dy(index)) / 2 - 6 - height + 3
+                width: bl.implicitWidth + 6
+                height: bl.implicitHeight
+                radius: 3
+                color: Theme.surface
+                Txt { id: bl; x: 3; text: parent.parent.branch.map(function (b) { return b.op }).join(" · "); color: Theme.ser3; font.pixelSize: 11; elide: Text.ElideNone }
             }
             Node {
                 x: root.destX; y: root.dy(index) - root.nh / 2

@@ -61,6 +61,17 @@ ISSUE = {"id": 41, "code": "I-41", "type": "file", "severity": "critical", "titl
          "owner": {"account_id": 7, "name": "R. Mensah", "you": True}, "state": "open", "label": "Open", "escalated": False}
 
 
+# A flow as `flow.list` answers it: stages and destinations point at their parent stage by id. Stage 1 is what an
+# earlier edit left on record (nothing reaches it); 2 is before the split, 3 is on the branch to the archive only.
+FLOW = {"id": 5, "source_pc_id": 7, "source_hostname": "OPS-07", "source_path": "C:/reports/weekly", "status": "active",
+        "pause_reason": None, "consent_status": "not_required", "created_by_account_id": 7,
+        "stages": [{"id": 1, "parent_stage_id": None, "stage_type": "transformation", "config": None},
+                   {"id": 2, "parent_stage_id": None, "stage_type": "categorization", "config": {"op": "Sort by file type", "by": "extension"}},
+                   {"id": 3, "parent_stage_id": 2, "stage_type": "transformation", "config": {"op": "Compress to ZIP"}}],
+        "destinations": [{"id": 8, "destination_pc_id": 21, "destination_hostname": "LOG-01", "destination_path": "D:/weekly", "parent_stage_id": 2},
+                         {"id": 9, "destination_pc_id": 22, "destination_hostname": "LOG-02", "destination_path": "D:/archive", "parent_stage_id": 3}]}
+
+
 class _Identity:
     """What the handshake returned. The role is the whole point: the console is a different product at
     each level, so a test has to say which one it is looking at."""
@@ -106,6 +117,8 @@ class _Connection:
         if type_ == "marks.get":
             return {"mark": {"id": 3}, "copies": [{"issue_id": 41, "severity": "high", "host": "OPS-01", "file": "salaries.csv",
                                                    "folder": "C:/Users/Kojo", "signed_in": "Kojo", "opened_at": _ago(2)}]}
+        if type_ == "flow.list":
+            return {"flows": [FLOW]}
         if type_ == "enroll.list":
             return {"requests": []}
         if type_ == "hierarchy.traverse":
@@ -320,6 +333,27 @@ async def test_marks_are_the_person_s_own_and_their_copies_are_issues(console):
 
 
 QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))
+
+
+async def test_a_flow_s_steps_keep_their_names_and_their_place(console):
+    """The Engine holds the steps as a tree; the page draws them as the concept does, named, before the split or on
+    one branch, and leaves out what an earlier edit left unreached. Saving an edit sends the same tree back."""
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "flows", "flowsView")
+    await _wait(lambda: len(prop(view, "steps") or []) == 2)
+    steps = [{"kind": "Categorize", "op": "Sort by file type", "scope": "all"}, {"kind": "Transform", "op": "Compress to ZIP", "scope": 1}]
+    assert prop(view, "steps") == steps
+    win.setProperty("view", "flows/edit-5")
+    await _wait(lambda: win.findChild(QObject, "newFlow") is not None)
+    edit = win.findChild(QObject, "newFlow")
+    await _wait(lambda: len(prop(edit, "stages") or []) == 2)
+    assert prop(edit, "stages") == steps
+    QMetaObject.invokeMethod(edit, "save")
+    await _wait(lambda: any(t == "flow.edit" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "flow.edit")
+    assert sent["stages"] == [{"stage_type": "categorization", "parent_index": None, "config": {"op": "Sort by file type", "by": "extension"}},
+                              {"stage_type": "transformation", "parent_index": 0, "config": {"op": "Compress to ZIP"}}]
+    assert [d["parent_index"] for d in sent["destinations"]] == [0, 1]
 
 
 def test_nothing_clickable_uses_a_taphandler():

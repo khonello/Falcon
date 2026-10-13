@@ -241,3 +241,17 @@ part is recorded for later, not built.
   (`test_worker_client.py`, elevated prompt only, each removing what it installed): a probe service reported that it runs as the system account in session 0, may trace programs and file opens, and started a program on the
   signed-in person's desktop; and the real Worker, installed as a service against a throwaway Engine, connected as FIN-01, appeared online with its version, OS and address, and went offline when stopped.
   *Not yet done (final packaging):* a bundled interpreter and installer, signing, the helper windows frozen as executables, and a pinned Engine certificate and key delivered with the install.
+
+- **Flows: what the concept's Flows pages show that the Engine and Worker cannot do yet** (13 Oct 2026, found putting the concept's flow
+  graph side by side with the QML). The console now keeps each step's name in its stage `config` as `op` (plus `by: "extension"` for
+  Sort by file type, which the Worker already reads) and reads a flow's steps from the `parent_stage_id` tree: this is the smallest
+  shape that lets a step come back as it was picked. The full `config` shape is still a deferred decision (spec §10), so it is for
+  the user to confirm. Open: (1) **the Worker carries out only Sort by file type.** Rename by date, Convert to PDF, Compress to ZIP and
+  Sort by month are kept and drawn, but they leave the files as they are (`worker_client/flowsync.py` converts only txt/md/csv).
+  (2) **An edit leaves the old stages on record.** `FlowsRepo.replace_structure` adds new `flow_stages` rows and keeps the old ones,
+  and `flow.list` returns them all. The console counts only stages a live destination reaches, but the Engine should mark the old
+  ones retired or leave them out of `shapes`. (3) **Not in the Engine, drawn disabled with the reason:** a flow's own name (flows are named
+  `<source folder>-<id>`), several sources merging into one flow, carrying on from another flow, asking the Super User or another
+  Admin to pick a folder on their own workstation, copying on a schedule or only when run, and the files-copied count per flow (the
+  concept's "Files copied" column and figure; the console shows branches and the last copy instead). (4) A destination in remote
+  storage (no machine) cannot be picked in the builder, so editing such a flow shows it as unset.

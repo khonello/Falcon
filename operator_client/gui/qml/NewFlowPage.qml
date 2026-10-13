@@ -21,18 +21,25 @@ Page {
     property var stages: []                 // [{kind, op, scope: "all" | index}]
     property var dests: [{ mode: "mine", pc: 0, path: "", who: 0 }]
 
+    property int copyOf: 0                  // the flow this one starts as a copy of, or 0
     Component.onCompleted: falcon.call("flow.list", {}, function (ok, r) {
         page.flows = ok ? (r.flows || []) : []
-        if (page.editId) {
-            var f = page.flows.filter(function (x) { return x.id === page.editId })[0]
-            if (f) {
-                page.src = { pc: f.source_pc_id, path: f.source_path }
-                page.dests = (f.destinations || []).map(function (d) { return { mode: "mine", pc: d.destination_pc_id || 0, path: d.destination_path, who: 0 } })
-                page.stages = (f.stages || []).map(function (s) { return { kind: s.stage_type === "categorization" ? "Categorize" : "Transform", op: s.stage_type, scope: "all" } })
-            }
-        }
+        if (page.editId) page.fill(page.flows.filter(function (x) { return x.id === page.editId })[0])
     })
-    readonly property var stageOps: ({ Transform: ["Rename by date", "Convert to PDF", "Compress to ZIP"], Categorize: ["Sort by file type", "Sort by month"] })
+    // the builder's state from an existing flow: as itself when editing it, or as a copy to start from
+    function fill(f) {
+        if (!f) return
+        page.src = { pc: f.source_pc_id, path: f.source_path }
+        page.dests = (f.destinations || []).map(function (d) { return { mode: "mine", pc: d.destination_pc_id || 0, path: d.destination_path, who: 0 } })
+        page.stages = Sync.steps(f)
+    }
+    function startFrom(id) {
+        page.copyOf = id || 0
+        if (!id) { page.src = { pc: 0, path: "" }; page.stages = []; page.dests = [{ mode: "mine", pc: 0, path: "", who: 0 }]; return }
+        page.fill(page.flows.filter(function (x) { return x.id === id })[0])
+    }
+    function flowName(f) { return Sync.folder(f.source_path) + "-" + f.id }
+    readonly property var stageOps: Sync.stepOps
     readonly property var hosts: {
         var out = []
         if (!Nav.boss && falcon.pcId) out.push({ value: falcon.pcId, label: "your workstation" })
@@ -81,14 +88,11 @@ Page {
                     function () { Nav.go("flows") })
     }
     function save() {
-        // shared steps chain one after another; a branch's step hangs off the last shared one; a destination off its own step
-        var shared = stages.filter(function (s) { return s.scope === "all" }), out = [], idx = {}
-        shared.forEach(function (s, i) { out.push({ stage_type: s.kind === "Categorize" ? "categorization" : "transformation", parent_index: i ? i - 1 : null }) })
-        stages.forEach(function (s, i) { if (s.scope !== "all") { idx[s.scope] = out.length; out.push({ stage_type: s.kind === "Categorize" ? "categorization" : "transformation", parent_index: shared.length ? shared.length - 1 : null }) } })
-        var ds = dests.filter(function (d) { return d.mode === "mine" }).map(function (d, i) {
-            return { destination_pc_id: d.pc, destination_path: d.path, parent_index: idx[i] !== undefined ? idx[i] : shared.length ? shared.length - 1 : null }
-        })
-        var payload = { destinations: ds, stages: out }
+        // the shared steps one after another, then each destination's own steps; each keeps its name (Sync.plan)
+        var p = Sync.plan(stages, dests.length)
+        var ds = []
+        dests.forEach(function (d, i) { if (d.mode === "mine") ds.push({ destination_pc_id: d.pc, destination_path: d.path, parent_index: p.parents[i] }) })
+        var payload = { destinations: ds, stages: p.stages }
         if (page.editId) payload.flow_id = page.editId
         else { payload.source_pc_id = src.pc; payload.source_path = src.path }
         falcon.call(page.editId ? "flow.edit" : "flow.create", payload, function (ok, r) {
@@ -182,21 +186,23 @@ Page {
                             Row { spacing: 10; width: parent.width
                                   Num { n: index + 1 }
                                   Select { width: 130; value: modelData.kind; options: ["Transform", "Categorize"]; onPicked: function (v) { page.setStage(index, { kind: v, op: page.stageOps[v][0] }) } }
-                                  Select { width: 200; value: modelData.op; options: page.stageOps[modelData.kind]; onPicked: function (v) { page.setStage(index, { op: v }) } }
+                                  Select { width: 200; value: modelData.op; options: page.stageOps[modelData.kind].indexOf(modelData.op) < 0 ? [modelData.op].concat(page.stageOps[modelData.kind]) : page.stageOps[modelData.kind]
+                                           onPicked: function (v) { page.setStage(index, { op: v }) } }
                                   Item { width: parent.width - 410; height: 1 }
                                   Btn { small: true; kind: "text"; iconName: "close"; onClicked: { var s = page.stages.slice(); s.splice(index, 1); page.stages = s } } }
-                            Row { spacing: 8
-                                  Txt { text: "Applies to"; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
-                                  Segmented { options: [{ value: "all", label: "Every destination (before the split)" }, { value: "one", label: "One destination" }]
+                            // the destination picker wraps under the switch when the box is narrow, as the concept's row does
+                            Flow { width: parent.width; spacing: 8
+                                  Txt { height: aseg.height; verticalAlignment: Text.AlignVCenter; text: "Applies to"; color: Theme.text3; font.pixelSize: 12 }
+                                  Segmented { id: aseg; options: [{ value: "all", label: "Every destination (before the split)" }, { value: "one", label: "One destination" }]
                                               value: modelData.scope === "all" ? "all" : "one"; onPicked: function (v) { page.setStage(index, { scope: v === "all" ? "all" : 0 }) } }
                                   Select { visible: modelData.scope !== "all"; width: 200; small: true; value: modelData.scope
-                                           options: page.dests.map(function (d, j) { return { value: j, label: d.pc ? page.hostName(d.pc) + " " + d.path : "Destination " + (j + 1) } })
+                                           options: page.dests.map(function (d, j) { return { value: j, label: d.mode === "ask" ? "Destination " + (j + 1) : d.pc ? page.hostName(d.pc) + " " + d.path : "Destination " + (j + 1) } })
                                            onPicked: function (v) { page.setStage(index, { scope: v }) } } }
                         }
                     }
                     Btn { iconName: "plus"; text: "Add a step"; onClicked: page.stages = page.stages.concat([{ kind: "Transform", op: "Rename by date", scope: "all" }]) }
                     Txt { visible: page.stages.length > 0; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                          text: "What a step does is still to be decided (spec §10): it is saved as a step of its kind, with no settings yet." }
+                          text: "Each step is kept with the flow by name and drawn where it applies. Of these, the Worker carries out Sort by file type today; the others are not built in the Worker yet and leave the files as they are." }
                 }
                 Rectangle { width: parent.width; height: 1; color: Theme.border }
                 // 3. destinations
@@ -236,7 +242,12 @@ Page {
                 // 4. check
                 Column {
                     x: 24; width: parent.width - 48; topPadding: 22; bottomPadding: 22; spacing: 8
-                    Head { t: "Check it"; d: page.editId ? "The checks run again against every other flow. The flow keeps running as it was until you save." : "These checks run against every other flow before anything is copied." }
+                    Head { t: "Name it and check it"; d: page.editId ? "The checks run again against every other flow. The flow keeps running as it was until you save." : "These checks run against every other flow before anything is copied." }
+                    Row { spacing: 12
+                          Txt { width: 130; text: "Name"; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+                          Field { width: 320; enabled: false; placeholderText: page.src.path ? Sync.folder(page.src.path) + "-…" : "my-flow" } }
+                    Txt { x: 142; width: parent.width - 142; bottomPadding: 10; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          text: "A flow is named after its source folder for now. A name of its own is not built in the Engine yet." }
                     Repeater {
                         model: [["No loop back to the source, along the whole chain", !page.checks.some(function (c) { return /loop/.test(c[1]) })],
                                 ["No folder written by two flows", !page.checks.some(function (c) { return /already written/.test(c[1]) })],
@@ -271,6 +282,11 @@ Page {
                 Row { spacing: 8
                       Txt { text: "The flow so far"; font.weight: Font.DemiBold; elide: Text.ElideNone }
                       Txt { text: "files only move left to right"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter } }
+                Txt { visible: page.editId > 0; width: parent.width; color: Theme.text3; font.pixelSize: 12; textFormat: Text.StyledText
+                      text: "Editing <b>" + (page.flows.filter(function (x) { return x.id === page.editId }).map(page.flowName)[0] || "this flow") + "</b>. It keeps running as it was until you save." }
+                Select { visible: !page.editId; width: 240; small: true; search: true; placeholder: "Start from a copy of a flow"; value: page.copyOf || null
+                         options: (page.copyOf ? [{ value: 0, label: "Start blank" }] : []).concat(page.flows.map(function (x) { return { value: x.id, label: "Copy of " + page.flowName(x) } }))
+                         onPicked: function (v) { page.startFrom(v) } }
                 FlowPreview {
                     width: parent.width
                     srcs: [{ host: page.src.pc ? page.hostName(page.src.pc) : "", path: page.src.path }]

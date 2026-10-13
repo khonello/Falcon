@@ -37,6 +37,8 @@ Page {
     }).filter(function (f) { return (f.name + " " + f.path).toLowerCase().indexOf(list.query.toLowerCase()) >= 0 })
       .sort(function (a, b) { return (page.lastCopy(b) || 0) - (page.lastCopy(a) || 0) })
     readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].key === sel) return rows[i]; return rows.length ? rows[0] : null }
+    // the steps along the way, read from the Engine's stage tree (Sync.steps): named, and before or after the split
+    readonly property var steps: Sync.steps(cur)
     onCurChanged: if (cur) falcon.call("flow.history", { flow_id: cur.id }, function (ok, r) { page.log = ok ? (r.history || []) : [] })
     readonly property var asks: flows.filter(function (f) {
         return f.consent_status === "pending" && (f.destinations || []).some(function (d) { return d.owner_account_id === falcon.accountId })
@@ -129,7 +131,7 @@ Page {
                         ["Last copy", page.lastCopy(f) ? Time.atDay(page.lastCopy(f)) : "—"],
                         ["From", f.source_hostname + " " + f.source_path, null, true],
                         ["To", (f.destinations || []).map(function (d) { return (d.destination_hostname || "storage") + " " + d.destination_path }).join("\n"), null, true],
-                        ["Along the way", (f.stages || []).length ? f.stages.map(function (s) { return s.stage_type }).join(", ") : "Copied as they are"]] : []
+                        ["Along the way", page.steps.length ? page.steps.map(function (s) { return s.op }).join(", ") : "Copied as they are"]] : []
             actions: [
                 Btn { text: page.cur && page.cur.status === "paused" ? "Resume" : "Pause"; visible: page.cur !== null && page.cur.status !== "inactive"
                       onClicked: falcon.call(page.cur.status === "paused" ? "flow.resume" : "flow.pause", { flow_id: page.cur.id }, function (ok, r) {
@@ -171,16 +173,18 @@ Page {
             FlowPreview {
                 width: parent.width
                 srcs: page.cur ? [{ host: page.cur.source_hostname, path: page.cur.source_path }] : []
-                stages: page.cur ? (page.cur.stages || []).map(function (s) { return { op: s.stage_type, kind: "Step", scope: s.parent_index === null || s.parent_index === undefined ? "all" : s.parent_index } }) : []
+                stages: page.steps
                 dests: page.cur ? (page.cur.destinations || []).map(function (d) {
                     return { host: d.destination_hostname || "storage", path: d.destination_path, ask: page.cur.consent_status === "pending", bad: !!d.paused_reason } }) : []
             }
             Row {
                 spacing: 14
                 Row { spacing: 6; Rectangle { width: 10; height: 2; color: Theme.ser2; anchors.verticalCenter: parent.verticalCenter } Txt { text: "copying"; color: Theme.text3; font.pixelSize: 12 } }
-                Txt { text: page.cur && (page.cur.stages || []).length ? (page.cur.stages || []).length + " step(s) along the way" : "copied as they are"; color: Theme.text3; font.pixelSize: 12 }
-                Row { spacing: 6; Rectangle { width: 10; height: 2; color: Theme.crit; anchors.verticalCenter: parent.verticalCenter } Txt { text: "branch paused"; color: Theme.text3; font.pixelSize: 12 } }
-                Row { spacing: 6; Rectangle { width: 10; height: 2; color: Theme.med; anchors.verticalCenter: parent.verticalCenter } Txt { text: "waiting for someone to agree"; color: Theme.text3; font.pixelSize: 12 } }
+                Txt { text: page.steps.length ? Theme.many(page.steps.length, "step") + " along the way: " + page.steps.map(function (s) { return s.op }).join(", ") : "copied as they are"; color: Theme.text3; font.pixelSize: 12 }
+                Row { visible: page.cur !== null && (page.cur.destinations || []).some(function (d) { return d.paused_reason }); spacing: 6
+                      Rectangle { width: 10; height: 2; color: Theme.crit; anchors.verticalCenter: parent.verticalCenter } Txt { text: "branch paused"; color: Theme.text3; font.pixelSize: 12 } }
+                Row { visible: page.cur !== null && page.cur.consent_status === "pending"; spacing: 6
+                      Rectangle { width: 10; height: 2; color: Theme.med; anchors.verticalCenter: parent.verticalCenter } Txt { text: "waiting for someone to agree"; color: Theme.text3; font.pixelSize: 12 } }
             }
         }
     }
@@ -193,6 +197,15 @@ Page {
         sub: page.cur ? "latest · " + page.cur.name : ""
         Column {
             width: parent.width
+            Rectangle {
+                width: parent.width; height: 32; color: "transparent"
+                Row { x: 14; anchors.verticalCenter: parent.verticalCenter
+                      Txt { width: 70; text: "Time"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium }
+                      Txt { width: (page.w - 100) * 0.4; text: "File"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium }
+                      Txt { width: (page.w - 100) * 0.35; text: "Destination"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium }
+                      Txt { width: (page.w - 100) * 0.25; text: "Result"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium } }
+                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+            }
             Txt { visible: page.log.length === 0; x: 14; topPadding: 14; bottomPadding: 14; text: "Nothing copied yet."; color: Theme.text3 }
             Repeater {
                 model: page.log.slice(0, 10)
