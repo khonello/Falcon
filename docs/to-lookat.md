@@ -5,9 +5,7 @@ Last updated 13 Oct 2026.
 
 ## Waiting on a decision
 
-- **Hostname mismatch wording.** The concept's card reads like a refusal. The Engine (per the design doc) records a
-  deviation, tells the person and lets the machine connect. Either the console wording becomes "recorded, not blocked"
-  (the GUI session has been told) or the Engine is changed to refuse. Confirm which.
+- Nothing. (Hostname mismatch decided 13 Oct 2026: the console says "recorded, not blocked", as the Engine behaves.)
 
 ## Not exercised yet
 
