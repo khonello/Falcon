@@ -69,6 +69,11 @@ def create(config: LocalConfig, *, auto_connect: bool = False) -> tuple[QGuiAppl
         raise SystemExit("failed to load QML (see errors above)")
     win = engine.rootObjects()[0]
     QTimer.singleShot(0, lambda: fit_to_screen(win))   # after the native window exists (frame margins known)
+    if config.client_id:
+        # This machine already knows its Engine and its own key (setup writes them), so connect at once:
+        # nothing else in the console starts a connection, and the Not connected page only retries one.
+        QTimer.singleShot(0, lambda: bridge.connectTo(config.engine_host, config.engine_port, config.client_id,
+                                                      config.client_key or "", not config.tls, config.ca_cert or ""))
 
     # On quit the bridge is collected before the scene is, and every binding that reads `falcon`
     # re-evaluates against null on the way out -- two dozen "Cannot read property of null" lines

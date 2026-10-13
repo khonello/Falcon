@@ -171,6 +171,8 @@ class WorkerService:
 
     async def _on_push(self, type_: str, payload: dict[str, Any]) -> None:
         self.pushes_handled += 1
+        if self.identity is None and type_.startswith("session."):
+            return                      # a push that beat the handshake: the held state is read again once connected
         try:
             if type_ == "session.blocked":
                 if payload.get("pc_id") == self.identity.pc_id and payload.get("occupant_account_id") != self.identity.account_id:

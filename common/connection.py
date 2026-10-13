@@ -32,6 +32,10 @@ from protocol import Envelope, Kind, ProtocolError, decode, encode, request
 
 log = logging.getLogger(__name__)
 
+# One message is one line, and a screen frame is a few hundred kilobytes of it: asyncio's default limit (64 KB)
+# ends the read loop on the first frame. The Engine reads up to 4 MB a line; a frame is held to that.
+_LINE_LIMIT = 32 * 1024 * 1024
+
 PushHandler = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
@@ -98,7 +102,8 @@ class EngineConnection:
         (`enroll.request`, `enroll.wait`). Everything else is refused by the Engine until `connect()` has authenticated."""
         ssl_ctx = self._ssl_context()
         self._reader, self._writer = await asyncio.open_connection(
-            self.host, self.port, ssl=ssl_ctx, server_hostname=self.host if ssl_ctx else None)
+            self.host, self.port, ssl=ssl_ctx, server_hostname=self.host if ssl_ctx else None,
+            limit=_LINE_LIMIT)
         self._closed = False
         loop = asyncio.get_running_loop()
         self._challenge = loop.create_future()
@@ -109,7 +114,8 @@ class EngineConnection:
     async def connect(self) -> Identity:
         ssl_ctx = self._ssl_context()
         self._reader, self._writer = await asyncio.open_connection(
-            self.host, self.port, ssl=ssl_ctx, server_hostname=self.host if ssl_ctx else None)
+            self.host, self.port, ssl=ssl_ctx, server_hostname=self.host if ssl_ctx else None,
+            limit=_LINE_LIMIT)
         self._closed = False
         loop = asyncio.get_running_loop()
         self._challenge = loop.create_future()

@@ -120,7 +120,7 @@ Page {
         }
         if (o.key === "enter" || o.key === "look") {
             confirm.ask({ title: "Enter " + i.host + "?", text: (m && m.user ? m.user + " is signed in and is locked out while you are in. " : "") + "You get 30 minutes, and can extend them.", ok: "Enter" },
-                        function () { falcon.call("hierarchy.traverse", { pc_id: i.pc_id, force: false }, function (ok, r) {
+                        function () { falcon.call("hierarchy.traverse", { pc_id: i.pc_id, force: true }, function (ok, r) {
                             if (!ok) { Msg.failed(r && r.message ? r.message : "Could not enter"); return }
                             page.mark(i, "Open", "Entered " + i.host); Msg.ok("You are in " + i.host)
                         }) })

@@ -56,7 +56,7 @@ Page {
                  : "No one is signed in. You get 30 minutes, and can extend them.",
             ok: x.held ? "End and enter" : "Enter", danger: !!x.held
         }, function () {
-            falcon.call("hierarchy.traverse", { pc_id: x.pc_id, force: !!x.held }, function (ok, r) {
+            falcon.call("hierarchy.traverse", { pc_id: x.pc_id, force: true }, function (ok, r) {
                 if (!ok) { Msg.failed(r && r.message ? r.message : "Could not enter"); return }
                 Msg.ok("You are in " + x.host)
             })

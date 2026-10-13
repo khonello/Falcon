@@ -21,12 +21,12 @@ Modal {
 
     function ask(a, landing) { admin = a; to = landing || null; pick = "block"; open() }
 
-    function enter() {
+    function go() {
         if (!admin) return
         busy = true
         // The Engine ends the occupant either way today; blocking (they keep their place) is asked for
         // and recorded, and logged as an Engine gap.
-        falcon.call("hierarchy.traverse", { pc_id: admin.pc_id, force: true, mode: pick }, function (ok, r) {
+        falcon.call("hierarchy.traverse", { pc_id: admin.pc_id, force: true }, function (ok, r) {
             root.busy = false
             if (!ok) { Msg.failed(r && r.message ? r.message : "Could not enter"); return }
             root.how = root.pick
@@ -95,7 +95,7 @@ Modal {
             danger: root.pick === "end"
             loading: root.busy
             text: root.pick === "end" ? "End and enter" : "Block and enter"
-            onClicked: root.enter()
+            onClicked: root.go()
         }
     ]
 }

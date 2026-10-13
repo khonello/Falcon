@@ -28,3 +28,14 @@ Last updated 13 Oct 2026.
 - **`CLAUDE.md` was committed whole in 3000d67**, so it may include the GUI session's console-line edits. Check the diff.
 - **Decided, for the record:** Admin from another department stays disabled; retention is 90 days on the audit clock
   (`audit_log`, `file_events`, run outputs), logged per part.
+
+## Found while trying the session window live (13 Oct 2026)
+
+- **The blocked person sees nothing.** The Engine pushes `session.blocked` / `session.viewing`, `ClientState` keeps
+  it (`falcon.blocked`, `blockedSession`, `blockedBy`), but no QML draws it: the Admin whose console the Super User
+  entered shows no bar. For the GUI session (the one session lid, "blocked" wording).
+- **Block vs end an Admin's session.** The Engine treats both the same; the dialog offers both.
+- **Session window:** picture works (fixed: long messages dropped the connection). Control mode (mouse and typing
+  reaching the machine) still to be confirmed by the user.
+- **Fixed in GUI files by this session:** auto-connect on start (`app.py`), `EnterConsole.qml` (`enter` clashed with the
+  popup's own; the mode sent was "block"/"end"), the three pages that enter a machine now send the take-over.
