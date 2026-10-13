@@ -256,7 +256,8 @@ class FalconBridge(QObject):
         if self.conn is not None:
             await self.conn.close()
         conn = EngineConnection(cfg.engine_host, cfg.engine_port, client_id=cfg.client_id, tls=cfg.tls,
-                                ca_cert=cfg.ca_cert, derived_key=cfg.client_key or None, hostname=self.hostname)
+                                ca_cert=cfg.ca_cert, derived_key=cfg.client_key or None, hostname=self.hostname,
+                                signer=cfg.signer_fn())
         conn.on_push(self.state.on_push)
         conn.on_push(self._on_push)
         conn.on_disconnect = self._on_disconnect

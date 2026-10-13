@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from worker_client.screenstream import RemoteInput  # noqa: E402
+from worker_client.screenstream import RemoteInput
 
 VK_A, VK_BACK, VK_SHIFT, VK_RETURN, VK_LEFT = 0x41, 0x08, 0x10, 0x0D, 0x25
 
@@ -62,8 +62,8 @@ def main() -> int:
     remote.stop()
     want = "Hello, Falcon Aaé中"
     got = result.get("text", "")
-    print(f"typed into the box: {ascii(got)}")
-    print("PASS" if got == want else f"FAIL (wanted {ascii(want)})")
+    print(f"typed into the box: {got!a}")
+    print("PASS" if got == want else f"FAIL (wanted {want!a})")
     return 0 if got == want else 1
 
 

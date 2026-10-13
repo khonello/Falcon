@@ -224,13 +224,48 @@ def probe() -> dict[str, Any]:
     return out
 
 
+REGISTER_AGAIN_SECONDS = 600.0
+
+
+async def _wait_to_be_registered(cfg: Any, stop_event: asyncio.Event) -> None:
+    """A machine installed with no key of its own: ask the Engine to register it (it waits on probation, shows a code in the
+    person's session, and an Admin or the Super User confirms), then carry on with the key it is handed. A refused or expired
+    request is asked again after a while: the service never gives up and never registers itself."""
+    from worker_client.enroll import EnrollmentEnded, enroll
+    from worker_client.windows.spawn import open_window
+
+    async def show(text: str) -> Any:
+        return await open_window("message", {"text": text, "from": ""})
+
+    while not cfg.client_id and not stop_event.is_set():
+        task = asyncio.create_task(enroll(cfg, department_id=cfg.enroll_department, level=cfg.enroll_level,
+                                          show=lambda m: log.info("%s", m), window=show if cfg.windows else None))
+        stopped = asyncio.create_task(stop_event.wait())
+        await asyncio.wait({task, stopped}, return_when=asyncio.FIRST_COMPLETED)
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            return
+        stopped.cancel()
+        try:
+            task.result()
+        except EnrollmentEnded as exc:
+            log.warning("not registered: %s; asking again in %.0f minutes", exc, REGISTER_AGAIN_SECONDS / 60)
+            try:
+                await asyncio.wait_for(stop_event.wait(), REGISTER_AGAIN_SECONDS)
+            except asyncio.TimeoutError:
+                pass
+
+
 async def _run_worker(config: str | None, stop_event: asyncio.Event) -> None:
     from worker_client.config import WorkerConfig
     from worker_client.service import WorkerService
 
     cfg = WorkerConfig.load(Path(config) if config else None)
     if not cfg.client_id:
-        raise SystemExit("the Worker has no client id yet: run `python -m worker_client --enroll` (or pass --client-id) once, then start the service")
+        await _wait_to_be_registered(cfg, stop_event)
+        if not cfg.client_id:
+            return                                  # stopped while waiting
     cfg.separate_programs = True            # as a service the indexer and the event tracker are their own supervised programs
     svc = WorkerService(cfg, native_watch=True, allow_power=False)
     await svc.start()

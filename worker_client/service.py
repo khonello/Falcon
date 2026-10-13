@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from common.connection import ConnectionError_, EngineConnection, EngineError
+from common.signpipe import SignPipeServer
 from worker_client import winsession
 from worker_client.config import WorkerConfig
 from worker_client.executor import Executor
@@ -58,6 +59,7 @@ class WorkerService:
         self.remote_input: Any = HelperInput(self.helper) if self.helper else RemoteInput()
         self.inventory = Inventory(self.call)
         self._native_watch = native_watch
+        self.signpipe: SignPipeServer | None = None
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
         if config.separate_programs:
             self.watcher: Any = IsolatedWatcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
@@ -86,6 +88,10 @@ class WorkerService:
 
     async def start(self) -> None:
         await self._connect(forever=True)
+        if self.config.serve_console and self.config.client_key:
+            self.signpipe = SignPipeServer(self.config.client_key, client_id=self.config.client_id)
+            if not self.signpipe.start():
+                log.warning("the console on this machine cannot be signed in: the signing pipe did not start")
         await self.watcher.start()
         await self.signals.start()
         await self.ossignals.start(native=self._native_watch)
@@ -107,6 +113,8 @@ class WorkerService:
         self.remote_input.stop()
         if self.helper is not None:
             await self.helper.stop()
+        if self.signpipe is not None:
+            self.signpipe.stop()
         await self.watcher.stop()
         await self.signals.stop()
         await self.ossignals.stop()

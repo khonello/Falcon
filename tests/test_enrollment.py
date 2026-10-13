@@ -172,3 +172,59 @@ async def test_one_address_cannot_flood_the_waiting_list(engine, org):
     finally:
         for m in machines:
             await m.close()
+
+
+async def test_a_service_installed_with_no_key_asks_shows_the_code_and_carries_on_once_confirmed(engine, org, connect, tmp_path, monkeypatch):
+    """What an installed Worker does on first start: no client id, so it asks, puts the code on the signed-in person's screen, waits on
+    probation, and keeps the key it is handed (once)."""
+    from worker_client import winservice
+    from worker_client.config import WorkerConfig
+    from worker_client.windows import spawn
+
+    shown: list[str] = []
+
+    class Handle:
+        def close(self) -> None:
+            shown.append("closed")
+
+    async def fake_open(kind, spec):
+        shown.append(spec["text"])
+        return Handle()
+
+    monkeypatch.setattr(spawn, "open_window", fake_open)
+    su = await connect("cid-su")
+    cfg = WorkerConfig(windows=True, engine_host="127.0.0.1", engine_port=engine.port, tls=False, enroll_level="worker",
+                       enroll_department=org["fin"], path=tmp_path / "private" / "worker.json")
+    stop = asyncio.Event()
+    task = asyncio.create_task(winservice._wait_to_be_registered(cfg, stop))
+    try:
+        for _ in range(100):
+            if shown:
+                break
+            await asyncio.sleep(0.1)
+        code = "".join(ch for ch in shown[0].split("Code")[1].split("\n")[0] if ch.isdigit())
+        assert len(code) == 4                                                      # the code is on the person's screen
+        waiting = (await su.ok("enroll.list"))["requests"]
+        assert len(waiting) == 1 and not cfg.client_id                              # on probation, with no key yet
+        await su.ok("enroll.confirm", {"enrollment_id": waiting[0]["id"], "code": code})
+        await asyncio.wait_for(task, 20)
+        assert cfg.client_id and cfg.client_key                                     # handed once
+        saved = WorkerConfig.load(cfg.path)
+        assert saved.client_id == cfg.client_id and saved.client_key == cfg.client_key and shown[-1] == "closed"
+    finally:
+        stop.set()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_stopping_a_service_that_is_waiting_on_probation_ends_it_cleanly(engine, org, tmp_path, monkeypatch):
+    from worker_client import winservice
+    from worker_client.config import WorkerConfig
+
+    cfg = WorkerConfig(windows=False, engine_host="127.0.0.1", engine_port=engine.port, tls=False, path=tmp_path / "worker.json")
+    stop = asyncio.Event()
+    task = asyncio.create_task(winservice._wait_to_be_registered(cfg, stop))
+    await asyncio.sleep(1.0)
+    stop.set()
+    await asyncio.wait_for(task, 10)
+    assert not cfg.client_id

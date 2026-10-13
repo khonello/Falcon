@@ -65,7 +65,8 @@ class Identity:
 class EngineConnection:
     def __init__(self, host: str, port: int, *, client_id: str, tls: bool = True,
                  ca_cert: str | Path | None = None, derived_key: bytes | str | None = None,
-                 hostname: str | None = None, request_timeout: float = 30.0, hello: dict[str, Any] | None = None) -> None:
+                 hostname: str | None = None, request_timeout: float = 30.0, hello: dict[str, Any] | None = None,
+                 signer: Callable[[str], str] | None = None) -> None:
         self.host = host
         self.port = port
         self.client_id = client_id
@@ -75,6 +76,7 @@ class EngineConnection:
         self.derived_key = bytes.fromhex(derived_key) if isinstance(derived_key, str) and derived_key else (derived_key or None)
         self.hostname = hostname or socket.gethostname()
         self.hello = hello or {}        # what this client says about itself when it authenticates (version, os, ...)
+        self.signer = signer            # answers the challenge for a machine whose key this process must not hold (common.signpipe)
         self.request_timeout = request_timeout
         self.identity: Identity | None = None
         self._reader: asyncio.StreamReader | None = None
@@ -127,7 +129,7 @@ class EngineConnection:
         except asyncio.TimeoutError:
             # The Engine may run with DEV_BYPASS_AUTH and send no challenge at all.
             nonce = ""
-        answer = self._answer(nonce)
+        answer = await asyncio.to_thread(self._answer, nonce)
         result = await self.call("auth.respond", {"client_id": self.client_id, "hmac": answer,
                                                   "hostname": self.hostname, **self.hello})
         self.auth_result = result             # what the Engine said back, e.g. a hostname it did not expect
@@ -206,7 +208,15 @@ class EngineConnection:
     def _answer(self, nonce: str) -> str:
         """HMAC(derived_key, nonce). Without a key or a nonce (Engine in DEV_BYPASS_AUTH) the field is
         still present so the message shape never changes; a real Engine rejects it."""
-        if self.derived_key is None or not nonce:
+        if not nonce:
+            return ""
+        if self.derived_key is None and self.signer is not None:
+            try:
+                return self.signer(nonce)
+            except OSError as exc:
+                log.warning("could not get the challenge signed: %s", exc)
+                return ""
+        if self.derived_key is None:
             return ""
         return hmac.new(self.derived_key, nonce.encode("utf-8"), hashlib.sha256).hexdigest()
 

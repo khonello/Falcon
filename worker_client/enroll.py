@@ -26,6 +26,11 @@ from worker_client.config import WorkerConfig
 log = logging.getLogger(__name__)
 
 POLL_SECONDS = 3.0
+RESHOW_SECONDS = 30.0
+
+
+def loop_time() -> float:
+    return asyncio.get_running_loop().time()
 
 
 class EnrollmentEnded(RuntimeError):
@@ -66,9 +71,14 @@ async def enroll(cfg: WorkerConfig, *, department_id: int | None = None, level: 
         message = f"Registering this machine. Code {spaced(asked['code'])}"
         show(message)
         show("Ask your Admin to confirm it, and give them this code. Waiting...")
+        text = message + "\n\nGive this code to whoever is registering you, and wait."
         if window is not None:
-            handle = await window(message + "\n\nGive this code to whoever is registering you, and wait.")
+            handle = await window(text)
+        shown_at = loop_time()
         while True:
+            if window is not None and handle is None and loop_time() - shown_at >= RESHOW_SECONDS:
+                handle = await window(text)                    # nobody was signed in to see it the first time
+                shown_at = loop_time()
             try:
                 await asyncio.wait_for(decided.wait(), poll)       # the Engine nudges; polling covers a missed nudge
             except asyncio.TimeoutError:

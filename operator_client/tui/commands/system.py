@@ -31,7 +31,7 @@ async def connect(ctx: ShellContext, args: Args) -> str:
     if ctx.conn is not None:
         await ctx.conn.close()
     conn = EngineConnection(cfg.engine_host, cfg.engine_port, client_id=cfg.client_id, tls=cfg.tls,
-                            ca_cert=cfg.ca_cert, derived_key=cfg.client_key or None)
+                            ca_cert=cfg.ca_cert, derived_key=cfg.client_key or None, signer=cfg.signer_fn())
     conn.on_push(ctx.state.on_push)
     extra = ctx.scratch.get("push_printer")
     if extra:
