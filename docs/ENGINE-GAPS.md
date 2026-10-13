@@ -255,3 +255,14 @@ part is recorded for later, not built.
   Admin to pick a folder on their own workstation, copying on a schedule or only when run, and the files-copied count per flow (the
   concept's "Files copied" column and figure; the console shows branches and the last copy instead). (4) A destination in remote
   storage (no machine) cannot be picked in the builder, so editing such a flow shows it as unset.
+
+- **The console against the concept, page by page: what the Engine cannot back yet** (13 Oct 2026, found auditing every page at both
+  levels against the published concept). Each is drawn disabled with the reason, or left out where the concept only decorates; nothing is faked.
+  (1) **Rules:** a threshold on *disk* or *network* (only `threshold.cpu` / `threshold.memory` exist; the reading picker lists them disabled).
+  (2) **Actions:** *Test on one machine* for a script not saved yet: `control.action_run` takes a saved action id, so an unsaved draft cannot
+  be tried; the button is disabled on New action. (3) **Tasks:** changing a department task after it is sent (Edit is disabled on the
+  Super User's given tasks). (4) **Reports:** *Prompt the department* (the Super User nudging a department's Admins about a report they
+  have not handled). (5) **History behind the headline figures:** the concept's small trends under the overview figures need a few days of
+  each figure (KPI histories); the overviews show today's figure without a trend. Likewise a week of sessions and assisted access per
+  department for the Departments page's day view beyond today. (6) **Flows** — see the entry above (names, files copied per flow,
+  several sources, carrying on from another flow, asking someone to pick a folder, schedules).
