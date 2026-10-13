@@ -95,7 +95,7 @@ Page {
                              ["On " + (Fleet.version || "current"), page.d.ok + " of " + page.d.machines.length]] : []
             extra: Btn { visible: page.d !== null && page.d.admins.length > 1; small: true; iconName: "team"; text: "All " + (page.d ? page.d.admins.length : 0) + " Admins"; onClicked: admins.openFor(page.d, null) }
             actions: [
-                Btn { visible: page.d !== null && !page.d.admins.length; kind: "primary"; iconName: "useradd"; text: "Assign an Admin"; onClicked: assign.open() },
+                Btn { visible: page.d !== null && !page.d.admins.length; kind: "primary"; iconName: "useradd"; text: "Assign an Admin"; onClicked: { assign.who = null; assign.open() } },
                 Btn { visible: page.d !== null && page.d.admins.length === 1; kind: "primary"; iconName: "login"; text: page.d && page.d.admins.length ? "Enter " + page.d.admins[0].name + "'s console →" : ""
                       onClicked: Nav.enter(page.d.admins[0], null) },
                 Btn { visible: page.d !== null && page.d.admins.length > 1; kind: "primary"; iconName: "login"; text: "Enter a console…"; onClicked: admins.openFor(page.d, null) }
@@ -185,17 +185,21 @@ Page {
             }
         }
     }
+    KeyDrawer { id: keys; page: page; onDone: Fleet.refresh() }
     Drawer {
         id: assign
         page: page
         width: 420
         title: page.d ? "Assign an Admin · " + page.d.name : ""
-        note: "Promoting a worker to Admin is not built in the Engine yet"
-        footer: [ Btn { text: "Cancel"; onClicked: assign.close() }, Btn { kind: "primary"; text: "Assign"; enabled: false } ]
+        property var who: null
+        footer: [ Btn { text: "Cancel"; onClicked: assign.close() },
+                  Btn { kind: "primary"; text: "Assign"; enabled: assign.who !== null
+                        onClicked: { var m = page.d.machines.filter(function (x) { return x.account === assign.who })[0]; assign.close()
+                                     keys.ask({ mode: "promote", account_id: assign.who, subject: m ? m.user : "They" }) } } ]
         Column {
             width: parent.width; spacing: 6
             Txt { text: "WHO"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            Select { width: parent.width; search: true; placeholder: "Pick someone"
+            Select { width: parent.width; search: true; placeholder: "Pick someone"; value: assign.who; onPicked: function (v) { assign.who = v }
                      options: page.d ? page.d.machines.filter(function (m) { return m.user }).map(function (m) { return { value: m.account, label: m.user + " · works on " + m.host + ", promote to Admin" } }) : [] }
         }
         Rectangle {

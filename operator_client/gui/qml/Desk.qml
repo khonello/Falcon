@@ -50,8 +50,8 @@ QtObject {
         Fleet.depts.filter(function (d) { return !d.admins.length }).forEach(function (d) {
             out.push({ id: "seat-" + d.id, kind: "seat", dept: d.id, sev: "high", icon: "useradd", title: d.name + " has no Admin", short: d.name + " has no Admin", age: "",
                        why: Theme.many(d.machines.length, "machine") + " and every report from them have nobody below you. Only you can assign an Admin.",
-                       options: [{ key: "pick", icon: "user", title: "Promote someone who works there", desc: "Gives them a console and a key, shown once. An Admin belongs to one department.", verb: "Assign", need: "pick",
-                                   cannot: "Promoting a worker to Admin is not built in the Engine yet" },
+                       options: [{ key: "pick", icon: "user", title: "Promote someone who works there", desc: "Gives them a console and a key, shown once. An Admin belongs to one department.",
+                                   verb: "Pick them on Departments", go: ["departments", d.id] },
                                  { key: "new", icon: "useradd", title: "Provision a new Admin for " + d.name, desc: "A new account with its own workstation, from Registry.", verb: "Open Registry", go: ["registry", "acct"] }] })
         })
         // the version gate

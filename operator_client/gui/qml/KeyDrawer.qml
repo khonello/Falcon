@@ -3,7 +3,8 @@ import "."
 
 // REGISTER A PC, PROVISION AN ADMIN, OR A NEW KEY: one drawer in two steps. The first asks the name and the
 // department; the second shows the key, once. A new key skips the first step (the confirm came before).
-//   ask({mode: "pc" | "admin" | "rekey", subject?, pc_id?})
+//   ask({mode: "pc" | "admin" | "rekey" | "promote", subject?, pc_id?, account_id?})
+// "promote" makes a worker an Admin of their department (hierarchy.admin_promote): their machine gets a new key, shown here.
 Drawer {
     id: kd
     width: 480
@@ -15,11 +16,21 @@ Drawer {
     property bool busy: false
     readonly property bool rk: spec !== null && spec.mode === "rekey"
     readonly property bool pc: spec !== null && spec.mode === "pc"
-    title: !spec ? "" : rk ? "New key for " + spec.subject : pc ? "Register a PC" : "Provision an Admin"
+    readonly property bool pr: spec !== null && spec.mode === "promote"
+    title: !spec ? "" : pr ? spec.subject + " becomes an Admin" : rk ? "New key for " + spec.subject : pc ? "Register a PC" : "Provision an Admin"
     note: step === 0 && spec && !rk ? (!name.trim() ? (pc ? "Name the machine." : "Name the machine they will work on.") : dept === null ? "Pick the department." : "") : ""
     signal done()
 
-    function ask(s) { spec = s; name = ""; dept = s.department_id !== undefined ? s.department_id : null; made = null; busy = false; step = s.mode === "rekey" ? 1 : 0; open(); if (s.mode === "rekey") rekey() }
+    function ask(s) { spec = s; name = ""; dept = s.department_id !== undefined ? s.department_id : null; made = null; busy = false; step = s.mode === "rekey" || s.mode === "promote" ? 1 : 0; open()
+                      if (s.mode === "rekey") rekey(); if (s.mode === "promote") promote() }
+    function promote() {
+        busy = true
+        falcon.call("hierarchy.admin_promote", { account_id: spec.account_id }, function (ok, r) {
+            kd.busy = false
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not promoted"); kd.close(); return }
+            kd.made = r; Msg.ok(kd.spec.subject + " is an Admin now · recorded"); kd.done()
+        })
+    }
     function rekey() {
         busy = true
         falcon.call("hierarchy.pc_rekey", { pc_id: spec.pc_id }, function (ok, r) {
@@ -69,6 +80,7 @@ Drawer {
         spacing: 12
         Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text2
               text: kd.made === null ? "Making the key…"
+                  : kd.pr ? kd.spec.subject + " is an Admin of their department. Their machine's Worker install stops working: install the Operator Client on it with this key."
                   : (kd.rk ? "The old key for " + kd.spec.subject + " stops working at once." : kd.name.trim() + " is registered.")
                     + " Copy this into " + (kd.rk || kd.pc ? "the machine's Worker Client settings." : "their Operator Client settings.") }
         Repeater {
