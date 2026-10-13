@@ -17,7 +17,7 @@ Last updated 13 Oct 2026.
 
 ## On hold until everything is locked
 
-- **Final packaging:** bundled interpreter, installer, signing, helper windows built as executables, delivery of the
+- **Final packaging** (plan agreed in `docs/PACKAGING-PLAN.md`): bundled interpreter, installer, signing, helper windows built as executables, delivery of the
   Engine's certificate and key with the install. The small packaging (`python -m worker_client service install|start|stop|uninstall|status`)
   is done and tested.
 
