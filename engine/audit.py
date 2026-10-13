@@ -136,7 +136,7 @@ class AuditTrail:
                           ("run outputs", self.db.control.clear_outputs_older_than)):
             try:
                 n = await job(days)
-            except Exception:  # noqa: BLE001 -- say so and carry on with the rest
+            except Exception:
                 log.exception("retention: FAILED to clear %s older than %d days", what, days)
                 continue
             log.info("retention: ok, %s %s older than %d days", n, what, days)
