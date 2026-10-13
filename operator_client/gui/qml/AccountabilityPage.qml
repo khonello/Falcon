@@ -102,12 +102,12 @@ Page {
             title: page.dev ? page.dev.short : ""
             sub: page.dev && page.sel === page.dev.id ? "the one you picked" : "the most serious · click another"
             factLabelWidth: 118
-            fixed: false
-            facts: page.dev ? [["Deviation", Fleet.sevWord(page.dev.sev) + " · D-" + page.dev.id + " · " + Rules.outcomes[page.dev.out][0], Fleet.sevColor(page.dev.sev)],
-                               ["Rule", Rules.byId(page.dev.rule).name + " · built in"],
+            // at the list's height, as the concept's: what does not fit scrolls inside it
+            facts: page.dev ? [["Deviation", Fleet.sevWord(page.dev.sev) + " · D-" + page.dev.id + " · " + Rules.outcomes[page.dev.out][0], Rules.outcomes[page.dev.out][1], false, true],
+                               ["Rule", Rules.byId(page.dev.rule).name + " · built in", null, false, false, "See the rule →"],
                                ["Expected", page.dev.expected], ["What happened", page.dev.happened],
                                ["Who", page.dev.who + (page.dev.whoSub ? " · " + page.dev.whoSub : "")], ["When", page.when(page.dev.at)], ["Kind", Rules.whoKind[page.dev.kind][0]]] : []
-            extra: Btn { visible: page.dev !== null; small: true; kind: "link"; text: "See the rule →"; onClicked: Nav.go("rules", page.dev.rule) }
+            onFactLink: function (label) { if (label === "Rule") Nav.go("rules", page.dev.rule) }
             Column {
                 width: parent.width
                 spacing: 10

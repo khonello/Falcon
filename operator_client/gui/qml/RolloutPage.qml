@@ -91,7 +91,7 @@ Page {
             emptyText: "Pick a machine in the list."
             title: page.m ? page.m.host : ""
             sub: page.m && page.sel === page.m.host ? "the one you picked" : "the first in the list · click another"
-            facts: page.m ? [["Running", page.m.ver], ["Should run", page.cur], ["Failed attempts", String(page.m.failures || 0)], ["Escalated", page.m.escalated ? "Yes" + (Nav.boss ? ", to you" : ", to the Super User") : "No", page.m.escalated ? Theme.crit : null],
+            facts: page.m ? [["Running", page.m.ver], ["Should run", page.cur], ["Attempts", String(page.m.failures || 0) + (page.m.lastTry ? ", last " + Time.at(page.m.lastTry) : ""), null], ["Last error", "not kept by the Engine yet", Theme.text3], ["Escalated", page.m.escalated ? "Yes" + (Nav.boss ? ", to you" : ", to the Super User") : "No", page.m.escalated ? Theme.crit : null],
                              ["Next try", page.m.online ? "Next idle window" : "When it is back online"], ["Department", page.m.deptName]] : []
             actions: [
                 Btn { visible: Nav.boss; text: "Leave it out of the gate"; enabled: false; tip: "Leaving a machine out of the gate is not built in the Engine yet" },

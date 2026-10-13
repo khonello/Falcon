@@ -20,11 +20,15 @@ Row {
     readonly property var nums: {
         var out = [], n = pages, c = current
         if (n <= 7) { for (var i = 1; i <= n; i++) out.push(i); return out }
-        out.push(1)
-        if (c > 3) out.push(-1)
-        for (var k = Math.max(2, c - 1); k <= Math.min(n - 1, c + 1); k++) out.push(k)
-        if (c < n - 2) out.push(-2)
-        out.push(n)
+        // the concept's (antd's): five pages around the current one, then the first and the last; "1 2 3 4 5 … 16"
+        var left = Math.max(1, c - 2), right = Math.min(n, c + 2)
+        if (c - 1 <= 2) right = 5
+        if (n - c <= 2) left = n - 4
+        if (left > 1) out.push(1)
+        if (left > 2) out.push(-1)
+        for (var k = left; k <= right; k++) out.push(k)
+        if (right < n - 1) out.push(-2)
+        if (right < n) out.push(n)
         return out
     }
 

@@ -145,7 +145,7 @@ QtObject {
                     heldFrom: held && s.entered_at ? s.entered_at : null,
                     ip: ag ? ag.ip || "" : "", gen: ag ? ag.key_generation : null, os: ag ? ag.os || "" : "",
                     ver: ag && ag.version ? ag.version : be ? (be.version || "behind") : (ro && ro.version ? ro.version.version_string : ""),
-                    behind: ag && ag.version ? !!ag.behind : !!be, escalated: be ? !!be.escalated : false, failures: be ? be.failures : 0,
+                    behind: ag && ag.version ? !!ag.behind : !!be, escalated: be ? !!be.escalated : false, failures: be ? be.failures : 0, lastTry: be ? be.last_attempt_at : null,
                     status: status,
                     note: !online ? "Offline" + (w.last_seen_at ? " since " + Time.at(w.last_seen_at) : "") + (worst ? " · " + worst.note.toLowerCase() : "")
                                   : worst ? worst.note : (held ? "Session held by " + held : (w.name ? "" : "No one signed in")),

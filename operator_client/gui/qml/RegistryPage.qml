@@ -202,7 +202,7 @@ Page {
             actions: [
                 // a machine
                 Btn { visible: page.tab === "pc" && page.cur !== null && page.cur.m && (Fleet.dept(page.cur.m.dept) || { admins: [] }).admins.length > 0; iconName: "login"
-                      text: page.cur && page.cur.m && Fleet.dept(page.cur.m.dept) && Fleet.dept(page.cur.m.dept).admins.length ? "In " + Fleet.dept(page.cur.m.dept).admins[0].name + "'s console →" : ""
+                      text: page.cur && page.cur.m && Fleet.dept(page.cur.m.dept) && Fleet.dept(page.cur.m.dept).admins.length ? "Work on it in " + Fleet.dept(page.cur.m.dept).admins[0].name + "'s console →" : ""
                       onClicked: Nav.enter(Fleet.dept(page.cur.m.dept).admins[0], ["machines", page.cur.m.host]) },
                 Btn { visible: page.tab === "pc" && page.cur !== null && page.cur.m && (Fleet.dept(page.cur.m.dept) || { admins: [] }).admins.length === 0; enabled: false; text: "No Admin to work on it"
                       tip: page.cur && page.cur.m ? page.cur.m.deptName + " has no Admin, so there is no console to work on it in. Appoint one first." : "" },

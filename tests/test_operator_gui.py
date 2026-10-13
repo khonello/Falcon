@@ -77,6 +77,14 @@ PINGS = [{"id": 5, "sender_account_id": 21, "receiver_account_id": 7, "from_name
          {"id": 9, "sender_account_id": 21, "receiver_account_id": 7, "from_name": "Kojo", "sent_at": _ago(1), "addressed_at": None}]
 
 
+# As `reports.board` answers: each report says whose it is.
+BOARD = [{"id": 40, "category": "update_status", "label": "Update stuck", "summary": "LOG-02 past the limit", "at": _ago(5), "pc_id": 22, "host": "LOG-02",
+          "department_id": 3, "department_name": "Logistics", "owner": "noadmin", "seen": False, "addressed": None},
+         {"id": 41, "category": "resource_violation", "label": "Restricted file", "summary": "A copy on OPS-07", "at": _ago(2), "pc_id": 7, "host": "OPS-07",
+          "department_id": 1, "department_name": "Operations", "owner": "dept", "seen": False,
+          "addressed": {"by": "R. Mensah", "at": _ago(1), "took_minutes": 42}}]
+
+
 class _Identity:
     """What the handshake returned. The role is the whole point: the console is a different product at
     each level, so a test has to say which one it is looking at."""
@@ -122,6 +130,8 @@ class _Connection:
         if type_ == "marks.get":
             return {"mark": {"id": 3}, "copies": [{"issue_id": 41, "severity": "high", "host": "OPS-01", "file": "salaries.csv",
                                                    "folder": "C:/Users/Kojo", "signed_in": "Kojo", "opened_at": _ago(2)}]}
+        if type_ == "reports.board":
+            return {"reports": BOARD, "strip": {}, "handling": [], "categories": []}
         if type_ == "assistance.ping_status":
             return {"unaddressed": 2, "pings": PINGS}
         if type_ == "flow.list":
@@ -372,6 +382,19 @@ async def test_one_person_s_pings_are_one_row_with_every_time(console):
     assert len(pings) == 1
     assert pings[0]["pings"] == 2 and pings[0]["pid"] == 5 and pings[0]["st"][0] == "Pinged you 2 times"
     assert len(pings[0]["times"]) == 2
+
+
+async def test_a_report_says_whose_it_is_as_the_engine_decides(console):
+    """reports.board's owner decides the wording: a department without an Admin keeps its reports with the Super User."""
+    win, bridge, _ = console("super_user")
+    view = await _open(win, bridge, "reports", "reportsView")
+    await _wait(lambda: len(prop(view, "rows") or []) == 2)
+    rows = {r["id"]: r for r in prop(view, "rows")}
+    assert rows[40]["st"] == "you" and rows[41]["st"] == "done"
+    from PySide6.QtCore import Q_ARG, Q_RETURN_ARG
+    for rid, want in ((40, "You only · Logistics has no Admin"), (41, "You and Operations")):
+        out = QMetaObject.invokeMethod(view, "goesTo", Q_RETURN_ARG("QVariant"), Q_ARG("QVariant", rows[rid]))
+        assert out == want
 
 
 def test_nothing_clickable_uses_a_taphandler():

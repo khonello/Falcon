@@ -71,6 +71,9 @@ Rectangle {
         for (var i = 0; i < cols.length; i++) w += (cols[i].width || 170)
         return w
     }
+    // when the columns do not fit, they give way in proportion so the name keeps 220px (the concept's list does the same)
+    readonly property real colScale: Math.min(1, Math.max(0.3, (width - 2 - 220) / Math.max(1, fixedWidth())))
+    function colW(w) { return (w || 170) * colScale }
 
     // --- header ----------------------------------------------------------------------------------
     Item {
@@ -142,7 +145,7 @@ Rectangle {
         anchors.top: head.bottom
         anchors.bottom: foot.top
         width: parent.width - 2
-        readonly property real nameW: Math.max(160, width - root.fixedWidth())
+        readonly property real nameW: width - root.fixedWidth() * root.colScale
 
         Rectangle {
             id: th
@@ -156,14 +159,14 @@ Rectangle {
                     model: root.cols
                     Txt {
                         required property var modelData
-                        width: modelData.width || 170
+                        width: root.colW(modelData.width)
                         leftPadding: 8
                         text: modelData.title
                         color: Theme.text3; font.pixelSize: Theme.fSmall; font.weight: Font.Medium
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
-                Txt { width: root.nowWidth; leftPadding: 8; text: root.nowTitle; color: Theme.text3; font.pixelSize: Theme.fSmall; font.weight: Font.Medium; anchors.verticalCenter: parent.verticalCenter }
+                Txt { width: root.colW(root.nowWidth); leftPadding: 8; text: root.nowTitle; color: Theme.text3; font.pixelSize: Theme.fSmall; font.weight: Font.Medium; anchors.verticalCenter: parent.verticalCenter }
             }
             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
         }
@@ -228,7 +231,7 @@ Rectangle {
                             delegate: Item {
                                 id: cell
                                 required property var modelData
-                                width: modelData.width || 170
+                                width: root.colW(modelData.width)
                                 height: row.height
                                 Txt {
                                     visible: !!cell.modelData.text
@@ -260,7 +263,7 @@ Rectangle {
                         }
                         // now
                         Item {
-                            width: root.nowWidth
+                            width: root.colW(root.nowWidth)
                             height: row.height
                             St {
                                 x: 8

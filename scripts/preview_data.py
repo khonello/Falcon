@@ -564,6 +564,47 @@ def reports(role: str, dept_id: int | None) -> dict[str, Any]:
     return {"reports": out}
 
 
+REPORT_HOST = {3001: "OPS-07", 3002: "OPS-03", 3003: "OPS-05", 3004: "LOG-02", 3005: "OPS-06", 3006: "OPS-07", 3007: "FIN-01", 3008: "LOG-02", 3009: "LOG-01"}
+REPORT_LABEL = {"resource_violation": "Restricted file", "deviation": "Deviation", "update_status": "Update stuck", "flow_failure": "Flow failed",
+                "listener_report": "Listener report", "about_admin": "About an Admin"}
+
+
+def board(role: str, dept_id: int | None) -> dict[str, Any]:
+    """reports.board as the Engine answers it (engine/console/overview.py): each report with whose it is."""
+    with_admin = {d for _a, _n, d, *_ in ADMINS}
+    names = dict(DEPTS)
+
+    def owner(cat: str, d: int) -> str:
+        if cat == "about_admin":
+            return "fixed"
+        if d not in with_admin:
+            return "noadmin"
+        return "dept" if d in ROUTING.get(cat, []) else "unrouted"
+    views = []
+    for rid, cat, summary, h, addr, d in REPORTS:
+        o = owner(cat, d)
+        if role == "admin" and (o != "dept" or d != dept_id):
+            continue
+        host = REPORT_HOST[rid]
+        views.append({"id": rid, "category": cat, "label": REPORT_LABEL.get(cat, cat), "summary": summary, "at": at(-h),
+                      "pc_id": HOST[host][0], "host": host, "department_id": d, "department_name": names[d], "owner": o, "seen": False,
+                      "addressed": {"by": addr[1], "at": at(-h + addr[0]), "took_minutes": round(addr[0] * 60)} if addr else None})
+    took = sorted(v["addressed"]["took_minutes"] for v in views if v["addressed"] and v["owner"] == "dept")
+    med = took[len(took) // 2] if took else None
+    handling = []
+    if role == "super_user":
+        for d, n in DEPTS:
+            mine = [v for v in views if v["department_id"] == d and v["owner"] == "dept"]
+            t = sorted(v["addressed"]["took_minutes"] for v in mine if v["addressed"])
+            handling.append({"department_id": d, "name": n, "has_admin": d in with_admin, "all": len([v for v in views if v["department_id"] == d]),
+                             "done": len(t), "waiting": len(mine) - len(t), "to_you": sum(1 for v in views if v["department_id"] == d and v["owner"] != "dept" and not v["addressed"]),
+                             "median_minutes": t[len(t) // 2] if t else None})
+    strip = {"waiting": sum(1 for v in views if v["owner"] != "dept" and not v["addressed"]) if role == "super_user" else sum(1 for v in views if not v["addressed"]),
+             "with_department": sum(1 for v in views if v["owner"] == "dept" and not v["addressed"]) if role == "super_user" else None,
+             "addressed": sum(1 for v in views if v["addressed"]), "typical_minutes": med}
+    return {"reports": views, "strip": strip, "handling": handling, "categories": sorted({v["category"] for v in views})}
+
+
 def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id: int | None) -> Any:
     """The sample's answer to one call, or None when the sample does not cover it."""
     if type_ == "hierarchy.tree":
@@ -633,10 +674,7 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
     if type_ == "reports.list":
         return reports(role, dept_id)
     if type_ == "reports.board":
-        # only the per-department handling the Departments page reads; the Reports page reads reports.list
-        mins = {1: 42, 2: 130, 3: None}
-        return {"reports": [], "strip": {}, "categories": [],
-                "handling": [{"department_id": d, "name": n, "has_admin": d != 3, "median_minutes": mins[d]} for d, n in DEPTS] if role == "super_user" else []}
+        return board(role, dept_id)
     if type_ == "reports.routing_get":
         return {"categories": list({r[1] for r in REPORTS}), "fixed": ["about_admin"],
                 "routing": [{"category": c, "routed_department_id": d, "department_name": dict(DEPTS)[d]} for c, ds in ROUTING.items() for d in ds]}

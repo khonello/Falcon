@@ -111,16 +111,20 @@ Rectangle {
                         x: root.factLabelWidth + 12 + (parent.dot ? 13 : 0)
                         y: 7
                         readonly property real room: parent.width - root.factLabelWidth - 12 - (parent.dot ? 13 : 0)
-                        width: modelData[5] ? Math.min(implicitWidth, room - fl.implicitWidth - 18) : room
-                        text: modelData[1] === undefined || modelData[1] === null ? "—" : String(modelData[1])
+                        width: room
+                        readonly property string plain: modelData[1] === undefined || modelData[1] === null ? "—" : String(modelData[1])
+                        text: modelData[5] ? esc(plain) + " <font color='" + Theme.text3 + "'>·</font> <a href='go'>" + esc(modelData[5]) + "</a>" : plain
                         color: modelData[2] && !parent.dot ? modelData[2] : Theme.text
                         mono: !!modelData[3]
                         wrapMode: Text.Wrap
                         elide: Text.ElideNone
-                        textFormat: Text.PlainText
+                        // a link runs on in the text, after a quiet dot, as the concept's does
+                        function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
+                        textFormat: modelData[5] ? Text.StyledText : Text.PlainText
+                        linkColor: Theme.accent
+                        onLinkActivated: root.factLink(modelData[0])
+                        HoverHandler { enabled: !!modelData[5]; cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
                     }
-                    Txt { visible: !!modelData[5]; x: val.x + val.width + 4; y: 7; text: "·"; color: Theme.text3 }
-                    Link { id: fl; visible: !!modelData[5]; x: val.x + val.width + 14; y: 7; text: modelData[5] || ""; onClicked: root.factLink(modelData[0]) }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }
@@ -156,18 +160,23 @@ Rectangle {
             Rectangle { width: parent.width; height: 1; color: Theme.border }
             Item { id: dockBox; x: 16; y: 10; width: parent.width - 32; height: childrenRect.height }
         }
+        // the actions, right aligned; when they do not fit on one line they wrap, each line still right aligned
         Item {
+            id: actArea
             width: parent.width
-            height: root.anyShown(actionRow) ? 50 : 0
+            height: root.anyShown(actionRow) ? actionRow.height + 20 : 0
             clip: true
+            readonly property real natural: { var w = 0, n = 0; for (var i = 0; i < actionRow.children.length; i++) { var c = actionRow.children[i]; if (c.visible) { w += c.width; n++ } } return w + Math.max(0, n - 1) * 8 }
+            readonly property real room: width - 32
             Rectangle { width: parent.width; height: 1; color: Theme.border }
-            Row {
+            Flow {
                 id: actionRow
                 anchors.right: parent.right
                 anchors.rightMargin: 16
-                anchors.verticalCenter: parent.verticalCenter
+                y: 10
+                width: Math.min(actArea.natural, actArea.room)
                 spacing: 8
-                layoutDirection: Qt.LeftToRight
+                layoutDirection: actArea.natural > actArea.room ? Qt.RightToLeft : Qt.LeftToRight
             }
         }
     }

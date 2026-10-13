@@ -123,8 +123,9 @@ Page {
                         ["Last fired", fs.length ? Time.atDay(fs[0].at) : "Not this week"], ["Fired, 7 days", Theme.fmt(fs.length)],
                         ["Problems, 7 days", pr ? pr + " failed or timed out" : "None", pr ? Theme.crit : null], ["Owner", r.read_only ? "Super User" : "This department"]] : []
             actions: [
-                Check { text: "Switched on"; controlled: true; checked: side.r !== null && side.r.enabled; enabled: side.r !== null && !side.r.read_only
-                        anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { page.toggle(side.r, on) } },
+                Item { width: sw.implicitWidth; height: Theme.control      // the actions wrap, so the switch centres in its own box
+                       Check { id: sw; text: "Switched on"; controlled: true; checked: side.r !== null && side.r.enabled; enabled: side.r !== null && !side.r.read_only
+                               anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { page.toggle(side.r, on) } } },
                 Btn { kind: "primary"; iconName: "edit"; text: "Edit"; enabled: side.r !== null && !side.r.read_only
                       tip: side.r && side.r.read_only ? "Set by the Super User for the whole organisation. Only they can change it." : ""
                       onClicked: Nav.go("automation", "edit-" + side.r.id) }
