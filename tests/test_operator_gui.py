@@ -445,6 +445,10 @@ async def test_a_flow_s_steps_keep_their_names_and_their_place(console):
     edit = win.findChild(QObject, "newFlow")
     await _wait(lambda: len(prop(edit, "stages") or []) == 2)
     assert prop(edit, "stages") == steps
+    # the three stage columns share one height, the tallest one's, whatever each holds (side by side from 900 wide;
+    # the offscreen test window is narrower, so the shared height is read rather than drawn)
+    needs = [win.findChild(QObject, n).property("need") for n in ("nfSources", "nfSteps", "nfDests")]
+    assert edit.property("colH") == max(needs) > min(needs)
     QMetaObject.invokeMethod(edit, "save")
     await _wait(lambda: any(t == "flow.edit" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "flow.edit")

@@ -19,8 +19,9 @@ Column {
     Row {
         width: parent.width
         spacing: 14
-        Item { id: leftBox; width: (parent.width - 14) * root.ratio; height: childrenRect.height }
-        Item { id: rightBox; width: (parent.width - 14) * (1 - root.ratio); height: childrenRect.height }
+        // ratio 1: one pane across the whole width, its picture inside it (New flow)
+        Item { id: leftBox; width: root.ratio >= 1 ? parent.width : (parent.width - 14) * root.ratio; height: childrenRect.height }
+        Item { id: rightBox; visible: root.ratio < 1; width: visible ? (parent.width - 14) * (1 - root.ratio) : 0; height: childrenRect.height }
     }
     Rectangle {
         width: parent.width
