@@ -140,8 +140,8 @@ Page {
             nameText: function (x) { return page.word(x.category) }
             nameLine: function (x) { return "R-" + x.id + (x.summary ? " · " + x.summary : "") }
             cols: Nav.boss ? [{ title: "Goes to", width: 170, text: function (x) { return x.owner === "dept" ? "You and " + x.department_name : "You only" } },
-                              { title: "Written", width: 110, text: function (x) { return Time.at(x.at) } }]
-                           : [{ title: "Written", width: 120, text: function (x) { return Time.at(x.at) } }]
+                              { title: "Written", width: 110, text: function (x) { return Time.atDay(x.at) } }]
+                           : [{ title: "Written", width: 120, text: function (x) { return Time.atDay(x.at) } }]
             now: function (x) {
                 return x.st === "done" ? ["Addressed" + (x.addressed.by ? " · " + x.addressed.by : ""), "good"]
                      : x.st === "dept" ? ["With the department", "wait"] : x.st === "you" ? ["Waiting on you", "bad"] : ["Waiting", "bad"]
