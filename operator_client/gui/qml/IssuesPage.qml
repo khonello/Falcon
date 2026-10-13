@@ -187,6 +187,7 @@ Page {
             nameLine: function (i) { return (i.subject ? i.subject + " · " : "") + i.host }
             cols: [
                 { title: "Severity", width: 100, text: function (i) { return Fleet.sevWord(i.sev) } },
+                { title: "Owner", width: 110, text: function (i) { return i.owner ? (i.owner.you ? "You" : i.owner.name) : i.escalated ? "Super User" : "Nobody" } },
                 { title: "Age", width: 90, text: function (i) { return i.at ? Time.age(i.at) : "—" } }
             ]
             now: function (i) {
@@ -201,7 +202,6 @@ Page {
         }
         SidePanel {
             id: side
-            fixed: false
             width: (parent.width - 14) * 4 / 12
             showEmpty: page.it === null
             emptyIcon: "check"
@@ -210,8 +210,6 @@ Page {
             title: page.it ? page.it.title : ""
             sub: page.it && page.sel === page.it.id ? "the one you picked" : "the worst open · click another"
             actions: [
-                Btn { visible: page.it !== null && page.it.iid !== undefined && !(page.it.owner && page.it.owner.you); text: "Take it"
-                      onClicked: falcon.call("issues.assign", { issue_id: page.it.iid }, function (ok, r) { if (ok) { Msg.ok("It is yours"); Fleet.refresh(); page.loadDet() } else Msg.failed(r.message || "Not taken") }) },
                 Btn { visible: page.it !== null && page.it.iid !== undefined && falcon.role === "admin" && !page.it.escalated; text: "Send it up"
                       onClicked: falcon.call("issues.escalate", { issue_id: page.it.iid }, function (ok, r) { if (ok) { Msg.ok("Sent up to the Super User"); Fleet.refresh(); page.loadDet() } else Msg.failed(r.message || "Not sent") }) },
                 Btn { text: page.it ? "Open " + page.it.host + "'s page →" : ""; onClicked: Nav.go("machines", page.it.host) }
@@ -238,8 +236,26 @@ Page {
                                     + "<span style='color:" + Theme.text3 + "'> · " + (page.it.at ? Time.age(page.it.at) + " old" : "") + "</span>"
                                     + (page.late(page.it) ? "<span style='color:" + Theme.crit + "'> · past its target</span>" : "") : ""
                 }
-                Txt { visible: page.it !== null && page.it.iid !== undefined; width: parent.width; color: Theme.text3; font.pixelSize: 12
-                      text: !page.it ? "" : page.it.owner ? (page.it.owner.you ? "Yours" : "With " + page.it.owner.name) : page.it.escalated ? "With the Super User; nobody below can take it" : "Nobody has taken it yet" }
+                // who has it: take it, give it to another Admin of the department, or hand it back (issues.assign)
+                Row {
+                    visible: page.it !== null && page.it.iid !== undefined
+                    spacing: 8
+                    Txt { text: "Owner"; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone }
+                    Select {
+                        width: 170; small: true
+                        enabled: !(page.it && page.it.escalated)
+                        value: page.it && page.it.owner ? page.it.owner.account_id : 0
+                        options: [{ value: 0, label: page.it && page.it.escalated ? "The Super User" : "Nobody yet" }].concat(
+                                 (Fleet.dept(falcon.departmentId) || { admins: [] }).admins.map(function (a) { return { value: a.account_id, label: a.account_id === falcon.accountId ? "You" : a.name } }))
+                        onPicked: function (v) {
+                            var pl = { issue_id: page.it.iid }; pl.account_id = v === 0 ? null : v
+                            falcon.call("issues.assign", pl, function (ok, r) {
+                                if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
+                                Msg.ok(v === 0 ? "Handed back" : v === falcon.accountId ? "It is yours" : "Given to " + Fleet.adminName(v)); Fleet.refresh(); page.loadDet()
+                            })
+                        }
+                    }
+                }
             }
 
             // resolved: what was done, and Reopen

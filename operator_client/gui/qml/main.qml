@@ -238,7 +238,7 @@ ApplicationWindow {
                                 color: Theme.text3
                                 font.pixelSize: Theme.fSmall
                                 elide: Text.ElideNone
-                                text: falcon.isConnected ? "Live · " + Math.floor(((Time.now - counter.at) / 1000) % 60) + "s ago" : "Not connected"
+                                text: falcon.isConnected ? "Live · " + Math.floor((Math.max(0, Time.now - counter.at) / 1000) % 60) + "s ago" : "Not connected"
                             }
                         }
                         Segmented {
