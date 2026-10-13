@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -59,12 +60,9 @@ def test_a_console_gets_its_challenge_signed_over_a_real_pipe(pipe):
 @windows_only
 def test_a_client_that_connects_and_says_nothing_does_not_hold_the_pipe(pipe):
     name, key, _ = pipe
-    silent = open(name, "r+b", buffering=0)                                           # says nothing
-    try:
+    with open(name, "r+b", buffering=0):                                              # says nothing
         assert signpipe.sign("still-works", name=name) == expected(key, "still-works")   # others are served meanwhile
         time.sleep(signpipe.CLIENT_SECONDS + 0.5)                                    # and it is let go
-    finally:
-        silent.close()
     assert signpipe.sign("after", name=name) == expected(key, "after")
 
 
@@ -102,7 +100,7 @@ def test_the_config_takes_its_address_from_the_machine_and_its_id_from_the_servi
 @windows_only
 @requires_db
 async def test_the_engine_accepts_a_console_signed_for_by_the_service(engine, org, pipe):
-    from common.connection import EngineConnection
+    from common.connection import ConnectionError_, EngineConnection, EngineError
 
     name, _, _ = pipe
     key = bytes.fromhex(key_for("cid-a1").hex()) if isinstance(key_for("cid-a1"), bytes) else bytes.fromhex(key_for("cid-a1"))
@@ -112,7 +110,7 @@ async def test_the_engine_accepts_a_console_signed_for_by_the_service(engine, or
         for _ in range(50):
             if os.path.exists(name + "x"):
                 break
-            time.sleep(0.05)
+            await asyncio.sleep(0.05)
         conn = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=None,
                                 signer=lambda nonce: signpipe.sign(nonce, name=name + "x"))
         ident = await conn.connect()                                                   # no key in this process at all
@@ -120,7 +118,7 @@ async def test_the_engine_accepts_a_console_signed_for_by_the_service(engine, or
         await conn.close()
         bad = EngineConnection("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=None,
                                signer=lambda nonce: signpipe.sign(nonce, name=r"\\.\pipe\FalconNobodyHome", seconds=0.1))
-        with pytest.raises(Exception):                                                 # nobody to sign: the Engine refuses
+        with pytest.raises((EngineError, ConnectionError_)):                              # nobody to sign: the Engine refuses
             await bad.connect()
         await bad.close()
     finally:

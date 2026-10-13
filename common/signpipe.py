@@ -93,7 +93,7 @@ class SignPipeServer:
                          (k32.ReadFile, [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]),
                          (k32.WriteFile, [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]),
                          (k32.FlushFileBuffers, [wintypes.HANDLE]), (k32.DisconnectNamedPipe, [wintypes.HANDLE]),
-                         (k32.CloseHandle, [wintypes.HANDLE])):
+                         (k32.CancelIoEx, [wintypes.HANDLE, ctypes.c_void_p]), (k32.CloseHandle, [wintypes.HANDLE])):
             fn.argtypes = args
 
         class SECURITY_ATTRIBUTES(ctypes.Structure):
@@ -108,7 +108,7 @@ class SignPipeServer:
         sa = SECURITY_ATTRIBUTES(ctypes.sizeof(SECURITY_ATTRIBUTES), sd, False)
 
         def serve_one(handle: int) -> None:
-            timer = threading.Timer(CLIENT_SECONDS, lambda: k32.CloseHandle(handle))      # a client that says nothing is let go
+            timer = threading.Timer(CLIENT_SECONDS, lambda: k32.CancelIoEx(handle, None))      # a client that says nothing is let go
             timer.start()
             try:
                 buf = ctypes.create_string_buffer(4096)
