@@ -276,3 +276,10 @@ part is recorded for later, not built.
   `tests/test_children.py` (real child processes: killed and restarted, still reporting; a program that cannot start becomes unhealthy; the issue raised and
   closed), and for real as an installed service (elevated prompt): both parts run under it, a killed tracker comes back, a file the indexer saw reaches the
   Engine, and both go when the service stops. *Not done:* the UI helper is still started by the service on demand as before (already its own program).
+
+- **The Worker's overlays and the keyboard, tried for real** (13 Oct 2026). With the windows installed (`PySide6-Essentials` is all the Worker's windows need; the `worker-ui` extra
+  now asks for that, ~170 MB lighter than all of PySide6), entering a machine in *see* mode puts "<name> is viewing your screen" at the top of the person's desktop, and
+  in *control* mode a card "<name> is using this machine · you can use it again when they leave, about 30 minutes" over it; both go when the session ends (picture taken from the
+  desktop itself). The keyboard path was checked with `scripts/keyboard_check.py`: the Worker's input code typed text (including é and 中), Shift+A, ordinary keys and
+  Backspace into a real window. Mouse control had been tried through the console. *Still only by a second machine:* the console's own key presses arriving through the session
+  window (on one PC the viewer is its own target).

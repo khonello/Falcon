@@ -35,7 +35,6 @@ Last updated 13 Oct 2026.
   it (`falcon.blocked`, `blockedSession`, `blockedBy`), but no QML draws it: the Admin whose console the Super User
   entered shows no bar. For the GUI session (the one session lid, "blocked" wording).
 - **Block vs end an Admin's session.** The Engine treats both the same; the dialog offers both.
-- **Session window:** picture works (fixed: long messages dropped the connection). Control mode (mouse and typing
-  reaching the machine) still to be confirmed by the user.
+- **Session window:** picture, mouse and (by script) keyboard injection work; overlays shown on the Worker PC for see and control. Left: typing through the console on a second machine.
 - **Fixed in GUI files by this session:** auto-connect on start (`app.py`), `EnterConsole.qml` (`enter` clashed with the
   popup's own; the mode sent was "block"/"end"), the three pages that enter a machine now send the take-over.
