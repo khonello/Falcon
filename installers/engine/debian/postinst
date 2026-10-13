@@ -1,0 +1,19 @@
+#!/bin/sh
+# After the files are unpacked. A first install only says what to do next (the Engine needs the names its PCs will use, and only a person
+# knows them). An upgrade, where the Engine already has its settings, installs the new code and restarts it with the same settings.
+set -e
+
+case "$1" in
+    configure)
+        if [ -f /etc/falcon/falcon.env ]; then
+            echo "falcon-engine: upgrading the Engine in place"
+            cd /opt/falcon/payload
+            python3 -m installers.engine.install --source /opt/falcon/payload --no-database --no-setup
+        else
+            echo "falcon-engine: files are in place. To set the Engine up, run once, as root:"
+            echo "    falcon-engine-install --names <name-or-address-the-PCs-use>[,more] --hostname <the Super User's PC>"
+        fi
+        ;;
+esac
+
+exit 0

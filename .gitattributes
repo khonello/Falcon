@@ -1,0 +1,5 @@
+
+# the Linux installer scripts must stay LF on a Windows checkout, or they break on the server
+installers/engine/build_deb.sh text eol=lf
+installers/engine/debian/* text eol=lf
+*.service text eol=lf

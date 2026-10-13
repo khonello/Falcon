@@ -344,11 +344,17 @@ class _Run:
         return 0
 
 
-def _logging() -> None:
+def log_dir(config: str | None = None) -> Path:
+    """The log sits beside the settings (an installed machine keeps both in a folder only the system and administrators can read)."""
+    return Path(config).resolve().parent if config else data_dir()
+
+
+def _logging(config: str | None = None) -> None:
     from logging.handlers import RotatingFileHandler
 
-    data_dir().mkdir(parents=True, exist_ok=True)
-    handler = RotatingFileHandler(data_dir() / "worker.log", maxBytes=2_000_000, backupCount=3, encoding="utf-8")
+    folder = log_dir(config)
+    folder.mkdir(parents=True, exist_ok=True)
+    handler = RotatingFileHandler(folder / "worker.log", maxBytes=2_000_000, backupCount=3, encoding="utf-8")
     logging.basicConfig(level=logging.INFO, handlers=[handler], format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
 
 
@@ -364,7 +370,7 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
     try:
         if args.action == "run":
-            _logging()
+            _logging(args.config)
             return _Run(args.name, args.config, args.probe).run()
         if args.action == "status":
             print(f"{args.name}: {_state(args.name)}")

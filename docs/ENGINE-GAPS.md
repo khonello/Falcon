@@ -283,3 +283,15 @@ part is recorded for later, not built.
   desktop itself). The keyboard path was checked with `scripts/keyboard_check.py`: the Worker's input code typed text (including é and 中), Shift+A, ordinary keys and
   Backspace into a real window. Mouse control had been tried through the console. *Still only by a second machine:* the console's own key presses arriving through the session
   window (on one PC the viewer is its own target).
+
+- **The installers' code, written and tested** (13 Oct 2026; compiling it into executables stays on hold). `installers/`: `roles.py` (what each installer carries), `payload.py`
+  (a role's packages, the libraries read from `pyproject.toml`, a manifest of hashes; refuses any secret, test or cache), `bundle.py` (the Engine's address and certificate,
+  no key, with its fingerprint), `engine/install.py` (Linux: user, folders, runtime, a PostgreSQL role with a made password, settings, `engine setup`, ownership, the bundle,
+  a hardened systemd unit; plus `debian/` and `build_deb.sh`), `windows/install.py` (worker, admin, superuser: code, runtime, the public and the private folders with real ACLs,
+  the service, the console shortcut, the Super User's own settings, a receipt, uninstall that keeps the key) and `windows/falcon.iss` (the wrapper for the later `setup.exe`).
+  See `installers/README.md`. Machines register by probation, as decided: a service installed with no key asks, shows the code in the person's session (again if nobody was
+  there), and keeps the key it is handed in the closed folder. An Admin's console holds no key: the service answers the Engine's challenge for it over a named pipe
+  (`common/signpipe.py`). *Tested:* `tests/test_installers.py` (including, from an elevated prompt, an Admin workstation installed as a service that registers itself and
+  whose keyless console signs in), `test_signpipe.py`, `test_enrollment.py`. *Not run for real:* the Engine's installer on Linux and the Windows runtime venv with real wheels
+  (the VMs); a non-administrator Windows user opening the pipe (the VM). *Still open:* a bundled interpreter, frozen helper windows, signing, the update pipeline, and whether
+  the Super User's PC is also a managed machine.

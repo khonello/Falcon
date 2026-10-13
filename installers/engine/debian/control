@@ -1,0 +1,14 @@
+Package: falcon-engine
+Version: @VERSION@
+Section: admin
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10), python3-venv, python3-pip, postgresql, systemd
+Recommends: ufw | firewalld
+Maintainer: Falcon <root@localhost>
+Description: Falcon Engine
+ The server of the Falcon hierarchy system: it owns the database, the audit trail,
+ the Global File Index and every machine's key. Installing this package puts the
+ Engine's files in /opt/falcon/payload and adds the command falcon-engine-install.
+ Run that command once, as root, to set the Engine up (see its --help); installing
+ a newer package afterwards upgrades the Engine in place.

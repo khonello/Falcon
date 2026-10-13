@@ -1,0 +1,22 @@
+#!/bin/sh
+# Removing the package removes the program and the service. It NEVER removes /var/lib/falcon (the master secret, the certificate and key,
+# the model) or /etc/falcon (the settings, the database password), and never the database: those are the organisation's, and without the
+# master secret every machine would have to be registered again. `purge` says where they are and leaves the decision to the person.
+set -e
+
+case "$1" in
+    remove|purge)
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl disable falcon-engine >/dev/null 2>&1 || true
+            rm -f /etc/systemd/system/falcon-engine.service
+            systemctl daemon-reload || true
+        fi
+        rm -rf /opt/falcon/app /opt/falcon/venv /opt/falcon/payload
+        if [ "$1" = "purge" ]; then
+            echo "falcon-engine: kept /var/lib/falcon (secret, certificate, model), /etc/falcon (settings) and the falcon database."
+            echo "               Remove them yourself only if this organisation is finished with Falcon."
+        fi
+        ;;
+esac
+
+exit 0

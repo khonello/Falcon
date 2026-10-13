@@ -17,7 +17,7 @@ Last updated 13 Oct 2026.
 
 ## On hold until everything is locked
 
-- **Final packaging** (plan agreed in `docs/PACKAGING-PLAN.md`): bundled interpreter, installer, signing, helper windows built as executables, delivery of the
+- **Final packaging** (plan in `docs/PACKAGING-PLAN.md`; the installers' code is written and tested in `installers/`): bundled interpreter, installer, signing, helper windows built as executables, delivery of the
   Engine's certificate and key with the install. The small packaging (`python -m worker_client service install|start|stop|uninstall|status`)
   is done and tested.
 
@@ -31,10 +31,15 @@ Last updated 13 Oct 2026.
 
 ## Found while trying the session window live (13 Oct 2026)
 
-- **The blocked person sees nothing.** The Engine pushes `session.blocked` / `session.viewing`, `ClientState` keeps
-  it (`falcon.blocked`, `blockedSession`, `blockedBy`), but no QML draws it: the Admin whose console the Super User
-  entered shows no bar. For the GUI session (the one session lid, "blocked" wording).
+- **The blocked person's bar is the Worker's overlay, not the console's** (decided 13 Oct 2026): nothing to build in the console; the Admin installer puts the overlay on the Admin's PC.
 - **Block vs end an Admin's session.** The Engine treats both the same; the dialog offers both.
 - **Session window:** picture, mouse and (by script) keyboard injection work; overlays shown on the Worker PC for see and control. Left: typing through the console on a second machine.
 - **Fixed in GUI files by this session:** auto-connect on start (`app.py`), `EnterConsole.qml` (`enter` clashed with the
   popup's own; the mode sent was "block"/"end"), the three pages that enter a machine now send the take-over.
+
+## Installers (13 Oct 2026)
+
+- **Written and tested, not run for real on a Linux server or a clean Windows VM.** The Hyper-V pass should do, in order: the Engine's installer (Linux VM), then the Super User's,
+  an Admin's and a person's PC (Windows VMs), confirm each registration, and try the console as a non-administrator user on the Admin workstation (the pipe's access rules).
+- **Decide:** is the Super User's PC also a managed machine (the Worker service on it)? Today the Super User's installer is the console only.
+- **Not mine, and removed from the list:** the Admin console needs no blocked bar; the overlay on the Admin's PC does it (the Admin installer puts the Worker pieces there).

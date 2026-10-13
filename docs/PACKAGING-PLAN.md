@@ -1,4 +1,4 @@
-# Packaging plan (agreed 13 Oct 2026; the building itself stays on hold)
+# Packaging plan (agreed 13 Oct 2026; the installers' code is written and tested in `installers/` (see its README); compiling it into executables stays on hold)
 
 What is installed where, and how it is split. Final packaging (Phase 9) starts only when the user gives the green flag;
 the small part already built is `python -m worker_client service install|start|stop|uninstall|status`.
