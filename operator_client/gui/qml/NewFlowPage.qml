@@ -111,7 +111,7 @@ Page {
     TextMetrics { id: tmOne; font.family: Theme.sans; font.pixelSize: Theme.fSmall; font.weight: Font.Medium; text: "One destination" }
     readonly property real applyW: tmAll.width + tmOne.width + 4 * 9 + 4
 
-    // a stage column: its number, title and a quiet line, the cards, and its Add button on the bottom line
+    // a stage column: its number, title and a quiet line, the cards, and its Add button at the right of the bottom line
     component StageCol: Rectangle {
         id: sc
         property int n: 1
@@ -201,7 +201,7 @@ Page {
                                FolderField { width: Math.min(200, parent.width); pcId: page.src.pc; text: page.src.path; placeholder: "Folder"
                                              onEdited: function (t) { page.src = { pc: page.src.pc, path: t } } } }
                     }
-                    add: Btn { width: parent.width; iconName: "plus"; text: "Add a source"; enabled: false; tip: "Several sources are not built in the Engine yet" }
+                    add: Btn { anchors.right: parent.right; iconName: "plus"; text: "Add a source"; enabled: false; tip: "Several sources are not built in the Engine yet" }
                 }
                 StageCol {
                     id: c2
@@ -238,7 +238,7 @@ Page {
                     }
                     Txt { visible: page.stages.length > 0; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
                           text: "The Worker carries out Sort by file type today; the other steps are not built in the Worker yet and leave the files as they are." }
-                    add: Btn { width: parent.width; iconName: "plus"; text: "Add a step"; onClicked: page.stages = page.stages.concat([{ kind: "Transform", op: "Rename by date", scope: "all" }]) }
+                    add: Btn { anchors.right: parent.right; iconName: "plus"; text: "Add a step"; onClicked: page.stages = page.stages.concat([{ kind: "Transform", op: "Rename by date", scope: "all" }]) }
                 }
                 StageCol {
                     id: c3
@@ -267,7 +267,7 @@ Page {
                                 border.width: 1; border.color: Theme.alpha(Theme.med, 0.35)
                                 Txt { id: wt; x: 12; y: 10; width: parent.width - 24; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
                                       text: "That is a lot of destinations. Every file is copied " + page.dests.length + " times. Consider splitting this into two flows." } }
-                    add: Btn { width: parent.width; iconName: "plus"; text: "Add a destination"; onClicked: page.dests = page.dests.concat([{ mode: "mine", pc: 0, path: "", who: 0 }]) }
+                    add: Btn { anchors.right: parent.right; iconName: "plus"; text: "Add a destination"; onClicked: page.dests = page.dests.concat([{ mode: "mine", pc: 0, path: "", who: 0 }]) }
                 }
             }
             // the name, how files are copied, and the checks
