@@ -45,10 +45,27 @@ Split by **where the code must run and with what rights**, not by feature.
 - The Engine package wraps `python -m engine setup` (database, schema, certificate, master secret, first Super User,
   firewall step) and adds the service unit.
 
+## Decided 13 Oct 2026
+
+- **The event tracker is its own supervised process.** The service starts it, restarts it if it dies, and reports it
+  unhealthy if it keeps dying. (It already sits behind its own module.)
+- **Machines register by probation.** An installer carries only the Engine's host and its certificate (or fingerprint);
+  the machine connects and announces itself (PC name, account, level) and waits. This is `enroll.request / wait / list /
+  confirm / refuse`, designed in `design/ENGINE-WORK.md` item 15 ("Waiting to be registered"). Rules:
+  1. What a machine announces is a **claim**. It grants nothing; the approver sets the role. A claim of "Super User" is
+     worth no more than any other.
+  2. The approver types the **pairing code** shown on that PC's screen, so an impostor naming itself "FIN-02" cannot be
+     approved by mistake.
+  3. The installer carries the certificate (or its fingerprint) too, so the first connect cannot be answered by a fake
+     Engine. Every installer carries the same two things; nothing is per-machine.
+  4. After approval the key goes once, over the pinned connection, to the waiting connection, and is stored with
+     restricted rights. Nothing is typed or copied by hand.
+  5. Who approves: an Admin for worker PCs of their department; the Super User for Admin and Super User workstations; a
+     command on the Engine host as the fallback and for first setup (the TUI's `enroll` commands).
+  6. The probation list is reachable by anyone on the network: rate-limit requests, expire old ones, and raise a flag
+     for a machine that keeps asking.
+
 ## Still to decide when packaging starts
 
-- Whether the event tracker also becomes its own supervised process (today it is inside the service).
-- How a machine gets its own id and key at install: typed, a file next to the installer, or the pairing code in
-  `design/ENGINE-WORK.md` item 15.
-- Bundled interpreter, signing, frozen helper windows, certificate and key delivery, update pipeline (all in
-  `ENGINE-GAPS.md` and `PHASES.md` Phase 9).
+- Bundled interpreter, signing, frozen helper windows, update pipeline (`ENGINE-GAPS.md`, `PHASES.md` Phase 9).
+- What the pairing code looks like on a PC with nobody signed in (a service machine at the login screen).
