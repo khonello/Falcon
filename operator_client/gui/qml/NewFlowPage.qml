@@ -103,9 +103,13 @@ Page {
         })
     }
 
-    readonly property bool wide: width >= 900   // the three columns side by side; narrower, one under the other
-    // the three columns are one height, the tallest one's, so their Add buttons sit on one line
+    // the three columns are side by side at every width and one height, the tallest one's, so their Add buttons
+    // sit on one line (user, 13 Oct 2026)
     readonly property real colH: Math.max(c1.need, c2.need, c3.need)
+    // the Applies-to switch at its natural width; a card narrower than that stretches it and cuts the labels short
+    TextMetrics { id: tmAll; font.family: Theme.sans; font.pixelSize: Theme.fSmall; font.weight: Font.Medium; text: "Every destination (before the split)" }
+    TextMetrics { id: tmOne; font.family: Theme.sans; font.pixelSize: Theme.fSmall; font.weight: Font.Medium; text: "One destination" }
+    readonly property real applyW: tmAll.width + tmOne.width + 4 * 9 + 4
 
     // a stage column: its number, title and a quiet line, the cards, and its Add button on the bottom line
     component StageCol: Rectangle {
@@ -116,8 +120,8 @@ Page {
         default property alias inner: cb.data
         property alias add: addSlot.data
         readonly property real need: 42 + 14 + cb.height + 10 + addSlot.height + 14
-        width: !parent ? 0 : page.wide ? (parent.width - 28) / 3 : parent.width
-        height: page.wide ? page.colH : need
+        width: parent ? (parent.width - 28) / 3 : 0
+        height: page.colH
         radius: Theme.radius
         color: Theme.surface
         border.width: 1
@@ -180,7 +184,7 @@ Page {
                 }
             }
             // sources | along the way | destinations, in the files' own order
-            Flow {
+            Row {
                 width: parent.width
                 spacing: 14
                 StageCol {
@@ -203,7 +207,14 @@ Page {
                     id: c2
                     objectName: "nfSteps"
                     n: 2; t: "Along the way"; d: "optional"
-                    Rectangle { visible: page.stages.length === 0; width: parent.width; height: 46; radius: Theme.radius; color: "transparent"; border.width: 1; border.color: Theme.borderStrong
+                    Item { visible: page.stages.length === 0; width: parent.width; height: 46
+                           // dashed, as the concept's empty slot is
+                           Canvas { anchors.fill: parent
+                                    onPaint: { var c = getContext("2d"); c.reset(); c.strokeStyle = Theme.borderStrong; c.lineWidth = 1; c.setLineDash([4, 3])
+                                               var r = Theme.radius, w = width - 1, h = height - 1; c.beginPath(); c.moveTo(0.5 + r, 0.5); c.lineTo(w - r, 0.5); c.arcTo(w, 0.5, w, r, r)
+                                               c.lineTo(w, h - r); c.arcTo(w, h, w - r, h, r); c.lineTo(0.5 + r, h); c.arcTo(0.5, h, 0.5, h - r, r); c.lineTo(0.5, 0.5 + r); c.arcTo(0.5, 0.5, 0.5 + r, 0.5, r); c.stroke() }
+                                    onWidthChanged: requestPaint()
+                                    Connections { target: Theme; function onDarkChanged() { parent.requestPaint() } } }
                                 Txt { anchors.centerIn: parent; width: Math.min(implicitWidth, parent.width - 20); text: "No steps. Files are copied exactly as they are."; color: Theme.text3 } }
                     Repeater {
                         model: page.stages
@@ -215,9 +226,10 @@ Page {
                                    Select { width: 130; value: modelData.kind; options: ["Transform", "Categorize"]; onPicked: function (v) { page.setStage(index, { kind: v, op: page.stageOps[v][0] }) } }
                                    Select { width: Math.min(200, parent.width); value: modelData.op; options: page.stageOps[modelData.kind].indexOf(modelData.op) < 0 ? [modelData.op].concat(page.stageOps[modelData.kind]) : page.stageOps[modelData.kind]
                                             onPicked: function (v) { page.setStage(index, { op: v }) } } }
-                            Flow { width: parent.width; spacing: 8
+                            // below the close button, so this row may use the card's right padding too
+                            Flow { width: parent.width + 40; spacing: 8
                                    Txt { height: aseg.height; verticalAlignment: Text.AlignVCenter; text: "Applies to"; color: Theme.text3; font.pixelSize: 12 }
-                                   Segmented { id: aseg; options: [{ value: "all", label: "Every destination (before the split)" }, { value: "one", label: "One destination" }]
+                                   Segmented { id: aseg; block: page.applyW > parent.width; width: block ? parent.width : implicitWidth; options: [{ value: "all", label: "Every destination (before the split)" }, { value: "one", label: "One destination" }]
                                                value: modelData.scope === "all" ? "all" : "one"; onPicked: function (v) { page.setStage(index, { scope: v === "all" ? "all" : 0 }) } }
                                    Select { visible: modelData.scope !== "all"; width: Math.min(200, parent.width); small: true; value: modelData.scope
                                             options: page.dests.map(function (d, j) { return { value: j, label: d.mode === "ask" ? "Destination " + (j + 1) : d.pc ? page.hostName(d.pc) + " " + d.path : "Destination " + (j + 1) } })
@@ -267,22 +279,23 @@ Page {
                     id: nameRow
                     width: parent.width
                     spacing: 28
-                    readonly property real half: page.wide ? (width - 28) / 2 : width
+                    readonly property real half: (width - 28) / 2
                     Column {
                         width: nameRow.half
                         spacing: 8
                         Row { spacing: 12
                               Txt { width: 130; text: "Name"; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
-                              Field { width: 320; enabled: false; placeholderText: page.src.path ? Sync.folder(page.src.path) + "-…" : "my-flow" } }
+                              Field { width: Math.min(320, nameRow.half - 142); enabled: false; placeholderText: page.src.path ? Sync.folder(page.src.path) + "-…" : "my-flow" } }
                         Txt { x: 142; width: parent.width - 142; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
                               text: "A flow is named after its source folder for now. A name of its own is not built in the Engine yet." }
-                        Row { spacing: 12; topPadding: 6
-                              Txt { width: 130; text: "Copy files"; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
-                              Repeater {
-                                  model: [["Real time", 96], ["On a schedule", 122], ["Only when I run it", 140]]
-                                  Radio { required property var modelData; width: modelData[1]; anchors.verticalCenter: parent.verticalCenter
-                                          options: [{ value: modelData[0], label: modelData[0] }]; value: page.when; onPicked: function (v) { page.when = v } }
-                              } }
+                        Row { spacing: 12; topPadding: 6; width: parent.width
+                              Txt { width: 130; height: Theme.controlSm; verticalAlignment: Text.AlignVCenter; text: "Copy files"; color: Theme.text3 }
+                              Flow { width: parent.width - 142; spacing: 12
+                                     Repeater {
+                                         model: [["Real time", 96], ["On a schedule", 122], ["Only when I run it", 140]]
+                                         Radio { required property var modelData; width: modelData[1]; height: Theme.controlSm
+                                                 options: [{ value: modelData[0], label: modelData[0] }]; value: page.when; onPicked: function (v) { page.when = v } }
+                                     } } }
                         Txt { x: 142; width: parent.width - 142; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
                               text: page.when === "Real time" ? "A file is copied the moment it changes, from the machine's own file events."
                                     : page.when === "On a schedule" ? "Copying on a schedule is not built in the Engine yet; the flow copies in real time."

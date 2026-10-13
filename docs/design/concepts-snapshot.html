@@ -445,7 +445,15 @@ a { color: var(--accent); text-decoration: none; }
 .nf-col > div > .row:first-child > .mono:first-child { display: none !important; }
 .nf-col > div[style*="border"] { position: relative; padding-right: 40px !important; }
 .nf-col > div > .row:first-child > button:last-child { position: absolute; top: 12px; right: 8px; }
-@media (max-width: 1100px) { .nf-cols { grid-template-columns: minmax(0, 1fr); } }
+/* the three never stack: side by side at every width, one height, the tallest one's (user, 13 Oct 2026) */
+.nf-col > div > .row:not(:first-child) { margin-right: -26px; }
+.nf-col .ant-segmented { max-width: 100%; }
+.nf-cols > .panel > .phd { flex-wrap: nowrap; }
+.nf-cols > .panel > .phd > .pt { min-width: 0; overflow: hidden; white-space: nowrap; }
+.nf-cols > .panel > .phd > .pt small { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nf-col .ant-segmented-group { display: flex; min-width: 0; }
+.nf-col .ant-segmented-item { min-width: 0; flex: 0 1 auto; }
+.nf-col .ant-segmented-item-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 

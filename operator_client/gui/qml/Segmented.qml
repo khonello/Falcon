@@ -61,6 +61,8 @@ Item {
                         Txt {
                             visible: seg.modelData.label !== undefined && seg.modelData.label !== ""
                             text: seg.modelData.label || ""
+                            // a block switch narrower than its labels cuts them short rather than spilling out
+                            width: root.block ? Math.min(implicitWidth, seg.width - 2 * (root.small ? 9 : 12) - (seg.modelData.icon ? 18 : 0)) : implicitWidth
                             color: seg.on ? Theme.text : (area.containsMouse ? Theme.text : Theme.text2)
                             font.pixelSize: root.small ? Theme.fSmall : Theme.fBody
                             font.weight: seg.on ? Font.Medium : Font.Normal
