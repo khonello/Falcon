@@ -234,3 +234,10 @@ part is recorded for later, not built.
 - **File-event retention and the firewall** (13 Oct 2026). `file_events` now ages out on the audit trail's clock (`FALCON_AUDIT_RETENTION_DAYS`, 90): a file's journey reaches back as far as the trail does, and the one
   setting governs both; the "only hard delete" invariant in CLAUDE.md names both purges. `python -m engine setup` opens the Engine's port in a running `ufw` or `firewalld` on Linux (as root, else it prints the
   command); other firewalls are left alone and it says so; on a non-Linux machine it only says the Engine is meant for Linux. *Test:* `test_console_rollout.py`, `test_setup_firewall.py`.
+
+- **The Worker as a Windows service: the necessary part of packaging, built and tested** (13 Oct 2026; the final packaging stays on hold). `python -m worker_client service install` (once, from an elevated prompt) registers the
+  Worker as a service that starts with Windows, runs as the system account and restarts itself if it stops; `uninstall`, `start`, `stop`, `status` do the rest. `worker_client/winservice.py` speaks the service-control
+  protocol through ctypes, so nothing extra is bundled; settings are the Worker's usual file (`%PROGRAMDATA%\Falcon\worker.json`), the log `%PROGRAMDATA%\Falcon\worker.log`. *Tested for real on this machine*
+  (`test_worker_client.py`, elevated prompt only, each removing what it installed): a probe service reported that it runs as the system account in session 0, may trace programs and file opens, and started a program on the
+  signed-in person's desktop; and the real Worker, installed as a service against a throwaway Engine, connected as FIN-01, appeared online with its version, OS and address, and went offline when stopped.
+  *Not yet done (final packaging):* a bundled interpreter and installer, signing, the helper windows frozen as executables, and a pinned Engine certificate and key delivered with the install.

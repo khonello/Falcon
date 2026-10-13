@@ -57,6 +57,10 @@ async def _enroll(cfg: WorkerConfig, department_id: int | None, level: str) -> N
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "service":
+        from worker_client import winservice
+
+        raise SystemExit(winservice.main(sys.argv[2:]))
     ap = argparse.ArgumentParser(prog="worker_client", description="Falcon Worker Client")
     ap.add_argument("--engine", help="host:port of the Engine (remembered)")
     ap.add_argument("--client-id", help="this PC's provisioned client id (remembered)")

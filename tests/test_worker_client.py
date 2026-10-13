@@ -951,3 +951,76 @@ def test_a_program_is_started_on_the_desktop_only_from_a_service_and_never_crash
     assert winsession.spawn_in_user_session([sys.executable, "-c", "pass"]) is None          # only the system account may take someone's token: refused, logged, no crash
     assert Executor._on_desktop({"builtin_type": "screenshot"}) and Executor._on_desktop({"builtin_type": "notify"})
     assert not Executor._on_desktop({"builtin_type": "kill_process"}) and not Executor._on_desktop({"kind": "custom", "builtin_type": "screenshot"})
+
+
+def test_the_worker_installs_runs_and_removes_itself_as_a_windows_service():
+    """Needs an elevated prompt (installing a service does): it installs a throwaway service in probe mode, lets Windows start it as the system account,
+    reads what it reported about itself, and removes it again -- whatever happens."""
+    import ctypes
+    import json
+    import sys
+    import time
+
+    if sys.platform != "win32" or not ctypes.windll.shell32.IsUserAnAdmin():
+        pytest.skip("needs Windows and an elevated prompt")
+    from worker_client import winservice
+
+    name = "FalconWorkerTest"
+    probe_file = winservice.data_dir() / "service-probe.json"
+    probe_file.unlink(missing_ok=True)
+    try:
+        assert "installed" in winservice.install(name, None, probe=True) and winservice._state(name) == "stopped"
+        assert "already installed" in winservice.install(name, None, probe=True)
+        assert winservice.start(name).endswith("running")
+        for _ in range(100):
+            if probe_file.exists():
+                break
+            time.sleep(0.1)
+        got = json.loads(probe_file.read_text(encoding="utf-8"))
+        assert got["in_service_session"] is True                                   # Windows ran it as a service, in session 0
+        assert got["may_trace_programs"] is True and got["may_trace_files"] is True   # as the system account it may trace
+        assert winservice.stop(name) == f"{name} stopped"
+    finally:
+        winservice.uninstall(name)
+    for _ in range(50):                                                            # Windows finishes the removal when the last handle closes
+        if winservice._state(name) == "not installed":
+            break
+        time.sleep(0.2)
+    assert winservice._state(name) == "not installed"
+    probe_file.unlink(missing_ok=True)
+
+
+async def test_the_installed_worker_service_connects_to_the_engine_as_its_machine_and_goes_when_stopped(engine, org, tmp_path):
+    """The whole route, for real (elevated prompt only): the Worker installed as a Windows service, started by Windows as the system account, reads its settings,
+    handshakes with a throwaway Engine as FIN-01, is seen online with its version, and is gone again when the service is stopped. Removed afterwards."""
+    import ctypes
+    import json
+    import sys
+
+    if sys.platform != "win32" or not ctypes.windll.shell32.IsUserAnAdmin():
+        pytest.skip("needs Windows and an elevated prompt")
+    from worker_client import winservice
+
+    config = tmp_path / "worker.json"
+    config.write_text(json.dumps({"engine_host": "127.0.0.1", "engine_port": engine.port, "client_id": "cid-w1", "client_key": key_for("cid-w1"), "tls": False,
+                                  "windows": False, "watch_roots": [str(tmp_path / "watched")], "metrics_seconds": 5}), encoding="utf-8")
+    (tmp_path / "watched").mkdir()
+    name = "FalconWorkerTest2"
+    try:
+        assert "installed" in winservice.install(name, str(config))
+        assert winservice.start(name).endswith("running")
+        for _ in range(150):
+            if org["w1_pc"] in engine.online_pc_ids():
+                break
+            await asyncio.sleep(0.1)
+        assert org["w1_pc"] in engine.online_pc_ids()
+        pc = await engine.db.accounts.pc(org["w1_pc"])
+        assert pc["agent_version"] and pc["os"] and pc["last_ip"] == "127.0.0.1"          # it said what it is, from the service
+        assert winservice.stop(name) == f"{name} stopped"
+        for _ in range(100):
+            if org["w1_pc"] not in engine.online_pc_ids():
+                break
+            await asyncio.sleep(0.1)
+        assert org["w1_pc"] not in engine.online_pc_ids()
+    finally:
+        winservice.uninstall(name)

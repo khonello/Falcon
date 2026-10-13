@@ -123,6 +123,15 @@ In the Super User's window:
    It watches the folders given with `--watch` (repeatable) and relays file activity, runs actions, and shows the
    person's small windows ("R. Mensah is using this machine", a task given to them).
 
+   To keep it running without anyone signed in, as a Windows service (once, from an elevated prompt, after the run above has remembered its settings):
+
+   ```powershell
+   environ-worker\Scripts\python.exe -m worker_client service install
+   environ-worker\Scripts\python.exe -m worker_client service start
+   ```
+
+   It then starts with Windows and restarts itself; its log is `C:\ProgramData\Falcon\worker.log`. `service stop` / `uninstall` / `status` do the rest.
+
 ### Checking it works
 
 - The Super User's **Must see** shows every department; a department shows its machines, quiet when fine.

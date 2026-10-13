@@ -379,8 +379,8 @@ class EtwWatcher:
         if got is None or got[1] & FILE_DIRECTORY_FILE or got[0].endswith("\\"):
             return
         path = drive_path(got[0], self._devices)
-        if path is None or not self.files.matches(path):
-            return
+        if path is None or not self.files.matches(path) or os.path.isdir(path):
+            return                                  # (a folder opened without the directory flag is still a folder)
         import time
 
         now = time.monotonic()
