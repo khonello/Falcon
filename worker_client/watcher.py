@@ -270,12 +270,14 @@ class Watcher:
 
         worker = asyncio.create_task(asyncio.to_thread(walk))
         interrupted = False
+        first = True
         try:
             while True:
                 batch = await queue.get()
                 if batch is None:
                     break
-                await self.report("index.sweep_batch", {"entries": batch})
+                await self.report("index.sweep_batch", {"entries": batch, "first": first})
+                first = False
                 total += len(batch)
             interrupted = self._sweep_cancel.is_set()
         finally:
@@ -285,4 +287,8 @@ class Watcher:
             log.info("idle sweep reported %d entries%s", total, " (interrupted)" if interrupted else "")
         if not interrupted:
             self.sweeps_completed += 1
+            try:
+                await self.report("index.sweep_done", {"roots": [str(r) for r in self.roots]})      # what it did not see is gone
+            except Exception as exc:  # noqa: BLE001 -- a missed word costs only a stale row until the next sweep
+                log.warning("could not say the sweep finished: %s", exc)
         return total

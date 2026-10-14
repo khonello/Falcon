@@ -22,6 +22,7 @@ left (moved away, deleted) is marked `gone_at`, the row kept.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
@@ -50,6 +51,7 @@ class FileIndex:
         # expectation) subscribe here rather than defining their own detection.
         self._subscribers: list[Any] = []
         self._observers: list[Any] = []
+        self._sweeps: dict[int, datetime] = {}      # pc -> when its running idle sweep began (what the sweep sees is newer than this)
 
     def subscribe(self, callback: Any, *, every_op: bool = False) -> None:
         """callback(event: dict) -> Awaitable[None]. Called for every ingested file event that is about a file's
@@ -85,7 +87,9 @@ class FileIndex:
             await cb(full)
         return file_index_id
 
-    async def ingest_sweep_batch(self, pc_id: int, entries: list[dict[str, Any]]) -> int:
+    async def ingest_sweep_batch(self, pc_id: int, entries: list[dict[str, Any]], *, first: bool = False) -> int:
+        if first or pc_id not in self._sweeps:
+            self._sweeps[pc_id] = datetime.now(timezone.utc)           # everything this sweep sees is newer than this
         n = 0
         for raw in entries:
             entry = _normalize(raw)
@@ -161,8 +165,23 @@ async def index_event(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("index.sweep_batch")
 async def index_sweep_batch(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    n = await ctx.engine.file_index.ingest_sweep_batch(_pc_id(ctx, payload), payload.get("entries") or [])
+    n = await ctx.engine.file_index.ingest_sweep_batch(_pc_id(ctx, payload), payload.get("entries") or [], first=bool(payload.get("first")))
     return {"accepted": n}
+
+
+@handler("index.sweep_done")
+async def index_sweep_done(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"roots": [..]}: a sweep of these folders ran to the end (it was not interrupted). What the index holds under them that the sweep did not
+    see is marked gone, so a file deleted while the machine was away stops counting as a collision, a copy or a search hit."""
+    pc_id = _pc_id(ctx, payload)
+    began = ctx.engine.file_index._sweeps.pop(pc_id, None)
+    roots = [str(r) for r in payload.get("roots") or []]
+    if began is None or not roots:
+        return {"gone": 0}
+    gone = await ctx.engine.db.file_index.mark_unseen_gone(pc_id, roots, began)
+    if gone:
+        await ctx.engine.audit.record(ctx, "index.swept", target_type="pcs", target_id=pc_id, pc_id=pc_id, detail={"gone": gone, "roots": roots})
+    return {"gone": gone}
 
 
 @handler("index.folders")

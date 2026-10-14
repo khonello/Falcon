@@ -528,6 +528,18 @@ class FileIndexRepo(_Repo):
             "UPDATE file_index SET gone_at = now() WHERE pc_id = $1 AND path = $2 AND gone_at IS NULL RETURNING id",
             pc_id, path)
 
+    async def mark_unseen_gone(self, pc_id: int, roots: list[str], before: datetime) -> int:
+        """A whole sweep of these folders finished, and these files were not seen in it: they are no longer there (deleted while the machine was
+        away, or by something that raised no event). The rows stay (no hard deletes); returns how many were marked."""
+        prefixes = [r.replace("\\", "/").rstrip("/").lower() + "/" for r in roots if r.strip()]
+        if not prefixes:
+            return 0
+        found = await self._fetch(
+            "UPDATE file_index SET gone_at = now() WHERE pc_id = $1 AND gone_at IS NULL AND last_seen_at < $2 "
+            "AND EXISTS (SELECT 1 FROM unnest($3::text[]) p WHERE starts_with(lower(replace(path, chr(92), '/')), p)) RETURNING id",
+            pc_id, before, prefixes)
+        return len(found)
+
     async def record_event(self, pc_id: int, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False,
                            content_hash: str | None = None, file_index_id: int | None = None) -> bool:
         """Append to the history of what happened to files and folders. A file being edited is recorded at most

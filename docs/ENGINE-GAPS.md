@@ -295,3 +295,16 @@ part is recorded for later, not built.
   whose keyless console signs in), `test_signpipe.py`, `test_enrollment.py`. *Run for real:* the Engine's installer on Linux (WSL), twice, with a Windows client connecting over the bundle's pinned certificate; the second run changed nothing. *Not run for real:* the Windows runtime venv with real wheels
   and the `.deb` build (the VMs); a non-administrator Windows user opening the pipe (the VM). *Still open:* a bundled interpreter, frozen helper windows, signing, the update pipeline, and whether
   the Super User's PC is also a managed machine.
+
+- **Flow, Restricted and Task tried live, and what that found** (14 Oct 2026). `python scripts/live_drill.py flow|restricted|task|gui` runs real Worker processes on this PC against a running
+  Engine and says PASS or FAIL per behaviour (28, 26, 26 and 36 checks; all pass now). It found and fixed: **Flow** -- a file over ~3 MB never arrived (one message longer than a
+  connection reads; now chunks both ways, `CHUNK_BYTES`), a destination that was away lost what it missed with no status (now paused as `destination:unreachable`, resumed when it
+  returns, and caught up: `flow.list` / `flow.listing`, `flow_sync_log.source_hash`, migration 031), a flow made over files already in the source folder or resumed after a pause sent
+  nothing of what was missed (same catch-up), a file being written was read at every event (now once, `FALCON_FLOW_SETTLE_SECONDS`), unfinished transfers lived forever (failed after ten
+  minutes); **Restricted** -- renaming or moving the marked original raised a copy issue against itself (the mark now follows a move: a move event, or a delete and a create of the same
+  content within ten seconds; a folder move takes its marks along), an allowance matched by path alone so other restricted content saved there went unreported (now that content on that
+  machine); **Task** -- `index.search` (the Task page's find-an-existing-file) failed on timestamps; **the index** -- files deleted while a Worker was away stayed "present" and
+  caused false collisions, so a complete idle sweep now marks what it did not see as gone (`index.sweep_done`). *Open, decided by the user:* a file deleted at the source is not deleted
+  at the destinations (the design says "updated to match source"); the index of a machine learns of offline deletions only at its next complete idle sweep; the console's forms
+  (New flow, New task, Mark files) are tested against faked answers, and every page loads clean against the live Engine, but filling a form through the real console is not scripted;
+  Task proposals were tried with the 0.6B model (the default 1.7B is not on this machine).

@@ -30,7 +30,7 @@ PIPE_NAME = r"\\.\pipe\FalconSign"
 SDDL = "D:(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
 MAX_NONCE = 256
 CLIENT_SECONDS = 3.0
-ABSENT_SECONDS = 0.3
+ABSENT_SECONDS = 1.5      # between one client being taken and the next instance being made there is a moment with no pipe at all; a loaded machine stretches it
 
 _PIPE_ACCESS_DUPLEX, _PIPE_REJECT_REMOTE_CLIENTS, _UNLIMITED = 0x3, 0x8, 255
 _ERROR_PIPE_CONNECTED, _ERROR_PIPE_BUSY = 535, 231
@@ -81,6 +81,12 @@ class SignPipeServer:
             self._thread = None
 
     def _run(self) -> None:
+        try:
+            self._serve()
+        except Exception as exc:  # noqa: BLE001 -- the pipe thread must say why it stopped, not vanish
+            self.error = f"the pipe stopped: {exc!r}"
+
+    def _serve(self) -> None:
         import ctypes
         from ctypes import wintypes
 

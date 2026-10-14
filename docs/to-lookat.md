@@ -43,3 +43,10 @@ Last updated 13 Oct 2026.
   an Admin's and a person's PC (Windows VMs), confirm each registration, and try the console as a non-administrator user on the Admin workstation (the pipe's access rules).
 - **Decide:** is the Super User's PC also a managed machine (the Worker service on it)? Today the Super User's installer is the console only.
 - **Not mine, and removed from the list:** the Admin console needs no blocked bar; the overlay on the Admin's PC does it (the Admin installer puts the Worker pieces there).
+
+## Flow, Restricted, Task tried live (14 Oct 2026)
+
+- Fixed along the way (see `ENGINE-GAPS.md`): big files, a destination that was away, files already in a source folder, a file mid-write, a marked file being moved, an allowance by path, `index.search`, ghosts in the index.
+- **Decide:** should a file deleted at a flow's source also be deleted at its destinations? Today it is not (the design says "destination updated to match source"; deleting is the risky half).
+- **Not scripted yet:** filling the console's own forms (New flow, New task, Mark files) against the live Engine, and a flow between two separate PCs (the drill uses three Workers on this one).
+- **The language model:** Task was tried with Qwen3-0.6B; the default Qwen3-1.7B is not on this machine (`python -m engine setup --download-model`).

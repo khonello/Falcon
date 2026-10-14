@@ -59,9 +59,13 @@ def test_a_console_gets_its_challenge_signed_over_a_real_pipe(pipe):
 
 @windows_only
 def test_a_client_that_connects_and_says_nothing_does_not_hold_the_pipe(pipe):
-    name, key, _ = pipe
+    name, key, server = pipe
     with open(name, "r+b", buffering=0):                                              # says nothing
-        assert signpipe.sign("still-works", name=name) == expected(key, "still-works")   # others are served meanwhile
+        try:
+            got = signpipe.sign("still-works", name=name)                                # others are served meanwhile
+        except OSError as exc:
+            raise AssertionError(f"not served while one client was silent: {exc!r}; server.error={server.error}; served={server.served}") from exc
+        assert got == expected(key, "still-works")
         time.sleep(signpipe.CLIENT_SECONDS + 0.5)                                    # and it is let go
     assert signpipe.sign("after", name=name) == expected(key, "after")
 

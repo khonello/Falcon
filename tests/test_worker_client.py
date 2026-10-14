@@ -1054,3 +1054,24 @@ async def test_the_installed_worker_service_connects_to_the_engine_as_its_machin
         assert org["w1_pc"] not in engine.online_pc_ids()
     finally:
         winservice.uninstall(name)
+
+
+async def test_a_complete_sweep_marks_what_it_did_not_see_as_gone(engine, org, tmp_path: Path):
+    """Found trying Flow live: files deleted while a Worker was away stayed 'present' in the index, so a new flow was told its destination
+    collided with 20 files that no longer existed."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "kept.txt").write_text("kept", encoding="utf-8")
+    svc = await _start(engine, tmp_path, "cid-w1", [str(docs)])
+    try:
+        # the index remembers a file that was deleted while nothing was watching (no event ever said so)
+        await engine.db.file_index.upsert(org["w1_pc"], str(docs / "ghost.txt"), "ghost.txt", "g", None, None, "event")
+        await engine.db.file_index.upsert(org["w1_pc"], str(tmp_path / "elsewhere" / "other.txt"), "other.txt", "o", None, None, "event")
+        assert await engine.db.file_index.by_path(org["w1_pc"], str(docs / "ghost.txt"), present_only=True) is not None
+        n = await svc.watcher.sweep()
+        assert n == 1                                                                       # it saw one file
+        assert await engine.db.file_index.by_path(org["w1_pc"], str(docs / "ghost.txt"), present_only=True) is None       # the ghost is gone
+        assert await engine.db.file_index.by_path(org["w1_pc"], str(docs / "kept.txt"), present_only=True) is not None
+        assert await engine.db.file_index.by_path(org["w1_pc"], str(tmp_path / "elsewhere" / "other.txt"), present_only=True) is not None   # outside what was swept
+    finally:
+        await svc.stop()
