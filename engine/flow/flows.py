@@ -312,6 +312,10 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                           "collisions_confirmed": len(checks["collisions"])})
     flow = await ctx.engine.db.flows.get(flow_id)
     assert flow is not None
+    if not pending:
+        from engine.flow import sync
+
+        sync.catch_up_later(ctx.engine, flow_id)               # what is already in the source folder is sent too
     return {"flow": await _flow_view(ctx.engine, flow), "consent_pending": bool(pending),
             "collisions_confirmed": checks["collisions"]}
 
@@ -340,6 +344,10 @@ async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await issues.resolve_source(ctx.engine, "flow_consent", flow_id, "Agreed" if granted else "Declined")
     await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.consent_answered",
                                      {"flow_id": flow_id, "granted": granted, "by_account_id": ident.account_id})
+    if granted:
+        from engine.flow import sync
+
+        sync.catch_up_later(ctx.engine, flow_id)
     return {"flow_id": flow_id, "granted": granted}
 
 
@@ -392,6 +400,10 @@ async def resume(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                   detail={"destination_id": dest_id})
     updated = await ctx.engine.db.flows.get(flow_id)
     assert updated is not None
+    if updated["status"] == "active":
+        from engine.flow import sync
+
+        sync.catch_up_later(ctx.engine, flow_id)               # what was missed while it was paused or failed is sent now
     return {"flow": await _flow_view(ctx.engine, updated)}
 
 

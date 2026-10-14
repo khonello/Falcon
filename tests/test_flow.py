@@ -126,3 +126,24 @@ async def test_propagation_attribution_conflict_and_failure(engine, org, connect
     await a1.ok("flow.delete", {"flow_id": flow["id"]})
     assert (await a1.ok("flow.list"))["flows"] == []
     assert await engine.db.pool.fetchval("SELECT count(*) FROM flow_sync_log") == 2
+
+
+async def test_a_file_that_keeps_changing_is_read_once_after_it_settles(engine, org, connect):
+    """A big copy or an editor saving raises event after event; reading at each would send half-written files and replace them."""
+    import asyncio
+
+    object.__setattr__(engine.settings, "flow_settle_seconds", 0.5)             # the settings are frozen; this test changes one
+    a1 = await connect("cid-a1")
+    await a1.ok("flow.create", flow_payload(org["a1_pc"], [(org["w1_pc"], "C:/in")]))
+    await a1.drain_pushes()
+    for i in range(6):
+        await a1.ok("index.event", {"event": {"op": "modify", "path": "C:/out/big.bin", "hash": f"h{i}"}})
+        await asyncio.sleep(0.1)
+    assert [p for p in await a1.drain_pushes() if p.type == "flow.read"] == []                 # still being written: not read yet
+    await asyncio.sleep(0.8)
+    reads = [p for p in await a1.drain_pushes() if p.type == "flow.read"]
+    assert len(reads) == 1 and reads[0].payload["path"] == "C:/out/big.bin"                     # read once, after it stopped changing
+    # a different file is not held back by it
+    await a1.ok("index.event", {"event": {"op": "modify", "path": "C:/out/other.txt", "hash": "x"}})
+    await asyncio.sleep(0.8)
+    assert [p.payload["path"] for p in await a1.drain_pushes() if p.type == "flow.read"] == ["C:/out/other.txt"]

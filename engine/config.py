@@ -38,6 +38,8 @@ class Settings:
     update_escalation_failures: int = 3
     # Polled/evaluated Events (thresholds, idle, time) are checked on this interval.
     control_poll_seconds: int = 15
+    # A file being written raises many events; a flow reads it once, this long after the last one (0: at once).
+    flow_settle_seconds: float = 1.0
     # Local LLM (spec 7.2.1). Never an external API. In-process llama.cpp by default (open
     # item 10.3); 'openai' / 'ollama' select a local sidecar process instead.
     llm_backend: str = "llamacpp"
@@ -78,6 +80,7 @@ class Settings:
                 os.environ.get("FALCON_UPDATE_ESCALATION_FAILURES", cls.update_escalation_failures)
             ),
             control_poll_seconds=int(os.environ.get("FALCON_CONTROL_POLL_SECONDS", cls.control_poll_seconds)),
+            flow_settle_seconds=float(os.environ.get("FALCON_FLOW_SETTLE_SECONDS", cls.flow_settle_seconds)),
             llm_backend=os.environ.get("FALCON_LLM_BACKEND", cls.llm_backend),
             llm_model_path=os.environ.get("FALCON_LLM_MODEL_PATH", cls.llm_model_path) or None,
             llm_endpoint=os.environ.get("FALCON_LLM_ENDPOINT", cls.llm_endpoint),

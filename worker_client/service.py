@@ -220,6 +220,8 @@ class WorkerService:
                 await self.executor.terminate(int(payload["execution_id"]))
             elif type_ == "flow.read":
                 await self.flowsync.on_read(payload)
+            elif type_ == "flow.list":
+                await self.flowsync.on_list(payload)
             elif type_ == "flow.apply":
                 await self.flowsync.on_apply(payload)
             elif type_ == "flow.resolve_conflict":

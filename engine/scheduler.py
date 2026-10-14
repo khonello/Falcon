@@ -54,6 +54,7 @@ class Scheduler:
         self.every("control.polled", float(self.engine.settings.control_poll_seconds), self._evaluate_polled)
         self.every("alerts.deliver", 30.0, self._deliver_alerts)
         self.every("enroll.expire", 600.0, self._expire_enrollments)
+        self.every("flow.transfers", 30.0, self._expire_flow_transfers)
         self.every("issues.sweep", 60.0, self._sweep_issues)
         self.every("accountability.sweep", 60.0, self._sweep_accountability)
         for name, seconds, job in self._periodic:
@@ -77,6 +78,11 @@ class Scheduler:
         from engine.console import issues
 
         await issues.sweep(self.engine)
+
+    async def _expire_flow_transfers(self) -> None:
+        from engine.flow import sync
+
+        await sync.expire_transfers(self.engine)
 
     async def _expire_enrollments(self) -> None:
         from engine.hierarchy import enrollment

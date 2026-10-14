@@ -147,7 +147,8 @@ async def engine() -> Engine:
     assert TEST_DB_URL
     eng = Engine(Settings(host="127.0.0.1", port=0, database_url=TEST_DB_URL, dev_plaintext=True,
                           master_secret=TEST_MASTER_SECRET,
-                          refuse_unreachable=False))   # most tests enter machines with no worker running
+                          refuse_unreachable=False,    # most tests enter machines with no worker running
+                          flow_settle_seconds=0.0))    # a flow reads a changed file at once (settling is tested on its own)
     await eng.db.connect()
     await _wipe_and_migrate(eng.db)
     await eng.db.close()

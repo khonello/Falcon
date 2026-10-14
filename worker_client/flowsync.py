@@ -1,8 +1,11 @@
 """Flow work on this PC (Flow -> Synchronization Mechanism, Stages, Conflict Handling).
 
     flow.read {transfer_id, path}                    -> we send flow.content {transfer_id, hash, content_b64}
+                                                        (a big file in chunks: {..., chunk: {index, total}, content_b64})
+    flow.list {request_id, path}                     -> we send flow.listing {request_id, entries: [{relative_path, hash}], done}
     flow.apply {transfer_id, destination_id, destination_path, relative_path, stages, content_b64}
                                                      -> write through the stages, then flow.sync_result
+                                                        (a big file arrives in chunks, each with chunk: {index, total}; written when whole)
     flow.resolve_conflict {path, rename_to}          -> rename the externally modified copy
 
 Stages (v1):
@@ -39,11 +42,17 @@ CONVERTERS: dict[tuple[str, str], Converter] = {
 }
 
 
+CHUNK_BYTES = 512 * 1024          # raw bytes per message: one message must stay far below what a connection reads at a time
+LIST_BATCH = 200
+
+
 class FlowSync:
-    def __init__(self, report: Reporter, *, read_limit: int = 64 << 20) -> None:
+    def __init__(self, report: Reporter, *, read_limit: int = 64 << 20, hash_limit: int = 64 << 20) -> None:
         self.report = report
         self.read_limit = read_limit
+        self.hash_limit = hash_limit
         self.written_hashes: dict[str, str] = {}  # path -> sha256 of our last write
+        self._arriving: dict[tuple[str, int], dict[int, bytes]] = {}      # chunks of a file on its way in
 
     async def on_read(self, payload: dict[str, Any]) -> None:
         transfer_id, path = payload["transfer_id"], Path(payload["path"])
@@ -55,13 +64,50 @@ class FlowSync:
             log.warning("flow.read %s failed: %s", path, exc)
             await self.report("flow.content", {"transfer_id": transfer_id, "error": "unreadable"})
             return
-        await self.report("flow.content", {"transfer_id": transfer_id, "hash": hashlib.sha256(data).hexdigest(),
-                                           "content_b64": base64.b64encode(data).decode("ascii")})
+        digest = hashlib.sha256(data).hexdigest()
+        if len(data) <= CHUNK_BYTES:
+            await self.report("flow.content", {"transfer_id": transfer_id, "hash": digest, "content_b64": base64.b64encode(data).decode("ascii")})
+            return
+        total = (len(data) + CHUNK_BYTES - 1) // CHUNK_BYTES
+        for index in range(total):
+            piece = data[index * CHUNK_BYTES:(index + 1) * CHUNK_BYTES]
+            await self.report("flow.content", {"transfer_id": transfer_id, "hash": digest, "chunk": {"index": index, "total": total},
+                                               "content_b64": base64.b64encode(piece).decode("ascii")})
+
+    async def on_list(self, payload: dict[str, Any]) -> None:
+        """What this folder holds now, with each file's hash, so the Engine can send a destination what it is missing."""
+        request_id, root = payload["request_id"], Path(payload["path"])
+
+        def walk() -> list[dict[str, Any]]:
+            found = []
+            for dirpath, _dirs, files in os.walk(root):
+                for name in files:
+                    f = Path(dirpath) / name
+                    try:
+                        digest = hash_of(f, self.hash_limit)
+                    except OSError:
+                        continue                                  # locked or gone: it will come with its own event
+                    found.append({"relative_path": str(f.relative_to(root)).replace("\\", "/"), "hash": digest})
+            return found
+
+        entries = await asyncio.to_thread(walk) if root.is_dir() else []
+        for i in range(0, max(len(entries), 1), LIST_BATCH):
+            await self.report("flow.listing", {"request_id": request_id, "entries": entries[i:i + LIST_BATCH],
+                                              "done": i + LIST_BATCH >= len(entries)})
 
     async def on_apply(self, payload: dict[str, Any]) -> None:
         transfer_id, dest_id = payload["transfer_id"], payload["destination_id"]
+        chunk = payload.get("chunk")
+        piece = base64.b64decode(payload.get("content_b64") or "")
+        if chunk:
+            parts = self._arriving.setdefault((transfer_id, dest_id), {})
+            parts[int(chunk["index"])] = piece
+            if len(parts) < int(chunk["total"]):
+                return                                            # the rest is on its way
+            piece = b"".join(parts[i] for i in range(int(chunk["total"])))
+            del self._arriving[(transfer_id, dest_id)]
         try:
-            data = base64.b64decode(payload.get("content_b64") or "")
+            data = piece
             rel = str(payload["relative_path"]).replace("\\", "/")
             target = Path(str(payload["destination_path"])) / rel
             for stage in payload.get("stages") or []:
@@ -120,6 +166,17 @@ class FlowSync:
             folder = target.suffix.lower().lstrip(".") or "other"
             return target.parent / folder / target.name, data
         return target, data
+
+
+def hash_of(path: Path, limit: int) -> str | None:
+    """sha256 of a file, or None above the size a flow relays."""
+    if path.stat().st_size > limit:
+        return None
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
 
 
 class StageError(Exception):

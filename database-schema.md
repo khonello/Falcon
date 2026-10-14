@@ -629,3 +629,8 @@ Postgres adaptations applied uniformly: identity columns for PKs, `TIMESTAMPTZ` 
 `issues.type` also takes `'component'`: a Worker's indexer or event tracker that keeps dying. The Worker service reports it
 (`control.component_status {component, healthy}`); one issue per machine and part (`source_table = 'component_status'`,
 `source_id = pc_id * 10 + 1 (indexer) | 2 (tracker)`), closed by the next report that says it is healthy again. Code prefix `CMP`.
+
+### What a destination was last given (migration 031)
+
+`flow_sync_log.source_hash`: the hash of the SOURCE file a sync was made from (`content_hash` stays what was written, which a stage may change). The Engine reads the latest
+per destination and source file to catch a destination up (`engine/flow/sync.py`): after a pause, a failure, an absence, a new flow over files already there, or a granted consent.

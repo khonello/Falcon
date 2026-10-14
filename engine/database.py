@@ -1258,12 +1258,28 @@ class FlowsRepo(_Repo):
 
     async def log_sync(self, destination_id: int, content_hash: str, written_by: str,
                        written_by_account_id: int | None, conflict_resolved: bool = False, *,
-                       source_relative_path: str | None = None, written_path: str | None = None) -> int:
+                       source_relative_path: str | None = None, written_path: str | None = None,
+                       source_hash: str | None = None) -> int:
         return await self._val(
             "INSERT INTO flow_sync_log (flow_destination_id, content_hash, written_by, written_by_account_id, "
-            "conflict_resolved, source_relative_path, written_path) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+            "conflict_resolved, source_relative_path, written_path, source_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
             destination_id, content_hash, written_by, written_by_account_id, conflict_resolved,
-            source_relative_path, written_path)
+            source_relative_path, written_path, source_hash)
+
+    async def synced_source_hashes(self, destination_id: int) -> dict[str, str | None]:
+        """What this destination was last given, per source file (lower-case relative path -> the source hash it was made from)."""
+        found = await self._fetch(
+            "SELECT DISTINCT ON (lower(replace(source_relative_path, '\\', '/'))) "
+            "lower(replace(source_relative_path, '\\', '/')) AS rel, source_hash FROM flow_sync_log "
+            "WHERE flow_destination_id = $1 AND written_by = 'flow_sync' AND source_relative_path IS NOT NULL "
+            "ORDER BY lower(replace(source_relative_path, '\\', '/')), occurred_at DESC, id DESC", destination_id)
+        return {r["rel"]: r["source_hash"] for r in found}
+
+    async def paused_unreachable_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
+        """Destinations on this machine that were paused only because it could not be reached (and whose flow is still running)."""
+        return await self._fetch(
+            "SELECT d.id, d.flow_id FROM flow_destinations d JOIN flows f ON f.id = d.flow_id "
+            "WHERE d.destination_pc_id = $1 AND d.removed_at IS NULL AND f.status = 'active' AND d.paused_reason = 'destination:unreachable'", pc_id)
 
     async def last_sync(self, destination_id: int) -> dict[str, Any] | None:
         return await self._one(
