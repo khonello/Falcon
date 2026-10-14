@@ -349,3 +349,12 @@ async def test_a_department_task_is_not_an_admins_task(engine, org, connect):
                                             "admin_ids": [a1b]}))["task"]
     assert one["told"] == 1 and (await a1.ok("task.dept_list"))["tasks"] == []
     assert [t["id"] for t in (await a1_2.ok("task.dept_list"))["tasks"]] == [one["id"]]
+
+
+async def test_searching_the_index_returns_files_with_their_times(engine, org, connect):
+    """Found trying Task live: index.search (the Task page's 'find an existing file') returned raw rows and failed on their timestamps."""
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1")
+    await w1.ok("index.event", {"event": {"op": "create", "path": "C:/docs/budget-2026.txt", "hash": "H"}})
+    found = (await a1.ok("index.search", {"query": "budget-2026"}))["results"]
+    assert [f["filename"] for f in found] == ["budget-2026.txt"]

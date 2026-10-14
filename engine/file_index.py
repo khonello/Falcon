@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any
 from engine.dispatch import Context, handler
 from engine.permissions import int_field, require_department_scope, require_role
 from engine.resource.resource import allowed_tags_for
+from engine.serialize import rows
 from protocol import ErrorCode, ProtocolError
 
 if TYPE_CHECKING:
@@ -187,4 +188,4 @@ async def index_search(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = ctx.identity
     results = await ctx.engine.file_index.search(query, role=ident.role or "worker",
                                                  department_id=ident.department_id)
-    return {"results": results}
+    return {"results": rows(results)}
