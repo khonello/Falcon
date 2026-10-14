@@ -85,7 +85,7 @@ ApplicationWindow {
     // a page and the thing open on it: some open a page of their own (a machine, an editor)
     function pageFile(p, s) {
         if (p === "machines" && s) return "MachinePage.qml"
-        if (p === "tasks" && s === "new") return "NewTaskPage.qml"
+        if (p === "tasks" && s === "new") return Nav.boss ? "GiveTaskPage.qml" : "NewTaskPage.qml"
         if (p === "restricted" && s === "mark") return "MarkPage.qml"
         if (p === "flows" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewFlowPage.qml"
         if (p === "automation" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewRulePage.qml"

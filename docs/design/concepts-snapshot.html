@@ -3684,6 +3684,61 @@ function TaskPath({ t }) {
     <circle cx=${X(4)} cy=${top + (adm.length * rh) / 2} r="9" style=${{ fill: anyDone ? "color-mix(in srgb, var(--ok) 18%, var(--surface))" : "var(--surface)", stroke: anyDone ? "var(--ok)" : "var(--text-4)" }} strokeWidth="1.75" />
   </svg></div>`;
 }
+// The Super User's New task (14 Oct 2026: a page, as every other New is, no longer a drawer over the list). What needs
+// doing, the department, who in it is told and the deadline on the left; on the right, what those Admins will see the
+// moment it is given. No checks are set: the Admins say how far it has got and only the Super User completes it.
+function GiveTask({ go }) {
+  useDT();
+  const blank = { text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] };
+  const [t, setT] = useState(blank);
+  const [modal, modalCtx] = Modal.useModal();
+  const set = (patch) => setT((x) => ({ ...x, ...patch }));
+  const depts = FULL.DEPTS || DEPTS, dd = depts.find((x) => x.id === t.dept);
+  const told = dd ? (t.who === "all" || dd.admins.length < 2 ? dd.admins : t.some) : [];
+  const base = dayjs("2026-10-01T00:00:00"), quick = [["today", "End of today", 17], ["fri", "Friday 17:00", 41], ["week", "In a week", 17 + 24 * 7]];
+  const dueAt = base.add(t.due * 60, "minute").format("ddd D MMM, HH:mm");
+  const miss = !t.text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : !told.length ? "Pick at least one Admin." : null;
+  const leave = () => go("tasks");
+  const cancel = () => (!t.text.trim() && !t.dept ? leave() : modal.confirm({ title: "Stop giving this task?", content: "Nothing has been given. What you have written is discarded.", okText: "Discard", okButtonProps: { danger: true }, cancelText: "Keep going", onOk: leave }));
+  const save = () => { const id = `D-${200 + DEPT_TASKS.length}`;
+    dtChange(() => DEPT_TASKS.unshift({ id, title: t.text.trim(), dept: dd.id, at: NOWH + (Date.now() - T0) / 3.6e6, due: t.due, st: Object.fromEntries(told.map((a) => [a, "sent"])), when: {} }));
+    toast(`Given to ${dd.name} · ${told.length > 2 ? told.length + " Admins" : told.join(" and ")} told (concept)`); go("tasks", id); };
+  const left = html`<section className="panel" style=${{ minWidth: 0 }}>
+    <div className="phd"><div className="pt">Give a department a task<small>its Admins say how far it has got; only you complete it</small></div></div>
+    <div className="pbd" style=${{ display: "flex", flexDirection: "column", gap: 22, padding: "18px 20px 22px" }}>
+      <div><div className="nt-h">What needs doing</div>
+        <${Input.TextArea} id="dt-text" autoSize=${{ minRows: 3, maxRows: 6 }} maxLength=${200} showCount value=${t.text} onChange=${(e) => set({ text: e.target.value })} placeholder="Collect the signed leave forms from every team" /></div>
+      <div><div className="nt-h">Department</div>
+        <${Select} id="dt-dept" showSearch optionFilterProp="label" style=${{ width: "100%", maxWidth: 420 }} placeholder="Which department?" value=${t.dept} onChange=${(v) => set({ dept: v, some: [] })}
+          options=${depts.map((x) => ({ value: x.id, label: x.admins.length ? x.name : `${x.name} · no Admin`, disabled: !x.admins.length }))} />
+        ${!dd ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>A department with no Admin cannot take a task. Assign one first, from Departments.</div>` : null}</div>
+      ${dd && dd.admins.length > 1 ? html`<div><div className="nt-h">Who is told</div>
+        <${Segmented} value=${t.who} onChange=${(v) => set({ who: v })} options=${[{ value: "all", label: `Every Admin in ${fitEnd(dd.name, 22)} (${dd.admins.length})` }, { value: "some", label: "Only some" }]} />
+        ${t.who === "some" ? html`<${Select} id="dt-some" mode="multiple" maxTagCount="responsive" showSearch style=${{ width: "100%", maxWidth: 420, marginTop: 8 }} placeholder="Which Admins?" value=${t.some}
+          onChange=${(v) => set({ some: v })} options=${dd.admins.map((a) => ({ value: a, label: `${a} · ${ADMIN_INFO[a] && ADMIN_INFO[a].busy ? "inside a machine" : "at their desk"}` }))} />` : null}</div>` : null}
+      <div><div className="nt-h">Deadline</div>
+        <${Segmented} value=${t.dueKey} onChange=${(k) => { const q = quick.find((x) => x[0] === k); set({ dueKey: k, due: q ? q[2] : t.due }); }} options=${[...quick.map(([k, l]) => ({ value: k, label: l })), { value: "pick", label: "Pick a date" }]} />
+        ${t.dueKey === "pick" ? html`<div style=${{ marginTop: 8 }}><${DatePicker} id="dt-due" showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${base.add(t.due * 60, "minute")} onChange=${(v) => v && set({ due: v.diff(base, "minute") / 60 })} /></div>` : null}
+        <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>Due ${dueAt}.</div></div>
+    </div></section>`;
+  const right = html`<section className="panel" style=${{ minWidth: 0 }}>
+    <div className="phd"><div className="pt">What they see<small>the moment you give it</small></div></div>
+    <div className="pbd" style=${{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="newtask" style=${{ borderRadius: 6, border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)", padding: "9px 12px" }}>
+        <span className="nt-ico">${ic("NotificationFilled")}</span>
+        <b style=${{ fontWeight: 600, flex: "none" }}>New task from the Super User</b>
+        <span className="nt-t ${t.text.trim() ? "" : "t4"}" title=${t.text}>${t.text.trim() || "What needs doing"}</span>
+        <span className="mono" style=${{ flex: "none" }}>due ${t.due < 24 ? "today " + hhmm(t.due) : dayOf(t.due) + " " + hhmm(t.due)}</span></div>
+      <div className="t3" style=${{ fontSize: 12.5 }}>On every page of their console until they mark it seen. You see when each of them does.</div>
+      <div><div className="nt-h">Told${told.length ? html` <span className="t4" style=${{ fontWeight: 400 }}>${told.length}</span>` : null}</div>
+        ${told.length ? told.map((a) => html`<div key=${a} className="org-adm"><span className="av">${a.split(/[ .]+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2)}</span>
+            <div style=${{ minWidth: 0 }}><div style=${{ fontWeight: 500 }}>${a}</div><div className="t3" style=${{ fontSize: 12 }}>${ADMIN_INFO[a] && ADMIN_INFO[a].busy ? "inside a machine" : "at their desk"}${ADMIN_INFO[a] && ADMIN_INFO[a].ws ? " · " + ADMIN_INFO[a].ws : ""}</div></div></div>`)
+          : html`<div className="t3" style=${{ fontSize: 12.5 }}>${dd ? "Nobody picked yet." : "Pick a department to see who is told."}</div>`}
+        ${dd && t.who === "some" && told.length ? html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>The others in ${dd.name} do not see it.</div>` : null}</div>
+      <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>No checks are set: the Admins say how far it has got, and you decide when it is complete. Nothing is closed for you.</div>
+    </div></section>`;
+  return html`<${React.Fragment}>${modalCtx}<${EditorShell} ratio="minmax(0, 7fr) minmax(0, 5fr)" left=${left} right=${right} problem=${miss} note=${dd ? `Given to ${dd.name} as soon as you press it` : ""} onCancel=${cancel} saveLabel="Give it to them" onSave=${save} /><//>`;
+}
 function GivenToDepts({ go, open: open0 }) {
   useDT();
   // what a department task needs from you decides where it sits, as on the Admin's Tasks page
@@ -3693,12 +3748,10 @@ function GivenToDepts({ go, open: open0 }) {
   const [f, setF] = useState(null);
   const open = DEPT_TASKS.filter((t) => !t.complete).sort((a, b) => Object.keys(DCAT).indexOf(catOf(a)) - Object.keys(DCAT).indexOf(catOf(b)) || a.due - b.due);
   const dtasks = open.filter((t) => !f || catOf(t) === f);
-  const [newT, setNewT] = useState(null);
   const [pick, setPick0] = useState(open0 || null);
   const setPick = (id) => { setPick0(id); keepOpen("tasks", id); };
   const [tq, setTq] = useState("");
   const wpg = usePaged(dtasks, 6, f);
-  const blankT = { text: "", dept: undefined, due: 41, dueKey: "fri", who: "all", some: [] };
   const waiting = open.filter((t) => catOf(t) === "verify");
   const setSel = (id) => { WORK_PRESET = id; go("overview"); };
   const state = (t) => { const stt = taskState(t), adm = Object.keys(t.st), who = adm.filter((x) => t.st[x] === stt), seen = adm.filter((x) => t.st[x] !== "sent").length;
@@ -3708,46 +3761,17 @@ function GivenToDepts({ go, open: open0 }) {
       return { key: k, label: w, value: fmt(n), delta: k === "late" && n ? "past the deadline" : k === "verify" && n ? "only you can complete" : "", dc: k === "late" && n ? "var(--crit)" : undefined }; })} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <${ListPanel} title=${f ? DCAT[f][0] : "Given to departments"} sub=${f ? html`<span>${fmt(dtasks.length)} · <a onClick=${() => setF(null)}>show all ${fmt(open.length)}</a></span>` : "most urgent first · click one to see it on the right"}
-        q=${tq} setQ=${setTq} placeholder="Filter by task or department" action=${{ label: "New task", onClick: () => setNewT(blankT) }} pick=${pick} onPick=${setPick} rowKey="id"
+        q=${tq} setQ=${setTq} placeholder="Filter by task or department" action=${{ label: "New task", onClick: () => go("tasks", "new") }} pick=${pick} onPick=${setPick} rowKey="id"
         rows=${dtasks.map((t) => ({ ...t, dn: ((FULL.DEPTS || DEPTS).find((x) => x.id === t.dept) || { name: t.dept }).name })).filter((t) => `${t.title} ${t.dn} ${t.id}`.toLowerCase().includes(tq.toLowerCase()))}
         icon="CheckSquareOutlined" name=${{ title: "Task", text: (r) => r.title, line: (r) => `${r.id} · ${r.dn}` }}
         cols=${[{ title: "Told", text: (r) => listNames(Object.keys(r.st)) },
           { title: "Deadline", width: 150, bar: (r) => ({ v: Math.max(0, Math.min(1, (NOWH - r.at) / Math.max(1, r.due - r.at))), max: 1, text: dueText(r.due) }) }]}
         now=${(r) => { const k = catOf(r); return k === "verify" ? ["Ready to complete", "good"] : k === "late" ? ["Past its deadline", "bad"] : k === "unseen" ? ["Not seen yet", "wait"] : ["Under way", "good"]; }}
-        empty=${!open.length ? html`<${Empty} icon="CheckSquareOutlined" title="Nothing given to a department" text="A task goes to a department's Admins. They say how far it has got; only you call it complete." act="New task" onAct=${() => setNewT(blankT)} h=${200} />` : null} />
+        empty=${!open.length ? html`<${Empty} icon="CheckSquareOutlined" title="Nothing given to a department" text="A task goes to a department's Admins. They say how far it has got; only you call it complete." act="New task" onAct=${() => go("tasks", "new")} h=${200} />` : null} />
       ${(() => { const t = dtasks.find((x) => x.id === pick) || dtasks[0]; return t ? html`<${TaskBoard} key=${"s" + t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="side" />`
         : html`<${SidePanel} empty=${html`<${Empty} icon="CheckSquareOutlined" title="Nothing given" text="Give a department a task; it shows here when you pick it." h=${200} />`} />`; })()}
     </div>
     ${(() => { const t = dtasks.find((x) => x.id === pick) || dtasks[0]; return t ? html`<${TaskBoard} key=${t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="chart" />` : null; })()}
-    <${Drawer} open=${!!newT} onClose=${() => setNewT(null)} width=${480} title="Give a department a task"
-      footer=${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept), miss = !newT.text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : newT.who === "some" && !newT.some.length ? "Pick at least one Admin." : null;
-        return html`<div className="row"><span className="t3" style=${{ fontSize: 12 }}>${miss || ""}</span><span className="sp" /><${Button} onClick=${() => setNewT(null)}>Cancel<//>
-          <${Button} type="primary" disabled=${!!miss} onClick=${() => { const told = newT.who === "all" ? dd.admins : newT.some, st = Object.fromEntries(told.map((a) => [a, "sent"]));
-            dtChange(() => DEPT_TASKS.unshift({ id: `D-${200 + DEPT_TASKS.length}`, title: newT.text.trim(), dept: dd.id, at: NOWH + (Date.now() - T0) / 3.6e6, due: newT.due, st, when: {} })); wpg.setPage(0); setNewT(null);
-            toast(`Given to ${dd.name} · ${told.length > 2 ? told.length + " Admins" : told.join(" and ")} told (concept)`); }}>Give it to them<//></div>`; })() : null}>
-      ${newT ? (() => { const dd = (FULL.DEPTS || DEPTS).find((x) => x.id === newT.dept);
-        const base = dayjs("2026-10-01T00:00:00"), quick = [["today", "End of today", 17], ["fri", "Friday 17:00", 41], ["week", "In a week", 17 + 24 * 7]];
-        return html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div><div className="nt-h">What needs doing</div>
-            <${Input.TextArea} id="dt-text" autoSize=${{ minRows: 3, maxRows: 6 }} maxLength=${280} showCount value=${newT.text} onChange=${(e) => setNewT({ ...newT, text: e.target.value })} placeholder="Collect the signed leave forms from every team" /></div>
-          <div><div className="nt-h">Department</div>
-            <${Select} id="dt-dept" showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Which department?" value=${newT.dept} onChange=${(v) => setNewT({ ...newT, dept: v, some: [] })}
-              options=${(FULL.DEPTS || DEPTS).map((x) => ({ value: x.id, label: x.admins.length ? x.name : `${x.name} · no Admin`, disabled: !x.admins.length }))} />
-            ${dd ? (() => { const told = newT.who === "all" ? dd.admins : newT.some;
-              return html`<div>
-              ${dd.admins.length > 1 ? html`<div style=${{ marginTop: 12 }}><div className="nt-h">Who is told</div>
-                <${Segmented} value=${newT.who} onChange=${(v) => setNewT({ ...newT, who: v })} options=${[{ value: "all", label: `Every Admin in ${fitEnd(dd.name, 22)} (${dd.admins.length})` }, { value: "some", label: "Only some" }]} />
-                ${newT.who === "some" ? html`<${Select} id="dt-some" mode="multiple" maxTagCount="responsive" showSearch style=${{ width: "100%", marginTop: 8 }} placeholder="Which Admins?" value=${newT.some}
-                  onChange=${(v) => setNewT({ ...newT, some: v })} options=${dd.admins.map((a) => ({ value: a, label: `${a} · ${ADMIN_INFO[a] && ADMIN_INFO[a].busy ? "inside a machine" : "at their desk"}` }))} />` : null}</div>` : null}
-              <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>${ic("NotificationOutlined")} ${told.length ? `${told.length > 3 ? `${told.slice(0, 3).join(", ")} and ${told.length - 3} more` : told.join(" and ")} ${told.length === 1 ? "is" : "are"} told as soon as you give it, on every page of their console until they mark it seen.` : "Nobody picked yet."}${newT.who === "some" && told.length ? " The others in the department do not see it." : ""}</div></div>`; })()
-              : html`<div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>A department with no Admin cannot take a task. Assign one first, from its card above.</div>`}</div>
-          <div><div className="nt-h">Deadline</div>
-            <${Segmented} value=${newT.dueKey} onChange=${(k) => { const q = quick.find((x) => x[0] === k); setNewT({ ...newT, dueKey: k, due: q ? q[2] : newT.due }); }} options=${[...quick.map(([k, l]) => ({ value: k, label: l })), { value: "pick", label: "Pick a date" }]} />
-            ${newT.dueKey === "pick" ? html`<div style=${{ marginTop: 8 }}><${DatePicker} id="dt-due" showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${base.add(newT.due * 60, "minute")} onChange=${(v) => v && setNewT({ ...newT, due: v.diff(base, "minute") / 60 })} /></div>` : null}
-            <div className="t3" style=${{ fontSize: 12.5, marginTop: 8 }}>Due ${base.add(newT.due * 60, "minute").format("ddd D MMM, HH:mm")}.</div></div>
-          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>No checks are set: the Admins say how far it has got, and you decide when it is complete. Nothing is closed for you.</div>
-        </div>`; })() : null}
-    <//>
   <//>`;
 }
 const LIST_ROWS = 6, LIST_H = 452;
@@ -5380,7 +5404,7 @@ function App() {
   else if (page === "machines") body = sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
   else if (page === "sessions" || page === "access") body = html`<${AccessPage} go=${go} open=${sub} me=${level ? level.admin : null} />`;
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
-  else if (page === "tasks") body = !level && (!sub || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${GivenToDepts} go=${go} open=${sub} />` : sub === "new" ? html`<${NewTask} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
+  else if (page === "tasks") body = !level && sub === "new" ? html`<${GiveTask} go=${go} />` : !level && (!sub || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${GivenToDepts} go=${go} open=${sub} />` : sub === "new" ? html`<${NewTask} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
   else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : html`<${FlowsSU} go=${go} me=${level ? level.admin : null} open=${FBY[sub] ? sub : null} />`;
   else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;

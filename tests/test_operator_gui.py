@@ -288,7 +288,7 @@ async def test_the_super_user_never_opens_an_admin_s_page(console):
 
 PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
-    ("admin", "restricted/mark"), ("admin", "machines/OPS-01"), ("super_user", "rules/new"), ("super_user", "rules/edit-O-5")]
+    ("admin", "restricted/mark"), ("admin", "machines/OPS-01"), ("super_user", "rules/new"), ("super_user", "rules/edit-O-5"), ("super_user", "tasks/new")]
 
 
 @pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])
@@ -456,6 +456,24 @@ async def test_a_flow_s_steps_keep_their_names_and_their_place(console):
                               {"stage_type": "transformation", "parent_index": 0, "config": {"op": "Compress to ZIP"}}]
     assert [d["parent_index"] for d in sent["destinations"]] == [0, 1]
 
+
+
+async def test_the_super_user_gives_a_task_on_its_own_page(console):
+    """New task at the Super User's level is a page, not a drawer over the list: it holds Give back until the work and
+    a department with an Admin are set, shows who is told, and sends task.dept_create, then opens the list."""
+    win, bridge, _ = console("super_user")
+    page = await _open(win, bridge, "tasks/new", "giveTask")
+    assert prop(page, "problem") == "Say what needs doing."
+    page.setProperty("text", "Collect the signed leave forms")
+    assert prop(page, "problem") == "Pick a department."
+    page.setProperty("dept", 1)
+    await _wait(lambda: prop(page, "problem") == "")
+    assert [a["name"] for a in prop(page, "told")] == ["R. Mensah"]
+    QMetaObject.invokeMethod(page, "save")
+    await _wait(lambda: any(t == "task.dept_create" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "task.dept_create")
+    assert sent["department_id"] == 1 and sent["title"] == "Collect the signed leave forms" and "admin_ids" not in sent
+    await _wait(lambda: prop(win, "where") == "tasks")
 
 async def test_one_person_s_pings_are_one_row_with_every_time(console):
     """The Engine answers a row per ping; two pings from Kojo are one row that says twice, answered as the first."""

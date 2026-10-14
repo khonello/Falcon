@@ -4,7 +4,7 @@ import "."
 // TASKS, AT THE SUPER USER'S LEVEL: work given to departments. No checks -- such work is rarely a file or
 // a program. Every Admin told marks it seen, ongoing or done; the furthest any has got is where it
 // stands; only the Super User calls it complete. The list, the task beside it with that decision, and
-// how far each Admin has got drawn under both. New task opens a drawer.
+// how far each Admin has got drawn under both. New task opens its own page (GiveTaskPage).
 Page {
     id: page
     objectName: "tasksView"
@@ -56,7 +56,7 @@ Page {
             onSubLinkClicked: page.f = ""
             placeholder: "Filter by task or department"
             actionLabel: "New task"
-            onAction: newTask.start()
+            onAction: Nav.go("tasks", "new")
             rows: page.rows
             pick: page.t ? page.t.id : null
             onPicked: function (k) { page.sel = k; page.note = "" }
@@ -72,7 +72,7 @@ Page {
             emptyTitle: "Nothing given to a department"
             emptyText: "A task goes to a department's Admins. They say how far it has got; only you call it complete."
             emptyAct: "New task"
-            onEmptyAction: newTask.start()
+            onEmptyAction: Nav.go("tasks", "new")
         }
         SidePanel {
             width: (parent.width - 14) * 4 / 12
@@ -116,81 +116,5 @@ Page {
         title: page.t ? "How far it has got · " + page.t.title : ""
         sub: page.t ? Fleet.deptName(page.t.department_id) + " · the same task as on the right" : ""
         TaskPath { width: parent.width; task: page.t }
-    }
-
-    // --- give a department a task -------------------------------------------------------------------
-    Drawer {
-        id: newTask
-        page: page
-        width: 480
-        title: "Give a department a task"
-        property string text: ""
-        property int dept: 0
-        property string who: "all"
-        property var some: []
-        property string dueKey: "fri"
-        property var due: null
-        readonly property var dd: Fleet.dept(dept)
-        readonly property var told: dd ? (who === "all" ? dd.admins : dd.admins.filter(function (a) { return newTask.some.indexOf(a.account_id) >= 0 })) : []
-        function quick(k) {
-            var d = new Date(Time.now)
-            if (k === "today") d.setHours(17, 0, 0, 0)
-            else if (k === "fri") { d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7 || 7)); d.setHours(17, 0, 0, 0) }
-            else if (k === "week") { d.setDate(d.getDate() + 7); d.setHours(17, 0, 0, 0) }
-            return d.toISOString()
-        }
-        function start() { text = ""; dept = 0; who = "all"; some = []; dueKey = "fri"; due = quick("fri"); open() }
-        note: !text.trim() ? "Say what needs doing." : !dd ? "Pick a department." : who === "some" && !some.length ? "Pick at least one Admin." : ""
-        footer: [
-            Btn { text: "Cancel"; onClicked: newTask.close() },
-            Btn { kind: "primary"; text: "Give it to them"; enabled: newTask.note === ""
-                  onClicked: {
-                      var p = { department_id: newTask.dept, title: newTask.text.trim(), deadline_at: newTask.due }
-                      if (newTask.who === "some") p.admin_ids = newTask.some
-                      falcon.call("task.dept_create", p, function (ok, r) {
-                          if (!ok) { Msg.failed(r && r.message ? r.message : "Not given"); return }
-                          Msg.ok("Given to " + newTask.dd.name + " · " + Theme.listNames(newTask.told.map(function (a) { return a.name })) + " told")
-                          newTask.close(); page.load()
-                      })
-                  } }
-        ]
-        Column {
-            width: parent.width; spacing: 6
-            Txt { text: "WHAT NEEDS DOING"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            TextArea2 { width: parent.width; minRows: 3; maxRows: 6; maxLength: 200; placeholder: "Collect the signed leave forms from every team"; text: newTask.text; onEdited: function (t) { newTask.text = t } }
-        }
-        Column {
-            width: parent.width; spacing: 6
-            Txt { text: "DEPARTMENT"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            Select { width: parent.width; search: true; placeholder: "Which department?"; value: newTask.dept || null
-                     options: Fleet.depts.map(function (d) { return { value: d.id, label: d.admins.length ? d.name : d.name + " · no Admin", disabled: !d.admins.length } })
-                     onPicked: function (v) { newTask.dept = v; newTask.some = [] } }
-            Column {
-                visible: newTask.dd !== null && newTask.dd.admins.length > 1
-                width: parent.width; spacing: 8; topPadding: 6
-                Txt { text: "WHO IS TOLD"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                Segmented { small: false; options: [{ value: "all", label: newTask.dd ? "Every Admin in " + newTask.dd.name + " (" + newTask.dd.admins.length + ")" : "" }, { value: "some", label: "Only some" }]
-                            value: newTask.who; onPicked: function (v) { newTask.who = v } }
-                Select { visible: newTask.who === "some"; width: parent.width; multiple: true; placeholder: "Which Admins?"; values: newTask.some
-                         options: newTask.dd ? newTask.dd.admins.map(function (a) { return { value: a.account_id, label: a.name } }) : []
-                         onPicked: function (v) { newTask.some = v } }
-            }
-            Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12; topPadding: 4
-                  text: !newTask.dd ? "" : !newTask.dd.admins.length ? "A department with no Admin cannot take a task. Assign one first."
-                        : newTask.told.length ? Theme.listNames(newTask.told.map(function (a) { return a.name }), 3) + (newTask.told.length === 1 ? " is" : " are") + " told as soon as you give it, on every page of their console until they mark it seen." : "Nobody picked yet." }
-        }
-        Column {
-            width: parent.width; spacing: 8
-            Txt { text: "DEADLINE"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            Segmented { small: false; options: [{ value: "today", label: "End of today" }, { value: "fri", label: "Friday 17:00" }, { value: "week", label: "In a week" }, { value: "pick", label: "Pick a date" }]
-                        value: newTask.dueKey; onPicked: function (v) { newTask.dueKey = v; if (v !== "pick") newTask.due = newTask.quick(v) } }
-            DateTimeField { visible: newTask.dueKey === "pick"; width: 220; value: newTask.due; onChanged: function (v) { newTask.due = v } }
-            Txt { text: "Due " + Time.date(newTask.due) + "."; color: Theme.text3; font.pixelSize: 12 }
-        }
-        Rectangle {
-            width: parent.width; height: nn.height + 20; radius: 6; color: Theme.surface2
-            Txt { id: nn; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                  text: "No checks are set: the Admins say how far it has got, and you decide when it is complete. Nothing is closed for you." }
-        }
     }
 }
