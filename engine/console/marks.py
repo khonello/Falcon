@@ -24,6 +24,7 @@ department's.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -57,6 +58,14 @@ def allowed_at(mark: dict[str, Any], pc_id: int, path: str) -> bool:
     return pc_id == mark["pc_id"] and (mark["keep"] == "machine" or inside(mark, pc_id, path))
 
 
+MOVE_WINDOW_SECONDS = 10.0
+_just_left: dict[tuple[int, str], tuple[float, int, str]] = {}      # (pc, hash) -> (when, mark, the place it left)
+
+
+def reset_state() -> None:
+    _just_left.clear()
+
+
 def install(engine: Engine) -> None:
     """Every file event: a marked file or folder gains versions (and new files), and a copy found where the mark does not allow it is flagged."""
 
@@ -64,6 +73,13 @@ def install(engine: Engine) -> None:
         if not engine.db.connected or event["op"] not in ("create", "modify", "move", "copy") or event.get("file_index_id") is None:
             return
         db = engine.db
+        if event["op"] == "move" and event.get("old_path"):
+            await _follow(engine, event["pc_id"], str(event["old_path"]), event["path"])      # the marked file itself moved: the mark goes with it
+        elif event["op"] == "create":
+            entry = await db.file_index.get(event["file_index_id"])
+            left = _just_left.pop((event["pc_id"], (entry or {}).get("content_hash") or ""), None)
+            if left is not None and time.monotonic() - left[0] <= MOVE_WINDOW_SECONDS:
+                await _follow(engine, event["pc_id"], left[2], event["path"])                 # it left one place and appeared in another: it moved
         entry = await db.file_index.get(event["file_index_id"])
         if entry is None or not entry.get("content_hash"):
             return
@@ -73,7 +89,39 @@ def install(engine: Engine) -> None:
                 await db.marks.add_hash(mark["id"], digest, path)             # a new version, or a new file in a marked folder
         await _flag_copies_of(engine, entry)
 
+    async def on_any(event: dict[str, Any]) -> None:
+        if not engine.db.connected:
+            return
+        if event.get("is_dir") and event["op"] == "move" and event.get("old_path"):
+            await _follow(engine, event["pc_id"], str(event["old_path"]), event["path"])      # a marked folder (or one holding marked files) moved
+        elif event["op"] == "delete" and not event.get("is_dir"):
+            # a marked file that was deleted may be about to reappear elsewhere (some moves arrive as a delete and a create)
+            row = await engine.db.file_index.by_path(event["pc_id"], event["path"])
+            digest = (row or {}).get("content_hash")
+            if digest:
+                for mark in await engine.db.marks.active_on_pc(event["pc_id"]):
+                    if mark["kind"] == "file" and norm(mark["path"]) == norm(event["path"]):
+                        _just_left[(event["pc_id"], digest)] = (time.monotonic(), mark["id"], event["path"])
+
     engine.file_index.subscribe(on_file)
+    engine.file_index.subscribe(on_any, every_op=True)
+
+
+async def _follow(engine: Engine, pc_id: int, old_path: str, new_path: str) -> None:
+    """The original was moved or renamed, not copied: the mark follows it, and anything raised about the new place closes."""
+    from engine.console.issues import resolve_issue
+
+    db = engine.db
+    for mark_id in await db.marks.follow(pc_id, old_path, new_path):
+        mark = await db.marks.get(mark_id)
+        if mark is None:
+            continue
+        cleared = 0
+        for c in await db.marks.copy_issues(mark_id):
+            if c["state"] != "resolved" and allowed_at(mark, c["pc_id"], c["detail"].get("path", "")):
+                cleared += int(await resolve_issue(engine, c["id"], "The marked file was moved: this is it"))
+        await engine.audit.record(None, "mark.followed", target_type="resource_marks", target_id=mark_id, pc_id=pc_id,
+                                  detail={"from": old_path, "to": new_path, "cleared": cleared})
 
 
 async def _flag_copies_of(engine: Engine, entry: dict[str, Any]) -> int:

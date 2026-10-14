@@ -905,6 +905,17 @@ class MarksRepo(_Repo):
             "UPDATE resource_marks SET unmarked_at = now(), unmarked_by_account_id = $2 WHERE id = $1 AND unmarked_at IS NULL RETURNING id",
             mark_id, by_account_id) is not None
 
+    async def follow(self, pc_id: int, old_path: str, new_path: str) -> list[int]:
+        """A marked file or folder was moved or renamed on its own machine, so the mark goes with it (a folder's mark takes what is marked
+        inside it along). Returns the marks that changed."""
+        old = old_path.replace("\\", "/").rstrip("/")
+        rows = await self._fetch(
+            "UPDATE resource_marks SET path = $3 || substr(path, length($2) + 1), "
+            "name = CASE WHEN kind = 'file' AND lower(replace(path, '\\', '/')) = lower($2) THEN regexp_replace($3, '^.*[\\\\/]', '') ELSE name END "
+            "WHERE pc_id = $1 AND unmarked_at IS NULL AND (lower(replace(path, '\\', '/')) = lower($2) "
+            "OR starts_with(lower(replace(path, '\\', '/')), lower($2) || '/')) RETURNING id", pc_id, old, new_path.rstrip("/\\"))
+        return [r["id"] for r in rows]
+
     async def set_keep(self, mark_id: int, keep: str) -> None:
         await self._exec("UPDATE resource_marks SET keep = $2 WHERE id = $1 AND unmarked_at IS NULL", mark_id, keep)
 
@@ -2270,8 +2281,8 @@ class ResourceRepo(_Repo):
     async def is_allowed(self, pc_id: int, path: str, content_hash: str | None) -> bool:
         return bool(await self._val(
             "SELECT EXISTS (SELECT 1 FROM restricted_allowances WHERE pc_id = $1 AND "
-            "(lower(replace(path, chr(92), '/')) = lower(replace($2, chr(92), '/')) "
-            " OR ($3::text IS NOT NULL AND content_hash = $3)))", pc_id, path, content_hash))
+            "((content_hash IS NOT NULL AND content_hash = $3) "
+            " OR (content_hash IS NULL AND lower(replace(path, chr(92), '/')) = lower(replace($2, chr(92), '/')))))", pc_id, path, content_hash))
 
     async def ignored_file_ids(self, pc_id: int) -> set[int]:
         """Files on a PC currently ignored by the system: unresolved violations."""

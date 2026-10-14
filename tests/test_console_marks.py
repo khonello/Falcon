@@ -141,3 +141,49 @@ async def test_an_existing_copy_is_found_at_marking_and_changing_where_it_is_all
     await w2.ok("index.event", {"event": {"op": "modify", "path": "C:/Users/kofi/plan.docx", "hash": "PLAN"}})
     assert (await a1.ok("issues.list", {"type": "file"}))["summary"]["open"] == 0           # not restricted any more
     assert await engine.db.pool.fetchval("SELECT count(*) FROM resource_marks WHERE unmarked_at IS NOT NULL") == 1
+
+
+async def test_the_marked_original_moving_is_not_a_copy_but_a_copy_beside_it_still_is(engine, org, connect):
+    """Found trying Restricted live: renaming a marked file, or dragging it into a sub-folder, raised a copy issue against the original itself."""
+    a1 = await connect("cid-a1")
+    await _index(a1, ("C:/Finance/memo.txt", "M1"), ("C:/Finance/Contracts/one.txt", "K1"))
+    [memo] = (await a1.ok("marks.create", {"paths": ["C:/Finance/memo.txt"], "keep": "path"}))["marks"]
+    [folder] = (await a1.ok("marks.create", {"paths": ["C:/Finance/Contracts"], "keep": "path"}))["marks"]
+
+    async def open_copies() -> int:
+        return len([i for i in (await a1.ok("issues.list", {"type": "file"}))["issues"] if i["state"] != "resolved"])
+
+    # renamed in place: a move event, with where it was
+    await a1.ok("index.event", {"event": {"op": "move", "path": "C:/Finance/memo-final.txt", "old_path": "C:/Finance/memo.txt", "hash": "M1"}})
+    assert await open_copies() == 0
+    got = next(m for m in (await a1.ok("marks.list"))["marks"] if m["id"] == memo["id"])
+    assert got["path"] == "C:/Finance/memo-final.txt" and got["name"] == "memo-final.txt"            # the mark went with it
+    # dragged into a sub-folder: some moves arrive as a delete and then a create
+    await a1.ok("index.event", {"event": {"op": "delete", "path": "C:/Finance/memo-final.txt"}})
+    await a1.ok("index.event", {"event": {"op": "create", "path": "C:/Finance/Archive/memo-final.txt", "hash": "M1"}})
+    assert await open_copies() == 0
+    assert next(m for m in (await a1.ok("marks.list"))["marks"] if m["id"] == memo["id"])["path"] == "C:/Finance/Archive/memo-final.txt"
+    # a COPY made while the original stays is still caught
+    await a1.ok("index.event", {"event": {"op": "create", "path": "C:/Finance/copy-of-memo.txt", "hash": "M1"}})
+    assert await open_copies() == 1
+    # a folder renamed: the mark and what it marks follow it, and its files are not copies
+    await a1.ok("index.event", {"event": {"op": "move", "path": "C:/Finance/Deals", "old_path": "C:/Finance/Contracts", "is_dir": True}})
+    await a1.ok("index.event", {"event": {"op": "move", "path": "C:/Finance/Deals/one.txt", "old_path": "C:/Finance/Contracts/one.txt", "hash": "K1"}})
+    assert await open_copies() == 1
+    assert next(m for m in (await a1.ok("marks.list"))["marks"] if m["id"] == folder["id"])["path"] == "C:/Finance/Deals"
+
+
+async def test_allowing_a_copy_allows_that_content_there_and_not_whatever_else_is_saved_at_that_path(engine, org, connect):
+    """Found trying Restricted live: an allowance matched by path alone let any other restricted file saved at that path through."""
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1")
+    await _index(a1, ("C:/Finance/a.txt", "A1"), ("C:/Finance/b.txt", "B1"))
+    await a1.ok("marks.create", {"paths": ["C:/Finance/a.txt"], "keep": "path"})
+    await a1.ok("marks.create", {"paths": ["C:/Finance/b.txt"], "keep": "path"})
+    await w1.ok("index.event", {"event": {"op": "create", "path": "C:/Users/p/docs/x.txt", "hash": "A1"}})
+    [issue] = [i for i in (await a1.ok("issues.list", {"type": "file"}))["issues"] if i["state"] != "resolved"]
+    await a1.ok("issues.act", {"issue_id": issue["id"], "key": "allow", "reason": "the clerk needs it"})
+    await w1.ok("index.event", {"event": {"op": "create", "path": "C:/Users/p/docs/x.txt", "hash": "A1"}})
+    assert [i for i in (await a1.ok("issues.list", {"type": "file"}))["issues"] if i["state"] != "resolved"] == []          # allowed: not reported again
+    await w1.ok("index.event", {"event": {"op": "modify", "path": "C:/Users/p/docs/x.txt", "hash": "B1"}})                   # other restricted content, same path
+    assert len([i for i in (await a1.ok("issues.list", {"type": "file"}))["issues"] if i["state"] != "resolved"]) == 1

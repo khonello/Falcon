@@ -75,7 +75,7 @@ class Engine:
         from engine.control import inventory as control_inventory
         from engine.hierarchy import assisted_access
 
-        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens):
+        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens, console_marks):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
 
