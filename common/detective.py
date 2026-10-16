@@ -1,0 +1,571 @@
+"""Detective: what a person seems to be trying to do, read from several small things happening together.
+
+Not "this event, so do that". The system watches what happens to files, programs and drives on a machine and asks what a person would be doing for
+it to look that way. The vocabulary is human:
+
+    BEHAVIOURS   concealment (making something hard to find or recognise), collection (gathering things in one place), exfiltration (getting it off the
+                 machine), capture (taking the information without the file), erasure (removing the evidence), evasion (slipping the watch),
+                 sabotage (destroying, not taking), reach (looking where one has no business)
+    MINI-GRAPHS  each behaviour owns a few small patterns. A pattern has a SPARK (the one event that starts it) and looks back and forward over a time
+                 window for the supporting steps; it is only evaluated when its spark appears, so it is cheap.
+    FINDING      what one mini-graph concluded: a behaviour, a weight, the evidence, and what would make it innocent.
+    CASE         findings about the same person/machine/files collected under one hypothesis, an INTENT ("taking data out", "covering up", ...), with the
+                 STAGE it has reached ("collected and hidden, not yet taken out") and what usually comes next. The verdict is the case's, never one graph's.
+
+How it speaks: it states a pattern and shows its evidence, never an accusation and never a cause. Context lowers or raises weight (a task for that file, a
+flow that wrote it, an allowance, a drive that is always used); the time of day is context, never a trigger; Falcon's own work is ignored entirely.
+
+Provenance (`Sig.by`) says who made a change when that is known: "hand" (input happened just before, in the program doing it), "started" (a program the
+person started), "alone" (a program on its own), "falcon" (a flow or an action), "unknown" (not yet observed). It is a weight, never a verdict.
+
+Stdlib only: it runs on a Worker or in the Engine, and is tested with scripted scenarios (scripts/detective_scenarios.py).
+"""
+
+from __future__ import annotations
+
+import re
+import time
+from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any
+
+BEHAVIOURS = ("concealment", "collection", "exfiltration", "capture", "erasure", "evasion", "sabotage", "reach")
+BEHAVIOUR_WORDS = {"concealment": "Concealment", "collection": "Collection", "exfiltration": "Taking out", "capture": "Capture", "erasure": "Erasure",
+                   "evasion": "Evasion", "sabotage": "Sabotage", "reach": "Reach"}
+
+# the order a taking-out usually runs in, so a case can say how far along it is and what usually follows
+ARC_STAGES = (("Reaching", ("reach",)), ("Gathering", ("collection",)), ("Hiding", ("concealment",)), ("Taking out", ("exfiltration", "capture")), ("Covering up", ("erasure",)))
+
+NOTED, CASE, URGENT = 0.35, 0.60, 0.85       # weights: kept quietly; shown as a case; shown first and to the Super User as well
+
+WINDOW = 15 * 60                              # how far back/forward a mini-graph looks for its supporting steps
+SESSION = 2 * 3600                            # findings on one machine this close together are one sitting
+PATIENT = 7 * 86400                           # ... and a later step of the same arc on the same machine can still join an earlier case
+KEEP = 6 * 3600                               # how much recent activity a machine's memory holds
+
+DOC_EXT = {"doc", "docx", "xls", "xlsx", "csv", "pdf", "ppt", "pptx", "txt", "rtf", "odt", "ods", "md", "json"}
+SYSTEMISH_EXT = {"dll", "sys", "exe", "tmp", "dat", "bin", "scr", "js", "vbs", "bat", "cab", "ini", "db", "bak"}
+ARCHIVE_EXT = {"zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "cab"}
+_DOUBLE = re.compile(r"\.(docx?|xlsx?|pdf|pptx?|csv|txt)\.(exe|scr|dll|js|vbs|bat|tmp|dat|sys)$", re.IGNORECASE)
+_SYSTEM_DIRS = ("\\windows\\", "\\program files", "\\programdata\\", "\\appdata\\", "\\temp\\", "\\$recycle.bin\\", "\\system volume information\\",
+                "/windows/", "/programdata/", "/tmp/", "/var/", "/proc/", "/etc/")
+
+# programs that move data around for a living: they lower a taking-out finding (a backup is not a theft) unless something else says otherwise
+USUAL_MOVERS = ("robocopy", "backup", "veeam", "acronis", "syncthing", "onedrive", "dropbox", "rsync", "7zg", "windowssearch")
+
+
+def ext_of(path: str) -> str:
+    name = path.replace("\\", "/").rsplit("/", 1)[-1]
+    return name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+
+def name_of(path: str) -> str:
+    return path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def folder_of(path: str) -> str:
+    p = path.replace("\\", "/")
+    return p.rsplit("/", 1)[0] if "/" in p else ""
+
+
+def is_system_folder(path: str) -> bool:
+    low = "\\" + path.lower().replace("/", "\\") if not path.lower().startswith(("c:", "d:")) else path.lower().replace("/", "\\")
+    return any(d.replace("/", "\\") in low for d in _SYSTEM_DIRS)
+
+
+def is_archive(path: str) -> bool:
+    return ext_of(path) in ARCHIVE_EXT
+
+
+def disguised(old: str, new: str) -> bool:
+    """A name changed so that the thing looks like something it is not: a document made to look like a system file, or given a second extension."""
+    if not old or not new:
+        return False
+    before, after = ext_of(old), ext_of(new)
+    if before in DOC_EXT and after in SYSTEMISH_EXT:
+        return True
+    return bool(_DOUBLE.search(name_of(new)) and not _DOUBLE.search(name_of(old)))
+
+
+@dataclass(frozen=True)
+class Sig:
+    """One thing that happened, as the detector reads it. `verb` is one of: created modified renamed moved copied deleted opened hid unhid permissions
+    attached detached launched exited captured cleared silent. `thing` follows the file (its content hash or identity); `device` is a drive's own name."""
+    at: float
+    pc: int
+    verb: str
+    path: str = ""
+    old: str = ""
+    thing: str = ""
+    program: str = ""
+    by: str = "unknown"
+    device: str = ""
+    tags: frozenset[str] = frozenset()
+    info: dict[str, Any] = field(default_factory=dict, compare=False, hash=False)
+
+    @property
+    def name(self) -> str:
+        return name_of(self.path) or self.device or self.program
+
+    def phrase(self) -> str:
+        n = self.name
+        return {"created": f"created {n}", "modified": f"changed {n}", "renamed": f"renamed {name_of(self.old)} to {n}", "moved": f"moved {n} to {folder_of(self.path) or 'another place'}",
+                "copied": f"copied {n} to {folder_of(self.path) or 'another place'}", "deleted": f"deleted {n}", "opened": f"opened {n}", "hid": f"hid {n}",
+                "unhid": f"made {n} visible", "permissions": f"changed who may open {n}", "attached": f"plugged in a drive ({self.device})",
+                "detached": f"removed a drive ({self.device})", "launched": f"started {self.program}", "exited": f"closed {self.program}",
+                "captured": f"captured the screen ({self.program or 'a tool'})", "cleared": f"cleared {self.info.get('what') or 'a history'}",
+                "silent": "stopped reporting while still switched on"}.get(self.verb, f"{self.verb} {n}")
+
+
+@dataclass
+class Finding:
+    behaviour: str
+    graph: str
+    at: float
+    pc: int
+    weight: float
+    things: frozenset[str]
+    summary: str
+    evidence: list[Sig]
+    innocent: str                                  # what would make this harmless
+    why: list[str] = field(default_factory=list)   # what raised or lowered the weight, in words
+
+
+@dataclass
+class Case:
+    pc: int
+    findings: list[Finding] = field(default_factory=list)
+    id: int | None = None
+    first_at: float = 0.0
+    last_at: float = 0.0
+
+    @property
+    def behaviours(self) -> set[str]:
+        return {f.behaviour for f in self.findings}
+
+    @property
+    def things(self) -> set[str]:
+        out: set[str] = set()
+        for f in self.findings:
+            out |= f.things
+        return out
+
+    @property
+    def weight(self) -> float:
+        """Several independent hints are stronger together than any one: 1 - the chance every one of them is nothing, plus a little for each further kind of behaviour."""
+        rest = 1.0
+        for f in self.findings:
+            rest *= 1.0 - min(0.95, f.weight)
+        return min(0.99, (1.0 - rest) + 0.06 * max(0, len(self.behaviours) - 1))
+
+    @property
+    def level(self) -> str:
+        w = self.weight
+        return "urgent" if w >= URGENT else "case" if w >= CASE else "noted" if w >= NOTED else "quiet"
+
+    @property
+    def intent(self) -> str:
+        b = self.behaviours
+        if "sabotage" in b:
+            return "Wrecking things"
+        if "exfiltration" in b or ("collection" in b and ("concealment" in b or "capture" in b)):
+            return "Taking data out"
+        if "capture" in b and "reach" in b:
+            return "Spying"
+        if b <= {"erasure", "evasion"} and b:
+            return "Covering up" if "erasure" in b else "Slipping the watch"
+        if "concealment" in b and "erasure" in b:
+            return "Covering up"
+        if "collection" in b:
+            return "Gathering"
+        if "reach" in b:
+            return "Looking where they should not"
+        return "Hiding something" if "concealment" in b else "Unusual activity"
+
+    @property
+    def stage(self) -> tuple[int, str, str | None]:
+        """(how many of the five stages of a taking-out have shown, the latest one's name, what usually comes next)."""
+        seen = [i for i, (_, bs) in enumerate(ARC_STAGES) if self.behaviours & set(bs)]
+        if not seen:
+            return 0, "", None
+        top = max(seen)
+        nxt = ARC_STAGES[top + 1][0] if top + 1 < len(ARC_STAGES) else None
+        return len(seen), ARC_STAGES[top][0], nxt
+
+    def not_yet(self) -> str | None:
+        """The step that has not happened, said plainly, when everything up to it has."""
+        b = self.behaviours
+        if self.intent != "Taking data out":
+            return None
+        if not b & {"exfiltration", "capture"}:
+            return "It has not left the machine yet."
+        if "erasure" not in b:
+            return "Nothing has been erased yet."
+        return None
+
+    def story(self) -> list[str]:
+        """The evidence in the order it happened, one line each."""
+        seen: set[Sig] = set()
+        sigs: list[Sig] = []
+        for f in self.findings:
+            for e in f.evidence:
+                if e not in seen:
+                    seen.add(e)
+                    sigs.append(e)
+        sigs.sort(key=lambda e: e.at)
+        days = (self.last_at - self.first_at) >= 18 * 3600
+        fmt = "%a %H:%M" if days else "%H:%M"
+        lines: list[str] = []
+        i = 0
+        while i < len(sigs):
+            j = i
+            while (j + 1 < len(sigs) and sigs[j + 1].verb == sigs[i].verb and folder_of(sigs[j + 1].path) == folder_of(sigs[i].path)
+                   and sigs[i].verb in ("copied", "opened", "deleted", "created", "moved") and sigs[j + 1].at - sigs[j].at <= 90):
+                j += 1
+            run = sigs[i:j + 1]
+            when = time.strftime(fmt, time.localtime(run[0].at))
+            if len(run) > 2:
+                lines.append(f"{when}  {run[0].verb} {len(run)} files {'to' if run[0].verb in ('copied', 'moved') else 'in'} {folder_of(run[0].path) or 'another place'}")
+            else:
+                for e in run:
+                    lines.append(f"{when}  {e.phrase()}")
+            i = j + 1
+        return lines
+
+    def headline(self) -> str:
+        top = sorted(self.findings, key=lambda f: f.weight, reverse=True)[:4]
+        said = f"{self.intent}. " + ("; ".join(dict.fromkeys(f.summary for f in sorted(top, key=lambda f: f.at))) + ".")
+        extra = self.not_yet()
+        return said + (f" {extra}" if extra else "")
+
+
+@dataclass
+class Update:
+    case: Case
+    created: bool
+    raised: bool                # crossed into "case" or "urgent" with this finding (the moment to tell people)
+    was: str
+    now: str
+    weight: float = 0.0         # the case as it stood at that moment (the case itself keeps growing)
+    intent: str = ""
+    stage: tuple[int, str, str | None] = (0, "", None)
+    not_yet: str | None = None
+    finding: Finding | None = None
+
+
+class Context:
+    """What the detector may ask the rest of the system (the Engine supplies it; tests supply a dict). Every method has a safe answer for 'unknown'."""
+
+    def __init__(self, *, task_things: Callable[[int], set[str]] | None = None, flow_paths: Callable[[int, str], bool] | None = None,
+                 allowed: Callable[[int, str, str], bool] | None = None, known_device: Callable[[int, str], int] | None = None) -> None:
+        self._task, self._flow, self._allowed, self._known = task_things, flow_paths, allowed, known_device
+
+    def has_task(self, pc: int, thing: str) -> bool:
+        return bool(self._task and thing in self._task(pc))
+
+    def written_by_flow(self, pc: int, path: str) -> bool:
+        return bool(self._flow and self._flow(pc, path))
+
+    def allowed(self, pc: int, thing: str, where: str) -> bool:
+        return bool(self._allowed and self._allowed(pc, thing, where))
+
+    def device_uses(self, pc: int, device: str) -> int:
+        return self._known(pc, device) if self._known else 0
+
+
+class Memory:
+    """What one machine has been seen doing lately, and its drives."""
+
+    def __init__(self) -> None:
+        self.recent: deque[Sig] = deque()
+        self.devices: dict[str, float] = {}                   # drive -> when it was plugged in (still attached)
+        self.lineage: dict[str, set[str]] = {}                # an archive's thing -> the things that went into it
+        self.hidden: set[str] = set()
+
+    def add(self, s: Sig) -> None:
+        self.recent.append(s)
+        while self.recent and self.recent[0].at < s.at - KEEP:
+            self.recent.popleft()
+
+    def since(self, at: float, *verbs: str) -> list[Sig]:
+        return [x for x in self.recent if x.at >= at and (not verbs or x.verb in verbs)]
+
+
+def _on_external(m: Memory, path: str) -> str:
+    low = path.lower().replace("/", "\\")
+    for dev in m.devices:
+        d = dev.lower().replace("/", "\\").rstrip("\\")
+        if d and low.startswith(d + "\\"):
+            return dev
+    return ""
+
+
+class Detective:
+    """Feed it what happens; it says when a case is raised or grows. One instance holds every machine's memory and every open case."""
+
+    def __init__(self, ctx: Context | None = None, clock: Callable[[], float] = time.time) -> None:
+        self.ctx = ctx or Context()
+        self.clock = clock
+        self.mem: dict[int, Memory] = {}
+        self.cases: list[Case] = []
+
+    # --- feeding -----------------------------------------------------------------------------------------------
+
+    def feed(self, s: Sig) -> list[Update]:
+        if s.by == "falcon":
+            return []                                        # Falcon's own flows and actions are not behaviour
+        m = self.mem.setdefault(s.pc, Memory())
+        if s.verb == "attached":
+            m.devices[s.device or s.path] = s.at
+        elif s.verb == "detached":
+            m.devices.pop(s.device or s.path, None)
+        m.add(s)
+        out: list[Update] = []
+        for f in self._graphs(m, s):
+            f.weight = self._contextual(f, s)
+            if f.weight < 0.12:
+                continue
+            out.append(self._attach(f))
+        return out
+
+    # --- the mini-graphs ----------------------------------------------------------------------------------------
+
+    def _graphs(self, m: Memory, s: Sig) -> list[Finding]:
+        found: list[Finding | None] = []
+        if s.verb == "hid":
+            found.append(self._hidden(m, s))
+        if s.verb in ("renamed", "moved"):
+            found.append(self._disguised(m, s))
+            found.append(self._buried(m, s))
+        if s.verb in ("created", "copied", "modified"):
+            found.append(self._archived(m, s))
+            found.append(self._gathering(m, s))
+            found.append(self._to_drive(m, s))
+        if s.verb == "attached":
+            found.append(self._drive_after_staging(m, s))
+        if s.verb == "deleted":
+            found.append(self._removed_after_taking(m, s))
+            found.append(self._mass_removal(m, s))
+        if s.verb == "cleared":
+            found.append(self._history_cleared(m, s))
+        if s.verb == "opened":
+            found.append(self._outside_role(m, s))
+        return [f for f in found if f is not None]
+
+    def _restricted(self, *sigs: Sig) -> bool:
+        return any("restricted" in x.tags for x in sigs)
+
+    def _hidden(self, m: Memory, s: Sig) -> Finding:
+        w, why = 0.30, ["a file was made hidden"]
+        if is_system_folder(s.path):
+            w += 0.20
+            why.append("in a system folder")
+        if self._restricted(s):
+            w += 0.20
+            why.append("a restricted file")
+        if ext_of(s.path) in DOC_EXT:
+            w += 0.08
+        m.hidden.add(s.thing or s.path)
+        return Finding("concealment", "hidden", s.at, s.pc, w, frozenset({s.thing or s.path}), f"{s.name} was hidden", [s],
+                       "someone hiding a personal or in-progress file", why)
+
+    def _disguised(self, m: Memory, s: Sig) -> Finding | None:
+        old = s.old or ""
+        if s.verb == "renamed" and disguised(old, s.path):
+            w, why = 0.45, [f"{name_of(old)} was given the look of {name_of(s.path)}"]
+            if is_system_folder(s.path):
+                w += 0.12
+                why.append("in a system folder")
+            if self._restricted(s):
+                w += 0.15
+                why.append("a restricted file")
+            if s.by in ("alone", "started"):
+                w += 0.08
+                why.append("done by a program")
+            return Finding("concealment", "disguised", s.at, s.pc, w, frozenset({s.thing or s.path}),
+                           f"{name_of(old)} was renamed to look like a different kind of file ({name_of(s.path)})", [s],
+                           "a file saved in a format or name an application insists on", why)
+        if s.verb == "moved" and s.old and disguised(s.old, s.path):
+            return Finding("concealment", "disguised", s.at, s.pc, 0.45, frozenset({s.thing or s.path}),
+                           f"{name_of(s.old)} was renamed to look like a different kind of file ({s.name}) while moving", [s], "an application's own save", ["renamed while moving"])
+        return None
+
+    def _buried(self, m: Memory, s: Sig) -> Finding | None:
+        if s.verb != "moved" or ext_of(s.path) not in DOC_EXT | ARCHIVE_EXT or not is_system_folder(s.path) or (s.old and is_system_folder(s.old)):
+            return None
+        w, why = 0.30, [f"{s.name} was moved into a system folder"]
+        if self._restricted(s):
+            w += 0.20
+            why.append("a restricted file")
+        return Finding("concealment", "buried", s.at, s.pc, w, frozenset({s.thing or s.path}), f"{s.name} was moved somewhere nobody looks ({folder_of(s.path)})", [s],
+                       "an application keeping its own data there", why)
+
+    def _archived(self, m: Memory, s: Sig) -> Finding | None:
+        if s.verb != "created" or not is_archive(s.path):
+            return None
+        lo = s.at - 5 * 60
+        sources = [x for x in m.since(lo, "opened", "copied", "created", "modified") if x is not s and not is_archive(x.path) and x.path != s.path
+                   and ("restricted" in x.tags or x.verb in ("opened", "copied")) and (not s.program or not x.program or x.program == s.program)]
+        things = {x.thing or x.path for x in sources}
+        if len(things) < 3:
+            return None
+        m.lineage[s.thing or s.path] = things
+        w, why = 0.42, [f"{len(things)} files were packed together"]
+        if self._restricted(*sources):
+            w += 0.22
+            why.append("restricted files among them")
+        if s.by in ("alone", "started"):
+            w += 0.06
+        return Finding("collection", "archived", s.at, s.pc, w, frozenset(things | {s.thing or s.path}),
+                       f"{len(things)} files were packed into {s.name}", sources[-200:] + [s], "a person sending a few files together or a backup", why)
+
+    def _gathering(self, m: Memory, s: Sig) -> Finding | None:
+        lo = s.at - 10 * 60
+        near = [x for x in m.since(lo, "opened", "copied") if "restricted" in x.tags]
+        things = {x.thing or x.path for x in near}
+        if len(things) < 8 or s.verb not in ("copied", "opened"):
+            return None
+        if any(f.graph == "gathering" and s.at - f.at < 10 * 60 for c in self.cases if c.pc == s.pc for f in c.findings):
+            return None
+        return Finding("collection", "gathering", s.at, s.pc, 0.40 + min(0.20, 0.02 * (len(things) - 8)), frozenset(things),
+                       f"{len(things)} restricted files were gathered in ten minutes", near[-200:], "a review or an audit that needs all of them", [f"{len(things)} restricted files in ten minutes"])
+
+    def _to_drive(self, m: Memory, s: Sig) -> Finding | None:
+        dev = _on_external(m, s.path)
+        if not dev or s.verb not in ("copied", "created"):
+            return None
+        lineage = m.lineage.get(s.thing or s.path, set())
+        w, why = 0.45, [f"{s.name} was put on a removable drive"]
+        if is_archive(s.path):
+            w += 0.10
+            why.append("an archive")
+        if self._restricted(s) or any(("restricted" in x.tags) for x in m.since(s.at - 3600) if (x.thing or x.path) in lineage):
+            w += 0.18
+            why.append("restricted content")
+        if s.by in ("alone", "started"):
+            w += 0.05
+        return Finding("exfiltration", "to_drive", s.at, s.pc, w, frozenset({s.thing or s.path} | lineage), f"{s.name} was copied to a removable drive ({dev})", [s],
+                       "a drive this person always uses for their own files", why)
+
+    def _drive_after_staging(self, m: Memory, s: Sig) -> Finding | None:
+        lo = s.at - WINDOW
+        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if f.behaviour in ("collection", "concealment") and f.at >= lo]
+        if not staged:
+            return None
+        return Finding("exfiltration", "drive_after_staging", s.at, s.pc, 0.34, frozenset().union(*(f.things for f in staged)),
+                       f"a drive was plugged in just after files were gathered or hidden ({s.device})", [s], "a coincidence", ["a drive appeared right after staging"])
+
+    def _removed_after_taking(self, m: Memory, s: Sig) -> Finding | None:
+        lo = s.at - 30 * 60
+        thing = s.thing or s.path
+        gone = {thing}
+        for arc, srcs in m.lineage.items():
+            if thing == arc or thing in srcs:
+                gone |= srcs | {arc}
+        taken = [x for x in m.since(lo, "copied", "created", "moved") if _on_external(m, x.path) and (x.thing or x.path) in gone]
+        if not taken:
+            return None
+        w, why = 0.52, [f"{s.name} was deleted after it was copied to a drive"]
+        if is_archive(s.path):
+            why.append("the archive that carried it")
+        if self._restricted(s):
+            w += 0.12
+        if s.by in ("alone", "started"):
+            w += 0.06
+        return Finding("erasure", "removed_after_taking", s.at, s.pc, w, frozenset(gone), f"{s.name} was deleted after being copied off the machine", taken[-1:] + [s],
+                       "tidying up after a legitimate transfer", why)
+
+    def _mass_removal(self, m: Memory, s: Sig) -> Finding | None:
+        lo = s.at - 120
+        dels = [x for x in m.since(lo, "deleted") if ext_of(x.path) in DOC_EXT and x.by != "hand"]
+        if len(dels) < 15:
+            return None
+        first = min(x.at for x in dels)
+        if any(f.graph == "mass_removal" and abs(f.at - first) < 120 for c in self.cases if c.pc == s.pc for f in c.findings):
+            return None
+        return Finding("erasure", "mass_removal", s.at, s.pc, 0.40, frozenset({x.thing or x.path for x in dels}), f"{len(dels)} documents were deleted in two minutes, not by hand", dels[-200:],
+                       "a clean-up script or an application removing its own files", [f"{len(dels)} deletions in two minutes"])
+
+    def _history_cleared(self, m: Memory, s: Sig) -> Finding:
+        return Finding("erasure", "history_cleared", s.at, s.pc, 0.40, frozenset(), f"{s.info.get('what') or 'a history'} was cleared", [s],
+                       "routine housekeeping", ["a history was cleared"])
+
+    def _outside_role(self, m: Memory, s: Sig) -> Finding | None:
+        lo = s.at - 20 * 60
+        outside = [x for x in m.since(lo, "opened") if "outside_role" in x.tags]
+        folders = {folder_of(x.path) for x in outside}
+        if len(outside) < 15 or len(folders) < 3 or "outside_role" not in s.tags:
+            return None
+        first = min(x.at for x in outside)
+        if any(f.graph == "outside_role" and abs(f.at - first) < 20 * 60 for c in self.cases if c.pc == s.pc for f in c.findings):
+            return None
+        return Finding("reach", "outside_role", s.at, s.pc, 0.36 + min(0.2, 0.01 * (len(outside) - 15)), frozenset({x.thing or x.path for x in outside}),
+                       f"{len(outside)} files were opened across {len(folders)} folders that are not part of this person's work", outside[-200:],
+                       "covering for a colleague, or looking for one particular file", [f"{len(outside)} files in {len(folders)} places outside their work"])
+
+    # --- context ------------------------------------------------------------------------------------------------
+
+    def _contextual(self, f: Finding, s: Sig) -> float:
+        w = f.weight
+        for thing in f.things:
+            if self.ctx.has_task(s.pc, thing):
+                w -= 0.45
+                f.why.append("a task covers this file")
+                break
+        if any(self.ctx.written_by_flow(s.pc, e.path) for e in f.evidence if e.path):
+            w -= 0.40
+            f.why.append("a flow wrote it")
+        mem = self.mem[s.pc]
+        dev = next((d for e in f.evidence for d in ((e.device,) if e.verb == "attached" else (_on_external(mem, e.path),)) if d), "")
+        if dev and any(self.ctx.allowed(s.pc, t, dev) for t in f.things):
+            w -= 0.45
+            f.why.append("recorded as allowed there")
+        if dev:
+            uses = self.ctx.device_uses(s.pc, dev)
+            if uses >= 3:
+                w -= 0.35
+                f.why.append(f"a drive this machine has used {uses} times")
+            elif uses == 0 and f.behaviour == "exfiltration" and not any("a task covers" in x for x in f.why):
+                w += 0.10
+                f.why.append("a drive this machine has not seen before")
+        mover = next((e.program for e in f.evidence if e.program and any(p in e.program.lower() for p in USUAL_MOVERS)), "")
+        if mover:
+            w -= 0.35
+            f.why.append(f"{mover} is a program that moves files for a living")
+        hour = time.localtime(s.at).tm_hour
+        if (hour >= 22 or hour < 6) and f.weight >= 0.3:
+            w += 0.04                                           # context only: it can never start a finding
+        return max(0.0, min(0.95, w))
+
+    # --- cases --------------------------------------------------------------------------------------------------
+
+    def _attach(self, f: Finding) -> Update:
+        best, how = None, 0
+        for c in self.cases:
+            if c.pc != f.pc:
+                continue
+            link = 3 if (c.things & f.things) else 2 if f.at - c.last_at <= SESSION else 1 if (f.at - c.last_at <= PATIENT and self._continues(c, f)) else 0
+            if link > how:
+                best, how = c, link
+        created = best is None
+        if best is None:
+            best = Case(pc=f.pc, first_at=f.at)
+            self.cases.append(best)
+        was = "quiet" if created else best.level
+        best.findings.append(f)
+        best.last_at = max(best.last_at, f.at)
+        now = best.level
+        order = ("quiet", "noted", "case", "urgent")
+        return Update(best, created, order.index(now) > order.index(was) and now in ("case", "urgent"), was, now, best.weight, best.intent, best.stage, best.not_yet(), f)
+
+    @staticmethod
+    def _continues(c: Case, f: Finding) -> bool:
+        """A later step of the same arc: it follows what the case has already shown (hiding, then taking out, then covering up)."""
+        order = {b: i for i, (_, bs) in enumerate(ARC_STAGES) for b in bs}
+        have = max((order.get(b, -1) for b in c.behaviours), default=-1)
+        return order.get(f.behaviour, -2) >= have >= 0
+
+    def open_cases(self, *, pc: int | None = None, level: str | None = None) -> list[Case]:
+        out = [c for c in self.cases if (pc is None or c.pc == pc) and (level is None or c.level == level)]
+        return sorted(out, key=lambda c: c.weight, reverse=True)
