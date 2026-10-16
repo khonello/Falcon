@@ -16,11 +16,12 @@ from typing import Any
 import engine.auth
 import engine.console
 import engine.control
+import engine.detective
 import engine.flow
 import engine.hierarchy
 import engine.resource
 import engine.task
-import engine.updates  # noqa: F401
+import engine.updates
 from engine.audit import AuditTrail
 from engine.config import Settings
 from engine.connection import Connection
@@ -67,6 +68,8 @@ class Engine:
         from engine.console import marks as console_marks
 
         console_marks.install(self)
+        if self.settings.detective:
+            engine.detective.install(self)
 
         # In-memory registries (offers, transfers, live outputs, polled state) belong to one
         # Engine process; a fresh Engine starts clean.
@@ -75,7 +78,7 @@ class Engine:
         from engine.control import inventory as control_inventory
         from engine.hierarchy import assisted_access, handover
 
-        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens, console_marks, handover):
+        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens, console_marks, handover, engine.detective):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
 

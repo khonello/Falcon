@@ -447,6 +447,10 @@ async def signal(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if ident.pc_id is None:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
     fired = await on_signal(ctx.engine, ident.pc_id, etype, payload.get("data") or {})
+    if ctx.engine.settings.detective:
+        from engine import detective
+
+        await detective.on_signal(ctx.engine, ident.pc_id, etype, payload.get("data") or {})
     return {"accepted": True, "fired": fired}
 
 
@@ -461,6 +465,9 @@ async def interest_for_pc(engine: Engine, pc_id: int) -> dict[str, list[dict[str
             spec = definition["condition_spec"]
             if _pc_in_scope(spec, pc_id, await _dept_pcs(engine, definition)):
                 out.setdefault(etype, []).append(spec.get("match") or {})
+    if engine.settings.detective:
+        for etype in ("usb.inserted", "usb.removed"):      # Detective always wants to know when a drive comes and goes
+            out.setdefault(etype, []).append({})
     return out
 
 

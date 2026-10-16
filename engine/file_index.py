@@ -78,7 +78,7 @@ class FileIndex:
             if op == "move" and entry.get("old_path"):
                 await db.mark_gone(pc_id, str(entry["old_path"]))    # it left its old place: this used to be forgotten
         await db.record_event(pc_id, op, path, old_path=entry.get("old_path"), is_dir=entry["is_dir"],
-                              content_hash=entry.get("hash"), file_index_id=known_id)
+                              content_hash=entry.get("hash"), file_index_id=known_id, detail=entry.get("detail"))
         full = {"pc_id": pc_id, "file_index_id": file_index_id, **entry}
         if op in CONTENT_OPS and not entry["is_dir"]:
             for cb in self._subscribers:
@@ -126,6 +126,14 @@ class FileIndex:
         return await self.db.file_index.by_hash(content_hash)
 
 
+def _detail(raw: Any) -> dict[str, bool] | None:
+    """What an attribute change was, kept to the few facts that are known (a Worker may say more; nothing else is stored)."""
+    if not isinstance(raw, dict):
+        return None
+    out = {k: bool(raw[k]) for k in ("hidden", "was_hidden", "system", "was_system", "read_only") if k in raw}
+    return out or None
+
+
 def _normalize(event: dict[str, Any]) -> dict[str, Any]:
     op = str(event.get("op", "modify"))
     if op not in OPS:
@@ -145,6 +153,7 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
         "is_dir": bool(event.get("is_dir")),
         "resource_tag": tag,
         "scope_department_id": event.get("scope_department_id"),
+        "detail": _detail(event.get("detail")),
     }
 
 

@@ -173,7 +173,7 @@ class Watcher:
                 return                                   # it is already gone; the delete will follow
             self._meta[src] = now
             for op in (["modify"] if before is None else fsmeta.changes(before, now)):
-                await self.report_event(op, src)
+                await self.report_event(op, src, detail=fsmeta.attr_detail(before.attrs, now.attrs) if op == "attrib" and before is not None else None)
 
     async def _remember(self, path: str) -> None:
         now = await asyncio.to_thread(fsmeta.meta, path)
@@ -220,14 +220,14 @@ class Watcher:
                 if before[:2] != sig[:2]:
                     await self.report_event("modify", path)
                 if before[3] != sig[3]:
-                    await self.report_event("attrib", path)
+                    await self.report_event("attrib", path, detail=fsmeta.attr_detail(before[3], sig[3]))
             for path in gone:
                 await self.report_event("delete", path)
             self._snapshot = current
 
     # --- reporting ------------------------------------------------------------------------------
 
-    async def report_event(self, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False) -> None:
+    async def report_event(self, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False, detail: dict[str, bool] | None = None) -> None:
         digest = None
         if op not in ("delete", "attrib", "security") and not is_dir:        # the content did not change in the last two
             digest = await asyncio.to_thread(hash_file, Path(path), self.hash_limit)
@@ -236,6 +236,8 @@ class Watcher:
             event["old_path"] = old_path
         if is_dir:
             event["is_dir"] = True
+        if detail:
+            event["detail"] = detail                         # for an attribute change: hidden, system, read-only, before and after
         try:
             await self.report("index.event", {"event": event})
             self.events_reported += 1

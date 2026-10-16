@@ -103,3 +103,9 @@ Last updated 13 Oct 2026.
 
 - Announcements are a second side of **Messages** (a "Conversations | Announcements" switch at the top of both), no longer a menu item. The compose form offers two kinds, Announcement and Emergency (the Engine still supports Warning). The palette has "New announcement".
 - **Detective** is in the Core menu at both levels as an empty page, only so the menu can be decided. Menu decided: **Home** (Overview, Messages), **Core** (Tasks, Flows, Restricted, Detective), then the rest.
+
+## Detective, first slice (16 Oct 2026)
+- Built: the behaviour model (`common/detective.py`), scripted scenarios (`python scripts/detective_scenarios.py`), the Engine keeping/raising/reviewing cases
+  (`engine/detective`, `detective.*`), the Worker telling "made hidden" from other attribute changes, and `detective` commands in the shell. Design and the
+  decisions: `docs/design/detective.md`. The Detective page is still the blank placeholder: next.
+- The leak scenario raises while the files are still on the machine ("It has not left the machine yet"); the backup twin with the same moves stays quiet.

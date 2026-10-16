@@ -65,6 +65,18 @@ def meta(path: str) -> Meta | None:
     return Meta(st.st_size, st.st_mtime_ns, attrs, security, st.st_ino)
 
 
+FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_SYSTEM = 0x1, 0x2, 0x4
+
+
+def attr_detail(before: int, after: int, *, windows: bool | None = None) -> dict[str, bool]:
+    """Which attributes an `attrib` change was: hidden, system, read-only -- before and after, so "made hidden" can be told from "made visible" and from the rest.
+    Only Windows has these flags in the attribute word; elsewhere nothing is claimed."""
+    if not (sys.platform == "win32" if windows is None else windows):
+        return {}
+    return {"hidden": bool(after & FILE_ATTRIBUTE_HIDDEN), "was_hidden": bool(before & FILE_ATTRIBUTE_HIDDEN),
+            "system": bool(after & FILE_ATTRIBUTE_SYSTEM), "was_system": bool(before & FILE_ATTRIBUTE_SYSTEM), "read_only": bool(after & FILE_ATTRIBUTE_READONLY)}
+
+
 def changes(before: Meta, after: Meta) -> list[str]:
     """Which kinds of change turn `before` into `after`: 'modify' (content), 'attrib', 'security'."""
     out = []

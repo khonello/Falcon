@@ -251,6 +251,9 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                   detail={"assignee_account_id": assignee["id"], "verification_mode": mode,
                                           "items": len(items)})
     await ctx.engine.push_to_account(assignee["id"], "task.assigned", {"task_id": task_id})
+    from engine import detective
+
+    detective.tasks_changed()                                 # what a task covers is part of what Detective weighs
     return {"task": await _task_view(ctx.engine, ctx, task)}
 
 

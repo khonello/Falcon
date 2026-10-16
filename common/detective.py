@@ -27,7 +27,7 @@ import re
 import time
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 BEHAVIOURS = ("concealment", "collection", "exfiltration", "capture", "erasure", "evasion", "sabotage", "reach")
@@ -116,6 +116,16 @@ class Sig:
                 "detached": f"removed a drive ({self.device})", "launched": f"started {self.program}", "exited": f"closed {self.program}",
                 "captured": f"captured the screen ({self.program or 'a tool'})", "cleared": f"cleared {self.info.get('what') or 'a history'}",
                 "silent": "stopped reporting while still switched on"}.get(self.verb, f"{self.verb} {n}")
+
+
+def sig_to_dict(x: Sig) -> dict[str, Any]:
+    return {"at": x.at, "pc": x.pc, "verb": x.verb, "path": x.path, "old": x.old, "thing": x.thing, "program": x.program, "by": x.by, "device": x.device,
+            "tags": sorted(x.tags), "info": x.info, "text": x.phrase()}
+
+
+def sig_from_dict(d: dict[str, Any]) -> Sig:
+    return Sig(float(d["at"]), int(d["pc"]), str(d["verb"]), str(d.get("path") or ""), str(d.get("old") or ""), str(d.get("thing") or ""), str(d.get("program") or ""),
+               str(d.get("by") or "unknown"), str(d.get("device") or ""), frozenset(d.get("tags") or ()), dict(d.get("info") or {}))
 
 
 @dataclass
@@ -282,8 +292,14 @@ class Memory:
         self.devices: dict[str, float] = {}                   # drive -> when it was plugged in (still attached)
         self.lineage: dict[str, set[str]] = {}                # an archive's thing -> the things that went into it
         self.hidden: set[str] = set()
+        self.at_path: dict[str, str] = {}                     # where a thing was last seen -> which thing (a delete carries no hash of its own)
 
     def add(self, s: Sig) -> None:
+        if s.thing and s.path:
+            self.at_path[s.path.lower().replace("/", "\\")] = s.thing
+            if len(self.at_path) > 20000:
+                for k in list(self.at_path)[:5000]:
+                    self.at_path.pop(k, None)
         self.recent.append(s)
         while self.recent and self.recent[0].at < s.at - KEEP:
             self.recent.popleft()
@@ -316,6 +332,10 @@ class Detective:
         if s.by == "falcon":
             return []                                        # Falcon's own flows and actions are not behaviour
         m = self.mem.setdefault(s.pc, Memory())
+        if not s.thing:
+            known = m.at_path.get(s.path.lower().replace("/", "\\")) or (m.at_path.get(s.old.lower().replace("/", "\\")) if s.old else "")
+            if known:
+                s = replace(s, thing=known)
         if s.verb == "attached":
             m.devices[s.device or s.path] = s.at
         elif s.verb == "detached":
@@ -328,6 +348,15 @@ class Detective:
                 continue
             out.append(self._attach(f))
         return out
+
+    def remember(self, s: Sig) -> None:
+        """Put something in a machine's memory without judging it (what was already known before this run, so a restart does not forget the last hours)."""
+        m = self.mem.setdefault(s.pc, Memory())
+        if s.verb == "attached":
+            m.devices[s.device or s.path] = s.at
+        elif s.verb == "detached":
+            m.devices.pop(s.device or s.path, None)
+        m.add(s)
 
     # --- the mini-graphs ----------------------------------------------------------------------------------------
 
@@ -517,6 +546,9 @@ class Detective:
             w -= 0.40
             f.why.append("a flow wrote it")
         mem = self.mem[s.pc]
+        if any("allowed" in e.tags for e in f.evidence):
+            w -= 0.45
+            f.why.append("recorded as allowed")
         dev = next((d for e in f.evidence for d in ((e.device,) if e.verb == "attached" else (_on_external(mem, e.path),)) if d), "")
         if dev and any(self.ctx.allowed(s.pc, t, dev) for t in f.things):
             w -= 0.45

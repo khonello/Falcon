@@ -40,6 +40,8 @@ class Settings:
     control_poll_seconds: int = 15
     # A file being written raises many events; a flow reads it once, this long after the last one (0: at once).
     flow_settle_seconds: float = 1.0
+    # Detective (what a person seems to be trying to do) listens by itself; this turns it off (FALCON_DETECTIVE=0).
+    detective: bool = True
     # Local LLM (spec 7.2.1). Never an external API. In-process llama.cpp by default (open
     # item 10.3); 'openai' / 'ollama' select a local sidecar process instead.
     llm_backend: str = "llamacpp"
@@ -81,6 +83,7 @@ class Settings:
             ),
             control_poll_seconds=int(os.environ.get("FALCON_CONTROL_POLL_SECONDS", cls.control_poll_seconds)),
             flow_settle_seconds=float(os.environ.get("FALCON_FLOW_SETTLE_SECONDS", cls.flow_settle_seconds)),
+            detective=os.environ.get("FALCON_DETECTIVE", "1").lower() not in ("0", "false", "no", "off"),
             llm_backend=os.environ.get("FALCON_LLM_BACKEND", cls.llm_backend),
             llm_model_path=os.environ.get("FALCON_LLM_MODEL_PATH", cls.llm_model_path) or None,
             llm_endpoint=os.environ.get("FALCON_LLM_ENDPOINT", cls.llm_endpoint),

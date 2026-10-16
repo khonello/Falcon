@@ -30,7 +30,7 @@ POLYMORPHIC_TABLES = frozenset({
     "tasks", "department_tasks", "enrollments", "issues", "resource_marks", "deviations", "rules", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
-    "deviation_log", "versions", "pc_version_status", "system_alerts",
+    "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases",
     # non-table targets used by the audit trail
     "client", "session", "event", "execution",
 })
@@ -85,6 +85,7 @@ class Database:
         self.audit = AuditRepo(self)
         self.updates = UpdatesRepo(self)
         self.alerts = AlertsRepo(self)
+        self.detective = DetectiveRepo(self)
         self.resource = ResourceRepo(self)
 
     @property
@@ -556,7 +557,7 @@ class FileIndexRepo(_Repo):
         return len(found)
 
     async def record_event(self, pc_id: int, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False,
-                           content_hash: str | None = None, file_index_id: int | None = None) -> bool:
+                           content_hash: str | None = None, file_index_id: int | None = None, detail: dict[str, Any] | None = None) -> bool:
         """Append to the history of what happened to files and folders. A file being edited is recorded at most
         once per ten minutes (every save would bury the rest). False when it was coalesced away."""
         if op == "modify" and not is_dir and await self._val(
@@ -564,8 +565,8 @@ class FileIndexRepo(_Repo):
                 "AND occurred_at > now() - interval '10 minutes')", pc_id, path):
             return False
         await self._exec(
-            "INSERT INTO file_events (pc_id, op, is_dir, path, old_path, content_hash, file_index_id) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7)", pc_id, op, is_dir, path, old_path, content_hash, file_index_id)
+            "INSERT INTO file_events (pc_id, op, is_dir, path, old_path, content_hash, file_index_id, detail) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", pc_id, op, is_dir, path, old_path, content_hash, file_index_id, detail)
         return True
 
     async def events_for_paths(self, places: list[tuple[int, str]]) -> list[dict[str, Any]]:
@@ -2284,6 +2285,78 @@ class AlertsRepo(_Repo):
     async def cancel(self, alert_id: int) -> bool:
         """Withdraw a scheduled one before it goes out. Delivered ones stay (they were delivered)."""
         return (await self._exec("UPDATE system_alerts SET cancelled_at = now() WHERE id = $1 AND delivered_at IS NULL AND cancelled_at IS NULL", alert_id)).endswith("1")
+
+
+# ============================================================================================
+# 14. Detective (migration 035)
+# ============================================================================================
+
+class DetectiveRepo(_Repo):
+    _CASE = ("c.*, p.hostname, p.pc_type, p.department_id AS pc_department_id, d.name AS department_name "
+             "FROM detective_cases c JOIN pcs p ON p.id = c.pc_id LEFT JOIN departments d ON d.id = c.department_id")
+
+    async def save_case(self, case_id: int | None, row: dict[str, Any], new_findings: list[dict[str, Any]]) -> int:
+        """Insert or update a case and append its new findings, in one transaction."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            if case_id is None:
+                case_id = await conn.fetchval(
+                    "INSERT INTO detective_cases (pc_id, department_id, intent, level, weight, stage_count, stage_name, next_stage, not_yet, behaviours, headline, story, "
+                    "first_at, last_at, raised_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id",
+                    row["pc_id"], row["department_id"], row["intent"], row["level"], row["weight"], row["stage_count"], row["stage_name"], row["next_stage"],
+                    row["not_yet"], row["behaviours"], row["headline"], row["story"], row["first_at"], row["last_at"], row.get("raised_at"))
+            else:
+                await conn.execute(
+                    "UPDATE detective_cases SET intent = $2, level = $3, weight = $4, stage_count = $5, stage_name = $6, next_stage = $7, not_yet = $8, behaviours = $9, "
+                    "headline = $10, story = $11, last_at = $12, raised_at = COALESCE(raised_at, $13) WHERE id = $1",
+                    case_id, row["intent"], row["level"], row["weight"], row["stage_count"], row["stage_name"], row["next_stage"], row["not_yet"], row["behaviours"],
+                    row["headline"], row["story"], row["last_at"], row.get("raised_at"))
+            for f in new_findings:
+                await conn.execute(
+                    "INSERT INTO detective_findings (case_id, behaviour, graph, weight, at, summary, innocent, why, things, evidence) "
+                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", case_id, f["behaviour"], f["graph"], f["weight"], f["at"], f["summary"], f["innocent"],
+                    f["why"], f["things"], f["evidence"])
+        return case_id
+
+    async def case(self, case_id: int) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._CASE} WHERE c.id = $1", case_id)
+
+    async def findings(self, case_id: int) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM detective_findings WHERE case_id = $1 ORDER BY at, id", case_id)
+
+    async def cases(self, *, department_id: int | None = None, levels: list[str] | None = None, status: str | None = None,
+                    exclude_pc_types: list[str] | None = None, only_pc_types: list[str] | None = None, limit: int = 200) -> list[dict[str, Any]]:
+        return await self._fetch(
+            f"SELECT {self._CASE} WHERE ($1::int IS NULL OR p.department_id = $1) AND ($2::text[] IS NULL OR c.level = ANY($2)) AND ($3::text IS NULL OR c.status = $3) "
+            "AND ($4::text[] IS NULL OR p.pc_type <> ALL($4)) AND ($5::text[] IS NULL OR p.pc_type = ANY($5)) ORDER BY c.weight DESC, c.last_at DESC LIMIT $6",
+            department_id, levels, status, exclude_pc_types, only_pc_types, limit)
+
+    async def open_since(self, since: Any) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM detective_cases WHERE status = 'open' AND last_at >= $1 ORDER BY id", since)
+
+    async def review(self, case_id: int, status: str, by_account_id: int, note: str | None) -> bool:
+        return (await self._exec(
+            "UPDATE detective_cases SET status = $2, reviewed_by_account_id = $3, reviewed_at = now(), note = $4 WHERE id = $1", case_id, status, by_account_id, note)).endswith("1")
+
+    async def device_uses(self, pc_id: int, device: str) -> int:
+        return int(await self._val("SELECT uses FROM detective_devices WHERE pc_id = $1 AND device = $2", pc_id, device) or 0)
+
+    async def see_device(self, pc_id: int, device: str) -> int:
+        """A drive was plugged in: how many times this machine had seen it before."""
+        before = await self.device_uses(pc_id, device)
+        await self._exec(
+            "INSERT INTO detective_devices (pc_id, device) VALUES ($1, $2) ON CONFLICT (pc_id, device) DO UPDATE SET uses = detective_devices.uses + 1, last_seen = now()", pc_id, device)
+        return before
+
+    async def recent_events(self, since: Any) -> list[dict[str, Any]]:
+        """What happened to files lately, oldest first (a restart's memory of the last few hours)."""
+        return await self._fetch(
+            "SELECT pc_id, op, path, old_path, content_hash, detail, occurred_at FROM file_events WHERE occurred_at >= $1 AND NOT is_dir ORDER BY occurred_at, id", since)
+
+    async def counts(self, *, department_id: int | None = None, exclude_pc_types: list[str] | None = None, only_pc_types: list[str] | None = None) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT c.intent, c.level, c.status, count(*)::int AS n FROM detective_cases c JOIN pcs p ON p.id = c.pc_id "
+            "WHERE ($1::int IS NULL OR p.department_id = $1) AND ($2::text[] IS NULL OR p.pc_type <> ALL($2)) AND ($3::text[] IS NULL OR p.pc_type = ANY($3)) "
+            "GROUP BY c.intent, c.level, c.status", department_id, exclude_pc_types, only_pc_types)
 
 
 # ============================================================================================

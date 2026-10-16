@@ -635,3 +635,11 @@ Postgres adaptations applied uniformly: identity columns for PKs, `TIMESTAMPTZ` 
 
 `flow_sync_log.source_hash`: the hash of the SOURCE file a sync was made from (`content_hash` stays what was written, which a stage may change). The Engine reads the latest
 per destination and source file to catch a destination up (`engine/flow/sync.py`): after a pause, a failure, an absence, a new flow over files already there, or a granted consent.
+
+## 14. Detective (migration 035)
+
+`detective_cases` (one per case: machine, department, intent, level quiet/noted/case/urgent, weight, the stage reached, what has not happened yet, the story,
+status open/explained/accepted/escalated/dismissed with who reviewed and when), `detective_findings` (what each mini-graph concluded: behaviour, graph, weight,
+summary, what would make it innocent, why the weight is what it is, the things (files) it concerns, the evidence signals), `detective_devices` (how often a
+drive has been seen on a machine). `file_events.detail` (JSONB) says which attributes an `attrib` change was (hidden, system, read-only, before and after).
+Design: `docs/design/detective.md`.
