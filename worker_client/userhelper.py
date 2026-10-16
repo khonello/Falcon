@@ -63,6 +63,14 @@ class UserHelper:
             raise OSError(r.get("error") or "no picture")
         return r["sw"], r["sh"], r["w"], r["h"], base64.b64decode(r["png_b64"])
 
+    async def witness(self) -> tuple[float | None, str | None]:
+        """Seconds since the person last touched the machine, and the program in front, as the helper on their desktop sees them."""
+        r = await self.request({"cmd": "witness"}, timeout=3.0)
+        if not r.get("ok"):
+            return None, None
+        idle_s = r.get("idle_s")
+        return (float(idle_s) if idle_s is not None else None), r.get("front")
+
     async def stop(self) -> None:
         proc, self._proc = self._proc, None
         if proc is None:

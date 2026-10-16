@@ -78,7 +78,8 @@ class FileIndex:
             if op == "move" and entry.get("old_path"):
                 await db.mark_gone(pc_id, str(entry["old_path"]))    # it left its old place: this used to be forgotten
         await db.record_event(pc_id, op, path, old_path=entry.get("old_path"), is_dir=entry["is_dir"],
-                              content_hash=entry.get("hash"), file_index_id=known_id, detail=entry.get("detail"))
+                              content_hash=entry.get("hash"), file_index_id=known_id,
+                              detail=({**(entry.get("detail") or {}), **(entry.get("witness") or {})} or None))
         full = {"pc_id": pc_id, "file_index_id": file_index_id, **entry}
         if op in CONTENT_OPS and not entry["is_dir"]:
             for cb in self._subscribers:
@@ -130,8 +131,18 @@ def _detail(raw: Any) -> dict[str, bool] | None:
     """What an attribute change was, kept to the few facts that are known (a Worker may say more; nothing else is stored)."""
     if not isinstance(raw, dict):
         return None
-    out = {k: bool(raw[k]) for k in ("hidden", "was_hidden", "system", "was_system", "read_only") if k in raw}
+    out: dict[str, Any] = {k: bool(raw[k]) for k in ("hidden", "was_hidden", "system", "was_system", "read_only") if k in raw}
     return out or None
+
+
+def _witness(raw: Any) -> dict[str, str] | None:
+    """What the Worker saw when a change happened: who made it (hand / started / alone / unknown) and the program in front (only for hand)."""
+    if not isinstance(raw, dict) or raw.get("by") not in ("hand", "started", "alone", "unknown"):
+        return None
+    out = {"by": str(raw["by"])}
+    if raw.get("front"):
+        out["front"] = str(raw["front"])[:120]
+    return out
 
 
 def _normalize(event: dict[str, Any]) -> dict[str, Any]:
@@ -154,6 +165,7 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
         "resource_tag": tag,
         "scope_department_id": event.get("scope_department_id"),
         "detail": _detail(event.get("detail")),
+        "witness": _witness(event.get("witness")),
     }
 
 

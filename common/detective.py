@@ -490,9 +490,6 @@ class Detective:
             if self._restricted(s):
                 w += 0.15
                 why.append("a restricted file")
-            if s.by in ("alone", "started"):
-                w += 0.08
-                why.append("done by a program")
             return Finding("concealment", "disguised", s.at, s.pc, w, frozenset({s.thing or s.path}),
                            f"{name_of(old)} was renamed to look like a different kind of file ({name_of(s.path)})", [s],
                            "a file saved in a format or name an application insists on", why)
@@ -525,8 +522,6 @@ class Detective:
         if self._restricted(*sources):
             w += 0.22
             why.append("restricted files among them")
-        if s.by in ("alone", "started"):
-            w += 0.06
         return Finding("collection", "archived", s.at, s.pc, w, frozenset(things | {s.thing or s.path}),
                        f"{len(things)} files were packed into {s.name}", sources[-200:] + [s], "a person sending a few files together or a backup", why)
 
@@ -553,8 +548,6 @@ class Detective:
         if self._restricted(s) or any(("restricted" in x.tags) for x in m.since(s.at - 3600) if (x.thing or x.path) in lineage):
             w += 0.18
             why.append("restricted content")
-        if s.by in ("alone", "started"):
-            w += 0.05
         return Finding("exfiltration", "to_drive", s.at, s.pc, w, frozenset({s.thing or s.path} | lineage), f"{s.name} was copied to a removable drive ({dev})", [s],
                        "a drive this person always uses for their own files", why)
 
@@ -581,8 +574,6 @@ class Detective:
             why.append("the archive that carried it")
         if self._restricted(s):
             w += 0.12
-        if s.by in ("alone", "started"):
-            w += 0.06
         return Finding("erasure", "removed_after_taking", s.at, s.pc, w, frozenset(gone), f"{s.name} was deleted after being copied off the machine", taken[-1:] + [s],
                        "tidying up after a legitimate transfer", why)
 
@@ -618,6 +609,9 @@ class Detective:
 
     def _contextual(self, f: Finding, s: Sig) -> float:
         w = f.weight
+        if f.behaviour in ("concealment", "collection", "exfiltration", "erasure") and s.by in ("alone", "started"):
+            w += 0.08 if s.by == "alone" else 0.05                       # done by a program rather than by hand: a little more telling, never a verdict
+            f.why.append("done by a program on its own" if s.by == "alone" else "done by a program the person started")
         for thing in f.things:
             if self.ctx.has_task(s.pc, thing):
                 w -= 0.45
@@ -666,11 +660,15 @@ class Detective:
             best = Case(pc=f.pc, first_at=f.at)
             self.cases.append(best)
         was = "quiet" if created else best.level
+        intent_was = "" if created else best.intent
         best.findings.append(f)
         best.last_at = max(best.last_at, f.at)
         now = best.level
         order = ("quiet", "noted", "case", "urgent")
-        return Update(best, created, order.index(now) > order.index(was) and now in ("case", "urgent"), was, now, best.weight, best.intent, best.stage, best.not_yet(), f)
+        crossed = order.index(now) > order.index(was) and now in ("case", "urgent")
+        # a case already raised that turns into something graver (hiding becomes taking data out) is worth telling people again
+        graver = bool(intent_was) and now in ("case", "urgent") and best.intent != intent_was and best.intent in ("Taking data out", "Wrecking things")
+        return Update(best, created, crossed or graver, was, now, best.weight, best.intent, best.stage, best.not_yet(), f)
 
     @staticmethod
     def _continues(c: Case, f: Finding) -> bool:

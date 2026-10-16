@@ -144,13 +144,14 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
         digest = digest or (entry or {}).get("content_hash")
         if (entry or {}).get("resource_tag") == "restricted" or (digest and await engine.db.marks.active_with_hash(digest)):
             tags.add("restricted")
-    by = "falcon" if op in ("create", "modify", "move", "copy") and await _flow_wrote(engine, pc_id, path, digest) else "unknown"
+    seen = event.get("witness") or {}
+    by = "falcon" if op in ("create", "modify", "move", "copy") and await _flow_wrote(engine, pc_id, path, digest) else seen.get("by", "unknown")
     det = _detector()
     mem = det.mem.get(pc_id)
     if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
         tags.add("allowed")
     await _tasks_things(engine, pc_id)
-    sig = Sig(time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", "", by, "", frozenset(tags))
+    sig = Sig(time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("front", "") if by == "hand" else "", by, "", frozenset(tags))
     await _apply(engine, det.feed(sig))
 
 
@@ -222,7 +223,7 @@ async def _ensure(engine: Engine) -> None:
     for r in await engine.db.detective.recent_events(since):
         verb = _verb({"op": r["op"], "path": r["path"], "old_path": r["old_path"], "detail": r["detail"] or {}})
         if verb:
-            det.remember(Sig(r["occurred_at"].timestamp(), r["pc_id"], verb, r["path"], r["old_path"] or "", r["content_hash"] or ""))
+            det.remember(Sig(r["occurred_at"].timestamp(), r["pc_id"], verb, r["path"], r["old_path"] or "", r["content_hash"] or "", by=(r["detail"] or {}).get("by", "unknown")))
     for c in await engine.db.detective.open_since(datetime.now(timezone.utc) - RESUME):
         case = Case(pc=c["pc_id"], id=c["id"], first_at=c["first_at"].timestamp(), last_at=c["last_at"].timestamp())
         for f in await engine.db.detective.findings(c["id"]):

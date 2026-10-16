@@ -68,6 +68,10 @@ class WorkerService:
         # the signed-in person's desktop; otherwise in this process.
         self.helper = UserHelper() if winsession.in_service_session() else None
         self.screens = ScreenStreamer(self.call, acapture=self.helper.capture if self.helper else None)
+        # what the machine saw when a file changed (was a person at the keyboard?): a service sees no desktop, so it asks the helper on the person's
+        from worker_client.witness import Witness
+
+        self.witness = Witness(self.helper.witness if self.helper else (self._no_desktop if winsession.in_service_session() else None))
         self.remote_input: Any = HelperInput(self.helper) if self.helper else RemoteInput()
         self.inventory = Inventory(self.call)
         self._native_watch = native_watch
@@ -75,12 +79,12 @@ class WorkerService:
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
         state_path = Path(config.path).parent / "index-state.db" if config.index_state else None
         if config.separate_programs:
-            self.watcher: Any = IsolatedWatcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
+            self.watcher: Any = IsolatedWatcher(config.watch_roots, self._relay, poll_seconds=config.poll_seconds,
                                                 hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
                                                 native=native_watch, on_unhealthy=self._component_changed,
                                                 state_path=state_path, reconcile_seconds=config.reconcile_seconds)
         else:
-            self.watcher = Watcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
+            self.watcher = Watcher(config.watch_roots, self._relay, poll_seconds=config.poll_seconds,
                                    hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
                                    native=native_watch, state_path=state_path, reconcile_seconds=config.reconcile_seconds)
         self.notifiers: list[Notifier] = []   # the narrow UI / dialogs subscribe here
@@ -160,6 +164,16 @@ class WorkerService:
         if self.conn is None or not self.conn.connected:
             raise ConnectionError_("not connected")
         return await self.conn.call(type_, payload)
+
+    @staticmethod
+    async def _no_desktop() -> tuple[float | None, str | None]:
+        return None, None                          # a service in session 0 with no helper on the desktop: it does not guess
+
+    async def _relay(self, type_: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """What the file watcher (here or in its own program) reports goes through here, so each change carries the witness stamp taken as it was told."""
+        if type_ == "index.event" and payload and isinstance(payload.get("event"), dict) and "witness" not in payload["event"]:
+            payload = {**payload, "event": {**payload["event"], "witness": await self.witness.stamp()}}
+        return await self.call(type_, payload)
 
     # --- connection -----------------------------------------------------------------------------
 
