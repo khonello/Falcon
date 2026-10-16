@@ -81,7 +81,7 @@ QtObject {
     // --- titles: what each page is, in a line --------------------------------------------------------
     readonly property var titles: ({
         messages: ["Messages", "Conversations, and announcements to the people you look after"],
-        detective: ["Detective", "Held while its place is decided"],
+        detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"],
         departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"],
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
         access: ["Access", "Who is inside which machine, and who was let in"],

@@ -44,6 +44,8 @@ async def test_a_leak_on_a_department_machine_is_raised_kept_and_seen_by_the_rig
     assert (await a2.ok("detective.cases", {}))["cases"] == [] and await a2.err("detective.case", {"case_id": c["id"]}) == "not_found"
     assert await w1.err("detective.cases", {}) == "forbidden"
     detail = await a1.ok("detective.case", {"case_id": c["id"]})
+    labels = {n["label"]: n["col"] for n in detail["graph"]["nodes"]}
+    assert labels["12 files in Staging"] == 1 and labels["Drive E:"] == 3 and labels["notes.txt.dll"] == 1 and detail["graph"]["edges"]
     kinds = {f["behaviour"] for f in detail["findings"]}
     assert kinds >= {"concealment", "collection", "exfiltration", "erasure"}
     assert all(f["innocent"] and f["evidence"] for f in detail["findings"])

@@ -2326,7 +2326,7 @@ class DetectiveRepo(_Repo):
     async def cases(self, *, department_id: int | None = None, levels: list[str] | None = None, status: str | None = None,
                     exclude_pc_types: list[str] | None = None, only_pc_types: list[str] | None = None, limit: int = 200) -> list[dict[str, Any]]:
         return await self._fetch(
-            f"SELECT {self._CASE} WHERE ($1::int IS NULL OR p.department_id = $1) AND ($2::text[] IS NULL OR c.level = ANY($2)) AND ($3::text IS NULL OR c.status = $3) "
+            f"SELECT {self._CASE} WHERE ($1::int IS NULL OR p.department_id = $1) AND ($2::text[] IS NULL OR c.level = ANY($2)) AND ($3::text IS NULL OR c.status = $3 OR ($3 = 'reviewed' AND c.status <> 'open')) "
             "AND ($4::text[] IS NULL OR p.pc_type <> ALL($4)) AND ($5::text[] IS NULL OR p.pc_type = ANY($5)) ORDER BY c.weight DESC, c.last_at DESC LIMIT $6",
             department_id, levels, status, exclude_pc_types, only_pc_types, limit)
 

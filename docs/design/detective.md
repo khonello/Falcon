@@ -39,5 +39,5 @@ It is stdlib-only so it can move to the Worker later (raw activity then never le
 ## Not built yet (in order)
 1. Witness signals on the Worker: process and parent for a file change (ETW), whether input just happened, USB drive serial/label, log clearing, screenshot-tool and
    clipboard-image signals, which attribute changed beyond hidden. 2. Graphs for capture, evasion (including a machine going silent) and sabotage.
-3. The Detective page (case as a story with the graph drawn), and a demo-scenario generator for showing it. 4. The model (Qwen3-1.7B) as a labeller of names/paths/
+3. A demo-scenario generator for showing it (the page itself is built). 4. The model (Qwen3-1.7B) as a labeller of names/paths/
 titles (is this a disguise? a webmail window?) and a second opinion on a case -- measured with and without, never the verdict. 5. Moving the matcher to the Worker.

@@ -178,3 +178,26 @@ def test_what_is_remembered_is_bounded():
     for i in range(20000):
         det.feed(Sig(t + i * 5, 1, "modified", rf"C:\a\f{i % 50}.txt", thing=str(i)))
     assert len(det.mem[1].recent) < 5000 and time.time() > 0
+
+
+def test_a_case_draws_as_a_picture_where_a_burst_is_one_thing():
+    det, _ = play(SCENARIOS["leak"]())
+    g = det.open_cases()[0].graph()
+    by = {n["label"]: n for n in g["nodes"]}
+    assert by["14 files in Payroll"]["col"] == 0 and by["14 files in Staging"]["col"] == 1 and by["Drive E:"]["col"] == 3 and by["q3.zip"]["col"] == 2
+    assert by["notes.txt.dll"]["badges"] == ["hidden"] and by["q3.zip"]["badges"] == ["deleted"] and by["cleared the list of recent files"]["col"] == 4
+    verbs = [(e["verb"], e["to"].split(":")[0]) for e in g["edges"]]
+    assert ("moved", "f") in verbs and ("copied", "dir") in verbs and ("packed", "f") in verbs and ("copied", "dev") in verbs
+    ids = {n["id"] for n in g["nodes"]}
+    assert all(e["from"] in ids and e["to"] in ids for e in g["edges"])                  # every line joins two things that are drawn
+    assert [n["col"] for n in g["nodes"]] == sorted(n["col"] for n in g["nodes"])
+
+
+def test_a_graph_of_nothing_is_empty_and_the_evidence_survives_a_round_trip():
+    from common.detective import graph_of, sig_from_dict, sig_to_dict
+
+    assert graph_of([]) == {"nodes": [], "edges": []}
+    det, _ = play(SCENARIOS["patient"]())
+    before = det.open_cases()[0].graph()
+    sigs = [sig_from_dict(sig_to_dict(e)) for f in det.open_cases()[0].findings for e in f.evidence]
+    assert {n["label"] for n in graph_of(sigs)["nodes"]} == {n["label"] for n in before["nodes"]}

@@ -107,5 +107,5 @@ Last updated 13 Oct 2026.
 ## Detective, first slice (16 Oct 2026)
 - Built: the behaviour model (`common/detective.py`), scripted scenarios (`python scripts/detective_scenarios.py`), the Engine keeping/raising/reviewing cases
   (`engine/detective`, `detective.*`), the Worker telling "made hidden" from other attribute changes, and `detective` commands in the shell. Design and the
-  decisions: `docs/design/detective.md`. The Detective page is still the blank placeholder: next.
+  decisions: `docs/design/detective.md`. The Detective page is built (cases, the picture, the story, review).
 - The leak scenario raises while the files are still on the machine ("It has not left the machine yet"); the backup twin with the same moves stays quiet.

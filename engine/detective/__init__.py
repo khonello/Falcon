@@ -29,6 +29,7 @@ from common.detective import (
     Sig,
     Update,
     folder_of,
+    graph_of,
     name_of,
     sig_from_dict,
     sig_to_dict,
@@ -259,8 +260,10 @@ async def cases(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
     scope = _scope(ctx)
     levels = ["noted", "case", "urgent"] if payload.get("include_noted") else OPEN_LEVELS
     status = payload.get("status")
-    if status is not None and status not in ("open", *OUTCOMES):
-        raise ProtocolError(ErrorCode.INVALID, "status is open, explained, accepted, dismissed or escalated")
+    if status is not None and status not in ("open", "reviewed", *OUTCOMES):
+        raise ProtocolError(ErrorCode.INVALID, "status is open, reviewed, explained, accepted, dismissed or escalated")
+    if status in ("reviewed", *OUTCOMES):
+        levels = None                                                  # anything that was reviewed, whatever its level was
     return {"cases": [_view(c) for c in await ctx.engine.db.detective.cases(levels=levels, status=status, **scope)]}
 
 
@@ -271,7 +274,9 @@ async def case(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
     names = await ctx.engine.db.accounts.display_names_for(ctx.identity.account_id, [c["reviewed_by_account_id"]] if c.get("reviewed_by_account_id") else [])
     out = _view(c)
     out["reviewed_by"] = names.get(c.get("reviewed_by_account_id"))
-    return {"case": out, "findings": rows(found)}
+    seen: set[Sig] = set()
+    sigs = [e for f in found for e in (sig_from_dict(x) for x in (f["evidence"] or [])) if not (e in seen or seen.add(e))]
+    return {"case": out, "findings": rows(found), "graph": graph_of(sigs)}
 
 
 @handler("detective.review")

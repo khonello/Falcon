@@ -243,11 +243,92 @@ class Case:
             i = j + 1
         return lines
 
+    def graph(self) -> dict[str, Any]:
+        seen: set[Sig] = set()
+        sigs = [e for f in self.findings for e in f.evidence if not (e in seen or seen.add(e))]
+        return graph_of(sigs)
+
     def headline(self) -> str:
         top = sorted(self.findings, key=lambda f: f.weight, reverse=True)[:4]
         said = f"{self.intent}. " + ("; ".join(dict.fromkeys(f.summary for f in sorted(top, key=lambda f: f.at))) + ".")
         extra = self.not_yet()
         return said + (f" {extra}" if extra else "")
+
+
+def graph_of(sigs: list[Sig]) -> dict[str, Any]:
+    """The picture of a case: what was touched, where it went, in columns (where it came from, where it was staged, packed, taken out, the traces).
+    Runs of the same step in one folder become one node ("14 files in Staging"), so a burst reads as one thing. Computed here, so a console only draws it."""
+    ordered = sorted(sigs, key=lambda e: e.at)
+    devices = [e.device or e.path for e in ordered if e.verb == "attached"]
+
+    def on_device(path: str) -> str:
+        low = path.lower().replace("/", "\\")
+        return next((d for d in devices if low.startswith(d.lower().replace("/", "\\").rstrip("\\") + "\\")), "")
+
+    # bundles: consecutive same step into the same folder
+    runs: list[list[Sig]] = []
+    for e in ordered:
+        if (runs and e.verb in ("copied", "created", "moved", "opened", "deleted") and runs[-1][-1].verb == e.verb and folder_of(runs[-1][-1].path) == folder_of(e.path)
+                and e.at - runs[-1][-1].at <= 90):
+            runs[-1].append(e)
+        else:
+            runs.append([e])
+    nodes: dict[str, dict[str, Any]] = {}
+    edges: list[dict[str, Any]] = []
+
+    def node(key: str, label: str, col: int, kind: str, at: float, count: int = 1) -> dict[str, Any]:
+        n = nodes.setdefault(key, {"id": key, "label": label, "col": col, "kind": kind, "count": count, "badges": [], "at": at})
+        n["count"] = max(n["count"], count)
+        return n
+
+    def badge(n: dict[str, Any], what: str) -> None:
+        if what not in n["badges"]:
+            n["badges"].append(what)
+
+    def place(path: str, count: int, at: float, run: list[Sig]) -> dict[str, Any]:
+        dev = on_device(path)
+        if dev:
+            return node("dev:" + dev, f"Drive {dev.rstrip(chr(92))}", 3, "drive", at)
+        if count > 2:
+            return node("dir:" + folder_of(path).lower(), f"{count} files in {name_of(folder_of(path)) or folder_of(path)}", 1 if run[0].verb != "opened" else 0, "staging", at, count)
+        if is_archive(path):
+            return node("f:" + path.lower(), name_of(path), 2, "archive", at)
+        return node("f:" + path.lower(), name_of(path), 1 if is_system_folder(path) else 0, "system" if is_system_folder(path) else "file", at)
+
+    last_bundle: dict[str, Any] | None = None
+    for run in runs:
+        e, n = run[0], len(run)
+        if e.verb == "attached":
+            node("dev:" + (e.device or e.path), f"Drive {(e.device or e.path).rstrip(chr(92))}", 3, "drive", e.at)
+        elif e.verb == "cleared":
+            node("trace:" + str(e.info.get("what") or "history"), f"cleared {e.info.get('what') or 'a history'}", 4, "trace", e.at)
+        elif e.verb in ("hid", "unhid"):
+            badge(place(e.path, 1, e.at, run), "hidden" if e.verb == "hid" else "visible")
+        elif e.verb == "deleted":
+            for x in run:
+                badge(place(x.path, 1, x.at, [x]) if n <= 2 else place(x.path, n, x.at, run), "deleted")
+                if n > 2:
+                    break
+        elif e.verb in ("copied", "moved", "renamed"):
+            to = place(e.path, n, e.at, run)
+            if e.old:
+                src_count = n
+                src = node("dir:" + folder_of(e.old).lower(), f"{n} files in {name_of(folder_of(e.old))}", 0, "staging", e.at, n) if src_count > 2 else \
+                    node("f:" + e.old.lower(), name_of(e.old), 0, "file", e.at)
+                edges.append({"from": src["id"], "to": to["id"], "verb": e.verb, "at": e.at})
+            if n > 2:
+                last_bundle = to
+        elif e.verb == "created":
+            to = place(e.path, n, e.at, run)
+            if is_archive(e.path) and last_bundle is not None and e.at - last_bundle["at"] <= 600:
+                edges.append({"from": last_bundle["id"], "to": to["id"], "verb": "packed", "at": e.at})
+            if n > 2:
+                last_bundle = to
+        elif e.verb == "opened":
+            place(e.path, n, e.at, run)
+    for n in nodes.values():
+        n["badges"] = list(n["badges"])
+    return {"nodes": sorted(nodes.values(), key=lambda x: (x["col"], x["at"])), "edges": edges}
 
 
 @dataclass
