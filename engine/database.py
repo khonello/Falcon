@@ -273,6 +273,21 @@ class AccountsRepo(_Repo):
             "INSERT INTO pcs (hostname, department_id, pc_type, client_id) VALUES ($1, $2, $3, $4) RETURNING id",
             hostname, department_id, pc_type, client_id)
 
+    async def move_super_user(self, account_id: int, hostname: str, client_id: str) -> tuple[int, int]:
+        """The Super User's account moves to a new machine, all or nothing: (the old pc id, the new pc id). The old machine's key is rotated so it
+        stops being the Super User's at once, and any session it held ends."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            old = await conn.fetchval("SELECT bound_pc_id FROM accounts WHERE id = $1 AND role = 'super_user' AND status = 'active' FOR UPDATE", account_id)
+            if old is None:
+                raise ValueError("not an active Super User bound to a machine")
+            await conn.execute("UPDATE accounts SET bound_pc_id = NULL WHERE id = $1", account_id)
+            new = await conn.fetchval(
+                "INSERT INTO pcs (hostname, department_id, pc_type, client_id) VALUES ($1, NULL, 'super_user_workstation', $2) RETURNING id", hostname, client_id)
+            await conn.execute("UPDATE accounts SET bound_pc_id = $2 WHERE id = $1", account_id, new)
+            await conn.execute("UPDATE pcs SET key_generation = key_generation + 1 WHERE id = $1", old)
+            await conn.execute("UPDATE sessions SET ended_at = now(), ended_reason = 'voluntary' WHERE pc_id = $1 AND ended_at IS NULL", old)
+        return old, new
+
     async def rekey_pc(self, pc_id: int) -> int:
         """Bump the key generation: every previously issued key for this PC stops verifying."""
         return await self._val(

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import logging
 import sys
 
@@ -22,6 +21,8 @@ def main() -> None:
     ap.add_argument("--connect", action="store_true", help="connect immediately with the remembered settings")
     ap.add_argument("--script", help="run these ';'-separated commands and exit (no TUI)")
     ap.add_argument("--gui", action="store_true", help="start the QML GUI instead of the TUI")
+    ap.add_argument("--handover-join", action="store_true",
+                    help="ask to become the Super User's machine (the current Super User opens a handover and types the code shown here)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING,
@@ -30,6 +31,24 @@ def main() -> None:
     from pathlib import Path
 
     cfg = LocalConfig.load(Path(args.config) if args.config else None)
+    if args.handover_join:
+        import asyncio
+
+        from operator_client.core.handover_join import HandoverEnded, join
+
+        if args.engine:
+            host, _, port = args.engine.rpartition(":")
+            cfg.engine_host, cfg.engine_port = (host or args.engine), int(port) if port.isdigit() else cfg.engine_port
+        if args.ca:
+            cfg.ca_cert = args.ca
+        if args.plaintext:
+            cfg.tls = False
+        try:
+            asyncio.run(join(cfg))
+        except HandoverEnded as exc:
+            print(f"Not finished: {exc}")
+            raise SystemExit(1) from exc
+        raise SystemExit(0)
     connect_args = []
     if args.engine:
         connect_args.append(args.engine)

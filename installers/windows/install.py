@@ -28,6 +28,7 @@ import getpass
 import json
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -110,6 +111,8 @@ class WindowsInstall:
               skip=None if r.service and not a.no_service else ("--no-service" if r.service else "this role has no service"))
         p.add("The console", self.console, "Start-menu shortcut" + ("; the Super User's id and key for the person installing" if r.name == "superuser" else ""),
               skip=None if r.console else "this role has no console")
+        p.add("Become the Super User's machine", self.handover, "ask the Engine, show a code; the current Super User confirms it (opened with `handover open`)",
+              skip=None if a.handover else "--handover not given")
         p.add("Receipt", self.receipt, f"{self.target / 'install.json'}")
         return p
 
@@ -236,6 +239,8 @@ class WindowsInstall:
     def _super_user_settings(self) -> str:
         """The Super User's console needs the id and key the Engine's installer printed. They go into the settings of the person running this."""
         assert self.bundle is not None
+        if self.a.handover:
+            return self._write_super_user_settings("", "", "this machine will ask to become the Super User's (next step)")
         if not self.a.client_id:
             return "no --client-id given: put the Super User's id and key in the console's settings yourself (the Engine's installer printed them)"
         key = self.a.client_key or (Path(self.a.client_key_file).read_text(encoding="utf-8").strip() if self.a.client_key_file else "")
@@ -243,13 +248,28 @@ class WindowsInstall:
             key = getpass.getpass("The Super User's client key (typed here, not shown): ").strip()
         if not key:
             raise InstallError("--client-id needs the key: --client-key-file <file> (or type it when asked)")
-        base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Falcon"
-        base.mkdir(parents=True, exist_ok=True)
-        path = base / "operator.json"
-        cfg = {"engine_host": self.bundle.engine_host, "engine_port": self.bundle.engine_port, "client_id": self.a.client_id, "client_key": key,
+        return self._write_super_user_settings(self.a.client_id, key, "")
+
+    def _write_super_user_settings(self, client_id: str, key: str, note: str) -> str:
+        assert self.bundle is not None
+        path = self.operator_json()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cfg = {"engine_host": self.bundle.engine_host, "engine_port": self.bundle.engine_port, "client_id": client_id, "client_key": key,
                "tls": True, "ca_cert": str(self.cert), "prefs": {}, "cache": {}}
         path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-        return f"the Super User's settings are in {path} (readable by this person only)"
+        return f"the Super User's settings are in {path} (readable by this person only)" + (f"; {note}" if note else "")
+
+    def operator_json(self) -> Path:
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Falcon" / "operator.json"
+
+    def handover(self) -> str:
+        """Ask the Engine to make this machine the Super User's. The code is shown here, in this window, and the person at the CURRENT Super User
+        console types it there. Nothing is moved until they do."""
+        argv = [str(self.runtime_python), "-m", "operator_client", "--handover-join", "--config", str(self.operator_json())]
+        proc = subprocess.run(argv, cwd=str(self.app), check=False)             # not captured: the person has to read the code
+        if proc.returncode != 0:
+            raise InstallError("the handover was not confirmed. On the current Super User's console type `handover open`, then run this installer again.")
+        return "this machine is now the Super User's console"
 
     def receipt(self) -> str:
         path = self.target / "install.json"
@@ -308,6 +328,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--bundle", help="falcon-client.json from the Engine's installer")
     ap.add_argument("--fingerprint", help="the certificate's fingerprint the Engine's installer printed: refuse any other")
     ap.add_argument("--department", type=int, help="the department this machine asks to join (otherwise the person confirming chooses)")
+    ap.add_argument("--handover", action="store_true",
+                    help="superuser: this is the Super User's NEW machine; no id or key is given, it asks the Engine and the current Super User confirms with the code shown")
     ap.add_argument("--client-id", help="superuser: the Super User's client id")
     ap.add_argument("--client-key", help="superuser: the key (prefer --client-key-file: a command line is remembered)")
     ap.add_argument("--client-key-file", help="superuser: a file holding the key")

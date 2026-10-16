@@ -64,8 +64,13 @@ async def request(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if not hostname:
         raise ProtocolError(ErrorCode.INVALID, "a machine must say its name")
     level = str(payload.get("level") or "worker")
-    if level not in LEVELS:
+    if level not in LEVELS + ("super_user",):
         raise ProtocolError(ErrorCode.INVALID, f"level must be one of {LEVELS}")
+    if level == "super_user":
+        from engine.hierarchy import handover
+
+        if not handover.is_open():                               # only while the current Super User has opened a handover
+            raise ProtocolError(ErrorCode.FORBIDDEN, "the Super User has not opened a handover")
     department_id = payload.get("department_id")
     if department_id is not None:
         try:
@@ -157,6 +162,8 @@ async def confirm(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     enr = await _load_pending(ctx, int_field(payload, "enrollment_id"))
+    if enr["requested_level"] == "super_user":
+        raise ProtocolError(ErrorCode.FORBIDDEN, "a machine asking to become the Super User's is confirmed with handover.confirm")
     if not hmac.compare_digest(str_field(payload, "code").strip(), enr["code"]):
         wrong = await db.enrollments.wrong_code(enr["id"])
         if wrong >= MAX_WRONG_CODES:

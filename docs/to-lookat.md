@@ -84,3 +84,9 @@ Last updated 13 Oct 2026.
 - New window kind `tasks` ("Your tasks"): everything assigned to the person, soonest due first, Start on what is not started. Opened from the tray (click the icon, or "My tasks"); the tray menu also still has "Ask my Admin for help".
 - Pickers say how old their names are: "Not connected. Names as of ..." (palette; the pages themselves are replaced by the Connect screen while disconnected), or "Names as of ..., from the last time you were connected. Updating." just after start.
 - Still to look at on a real desktop (VM plan): the tray icon, the reminder window popping over other applications, the list window from the tray.
+
+## Moving the Super User to a dedicated machine (16 Oct 2026)
+
+- Built (Engine + TUI + installer option): `handover open | status | confirm <id> <code> | cancel`, migration 033, `python -m operator_client --handover-join`, and `installers.windows.install --role superuser --handover`. See `docs/GETTING-STARTED.md`. Tested end to end (`tests/test_handover.py`): same account, one Super User at all times, old key stops at once, wrong codes and expired windows change nothing.
+- Not built: a page for it in the console (Access / Registry) — today it is TUI commands. Nothing for the old machine afterwards except registering it like any other.
+- Still your decision: should the old machine be kept as an ordinary managed machine? (Default: it is just unbound; register it as a Worker if you want it.)

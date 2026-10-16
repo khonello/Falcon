@@ -167,8 +167,11 @@ async def test_one_address_cannot_flood_the_waiting_list(engine, org):
             await extra.call("enroll.request", {"hostname": "  "})
         assert blank.value.code == "invalid"
         with pytest.raises(EngineError) as level:
-            await extra.call("enroll.request", {"hostname": "PC-Y", "level": "super_user"})
+            await extra.call("enroll.request", {"hostname": "PC-Y", "level": "owner"})
         assert level.value.code == "invalid"
+        with pytest.raises(EngineError) as closed:
+            await extra.call("enroll.request", {"hostname": "PC-Z", "level": "super_user"})        # only while a handover is open
+        assert closed.value.code == "forbidden"
     finally:
         for m in machines:
             await m.close()

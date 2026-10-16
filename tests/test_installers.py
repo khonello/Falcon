@@ -316,7 +316,7 @@ def test_the_command_line_installs_and_says_what_is_left_to_do(tmp_path, monkeyp
             "--python", sys.executable, "--reuse-python", "--no-acl", "--no-service", "--no-windows"]
     assert win_install.main(argv) == 0
     out = capsys.readouterr().out
-    assert "[1/9] Check" in out and "this machine has no key yet" in out
+    assert "[1/10] Check" in out and "this machine has no key yet" in out
     assert win_install.main([*argv[:2], "--role", "worker", "--bundle", str(tmp_path / "missing.json"), *argv[4:]]) == 1
 
 
@@ -389,3 +389,13 @@ async def test_an_installed_admin_workstation_registers_itself_and_its_console_i
     finally:
         winservice.stop(name)
         winservice.uninstall(name)
+
+
+def test_a_new_super_user_machine_is_installed_without_an_id_and_asks_to_take_over(tmp_path, capsys):
+    """`--handover`: no client id or key is given; the plan has a step that asks the Engine, and without the flag that step is skipped."""
+    for flags, shown in (([], False), (["--handover"], True)):
+        assert win_install.main(["--role", "superuser", "--bundle", str(tmp_path / "b.json"), "--target", str(tmp_path / "pf"), "--data", str(tmp_path / "pd"),
+                                 "--dry-run", *flags]) == 0
+        out = capsys.readouterr().out
+        step = next(line for line in out.splitlines() if "Become the Super User's machine" in line)
+        assert ("--handover not given" in step) is (not shown)

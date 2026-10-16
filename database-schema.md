@@ -74,7 +74,7 @@ A machine asking to be registered. A request, never a grant: it waits here until
 | `token_hash` | TEXT NOT NULL UNIQUE | SHA-256 of the token the machine holds; lets it (and only it) collect the key |
 | `hostname`, `os`, `mac` | TEXT | What the machine says about itself -- a request, not a fact |
 | `requested_department_id` | INTEGER FK → departments.id NULLABLE | What it asked for; the confirmer may choose another (or must, if it asked for none) |
-| `requested_level` | TEXT NOT NULL | `worker` or `admin`; an Admin workstation needs the Super User |
+| `requested_level` | TEXT NOT NULL | `worker`, `admin` or `super_user`; an Admin workstation needs the Super User; `super_user` is a machine asking to take over the Super User (migration 033, `handover.*`) |
 | `peer` | TEXT | The address it asked from (rate limit: five waiting per address) |
 | `status` | TEXT NOT NULL | `pending` / `confirmed` / `refused` / `expired` (after 24 h) |
 | `attempts` | INTEGER NOT NULL | Wrong codes so far; five refuse the request |
@@ -287,6 +287,7 @@ What the Super User gives a **department** -- a different thing from the Admin �
 | `status` | TEXT NOT NULL DEFAULT 'active' CHECK (`status` IN ('active','paused','inactive')) | |
 | `pause_reason` | TEXT NULLABLE | Populated only when `status = 'paused'`; free text since Failure Handling's predefined-suggestion set (Flow §Failure Handling) is a UI/logic concern layered on top of this, not a fixed schema enum |
 | `consent_status` | TEXT NOT NULL CHECK (`consent_status` IN ('not_required','pending','granted')) | `'not_required'` when creator already outranks every destination owner; `'pending'`/`'granted'` for lateral or upward flows |
+| `on_source_delete` | TEXT NOT NULL DEFAULT 'keep' CHECK (`on_source_delete` IN ('keep','mirror')) | what a file deleted at the source does at the destinations: `keep` their copy, or `mirror` (they put it aside in `.falcon-removed`; migration 032) |
 | `created_at` | TIMESTAMP NOT NULL | |
 
 ### `flow_destinations`

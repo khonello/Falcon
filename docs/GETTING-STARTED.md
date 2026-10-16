@@ -153,3 +153,16 @@ Typing each PC's name and copying its key by hand is the step that stings at sca
 be registered; the request waits in the department's **"Waiting to be registered"** list; the Admin confirms it by
 typing a short **pairing code** shown on that PC's screen; the key then goes to the PC by itself. Until then, Step 4
 above is the way.
+
+---
+
+## Setting up from a temporary machine, then moving the Super User
+
+A first install can be done from any machine you have to hand, and the Super User then moved to the machine that will keep the role. It is the same account, so every department, name, task and audit record stays; only the machine changes.
+
+1. On the temporary machine, run the Super User setup as above. It is the Super User while you make the departments and onboard the first Admin and Workers.
+2. On the dedicated machine, install the Super User console with `--role superuser --handover` (no id or key to copy). Before that, on the temporary machine's console, type `handover open`: it lets **one** new machine ask, for ten minutes.
+3. The dedicated machine shows a short code. On the temporary machine type `handover` (it lists who is waiting), then `handover confirm <id> <code>`.
+4. The Engine binds the Super User to the new machine, rotates the old machine's key (it stops being the Super User's at once) and ends any session it held. If anything fails, nothing changes. The old machine can be registered afterwards like any other (as a Worker, say).
+
+`handover cancel` closes the window and refuses whoever is waiting. Five wrong codes refuse the request.
