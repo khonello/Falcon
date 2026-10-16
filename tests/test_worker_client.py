@@ -353,16 +353,16 @@ async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine
     svc = await _start(engine, tmp_path, "cid-w1", [])
     admin = await _admin(engine)
     try:
-        assert svc.ossignals.interest == {}
+        assert set(svc.ossignals.interest) <= {"usb.inserted", "usb.removed"}        # only the drives Detective always wants; no automation waits for anything
         note = (await admin.call("control.action_create", {"kind": "control", "builtin_type": "notify",
                                                            "timeout_s": 5, "params": {"message": "started"}}))["action"]
         ev = (await admin.call("control.event_create", {"type": "program.launched", "pc_ids": [org["w1_pc"]],
                                                         "match": {"process": "falcon-test-probe.exe"},
                                                         "action_ids": [note["id"]]}))["event"]
         assert await _wait(lambda: "program.launched" in svc.ossignals.interest, timeout=5)
-        assert "usb.inserted" not in svc.ossignals.interest
+        assert "network.connected" not in svc.ossignals.interest          # nothing waits for the network: not read
         await svc.ossignals.tick()                               # the baseline
-        assert "drives" not in svc.ossignals._base               # nothing waits for drives: not read
+        assert "network" not in svc.ossignals._base
         looks = iter([{1: "explorer.exe"}, {1: "explorer.exe", 2: "falcon-test-probe.exe"},
                       {1: "explorer.exe", 2: "falcon-test-probe.exe", 3: "other.exe"}])
         monkeypatch.setattr(ossignals, "programs", lambda: next(looks))
@@ -371,7 +371,7 @@ async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine
         assert await svc.ossignals.tick() == 1                    # the probe starts: the match fires
         assert await svc.ossignals.tick() == 0                    # another program starts: not what was asked
         await admin.call("control.event_delete", {"event_id": ev["id"]})
-        assert await _wait(lambda: svc.ossignals.interest == {}, timeout=5)
+        assert await _wait(lambda: "program.launched" not in svc.ossignals.interest, timeout=5)
     finally:
         await admin.close()
         await svc.stop()

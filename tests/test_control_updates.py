@@ -338,22 +338,23 @@ async def test_a_machine_watches_only_the_os_signals_an_automation_waits_for(eng
     a1 = await connect("cid-a1")
     w1 = await connect("cid-w1")
     w2 = await connect("cid-w2")
-    assert (await w1.ok("control.signal_interest"))["interest"] == {}
+    drives = {"usb.inserted": [{}], "usb.removed": [{}]}                       # Detective always wants to know when a drive comes and goes
+    assert (await w1.ok("control.signal_interest"))["interest"] == drives
     note = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "notify", "timeout_s": 5,
                                                   "params": {"message": "opened"}}))["action"]
     ev = (await a1.ok("control.event_create", {"type": "file.accessed", "pc_ids": [org["w1_pc"]],
                                                "match": {"path_prefix": "C:/Finance"},
                                                "action_ids": [note["id"]]}))["event"]
     assert "control.interest_changed" in w1.push_types(await w1.drain_pushes())
-    assert (await w1.ok("control.signal_interest"))["interest"] == {"file.accessed": [{"path_prefix": "C:/Finance"}]}
-    assert (await w2.ok("control.signal_interest"))["interest"] == {}          # named machines only
+    assert (await w1.ok("control.signal_interest"))["interest"] == {"file.accessed": [{"path_prefix": "C:/Finance"}], **drives}
+    assert (await w2.ok("control.signal_interest"))["interest"] == drives      # named machines only
     res = await w1.ok("control.signal", {"type": "file.accessed",
                                          "data": {"path": "C:/Finance/budget.xlsx", "process": "EXCEL.EXE"}})
     assert res["fired"] == 1
     assert (await w1.ok("control.signal", {"type": "file.accessed", "data": {"path": "C:/Other/x.txt"}}))["fired"] == 0
     await a1.ok("control.event_delete", {"event_id": ev["id"]})
     assert "control.interest_changed" in w1.push_types(await w1.drain_pushes())
-    assert (await w1.ok("control.signal_interest"))["interest"] == {}
+    assert (await w1.ok("control.signal_interest"))["interest"] == drives
 
 
 async def test_built_in_actions_take_the_settings_the_design_asks_for(engine, org, connect):
