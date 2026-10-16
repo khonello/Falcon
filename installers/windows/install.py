@@ -94,6 +94,11 @@ class WindowsInstall:
     def shortcut(self) -> Path:
         return Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Falcon" / "Falcon Console.lnk"
 
+    def program_shortcut(self) -> Path:
+        return self.shortcut().with_name("Falcon.lnk")
+
+    RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
     # --- the plan --------------------------------------------------------------------------------------------------
 
     def plan(self) -> Plan:
@@ -109,6 +114,8 @@ class WindowsInstall:
               skip=None if r.service else "this role has no service")
         p.add("The Worker service", self.install_service, f"{self.service}: starts with Windows, restarts itself",
               skip=None if r.service and not a.no_service else ("--no-service" if r.service else "this role has no service"))
+        p.add("The Falcon program", self.program, "starts when anyone signs in (tray icon, nothing on screen); a Start-menu shortcut opens it",
+              skip=None if r.service and not a.no_windows and not a.no_service else "this role has no service, or no windows")
         p.add("The console", self.console, "Start-menu shortcut" + ("; the Super User's id and key for the person installing" if r.name == "superuser" else ""),
               skip=None if r.console else "this role has no console")
         p.add("Become the Super User's machine", self.handover, "ask the Engine, show a code; the current Super User confirms it (opened with `handover open`)",
@@ -221,6 +228,41 @@ class WindowsInstall:
         run_cmd(base + ["start", "--name", self.service], cwd=self.app)
         return said + "; started"
 
+    def program(self) -> str:
+        """The small program a person at this machine opens to see what concerns them: it starts at sign-in for everyone (a Run entry for all users),
+        and a Start-menu shortcut brings it up. It holds no key and talks only to the service on this machine."""
+        pythonw = self.runtime_python.with_name("pythonw.exe")
+        exe = pythonw if pythonw.exists() else self.runtime_python
+        said = []
+        if sys.platform == "win32":
+            import winreg
+
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, self.RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+                winreg.SetValueEx(key, "Falcon", 0, winreg.REG_SZ, f'"{exe}" -m worker_client.program --background')
+            said.append("starts at sign-in")
+        if not self.a.no_shortcuts:
+            lnk = self.program_shortcut()
+            lnk.parent.mkdir(parents=True, exist_ok=True)
+            ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($args[0]);$s.TargetPath=$args[1];$s.Arguments='-m worker_client.program';"
+                  "$s.WorkingDirectory=$args[2];$s.Description='Falcon';$s.Save()")
+            run_cmd(["powershell", "-NoProfile", "-Command", ps, str(lnk), str(exe), str(self.app)])
+            said.append(f"shortcut {lnk}")
+        return "; ".join(said) or "nothing to do"
+
+    def remove_program_startup(self) -> str:
+        if sys.platform == "win32":
+            import winreg
+
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, self.RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+                    winreg.DeleteValue(key, "Falcon")
+            except OSError:
+                pass
+        lnk = self.program_shortcut()
+        if lnk.exists():
+            lnk.unlink()
+        return "removed"
+
     def console(self) -> str:
         lnk = self.shortcut()
         if not self.a.no_shortcuts:
@@ -285,6 +327,8 @@ class WindowsInstall:
     def uninstall_plan(self) -> Plan:
         p = Plan(f"Falcon uninstall ({self.role.title})", say=self.say)
         p.add("Stop and remove the service", self.remove_service, self.service)
+        p.add("Remove the Falcon program's start-up entry and shortcut", self.remove_program_startup, "the Run entry and the Start-menu shortcut",
+              skip=None if self.role.service else "this role has no service")
         p.add("Remove the shortcut", self.remove_shortcut, str(self.shortcut()))
         p.add("Remove the program", self.remove_program, str(self.target))
         p.add("Settings and key", self.remove_data, "kept unless --purge-data: without its key this machine must be registered again")

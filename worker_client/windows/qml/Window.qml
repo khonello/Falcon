@@ -14,7 +14,7 @@ import QtQuick.Window
 Window {
     id: win
 
-    readonly property bool covers: kind === "blocked" || kind === "locked"
+    readonly property bool covers: kind === "blocked" || kind === "locked" || kind === "emergency"
     readonly property bool bar: kind === "viewing"      // a small notice at the top of the screen that the click goes through
 
     readonly property color pane: "#ffffff"
@@ -67,7 +67,7 @@ Window {
 
     Rectangle {
         id: card
-        width: kind === "task" || kind === "tasks" ? 460 : bar ? 300 : 360
+        width: kind === "task" ? 460 : kind === "emergency" ? 480 : bar ? 300 : 360
         height: body.implicitHeight + 44
         anchors.centerIn: win.covers || backdrop ? parent : undefined
         x: 24; y: 24
@@ -169,16 +169,13 @@ Window {
                     width: parent.width; height: 20
                     Row { spacing: 8
                           Glyph { name: "tasks"; size: 15; color: win.faint; anchors.verticalCenter: parent.verticalCenter }
-                          Text { text: (spec.reminder ? "Still waiting to be started: a task from " : "A task from ") + (spec.from || "your Admin"); color: spec.reminder ? win.warn : win.dim
+                          Text { text: "A task from " + (spec.from || "your Admin"); color: win.dim
                                  font.family: win.sans; font.pixelSize: 13 } }
                     Glyph { anchors.right: parent.right; name: "x"; size: 14; color: win.faint
                             MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: answer.give({ later: true }) } }
                 }
                 Text { width: parent.width; wrapMode: Text.WordWrap; color: win.ink
                        font.family: win.sans; font.pixelSize: 20; font.bold: true; text: spec.title || "" }
-                Text { visible: !!spec.reminder; width: parent.width; wrapMode: Text.WordWrap; color: win.dim
-                       font.family: win.sans; font.pixelSize: 12
-                       text: "You closed this before. Press Start when you begin, or close it again and it comes back later." }
                 Text { width: parent.width; wrapMode: Text.WordWrap; color: win.dim
                        font.family: win.sans; font.pixelSize: 13; text: spec.description || "" }
                 Rectangle {
@@ -227,39 +224,24 @@ Window {
                 }
             }
 
-            // --- everything assigned to you (opened from the tray) ------------------------------------------------
+            // --- an emergency announcement: covers the screen until it is read ---------------------------------------------------------------
             Column {
-                visible: kind === "tasks"
+                visible: kind === "emergency"
                 width: parent.width
-                spacing: 10
+                spacing: 12
+                Row { spacing: 8
+                      Glyph { name: "warn"; size: 16; color: win.warn; anchors.verticalCenter: parent.verticalCenter }
+                      Text { text: spec.from ? "Emergency announcement from " + spec.from : "Emergency announcement"; color: win.warn
+                             font.family: win.sans; font.pixelSize: 13; font.bold: true; anchors.verticalCenter: parent.verticalCenter } }
+                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.ink; font.family: win.sans; font.pixelSize: 20; font.bold: true; text: spec.title || "" }
+                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.ink; font.family: win.sans; font.pixelSize: 14; text: spec.text || "" }
+                Item { width: 1; height: 6 }
                 Item {
-                    width: parent.width; height: 24
-                    Text { text: "Your tasks"; color: win.ink; font.family: win.sans; font.pixelSize: 18; font.bold: true }
-                    Glyph { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; name: "x"; size: 14; color: win.faint
-                            MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: answer.give({ later: true }) } }
+                    width: parent.width; height: 34
+                    Text { anchors.verticalCenter: parent.verticalCenter; color: win.faint; font.family: win.sans; font.pixelSize: 12
+                           text: "It stays in your Falcon program." }
+                    Act { anchors.right: parent.right; text: "I have read this"; primary: true; onClicked: answer.give({ seen: true }) }
                 }
-                Text { visible: (spec.tasks || []).length === 0; width: parent.width; wrapMode: Text.WordWrap; color: win.dim
-                       font.family: win.sans; font.pixelSize: 13; text: "Nothing is assigned to you right now." }
-                Repeater {
-                    model: spec.tasks || []
-                    delegate: Item {
-                        required property var modelData
-                        width: parent.width; height: 58
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: win.line }
-                        Column {
-                            anchors.left: parent.left; anchors.right: startBtn.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 3
-                            Text { width: parent.width; elide: Text.ElideRight; text: modelData.title; color: win.ink; font.family: win.sans; font.pixelSize: 14 }
-                            Text { width: parent.width; elide: Text.ElideRight; color: win.dim; font.family: win.sans; font.pixelSize: 12
-                                   text: "From " + modelData.from + (modelData.due ? " · due " + win.when(modelData.due) : " · no deadline") }
-                        }
-                        Act { id: startBtn; anchors.right: parent.right; visible: !modelData.started; text: "Start"; primary: true
-                              onClicked: answer.give({ start: modelData.id }) }
-                        Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; visible: !!modelData.started
-                               text: "Started"; color: win.dim; font.family: win.sans; font.pixelSize: 13 }
-                    }
-                }
-                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 12
-                       text: "Your Admin closes a task when the work is checked." }
             }
         }
     }

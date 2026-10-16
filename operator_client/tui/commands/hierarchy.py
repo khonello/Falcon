@@ -285,7 +285,7 @@ async def handover_open(ctx: ShellContext, args: Args) -> str:
 @command("handover", "confirm", "<id> <code>", "Type the code the new machine shows: the Super User moves there and this machine stops being the Super User's")
 async def handover_confirm(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("handover.confirm", {"enrollment_id": args.get_int(0, "id"), "code": args.get(1, "code")})
-    return f"the Super User now lives on {res['hostname']} (pc {res['to_pc']}); this machine ({res['from_pc']}) is no longer the Super User's"
+    return f"the Super User now lives on {res['hostname']} (pc {res['to_pc']}); this machine ({res['from_pc']}) is no longer the Super User's and is no longer part of Falcon"
 
 
 @command("handover", "cancel", "", "Close the handover and refuse any machine waiting")

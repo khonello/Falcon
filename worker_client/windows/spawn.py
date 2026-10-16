@@ -55,25 +55,13 @@ async def open_window(kind: str, spec: dict[str, Any]) -> WindowHandle | None:
     return WindowHandle(proc) if proc is not None else None
 
 
-async def open_tray() -> WindowHandle | None:
-    """Start the tray icon (the person's way of asking for help); None on a headless install."""
+async def open_program() -> WindowHandle | None:
+    """Start the person's Falcon program (tray icon, and a window on demand); None on a headless install. One copy runs per person: a second start
+    only asks the first to come forward and exits."""
     if not available():
         return None
-    proc = await _launch([sys.executable, "-m", "worker_client.windows.tray"])
+    proc = await _launch([sys.executable, "-m", "worker_client.program", "--background"])
     return WindowHandle(proc) if proc is not None else None
-
-
-def tasks_spec(tasks: list[dict[str, Any]]) -> dict[str, Any]:
-    """What is assigned to this person, for the small list window: not finished ones, the soonest due first."""
-    rows = []
-    for t in tasks:
-        if t.get("status") not in (None, "active"):
-            continue
-        text = str(t.get("description_raw") or "")
-        rows.append({"id": t["id"], "title": text.split(".")[0].strip()[:70] or "A task", "from": t.get("assigner_name") or "your Admin",
-                     "due": t.get("final_deadline_at"), "started": bool(t.get("started_at"))})
-    rows.sort(key=lambda r: (r["due"] is None, r["due"] or ""))
-    return {"tasks": rows}
 
 
 def task_spec(task: dict[str, Any]) -> dict[str, Any]:

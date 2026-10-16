@@ -715,7 +715,7 @@ async def test_the_worker_shows_the_ask_to_delete_a_copy_and_retries_an_update_n
     svc = WorkerService(cfg, native_watch=False)
     svc.executor.log_dir = tmp_path / "exec"
     svc.executor.log_dir.mkdir()
-    monkeypatch.setattr(svc, "_start_tray", lambda: asyncio.sleep(0))
+    monkeypatch.setattr(svc, "_start_program", lambda: asyncio.sleep(0))
     await svc.start()
     admin = await _admin(engine)
     try:

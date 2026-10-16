@@ -6,7 +6,7 @@ from pathlib import Path
 
 from tests.conftest import requires_db
 from tests.test_worker_client import _admin, _start
-from worker_client.reminders import INTERVALS, TaskReminders
+from worker_client.reminders import FIRST_AFTER_CONNECT, INTERVALS, TaskReminders
 
 
 class Clock:
@@ -40,7 +40,7 @@ def test_a_task_found_waiting_keeps_its_place_and_a_started_one_is_forgotten():
     r.track_new(1)
     clock.t = 60
     r.track_new(1)                                          # found again at the next refresh: not pushed back
-    assert r._due[1] == 5 * 60
+    assert r._due[1] == FIRST_AFTER_CONNECT * 60
     r.track_new(2)
     r.keep_only({2})                                        # task 1 was started elsewhere, or taken away
     assert r.waiting() == [2]
@@ -59,26 +59,27 @@ def test_the_longest_waiting_is_reminded_first_and_postponing_moves_it_back():
     assert r.due() == [1]
 
 
+class Handle:
+    def __init__(self, answer):
+        self._answer = answer
+
+    async def answer(self):
+        return self._answer
+
+    def close(self):
+        pass
+
+
 @requires_db
-async def test_the_service_shows_a_waiting_task_again_until_it_is_started(engine, org, tmp_path: Path, monkeypatch):
+async def test_a_task_nobody_started_comes_back_as_a_quiet_note_never_a_window(engine, org, tmp_path: Path, monkeypatch):
     from worker_client.windows import spawn
 
     shown = []
-    answers = [{"later": True}, None, {"start": True}]          # closed, closed without answering, then started
-
-    class Handle:
-        def __init__(self, answer):
-            self._answer = answer
-
-        async def answer(self):
-            return self._answer
-
-        def close(self):
-            pass
+    answers = [{"later": True}]                                  # the task's own window, closed without starting
 
     async def fake_open(kind, spec):
         shown.append((kind, spec))
-        return Handle(answers.pop(0) if kind == "task" and answers else {"seen": True})
+        return Handle(answers.pop(0) if answers else {"seen": True})
 
     monkeypatch.setattr(spawn, "open_window", fake_open)
     svc = await _start(engine, tmp_path, "cid-w1", [])
@@ -90,57 +91,21 @@ async def test_the_service_shows_a_waiting_task_again_until_it_is_started(engine
         await svc._refresh_tasks()
         assert svc.reminders.waiting() == [tid]                 # found waiting
         await svc._show_task(tid)                                # its window opens when it is given; closed with "later"
-        assert shown[0][0] == "task" and not shown[0][1].get("reminder")
-        assert svc.reminders.waiting() == [tid]
-        await svc._show_task(tid, reminder=True)                 # the reminder: closed without an answer
-        assert shown[1][1]["reminder"] is True and shown[1][1]["times"] >= 1
-        assert svc.reminders.waiting() == [tid]
-        await svc._show_task(tid, reminder=True)                 # and at last started
+        assert [k for k, _ in shown] == ["task"] and svc.reminders.waiting() == [tid]
+        await svc._remind(tid)                                   # the reminder: a note for the program, no window
+        assert [k for k, _ in shown] == ["task"]
+        assert list(svc.toasts) == [f"t{tid}"] and svc.toasts[f"t{tid}"]["text"] == "Still waiting to be started"
+        assert svc.reminders.waiting() == [tid]                 # and it will come back again, later
+        await svc.app_start_task(tid)                            # started from the program
         assert svc.reminders.waiting() == []
         assert (await admin.call("task.get", {"task_id": tid}))["task"]["started_at"]
-        count = len(shown)
-        await svc._show_task(tid, reminder=True)                 # started: nothing is shown again
-        assert len(shown) == count
+        svc.toasts.clear()
+        await svc._remind(tid)                                   # started: nothing more is said
+        assert svc.toasts == {}
     finally:
         await admin.close()
         await svc.stop()
 
 
-@requires_db
-async def test_the_list_window_shows_what_is_assigned_and_start_works_from_it(engine, org, tmp_path: Path, monkeypatch):
-    from worker_client.windows import spawn
-
-    shown = []
-
-    class Handle:
-        def __init__(self, answer):
-            self._answer = answer
-
-        async def answer(self):
-            return self._answer
-
-        def close(self):
-            pass
-
-    async def fake_open(kind, spec):
-        shown.append((kind, spec))
-        return Handle({"start": spec["tasks"][0]["id"]} if kind == "tasks" else {"seen": True})
-
-    monkeypatch.setattr(spawn, "open_window", fake_open)
-    svc = await _start(engine, tmp_path, "cid-w1", [])
-    admin = await _admin(engine)
-    try:
-        a = (await admin.call("task.create", {"assignee_account_id": org["w1"], "description": "first thing",
-                                              "verification_mode": "none", "confirm_none": True,
-                                              "final_deadline_at": "2030-01-02T10:00:00+00:00"}))["task"]["id"]
-        await admin.call("task.create", {"assignee_account_id": org["w1"], "description": "second thing",
-                                         "verification_mode": "none", "confirm_none": True})
-        await svc.show_my_tasks()
-        kind, spec = shown[0]
-        assert kind == "tasks" and [t["title"] for t in spec["tasks"]] == ["first thing", "second thing"]      # soonest due first, undated last
-        assert spec["tasks"][0]["id"] == a and spec["tasks"][0]["started"] is False
-        assert (await admin.call("task.get", {"task_id": a}))["task"]["started_at"]                              # Start in the list started it
-        assert a not in svc.reminders.waiting()
-    finally:
-        await admin.close()
-        await svc.stop()
+def test_reminders_are_spaced_to_be_unobtrusive():
+    assert INTERVALS[0] >= 60 and INTERVALS[-1] >= 240          # not minutes apart: an hour at first, then hours

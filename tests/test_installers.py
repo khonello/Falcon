@@ -316,7 +316,7 @@ def test_the_command_line_installs_and_says_what_is_left_to_do(tmp_path, monkeyp
             "--python", sys.executable, "--reuse-python", "--no-acl", "--no-service", "--no-windows"]
     assert win_install.main(argv) == 0
     out = capsys.readouterr().out
-    assert "[1/10] Check" in out and "this machine has no key yet" in out
+    assert "[1/11] Check" in out and "this machine has no key yet" in out
     assert win_install.main([*argv[:2], "--role", "worker", "--bundle", str(tmp_path / "missing.json"), *argv[4:]]) == 1
 
 

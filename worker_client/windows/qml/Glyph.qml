@@ -19,7 +19,11 @@ Item {
         window: ["M3 4h18v16H3z", "M3 9h18"],
         x: ["M6 6l12 12", "M18 6L6 18"],
         play: ["M7 4l12 8-12 8z"],
-        check: ["M5 12l5 5 9-10"]
+        check: ["M5 12l5 5 9-10"],
+        warn: ["M12 4l9 16H3z", "M12 10v4", "M12 17.2v.3"],
+        announce: ["M4 10v4h3l6 4V6L7 10z", "M16 9a4 4 0 0 1 0 6"],
+        user: ["M15.5 8a3.5 3.5 0 1 0 -7 0a3.5 3.5 0 1 0 7 0", "M5 20a7 7 0 0 1 14 0"],
+        home: ["M4 11l8-7 8 7", "M6 10v10h12V10"]
     })
     readonly property var paths: set[name] || []
     implicitWidth: size

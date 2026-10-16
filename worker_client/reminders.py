@@ -1,9 +1,9 @@
 """Reminders for a task its person has not started.
 
 A task's window opens once, when it is given. If the person closes it, or never sees it (away from the desk, on a call), nothing else would ever
-bring it back. So the Worker keeps a small list of tasks that are waiting to be started and shows each one's window again, a little later each
-time, until the person starts it or it is no longer theirs to start. Never more than one at a time, never while a superior is using the machine,
-and never for a task that is already started, finished or gone.
+bring it back. So the Worker keeps a small list of tasks that are waiting to be started and leaves a quiet note about each one for the person's Falcon
+program to show in the corner, further apart each time, until the person starts it or it is no longer theirs to start. Never a window over their
+work, never more than one at a time, never while a superior is using the machine, and never for a task that is already started, finished or gone.
 
 The list is rebuilt from the Engine at every connect (`task.list`), so a restart of the service or the machine forgets nothing.
 """
@@ -13,9 +13,9 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-# minutes between a window being dismissed and the next reminder: soon, then less often, then hourly for as long as it takes
-INTERVALS = (15, 30, 60)
-FIRST_AFTER_CONNECT = 5          # a task found waiting at connect is mentioned five minutes later, not the instant the machine starts
+# minutes between a task being passed over and the next quiet note about it: an hour, then four, then every eight, for as long as it takes
+INTERVALS = (60, 240, 480)
+FIRST_AFTER_CONNECT = 30         # a task found waiting at connect is mentioned half an hour later, not at once
 
 
 class TaskReminders:

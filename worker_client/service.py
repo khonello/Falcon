@@ -13,9 +13,11 @@ reconnect the handshake tells us whether we are still blocked (spec 7.1).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
+import time
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,7 @@ from worker_client.executor import Executor
 from worker_client.flowsync import FlowSync
 from worker_client.inventory import Inventory
 from worker_client.isolated import IsolatedSignals, IsolatedWatcher
+from worker_client.localapp import LocalApp
 from worker_client.lockout import Lockout
 from worker_client.ossignals import OsSignals
 from worker_client.reminders import TaskReminders
@@ -41,6 +44,13 @@ log = logging.getLogger(__name__)
 VERSION = "0.0.1"
 
 Notifier = Callable[[str, dict[str, Any]], Awaitable[None]]
+
+
+
+def _iso(text: str) -> datetime:
+    """A time from the Engine ("...Z" or with an offset) as an aware datetime."""
+    t = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 
 
 class WorkerService:
@@ -81,8 +91,12 @@ class WorkerService:
         # the Worker's windows (WR01, TK07): the block overlay follows the lockout; a new task opens its window
         self._overlay: Any = None
         self._viewbar: Any = None
-        self._tray: Any = None
-        self._tray_task: asyncio.Task[None] | None = None
+        self._program: Any = None
+        self.localapp = LocalApp(self, config.path) if config.windows else None
+        self._view: dict[str, Any] = {}
+        self._view_at = 0.0
+        self.toasts: dict[str, dict[str, Any]] = {}              # quiet notes for the program to show; they stay until it says it showed them
+        self._dismissed: set[int] = {int(i) for i in config.cache.get("dismissed_alerts", [])}
         self._window_tasks: set[asyncio.Task[None]] = set()
         self.reminders = TaskReminders()                      # tasks waiting to be started, shown again until they are
         self._reminder_task: asyncio.Task[None] | None = None
@@ -104,7 +118,8 @@ class WorkerService:
         await self.inventory.start()
         await self._refresh_tasks()
         if self.config.windows:
-            await self._start_tray()
+            await self.localapp.start()
+            await self._start_program()
             self._reminder_task = asyncio.create_task(self._reminder_loop())
         log.info("worker service up as pc %s (account %s)", self.identity.pc_id, self.identity.account_id)
 
@@ -112,12 +127,10 @@ class WorkerService:
         self._stopping = True
         if self._reconnect_task:
             self._reconnect_task.cancel()
-        if self._tray_task:
-            self._tray_task.cancel()
+        if self.localapp is not None:
+            await self.localapp.stop()
         if self._reminder_task:
             self._reminder_task.cancel()
-        if self._tray is not None:
-            self._tray.close()
         await self.screens.shutdown()
         self.remote_input.stop()
         if self.helper is not None:
@@ -181,6 +194,8 @@ class WorkerService:
             self.lockout.release()
         await self.ossignals.refresh()
         self._spawn(self._reconcile_index())          # whatever changed while the Engine was not listening is told now, in the background
+        if self.config.windows:
+            self._spawn(self._replay_emergencies())
         cur = await self.call("updates.current")
         if cur.get("version") and cur["version"]["version_string"] != VERSION:
             self.updater.on_available({"version": cur["version"]["version_string"]})
@@ -245,6 +260,8 @@ class WorkerService:
                 await self.ossignals.refresh()
             elif type_ == "update.available":
                 self.updater.on_available(payload)
+            elif type_ == "alert.delivered":
+                await self._on_alert(payload)
             elif type_ in ("task.assigned", "task.completed", "task.incomplete"):
                 await self._refresh_tasks()
                 if type_ == "task.assigned" and self.config.windows:
@@ -333,8 +350,9 @@ class WorkerService:
         if handle is not None:
             await handle.answer()
 
-    async def _show_task(self, task_id: int, *, reminder: bool = False) -> None:
-        """A task given to this person: its window, and Start if they choose to (never Complete). Closed without starting, it comes back later."""
+    async def _show_task(self, task_id: int) -> None:
+        """A task given to this person: its window, and Start if they choose to (never Complete). Closed without starting, it is reminded about later,
+        quietly (see _remind)."""
         from worker_client.windows.spawn import open_window, task_spec
 
         try:
@@ -345,11 +363,7 @@ class WorkerService:
         if task.get("status") != "active" or task.get("started_at") or task.get("assignee_account_id") != self.identity.account_id:
             self.reminders.clear(task_id)                      # not waiting to be started any more (or never theirs)
             return
-        spec = task_spec(task)
-        if reminder:
-            spec["reminder"] = True
-            spec["times"] = self.reminders.times_reminded(task_id) + 1
-        handle = await open_window("task", spec)
+        handle = await open_window("task", task_spec(task))
         answer = await handle.answer() if handle is not None else None
         if answer and answer.get("start"):
             await self._start_task(task_id)
@@ -372,50 +386,115 @@ class WorkerService:
                 if self.lockout.blocked_by is not None or self.conn is None or not self.conn.connected:
                     continue
                 for task_id in self.reminders.due()[:1]:
-                    await self._show_task(task_id, reminder=True)
+                    await self._remind(task_id)
             except asyncio.CancelledError:
                 raise
             except Exception:
                 log.exception("a task reminder failed")
 
-    async def show_my_tasks(self) -> None:
-        """The person asked to see what is assigned to them (from the tray): the list, with Start on what has not been started."""
-        from worker_client.windows.spawn import open_window, tasks_spec
+    # --- the small Falcon program on this machine (worker_client/program) ------------------------------------------------------------
 
+    async def _start_program(self) -> None:
+        """The person's own program: tray icon, and a window with their tasks, announcements and help. One copy per person; a second start only
+        brings the first to the front, so it is safe to ask for it whenever the service starts."""
+        from worker_client.windows.spawn import open_program
+
+        self._program = await open_program()
+
+    async def _build_view(self) -> None:
         try:
             tasks = (await self.call("task.list"))["tasks"]
+            alerts = (await self.call("alerts.list"))["alerts"]
+            admins = (await self.call("assistance.my_admins"))["admins"]
         except (EngineError, ConnectionError_) as exc:
-            log.debug("my tasks: %s", exc)
-            handle = await open_window("message", {"text": "Your tasks could not be loaded just now. Try again in a moment.", "from": ""})
-            if handle is not None:
-                await handle.answer()
+            log.debug("the program's view could not be refreshed: %s", exc)
             return
-        handle = await open_window("tasks", tasks_spec([t for t in tasks if t.get("assignee_account_id") == self.identity.account_id]))
+        mine = [t for t in tasks if t.get("assignee_account_id") == self.identity.account_id and t.get("status") in (None, "active")]
+        rows = []
+        for t in mine:
+            text = str(t.get("description_raw") or "")
+            rows.append({"id": t["id"], "title": text.split(".")[0].strip()[:90] or "A task", "description": text, "from": t.get("assigner_name") or "your Admin",
+                         "due": t.get("final_deadline_at"), "started": bool(t.get("started_at"))})
+        rows.sort(key=lambda r: (r["due"] is None, r["due"] or ""))
+        notes = [{"id": a["id"], "kind": a["alert_type"], "title": a.get("title") or "", "body": a.get("body") or "", "from": a.get("from_name") or "",
+                  "at": a.get("deliver_at")} for a in alerts]
+        self._view = {"tasks": rows, "announcements": notes, "admins": admins, "as_of": datetime.now(timezone.utc).isoformat(), "version": VERSION}
+        self._view_at = time.monotonic()
+
+    async def app_view(self) -> dict[str, Any]:
+        """What is relevant to this person, now: fresh when the Engine can be reached, what was last known (and said so) when it cannot."""
+        online = self.conn is not None and self.conn.connected
+        if online and time.monotonic() - self._view_at > 3:
+            await self._build_view()
+        held = self.lockout.blocked_by
+        return {**self._view, "connected": online, "held_by": (held or {}).get("occupant_name") or ("an Admin" if held else None),
+                "toasts": list(self.toasts.values())}
+
+    async def app_start_task(self, task_id: int) -> None:
+        await self._start_task(task_id)
+        self._view_at = 0.0
+
+    async def app_ask(self, to_account_id: int) -> None:
+        await self.call("assistance.ping", {"to_account_id": to_account_id})
+
+    async def app_ack(self, ids: list[str]) -> None:
+        for i in ids:
+            self.toasts.pop(i, None)
+
+    async def _remind(self, task_id: int) -> None:
+        """A quiet nudge for a task nobody started: a small note in the corner (the program shows it), never a window over their work."""
+        try:
+            task = (await self.call("task.get", {"task_id": task_id}))["task"]
+        except (EngineError, ConnectionError_):
+            self.reminders.postpone(task_id, 5)
+            return
+        if task.get("status") != "active" or task.get("started_at") or task.get("assignee_account_id") != self.identity.account_id:
+            self.reminders.clear(task_id)
+            return
+        text = str(task.get("description_raw") or "").split(".")[0].strip()[:90] or "A task"
+        self.toasts[f"t{task_id}"] = {"id": f"t{task_id}", "kind": "task", "title": text, "text": "Still waiting to be started"}
+        self.reminders.track(task_id)
+
+    async def _on_alert(self, payload: dict[str, Any]) -> None:
+        self._view_at = 0.0
+        if payload.get("alert_type") == "emergency":
+            if self.config.windows:
+                self._spawn(self._show_emergency(payload))
+        elif payload.get("alert_type") != "routine":
+            body = str(payload.get("body") or "")
+            self.toasts[f"a{payload['id']}"] = {"id": f"a{payload['id']}", "kind": "announcement", "title": payload.get("title") or "New announcement",
+                                                "text": body[:110]}
+
+    async def _show_emergency(self, alert: dict[str, Any]) -> None:
+        """An emergency covers the screen until the person says they have read it; it is also in the program's list."""
+        from worker_client.windows.spawn import open_window
+
+        alert_id = int(alert["id"])
+        if alert_id in self._dismissed:
+            return
+        sender = ""
+        try:
+            sender = next((a.get("from_name") or "" for a in (await self.call("alerts.list"))["alerts"] if a["id"] == alert_id), "")
+        except (EngineError, ConnectionError_):
+            pass
+        handle = await open_window("emergency", {"title": alert.get("title") or "An emergency announcement", "text": alert.get("body") or "", "from": sender})
         answer = await handle.answer() if handle is not None else None
-        if answer and answer.get("start"):
-            await self._start_task(int(answer["start"]))
+        if answer and answer.get("seen"):
+            self._dismissed.add(alert_id)
+            self.config.cache["dismissed_alerts"] = sorted(self._dismissed)[-200:]
+            with contextlib.suppress(OSError):
+                self.config.save()
 
-    async def _start_tray(self) -> None:
-        """The tray icon a person uses to ask their Admin for help; each click arrives as a line on its stdout."""
-        from worker_client.windows.spawn import open_tray
-
-        self._tray = await open_tray()
-        if self._tray is not None:
-            self._tray_task = asyncio.create_task(self._tray_loop())
-
-    async def _tray_loop(self) -> None:
-        assert self._tray is not None and self._tray.proc.stdout is not None
-        while True:
-            line = (await self._tray.proc.stdout.readline()).decode("utf-8", "replace").strip()
-            if not line:
-                return                                   # the icon closed
-            if line == "no-tray":
-                log.warning("this machine has no notification area; the ask-for-help icon is not shown")
-                return
-            if line == "ask":
-                self._spawn(self.ask_for_help())
-            elif line == "tasks":
-                self._spawn(self.show_my_tasks())
+    async def _replay_emergencies(self) -> None:
+        """An emergency delivered while this machine was off or away, and not yet dismissed here, is shown now (for a day after it was sent)."""
+        try:
+            alerts = (await self.call("alerts.list"))["alerts"]
+        except (EngineError, ConnectionError_):
+            return
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        for a in alerts:
+            if a["alert_type"] == "emergency" and a["id"] not in self._dismissed and a.get("deliver_at") and _iso(str(a["deliver_at"])) >= cutoff:
+                await self._show_emergency(a)
 
     async def ask_for_help(self) -> None:
         """The person chose to ask for help: say who they can ask, let them pick, send the ping. A ping carries

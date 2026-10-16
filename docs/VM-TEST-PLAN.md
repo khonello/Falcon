@@ -35,3 +35,14 @@ Use an **external** (bridged) switch so the guests reach each other and the host
 ## Record
 
 Run `python scripts/live_drill.py flow|restricted|task|gui|forms` from the host against the Engine for the single-machine checks (they need Worker processes on the same PC as the drill, so they do not replace the above).
+
+## The Falcon program, announcements, emergencies (added 16 Oct 2026)
+
+On a Worker VM (installed with the Windows installer, signed in as a normal user):
+1. After sign-in the Falcon tray icon is there with no window. Click it: the window opens on Today. Click the Start-menu "Falcon" shortcut while it is open: it comes forward, no second copy.
+2. From the Admin console, give this person a task: its window appears once. Close it without Start. The tray icon shows a count; after the interval a small note appears in the corner and goes by itself; it never takes the keyboard.
+3. Send an announcement to the department: a corner note, the Announcements tab shows it, the count on the icon goes up and clears when the tab is opened.
+4. Send an emergency: the screen is covered until "I have read this"; it is still in the Announcements tab. Restart the Worker service before reading it: it is shown again.
+5. Stop the Worker service: the program says it cannot reach the service and keeps showing what it last knew.
+6. My machine → Ask for help pings the Admin.
+7. Another Windows user on the same machine (fast user switching): each gets their own program.
