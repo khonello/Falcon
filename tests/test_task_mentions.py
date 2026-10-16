@@ -193,3 +193,29 @@ async def test_the_palette_opens_with_ctrl_k_ctrl_p_and_ctrl_shift_p_for_command
     groups = {i["g"] for i in prop(pal, "items")}
     assert "Commands" in groups and "Go to" in groups and "Machines" not in groups
     assert any(i["l"] == "New task" for i in prop(pal, "items"))
+
+
+# --- the local memory of lookups -------------------------------------------------------------------------------
+
+async def test_what_the_console_learns_about_people_is_kept_for_next_time(console):
+    win, bridge, _ = console("admin")
+    bridge.lookups.adopt("test@engine")
+    await _open(win, bridge, "tasks/new", "newTask")
+    await _wait(lambda: bool(bridge.lookups.get("tree")["items"]))
+    kept = bridge.lookups.get("tree")["items"]
+    assert [d["name"] for d in kept] == ["Operations", "Logistics"]
+    assert kept[0]["workers"][0] == {"pc_id": 1, "account_id": 21, "hostname": "OPS-01", "name": "Kojo"}   # only what a picker needs
+    assert "session" not in kept[0]["workers"][0]
+    assert bridge.lookups.get("tree")["at"] > 0                                                              # and when it was learned
+
+
+async def test_a_file_picked_before_is_offered_again_from_memory(console):
+    win, bridge, _ = console("admin")
+    bridge.lookups.adopt("test@engine")
+    bridge.cacheRemember("files", {"id": 4, "path": "C:/Finance/budget-2026.xlsx", "filename": "budget-2026.xlsx", "hostname": "OPS-01", "resource_tag": None}, "path")
+    win2, _ = await _smart(lambda role: (win, bridge, []))
+    keys(win2, "Plan @file:budget")
+    labels_ = [o["label"] for o in prop(picker(win2)[0], "opts")]
+    assert "C:/Finance/budget-2026.xlsx" in labels_                                   # the index was asked and said nothing; memory answered
+    sub = next(o["sub"] for o in prop(picker(win2)[0], "opts") if o["label"] == "C:/Finance/budget-2026.xlsx")
+    assert sub.startswith("seen before")                                              # and it says so: it is not live

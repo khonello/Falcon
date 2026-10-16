@@ -276,6 +276,7 @@ Column {
     }
     function mentionTitle() {
         var k = mention.kind
+        if (!falcon.isConnected) return "Offline: showing what was known"
         return k === "" ? "Mark this as…" : k === "person" ? "Who is this for?" : k === "file" ? "Which file?" : k === "folder" ? "Which folder?" : k === "program" ? "Which program?" : "When?"
     }
     function emptyWord(men) {
@@ -310,10 +311,17 @@ Column {
         lookFile(q)
         var hits = (fileHits[q] || []).filter(function (f) { return String(f.filename || f.path || "").toLowerCase().indexOf(q.toLowerCase()) >= 0 })
         function mark(nm, extra) { var k = "file:" + nm.toLowerCase(); root.settle(nm, k, Object.assign({ kind: "file", label: nm }, extra), root.askIntent("file", k, nm, root.fileIntentList)) }
+        // files picked or seen recently, from this machine's own memory: all there is offline, and quick before the index has answered
+        var recent = (typeof falcon.cacheGet === "function" ? falcon.cacheGet("files").items : []).filter(function (f) {
+            return q && String(f.filename || f.path || "").toLowerCase().indexOf(q.toLowerCase()) >= 0 && !hits.some(function (h) { return h.path === f.path })
+        })
+        hits = hits.concat(recent.map(function (f) { return Object.assign({}, f, { recent: true }) }))
         var res = hits.slice(0, 5).map(function (f) {
             var nm = f.filename || String(f.path).split(/[\\/]/).pop()
-            return { label: f.path || f.filename, sub: (f.hostname || "") + (f.resource_tag ? " · " + f.resource_tag : ""), mono: true,
-                     run: function () { if (m) root.choose(m, { label: q, sub: f.path, file_index_id: f.id }); else mark(nm, { sub: f.path, file_index_id: f.id }) } }
+            return { label: f.path || f.filename, sub: (f.recent ? "seen before · " : "") + (f.hostname || "") + (f.resource_tag ? " · " + f.resource_tag : ""), mono: true,
+                     run: function () {
+                         if (typeof falcon.cacheRemember === "function") falcon.cacheRemember("files", { id: f.id, path: f.path, filename: f.filename, hostname: f.hostname, resource_tag: f.resource_tag }, "path")   // picked: remembered, not merely listed
+                         if (m) root.choose(m, { label: q, sub: f.path, file_index_id: f.id }); else mark(nm, { sub: f.path, file_index_id: f.id }) } }
         })
         if (q) res.push({ label: m ? "A new file" : "“" + q + "” as a new file", mono: !m, sub: hits.length ? "A different file with this name, not created yet" : "Not in the file index yet. A check can expect it to be created.",
                           run: function () { if (m) root.choose(m, { label: q, sub: "a new file" }); else mark(q, { sub: "a new file" }) } })

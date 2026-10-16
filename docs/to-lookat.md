@@ -70,3 +70,10 @@ Last updated 13 Oct 2026.
 - Decided with the user: each flow chooses, in its setup beside the source: **Keep the copies** (the default) or **Remove the copies**. `flows.on_source_delete`, migration 032, `flow.create` / `flow.edit` take `on_source_delete`.
 - Remove means *put aside*: the destination's machine moves its copy into `.falcon-removed` under the destination folder, only if the flow wrote it and it is unchanged since (otherwise it is kept and the creator is told). A destination that was away is dealt with on catch-up. A mirror never removes anything because a listing came back empty (`flow.mirror_held` in the audit).
 - Not built: a console-wide default for new flows (each new flow starts on Keep).
+
+## A local memory of lookups (16 Oct 2026)
+
+- `operator_client/core/lookup_cache.py`: a small JSON file next to the console's settings (`<settings>.cache.json`), per signed-in account and Engine (another account starts empty), every section dated, bounded (2000 items, 30 days), written atomically, an unreadable file is just empty. Read-only convenience: the Engine stays the only source of truth.
+- Kept now: the people/machines tree (what the `@` person list and the palette's machines need) and files you picked (offered again as "seen before" when the index says nothing or there is no Engine). Offline, the `@` list says "Offline: showing what was known".
+- Not cached on purpose: the whole file index, sessions, health, issues.
+- Next if wanted: recent tasks/flows/rules for the palette, and a "last updated" line on the pickers.

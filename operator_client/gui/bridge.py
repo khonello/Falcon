@@ -26,6 +26,7 @@ from common.connection import ConnectionError_, EngineConnection, EngineError
 from common.when import resolve as resolve_when
 from operator_client.core.config import LocalConfig
 from operator_client.core.deadlines import resolve_phrase
+from operator_client.core.lookup_cache import LookupCache
 from operator_client.core.narrate import narrate as _narrate
 from operator_client.core.state import ClientState
 from operator_client.tui.push_format import describe_push
@@ -49,6 +50,10 @@ class FalconBridge(QObject):
         self.config = config
         self.state = ClientState()
         self.state.subscribe(self.stateChanged.emit)
+        # what pickers look things up in, kept for this account so they are instant and still say something with no Engine (core/lookup_cache.py)
+        self.lookups = LookupCache(config.path.with_suffix(".cache.json"))
+        if config.client_id:
+            self.lookups.adopt(f"{config.client_id}@{config.engine_address}")
         self.conn: EngineConnection | None = None
         self.js_engine: Any = None          # the QQmlEngine, set by app.create(); converts results for callbacks
         self.hostname = socket.gethostname()
@@ -276,6 +281,7 @@ class FalconBridge(QObject):
         self._held, self._lost_at, self._retry_in = None, "", 0
         self._conn_state = "connected"
         self.state.set_identity(ident, cfg.engine_address)
+        self.lookups.adopt(f"{getattr(ident, 'client_id', cfg.client_id)}@{cfg.engine_address}")
         self.state.clear_indicator("conn")
         cfg.save()
         try:
@@ -402,6 +408,19 @@ class FalconBridge(QObject):
         """A deadline phrase -> ISO timestamp, or "" when it cannot be resolved mechanically."""
         dt = resolve_phrase(phrase)
         return dt.isoformat() if dt else ""
+
+    @Slot(str, result="QVariant")
+    def cacheGet(self, name: str) -> Any:
+        """What was last kept under `name`: {at (seconds), items}. Empty when nothing is, or it is old, or it was someone else's."""
+        return self.lookups.get(name)
+
+    @Slot(str, "QVariant")
+    def cachePut(self, name: str, items: Any) -> None:
+        self.lookups.put(name, _to_python(items))
+
+    @Slot(str, "QVariant", str)
+    def cacheRemember(self, name: str, item: Any, key: str) -> None:
+        self.lookups.remember(name, _to_python(item), key)
 
     @Slot(str, result="QVariant")
     def readWhen(self, phrase: str) -> Any:

@@ -14,6 +14,29 @@ QtObject {
     id: fleet
 
     property var depts: []          // [{id, name, admins: [...], machines: [...]}]
+    // what was known the last time this account was connected (local, dated, read-only): pickers use it until the Engine has answered, or when it cannot
+    property var cachedTree: []
+    property real cachedAt: 0
+    function loadCached() {
+        if (typeof falcon.cacheGet !== "function") return
+        var c = falcon.cacheGet("tree")
+        cachedTree = (c && c.items) || []
+        cachedAt = c && c.at ? c.at * 1000 : 0
+    }
+    function cachedPeople() {
+        var out = []
+        cachedTree.forEach(function (d) { (d.workers || []).forEach(function (w) { if (w.name && w.account_id) out.push({ name: w.name, sub: (w.hostname || "") + " · " + (d.name || ""), host: w.hostname || "", account: w.account_id }) }) })
+        return out
+    }
+    function cachedMachines() {
+        var out = []
+        cachedTree.forEach(function (d) { (d.workers || []).forEach(function (w) { out.push({ host: w.hostname, sub: (w.name || "no user") + " · " + d.name + " · last known" }) }) })
+        return out
+    }
+    property Connections remember: Connections {
+        target: falcon
+        function onConnected() { fleet.loadCached() }
+    }
     property var machines: []       // [{pc_id, host, user, dept, deptName, online, seen, session, held, ver, behind, escalated, failures, status, note, issues}]
     property var byHost: ({})
     property var byPc: ({})
@@ -157,6 +180,11 @@ QtObject {
             for (var a = 0; a < (d.admins || []).length; a++)
                 if (d.admins[a].account_id === falcon.accountId) Nav.myName = d.admins[a].name
         }
+        if (tree && typeof falcon.cachePut === "function")      // only what a picker needs, not sessions or health
+            falcon.cachePut("tree", ds.map(function (d) {
+                return { department_id: d.department_id, name: d.name, admins: (d.admins || []).map(function (a) { return { account_id: a.account_id, name: a.name } }),
+                         workers: (d.workers || []).map(function (w) { return { pc_id: w.pc_id, account_id: w.account_id, hostname: w.hostname, name: w.name } }) }
+            }))
         depts = outD
         machines = outM
         byHost = bh
@@ -190,5 +218,5 @@ QtObject {
             if (/^(session|hierarchy|pc\.presence|resource|update|assistance|enroll|issue|machine)/.test(type)) fleet.later.restart()
         }
     }
-    Component.onCompleted: if (falcon.isConnected) refresh()
+    Component.onCompleted: { loadCached(); if (falcon.isConnected) refresh() }
 }

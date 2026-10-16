@@ -40,7 +40,7 @@ Popup {
     onOpened: {
         input.text = pending; pending = ""; at = 0; input.forceActiveFocus(); input.cursorPosition = input.text.length
         falcon.call("hierarchy.tree", {}, function (ok, r) {
-            if (!ok) return
+            if (!ok) { if (root.machines.length === 0) root.machines = Fleet.cachedMachines(); return }
             var ms = [], ds = r.departments || []
             for (var i = 0; i < ds.length; i++)
                 for (var k = 0; k < (ds[i].workers || []).length; k++) {

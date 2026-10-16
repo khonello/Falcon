@@ -24,7 +24,7 @@ Page {
     readonly property var people: {
         var out = []
         Fleet.machines.forEach(function (m) { if (m.user && m.account) out.push({ name: m.user, sub: m.host + " · " + m.deptName, host: m.host, account: m.account }) })
-        return out
+        return out.length ? out : Fleet.cachedPeople()          // before the Engine has answered, or with no Engine: what was known last time
     }
     readonly property var confirmedPerson: {
         for (var k in conf) if (conf[k].kind === "person") return conf[k]
