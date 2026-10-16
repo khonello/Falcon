@@ -2244,19 +2244,19 @@ class AlertsRepo(_Repo):
     async def create(self, created_by: int, alert_type: str, audience: str, body: str, *,
                      department_id: int | None = None, recipient_account_ids: list[int] | None = None,
                      action_link: str | None = None, deliver_at: datetime | None = None,
-                     recurrence: dict[str, Any] | None = None) -> int:
+                     recurrence: dict[str, Any] | None = None, title: str | None = None) -> int:
         return await self._val(
             "INSERT INTO system_alerts (created_by_account_id, alert_type, audience, department_id, "
-            "recipient_account_ids, body, action_link, deliver_at, recurrence) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, now()), $9) RETURNING id",
+            "recipient_account_ids, body, action_link, deliver_at, recurrence, title) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, now()), $9, $10) RETURNING id",
             created_by, alert_type, audience, department_id, recipient_account_ids, body, action_link,
-            deliver_at, recurrence)
+            deliver_at, recurrence, title)
 
     async def for_account(self, account_id: int, role: str, department_id: int | None,
                           limit: int = 100) -> list[dict[str, Any]]:
         """Alerts addressed to this account, delivered (deliver_at <= now)."""
         return await self._fetch(
-            "SELECT * FROM system_alerts WHERE deliver_at <= now() AND ("
+            "SELECT * FROM system_alerts WHERE deliver_at <= now() AND cancelled_at IS NULL AND ("
             " audience = 'all_users'"
             " OR (audience = 'admin_only' AND $2 IN ('admin', 'super_user'))"
             " OR (audience = 'department' AND department_id = $3)"
@@ -2264,14 +2264,26 @@ class AlertsRepo(_Repo):
             ") ORDER BY deliver_at DESC LIMIT $4", account_id, role, department_id, limit)
 
     async def pending(self) -> list[dict[str, Any]]:
-        return await self._fetch("SELECT * FROM system_alerts WHERE deliver_at > now() ORDER BY deliver_at")
+        return await self._fetch("SELECT * FROM system_alerts WHERE deliver_at > now() AND cancelled_at IS NULL ORDER BY deliver_at")
 
     async def due_undelivered(self) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT * FROM system_alerts WHERE deliver_at <= now() AND delivered_at IS NULL ORDER BY deliver_at")
+            "SELECT * FROM system_alerts WHERE deliver_at <= now() AND delivered_at IS NULL AND cancelled_at IS NULL ORDER BY deliver_at")
 
     async def mark_delivered(self, alert_id: int) -> None:
         await self._exec("UPDATE system_alerts SET delivered_at = now() WHERE id = $1", alert_id)
+
+    async def get(self, alert_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM system_alerts WHERE id = $1", alert_id)
+
+    async def sent(self, created_by: int | None, limit: int = 100) -> list[dict[str, Any]]:
+        """What was sent (and scheduled, and withdrawn): one person's own, or everything when `created_by` is None (the Super User's view)."""
+        return await self._fetch(
+            "SELECT * FROM system_alerts WHERE ($1::int IS NULL OR created_by_account_id = $1) ORDER BY created_at DESC, id DESC LIMIT $2", created_by, limit)
+
+    async def cancel(self, alert_id: int) -> bool:
+        """Withdraw a scheduled one before it goes out. Delivered ones stay (they were delivered)."""
+        return (await self._exec("UPDATE system_alerts SET cancelled_at = now() WHERE id = $1 AND delivered_at IS NULL AND cancelled_at IS NULL", alert_id)).endswith("1")
 
 
 # ============================================================================================

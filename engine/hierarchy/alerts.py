@@ -38,6 +38,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     alert_type = str_field(payload, "type", choices=ALERT_TYPES)
     audience = str_field(payload, "audience", choices=AUDIENCES)
     body = str_field(payload, "body")
+    title = " ".join(str(payload.get("title") or "").split())[:120] or None
     department_id = int_field(payload, "department_id", required=audience == "department")
     account_ids = payload.get("account_ids")
     if audience == "all_users" and ident.role != "super_user":
@@ -64,11 +65,11 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     alert_id = await ctx.engine.db.alerts.create(
         ident.account_id, alert_type, audience, body, department_id=department_id,
         recipient_account_ids=account_ids, action_link=payload.get("action_link"),
-        deliver_at=deliver_at, recurrence=payload.get("recurrence"))
+        deliver_at=deliver_at, recurrence=payload.get("recurrence"), title=title)
     await ctx.engine.audit.record(ctx, "alert.created", target_type="system_alerts", target_id=alert_id,
-                                  detail={"type": alert_type, "audience": audience})
+                                  detail={"type": alert_type, "audience": audience, "title": title})
     if deliver_at is None:
-        await deliver(ctx.engine, {"id": alert_id, "alert_type": alert_type, "audience": audience, "body": body,
+        await deliver(ctx.engine, {"id": alert_id, "alert_type": alert_type, "audience": audience, "body": body, "title": title,
                                    "department_id": department_id, "recipient_account_ids": account_ids,
                                    "action_link": payload.get("action_link")})
         await ctx.engine.db.alerts.mark_delivered(alert_id)
@@ -78,7 +79,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def deliver(engine: Any, alert: dict[str, Any]) -> None:
     """Push to every connected recipient. Offline users pick it up from alerts.list."""
     audience = alert["audience"]
-    payload = {k: alert.get(k) for k in ("id", "alert_type", "audience", "body", "action_link")}
+    payload = {k: alert.get(k) for k in ("id", "alert_type", "audience", "title", "body", "action_link")}
 
     def wants(c: Any) -> bool:
         i = c.ctx.identity
@@ -111,4 +112,35 @@ async def list_alerts(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Delivered alerts addressed to the caller's role/department/account."""
     ident = require_account(ctx)
     found = await ctx.engine.db.alerts.for_account(ident.account_id, ident.role, ident.department_id)
-    return {"alerts": rows(found)}
+    names = await ctx.engine.db.accounts.display_names_for(ident.account_id, sorted({a["created_by_account_id"] for a in found}))
+    out = rows(found)
+    for a in out:
+        a["from_name"] = names.get(a["created_by_account_id"])          # as the reader names them, never anyone else's name for them
+    return {"alerts": out}
+
+
+@handler("alerts.sent")
+async def sent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """What this person has sent, scheduled or withdrawn (the Super User: everything), with who it reached."""
+    ident = require_role(ctx, "super_user", "admin")
+    found = await ctx.engine.db.alerts.sent(None if ident.role == "super_user" else ident.account_id)
+    depts = {d["id"]: d["name"] for d in await ctx.engine.db.accounts.list_departments()}
+    out = rows(found)
+    for a in out:
+        a["status"] = "withdrawn" if a["cancelled_at"] else "delivered" if a["delivered_at"] else "scheduled"
+        a["audience_label"] = {"all_users": "Everyone", "admin_only": "All Admins", "department": depts.get(a["department_id"], "A department"),
+                               "specific_users": f"{len(a['recipient_account_ids'] or [])} chosen people"}[a["audience"]]
+    return {"alerts": out}
+
+
+@handler("alerts.cancel")
+async def cancel(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Withdraw a scheduled announcement before it goes out. {"alert_id"}; its sender, or the Super User."""
+    ident = require_role(ctx, "super_user", "admin")
+    alert = await ctx.engine.db.alerts.get(int_field(payload, "alert_id"))
+    if alert is None or (ident.role != "super_user" and alert["created_by_account_id"] != ident.account_id):
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such announcement of yours")
+    if not await ctx.engine.db.alerts.cancel(alert["id"]):
+        raise ProtocolError(ErrorCode.CONFLICT, "it has already been delivered or withdrawn")
+    await ctx.engine.audit.record(ctx, "alert.withdrawn", target_type="system_alerts", target_id=alert["id"])
+    return {"alert_id": alert["id"], "status": "withdrawn"}

@@ -56,21 +56,31 @@ async def addressed(ctx: ShellContext, args: Args) -> str:
 
 @command("alerts", help_="Alerts delivered to you")
 async def alerts(ctx: ShellContext, args: Args) -> str:
-    return table((await ctx.call("alerts.list"))["alerts"], ["id", "alert_type", "audience", "body", "action_link", "deliver_at"], width=50)
+    return table((await ctx.call("alerts.list"))["alerts"], ["id", "alert_type", "title", "from_name", "body", "deliver_at"], width=50)
 
 
-@command("alert", None, "<emergency|warning|announcement|routine> <admin_only|department|all_users|specific_users> <body...> [dept=<id>] [to=1,2] [at=<iso>] [link=<url>]",
-         "Send a system alert now (or schedule it with at=)")
+@command("alerts", "sent", "", "What you have sent, scheduled or withdrawn (the Super User: everyone's)")
+async def alerts_sent(ctx: ShellContext, args: Args) -> str:
+    rows_ = (await ctx.call("alerts.sent"))["alerts"]
+    return table(rows_, ["id", "alert_type", "status", "audience_label", "title", "body", "deliver_at"], width=40) if rows_ else "(nothing sent)"
+
+
+@command("alerts", "cancel", "<id>", "Withdraw a scheduled announcement before it goes out")
+async def alerts_cancel(ctx: ShellContext, args: Args) -> str:
+    await ctx.call("alerts.cancel", {"alert_id": args.get_int(0, "id")})
+    return "withdrawn"
+
+
+@command("alert", None, "<emergency|warning|announcement|routine> <admin_only|department|all_users|specific_users> <body...> [title=<words>] [dept=<id>] [to=1,2] [at=<iso>] [link=<url>]",
+         "Send an announcement now (or schedule it with at=)")
 async def alert(ctx: ShellContext, args: Args) -> str:
     if len(args.positional) < 3:
         raise UsageError("type, audience and body are required")
     res = await ctx.call("alerts.create", {"type": args.positional[0], "audience": args.positional[1],
-                                           "body": args.rest(2, "body"), "department_id": args.opt_int("dept"),
+                                           "body": args.rest(2, "body"), "title": args.opt("title"), "department_id": args.opt_int("dept"),
                                            "account_ids": args.opt_ints("to"), "deliver_at": args.opt("at"),
                                            "action_link": args.opt("link")})
     return f"alert {res['alert_id']} " + (f"scheduled for {res['deliver_at']}" if res["deliver_at"] else "delivered")
-
-
 
 
 @command("audit", usage="[n] [actor=<account_id>] [prefix=<action.>]", help_="Recent audit entries you may see")

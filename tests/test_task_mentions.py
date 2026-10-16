@@ -238,3 +238,22 @@ async def test_the_palette_says_how_old_its_names_are_when_they_are_not_live(con
     _pump(0.5)
     foot = win.findChild(QObject, "paletteAsOf")
     assert foot.property("visible") and "Not connected" in foot.property("text")
+
+
+async def test_an_announcement_is_sent_from_its_page_and_lists_what_was_sent(console):
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "announcements", "announcements")
+    assert "Write the announcement" in prop(page, "problem")
+    page.setProperty("body", "Fire drill at 10.")
+    page.setProperty("title", "Fire drill")
+    page.setProperty("kind", "warning")
+    await _wait(lambda: prop(page, "problem") == "")
+    QMetaObject.invokeMethod(page, "send")
+    await _wait(lambda: any(t == "alerts.create" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "alerts.create")
+    assert sent["type"] == "warning" and sent["audience"] == "department" and sent["title"] == "Fire drill" and sent["body"] == "Fire drill at 10."
+    assert "deliver_at" not in sent                                                       # now, not later
+    assert prop(page, "body") == ""                                                       # sent: the box is empty again
+    page.setProperty("body", "Again.")
+    page.setProperty("audience", "specific_users")
+    assert "Pick at least one person" in prop(page, "problem")
