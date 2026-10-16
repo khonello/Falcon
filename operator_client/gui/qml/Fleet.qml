@@ -23,6 +23,13 @@ QtObject {
         cachedTree = (c && c.items) || []
         cachedAt = c && c.at ? c.at * 1000 : 0
     }
+    // said under a picker whose names are not live: where they came from and how old they are. Empty when they are live.
+    readonly property string asOf: {
+        if (falcon.isConnected && loaded) return ""
+        var when = loaded ? at : cachedAt
+        if (!falcon.isConnected) return when ? "Not connected. Names as of " + Time.at(when) : "Not connected."
+        return when ? "Names as of " + Time.at(when) + ", from the last time you were connected. Updating." : ""
+    }
     function cachedPeople() {
         var out = []
         cachedTree.forEach(function (d) { (d.workers || []).forEach(function (w) { if (w.name && w.account_id) out.push({ name: w.name, sub: (w.hostname || "") + " · " + (d.name || ""), host: w.hostname || "", account: w.account_id }) }) })

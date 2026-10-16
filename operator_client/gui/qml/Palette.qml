@@ -184,5 +184,7 @@ Popup {
             }
         }
         Txt { visible: root.items.length === 0; text: "No matches."; color: Theme.text3; x: 12; y: 8 }
+        footer: Txt { objectName: "paletteAsOf"; visible: Fleet.asOf !== ""; width: list.width; text: visible ? Fleet.asOf : ""; color: Theme.text4; font.pixelSize: 11
+                      leftPadding: 10; topPadding: 6; bottomPadding: 4; height: visible ? implicitHeight : 0 }
     }
 }

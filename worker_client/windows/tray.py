@@ -41,13 +41,16 @@ def main() -> int:
     paint.end()
 
     tray = QSystemTrayIcon(QIcon(pix))
-    tray.setToolTip("Ask your Admin for help")
+    tray.setToolTip("Falcon: your tasks, and help from your Admin")
     menu = QMenu()
+    mine = QAction("My tasks")
+    mine.triggered.connect(lambda: print("tasks", flush=True))
+    menu.addAction(mine)
     ask = QAction("Ask my Admin for help")
     ask.triggered.connect(lambda: print("ask", flush=True))
     menu.addAction(ask)
     tray.setContextMenu(menu)
-    tray.activated.connect(lambda why: print("ask", flush=True) if why == QSystemTrayIcon.ActivationReason.Trigger else None)
+    tray.activated.connect(lambda why: print("tasks", flush=True) if why == QSystemTrayIcon.ActivationReason.Trigger else None)
     tray.show()
     return app.exec()
 

@@ -63,6 +63,19 @@ async def open_tray() -> WindowHandle | None:
     return WindowHandle(proc) if proc is not None else None
 
 
+def tasks_spec(tasks: list[dict[str, Any]]) -> dict[str, Any]:
+    """What is assigned to this person, for the small list window: not finished ones, the soonest due first."""
+    rows = []
+    for t in tasks:
+        if t.get("status") not in (None, "active"):
+            continue
+        text = str(t.get("description_raw") or "")
+        rows.append({"id": t["id"], "title": text.split(".")[0].strip()[:70] or "A task", "from": t.get("assigner_name") or "your Admin",
+                     "due": t.get("final_deadline_at"), "started": bool(t.get("started_at"))})
+    rows.sort(key=lambda r: (r["due"] is None, r["due"] or ""))
+    return {"tasks": rows}
+
+
 def task_spec(task: dict[str, Any]) -> dict[str, Any]:
     """A task as the assignee reads it (TK07): what, when it is due, and the signs that will show the work."""
     text = str(task.get("description_raw") or "")

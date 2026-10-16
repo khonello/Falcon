@@ -14,7 +14,7 @@ import pytest
 pytest.importorskip("PySide6")
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject, Qt
 from PySide6.QtGui import QKeyEvent
 
 from tests.test_operator_gui import (  # noqa: F401  (console is a fixture)
@@ -219,3 +219,22 @@ async def test_a_file_picked_before_is_offered_again_from_memory(console):
     assert "C:/Finance/budget-2026.xlsx" in labels_                                   # the index was asked and said nothing; memory answered
     sub = next(o["sub"] for o in prop(picker(win2)[0], "opts") if o["label"] == "C:/Finance/budget-2026.xlsx")
     assert sub.startswith("seen before")                                              # and it says so: it is not live
+
+
+async def test_the_palette_says_how_old_its_names_are_when_they_are_not_live(console):
+    win, bridge, _ = console("admin")
+    win.showNormal()
+    await _open(win, bridge, "tasks", "tasksView")
+    pal = win.findChild(QObject, "palette")
+    QMetaObject.invokeMethod(pal, "open")
+    _pump(0.5)
+    foot = win.findChild(QObject, "paletteAsOf")
+    assert foot is not None and not foot.property("visible")                       # live: nothing to say
+    QMetaObject.invokeMethod(pal, "close")
+    bridge.state.connected = False                                                 # the Engine goes away; the palette still opens
+    bridge.stateChanged.emit()
+    _pump(0.4)
+    QMetaObject.invokeMethod(pal, "open")
+    _pump(0.5)
+    foot = win.findChild(QObject, "paletteAsOf")
+    assert foot.property("visible") and "Not connected" in foot.property("text")

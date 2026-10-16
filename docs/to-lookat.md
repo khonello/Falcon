@@ -77,3 +77,10 @@ Last updated 13 Oct 2026.
 - Kept now: the people/machines tree (what the `@` person list and the palette's machines need) and files you picked (offered again as "seen before" when the index says nothing or there is no Engine). Offline, the `@` list says "Offline: showing what was known".
 - Not cached on purpose: the whole file index, sessions, health, issues.
 - Next if wanted: recent tasks/flows/rules for the palette, and a "last updated" line on the pickers.
+
+## The Worker's task reminders, and a small list of "my tasks" (16 Oct 2026)
+
+- A task window used to open once; closed without Start, it was never seen again. Now `worker_client/reminders.py` keeps the tasks waiting to be started and shows each one's window again (15, then 30, then hourly), marked "Still waiting to be started", one at a time, never while a superior is using the machine, never once started/finished. Rebuilt from the Engine at every connect, so a restart forgets nothing.
+- New window kind `tasks` ("Your tasks"): everything assigned to the person, soonest due first, Start on what is not started. Opened from the tray (click the icon, or "My tasks"); the tray menu also still has "Ask my Admin for help".
+- Pickers say how old their names are: "Not connected. Names as of ..." (palette; the pages themselves are replaced by the Connect screen while disconnected), or "Names as of ..., from the last time you were connected. Updating." just after start.
+- Still to look at on a real desktop (VM plan): the tray icon, the reminder window popping over other applications, the list window from the tray.

@@ -29,6 +29,7 @@ from worker_client.inventory import Inventory
 from worker_client.isolated import IsolatedSignals, IsolatedWatcher
 from worker_client.lockout import Lockout
 from worker_client.ossignals import OsSignals
+from worker_client.reminders import TaskReminders
 from worker_client.screenstream import RemoteInput, ScreenStreamer
 from worker_client.signals import Signals
 from worker_client.updater import Updater
@@ -83,6 +84,8 @@ class WorkerService:
         self._tray: Any = None
         self._tray_task: asyncio.Task[None] | None = None
         self._window_tasks: set[asyncio.Task[None]] = set()
+        self.reminders = TaskReminders()                      # tasks waiting to be started, shown again until they are
+        self._reminder_task: asyncio.Task[None] | None = None
         if config.windows:
             self.lockout.on_change(self._on_block_changed)
             self.lockout.on_view_change(self._on_view_changed)
@@ -102,6 +105,7 @@ class WorkerService:
         await self._refresh_tasks()
         if self.config.windows:
             await self._start_tray()
+            self._reminder_task = asyncio.create_task(self._reminder_loop())
         log.info("worker service up as pc %s (account %s)", self.identity.pc_id, self.identity.account_id)
 
     async def stop(self) -> None:
@@ -110,6 +114,8 @@ class WorkerService:
             self._reconnect_task.cancel()
         if self._tray_task:
             self._tray_task.cancel()
+        if self._reminder_task:
+            self._reminder_task.cancel()
         if self._tray is not None:
             self._tray.close()
         await self.screens.shutdown()
@@ -327,8 +333,8 @@ class WorkerService:
         if handle is not None:
             await handle.answer()
 
-    async def _show_task(self, task_id: int) -> None:
-        """A task given to this person: its window, and Start if they choose to (never Complete)."""
+    async def _show_task(self, task_id: int, *, reminder: bool = False) -> None:
+        """A task given to this person: its window, and Start if they choose to (never Complete). Closed without starting, it comes back later."""
         from worker_client.windows.spawn import open_window, task_spec
 
         try:
@@ -336,13 +342,58 @@ class WorkerService:
         except (EngineError, ConnectionError_) as exc:
             log.debug("task %s for its window: %s", task_id, exc)
             return
-        handle = await open_window("task", task_spec(task))
+        if task.get("status") != "active" or task.get("started_at") or task.get("assignee_account_id") != self.identity.account_id:
+            self.reminders.clear(task_id)                      # not waiting to be started any more (or never theirs)
+            return
+        spec = task_spec(task)
+        if reminder:
+            spec["reminder"] = True
+            spec["times"] = self.reminders.times_reminded(task_id) + 1
+        handle = await open_window("task", spec)
         answer = await handle.answer() if handle is not None else None
         if answer and answer.get("start"):
+            await self._start_task(task_id)
+        else:
+            self.reminders.track(task_id)                      # not now: it is not forgotten
+
+    async def _start_task(self, task_id: int) -> None:
+        try:
+            await self.call("task.start", {"task_id": task_id})
+            self.reminders.clear(task_id)
+        except (EngineError, ConnectionError_) as exc:
+            log.warning("starting task %s failed: %s", task_id, exc)
+            self.reminders.track(task_id, in_minutes=5)
+
+    async def _reminder_loop(self) -> None:
+        """Every half minute: if a task has waited long enough for its next reminder, and nobody is using this machine, show it (one at a time)."""
+        while not self._stopping:
+            await asyncio.sleep(30)
             try:
-                await self.call("task.start", {"task_id": task_id})
-            except (EngineError, ConnectionError_) as exc:
-                log.warning("starting task %s failed: %s", task_id, exc)
+                if self.lockout.blocked_by is not None or self.conn is None or not self.conn.connected:
+                    continue
+                for task_id in self.reminders.due()[:1]:
+                    await self._show_task(task_id, reminder=True)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("a task reminder failed")
+
+    async def show_my_tasks(self) -> None:
+        """The person asked to see what is assigned to them (from the tray): the list, with Start on what has not been started."""
+        from worker_client.windows.spawn import open_window, tasks_spec
+
+        try:
+            tasks = (await self.call("task.list"))["tasks"]
+        except (EngineError, ConnectionError_) as exc:
+            log.debug("my tasks: %s", exc)
+            handle = await open_window("message", {"text": "Your tasks could not be loaded just now. Try again in a moment.", "from": ""})
+            if handle is not None:
+                await handle.answer()
+            return
+        handle = await open_window("tasks", tasks_spec([t for t in tasks if t.get("assignee_account_id") == self.identity.account_id]))
+        answer = await handle.answer() if handle is not None else None
+        if answer and answer.get("start"):
+            await self._start_task(int(answer["start"]))
 
     async def _start_tray(self) -> None:
         """The tray icon a person uses to ask their Admin for help; each click arrives as a line on its stdout."""
@@ -363,6 +414,8 @@ class WorkerService:
                 return
             if line == "ask":
                 self._spawn(self.ask_for_help())
+            elif line == "tasks":
+                self._spawn(self.show_my_tasks())
 
     async def ask_for_help(self) -> None:
         """The person chose to ask for help: say who they can ask, let them pick, send the ping. A ping carries
@@ -396,5 +449,10 @@ class WorkerService:
                 if t.get("verification_mode") == "stack":
                     detailed.append((await self.call("task.get", {"task_id": t["id"]}))["task"])
             await self.signals.refresh_tasks(detailed)
+            waiting = {t["id"] for t in tasks if t.get("assignee_account_id") == self.identity.account_id
+                       and t.get("status") == "active" and not t.get("started_at")}
+            self.reminders.keep_only(waiting)
+            for task_id in waiting:
+                self.reminders.track_new(task_id)
         except (EngineError, ConnectionError_) as exc:
             log.debug("task refresh failed: %s", exc)

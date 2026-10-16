@@ -233,6 +233,8 @@ Column {
                         MouseArea { id: oa; anchors.fill: parent; hoverEnabled: true; cursorShape: modelData.off ? Qt.ArrowCursor : Qt.PointingHandCursor; onEntered: root.hi = index; onClicked: if (!modelData.off) modelData.run() }
                     }
                 }
+                Txt { objectName: "smartAsOf"; visible: root.stage === null && root.mention !== null && Fleet.asOf !== "" && picker.opts.length > 0 && root.mention.kind !== "file" && root.mention.kind !== "deadline"
+                      width: parent.width; wrapMode: Text.Wrap; text: Fleet.asOf; color: Theme.text4; font.pixelSize: 11; leftPadding: 8; topPadding: visible ? 6 : 0; height: visible ? implicitHeight : 0 }
                 Rectangle { visible: picker.m !== null && root.stage === null; width: parent.width; height: 1; color: Theme.border }
                 Link {
                     visible: picker.m !== null && root.stage === null
