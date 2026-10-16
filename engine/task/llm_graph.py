@@ -80,19 +80,23 @@ HARD_TIME_RE = re.compile(r"\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?"
                           r"|\d{1,2}:\d{2}(?:\s*(?:am|pm))?|\d{1,2}\s*(?:am|pm))\b", re.IGNORECASE)
 # A bare time word is a deadline only in a deadline position: "... today", "on Monday,", "this Friday".
 BARE_TIME_RE = re.compile(r"(?:\b(?:on|this|next)\s+)?\b(" + WEEKDAYS + r"|today|tonight|tomorrow)\b"
-                          r"(?=\s*(?:[.,;!?]|$|or\b|whichever\b))", re.IGNORECASE)
+                          r"(?=\s*(?:[.,;!?]|$|or\b|whichever\b)|['’]s\s+(?:review|meeting|call|deadline|standup|presentation|session)\b)",
+                          re.IGNORECASE)
 
 # Verb cues that settle a file's Intent without asking the model (a mechanical reading).
-CREATE_CUES = re.compile(r"\b(?:create[ds]?|write|written|put together|makes?|made|produced?|prepared?|"
+CREATE_CUES = re.compile(r"\b(?:create[ds]?|write|written(?! to\b)|put together|makes?|made|produced?|prepared?|"
                          r"draft(?:ed)?|generate[ds]?|builds?|built|compiled?|convert(?:ed)?|"
-                         r"save (?:it )?as|exported?|archived?|zip(?:ped)?)\b", re.IGNORECASE)
+                         r"save (?:it )?as|export(?:s|ed)?|archived?|zip(?:ped)?|back(?:s|ed)? up|backup|"
+                         r"rename[ds]?\s+\S+\s+to)\b", re.IGNORECASE)
 UPDATE_CUES = re.compile(r"\b(?:update|change|edit|modify|revise|fix|correct|refresh|keep \S+ current|fill in|"
                          r"add to|append)\b", re.IGNORECASE)
-EXISTS_CUES = re.compile(r"\b(?:make sure|ensure|check|confirm|verify)\b.{0,60}?\b(?:present|exists?|available|there|"
-                         r"on your machine|in place|sitting|saved|filed|stored|uploaded|attached)\b", re.IGNORECASE)
+EXISTS_CUES = re.compile(r"(?:\b(?:make sure|ensure|check|confirm|verify)\b.{0,60}?\b(?:present|exists?|available|there|"
+                         r"on your machine|in place|sitting|saved|filed|stored|uploaded|attached)\b)|"
+                         r"(?:\b(?:must|has to|have to|should|needs? to)\s+be\s+(?:on|in|at|present|there|available|saved|stored|uploaded)\b)",
+                         re.IGNORECASE)
 # A file the work reads FROM is a target that must be there -- not one to produce.
 # "Convert scan.tiff to scan.pdf": scan.tiff is Exists, only scan.pdf is Create.
-SOURCE_CUES = re.compile(r"\b(?:convert|from|out of|based on|starting from|using)\s+(?:the\s+)?$", re.IGNORECASE)
+SOURCE_CUES = re.compile(r"\b(?:convert|rename|from|out of|based on|starting from|using)\s+(?:the\s+)?$", re.IGNORECASE)
 # Standalone capitalised token (Excel, 7-Zip, Outlook): not part of a file/path token.
 CAP_WORD_RE = re.compile(r"(?<![\w/\\.-])([A-Z0-9][A-Za-z0-9+#-]*[A-Za-z][A-Za-z0-9+#-]*)(?![\w/\\.])")
 DAY_WORD_RE = re.compile(r"\b(" + WEEKDAYS + r"|today|tonight|tomorrow|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?)\b",

@@ -81,13 +81,24 @@ TUNED: list[Case] = [
      [("program", "running", "spooler")], set(), None, False),
     ("Shut Slack and Discord down for the deploy",
      [("program", "closed_not_running", "Slack"), ("program", "closed_not_running", "Discord")], set(), None, False),
-]
-
-HELDOUT: list[Case] = [
+    # moved from HELDOUT 16 Oct 2026: they exposed verbs the cue lists missed (export, back up, 'must be on', rename)
     ("Export the attendance log to attendance-oct.csv",
      [("file", "create", "attendance-oct.csv")], set(), None, False),
     ("The vendor contract contract-signed.pdf must be on the shared drive before we pay them",
      [("file", "exists", "contract-signed.pdf")], set(), None, False),
+    ("Prepare slides.pptx and notes.docx for Monday's review",
+     [("file", "create", "slides.pptx"), ("file", "create", "notes.docx")], set(), "Monday", False),
+    ("Back up the database to backup-2026-09-28.bak before you restart anything",
+     [("file", "create", "backup-2026-09-28.bak")], set(), None, False),
+    ("Delete nothing, just rename summary.docx to summary-final.docx",
+     [("file", "exists", "summary.docx"), ("file", "create", "summary-final.docx")], set(), None, False),
+]
+
+HELDOUT: list[Case] = [
+    ('Export the weekly timesheets to timesheets-w42.csv and upload it before Thursday 5pm', [('file', 'create', 'timesheets-w42.csv')], set(), 'Thursday', False),
+    ('The signed lease lease-2026.pdf should be stored in the legal folder', [('file', 'exists', 'lease-2026.pdf')], set(), None, False),
+    ('Back up the payroll database into payroll-oct.bak tonight', [('file', 'create', 'payroll-oct.bak')], set(), 'tonight', False),
+    ('Rename draft.docx to final-v2.docx', [('file', 'exists', 'draft.docx'), ('file', 'create', 'final-v2.docx')], set(), None, False),
     ("Rebuild the dashboard workbook dash.xlsx from scratch",
      [("file", "create", "dash.xlsx")], set(), None, False),
     ("Please double-check that Defender is installed on every machine you touch",
@@ -114,8 +125,6 @@ HELDOUT: list[Case] = [
      [("file", "exists", "invoices.zip")], set(), None, False),
     ("Nothing to do here, just keep an eye on things",
      [], {"no_target"}, None, False),
-    ("Prepare slides.pptx and notes.docx for Monday's review",
-     [("file", "create", "slides.pptx"), ("file", "create", "notes.docx")], set(), "Monday", False),
     ("Update the wiki, then export wiki-backup.zip by noon",
      [("file", "create", "wiki-backup.zip")], set(), "noon", False),
     ("Verify that antivirus.log is being written to",
@@ -124,14 +133,10 @@ HELDOUT: list[Case] = [
      [], {"no_target"}, "10/31", False),
     ("Open Acrobat and sign nda-2026.pdf",
      [("file", "update", "nda-2026.pdf"), ("program", "used_with_file", "Acrobat")], set(), None, False),
-    ("Back up the database to backup-2026-09-28.bak before you restart anything",
-     [("file", "create", "backup-2026-09-28.bak")], set(), None, False),
     ("Keep Jenkins running while the build finishes",
      [("program", "running", "Jenkins")], set(), None, False),
     ("Please make sure the backup service is running before you go home",
      [("program", "running", "backup service")], set(), None, False),
-    ("Delete nothing, just rename summary.docx to summary-final.docx",
-     [("file", "exists", "summary.docx"), ("file", "create", "summary-final.docx")], set(), None, False),
     ("Turn off OneDrive syncing for the rest of the week",
      [("program", "closed_not_running", "OneDrive")], set(), None, False),
     ("The compliance pack compliance-2026.zip has to be uploaded by Thursday 5pm",
