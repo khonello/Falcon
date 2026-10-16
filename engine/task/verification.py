@@ -38,6 +38,10 @@ class VerificationItem:
     file_index_id: int | None = None      # exists/update: the indexed file chosen by the assigner
     populated_by: str = "llm"
     status: str = "pending"
+    # Not stored: how this proposal came about, for the person reviewing it. `source` is where the TARGET came from (hint: they said it outright with @,
+    # rule: found by a pattern, model: the model found it); `intent_by` is how its INTENT was settled (hint, rule, model).
+    source: str = "rule"
+    intent_by: str = "rule"
 
     def validate(self) -> list[str]:
         problems: list[str] = []
@@ -85,10 +89,16 @@ class ProposedStructure:
     """What the LLM graph produces for the assigner to review. `flags` are the places where
     'surface to assigner' fired; a structure with flags cannot be committed as-is."""
     items: list[VerificationItem] = field(default_factory=list)
-    final_deadline: str | None = None
+    final_deadline: str | None = None           # as written ("by Friday")
     soft_deadline: str | None = None
+    final_deadline_at: str | None = None        # as a time (ISO 8601, the assigner's zone), when the words name exactly one
+    soft_deadline_at: str | None = None
+    final_said: str | None = None               # the time in words, to show back ("Fri 16 Oct, 17:00")
+    soft_said: str | None = None
+    deadline_source: str | None = None          # hint | rule | model
     flags: list[dict[str, Any]] = field(default_factory=list)
     proposed_split: list[dict[str, Any]] | None = None  # multi-task detection
+    notes: list[str] = field(default_factory=list)       # what the reading did that the reviewer should know (input shortened, model unavailable)
 
     def needs_assigner(self) -> bool:
         return bool(self.flags or self.proposed_split)

@@ -16,6 +16,14 @@ Backends (open item 10.3 -- in-process is the default, a sidecar remains availab
 Settings: FALCON_LLM_BACKEND (llamacpp|openai|ollama), FALCON_LLM_MODEL_PATH,
 FALCON_LLM_ENDPOINT, FALCON_LLM_MODEL. A missing model file / unreachable sidecar makes the
 client unavailable (logged once, retried after a backoff) -- the Engine still runs.
+
+Hardening (the model is the part of Task a person waits on, so it must never be the part that breaks):
+  * answers are cached (temperature 0 makes the same question the same answer), so reading the same description twice costs nothing;
+  * every call has a time limit; one that overruns is an unclear answer, not a hung request;
+  * one failure is not an outage: the backend is declared away only after FAILURES_BEFORE_BACKOFF in a row, and any success clears the count;
+  * a prompt too long for the model's context is refused up front (it is that input that is wrong, not the backend), and the text inside the
+    quotes can never close them early;
+  * `stats()` says how many questions were asked, answered from the cache, timed out or failed, and how long they took.
 """
 
 from __future__ import annotations
@@ -26,6 +34,7 @@ import logging
 import time
 import urllib.error
 import urllib.request
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -33,7 +42,11 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 BACKENDS = ("llamacpp", "openai", "ollama")
-_BACKOFF_SECONDS = 60.0  # after a failure, don't hammer the backend on every question
+_BACKOFF_SECONDS = 60.0  # once the backend is declared away, don't hammer it on every question
+FAILURES_BEFORE_BACKOFF = 3
+MAX_PROMPT_CHARS = 9000        # about 3,000 tokens: well inside the context window below
+CACHE_SIZE = 1024
+N_CTX = 4096
 
 SYSTEM = ("You classify short workplace task descriptions. Answer with exactly what is asked and "
           "nothing else: no explanation, no punctuation, no extra words.")
@@ -54,7 +67,18 @@ class LocalLLM:
         self._unavailable_until = 0.0
         self._llama: Any = None
         self._executor: ThreadPoolExecutor | None = None
-        self.calls = 0
+        self.calls = 0                                    # questions that reached the model
+        self.cache_hits = 0
+        self.timeouts = 0
+        self.failures = 0
+        self.refused = 0                                  # prompts too long to ask
+        self.seconds = 0.0                                # total time the model spent answering
+        self._consecutive_failures = 0
+        self._cache: OrderedDict[str, str] = OrderedDict()
+
+    def stats(self) -> dict[str, Any]:
+        return {"calls": self.calls, "cache_hits": self.cache_hits, "timeouts": self.timeouts, "failures": self.failures, "refused": self.refused,
+                "seconds": round(self.seconds, 3), "available": self.available, "backend": self.backend}
 
     @property
     def available(self) -> bool:
@@ -70,7 +94,7 @@ class LocalLLM:
     # --- narrow question types ------------------------------------------------------------------
 
     async def yes_no(self, question: str, text: str) -> bool | None:
-        answer = await self._ask(f"{question}\n\nText: \"\"\"{text}\"\"\"\n\nAnswer YES or NO.", max_tokens=3)
+        answer = await self._ask(f"{question}\n\nText: \"\"\"{_quoted(text)}\"\"\"\n\nAnswer YES or NO.", max_tokens=3)
         if answer is None:
             return None
         word = answer.strip().upper().strip(".!,\"'")
@@ -82,7 +106,7 @@ class LocalLLM:
 
     async def choose(self, question: str, text: str, options: list[str]) -> str | None:
         answer = await self._ask(
-            f"{question}\n\nText: \"\"\"{text}\"\"\"\n\nAnswer with exactly one of: "
+            f"{question}\n\nText: \"\"\"{_quoted(text)}\"\"\"\n\nAnswer with exactly one of: "
             f"{' | '.join(options)}.", max_tokens=8)
         if answer is None:
             return None
@@ -106,7 +130,7 @@ class LocalLLM:
         """Short span extraction (a file name, a program name, a date phrase)."""
         answer = await self._ask(
             f"Extract {what} from the text. Reply with only the extracted value, copied verbatim "
-            f"from the text, or the single word NONE if it is not present.\n\nText: \"\"\"{text}\"\"\"",
+            f"from the text, or the single word NONE if it is not present.\n\nText: \"\"\"{_quoted(text)}\"\"\"",
             max_tokens=24)
         if answer is None:
             return None
@@ -120,20 +144,49 @@ class LocalLLM:
     async def _ask(self, prompt: str, *, max_tokens: int) -> str | None:
         if not self.available:
             return None
+        if len(prompt) > MAX_PROMPT_CHARS:
+            self.refused += 1                                           # this input is too long to read; the backend is fine
+            return None
+        key = f"{max_tokens}|{prompt}"
+        if (hit := self._cache.get(key)) is not None:
+            self._cache.move_to_end(key)
+            self.cache_hits += 1
+            return hit
         self.calls += 1
+        started = time.monotonic()
         try:
             if self.backend == "llamacpp":
                 loop = asyncio.get_running_loop()
-                return await loop.run_in_executor(self._worker(), self._generate_local, prompt, max_tokens)
-            return await asyncio.to_thread(self._generate_http, prompt, max_tokens)
+                answer = await asyncio.wait_for(loop.run_in_executor(self._worker(), self._generate_local, prompt, max_tokens), self.timeout)
+            else:
+                answer = await asyncio.wait_for(asyncio.to_thread(self._generate_http, prompt, max_tokens), self.timeout + 5)
+        except asyncio.TimeoutError:
+            self.timeouts += 1
+            self._failed(f"did not answer within {self.timeout:.0f}s")
+            return None
         except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
-            log.warning("local LLM (%s) unreachable: %s; backing off %.0fs", self.backend, exc, _BACKOFF_SECONDS)
-            self._unavailable_until = time.monotonic() + _BACKOFF_SECONDS
+            self._failed(f"unreachable: {exc}")
             return None
         except (ValueError, KeyError, RuntimeError) as exc:
-            log.warning("local LLM (%s) failed: %s", self.backend, exc)
-            self._unavailable_until = time.monotonic() + _BACKOFF_SECONDS
+            self._failed(f"failed: {exc}")
             return None
+        finally:
+            self.seconds += time.monotonic() - started
+        self._consecutive_failures = 0
+        self._cache[key] = answer
+        while len(self._cache) > CACHE_SIZE:
+            self._cache.popitem(last=False)
+        return answer
+
+    def _failed(self, why: str) -> None:
+        """One failure is a missing answer; only several in a row mean the backend is away."""
+        self.failures += 1
+        self._consecutive_failures += 1
+        log.warning("local LLM (%s) %s (%d in a row)", self.backend, why, self._consecutive_failures)
+        if self._consecutive_failures >= FAILURES_BEFORE_BACKOFF:
+            self._unavailable_until = time.monotonic() + _BACKOFF_SECONDS
+            self._consecutive_failures = 0
+            log.warning("local LLM (%s) is treated as away for %.0fs", self.backend, _BACKOFF_SECONDS)
 
     def _worker(self) -> ThreadPoolExecutor:
         if self._executor is None:
@@ -145,7 +198,7 @@ class LocalLLM:
             from llama_cpp import Llama  # imported lazily: optional dependency
 
             log.info("loading local model %s", self.model_path)
-            self._llama = Llama(model_path=str(self.model_path), n_ctx=2048, n_threads=self.n_threads,
+            self._llama = Llama(model_path=str(self.model_path), n_ctx=N_CTX, n_threads=self.n_threads,
                                 verbose=False)
         return self._llama
 
@@ -181,3 +234,8 @@ def _strip_thinking(text: str) -> str:
     if "</think>" in text:
         text = text.rsplit("</think>", 1)[1]
     return text.strip()
+
+
+def _quoted(text: str) -> str:
+    """The description goes inside triple quotes in the prompt; nothing in it may close them early or pose as a new instruction line."""
+    return str(text).replace(chr(34) * 3, chr(39) * 3).replace(chr(0), "")

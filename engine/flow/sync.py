@@ -243,7 +243,9 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
             continue
         base = {"transfer_id": transfer.id, "flow_id": flow["id"], "destination_id": dest["id"],
                 "destination_path": dest["destination_path"], "relative_path": transfer.relative_path,
-                "hash": transfer.hash, "stages": flowdefs.stage_chain(flow, dest)}
+                "hash": transfer.hash, "stages": flowdefs.stage_chain(flow, dest),
+                # what the flow itself last wrote there: anything else already at that place is someone's, and is kept, not overwritten
+                "previous": await engine.db.flows.last_written_for(dest["id"], transfer.relative_path)}
         data = transfer.data
         if data is None or len(data) <= CHUNK_BYTES:
             content = transfer.content_b64 if data is None else base64.b64encode(data).decode("ascii")
@@ -342,6 +344,15 @@ async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                            written_path=payload.get("written_path"), source_hash=transfer.hash)
         await ctx.engine.audit.record(ctx, "flow.synced", target_type="flow_destinations", target_id=dest_id,
                                       detail={"flow_id": flow["id"], "relative_path": transfer.relative_path})
+        if payload.get("preserved"):
+            # the flow was about to write over a file it had not written: the Worker kept that file beside the new one
+            await ctx.engine.db.flows.log_sync(dest_id, "", "external", None, conflict_resolved=True,
+                                               source_relative_path=transfer.relative_path, written_path=str(payload["preserved"]))
+            await ctx.engine.audit.record(ctx, "flow.conflict", target_type="flow_destinations", target_id=dest_id,
+                                          detail={"flow_id": flow["id"], "kept": str(payload["preserved"]), "why": "a file the flow did not write was there"})
+            note = {"flow_id": flow["id"], "destination_id": dest_id, "kept": str(payload["preserved"]), "relative_path": transfer.relative_path}
+            await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.conflict", note)
+            await ctx.engine.push_to_account(dest["owner_account_id"], "flow.conflict", note)
         await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.synced",
                                          {"flow_id": flow["id"], "destination_id": dest_id,
                                           "relative_path": transfer.relative_path})
@@ -407,6 +418,16 @@ async def catch_up(engine: Engine, flow_id: int, only: set[int] | None = None) -
     _listings[request_id] = Listing(flow_id, only)
     await engine.push_to_pc(flow["source_pc_id"], "flow.list", {"request_id": request_id, "flow_id": flow_id, "path": flow["source_path"]})
     return True
+
+
+async def heal(engine: Engine) -> None:
+    """Proactive: now and then every running flow is looked at again, whether or not anything seemed to go wrong. Each destination is sent only what
+    it does not already hold, so when nothing was missed this costs a listing and no transfers; when an event was missed it is made good."""
+    if not engine.db.connected:
+        return
+    for flow in await engine.db.flows.list_all():
+        if flow["status"] == "active" and flow["consent_status"] != "pending":
+            await catch_up(engine, flow["id"])
 
 
 def catch_up_later(engine: Engine, flow_id: int, only: set[int] | None = None) -> None:

@@ -15,6 +15,11 @@ input resumes (spec 6.2 self-throttling). The walk runs in a thread so the event
 serving pushes; cancellation is cooperative.
 
 Content hashes are sha256, computed off the loop, skipped above `hash_limit_bytes`.
+
+Reconciliation (proactive, the core of this module): events only tell what happens while the watcher runs. `reconcile()` compares the watched
+folders with what the Engine was last told (`worker_client.snapshot`, kept on disk) and reports exactly the difference -- files that appeared,
+changed or went while the machine was off, the service restarting, or the Engine unreachable -- through `index.catchup`, which the Engine treats as
+if each had happened live. It runs when the Worker connects, again now and then, and the very first time as a full baseline.
 """
 
 from __future__ import annotations
@@ -24,17 +29,21 @@ import hashlib
 import logging
 import os
 import threading
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
 from worker_client import fsmeta, idle
+from worker_client.snapshot import Snapshot
+from worker_client.stopping import stop_tasks
 
 log = logging.getLogger(__name__)
 
 Reporter = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]  # (message type, payload)
 
 SWEEP_BATCH = 200
+CATCHUP_BATCH = 100
 SWEEP_CHECK_EVERY = 50  # files between idle re-checks
 
 
@@ -53,7 +62,12 @@ def hash_file(path: Path, limit: int) -> str | None:
 
 class Watcher:
     def __init__(self, roots: list[str], report: Reporter, *, poll_seconds: float = 5.0,
-                 hash_limit: int = 64 << 20, idle_after: float = 300.0, native: bool = True) -> None:
+                 hash_limit: int = 64 << 20, idle_after: float = 300.0, native: bool = True,
+                 state_path: Path | None = None, reconcile_seconds: float = 1800.0) -> None:
+        self.state = Snapshot(state_path) if state_path is not None else None
+        self.reconcile_seconds = reconcile_seconds
+        self._reconciling = False
+        self.reconciled = {"at": 0.0, "found": 0}
         self.roots = [Path(r) for r in roots if Path(r).is_dir()]
         self.report = report
         self.poll_seconds = poll_seconds
@@ -85,18 +99,20 @@ class Watcher:
             self._snapshot = await asyncio.to_thread(self._scan)
             self._tasks.append(asyncio.create_task(self._poll_loop()))
         self._tasks.append(asyncio.create_task(self._idle_sweep_loop()))
+        if self.state is not None and self.reconcile_seconds > 0:
+            self._tasks.append(asyncio.create_task(self._reconcile_loop()))
         log.info("watcher: %s over %s", self.mode, ", ".join(str(r) for r in self.roots))
 
     async def stop(self) -> None:
         self._sweep_cancel.set()
-        for t in self._tasks:
-            t.cancel()
-        await asyncio.gather(*self._tasks, return_exceptions=True)
+        await stop_tasks(self._tasks)
         self._tasks.clear()
         if self._observer is not None:
             self._observer.stop()
             self._observer.join(timeout=2)
             self._observer = None
+        if self.state is not None:
+            self.state.close()
 
     # --- native (watchdog) ----------------------------------------------------------------------
 
@@ -224,7 +240,32 @@ class Watcher:
             await self.report("index.event", {"event": event})
             self.events_reported += 1
         except Exception as exc:  # noqa: BLE001 -- never let a report failure kill the watcher
-            log.warning("index.event failed for %s: %s", path, exc)
+            log.warning("index.event failed for %s: %s (the next reconcile will find it again)", path, exc)
+            return
+        if self.state is not None:
+            await asyncio.to_thread(self._remember_told, op, path, old_path, is_dir, digest)
+
+    def _remember_told(self, op: str, path: str, old_path: str | None, is_dir: bool, digest: str | None) -> None:
+        """The Engine took this report: the snapshot now says what it says."""
+        assert self.state is not None
+        if is_dir:
+            if op == "delete":
+                self.state.remove_under(path)
+            elif op == "move" and old_path:
+                self.state.move_under(old_path, path)
+            return
+        if op == "delete":
+            self.state.remove([path])
+            return
+        if op == "move" and old_path:
+            self.state.remove([old_path])
+        if op in ("attrib", "security"):
+            return
+        try:
+            st = os.stat(path)
+        except OSError:
+            return
+        self.state.upsert([(path, st.st_size, st.st_mtime_ns, digest)])
 
     # --- idle-time full sweep -------------------------------------------------------------------
 
@@ -237,10 +278,11 @@ class Watcher:
             # After a full sweep, wait for a fresh idle period before doing it again.
             await asyncio.sleep(max(self.idle_after, 60.0))
 
-    async def sweep(self) -> int:
-        """Walk every root, reporting in batches; stops the moment the user is active.
+    async def sweep(self, *, force: bool = False) -> int:
+        """Walk every root, reporting in batches; stops the moment the user is active (unless `force`: the first full look).
         Returns entries reported (partial sweeps are fine -- the next idle period continues)."""
         self._sweep_cancel.clear()
+        run = self.state.next_run() if self.state is not None else 0
         total = 0
         queue: asyncio.Queue[list[dict[str, Any]] | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
@@ -255,7 +297,7 @@ class Watcher:
                             loop.call_soon_threadsafe(queue.put_nowait, None)
                             return
                         n += 1
-                        if n % SWEEP_CHECK_EVERY == 0 and not idle.is_idle(self.idle_after):
+                        if n % SWEEP_CHECK_EVERY == 0 and not force and not idle.is_idle(self.idle_after):
                             self._sweep_cancel.set()
                             loop.call_soon_threadsafe(queue.put_nowait, None)
                             return
@@ -279,6 +321,8 @@ class Watcher:
                 await self.report("index.sweep_batch", {"entries": batch, "first": first})
                 first = False
                 total += len(batch)
+                if self.state is not None:
+                    await asyncio.to_thread(self._remember_swept, batch, run)
             interrupted = self._sweep_cancel.is_set()
         finally:
             self._sweep_cancel.set()
@@ -287,8 +331,120 @@ class Watcher:
             log.info("idle sweep reported %d entries%s", total, " (interrupted)" if interrupted else "")
         if not interrupted:
             self.sweeps_completed += 1
+            if self.state is not None:                                       # and the snapshot forgets what the sweep did not meet
+                gone = [p for r in self.roots for p in self.state.unseen_under(str(r), run)]
+                self.state.remove(gone)
             try:
                 await self.report("index.sweep_done", {"roots": [str(r) for r in self.roots]})      # what it did not see is gone
             except Exception as exc:  # noqa: BLE001 -- a missed word costs only a stale row until the next sweep
                 log.warning("could not say the sweep finished: %s", exc)
         return total
+
+
+    def _remember_swept(self, batch: list[dict[str, Any]], run: int) -> None:
+        assert self.state is not None
+        rows = []
+        for e in batch:
+            try:
+                st = os.stat(e["path"])
+            except OSError:
+                continue
+            rows.append((e["path"], st.st_size, st.st_mtime_ns, e.get("hash")))
+        self.state.upsert(rows, run)
+
+    # --- reconciliation: tell the Engine what changed while it was not listening ----------------------------------
+
+    async def _reconcile_loop(self) -> None:
+        while True:
+            await asyncio.sleep(self.reconcile_seconds)
+            try:
+                await self.reconcile()
+            except Exception as exc:  # noqa: BLE001 -- a look that failed is simply made again next time
+                log.warning("reconcile failed: %s", exc)
+
+    async def reconcile(self) -> dict[str, Any]:
+        """Bring the Engine up to date with this machine's folders. The first time (nothing recorded) that is a full baseline; after that only
+        the difference is sent: created, changed and deleted files, as `index.catchup` events the Engine treats as live ones."""
+        if self.state is None or not self.roots:
+            return {"skipped": True}
+        if self._reconciling:
+            return {"busy": True}
+        self._reconciling = True
+        try:
+            if not await asyncio.to_thread(self.state.baselined):
+                before = self.sweeps_completed
+                sent = await self.sweep(force=True)
+                if self.sweeps_completed > before:                 # it ran to the end: that is the first full look
+                    await asyncio.to_thread(self.state.set_baselined)
+                self.sweeps_completed = before                     # ... which is not one of the idle sweeps that are counted
+                self.reconciled = {"at": time.time(), "found": sent}
+                return {"baseline": sent}
+            found = await self._reconcile_changes()
+            self.reconciled = {"at": time.time(), "found": found}
+            if found:
+                log.info("reconcile: told the Engine about %d change(s) it had not heard", found)
+            return {"changes": found}
+        finally:
+            self._reconciling = False
+
+    async def _reconcile_changes(self) -> int:
+        assert self.state is not None
+        state = self.state
+        run = await asyncio.to_thread(state.next_run)
+        queue: asyncio.Queue[list[dict[str, Any]] | None] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+        cancel = threading.Event()
+        self._sweep_cancel.clear()
+
+        def walk() -> None:
+            batch: list[dict[str, Any]] = []
+            for root in self.roots:
+                for dirpath, _dirs, files in os.walk(root):
+                    unchanged: list[str] = []
+                    for name in files:
+                        if self._sweep_cancel.is_set() or cancel.is_set():
+                            loop.call_soon_threadsafe(queue.put_nowait, None)
+                            return
+                        p = os.path.join(dirpath, name)
+                        try:
+                            st = os.stat(p)
+                        except OSError:
+                            continue
+                        known = state.known(p)
+                        if known is not None:
+                            unchanged.append(p)          # met in this walk, changed or not: it is not one of the files that went
+                        if known is not None and known[0] == st.st_size and known[1] == st.st_mtime_ns:
+                            continue
+                        batch.append({"op": "modify" if known else "create", "path": p, "name": name,
+                                      "hash": hash_file(Path(p), self.hash_limit), "_size": st.st_size, "_mtime": st.st_mtime_ns})
+                        if len(batch) >= CATCHUP_BATCH:
+                            loop.call_soon_threadsafe(queue.put_nowait, batch)
+                            batch = []
+                    state.mark_seen(unchanged, run)
+            if batch:
+                loop.call_soon_threadsafe(queue.put_nowait, batch)
+            gone = [p for r in self.roots for p in state.unseen_under(str(r), run)]
+            for i in range(0, len(gone), CATCHUP_BATCH):
+                loop.call_soon_threadsafe(queue.put_nowait, [{"op": "delete", "path": p, "name": os.path.basename(p)} for p in gone[i:i + CATCHUP_BATCH]])
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        worker = asyncio.create_task(asyncio.to_thread(walk))
+        total = 0
+        try:
+            while True:
+                batch = await queue.get()
+                if batch is None:
+                    break
+                events = [{k: v for k, v in e.items() if not k.startswith("_")} for e in batch]
+                await self.report("index.catchup", {"events": events})                  # raises if the Engine did not take it: nothing is recorded
+                total += len(batch)
+                await asyncio.to_thread(self._remember_caught_up, batch, run)
+        finally:
+            cancel.set()
+            await worker
+        return total
+
+    def _remember_caught_up(self, batch: list[dict[str, Any]], run: int) -> None:
+        assert self.state is not None
+        self.state.upsert([(e["path"], e["_size"], e["_mtime"], e.get("hash")) for e in batch if e["op"] != "delete"], run)
+        self.state.remove([e["path"] for e in batch if e["op"] == "delete"])

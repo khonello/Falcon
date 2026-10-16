@@ -69,6 +69,35 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
             await push_stack(engine, task["id"])
 
 
+async def heal(engine: Engine) -> int:
+    """Proactive: now and then every open task is checked against the index, so a file it asked for that appeared while the Engine was not
+    listening is bound and counted anyway. Returns how many items were bound."""
+    if not engine.db.connected:
+        return 0
+    bound = 0
+    for task in await engine.db.tasks.open_with_items():
+        if task["verification_mode"] == "none":
+            continue
+        touched = False
+        for item in task["items"]:
+            if item["target_type"] != "file" or item["intent"] != "create" or item.get("file_index_id") is not None:
+                continue
+            name = (item.get("proposed_filename") or "").strip()
+            if not name:
+                continue
+            for found in await engine.db.file_index.by_name(name, pc_ids=[task["assignee_pc_id"]] if task.get("assignee_pc_id") else None):
+                if item.get("proposed_path") and not _under(found["path"], item["proposed_path"]):
+                    continue
+                await engine.db.tasks.bind_item_file(item["id"], found["id"])
+                await engine.db.tasks.add_expectation(item["id"], "file_created", {"path": found["path"]})
+                bound += 1
+                touched = True
+                break
+        if touched:
+            await push_stack(engine, task["id"])
+    return bound
+
+
 def _under(path: str, folder: str) -> bool:
     p, f = path.replace("\\", "/").lower().rstrip("/"), folder.replace("\\", "/").lower().rstrip("/")
     return p.startswith(f + "/")

@@ -37,6 +37,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
+from engine.isotime import parse_iso
 from engine.permissions import (
     int_field,
     require_account,
@@ -249,7 +250,7 @@ async def evaluate_polled(engine: Engine) -> int:
         last = _last_fired.get(definition["id"])
         if etype == "time.scheduled":
             try:
-                at = datetime.fromisoformat(str(m.get("at")))
+                at = parse_iso(str(m.get("at")))
             except (TypeError, ValueError):
                 continue
             at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
@@ -298,7 +299,7 @@ def _parse_spec(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         raise ProtocolError(ErrorCode.INVALID, "match must be an object")
     if etype == "time.scheduled":
         try:
-            datetime.fromisoformat(str(match.get("at")))
+            parse_iso(str(match.get("at")))
         except (TypeError, ValueError) as exc:
             raise ProtocolError(ErrorCode.INVALID, "time.scheduled needs match.at (ISO 8601)") from exc
     if "tier" in match and match["tier"] not in TIER_TAGS:
@@ -530,9 +531,9 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         if mine is not None and ex["target_pc_id"] not in mine:
             continue
         ex["outcome"] = outcome_of(ex)
-        started = datetime.fromisoformat(ex["started_at"])
+        started = parse_iso(ex["started_at"])
         for firing in firings:                                  # newest first: the first earlier one wins
-            if firing["pc_id"] in (ex["target_pc_id"], 0) and datetime.fromisoformat(firing["at"]) <= started:
+            if firing["pc_id"] in (ex["target_pc_id"], 0) and parse_iso(firing["at"]) <= started:
                 firing["runs"].append(ex)
                 break
     if mine is not None:
@@ -540,7 +541,7 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     for f in firings:
         f["machines"] = len({ex["target_pc_id"] for ex in f["runs"]}) if not f["pc_id"] else 1
     today = datetime.now(timezone.utc).date()
-    fired_today = sum(1 for f in firings if datetime.fromisoformat(f["at"]).date() == today)
+    fired_today = sum(1 for f in firings if parse_iso(f["at"]).date() == today)
     running = [ex for f in firings for ex in f["runs"] if ex["status"] == "pending"]
     return {"event_id": event_id, "firings": firings, "fired_today": fired_today, "running": running}
 

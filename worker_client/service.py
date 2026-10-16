@@ -16,6 +16,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from common.connection import ConnectionError_, EngineConnection, EngineError
@@ -61,14 +62,16 @@ class WorkerService:
         self._native_watch = native_watch
         self.signpipe: SignPipeServer | None = None
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
+        state_path = Path(config.path).parent / "index-state.db" if config.index_state else None
         if config.separate_programs:
             self.watcher: Any = IsolatedWatcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
                                                 hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
-                                                native=native_watch, on_unhealthy=self._component_changed)
+                                                native=native_watch, on_unhealthy=self._component_changed,
+                                                state_path=state_path, reconcile_seconds=config.reconcile_seconds)
         else:
             self.watcher = Watcher(config.watch_roots, self.call, poll_seconds=config.poll_seconds,
                                    hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
-                                   native=native_watch)
+                                   native=native_watch, state_path=state_path, reconcile_seconds=config.reconcile_seconds)
         self.notifiers: list[Notifier] = []   # the narrow UI / dialogs subscribe here
         self.native_session_id: int | None = None
         self._stopping = False
@@ -171,6 +174,7 @@ class WorkerService:
         else:
             self.lockout.release()
         await self.ossignals.refresh()
+        self._spawn(self._reconcile_index())          # whatever changed while the Engine was not listening is told now, in the background
         cur = await self.call("updates.current")
         if cur.get("version") and cur["version"]["version_string"] != VERSION:
             self.updater.on_available({"version": cur["version"]["version_string"]})
@@ -251,6 +255,12 @@ class WorkerService:
             self.native_session_id = res.get("session_id")
         except (EngineError, ConnectionError_) as exc:
             log.warning("could not re-claim the native session: %s", exc)
+
+    async def _reconcile_index(self) -> None:
+        try:
+            await self.watcher.reconcile()
+        except Exception as exc:  # noqa: BLE001 -- a look that failed is made again at the next connect and on the timer
+            log.warning("could not bring the Engine's index up to date: %s", exc)
 
     def _component_changed(self, name: str, healthy: bool) -> None:
         """The indexer or the tracker started dying again and again, or recovered: the Engine is told, so someone can look."""

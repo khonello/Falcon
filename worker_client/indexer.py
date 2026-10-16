@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import sys
+from pathlib import Path
 
 from worker_client.childproc import Link
 from worker_client.watcher import Watcher
@@ -33,7 +34,9 @@ async def run(cfg: dict) -> None:
     link = Link()
     watcher = Watcher(cfg.get("roots") or [], link.report, poll_seconds=float(cfg.get("poll_seconds", 5.0)),
                       hash_limit=int(cfg.get("hash_limit", 64 << 20)), idle_after=float(cfg.get("idle_after", 300.0)),
-                      native=bool(cfg.get("native", True)))
+                      native=bool(cfg.get("native", True)),
+                      state_path=Path(cfg["state_path"]) if cfg.get("state_path") else None,
+                      reconcile_seconds=float(cfg.get("reconcile_seconds", 1800.0)))
 
     def show() -> dict:
         return {"mode": watcher.mode, "events_reported": watcher.events_reported,
@@ -47,6 +50,12 @@ async def run(cfg: dict) -> None:
     async def status(_args: dict) -> dict:
         return show()
 
+    async def reconcile(_args: dict) -> dict:
+        res = await watcher.reconcile()
+        link.status(**show())
+        return res
+
+    link.command("reconcile", reconcile)
     link.command("sweep", sweep)
     link.command("status", status)
     served = asyncio.create_task(link.serve())

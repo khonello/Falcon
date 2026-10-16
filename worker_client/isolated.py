@@ -23,8 +23,9 @@ Unhealthy = Callable[[str, bool], None]
 
 class IsolatedWatcher:
     def __init__(self, roots: list[str], call: Call, *, poll_seconds: float, hash_limit: int, idle_after: float,
-                 native: bool, on_unhealthy: Unhealthy | None = None) -> None:
-        cfg = {"roots": roots, "poll_seconds": poll_seconds, "hash_limit": hash_limit, "idle_after": idle_after, "native": native}
+                 native: bool, on_unhealthy: Unhealthy | None = None, state_path: Any = None, reconcile_seconds: float = 1800.0) -> None:
+        cfg = {"roots": roots, "poll_seconds": poll_seconds, "hash_limit": hash_limit, "idle_after": idle_after, "native": native,
+               "state_path": str(state_path) if state_path else None, "reconcile_seconds": reconcile_seconds}
         self.child = Supervised("indexer", "worker_client.indexer", [json.dumps(cfg)], call, on_unhealthy=on_unhealthy)
 
     @property
@@ -48,6 +49,11 @@ class IsolatedWatcher:
     async def sweep(self) -> int:
         res = await self.child.command("sweep", timeout=3600)
         return int(res.get("n") or 0)
+
+    async def reconcile(self) -> dict[str, Any]:
+        if not self.child.running:
+            return {"skipped": True}
+        return await self.child.command("reconcile", timeout=3600)
 
 
 class IsolatedSignals:

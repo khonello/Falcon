@@ -45,15 +45,25 @@ Column {
                 "Watched through " + (host || "the machine") + "'s own file events, as they happen. Recognised by content, so a rename or a move does not lose it."]
     }
 
-    // the marks' words across the top
+    // the marks' words across the top. Marks that fall within a few words of each other (a task given and started minutes ago has Started and
+    // Now at the same place on a day-long clock) share one label, "Started · Now", instead of being written on top of each other
+    readonly property var labels: {
+        var out = [], gap = 56
+        marks.slice().sort(function (p, q) { return p[1] - q[1] }).forEach(function (mk) {
+            var x = xAt(mk[1], width), last = out.length ? out[out.length - 1] : null
+            if (last && x - last.x < gap) { last.text += " · " + mk[0]; last.color = mk[2]; last.soft = last.soft && mk[0] === "Soft" }
+            else out.push({ x: x, text: mk[0], color: mk[2], soft: mk[0] === "Soft" })
+        })
+        return out
+    }
     Item {
         width: root.width; height: 16
         Repeater {
-            model: root.marks
+            model: root.labels
             Txt {
                 required property var modelData
-                x: Math.max(0, Math.min(root.width - implicitWidth, root.xAt(modelData[1], root.width) - (modelData[0] === "Soft" ? implicitWidth + 3 : implicitWidth / 2)))
-                text: modelData[0]; color: modelData[2]; font.pixelSize: 10; elide: Text.ElideNone
+                x: Math.max(0, Math.min(root.width - implicitWidth, modelData.x - (modelData.soft ? implicitWidth + 3 : implicitWidth / 2)))
+                text: modelData.text; color: modelData.color; font.pixelSize: 10; elide: Text.ElideNone
             }
         }
     }
@@ -124,7 +134,7 @@ Column {
                     })
                     if (lane.st === "passed") {
                         var first = lane.sig.length ? Math.min.apply(null, lane.sig.map(function (e) { return Time.ms(e.observed_at) })) : root.end
-                        var fx = root.xAt(first, w)
+                        var fx = Math.max(7, Math.min(w - 7, root.xAt(first, w)))          // the whole mark stays on the strip, never half cut off at an edge
                         c.fillStyle = Theme.surface; c.strokeStyle = Theme.text; c.lineWidth = 1.5
                         c.beginPath(); c.arc(fx, 11, 5.5, 0, Math.PI * 2); c.fill(); c.stroke()
                         c.fillStyle = Theme.text; c.beginPath(); c.arc(fx, 11, 2.2, 0, Math.PI * 2); c.fill()

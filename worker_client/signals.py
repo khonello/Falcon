@@ -21,6 +21,7 @@ from typing import Any
 
 from worker_client import idle
 from worker_client.foreground import foreground
+from worker_client.stopping import stop_tasks
 
 log = logging.getLogger(__name__)
 
@@ -78,9 +79,7 @@ class Signals:
         self._tasks = [asyncio.create_task(self._metrics_loop()), asyncio.create_task(self._program_loop())]
 
     async def stop(self) -> None:
-        for t in self._tasks:
-            t.cancel()
-        await asyncio.gather(*self._tasks, return_exceptions=True)
+        await stop_tasks(self._tasks)
         self._tasks.clear()
 
     async def refresh_tasks(self, tasks: list[dict[str, Any]]) -> None:

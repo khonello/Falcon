@@ -308,3 +308,17 @@ part is recorded for later, not built.
   at the destinations (the design says "updated to match source"); the index of a machine learns of offline deletions only at its next complete idle sweep; the console's forms
   (New flow, New task, Mark files) are tested against faked answers, and every page loads clean against the live Engine, but filling a form through the real console is not scripted;
   Task proposals were tried with the 0.6B model (the default 1.7B is not on this machine).
+
+- **Proactive first, reactive second: the core heals itself** (16 Oct 2026, the user's rule). Events are the fast path; they are never the only path.
+  *The index:* each Worker keeps what the Engine was last told (`worker_client/snapshot.py`, sqlite beside its settings) and `Watcher.reconcile()` compares its
+  folders with it on connect, on a timer (`reconcile_seconds`) and after a failed report, sending exactly what appeared, changed or went as `index.catchup` events the
+  Engine ingests as if they had happened live -- so Flow, Restricted and Task react to what happened while the machine was off or the Engine unreachable. The first look is a
+  full baseline. A file is recorded only after the Engine took the report. *The Engine looks again by itself:* `flow.heal` (every running flow is caught up, 20 min),
+  `marks.heal` (every marked content against everything the index holds, 30 min), `tasks.heal` (a file a task asked for that is already there is bound, 10 min), on top of
+  the catch-up on create, resume, return and consent. *Collisions:* a flow never overwrites a file it did not write: the Engine tells the destination what the flow last
+  wrote there (`previous`) and the Worker keeps anything else beside the new file as `<name>-modified` and says so (`flow.conflict`); a source file deleted and brought back
+  finds its destination copy still there (deletes are not propagated) and no collision. *Also found and fixed on the way:* a stop that never finished (Python 3.10's
+  `wait_for` can swallow a cancellation, so `task.cancel()` + `gather` hung the service; `worker_client/stopping.stop_tasks` cancels until it really stops), a modified
+  file reported as deleted by the first reconcile, deadlines set in the console failing ("must be ISO 8601": JavaScript's `...Z` is refused by Python 3.10; `engine/isotime.py`),
+  and the New flow form turning a collision into an error instead of the question it should be. *Tried live through the real console:* `python scripts/live_drill.py forms`
+  (New flow with and without files at the destination, New task read by the 1.7B model, Mark files). The default 1.7B model is on this machine now.

@@ -18,6 +18,8 @@ import sys
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from worker_client.stopping import stop_tasks
+
 log = logging.getLogger(__name__)
 
 Reporter = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
@@ -151,9 +153,7 @@ class Inventory:
                        asyncio.create_task(self._every(self.installed_seconds, "installed", installed))]
 
     async def stop(self) -> None:
-        for t in self._tasks:
-            t.cancel()
-        await asyncio.gather(*self._tasks, return_exceptions=True)
+        await stop_tasks(self._tasks)
         self._tasks.clear()
 
     async def send(self, what: str, read: Callable[[], list[dict[str, Any]]]) -> None:

@@ -20,9 +20,11 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
+from engine.isotime import parse_iso
 from engine.permissions import int_field, require_account, require_role, str_field
 from engine.serialize import row, rows
 from engine.task import llm_graph, verification
+from engine.task.hints import parse_hints
 from engine.task.verification import VerificationItem
 from protocol import ErrorCode, ProtocolError
 
@@ -58,7 +60,7 @@ def _parse_when(payload: dict[str, Any], name: str) -> datetime | None:
     if not raw:
         return None
     try:
-        when = datetime.fromisoformat(str(raw))
+        when = parse_iso(str(raw))
     except ValueError as exc:
         raise ProtocolError(ErrorCode.INVALID, f"{name} must be ISO 8601") from exc
     return when if when.tzinfo else when.replace(tzinfo=timezone.utc)
@@ -132,28 +134,64 @@ async def reschedule_all(engine: Engine) -> int:
 
 @handler("task.propose")
 async def propose(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"description": str, "assignee_account_id": int} -> LLM-populated structure for review.
+    """{"description": str, "assignee_account_id": int, "hints"?: [..], "now"?: ISO} -> a structure for review.
+
+    `hints` are what the assigner marked outright with @ (a file, a program, a folder, a time; see engine/task/hints.py): taken as given, so the
+    model is asked only about the rest. `now` is the assigner's own clock with its zone, so "by 3pm tomorrow" means their tomorrow.
 
     Nothing is committed here. `needs_assigner` is true when any question in the decision
-    graph came back unclear/contradictory, a deadline was ambiguous, several tasks were
+    graph came back unclear/contradictory, a deadline was ambiguous or could not be read, several tasks were
     detected, or a Create-intent name collides. When the local LLM is unreachable the
-    structure is empty and `llm_available` is false: the assigner uses the manual editor."""
+    structure holds what patterns and hints settled and `llm_available` is false."""
     require_role(ctx, "super_user", "admin")
     description = str_field(payload, "description")
     assignee = await _assignee_for(ctx, int_field(payload, "assignee_account_id"))
-    structure = await llm_graph.populate(ctx.engine.llm, description)
+    now = _clock(payload.get("now"))
+    hints = parse_hints(payload.get("hints"), now)
+    llm = ctx.engine.llm
+    before = dict(llm.stats()) if hasattr(llm, "stats") else {}
+    structure = await llm_graph.populate(llm, description, hints, now)
+    after = dict(llm.stats()) if hasattr(llm, "stats") else {}
     collisions = await verification.check_create_collisions(ctx.engine, structure.items, assignee["bound_pc_id"])
     await verification.bind_existing_files(ctx.engine, structure, assignee["bound_pc_id"])
     return {
-        "llm_available": ctx.engine.llm.available,
+        "llm_available": llm.available,
         "items": [vars(i) for i in structure.items],
         "final_deadline": structure.final_deadline,
         "soft_deadline": structure.soft_deadline,
+        "final_deadline_at": structure.final_deadline_at,
+        "soft_deadline_at": structure.soft_deadline_at,
+        "final_said": structure.final_said,
+        "soft_said": structure.soft_said,
+        "deadline_source": structure.deadline_source,
         "flags": structure.flags,
         "proposed_split": structure.proposed_split,
         "collisions": collisions,
+        "notes": structure.notes,
         "needs_assigner": structure.needs_assigner() or bool(collisions),
+        "model": {k: after.get(k, 0) - before.get(k, 0) for k in ("calls", "cache_hits", "timeouts", "failures", "refused", "seconds")},
     }
+
+
+def _clock(raw: Any) -> datetime:
+    """The assigner's own clock, with its zone (UTC when it did not say)."""
+    if raw:
+        try:
+            at = parse_iso(raw)
+            return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+        except ValueError as exc:
+            raise ProtocolError(ErrorCode.INVALID, "now must be ISO 8601 with its zone") from exc
+    return datetime.now(timezone.utc)
+
+
+@handler("task.when")
+async def when(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"phrase": str, "now"?: ISO} -> {"at": ISO | null, "said": str, "why": str}: the words read as a time, or why they cannot be."""
+    require_role(ctx, "super_user", "admin")
+    from common.when import resolve
+
+    got = resolve(str(payload.get("phrase") or ""), _clock(payload.get("now")))
+    return {"at": got.at.isoformat() if got.at else None, "said": got.said, "why": got.why}
 
 
 @handler("task.create")

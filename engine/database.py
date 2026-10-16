@@ -718,6 +718,14 @@ class TasksRepo(_Repo):
             t["items"] = await self.items(t["id"])
         return tasks
 
+    async def open_with_items(self) -> list[dict[str, Any]]:
+        """Every task not yet completed, with its items and the PC its assignee works at."""
+        tasks = await self._fetch(
+            f"SELECT {self._TASK_COLS} {self._TASK_FROM} WHERE t.status <> 'completed'")
+        for t in tasks:
+            t["items"] = await self.items(t["id"])
+        return tasks
+
     async def latest_signal(self, item_id: int, signal_type: str) -> dict[str, Any] | None:
         return await self._one(
             "SELECT * FROM expectations WHERE verification_item_id = $1 AND signal_type = $2 "
@@ -1288,6 +1296,13 @@ class FlowsRepo(_Repo):
             "conflict_resolved, source_relative_path, written_path, source_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
             destination_id, content_hash, written_by, written_by_account_id, conflict_resolved,
             source_relative_path, written_path, source_hash)
+
+    async def last_written_for(self, destination_id: int, source_relative_path: str) -> dict[str, Any] | None:
+        """What the flow last wrote at a destination for one source file: where, and the hash of what it wrote."""
+        return await self._one(
+            "SELECT written_path AS path, content_hash AS hash FROM flow_sync_log WHERE flow_destination_id = $1 AND written_by = 'flow_sync' "
+            "AND lower(replace(source_relative_path, '\\', '/')) = lower(replace($2, '\\', '/')) ORDER BY occurred_at DESC, id DESC LIMIT 1",
+            destination_id, source_relative_path)
 
     async def synced_source_hashes(self, destination_id: int) -> dict[str, str | None]:
         """What this destination was last given, per source file (lower-case relative path -> the source hash it was made from)."""

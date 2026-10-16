@@ -139,6 +139,23 @@ async def _flag_copies_of(engine: Engine, entry: dict[str, Any]) -> int:
     return 1 if await flag_copy(engine, pc, entry, "restricted", None, marks[0]) else 0
 
 
+async def heal(engine: Engine) -> int:
+    """Proactive: now and then every active mark's content is checked against everything the index holds, so a copy whose event was missed (or
+    that arrived before its original was marked) is found anyway. Returns how many copies were newly flagged."""
+    if not engine.db.connected:
+        return 0
+    db = engine.db
+    flagged = 0
+    for mark in await db.marks.list():
+        for digest in await db.marks.hashes(mark["id"]):
+            for entry in await db.file_index.by_hash(digest):
+                if not allowed_at(mark, entry["pc_id"], entry["path"]):
+                    flagged += await _flag_copies_of(engine, entry)
+    if flagged:
+        await engine.audit.record(None, "mark.healed", target_type="resource_marks", target_id=None, detail={"flagged": flagged})
+    return flagged
+
+
 def _iso(value: Any) -> str | None:
     return value.isoformat() if value is not None else None
 

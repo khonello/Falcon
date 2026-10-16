@@ -17,6 +17,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from worker_client.stopping import stop_tasks
+
 log = logging.getLogger(__name__)
 
 Reporter = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
@@ -137,15 +139,13 @@ class OsSignals:
         if self.etw is not None:
             await asyncio.to_thread(self.etw.stop)
         if self._drain_task:
-            self._drain_task.cancel()
-            await asyncio.gather(self._drain_task, return_exceptions=True)
+            await stop_tasks([self._drain_task])
             self._drain_task = None
         if self._notifier is not None:
             self._notifier.stop()
             self._notifier = None
         if self._task:
-            self._task.cancel()
-            await asyncio.gather(self._task, return_exceptions=True)
+            await stop_tasks([self._task])
             self._task = None
 
     def nudge(self, group: str = "") -> None:

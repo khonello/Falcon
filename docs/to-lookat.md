@@ -48,5 +48,10 @@ Last updated 13 Oct 2026.
 
 - Fixed along the way (see `ENGINE-GAPS.md`): big files, a destination that was away, files already in a source folder, a file mid-write, a marked file being moved, an allowance by path, `index.search`, ghosts in the index.
 - **Decide:** should a file deleted at a flow's source also be deleted at its destinations? Today it is not (the design says "destination updated to match source"; deleting is the risky half).
-- **Not scripted yet:** filling the console's own forms (New flow, New task, Mark files) against the live Engine, and a flow between two separate PCs (the drill uses three Workers on this one).
-- **The language model:** Task was tried with Qwen3-0.6B; the default Qwen3-1.7B is not on this machine (`python -m engine setup --download-model`).
+- **Done since:** the console's own forms are scripted live (`live_drill.py forms`, 18 checks) and the default Qwen3-1.7B model is downloaded and probed 8/8. **Still only on separate machines:** a flow between two real PCs (`docs/VM-TEST-PLAN.md`).
+
+## Proactive and reactive (16 Oct 2026)
+
+- Built: the index reconciles on start, reconnect and a timer; the Engine heals flows, marks and tasks on timers; a flow never overwrites what it did not write. See `ENGINE-GAPS.md`.
+- The two-PC Flow test, the away-and-back tests and the non-administrator console test are in `docs/VM-TEST-PLAN.md` (needs a machine with ~14 GB free for the guests).
+- Still open: should a deleted source file be deleted at destinations? (Today: no; the destination keeps its copy. The user said that is what they first thought.)

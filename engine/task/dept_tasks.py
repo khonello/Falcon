@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
+from engine.isotime import parse_iso
 from engine.permissions import int_field, require_role, str_field
 from engine.serialize import row
 from protocol import ErrorCode, ProtocolError
@@ -88,7 +89,7 @@ def _parse_deadline(payload: dict[str, Any]) -> datetime:
     if not raw:
         raise ProtocolError(ErrorCode.INVALID, "a department task needs a deadline")
     try:
-        when = datetime.fromisoformat(str(raw))
+        when = parse_iso(str(raw))
     except ValueError as exc:
         raise ProtocolError(ErrorCode.INVALID, "deadline_at must be ISO 8601") from exc
     return when if when.tzinfo else when.replace(tzinfo=timezone.utc)

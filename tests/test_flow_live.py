@@ -125,3 +125,54 @@ async def test_a_transfer_nobody_finished_is_failed_not_kept_forever(engine, org
         assert f["destinations"][0]["paused_reason"] == "source:unreadable"                  # the source never answered
     finally:
         await admin.close()
+
+
+async def test_a_flow_never_overwrites_a_file_it_did_not_write(engine, org, tmp_path: Path):
+    """A destination already holding a different file of the same name keeps it, beside the new one; the flow's own earlier write is replaced cleanly."""
+    src, dst = tmp_path / "out", tmp_path / "in"
+    src.mkdir()
+    dst.mkdir()
+    (src / "report.txt").write_text("from the source", encoding="utf-8")
+    (dst / "report.txt").write_text("a person's own report", encoding="utf-8")                # not the flow's
+    w1, w2, admin = await _start(engine, tmp_path, "cid-w1", [str(src)]), await _start(engine, tmp_path, "cid-w2", [str(dst)]), await _admin(engine)
+    try:
+        await admin.call("flow.create", _flow(org, src, dst, confirm_collisions=True))
+        assert await _wait(lambda: (dst / "report.txt").exists() and (dst / "report.txt").read_text(encoding="utf-8") == "from the source", timeout=15)
+        kept = dst / "report-modified.txt"
+        assert kept.exists() and kept.read_text(encoding="utf-8") == "a person's own report"           # nothing of theirs was lost
+        audit = await engine.db.audit.recent(action_prefix="flow.conflict")
+        assert audit and "did not write" in str(audit[0]["detail"])                                  # and it was said
+        # the flow's own earlier write, untouched, is replaced without fuss
+        (src / "report.txt").write_text("the source moves on", encoding="utf-8")
+        assert await _wait(lambda: (dst / "report.txt").read_text(encoding="utf-8") == "the source moves on", timeout=15)
+        assert sorted(p.name for p in dst.iterdir()) == ["report-modified.txt", "report.txt"]       # no second copy was made
+    finally:
+        await admin.close()
+        await w1.stop()
+        await w2.stop()
+
+
+async def test_a_deleted_source_file_leaves_the_destination_copy_and_comes_back_without_a_collision(engine, org, tmp_path: Path):
+    src, dst = tmp_path / "out", tmp_path / "in"
+    src.mkdir()
+    dst.mkdir()
+    w1, w2, admin = await _start(engine, tmp_path, "cid-w1", [str(src)]), await _start(engine, tmp_path, "cid-w2", [str(dst)]), await _admin(engine)
+    try:
+        await admin.call("flow.create", _flow(org, src, dst))
+        (src / "a.txt").write_text("version one", encoding="utf-8")
+        assert await _wait(lambda: (dst / "a.txt").exists(), timeout=15)
+        (src / "a.txt").unlink()
+        await asyncio.sleep(3)
+        assert (dst / "a.txt").read_text(encoding="utf-8") == "version one"                        # the destination keeps its copy
+        (src / "a.txt").write_text("version one", encoding="utf-8")                                # the same file comes back
+        await asyncio.sleep(4)
+        assert sorted(p.name for p in dst.iterdir()) == ["a.txt"]                                  # no collision, no duplicate
+        (src / "a.txt").unlink()
+        await asyncio.sleep(2)
+        (src / "a.txt").write_text("version two", encoding="utf-8")                                # a different one comes back
+        assert await _wait(lambda: (dst / "a.txt").read_text(encoding="utf-8") == "version two", timeout=15)
+        assert sorted(p.name for p in dst.iterdir()) == ["a.txt"]                                  # untouched since the flow wrote it: replaced cleanly
+    finally:
+        await admin.close()
+        await w1.stop()
+        await w2.stop()

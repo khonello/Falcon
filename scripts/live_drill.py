@@ -160,6 +160,7 @@ def report() -> int:
 async def main(which: str) -> int:
     from live_drills import (
         flow_drill,
+        forms_drill,
         gui_drill,
         restricted_drill,
         task_drill,
@@ -168,7 +169,7 @@ async def main(which: str) -> int:
     d = Drill()
     await d.start()
     try:
-        await {"flow": flow_drill, "restricted": restricted_drill, "task": task_drill, "gui": gui_drill}[which].run(d, check, say, wait_for)
+        await {"flow": flow_drill, "restricted": restricted_drill, "task": task_drill, "gui": gui_drill, "forms": forms_drill}[which].run(d, check, say, wait_for)
     finally:
         await d.stop()
     return report()

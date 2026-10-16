@@ -358,3 +358,14 @@ async def test_searching_the_index_returns_files_with_their_times(engine, org, c
     await w1.ok("index.event", {"event": {"op": "create", "path": "C:/docs/budget-2026.txt", "hash": "H"}})
     found = (await a1.ok("index.search", {"query": "budget-2026"}))["results"]
     assert [f["filename"] for f in found] == ["budget-2026.txt"]
+
+
+async def test_a_deadline_the_console_writes_is_understood(engine, org, connect):
+    """Found filling the New task form live: JavaScript writes 2026-10-17T17:00:00.000Z, which Python 3.10's fromisoformat refuses, so every deadline
+    set in the console failed with "must be ISO 8601"."""
+    a1 = await connect("cid-a1")
+    soft = (_now() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    final = (_now() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    res = await a1.ok("task.create", {"assignee_account_id": org["w1"], "description": "x", "verification_mode": "none", "confirm_none": True,
+                                      "soft_deadline_at": soft, "final_deadline_at": final})
+    assert res["task"]["final_deadline_at"] is not None and res["task"]["soft_deadline_at"] is not None

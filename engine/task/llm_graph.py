@@ -39,8 +39,13 @@ from __future__ import annotations
 
 import logging
 import re
+import time
+import unicodedata
+from datetime import datetime
 from typing import TYPE_CHECKING
 
+from common.when import resolve
+from engine.task.hints import Hint
 from engine.task.verification import ProposedStructure, VerificationItem
 
 if TYPE_CHECKING:
@@ -242,12 +247,70 @@ def mentions_use_on_file(text: str) -> bool:
 
 # --- the graph ----------------------------------------------------------------------------------
 
-async def populate(llm: LocalLLM, description: str) -> ProposedStructure:
+MAX_DESCRIPTION = 2000          # characters read; the rest is said to have been left out, never silently dropped
+MODEL_BUDGET_SECONDS = 75.0     # one proposal never keeps a person waiting longer than this on the model; the rest is flagged as unclear
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u202a-\u202e\u2066-\u2069\u200b-\u200f\ufeff]")
+
+
+def normalize(description: str) -> tuple[str, bool]:
+    """The description as it is read: one Unicode form, no control or direction-changing characters, tidy spacing, a length the model can take.
+    Returns (text, was_shortened)."""
+    text = unicodedata.normalize("NFC", str(description or ""))
+    text = _CONTROL.sub("", text).replace("\r\n", "\n").replace("\r", "\n")
+    text = "\n".join(" ".join(line.split()) for line in text.split("\n"))
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    if len(text) > MAX_DESCRIPTION:
+        cut = text[:MAX_DESCRIPTION]
+        return (cut[:cut.rfind(" ")] if " " in cut[-60:] else cut).rstrip(), True
+    return text, False
+
+
+class _Budgeted:
+    """The model for one proposal: when its time is used up, every further question comes back unclear and the graph flags it."""
+
+    def __init__(self, llm: LocalLLM, seconds: float) -> None:
+        self._llm, self._until = llm, time.monotonic() + seconds
+        self.out_of_time = False
+
+    @property
+    def available(self) -> bool:
+        return self._llm.available
+
+    def _spent(self) -> bool:
+        if time.monotonic() >= self._until:
+            self.out_of_time = True
+        return self.out_of_time
+
+    async def yes_no(self, question: str, text: str) -> bool | None:
+        return None if self._spent() else await self._llm.yes_no(question, text)
+
+    async def choose(self, question: str, text: str, options: list[str]) -> str | None:
+        return None if self._spent() else await self._llm.choose(question, text, options)
+
+    async def extract(self, what: str, text: str) -> str | None:
+        return None if self._spent() else await self._llm.extract(what, text)
+
+
+async def populate(llm: LocalLLM, description: str, hints: list[Hint] | tuple[Hint, ...] = (), now: datetime | None = None) -> ProposedStructure:
+    """Read a description into targets and a deadline. What the person marked outright (`hints`) is taken as given; patterns settle what they can;
+    the model is asked only about what is left, within a time budget. Nothing is guessed: whatever is still unclear is a flag."""
     out = ProposedStructure()
-    text = description.strip()
-    file_items = await _file_branch(llm, text, out)
-    await _program_branch(llm, text, out, file_items[0] if file_items else None)
-    await _deadline_branch(llm, text, out)
+    text, shortened = normalize(description)
+    if shortened:
+        out.flags.append({"kind": "too_long", "limit": MAX_DESCRIPTION, "detail": f"Only the first {MAX_DESCRIPTION} characters were read."})
+        out.notes.append("the description was longer than could be read; the rest was left out")
+    model = _Budgeted(llm, MODEL_BUDGET_SECONDS)
+    if not llm.available:
+        out.notes.append("the local model is not available: only what patterns and your marks settle was read")
+    files = [h for h in hints if h.kind == "file"]
+    programs = [h for h in hints if h.kind == "program"]
+    folders = [h for h in hints if h.kind == "folder"]
+    deadlines = [h for h in hints if h.kind == "deadline"]
+    file_items = await _file_branch(model, text, out, files, folders)
+    await _program_branch(model, text, out, file_items[0] if file_items else None, programs)
+    await _deadline_branch(model, text, out, deadlines, now)
+    if model.out_of_time:
+        out.notes.append("the model ran out of time for this reading; what it did not answer is marked unclear")
     _multitask_branch(text, out, file_items)
     # A target whose Intent could not be settled is still a target -- "nothing was found" would
     # be a different and wrong thing to tell the assigner.
@@ -267,16 +330,28 @@ def _unclear(out: ProposedStructure, question: str, *, target: str | None = None
     out.flags.append(flag)
 
 
-async def _file_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> list[VerificationItem]:
-    names = find_file_names(text)
+async def _file_branch(llm: LocalLLM, text: str, out: ProposedStructure, hints: list[Hint] = (),
+                       folders: list[Hint] = ()) -> list[VerificationItem]:  # type: ignore[assignment]
+    by_hint = {h.name.lower(): h for h in hints}
+    names = [h.name for h in hints]                                   # what the person marked is a target, whether or not a pattern would have found it
+    found_by = {n.lower(): "hint" for n in names}
+    for n in find_file_names(text):
+        if n.lower() not in found_by:
+            names.append(n)
+            found_by[n.lower()] = "rule"
     if not names:
         # Fallback: ask, but accept only a real file token that is in the text.
         guess = _verbatim(await llm.extract("the file name that the task is about", text), text)
         if guess and FILE_RE.fullmatch(guess):
             names = [guess]
+            found_by[guess.lower()] = "model"
     items: list[VerificationItem] = []
     for name in names:
-        intent = file_intent_cue(text, name)
+        hint = by_hint.get(name.lower())
+        intent, intent_by = (hint.intent, "hint") if hint and hint.intent else (None, "")
+        if intent is None:
+            intent = file_intent_cue(text, name)
+            intent_by = "rule"
         if intent is None:
             q = f"For the file {name}, does the task ask to:"
             choice = await llm.choose(q, text, list(FILE_INTENT_OPTIONS))
@@ -284,16 +359,23 @@ async def _file_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> list
                 _unclear(out, f"{q} {' / '.join(FILE_INTENT_OPTIONS)}",
                          target=name, options=list(FILE_INTENT_OPTIONS.values()))
                 continue
-            intent = FILE_INTENT_OPTIONS[choice]
-        path = find_path(text, name) if intent == "create" else None
-        item = VerificationItem(target_type="file", intent=intent, name=name, path=path)
+            intent, intent_by = FILE_INTENT_OPTIONS[choice], "model"
+        path = (hint.path if hint and hint.path else None)
+        if path is None and intent == "create":
+            path = find_path(text, name) or (folders[0].path if folders else None)
+        item = VerificationItem(target_type="file", intent=intent, name=name, path=path, file_index_id=hint.file_index_id if hint else None,
+                                source=found_by[name.lower()], intent_by=intent_by)
         out.items.append(item)
         items.append(item)
     return items
 
 
 async def _program_branch(llm: LocalLLM, text: str, out: ProposedStructure,
-                          file_item: VerificationItem | None) -> None:
+                          file_item: VerificationItem | None, hints: list[Hint] = ()) -> None:  # type: ignore[assignment]
+    if hints:                                                       # the person named the programs: nothing to find, and the model is not asked to
+        for h in hints:
+            await _one_program(llm, text, out, file_item, h.name, forced=h.intent, source="hint")
+        return
     for name in await _program_names(llm, text, out):
         await _one_program(llm, text, out, file_item, name)
 
@@ -324,8 +406,9 @@ async def _program_names(llm: LocalLLM, text: str, out: ProposedStructure) -> li
 
 
 async def _one_program(llm: LocalLLM, text: str, out: ProposedStructure,
-                       file_item: VerificationItem | None, name: str) -> None:
-    intent = program_intent_cue(text, name)
+                       file_item: VerificationItem | None, name: str, *, forced: str | None = None, source: str = "rule") -> None:
+    intent = forced or program_intent_cue(text, name)
+    intent_by = "hint" if forced else "rule"
     if intent is None:
         q = f"What should happen with the program {name}?"
         choice = await llm.choose(q, text, list(PROGRAM_INTENT_OPTIONS))
@@ -334,7 +417,8 @@ async def _one_program(llm: LocalLLM, text: str, out: ProposedStructure,
                      target=name, options=list(PROGRAM_INTENT_OPTIONS.values()))
             return
         intent = PROGRAM_INTENT_OPTIONS[choice]
-    if intent == "used" and file_item is not None and mentions_use_on_file(text):
+        intent_by = "model"
+    if intent == "used" and file_item is not None and mentions_use_on_file(text) and not forced:
         intent = "used_with_file"  # "use X to update Y" ties the program to the file
     if intent == "used_with_file":
         if file_item is None:
@@ -342,12 +426,42 @@ async def _one_program(llm: LocalLLM, text: str, out: ProposedStructure,
                               "detail": f"{name} is to be used on a file, but no file target was found"})
             return
         out.items.append(VerificationItem(target_type="program", intent=intent, name=name,
-                                          linked_item_index=out.items.index(file_item)))
+                                          linked_item_index=out.items.index(file_item), source=source, intent_by=intent_by))
         return
-    out.items.append(VerificationItem(target_type="program", intent=intent, name=name))
+    out.items.append(VerificationItem(target_type="program", intent=intent, name=name, source=source, intent_by=intent_by))
 
 
-async def _deadline_branch(llm: LocalLLM, text: str, out: ProposedStructure) -> None:
+def _set_deadline(out: ProposedStructure, role: str, phrase: str, at: str | None, said: str | None) -> None:
+    if role == "soft":
+        out.soft_deadline, out.soft_deadline_at, out.soft_said = phrase, at, said
+    else:
+        out.final_deadline, out.final_deadline_at, out.final_said = phrase, at, said
+
+
+async def _deadline_branch(llm: LocalLLM, text: str, out: ProposedStructure, hints: list[Hint] = (),  # type: ignore[assignment]
+                           now: datetime | None = None) -> None:
+    for h in hints:                                              # a time the person set is the deadline: no finding, no flag
+        _set_deadline(out, h.role or "final", h.when.said, h.when.at.isoformat(), h.when.said)  # type: ignore[union-attr]
+        out.deadline_source = "hint"
+    if any(h.role in (None, "final") for h in hints):
+        return
+    await _found_deadline(llm, text, out, now)
+
+
+async def _found_deadline(llm: LocalLLM, text: str, out: ProposedStructure, now: datetime | None) -> None:
+    await _deadline_phrase(llm, text, out)
+    phrase = out.final_deadline
+    if phrase and now is not None:
+        when = resolve(phrase, now)
+        if when:
+            out.final_deadline_at, out.final_said = when.at.isoformat(), when.said
+        else:
+            out.flags.append({"kind": "unresolved_deadline", "phrase": phrase, "detail": f"“{phrase}” — {when.why}."})
+    if phrase:
+        out.deadline_source = out.deadline_source or "rule"
+
+
+async def _deadline_phrase(llm: LocalLLM, text: str, out: ProposedStructure) -> None:
     phrases = find_deadlines(text)
     if not phrases:
         guess = _verbatim(await llm.extract("the deadline phrase saying when the task must be done", text), text)

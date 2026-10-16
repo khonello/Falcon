@@ -53,6 +53,7 @@ class FlowSync:
         self.hash_limit = hash_limit
         self.written_hashes: dict[str, str] = {}  # path -> sha256 of our last write
         self._arriving: dict[tuple[str, int], dict[int, bytes]] = {}      # chunks of a file on its way in
+        self._hashes: dict[str, tuple[int, int, str | None]] = {}          # path -> (size, mtime_ns, hash) of what a listing last read
 
     async def on_read(self, payload: dict[str, Any]) -> None:
         transfer_id, path = payload["transfer_id"], Path(payload["path"])
@@ -84,7 +85,14 @@ class FlowSync:
                 for name in files:
                     f = Path(dirpath) / name
                     try:
-                        digest = hash_of(f, self.hash_limit)
+                        st = f.stat()
+                        cached = self._hashes.get(str(f))
+                        if cached and cached[0] == st.st_size and cached[1] == st.st_mtime_ns:
+                            digest = cached[2]                    # unchanged since it was last listed: not read again (a listing is asked for often)
+                        else:
+                            digest = hash_of(f, self.hash_limit)
+                            if len(self._hashes) < 200_000:
+                                self._hashes[str(f)] = (st.st_size, st.st_mtime_ns, digest)
                     except OSError:
                         continue                                  # locked or gone: it will come with its own event
                     found.append({"relative_path": str(f.relative_to(root)).replace("\\", "/"), "hash": digest})
@@ -113,6 +121,7 @@ class FlowSync:
             for stage in payload.get("stages") or []:
                 target, data = self._apply_stage(stage, target, data)
             target.parent.mkdir(parents=True, exist_ok=True)
+            preserved = await asyncio.to_thread(self._preserve_unknown, target, data, payload.get("previous"))
             await asyncio.to_thread(target.write_bytes, data)
         except StageError as exc:
             await self.report("flow.sync_result", {"transfer_id": transfer_id, "destination_id": dest_id,
@@ -130,8 +139,33 @@ class FlowSync:
             return
         digest = hashlib.sha256(data).hexdigest()
         self.written_hashes[str(target)] = digest
-        await self.report("flow.sync_result", {"transfer_id": transfer_id, "destination_id": dest_id,
-                                               "status": "success", "written_hash": digest, "written_path": str(target)})
+        result = {"transfer_id": transfer_id, "destination_id": dest_id, "status": "success", "written_hash": digest, "written_path": str(target)}
+        if preserved:
+            result["preserved"] = str(preserved)
+        await self.report("flow.sync_result", result)
+
+    @staticmethod
+    def _preserve_unknown(target: Path, data: bytes, previous: dict[str, Any] | None) -> Path | None:
+        """Whatever is already at the place a flow is about to write is either (a) what the flow wrote last time and nobody touched, (b) already
+        the very content about to be written, or (c) something the flow did not write: someone's own file, or an edit. Only (c) is kept, beside the
+        new file as `<name>-modified.<ext>`, so a flow can never silently overwrite a person's file. Returns where it was kept."""
+        if not target.is_file():
+            return None
+        try:
+            now = hash_of(target, 1 << 62)
+        except OSError:
+            return None
+        if now == hashlib.sha256(data).hexdigest():
+            return None                                                    # already exactly this
+        if previous and previous.get("hash") and now == previous["hash"] and _same_path(str(previous.get("path") or ""), str(target)):
+            return None                                                    # the flow's own earlier write, untouched since
+        kept = target.with_name(f"{target.stem}-modified{target.suffix}")
+        n = 2
+        while kept.exists():
+            kept = target.with_name(f"{target.stem}-modified-{n}{target.suffix}")
+            n += 1
+        os.replace(target, kept)
+        return kept
 
     async def on_resolve_conflict(self, payload: dict[str, Any]) -> None:
         src, dst = Path(str(payload["path"])), Path(str(payload["rename_to"]))
@@ -166,6 +200,10 @@ class FlowSync:
             folder = target.suffix.lower().lstrip(".") or "other"
             return target.parent / folder / target.name, data
         return target, data
+
+
+def _same_path(a: str, b: str) -> bool:
+    return a.replace("\\", "/").lower() == b.replace("\\", "/").lower()
 
 
 def hash_of(path: Path, limit: int) -> str | None:

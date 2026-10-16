@@ -19,6 +19,7 @@ from typing import Any
 
 from engine.console.feed import describe_many
 from engine.dispatch import Context, handler
+from engine.isotime import parse_iso
 from engine.permissions import int_field, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
@@ -75,10 +76,10 @@ async def deviations_list(ctx: Context, payload: dict[str, Any]) -> dict[str, An
                 and (not payload.get("rule_id") or d["rule"]["id"] == payload["rule_id"])]
     if payload.get("day"):
         try:
-            day = datetime.fromisoformat(str(payload["day"])).date()
+            day = parse_iso(str(payload["day"])).date()
         except ValueError as exc:
             raise ProtocolError(ErrorCode.INVALID, "day must be an ISO date") from exc
-        narrowed = [d for d in narrowed if datetime.fromisoformat(d["at"]).astimezone(timezone.utc).date() == day]
+        narrowed = [d for d in narrowed if parse_iso(d["at"]).astimezone(timezone.utc).date() == day]
     by_kind = {k: sum(1 for d in everything if d["kind"] == k and d["outcome"] == "open") for k in KINDS}
     by_rule: dict[int, dict[str, Any]] = {}
     for d in everything:

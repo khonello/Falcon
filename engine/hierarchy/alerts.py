@@ -12,10 +12,10 @@ Scheduler. Every alert is audited; delivery is a push plus the alert list.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from engine.dispatch import Context, handler
+from engine.isotime import parse_iso
 from engine.permissions import (
     int_field,
     require_account,
@@ -58,7 +58,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     deliver_at = None
     if payload.get("deliver_at"):
         try:
-            deliver_at = datetime.fromisoformat(str(payload["deliver_at"]))
+            deliver_at = parse_iso(str(payload["deliver_at"]))
         except ValueError as exc:
             raise ProtocolError(ErrorCode.INVALID, "deliver_at must be ISO 8601") from exc
     alert_id = await ctx.engine.db.alerts.create(

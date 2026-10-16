@@ -163,6 +163,20 @@ async def index_event(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"accepted": True, "file_index_id": file_index_id}
 
 
+@handler("index.catchup")
+async def index_catchup(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"events": [{op, path, name, hash?}]}: what changed on this machine while the Engine was not listening (it was off, the network was down, the
+    service was restarting), found by the Worker comparing its folders with what the Engine was last told. Each is ingested exactly as if it had
+    arrived live, so Flow, Restricted and Task react to it as they would have."""
+    pc_id = _pc_id(ctx, payload)
+    events = (payload.get("events") or [])[:500]
+    for ev in events:
+        await ctx.engine.file_index.ingest_event(pc_id, ev)
+    if events:
+        await ctx.engine.audit.record(ctx, "index.caught_up", target_type="pcs", target_id=pc_id, pc_id=pc_id, detail={"events": len(events), "sample": [str(e.get("path")) for e in events[:5]]})
+    return {"accepted": len(events)}
+
+
 @handler("index.sweep_batch")
 async def index_sweep_batch(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     n = await ctx.engine.file_index.ingest_sweep_batch(_pc_id(ctx, payload), payload.get("entries") or [], first=bool(payload.get("first")))

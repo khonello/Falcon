@@ -72,8 +72,11 @@ Page {
         var one = {
             title: text.trim().split(/[.\n]/)[0].slice(0, 80), titleSrc: "rule", phrase: text.trim(),
             who: foundPerson.name, whoAccount: foundPerson.account, whoSrc: confirmedPerson ? "you" : "rule",
-            final: fin ? fin.v : r.final_deadline || null, finalSrc: fin ? "you" : r.final_deadline ? ((r.flags || []).indexOf("deadline_ambiguous") >= 0 ? "input" : "rule") : "none",
-            soft: soft ? soft.v : r.soft_deadline || null, softSrc: soft ? "you" : r.soft_deadline ? "rule" : "none",
+            // the Engine finds a deadline as the words in the text ("by tomorrow evening"); the task needs a time. Put in a time here, or say it is still
+            // needed: never send the words on as if they were one (the Engine refuses them, and the person would see only "must be ISO 8601")
+            final: fin ? fin.v : page.whenOf(r.final_deadline),
+            finalSrc: fin ? "you" : r.final_deadline ? (page.whenOf(r.final_deadline) && !(r.flags || []).some(function (f) { return f.kind === "ambiguous_deadline" }) ? "rule" : "input") : "none",
+            soft: soft ? soft.v : page.whenOf(r.soft_deadline), softSrc: soft ? "you" : r.soft_deadline ? (page.whenOf(r.soft_deadline) ? "rule" : "input") : "none",
             none: false, checks: checks
         }
         var out = [one]
@@ -86,6 +89,7 @@ Page {
         tasks = out
         cur = 0
     }
+    function whenOf(phrase) { if (!phrase) return null; var t = smart.parseDate(String(phrase)); return t ? t.toISOString() : null }
     function patch(i, f) { var t = tasks.slice(); t[i] = Object.assign({}, t[i], f); tasks = t }
     function patchCheck(i, k, f) {
         var cs = tasks[i].checks.slice(); cs[k] = Object.assign({}, cs[k], f, { src: "you", why: "Set by you" })

@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from engine.dispatch import Context, Identity, handler
+from engine.isotime import parse_iso
 from protocol import ErrorCode, ProtocolError
 
 log = logging.getLogger(__name__)
@@ -136,7 +137,7 @@ async def _remember_agent(ctx: Context, payload: dict[str, Any]) -> None:
     started = None
     try:
         raw = payload.get("started_at")
-        started = datetime.fromisoformat(str(raw)) if raw else None
+        started = parse_iso(str(raw)) if raw else None
     except ValueError:
         started = None
     await ctx.engine.db.accounts.set_agent(pc_id, ip=str(peer[0]) if peer else None,

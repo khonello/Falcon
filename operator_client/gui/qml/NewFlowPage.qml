@@ -96,7 +96,20 @@ Page {
         var payload = { destinations: ds, stages: p.stages }
         if (page.editId) payload.flow_id = page.editId
         else { payload.source_pc_id = src.pc; payload.source_path = src.path }
+        page.send(payload)
+    }
+    // Files already in a destination are surfaced, never overwritten or accepted silently (flow-natural-combo.md, Pre-Flight Collision Check): the Engine
+    // refuses until the creator says it is intended, and the flow itself never overwrites a file it did not write -- the Worker keeps it beside the new one
+    // as <name>-modified. So the question here is a real one, with its consequence told.
+    function send(payload) {
         falcon.call(page.editId ? "flow.edit" : "flow.create", payload, function (ok, r) {
+            if (!ok && r && r.code === "conflict" && /collides with existing content/.test(r.message || "") && !payload.confirm_collisions) {
+                var what = String(r.message).replace(/^.*existing content:\s*/, "").replace(/\s*--.*$/, "")
+                confirm.ask({ title: "Files are already in the destination", ok: "Create anyway", cancel: "Choose another folder",
+                              text: what + ". Nothing there is overwritten or deleted: where a file has the same name, the existing one is kept beside the new one as name-modified, and you are told." },
+                            function () { payload.confirm_collisions = true; page.send(payload) })
+                return
+            }
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not saved"); return }
             Msg.ok(page.editId ? "Saved · checks passed, recorded in the audit log" : r.consent_pending ? "Flow created · the owner is asked to agree" : "Flow created and running")
             Nav.go("flows")
