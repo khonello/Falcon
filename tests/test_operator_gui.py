@@ -242,9 +242,9 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
     return win.findChild(QObject, name)
 
 
-ADMIN_MENU = ["overview", "messages", "tasks", "restricted", "flows", "detective", "machines", "sessions", "issues",
+ADMIN_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "machines", "sessions", "issues",
               "automation", "actions", "rollout", "audit", "reports"]
-SU_MENU = ["overview", "messages", "tasks", "restricted", "flows", "detective", "departments", "accountability", "access",
+SU_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "departments", "accountability", "access",
            "registry", "reports", "rules", "rollout", "audit"]
 
 

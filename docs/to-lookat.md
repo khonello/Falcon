@@ -102,4 +102,4 @@ Last updated 13 Oct 2026.
 ## Messages now holds announcements; Detective is a blank page (16 Oct 2026)
 
 - Announcements are a second side of **Messages** (a "Conversations | Announcements" switch at the top of both), no longer a menu item. The compose form offers two kinds, Announcement and Emergency (the Engine still supports Warning). The palette has "New announcement".
-- **Detective** is in the Core menu at both levels as an empty page, only so the menu can be decided. Menu organisation is open: see the suggestion made in the conversation (Overview + Messages on their own, then the four: Tasks, Flows, Restricted, Detective).
+- **Detective** is in the Core menu at both levels as an empty page, only so the menu can be decided. Menu decided: **Home** (Overview, Messages), **Core** (Tasks, Flows, Restricted, Detective), then the rest.
