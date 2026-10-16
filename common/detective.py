@@ -35,7 +35,8 @@ BEHAVIOUR_WORDS = {"concealment": "Concealment", "collection": "Collection", "ex
                    "evasion": "Evasion", "sabotage": "Sabotage", "reach": "Reach"}
 
 # the order a taking-out usually runs in, so a case can say how far along it is and what usually follows
-ARC_STAGES = (("Reaching", ("reach",)), ("Gathering", ("collection",)), ("Hiding", ("concealment",)), ("Taking out", ("exfiltration", "capture")), ("Covering up", ("erasure",)))
+ARC_STAGES = (("Reaching", ("reach",)), ("Gathering", ("collection",)), ("Hiding", ("concealment",)), ("Taking out", ("exfiltration", "capture")),
+              ("Covering up", ("erasure", "evasion")))
 
 NOTED, CASE, URGENT = 0.35, 0.60, 0.85       # weights: kept quietly; shown as a case; shown first and to the Super User as well
 
@@ -50,6 +51,10 @@ ARCHIVE_EXT = {"zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "cab"}
 _DOUBLE = re.compile(r"\.(docx?|xlsx?|pdf|pptx?|csv|txt)\.(exe|scr|dll|js|vbs|bat|tmp|dat|sys)$", re.IGNORECASE)
 _SYSTEM_DIRS = ("\\windows\\", "\\program files", "\\programdata\\", "\\appdata\\", "\\temp\\", "\\$recycle.bin\\", "\\system volume information\\",
                 "/windows/", "/programdata/", "/tmp/", "/var/", "/proc/", "/etc/")
+
+# programs whose job is to take a picture or a recording of the screen: a person using one while working on restricted files is taking the information without the file
+CAPTURE_TOOLS = ("snippingtool.exe", "screenclippinghost.exe", "snip.exe", "sharex.exe", "lightshot.exe", "greenshot.exe", "snagit32.exe", "snagiteditor.exe",
+                 "screenpresso.exe", "bandicam.exe", "camtasia.exe", "obs64.exe", "picpick.exe", "flameshot.exe")
 
 # programs that move data around for a living: they lower a taking-out finding (a backup is not a theft) unless something else says otherwise
 USUAL_MOVERS = ("robocopy", "backup", "veeam", "acronis", "syncthing", "onedrive", "dropbox", "rsync", "7zg", "windowssearch")
@@ -187,6 +192,8 @@ class Case:
             return "Covering up" if "erasure" in b else "Slipping the watch"
         if "concealment" in b and "erasure" in b:
             return "Covering up"
+        if "capture" in b:
+            return "Copying what is on screen"
         if "collection" in b:
             return "Gathering"
         if "reach" in b:
@@ -302,6 +309,10 @@ def graph_of(sigs: list[Sig]) -> dict[str, Any]:
             node("dev:" + (e.device or e.path), f"Drive {(e.device or e.path).rstrip(chr(92))}", 3, "drive", e.at)
         elif e.verb == "cleared":
             node("trace:" + str(e.info.get("what") or "history"), f"cleared {e.info.get('what') or 'a history'}", 4, "trace", e.at)
+        elif e.verb == "launched":
+            node("trace:launched:" + e.program.lower(), f"started {e.program}" + (f" ({n} times)" if n > 1 else ""), 4, "trace", e.at, n)
+        elif e.verb == "silent":
+            node("trace:silent", "stopped reporting", 4, "trace", e.at)
         elif e.verb in ("hid", "unhid"):
             badge(place(e.path, 1, e.at, run), "hidden" if e.verb == "hid" else "visible")
         elif e.verb == "deleted":
@@ -459,6 +470,12 @@ class Detective:
             found.append(self._mass_removal(m, s))
         if s.verb == "cleared":
             found.append(self._history_cleared(m, s))
+        if s.verb == "launched":
+            found.append(self._capture_tool(m, s))
+        if s.verb == "silent":
+            found.append(self._went_silent(m, s))
+        if s.verb in ("renamed", "modified", "deleted"):
+            found.append(self._wrecking(m, s))
         if s.verb == "opened":
             found.append(self._outside_role(m, s))
         return [f for f in found if f is not None]
@@ -589,8 +606,64 @@ class Detective:
                        "a clean-up script or an application removing its own files", [f"{len(dels)} deletions in two minutes"])
 
     def _history_cleared(self, m: Memory, s: Sig) -> Finding:
-        return Finding("erasure", "history_cleared", s.at, s.pc, 0.40, frozenset(), f"{s.info.get('what') or 'a history'} was cleared", [s],
-                       "routine housekeeping", ["a history was cleared"])
+        is_log = "log" in str(s.info.get("what") or "").lower()
+        return Finding("erasure", "history_cleared", s.at, s.pc, 0.55 if is_log else 0.40, frozenset(), f"{s.info.get('what') or 'a history'} was cleared", [s],
+                       "an administrator clearing a log on purpose" if is_log else "routine housekeeping", ["the machine's own record of what happened was cleared" if is_log else "a history was cleared"])
+
+    def _capture_tool(self, m: Memory, s: Sig) -> Finding | None:
+        if not any(t in s.program.lower() for t in CAPTURE_TOOLS):
+            return None
+        lo = s.at - 10 * 60
+        working = [x for x in m.since(lo) if "restricted" in x.tags and x.verb not in ("attached", "detached")]
+        again = [x for x in m.since(s.at - 30 * 60, "launched") if x is not s and any(t in x.program.lower() for t in CAPTURE_TOOLS)]
+        w, why = 0.22, [f"{s.program} was started"]
+        if working:
+            w += 0.30
+            why.append("restricted files were being worked on just before")
+        if again:
+            w += 0.10 * min(3, len(again))
+            why.append("it has been started again and again")
+        return Finding("capture", "capture_tool", s.at, s.pc, w, frozenset({x.thing or x.path for x in working}), f"{s.program} was started while restricted files were open" if working
+                       else f"{s.program} was started", working[-6:] + [s], "someone capturing their own work, or documenting a problem for support", why)
+
+    def _went_silent(self, m: Memory, s: Sig) -> Finding | None:
+        """A machine that stops reporting while still switched on, right after something worth a look happened on it: the watch is being slipped."""
+        recent = [c for c in self.cases if c.pc == s.pc and s.at - c.last_at <= 60 * 60 and c.weight >= NOTED]
+        if not recent:
+            return None
+        top = max(recent, key=lambda c: c.weight)
+        w = 0.30 + (0.20 if top.level in ("case", "urgent") else 0.0)
+        return Finding("evasion", "went_silent", s.at, s.pc, w, frozenset(top.things), "the machine stopped reporting while a case was open on it", [s],
+                       "a laptop closed, a power cut or a network fault", [f"a case ({top.intent.lower()}) was open on it"])
+
+    def _wrecking(self, m: Memory, s: Sig) -> Finding | None:
+        """Files being destroyed or scrambled in bulk by a program, not a person: many documents deleted, renamed to one odd ending, or rewritten in two minutes."""
+        if ext_of(s.path) not in DOC_EXT and s.verb != "renamed":
+            return None
+        lo = s.at - 120
+        burst = [x for x in m.since(lo, s.verb) if x.by != "hand"]
+        if s.verb == "renamed":
+            ends = {}
+            for x in burst:
+                if ext_of(x.old) in DOC_EXT and ext_of(x.path) not in DOC_EXT:
+                    ends.setdefault(ext_of(x.path), []).append(x)
+            if not ends:
+                return None
+            ending, same = max(ends.items(), key=lambda kv: len(kv[1]))
+            if len(same) < 10:
+                return None
+            graph, summary = "scrambled_names", f"{len(same)} documents were renamed to end in .{ending} in two minutes, not by hand"
+            hits = same
+        else:
+            hits = [x for x in burst if ext_of(x.path) in DOC_EXT]
+            if len(hits) < 40:
+                return None
+            graph = "bulk_destroyed" if s.verb == "deleted" else "bulk_rewritten"
+            summary = f"{len(hits)} documents were {'deleted' if s.verb == 'deleted' else 'rewritten'} in two minutes, not by hand"
+        if any(f.graph == graph and s.at - f.at < 120 and len(f.things) + 19 >= len(hits) for c in self.cases if c.pc == s.pc for f in c.findings):
+            return None                                           # one finding per burst, said again only when it has grown a great deal
+        return Finding("sabotage", graph, s.at, s.pc, 0.60 + min(0.25, 0.01 * (len(hits) - 10)), frozenset({x.thing or x.path for x in hits}), summary, hits[-200:],
+                       "a deliberate clean-up, a migration tool or a conversion", [f"{len(hits)} files in two minutes by a program"])
 
     def _outside_role(self, m: Memory, s: Sig) -> Finding | None:
         lo = s.at - 20 * 60

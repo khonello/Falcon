@@ -28,7 +28,7 @@ INTERVAL_SECONDS = 3.0           # how often to look when Windows cannot tell us
 SAFETY_SECONDS = 30.0            # with native notifications the look is only a safety net
 SETTLE_SECONDS = 0.5             # a moment after Windows says "changed", for the drive list to catch up
 WATCHED = ("usb.inserted", "usb.removed", "network.connected", "network.disconnected",
-           "program.launched", "program.exited", "user.login", "user.logout")
+           "program.launched", "program.exited", "user.login", "user.logout", "log.cleared")
 
 
 def _psutil() -> Any:
@@ -99,6 +99,42 @@ def volume_identity(mount: str) -> dict[str, str]:
     if not ok:
         return {}
     return {"serial": f"{serial.value >> 16:04X}-{serial.value & 0xFFFF:04X}", "label": label.value}
+
+
+_LOGS = (("Security", 1102), ("System", 104))                 # "the audit log was cleared" and "the System log was cleared"
+_log_cache: tuple[float, dict[str, str]] = (0.0, {})
+LOG_LOOK_SECONDS = 30.0
+
+
+def event_logs() -> dict[str, str]:
+    """When each of the machine's own logs was last cleared (the newest clearing record), as the log says it. Windows only; looked at every half minute at most
+    (it asks the system tool, which is not free). A log nobody can read here (no rights) is simply absent."""
+    global _log_cache
+    import re
+    import subprocess
+    import time
+
+    if os.name != "nt":
+        return {}
+    now = time.monotonic()
+    if now - _log_cache[0] < LOG_LOOK_SECONDS:
+        return _log_cache[1]
+    out: dict[str, str] = {}
+    for name, event_id in _LOGS:
+        try:
+            done = subprocess.run(["wevtutil", "qe", name, f"/q:*[System[(EventID={event_id})]]", "/c:1", "/rd:true", "/f:xml"], capture_output=True, text=True,
+                                  timeout=10, check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except (OSError, subprocess.SubprocessError):
+            continue
+        hit = re.search(r"SystemTime='([^']+)'", done.stdout or "")
+        if hit:
+            out[name] = hit.group(1)
+    _log_cache = (now, out)
+    return out
+
+
+def diff_logs(before: dict[str, str], after: dict[str, str]) -> list[tuple[str, dict[str, Any]]]:
+    return [("log.cleared", {"log": name, "at": at}) for name, at in sorted(after.items()) if before.get(name) != at]
 
 
 def diff_drives(before: dict[str, str], after: dict[str, str], identify: Callable[[str], dict[str, str]] = volume_identity) -> list[tuple[str, dict[str, Any]]]:
@@ -226,7 +262,8 @@ class OsSignals:
         return {"drives": ("usb.inserted", "usb.removed"),
                 "network": ("network.connected", "network.disconnected"),
                 "programs": ("program.launched", "program.exited"),
-                "sessions": ("user.login", "user.logout")}
+                "sessions": ("user.login", "user.logout"),
+                "logs": ("log.cleared",)}
 
     def wanted(self, etype: str, data: dict[str, Any]) -> bool:
         """Some automation here waits for this signal. A program match is applied here, by the same rule
@@ -240,7 +277,7 @@ class OsSignals:
     async def tick(self) -> int:
         """One comparison pass; returns how many signals were sent."""
         readers = {"drives": (drives, diff_drives), "network": (interfaces, diff_interfaces),
-                   "programs": (programs, diff_programs), "sessions": (sessions, diff_sessions)}
+                   "programs": (programs, diff_programs), "sessions": (sessions, diff_sessions), "logs": (event_logs, diff_logs)}
         sent = 0
         for group, types in self._groups().items():
             if not any(t in self.interest for t in types):

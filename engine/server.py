@@ -208,6 +208,13 @@ class Engine:
             return                                  # another connection from the same machine is still up
         if self.db.connected:
             await self.db.accounts.touch_pc(ident.pc_id)
+        if not online and self.settings.detective:
+            from engine import detective
+
+            try:
+                await detective.on_presence(self, ident.pc_id, False)
+            except Exception:
+                log.exception("detective: could not weigh pc %s going quiet", ident.pc_id)
         if online:
             from engine.flow import sync as flow_sync
 

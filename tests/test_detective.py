@@ -201,3 +201,47 @@ def test_a_graph_of_nothing_is_empty_and_the_evidence_survives_a_round_trip():
     before = det.open_cases()[0].graph()
     sigs = [sig_from_dict(sig_to_dict(e)) for f in det.open_cases()[0].findings for e in f.evidence]
     assert {n["label"] for n in graph_of(sigs)["nodes"]} == {n["label"] for n in before["nodes"]}
+
+
+def test_a_screenshot_tool_while_restricted_files_are_open_is_capture_and_alone_it_is_nothing():
+    det, updates = play(SCENARIOS["screenshots"]())
+    (case,) = det.open_cases()
+    assert case.behaviours == {"capture"} and case.intent == "Copying what is on screen" and case.level == "case"
+    assert [u.now for u in updates] == ["noted", "case"] and updates[-1].raised                      # the second start, five minutes on, is what makes it a case
+    det2, _ = play(SCENARIOS["screenshot_of_nothing"]())
+    assert all(c.level == "quiet" for c in det2.cases)
+
+
+def test_a_machine_that_goes_quiet_matters_only_when_something_was_already_wrong_on_it():
+    det, _ = play(SCENARIOS["goes_dark"]())
+    (case,) = det.open_cases()
+    assert "evasion" in case.behaviours and case.level == "urgent" and case.stage[1] == "Covering up"
+    assert any("stopped reporting" in line for line in case.story())
+    det2, updates = play(SCENARIOS["laptop_lid"]())
+    assert det2.cases == [] and updates == []                                                         # a closed laptop is not a finding
+
+
+def test_documents_scrambled_or_destroyed_in_bulk_by_a_program_are_sabotage_and_by_hand_they_are_not():
+    det, updates = play(SCENARIOS["ransom"]())
+    (case,) = det.open_cases()
+    assert case.intent == "Wrecking things" and case.behaviours == {"sabotage"} and case.level == "urgent"
+    assert [u.raised for u in updates] == [True, True] and "locked" in case.headline()                # raised at ten, and again when it had grown to thirty
+    det2, _ = play(SCENARIOS["wiped"]())
+    assert det2.open_cases()[0].intent == "Wrecking things" and "sabotage" in det2.open_cases()[0].behaviours
+    det3, up3 = play(SCENARIOS["big_clean_up_by_hand"]())
+    assert det3.cases == [] and up3 == []                                                             # sixty deletions by a person's own hands: tidying up
+
+
+def test_clearing_the_machine_s_own_log_is_telling_on_its_own():
+    det, updates = play(SCENARIOS["log_cleared"]())
+    (case,) = det.open_cases()
+    assert case.intent == "Covering up" and case.level == "case" and updates[0].raised
+    assert "innocent" and "administrator clearing a log" in case.findings[0].innocent
+
+
+def test_the_picture_shows_a_started_tool_and_a_machine_going_quiet_as_traces():
+    det, _ = play(SCENARIOS["screenshots"]())
+    labels = {n["label"]: n["col"] for n in det.open_cases()[0].graph()["nodes"]}
+    assert labels["payroll-q3.xlsx"] == 0 and any(label.startswith("started snippingtool.exe") and col == 4 for label, col in labels.items())
+    det2, _ = play(SCENARIOS["goes_dark"]())
+    assert {n["label"] for n in det2.open_cases()[0].graph()["nodes"]} >= {"stopped reporting"}

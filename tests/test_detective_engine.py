@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from engine import detective
 from tests.conftest import requires_db
 
@@ -192,3 +194,57 @@ async def test_a_real_file_made_hidden_on_a_watched_machine_reaches_detective(en
         assert cases and cases[0]["intent"] == "Hiding something"
     finally:
         await svc.stop()
+
+
+async def test_what_a_machine_is_asked_to_watch_for_includes_drives_logs_and_screenshot_tools(engine, org, connect):
+    from common.detective import CAPTURE_TOOLS
+
+    w1 = await connect("cid-w1")
+    interest = (await w1.ok("control.signal_interest"))["interest"]
+    assert interest["usb.inserted"] == [{}] and interest["log.cleared"] == [{}]
+    assert {m["process"] for m in interest["program.launched"]} == set(CAPTURE_TOOLS)
+
+
+async def test_a_screenshot_tool_a_cleared_log_and_a_machine_going_quiet_reach_detective(engine, org, connect):
+    su, w1 = await connect("cid-su"), await connect("cid-w1")
+    pc = org["w1_pc"]
+    await engine.file_index.ingest_event(pc, ev("modify", r"C:\Finance\Payroll\q3.xlsx", hash="h-q3", tag="restricted", witness={"by": "hand", "front": "excel.exe"}))
+    await engine.file_index.ingest_event(pc, ev("create", r"C:\Finance\Payroll\q3b.xlsx", hash="h-q3b", tag="restricted", witness={"by": "hand", "front": "excel.exe"}))
+    for _ in range(2):
+        await w1.ok("control.signal", {"type": "program.launched", "data": {"process": "SnippingTool.exe"}})
+    await w1.ok("control.signal", {"type": "program.launched", "data": {"process": "notepad.exe"}})                    # not a capture tool: nothing
+    (case,) = (await su.ok("detective.cases", {"include_noted": True}))["cases"]
+    assert case["behaviours"] == ["capture"] and case["intent"] == "Copying what is on screen"
+    await w1.ok("control.signal", {"type": "log.cleared", "data": {"log": "Security", "at": "2026-10-16T01:00:00Z"}})
+    again = (await su.ok("detective.cases", {"include_noted": True}))["cases"]
+    assert len(again) == 1 and set(again[0]["behaviours"]) == {"capture", "erasure"}                                   # the same sitting: one case, graver
+    await w1.close()                                                                                                    # the machine stops reporting
+    for _ in range(50):
+        got = (await su.ok("detective.cases", {"include_noted": True}))["cases"]
+        if "evasion" in got[0]["behaviours"]:
+            break
+        await asyncio.sleep(0.1)
+    assert "evasion" in got[0]["behaviours"] and got[0]["level"] in ("case", "urgent")
+
+
+async def test_a_machine_going_quiet_with_nothing_wrong_on_it_is_not_a_finding(engine, org, connect):
+    su, w2 = await connect("cid-su"), await connect("cid-w2")
+    await w2.close()
+    await asyncio.sleep(0.5)
+    assert (await su.ok("detective.cases", {"include_noted": True}))["cases"] == []
+
+
+def test_the_logs_a_machine_clears_are_read_from_its_own_event_log(monkeypatch):
+    import subprocess
+    from types import SimpleNamespace
+
+    from worker_client import ossignals
+
+    xml = "<Event><System><EventID>1102</EventID><TimeCreated SystemTime='2026-10-16T01:02:03.456Z'/></System></Event>"
+    monkeypatch.setattr(ossignals.os, "name", "nt")
+    monkeypatch.setattr(ossignals, "_log_cache", (0.0, {}))
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: SimpleNamespace(stdout=xml if argv[2] == "Security" else "", returncode=0))
+    assert ossignals.event_logs() == {"Security": "2026-10-16T01:02:03.456Z"}
+    before = {"Security": "2026-10-15T01:00:00Z"}
+    assert ossignals.diff_logs(before, {"Security": "2026-10-16T01:02:03.456Z"}) == [("log.cleared", {"log": "Security", "at": "2026-10-16T01:02:03.456Z"})]
+    assert ossignals.diff_logs(before, before) == [] and ossignals.diff_logs({}, {}) == []

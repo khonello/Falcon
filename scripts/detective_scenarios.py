@@ -117,7 +117,63 @@ def snooping() -> Scenario:
     return Scenario("snooping", "A worker opens twenty files across four folders that are not part of their work, in seven minutes.", s.out)
 
 
-SCENARIOS: dict[str, Callable[[], Scenario]] = {f.__name__: f for f in (leak, backup_twin, patient, one_hidden_file, flow_to_drive, covered_by_task, snooping)}
+def screenshots() -> Scenario:
+    s = Script(clock(13, 16, 0))
+    s.add("opened", r"C:\Finance\Payroll\payroll-q3.xlsx", thing="h-q3", by="hand", program="excel.exe", tags=R)
+    s.after(40).add("launched", program="snippingtool.exe", by="hand")
+    s.after(300).add("launched", program="snippingtool.exe", by="hand")
+    return Scenario("screenshots", "A worker has a restricted payroll sheet open and starts the snipping tool, twice, five minutes apart.", s.out)
+
+
+def screenshot_of_nothing() -> Scenario:
+    s = Script(clock(13, 16, 0))
+    s.add("launched", program="snippingtool.exe", by="hand")
+    return Scenario("screenshot_of_nothing", "The snipping tool is started on a machine where nothing restricted is being worked on.", s.out)
+
+
+def goes_dark() -> Scenario:
+    s = Script(clock(13, 23, 0))
+    s.add("moved", r"C:\Windows\Temp\notes.txt.dll", old=r"C:\Finance\Payroll\payroll-q3.xlsx", thing="h-q3", by="started", program="powershell.exe", tags=R)
+    s.after(5).add("hid", r"C:\Windows\Temp\notes.txt.dll", thing="h-q3", by="started", program="powershell.exe", tags=R)
+    s.after(120).add("silent", by="alone")
+    return Scenario("goes_dark", "Something is hidden, and two minutes later the machine stops reporting while still switched on.", s.out)
+
+
+def laptop_lid() -> Scenario:
+    s = Script(clock(13, 17, 30))
+    s.add("silent", by="alone")
+    return Scenario("laptop_lid", "A machine stops reporting with nothing else having happened on it.", s.out)
+
+
+def ransom() -> Scenario:
+    s = Script(clock(13, 3, 0))
+    for i in range(30):
+        s.after(2).add("renamed", rf"C:\Users\kojo\Documents\doc{i}.docx.locked", old=rf"C:\Users\kojo\Documents\doc{i}.docx", thing=f"h-d{i}", by="alone", program="unknown.exe")
+    return Scenario("ransom", "Thirty documents are renamed to end in .locked in a minute, by a program, at 03:00.", s.out)
+
+
+def big_clean_up_by_hand() -> Scenario:
+    s = Script(clock(13, 10, 0))
+    for i in range(60):
+        s.after(1).add("deleted", rf"C:\Users\ama\Documents\old{i}.docx", thing=f"h-o{i}", by="hand", program="explorer.exe")
+    return Scenario("big_clean_up_by_hand", "A person selects sixty old documents and deletes them.", s.out)
+
+
+def wiped() -> Scenario:
+    s = Script(clock(13, 2, 0))
+    for i in range(60):
+        s.after(1).add("deleted", rf"C:\Users\kojo\Documents\d{i}.docx", thing=f"h-d{i}", by="alone", program="cleaner.exe")
+    return Scenario("wiped", "Sixty documents are deleted in a minute by a program, in the small hours.", s.out)
+
+
+def log_cleared() -> Scenario:
+    s = Script(clock(13, 19, 0))
+    s.add("cleared", info={"what": "the Security log"}, by="started", program="wevtutil.exe")
+    return Scenario("log_cleared", "The machine's security log is cleared.", s.out)
+
+
+SCENARIOS: dict[str, Callable[[], Scenario]] = {f.__name__: f for f in (leak, backup_twin, patient, one_hidden_file, flow_to_drive, covered_by_task, snooping, screenshots, screenshot_of_nothing, goes_dark,
+                                                                  laptop_lid, ransom, big_clean_up_by_hand, wiped, log_cleared)}
 
 
 def play(sc: Scenario) -> tuple[Detective, list[Update]]:

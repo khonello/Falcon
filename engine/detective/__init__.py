@@ -157,9 +157,33 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     await _apply(engine, det.feed(sig))
 
 
+async def on_presence(engine: Engine, pc_id: int, online: bool) -> None:
+    """A machine stopped reporting (or is back). Going quiet only matters when something worth a look had just happened on it: the watch is being slipped."""
+    if not engine.db.connected or online:
+        return
+    await _ensure(engine)
+    await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "silent", by="alone")))
+
+
 async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]) -> None:
-    """A drive plugged in or removed (control.signal)."""
-    if not engine.db.connected or etype not in ("usb.inserted", "usb.removed"):
+    """What the OS tells the Worker that bears on behaviour: a drive plugged in or removed, a tool that photographs the screen started, a log cleared (control.signal)."""
+    if not engine.db.connected:
+        return
+    if etype == "program.launched":
+        from common.detective import CAPTURE_TOOLS
+
+        process = str(data.get("process") or "")
+        if not any(t in process.lower() for t in CAPTURE_TOOLS):
+            return
+        await _ensure(engine)
+        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "launched", program=process[:120], by="unknown")))
+        return
+    if etype == "log.cleared":
+        await _ensure(engine)
+        which = str(data.get("log") or "event")[:40]
+        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "cleared", by="unknown", info={"what": f"the {which} log", "log": which})))
+        return
+    if etype not in ("usb.inserted", "usb.removed"):
         return
     await _ensure(engine)
     device = str(data.get("device") or data.get("path") or "")
