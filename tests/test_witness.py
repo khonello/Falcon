@@ -90,3 +90,30 @@ def test_the_desktop_helper_answers_a_witness_request():
 
     r = handle({"cmd": "witness"}, RemoteInput())
     assert r["ok"] is True and "idle_s" in r and "front" in r
+
+
+def test_a_drive_is_known_by_its_own_serial_not_by_the_letter_it_got_this_time():
+    from worker_client.ossignals import diff_drives, volume_identity
+
+    out = diff_drives({}, {"E:\\": "E:\\"}, lambda mount: {"serial": "ABCD-1234", "label": "BACKUP"})
+    assert out == [("usb.inserted", {"device": "E:\\", "path": "E:\\", "serial": "ABCD-1234", "label": "BACKUP"})]
+    assert diff_drives({"E:\\": "E:\\"}, {}, lambda mount: {"serial": "x"}) == [("usb.removed", {"device": "E:\\", "path": "E:\\"})]       # nothing to read once it is gone
+    import os
+
+    got = volume_identity("C:\\") if os.name == "nt" else {}
+    assert got == {} or (len(got["serial"]) == 9 and got["serial"][4] == "-")
+
+
+@requires_db
+async def test_the_same_drive_in_another_letter_is_still_a_familiar_drive(engine, org, connect):
+    from engine import detective
+
+    pc = org["w1_pc"]
+    for letter in ("E:\\", "F:\\", "G:\\", "E:\\"):
+        await detective.on_signal(engine, pc, "usb.inserted", {"device": letter, "path": letter, "serial": "ABCD-1234", "label": "BACKUP"})
+        await detective.on_signal(engine, pc, "usb.removed", {"device": letter, "path": letter})
+    assert await engine.db.detective.device_uses(pc, "ABCD-1234") == 4 and await engine.db.detective.device_uses(pc, "E:\\") == 0
+    await detective.on_signal(engine, pc, "usb.inserted", {"device": "H:\\", "path": "H:\\", "serial": "ABCD-1234", "label": "BACKUP"})
+    assert detective._detector().ctx.device_uses(pc, "H:\\") == 4                               # four times before: familiar, whatever its letter
+    story = detective._detector().mem[pc].recent[-1].phrase()
+    assert story == r"plugged in a drive (BACKUP, H:\)"

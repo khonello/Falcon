@@ -112,7 +112,7 @@ class Sig:
         n = self.name
         return {"created": f"created {n}", "modified": f"changed {n}", "renamed": f"renamed {name_of(self.old)} to {n}", "moved": f"moved {n} to {folder_of(self.path) or 'another place'}",
                 "copied": f"copied {n} to {folder_of(self.path) or 'another place'}", "deleted": f"deleted {n}", "opened": f"opened {n}", "hid": f"hid {n}",
-                "unhid": f"made {n} visible", "permissions": f"changed who may open {n}", "attached": f"plugged in a drive ({self.device})",
+                "unhid": f"made {n} visible", "permissions": f"changed who may open {n}", "attached": f"plugged in a drive ({self.info.get('label') + ', ' if self.info.get('label') else ''}{self.device})",
                 "detached": f"removed a drive ({self.device})", "launched": f"started {self.program}", "exited": f"closed {self.program}",
                 "captured": f"captured the screen ({self.program or 'a tool'})", "cleared": f"cleared {self.info.get('what') or 'a history'}",
                 "silent": "stopped reporting while still switched on"}.get(self.verb, f"{self.verb} {n}")

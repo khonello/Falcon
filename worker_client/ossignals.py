@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -83,8 +84,25 @@ def diff_sessions(before: dict[str, str], after: dict[str, str]) -> list[tuple[s
             + [("user.logout", {"user": before[k]}) for k in sorted(set(before) - set(after))])
 
 
-def diff_drives(before: dict[str, str], after: dict[str, str]) -> list[tuple[str, dict[str, Any]]]:
-    return ([("usb.inserted", {"device": k, "path": k}) for k in sorted(set(after) - set(before))]
+def volume_identity(mount: str) -> dict[str, str]:
+    """A drive's own name: its volume serial number and label. The drive letter changes from one plug-in to the next; the serial does not, which is what
+    tells a drive this machine has always used from one it has never seen. Windows only; elsewhere nothing is claimed."""
+    if os.name != "nt":
+        return {}
+    import ctypes
+
+    label, serial = ctypes.create_unicode_buffer(261), ctypes.c_uint32(0)
+    try:
+        ok = ctypes.windll.kernel32.GetVolumeInformationW(mount, label, 261, ctypes.byref(serial), None, None, None, 0)  # type: ignore[attr-defined]
+    except (AttributeError, OSError):
+        return {}
+    if not ok:
+        return {}
+    return {"serial": f"{serial.value >> 16:04X}-{serial.value & 0xFFFF:04X}", "label": label.value}
+
+
+def diff_drives(before: dict[str, str], after: dict[str, str], identify: Callable[[str], dict[str, str]] = volume_identity) -> list[tuple[str, dict[str, Any]]]:
+    return ([("usb.inserted", {"device": k, "path": k, **identify(k)}) for k in sorted(set(after) - set(before))]
             + [("usb.removed", {"device": k, "path": k}) for k in sorted(set(before) - set(after))])
 
 

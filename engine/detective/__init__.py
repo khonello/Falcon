@@ -53,7 +53,8 @@ OPEN_LEVELS = ["case", "urgent"]
 
 _det: Detective | None = None
 _restored = False
-_devices: dict[tuple[int, str], int] = {}
+_devices: dict[tuple[int, str], int] = {}          # (pc, drive's own name) -> how many times this machine had seen it before the last plug-in
+_keys: dict[tuple[int, str], str] = {}             # (pc, where it is mounted now) -> the drive's own name (its serial when the Worker could read one)
 _tasks: dict[int, tuple[float, set[str]]] = {}
 _saved: dict[int, int] = {}                       # id(case) -> findings already saved
 
@@ -62,6 +63,7 @@ def reset_state() -> None:
     global _det, _restored
     _det, _restored = None, False
     _devices.clear()
+    _keys.clear()
     _tasks.clear()
     _saved.clear()
 
@@ -73,7 +75,7 @@ def tasks_changed() -> None:
 def _detector() -> Detective:
     global _det
     if _det is None:
-        _det = Detective(Context(task_things=lambda pc: _tasks.get(pc, (0, set()))[1], known_device=lambda pc, dev: _devices.get((pc, dev), 0)))
+        _det = Detective(Context(task_things=lambda pc: _tasks.get(pc, (0, set()))[1], known_device=lambda pc, dev: _devices.get((pc, _keys.get((pc, dev), dev)), 0)))
     return _det
 
 
@@ -163,9 +165,12 @@ async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]
     device = str(data.get("device") or data.get("path") or "")
     if not device:
         return
+    info: dict[str, Any] = {k: str(data[k])[:80] for k in ("serial", "label") if data.get(k)}
     if etype == "usb.inserted":
-        _devices[(pc_id, device)] = await engine.db.detective.see_device(pc_id, device)
-    await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "attached" if etype == "usb.inserted" else "detached", device, device=device, by="alone")))
+        key = info.get("serial") or device                  # the same drive in another letter is still the same drive
+        _keys[(pc_id, device)] = key
+        _devices[(pc_id, key)] = await engine.db.detective.see_device(pc_id, key)
+    await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "attached" if etype == "usb.inserted" else "detached", device, device=device, by="alone", info=info)))
 
 
 # --- keeping what it concludes ------------------------------------------------------------------------------------
