@@ -23,6 +23,7 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from PySide6.QtQml import QJSValue
 
 from common.connection import ConnectionError_, EngineConnection, EngineError
+from common.when import resolve as resolve_when
 from operator_client.core.config import LocalConfig
 from operator_client.core.deadlines import resolve_phrase
 from operator_client.core.narrate import narrate as _narrate
@@ -401,6 +402,12 @@ class FalconBridge(QObject):
         """A deadline phrase -> ISO timestamp, or "" when it cannot be resolved mechanically."""
         dt = resolve_phrase(phrase)
         return dt.isoformat() if dt else ""
+
+    @Slot(str, result="QVariant")
+    def readWhen(self, phrase: str) -> Any:
+        """A deadline phrase read the way the Engine reads it: {at (ISO or ""), said (plain words), why (the reason it was refused, or "")}."""
+        got = resolve_when(phrase, datetime.now().astimezone())
+        return {"at": got.at.isoformat() if got.at else "", "said": got.said or "", "why": got.why or ""}
 
     @Slot(str, "QVariant", result="QVariant")
     def narrate(self, topic: str, data: Any) -> Any:

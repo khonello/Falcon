@@ -55,3 +55,12 @@ Last updated 13 Oct 2026.
 - Built: the index reconciles on start, reconnect and a timer; the Engine heals flows, marks and tasks on timers; a flow never overwrites what it did not write. See `ENGINE-GAPS.md`.
 - The two-PC Flow test, the away-and-back tests and the non-administrator console test are in `docs/VM-TEST-PLAN.md` (needs a machine with ~14 GB free for the guests).
 - Still open: should a deleted source file be deleted at destinations? (Today: no; the destination keeps its copy. The user said that is what they first thought.)
+
+## Task creation, hardened (16 Oct 2026)
+
+- **`@` dialog** (New task): `@` lists Person / File / Folder / Program / Deadline; Up/Down move, Enter or Tab take the highlighted one, Esc closes. `@file:`, `@program:`, `@folder:`, `@deadline:` can also be typed straight. A file or program asks a second question (what should happen to it). What is marked goes to the Engine as `hints` and is taken as given; the patterns and the model only read the rest. Tested with real key events (`tests/test_task_mentions.py`).
+- **One deadline reader** (`common/when.py`, 124 cases): used by the Engine, the console and the dialog. It never guesses: `3/4`, "Monday or Wednesday", "next week" are refused with the reason. `task.when` and `falcon.readWhen` expose it.
+- **The model**: cached, time-limited per call and per proposal (75 s), declared away only after 3 failures in a row, refuses prompts too long to ask, text can't close its own quotes. `task.propose` returns `model` stats and `notes`.
+- **Benchmark on this machine (Windows wheel):** the 1.7B scored 26/27 tuned and 26/32 held-out before the verb fixes (export, back up, rename, "must be on", "Monday's review" were cue-list gaps, not model errors). After them: tuned 32/32, fresh held-out 31/31. The 29/32 in CLAUDE.md was measured elsewhere.
+- **Command palette**: Ctrl K and Ctrl P open it, Ctrl Shift P opens it in `>` command mode (commands, pages, "New task/flow/rule"); it now also finds tasks and flows (and rules at the Super User's level), and the list follows the arrow keys.
+- For the GUI session: I edited `SmartText.qml`, `NewTaskPage.qml`, `NewFlowPage.qml`, `TaskChart.qml`, `Palette.qml`, `main.qml` (two shortcuts) and `bridge.py` (`readWhen`).

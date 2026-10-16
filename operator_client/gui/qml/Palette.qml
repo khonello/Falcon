@@ -2,9 +2,11 @@ import QtQuick
 import QtQuick.Controls.Basic
 import "."
 
-// SEARCH, WHICH IS A JUMP (Ctrl K): pages, machines, issues, a few things to do, and at the Super User's level
-// departments. At most five per group; the rest are counted, and a sharper query finds them. Arrows move, Enter
-// opens. Two letters or more ask the Engine (search.find), which finds only what this console may see.
+// SEARCH, WHICH IS A JUMP (Ctrl K or Ctrl P): pages, machines, issues, tasks, flows, a few things to do, and at the
+// Super User's level departments and rules. At most five per group; the rest are counted, and a sharper query finds
+// them. Arrows move (and the list follows), Enter opens, Esc closes. Two letters or more ask the Engine (search.find),
+// which finds only what this console may see. Start with ">" (Ctrl Shift P) to see only what can be done: the
+// commands, the pages, and starting something new.
 Popup {
     id: root
     objectName: "palette"
@@ -23,14 +25,19 @@ Popup {
     property var depts: []
     property var found: []             // search.find for the query
     property int at: 0
+    onAtChanged: if (list.count > 0) list.positionViewAtIndex(Math.min(at, list.count - 1), ListView.Contain)
+    // open with something already typed: ">" for the commands
+    property string pending: ""
+    function openWith(prefix) { pending = prefix || ""; open() }
+    readonly property bool commands: input.text.charAt(0) === ">"
     Timer { id: ask; interval: 150; onTriggered: {
         var q = input.text.trim()
         if (q.length < 2) { root.found = []; return }
-        falcon.call("search.find", { q: q, kinds: ["machine", "issue", "department"], limit: 25 }, function (ok, r) { if (ok && r.q === q) root.found = r.results || [] })
+        falcon.call("search.find", { q: q, kinds: Nav.boss ? ["machine", "issue", "department", "task", "flow", "rule"] : ["machine", "issue", "task", "flow"], limit: 25 }, function (ok, r) { if (ok && r.q === q) root.found = r.results || [] })
     } }
 
     onOpened: {
-        input.text = ""; at = 0; input.forceActiveFocus()
+        input.text = pending; pending = ""; at = 0; input.forceActiveFocus(); input.cursorPosition = input.text.length
         falcon.call("hierarchy.tree", {}, function (ok, r) {
             if (!ok) return
             var ms = [], ds = r.departments || []
@@ -45,8 +52,8 @@ Popup {
     }
 
     readonly property var items: {
-        var q = input.text.toLowerCase(), out = [], extra = {}, seen = {}
-        var all = [], asked = input.text.trim().length >= 2
+        var cmd = commands, q = (cmd ? input.text.slice(1) : input.text).trim().toLowerCase(), out = [], extra = {}, seen = {}
+        var all = [], asked = !cmd && input.text.trim().length >= 2
         for (var g = 0; g < Nav.menu.length; g++)
             for (var i = 0; i < Nav.menu[g][1].length; i++) {
                 var m = Nav.menu[g][1][i]
@@ -58,9 +65,12 @@ Popup {
                 if (x.kind === "machine") { var fm = Fleet.byHost[x.title]
                     all.push({ g: "Machines", l: x.title, s: (fm ? (fm.user || "no user") + " · " + Fleet.words[fm.status] : x.sub), icon: "desktop", mono: true, page: Nav.boss ? "registry" : "machines", sub: x.title }) }
                 else if (x.kind === "issue") all.push({ g: "Issues", l: x.title, s: x.sub, icon: "alert", page: Nav.boss ? "departments" : "issues", sub: Nav.boss ? x.department_id : x.id })
+                else if (x.kind === "task") all.push({ g: "Tasks", l: x.title, s: x.sub, icon: "checkcircle", page: "tasks", sub: null })
+                else if (x.kind === "flow") all.push({ g: "Flows", l: x.title, s: x.sub, icon: "branches", mono: true, page: "flows", sub: String(x.id) })
+                else if (x.kind === "rule" && Nav.boss) all.push({ g: "Rules", l: x.title, s: x.sub, icon: "bolt", page: "rules", sub: x.sub })
                 else if (x.kind === "department" && Nav.boss) all.push({ g: "Departments", l: x.title, s: x.sub, icon: "apartment", page: "departments", sub: x.id })
             })
-        } else {
+        } else if (!cmd) {
             for (var k = 0; k < machines.length; k++)
                 all.push({ g: "Machines", l: machines[k].host, s: machines[k].sub, icon: "desktop", mono: true, page: Nav.boss ? "registry" : "machines", sub: machines[k].host })
             if (Nav.boss)
@@ -71,16 +81,21 @@ Popup {
         // a few things to do: leave the session you hold; at an Admin's level, run an action once
         var held = falcon.traversing && falcon.session ? Fleet.byPc[falcon.session.pc_id] : null
         if (held) all.push({ g: "Actions", l: "Leave your session on " + held.host, s: held.user ? held.user + " gets the machine back" : "nobody is waiting for it", icon: "logout", leave: true })
+        all.push({ g: "Commands", l: "New task", s: "describe the work; @ marks a person, file, folder, program or deadline", icon: "plus", page: "tasks", sub: "new" })
+        if (!Nav.boss) {
+            all.push({ g: "Commands", l: "New flow", s: "a one-way sync from a folder to others", icon: "plus", page: "flows", sub: "new" })
+            all.push({ g: "Commands", l: "New rule", s: "an event, a condition, an action", icon: "plus", page: "automation", sub: "new" })
+        }
         if (!Nav.boss) all.push({ g: "Actions", l: "Run an action once…", s: "pick it on Actions, then Run once", icon: "playcircle", page: "actions", sub: null })
         for (var j = 0; j < all.length; j++) {
             var x = all[j]
-            if (!(asked && (x.g === "Machines" || x.g === "Issues" || x.g === "Departments")) && (x.l + " " + (x.s || "") + " " + x.g).toLowerCase().indexOf(q) < 0) continue
+            if (!(asked && (x.g === "Machines" || x.g === "Issues" || x.g === "Departments" || x.g === "Tasks" || x.g === "Flows" || x.g === "Rules")) && (x.l + " " + (x.s || "") + " " + x.g).toLowerCase().indexOf(q) < 0) continue
             seen[x.g] = (seen[x.g] || 0) + 1
             if (seen[x.g] <= 5 || x.g === "Go to") out.push(x); else extra[x.g] = (extra[x.g] || 0) + 1
         }
         for (var gg in extra)
             out.push({ g: gg, l: "+" + extra[gg] + " more " + gg.toLowerCase(), s: "type more to narrow, or open the full list",
-                       icon: "ellipsis", page: gg === "Machines" ? (Nav.boss ? "registry" : "machines") : gg === "Issues" ? (Nav.boss ? "departments" : "issues") : "departments", sub: null })
+                       icon: "ellipsis", page: gg === "Machines" ? (Nav.boss ? "registry" : "machines") : gg === "Issues" ? (Nav.boss ? "departments" : "issues") : gg === "Tasks" ? "tasks" : gg === "Flows" ? "flows" : gg === "Rules" ? "rules" : "departments", sub: null })
         return out
     }
     function pick(x) {
@@ -106,7 +121,7 @@ Popup {
         font.family: Theme.sans
         font.pixelSize: Theme.fLead
         color: Theme.text
-        placeholderText: Nav.boss ? "Jump to a page, machine, issue or department" : "Jump to a page, machine or issue"
+        placeholderText: root.commands ? "Type a command, or a page to go to" : (Nav.boss ? "Jump to a page, machine, issue, task or flow. Type > for commands" : "Jump to a page, machine, issue, task or flow. Type > for commands")
         placeholderTextColor: Theme.text4
         background: Rectangle { color: "transparent"; Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border } }
         onTextChanged: { root.at = 0; ask.restart() }

@@ -286,7 +286,8 @@ ApplicationWindow {
     Connections { target: Nav; function onEnterRequested(admin, to) { enter.ask(admin, to) } }
     SessionWindow { }
     Palette { id: palette }
-    Shortcut { sequences: ["Ctrl+K"]; onActivated: palette.visible ? palette.close() : palette.open() }
+    Shortcut { sequences: ["Ctrl+K", "Ctrl+P"]; onActivated: palette.visible ? palette.close() : palette.open() }
+    Shortcut { sequences: ["Ctrl+Shift+P"]; onActivated: palette.openWith(">") }
 
     // every `Msg` from anywhere in the console lands here, over everything, including a modal
     Toast {

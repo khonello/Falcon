@@ -8,6 +8,7 @@ import "."
 //
 // Drawn as the concept draws it: a mirror of the text with the marks behind a transparent text box.
 Column {
+    objectName: "smartText"
     id: root
     property string text: ""
     property var people: []                  // [{name, sub, host, account}]
@@ -80,7 +81,28 @@ Column {
     }
 
     property int openAt: -1                  // the match whose picker is open
-    property var mention: null              // {start, end, q} while an @ is being typed
+    property var mention: null              // {start, end, q, kind} while an @ is being typed ("" kind = still choosing what it is)
+    property var stage: null                // {title, sub, at, opts} -- the second question after a file or program (what is to happen to it)
+    property int hi: 0                      // the highlighted option: Up/Down move it, Enter or Tab takes it, Esc closes
+    readonly property bool pickerOpen: picker.visible
+    readonly property var kinds: [
+        { id: "person", label: "Person", sub: "who it is for" },
+        { id: "file", label: "File", sub: "a file the work is about" },
+        { id: "folder", label: "Folder", sub: "where a new file is to be put" },
+        { id: "program", label: "Program", sub: "an application to be used or checked" },
+        { id: "deadline", label: "Deadline", sub: "a time: final or soft" }]
+    // everything the person stated outright, as the Engine reads it (task.propose `hints`): the model and the patterns work on the rest
+    readonly property var hints: {
+        var out = []
+        for (var k in conf) {
+            var c = conf[k]
+            if (c.kind === "file") out.push({ kind: "file", name: c.text, intent: c.intent || undefined, file_index_id: c.file_index_id || undefined })
+            else if (c.kind === "program") out.push({ kind: "program", name: c.text, intent: c.intent || undefined })
+            else if (c.kind === "folder") out.push({ kind: "folder", path: c.text })
+            else if (c.kind === "date" && c.v) out.push({ kind: "deadline", role: c.role || "final", at: c.v })
+        }
+        return out
+    }
 
     Item {
         width: root.width
@@ -99,6 +121,7 @@ Column {
         }
         TextArea {
             id: area
+            objectName: "smartArea"
             anchors.fill: parent
             leftPadding: 11; rightPadding: 11; topPadding: 8; bottomPadding: 8
             wrapMode: TextEdit.Wrap
@@ -107,22 +130,35 @@ Column {
             color: Theme.text
             selectByMouse: true
             selectionColor: Theme.alpha(Theme.accent, 0.3)
-            placeholderText: "What needs doing? Type @ to pick a person."
+            placeholderText: "What needs doing? Type @ to mark a person, file, folder, program or deadline."
             placeholderTextColor: Theme.text4
             background: null
             text: root.text
             onTextChanged: {
                 if (text !== root.text) root.edited(text)
-                var c = cursorPosition, mm = /@([\w.]*)$/.exec(text.slice(0, c))
-                root.mention = mm ? { start: c - mm[0].length, end: c, q: mm[1] } : null
+                root.detect()
                 pause.restart()
             }
-            onCursorPositionChanged: if (!root.mention) root.openAt = -1
+            onCursorPositionChanged: { root.detect(); if (!root.mention) root.openAt = -1 }
             onReleased: {
                 var c = cursorPosition
                 root.openAt = root.matches.findIndex(function (m) { return c >= m.start && c <= m.end })
             }
-            Keys.onEscapePressed: { root.openAt = -1; root.mention = null }
+            // with a picker open the keyboard drives it: Up/Down choose, Enter or Tab take the highlighted option, Esc closes
+            Keys.onPressed: function (e) {
+                if (!root.pickerOpen) return
+                var n = picker.opts.length
+                if (e.key === Qt.Key_Escape) { root.close(); e.accepted = true }
+                else if (root.stage && !root.mention && e.text.length > 0 && e.key !== Qt.Key_Return && e.key !== Qt.Key_Enter && e.key !== Qt.Key_Tab) { root.stage = null }
+                else if (n === 0) return
+                else if (e.key === Qt.Key_Down) { root.hi = (root.hi + 1) % n; e.accepted = true }
+                else if (e.key === Qt.Key_Up) { root.hi = (root.hi + n - 1) % n; e.accepted = true }
+                else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Tab) {
+                    var o = picker.opts[Math.min(root.hi, n - 1)]
+                    if (o && !o.off) o.run()
+                    e.accepted = true
+                }
+            }
         }
         // a pause on a new, unconfirmed match offers it once; after that it waits to be clicked
         property var offered: ({})
@@ -144,12 +180,13 @@ Column {
         Rectangle {
             id: picker
             readonly property var m: root.openAt >= 0 && root.openAt < root.matches.length ? root.matches[root.openAt] : null
-            readonly property var opts: root.optionsFor(m, root.mention)
-            visible: m !== null || root.mention !== null
-            readonly property rect at: m ? area.positionToRectangle(m.end) : root.mention ? area.positionToRectangle(root.mention.start) : Qt.rect(0, 0, 0, 0)
+            readonly property var opts: root.stage ? root.stage.opts : root.optionsFor(m, root.mention)
+            visible: m !== null || root.mention !== null || root.stage !== null
+            readonly property rect at: root.stage ? area.positionToRectangle(root.stage.at) : m ? area.positionToRectangle(m.end) : root.mention ? area.positionToRectangle(root.mention.start) : Qt.rect(0, 0, 0, 0)
             x: Math.max(0, Math.min(at.x - 20, parent.width - width))
             y: at.y + at.height + 6
-            width: 310
+            objectName: "smartPicker"
+            width: 330
             height: pcol.height + 12
             radius: Theme.radius
             color: Theme.surface
@@ -166,18 +203,20 @@ Column {
                     leftPadding: 2
                     bottomPadding: 4
                     Rectangle { visible: picker.m !== null; width: 8; height: 8; radius: 2; color: picker.m ? root.kindColor[picker.m.kind] : "transparent"; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { text: picker.m ? "Is this a " + root.kindWord[picker.m.kind] + "?" : "Who is this for?"; color: Theme.text3; font.pixelSize: 12; width: parent.width - 120 }
-                    Txt { visible: picker.m !== null; text: picker.m ? picker.m.text : ""; font.weight: Font.Medium; font.pixelSize: 12; width: 100; horizontalAlignment: Text.AlignRight }
+                    Txt { objectName: "smartPickerTitle"; text: root.stage ? root.stage.title : picker.m ? "Is this a " + root.kindWord[picker.m.kind] + "?" : root.mention ? root.mentionTitle() : ""; color: Theme.text3; font.pixelSize: 12; width: parent.width - 120 }
+                    Txt { visible: picker.m !== null || root.stage !== null; text: root.stage ? root.stage.sub : picker.m ? picker.m.text : ""; font.weight: Font.Medium; font.pixelSize: 12; width: 100; horizontalAlignment: Text.AlignRight }
                 }
-                Txt { visible: picker.opts.length === 0 && root.mention !== null; text: "No one matches “" + (root.mention ? root.mention.q : "") + "”."; color: Theme.text3; font.pixelSize: 12; leftPadding: 8 }
+                Txt { visible: picker.opts.length === 0 && root.mention !== null; text: root.mention ? root.emptyWord(root.mention) : ""; color: Theme.text3; font.pixelSize: 12; leftPadding: 8; width: pcol.width; wrapMode: Text.Wrap }
                 Repeater {
                     model: picker.opts
                     Rectangle {
                         required property var modelData
+                        required property int index
                         width: pcol.width
                         height: oc.height + 12
                         radius: Theme.radiusSm
-                        color: oa.containsMouse ? Theme.accentSoft : "transparent"
+                        color: oa.containsMouse || index === root.hi ? Theme.accentSoft : "transparent"
+                        opacity: modelData.off ? 0.55 : 1
                         Column {
                             id: oc
                             x: 8; y: 6
@@ -185,12 +224,12 @@ Column {
                             Txt { width: parent.width; text: modelData.label; mono: !!modelData.mono; font.pixelSize: 12; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone }
                             Txt { visible: !!modelData.sub; width: parent.width; text: modelData.sub || ""; color: Theme.text3; font.pixelSize: 11 }
                         }
-                        MouseArea { id: oa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: modelData.run() }
+                        MouseArea { id: oa; anchors.fill: parent; hoverEnabled: true; cursorShape: modelData.off ? Qt.ArrowCursor : Qt.PointingHandCursor; onEntered: root.hi = index; onClicked: if (!modelData.off) modelData.run() }
                     }
                 }
-                Rectangle { visible: picker.m !== null; width: parent.width; height: 1; color: Theme.border }
+                Rectangle { visible: picker.m !== null && root.stage === null; width: parent.width; height: 1; color: Theme.border }
                 Link {
-                    visible: picker.m !== null
+                    visible: picker.m !== null && root.stage === null
                     leftPadding: 8; topPadding: 6
                     text: picker.m ? "Not a " + root.kindWord[picker.m.kind] : ""
                     font.pixelSize: 12
@@ -200,38 +239,126 @@ Column {
         }
     }
 
-    function choose(m, o) { var c = Object.assign({}, conf); c[m.key] = Object.assign({ kind: m.kind, text: m.text }, o); conf = c; openAt = -1; area.forceActiveFocus() }
-    function pickPerson(p) {
-        var v = text.slice(0, mention.start) + p.name + text.slice(mention.end)
-        var c = Object.assign({}, conf); c["person:" + p.name.toLowerCase()] = { kind: "person", text: p.name, name: p.name, label: p.name, sub: p.sub, account: p.account }; conf = c
-        mention = null; openAt = -1
-        edited(v)
+    // is the cursor inside an @ token? (read again whenever the text or the cursor moves)
+    function detect() {
+        var text = area.text
+                var c = area.cursorPosition, before = text.slice(0, c)
+                var mk = /(?:^|[^\w])@(person|file|folder|program|deadline):([^\n@]*)$/.exec(before), mm = /(?:^|[^\w])@([\w.]*)$/.exec(before)
+                var old = mention
+                if (mk) { var t0 = mk[0].lastIndexOf("@"); mention = { start: c - mk[0].length + t0, end: c, q: mk[2], kind: mk[1] } }
+                else if (mm) { var t1 = mm[0].lastIndexOf("@"); mention = { start: c - mm[0].length + t1, end: c, q: mm[1], kind: "" } }
+                else mention = null
+                if (mention) stage = null
+                if (!old || !mention || old.q !== mention.q || old.kind !== mention.kind) hi = 0
     }
+    function close() { openAt = -1; mention = null; stage = null; hi = 0; area.forceActiveFocus() }
+    function choose(m, o) { var c = Object.assign({}, conf); c[m.key] = Object.assign({ kind: m.kind, text: m.text }, o); conf = c; close() }
+    // put `insert` where the @ token was, remember what it is, and leave the cursor after it
+    function settle(insert, key, entry, next) {
+        var men = mention, c = Object.assign({}, conf)
+        c[key] = Object.assign({ text: insert }, entry); conf = c
+        var v = text.slice(0, men.start) + insert + text.slice(men.end), pos = men.start + insert.length
+        mention = null; openAt = -1; hi = 0; stage = null
+        edited(v)
+        Qt.callLater(function () {
+            area.forceActiveFocus(); area.cursorPosition = pos
+            if (next) { var r = next(); r.at = pos; root.stage = r; root.hi = 0 }
+        })
+    }
+    function pickPerson(p) {
+        settle(p.name, "person:" + p.name.toLowerCase(), { kind: "person", name: p.name, label: p.name, sub: p.sub, account: p.account })
+    }
+    function mentionTitle() {
+        var k = mention.kind
+        return k === "" ? "Mark this as…" : k === "person" ? "Who is this for?" : k === "file" ? "Which file?" : k === "folder" ? "Which folder?" : k === "program" ? "Which program?" : "When?"
+    }
+    function emptyWord(men) {
+        if (men.kind === "person" || men.kind === "") return men.q ? "No one matches “" + men.q + "”." : "No one to pick."
+        if (men.kind === "deadline") return "Type a time, for example “friday 3pm” or “in 2 hours”."
+        return "Type a name."
+    }
+    // the second question: what is to happen to the file or program that was just marked
+    function askIntent(kind, entryKey, label, items) {
+        return function () {
+            return { title: "What should happen to " + label + "?", sub: kind, opts: items.map(function (it) {
+                return { label: it[1], sub: it[2], run: function () {
+                    var c = Object.assign({}, root.conf), e = Object.assign({}, c[entryKey])
+                    if (it[0]) e.intent = it[0]; else delete e.intent
+                    c[entryKey] = e; root.conf = c; root.close()
+                } }
+            }) }
+        }
+    }
+    readonly property var fileIntentList: [["create", "Create it", "a new file the work should produce"], ["update", "Change it", "an existing file the work should edit"], ["exists", "It must exist", "only check that it is there"], ["", "Let the model decide", "read it from the words around it"]]
+    readonly property var programIntentList: [["used", "Use it", "the work is done in it"], ["used_with_file", "Use it on the file", "tied to the file marked above"], ["installed_available", "Have it installed", ""], ["running", "Have it running", ""], ["closed_not_running", "Not running", "closed"], ["", "Let the model decide", "read it from the words around it"]]
+    readonly property var asked: ({})
     property var fileHits: ({})               // a file name -> what the index has under it
     function lookFile(name) {
-        if (fileHits[name] !== undefined) return
-        var h = Object.assign({}, fileHits); h[name] = []; fileHits = h
+        if (name.length < 2 || asked[name] || fileHits[name] !== undefined) return
+        asked[name] = true                  // marked in place: this runs while the options are being worked out, so it must not change a bound value
         falcon.call("index.search", { query: name }, function (ok, r) {
             var x = Object.assign({}, root.fileHits); x[name] = ok ? (r.results || []) : []; root.fileHits = x
         })
     }
+    function fileOptions(q, m) {
+        lookFile(q)
+        var hits = (fileHits[q] || []).filter(function (f) { return String(f.filename || f.path || "").toLowerCase().indexOf(q.toLowerCase()) >= 0 })
+        function mark(nm, extra) { var k = "file:" + nm.toLowerCase(); root.settle(nm, k, Object.assign({ kind: "file", label: nm }, extra), root.askIntent("file", k, nm, root.fileIntentList)) }
+        var res = hits.slice(0, 5).map(function (f) {
+            var nm = f.filename || String(f.path).split(/[\\/]/).pop()
+            return { label: f.path || f.filename, sub: (f.hostname || "") + (f.resource_tag ? " · " + f.resource_tag : ""), mono: true,
+                     run: function () { if (m) root.choose(m, { label: q, sub: f.path, file_index_id: f.id }); else mark(nm, { sub: f.path, file_index_id: f.id }) } }
+        })
+        if (q) res.push({ label: m ? "A new file" : "“" + q + "” as a new file", mono: !m, sub: hits.length ? "A different file with this name, not created yet" : "Not in the file index yet. A check can expect it to be created.",
+                          run: function () { if (m) root.choose(m, { label: q, sub: "a new file" }); else mark(q, { sub: "a new file" }) } })
+        return res
+    }
+    function deadlineOptions(q, m) {
+        if (!q.trim()) return []
+        var w = typeof falcon.readWhen === "function" ? falcon.readWhen(q) : { at: "", said: "", why: "The reader is not available here." }
+        if (!w.at) return [{ label: "“" + q.trim() + "” is not one time", sub: w.why, off: true, run: function () {} }]
+        function mk(role, word) {
+            return { label: word + " · " + w.said, sub: role === "final" ? "the task is overdue after this" : "a nudge before the final deadline", run: function () {
+                if (m) root.choose(m, { role: role, v: w.at, label: word, sub: w.said })
+                else root.settle(q.trim(), "date:" + q.trim().toLowerCase(), { kind: "date", role: role, v: w.at, label: word, sub: w.said }) } }
+        }
+        return [mk("final", "Final deadline"), mk("soft", "Soft deadline")]
+    }
+    function programOptions(q) {
+        var ql = q.trim().toLowerCase()
+        function mark(name, exe) { var k = "program:" + name.toLowerCase(); root.settle(name, k, { kind: "program", label: exe, exe: exe, sub: "program" }, root.askIntent("program", k, name, root.programIntentList)) }
+        var known = programs.filter(function (p) { return !ql || p[0].toLowerCase().indexOf(ql) >= 0 })
+        var res = known.map(function (p) { return { label: p[0], sub: p[1], run: function () { mark(p[0], p[1]) } } })
+        if (ql && !known.some(function (p) { return p[0].toLowerCase() === ql }))
+            res.push({ label: "“" + q.trim() + "”", sub: "A program that is not in the list", run: function () { mark(q.trim(), q.trim()) } })
+        return res
+    }
     function optionsFor(m, men) {
-        if (men && !m) return people.filter(function (p) { return p.name.toLowerCase().indexOf(men.q.toLowerCase()) >= 0 }).slice(0, 6)
-                                    .map(function (p) { return { label: p.name, sub: p.sub, run: function () { root.pickPerson(p) } } })
+        if (men && !m) {
+            var q = men.q, ql = q.toLowerCase()
+            var ppl = people.filter(function (p) { return p.name.toLowerCase().indexOf(ql) >= 0 }).slice(0, 6)
+                            .map(function (p) { return { label: p.name, sub: p.sub, run: function () { root.pickPerson(p) } } })
+            if (men.kind === "person") return ppl
+            if (men.kind === "") {
+                var cats = kinds.filter(function (k) { return !ql || k.label.toLowerCase().indexOf(ql) === 0 })
+                                .map(function (k) { return { label: k.label, sub: k.sub, run: function () {
+                                    var ins = "@" + k.id + ":", v = text.slice(0, men.start) + ins + text.slice(men.end), pos = men.start + ins.length
+                                    edited(v); Qt.callLater(function () { area.forceActiveFocus(); area.cursorPosition = pos }) } } })
+                return ql ? cats.concat(ppl) : cats
+            }
+            if (men.kind === "file") return fileOptions(q.trim(), null)
+            if (men.kind === "folder") return q.trim() ? [{ label: q.trim(), mono: true, sub: "Where a new file is to be put",
+                run: function () { root.settle(q.trim(), "folder:" + q.trim().toLowerCase(), { kind: "folder", label: q.trim(), sub: "folder" }) } }] : []
+            if (men.kind === "program") return programOptions(q)
+            return deadlineOptions(q, null)
+        }
         if (!m) return []
         if (m.kind === "person") return people.filter(function (p) { return p.name === m.text })
                                                .map(function (p) { return { label: p.name, sub: p.sub, run: function () { root.choose(m, { name: p.name, label: p.name, sub: p.sub, account: p.account }) } } })
-        if (m.kind === "file") {
-            lookFile(m.text)
-            var hits = (fileHits[m.text] || []).filter(function (f) { return String(f.filename || f.path || "").toLowerCase().indexOf(m.text.toLowerCase()) >= 0 })
-            return hits.slice(0, 4).map(function (f) {
-                return { label: f.path || f.filename, sub: (f.hostname || "") + (f.resource_tag ? " · " + f.resource_tag : ""), mono: true,
-                         run: function () { root.choose(m, { label: m.text, sub: f.path, file_index_id: f.id }) } }
-            }).concat([{ label: "A new file", sub: hits.length ? "A different file with this name, not created yet" : "Not in the file index yet. A check can expect it to be created.",
-                         run: function () { root.choose(m, { label: m.text, sub: "a new file" }) } }])
-        }
+        if (m.kind === "file") return fileOptions(m.text, m)
         if (m.kind === "date") {
-            var d = parseDate(m.text)
+            var w = typeof falcon.readWhen === "function" ? falcon.readWhen(m.text) : { at: "" }
+            var d = w.at ? new Date(w.at) : parseDate(m.text)
             return d ? [{ label: "Final deadline", sub: Time.date(d), run: function () { root.choose(m, { role: "final", v: d.toISOString(), label: "Final deadline", sub: Time.date(d) }) } },
                         { label: "Soft deadline", sub: Time.date(d), run: function () { root.choose(m, { role: "soft", v: d.toISOString(), label: "Soft deadline", sub: Time.date(d) }) } }] : []
         }

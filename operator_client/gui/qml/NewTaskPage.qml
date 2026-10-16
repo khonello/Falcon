@@ -48,7 +48,7 @@ Page {
         if (!foundPerson) return
         busy = true
         var at = text
-        falcon.call("task.propose", { description: at.trim(), assignee_account_id: foundPerson.account }, function (ok, r) {
+        falcon.call("task.propose", { description: at.trim(), assignee_account_id: foundPerson.account, hints: smart.hints, now: page.nowLocal() }, function (ok, r) {
             page.busy = false
             if (!ok) { Msg.failed(r && r.message ? r.message : "Nothing came back"); return }
             page.checked = at
@@ -66,17 +66,19 @@ Page {
             return { target_type: it.target_type, intent: it.intent, name: it.name, path: it.path || null,
                      file_index_id: hit && hit.file_index_id ? hit.file_index_id : it.file_index_id || null,
                      linked_item_index: it.linked_item_index === undefined ? null : it.linked_item_index,
-                     src: hit ? "you" : it.populated_by === "manual" ? "you" : "model",
-                     why: hit ? "You picked it while typing; the model chose “" + page.intentWord(it.intent) + "”" : "Chosen from the intents for a " + it.target_type }
+                     src: it.source === "hint" || it.intent_by === "hint" || hit ? "you" : it.populated_by === "manual" ? "you" : it.intent_by === "rule" ? "rule" : "model",
+                     why: it.intent_by === "hint" ? "You set this with @" : it.source === "hint" ? "You marked the " + it.target_type + " with @; “" + page.intentWord(it.intent) + "” was " + (it.intent_by === "rule" ? "read from your words" : "chosen by the model")
+                          : hit ? "You picked it while typing; “" + page.intentWord(it.intent) + "” was " + (it.intent_by === "rule" ? "read from your words" : "chosen by the model")
+                          : it.intent_by === "rule" ? "Found and settled by rule: the words around it say “" + page.intentWord(it.intent) + "”" : "Chosen by the model from the intents for a " + it.target_type }
         })
         var one = {
             title: text.trim().split(/[.\n]/)[0].slice(0, 80), titleSrc: "rule", phrase: text.trim(),
             who: foundPerson.name, whoAccount: foundPerson.account, whoSrc: confirmedPerson ? "you" : "rule",
             // the Engine finds a deadline as the words in the text ("by tomorrow evening"); the task needs a time. Put in a time here, or say it is still
             // needed: never send the words on as if they were one (the Engine refuses them, and the person would see only "must be ISO 8601")
-            final: fin ? fin.v : page.whenOf(r.final_deadline),
-            finalSrc: fin ? "you" : r.final_deadline ? (page.whenOf(r.final_deadline) && !(r.flags || []).some(function (f) { return f.kind === "ambiguous_deadline" }) ? "rule" : "input") : "none",
-            soft: soft ? soft.v : page.whenOf(r.soft_deadline), softSrc: soft ? "you" : r.soft_deadline ? (page.whenOf(r.soft_deadline) ? "rule" : "input") : "none",
+            final: fin ? fin.v : r.final_deadline_at ? new Date(r.final_deadline_at).toISOString() : page.whenOf(r.final_deadline),
+            finalSrc: fin ? "you" : r.final_deadline_at ? (r.deadline_source === "hint" ? "you" : "rule") : r.final_deadline ? (page.whenOf(r.final_deadline) && !(r.flags || []).some(function (f) { return f.kind === "ambiguous_deadline" }) ? "rule" : "input") : "none",
+            soft: soft ? soft.v : r.soft_deadline_at ? new Date(r.soft_deadline_at).toISOString() : page.whenOf(r.soft_deadline), softSrc: soft ? "you" : r.soft_deadline_at ? "you" : r.soft_deadline ? (page.whenOf(r.soft_deadline) ? "rule" : "input") : "none",
             none: false, checks: checks
         }
         var out = [one]
@@ -89,7 +91,17 @@ Page {
         tasks = out
         cur = 0
     }
-    function whenOf(phrase) { if (!phrase) return null; var t = smart.parseDate(String(phrase)); return t ? t.toISOString() : null }
+    function whenOf(phrase) {
+        if (!phrase) return null
+        if (typeof falcon.readWhen === "function") { var w = falcon.readWhen(String(phrase)); return w.at ? new Date(w.at).toISOString() : null }
+        var t = smart.parseDate(String(phrase)); return t ? t.toISOString() : null
+    }
+    // the assigner's own UTC offset as +hh:mm, so "tomorrow 3pm" means their clock, not the Engine's
+    function nowLocal() {
+        var d = new Date(), p = function (n) { return ("0" + n).slice(-2) }
+        return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()) + page.zone()
+    }
+    function zone() { var o = -new Date().getTimezoneOffset(), a = Math.abs(o); return (o < 0 ? "-" : "+") + ("0" + Math.floor(a / 60)).slice(-2) + ":" + ("0" + (a % 60)).slice(-2) }
     function patch(i, f) { var t = tasks.slice(); t[i] = Object.assign({}, t[i], f); tasks = t }
     function patchCheck(i, k, f) {
         var cs = tasks[i].checks.slice(); cs[k] = Object.assign({}, cs[k], f, { src: "you", why: "Set by you" })
