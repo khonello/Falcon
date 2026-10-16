@@ -16,6 +16,7 @@ Popup {
     width: Math.min(640, parent.width - 32)
     height: input.height + Math.min(360, list.contentHeight + 12) + 2
     padding: 0
+    clip: true
     modal: true
     dim: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -96,6 +97,12 @@ Popup {
         for (var gg in extra)
             out.push({ g: gg, l: "+" + extra[gg] + " more " + gg.toLowerCase(), s: "type more to narrow, or open the full list",
                        icon: "ellipsis", page: gg === "Machines" ? (Nav.boss ? "registry" : "machines") : gg === "Issues" ? (Nav.boss ? "departments" : "issues") : gg === "Tasks" ? "tasks" : gg === "Flows" ? "flows" : gg === "Rules" ? "rules" : "departments", sub: null })
+        if (cmd) {           // in command mode what can be done comes first, then the pages
+            var rank = { "Commands": 0, "Actions": 1 }
+            out = out.map(function (x, i) { return { x: x, i: i } }).sort(function (a, b) {
+                var ra = rank[a.x.g] === undefined ? 2 : rank[a.x.g], rb = rank[b.x.g] === undefined ? 2 : rank[b.x.g]
+                return ra - rb || a.i - b.i }).map(function (e) { return e.x })
+        }
         return out
     }
     function pick(x) {

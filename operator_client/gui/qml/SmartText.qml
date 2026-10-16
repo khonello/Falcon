@@ -183,8 +183,14 @@ Column {
             readonly property var opts: root.stage ? root.stage.opts : root.optionsFor(m, root.mention)
             visible: m !== null || root.mention !== null || root.stage !== null
             readonly property rect at: root.stage ? area.positionToRectangle(root.stage.at) : m ? area.positionToRectangle(m.end) : root.mention ? area.positionToRectangle(root.mention.start) : Qt.rect(0, 0, 0, 0)
-            x: Math.max(0, Math.min(at.x - 20, parent.width - width))
-            y: at.y + at.height + 6
+            // drawn on the window's overlay, so the card the box sits in cannot cut it off
+            parent: Overlay.overlay
+            readonly property point pos: {
+                var p = area.mapToItem(Overlay.overlay, at.x - 20, at.y + at.height + 6), o = Overlay.overlay
+                return Qt.point(Math.max(8, Math.min(p.x, o.width - width - 8)), Math.max(8, Math.min(p.y, o.height - height - 8)))
+            }
+            x: pos.x
+            y: pos.y
             objectName: "smartPicker"
             width: 330
             height: pcol.height + 12
