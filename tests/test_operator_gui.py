@@ -455,7 +455,22 @@ async def test_a_flow_s_steps_keep_their_names_and_their_place(console):
     assert sent["stages"] == [{"stage_type": "categorization", "parent_index": None, "config": {"op": "Sort by file type", "by": "extension"}},
                               {"stage_type": "transformation", "parent_index": 0, "config": {"op": "Compress to ZIP"}}]
     assert [d["parent_index"] for d in sent["destinations"]] == [0, 1]
+    assert sent["on_source_delete"] == "keep"                                    # said in the setup, and kept unless chosen otherwise
+    assert win.findChild(QObject, "nfOnDelete") is not None
 
+
+async def test_a_flow_can_be_set_to_remove_copies_when_the_source_deletes(console):
+    win, bridge, _ = console("admin")
+    await _open(win, bridge, "flows", "flowsView")
+    win.setProperty("view", "flows/edit-5")
+    await _wait(lambda: win.findChild(QObject, "newFlow") is not None)
+    edit = win.findChild(QObject, "newFlow")
+    await _wait(lambda: len(prop(edit, "stages") or []) == 2)
+    assert prop(edit, "onDelete") == "keep"
+    edit.setProperty("onDelete", "mirror")
+    QMetaObject.invokeMethod(edit, "save")
+    await _wait(lambda: any(t == "flow.edit" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "flow.edit")["on_source_delete"] == "mirror"
 
 
 async def test_the_super_user_gives_a_task_on_its_own_page(console):

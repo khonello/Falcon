@@ -1186,9 +1186,10 @@ class FlowsRepo(_Repo):
         a stage the same way. Resolved to ids inside one transaction."""
         async with self.pool.acquire() as conn, conn.transaction():
             flow_id = await conn.fetchval(
-                "INSERT INTO flows (created_by_account_id, source_pc_id, source_path, consent_status) "
-                "VALUES ($1, $2, $3, $4) RETURNING id",
-                flow["created_by_account_id"], flow["source_pc_id"], flow["source_path"], flow["consent_status"])
+                "INSERT INTO flows (created_by_account_id, source_pc_id, source_path, consent_status, on_source_delete) "
+                "VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                flow["created_by_account_id"], flow["source_pc_id"], flow["source_path"], flow["consent_status"],
+                flow.get("on_source_delete") or "keep")
             stage_ids: list[int] = []
             for st in stages:
                 parent = stage_ids[st["parent_index"]] if st.get("parent_index") is not None else None
@@ -1234,7 +1235,7 @@ class FlowsRepo(_Repo):
 
     async def sources_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT id, source_path FROM flows WHERE source_pc_id = $1 AND status = 'active'", pc_id)
+            "SELECT id, source_path, on_source_delete FROM flows WHERE source_pc_id = $1 AND status = 'active'", pc_id)
 
     async def destinations_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -1279,6 +1280,9 @@ class FlowsRepo(_Repo):
     async def set_status(self, flow_id: int, status: str, pause_reason: str | None = None) -> None:
         await self._exec(
             "UPDATE flows SET status = $2, pause_reason = $3 WHERE id = $1", flow_id, status, pause_reason)
+
+    async def set_on_source_delete(self, flow_id: int, choice: str) -> None:
+        await self._exec("UPDATE flows SET on_source_delete = $2 WHERE id = $1", flow_id, choice)
 
     async def set_consent(self, flow_id: int, consent_status: str) -> None:
         await self._exec("UPDATE flows SET consent_status = $2 WHERE id = $1", flow_id, consent_status)

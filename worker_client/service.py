@@ -230,6 +230,8 @@ class WorkerService:
                 await self.flowsync.on_apply(payload)
             elif type_ == "flow.resolve_conflict":
                 await self.flowsync.on_resolve_conflict(payload)
+            elif type_ == "flow.remove":
+                await self.flowsync.on_remove(payload)
             elif type_ == "issue.ask_delete":
                 if self.config.windows:
                     self._spawn(self._ask_to_delete(payload))

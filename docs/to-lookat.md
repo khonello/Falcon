@@ -64,3 +64,9 @@ Last updated 13 Oct 2026.
 - **Benchmark on this machine (Windows wheel):** the 1.7B scored 26/27 tuned and 26/32 held-out before the verb fixes (export, back up, rename, "must be on", "Monday's review" were cue-list gaps, not model errors). After them: tuned 32/32, fresh held-out 31/31. The 29/32 in CLAUDE.md was measured elsewhere.
 - **Command palette**: Ctrl K and Ctrl P open it, Ctrl Shift P opens it in `>` command mode (commands, pages, "New task/flow/rule"); it now also finds tasks and flows (and rules at the Super User's level), and the list follows the arrow keys.
 - For the GUI session: I edited `SmartText.qml`, `NewTaskPage.qml`, `NewFlowPage.qml`, `TaskChart.qml`, `Palette.qml`, `main.qml` (two shortcuts) and `bridge.py` (`readWhen`).
+
+## A deleted source file: now a choice per flow (16 Oct 2026)
+
+- Decided with the user: each flow chooses, in its setup beside the source: **Keep the copies** (the default) or **Remove the copies**. `flows.on_source_delete`, migration 032, `flow.create` / `flow.edit` take `on_source_delete`.
+- Remove means *put aside*: the destination's machine moves its copy into `.falcon-removed` under the destination folder, only if the flow wrote it and it is unchanged since (otherwise it is kept and the creator is told). A destination that was away is dealt with on catch-up. A mirror never removes anything because a listing came back empty (`flow.mirror_held` in the audit).
+- Not built: a console-wide default for new flows (each new flow starts on Keep).

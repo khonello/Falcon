@@ -7,6 +7,9 @@
                                                      -> write through the stages, then flow.sync_result
                                                         (a big file arrives in chunks, each with chunk: {index, total}; written when whole)
     flow.resolve_conflict {path, rename_to}          -> rename the externally modified copy
+    flow.remove {destination_id, relative_path, path, hash, root}
+                                                     -> the source deleted it and the flow mirrors deletions: move our own, unedited copy aside
+                                                        (into `.falcon-removed`), then flow.remove_result {status: removed|kept|missing}
 
 Stages (v1):
   * transformation {"to": "<ext>"}  -- converts when a converter is registered for the pair;
@@ -166,6 +169,41 @@ class FlowSync:
             n += 1
         os.replace(target, kept)
         return kept
+
+    async def on_remove(self, payload: dict[str, Any]) -> None:
+        """The source deleted a file and the flow mirrors deletions: put away the copy it wrote. Moved into `.falcon-removed` under the destination
+        (never destroyed), and only if it is still exactly what the flow wrote -- anything edited since is kept and said so."""
+        path = Path(str(payload["path"]))
+        root = Path(str(payload["root"]))
+        rel = str(payload["relative_path"])
+        reply = {"destination_id": payload["destination_id"], "relative_path": rel, "path": str(path)}
+        try:
+            if not path.is_file():
+                reply["status"] = "missing"
+            elif await asyncio.to_thread(hash_of, path, 1 << 62) != payload.get("hash"):
+                reply["status"] = "kept"                                       # changed since the flow wrote it: not ours to remove
+            else:
+                aside = await asyncio.to_thread(self._put_away, path, root)
+                reply["status"], reply["moved_to"] = "removed", str(aside)
+        except OSError as exc:
+            log.warning("flow.remove failed for %s: %s", path, exc)
+            reply["status"] = "kept"
+        await self.report("flow.remove_result", reply)
+
+    @staticmethod
+    def _put_away(path: Path, root: Path) -> Path:
+        try:
+            inside = path.relative_to(root)
+        except ValueError:
+            inside = Path(path.name)
+        target = root / ".falcon-removed" / inside
+        target.parent.mkdir(parents=True, exist_ok=True)
+        n = 1
+        while target.exists():
+            n += 1
+            target = target.with_name(f"{inside.stem}-{n}{inside.suffix}")
+        os.replace(path, target)
+        return target
 
     async def on_resolve_conflict(self, payload: dict[str, Any]) -> None:
         src, dst = Path(str(payload["path"])), Path(str(payload["rename_to"]))

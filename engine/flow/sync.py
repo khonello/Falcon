@@ -137,9 +137,15 @@ def install(engine: Engine) -> None:
 # --- detection ----------------------------------------------------------------------------------
 
 async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
-    if not engine.db.connected or event["op"] == "delete":
+    if not engine.db.connected:
         return
     pc_id = event["pc_id"]
+    if event["op"] == "delete":
+        for src in await engine.db.flows.sources_for_pc(pc_id):
+            rel = relative_under(event["path"], src["source_path"])
+            if rel is not None and src.get("on_source_delete") == "mirror":
+                await remove_at_destinations(engine, src["id"], rel)
+        return
     # A file under an unresolved Resource violation is ignored by the system (Resource ->
     # Compliance): Flow never moves it.
     if event.get("file_index_id") in await engine.db.resource.ignored_file_ids(pc_id):
@@ -176,6 +182,57 @@ async def _check_destination_write(engine: Engine, dest: dict[str, Any], event: 
     if flow is not None:
         await propagate(engine, flow["id"], join_client_path(flow["source_path"], source_rel), source_rel, None,
                         only_destination=dest["id"])
+
+
+# --- a file deleted at the source ---------------------------------------------------------------
+
+REMOVED = "removed"             # the content hash a sync-log entry carries when the flow put a destination's copy away
+
+
+async def remove_at_destinations(engine: Engine, flow_id: int, rel: str, *, only: set[int] | None = None) -> int:
+    """A mirroring flow: the file is gone from the source, so each destination is asked to put away the copy THE FLOW WROTE (never anything else).
+    The destination's machine moves it aside (nothing is destroyed) and says what it did. A destination that is away is dealt with on catch-up."""
+    flow = await engine.db.flows.get(flow_id)
+    if flow is None or flow["status"] != "active" or flow.get("on_source_delete") != "mirror":
+        return 0
+    asked = 0
+    online = engine.online_pc_ids()
+    for dest in flow["destinations"]:
+        if dest.get("paused_reason") or (only is not None and dest["id"] not in only) or dest["destination_pc_id"] not in online:
+            continue
+        last = await engine.db.flows.last_written_for(dest["id"], rel)
+        if not last or not last.get("path") or not last.get("hash") or last["hash"] == REMOVED:
+            continue                                                       # the flow never wrote it here, or it is already put away
+        await engine.push_to_pc(dest["destination_pc_id"], "flow.remove", {
+            "flow_id": flow_id, "destination_id": dest["id"], "relative_path": rel, "path": last["path"], "hash": last["hash"],
+            "root": dest["destination_path"]})
+        asked += 1
+    return asked
+
+
+@handler("flow.remove_result")
+async def remove_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """The destination machine reports what it did: {"destination_id", "relative_path", "status": "removed"|"kept"|"missing", "path", "moved_to"?}"""
+    ident = require_account(ctx)
+    dest = await ctx.engine.db.flows.destination(int_field(payload, "destination_id"))
+    if dest is None or dest["destination_pc_id"] != ident.pc_id:
+        raise ProtocolError(ErrorCode.FORBIDDEN, "not the destination pc")
+    status = str_field(payload, "status", choices=("removed", "kept", "missing"))
+    rel, path = str_field(payload, "relative_path"), str(payload.get("path") or "")
+    flow = await ctx.engine.db.flows.get(dest["flow_id"])
+    if status in ("removed", "missing"):
+        # recorded so a catch-up knows the destination no longer holds this file, and gives it back if the source brings it again
+        await ctx.engine.db.flows.log_sync(dest["id"], REMOVED, "flow_sync", None, source_relative_path=rel, written_path=path or None, source_hash=None)
+        await ctx.engine.audit.record(ctx, "flow.removed", target_type="flow_destinations", target_id=dest["id"],
+                                      detail={"flow_id": dest["flow_id"], "relative_path": rel, "moved_to": payload.get("moved_to"), "status": status})
+    else:
+        await ctx.engine.audit.record(ctx, "flow.kept", target_type="flow_destinations", target_id=dest["id"],
+                                      detail={"flow_id": dest["flow_id"], "relative_path": rel, "why": "it was changed after the flow wrote it"})
+        if flow is not None:
+            await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.conflict",
+                                             {"flow_id": flow["id"], "destination_id": dest["id"], "kept": path, "relative_path": rel,
+                                              "why": "deleted at the source, but changed here since: kept"})
+    return {"recorded": True}
 
 
 # --- propagation --------------------------------------------------------------------------------
@@ -461,6 +518,7 @@ async def _reconcile(engine: Engine, found: Listing) -> None:
     if not targets:
         return
     given = {d["id"]: await engine.db.flows.synced_source_hashes(d["id"]) for d in targets}
+    await _mirror_deletes(engine, flow, found, targets, given)
     sent = 0
     for entry in found.entries:
         rel, digest = entry["relative_path"], entry["hash"]
@@ -477,6 +535,24 @@ async def _reconcile(engine: Engine, found: Listing) -> None:
     if sent:
         await engine.audit.record(None, "flow.caught_up", target_type="flows", target_id=flow["id"],
                                   detail={"files": sent, "destinations": [d["id"] for d in targets]})
+
+
+async def _mirror_deletes(engine: Engine, flow: dict[str, Any], found: Listing, targets: list[dict[str, Any]], given: dict[int, dict[str, Any]]) -> None:
+    """A mirroring flow also catches up on deletions it missed: what a destination was given from the source but the source no longer holds.
+    Never from an empty listing (a source folder that cannot be read looks exactly like one emptied on purpose)."""
+    if flow.get("on_source_delete") != "mirror":
+        return
+    present = {e["relative_path"].replace("\\", "/").lower() for e in found.entries}
+    for d in targets:
+        gone = [rel for rel, digest in given[d["id"]].items() if digest is not None and rel not in present]
+        if not gone:
+            continue
+        if not present:
+            await engine.audit.record(None, "flow.mirror_held", target_type="flows", target_id=flow["id"],
+                                      detail={"why": "the source listing was empty; nothing was removed", "files": len(gone)})
+            return
+        for rel in gone:
+            await remove_at_destinations(engine, flow["id"], rel, only={d["id"]})
 
 
 async def on_pc_online(engine: Engine, pc_id: int) -> None:

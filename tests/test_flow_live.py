@@ -10,6 +10,9 @@ import hashlib
 import time
 from pathlib import Path
 
+import pytest
+
+from common.connection import EngineError
 from engine.flow import sync
 from tests.conftest import requires_db
 from tests.test_worker_client import _admin, _start, _wait
@@ -176,3 +179,95 @@ async def test_a_deleted_source_file_leaves_the_destination_copy_and_comes_back_
         await admin.close()
         await w1.stop()
         await w2.stop()
+
+
+async def test_a_deleted_source_file_stays_at_the_destination_unless_the_flow_mirrors_deletes(engine, org, tmp_path: Path):
+    src, dst = tmp_path / "out", tmp_path / "in"
+    src.mkdir()
+    dst.mkdir()
+    w1, w2, admin = await _start(engine, tmp_path, "cid-w1", [str(src)]), await _start(engine, tmp_path, "cid-w2", [str(dst)]), await _admin(engine)
+    try:
+        await admin.call("flow.create", _flow(org, src, dst))                                 # the default: keep
+        (src / "keep.txt").write_text("k", encoding="utf-8")
+        assert await _wait(lambda: (dst / "keep.txt").exists(), timeout=15)
+        (src / "keep.txt").unlink()
+        await asyncio.sleep(3)
+        assert (dst / "keep.txt").exists()
+    finally:
+        await admin.close()
+        await w1.stop()
+        await w2.stop()
+
+
+async def test_a_mirroring_flow_puts_the_copy_aside_only_if_it_is_still_the_flows_own(engine, org, tmp_path: Path):
+    src, dst = tmp_path / "out", tmp_path / "in"
+    src.mkdir()
+    dst.mkdir()
+    w1, w2, admin = await _start(engine, tmp_path, "cid-w1", [str(src)]), await _start(engine, tmp_path, "cid-w2", [str(dst)]), await _admin(engine)
+    try:
+        fid = (await admin.call("flow.create", _flow(org, src, dst, on_source_delete="mirror")))["flow"]["id"]
+        assert (await engine.db.flows.get(fid))["on_source_delete"] == "mirror"
+        (src / "gone.txt").write_text("g", encoding="utf-8")
+        (src / "edited.txt").write_text("e", encoding="utf-8")
+        assert await _wait(lambda: (dst / "gone.txt").exists() and (dst / "edited.txt").exists(), timeout=15)
+        (dst / "edited.txt").write_text("someone changed this here", encoding="utf-8")        # not the flow's any more
+        await asyncio.sleep(1.5)
+        (src / "gone.txt").unlink()
+        (src / "edited.txt").unlink()
+        assert await _wait(lambda: not (dst / "gone.txt").exists(), timeout=15)
+        assert (dst / ".falcon-removed" / "gone.txt").read_text(encoding="utf-8") == "g"      # put aside, not destroyed
+        await asyncio.sleep(1.5)
+        # the edit was kept beside the flow's file (the flow's existing rule), and nothing of the person's was lost
+        assert (dst / "edited-modified.txt").read_text(encoding="utf-8") == "someone changed this here"
+        # and a copy changed after the flow wrote it is never put away: asked directly, the machine says "kept"
+        mine = dst / "mine.txt"
+        mine.write_text("not the flow's content", encoding="utf-8")
+        told = []
+        w2.flowsync.report = lambda t, p: told.append((t, p)) or asyncio.sleep(0)
+        await w2.flowsync.on_remove({"destination_id": 1, "relative_path": "mine.txt", "path": str(mine), "hash": "0" * 64, "root": str(dst)})
+        assert told[0][1]["status"] == "kept" and mine.read_text(encoding="utf-8") == "not the flow's content"
+        (src / "gone.txt").write_text("back again", encoding="utf-8")                          # the source brings it back
+        assert await _wait(lambda: (dst / "gone.txt").exists(), timeout=15)
+    finally:
+        await admin.close()
+        await w1.stop()
+        await w2.stop()
+
+
+async def test_a_mirror_never_removes_everything_because_a_listing_was_empty(engine, org, tmp_path: Path):
+    src, dst = tmp_path / "out", tmp_path / "in"
+    src.mkdir()
+    dst.mkdir()
+    w1, w2, admin = await _start(engine, tmp_path, "cid-w1", [str(src)]), await _start(engine, tmp_path, "cid-w2", [str(dst)]), await _admin(engine)
+    try:
+        fid = (await admin.call("flow.create", _flow(org, src, dst, on_source_delete="mirror")))["flow"]["id"]
+        (src / "a.txt").write_text("a", encoding="utf-8")
+        assert await _wait(lambda: (dst / "a.txt").exists(), timeout=15)
+        flow = await engine.db.flows.get(fid)
+        found = sync.Listing(fid, None)                                                         # a listing that came back empty
+        await sync._reconcile(engine, found)
+        await asyncio.sleep(1.5)
+        assert (dst / "a.txt").exists()
+        assert await engine.db.pool.fetchval("SELECT count(*) FROM audit_log WHERE action_type = 'flow.mirror_held'") == 1
+        assert flow["on_source_delete"] == "mirror"
+    finally:
+        await admin.close()
+        await w1.stop()
+        await w2.stop()
+
+
+async def test_the_delete_rule_is_checked_and_can_be_changed(engine, org, tmp_path: Path):
+    src, dst = tmp_path / "out", tmp_path / "in"
+    src.mkdir()
+    dst.mkdir()
+    admin = await _admin(engine)
+    try:
+        r = await admin.call("flow.create", _flow(org, src, dst))
+        fid = r["flow"]["id"]
+        assert r["flow"]["on_source_delete"] == "keep"
+        with pytest.raises(EngineError):
+            await admin.call("flow.create", _flow(org, src, dst, on_source_delete="shred"))     # an unknown rule is refused
+        edited = await admin.call("flow.edit", {"flow_id": fid, "destinations": _flow(org, src, dst)["destinations"], "stages": [], "on_source_delete": "mirror"})
+        assert edited["flow"]["on_source_delete"] == "mirror"
+    finally:
+        await admin.close()

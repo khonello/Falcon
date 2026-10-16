@@ -18,6 +18,7 @@ Page {
     readonly property int editId: Nav.sub && String(Nav.sub).indexOf("edit-") === 0 ? Number(String(Nav.sub).slice(5)) : 0
     property var flows: []
     property var src: ({ pc: 0, path: "" })
+    property string onDelete: "keep"       // what the destinations do when a file is deleted at the source: keep their copy, or mirror the deletion
     property string when: "Real time"
     property var stages: []                 // [{kind, op, scope: "all" | index}]
     property var dests: [{ mode: "mine", pc: 0, path: "", who: 0 }]
@@ -31,6 +32,7 @@ Page {
     function fill(f) {
         if (!f) return
         page.src = { pc: f.source_pc_id, path: f.source_path }
+        page.onDelete = f.on_source_delete === "mirror" ? "mirror" : "keep"
         page.dests = (f.destinations || []).map(function (d) { return { mode: "mine", pc: d.destination_pc_id || 0, path: d.destination_path, who: 0 } })
         page.stages = Sync.steps(f)
     }
@@ -93,7 +95,7 @@ Page {
         var p = Sync.plan(stages, dests.length)
         var ds = []
         dests.forEach(function (d, i) { if (d.mode === "mine") ds.push({ destination_pc_id: d.pc, destination_path: d.path, parent_index: p.parents[i] }) })
-        var payload = { destinations: ds, stages: p.stages }
+        var payload = { destinations: ds, stages: p.stages, on_source_delete: page.onDelete }
         if (page.editId) payload.flow_id = page.editId
         else { payload.source_pc_id = src.pc; payload.source_path = src.path }
         page.send(payload)
@@ -213,6 +215,13 @@ Page {
                                         onPicked: function (v) { page.src = { pc: v, path: page.src.path } } }
                                FolderField { width: Math.min(200, parent.width); pcId: page.src.pc; text: page.src.path; placeholder: "Folder"
                                              onEdited: function (t) { page.src = { pc: page.src.pc, path: t } } } }
+                        // what a deletion at the source does at the destinations: chosen here, where the source is chosen, and told in words
+                        Txt { text: "When a file is deleted here"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                        Segmented { objectName: "nfOnDelete"; options: [{ value: "keep", label: "Keep the copies" }, { value: "mirror", label: "Remove the copies" }]; value: page.onDelete
+                                    onPicked: function (v) { page.onDelete = v } }
+                        Txt { width: parent.width; wrapMode: Text.Wrap; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                              text: page.onDelete === "mirror" ? "The destinations put their copy aside, in a “.falcon-removed” folder (nothing is destroyed). Only a copy this flow wrote and nobody has changed is touched."
+                                                               : "The destinations keep what they were given. Deleting a file here never deletes it there." }
                     }
                     add: Btn { anchors.right: parent.right; iconName: "plus"; text: "Add a source"; enabled: false; tip: "Several sources are not built in the Engine yet" }
                 }

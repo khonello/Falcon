@@ -232,6 +232,13 @@ async def run_checks(engine: Engine, creator: dict[str, Any], source_pc_id: int,
 
 # --- handlers -----------------------------------------------------------------------------------
 
+def _on_delete(payload: dict[str, Any]) -> str | None:
+    """What happens at the destinations when a file is deleted at the source: "keep" (the default) or "mirror". None when not given."""
+    if payload.get("on_source_delete") is None:
+        return None
+    return str_field(payload, "on_source_delete", choices=("keep", "mirror"))
+
+
 async def _flow_view(engine: Engine, flow: dict[str, Any]) -> dict[str, Any]:
     view = row(flow) or {}
     view["suggestion"] = suggestion_for(flow.get("pause_reason"))
@@ -270,6 +277,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     source_pc_id = int_field(payload, "source_pc_id")
     source_path = str_field(payload, "source_path")
     dests, stages = _parse_structure(payload)
+    on_delete = _on_delete(payload)
     src = await ctx.engine.db.accounts.pc(source_pc_id)
     if src is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such source pc")
@@ -283,7 +291,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         d["pre_flight_check_status"] = "passed"
     flow_id = await ctx.engine.db.flows.create(
         {"created_by_account_id": ident.account_id, "source_pc_id": source_pc_id, "source_path": source_path,
-         "consent_status": "pending" if pending else "not_required"}, dests, stages)
+         "consent_status": "pending" if pending else "not_required", "on_source_delete": on_delete or "keep"}, dests, stages)
     if pending:
         await ctx.engine.db.flows.set_status(flow_id, "paused", "consent:pending")
         names = await ctx.engine.db.accounts.display_names_for(pending[0]["owner_account_id"], [ident.account_id])
@@ -307,7 +315,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                     "consent_by": who.get(first["owner_account_id"]), "consent_account_id": first["owner_account_id"],
                     "destination_pc_id": first.get("destination_pc_id"), "asked_at": datetime.now(timezone.utc).isoformat()})
     await ctx.engine.audit.record(ctx, "flow.created", target_type="flows", target_id=flow_id,
-                                  detail={"source_pc_id": source_pc_id, "destinations": len(dests),
+                                  detail={"source_pc_id": source_pc_id, "destinations": len(dests), "on_source_delete": on_delete or "keep",
                                           "consent_pending": [d["owner_account_id"] for d in pending],
                                           "collisions_confirmed": len(checks["collisions"])})
     flow = await ctx.engine.db.flows.get(flow_id)
@@ -367,6 +375,10 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.FORBIDDEN, "new destinations outside your authority need a new flow "
                                                  "(consent is requested at creation)")
     await ctx.engine.db.flows.replace_structure(flow_id, dests, stages)
+    on_delete = _on_delete(payload)
+    if on_delete and on_delete != flow.get("on_source_delete"):
+        await ctx.engine.db.flows.set_on_source_delete(flow_id, on_delete)
+        await ctx.engine.audit.record(ctx, "flow.delete_rule_changed", target_type="flows", target_id=flow_id, detail={"on_source_delete": on_delete})
     await ctx.engine.audit.record(ctx, "flow.edited", target_type="flows", target_id=flow_id)
     updated = await ctx.engine.db.flows.get(flow_id)
     assert updated is not None
