@@ -67,6 +67,8 @@ Page {
 
     component Head: Txt { color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; elide: Text.ElideNone }
 
+    MessageTabs {}
+
     Row {
         width: parent.width
         spacing: 14
@@ -92,11 +94,11 @@ Page {
                 Column {
                     width: parent.width; spacing: 8
                     Head { text: "KIND" }
-                    Segmented { objectName: "annKind"; options: [{ value: "announcement", label: "Announcement" }, { value: "warning", label: "Warning" }, { value: "emergency", label: "Emergency" }]
+                    Segmented { objectName: "annKind"; options: [{ value: "announcement", label: "Announcement" }, { value: "emergency", label: "Emergency" }]
                                 value: page.kind; onPicked: function (v) { page.kind = v } }
                     Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: page.kind === "emergency" ? Theme.crit : Theme.text3; font.pixelSize: 12
                           text: page.kind === "emergency" ? "An emergency covers the screen on every machine it reaches until the person dismisses it. Use it only when it cannot wait."
-                              : page.kind === "warning" ? "Shown first in the person's list, marked as a warning." : "Waits in the person's Falcon program. It does not interrupt anyone." }
+                              : "Waits in the person's Falcon program. It does not interrupt anyone." }
                 }
                 Column {
                     width: parent.width; spacing: 8

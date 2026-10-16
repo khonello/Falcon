@@ -82,6 +82,7 @@ Popup {
         // a few things to do: leave the session you hold; at an Admin's level, run an action once
         var held = falcon.traversing && falcon.session ? Fleet.byPc[falcon.session.pc_id] : null
         if (held) all.push({ g: "Actions", l: "Leave your session on " + held.host, s: held.user ? held.user + " gets the machine back" : "nobody is waiting for it", icon: "logout", leave: true })
+        all.push({ g: "Commands", l: "New announcement", s: "tell everyone, a department or chosen people; an emergency covers their screen", icon: "plus", page: "messages", sub: "announcements" })
         all.push({ g: "Commands", l: "New task", s: "describe the work; @ marks a person, file, folder, program or deadline", icon: "plus", page: "tasks", sub: "new" })
         if (!Nav.boss) {
             all.push({ g: "Commands", l: "New flow", s: "a one-way sync from a folder to others", icon: "plus", page: "flows", sub: "new" })

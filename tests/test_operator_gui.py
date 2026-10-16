@@ -242,9 +242,9 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
     return win.findChild(QObject, name)
 
 
-ADMIN_MENU = ["overview", "messages", "tasks", "announcements", "restricted", "flows", "machines", "sessions", "issues",
+ADMIN_MENU = ["overview", "messages", "tasks", "restricted", "flows", "detective", "machines", "sessions", "issues",
               "automation", "actions", "rollout", "audit", "reports"]
-SU_MENU = ["overview", "messages", "tasks", "announcements", "restricted", "flows", "departments", "accountability", "access",
+SU_MENU = ["overview", "messages", "tasks", "restricted", "flows", "detective", "departments", "accountability", "access",
            "registry", "reports", "rules", "rollout", "audit"]
 
 
@@ -288,7 +288,7 @@ async def test_the_super_user_never_opens_an_admin_s_page(console):
 
 PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
-    ("admin", "restricted/mark"), ("admin", "machines/OPS-01"), ("super_user", "rules/new"), ("super_user", "rules/edit-O-5"), ("super_user", "tasks/new")]
+    ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("super_user", "messages/announcements"), ("admin", "machines/OPS-01"), ("super_user", "rules/new"), ("super_user", "rules/edit-O-5"), ("super_user", "tasks/new")]
 
 
 @pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])

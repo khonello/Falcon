@@ -64,7 +64,7 @@ ApplicationWindow {
     readonly property var pages: ({
         overview: Nav.boss ? "SuOverviewPage.qml" : "OverviewPage.qml",
         messages: "MessagesPage.qml",
-        announcements: "AnnouncementsPage.qml",
+        detective: "DetectivePage.qml",
         tasks: Nav.boss ? "GivenTasksPage.qml" : "TasksPage.qml",
         restricted: "RestrictedPage.qml",
         flows: "FlowsPage.qml",
@@ -86,6 +86,7 @@ ApplicationWindow {
     // a page and the thing open on it: some open a page of their own (a machine, an editor)
     function pageFile(p, s) {
         if (p === "machines" && s) return "MachinePage.qml"
+        if (p === "messages" && s === "announcements") return "AnnouncementsPage.qml"
         if (p === "tasks" && s === "new") return Nav.boss ? "GiveTaskPage.qml" : "NewTaskPage.qml"
         if (p === "restricted" && s === "mark") return "MarkPage.qml"
         if (p === "flows" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewFlowPage.qml"

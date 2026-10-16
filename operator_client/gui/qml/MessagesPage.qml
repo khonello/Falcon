@@ -112,6 +112,8 @@ Page {
 
     Confirm { id: confirm; page: page }
 
+    MessageTabs {}
+
     Strip {
         width: parent.width
         on: page.f === "" ? null : page.f

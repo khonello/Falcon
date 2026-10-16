@@ -56,14 +56,14 @@ QtObject {
     // --- the menus ----------------------------------------------------------------------------------
     readonly property var adminMenu: [
         ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"],
-                  ["announcements", "Announcements", "notification"], ["restricted", "Restricted", "fileprotect"], ["flows", "Flows", "branches"]]],
+                  ["restricted", "Restricted", "fileprotect"], ["flows", "Flows", "branches"], ["detective", "Detective", "filesearch"]]],
         ["Monitor", [["machines", "Machines", "desktop"], ["sessions", "Sessions", "login"], ["issues", "Issues", "alert"]]],
         ["Automate", [["automation", "Automation", "thunderbolt"], ["actions", "Actions", "playcircle"]]],
         ["Govern", [["rollout", "Rollout", "cloudupload"], ["audit", "Audit log", "history"], ["reports", "Reports", "filetext"]]]
     ]
     readonly property var suMenu: [
         ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"],
-                  ["announcements", "Announcements", "notification"], ["restricted", "Restricted", "fileprotect"], ["flows", "Flows", "branches"]]],
+                  ["restricted", "Restricted", "fileprotect"], ["flows", "Flows", "branches"], ["detective", "Detective", "filesearch"]]],
         ["Organisation", [["departments", "Departments", "apartment"], ["accountability", "Accountability", "eye"],
                           ["access", "Access", "login"], ["registry", "Registry", "desktop"], ["reports", "Reports", "filetext"]]],
         ["Govern", [["rules", "Rules", "safety"], ["rollout", "Rollout", "cloudupload"], ["audit", "Audit log", "history"]]]
@@ -78,8 +78,8 @@ QtObject {
 
     // --- titles: what each page is, in a line --------------------------------------------------------
     readonly property var titles: ({
-        messages: ["Messages", "Pings and the conversations they open, one message each way at a time"],
-        announcements: ["Announcements", "Tell the people it concerns · it reaches their Falcon program, and an emergency covers the screen"],
+        messages: ["Messages", "Conversations, and announcements to the people you look after"],
+        detective: ["Detective", "Held while its place is decided"],
         departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"],
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
         access: ["Access", "Who is inside which machine, and who was let in"],

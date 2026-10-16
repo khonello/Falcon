@@ -242,18 +242,30 @@ async def test_the_palette_says_how_old_its_names_are_when_they_are_not_live(con
 
 async def test_an_announcement_is_sent_from_its_page_and_lists_what_was_sent(console):
     win, bridge, _ = console("admin")
-    page = await _open(win, bridge, "announcements", "announcements")
+    page = await _open(win, bridge, "messages/announcements", "announcements")
     assert "Write the announcement" in prop(page, "problem")
     page.setProperty("body", "Fire drill at 10.")
     page.setProperty("title", "Fire drill")
-    page.setProperty("kind", "warning")
+    page.setProperty("kind", "emergency")
     await _wait(lambda: prop(page, "problem") == "")
     QMetaObject.invokeMethod(page, "send")
     await _wait(lambda: any(t == "alerts.create" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "alerts.create")
-    assert sent["type"] == "warning" and sent["audience"] == "department" and sent["title"] == "Fire drill" and sent["body"] == "Fire drill at 10."
+    assert sent["type"] == "emergency" and sent["audience"] == "department" and sent["title"] == "Fire drill" and sent["body"] == "Fire drill at 10."
     assert "deliver_at" not in sent                                                       # now, not later
     assert prop(page, "body") == ""                                                       # sent: the box is empty again
     page.setProperty("body", "Again.")
     page.setProperty("audience", "specific_users")
     assert "Pick at least one person" in prop(page, "problem")
+
+
+async def test_messages_holds_conversations_and_announcements_behind_one_switch(console):
+    win, bridge, _ = console("admin")
+    await _open(win, bridge, "messages", "messagesView")
+    tabs = win.findChild(QObject, "messageTabs")
+    assert tabs is not None
+    win.setProperty("view", "messages/announcements")
+    await _wait(lambda: win.findChild(QObject, "announcements") is not None)
+    assert win.findChild(QObject, "messageTabs") is not None                         # the same switch on the other side
+    assert "announcements" not in prop(win, "menuKeys") and "detective" in prop(win, "menuKeys")
+    await _open(win, bridge, "detective", "detectiveView")

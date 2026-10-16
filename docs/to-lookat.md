@@ -98,3 +98,8 @@ Last updated 13 Oct 2026.
 - **Quiet reminders**: a task passed over gets a small corner note from the program after an hour, then four, then every eight — never a window over their work. The task's own window still opens once when it is given.
 - Old machine after a handover: unbound, no longer part of Falcon (the message says so).
 - Needs a real desktop to judge (VM plan): the tray icon and its number, the corner note, the program starting at sign-in, the emergency covering a real screen, the Start-menu shortcut.
+
+## Messages now holds announcements; Detective is a blank page (16 Oct 2026)
+
+- Announcements are a second side of **Messages** (a "Conversations | Announcements" switch at the top of both), no longer a menu item. The compose form offers two kinds, Announcement and Emergency (the Engine still supports Warning). The palette has "New announcement".
+- **Detective** is in the Core menu at both levels as an empty page, only so the menu can be decided. Menu organisation is open: see the suggestion made in the conversation (Overview + Messages on their own, then the four: Tasks, Flows, Restricted, Detective).
