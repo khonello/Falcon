@@ -154,6 +154,83 @@ def sync_client_upload() -> Scenario:
     return Scenario("sync_client_upload", "The company's sync client sends 300 MB out in a minute, as it does.", s.out)
 
 
+def zip_one_file_then_upload() -> Scenario:
+    s = Script(clock(13, 19, 0))
+    s.add("copied", r"C:\Users\kojo\Desktop\customers-master.xlsx", old=r"C:\Finance\Sales\customers-master.xlsx", thing="h-cm", by="hand", program="explorer.exe", tags=R)
+    s.after(40).add("created", r"C:\Users\kojo\Desktop\invoice.zip", thing="h-inv", by="started", program="7z.exe")
+    s.after(120).add("uploaded", program="chrome.exe", by="unknown", info={"bytes": 12_000_000, "to": "198.51.100.7", "destinations": 1, "seconds": 60})
+    return Scenario("zip_one_file_then_upload", "One restricted file is copied to the desktop, packed into a zip called invoice.zip, and 12 MB goes out through the browser.", s.out)
+
+
+def convert_then_drive() -> Scenario:
+    s = Script(clock(13, 17, 0))
+    s.add("attached", "E:\\", device="E:\\", by="alone")
+    s.after(30).add("created", r"C:\Users\ama\Documents\board-minutes.pdf", thing="h-pdf", by="hand", program="winword.exe", tags=R)
+    s.add("modified", r"C:\Users\ama\Documents\board-minutes.docx", thing="h-docx", by="hand", program="winword.exe", tags=R)
+    s.after(25).add("copied", r"E:\board-minutes.pdf", old=r"C:\Users\ama\Documents\board-minutes.pdf", thing="h-pdf", by="hand", program="explorer.exe", tags=R)
+    return Scenario("convert_then_drive", "A restricted document is saved as a PDF and the PDF goes on a drive that was just plugged in.", s.out)
+
+
+def one_file_to_a_share() -> Scenario:
+    s = Script(clock(13, 15, 0))
+    s.add("copied", r"\\fileserver\public\salary-bands.xlsx", old=r"C:\HR\salary-bands.xlsx", thing="h-sb", by="hand", program="explorer.exe", tags=R)
+    return Scenario("one_file_to_a_share", "One restricted file is copied to a public share on the network.", s.out)
+
+
+def sole_copy_deleted() -> Scenario:
+    s = Script(clock(13, 16, 45))
+    s.add("deleted", r"C:\Legal\contract-amendment-7.docx", thing="h-ca", by="hand", program="explorer.exe", tags=frozenset({"restricted", "only_copy"}))
+    return Scenario("sole_copy_deleted", "One deletion: the only copy of a restricted contract amendment.", s.out)
+
+
+def ordinary_delete() -> Scenario:
+    s = Script(clock(13, 16, 45))
+    s.add("deleted", r"C:\Users\ama\Documents\notes-old.txt", thing="h-no", by="hand", program="explorer.exe", tags=frozenset({"only_copy"}))
+    return Scenario("ordinary_delete", "One deletion of an ordinary old note that nothing else says matters.", s.out)
+
+
+def lock_out() -> Scenario:
+    s = Script(clock(13, 14, 30))
+    s.add("permissions", r"C:\Shared\Projects\plan.xlsx", thing="h-pl", by="hand", program="explorer.exe")
+    return Scenario("lock_out", "Who may open a shared project file is changed by hand.", s.out)
+
+
+def backups_then_files() -> Scenario:
+    s = Script(clock(13, 23, 0))
+    for i in range(2):
+        s.after(5).add("deleted", rf"D:\Backups\nightly-{i}.vhdx", thing=f"h-b{i}", by="hand", program="explorer.exe")
+    for i in range(4):
+        s.after(5).add("deleted", rf"C:\Shared\Projects\plan{i}.xlsx", thing=f"h-p{i}", by="hand", program="explorer.exe", tags=R)
+    return Scenario("backups_then_files", "Two backup images are deleted, then four restricted project files.", s.out)
+
+
+def weekly_collector() -> Scenario:
+    s = Script(clock(1, 10, 0))
+    for week in range(3):
+        s.t = clock(1 + week * 7, 10, 0)
+        s.add("copied", rf"C:\Users\kojo\Misc\r{week}.xlsx", old=rf"C:\Finance\Payroll\r{week}.xlsx", thing=f"h-w{week}", by="hand", program="explorer.exe", tags=R)
+    s.t = clock(22, 21, 0)
+    s.add("attached", "E:\\", device="E:\\", by="alone")
+    s.after(20).add("created", r"C:\Users\kojo\Misc\misc.zip", thing="h-misc", by="started", program="7z.exe")
+    s.after(30).add("copied", r"E:\misc.zip", old=r"C:\Users\kojo\Misc\misc.zip", thing="h-misc", by="hand", program="explorer.exe")
+    return Scenario("weekly_collector", "One restricted file a week for three weeks into a folder called Misc; on day 22 the folder is zipped and the zip goes to a drive.", s.out)
+
+
+def one_look_at_the_director() -> Scenario:
+    s = Script(clock(13, 15, 30))
+    s.add("opened", r"\\hr\files\director\pay-review.docx", thing="h-dr", by="hand", program="winword.exe", tags=frozenset({"outside_role", "restricted"}))
+    return Scenario("one_look_at_the_director", "A worker opens one restricted file in the director's folder, which is not part of their work.", s.out)
+
+
+def ordinary_day() -> Scenario:
+    s = Script(clock(13, 11, 0))
+    s.add("renamed", r"C:\Users\ama\Documents\notes.md", old=r"C:\Users\ama\Documents\notes.txt", thing="h-n", by="hand", program="explorer.exe")
+    s.after(60).add("copied", r"C:\Users\ama\Documents\Project\spec.docx", old=r"C:\Users\ama\Downloads\spec.docx", thing="h-sp", by="hand", program="explorer.exe")
+    s.after(120).add("created", r"C:\Users\ama\Documents\spec.pdf", thing="h-spp", by="hand", program="winword.exe")
+    s.after(300).add("deleted", r"C:\Users\ama\Downloads\old-installer.zip", thing="h-oi", by="hand", program="explorer.exe")
+    return Scenario("ordinary_day", "An ordinary morning: a note renamed, a download filed, a PDF made, an old installer deleted.", s.out)
+
+
 def screenshot_of_nothing() -> Scenario:
     s = Script(clock(13, 16, 0))
     s.add("launched", program="snippingtool.exe", by="hand")
@@ -218,7 +295,8 @@ def log_cleared() -> Scenario:
     return Scenario("log_cleared", "The machine's security log is cleared.", s.out)
 
 
-SCENARIOS: dict[str, Callable[[], Scenario]] = {f.__name__: f for f in (leak, backup_twin, patient, one_hidden_file, flow_to_drive, covered_by_task, snooping, screenshots, screenshot_of_nothing, printscreens, printscreen_of_nothing, upload_after_packing, sync_client_upload, goes_dark,
+SCENARIOS: dict[str, Callable[[], Scenario]] = {f.__name__: f for f in (leak, backup_twin, patient, one_hidden_file, flow_to_drive, covered_by_task, snooping, screenshots, screenshot_of_nothing, printscreens, printscreen_of_nothing, upload_after_packing, sync_client_upload, zip_one_file_then_upload, convert_then_drive, one_file_to_a_share, sole_copy_deleted, ordinary_delete, lock_out,
+                                                                  backups_then_files, weekly_collector, one_look_at_the_director, ordinary_day, goes_dark,
                                                                   laptop_lid, ransom, big_clean_up_by_hand, restricted_wiped_by_hand, leak_then_clean_up_by_hand, wiped, log_cleared)}
 
 

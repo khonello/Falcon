@@ -95,7 +95,7 @@ class UploadMeter:
 
     Only volumes are kept (never what was sent). A program is told about once per `cooldown`: a long upload is one signal, not a hundred."""
 
-    def __init__(self, *, window: float = 60.0, threshold: int = 25_000_000, cooldown: float = 600.0, public_only: bool = True) -> None:
+    def __init__(self, *, window: float = 60.0, threshold: int = 8_000_000, cooldown: float = 600.0, public_only: bool = True) -> None:
         self.window, self.threshold, self.cooldown, self.public_only = window, threshold, cooldown, public_only
         self._sent: dict[int, list[tuple[float, int, str]]] = {}
         self._told: dict[int, float] = {}

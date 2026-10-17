@@ -557,7 +557,8 @@ class FileIndexRepo(_Repo):
         return len(found)
 
     async def record_event(self, pc_id: int, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False,
-                           content_hash: str | None = None, file_index_id: int | None = None, detail: dict[str, Any] | None = None) -> bool:
+                           content_hash: str | None = None, file_index_id: int | None = None, detail: dict[str, Any] | None = None,
+                           occurred_at: float | None = None) -> bool:
         """Append to the history of what happened to files and folders. A file being edited is recorded at most
         once per ten minutes (every save would bury the rest). False when it was coalesced away."""
         if op == "modify" and not is_dir and await self._val(
@@ -565,8 +566,8 @@ class FileIndexRepo(_Repo):
                 "AND occurred_at > now() - interval '10 minutes')", pc_id, path):
             return False
         await self._exec(
-            "INSERT INTO file_events (pc_id, op, is_dir, path, old_path, content_hash, file_index_id, detail) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", pc_id, op, is_dir, path, old_path, content_hash, file_index_id, detail)
+            "INSERT INTO file_events (pc_id, op, is_dir, path, old_path, content_hash, file_index_id, detail, occurred_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE(to_timestamp($9), now()))", pc_id, op, is_dir, path, old_path, content_hash, file_index_id, detail, occurred_at)
         return True
 
     async def events_for_paths(self, places: list[tuple[int, str]]) -> list[dict[str, Any]]:
@@ -2371,8 +2372,9 @@ class DetectiveRepo(_Repo):
 
     async def recent_events(self, since: Any) -> list[dict[str, Any]]:
         """What happened to files lately, oldest first (a restart's memory of the last few hours)."""
-        return await self._fetch(
-            "SELECT pc_id, op, path, old_path, content_hash, detail, occurred_at FROM file_events WHERE occurred_at >= $1 AND NOT is_dir ORDER BY occurred_at, id", since)
+        rows = await self._fetch(
+            "SELECT pc_id, op, path, old_path, content_hash, detail, occurred_at FROM file_events WHERE occurred_at >= $1 AND NOT is_dir ORDER BY occurred_at DESC, id DESC LIMIT 60000", since)
+        return rows[::-1]
 
     async def counts(self, *, department_id: int | None = None, exclude_pc_types: list[str] | None = None, only_pc_types: list[str] | None = None) -> list[dict[str, Any]]:
         return await self._fetch(

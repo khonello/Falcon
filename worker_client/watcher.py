@@ -417,7 +417,7 @@ class Watcher:
                             unchanged.append(p)          # met in this walk, changed or not: it is not one of the files that went
                         if known is not None and known[0] == st.st_size and known[1] == st.st_mtime_ns:
                             continue
-                        batch.append({"op": "modify" if known else "create", "path": p, "name": name,
+                        batch.append({"op": "modify" if known else "create", "path": p, "name": name, "late": True, "at": st.st_mtime,
                                       "hash": hash_file(Path(p), self.hash_limit), "_size": st.st_size, "_mtime": st.st_mtime_ns})
                         if len(batch) >= CATCHUP_BATCH:
                             loop.call_soon_threadsafe(queue.put_nowait, batch)
@@ -427,7 +427,7 @@ class Watcher:
                 loop.call_soon_threadsafe(queue.put_nowait, batch)
             gone = [p for r in self.roots for p in state.unseen_under(str(r), run)]
             for i in range(0, len(gone), CATCHUP_BATCH):
-                loop.call_soon_threadsafe(queue.put_nowait, [{"op": "delete", "path": p, "name": os.path.basename(p)} for p in gone[i:i + CATCHUP_BATCH]])
+                loop.call_soon_threadsafe(queue.put_nowait, [{"op": "delete", "path": p, "name": os.path.basename(p), "late": True} for p in gone[i:i + CATCHUP_BATCH]])
             loop.call_soon_threadsafe(queue.put_nowait, None)
 
         worker = asyncio.create_task(asyncio.to_thread(walk))

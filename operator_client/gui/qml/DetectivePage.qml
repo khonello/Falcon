@@ -15,7 +15,6 @@ Page {
     property int sel: 0
     property var det: null                       // detective.case for the case on the right
     property string note: ""
-    readonly property var stages: ["Reaching", "Gathering", "Hiding", "Taking out", "Covering up"]
     readonly property var cur: { for (var i = 0; i < cases.length; i++) if (cases[i].id === sel) return cases[i]; return cases.length ? cases[0] : null }
     readonly property var levelTone: ({ urgent: "danger", "case": "warn", noted: "t4", quiet: "t4" })
 
@@ -141,24 +140,32 @@ Page {
                           text: page.cur && page.cur.not_yet ? page.cur.not_yet + (page.cur.next_stage ? " Next, it usually goes on to: " + page.cur.next_stage.toLowerCase() + "." : "") : "" }
                 }
 
-                // how far along it is
+                // what it covers: the areas of each intent that something falls in (coverage, not steps: no order, none required)
                 Column {
-                    visible: !!page.cur; width: parent.width; spacing: 8
-                    Head { text: "HOW FAR ALONG" }
-                    Row {
-                        spacing: 6
-                        Repeater {
-                            model: page.stages
-                            Rectangle {
-                                required property string modelData
-                                readonly property bool seen: page.cur && page.cur.behaviours && ((modelData === "Reaching" && page.cur.behaviours.indexOf("reach") >= 0)
-                                    || (modelData === "Gathering" && page.cur.behaviours.indexOf("collection") >= 0) || (modelData === "Hiding" && page.cur.behaviours.indexOf("concealment") >= 0)
-                                    || (modelData === "Taking out" && (page.cur.behaviours.indexOf("exfiltration") >= 0 || page.cur.behaviours.indexOf("capture") >= 0))
-                                    || (modelData === "Covering up" && page.cur.behaviours.indexOf("erasure") >= 0))
-                                width: pl.implicitWidth + 22; height: 28; radius: 14
-                                color: seen ? Theme.alpha(page.cur && page.cur.level === "urgent" ? Theme.crit : Theme.med, 0.16) : "transparent"
-                                border.width: 1; border.color: seen ? (page.cur && page.cur.level === "urgent" ? Theme.crit : Theme.med) : Theme.border
-                                Txt { id: pl; anchors.centerIn: parent; text: modelData; color: parent.seen ? Theme.text : Theme.text4; font.pixelSize: 12; elide: Text.ElideNone }
+                    visible: !!page.cur && !!page.det && !!page.det.board && page.det.board.length > 0; width: parent.width; spacing: 10
+                    Head { text: "WHAT IT COVERS" }
+                    Repeater {
+                        model: page.det && page.det.board ? page.det.board : []
+                        Column {
+                            required property var modelData
+                            objectName: "cover_" + modelData.behaviour
+                            width: parent.width; spacing: 6
+                            Txt { text: modelData.label + " \u00b7 " + modelData.covered + " of " + modelData.of + " areas have something in them"; color: Theme.text2; font.pixelSize: 12; elide: Text.ElideNone }
+                            Flow {
+                                width: parent.width; spacing: 6
+                                Repeater {
+                                    model: parent.parent.modelData.areas
+                                    Rectangle {
+                                        required property var modelData
+                                        objectName: "area_" + modelData.name
+                                        readonly property color tone: page.cur && page.cur.level === "urgent" ? Theme.crit : Theme.med
+                                        width: al.implicitWidth + 22; height: 28; radius: 14
+                                        color: modelData.covered ? Theme.alpha(tone, 0.16) : "transparent"
+                                        border.width: 1; border.color: modelData.covered ? tone : Theme.border
+                                        Txt { id: al; anchors.centerIn: parent; elide: Text.ElideNone; font.pixelSize: 12; color: parent.modelData.covered ? Theme.text : Theme.text4
+                                              text: parent.modelData.name + (parent.modelData.seen ? "" : " (no signal yet)") }
+                                    }
+                                }
                             }
                         }
                     }

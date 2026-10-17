@@ -207,7 +207,7 @@ def test_a_screenshot_tool_while_restricted_files_are_open_is_capture_and_alone_
     det, updates = play(SCENARIOS["screenshots"]())
     (case,) = det.open_cases()
     assert case.behaviours == {"capture"} and case.intent == "Copying what is on screen" and case.level == "case"
-    assert [u.now for u in updates] == ["noted", "case"] and updates[-1].raised                      # the second start, five minutes on, is what makes it a case
+    assert [u.now for u in updates if u.raised] == ["case"]                                           # raised once: the second start is what makes it a case                      # the second start, five minutes on, is what makes it a case
     det2, _ = play(SCENARIOS["screenshot_of_nothing"]())
     assert all(c.level == "quiet" for c in det2.cases)
 
@@ -225,7 +225,7 @@ def test_documents_scrambled_or_destroyed_in_bulk_by_a_program_are_sabotage_and_
     det, updates = play(SCENARIOS["ransom"]())
     (case,) = det.open_cases()
     assert case.intent == "Wrecking things" and case.behaviours == {"sabotage"} and case.level == "urgent"
-    assert [u.raised for u in updates] == [True, True] and "locked" in case.headline()                # raised at ten, and again when it had grown to thirty
+    assert [u.now for u in updates if u.raised] == ["case", "urgent"] and "locked" in case.headline()                # raised at ten, and again when it had grown to thirty
     det2, _ = play(SCENARIOS["wiped"]())
     assert det2.open_cases()[0].intent == "Wrecking things" and "sabotage" in det2.open_cases()[0].behaviours
     det3, up3 = play(SCENARIOS["big_clean_up_by_hand"]())

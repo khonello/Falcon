@@ -30,6 +30,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from common.anchors import ANCHORS, INCLUDES, coverage
+
 BEHAVIOURS = ("concealment", "collection", "exfiltration", "capture", "erasure", "evasion", "sabotage", "reach")
 BEHAVIOUR_WORDS = {"concealment": "Concealment", "collection": "Collection", "exfiltration": "Taking out", "capture": "Capture", "erasure": "Erasure",
                    "evasion": "Evasion", "sabotage": "Sabotage", "reach": "Reach"}
@@ -60,6 +62,28 @@ CAPTURE_TOOLS = ("snippingtool.exe", "screenclippinghost.exe", "snip.exe", "shar
 # programs that move data around for a living: they lower a taking-out finding (a backup is not a theft) unless something else says otherwise
 USUAL_MOVERS = ("robocopy", "backup", "veeam", "acronis", "syncthing", "onedrive", "dropbox", "rsync", "7zg", "windowssearch", "googledrivefs", "backblaze", "crashplan",
                 "teams", "zoom")
+
+
+HIT_KEEP = 30 * 86400                         # how long what fell in an area stays on the board: a patient person covers it slowly
+THREAD = 30 * 60                              # stages this close together are one piece of work even with no file in common
+ENC_EXT = {"gpg", "pgp", "enc", "aes", "crypt", "kdbx", "vault", "hc"}                  # (ransom endings like .locked are the sabotage graph's)
+BACKUP_EXT = {"bak", "bkf", "vhd", "vhdx", "wbcat", "vss", "tib", "bkp", "rbf"}
+IMAGE_EXT = {"jpg", "jpeg", "png", "bmp", "gif", "webp", "mp4", "mkv", "avi", "mov", "webm"}
+VALUABLE_EXT = DOC_EXT | ARCHIVE_EXT | {"db", "mdb", "accdb", "sql", "pst", "ost", "kdbx", "vsd", "dwg", "psd"}
+# words in a name or a place that say a thing matters, whether or not anyone marked it
+WORTH_WORDS = ("contract", "audit", "ledger", "payroll", "salary", "salaries", "invoice", "legal", "board", "tax", "passport", "confidential", "secret", "personnel",
+               "customer", "client", "master", "budget", "merger", "acquisition", "password", "credential", "finance", "compliance", "hr\\", "\\hr", "director", "ceo")
+BEHAVIOUR_LABEL = {"exfiltration": "Taking out", "collection": "Gathering", "concealment": "Hiding", "erasure": "Covering up", "capture": "Capturing",
+                   "evasion": "Slipping the watch", "sabotage": "Wrecking", "reach": "Looking where they should not"}
+# the anchor each existing mini-graph is a reading of, so a case can show the board whatever made the finding
+GRAPH_ANCHOR: dict[str, tuple[str, str]] = {
+    "gathering": ("exfiltration", "Gather"), "archived": ("exfiltration", "Compress"), "to_drive": ("exfiltration", "Transfer"),
+    "drive_after_staging": ("exfiltration", "Transfer"), "uploaded": ("exfiltration", "Transfer"), "hidden": ("concealment", "Disguise"),
+    "disguised": ("concealment", "Disguise"), "buried": ("concealment", "Relocate"), "removed_after_taking": ("erasure", "Remove"),
+    "mass_removal": ("erasure", "Remove"), "history_cleared": ("erasure", "Clear the trail"), "capture_tool": ("capture", "Capture"),
+    "clipboard_picture": ("capture", "Capture"), "went_silent": ("evasion", "Switch off"), "bulk_destroyed": ("sabotage", "Destroy"),
+    "bulk_rewritten": ("sabotage", "Destroy"), "scrambled_names": ("sabotage", "Destroy"), "outside_role": ("reach", "Beyond role"),
+}
 
 
 def ext_of(path: str) -> str:
@@ -162,6 +186,29 @@ class Finding:
     innocent: str                                  # what would make this harmless
     why: list[str] = field(default_factory=list)   # what raised or lowered the weight, in words
 
+    @property
+    def reads_as(self) -> str:
+        """The behaviour this finding counts as when a case works out how far an arc has got. Coverage of taking-out areas with nothing in the area where it
+        leaves is still gathering: it must not say "taken out" before anything has gone."""
+        if self.graph.startswith("coverage_") and self.weight < NOTED:
+            return ""                                  # light coverage is on the board but names no intent
+        if self.graph == "coverage_exfiltration":
+            areas = {a for x in self.why if x.startswith("areas covered: ") for a in x[len("areas covered: "):].split(", ")}
+            if "Transfer" not in areas:
+                return "collection" if areas & {"Gather", "Compress"} else ""      # only reshaping, nothing gathered or packed: not yet a taking-out
+        return self.behaviour
+
+
+@dataclass(frozen=True)
+class Hit:
+    """One event falling in one area (anchor) of one intent, with the weight of that event on its own."""
+    behaviour: str
+    anchor: str
+    at: float
+    weight: float
+    things: frozenset[str]
+    sig: Sig
+
 
 @dataclass
 class Case:
@@ -173,7 +220,7 @@ class Case:
 
     @property
     def behaviours(self) -> set[str]:
-        return {f.behaviour for f in self.findings}
+        return {f.reads_as for f in self.findings} - {""}
 
     @property
     def things(self) -> set[str]:
@@ -187,8 +234,12 @@ class Case:
         """Several independent hints are stronger together than any one: 1 - the chance every one of them is nothing, plus a little for each further kind of behaviour."""
         rest = 1.0
         for f in self.findings:
-            rest *= 1.0 - min(0.95, f.weight)
-        return min(0.99, (1.0 - rest) + 0.06 * max(0, len(self.behaviours) - 1))
+            if not f.graph.startswith("coverage_"):
+                rest *= 1.0 - min(0.95, f.weight)
+        # Coverage (what falls in an intent's areas on one piece of work) is a reading of the very same events the other findings are readings of, so it does not stack with
+        # them: it is a floor under the case, and what makes a case when no single graph fires.
+        core = max(1.0 - rest, max((f.weight for f in self.findings if f.graph.startswith("coverage_")), default=0.0))
+        return min(0.99, core + 0.06 * max(0, len(self.behaviours) - 1))
 
     @property
     def level(self) -> str:
@@ -236,6 +287,29 @@ class Case:
         if "erasure" not in b:
             return "Nothing has been erased yet."
         return None
+
+    def board(self) -> list[dict[str, Any]]:
+        """The areas of each intent this case touches, and which have something in them: [{behaviour, label, covered, of, areas: [{name, says, seen, covered}]}].
+        Areas are coverage, not steps: no order, none required."""
+        covered: dict[str, set[str]] = {}
+        for f in self.findings:
+            if f.graph.startswith("coverage_"):
+                for line in f.why:
+                    if line.startswith("areas covered: "):
+                        for x in line[len("areas covered: "):].split(", "):
+                            b, _, a = x.partition("/") if "/" in x else (f.behaviour, "", x)
+                            covered.setdefault(b, set()).add(a.strip().lower())
+                covered.setdefault(f.behaviour, set())
+            elif f.graph in GRAPH_ANCHOR:
+                b, a = GRAPH_ANCHOR[f.graph]
+                covered.setdefault(b, set()).add(a.lower())
+        out = []
+        for b in BEHAVIOURS:
+            if b not in covered:
+                continue
+            areas = [{"name": a.name, "says": a.says, "seen": a.seen, "covered": a.name.lower() in covered[b]} for a in ANCHORS.get(b, ())]
+            out.append({"behaviour": b, "label": BEHAVIOUR_LABEL[b], "covered": sum(1 for x in areas if x["covered"]), "of": sum(1 for x in areas if x["seen"]), "areas": areas})
+        return sorted(out, key=lambda x: (-x["covered"], x["behaviour"]))
 
     def story(self) -> list[str]:
         """The evidence in the order it happened, one line each."""
@@ -455,6 +529,7 @@ class Memory:
         self.lineage: dict[str, set[str]] = {}                # an archive's thing -> the things that went into it
         self.hidden: set[str] = set()
         self.at_path: dict[str, str] = {}                     # where a thing was last seen -> which thing (a delete carries no hash of its own)
+        self.hits: list[Hit] = []                             # the board: the stages reached lately, kept for days
 
     def add(self, s: Sig) -> None:
         if s.thing and s.path:
@@ -468,6 +543,11 @@ class Memory:
 
     def since(self, at: float, *verbs: str) -> list[Sig]:
         return [x for x in self.recent if x.at >= at and (not verbs or x.verb in verbs)]
+
+    def add_hits(self, hits: list[Hit], now: float) -> None:
+        self.hits.extend(hits)
+        if self.hits and (len(self.hits) > 4000 or self.hits[0].at < now - HIT_KEEP):
+            self.hits = [h for h in self.hits if h.at >= now - HIT_KEEP][-4000:]
 
 
 def _on_external(m: Memory, path: str) -> str:
@@ -487,6 +567,7 @@ class Detective:
         self.clock = clock
         self.mem: dict[int, Memory] = {}
         self.cases: list[Case] = []
+        self._covered: dict[tuple[int, str, int], float] = {}       # (machine, intent, when the piece of work began) -> the coverage already said
 
     # --- feeding -----------------------------------------------------------------------------------------------
 
@@ -503,8 +584,10 @@ class Detective:
         elif s.verb == "detached":
             m.devices.pop(s.device or s.path, None)
         m.add(s)
+        new = self._hits(m, s)
+        m.add_hits(new, s.at)
         out: list[Update] = []
-        for f in self._graphs(m, s):
+        for f in self._graphs(m, s) + self._coverage(m, s, new):
             f.weight = self._contextual(f, s)
             if f.weight < 0.12:
                 continue
@@ -519,6 +602,190 @@ class Detective:
         elif s.verb == "detached":
             m.devices.pop(s.device or s.path, None)
         m.add(s)
+        m.add_hits(self._hits(m, s), s.at)
+
+    # --- anchors: which stage of which intent an event is -----------------------------------------------------------
+
+    @staticmethod
+    def _worth(s: Sig) -> tuple[float, list[str]]:
+        """How much the thing itself matters, apart from what was done to it: one deletion of the right file outweighs ten of the wrong ones."""
+        w, why = 0.0, []
+        if "restricted" in s.tags:
+            w += 0.12
+            why.append("a restricted file")
+        low = (s.path + " " + s.old).lower().replace("/", "\\")
+        if any(k in low for k in WORTH_WORDS):
+            w += 0.08
+            why.append("its name or place says it matters")
+        if "only_copy" in s.tags:
+            # nearly every file is the only copy the index knows of, so it counts for little alone and for a lot beside anything else that says it matters
+            w += 0.20 if w > 0 else 0.04
+            why.append("the only copy the index knows of")
+        return w, why
+
+    def _sources_of(self, m: Memory, s: Sig) -> list[Sig]:
+        lo = s.at - 5 * 60
+        return [x for x in m.since(lo, "opened", "copied", "created", "modified") if x is not s and not is_archive(x.path) and x.path != s.path
+                and ("restricted" in x.tags or x.verb in ("opened", "copied")) and (not s.program or not x.program or x.program == s.program)]
+
+    def _hits(self, m: Memory, s: Sig) -> list[Hit]:
+        """The area(s) of each intent this event belongs to. An event may belong to several intents (what means little in one can mean a lot in another)."""
+        out: list[Hit] = []
+        v = s.verb
+        thing = s.thing or s.path
+        base = frozenset({thing}) if thing else frozenset()
+        worth, _ = self._worth(s)
+        ext, old_ext = ext_of(s.path), ext_of(s.old) if s.old else ""
+        dev = _on_external(m, s.path) if s.path else ""
+        low = s.path.lower().replace("/", "\\")
+
+        def add(b: str, a: str, w: float, extra: frozenset[str] = frozenset()) -> None:
+            out.append(Hit(b, a, s.at, round(w, 3), base | extra, s))
+
+        recent_exfil = frozenset().union(*(h.things for h in m.hits if h.behaviour == "exfiltration" and h.anchor in ("Gather", "Compress", "Transform") and s.at - h.at <= THREAD)) \
+            if m.hits else frozenset()
+        if v in ("copied", "moved", "created") and dev:
+            lineage = m.lineage.get(thing, set())
+            add("exfiltration", "Transfer", 0.30 + (0.08 if is_archive(s.path) else 0.0) + worth, frozenset(lineage))
+            if any(h.behaviour == "capture" and h.anchor == "Keep" and h.things & (base | frozenset(lineage)) for h in m.hits):
+                add("capture", "Pass on", 0.30 + worth)
+        elif v in ("copied", "moved") and s.path.startswith("\\\\"):
+            add("exfiltration", "Transfer", 0.26 + worth)             # a share elsewhere on the network: inside, but off this machine
+        elif v in ("copied", "moved") and not is_system_folder(s.path) and not is_system_folder(s.old or "") and ext not in SYSTEMISH_EXT \
+                and folder_of(s.path).lower() != folder_of(s.old or "").lower():
+            add("exfiltration", "Gather", 0.03 + worth)
+            add("collection", "Access", 0.03 + worth)
+            same = {x.thing or x.path for x in m.since(s.at - 10 * 60, "copied", "moved") if folder_of(x.path).lower() == folder_of(s.path).lower()}
+            if len(same) >= 3:
+                add("collection", "Assemble", 0.10 + worth)
+        if v in ("created", "copied") and is_archive(s.path) and not dev:
+            sources = self._sources_of(m, s)
+            things = {x.thing or x.path for x in sources}
+            here = folder_of(s.path).lower()
+            things |= {t for h in m.hits if h.behaviour == "exfiltration" and h.anchor == "Gather" and folder_of(h.sig.path).lower() == here for t in h.things}
+            if things:
+                m.lineage[thing] = things
+            add("exfiltration", "Compress", 0.18 + worth + min(0.10, 0.02 * len(things)), frozenset(things))
+            add("collection", "Consolidate", 0.12 + worth, frozenset(things))
+        if v in ("renamed", "moved") and s.old and old_ext != ext:
+            if (old_ext in DOC_EXT or old_ext in ARCHIVE_EXT) and ext not in DOC_EXT:
+                add("exfiltration", "Transform", 0.14 + worth)
+            if disguised(s.old, s.path):
+                add("concealment", "Disguise", 0.22 + worth)
+            if ext in ENC_EXT:
+                add("concealment", "Protect", 0.20 + worth)
+        if v == "hid":
+            add("concealment", "Disguise", 0.18 + worth)
+            add("exfiltration", "Transform", 0.08 + worth)
+        if v == "created" and ext in ENC_EXT:
+            add("exfiltration", "Transform", 0.20 + worth)
+            add("concealment", "Protect", 0.20 + worth)
+        elif v == "created" and ext and not is_archive(s.path):
+            stem = name_of(s.path).rsplit(".", 1)[0].lower()
+            if any(name_of(x.path).rsplit(".", 1)[0].lower() == stem and ext_of(x.path) != ext and ext_of(x.path) in DOC_EXT
+                   for x in m.since(s.at - 10 * 60, "created", "copied", "modified", "opened") if x is not s):
+                add("exfiltration", "Transform", 0.12 + worth)                       # the same document in another format
+        if v == "moved" and is_system_folder(s.path) and ext in DOC_EXT | ARCHIVE_EXT and not (s.old and is_system_folder(s.old)):
+            add("concealment", "Relocate", 0.15 + worth)
+        if v == "uploaded":
+            add("exfiltration", "Transfer", 0.25 + worth, recent_exfil)
+            if any(h.behaviour == "capture" and h.anchor == "Keep" and s.at - h.at <= THREAD for h in m.hits):
+                add("capture", "Pass on", 0.30)
+        if v == "deleted":
+            own = any(x.verb in ("created", "copied", "moved") and (x.path == s.path or (thing and x.thing == thing)) for x in m.recent if x is not s and x.at < s.at)
+            if ext in VALUABLE_EXT:
+                add("erasure", "Remove", 0.06 + worth)
+                if not own:                                   # taking back what one made a moment ago is tidying, not destroying
+                    add("sabotage", "Destroy", 0.10 + worth)
+                    if worth >= 0.12:
+                        add("sabotage", "Reach", 0.06 + worth)
+            if ext in BACKUP_EXT or "backup" in low or "shadow" in low:
+                add("sabotage", "Disable safety nets", 0.30)
+        if v == "modified" and worth >= 0.12:
+            add("erasure", "Alter", 0.08 + worth)
+            add("sabotage", "Reach", 0.06 + worth)
+        if v == "permissions":
+            add("sabotage", "Destroy", 0.22 + worth)                    # who may open it was changed: a lock-out
+        if v == "cleared":
+            add("erasure", "Clear the trail", 0.40)
+        if v in ("launched", "captured") and (v == "captured" or any(t in s.program.lower() for t in CAPTURE_TOOLS)):
+            add("capture", "Capture", 0.18)
+            working = [x for x in m.since(s.at - 10 * 60) if "restricted" in x.tags and x.verb not in ("attached", "detached", "captured")]
+            if working:
+                out.append(Hit("capture", "Open the source", s.at, 0.10, frozenset(x.thing or x.path for x in working), working[-1]))
+        if v == "created" and ext in IMAGE_EXT and any(h.behaviour == "capture" and h.anchor == "Capture" and 0 <= s.at - h.at <= 120 for h in m.hits):
+            add("capture", "Keep", 0.12)
+        if v == "silent":
+            add("evasion", "Switch off", 0.10)                             # alone it is a laptop lid; beside anything else it is not (see _went_silent)
+        if v == "opened":
+            add("collection", "Access", 0.03 + worth)
+            if "outside_role" in s.tags:
+                outside = [h for h in m.hits if h.behaviour == "reach" and h.anchor in ("Find", "Beyond role")]
+                if outside:
+                    add("reach", "Beyond role", 0.10 + worth)
+                else:
+                    add("reach", "Find", 0.15 + worth)                  # the first thing outside one's work that is opened is the most telling: it is the one that was chosen
+                if len({folder_of(h.sig.path).lower() for h in outside} | {folder_of(s.path).lower()}) >= 3:
+                    add("reach", "Widen", 0.15)
+                day = time.strftime("%Y%m%d", time.localtime(s.at))
+                if any(time.strftime("%Y%m%d", time.localtime(h.at)) != day for h in outside):
+                    add("reach", "Return", 0.20)
+        return out
+
+    def _coverage(self, m: Memory, s: Sig, new: list[Hit]) -> list[Finding]:
+        """What the events on the board add up to, intent by intent. A piece of work is the events that share a file or happen within half an hour of each other. Each
+        intent weighs what falls in its own areas and, at a discount, in the areas of the intents it contains. Nothing needs to be complete: one heavy event is enough."""
+        out: list[Finding] = []
+        touched = {h.behaviour for h in new}
+        targets = [b for b in ANCHORS if b in touched or any(c in touched for c in INCLUDES.get(b, ()))]
+        for behaviour in targets:
+            family = {behaviour, *INCLUDES.get(behaviour, ())}
+            mine = [h for h in m.hits if h.behaviour in family]
+            parent = list(range(len(mine)))
+
+            def find(i: int, parent: list[int] = parent) -> int:
+                while parent[i] != i:
+                    parent[i] = parent[parent[i]]
+                    i = parent[i]
+                return i
+
+            shared: set[int] = set()
+            for i, a in enumerate(mine):
+                for j in range(i):
+                    b = mine[j]
+                    by_thing = bool(a.things & b.things)
+                    if by_thing or abs(a.at - b.at) <= THREAD:
+                        parent[find(i)] = find(j)
+                        if by_thing:
+                            shared.update((i, j))
+            fresh = {id(h) for h in new}
+            for root in {find(i) for i, h in enumerate(mine) if id(h) in fresh}:
+                idx = [i for i in range(len(mine)) if find(i) == root]
+                comp = [mine[i] for i in idx]
+                own: dict[str, list[float]] = {}
+                kids: dict[str, list[float]] = {}
+                mine_sigs = {h.sig for h in comp if h.behaviour == behaviour}
+                for h in comp:
+                    if h.behaviour == behaviour:
+                        own.setdefault(h.anchor, []).append(h.weight)
+                    elif h.sig not in mine_sigs:              # the same event already counted in the intent's own areas is not evidence twice
+                        kids.setdefault(f"{h.behaviour}/{h.anchor}", []).append(h.weight)
+                w, covered = coverage(behaviour, own, kids)
+                if w < 0.12 or not any(h.behaviour == behaviour for h in comp):
+                    continue                               # (a parent is only said when something in its own areas is there: the children speak for themselves)
+                key = (s.pc, behaviour, round(min(h.at for h in comp)))
+                if w <= self._covered.get(key, 0.0) + 0.03:
+                    continue                               # nothing new worth saying
+                self._covered[key] = w
+                things = frozenset().union(*(h.things for h in comp))
+                linked = any(i in shared for i in idx)
+                sigs = sorted({h.sig for h in comp}, key=lambda x: x.at)[-14:]
+                names = [c.split("/")[-1] if "/" not in c else c for c in covered]
+                out.append(Finding(behaviour, "coverage_" + behaviour, s.at, s.pc, w, things,
+                                   f"{BEHAVIOUR_LABEL[behaviour]}: {', '.join(c.replace('/', ' · ') for c in covered)}", sigs,
+                                   "one piece of ordinary work that happens to touch these areas",
+                                   ["areas covered: " + ", ".join(names)] + ([] if linked or len(comp) == 1 else ["the events share no file, only the time"])))
+        return out
 
     # --- the mini-graphs ----------------------------------------------------------------------------------------
 
@@ -600,9 +867,7 @@ class Detective:
     def _archived(self, m: Memory, s: Sig) -> Finding | None:
         if s.verb != "created" or not is_archive(s.path):
             return None
-        lo = s.at - 5 * 60
-        sources = [x for x in m.since(lo, "opened", "copied", "created", "modified") if x is not s and not is_archive(x.path) and x.path != s.path
-                   and ("restricted" in x.tags or x.verb in ("opened", "copied")) and (not s.program or not x.program or x.program == s.program)]
+        sources = self._sources_of(m, s)
         things = {x.thing or x.path for x in sources}
         if len(things) < 3:
             return None
@@ -642,7 +907,7 @@ class Detective:
 
     def _drive_after_staging(self, m: Memory, s: Sig) -> Finding | None:
         lo = s.at - WINDOW
-        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if f.behaviour in ("collection", "concealment") and f.at >= lo]
+        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if not f.graph.startswith("coverage_") and f.behaviour in ("collection", "concealment") and f.at >= lo]
         if not staged:
             return None
         return Finding("exfiltration", "drive_after_staging", s.at, s.pc, 0.34, frozenset().union(*(f.things for f in staged)),
@@ -677,7 +942,7 @@ class Detective:
             return None
         # The same burst can be read as sabotage (damage) or as erasure (covering what was done). It is erasure when it follows staging or taking
         # on this machine; by hand and with nothing before it, it stays a little weight rather than nothing.
-        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if f.behaviour in ("collection", "exfiltration", "concealment") and s.at - f.at <= WINDOW]
+        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if not f.graph.startswith("coverage_") and f.behaviour in ("collection", "exfiltration", "concealment") and s.at - f.at <= WINDOW]
         if hand and not staged:
             return None                  # by hand with nothing before it this is read as damage (sabotage), not as covering anything up
         w, why = (0.20 if hand else 0.40), [f"{len(dels)} deletions in two minutes"]
@@ -730,7 +995,7 @@ class Detective:
         w, why = 0.18 + min(0.22, 0.05 * math.log2(size / 25_000_000 + 1)), [f"{megabytes(size)} sent out in {int(s.info.get('seconds') or 60)} seconds"]
         lo = s.at - 30 * 60
         near = [x for x in m.since(lo) if x.verb in ("created", "copied", "opened", "moved", "hid") and ("restricted" in x.tags or is_archive(x.path))]
-        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if f.behaviour in ("collection", "concealment") and s.at - f.at <= WINDOW]
+        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if not f.graph.startswith("coverage_") and f.behaviour in ("collection", "concealment") and s.at - f.at <= WINDOW]
         if near:
             w += 0.28
             why.append("just after restricted files were worked on or an archive was made")
@@ -824,39 +1089,46 @@ class Detective:
 
     def _contextual(self, f: Finding, s: Sig) -> float:
         w = f.weight
+        proportional = f.graph.startswith("coverage_")
+
+        def cut(w: float, d: float) -> float:
+            """Context lowers a finding. Coverage already adds many readings of the same work, so there it lowers in proportion (a task for the file takes most of it away
+            whatever it came to) instead of by a fixed amount that a large sum would shrug off."""
+            return w * (1.0 - min(0.9, d * 1.6)) if proportional else w - d
+
         if f.behaviour in ("concealment", "collection", "exfiltration", "erasure") and s.by in ("alone", "started"):
             w += 0.08 if s.by == "alone" else 0.05                       # done by a program rather than by hand: a little more telling, never a verdict
             f.why.append("done by a program on its own" if s.by == "alone" else "done by a program the person started")
         for thing in f.things:
             if self.ctx.has_task(s.pc, thing):
-                w -= 0.45
+                w = cut(w, 0.45)
                 f.why.append("a task covers this file")
                 break
         if any(self.ctx.written_by_flow(s.pc, e.path) for e in f.evidence if e.path):
-            w -= 0.40
+            w = cut(w, 0.40)
             f.why.append("a flow wrote it")
         mem = self.mem[s.pc]
         if any("allowed" in e.tags for e in f.evidence):
-            w -= 0.45
+            w = cut(w, 0.45)
             f.why.append("recorded as allowed")
         if (said := self.ctx.ruled(s.pc, f)):
-            w -= 0.45
+            w = cut(w, 0.45)
             f.why.append(said)
         dev = next((d for e in f.evidence for d in ((e.device,) if e.verb == "attached" else (_on_external(mem, e.path),)) if d), "")
         if dev and any(self.ctx.allowed(s.pc, t, dev) for t in f.things):
-            w -= 0.45
+            w = cut(w, 0.45)
             f.why.append("recorded as allowed there")
         if dev:
             uses = self.ctx.device_uses(s.pc, dev)
             if uses >= 3:
-                w -= 0.35
+                w = cut(w, 0.35)
                 f.why.append(f"a drive this machine has used {uses} times")
             elif uses == 0 and f.behaviour == "exfiltration" and not any("a task covers" in x for x in f.why):
                 w += 0.10
                 f.why.append("a drive this machine has not seen before")
         mover = next((e.program for e in f.evidence if e.program and any(p in e.program.lower() for p in USUAL_MOVERS)), "")
         if mover:
-            w -= 0.35
+            w = cut(w, 0.35)
             f.why.append(f"{mover} is a program that moves files for a living")
         hour = time.localtime(s.at).tm_hour
         if (hour >= 22 or hour < 6) and f.weight >= 0.3:

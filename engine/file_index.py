@@ -78,7 +78,7 @@ class FileIndex:
             if op == "move" and entry.get("old_path"):
                 await db.mark_gone(pc_id, str(entry["old_path"]))    # it left its old place: this used to be forgotten
         await db.record_event(pc_id, op, path, old_path=entry.get("old_path"), is_dir=entry["is_dir"],
-                              content_hash=entry.get("hash"), file_index_id=known_id,
+                              content_hash=entry.get("hash"), file_index_id=known_id, occurred_at=entry.get("at"),
                               detail=({**(entry.get("detail") or {}), **{k: v for k, v in (entry.get("witness") or {}).items() if k != "title"}} or None))
         full = {"pc_id": pc_id, "file_index_id": file_index_id, **entry}
         if op in CONTENT_OPS and not entry["is_dir"]:
@@ -135,6 +135,18 @@ def _detail(raw: Any) -> dict[str, bool] | None:
     return out or None
 
 
+def _when(raw: Any) -> float | None:
+    """When something happened as the Worker says, if that is believable: a number of seconds, not in the future, not older than a month."""
+    import time
+
+    try:
+        at = float(raw)
+    except (TypeError, ValueError):
+        return None
+    now = time.time()
+    return at if now - 30 * 86400 <= at <= now + 5 else None
+
+
 def _witness(raw: Any) -> dict[str, str] | None:
     """What the Worker saw when a change happened: who made it (hand / started / alone / unknown), the program in front (only for hand) and the program that
     last opened the file (who made the change, when Windows' file trace could say)."""
@@ -170,6 +182,8 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
         "scope_department_id": event.get("scope_department_id"),
         "detail": _detail(event.get("detail")),
         "witness": _witness(event.get("witness")),
+        "late": bool(event.get("late")),                  # found afterwards (the Engine was not listening): not "just now"
+        "at": _when(event.get("at")),                     # when it happened, if the Worker knows (a changed file's own time)
     }
 
 

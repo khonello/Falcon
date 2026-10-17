@@ -54,7 +54,7 @@ def sample():
     # a second, quieter case beside it
     quiet = {**case, "id": 2, "host": "FIN-02", "intent": "Hiding something", "level": "noted", "weight": 0.38, "stage_count": 1, "stage_name": "Hiding", "next_stage": "Taking out",
              "not_yet": None, "behaviours": ["concealment"], "headline": "Hiding something. birthday-plans.docx was hidden.", "story": ["11:00  hid birthday-plans.docx"]}
-    return case, quiet, {"case": {**case, "reviewed_by": None}, "findings": findings, "graph": c.graph(), "rule_options": rule_options(c.findings)}
+    return case, quiet, {"case": {**case, "reviewed_by": None}, "findings": findings, "graph": c.graph(), "rule_options": rule_options(c.findings), "board": c.board()}
 
 
 async def _page(console, role="super_user"):
@@ -82,6 +82,7 @@ async def test_a_case_reads_as_a_story_a_picture_and_a_question(console):
     ids = {n for n in names if n.startswith("node_")}
     assert any("dev:" in i for i in ids) and any("dir:" in i for i in ids) and len(ids) >= 6                  # the drive, the bursts, the archive, the hidden file
     assert win.findChild(QObject, "detExplained") is not None and win.findChild(QObject, "detNote") is not None
+    assert {"cover_exfiltration", "area_Gather", "area_Transfer", "area_Transform"} <= names                    # the areas, covered or not: coverage, not steps
 
 
 async def test_what_a_person_makes_of_it_is_sent_with_their_note(console):

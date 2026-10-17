@@ -81,6 +81,46 @@ finding (by the same amount as a recorded allowance); the finding is still kept 
 `detective.rules`), can be taken back (`detective unrule`, `detective.rule_revoke`), are audited when made and when revoked, and are scoped like cases (an Admin: own
 department's client machines). Nothing is written down unless it was asked for.
 
+## Anchors: the areas an intent covers (built 17 Oct 2026, the owner's model)
+The owner's idea: each intent has a few **anchors**, and every event that bears on it falls in one of them *whatever the route*. A pen drive, a browser, a share all fall
+in the same area of taking data out. **An anchor is a definition of coverage, not a step**: no order, none required, and filling more of them is not "getting further", only
+more evidence. (`common/anchors.py`.)
+
+| Intent | Areas |
+|---|---|
+| Taking out | Gather, Transform, Compress, Transfer |
+| Collecting | Access, Assemble, Consolidate |
+| Hiding | Disguise, Relocate, Protect |
+| Covering up | Remove, Alter, Clear the trail, (Switch off the record: no signal yet) |
+| Capturing | Open the source, Capture, Keep, Pass on |
+| Slipping the watch | (Test: no signal yet), Switch off, (Dodge: no signal yet) |
+| Wrecking | Reach, Disable safety nets, Destroy |
+| Looking where they should not | Find, Beyond role, Widen, Return |
+
+- **Intents contain intents.** Taking out is partly collecting, hiding and capturing; wrecking is partly covering up. What falls in a child's areas counts toward the
+  parent at 60%, and an event already counted in the parent's own areas is not counted again as the child's.
+- **Weighing.** Each event gets a weight of its own: what was done (a copy to a drive is heavier than a copy to another folder) plus how much the *thing* matters (restricted;
+  the only copy the index knows of, counted fully only beside something else that says it matters; a name or place such as contract, payroll, director). An area is
+  its heaviest event, or - for many light ones - what they add up to, but **numbers alone stop at 0.30, under "noted"**. Covering more areas adds a little. No area
+  has to be filled and one heavy event is enough: one deletion of the only copy of a restricted contract is a case; sixty old drafts are not.
+- **A piece of work** is the events that share a file (identity or archive contents, including what was gathered into the archive's folder weeks before) or happen within half
+  an hour of each other. The board keeps 30 days, so a person who gathers a file a week and packs it on day 22 is one piece of work.
+- **It is a floor, not another vote.** Coverage describes the same events the other graphs describe, so it does not stack with them: a case is at least its strongest
+  coverage and otherwise the combined graphs, as before. Coverage too light to be "noted" is kept on the board but names no intent. Context (a task, a flow, an
+  allowance, a trusted drive, a backup program) lowers coverage in proportion, since it is a sum of many readings.
+- **The page** shows "What it covers": for each intent in the case, its areas, filled when something falls in them, and "no signal yet" where we have none. Nothing is
+  drawn as a sequence.
+- **Misfire over oversight** is carried by the weights, not by hope: a lone Transfer to a share is "noted", the first look outside one's work in a place that matters is
+  "noted", any single heavy act is a finding. The price (more false alarms) is paid by making them cheap to dismiss: a dismissal can be written down as a rule.
+
+**Things I found while building it, to be aware of**
+- The Engine never produces `opened` events or the `outside_role` tag, so Collecting's *Access* (from opens) and all of Looking-where-they-should-not exist in the matcher
+  and the scenarios but are **dormant in production** until a source for them is built (file opens are only reported for automations' file-accessed interest).
+- Files found when a machine reconnects (the Worker's catch-up) used to look like they had just happened and by nobody. They now carry the file's own time and are marked
+  "found afterwards"; the Worker did not queue events while offline, so what happens offline is seen at reconnect only as files that are new or changed (deletions are seen
+  too). The journal of offline events with real timestamps and witness is still to be built.
+- The same sixty deletions score 0.28 (a folder of old drafts) or 0.64 (restricted, outside the person's work): the thing and the person's pattern matter more than the count.
+
 ## Pictures on the clipboard, window titles and what a program sends out (built 17 Oct 2026)
 - **Clipboard.** PrintScreen puts the whole screen on the clipboard and Win+Shift+S a region, so a screenshot needs no tool. `worker_client/clipboard.py` (run where the
   person's desktop is: the helper when the Worker is a service) watches Windows' clipboard change number and, when it moves and the clipboard now holds a picture, reads
@@ -90,7 +130,7 @@ department's client machines). Nothing is written down unless it was asked for.
 - **Window titles.** The title of the window in front is added to the witness stamp for a person's own hands, trimmed to 160 characters, and kept only in the evidence
   of a finding (it reads "opened payroll.xlsx (in "Payroll Q3 - Google Sheets")"). It is not written into the file event history.
 - **What a program sends out.** The Kernel-Network trace (same machinery as the file and process traces) counts, per program, what it sends to addresses outside this
-  network; volumes only. When one program has sent 25 MB in a minute it is said once (`network.upload`, again after ten minutes). Detective reads it as taking out,
+  network; volumes only. When one program has sent 8 MB in a minute it is said once (`network.upload`, again after ten minutes). Detective reads it as taking out,
   low alone (a video call, an update), raised after restricted files were worked on or an archive was made, and lowered for sync and backup clients. Verified against a
   real loopback transfer on this machine.
 

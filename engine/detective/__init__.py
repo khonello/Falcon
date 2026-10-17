@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 TASK_TTL = 120.0
-REMEMBER = timedelta(hours=6)
+REMEMBER = timedelta(days=30)                   # what a restart puts back on the board: the areas a patient person has covered over days (the matcher itself keeps six hours of detail)
 RESUME = timedelta(days=7)
 OUTCOMES = ("explained", "accepted", "dismissed", "escalated")
 OPEN_LEVELS = ["case", "urgent"]
@@ -161,6 +161,8 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
         digest = digest or (entry or {}).get("content_hash")
         if (entry or {}).get("resource_tag") == "restricted" or (digest and await engine.db.marks.active_with_hash(digest)):
             tags.add("restricted")
+    if op == "delete" and digest and not await engine.db.file_index.by_hash(digest):
+        tags.add("only_copy")                           # nothing else the index knows of holds this content
     seen = event.get("witness") or {}
     by = "falcon" if op in ("create", "modify", "move", "copy") and await _flow_wrote(engine, pc_id, path, digest) else seen.get("by", "unknown")
     det = _detector()
@@ -168,8 +170,11 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
         tags.add("allowed")
     await _tasks_things(engine, pc_id)
-    sig = Sig(time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("program") or (seen.get("front", "") if by == "hand" else ""), by, "", frozenset(tags),
-              {"title": seen["title"]} if by == "hand" and seen.get("title") else {})
+    info: dict[str, Any] = {"title": seen["title"]} if by == "hand" and seen.get("title") else {}
+    if event.get("late"):
+        info["late"] = True                              # found afterwards: when it happened is the file's own time, and who did it cannot be told
+    sig = Sig(event.get("at") or time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("program") or (seen.get("front", "") if by == "hand" else ""), by, "",
+              frozenset(tags), info)
     await _apply(engine, det.feed(sig))
 
 
@@ -385,8 +390,10 @@ async def case(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
     out["reviewed_by"] = names.get(c.get("reviewed_by_account_id"))
     seen: set[Sig] = set()
     sigs = [e for f in found for e in (sig_from_dict(x) for x in (f["evidence"] or [])) if not (e in seen or seen.add(e))]
-    again = [Finding(f["behaviour"], f["graph"], f["at"].timestamp(), c["pc_id"], float(f["weight"]), frozenset(), "", [sig_from_dict(e) for e in f["evidence"] or []], "") for f in found]
-    return {"case": out, "findings": rows(found), "graph": graph_of(sigs), "rule_options": rule_options(again)}
+    again = [Finding(f["behaviour"], f["graph"], f["at"].timestamp(), c["pc_id"], float(f["weight"]), frozenset(), "", [sig_from_dict(e) for e in f["evidence"] or []], "", list(f["why"] or []))
+             for f in found]
+    held = Case(pc=c["pc_id"], findings=again)
+    return {"case": out, "findings": rows(found), "graph": graph_of(sigs), "rule_options": rule_options(again), "board": held.board()}
 
 
 @handler("detective.review")
