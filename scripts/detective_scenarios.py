@@ -125,6 +125,35 @@ def screenshots() -> Scenario:
     return Scenario("screenshots", "A worker has a restricted payroll sheet open and starts the snipping tool, twice, five minutes apart.", s.out)
 
 
+def printscreens() -> Scenario:
+    s = Script(clock(13, 16, 30))
+    s.add("opened", r"C:\Finance\Payroll\payroll-q3.xlsx", thing="h-q3", by="hand", program="excel.exe", tags=R)
+    for _ in range(4):
+        s.after(25).add("captured", by="hand", program="excel.exe", info={"kind": "screen"})
+    return Scenario("printscreens", "A worker has a restricted payroll sheet open and presses PrintScreen four times in two minutes: no screenshot tool at all.", s.out)
+
+
+def printscreen_of_nothing() -> Scenario:
+    s = Script(clock(13, 16, 30))
+    s.add("captured", by="hand", program="chrome.exe", info={"kind": "region"})
+    return Scenario("printscreen_of_nothing", "A picture is put on the clipboard on a machine where nothing restricted is being worked on.", s.out)
+
+
+def upload_after_packing() -> Scenario:
+    s = Script(clock(13, 20, 0))
+    for i in range(10):
+        s.after(5).add("opened", rf"C:\Finance\Payroll\p{i}.xlsx", thing=f"h-p{i}", by="hand", program="excel.exe", tags=R)
+    s.after(30).add("created", r"C:\Users\kojo\Staging\q3.zip", thing="h-zip", by="started", program="7z.exe")
+    s.after(60).add("uploaded", program="python.exe", by="unknown", info={"bytes": 180_000_000, "to": "203.0.113.9", "destinations": 1, "seconds": 60})
+    return Scenario("upload_after_packing", "A restricted payroll set is opened, packed into an archive, and a script then sends 180 MB out to one address.", s.out)
+
+
+def sync_client_upload() -> Scenario:
+    s = Script(clock(13, 11, 0))
+    s.add("uploaded", program="onedrive.exe", by="unknown", info={"bytes": 300_000_000, "to": "13.107.42.12", "destinations": 3, "seconds": 60})
+    return Scenario("sync_client_upload", "The company's sync client sends 300 MB out in a minute, as it does.", s.out)
+
+
 def screenshot_of_nothing() -> Scenario:
     s = Script(clock(13, 16, 0))
     s.add("launched", program="snippingtool.exe", by="hand")
@@ -189,7 +218,7 @@ def log_cleared() -> Scenario:
     return Scenario("log_cleared", "The machine's security log is cleared.", s.out)
 
 
-SCENARIOS: dict[str, Callable[[], Scenario]] = {f.__name__: f for f in (leak, backup_twin, patient, one_hidden_file, flow_to_drive, covered_by_task, snooping, screenshots, screenshot_of_nothing, goes_dark,
+SCENARIOS: dict[str, Callable[[], Scenario]] = {f.__name__: f for f in (leak, backup_twin, patient, one_hidden_file, flow_to_drive, covered_by_task, snooping, screenshots, screenshot_of_nothing, printscreens, printscreen_of_nothing, upload_after_packing, sync_client_upload, goes_dark,
                                                                   laptop_lid, ransom, big_clean_up_by_hand, restricted_wiped_by_hand, leak_then_clean_up_by_hand, wiped, log_cleared)}
 
 

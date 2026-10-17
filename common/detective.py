@@ -58,7 +58,8 @@ CAPTURE_TOOLS = ("snippingtool.exe", "screenclippinghost.exe", "snip.exe", "shar
                  "screenpresso.exe", "bandicam.exe", "camtasia.exe", "obs64.exe", "picpick.exe", "flameshot.exe")
 
 # programs that move data around for a living: they lower a taking-out finding (a backup is not a theft) unless something else says otherwise
-USUAL_MOVERS = ("robocopy", "backup", "veeam", "acronis", "syncthing", "onedrive", "dropbox", "rsync", "7zg", "windowssearch")
+USUAL_MOVERS = ("robocopy", "backup", "veeam", "acronis", "syncthing", "onedrive", "dropbox", "rsync", "7zg", "windowssearch", "googledrivefs", "backblaze", "crashplan",
+                "teams", "zoom")
 
 
 def ext_of(path: str) -> str:
@@ -80,6 +81,14 @@ def is_system_folder(path: str) -> bool:
     return any(d.replace("/", "\\") in low for d in _SYSTEM_DIRS)
 
 
+def megabytes(n: Any) -> str:
+    try:
+        mb = float(n) / 1_000_000
+    except (TypeError, ValueError):
+        return "a lot of data"
+    return f"{mb / 1000:.1f} GB" if mb >= 1000 else f"{mb:.0f} MB"
+
+
 def is_archive(path: str) -> bool:
     return ext_of(path) in ARCHIVE_EXT
 
@@ -97,7 +106,7 @@ def disguised(old: str, new: str) -> bool:
 @dataclass(frozen=True)
 class Sig:
     """One thing that happened, as the detector reads it. `verb` is one of: created modified renamed moved copied deleted opened hid unhid permissions
-    attached detached launched exited captured cleared silent. `thing` follows the file (its content hash or identity); `device` is a drive's own name."""
+    attached detached launched exited captured uploaded cleared silent. `thing` follows the file (its content hash or identity); `device` is a drive's own name."""
     at: float
     pc: int
     verb: str
@@ -124,8 +133,9 @@ class Sig:
         return {"created": f"created {n}", "modified": f"changed {n}", "renamed": f"renamed {name_of(self.old)} to {n}", "moved": f"moved {n} to {folder_of(self.path) or 'another place'}",
                 "copied": f"copied {n} to {folder_of(self.path) or 'another place'}", "deleted": f"deleted {n}", "opened": f"opened {n}", "hid": f"hid {n}",
                 "unhid": f"made {n} visible", "permissions": f"changed who may open {n}", "attached": f"plugged in a drive ({self.info.get('label') + ', ' if self.info.get('label') else ''}{self.device})",
-                "detached": f"removed a drive ({self.device})", "launched": f"started {self.program}", "exited": f"closed {self.program}",
-                "captured": f"captured the screen ({self.program or 'a tool'})", "cleared": f"cleared {self.info.get('what') or 'a history'}",
+                "detached": f"removed a drive ({self.device})", "uploaded": f"sent {megabytes(self.info.get('bytes'))} out over the network ({self.program or 'a program'})", "launched": f"started {self.program}", "exited": f"closed {self.program}",
+                "captured": ("took a picture of the whole screen" if self.info.get("kind") == "screen" else "put a picture on the clipboard" if self.info.get("kind") == "region"
+                             else f"captured the screen ({self.program or 'a tool'})") + (f" ({self.program})" if self.info.get("kind") and self.program else ""), "cleared": f"cleared {self.info.get('what') or 'a history'}",
                 "silent": "stopped reporting while still switched on"}.get(self.verb, f"{self.verb} {n}")
 
 
@@ -317,6 +327,10 @@ def graph_of(sigs: list[Sig]) -> dict[str, Any]:
             node("trace:" + str(e.info.get("what") or "history"), f"cleared {e.info.get('what') or 'a history'}", 4, "trace", e.at)
         elif e.verb == "launched":
             node("trace:launched:" + e.program.lower(), f"started {e.program}" + (f" ({n} times)" if n > 1 else ""), 4, "trace", e.at, n)
+        elif e.verb == "uploaded":
+            node("net:" + e.program.lower(), f"{megabytes(e.info.get('bytes'))} sent out by {e.program or 'a program'}", 3, "drive", e.at)
+        elif e.verb == "captured":
+            node("trace:captured", "a picture of the screen was taken" + (f" ({n} times)" if n > 1 else ""), 4, "trace", e.at, n)
         elif e.verb == "silent":
             node("trace:silent", "stopped reporting", 4, "trace", e.at)
         elif e.verb in ("hid", "unhid"):
@@ -526,8 +540,10 @@ class Detective:
             found.append(self._mass_removal(m, s))
         if s.verb == "cleared":
             found.append(self._history_cleared(m, s))
-        if s.verb == "launched":
+        if s.verb in ("launched", "captured"):
             found.append(self._capture_tool(m, s))
+        if s.verb == "uploaded":
+            found.append(self._uploaded(m, s))
         if s.verb == "silent":
             found.append(self._went_silent(m, s))
         if s.verb in ("renamed", "modified", "deleted"):
@@ -678,20 +694,55 @@ class Detective:
                        "an administrator clearing a log on purpose" if is_log else "routine housekeeping", ["the machine's own record of what happened was cleared" if is_log else "a history was cleared"])
 
     def _capture_tool(self, m: Memory, s: Sig) -> Finding | None:
-        if not any(t in s.program.lower() for t in CAPTURE_TOOLS):
+        """The screen photographed: a tool started (the Snipping Tool, ShareX ...) or a picture put on the clipboard (PrintScreen, Win+Shift+S) -- one reading, two ways in."""
+        pictured = s.verb == "captured"
+        if pictured:
+            if any(x.verb == "launched" and any(t in x.program.lower() for t in CAPTURE_TOOLS) for x in m.since(s.at - 120)):
+                return None                                      # the tool that took it was already read when it started
+        elif not any(t in s.program.lower() for t in CAPTURE_TOOLS):
             return None
         lo = s.at - 10 * 60
-        working = [x for x in m.since(lo) if "restricted" in x.tags and x.verb not in ("attached", "detached")]
-        again = [x for x in m.since(s.at - 30 * 60, "launched") if x is not s and any(t in x.program.lower() for t in CAPTURE_TOOLS)]
-        w, why = 0.22, [f"{s.program} was started"]
+        working = [x for x in m.since(lo) if "restricted" in x.tags and x.verb not in ("attached", "detached", "captured")]
+        again = [x for x in m.since(s.at - 30 * 60, "launched", "captured") if x is not s and (x.verb == "captured" or any(t in x.program.lower() for t in CAPTURE_TOOLS))]
+        what = ("a picture of the whole screen" if s.info.get("kind") == "screen" else "a picture") + " was put on the clipboard" if pictured else f"{s.program} was started"
+        w, why = 0.22 if not pictured else 0.16, [what]
         if working:
             w += 0.30
             why.append("restricted files were being worked on just before")
         if again:
             w += 0.10 * min(3, len(again))
             why.append("it has been started again and again")
-        return Finding("capture", "capture_tool", s.at, s.pc, w, frozenset({x.thing or x.path for x in working}), f"{s.program} was started while restricted files were open" if working
-                       else f"{s.program} was started", working[-6:] + [s], "someone capturing their own work, or documenting a problem for support", why)
+        if pictured:
+            tail = f" ({s.program})" if s.program else ""
+            summary = (what[0].upper() + what[1:] + tail + (" while restricted files were open" if working else ""))
+        else:
+            summary = f"{s.program} was started while restricted files were open" if working else f"{s.program} was started"
+        return Finding("capture", "clipboard_picture" if pictured else "capture_tool", s.at, s.pc, w, frozenset({x.thing or x.path for x in working}), summary, working[-6:] + [s],
+                       "someone capturing their own work, or documenting a problem for support", why)
+
+    def _uploaded(self, m: Memory, s: Sig) -> Finding | None:
+        """A program sent a great deal out over the network. Alone it is mostly a video call, a sync client or an update; after files were gathered, packed or hidden it is the way out."""
+        import math
+
+        size = float(s.info.get("bytes") or 0)
+        if size <= 0:
+            return None
+        w, why = 0.18 + min(0.22, 0.05 * math.log2(size / 25_000_000 + 1)), [f"{megabytes(size)} sent out in {int(s.info.get('seconds') or 60)} seconds"]
+        lo = s.at - 30 * 60
+        near = [x for x in m.since(lo) if x.verb in ("created", "copied", "opened", "moved", "hid") and ("restricted" in x.tags or is_archive(x.path))]
+        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if f.behaviour in ("collection", "concealment") and s.at - f.at <= WINDOW]
+        if near:
+            w += 0.28
+            why.append("just after restricted files were worked on or an archive was made")
+        if staged:
+            w += 0.18
+            why.append("right after files were gathered or hidden")
+        if int(s.info.get("destinations") or 1) == 1:
+            w += 0.04
+            why.append("all to one place")
+        return Finding("exfiltration", "uploaded", s.at, s.pc, w, frozenset({x.thing or x.path for x in near if (x.thing or x.path)}),
+                       f"{s.program or 'a program'} sent {megabytes(size)} out over the network", near[-6:] + [s],
+                       "a video call, a sync or backup client, an update, or a person sending something they are meant to", why)
 
     def _went_silent(self, m: Memory, s: Sig) -> Finding | None:
         """A machine that stops reporting while still switched on, right after something worth a look happened on it: the watch is being slipped."""

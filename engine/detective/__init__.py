@@ -194,6 +194,17 @@ async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]
         await _ensure(engine)
         await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "launched", program=process[:120], by="unknown")))
         return
+    if etype == "network.upload":
+        await _ensure(engine)
+        process = str(data.get("process") or "")[:120]
+        info = {"bytes": int(data.get("bytes") or 0), "to": str(data.get("to") or "")[:60], "destinations": int(data.get("destinations") or 1), "seconds": int(data.get("seconds") or 60)}
+        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "uploaded", program=process, by="unknown", info=info)))
+        return
+    if etype == "screen.captured":
+        await _ensure(engine)
+        kind = "screen" if data.get("kind") == "screen" else "region"
+        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "captured", program=str(data.get("process") or "")[:120], by="hand", info={"kind": kind})))
+        return
     if etype == "log.cleared":
         await _ensure(engine)
         which = str(data.get("log") or "event")[:40]

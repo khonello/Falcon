@@ -56,6 +56,10 @@ def messages_for(s: Sig) -> list[tuple[str, dict]]:
         return [("control.signal", {"type": "usb.removed", "data": {"device": s.device, "path": s.device}})]
     if s.verb == "launched":
         return [("control.signal", {"type": "program.launched", "data": {"process": s.program}})]
+    if s.verb == "uploaded":
+        return [("control.signal", {"type": "network.upload", "data": {"process": s.program, **{k: v for k, v in s.info.items() if k in ("bytes", "to", "destinations", "seconds")}}})]
+    if s.verb == "captured":
+        return [("control.signal", {"type": "screen.captured", "data": {"kind": str(s.info.get("kind") or "screen"), "process": s.program}})]
     if s.verb == "cleared":
         return [("control.signal", {"type": "log.cleared", "data": {"log": str(s.info.get("log") or "Security")}})]
     return []

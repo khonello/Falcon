@@ -353,7 +353,7 @@ async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine
     svc = await _start(engine, tmp_path, "cid-w1", [])
     admin = await _admin(engine)
     try:
-        assert set(svc.ossignals.interest) <= {"usb.inserted", "usb.removed", "log.cleared", "program.launched"}      # only what Detective always wants
+        assert set(svc.ossignals.interest) <= {"usb.inserted", "usb.removed", "log.cleared", "program.launched", "screen.captured", "network.upload"}      # only what Detective always wants
         assert all(m.get("process") != "falcon-test-probe.exe" for m in svc.ossignals.interest.get("program.launched", []))
         note = (await admin.call("control.action_create", {"kind": "control", "builtin_type": "notify",
                                                            "timeout_s": 5, "params": {"message": "started"}}))["action"]

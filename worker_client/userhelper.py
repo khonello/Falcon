@@ -71,6 +71,11 @@ class UserHelper:
         idle_s = r.get("idle_s")
         return (float(idle_s) if idle_s is not None else None), r.get("front"), r.get("title")
 
+    async def clipboard(self) -> dict[str, Any] | None:
+        """The shape of any picture on the clipboard, and the program in front, as the helper on the person's desktop sees them."""
+        r = await self.request({"cmd": "clipboard"}, timeout=3.0)
+        return r if r.get("ok") else None
+
     async def stop(self) -> None:
         proc, self._proc = self._proc, None
         if proc is None:

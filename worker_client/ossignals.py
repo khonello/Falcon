@@ -28,7 +28,7 @@ INTERVAL_SECONDS = 3.0           # how often to look when Windows cannot tell us
 SAFETY_SECONDS = 30.0            # with native notifications the look is only a safety net
 SETTLE_SECONDS = 0.5             # a moment after Windows says "changed", for the drive list to catch up
 WATCHED = ("usb.inserted", "usb.removed", "network.connected", "network.disconnected",
-           "program.launched", "program.exited", "user.login", "user.logout", "log.cleared")
+           "program.launched", "program.exited", "user.login", "user.logout", "log.cleared", "screen.captured", "network.upload")
 
 
 def _psutil() -> Any:
@@ -227,6 +227,7 @@ class OsSignals:
         wants_programs = any(t in self.interest for t in ("program.launched", "program.exited"))
         await asyncio.to_thread(self.etw.want_programs, wants_programs or bool(self.etw.touch_roots))      # (a short-lived program is only named if it was seen starting)
         await asyncio.to_thread(self.etw.want_files, self.interest.get("file.accessed") or [])
+        await asyncio.to_thread(self.etw.want_network, "network.upload" in self.interest)
 
     def _from_trace(self, etype: str, data: dict[str, Any]) -> None:
         """From the trace's thread: queue the event for the loop (a full queue drops it: a flood is not worth the memory)."""

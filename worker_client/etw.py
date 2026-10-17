@@ -32,7 +32,10 @@ log = logging.getLogger(__name__)
 
 PROCESS_PROVIDER = "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}"     # Microsoft-Windows-Kernel-Process
 FILE_PROVIDER = "{EDD08927-9CC4-4E65-B970-C2560FB5C289}"        # Microsoft-Windows-Kernel-File
+NETWORK_PROVIDER = "{7DD42A49-5329-4832-8DFD-43D979153A88}"     # Microsoft-Windows-Kernel-Network
 PROCESS_KEYWORD = 0x10                                           # WINEVENT_KEYWORD_PROCESS
+NETWORK_KEYWORD = 0x30                                           # KERNEL_NETWORK_KEYWORD_IPV4 | _IPV6
+EVENT_TCP_SEND4, EVENT_TCP_SEND6 = 10, 26
 FILE_KEYWORD_CREATE = 0x80                                       # KERNEL_FILE_KEYWORD_CREATE
 EVENT_PROCESS_START, EVENT_PROCESS_STOP, EVENT_FILE_CREATE = 1, 2, 12
 FILE_DIRECTORY_FILE = 0x00000001
@@ -71,6 +74,57 @@ def process_start(data: bytes) -> tuple[int, str] | None:
     at = data.find("\\Device\\".encode("utf-16-le"), 8)
     name = basename(utf16z(data, at if at >= 0 else 24))
     return (pid, name) if name else None
+
+
+def tcp_send(event_id: int, data: bytes) -> tuple[int, int, str, int] | None:
+    """(pid, bytes, remote address, remote port) of a Kernel-Network TCP send event. The payload starts PID u32, size u32, then daddr, saddr (4 bytes each for IPv4,
+    16 for IPv6, as on the wire), then dport and sport (big-endian u16). The pid in the payload is the program that sent: the event's own header names the kernel."""
+    import ipaddress
+
+    width = 4 if event_id == EVENT_TCP_SEND4 else 16 if event_id == EVENT_TCP_SEND6 else 0
+    if not width or len(data) < 8 + 2 * width + 4:
+        return None
+    pid, size = struct.unpack_from("<II", data, 0)
+    daddr = data[8:8 + width]
+    port = struct.unpack_from(">H", data, 8 + 2 * width)[0]
+    return pid, size, str(ipaddress.ip_address(daddr)), port
+
+
+class UploadMeter:
+    """Adds up what each program sends out in a short window, to addresses outside this network, and says so once when a program has sent a lot.
+
+    Only volumes are kept (never what was sent). A program is told about once per `cooldown`: a long upload is one signal, not a hundred."""
+
+    def __init__(self, *, window: float = 60.0, threshold: int = 25_000_000, cooldown: float = 600.0, public_only: bool = True) -> None:
+        self.window, self.threshold, self.cooldown, self.public_only = window, threshold, cooldown, public_only
+        self._sent: dict[int, list[tuple[float, int, str]]] = {}
+        self._told: dict[int, float] = {}
+
+    def feed(self, pid: int, size: int, addr: str, now: float) -> dict[str, Any] | None:
+        import ipaddress
+
+        if pid <= 4 or size <= 0:
+            return None                                          # (pid 4 is the machine's own file sharing: not a program someone is running)
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            return None
+        if self.public_only and not ip.is_global:
+            return None                                          # the office network, this machine, a link-local address: not "out"
+        rows = self._sent.setdefault(pid, [])
+        rows.append((now, size, addr))
+        while rows and rows[0][0] < now - self.window:
+            rows.pop(0)
+        total = sum(r[1] for r in rows)
+        if total < self.threshold or now - self._told.get(pid, -1e9) < self.cooldown:
+            return None
+        self._told[pid] = now
+        by_addr: dict[str, int] = {}
+        for _, n, a in rows:
+            by_addr[a] = by_addr.get(a, 0) + n
+        if len(self._sent) > 500:
+            self._sent = {k: v for k, v in self._sent.items() if v and v[-1][0] >= now - self.window}
+        return {"bytes": total, "to": max(by_addr, key=by_addr.get), "destinations": len(by_addr), "seconds": int(self.window)}
 
 
 def file_open(data: bytes, pointer_size: int = 8) -> tuple[str, int] | None:
@@ -311,6 +365,8 @@ class EtwWatcher:
         self._devices: dict[str, str] = {}
         self._process: TraceSession | None = None
         self._file: TraceSession | None = None
+        self._net: TraceSession | None = None
+        self.meter = UploadMeter()
         self._recent: dict[str, float] = {}
         self.errors: dict[str, str] = {}
         # Who last touched a file under the folders this machine is watched on: the program name and when. Kept for Detective's witness stamp ("which program
@@ -376,11 +432,29 @@ class EtwWatcher:
             self._file = None
         return self._file is not None
 
+    @property
+    def network_live(self) -> bool:
+        return self._net is not None
+
+    def want_network(self, on: bool) -> bool:
+        """Count what each program sends out (volumes only), and say `network.upload` when one has sent a lot to somewhere outside this network."""
+        if on and self._net is None:
+            session = TraceSession("FalconNetwork", NETWORK_PROVIDER, NETWORK_KEYWORD, self._on_network)
+            if session.start():
+                self._net = session
+            else:
+                self.errors["network"] = session.error
+                log.info("sending volumes unavailable: %s", session.error)
+        elif not on and self._net is not None:
+            self._net.stop()
+            self._net = None
+        return self._net is not None
+
     def stop(self) -> None:
-        for session in (self._process, self._file):
+        for session in (self._process, self._file, self._net):
             if session is not None:
                 session.stop()
-        self._process = self._file = None
+        self._process = self._file = self._net = None
 
     # -- trace callbacks (the trace's own thread) -----------------------------------------------------------------
 
@@ -397,6 +471,18 @@ class EtwWatcher:
                 while len(self._ended) > 2000:
                     self._ended.popitem(last=False)
                 self.emit("program.exited", {"process": name})
+
+    def _on_network(self, event_id: int, header_pid: int, data: bytes) -> None:
+        if event_id not in (EVENT_TCP_SEND4, EVENT_TCP_SEND6):
+            return
+        got = tcp_send(event_id, data)
+        if got is None or got[0] == self._me:
+            return
+        import time
+
+        said = self.meter.feed(got[0], got[1], got[2], time.monotonic())
+        if said:
+            self.emit("network.upload", {"process": self._name_of(got[0]) or f"pid {got[0]}", **said})
 
     def _on_file(self, event_id: int, pid: int, data: bytes) -> None:
         if event_id != EVENT_FILE_CREATE or pid == self._me:

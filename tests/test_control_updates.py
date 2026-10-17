@@ -339,7 +339,7 @@ async def test_a_machine_watches_only_the_os_signals_an_automation_waits_for(eng
     w1 = await connect("cid-w1")
     w2 = await connect("cid-w2")
     drives = (await w1.ok("control.signal_interest"))["interest"]               # what Detective always wants: drives, a cleared log, screenshot tools
-    assert set(drives) == {"usb.inserted", "usb.removed", "log.cleared", "program.launched"}
+    assert set(drives) == {"usb.inserted", "usb.removed", "log.cleared", "program.launched", "screen.captured", "network.upload"}
     note = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "notify", "timeout_s": 5,
                                                   "params": {"message": "opened"}}))["action"]
     ev = (await a1.ok("control.event_create", {"type": "file.accessed", "pc_ids": [org["w1_pc"]],

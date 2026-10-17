@@ -81,6 +81,20 @@ finding (by the same amount as a recorded allowance); the finding is still kept 
 `detective.rules`), can be taken back (`detective unrule`, `detective.rule_revoke`), are audited when made and when revoked, and are scoped like cases (an Admin: own
 department's client machines). Nothing is written down unless it was asked for.
 
+## Pictures on the clipboard, window titles and what a program sends out (built 17 Oct 2026)
+- **Clipboard.** PrintScreen puts the whole screen on the clipboard and Win+Shift+S a region, so a screenshot needs no tool. `worker_client/clipboard.py` (run where the
+  person's desktop is: the helper when the Worker is a service) watches Windows' clipboard change number and, when it moves and the clipboard now holds a picture, reads
+  the picture's width and height from its header. It never reads pixels or text. A picture as large as the screen is "screen", smaller is "region"; it is sent as
+  `screen.captured` (always wanted when Detective is on), and Detective reads it with the screenshot-tool graph (capture), which does not count twice when a tool that
+  was just started took the picture.
+- **Window titles.** The title of the window in front is added to the witness stamp for a person's own hands, trimmed to 160 characters, and kept only in the evidence
+  of a finding (it reads "opened payroll.xlsx (in "Payroll Q3 - Google Sheets")"). It is not written into the file event history.
+- **What a program sends out.** The Kernel-Network trace (same machinery as the file and process traces) counts, per program, what it sends to addresses outside this
+  network; volumes only. When one program has sent 25 MB in a minute it is said once (`network.upload`, again after ten minutes). Detective reads it as taking out,
+  low alone (a video call, an update), raised after restricted files were worked on or an archive was made, and lowered for sync and backup clients. Verified against a
+  real loopback transfer on this machine.
+
 ## Not built yet
-Clipboard (an image copied to the clipboard, PrintScreen without a tool: needs the helper on the person's desktop to watch the clipboard), the page content of a window
-(foreground titles are only reported every 15 s and not kept), per-program network (uploads).
+Nothing in the original list. Remaining is verification, not building: the tray, the corner notes, the emergency overlay, the program at sign-in and the Detective page
+on a real signed-in desktop and a second machine (`docs/VM-TEST-PLAN.md`); the clipboard and the upload trace need a signed-in desktop and an elevated service to be
+seen working outside a test. What an upload carried is not known (volumes only), so a sync client that sends company files to a personal account looks like any other.

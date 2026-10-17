@@ -119,6 +119,7 @@ class WorkerService:
         await self.watcher.start()
         await self.signals.start()
         await self.ossignals.start(native=self._native_watch)
+        self._clipboard_watch().start()
         if getattr(self.ossignals, "etw", None) is not None:              # who made a file change: remembered from the file trace over the watched folders
             self.ossignals.etw.set_touch_roots(list(self.config.watch_roots))
             await asyncio.to_thread(self.ossignals.etw.want_programs, True)
@@ -147,6 +148,8 @@ class WorkerService:
             self.signpipe.stop()
         await self.watcher.stop()
         await self.signals.stop()
+        if self._clipboard is not None:
+            await self._clipboard.stop()
         await self.ossignals.stop()
         await self.inventory.stop()
         await self.updater.stop()
@@ -168,6 +171,36 @@ class WorkerService:
         if self.conn is None or not self.conn.connected:
             raise ConnectionError_("not connected")
         return await self.conn.call(type_, payload)
+
+    _clipboard: Any = None
+
+    def _clipboard_watch(self) -> Any:
+        """A picture put on the clipboard (PrintScreen, the Snipping Tool) is reported as `screen.captured` while the Engine wants it. It is looked at where the person's
+        desktop is: the helper there when this is a service, else this process."""
+        if self._clipboard is None:
+            from worker_client import clipboard, foreground
+
+            async def mine() -> dict[str, Any] | None:
+                return await asyncio.to_thread(clipboard.look)
+
+            async def front() -> str | None:
+                return ((await asyncio.to_thread(foreground.foreground)) or {}).get("program")
+
+            if self.helper:
+                async def source() -> dict[str, Any] | None:
+                    got = await self.helper.clipboard()
+                    return got
+
+                async def helper_front() -> str | None:
+                    return (await self.helper.clipboard() or {}).get("front")
+
+                self._clipboard = clipboard.ClipboardWatcher(self.call, source, front=helper_front, wanted=self._wants_clipboard)
+            else:
+                self._clipboard = clipboard.ClipboardWatcher(self.call, mine, front=front, wanted=self._wants_clipboard)
+        return self._clipboard
+
+    def _wants_clipboard(self) -> bool:
+        return bool(getattr(self.ossignals, "interest", {}).get("screen.captured"))
 
     def _who_touched(self, path: str) -> str:
         """Which program last opened this file (Windows' file trace, when this process may have one)."""
