@@ -353,7 +353,8 @@ async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine
     svc = await _start(engine, tmp_path, "cid-w1", [])
     admin = await _admin(engine)
     try:
-        assert set(svc.ossignals.interest) <= {"usb.inserted", "usb.removed"}        # only the drives Detective always wants; no automation waits for anything
+        assert set(svc.ossignals.interest) <= {"usb.inserted", "usb.removed", "log.cleared", "program.launched"}      # only what Detective always wants
+        assert all(m.get("process") != "falcon-test-probe.exe" for m in svc.ossignals.interest.get("program.launched", []))
         note = (await admin.call("control.action_create", {"kind": "control", "builtin_type": "notify",
                                                            "timeout_s": 5, "params": {"message": "started"}}))["action"]
         ev = (await admin.call("control.event_create", {"type": "program.launched", "pc_ids": [org["w1_pc"]],
@@ -371,7 +372,7 @@ async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine
         assert await svc.ossignals.tick() == 1                    # the probe starts: the match fires
         assert await svc.ossignals.tick() == 0                    # another program starts: not what was asked
         await admin.call("control.event_delete", {"event_id": ev["id"]})
-        assert await _wait(lambda: "program.launched" not in svc.ossignals.interest, timeout=5)
+        assert await _wait(lambda: all(m.get("process") != "falcon-test-probe.exe" for m in svc.ossignals.interest.get("program.launched", [])), timeout=5)
     finally:
         await admin.close()
         await svc.stop()
@@ -865,7 +866,7 @@ def test_the_etw_watcher_tells_programs_and_opens_once_and_ignores_itself_and_fo
     w._on_file(12, 10, opened("Users\\ama\\Sheets.xlsx", options=0x1))        # a folder
     w._on_file(12, os.getpid(), opened("Users\\ama\\other.xlsx"))             # itself
     w._on_file(11, 10, opened("Users\\ama\\late.xlsx"))                      # not a create
-    assert seen == [("file.accessed", {"path": "C:\\Users\\ama\\budget.xlsx", "name": "budget.xlsx", "process": ""})]
+    assert seen == [("file.accessed", {"path": "C:\\Users\\ama\\budget.xlsx", "name": "budget.xlsx", "process": "notepad.exe"})]      # named from its start, though it had finished
 
 
 async def test_the_os_signals_relay_what_the_trace_reports_and_stop_looking_for_programs_when_it_is_live():

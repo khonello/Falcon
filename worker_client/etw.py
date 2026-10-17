@@ -24,6 +24,7 @@ import struct
 import sys
 import threading
 import uuid
+from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
 
@@ -37,6 +38,10 @@ EVENT_PROCESS_START, EVENT_PROCESS_STOP, EVENT_FILE_CREATE = 1, 2, 12
 FILE_DIRECTORY_FILE = 0x00000001
 
 Emit = Callable[[str, dict[str, Any]], None]
+
+# programs that open everything all the time and say nothing about who made a change: not worth remembering as "the one that touched it"
+QUIET_TOUCHERS = frozenset({"system", "searchindexer.exe", "searchprotocolhost.exe", "msmpeng.exe", "svchost.exe", "dllhost.exe", "backgroundtaskhost.exe",
+                            "runtimebroker.exe", "audiodg.exe", "wmiprvse.exe", "smartscreen.exe", "taskhostw.exe"})
 
 
 # --- reading an event's payload (pure: testable anywhere) ---------------------------------------------------------------------
@@ -308,6 +313,24 @@ class EtwWatcher:
         self._file: TraceSession | None = None
         self._recent: dict[str, float] = {}
         self.errors: dict[str, str] = {}
+        # Who last touched a file under the folders this machine is watched on: the program name and when. Kept for Detective's witness stamp ("which program
+        # made this change"), by the same trace -- one dict write per open under the watched folders, nothing sent anywhere.
+        self.touch_roots: list[str] = []
+        self.touches: OrderedDict[str, tuple[int, float]] = OrderedDict()       # path -> (the process that opened it, when); named when asked, not now
+        self._ended: OrderedDict[int, str] = OrderedDict()                       # the last few programs that have already finished
+
+    def set_touch_roots(self, roots: list[str]) -> None:
+        self.touch_roots = [r.replace("/", "\\").rstrip("\\").lower() + "\\" for r in roots if r]
+
+    def who(self, path: str, within: float = 5.0) -> str:
+        """The program that last opened this file, if it did so in the last few seconds (the file change being reported is what it did)."""
+        import time
+
+        hit = self.touches.get(path.replace("/", "\\").lower())
+        if not hit or time.monotonic() - hit[1] > within:
+            return ""
+        name = self._name_of(hit[0])
+        return "" if name.lower() in QUIET_TOUCHERS else name
 
     @property
     def programs_live(self) -> bool:
@@ -340,7 +363,7 @@ class EtwWatcher:
         self.files.set(matches or [])
         if self.files.unfiltered_skipped:
             log.warning("%d file-open interest(s) name no path or suffix and are not watched live", self.files.unfiltered_skipped)
-        if self.files.active and self._file is None:
+        if (self.files.active or self.touch_roots) and self._file is None:
             self._devices = device_map()
             session = TraceSession("FalconFile", FILE_PROVIDER, FILE_KEYWORD_CREATE, self._on_file)
             if session.start():
@@ -348,7 +371,7 @@ class EtwWatcher:
             else:
                 self.errors["files"] = session.error
                 log.info("instant file-open events unavailable: %s", session.error)
-        elif not self.files.active and self._file is not None:
+        elif not (self.files.active or self.touch_roots) and self._file is not None:
             self._file.stop()
             self._file = None
         return self._file is not None
@@ -370,6 +393,9 @@ class EtwWatcher:
         elif event_id == EVENT_PROCESS_STOP and pid != self._me:
             name = self._names.pop(pid, None)
             if name:
+                self._ended[pid] = name
+                while len(self._ended) > 2000:
+                    self._ended.popitem(last=False)
                 self.emit("program.exited", {"process": name})
 
     def _on_file(self, event_id: int, pid: int, data: bytes) -> None:
@@ -379,11 +405,19 @@ class EtwWatcher:
         if got is None or got[1] & FILE_DIRECTORY_FILE or got[0].endswith("\\"):
             return
         path = drive_path(got[0], self._devices)
-        if path is None or not self.files.matches(path) or os.path.isdir(path):
-            return                                  # (a folder opened without the directory flag is still a folder)
+        if path is None:
+            return
         import time
 
         now = time.monotonic()
+        low = path.lower()
+        if self.touch_roots and low.startswith(tuple(self.touch_roots)) and (self._names.get(pid) or self._ended.get(pid) or "").lower() not in QUIET_TOUCHERS:
+            self.touches[low] = (pid, now)           # the program's name may not have reached us yet (the two traces are delivered separately): it is looked up when asked
+            self.touches.move_to_end(low)
+            while len(self.touches) > 20000:
+                self.touches.popitem(last=False)
+        if not self.files.matches(path) or os.path.isdir(path):
+            return                                  # (a folder opened without the directory flag is still a folder)
         if now - self._recent.get(path, 0.0) < 3.0:                       # one open is many create calls: tell it once
             return
         if len(self._recent) > 2000:
@@ -393,7 +427,7 @@ class EtwWatcher:
 
     def _name_of(self, pid: int) -> str:
         """Which program opened it: known from its start, or asked of Windows for a process that was already running."""
-        name = self._names.get(pid)
+        name = self._names.get(pid) or self._ended.get(pid)
         if name is None:
             try:
                 import psutil

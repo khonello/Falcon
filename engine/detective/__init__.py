@@ -163,7 +163,7 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
         tags.add("allowed")
     await _tasks_things(engine, pc_id)
-    sig = Sig(time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("front", "") if by == "hand" else "", by, "", frozenset(tags))
+    sig = Sig(time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("program") or (seen.get("front", "") if by == "hand" else ""), by, "", frozenset(tags))
     await _apply(engine, det.feed(sig))
 
 

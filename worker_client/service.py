@@ -71,7 +71,7 @@ class WorkerService:
         # what the machine saw when a file changed (was a person at the keyboard?): a service sees no desktop, so it asks the helper on the person's
         from worker_client.witness import Witness
 
-        self.witness = Witness(self.helper.witness if self.helper else (self._no_desktop if winsession.in_service_session() else None))
+        self.witness = Witness(self.helper.witness if self.helper else (self._no_desktop if winsession.in_service_session() else None), toucher=self._who_touched)
         self.remote_input: Any = HelperInput(self.helper) if self.helper else RemoteInput()
         self.inventory = Inventory(self.call)
         self._native_watch = native_watch
@@ -119,6 +119,10 @@ class WorkerService:
         await self.watcher.start()
         await self.signals.start()
         await self.ossignals.start(native=self._native_watch)
+        if getattr(self.ossignals, "etw", None) is not None:              # who made a file change: remembered from the file trace over the watched folders
+            self.ossignals.etw.set_touch_roots(list(self.config.watch_roots))
+            await asyncio.to_thread(self.ossignals.etw.want_programs, True)
+            await asyncio.to_thread(self.ossignals.etw.want_files, self.ossignals.interest.get("file.accessed") or [])
         await self.inventory.start()
         await self._refresh_tasks()
         if self.config.windows:
@@ -165,6 +169,11 @@ class WorkerService:
             raise ConnectionError_("not connected")
         return await self.conn.call(type_, payload)
 
+    def _who_touched(self, path: str) -> str:
+        """Which program last opened this file (Windows' file trace, when this process may have one)."""
+        etw = getattr(self.ossignals, "etw", None)
+        return etw.who(path) if etw is not None else ""
+
     @staticmethod
     async def _no_desktop() -> tuple[float | None, str | None]:
         return None, None                          # a service in session 0 with no helper on the desktop: it does not guess
@@ -172,7 +181,7 @@ class WorkerService:
     async def _relay(self, type_: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """What the file watcher (here or in its own program) reports goes through here, so each change carries the witness stamp taken as it was told."""
         if type_ == "index.event" and payload and isinstance(payload.get("event"), dict) and "witness" not in payload["event"]:
-            payload = {**payload, "event": {**payload["event"], "witness": await self.witness.stamp()}}
+            payload = {**payload, "event": {**payload["event"], "witness": await self.witness.stamp(str(payload["event"].get("path") or ""))}}
         return await self.call(type_, payload)
 
     # --- connection -----------------------------------------------------------------------------

@@ -8,9 +8,10 @@ small stamp, taken at that moment:
             "alone"    nobody has touched the machine for half a minute or more: a program (or a script, or a scheduled job) on its own
             "unknown"  it cannot be told (no desktop to ask, or not Windows)
     front   the program in front when it happened (only claimed for "hand": it is the program the person is using)
+    program the program that last opened the file in the seconds before (Windows' own file trace, where this process may have one): it names who made the
+            change, and a person who runs a script (powershell, robocopy, python ...) is "started", not "hand": their hands started it, a program did the work
 
-It is a weight, never a verdict: a person who starts a script is "started" or "alone" depending on how long they then leave it. What names the program that
-made a change (rather than the one in front) is the next step, from the kernel's file trace, where Windows lets this process have one.
+It is a weight, never a verdict: a person who starts a script is "started" or "alone" depending on how long they then leave it.
 
 A service lives in session 0 and sees no desktop: its input and foreground are not the person's. There the stamp comes from the helper on the person's desktop
 (`worker_client/helper.py`, "witness"), and if there is none it says "unknown" rather than guess.
@@ -31,6 +32,11 @@ ALONE_SECONDS = 30.0
 TTL = 1.0                      # one look serves every event in the same second (a burst of fourteen copies is one look)
 
 Source = Callable[[], Awaitable[tuple[float | None, str | None]]]
+Toucher = Callable[[str], str]
+
+# programs a person starts to make a machine do work for them: a change they make is by their hand only in the sense that they started it
+SCRIPT_HOSTS = frozenset({"powershell.exe", "pwsh.exe", "cmd.exe", "python.exe", "pythonw.exe", "wscript.exe", "cscript.exe", "robocopy.exe", "xcopy.exe", "7z.exe",
+                          "7zg.exe", "rclone.exe", "bash.exe", "wsl.exe", "node.exe"})
 
 
 def classify(idle_s: float | None) -> str:
@@ -57,12 +63,13 @@ async def here() -> tuple[float | None, str | None]:
 
 
 class Witness:
-    def __init__(self, source: Source | None = None, *, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, source: Source | None = None, *, clock: Callable[[], float] = time.monotonic, toucher: Toucher | None = None) -> None:
         self._source = source or here
         self._clock = clock
+        self._toucher = toucher
         self._last: tuple[float, dict[str, Any]] | None = None
 
-    async def stamp(self) -> dict[str, Any]:
+    async def _look(self) -> dict[str, Any]:
         now = self._clock()
         if self._last is not None and now - self._last[0] < TTL:
             return self._last[1]
@@ -76,4 +83,14 @@ class Witness:
         if by == "hand" and front:
             out["front"] = str(front)[:120]
         self._last = (now, out)
+        return out
+
+    async def stamp(self, path: str | None = None) -> dict[str, Any]:
+        out = dict(await self._look())
+        program = self._toucher(path) if (self._toucher and path) else ""
+        if program:
+            out["program"] = program[:120]
+            if out["by"] == "hand" and program.lower() in SCRIPT_HOSTS:
+                out["by"] = "started"                    # a person's hands started it; the program did the work
+                out.pop("front", None)
         return out

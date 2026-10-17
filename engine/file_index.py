@@ -136,12 +136,14 @@ def _detail(raw: Any) -> dict[str, bool] | None:
 
 
 def _witness(raw: Any) -> dict[str, str] | None:
-    """What the Worker saw when a change happened: who made it (hand / started / alone / unknown) and the program in front (only for hand)."""
+    """What the Worker saw when a change happened: who made it (hand / started / alone / unknown), the program in front (only for hand) and the program that
+    last opened the file (who made the change, when Windows' file trace could say)."""
     if not isinstance(raw, dict) or raw.get("by") not in ("hand", "started", "alone", "unknown"):
         return None
     out = {"by": str(raw["by"])}
-    if raw.get("front"):
-        out["front"] = str(raw["front"])[:120]
+    for key in ("front", "program"):
+        if raw.get(key):
+            out[key] = str(raw[key])[:120]
     return out
 
 

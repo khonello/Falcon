@@ -225,7 +225,7 @@ class OsSignals:
         if self.etw is None:
             return
         wants_programs = any(t in self.interest for t in ("program.launched", "program.exited"))
-        await asyncio.to_thread(self.etw.want_programs, wants_programs)
+        await asyncio.to_thread(self.etw.want_programs, wants_programs or bool(self.etw.touch_roots))      # (a short-lived program is only named if it was seen starting)
         await asyncio.to_thread(self.etw.want_files, self.interest.get("file.accessed") or [])
 
     def _from_trace(self, etype: str, data: dict[str, Any]) -> None:
