@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from detective_scenarios import SCENARIOS, play
 from PySide6.QtCore import QMetaObject, QObject
 
+from common.detective import rule_options
 from tests.test_operator_gui import _open, _pump, _wait, console, prop  # noqa: F401
 
 
@@ -53,7 +54,7 @@ def sample():
     # a second, quieter case beside it
     quiet = {**case, "id": 2, "host": "FIN-02", "intent": "Hiding something", "level": "noted", "weight": 0.38, "stage_count": 1, "stage_name": "Hiding", "next_stage": "Taking out",
              "not_yet": None, "behaviours": ["concealment"], "headline": "Hiding something. birthday-plans.docx was hidden.", "story": ["11:00  hid birthday-plans.docx"]}
-    return case, quiet, {"case": {**case, "reviewed_by": None}, "findings": findings, "graph": c.graph()}
+    return case, quiet, {"case": {**case, "reviewed_by": None}, "findings": findings, "graph": c.graph(), "rule_options": rule_options(c.findings)}
 
 
 async def _page(console, role="super_user"):
@@ -86,7 +87,9 @@ async def test_a_case_reads_as_a_story_a_picture_and_a_question(console):
 async def test_what_a_person_makes_of_it_is_sent_with_their_note(console):
     win, bridge, page = await _page(console)
     page.setProperty("note", "It was the Q3 close")
-    QMetaObject.invokeMethod(page, "review", __import__("PySide6.QtCore", fromlist=["Q_ARG"]).Q_ARG("QVariant", "explained"))
+    from PySide6.QtCore import Q_ARG
+
+    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "explained"), Q_ARG("QVariant", ""))
     await _wait(lambda: any(t == "detective.review" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "detective.review")
     assert sent == {"case_id": 1, "outcome": "explained", "note": "It was the Q3 close"}
@@ -97,3 +100,14 @@ async def test_only_an_admin_can_send_it_up_and_the_super_user_sees_every_machin
     assert win.findChild(QObject, "detEscalate").property("visible") is True
     win2, bridge2, page2 = await _page(console, "super_user")
     assert win2.findChild(QObject, "detEscalate").property("visible") is False
+
+
+async def test_a_dismissal_can_be_remembered_for_a_folder_or_a_drive_the_case_involves(console):
+    from PySide6.QtCore import Q_ARG
+
+    win, bridge, page = await _page(console)
+    assert win.findChild(QObject, "detRememberFolder").property("visible") is True and win.findChild(QObject, "detRememberDrive").property("visible") is True
+    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "dismissed"), Q_ARG("QVariant", "folder"))
+    await _wait(lambda: any(t == "detective.review" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "detective.review")
+    assert sent["outcome"] == "dismissed" and sent["remember"] == {"kind": "folder"}

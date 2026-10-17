@@ -341,3 +341,30 @@ async def test_the_live_demo_plays_a_scenario_as_a_worker_and_detective_raises_i
             break
         await asyncio.sleep(0.1)
     assert "evasion" in got["FIN-02"]["behaviours"]
+
+
+async def test_a_dismissal_can_be_written_down_as_a_rule_that_lowers_the_same_thing_next_time_and_can_be_taken_back(engine, org, connect):
+    su, a1, a2 = await connect("cid-su"), await connect("cid-a1"), await connect("cid-a2")
+    pc = org["w1_pc"]
+    await _leak(engine, pc)
+    case_id = (await su.ok("detective.cases", {}))["cases"][0]["id"]
+    assert await a1.err("detective.review", {"case_id": case_id, "outcome": "escalated", "remember": {"kind": "folder"}}) == "invalid"      # only a dismissal or an explanation
+    assert await a1.err("detective.review", {"case_id": case_id, "outcome": "dismissed", "remember": {"kind": "everything"}}) == "invalid"
+    done = await a1.ok("detective.review", {"case_id": case_id, "outcome": "dismissed", "note": "the weekly backup", "remember": {"kind": "folder"}})
+    rules = done["rules"]
+    assert rules and all(r["kind"] == "folder" for r in rules) and any(r["graph"] == "to_drive" and r["value"] == "E:" for r in rules)
+    assert [r["id"] for r in (await a1.ok("detective.rules", {}))["rules"]] and (await a2.ok("detective.rules", {}))["rules"] == []        # an Admin sees their own department's
+    again = await a1.ok("detective.review", {"case_id": case_id, "outcome": "dismissed", "remember": {"kind": "folder"}})
+    assert again["rules"] == []                                                                                  # already written down: not made twice
+    # the same thing again on that machine: still recorded, but lowered, and it says why
+    await engine.file_index.ingest_event(pc, ev("copy", "E:\\q4.zip", old_path="C:\\Users\\kojo\\Staging\\q4.zip", hash="h-zip4"))
+    why = [w for r in await engine.db.pool.fetch("SELECT why FROM detective_findings WHERE graph = 'to_drive' ORDER BY id DESC LIMIT 1") for w in r["why"]]
+    assert any(w.startswith("you ruled folder E: fine") for w in why)
+    audited = [r["action_type"] for r in await engine.db.pool.fetch("SELECT action_type FROM audit_log WHERE action_type LIKE 'detective.rule%'")]
+    assert "detective.rule_made" in audited
+    # taking it back: an Admin of another department cannot, the right one can, and the next one is not lowered
+    rid = rules[0]["id"]
+    assert await a2.err("detective.rule_revoke", {"rule_id": rid}) == "not_found"
+    await a1.ok("detective.rule_revoke", {"rule_id": rid})
+    assert rid not in [r["id"] for r in (await a1.ok("detective.rules", {}))["rules"]]
+    assert "detective.rule_revoked" in [r["action_type"] for r in await engine.db.pool.fetch("SELECT action_type FROM audit_log WHERE action_type LIKE 'detective.rule%'")]

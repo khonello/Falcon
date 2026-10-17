@@ -30,7 +30,7 @@ POLYMORPHIC_TABLES = frozenset({
     "tasks", "department_tasks", "enrollments", "issues", "resource_marks", "deviations", "rules", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
-    "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases",
+    "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases", "detective_rules",
     # non-table targets used by the audit trail
     "client", "session", "event", "execution",
 })
@@ -2336,6 +2336,25 @@ class DetectiveRepo(_Repo):
     async def review(self, case_id: int, status: str, by_account_id: int, note: str | None) -> bool:
         return (await self._exec(
             "UPDATE detective_cases SET status = $2, reviewed_by_account_id = $3, reviewed_at = now(), note = $4 WHERE id = $1", case_id, status, by_account_id, note)).endswith("1")
+
+    async def add_rule(self, pc_id: int, graph: str, kind: str, value: str, case_id: int, by_account_id: int) -> int | None:
+        return await self._val(
+            "INSERT INTO detective_rules (pc_id, graph, kind, value, case_id, made_by_account_id) VALUES ($1, $2, $3, $4, $5, $6) "
+            "ON CONFLICT (pc_id, graph, kind, lower(value)) WHERE revoked_at IS NULL DO NOTHING RETURNING id", pc_id, graph, kind, value, case_id, by_account_id)
+
+    async def live_rules(self) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM detective_rules WHERE revoked_at IS NULL ORDER BY id")
+
+    async def rules(self, *, department_id: int | None = None, only_pc_types: list[str] | None = None) -> list[dict[str, Any]]:
+        sql = ("SELECT r.*, p.hostname FROM detective_rules r JOIN pcs p ON p.id = r.pc_id WHERE r.revoked_at IS NULL "
+               "AND ($1::int IS NULL OR p.department_id = $1) AND ($2::text[] IS NULL OR p.pc_type = ANY($2)) ORDER BY r.id DESC")
+        return await self._fetch(sql, department_id, only_pc_types)
+
+    async def rule(self, rule_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT r.*, p.hostname, p.department_id AS pc_department_id, p.pc_type FROM detective_rules r JOIN pcs p ON p.id = r.pc_id WHERE r.id = $1", rule_id)
+
+    async def revoke_rule(self, rule_id: int, by_account_id: int) -> bool:
+        return (await self._exec("UPDATE detective_rules SET revoked_at = now(), revoked_by_account_id = $2 WHERE id = $1 AND revoked_at IS NULL", rule_id, by_account_id)).endswith("1")
 
     async def set_model_says(self, case_id: int, says: str | None) -> None:
         await self._exec("UPDATE detective_cases SET model_says = $2 WHERE id = $1", case_id, says)

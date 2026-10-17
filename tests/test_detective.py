@@ -229,7 +229,16 @@ def test_documents_scrambled_or_destroyed_in_bulk_by_a_program_are_sabotage_and_
     det2, _ = play(SCENARIOS["wiped"]())
     assert det2.open_cases()[0].intent == "Wrecking things" and "sabotage" in det2.open_cases()[0].behaviours
     det3, up3 = play(SCENARIOS["big_clean_up_by_hand"]())
-    assert det3.cases == [] and up3 == []                                                             # sixty deletions by a person's own hands: tidying up
+    assert all(c.level == "quiet" for c in det3.open_cases()) and not any(u.raised for u in up3)                                 # sixty old drafts by hand: remembered, but not a case
+
+
+def test_the_same_deletions_by_hand_are_sabotage_when_what_went_is_restricted_and_cover_up_when_they_follow_a_leak():
+    det, updates = play(SCENARIOS["restricted_wiped_by_hand"]())
+    (case,) = det.open_cases()
+    assert "sabotage" in case.behaviours and case.level in ("case", "urgent") and any(u.raised for u in updates)
+    assert any("restricted" in line for f in case.findings for line in f.why)
+    det2, _ = play(SCENARIOS["leak_then_clean_up_by_hand"]())
+    assert {"exfiltration", "erasure"} <= det2.open_cases()[0].behaviours                              # one act, read by a second behaviour because of what came before
 
 
 def test_clearing_the_machine_s_own_log_is_telling_on_its_own():
@@ -245,3 +254,22 @@ def test_the_picture_shows_a_started_tool_and_a_machine_going_quiet_as_traces():
     assert labels["payroll-q3.xlsx"] == 0 and any(label.startswith("started snippingtool.exe") and col == 4 for label, col in labels.items())
     det2, _ = play(SCENARIOS["goes_dark"]())
     assert {n["label"] for n in det2.open_cases()[0].graph()["nodes"]} >= {"stopped reporting"}
+
+
+def test_a_rule_lowers_what_it_names_and_only_that():
+    from common.detective import Context, Detective, Rule, rule_options
+
+    sc = SCENARIOS["leak"]()
+    det, _ = play(sc)
+    options = rule_options([f for c in det.cases for f in c.findings])
+    drive = next(o for o in options if o["graph"] == "to_drive" and o["kind"] == "folder")
+    base = max(f.weight for c in det.cases for f in c.findings if f.graph == drive["graph"])
+    ruled = Detective(Context(rules=lambda pc: [Rule(1, pc, drive["graph"], "folder", drive["value"], "14 Oct")]))
+    for sig in sc.sigs:
+        ruled.feed(sig)
+    assert max([f.weight for c in ruled.cases for f in c.findings if f.graph == drive["graph"]], default=0.0) < base                                                   # lowered, not removed: the case is still there
+    assert any(w.startswith("you ruled folder") for c in ruled.cases for f in c.findings for w in f.why)
+    other = Detective(Context(rules=lambda pc: [Rule(2, pc, drive["graph"], "folder", "Z:")]))
+    for sig in sc.sigs:
+        other.feed(sig)
+    assert max(f.weight for c in other.cases for f in c.findings if f.graph == drive["graph"]) == base                                                  # a rule about another drive changes nothing

@@ -642,4 +642,6 @@ per destination and source file to catch a destination up (`engine/flow/sync.py`
 status open/explained/accepted/escalated/dismissed with who reviewed and when), `detective_findings` (what each mini-graph concluded: behaviour, graph, weight,
 summary, what would make it innocent, why the weight is what it is, the things (files) it concerns, the evidence signals), `detective_devices` (how often a
 drive has been seen on a machine). `file_events.detail` (JSONB) says which attributes an `attrib` change was (hidden, system, read-only, before and after).
+`detective_rules` (migration 037: a reviewer's "this is fine" written down: graph, program/folder/drive, the machine, who and when, and
+when it was taken back; it only lowers a matching finding).
 Design: `docs/design/detective.md`.

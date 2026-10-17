@@ -357,12 +357,62 @@ class Update:
     finding: Finding | None = None
 
 
+@dataclass(frozen=True)
+class Rule:
+    """Something a reviewer said is fine, written down so it applies again: "this kind of finding, on this machine, with this program / in this folder / on
+    this drive". It only LOWERS a matching finding (the finding is still recorded, with the rule named in its reasons) -- it never hides anything."""
+    id: int
+    pc: int
+    graph: str
+    kind: str                      # program | folder | drive
+    value: str
+    made_at: str = ""
+
+    def matches(self, f: Finding) -> bool:
+        if f.graph != self.graph or not f.evidence:
+            return False
+        v = self.value.lower().replace("/", "\\")
+        if self.kind == "program":
+            return any(e.program.lower() == v for e in f.evidence if e.program)
+        if self.kind == "drive":
+            return any(((e.device or e.path).lower() == v) if e.verb == "attached" else _device_in(e.path, v) for e in f.evidence)
+        paths = [x.path.lower().replace("/", "\\") for x in f.evidence if x.path]
+        return bool(paths) and all(x == v or x.startswith(v.rstrip("\\") + "\\") for x in paths)
+
+
+def _device_in(path: str, device: str) -> bool:
+    return bool(device) and path.lower().replace("/", "\\").startswith(device.rstrip("\\") + "\\")
+
+
+def rule_options(findings: list[Finding]) -> list[dict[str, str]]:
+    """What a reviewer could say is fine about these findings: the programs, folders and drives they involve (so the Engine can write the rule down)."""
+    out: list[dict[str, str]] = []
+    for f in findings:
+        programs = sorted({e.program for e in f.evidence if e.program})
+        out += [{"graph": f.graph, "kind": "program", "value": x} for x in programs]
+        folders = {folder_of(e.path) for e in f.evidence if e.path and e.verb not in ("attached", "detached")}
+        if len(folders) == 1 and (only := next(iter(folders))):
+            out.append({"graph": f.graph, "kind": "folder", "value": only})
+        devices = sorted({e.device for e in f.evidence if e.verb == "attached" and e.device})
+        out += [{"graph": f.graph, "kind": "drive", "value": x} for x in devices]
+    seen: set[tuple[str, str, str]] = set()
+    return [o for o in out if not ((k := (o["graph"], o["kind"], o["value"])) in seen or seen.add(k))]
+
+
 class Context:
     """What the detector may ask the rest of the system (the Engine supplies it; tests supply a dict). Every method has a safe answer for 'unknown'."""
 
     def __init__(self, *, task_things: Callable[[int], set[str]] | None = None, flow_paths: Callable[[int, str], bool] | None = None,
-                 allowed: Callable[[int, str, str], bool] | None = None, known_device: Callable[[int, str], int] | None = None) -> None:
-        self._task, self._flow, self._allowed, self._known = task_things, flow_paths, allowed, known_device
+                 allowed: Callable[[int, str, str], bool] | None = None, known_device: Callable[[int, str], int] | None = None,
+                 rules: Callable[[int], list[Rule]] | None = None) -> None:
+        self._task, self._flow, self._allowed, self._known, self._rules = task_things, flow_paths, allowed, known_device, rules
+
+    def ruled(self, pc: int, f: Finding) -> str:
+        """Why a reviewer already said this is fine (or "")."""
+        for r in (self._rules(pc) if self._rules else []):
+            if r.pc == pc and r.matches(f):
+                return f"you ruled {r.kind} {r.value} fine for this" + (f" on {r.made_at}" if r.made_at else "")
+        return ""
 
     def has_task(self, pc: int, thing: str) -> bool:
         return bool(self._task and thing in self._task(pc))
@@ -597,14 +647,25 @@ class Detective:
 
     def _mass_removal(self, m: Memory, s: Sig) -> Finding | None:
         lo = s.at - 120
-        dels = [x for x in m.since(lo, "deleted") if ext_of(x.path) in DOC_EXT and x.by != "hand"]
-        if len(dels) < 15:
+        dels = [x for x in m.since(lo, "deleted") if ext_of(x.path) in DOC_EXT]
+        hand = sum(1 for x in dels if x.by == "hand") * 2 > len(dels)
+        if len(dels) < (25 if hand else 15):
             return None
         first = min(x.at for x in dels)
         if any(f.graph == "mass_removal" and abs(f.at - first) < 120 for c in self.cases if c.pc == s.pc for f in c.findings):
             return None
-        return Finding("erasure", "mass_removal", s.at, s.pc, 0.40, frozenset({x.thing or x.path for x in dels}), f"{len(dels)} documents were deleted in two minutes, not by hand", dels[-200:],
-                       "a clean-up script or an application removing its own files", [f"{len(dels)} deletions in two minutes"])
+        # The same burst can be read as sabotage (damage) or as erasure (covering what was done). It is erasure when it follows staging or taking
+        # on this machine; by hand and with nothing before it, it stays a little weight rather than nothing.
+        staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if f.behaviour in ("collection", "exfiltration", "concealment") and s.at - f.at <= WINDOW]
+        if hand and not staged:
+            return None                  # by hand with nothing before it this is read as damage (sabotage), not as covering anything up
+        w, why = (0.20 if hand else 0.40), [f"{len(dels)} deletions in two minutes"]
+        if staged:
+            w += 0.28
+            why.append("right after files were gathered, hidden or taken out")
+        return Finding("erasure", "mass_removal", s.at, s.pc, w, frozenset({x.thing or x.path for x in dels}),
+                       f"{len(dels)} documents were deleted in two minutes" + (" by hand" if hand else ", not by hand"), dels[-200:],
+                       "a clean-up script or an application removing its own files" if not hand else "a person tidying up old files", why)
 
     def _history_cleared(self, m: Memory, s: Sig) -> Finding:
         is_log = "log" in str(s.info.get("what") or "").lower()
@@ -642,7 +703,8 @@ class Detective:
         if ext_of(s.path) not in DOC_EXT and s.verb != "renamed":
             return None
         lo = s.at - 120
-        burst = [x for x in m.since(lo, s.verb) if x.by != "hand"]
+        burst = [x for x in m.since(lo, s.verb) if x.by != "falcon"]
+        by_hand = bool(burst) and sum(1 for x in burst if x.by == "hand") * 2 > len(burst)
         if s.verb == "renamed":
             ends = {}
             for x in burst:
@@ -661,10 +723,33 @@ class Detective:
                 return None
             graph = "bulk_destroyed" if s.verb == "deleted" else "bulk_rewritten"
             summary = f"{len(hits)} documents were {'deleted' if s.verb == 'deleted' else 'rewritten'} in two minutes, not by hand"
-        if any(f.graph == graph and s.at - f.at < 120 and len(f.things) + 19 >= len(hits) for c in self.cases if c.pc == s.pc for f in c.findings):
+        if any(f.graph == graph and s.at - f.at < 120 and (len(f.things) + 19 >= len(hits) or (by_hand and len(f.things) * 2 > len(hits))) for c in self.cases if c.pc == s.pc for f in c.findings):
             return None                                           # one finding per burst, said again only when it has grown a great deal
-        return Finding("sabotage", graph, s.at, s.pc, 0.60 + min(0.25, 0.01 * (len(hits) - 10)), frozenset({x.thing or x.path for x in hits}), summary, hits[-200:],
-                       "a deliberate clean-up, a migration tool or a conversion", [f"{len(hits)} files in two minutes by a program"])
+        # A program doing it is the loud case. A person's own hands doing it is not innocent by default either: it starts lower and is raised by what was
+        # destroyed (restricted files, work outside their role, many places at once) -- the same sixty deletions mean little in one folder of old drafts
+        # and a great deal across the restricted share.
+        if by_hand:
+            w, why = 0.28, [f"{len(hits)} files in two minutes by hand"]
+            summary = summary.replace(", not by hand", " by hand")
+        else:
+            w, why = 0.60 + min(0.25, 0.01 * (len(hits) - 10)), [f"{len(hits)} files in two minutes by a program"]
+        restricted = sum(1 for x in hits if "restricted" in x.tags)
+        if restricted * 4 >= len(hits):
+            w += 0.22 if by_hand else 0.08
+            why.append(f"{restricted} of them restricted")
+        outside = sum(1 for x in hits if "outside_role" in x.tags)
+        if outside * 2 >= len(hits):
+            w += 0.15 if by_hand else 0.05
+            why.append("mostly files outside this person's work")
+        places = len({folder_of(x.path) for x in hits})
+        if places >= 4:
+            w += 0.08 if by_hand else 0.0
+            why.append(f"across {places} folders")
+        if by_hand and len(hits) >= 150:
+            w += 0.08
+            why.append("a very large number")
+        return Finding("sabotage", graph, s.at, s.pc, w, frozenset({x.thing or x.path for x in hits}), summary, hits[-200:],
+                       "a deliberate clean-up, a migration tool or a conversion", why)
 
     def _outside_role(self, m: Memory, s: Sig) -> Finding | None:
         lo = s.at - 20 * 60
@@ -698,6 +783,9 @@ class Detective:
         if any("allowed" in e.tags for e in f.evidence):
             w -= 0.45
             f.why.append("recorded as allowed")
+        if (said := self.ctx.ruled(s.pc, f)):
+            w -= 0.45
+            f.why.append(said)
         dev = next((d for e in f.evidence for d in ((e.device,) if e.verb == "attached" else (_on_external(mem, e.path),)) if d), "")
         if dev and any(self.ctx.allowed(s.pc, t, dev) for t in f.things):
             w -= 0.45

@@ -40,10 +40,30 @@ async def detective_case(ctx: ShellContext, args: Args) -> str:
     return "\n".join(out)
 
 
-@command("detective", "review", "<id> <explained|accepted|dismissed|escalated> [note...]", "Record what you made of a case; escalating tells the Super User")
+@command("detective", "review", "<id> <explained|accepted|dismissed|escalated> [note...] [remember=program|folder|drive]",
+         "Record what you made of a case; escalating tells the Super User; remember= writes down that this program, folder or drive is fine for this kind of finding")
 async def detective_review(ctx: ShellContext, args: Args) -> str:
-    await ctx.call("detective.review", {"case_id": args.get_int(0, "id"), "outcome": args.get(1, "outcome"), "note": args.rest(2, "note") if len(args.positional) > 2 else ""})
-    return "recorded"
+    payload = {"case_id": args.get_int(0, "id"), "outcome": args.get(1, "outcome"), "note": args.rest(2, "note") if len(args.positional) > 2 else ""}
+    if args.opt("remember"):
+        payload["remember"] = {"kind": args.opt("remember")}
+    res = await ctx.call("detective.review", payload)
+    made = res.get("rules") or []
+    return "recorded" + "".join(f"\n  rule {r['id']}: {r['graph']} involving {r['kind']} {r['value']} is fine on this machine" for r in made)
+
+
+@command("detective", "rules", "", "What has been written down as fine, and where")
+async def detective_rules(ctx: ShellContext, args: Args) -> str:
+    found = (await ctx.call("detective.rules"))["rules"]
+    if not found:
+        return "(no rules)"
+    return table([{"id": r["id"], "machine": r["host"], "finding": r["graph"], "kind": r["kind"], "value": r["value"], "made": r["made_at"]} for r in found],
+                 ["id", "machine", "finding", "kind", "value", "made"])
+
+
+@command("detective", "unrule", "<id>", "Take a written-down rule back")
+async def detective_unrule(ctx: ShellContext, args: Args) -> str:
+    await ctx.call("detective.rule_revoke", {"rule_id": args.get_int(0, "id")})
+    return "taken back"
 
 
 @command("detective", "overview", "", "What is open, by intent and level")

@@ -159,6 +159,23 @@ def big_clean_up_by_hand() -> Scenario:
     return Scenario("big_clean_up_by_hand", "A person selects sixty old documents and deletes them.", s.out)
 
 
+def restricted_wiped_by_hand() -> Scenario:
+    s = Script(clock(13, 21, 30))
+    for i in range(60):
+        s.after(1).add("deleted", rf"C:\Finance\Payroll\p{i}.xlsx", thing=f"h-p{i}", by="hand", program="explorer.exe", tags=frozenset({"restricted", "outside_role"}))
+    return Scenario("restricted_wiped_by_hand", "A person deletes sixty restricted files that are not part of their work, with their own hands, in the evening.", s.out)
+
+
+def leak_then_clean_up_by_hand() -> Scenario:
+    sc = leak()
+    last = sc.sigs[-1].at
+    s = Script(last + 600)
+    for i in range(30):
+        s.after(1).add("deleted", rf"C:\Users\ama\Documents\old{i}.docx", thing=f"h-o{i}", by="hand", program="explorer.exe")
+    return Scenario("leak_then_clean_up_by_hand", "After the leak, the person deletes thirty documents by hand: the same act that is tidying elsewhere is covering up here.",
+                    sc.sigs + s.out, sc.ctx)
+
+
 def wiped() -> Scenario:
     s = Script(clock(13, 2, 0))
     for i in range(60):
@@ -173,7 +190,7 @@ def log_cleared() -> Scenario:
 
 
 SCENARIOS: dict[str, Callable[[], Scenario]] = {f.__name__: f for f in (leak, backup_twin, patient, one_hidden_file, flow_to_drive, covered_by_task, snooping, screenshots, screenshot_of_nothing, goes_dark,
-                                                                  laptop_lid, ransom, big_clean_up_by_hand, wiped, log_cleared)}
+                                                                  laptop_lid, ransom, big_clean_up_by_hand, restricted_wiped_by_hand, leak_then_clean_up_by_hand, wiped, log_cleared)}
 
 
 def play(sc: Scenario) -> tuple[Detective, list[Update]]:

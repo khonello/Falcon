@@ -27,11 +27,13 @@ from common.detective import (
     Context,
     Detective,
     Finding,
+    Rule,
     Sig,
     Update,
     folder_of,
     graph_of,
     name_of,
+    rule_options,
     sig_from_dict,
     sig_to_dict,
 )
@@ -59,6 +61,7 @@ _devices: dict[tuple[int, str], int] = {}          # (pc, drive's own name) -> h
 _keys: dict[tuple[int, str], str] = {}             # (pc, where it is mounted now) -> the drive's own name (its serial when the Worker could read one)
 _tasks: dict[int, tuple[float, set[str]]] = {}
 _saved: dict[int, int] = {}                       # id(case) -> findings already saved
+_rules: dict[int, list[Rule]] = {}                # machine -> what a reviewer has said is fine there
 
 
 _queue: asyncio.Queue[tuple[str, Any]] | None = None
@@ -76,6 +79,7 @@ def reset_state() -> None:
     _keys.clear()
     _tasks.clear()
     _saved.clear()
+    _rules.clear()
 
 
 def tasks_changed() -> None:
@@ -85,7 +89,8 @@ def tasks_changed() -> None:
 def _detector() -> Detective:
     global _det
     if _det is None:
-        _det = Detective(Context(task_things=lambda pc: _tasks.get(pc, (0, set()))[1], known_device=lambda pc, dev: _devices.get((pc, _keys.get((pc, dev), dev)), 0)))
+        _det = Detective(Context(task_things=lambda pc: _tasks.get(pc, (0, set()))[1], known_device=lambda pc, dev: _devices.get((pc, _keys.get((pc, dev), dev)), 0),
+                                  rules=lambda pc: _rules.get(pc, [])))
     return _det
 
 
@@ -304,6 +309,8 @@ async def _ensure(engine: Engine) -> None:
         return
     _restored = True
     det = _detector()
+    for r in await engine.db.detective.live_rules():
+        _rules.setdefault(r["pc_id"], []).append(_rule(r))
     since = datetime.now(timezone.utc) - REMEMBER
     for r in await engine.db.detective.recent_events(since):
         verb = _verb({"op": r["op"], "path": r["path"], "old_path": r["old_path"], "detail": r["detail"] or {}})
@@ -316,6 +323,10 @@ async def _ensure(engine: Engine) -> None:
                                          [sig_from_dict(e) for e in f["evidence"] or []], f["innocent"] or "", list(f["why"] or [])))
         det.cases.append(case)
         _saved[id(case)] = len(case.findings)
+
+
+def _rule(r: dict[str, Any]) -> Rule:
+    return Rule(r["id"], r["pc_id"], r["graph"], r["kind"], r["value"], r["made_at"].strftime("%d %b") if r.get("made_at") else "")
 
 
 # --- who sees what ----------------------------------------------------------------------------------------------------------
@@ -362,7 +373,8 @@ async def case(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
     out["reviewed_by"] = names.get(c.get("reviewed_by_account_id"))
     seen: set[Sig] = set()
     sigs = [e for f in found for e in (sig_from_dict(x) for x in (f["evidence"] or [])) if not (e in seen or seen.add(e))]
-    return {"case": out, "findings": rows(found), "graph": graph_of(sigs)}
+    again = [Finding(f["behaviour"], f["graph"], f["at"].timestamp(), c["pc_id"], float(f["weight"]), frozenset(), "", [sig_from_dict(e) for e in f["evidence"] or []], "") for f in found]
+    return {"case": out, "findings": rows(found), "graph": graph_of(sigs), "rule_options": rule_options(again)}
 
 
 @handler("detective.review")
@@ -371,12 +383,53 @@ async def review(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]
     c = await _visible(ctx, int_field(payload, "case_id"))
     outcome = str_field(payload, "outcome", choices=OUTCOMES)
     note = " ".join(str(payload.get("note") or "").split())[:500] or None
+    keep = payload.get("remember")                                    # "and treat this as fine next time": {"kind": "program"|"folder"|"drive"}, only on a dismissal or an explanation
+    kind = keep.get("kind") if isinstance(keep, dict) else None
+    if keep is not None and (outcome not in ("dismissed", "explained") or kind not in ("program", "folder", "drive")):
+        raise ProtocolError(ErrorCode.INVALID, "a rule is written down only with a dismissal or an explanation, for a program, a folder or a drive")
     if not await ctx.engine.db.detective.review(c["id"], outcome, ident.account_id, note):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such case")
+    made: list[dict[str, Any]] = []
+    if kind:
+        made = await _write_rules(ctx, c, kind, ident.account_id)
     await ctx.engine.audit.record(ctx, f"detective.{outcome}", target_type="detective_cases", target_id=c["id"], pc_id=c["pc_id"], detail={"note": note, "intent": c["intent"]})
     if outcome == "escalated":
         await ctx.engine.push_to_role("super_user", "detective.escalated", {"case_id": c["id"], "intent": c["intent"], "host": c.get("hostname")})
-    return {"case_id": c["id"], "status": outcome}
+    return {"case_id": c["id"], "status": outcome, "rules": made}
+
+
+async def _write_rules(ctx: HandlerContext, c: dict[str, Any], kind: str, account_id: int) -> list[dict[str, Any]]:
+    """The reviewer said this is fine, and to remember it: one rule per kind of finding in the case that involves that program, folder or drive."""
+    found = [Finding(f["behaviour"], f["graph"], f["at"].timestamp(), c["pc_id"], float(f["weight"]), frozenset(), "", [sig_from_dict(e) for e in f["evidence"] or []], "")
+             for f in await ctx.engine.db.detective.findings(c["id"])]
+    made: list[dict[str, Any]] = []
+    for o in (o for o in rule_options(found) if o["kind"] == kind):
+        rid = await ctx.engine.db.detective.add_rule(c["pc_id"], o["graph"], kind, o["value"], c["id"], account_id)
+        if rid is None:
+            continue                                                       # already written down
+        _rules.setdefault(c["pc_id"], []).append(Rule(rid, c["pc_id"], o["graph"], kind, o["value"]))
+        await ctx.engine.audit.record(ctx, "detective.rule_made", target_type="detective_rules", target_id=rid, pc_id=c["pc_id"], detail={**o, "case_id": c["id"]})
+        made.append({"id": rid, **o})
+    return made
+
+
+@handler("detective.rules")
+async def rules(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
+    return {"rules": [_view(r) for r in await ctx.engine.db.detective.rules(**_scope(ctx))]}
+
+
+@handler("detective.rule_revoke")
+async def rule_revoke(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
+    ident = require_role(ctx, "super_user", "admin")
+    r = await ctx.engine.db.detective.rule(int_field(payload, "rule_id"))
+    scope = _scope(ctx)
+    if r is None or (scope and (r["pc_department_id"] != scope["department_id"] or r["pc_type"] != "client_pc")):
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such rule")
+    if not await ctx.engine.db.detective.revoke_rule(r["id"], ident.account_id):
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such rule")
+    _rules[r["pc_id"]] = [x for x in _rules.get(r["pc_id"], []) if x.id != r["id"]]
+    await ctx.engine.audit.record(ctx, "detective.rule_revoked", target_type="detective_rules", target_id=r["id"], pc_id=r["pc_id"], detail={"graph": r["graph"], "kind": r["kind"], "value": r["value"]})
+    return {"rule_id": r["id"]}
 
 
 @handler("detective.overview")
@@ -392,4 +445,4 @@ async def overview(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, An
     return {"by_level": by_level, "by_intent": by_intent, "reviewed": sum(c["n"] for c in counts if c["status"] != "open")}
 
 
-__all__ = ["case", "cases", "install", "name_of", "on_file", "on_signal", "overview", "reset_state", "review"]
+__all__ = ["case", "cases", "install", "name_of", "on_file", "on_signal", "overview", "reset_state", "review", "rule_revoke", "rules"]

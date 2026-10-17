@@ -48,8 +48,15 @@ for a clearing (Security 1102, System 104), screenshot-tool starts, and the Engi
 Concealment: hidden, disguised name (document become system file, picture, song, archive, or given a second extension), buried. Collection: gathering, archived.
 Taking out: to a drive, drive after staging. Capture: a screenshot tool started while restricted files are being worked on (more weight when started again and again).
 Erasure: removed after taking, mass removal, history/log cleared. Evasion: a machine goes quiet while a case is open on it (a closed laptop alone is nothing).
-Sabotage: documents deleted, rewritten or renamed to one odd ending in bulk by a program (not by hand). Reach: files opened across folders outside one's work.
+Sabotage: documents deleted, rewritten or renamed to one odd ending in bulk. A program doing it is the loud case; a person's own hands doing it is **not**
+innocent by default: it starts low (sixty old drafts in one folder stay under "noted") and is raised by what went (a quarter or more restricted, half or more outside
+their work, many folders, a very large number). The same sixty deletions are very different in a folder of drafts and across the restricted share. Reach: files opened across folders outside one's work.
 A case already raised that turns graver (hiding becomes taking data out) is told again.
+
+**One signal, several readings.** What means little in one reading can mean a lot in another, so a signal is never owned by one behaviour: every graph that can use it
+looks at it. A burst of deletions is read as sabotage (damage: by whom, of what, how widely) and, separately, as erasure when it follows gathering, hiding or taking out
+on that machine (covering what was done). Thirty deletions by hand after a leak are erasure; the same thirty with nothing before them are nothing. A hidden flag is
+concealment alone, but the same file then going to a drive is exfiltration of a hidden thing. Findings combine into the one case, so each reading adds to the others.
 
 ## The local model: measured (scripts/detective_model_bench.py, Qwen3-1.7B)
 - **Second opinion on a case: used.** In the background, beside the rules' own conclusion, labelled as the model's, never changing a weight or a level. It reads 5 of 7
@@ -67,7 +74,13 @@ you name (only messages are sent; nothing on any machine is touched), so the cas
 - **Matching on the Worker.** The Engine already receives every file event for the index, and events missed while offline are caught up on reconnect (the reconcile), so
   moving the matcher to the machine would add a second pipeline for little: raw activity is already sent for the index. The matcher is stdlib-only, so it can move later.
 
+## A dismissal written down as a rule (built 17 Oct 2026)
+Reviewing a case as dismissed or explained, the reviewer may ask to remember it for the program, the folder or the drive the case involves. That writes a rule
+(`detective_rules`, migration 037): this kind of finding, on this machine, with that program / in that folder / on that drive, is fine. A rule only **lowers** a matching
+finding (by the same amount as a recorded allowance); the finding is still kept and says "you ruled folder E: fine for this on 17 Oct". Rules are listed (`detective rules`,
+`detective.rules`), can be taken back (`detective unrule`, `detective.rule_revoke`), are audited when made and when revoked, and are scoped like cases (an Admin: own
+department's client machines). Nothing is written down unless it was asked for.
+
 ## Not built yet
 Clipboard (an image copied to the clipboard, PrintScreen without a tool: needs the helper on the person's desktop to watch the clipboard), the page content of a window
-(foreground titles are only reported every 15 s and not kept), per-program network (uploads), and the ability to write a recorded dismissal as a rule that applies
-again (today a dismissal closes that case only).
+(foreground titles are only reported every 15 s and not kept), per-program network (uploads).

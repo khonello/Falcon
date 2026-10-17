@@ -37,10 +37,18 @@ Page {
     }
     onCurChanged: { note = ""; det = null; loadCase() }
     onShowChanged: load()
-    function review(outcome) {
-        falcon.call("detective.review", { case_id: cur.id, outcome: outcome, note: note }, function (ok, r) {
+    // what could be written down as fine, by kind: {kind: [values]} (a program, a folder or a drive that this case involves)
+    readonly property var ruleKinds: {
+        var out = {}, o = det && det.rule_options ? det.rule_options : []
+        for (var i = 0; i < o.length; i++) { (out[o[i].kind] = out[o[i].kind] || []); if (out[o[i].kind].indexOf(o[i].value) < 0) out[o[i].kind].push(o[i].value) }
+        return out
+    }
+    function review(outcome, remember) {
+        var p = { case_id: cur.id, outcome: outcome, note: note }
+        if (remember) p.remember = { kind: remember }
+        falcon.call("detective.review", p, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Could not record that"); return }
-            Msg.ok(outcome === "escalated" ? "Sent to the Super User" : "Recorded: " + outcome)
+            Msg.ok(outcome === "escalated" ? "Sent to the Super User" : remember ? "Recorded: " + outcome + ", and written down as fine" : "Recorded: " + outcome)
             page.note = ""
             page.load()
         })
@@ -215,6 +223,16 @@ Page {
                         Btn { objectName: "detAccepted"; text: "Accept it"; onClicked: page.review("accepted") }
                         Btn { objectName: "detDismissed"; text: "Dismiss"; onClicked: page.review("dismissed") }
                         Btn { objectName: "detEscalate"; visible: !Nav.boss; kind: "primary"; text: "Send to the Super User"; onClicked: page.review("escalated") }
+                    }
+                    // dismissing for good: the same kind of finding with the same program, in the same folder or on the same drive is then weighed lower on this machine
+                    // (still recorded, with the rule named; it can be taken back)
+                    Txt { visible: !!page.cur && page.cur.status === "open" && Object.keys(page.ruleKinds).length > 0; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          color: Theme.text3; font.pixelSize: 12; text: "Or dismiss it and remember, so the same thing from the same place is weighed lower here next time (it is still recorded, and you can take it back):" }
+                    Row {
+                        visible: !!page.cur && page.cur.status === "open"; spacing: 8
+                        Btn { objectName: "detRememberProgram"; visible: !!page.ruleKinds.program; text: "Dismiss, trust " + (page.ruleKinds.program ? page.ruleKinds.program[0] : ""); onClicked: page.review("dismissed", "program") }
+                        Btn { objectName: "detRememberFolder"; visible: !!page.ruleKinds.folder; text: "Dismiss, trust this folder"; onClicked: page.review("dismissed", "folder") }
+                        Btn { objectName: "detRememberDrive"; visible: !!page.ruleKinds.drive; text: "Dismiss, trust this drive"; onClicked: page.review("dismissed", "drive") }
                     }
                 }
             }
