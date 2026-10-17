@@ -74,7 +74,7 @@ def test_removing_backups_and_then_files_is_wrecking_with_no_order_required():
 
 
 def test_a_patient_collector_over_weeks_is_one_piece_of_work_when_the_folder_ties_them_together():
-    det, updates = play(SCENARIOS["weekly_collector"]())
+    det, _ = play(SCENARIOS["weekly_collector"]())
     final = max(det.cases, key=lambda c: c.weight)
     assert final.level in ("case", "urgent") and final.intent == "Taking data out"
     cover = [f for f in final.findings if f.graph == "coverage_exfiltration"][-1]
