@@ -36,8 +36,38 @@ human intent. Built 16 Oct 2026 from the owner's brief; `common/detective.py` is
 The matcher runs in the Engine over the file events and drive signals it already receives (control.signal interest now always includes usb.inserted/removed).
 It is stdlib-only so it can move to the Worker later (raw activity then never leaves the machine; only findings do) without changing what the Engine keeps.
 
-## Not built yet (in order)
-1. Witness signals on the Worker: process and parent for a file change (ETW), whether input just happened, USB drive serial/label, log clearing, screenshot-tool and
-   clipboard-image signals, which attribute changed beyond hidden. 2. Graphs for capture, evasion (including a machine going silent) and sabotage.
-3. A demo-scenario generator for showing it (the page itself is built). 4. The model (Qwen3-1.7B) as a labeller of names/paths/
-titles (is this a disguise? a webmail window?) and a second opinion on a case -- measured with and without, never the verdict. 5. Moving the matcher to the Worker.
+## The witness layer (built 17 Oct 2026)
+Every file change the Worker reports carries a stamp (`worker_client/witness.py`): **by** hand (input in the last 2 s) / started (a person is about, or a script they
+ran) / alone (nobody for 30 s) / unknown, the **program in front** (for hand), and the **program that made the change** -- Windows' own file trace
+(`worker_client/etw.py`) remembers which program last opened each file under the watched folders, so a person's `powershell` or `robocopy` is "started", not "by hand".
+A service in session 0 sees no desktop, so it asks the helper on the person's desktop and otherwise says "unknown" rather than guess. Also: which attribute changed
+(hidden/system/read-only, before and after), a USB drive's own serial and label (the same drive in another letter is still familiar), the machine's own event logs
+for a clearing (Security 1102, System 104), screenshot-tool starts, and the Engine hearing a machine stop reporting.
+
+## Behaviours and their graphs (all eight)
+Concealment: hidden, disguised name (document become system file, picture, song, archive, or given a second extension), buried. Collection: gathering, archived.
+Taking out: to a drive, drive after staging. Capture: a screenshot tool started while restricted files are being worked on (more weight when started again and again).
+Erasure: removed after taking, mass removal, history/log cleared. Evasion: a machine goes quiet while a case is open on it (a closed laptop alone is nothing).
+Sabotage: documents deleted, rewritten or renamed to one odd ending in bulk by a program (not by hand). Reach: files opened across folders outside one's work.
+A case already raised that turns graver (hiding becomes taking data out) is told again.
+
+## The local model: measured (scripts/detective_model_bench.py, Qwen3-1.7B)
+- **Second opinion on a case: used.** In the background, beside the rules' own conclusion, labelled as the model's, never changing a weight or a level. It reads 5 of 7
+  scripted cases as a careful person does (misses: the ransom case read as taking data out, snooping as nothing odd).
+- **Labelling a rename as a disguise: measured and left out.** With the classes of file in the rule (document / picture / song / archive / system) the rule is right on
+  every rename (9/9 tuned, 8/8 held out); the model alone was 9/9 tuned but 6/8 held out and the two together 7/8 (a false alarm). It earned nothing, so it is not used;
+  `looks_disguised` stays so the measurement can be repeated with a bigger model. (An earlier prompt that offered two descriptions to choose between made the model
+  answer the same thing every time -- the collapse the probe exists to catch.)
+
+## Showing it
+`python scripts/detective_scenarios.py` plays scripted people against the matcher. `python scripts/detective_demo.py ...` plays one live against a running Engine as a Worker
+you name (only messages are sent; nothing on any machine is touched), so the case appears on the page as it happens.
+
+## Decided against, for now
+- **Matching on the Worker.** The Engine already receives every file event for the index, and events missed while offline are caught up on reconnect (the reconcile), so
+  moving the matcher to the machine would add a second pipeline for little: raw activity is already sent for the index. The matcher is stdlib-only, so it can move later.
+
+## Not built yet
+Clipboard (an image copied to the clipboard, PrintScreen without a tool: needs the helper on the person's desktop to watch the clipboard), the page content of a window
+(foreground titles are only reported every 15 s and not kept), per-program network (uploads), and the ability to write a recorded dismissal as a rule that applies
+again (today a dismissal closes that case only).

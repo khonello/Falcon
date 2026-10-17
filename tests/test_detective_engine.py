@@ -308,3 +308,36 @@ async def test_a_model_that_has_no_opinion_or_says_nothing_odd_is_recorded_as_ex
             break
         await asyncio.sleep(0.1)
     assert case["model_says"] == "" and case["level"] == "urgent"                      # the model's view does not lower the rules' conclusion
+
+
+async def test_the_live_demo_plays_a_scenario_as_a_worker_and_detective_raises_it_for_real(engine, org, connect):
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from detective_demo import NOT_LIVE, messages_for, play_live
+    from detective_scenarios import SCENARIOS
+
+    from common.connection import EngineConnection
+    from tests.conftest import key_for
+
+    su = await connect("cid-su")
+    worker = EngineConnection("127.0.0.1", engine.port, client_id="cid-w1", tls=False, derived_key=key_for("cid-w1"))
+    await worker.connect()
+    said: list[str] = []
+    sent = await play_live(worker, SCENARIOS["leak"](), speed=100000, say=said.append)
+    await worker.close()
+    assert sent >= 20 and any("plugged in a drive" in line for line in said)
+    (case,) = (await su.ok("detective.cases", {}))["cases"]
+    assert case["intent"] == "Taking data out" and case["level"] == "urgent" and case["host"] == "FIN-01"
+    assert "patient" in NOT_LIVE and messages_for(SCENARIOS["leak"]().sigs[0]) == []                  # an open is not something a Worker reports as a file event
+    # the machine going quiet ends the connection, and it matters because a case was open
+    worker2 = EngineConnection("127.0.0.1", engine.port, client_id="cid-w2", tls=False, derived_key=key_for("cid-w2"))
+    await worker2.connect()
+    await play_live(worker2, SCENARIOS["goes_dark"](), speed=100000, say=said.append)
+    for _ in range(50):
+        got = {c["host"]: c for c in (await su.ok("detective.cases", {"include_noted": True}))["cases"]}
+        if "FIN-02" in got and "evasion" in got["FIN-02"]["behaviours"]:
+            break
+        await asyncio.sleep(0.1)
+    assert "evasion" in got["FIN-02"]["behaviours"]

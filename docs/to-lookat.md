@@ -109,3 +109,9 @@ Last updated 13 Oct 2026.
   (`engine/detective`, `detective.*`), the Worker telling "made hidden" from other attribute changes, and `detective` commands in the shell. Design and the
   decisions: `docs/design/detective.md`. The Detective page is built (cases, the picture, the story, review).
 - The leak scenario raises while the files are still on the machine ("It has not left the machine yet"); the backup twin with the same moves stays quiet.
+
+## Detective, the rest of it (17 Oct 2026)
+- Built: the witness layer (by hand / started / alone, the program that made a change from Windows' file trace, USB serial and label, log clearing, screenshot tools, a
+  machine going quiet), graphs for all eight behaviours, the local model as a labelled second opinion, a live demo (`scripts/detective_demo.py`). See `docs/design/detective.md`.
+- The model was measured: the second opinion is used; renaming labels were left out because the rule alone beat it (the benchmark is there to repeat with a bigger model).
+- Still open: clipboard / PrintScreen, per-program network, writing a dismissal as a rule that applies again, and a real-desktop look at the page (VM plan).
