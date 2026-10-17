@@ -120,3 +120,40 @@ async def test_the_engine_hands_the_board_to_the_page_and_knows_when_a_deleted_f
     await fi.ingest_event(pc, {"op": "delete", "path": "C:\\Legal\\copy.docx", "name": "copy.docx", "hash": "h-two", "witness": {"by": "hand"}})
     rows = await engine.db.pool.fetch("SELECT summary, weight FROM detective_findings WHERE summary ILIKE '%copy.docx%'")
     assert not rows or max(r["weight"] for r in rows) < 0.35
+
+
+def test_the_worker_keeps_which_files_were_opened_under_the_watched_folders_and_hands_them_over_once():
+    from worker_client import etw
+    from worker_client.etw import EtwWatcher
+
+    w = EtwWatcher(lambda kind, data: None)
+    w.set_touch_roots([r"C:\Finance"])
+    w._names[10] = "excel.exe"
+    w._names[11] = "searchindexer.exe"
+    w._devices = {r"\device\harddiskvolume3": "C:"}
+    w._on_file(etw.EVENT_FILE_CREATE, 10, b"\x00" * 16 + b"\x00\x00\x00\x00" * 4 + r"\Device\HarddiskVolume3\Finance\payroll.xlsx".encode("utf-16-le") + b"\x00\x00")
+    w._on_file(etw.EVENT_FILE_CREATE, 10, b"\x00" * 16 + b"\x00\x00\x00\x00" * 4 + r"\Device\HarddiskVolume3\Elsewhere\x.txt".encode("utf-16-le") + b"\x00\x00")
+    w._on_file(etw.EVENT_FILE_CREATE, 11, b"\x00" * 16 + b"\x00\x00\x00\x00" * 4 + r"\Device\HarddiskVolume3\Finance\indexed.xlsx".encode("utf-16-le") + b"\x00\x00")
+    assert w.take_opened() == [(r"C:\Finance\payroll.xlsx", "excel.exe")]                            # the indexer and other folders are not "opened by someone"
+    assert w.take_opened() == []
+
+
+@requires_db
+async def test_files_opened_that_matter_wake_reach_and_the_rest_are_nobody_s_business(engine, org, connect):
+    from engine import detective
+    from engine.control.events import interest_for_pc
+
+    assert "file.opened" in await interest_for_pc(engine, org["w1_pc"])
+    su = await connect("cid-su")
+    pc, other_dept = org["w1_pc"], org["hr"]
+    fi = engine.file_index
+    await fi.ingest_sweep_batch(pc, [{"op": "create", "path": r"\\hr\files\director\pay-review.docx", "name": "pay-review.docx", "hash": "h-dir", "resource_tag": "restricted",
+                                      "scope_department_id": other_dept},
+                                     {"op": "create", "path": r"C:\Users\kojo\notes.txt", "name": "notes.txt", "hash": "h-notes"}], first=True)
+    await detective.on_signal(engine, pc, "file.opened", {"files": [{"path": r"C:\Users\kojo\notes.txt", "process": "notepad.exe"},
+                                                                   {"path": r"\\hr\files\director\pay-review.docx", "process": "winword.exe"}]})
+    cases = (await su.ok("detective.cases", {"include_noted": True}))["cases"]
+    assert cases and "reach" in cases[0]["behaviours"] and cases[0]["level"] == "noted"
+    assert not any("notes.txt" in line for c in cases for line in c["story"])                       # an ordinary file opened is not remembered at all
+    got = await su.ok("detective.case", {"case_id": cases[0]["id"]})
+    assert any("not part of this person" in f["summary"] or f["graph"] == "coverage_reach" for f in got["findings"])

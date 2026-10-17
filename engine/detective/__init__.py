@@ -178,6 +178,49 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     await _apply(engine, det.feed(sig))
 
 
+async def _outside_role(engine: Engine, pc_id: int, entry: dict[str, Any], path: str) -> bool:
+    """Is this file outside what this person is meant to have in front of them? A restricted or admin-tier file that belongs to another department, an admin-tier file
+    on a worker's machine, or a restricted file on somebody else's share. Resource tiers are the Engine's own idea of who is meant to see what."""
+    tag = entry.get("resource_tag")
+    if tag not in ("restricted", "admin"):
+        return False
+    pc = await engine.db.accounts.pc(pc_id) or {}
+    scope = entry.get("resource_tag_scope_department_id")
+    if scope is not None and pc.get("department_id") is not None and scope != pc["department_id"]:
+        return True
+    if tag == "admin" and pc.get("pc_type") == "client_pc":
+        return True
+    host = path.replace("/", "\\")
+    if host.startswith("\\\\") and tag == "restricted":
+        owner = host[2:].split("\\", 1)[0].lower()
+        return bool(owner) and owner != str(pc.get("hostname") or "").lower()
+    return False
+
+
+async def _on_opened(engine: Engine, pc_id: int, data: dict[str, Any]) -> None:
+    """Which files were opened lately (a batch from the machine). Only the ones that matter become something Detective reads: restricted ones, and ones outside this
+    person's work; the rest of what was opened is nobody's business."""
+    await _ensure(engine)
+    now = time.time()
+    for item in (data.get("files") or [])[:300]:
+        path = str((item or {}).get("path") or "")
+        if not path:
+            continue
+        entry = await engine.db.file_index.by_path(pc_id, path)
+        if entry is None or entry.get("gone_at") is not None:
+            continue
+        digest = entry.get("content_hash")
+        tags: set[str] = set()
+        if entry.get("resource_tag") == "restricted" or (digest and await engine.db.marks.active_with_hash(digest)):
+            tags.add("restricted")
+        if await _outside_role(engine, pc_id, entry, path):
+            tags.add("outside_role")
+        if not tags:
+            continue
+        sig = Sig(now, pc_id, "opened", path, "", digest or "", str((item or {}).get("process") or "")[:120], "unknown", "", frozenset(tags))
+        await _apply(engine, _detector().feed(sig))
+
+
 async def on_presence(engine: Engine, pc_id: int, online: bool) -> None:
     """A machine stopped reporting (or is back). Going quiet only matters when something worth a look had just happened on it: the watch is being slipped."""
     if not engine.db.connected or online:
@@ -198,6 +241,9 @@ async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]
             return
         await _ensure(engine)
         await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "launched", program=process[:120], by="unknown")))
+        return
+    if etype == "file.opened":
+        await _on_opened(engine, pc_id, data)
         return
     if etype == "network.upload":
         await _ensure(engine)

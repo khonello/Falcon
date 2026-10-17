@@ -73,7 +73,7 @@ EVENT_TYPES: dict[str, str] = {
 # The native signals the Worker relays from the OS itself (control.signal). Opening a file is one of
 # them: nothing the index keeps changes, so it cannot come through index.event.
 OS_SIGNALS = frozenset({"usb.inserted", "usb.removed", "user.login", "user.logout", "program.launched",
-                        "program.exited", "network.connected", "network.disconnected", "file.accessed", "log.cleared", "screen.captured", "network.upload"})
+                        "program.exited", "network.connected", "network.disconnected", "file.accessed", "log.cleared", "screen.captured", "network.upload", "file.opened"})
 
 TIER_TAGS = {"admin": "admin", "restricted": "restricted", "workers": "worker_dept", "common": "common"}
 
@@ -468,7 +468,7 @@ async def interest_for_pc(engine: Engine, pc_id: int) -> dict[str, list[dict[str
     if engine.settings.detective:
         from common.detective import CAPTURE_TOOLS
 
-        for etype in ("usb.inserted", "usb.removed", "log.cleared", "screen.captured", "network.upload"):      # Detective always wants to know when a drive comes and goes, when a log is cleared, when a picture is put on the clipboard
+        for etype in ("usb.inserted", "usb.removed", "log.cleared", "screen.captured", "network.upload", "file.opened"):      # Detective always wants to know when a drive comes and goes, when a log is cleared, when a picture is put on the clipboard
             out.setdefault(etype, []).append({})
         for tool in CAPTURE_TOOLS:                                            # ... and when a tool that takes pictures of the screen is started
             out.setdefault("program.launched", []).append({"process": tool})

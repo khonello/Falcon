@@ -16,6 +16,7 @@ import asyncio
 import contextlib
 import logging
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,6 +43,9 @@ from worker_client.watcher import Watcher
 log = logging.getLogger(__name__)
 
 VERSION = "0.0.1"
+OPENS_SECONDS = 20.0                             # how often the files that were opened are told
+OPENS_BATCH = 300
+JOURNAL_MAX = 20000                              # events kept while the Engine cannot be told (a long absence on a busy machine; the reconcile finds the rest)
 
 Notifier = Callable[[str, dict[str, Any]], Awaitable[None]]
 
@@ -104,6 +108,10 @@ class WorkerService:
         self._window_tasks: set[asyncio.Task[None]] = set()
         self.reminders = TaskReminders()                      # tasks waiting to be started, shown again until they are
         self._reminder_task: asyncio.Task[None] | None = None
+        # What happened to files while the Engine could not be told, with the time it happened and who was at the keyboard: told as soon as it is back, so working
+        # offline is not a way to leave no trail (the reconcile after it finds anything this missed, e.g. after a restart, by the file's own time).
+        self.journal: deque[dict[str, Any]] = deque(maxlen=JOURNAL_MAX)
+        self._opens_task: asyncio.Task[None] | None = None
         if config.windows:
             self.lockout.on_change(self._on_block_changed)
             self.lockout.on_view_change(self._on_view_changed)
@@ -124,6 +132,7 @@ class WorkerService:
             self.ossignals.etw.set_touch_roots(list(self.config.watch_roots))
             await asyncio.to_thread(self.ossignals.etw.want_programs, True)
             await asyncio.to_thread(self.ossignals.etw.want_files, self.ossignals.interest.get("file.accessed") or [])
+        self._opens_task = asyncio.create_task(self._opens_loop())
         await self.inventory.start()
         await self._refresh_tasks()
         if self.config.windows:
@@ -140,6 +149,8 @@ class WorkerService:
             await self.localapp.stop()
         if self._reminder_task:
             self._reminder_task.cancel()
+        if self._opens_task:
+            self._opens_task.cancel()
         await self.screens.shutdown()
         self.remote_input.stop()
         if self.helper is not None:
@@ -214,8 +225,54 @@ class WorkerService:
     async def _relay(self, type_: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """What the file watcher (here or in its own program) reports goes through here, so each change carries the witness stamp taken as it was told."""
         if type_ == "index.event" and payload and isinstance(payload.get("event"), dict) and "witness" not in payload["event"]:
-            payload = {**payload, "event": {**payload["event"], "witness": await self.witness.stamp(str(payload["event"].get("path") or ""))}}
-        return await self.call(type_, payload)
+            event = {**payload["event"], "witness": await self.witness.stamp(str(payload["event"].get("path") or ""))}
+            event.setdefault("at", time.time())                    # when it happened, not when the Engine hears of it
+            payload = {**payload, "event": event}
+        try:
+            return await self.call(type_, payload)
+        except ConnectionError_:
+            if type_ == "index.event" and payload and isinstance(payload.get("event"), dict):
+                self.journal.append(payload["event"])
+            raise
+
+    async def _opens_loop(self) -> None:
+        """Which files were opened under the watched folders, and by what, told to the Engine every little while as one batch (`file.opened`) while it wants to know.
+        The Engine keeps only the ones that matter (restricted, or outside this person's work); opening a file is not a change, so no index event says so."""
+        while True:
+            await asyncio.sleep(OPENS_SECONDS)
+            etw = getattr(self.ossignals, "etw", None)
+            if etw is None or not getattr(self.ossignals, "interest", {}).get("file.opened"):
+                if etw is not None:
+                    etw.opened.clear()
+                continue
+            try:
+                got = etw.take_opened()[:OPENS_BATCH]
+                if got:
+                    await self.call("control.signal", {"type": "file.opened", "data": {"files": [{"path": p, "process": n} for p, n in got]}})
+            except Exception as exc:  # noqa: BLE001 -- a look that failed is not worth more than the next one
+                log.debug("could not tell the Engine which files were opened: %s", exc)
+
+    async def _flush_journal(self) -> int:
+        """Tell the Engine what happened while it could not be told, oldest first, with the times and the stamps they were taken with."""
+        sent = 0
+        while self.journal:
+            event = self.journal[0]
+            try:
+                await self.call("index.event", {"event": event})
+            except Exception:  # noqa: BLE001 -- still not back: the rest waits, in order
+                break
+            self.journal.popleft()
+            sent += 1
+            if self.watcher.state is not None:                    # it has been told now: the reconcile must not tell it again
+                await asyncio.to_thread(self.watcher._remember_told, event["op"], event["path"], event.get("old_path"), bool(event.get("is_dir")), event.get("hash"))
+        return sent
+
+    async def _flush_then_reconcile(self) -> None:
+        try:
+            await self._flush_journal()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not tell the Engine what happened while it was away: %s", exc)
+        await self._reconcile_index()
 
     # --- connection -----------------------------------------------------------------------------
 
@@ -249,7 +306,7 @@ class WorkerService:
         else:
             self.lockout.release()
         await self.ossignals.refresh()
-        self._spawn(self._reconcile_index())          # whatever changed while the Engine was not listening is told now, in the background
+        self._spawn(self._flush_then_reconcile())     # whatever happened while the Engine was not listening is told now (what we saw, then what we missed), in the background
         if self.config.windows:
             self._spawn(self._replay_emergencies())
         cur = await self.call("updates.current")

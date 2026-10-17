@@ -235,3 +235,40 @@ async def test_the_title_is_in_the_evidence_of_a_finding_and_not_in_the_event_hi
     case = (await su.ok("detective.cases", {"include_noted": True}))["cases"][0]
     found = (await su.ok("detective.case", {"case_id": case["id"]}))["findings"]
     assert any(e["info"].get("title") == "Finance - File Explorer" and "Finance - File Explorer" in e["text"] for f in found for e in f["evidence"])
+
+
+@requires_db
+async def test_what_happens_while_the_engine_is_away_is_told_afterwards_with_the_time_it_happened_and_who_was_there(engine, org, tmp_path):
+    import time
+
+    from common.connection import ConnectionError_
+    from tests.test_worker_client import _start, _wait
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    svc = await _start(engine, tmp_path, "cid-w1", [str(docs)])
+    try:
+        real, away = svc.call, [True]
+
+        async def call(type_, payload=None):
+            if away[0] and type_ == "index.event":
+                raise ConnectionError_("not connected")
+            return await real(type_, payload)
+
+        async def hand():
+            return 0.5, "explorer.exe", "Documents"
+
+        svc.call = call
+        svc.witness = Witness(hand)
+        (docs / "offline.txt").write_text("x", encoding="utf-8")
+        assert await _wait(lambda: len(svc.journal) >= 1)                                          # kept, not lost
+        ev = svc.journal[0]
+        assert ev["path"].endswith("offline.txt") and ev["witness"]["by"] == "hand" and abs(ev["at"] - time.time()) < 30
+        ev["at"] = time.time() - 3600                                                             # it was an hour ago
+        away[0] = False
+        assert await svc._flush_journal() >= 1 and not svc.journal
+        row = await engine.db.pool.fetchrow("SELECT occurred_at, detail FROM file_events WHERE path ILIKE '%offline.txt' ORDER BY id DESC")
+        assert row is not None and abs(row["occurred_at"].timestamp() - (time.time() - 3600)) < 60 and (row["detail"] or {}).get("by") == "hand"
+    finally:
+        svc.call = real
+        await svc.stop()

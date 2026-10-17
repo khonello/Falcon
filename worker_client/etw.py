@@ -374,6 +374,7 @@ class EtwWatcher:
         self.touch_roots: list[str] = []
         self.touches: OrderedDict[str, tuple[int, float]] = OrderedDict()       # path -> (the process that opened it, when); named when asked, not now
         self._ended: OrderedDict[int, str] = OrderedDict()                       # the last few programs that have already finished
+        self.opened: OrderedDict[str, tuple[int, float]] = OrderedDict()         # files opened under the watched folders since last asked: path -> (process, when)
 
     def set_touch_roots(self, roots: list[str]) -> None:
         self.touch_roots = [r.replace("/", "\\").rstrip("\\").lower() + "\\" for r in roots if r]
@@ -387,6 +388,11 @@ class EtwWatcher:
             return ""
         name = self._name_of(hit[0])
         return "" if name.lower() in QUIET_TOUCHERS else name
+
+    def take_opened(self) -> list[tuple[str, str]]:
+        """The files opened under the watched folders since the last call, as (path, program), oldest first. Clears them."""
+        got, self.opened = self.opened, OrderedDict()
+        return [(path, self._name_of(pid)) for path, (pid, _) in got.items()]
 
     @property
     def programs_live(self) -> bool:
@@ -502,6 +508,11 @@ class EtwWatcher:
             self.touches.move_to_end(low)
             while len(self.touches) > 20000:
                 self.touches.popitem(last=False)
+            if not os.path.isdir(path):
+                self.opened[path] = (pid, now)           # ... and kept for Detective: which files were opened, by what, in this stretch
+                self.opened.move_to_end(path)
+                while len(self.opened) > 5000:
+                    self.opened.popitem(last=False)
         if not self.files.matches(path) or os.path.isdir(path):
             return                                  # (a folder opened without the directory flag is still a folder)
         if now - self._recent.get(path, 0.0) < 3.0:                       # one open is many create calls: tell it once
