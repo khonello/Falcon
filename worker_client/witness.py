@@ -8,6 +8,7 @@ small stamp, taken at that moment:
             "alone"    nobody has touched the machine for half a minute or more: a program (or a script, or a scheduled job) on its own
             "unknown"  it cannot be told (no desktop to ask, or not Windows)
     front   the program in front when it happened (only claimed for "hand": it is the program the person is using)
+    title   that program's window title, as the person sees it (usually the document or the page): kept in the evidence of a finding, never in the event history
     program the program that last opened the file in the seconds before (Windows' own file trace, where this process may have one): it names who made the
             change, and a person who runs a script (powershell, robocopy, python ...) is "started", not "hand": their hands started it, a program did the work
 
@@ -31,7 +32,8 @@ HAND_SECONDS = 2.0
 ALONE_SECONDS = 30.0
 TTL = 1.0                      # one look serves every event in the same second (a burst of fourteen copies is one look)
 
-Source = Callable[[], Awaitable[tuple[float | None, str | None]]]
+Source = Callable[[], Awaitable[tuple[Any, ...]]]          # (idle seconds, program in front[, its window title])
+TITLE_MAX = 160
 Toucher = Callable[[str], str]
 
 # programs a person starts to make a machine do work for them: a change they make is by their hand only in the sense that they started it
@@ -47,17 +49,17 @@ def classify(idle_s: float | None) -> str:
     return "started" if idle_s < ALONE_SECONDS else "alone"
 
 
-async def here() -> tuple[float | None, str | None]:
-    """Idle seconds and the program in front, as this process sees them (right for a process on the person's desktop)."""
+async def here() -> tuple[float | None, str | None, str | None]:
+    """Idle seconds, the program in front and its window title, as this process sees them (right for a process on the person's desktop)."""
     from worker_client import idle
     from worker_client.foreground import foreground
 
-    def look() -> tuple[float | None, str | None]:
+    def look() -> tuple[float | None, str | None, str | None]:
         try:
             front = foreground()
         except OSError:
             front = None
-        return idle.idle_seconds(), (front or {}).get("program")
+        return idle.idle_seconds(), (front or {}).get("program"), (front or {}).get("title")
 
     return await asyncio.to_thread(look)
 
@@ -74,14 +76,17 @@ class Witness:
         if self._last is not None and now - self._last[0] < TTL:
             return self._last[1]
         try:
-            idle_s, front = await self._source()
+            got = await self._source()
+            idle_s, front, title = (tuple(got) + (None, None))[:3]
         except Exception as exc:  # noqa: BLE001 -- a stamp that cannot be taken is "unknown", never a failed report
             log.debug("could not take a witness stamp: %s", exc)
-            idle_s, front = None, None
+            idle_s, front, title = None, None, None
         by = classify(idle_s)
         out: dict[str, Any] = {"by": by}
         if by == "hand" and front:
             out["front"] = str(front)[:120]
+            if title:
+                out["title"] = " ".join(str(title).split())[:TITLE_MAX]
         self._last = (now, out)
         return out
 
@@ -93,4 +98,5 @@ class Witness:
             if out["by"] == "hand" and program.lower() in SCRIPT_HOSTS:
                 out["by"] = "started"                    # a person's hands started it; the program did the work
                 out.pop("front", None)
+                out.pop("title", None)
         return out

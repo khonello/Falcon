@@ -4,7 +4,7 @@
 
     {"cmd": "ping"}                                 -> {"ok": true}
     {"cmd": "capture", "width": 1280}               -> {"ok": true, "sw", "sh", "w", "h", "png_b64"}  (or {"ok": false, "error"})
-    {"cmd": "witness"}                              -> {"ok": true, "idle_s": seconds since input, "front": program in front}
+    {"cmd": "witness"}                              -> {"ok": true, "idle_s": seconds since input, "front": program in front, "title": its window title}
     {"cmd": "control", "on": true|false}            -> {"ok": true, "controlling": bool}   block the person's own input and take the console's
     {"cmd": "input", "events": [...]}               -> {"ok": true, "planned": n}          (only while controlling)
     {"cmd": "quit"}                                 -> exits
@@ -40,7 +40,7 @@ def handle(msg: dict, remote: RemoteInput) -> dict:
             front = foreground()
         except OSError:
             front = None
-        return {"ok": True, "idle_s": idle.idle_seconds(), "front": (front or {}).get("program")}
+        return {"ok": True, "idle_s": idle.idle_seconds(), "front": (front or {}).get("program"), "title": (front or {}).get("title")}
     if cmd == "control":
         remote.control(bool(msg.get("on")))
         return {"ok": True, "controlling": remote.controlling}

@@ -79,7 +79,7 @@ class FileIndex:
                 await db.mark_gone(pc_id, str(entry["old_path"]))    # it left its old place: this used to be forgotten
         await db.record_event(pc_id, op, path, old_path=entry.get("old_path"), is_dir=entry["is_dir"],
                               content_hash=entry.get("hash"), file_index_id=known_id,
-                              detail=({**(entry.get("detail") or {}), **(entry.get("witness") or {})} or None))
+                              detail=({**(entry.get("detail") or {}), **{k: v for k, v in (entry.get("witness") or {}).items() if k != "title"}} or None))
         full = {"pc_id": pc_id, "file_index_id": file_index_id, **entry}
         if op in CONTENT_OPS and not entry["is_dir"]:
             for cb in self._subscribers:
@@ -144,6 +144,8 @@ def _witness(raw: Any) -> dict[str, str] | None:
     for key in ("front", "program"):
         if raw.get(key):
             out[key] = str(raw[key])[:120]
+    if raw.get("title"):
+        out["title"] = " ".join(str(raw["title"]).split())[:160]            # for Detective's evidence only; not stored with the event (see ingest)
     return out
 
 

@@ -89,7 +89,7 @@ def test_the_desktop_helper_answers_a_witness_request():
     from worker_client.screenstream import RemoteInput
 
     r = handle({"cmd": "witness"}, RemoteInput())
-    assert r["ok"] is True and "idle_s" in r and "front" in r
+    assert r["ok"] is True and "idle_s" in r and "front" in r and "title" in r
 
 
 def test_a_drive_is_known_by_its_own_serial_not_by_the_letter_it_got_this_time():
@@ -201,3 +201,37 @@ async def test_the_program_that_made_a_change_travels_with_it_and_a_backup_progr
     assert cases["FIN-02"]["weight"] > cases["FIN-01"]["weight"] + 0.2                       # the same copy: a backup program is not what an unknown tool is
     row = await engine.db.pool.fetchrow("SELECT detail FROM file_events WHERE content_hash = 'h-robocopy.exe'")
     assert row["detail"] == {"by": "alone", "program": "robocopy.exe"}
+
+
+async def test_the_window_title_is_taken_for_a_person_s_own_hands_trimmed_and_never_for_a_program_on_its_own():
+    async def person():
+        return 0.5, "chrome.exe", "  Payroll   Q3 -  Google Sheets  " + "x" * 400
+
+    got = await Witness(person).stamp()
+    assert got["by"] == "hand" and got["front"] == "chrome.exe" and got["title"].startswith("Payroll Q3 - Google Sheets") and len(got["title"]) == 160
+
+    async def nobody():
+        return 600, "chrome.exe", "Payroll Q3"
+
+    assert await Witness(nobody).stamp() == {"by": "alone"}                                           # a title nobody was looking at is not claimed
+
+    async def script():
+        return 0.5, "powershell.exe", "Administrator: Windows PowerShell"
+
+    started = await Witness(script, toucher=lambda p: "powershell.exe").stamp("C:\\x")
+    assert started["by"] == "started" and "title" not in started
+
+
+@requires_db
+async def test_the_title_is_in_the_evidence_of_a_finding_and_not_in_the_event_history(engine, org, connect):
+    from tests.test_detective_engine import ev
+
+    su = await connect("cid-su")
+    pc = org["w1_pc"]
+    await engine.file_index.ingest_event(pc, ev("move", "C:\\Windows\\Temp\\n.docx.dll", old_path="C:\\Finance\\n.docx", hash="h-t", tag="restricted",
+                                                witness={"by": "hand", "front": "explorer.exe", "title": "Finance - File Explorer"}))
+    row = await engine.db.pool.fetchrow("SELECT detail FROM file_events WHERE content_hash = 'h-t'")
+    assert row["detail"] == {"by": "hand", "front": "explorer.exe"}                                  # history keeps who and with what, never what the window said
+    case = (await su.ok("detective.cases", {"include_noted": True}))["cases"][0]
+    found = (await su.ok("detective.case", {"case_id": case["id"]}))["findings"]
+    assert any(e["info"].get("title") == "Finance - File Explorer" and "Finance - File Explorer" in e["text"] for f in found for e in f["evidence"])

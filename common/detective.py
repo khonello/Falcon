@@ -115,6 +115,11 @@ class Sig:
         return name_of(self.path) or self.device or self.program
 
     def phrase(self) -> str:
+        said = self._phrase()
+        title = str(self.info.get("title") or "")
+        return f"{said} (in \"{title}\")" if title and self.verb not in ("attached", "detached", "launched", "exited", "cleared", "silent", "captured") else said
+
+    def _phrase(self) -> str:
         n = self.name
         return {"created": f"created {n}", "modified": f"changed {n}", "renamed": f"renamed {name_of(self.old)} to {n}", "moved": f"moved {n} to {folder_of(self.path) or 'another place'}",
                 "copied": f"copied {n} to {folder_of(self.path) or 'another place'}", "deleted": f"deleted {n}", "opened": f"opened {n}", "hid": f"hid {n}",
