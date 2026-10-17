@@ -125,6 +125,10 @@ Page {
                 Column {
                     visible: !!page.cur; width: parent.width; spacing: 6
                     Txt { objectName: "caseHeadline"; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 15; text: page.cur ? page.cur.headline : "" }
+                    Txt { objectName: "modelSays"; visible: !!page.cur && page.cur.model_says !== null && page.cur.model_says !== undefined; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          color: Theme.text3; font.pixelSize: 12
+                          text: page.cur && page.cur.model_says !== null && page.cur.model_says !== undefined
+                                ? (page.cur.model_says === "" ? "The local model reads it as nothing odd. That is its opinion, not the rules'." : "The local model reads it as: " + page.cur.model_says.toLowerCase() + ". That is its opinion, not the rules'.") : "" }
                     Txt { visible: !!(page.cur && page.cur.not_yet); width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.med; font.weight: Font.DemiBold
                           text: page.cur && page.cur.not_yet ? page.cur.not_yet + (page.cur.next_stage ? " Next, it usually goes on to: " + page.cur.next_stage.toLowerCase() + "." : "") : "" }
                 }

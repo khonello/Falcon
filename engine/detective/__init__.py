@@ -16,6 +16,7 @@ Worker's "witness" signals) arrives as more of the same signals, and the matchin
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -34,6 +35,7 @@ from common.detective import (
     sig_from_dict,
     sig_to_dict,
 )
+from engine.detective import labels
 from engine.dispatch import Context as HandlerContext
 from engine.dispatch import handler
 from engine.permissions import int_field, require_role, str_field
@@ -59,9 +61,17 @@ _tasks: dict[int, tuple[float, set[str]]] = {}
 _saved: dict[int, int] = {}                       # id(case) -> findings already saved
 
 
+_queue: asyncio.Queue[tuple[str, Any]] | None = None
+_worker: asyncio.Task[None] | None = None
+MODEL_QUEUE = 20
+
+
 def reset_state() -> None:
-    global _det, _restored
+    global _det, _restored, _queue, _worker
     _det, _restored = None, False
+    if _worker is not None:
+        _worker.cancel()
+    _queue, _worker = None, None
     _devices.clear()
     _keys.clear()
     _tasks.clear()
@@ -232,6 +242,8 @@ async def _save(engine: Engine, u: Update) -> None:
     fresh = case.findings[_saved.get(id(case), 0):]
     case.id = await engine.db.detective.save_case(case.id, _row(case, department_id, u.raised), [_finding_row(f) for f in fresh])
     _saved[id(case)] = len(case.findings)
+    if u.raised and engine.llm.available:
+        _ask(engine, "opinion", (case.id, case.story()))
     if u.raised:
         await engine.audit.record(None, "detective.raised", target_type="detective_cases", target_id=case.id, pc_id=case.pc,
                                   detail={"intent": case.intent, "level": case.level, "weight": round(case.weight, 2), "stage": case.stage[1]})
@@ -239,6 +251,50 @@ async def _save(engine: Engine, u: Update) -> None:
         await engine.push_to_role("super_user", "detective.raised", payload)
         if pc and pc["pc_type"] == "client_pc" and department_id is not None:                 # an Admin's own machine is the Super User's alone
             await engine.push_to_role("admin", "detective.raised", payload, department_id=department_id)
+
+
+# --- the local model, in the background, advisory ---------------------------------------------------------------------------
+
+def _ask(engine: Engine, kind: str, what: Any) -> None:
+    """Queue a question for the model. Never waits, never blocks a file operation, and drops the question when the model is away or the queue is full."""
+    global _queue, _worker
+    if not engine.llm.available:
+        return
+    if _queue is None:
+        _queue = asyncio.Queue(maxsize=MODEL_QUEUE)
+    if _worker is None or _worker.done():
+        _worker = asyncio.ensure_future(_model_worker(engine, _queue))
+    try:
+        _queue.put_nowait((kind, what))
+    except asyncio.QueueFull:
+        log.debug("detective: the model's queue is full; a question was dropped")
+
+
+async def _model_worker(engine: Engine, queue: asyncio.Queue[tuple[str, Any]]) -> None:
+    while True:
+        kind, what = await queue.get()
+        try:
+            if kind == "opinion":
+                await _opinion(engine, *what)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("detective: the model's reading failed")
+
+
+async def _opinion(engine: Engine, case_id: int | None, story: list[str]) -> None:
+    if case_id is None:
+        return
+    says = await labels.second_opinion(engine.llm, story)
+    if says is None:
+        return
+    await engine.db.detective.set_model_says(case_id, says)
+    c = await engine.db.detective.case(case_id)
+    if c is not None:
+        payload = {"case_id": case_id, "model_says": says}
+        await engine.push_to_role("super_user", "detective.updated", payload)
+        if c["pc_type"] == "client_pc" and c.get("department_id") is not None:
+            await engine.push_to_role("admin", "detective.updated", payload, department_id=c["department_id"])
 
 
 async def _ensure(engine: Engine) -> None:

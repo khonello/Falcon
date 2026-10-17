@@ -2337,6 +2337,9 @@ class DetectiveRepo(_Repo):
         return (await self._exec(
             "UPDATE detective_cases SET status = $2, reviewed_by_account_id = $3, reviewed_at = now(), note = $4 WHERE id = $1", case_id, status, by_account_id, note)).endswith("1")
 
+    async def set_model_says(self, case_id: int, says: str | None) -> None:
+        await self._exec("UPDATE detective_cases SET model_says = $2 WHERE id = $1", case_id, says)
+
     async def device_uses(self, pc_id: int, device: str) -> int:
         return int(await self._val("SELECT uses FROM detective_devices WHERE pc_id = $1 AND device = $2", pc_id, device) or 0)
 

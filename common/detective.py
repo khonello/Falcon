@@ -48,6 +48,7 @@ KEEP = 6 * 3600                               # how much recent activity a machi
 DOC_EXT = {"doc", "docx", "xls", "xlsx", "csv", "pdf", "ppt", "pptx", "txt", "rtf", "odt", "ods", "md", "json"}
 SYSTEMISH_EXT = {"dll", "sys", "exe", "tmp", "dat", "bin", "scr", "js", "vbs", "bat", "cab", "ini", "db", "bak"}
 ARCHIVE_EXT = {"zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "cab"}
+MEDIA_EXT = {"jpg", "jpeg", "png", "gif", "bmp", "heic", "webp", "svg", "mp3", "m4a", "wav", "flac", "ogg", "mp4", "mkv", "mov", "avi", "webm"}
 _DOUBLE = re.compile(r"\.(docx?|xlsx?|pdf|pptx?|csv|txt)\.(exe|scr|dll|js|vbs|bat|tmp|dat|sys)$", re.IGNORECASE)
 _SYSTEM_DIRS = ("\\windows\\", "\\program files", "\\programdata\\", "\\appdata\\", "\\temp\\", "\\$recycle.bin\\", "\\system volume information\\",
                 "/windows/", "/programdata/", "/tmp/", "/var/", "/proc/", "/etc/")
@@ -88,8 +89,8 @@ def disguised(old: str, new: str) -> bool:
     if not old or not new:
         return False
     before, after = ext_of(old), ext_of(new)
-    if before in DOC_EXT and after in SYSTEMISH_EXT:
-        return True
+    if before in DOC_EXT and (after in SYSTEMISH_EXT or after in MEDIA_EXT or after in ARCHIVE_EXT):
+        return True                                                # a document that now looks like a system file, a picture, a song or an archive
     return bool(_DOUBLE.search(name_of(new)) and not _DOUBLE.search(name_of(old)))
 
 
@@ -749,6 +750,10 @@ class Detective:
         order = {b: i for i, (_, bs) in enumerate(ARC_STAGES) for b in bs}
         have = max((order.get(b, -1) for b in c.behaviours), default=-1)
         return order.get(f.behaviour, -2) >= have >= 0
+
+    def note(self, f: Finding) -> Update:
+        """Take a finding made elsewhere (the model's label on a rename) into the same cases, weighed as it comes."""
+        return self._attach(f)
 
     def open_cases(self, *, pc: int | None = None, level: str | None = None) -> list[Case]:
         out = [c for c in self.cases if (pc is None or c.pc == pc) and (level is None or c.level == level)]
