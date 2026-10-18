@@ -645,3 +645,9 @@ drive has been seen on a machine). `file_events.detail` (JSONB) says which attri
 `detective_rules` (migration 037: a reviewer's "this is fine" written down: graph, program/folder/drive, the machine, who and when, and
 when it was taken back; it only lowers a matching finding).
 Design: `docs/design/detective.md`.
+
+## 15. Flows and restricted material (migration 038)
+
+`flow_restricted_consents` (a flow's request to carry something restricted, and its answer: the mark or tier, who asked and when, asked / granted / declined / revoked, who decided, an optional expiry, the issue raised for it). `proposals` (migration 039: what one feature suggests for a person to accept or dismiss: kind mark_folder / pause_flow / follow_up_task, a key so it is not made twice, the case or flow it comes from, open / accepted / dismissed with who and when).
+
+`restricted_allowances` gained `folder` (anything below the folder), `consent_id` (the consent that made it) and `revoked_at` (taken back).

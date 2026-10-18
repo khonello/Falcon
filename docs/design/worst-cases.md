@@ -27,8 +27,13 @@ goes to the hot things first. Cold things are not skipped, only later: heat deci
 | Heat itself | 50,000 keys on a Worker, 100,000 on the Engine | the coldest are forgotten first |
 | Detective memory | 6 hours of detail, 30 days / 4,000 stages on the board, 60,000 events replayed at a restart | oldest first |
 | Idle-time ETW | 5,000 opened files, 20,000 "last touched" per Worker | oldest first |
-| A restricted flow | (not a clamp) | a flow never touches a restricted file, checked every step |
+| A restricted flow | (not a clamp) | a flow carries nothing restricted without the owner's consent, checked every step |
+| Any list read from the database | 200,000 rows (`HARD_ROWS`) | cut, and said in the log; queries that already say LIMIT are untouched |
+| Open proposals | 500 | new ones are not added (and said in the log) |
+| What tasks expect, per machine | 20,000 content hashes | the rest is ignored |
+| Marking cost | measured | the estimate is the Engine's own measured time per file (smoothed), times a slowdown when the Engine is busy (load per processor, loop lateness); "assumed" until it has measured |
+| In-memory notes (flows' "said it already", marks' "just left") | 5,000 / 2,000 | old entries dropped |
 
-## Not yet looked at (to do when each is next touched)
-Reports and the audit trail listings (page sizes), the file search results, the Task proposal queue for a long run of tasks, and the console's own lists. Each should get a line here
-with its limit, and a message that says it was cut.
+## Looked at and found already bounded
+The audit and feed lists (500 at most, with `more`), search (25 a kind), metric series (a time window and buckets), the Worker's listing of a folder (clamped above), the file index tree (5,000).
+Anything not named here still falls under the 200,000-row cap above; a feature that adds a new kind of list should add a line.

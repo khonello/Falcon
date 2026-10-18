@@ -426,7 +426,7 @@ async def test_marking_picks_from_the_index_as_a_tree_of_files_and_folders(conso
     QMetaObject.invokeMethod(page, "mark")
     await _wait(lambda: any(t == "marks.create" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "marks.create")
-    assert sent == {"paths": ["C:\\Finance"], "keep": "machine"}
+    assert sent == {"paths": ["C:\\Finance"], "keep": "machine", "confirm_large": False}
 
 
 QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))

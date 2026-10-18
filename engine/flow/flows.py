@@ -197,14 +197,7 @@ async def run_checks(engine: Engine, creator: dict[str, Any], source_pc_id: int,
     """Consent / collision / cycle. Raises for hard refusals; returns what needs consent."""
     if is_resource_path(source_path) or any(is_resource_path(d["destination_path"]) for d in dests):
         raise ProtocolError(ErrorCode.INVALID, "Resource folders cannot be a direct flow source or destination")
-    from engine.flow import guard
 
-    # A flow never touches anything restricted: neither end of it may be a restricted file or folder (checked now, and again at every step it takes).
-    if (why := await guard.restricted_reason(engine, source_pc_id, source_path)):
-        raise ProtocolError(ErrorCode.INVALID, f"A flow never touches restricted files or folders, and the source is not allowed: {why}")
-    for d in dests:
-        if (why := await guard.restricted_reason(engine, d["destination_pc_id"], d["destination_path"])):
-            raise ProtocolError(ErrorCode.INVALID, f"A flow never touches restricted files or folders, and the destination {d['destination_path']} is not allowed: {why}")
     for d in dests:
         if d["destination_pc_id"] == source_pc_id and overlaps(d["destination_path"], source_path):
             raise ProtocolError(ErrorCode.CONFLICT, "destination overlaps its own source -- that is a cycle")
@@ -328,13 +321,24 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                   detail={"source_pc_id": source_pc_id, "destinations": len(dests), "on_source_delete": on_delete or "keep",
                                           "consent_pending": [d["owner_account_id"] for d in pending],
                                           "collisions_confirmed": len(checks["collisions"])})
+    # A flow does not carry anything restricted without the owner's consent: if either end already is restricted, the flow starts paused and the owner is asked.
+    from engine.flow import guard
+
+    held = False
+    ends = [(source_pc_id, source_path)] + [(d["destination_pc_id"], d["destination_path"]) for d in dests]
+    for pc, path in ends:
+        missing = await guard.unconsented(ctx.engine, flow_id, pc, path)
+        if missing:
+            await guard.request(ctx.engine, flow_id, missing, path, step="when the flow was made")
+            held = True
+    await ctx.engine.announce("flow.created", {"flow_id": flow_id, "source_pc_id": source_pc_id, "held": held, "pending": bool(pending)}, pc=source_pc_id)
     flow = await ctx.engine.db.flows.get(flow_id)
     assert flow is not None
-    if not pending:
+    if not pending and not held:
         from engine.flow import sync
 
         sync.catch_up_later(ctx.engine, flow_id)               # what is already in the source folder is sent too
-    return {"flow": await _flow_view(ctx.engine, flow), "consent_pending": bool(pending),
+    return {"flow": await _flow_view(ctx.engine, flow), "consent_pending": bool(pending), "restricted_pending": held,
             "collisions_confirmed": checks["collisions"]}
 
 
@@ -352,7 +356,11 @@ async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     db = ctx.engine.db
     if granted:
         await db.flows.set_consent(flow_id, "granted")
-        await db.flows.set_status(flow_id, "active", None)
+        waiting = await db.flows.consents(flow_id, states=("asked",))
+        if waiting:
+            await db.flows.set_status(flow_id, "paused", "restricted:consent")          # the destination agreed, but something restricted is still waiting for its owner
+        else:
+            await db.flows.set_status(flow_id, "active", None)
     else:
         await db.flows.set_status(flow_id, "inactive", "consent:denied")
     await ctx.engine.audit.record(ctx, "flow.consent", target_type="flows", target_id=flow_id,
@@ -362,11 +370,111 @@ async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await issues.resolve_source(ctx.engine, "flow_consent", flow_id, "Agreed" if granted else "Declined")
     await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.consent_answered",
                                      {"flow_id": flow_id, "granted": granted, "by_account_id": ident.account_id})
-    if granted:
+    if granted and not await db.flows.consents(flow_id, states=("asked",)):
         from engine.flow import sync
 
         sync.catch_up_later(ctx.engine, flow_id)
     return {"flow_id": flow_id, "granted": granted}
+
+
+async def _load_visible(ctx: Context, flow_id: int) -> dict[str, Any]:
+    """A flow as a party to it sees it: its creator, a destination's owner, the Super User, or somebody who may answer one of its requests."""
+    from engine.flow import guard
+
+    ident = ctx.identity
+    flow = await ctx.engine.db.flows.get(flow_id)
+    if flow is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such flow")
+    owners = {d["owner_account_id"] for d in flow["destinations"]}
+    asked = await ctx.engine.db.flows.consents(flow_id, states=("asked", "granted", "declined", "revoked"))
+    if ident.role != "super_user" and ident.account_id != flow["created_by_account_id"] and ident.account_id not in owners and not any(guard.can_decide(ident, c) for c in asked):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "not a party to this flow")
+    return flow
+
+
+@handler("flow.restricted")
+async def restricted(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"flow_id"} -> {"consents": [...], "can_decide": [ids]}: what a flow is waiting to carry, what has been consented to, and which of them this caller may answer."""
+    ident = require_account(ctx)
+    flow = await _load_visible(ctx, int_field(payload, "flow_id"))
+    found = await ctx.engine.db.flows.consents(flow["id"], states=("asked", "granted", "declined", "revoked"))
+    from engine.flow import guard
+
+    return {"consents": rows(found), "can_decide": [c["id"] for c in found if guard.can_decide(ident, c)]}
+
+
+@handler("flow.restricted_consent")
+async def restricted_consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """The owner of a restriction answers a flow that wants to carry it. {"consent_id", "grant": bool, "days"?: int (0 or none = until taken back), "note"?}
+    Granting makes the flow's destination folders a place the content may be, and lets the flow go on if nothing else is waiting. Declining leaves it paused."""
+    from datetime import timedelta
+
+    from engine.flow import guard
+
+    ident = require_role(ctx, "super_user", "admin")
+    db = ctx.engine.db
+    consent = await db.flows.consent(int_field(payload, "consent_id"))
+    if consent is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such request")
+    flow = await db.flows.get(consent["flow_id"])
+    if flow is None or consent["state"] != "asked":
+        raise ProtocolError(ErrorCode.CONFLICT, "that request is not waiting for an answer")
+    if not guard.can_decide(ident, consent):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only the person who made the restriction, or the Super User, can allow a flow to carry it")
+    grant = bool(payload.get("grant", False))
+    days = int_field(payload, "days", required=False) or 0
+    if days < 0 or days > 3650:
+        raise ProtocolError(ErrorCode.INVALID, "days must be 0 (until taken back) to 3650")
+    expires = datetime.now(timezone.utc) + timedelta(days=days) if days else None
+    note = " ".join(str(payload.get("note") or "").split())[:300] or None
+    await db.flows.decide_consent(consent["id"], "granted" if grant else "declined", ident.account_id, expires, note)
+    allowed = 0
+    if grant:
+        for d in flow["destinations"]:
+            if d.get("destination_pc_id") is not None:
+                await db.resource.allow(d["destination_pc_id"], d["destination_path"], None, ident.account_id,
+                                        f"flow #{flow['id']} carries it, by consent", consent.get("mark_id"), folder=True, consent_id=consent["id"])
+                allowed += 1
+    await ctx.engine.announce("flow.restricted_granted" if grant else "flow.restricted_declined", {"flow_id": flow["id"], "consent_id": consent["id"], "name": consent["name"]})
+    await ctx.engine.audit.record(ctx, "flow.restricted_consented" if grant else "flow.restricted_declined", target_type="flows", target_id=flow["id"],
+                                  detail={"consent_id": consent["id"], "name": consent["name"], "days": days, "places_allowed": allowed, "note": note})
+    from engine.console import issues
+
+    await issues.resolve_source(ctx.engine, "flow_restricted", consent["id"], "Allowed" if grant else "Declined", by=ctx)
+    await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.restricted_answered", {"flow_id": flow["id"], "consent_id": consent["id"], "granted": grant, "name": consent["name"]})
+    resumed = False
+    if (grant and flow["status"] == "paused" and flow.get("pause_reason") == guard.PAUSE and flow["consent_status"] != "pending"
+            and not await db.flows.consents(flow["id"], states=("asked",))):
+        await db.flows.set_status(flow["id"], "active", None)
+        resumed = True
+        from engine.flow import sync
+
+        sync.catch_up_later(ctx.engine, flow["id"])                    # what was held back is sent now
+    return {"consent_id": consent["id"], "granted": grant, "flow_resumed": resumed}
+
+
+@handler("flow.restricted_revoke")
+async def restricted_revoke(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Take a consent back. {"consent_id"}: the flow stops at once, and the places it made allowed are not allowed any more (what is already there is then reported)."""
+    from engine.flow import guard
+
+    ident = require_role(ctx, "super_user", "admin")
+    db = ctx.engine.db
+    consent = await db.flows.consent(int_field(payload, "consent_id"))
+    if consent is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such consent")
+    if not guard.can_decide(ident, consent):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only the person who made the restriction, or the Super User, can take this back")
+    if not await db.flows.decide_consent(consent["id"], "revoked", ident.account_id, None, "taken back"):
+        raise ProtocolError(ErrorCode.CONFLICT, "that consent is not in force")
+    removed = await db.resource.revoke_allowances(consent["id"])
+    flow = await db.flows.get(consent["flow_id"])
+    if flow is not None and flow["status"] == "active":
+        await db.flows.set_status(flow["id"], "paused", guard.PAUSE)
+    await ctx.engine.audit.record(ctx, "flow.restricted_revoked", target_type="flows", target_id=consent["flow_id"], detail={"consent_id": consent["id"], "places_no_longer_allowed": removed})
+    if flow is not None:
+        await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.restricted_answered", {"flow_id": flow["id"], "consent_id": consent["id"], "granted": False, "name": consent["name"]})
+    return {"consent_id": consent["id"], "revoked": True}
 
 
 @handler("flow.edit")
@@ -385,6 +493,12 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.FORBIDDEN, "new destinations outside your authority need a new flow "
                                                  "(consent is requested at creation)")
     await ctx.engine.db.flows.replace_structure(flow_id, dests, stages)
+    from engine.flow import guard
+
+    for d in dests:
+        missing = await guard.unconsented(ctx.engine, flow_id, d["destination_pc_id"], d["destination_path"])
+        if missing:
+            await guard.request(ctx.engine, flow_id, missing, d["destination_path"], step="when the flow was edited")
     on_delete = _on_delete(payload)
     if on_delete and on_delete != flow.get("on_source_delete"):
         await ctx.engine.db.flows.set_on_source_delete(flow_id, on_delete)
@@ -402,6 +516,7 @@ async def pause(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await _load_owned(ctx, flow_id)
     await ctx.engine.db.flows.set_status(flow_id, "paused", "manual")
     await ctx.engine.audit.record(ctx, "flow.paused", target_type="flows", target_id=flow_id)
+    await ctx.engine.announce("flow.paused", {"flow_id": flow_id, "by": "person"})
     return {"flow_id": flow_id, "status": "paused"}
 
 
@@ -416,12 +531,13 @@ async def resume(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     dest_id = int_field(payload, "destination_id", required=False)
     from engine.flow import guard
 
-    # a flow paused because a folder became restricted does not resume into it: it is looked at again now, not trusted from when it was paused
-    if (why := await guard.restricted_reason(ctx.engine, flow["source_pc_id"], flow["source_path"])):
-        raise ProtocolError(ErrorCode.CONFLICT, f"A flow never touches restricted files or folders, and the source is not allowed: {why}")
-    for d in flow["destinations"]:
-        if (dest_id is None or d["id"] == dest_id) and (why := await guard.restricted_reason(ctx.engine, d.get("destination_pc_id"), d["destination_path"])):
-            raise ProtocolError(ErrorCode.CONFLICT, f"A flow never touches restricted files or folders, and the destination {d['destination_path']} is not allowed: {why}")
+    # a flow paused for a restricted folder does not resume into it until its owner has said so: looked at again now, not trusted from when it was paused
+    for pc, path in [(flow["source_pc_id"], flow["source_path"])] + [(d.get("destination_pc_id"), d["destination_path"]) for d in flow["destinations"]
+                                                                       if dest_id is None or d["id"] == dest_id]:
+        missing = await guard.unconsented(ctx.engine, flow_id, pc, path)
+        if missing:
+            await guard.request(ctx.engine, flow_id, missing, path, step="when it was asked to resume")
+            raise ProtocolError(ErrorCode.CONFLICT, f"This flow would carry something restricted ({missing[0].reason}); it needs the consent of {guard.deciders_text(missing[0])}")
     if dest_id is not None:
         await ctx.engine.db.flows.set_destination_pause(dest_id, None)
     if flow["status"] == "paused":

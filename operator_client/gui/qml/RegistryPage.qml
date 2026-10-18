@@ -17,9 +17,19 @@ Page {
     property var accounts: []      // registry.accounts
     property var asks: []          // enroll.list
     property string code: ""
+    property var handover: null    // handover.status (the Super User only): is a move to another machine open, and who is waiting
+
+    function openHandover(on) {
+        falcon.call(on ? "handover.open" : "handover.cancel", {}, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not done"); return }
+            Msg.ok(on ? "Open for ten minutes · one new machine may ask" : "Closed")
+            page.load()
+        })
+    }
 
     function load() {
         if (!falcon.isConnected) return
+        if (Nav.boss) falcon.call("handover.status", {}, function (ok, r) { page.handover = ok ? r : null })
         falcon.call("machines.list", {}, function (ok, r) { page.list = ok ? (r.machines || []) : [] })
         falcon.call("registry.refused", { days: 7 }, function (ok, r) { page.refused = ok ? (r.refused || []) : [] })
         falcon.call("registry.accounts", {}, function (ok, r) { page.accounts = ok ? (r.accounts || []) : [] })
@@ -88,6 +98,31 @@ Page {
 
     Confirm { id: confirm; page: page }
     KeyDrawer { id: keys; page: page; onDone: { page.load(); Fleet.refresh() } }
+
+    // moving the Super User to a dedicated machine: allow ONE new machine to ask for ten minutes; it shows a code, which is typed below (under "Asking to join")
+    Rectangle {
+        objectName: "handoverCard"
+        visible: Nav.boss
+        width: parent.width
+        height: 56
+        radius: Theme.radius
+        color: Theme.surface
+        border.width: 1
+        border.color: Theme.border
+        Column {
+            x: 14
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width - 330
+            spacing: 2
+            Txt { text: "Move the Super User to another machine"; font.weight: Font.Medium; width: parent.width }
+            Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
+                  text: page.handover && page.handover.open ? "Open: one new machine may ask now" + (page.handover.waiting && page.handover.waiting.length ? " · " + Theme.many(page.handover.waiting.length, "machine") + " waiting under Asking to join" : "")
+                                                              : "Closed. Opening it lets ONE new machine ask for ten minutes; nothing moves until you type the code it shows. Your account, names, tasks and history stay." }
+        }
+        Btn { anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; objectName: "handoverToggle"
+              kind: page.handover && page.handover.open ? "normal" : "primary"; text: page.handover && page.handover.open ? "Close it" : "Let a new machine ask"
+              onClicked: page.openHandover(!(page.handover && page.handover.open)) }
+    }
 
     Strip {
         width: parent.width
@@ -187,7 +222,7 @@ Page {
                 nameTitle: "Machine"
                 nameText: function (y) { return y.hostname }
                 nameLine: function (y) { return (y.os || "") + (y.peer ? " · " + y.peer : "") }
-                cols: [{ title: "Wants to be", width: 120, text: function (y) { return y.requested_level === "admin" ? "an Admin" : "a worker PC" } },
+                cols: [{ title: "Wants to be", width: 120, text: function (y) { return y.requested_level === "super_user" ? "the Super User's" : y.requested_level === "admin" ? "an Admin" : "a worker PC" } },
                        { title: "Department", width: 130, text: function (y) { return Fleet.deptName(y.requested_department_id) || "Not said" } },
                        { title: "Asked", width: 120, text: function (y) { return Time.atDay(y.created_at) } }]
                 now: function (y) { return ["Waiting for you", "wait"] }
@@ -206,7 +241,7 @@ Page {
                  : page.tab === "acct" ? [["Role", page.cur.role], ["Department", page.cur.dept], ["Workstation", page.cur.ws || "—", null, true], ["Key", page.cur.gen ? "no. " + page.cur.gen : "—"], ["Now", page.cur.now]]
                  : page.tab === "door" ? [["Address", page.cur.ip || "—", null, true], ["Refused because", page.cur.why.charAt(0).toUpperCase() + page.cur.why.slice(1)],
                                           ["Tries this week", Theme.fmt(page.cur.tries)], ["Last try", Time.atDay(page.cur.last)]].concat(page.cur.blocked ? [["Now", "Blocked at the door", Theme.crit]] : [])
-                 : [["Wants to be", page.cur.requested_level === "admin" ? "an Admin" : "a worker PC"], ["Department", Fleet.deptName(page.cur.requested_department_id) || "Not said"],
+                 : [["Wants to be", page.cur.requested_level === "super_user" ? "the Super User's machine" : page.cur.requested_level === "admin" ? "an Admin" : "a worker PC"], ["Department", Fleet.deptName(page.cur.requested_department_id) || "Not said"],
                     ["Address", page.cur.peer || "—", null, true], ["System", page.cur.os || "—"], ["Asked", Time.atDay(page.cur.created_at)], ["Expires", Time.atDay(page.cur.expires_at)]]
             Txt { visible: page.tab === "door" && page.cur !== null; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: page.cur && page.cur.say ? page.cur.say : "" }
             Column {
@@ -239,8 +274,8 @@ Page {
                 Btn { visible: page.tab === "ask" && page.cur !== null; danger: true; text: "Refuse"
                       onClicked: falcon.call("enroll.refuse", { enrollment_id: page.cur.id, reason: "refused" }, function (ok, r) { if (ok) { Msg.ok("Refused"); page.load() } else Msg.failed(r.message || "Not refused") }) },
                 Btn { visible: page.tab === "ask" && page.cur !== null; kind: "primary"; text: "Let it in"; enabled: page.code.trim().length > 0
-                      onClicked: falcon.call("enroll.confirm", { enrollment_id: page.cur.id, code: page.code.trim() }, function (ok, r) {
-                          if (ok) { Msg.ok(page.cur.hostname + " joined · its key went to the machine"); page.code = ""; page.load(); Fleet.refresh() } else Msg.failed(r.message || "Wrong code") }) }
+                      onClicked: falcon.call(page.cur.requested_level === "super_user" ? "handover.confirm" : "enroll.confirm", { enrollment_id: page.cur.id, code: page.code.trim() }, function (ok, r) {
+                          if (ok) { Msg.ok(page.cur.requested_level === "super_user" ? page.cur.hostname + " is the Super User's machine now · this one no longer is" : page.cur.hostname + " joined · its key went to the machine"); page.code = ""; page.load(); Fleet.refresh() } else Msg.failed(r.message || "Wrong code") }) }
             ]
         }
     }

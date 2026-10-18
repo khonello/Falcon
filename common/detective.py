@@ -94,7 +94,7 @@ GRAPH_ANCHOR: dict[str, tuple[str, str]] = {
     "drive_after_staging": ("exfiltration", "Transfer"), "uploaded": ("exfiltration", "Transfer"), "hidden": ("concealment", "Disguise"),
     "disguised": ("concealment", "Disguise"), "buried": ("concealment", "Relocate"), "removed_after_taking": ("erasure", "Remove"),
     "mass_removal": ("erasure", "Remove"), "history_cleared": ("erasure", "Clear the trail"), "capture_tool": ("capture", "Capture"),
-    "clipboard_picture": ("capture", "Capture"), "went_silent": ("evasion", "Switch off"), "bulk_destroyed": ("sabotage", "Destroy"),
+    "clipboard_picture": ("capture", "Capture"), "flow_bypass": ("exfiltration", "Transfer"), "went_silent": ("evasion", "Switch off"), "bulk_destroyed": ("sabotage", "Destroy"),
     "bulk_rewritten": ("sabotage", "Destroy"), "scrambled_names": ("sabotage", "Destroy"), "outside_role": ("reach", "Beyond role"),
 }
 
@@ -845,6 +845,8 @@ class Detective:
         if s.verb in ("renamed", "moved"):
             found.append(self._disguised(m, s))
             found.append(self._buried(m, s))
+        if s.verb in ("created", "copied", "moved") and "flow_bypass" in s.tags:
+            found.append(self._bypass(m, s))
         if s.verb in ("created", "copied", "modified"):
             found.append(self._archived(m, s))
             found.append(self._gathering(m, s))
@@ -955,6 +957,15 @@ class Detective:
             why.append("restricted content")
         return Finding("exfiltration", "to_drive", s.at, s.pc, w, frozenset({s.thing or s.path} | lineage), f"{s.name} was copied to a removable drive ({dev})", [s],
                        "a drive this person always uses for their own files", why)
+
+    def _bypass(self, m: Memory, s: Sig) -> Finding | None:
+        """What a flow delivers here, put here by hand instead: the sanctioned way to move it is the flow (checked, consented, audited), so doing it by hand is a way round."""
+        w, why = 0.34, [f"{s.name} is what a flow delivers to this folder, put here by hand instead"]
+        if self._restricted(s):
+            w += 0.20
+            why.append("a restricted file")
+        return Finding("exfiltration", "flow_bypass", s.at, s.pc, w, frozenset({s.thing or s.path}), f"{s.name} was copied here by hand, not by the flow that delivers it", [s],
+                       "a person fetching something the flow was slow to bring", why)
 
     def _drive_after_staging(self, m: Memory, s: Sig) -> Finding | None:
         lo = s.at - WINDOW
@@ -1174,6 +1185,9 @@ class Detective:
         if any("allowed" in e.tags for e in f.evidence):
             w = cut(w, 0.45)
             f.why.append("recorded as allowed")
+        if any("task_expected" in e.tags for e in f.evidence):
+            w = cut(w, 0.45)
+            f.why.append("a task asks for exactly this")
         if (said := self.ctx.ruled(s.pc, f)):
             w = cut(w, 0.45)
             f.why.append(said)

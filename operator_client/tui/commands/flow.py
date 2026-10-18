@@ -76,6 +76,34 @@ async def flow_consent(ctx: ShellContext, args: Args) -> str:
     return f"flow {res['flow_id']}: consent {'granted' if res['granted'] else 'denied'}"
 
 
+@command("flow", "restricted", "<flow_id>", "What the flow is waiting to carry that is restricted, what was allowed, and what you may answer")
+async def flow_restricted(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("flow.restricted", {"flow_id": args.get_int(0, "flow_id")})
+    if not res["consents"]:
+        return "(nothing restricted is involved)"
+    rows = [{"id": c["id"], "thing": c["name"], "state": c["state"], "asked": c["asked_at"], "until": c.get("expires_at") or "", "you": "may answer" if c["id"] in res["can_decide"] else ""}
+            for c in res["consents"]]
+    return table(rows, ["id", "thing", "state", "asked", "until", "you"])
+
+
+@command("flow", "allow", "<consent_id> [days=<n>] [note=..]", "Allow a flow to carry something restricted (you made the restriction, or you are the Super User)")
+async def flow_allow(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("flow.restricted_consent", {"consent_id": args.get_int(0, "consent_id"), "grant": True, "days": int(args.opt("days") or 0), "note": args.opt("note") or ""})
+    return "allowed" + ("; the flow goes on" if res["flow_resumed"] else "")
+
+
+@command("flow", "refuse", "<consent_id> [note=..]", "Decline to let a flow carry something restricted (it stays paused)")
+async def flow_refuse(ctx: ShellContext, args: Args) -> str:
+    await ctx.call("flow.restricted_consent", {"consent_id": args.get_int(0, "consent_id"), "grant": False, "note": args.opt("note") or ""})
+    return "declined"
+
+
+@command("flow", "revoke", "<consent_id>", "Take an allowance back: the flow stops and the places it allowed are not allowed any more")
+async def flow_revoke(ctx: ShellContext, args: Args) -> str:
+    await ctx.call("flow.restricted_revoke", {"consent_id": args.get_int(0, "consent_id")})
+    return "taken back"
+
+
 @command("flow", "edit", "<flow_id> dest=.. [stage=..] [confirm]", "Replace a flow's destinations/stages (checks re-run)")
 async def flow_edit(ctx: ShellContext, args: Args) -> str:
     dests, stages = _parse_structure(args)

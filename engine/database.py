@@ -30,7 +30,7 @@ POLYMORPHIC_TABLES = frozenset({
     "tasks", "department_tasks", "enrollments", "issues", "resource_marks", "deviations", "rules", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
-    "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases", "detective_rules",
+    "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases", "detective_rules", "flow_restricted_consents", "proposals",
     # non-table targets used by the audit trail
     "client", "session", "event", "execution",
 })
@@ -86,6 +86,7 @@ class Database:
         self.updates = UpdatesRepo(self)
         self.alerts = AlertsRepo(self)
         self.detective = DetectiveRepo(self)
+        self.proposals = ProposalsRepo(self)
         self.resource = ResourceRepo(self)
 
     @property
@@ -158,6 +159,16 @@ def _strip_txn_wrappers(sql: str) -> str:
     return "\n".join(kept)
 
 
+HARD_ROWS = 200_000
+
+
+def _capped(sql: str) -> str:
+    head = sql.lstrip().upper()
+    if not head.startswith(("SELECT", "WITH")) or " LIMIT " in head or "FOR UPDATE" in head or "RETURNING" in head:
+        return sql
+    return f"SELECT * FROM ({sql}) AS _capped LIMIT {HARD_ROWS + 1}"
+
+
 class _Repo:
     def __init__(self, db: Database) -> None:
         self.db = db
@@ -169,7 +180,14 @@ class _Repo:
         return self.db.pool
 
     async def _fetch(self, sql: str, *args: Any) -> list[dict[str, Any]]:
-        return _rows(await self.pool.fetch(sql, *args))
+        """Every list read goes through here, and none can return more than HARD_ROWS rows: a table that has grown past anything a page, a job or a message was
+        built for is cut (and said so in the log) instead of exhausting the Engine's memory. Queries that already say LIMIT, and anything that is not a plain SELECT,
+        are left exactly as written."""
+        rows = await self.pool.fetch(_capped(sql), *args)
+        if len(rows) > HARD_ROWS:
+            log.warning("a query returned more than %d rows and was cut: %s", HARD_ROWS, " ".join(sql.split())[:120])
+            rows = rows[:HARD_ROWS]
+        return _rows(rows)
 
     async def _one(self, sql: str, *args: Any) -> dict[str, Any] | None:
         return _row(await self.pool.fetchrow(sql, *args))
@@ -1294,6 +1312,39 @@ class FlowsRepo(_Repo):
                  f"{r['destination_pc_id'] if r['destination_pc_id'] is not None else 'remote'}:{r['destination_path']}")
                 for r in rows]
 
+    # -- consent to carry something restricted ---------------------------------------------------
+
+    async def ask_consent(self, flow_id: int, *, mark_id: int | None, tag: str | None, scope_department_id: int | None, name: str, sample_path: str | None) -> tuple[int, bool]:
+        """Ask once per flow and thing: (id, newly asked). A thing already asked or granted is the same request."""
+        row = await self._one(
+            "SELECT id FROM flow_restricted_consents WHERE flow_id = $1 AND state IN ('asked', 'granted') AND "
+            "(($2::int IS NOT NULL AND mark_id = $2) OR ($3::text IS NOT NULL AND tag = $3 AND COALESCE(scope_department_id, 0) = COALESCE($4::int, 0)))",
+            flow_id, mark_id, tag, scope_department_id)
+        if row:
+            return row["id"], False
+        new = await self._val(
+            "INSERT INTO flow_restricted_consents (flow_id, mark_id, tag, scope_department_id, name, sample_path) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+            flow_id, mark_id, tag, scope_department_id, name, sample_path)
+        return new, True
+
+    async def consents(self, flow_id: int, *, states: tuple[str, ...] = ("asked", "granted")) -> list[dict[str, Any]]:
+        return await self._fetch(
+            "SELECT c.*, m.by_account_id AS mark_owner_account_id, m.pc_id AS mark_pc_id FROM flow_restricted_consents c LEFT JOIN resource_marks m ON m.id = c.mark_id "
+            "WHERE c.flow_id = $1 AND c.state = ANY($2::text[]) ORDER BY c.id", flow_id, list(states))
+
+    async def consent(self, consent_id: int) -> dict[str, Any] | None:
+        return await self._one(
+            "SELECT c.*, m.by_account_id AS mark_owner_account_id, m.pc_id AS mark_pc_id FROM flow_restricted_consents c LEFT JOIN resource_marks m ON m.id = c.mark_id WHERE c.id = $1",
+            consent_id)
+
+    async def decide_consent(self, consent_id: int, state: str, by_account_id: int, expires_at: Any, note: str | None) -> bool:
+        return (await self._exec(
+            "UPDATE flow_restricted_consents SET state = $2, decided_by_account_id = $3, decided_at = now(), expires_at = $4, note = $5 "
+            "WHERE id = $1 AND state IN ('asked', 'granted')", consent_id, state, by_account_id, expires_at, note)).endswith("1")
+
+    async def set_consent_issue(self, consent_id: int, issue_id: int) -> None:
+        await self._exec("UPDATE flow_restricted_consents SET issue_id = $2 WHERE id = $1", consent_id, issue_id)
+
     async def set_destination_pause(self, destination_id: int, reason: str | None) -> None:
         await self._exec("UPDATE flow_destinations SET paused_reason = $2 WHERE id = $1", destination_id, reason)
 
@@ -2316,6 +2367,27 @@ class AlertsRepo(_Repo):
 # 14. Detective (migration 035)
 # ============================================================================================
 
+class ProposalsRepo(_Repo):
+    async def open_count(self) -> int:
+        return int(await self._val("SELECT count(*) FROM proposals WHERE state = 'open'") or 0)
+
+    async def add(self, kind: str, key: str, title: str, detail: dict[str, Any], pc_id: int | None, department_id: int | None,
+                  case_id: int | None, flow_id: int | None) -> int | None:
+        return await self._val(
+            "INSERT INTO proposals (kind, key, title, detail, pc_id, department_id, case_id, flow_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
+            "ON CONFLICT (kind, key) WHERE state = 'open' DO NOTHING RETURNING id", kind, key, title, detail, pc_id, department_id, case_id, flow_id)
+
+    async def get(self, proposal_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM proposals WHERE id = $1", proposal_id)
+
+    async def list(self, state: str, limit: int) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM proposals WHERE state = $1 ORDER BY id DESC LIMIT $2", state, limit)
+
+    async def decide(self, proposal_id: int, state: str, by_account_id: int, note: str | None) -> bool:
+        return (await self._exec("UPDATE proposals SET state = $2, decided_by_account_id = $3, decided_at = now(), note = $4 WHERE id = $1 AND state = 'open'",
+                                 proposal_id, state, by_account_id, note)).endswith("1")
+
+
 class DetectiveRepo(_Repo):
     _CASE = ("c.*, p.hostname, p.pc_type, p.department_id AS pc_department_id, d.name AS department_name "
              "FROM detective_cases c JOIN pcs p ON p.id = c.pc_id LEFT JOIN departments d ON d.id = c.department_id")
@@ -2451,17 +2523,25 @@ class ResourceRepo(_Repo):
                          violation_id)
 
     async def allow(self, pc_id: int, path: str, content_hash: str | None, by_account_id: int, reason: str,
-                    mark_id: int | None = None) -> int:
-        """A place a restricted file's content may be, with the reason: it is not reported there again."""
+                    mark_id: int | None = None, *, folder: bool = False, consent_id: int | None = None) -> int:
+        """A place a restricted file's content may be, with the reason: it is not reported there again. `folder`: anything below this folder (what a consented flow writes into)."""
         return await self._val(
-            "INSERT INTO restricted_allowances (pc_id, path, content_hash, mark_id, reason, by_account_id) "
-            "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id", pc_id, path, content_hash, mark_id, reason, by_account_id)
+            "INSERT INTO restricted_allowances (pc_id, path, content_hash, mark_id, reason, by_account_id, folder, consent_id) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id", pc_id, path, content_hash, mark_id, reason, by_account_id, folder, consent_id)
+
+    async def revoke_allowances(self, consent_id: int) -> int:
+        """The consent was taken back: the places it made allowed are not allowed any more (the rows are kept, marked revoked)."""
+        got = await self._fetch("UPDATE restricted_allowances SET revoked_at = now() WHERE consent_id = $1 AND revoked_at IS NULL RETURNING id", consent_id)
+        return len(got)
 
     async def is_allowed(self, pc_id: int, path: str, content_hash: str | None) -> bool:
         return bool(await self._val(
-            "SELECT EXISTS (SELECT 1 FROM restricted_allowances WHERE pc_id = $1 AND "
-            "((content_hash IS NOT NULL AND content_hash = $3) "
-            " OR (content_hash IS NULL AND lower(replace(path, chr(92), '/')) = lower(replace($2, chr(92), '/')))))", pc_id, path, content_hash))
+            "SELECT EXISTS (SELECT 1 FROM restricted_allowances a WHERE a.pc_id = $1 AND a.revoked_at IS NULL AND ("
+            " (NOT a.folder AND ((a.content_hash IS NOT NULL AND a.content_hash = $3) "
+            "   OR (a.content_hash IS NULL AND lower(replace(a.path, chr(92), '/')) = lower(replace($2, chr(92), '/'))))) "
+            " OR (a.folder AND starts_with(lower(replace($2, chr(92), '/')), lower(rtrim(replace(a.path, chr(92), '/'), '/')) || '/') "
+            "   AND (a.mark_id IS NULL OR $3::text IS NULL OR EXISTS (SELECT 1 FROM resource_mark_hashes h WHERE h.mark_id = a.mark_id AND h.content_hash = $3)))))",
+            pc_id, path, content_hash))
 
     async def ignored_file_ids(self, pc_id: int) -> set[int]:
         """Files on a PC currently ignored by the system: unresolved violations."""

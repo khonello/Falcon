@@ -73,3 +73,19 @@ async def detective_overview(ctx: ShellContext, args: Args) -> str:
     lines = [f"urgent {lv['urgent']} · cases {lv['case']} · noted {lv['noted']} · reviewed {res['reviewed']}"]
     lines += [f"  {n}  {intent}" for intent, n in sorted(res["by_intent"].items(), key=lambda kv: -kv[1])]
     return "\n".join(lines)
+
+
+@command("proposals", usage="[accepted|dismissed]", help_="What the features suggest to you (Detective sees things Restricted, Flow and Task cannot): accept or dismiss")
+async def proposals(ctx: ShellContext, args: Args) -> str:
+    state = args.positional[0] if args.positional else "open"
+    found = (await ctx.call("proposals.list", {"state": state}))["proposals"]
+    if not found:
+        return "(nothing waiting)"
+    return table([{"id": p["id"], "kind": p["kind"], "suggestion": p["title"], "made": p["created_at"]} for p in found], ["id", "kind", "suggestion", "made"])
+
+
+@command("proposals", "accept", "<id> [note...]", "Accept a suggestion (pausing a flow is done; marking and tasks are made by you on their own pages)")
+async def proposals_accept(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("proposals.decide", {"proposal_id": args.get_int(0, "id"), "accept": True, "note": args.rest(1, "note") if len(args.positional) > 1 else ""})
+    extra = [res[k] for k in ("how", "mark", "task_description") if res.get(k)]
+    return "\n".join(["accepted", *extra])

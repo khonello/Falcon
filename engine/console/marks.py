@@ -113,6 +113,9 @@ def install(engine: Engine) -> None:
                 for mark in await engine.db.marks.active_on_pc(event["pc_id"]):
                     if mark["kind"] == "file" and norm(mark["path"]) == norm(event["path"]):
                         _just_left[(event["pc_id"], digest)] = (time.monotonic(), mark["id"], event["path"])
+        if len(_just_left) > 2000:                                       # bounded: what left long ago and never reappeared is forgotten
+            for k in [k for k, v in _just_left.items() if time.monotonic() - v[0] > MOVE_WINDOW_SECONDS][:1000]:
+                _just_left.pop(k, None)
 
     engine.file_index.subscribe(on_file, stage="guard", name="marks")
     engine.file_index.subscribe(on_any, every_op=True, stage="guard", name="marks.follow")
@@ -254,16 +257,21 @@ def _minutes(seconds: float) -> str:
     return "under a minute" if seconds < 60 else f"about {round(seconds / 60)} minute{'s' if seconds >= 90 else ''}" if seconds < 5400 else f"about {seconds / 3600:.1f} hours"
 
 
-async def assess(db: Any, pc_id: int, path: str, *, already: int = 0) -> dict[str, Any]:
+async def assess(db: Any, pc_id: int, path: str, *, already: int = 0, cost: Any = None) -> dict[str, Any]:
     """What marking this would cost, from the index, before anything is done: files, how many of them are generated (not tracked one by one), a pessimistic time, and a verdict
     ("ok", "large" = allowed once confirmed, "too_large" = refused) with the reasons in words a person can act on."""
     row = await db.file_index.by_path(pc_id, path, present_only=True)
+    per_file, measured = cost.per_unit("mark_file", SECONDS_PER_FILE) if cost is not None else (SECONDS_PER_FILE, 0)
+    slow = cost.slowdown() if cost is not None else 1.0
+    capacity = cost.capacity() if cost is not None else None
+    basis = f"measured over {measured} earlier job{'s' if measured != 1 else ''} on this Engine" if measured else "assumed (nothing measured yet)"
     if row is not None:
-        return {"path": path, "kind": "file", "files": 1, "junk": 0, "tracked": 1, "seconds": SECONDS_PER_FILE, "verdict": "ok", "reasons": [], "heaviest": [], "limit": MARK_MAX_FILES}
+        return {"path": path, "kind": "file", "files": 1, "junk": 0, "tracked": 1, "seconds": round(per_file * slow, 3), "verdict": "ok", "reasons": [], "heaviest": [],
+                "limit": MARK_MAX_FILES, "per_file_ms": round(per_file * 1000, 1), "basis": basis, "capacity": capacity}
     counts = await db.file_index.count_under(pc_id, path, JUNK_FOLDERS)
     files, junk = counts["files"], counts["junk"]
     tracked = files - junk
-    seconds = tracked * SECONDS_PER_FILE
+    seconds = tracked * per_file * slow
     reasons: list[str] = []
     heaviest = await db.file_index.heaviest_under(pc_id, path) if files > MARK_CONFIRM_FILES else []
     verdict = "ok"
@@ -271,7 +279,7 @@ async def assess(db: Any, pc_id: int, path: str, *, already: int = 0) -> dict[st
         reasons.append(f"{junk:,} of its {files:,} files are in generated folders such as node_modules; they are covered by the mark but not tracked one by one")
     if tracked > MARK_MAX_FILES:
         verdict = "too_large"
-        reasons.append(f"{tracked:,} files to track is more than one mark can hold ({MARK_MAX_FILES:,}); at about {SECONDS_PER_FILE * 1000:.0f} ms each that would take {_minutes(seconds)}")
+        reasons.append(f"{tracked:,} files to track is more than one mark can hold ({MARK_MAX_FILES:,}); at about {per_file * 1000:.0f} ms each that would take {_minutes(seconds)}")
     elif already + tracked > MARK_MAX_MACHINE:
         verdict = "too_large"
         reasons.append(f"this machine already tracks {already:,} files by content and the most it can is {MARK_MAX_MACHINE:,}; this would add {tracked:,}")
@@ -280,8 +288,12 @@ async def assess(db: Any, pc_id: int, path: str, *, already: int = 0) -> dict[st
         reasons.append(f"{tracked:,} files to track will take {_minutes(seconds)}")
     if verdict != "ok" and heaviest:
         reasons.append("the weight is in: " + ", ".join(f"{h['name']} ({h['files']:,})" for h in heaviest[:3]) + " -- mark a narrower folder, or the files that matter")
+    if slow > 1.0 and verdict != "too_large":
+        reasons.append(f"the Engine is {capacity['state']} right now, so allow about {slow:.1f} times longer than usual" if capacity else "the Engine is busy")
+    if verdict == "ok" and slow > 1.0 and seconds > 120:
+        verdict = "large"                                              # a job that is fine on a quiet Engine is asked about when it is busy
     return {"path": path, "kind": "folder", "files": files, "junk": junk, "tracked": tracked, "seconds": round(seconds, 1), "verdict": verdict, "reasons": reasons,
-            "heaviest": heaviest, "limit": MARK_MAX_FILES}
+            "heaviest": heaviest, "limit": MARK_MAX_FILES, "per_file_ms": round(per_file * 1000, 1), "basis": basis, "capacity": capacity}
 
 
 async def _tracked_on(db: Any, pc_id: int, marks: list[dict[str, Any]]) -> int:
@@ -309,11 +321,11 @@ async def marks_assess(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     now = await _tracked_on(db, ident.pc_id, await db.marks.active_on_pc(ident.pc_id))
     out, running = [], now
     for raw in paths:
-        a = await assess(db, ident.pc_id, raw.strip(), already=running)
+        a = await assess(db, ident.pc_id, raw.strip(), already=running, cost=ctx.engine.cost)
         if a["verdict"] != "too_large":
             running += a["tracked"]
         out.append(a)
-    return {"assessed": out, "tracked_now": now, "machine_limit": MARK_MAX_MACHINE}
+    return {"assessed": out, "tracked_now": now, "machine_limit": MARK_MAX_MACHINE, "capacity": ctx.engine.cost.capacity()}
 
 
 @handler("marks.create")
@@ -334,7 +346,7 @@ async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     # Assess everything first, so nothing is half done: a refusal names the path, how many files, how long it would take and where the weight is.
     running = await _tracked_on(db, ident.pc_id, existing)
     for raw in paths:
-        a = await assess(db, ident.pc_id, raw.strip(), already=running)
+        a = await assess(db, ident.pc_id, raw.strip(), already=running, cost=ctx.engine.cost)
         if a["verdict"] == "too_large":
             raise ProtocolError(ErrorCode.INVALID, f"{a['path']} is too large to mark as it is: " + "; ".join(a["reasons"]))
         if a["verdict"] == "large" and not payload.get("confirm_large"):
@@ -358,18 +370,18 @@ async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         if kind == "file" and not hashed:
             raise ProtocolError(ErrorCode.INVALID, "that file has no content hash yet (too large, or still being indexed), so a copy could not be recognised")
         name = (row["filename"] if row else path.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]) or path
+        began = time.perf_counter()
         mark_id = await db.marks.create(kind, name, ident.pc_id, path, keep, ident.account_id, ident.department_id)
         for t in hashed:
             await db.marks.add_hash(mark_id, t["content_hash"], t["path"])
         ctx.engine.marked.invalidate()
+        ctx.engine.cost.observe("mark_file", time.perf_counter() - began, max(1, len(hashed)))           # what it really cost, for the next estimate
         await ctx.engine.audit.record(ctx, "mark.created", target_type="resource_marks", target_id=mark_id, pc_id=ident.pc_id,
                                       detail={"path": path, "kind": kind, "keep": keep, "files": len(targets)})
         made.append(mark_id)
         mark = await db.marks.get(mark_id)
         assert mark is not None
-        from engine.flow import guard
-
-        await guard.sweep(ctx.engine, ident.pc_id)                 # a flow whose folder just became restricted stops at once, not file by file
+        await ctx.engine.announce("mark.created", {"mark_id": mark_id, "pc_id": ident.pc_id, "path": path, "kind": kind}, pc=ident.pc_id)   # (Flow hears it and stops at once)
         for digest in {t["content_hash"] for t in hashed}:
             for entry in await db.file_index.by_hash(digest):
                 if not allowed_at(mark, entry["pc_id"], entry["path"]):
@@ -489,6 +501,7 @@ async def marks_unmark(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if not await db.marks.unmark(mark["id"], ctx.identity.account_id):
         raise ProtocolError(ErrorCode.CONFLICT, "it is already unmarked")
     ctx.engine.marked.invalidate()
+    await ctx.engine.announce("mark.removed", {"mark_id": mark["id"], "pc_id": mark["pc_id"], "path": mark["path"]}, pc=mark["pc_id"])
     closed = 0
     for issue_id in await db.marks.resolve_open_copies(mark["id"]):
         closed += int(await resolve_issue(ctx.engine, issue_id, "The mark was removed", by=ctx))

@@ -90,6 +90,7 @@ _settling: dict[tuple[int, str], asyncio.Task[Any]] = {}
 
 def reset_state() -> None:
     guard.reset_state()
+    _routes.clear()
     _transfers.clear()
     _listings.clear()
     for waiting in list(_settling.values()):
@@ -151,11 +152,48 @@ async def wrote_here(engine: Engine, pc_id: int, path: str, digest: str | None) 
     return False
 
 
+_routes: dict[int, tuple[float, list[tuple[int, str]], list[tuple[int, str]]]] = {}      # machine -> (when, [(flow, source folder)], [(flow, destination folder)])
+ROUTES_TTL = 30.0
+
+
+async def _routes_of(engine: Engine, pc_id: int) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
+    hit = _routes.get(pc_id)
+    if hit is not None and time.monotonic() - hit[0] < ROUTES_TTL:
+        return hit[1], hit[2]
+    sources = [(s["id"], s["source_path"]) for s in await engine.db.flows.sources_for_pc(pc_id)]
+    dests = [(d["flow_id"], d["destination_path"]) for d in await engine.db.flows.destinations_for_pc(pc_id)]
+    _routes[pc_id] = (time.monotonic(), sources, dests)
+    return sources, dests
+
+
 async def _flow_fact(engine: Engine, event: dict[str, Any]) -> None:
-    """Written onto the event for the stages after Flow: whether this change was a flow's own write. Detective reads it instead of asking Flow's tables itself."""
+    """Written onto the event for the stages after Flow, so nothing after it asks Flow's tables itself:
+    `flow_wrote`   a flow's own write (Falcon's doing, not a person's)
+    `flow_route`   the flows that read from, and write to, the folder this file is in
+    `flow_bypass`  a person put here what a flow delivers here: the same content is in that flow's source folder, and the flow did not write this copy (the sanctioned way
+                   to move it is the flow, which is checked, consented and audited; by hand is a way round it)"""
     facts = event.get("facts")
-    if facts is not None and engine.db.connected and not event.get("is_dir") and event["op"] in ("create", "modify", "move", "copy"):
-        facts["flow_wrote"] = await wrote_here(engine, event["pc_id"], event["path"], event.get("hash") or facts.get("hash"))
+    if facts is None or not engine.db.connected or event.get("is_dir"):
+        return
+    path, pc_id = event["path"], event["pc_id"]
+    sources, dests = await _routes_of(engine, pc_id)
+    in_src = [fid for fid, folder in sources if relative_under(path, folder) is not None]
+    in_dst = [fid for fid, folder in dests if relative_under(path, folder) is not None]
+    if in_src or in_dst:
+        facts["flow_route"] = {"source": in_src, "destination": in_dst}
+    if event["op"] not in ("create", "modify", "move", "copy"):
+        return
+    digest = event.get("hash") or facts.get("hash")
+    facts["flow_wrote"] = await wrote_here(engine, pc_id, path, digest)
+    if in_dst and digest and not facts["flow_wrote"] and event["op"] in ("create", "copy", "move"):
+        for fid in in_dst:
+            flow = await engine.db.flows.get(fid)
+            if flow is None or flow["status"] == "inactive":
+                continue
+            for other in await engine.db.file_index.by_hash(digest):
+                if other["pc_id"] == flow["source_pc_id"] and relative_under(other["path"], flow["source_path"]) is not None:
+                    facts["flow_bypass"] = fid
+                    return
 
 
 # --- detection ----------------------------------------------------------------------------------
@@ -178,9 +216,8 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
     for src in await engine.db.flows.sources_for_pc(pc_id):
         rel = relative_under(event["path"], src["source_path"])
         if rel is not None:
-            if (why := await guard.restricted_reason(engine, pc_id, event["path"], event.get("hash"))):
-                await guard.refuse(engine, src["id"], pc_id, event["path"], why, step="seen at the source")
-                continue
+            if not await guard.gate(engine, src["id"], pc_id, event["path"], event.get("hash"), step="seen at the source"):
+                continue                                                      # paused, and the owner asked
             await _settle_then_propagate(engine, src["id"], event["path"], rel, event.get("hash"))
     # Destination side: attribution check.
     for dest in await engine.db.flows.destinations_for_pc(pc_id):
@@ -230,8 +267,7 @@ async def remove_at_destinations(engine: Engine, flow_id: int, rel: str, *, only
         last = await engine.db.flows.last_written_for(dest["id"], rel)
         if not last or not last.get("path") or not last.get("hash") or last["hash"] == REMOVED:
             continue                                                       # the flow never wrote it here, or it is already put away
-        if (why := await guard.restricted_reason(engine, dest["destination_pc_id"], last["path"], last["hash"])):
-            await guard.refuse(engine, flow_id, dest["destination_pc_id"], last["path"], why, step="before putting a copy away")
+        if not await guard.gate(engine, flow_id, dest["destination_pc_id"], last["path"], last["hash"], step="before putting a copy away"):
             continue
         await engine.push_to_pc(dest["destination_pc_id"], "flow.remove", {
             "flow_id": flow_id, "destination_id": dest["id"], "relative_path": rel, "path": last["path"], "hash": last["hash"],
@@ -298,8 +334,7 @@ async def propagate(engine: Engine, flow_id: int, source_file: str, relative_pat
     flow = await engine.db.flows.get(flow_id)
     if flow is None or flow["status"] != "active":
         return None
-    if (why := await guard.restricted_reason(engine, flow["source_pc_id"], source_file, file_hash)):
-        await guard.refuse(engine, flow_id, flow["source_pc_id"], source_file, why, step="before reading")
+    if not await guard.gate(engine, flow_id, flow["source_pc_id"], source_file, file_hash, step="before reading"):
         return None
     wanted = only if only is not None else ({only_destination} if only_destination is not None else None)
     targets = [d for d in flow["destinations"] if not d.get("paused_reason") and (wanted is None or d["id"] in wanted)]
@@ -332,11 +367,9 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
             transfer.pending_destinations.discard(dest["id"])
             continue
         target = join_client_path(dest["destination_path"], transfer.relative_path)
-        if (why := await guard.restricted_reason(engine, dest["destination_pc_id"], dest["destination_path"]) or
-                await guard.restricted_reason(engine, dest["destination_pc_id"], target)):
-            await guard.refuse(engine, flow["id"], dest["destination_pc_id"], target, why, step="before writing")
-            await _fail_destination(engine, flow, dest, "destination:restricted")
-            transfer.pending_destinations.discard(dest["id"])
+        if not (await guard.gate(engine, flow["id"], dest["destination_pc_id"], dest["destination_path"], step="before writing")
+                and await guard.gate(engine, flow["id"], dest["destination_pc_id"], target, step="before writing")):
+            transfer.pending_destinations.discard(dest["id"])               # the flow is paused; what is left of this transfer is caught up after consent
             continue
         base = {"transfer_id": transfer.id, "flow_id": flow["id"], "destination_id": dest["id"],
                 "destination_path": dest["destination_path"], "relative_path": transfer.relative_path,
@@ -361,6 +394,7 @@ async def _fail_destination(engine: Engine, flow: dict[str, Any], dest: dict[str
     await engine.db.flows.set_destination_pause(dest["id"], reason)
     await engine.audit.record(None, "flow.failed", target_type="flow_destinations", target_id=dest["id"],
                               detail={"flow_id": flow["id"], "reason": reason})
+    await engine.announce("flow.failed", {"flow_id": flow["id"], "destination_id": dest["id"], "reason": reason}, source="system", pc=dest["destination_pc_id"])
     report_id = await reports.emit(engine, "flow_failure", source_table="flow_destinations", source_id=dest["id"],
                                    summary=f"flow #{flow['id']} -> {dest['destination_path']}: {reason}")
     payload = {"flow_id": flow["id"], "destination_id": dest["id"], "destination_path": dest["destination_path"],
@@ -392,8 +426,7 @@ async def content(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         _transfers.pop(transfer.id, None)
         return {"accepted": False}
     transfer.hash = payload.get("hash") or transfer.hash
-    if (why := await guard.restricted_reason(ctx.engine, transfer.source_pc_id, transfer.source_path, transfer.hash)):
-        await guard.refuse(ctx.engine, transfer.flow_id, transfer.source_pc_id, transfer.source_path, why, step="when its content arrived")
+    if not await guard.gate(ctx.engine, transfer.flow_id, transfer.source_pc_id, transfer.source_path, transfer.hash, step="when its content arrived"):
         _transfers.pop(transfer.id, None)
         return {"accepted": False, "refused": "restricted"}
     chunk = payload.get("chunk")
@@ -457,6 +490,7 @@ async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.synced",
                                          {"flow_id": flow["id"], "destination_id": dest_id,
                                           "relative_path": transfer.relative_path})
+        await ctx.engine.announce("flow.synced", {"flow_id": flow["id"], "destination_id": dest_id, "relative_path": transfer.relative_path, "pc_id": ident.pc_id}, source="system", pc=ident.pc_id)
     else:
         failure = payload.get("failure") or {}
         reason = f"{failure.get('stage_type', 'destination')}:{failure.get('kind', 'unknown')}"

@@ -36,12 +36,26 @@ event ──► heat ──► guard ──► act ──► judge ──► tel
 5. **Privacy invariants hold across the spine** (Display Names never propagate across layers; Admins see their own department).
 6. **Worst cases are clamped** (`docs/design/worst-cases.md`): a bounded bus, bounded memory index, bounded chains.
 
-## What is on the spine now / what is next
-Now: every file event (all ops), every OS signal; the facts `entry`, `hash`, `restricted`, `own_scope`, `flow_wrote`; the marked index; the stage order; hot-first marking.
-Next, one at a time with joint scenarios (all four features acting on one story):
-* `task.assigned`, `flow.created`/`flow.synced`, `mark.created`/`mark.changed`, `case.raised`/`case.reviewed` as events, so features react to each other instead of polling:
-  * **Task as expected movement**: Detective expects what a task asks for (today by its own cache; becomes a `task_expects` fact).
-  * **Flows as legitimate routes**: a file appearing at a flow's destination by another route is a bypass.
-  * **Detective proposes**: a folder that outsiders keep reading → "mark it?"; an urgent exfiltration case on a flow's source machine → "pause the flow?"; a reviewed case → "follow-up task?".
-  * **Restricted tells the others**: marking a folder pauses the flows through it at once (done: `guard.sweep`), and tells the tasks that name its files.
-* A priority queue with a bound, so a backlog of cold events (a catch-up) never stands in front of a hot one (`index.catchup` already takes hot files first).
+## What is on the spine now
+**Events.** Every file event (all ops); every OS signal (`os.signal`); and Falcon's own: `task.created`, `flow.created` / `flow.paused` / `flow.synced` / `flow.failed` / `flow.restricted_granted` /
+`flow.restricted_declined`, `mark.created` / `mark.removed`, `case.raised` / `case.reviewed`.
+
+**Facts on a file event**, each written by the feature that owns it and read by the ones after:
+| Fact | Written by (stage) | Read by |
+|---|---|---|
+| `entry`, `hash`, `restricted` (and why), `own_scope` | Restricted (guard) | Detective |
+| `flow_wrote` | Flow (act) | Detective |
+| `flow_route` (the flows that read from / write to this folder) | Flow (act) | Detective |
+| `flow_bypass` (what a flow delivers here, put here by hand) | Flow (act) | Detective (a finding of its own, `flow_bypass`) |
+| `task_expects` (an open task asks for exactly this content) | Task (act) | Detective (lowers the finding, "a task asks for exactly this") |
+
+**Features hear each other by event, not by call.** A mark is made (`mark.created`) and Flow, which listens, holds every flow through it and asks the owner; a task is created (`task.created`)
+and Task drops what it expected and Detective drops its copy; a flow changes and Flow forgets which folders it reads and writes; a case is raised or reviewed and the proposals (below) listen.
+
+**Proposals** (`engine/proposals.py`, `proposals.list` / `proposals.decide`, `proposals` in the shell): Detective may not change another feature's state, but it may say what it would do.
+On `case.raised` it can propose "pause flow #n" (an urgent exfiltration case on a flow's source machine) and "mark this folder" (files from an unrestricted folder keep turning up in a case);
+on `case.reviewed` as escalated, a follow-up task for the department's Admin. Nothing happens until a person accepts; accepting a pause is the person's audited act; marking and tasks are made by the
+person on their own pages. The same suggestion is not made twice while open; there are at most 500 open.
+
+**Still to do on the spine:** a priority queue with a bound so a backlog of cold events never stands in front of a hot one (catch-ups already take hot files first); the "tell" stage for
+reports and notices; more proposals as more cross-feature insights appear.

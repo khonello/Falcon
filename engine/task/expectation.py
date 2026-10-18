@@ -31,6 +31,26 @@ def install(engine: Engine) -> None:
     """Subscribe to the Global File Index so file-target expectations update from the same
     event stream Flow and Resource use."""
     engine.file_index.subscribe(lambda event: _on_file_event(engine, event), stage="act", name="task")
+    engine.file_index.subscribe(lambda event: _task_fact(engine, event), every_op=True, stage="act", name="task.fact")
+
+    async def on_task(event: Any) -> None:
+        from engine.task import expected
+
+        expected.invalidate()                              # any task changing changes what is expected
+
+    engine.bus.on("task.*", on_task, stage="heat", name="task.expected")
+
+
+async def _task_fact(engine: Engine, event: dict[str, Any]) -> None:
+    """Written onto the event for the stages after Task: does an open task assigned to this machine's person expect exactly this content?"""
+    facts = event.get("facts")
+    if facts is None or not engine.db.connected or event.get("is_dir"):
+        return
+    digest = event.get("hash") or facts.get("hash")
+    if digest:
+        from engine.task import expected
+
+        facts["task_expects"] = digest in await expected.hashes_for(engine, event["pc_id"])
 
 
 async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:

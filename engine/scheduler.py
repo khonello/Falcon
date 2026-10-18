@@ -58,6 +58,7 @@ class Scheduler:
         self.every("flow.heal", 1200.0, self._heal_flows)
         self.every("marks.heal", 1800.0, self._heal_marks)
         self.every("tasks.heal", 600.0, self._heal_tasks)
+        self.every("cost.probe", 30.0, self.engine.cost.probe)
         self.every("issues.sweep", 60.0, self._sweep_issues)
         self.every("accountability.sweep", 60.0, self._sweep_accountability)
         for name, seconds, job in self._periodic:

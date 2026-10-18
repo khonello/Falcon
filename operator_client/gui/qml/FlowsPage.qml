@@ -12,7 +12,29 @@ Page {
     property string sel: Nav.sub ? String(Nav.sub) : ""
     property var log: []
 
-    function load() { falcon.call("flow.list", {}, function (ok, r) { page.flows = ok ? (r.flows || []) : [] }) }
+    // a flow that met something restricted waits for the owner of the restriction: the ones this person may answer, asked of the Engine flow by flow
+    property var rAsks: []
+    function load() {
+        falcon.call("flow.list", {}, function (ok, r) {
+            page.flows = ok ? (r.flows || []) : []
+            var held = page.flows.filter(function (f) { return f.pause_reason === "restricted:consent" })
+            var found = [], left = held.length
+            if (!left) { page.rAsks = []; return }
+            held.forEach(function (f) {
+                falcon.call("flow.restricted", { flow_id: f.id }, function (ok2, r2) {
+                    if (ok2 && r2) (r2.consents || []).forEach(function (c) { if (c.state === "asked" && (r2.can_decide || []).indexOf(c.id) >= 0) found.push(Object.assign({ flow: f }, c)) })
+                    if (--left === 0) page.rAsks = found
+                })
+            })
+        })
+    }
+    function answerRestricted(c, grant) {
+        falcon.call("flow.restricted_consent", { consent_id: c.id, grant: grant }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
+            Msg.ok(grant ? "Allowed · the flow goes on" : "Declined · the flow stays paused")
+            page.load()
+        })
+    }
     Component.onCompleted: load()
     Connections { target: falcon; function onPushReceived(type) { if (/^flow/.test(type)) again.restart() } }
     Timer { id: again; interval: 300; onTriggered: page.load() }
@@ -27,6 +49,7 @@ Page {
     function stateOf(f) {
         var paused = (f.destinations || []).filter(function (d) { return d.paused_reason })
         if (f.consent_status === "pending") return ["Waiting for agreement", "wait", "wait"]
+        if (f.pause_reason === "restricted:consent") return ["Waiting for consent to carry something restricted", "wait", "wait"]
         if (f.status === "inactive") return ["Retired", "wait", "off"]
         if (f.status === "paused" || paused.length) return ["A branch is paused", "bad", "deg"]
         return ["Copying", "good", "act"]
@@ -79,6 +102,38 @@ Page {
                 spacing: 8
                 Btn { small: true; text: "Decline"; onClicked: falcon.call("flow.consent", { flow_id: modelData.id, granted: false }, function (ok, r) { if (!ok) { Msg.failed(r.message || "Not answered"); return } Msg.ok("Declined · they are told"); page.load() }) }
                 Btn { small: true; kind: "primary"; text: "Accept"; onClicked: falcon.call("flow.consent", { flow_id: modelData.id, granted: true }, function (ok, r) { if (!ok) { Msg.failed(r.message || "Not answered"); return } Msg.ok("Accepted · it starts copying"); page.load() }) }
+            }
+        }
+    }
+
+    // a flow wants to carry something restricted, and this person made the restriction (or is the Super User): their answer lets it go on
+    Repeater {
+        model: page.rAsks
+        Rectangle {
+            required property var modelData
+            objectName: "restrictedAsk_" + modelData.id
+            width: page.w
+            height: 52
+            radius: Theme.radius
+            color: Theme.alpha(Theme.med, 0.10)
+            border.width: 1
+            border.color: Theme.alpha(Theme.med, 0.5)
+            Row {
+                x: 14
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+                Icon { name: "lock"; size: 15; color: Theme.med; anchors.verticalCenter: parent.verticalCenter }
+                Txt { anchors.verticalCenter: parent.verticalCenter; width: page.w - 330; wrapMode: Text.WordWrap; elide: Text.ElideNone; textFormat: Text.RichText
+                      text: "<b>Flow " + modelData.flow_id + "</b> wants to carry <b>" + modelData.name + "</b>, which is restricted <span style='color:" + Theme.text3 + "'>· from <span style='font-family:" + Theme.mono + "'>"
+                            + (modelData.sample_path || "") + "</span>. Nothing moves until you say so.</span>" }
+            }
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+                Btn { objectName: "restrictedDecline"; small: true; text: "Keep it paused"; onClicked: page.answerRestricted(modelData, false) }
+                Btn { objectName: "restrictedAllow"; small: true; kind: "primary"; text: "Allow this flow"; onClicked: page.answerRestricted(modelData, true) }
             }
         }
     }

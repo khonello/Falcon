@@ -61,6 +61,9 @@ class Engine:
         from engine.marked import MarkedIndex
 
         self.marked = MarkedIndex(self.db)
+        from engine.cost import Cost
+
+        self.cost = Cost()                    # what work really costs here, and how much room there is now (engine/cost.py)
         self.file_index.subscribe(self._warm_on_file, every_op=True, stage="heat", name="heat")
 
         # Every consumer of file events subscribes to the one index -- no per-combo detection.
@@ -81,6 +84,11 @@ class Engine:
         from engine.console import marks as console_marks
 
         console_marks.install(self)
+        from engine import proposals as proposals_mod
+        from engine.flow import guard as flow_guard
+
+        proposals_mod.install(self)
+        flow_guard.install(self)
         if self.settings.detective:
             engine.detective.install(self)
 
@@ -90,10 +98,19 @@ class Engine:
         from engine.control import executions as control_executions
         from engine.control import inventory as control_inventory
         from engine.hierarchy import assisted_access, handover
+        from engine.task import expected as task_expected
 
-        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens, console_marks, handover, engine.detective):
+        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens, console_marks, handover, engine.detective, task_expected):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
+
+    async def announce(self, kind: str, data: dict[str, Any] | None = None, *, source: str = "human", pc: int | None = None, cause: Any = None) -> Any:
+        """Say that something happened to the whole system (engine/bus.py). Never raises: telling the others must not be what makes the thing fail."""
+        try:
+            return await self.bus.publish(kind, data or {}, source=source, pc=pc, cause=cause)
+        except Exception:
+            log.exception("announcing %s failed", kind)
+            return None
 
     async def _warm_on_file(self, event: dict[str, Any]) -> None:
         pc = event.get("pc_id")

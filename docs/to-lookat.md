@@ -1,7 +1,7 @@
 # To look at
 
 Open items to go over with the user. Bring this up first in a new session, then tidy it as items close.
-Last updated 13 Oct 2026.
+Last updated 18 Oct 2026.
 
 ## Waiting on a decision
 
@@ -115,3 +115,15 @@ Last updated 13 Oct 2026.
   machine going quiet), graphs for all eight behaviours, the local model as a labelled second opinion, a live demo (`scripts/detective_demo.py`). See `docs/design/detective.md`.
 - The model was measured: the second opinion is used; renaming labels were left out because the rule alone beat it (the benchmark is there to repeat with a bigger model).
 - Still open: clipboard / PrintScreen, per-program network, writing a dismissal as a rule that applies again, and a real-desktop look at the page (VM plan).
+
+## Hot/cold, limits, the spine, restricted flows, the actors (18 Oct 2026)
+- Built: hot/cold ordering of the Worker's sweep and catch-up, program lists and the Engine's healing (`common/heat.py`); limits and an assessment before marking a folder restricted (`marks.assess`, 20,000 files a mark,
+  100,000 a machine, generated folders covered but not tracked); worst cases in `docs/design/worst-cases.md`; the event spine (`engine/bus.py`, `docs/design/the-spine.md`); flows pause and ask the owner before
+  carrying anything restricted (`flow.restricted*`); 39 actors against Detective (`docs/design/detective-actors.md`).
+- **Done since:** the marking assessment is measured (the Engine's own time per file, slowed when it is busy) and shown on the Mark page before anything is done; flows waiting for a restricted owner are answered on
+  the Flows page; the Super User's move to another machine is on the Registry page; every list read has a hard cap; Task, Flow, mark and case events are on the spine with the facts `task_expects`, `flow_route`,
+  `flow_bypass`; Detective proposes (pause a flow, mark a folder, a follow-up task) and a person decides (`proposals`).
+- **Still not done:** a console page for the proposals (shell and handlers only); a bounded priority queue on the bus; Reports/Notices as the spine's "tell" stage; the dormant sources (the Engine produces `opened`
+  events and the outside-role tag only from the new file-open batches, which need the Worker's file trace, i.e. an elevated service on a real machine).
+- **Waiting on the owner:** how they would get around the Detective scenarios (`docs/design/detective-assumptions.md`); whether the Super User's old machine is re-enrolled as a managed machine (default: unbound);
+  the VM runs (two-PC Flow, keyboard control, away-and-back, the tray / overlay / program at sign-in / Detective page on a real desktop).

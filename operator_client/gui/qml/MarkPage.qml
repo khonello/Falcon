@@ -91,9 +91,23 @@ Page {
     readonly property int nFiles: picked.reduce(function (a, x) { return a + x.n }, 0)
     function toggle(k) { var c = checked.slice(), i = c.indexOf(k); if (i >= 0) c.splice(i, 1); else c.push(k); checked = c }
 
+    // what marking would cost, asked of the Engine before anything is done (files, how long, whether it is too large): so a folder like node_modules is met with a reason, not a surprise
+    property var assessed: []
+    property bool confirmLarge: false
+    readonly property bool tooLarge: assessed.some(function (a) { return a.verdict === "too_large" })
+    readonly property bool large: assessed.some(function (a) { return a.verdict === "large" })
+    readonly property real seconds: assessed.reduce(function (t, a) { return t + (a.seconds || 0) }, 0)
+    onPickedChanged: { confirmLarge = false; if (!picked.length) assessed = []; else assessTimer.restart() }
+    Timer { id: assessTimer; interval: 350; onTriggered: page.runAssess() }
+    function runAssess() {
+        var want = picked.map(function (x) { return x.path })
+        falcon.call("marks.assess", { paths: want }, function (ok, r) { if (ok && r && page.picked.length === want.length) page.assessed = r.assessed || [] })
+    }
+    function span(sec) { return sec < 60 ? "under a minute" : sec < 5400 ? "about " + Math.round(sec / 60) + " minutes" : "about " + (sec / 3600).toFixed(1) + " hours" }
+
     function mark() {
         busy = true
-        falcon.call("marks.create", { paths: picked.map(function (x) { return x.path }), keep: keep }, function (ok, r) {
+        falcon.call("marks.create", { paths: picked.map(function (x) { return x.path }), keep: keep, confirm_large: confirmLarge }, function (ok, r) {
             page.busy = false
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not marked"); return }
             var n = r.copies_found || 0
@@ -105,7 +119,7 @@ Page {
 
     EditorShell {
         width: parent.width
-        problem: !page.picked.length ? "Tick at least one file or folder." : page.busy ? "Marking…" : ""
+        problem: !page.picked.length ? "Tick at least one file or folder." : page.tooLarge ? "Too large to mark as it is: the reasons are on the right." : page.large && !page.confirmLarge ? "This is large: tick the box on the right to go ahead." : page.busy ? "Marking…" : ""
         onSave: page.mark()
         note: "Nothing is moved or copied."
         saveLabel: "Mark restricted"
@@ -201,6 +215,35 @@ Page {
                     Txt { text: page.picked.length === 1 ? "WHERE IT IS ALLOWED" : "WHERE THEY ARE ALLOWED"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
                     Choice { width: parent.width; on: page.keep === "machine"; icon: "desktop"; title: "Only on your PC"; desc: "Moving or copying on it is fine. A copy on any other machine is caught."; onClicked: page.keep = "machine" }
                     Choice { width: parent.width; on: page.keep === "path"; icon: "aim"; title: "Only where it is now"; desc: "A copy anywhere else is caught, even elsewhere on your PC."; onClicked: page.keep = "path" }
+                }
+                Rectangle { visible: page.assessed.length > 0; width: parent.width; height: 1; color: Theme.border }
+                Column {
+                    objectName: "markAssess"
+                    visible: page.assessed.length > 0
+                    x: 14
+                    width: parent.width - 28
+                    topPadding: 14; bottomPadding: 14
+                    spacing: 8
+                    Txt { text: "WHAT MARKING COSTS"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
+                    Repeater {
+                        model: page.assessed
+                        Column {
+                            required property var modelData
+                            width: parent.width
+                            spacing: 3
+                            Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.weight: Font.Medium
+                                  color: modelData.verdict === "too_large" ? Theme.crit : modelData.verdict === "large" ? Theme.med : Theme.text
+                                  text: (modelData.verdict === "too_large" ? "Too large · " : modelData.verdict === "large" ? "Large · " : "") + Theme.fmt(modelData.tracked) + (modelData.tracked === 1 ? " file" : " files")
+                                        + " tracked" + (modelData.junk ? " · " + Theme.fmt(modelData.junk) + " generated, covered but not tracked" : "") + " · " + page.span(modelData.seconds || 0) }
+                            Repeater {
+                                model: modelData.reasons || []
+                                Txt { required property string modelData; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12; text: modelData }
+                            }
+                        }
+                    }
+                    Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text4; font.pixelSize: 11
+                          text: page.assessed.length && page.assessed[0].basis ? "The time is " + page.assessed[0].basis + (page.assessed[0].capacity ? "; the Engine is " + page.assessed[0].capacity.state + " now." : ".") : "" }
+                    Check { objectName: "markConfirmLarge"; visible: page.large && !page.tooLarge; controlled: true; checked: page.confirmLarge; text: "I understand: this will take " + page.span(page.seconds); onToggled: function (on) { page.confirmLarge = on } }
                 }
             }
         }

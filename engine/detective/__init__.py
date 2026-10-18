@@ -84,6 +84,9 @@ def reset_state() -> None:
 
 def tasks_changed() -> None:
     _tasks.clear()
+    from engine.task import expected
+
+    expected.invalidate()
 
 
 def _detector() -> Detective:
@@ -101,6 +104,11 @@ def install(engine: Engine) -> None:
         await on_signal(engine, event.data["pc_id"], event.data["type"], event.data["data"])
 
     engine.bus.on("os.signal", hear_signal, stage="judge", name="detective.signal")
+
+    async def hear_task(event: Any) -> None:
+        tasks_changed()                                   # what a task covers is part of what Detective weighs
+
+    engine.bus.on("task.*", hear_task, stage="judge", name="detective.tasks")
 
 
 # --- what the Engine hears, as signals ---------------------------------------------------------------------
@@ -132,22 +140,14 @@ async def _flow_wrote(engine: Engine, pc_id: int, path: str, digest: str | None)
 
 
 async def _tasks_things(engine: Engine, pc_id: int) -> None:
-    """The files (by content) that a task assigned to the person at this machine asks for: a task for exactly this lowers a finding."""
+    """The files (by content) that a task assigned to the person at this machine asks for: Task owns this knowledge (engine/task/expected.py); Detective keeps a copy for the
+    findings that span several files, refreshed from it."""
+    from engine.task import expected
+
     now = time.monotonic()
     if pc_id in _tasks and now - _tasks[pc_id][0] < TASK_TTL:
         return
-    things: set[str] = set()
-    for t in await engine.db.tasks.open_with_items():
-        if t.get("assignee_pc_id") != pc_id:
-            continue
-        for item in t["items"]:
-            if item.get("file_hash"):
-                things.add(item["file_hash"])
-            elif item.get("target_type") == "file" and item.get("name"):
-                for hit in await engine.db.file_index.by_name(str(item["name"]), pc_ids=[pc_id]):
-                    if hit.get("content_hash"):
-                        things.add(hit["content_hash"])
-    _tasks[pc_id] = (now, things)
+    _tasks[pc_id] = (now, await expected.hashes_for(engine, pc_id))
 
 
 async def on_file(engine: Engine, event: dict[str, Any]) -> None:
@@ -185,6 +185,10 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     mem = det.mem.get(pc_id)
     if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
         tags.add("allowed")
+    if facts.get("task_expects"):
+        tags.add("task_expected")                           # Task's fact: an open task asks for exactly this
+    if facts.get("flow_bypass"):
+        tags.add("flow_bypass")                             # Flow's fact: this is what a flow delivers here, put here by hand instead
     await _tasks_things(engine, pc_id)
     info: dict[str, Any] = {"title": seen["title"]} if by == "hand" and seen.get("title") else {}
     if event.get("late"):
@@ -341,6 +345,7 @@ async def _save(engine: Engine, u: Update) -> None:
         await engine.audit.record(None, "detective.raised", target_type="detective_cases", target_id=case.id, pc_id=case.pc,
                                   detail={"intent": case.intent, "level": case.level, "weight": round(case.weight, 2), "stage": case.stage[1]})
         payload = {"case_id": case.id, "intent": case.intent, "level": case.level, "pc_id": case.pc, "host": (pc or {}).get("hostname"), "not_yet": case.not_yet()}
+        await engine.announce("case.raised", {**payload, "behaviours": sorted(case.behaviours), "weight": round(case.weight, 2)}, source="system", pc=case.pc)
         await engine.push_to_role("super_user", "detective.raised", payload)
         if pc and pc["pc_type"] == "client_pc" and department_id is not None:                 # an Admin's own machine is the Super User's alone
             await engine.push_to_role("admin", "detective.raised", payload, department_id=department_id)
@@ -483,6 +488,7 @@ async def review(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]
     if kind:
         made = await _write_rules(ctx, c, kind, ident.account_id)
     await ctx.engine.audit.record(ctx, f"detective.{outcome}", target_type="detective_cases", target_id=c["id"], pc_id=c["pc_id"], detail={"note": note, "intent": c["intent"]})
+    await ctx.engine.announce("case.reviewed", {"case_id": c["id"], "outcome": outcome, "pc_id": c["pc_id"], "intent": c["intent"], "host": c.get("hostname")}, pc=c["pc_id"])
     if outcome == "escalated":
         await ctx.engine.push_to_role("super_user", "detective.escalated", {"case_id": c["id"], "intent": c["intent"], "host": c.get("hostname")})
     return {"case_id": c["id"], "status": outcome, "rules": made}
