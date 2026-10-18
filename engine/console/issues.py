@@ -313,7 +313,7 @@ def install(engine: Engine) -> None:
         for issue in await engine.db.issues.file_issues_at(event["pc_id"], gone):
             await resolve_issue(engine, issue["id"], "The copy is gone")
 
-    engine.file_index.subscribe(on_file)
+    engine.file_index.subscribe(on_file, stage="act", name="issues")
 
 
 async def on_execution(engine: Engine, execution_id: int, status: str, summary: str | None) -> None:

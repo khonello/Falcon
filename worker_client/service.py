@@ -78,6 +78,8 @@ class WorkerService:
         self.witness = Witness(self.helper.witness if self.helper else (self._no_desktop if winsession.in_service_session() else None), toucher=self._who_touched)
         self.remote_input: Any = HelperInput(self.helper) if self.helper else RemoteInput()
         self.inventory = Inventory(self.call)
+        if hasattr(self.ossignals, "on_program"):
+            self.ossignals.on_program = self.inventory.touch              # a program that just started is hot: it leads the lists, and an unknown one is looked up soon
         self._native_watch = native_watch
         self.signpipe: SignPipeServer | None = None
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
@@ -247,6 +249,10 @@ class WorkerService:
                 continue
             try:
                 got = etw.take_opened()[:OPENS_BATCH]
+                for path, _ in got:
+                    touch = getattr(self.watcher, "touch", None)
+                    if touch is not None:
+                        touch(path)                                       # a file somebody opened is hot: indexing and catching up reach it first
                 if got:
                     await self.call("control.signal", {"type": "file.opened", "data": {"files": [{"path": p, "process": n} for p, n in got]}})
             except Exception as exc:  # noqa: BLE001 -- a look that failed is not worth more than the next one

@@ -174,6 +174,7 @@ class OsSignals:
         self._live: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue(maxsize=2000)
         self._drain_task: asyncio.Task[None] | None = None
         self.native = False               # Windows is telling us about drives, sessions and the network
+        self.on_program: Callable[[str], None] | None = None          # a program was started (whether or not anyone asked): it is now hot
 
     async def start(self, *, native: bool = True) -> None:
         self._loop_ref = asyncio.get_running_loop()
@@ -244,6 +245,8 @@ class OsSignals:
     async def _drain(self) -> None:
         while True:
             etype, data = await self._live.get()
+            if etype == "program.launched" and self.on_program is not None:
+                self.on_program(str(data.get("process") or ""))
             if not self.wanted(etype, data):
                 continue
             try:
@@ -292,6 +295,8 @@ class OsSignals:
             if before is None:
                 continue                                  # the first look is only a baseline
             for etype, data in diff(before, now):
+                if etype == "program.launched" and self.on_program is not None:
+                    self.on_program(str(data.get("process") or ""))
                 if not self.wanted(etype, data):
                     continue
                 try:

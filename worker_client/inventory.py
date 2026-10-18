@@ -15,9 +15,11 @@ import asyncio
 import logging
 import os
 import sys
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from common.heat import Heat
 from worker_client.stopping import stop_tasks
 
 log = logging.getLogger(__name__)
@@ -26,6 +28,11 @@ Reporter = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 
 RUNNING_SECONDS = 60.0
 INSTALLED_SECONDS = 6 * 3600.0
+EARLY_INSTALLED_SECONDS = 90.0         # a program nobody has seen before just ran: the installed list is read again soon, not in six hours
+# Worst cases, clamped: a machine with thousands of programs or processes, or one that is thrashing, must not make a report that outgrows a message or a page.
+MAX_RUNNING = 500
+MAX_PROCESSES = 80
+MAX_INSTALLED = 3000
 
 
 def running() -> list[dict[str, Any]]:
@@ -146,6 +153,21 @@ class Inventory:
         self.running_seconds = running_seconds
         self.installed_seconds = installed_seconds
         self._tasks: list[asyncio.Task[None]] = []
+        # Programs that were just started or just in use are hot: they lead every list we send, and one nobody has seen before gets the installed list read again soon.
+        self.heat = Heat(ttl=3600.0, cap=5000)
+        self._known: set[str] = set()
+        self._again = asyncio.Event()
+        self._last_early = 0.0
+
+    def touch(self, program: str) -> None:
+        name = str(program or "").strip()
+        if not name:
+            return
+        key = name.lower().removesuffix(".exe")
+        self.heat.touch(key, folder=False)
+        if self._known and key not in self._known and time.monotonic() - self._last_early > EARLY_INSTALLED_SECONDS:
+            self._last_early = time.monotonic()
+            self._again.set()
 
     async def start(self) -> None:
         self._tasks = [asyncio.create_task(self._every(self.running_seconds, "running", running)),
@@ -157,7 +179,12 @@ class Inventory:
         self._tasks.clear()
 
     async def send(self, what: str, read: Callable[[], list[dict[str, Any]]]) -> None:
-        await self.report("control.inventory", {what: await asyncio.to_thread(read)})
+        rows = await asyncio.to_thread(read)
+        limit = {"running": MAX_RUNNING, "processes": MAX_PROCESSES, "installed": MAX_INSTALLED}.get(what, 1000)
+        rows = self.heat.hottest(rows, key=lambda r: str(r.get("name") or "").lower().removesuffix(".exe"))[:limit]            # the programs in use lead; nothing cold is dropped until the clamp
+        if what == "installed":
+            self._known = {str(r.get("name") or "").lower().removesuffix(".exe") for r in rows}
+        await self.report("control.inventory", {what: rows})
 
     async def _every(self, seconds: float, what: str, read: Callable[[], list[dict[str, Any]]]) -> None:
         while True:
@@ -167,4 +194,11 @@ class Inventory:
                 raise
             except Exception as exc:  # noqa: BLE001 -- a failed report is tried again next time
                 log.debug("inventory (%s) not reported: %s", what, exc)
-            await asyncio.sleep(seconds)
+            if what == "installed":
+                try:
+                    await asyncio.wait_for(self._again.wait(), seconds)             # ... or sooner, when a program nobody knew about has just run
+                except asyncio.TimeoutError:
+                    pass
+                self._again.clear()
+            else:
+                await asyncio.sleep(seconds)

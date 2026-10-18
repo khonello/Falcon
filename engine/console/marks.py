@@ -35,6 +35,17 @@ from protocol import ErrorCode, ProtocolError
 if TYPE_CHECKING:
     from engine.server import Engine
 
+# Worst cases, clamped. Marking a folder asks the Engine to track every file in it by content and to look for copies of each, and a folder like node_modules can hold
+# a million generated files. So a mark is assessed first (how many files, about how long, what the weight is) and refused, or asked to be confirmed, before anything starts.
+MARK_MAX_FILES = 20000             # tracked by content in one mark
+MARK_MAX_MACHINE = 100000          # tracked by content across all one machine's marks
+MARK_CONFIRM_FILES = 2000          # more than this is allowed only when it is confirmed
+SECONDS_PER_FILE = 0.02            # what tracking one file costs the Engine (a row, a lookup for copies): deliberately pessimistic
+HEAL_BUDGET = 4000                 # content hashes looked at per healing pass, rotating, so a huge mark cannot make one pass take for ever
+JUNK_FOLDERS = ("node_modules", ".git", "__pycache__", ".venv", "venv", "site-packages", ".gradle", ".m2", "bower_components", "$recycle.bin", ".cache", ".next", ".tox",
+                "dist", "build", "target", "obj", "bin", "pods", ".idea", ".vs")      # generated, rebuildable: covered by a folder mark, never tracked file by file
+_heal_cursor: dict[int, int] = {}
+
 KEEP = ("machine", "path")
 KEEP_WORDS = {"machine": "Anywhere on the PC", "path": "Only in its place"}
 SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -85,8 +96,8 @@ def install(engine: Engine) -> None:
             return
         pc_id, path, digest = event["pc_id"], entry["path"], entry["content_hash"]
         for mark in await db.marks.active_on_pc(pc_id):
-            if inside(mark, pc_id, path):
-                await db.marks.add_hash(mark["id"], digest, path)             # a new version, or a new file in a marked folder
+            if inside(mark, pc_id, path) and await db.marks.add_hash(mark["id"], digest, path):       # a new version, or a new file in a marked folder
+                engine.marked.invalidate()
         await _flag_copies_of(engine, entry)
 
     async def on_any(event: dict[str, Any]) -> None:
@@ -103,8 +114,8 @@ def install(engine: Engine) -> None:
                     if mark["kind"] == "file" and norm(mark["path"]) == norm(event["path"]):
                         _just_left[(event["pc_id"], digest)] = (time.monotonic(), mark["id"], event["path"])
 
-    engine.file_index.subscribe(on_file)
-    engine.file_index.subscribe(on_any, every_op=True)
+    engine.file_index.subscribe(on_file, stage="guard", name="marks")
+    engine.file_index.subscribe(on_any, every_op=True, stage="guard", name="marks.follow")
 
 
 async def _follow(engine: Engine, pc_id: int, old_path: str, new_path: str) -> None:
@@ -112,7 +123,10 @@ async def _follow(engine: Engine, pc_id: int, old_path: str, new_path: str) -> N
     from engine.console.issues import resolve_issue
 
     db = engine.db
-    for mark_id in await db.marks.follow(pc_id, old_path, new_path):
+    followed = await db.marks.follow(pc_id, old_path, new_path)
+    if followed:
+        engine.marked.invalidate()                                  # (the mark's place changed)
+    for mark_id in followed:
         mark = await db.marks.get(mark_id)
         if mark is None:
             continue
@@ -146,11 +160,24 @@ async def heal(engine: Engine) -> int:
         return 0
     db = engine.db
     flagged = 0
-    for mark in await db.marks.list():
-        for digest in await db.marks.hashes(mark["id"]):
+    budget = HEAL_BUDGET
+    # hot machines first; a mark too big for what is left of the budget is carried on from where it stopped at the next pass, so the whole of it is covered in time
+    for mark in engine.heat.hottest(await db.marks.list(), key=lambda m: f"pc:{m['pc_id']}"):
+        digests = await db.marks.hashes(mark["id"])
+        start = _heal_cursor.get(mark["id"], 0) % max(1, len(digests))
+        order = digests[start:] + digests[:start]
+        done = 0
+        for digest in order:
+            if budget <= 0:
+                break
+            budget -= 1
+            done += 1
             for entry in await db.file_index.by_hash(digest):
                 if not allowed_at(mark, entry["pc_id"], entry["path"]):
                     flagged += await _flag_copies_of(engine, entry)
+        _heal_cursor[mark["id"]] = (start + done) % max(1, len(digests))
+        if budget <= 0:
+            break
     if flagged:
         await engine.audit.record(None, "mark.healed", target_type="resource_marks", target_id=None, detail={"flagged": flagged})
     return flagged
@@ -218,6 +245,77 @@ async def marks_tree(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             "folders": [{"path": p, "files": n} for p, n in sorted(folders.items())]}
 
 
+def _in_junk(path: str) -> bool:
+    parts = path.replace("\\", "/").lower().split("/")
+    return any(p in JUNK_FOLDERS for p in parts[:-1])
+
+
+def _minutes(seconds: float) -> str:
+    return "under a minute" if seconds < 60 else f"about {round(seconds / 60)} minute{'s' if seconds >= 90 else ''}" if seconds < 5400 else f"about {seconds / 3600:.1f} hours"
+
+
+async def assess(db: Any, pc_id: int, path: str, *, already: int = 0) -> dict[str, Any]:
+    """What marking this would cost, from the index, before anything is done: files, how many of them are generated (not tracked one by one), a pessimistic time, and a verdict
+    ("ok", "large" = allowed once confirmed, "too_large" = refused) with the reasons in words a person can act on."""
+    row = await db.file_index.by_path(pc_id, path, present_only=True)
+    if row is not None:
+        return {"path": path, "kind": "file", "files": 1, "junk": 0, "tracked": 1, "seconds": SECONDS_PER_FILE, "verdict": "ok", "reasons": [], "heaviest": [], "limit": MARK_MAX_FILES}
+    counts = await db.file_index.count_under(pc_id, path, JUNK_FOLDERS)
+    files, junk = counts["files"], counts["junk"]
+    tracked = files - junk
+    seconds = tracked * SECONDS_PER_FILE
+    reasons: list[str] = []
+    heaviest = await db.file_index.heaviest_under(pc_id, path) if files > MARK_CONFIRM_FILES else []
+    verdict = "ok"
+    if junk:
+        reasons.append(f"{junk:,} of its {files:,} files are in generated folders such as node_modules; they are covered by the mark but not tracked one by one")
+    if tracked > MARK_MAX_FILES:
+        verdict = "too_large"
+        reasons.append(f"{tracked:,} files to track is more than one mark can hold ({MARK_MAX_FILES:,}); at about {SECONDS_PER_FILE * 1000:.0f} ms each that would take {_minutes(seconds)}")
+    elif already + tracked > MARK_MAX_MACHINE:
+        verdict = "too_large"
+        reasons.append(f"this machine already tracks {already:,} files by content and the most it can is {MARK_MAX_MACHINE:,}; this would add {tracked:,}")
+    elif tracked > MARK_CONFIRM_FILES:
+        verdict = "large"
+        reasons.append(f"{tracked:,} files to track will take {_minutes(seconds)}")
+    if verdict != "ok" and heaviest:
+        reasons.append("the weight is in: " + ", ".join(f"{h['name']} ({h['files']:,})" for h in heaviest[:3]) + " -- mark a narrower folder, or the files that matter")
+    return {"path": path, "kind": "folder", "files": files, "junk": junk, "tracked": tracked, "seconds": round(seconds, 1), "verdict": verdict, "reasons": reasons,
+            "heaviest": heaviest, "limit": MARK_MAX_FILES}
+
+
+async def _tracked_on(db: Any, pc_id: int, marks: list[dict[str, Any]]) -> int:
+    total = 0
+    for m in marks:
+        if m["kind"] == "file":
+            total += 1
+        else:
+            c = await db.file_index.count_under(m["pc_id"], m["path"], JUNK_FOLDERS)
+            total += c["files"] - c["junk"]
+    return total
+
+
+@handler("marks.assess")
+async def marks_assess(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"paths": [..]} -> {"assessed": [{path, kind, files, junk, tracked, seconds, verdict, reasons, heaviest, limit}], "tracked_now", "machine_limit"}: what marking these would
+    cost, before it is done. Nothing is changed."""
+    ident = require_role(ctx, "super_user", "admin")
+    if ident.pc_id is None:
+        raise ProtocolError(ErrorCode.INVALID, "you have no workstation registered")
+    paths = payload.get("paths")
+    if not isinstance(paths, list) or not paths or len(paths) > 50 or not all(isinstance(p, str) and p.strip() for p in paths):
+        raise ProtocolError(ErrorCode.INVALID, "paths must be a list of 1 to 50 paths")
+    db = ctx.engine.db
+    now = await _tracked_on(db, ident.pc_id, await db.marks.active_on_pc(ident.pc_id))
+    out, running = [], now
+    for raw in paths:
+        a = await assess(db, ident.pc_id, raw.strip(), already=running)
+        if a["verdict"] != "too_large":
+            running += a["tracked"]
+        out.append(a)
+    return {"assessed": out, "tracked_now": now, "machine_limit": MARK_MAX_MACHINE}
+
+
 @handler("marks.create")
 async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"paths": [..], "keep": "machine"|"path"} -> {"marks": [...], "copies_found": n}. Each path is a file or a folder the index has
@@ -229,8 +327,19 @@ async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     paths = payload.get("paths")
     if not isinstance(paths, list) or not paths or not all(isinstance(p, str) and p.strip() for p in paths):
         raise ProtocolError(ErrorCode.INVALID, "paths must be a non-empty list of paths")
+    if len(paths) > 50:
+        raise ProtocolError(ErrorCode.INVALID, "mark at most 50 paths at a time")
     db = ctx.engine.db
     existing = await db.marks.active_on_pc(ident.pc_id)
+    # Assess everything first, so nothing is half done: a refusal names the path, how many files, how long it would take and where the weight is.
+    running = await _tracked_on(db, ident.pc_id, existing)
+    for raw in paths:
+        a = await assess(db, ident.pc_id, raw.strip(), already=running)
+        if a["verdict"] == "too_large":
+            raise ProtocolError(ErrorCode.INVALID, f"{a['path']} is too large to mark as it is: " + "; ".join(a["reasons"]))
+        if a["verdict"] == "large" and not payload.get("confirm_large"):
+            raise ProtocolError(ErrorCode.CONFLICT, f"{a['path']} is large: " + "; ".join(a["reasons"]) + " -- confirm to go ahead (confirm_large)")
+        running += a["tracked"]
     made: list[int] = []
     found = 0
     for raw in paths:
@@ -245,18 +354,22 @@ async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             raise ProtocolError(ErrorCode.CONFLICT, f"{path} is already covered by the mark on {covering['path']}")
         kind = "file" if row else "folder"
         targets = [row] if row else below
-        hashed = [t for t in targets if t.get("content_hash")]
+        hashed = [t for t in targets if t.get("content_hash") and not _in_junk(t["path"])]
         if kind == "file" and not hashed:
             raise ProtocolError(ErrorCode.INVALID, "that file has no content hash yet (too large, or still being indexed), so a copy could not be recognised")
         name = (row["filename"] if row else path.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]) or path
         mark_id = await db.marks.create(kind, name, ident.pc_id, path, keep, ident.account_id, ident.department_id)
         for t in hashed:
             await db.marks.add_hash(mark_id, t["content_hash"], t["path"])
+        ctx.engine.marked.invalidate()
         await ctx.engine.audit.record(ctx, "mark.created", target_type="resource_marks", target_id=mark_id, pc_id=ident.pc_id,
                                       detail={"path": path, "kind": kind, "keep": keep, "files": len(targets)})
         made.append(mark_id)
         mark = await db.marks.get(mark_id)
         assert mark is not None
+        from engine.flow import guard
+
+        await guard.sweep(ctx.engine, ident.pc_id)                 # a flow whose folder just became restricted stops at once, not file by file
         for digest in {t["content_hash"] for t in hashed}:
             for entry in await db.file_index.by_hash(digest):
                 if not allowed_at(mark, entry["pc_id"], entry["path"]):
@@ -350,6 +463,7 @@ async def marks_change_keep(ctx: Context, payload: dict[str, Any]) -> dict[str, 
     db = ctx.engine.db
     effect = await _effect(ctx, mark, keep)
     await db.marks.set_keep(mark["id"], keep)
+    ctx.engine.marked.invalidate()
     fresh = await db.marks.get(mark["id"])
     assert fresh is not None
     cleared = flagged = 0
@@ -374,6 +488,7 @@ async def marks_unmark(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     db = ctx.engine.db
     if not await db.marks.unmark(mark["id"], ctx.identity.account_id):
         raise ProtocolError(ErrorCode.CONFLICT, "it is already unmarked")
+    ctx.engine.marked.invalidate()
     closed = 0
     for issue_id in await db.marks.resolve_open_copies(mark["id"]):
         closed += int(await resolve_issue(ctx.engine, issue_id, "The mark was removed", by=ctx))

@@ -277,6 +277,7 @@ Source: Admin PC - /raw-submissions/
 9. **Native-First Change Detection** — OS-emitted file events, filtered against registered flow sources, drive sync checks; polling is the fallback where native detection isn't practical
 10. **Failure is Scoped and Reactive** — a failure pauses only the affected flow/branch, persists as a status until resolved, and surfaces a predefined fix suggestion only when it happens — never configured upfront
 11. **Transparent History** — All syncs, conflicts, and failures logged for audit and troubleshooting
+12. **A Flow Never Touches Anything Restricted** (the owner, 18 Oct 2026) — no flow reads, writes, copies, moves or puts away a restricted file or folder, by any route (a change seen, a catch-up, a manual trigger, a retry, a mirrored delete). Restricted means any of: the index tags it restricted (or admin); it is in a restricted tier folder; a restricted mark names it or a folder above it; its content is a copy of a marked file's. The status is **checked every time and never remembered**: when a flow is made or edited (both ends), when a change is seen, before a file is read, when its content arrives (its hash may be marked even though its place is not), before it is written to each destination, and before a copy is put away. Something that turns restricted under a running flow pauses that flow (or that destination) at once; a flow does not resume into a restricted folder. Each refusal is in the audit trail, and the flow's creator is told (at most once in ten minutes per file). `engine/flow/guard.py`.
 
 ---
 

@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 def install(engine: Engine) -> None:
     """Subscribe to the Global File Index so file-target expectations update from the same
     event stream Flow and Resource use."""
-    engine.file_index.subscribe(lambda event: _on_file_event(engine, event))
+    engine.file_index.subscribe(lambda event: _on_file_event(engine, event), stage="act", name="task")
 
 
 async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:

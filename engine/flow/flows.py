@@ -51,6 +51,8 @@ FAILURE_SUGGESTIONS: dict[tuple[str, str], str] = {
     ("destination", "unsupported"): "Remote-storage destinations are not supported in v1; change the destination.",
     ("source", "unreadable"): "The source file could not be read; check it is not locked, then resume.",
     ("consent", "denied"): "The destination owner declined; choose another destination.",
+    ("destination", "restricted"): "That destination folder is now marked restricted. A flow never writes into a restricted folder: choose another destination.",
+    ("source", "restricted"): "The source folder is now marked restricted. A flow never reads from a restricted folder: choose another source, or unmark it.",
 }
 
 
@@ -195,6 +197,14 @@ async def run_checks(engine: Engine, creator: dict[str, Any], source_pc_id: int,
     """Consent / collision / cycle. Raises for hard refusals; returns what needs consent."""
     if is_resource_path(source_path) or any(is_resource_path(d["destination_path"]) for d in dests):
         raise ProtocolError(ErrorCode.INVALID, "Resource folders cannot be a direct flow source or destination")
+    from engine.flow import guard
+
+    # A flow never touches anything restricted: neither end of it may be a restricted file or folder (checked now, and again at every step it takes).
+    if (why := await guard.restricted_reason(engine, source_pc_id, source_path)):
+        raise ProtocolError(ErrorCode.INVALID, f"A flow never touches restricted files or folders, and the source is not allowed: {why}")
+    for d in dests:
+        if (why := await guard.restricted_reason(engine, d["destination_pc_id"], d["destination_path"])):
+            raise ProtocolError(ErrorCode.INVALID, f"A flow never touches restricted files or folders, and the destination {d['destination_path']} is not allowed: {why}")
     for d in dests:
         if d["destination_pc_id"] == source_pc_id and overlaps(d["destination_path"], source_path):
             raise ProtocolError(ErrorCode.CONFLICT, "destination overlaps its own source -- that is a cycle")
@@ -404,6 +414,14 @@ async def resume(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if flow["consent_status"] == "pending":
         raise ProtocolError(ErrorCode.CONFLICT, "still awaiting destination consent")
     dest_id = int_field(payload, "destination_id", required=False)
+    from engine.flow import guard
+
+    # a flow paused because a folder became restricted does not resume into it: it is looked at again now, not trusted from when it was paused
+    if (why := await guard.restricted_reason(ctx.engine, flow["source_pc_id"], flow["source_path"])):
+        raise ProtocolError(ErrorCode.CONFLICT, f"A flow never touches restricted files or folders, and the source is not allowed: {why}")
+    for d in flow["destinations"]:
+        if (dest_id is None or d["id"] == dest_id) and (why := await guard.restricted_reason(ctx.engine, d.get("destination_pc_id"), d["destination_path"])):
+            raise ProtocolError(ErrorCode.CONFLICT, f"A flow never touches restricted files or folders, and the destination {d['destination_path']} is not allowed: {why}")
     if dest_id is not None:
         await ctx.engine.db.flows.set_destination_pause(dest_id, None)
     if flow["status"] == "paused":

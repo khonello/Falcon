@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
 from engine.flow import flows as flowdefs
+from engine.flow import guard
 from engine.hierarchy import reports
 from engine.permissions import int_field, require_account, str_field
 from protocol import ErrorCode, ProtocolError
@@ -71,11 +72,14 @@ class Listing:
     only: set[int] | None
     entries: list[dict[str, Any]] = field(default_factory=list)
     created: float = field(default_factory=time.monotonic)
+    truncated: bool = False
 
 
 CHUNK_BYTES = 512 * 1024            # raw bytes per message (about 700 KB once encoded: far below the 4 MB a connection reads at a time)
 MAX_RELAY_BYTES = 64 * 1024 * 1024
 TRANSFER_SECONDS = 600.0            # a transfer nobody finished in this long is failed, not kept forever
+MAX_LISTING = 200000                # a source folder with more files than this is caught up in part; the next healing pass carries on (hot files first)
+MAX_LISTING_BATCH = 2000            # entries taken from one listing message
 IN_FLIGHT = 4                       # a catch-up sends this many files at a time, so thousands of files do not flood the Engine
 
 _transfers: dict[str, Transfer] = {}
@@ -85,6 +89,7 @@ _settling: dict[tuple[int, str], asyncio.Task[Any]] = {}
 
 
 def reset_state() -> None:
+    guard.reset_state()
     _transfers.clear()
     _listings.clear()
     for waiting in list(_settling.values()):
@@ -131,7 +136,26 @@ def relative_under(path: str, directory: str) -> str | None:
 
 
 def install(engine: Engine) -> None:
-    engine.file_index.subscribe(lambda event: _on_file_event(engine, event))
+    engine.file_index.subscribe(lambda event: _on_file_event(engine, event), stage="act", name="flow")
+    engine.file_index.subscribe(lambda event: _flow_fact(engine, event), every_op=True, stage="act", name="flow.fact")
+
+
+async def wrote_here(engine: Engine, pc_id: int, path: str, digest: str | None) -> bool:
+    """Falcon's own flows write files too: did one write this file, with this content? (Then it is Falcon's doing, not a person's.)"""
+    for dest in await engine.db.flows.destinations_for_pc(pc_id):
+        if relative_under(path, dest["destination_path"]) is None:
+            continue
+        own = await engine.db.flows.last_flow_write_at(dest["id"], path)
+        if own is not None and (digest is None or own.get("content_hash") == digest):
+            return True
+    return False
+
+
+async def _flow_fact(engine: Engine, event: dict[str, Any]) -> None:
+    """Written onto the event for the stages after Flow: whether this change was a flow's own write. Detective reads it instead of asking Flow's tables itself."""
+    facts = event.get("facts")
+    if facts is not None and engine.db.connected and not event.get("is_dir") and event["op"] in ("create", "modify", "move", "copy"):
+        facts["flow_wrote"] = await wrote_here(engine, event["pc_id"], event["path"], event.get("hash") or facts.get("hash"))
 
 
 # --- detection ----------------------------------------------------------------------------------
@@ -154,6 +178,9 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
     for src in await engine.db.flows.sources_for_pc(pc_id):
         rel = relative_under(event["path"], src["source_path"])
         if rel is not None:
+            if (why := await guard.restricted_reason(engine, pc_id, event["path"], event.get("hash"))):
+                await guard.refuse(engine, src["id"], pc_id, event["path"], why, step="seen at the source")
+                continue
             await _settle_then_propagate(engine, src["id"], event["path"], rel, event.get("hash"))
     # Destination side: attribution check.
     for dest in await engine.db.flows.destinations_for_pc(pc_id):
@@ -203,6 +230,9 @@ async def remove_at_destinations(engine: Engine, flow_id: int, rel: str, *, only
         last = await engine.db.flows.last_written_for(dest["id"], rel)
         if not last or not last.get("path") or not last.get("hash") or last["hash"] == REMOVED:
             continue                                                       # the flow never wrote it here, or it is already put away
+        if (why := await guard.restricted_reason(engine, dest["destination_pc_id"], last["path"], last["hash"])):
+            await guard.refuse(engine, flow_id, dest["destination_pc_id"], last["path"], why, step="before putting a copy away")
+            continue
         await engine.push_to_pc(dest["destination_pc_id"], "flow.remove", {
             "flow_id": flow_id, "destination_id": dest["id"], "relative_path": rel, "path": last["path"], "hash": last["hash"],
             "root": dest["destination_path"]})
@@ -268,6 +298,9 @@ async def propagate(engine: Engine, flow_id: int, source_file: str, relative_pat
     flow = await engine.db.flows.get(flow_id)
     if flow is None or flow["status"] != "active":
         return None
+    if (why := await guard.restricted_reason(engine, flow["source_pc_id"], source_file, file_hash)):
+        await guard.refuse(engine, flow_id, flow["source_pc_id"], source_file, why, step="before reading")
+        return None
     wanted = only if only is not None else ({only_destination} if only_destination is not None else None)
     targets = [d for d in flow["destinations"] if not d.get("paused_reason") and (wanted is None or d["id"] in wanted)]
     if not targets:
@@ -296,6 +329,13 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
         if dest["destination_pc_id"] not in online:
             # not forgotten: paused as unreachable, and resumed and caught up when the machine returns
             await _fail_destination(engine, flow, dest, "destination:unreachable")
+            transfer.pending_destinations.discard(dest["id"])
+            continue
+        target = join_client_path(dest["destination_path"], transfer.relative_path)
+        if (why := await guard.restricted_reason(engine, dest["destination_pc_id"], dest["destination_path"]) or
+                await guard.restricted_reason(engine, dest["destination_pc_id"], target)):
+            await guard.refuse(engine, flow["id"], dest["destination_pc_id"], target, why, step="before writing")
+            await _fail_destination(engine, flow, dest, "destination:restricted")
             transfer.pending_destinations.discard(dest["id"])
             continue
         base = {"transfer_id": transfer.id, "flow_id": flow["id"], "destination_id": dest["id"],
@@ -352,6 +392,10 @@ async def content(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         _transfers.pop(transfer.id, None)
         return {"accepted": False}
     transfer.hash = payload.get("hash") or transfer.hash
+    if (why := await guard.restricted_reason(ctx.engine, transfer.source_pc_id, transfer.source_path, transfer.hash)):
+        await guard.refuse(ctx.engine, transfer.flow_id, transfer.source_pc_id, transfer.source_path, why, step="when its content arrived")
+        _transfers.pop(transfer.id, None)
+        return {"accepted": False, "refused": "restricted"}
     chunk = payload.get("chunk")
     if chunk is not None:
         try:
@@ -482,7 +526,8 @@ async def heal(engine: Engine) -> None:
     it does not already hold, so when nothing was missed this costs a listing and no transfers; when an event was missed it is made good."""
     if not engine.db.connected:
         return
-    for flow in await engine.db.flows.list_all():
+    flows = engine.heat.hottest(await engine.db.flows.list_all(), key=lambda f: f"pc:{f['source_pc_id']}")
+    for flow in flows:
         if flow["status"] == "active" and flow["consent_status"] != "pending":
             await catch_up(engine, flow["id"])
 
@@ -499,10 +544,12 @@ async def listing(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     flow = await ctx.engine.db.flows.get(found.flow_id) if found else None
     if found is None or flow is None or flow["source_pc_id"] != ident.pc_id:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such listing for this pc")
-    for e in payload.get("entries") or []:
+    for e in (payload.get("entries") or [])[:MAX_LISTING_BATCH]:
         rel = str(e.get("relative_path") or "")
-        if rel:
+        if rel and len(found.entries) < MAX_LISTING:
             found.entries.append({"relative_path": rel, "hash": e.get("hash")})
+        elif rel:
+            found.truncated = True                                   # more than one catch-up will take on: the next healing pass continues where this left off
     if payload.get("done"):
         _listings.pop(str(payload["request_id"]), None)
         _spawn(_reconcile(ctx.engine, found))
@@ -520,7 +567,8 @@ async def _reconcile(engine: Engine, found: Listing) -> None:
     given = {d["id"]: await engine.db.flows.synced_source_hashes(d["id"]) for d in targets}
     await _mirror_deletes(engine, flow, found, targets, given)
     sent = 0
-    for entry in found.entries:
+    ordered = engine.heat.hottest(found.entries, key=lambda e: f"file:{flow['source_pc_id']}:{join_client_path(flow['source_path'], e['relative_path'])}")
+    for entry in ordered:
         rel, digest = entry["relative_path"], entry["hash"]
         key = rel.replace("\\", "/").lower()
         need = {d["id"] for d in targets if digest is None or given[d["id"]].get(key) != digest}

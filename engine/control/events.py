@@ -115,7 +115,12 @@ def last_fired(definition_id: int) -> str | None:
 
 
 def install(engine: Engine) -> None:
-    """file.* events come straight from the Global File Index stream."""
+    """file.* events come straight from the Global File Index stream; OS signals (a drive, a program, a cleared log ...) arrive on the same spine as `os.signal`."""
+
+    async def hear_signal(event: Any) -> None:
+        event.facts["fired"] = await on_signal(engine, event.data["pc_id"], event.data["type"], event.data["data"])
+
+    engine.bus.on("os.signal", hear_signal, stage="act", name="automations.signal")
 
     async def on_file(event: dict[str, Any]) -> None:
         etype = (FOLDER_OP_TO_EVENT if event.get("is_dir") else FILE_OP_TO_EVENT).get(event["op"])
@@ -124,7 +129,7 @@ def install(engine: Engine) -> None:
             await on_signal(engine, event["pc_id"], etype, {"path": event["path"], "name": event.get("name"),
                                                             "hash": event.get("hash"), "old_path": event.get("old_path"),
                                                             "tag": tag})
-    engine.file_index.subscribe(on_file, every_op=True)
+    engine.file_index.subscribe(on_file, every_op=True, stage="act", name="automations")
 
 
 async def _file_tag(engine: Engine, event: dict[str, Any]) -> str | None:
@@ -446,12 +451,9 @@ async def signal(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.INVALID, f"{etype!r} is not a relayable native signal")
     if ident.pc_id is None:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
-    fired = await on_signal(ctx.engine, ident.pc_id, etype, payload.get("data") or {})
-    if ctx.engine.settings.detective:
-        from engine import detective
-
-        await detective.on_signal(ctx.engine, ident.pc_id, etype, payload.get("data") or {})
-    return {"accepted": True, "fired": fired}
+    # One event on the spine (engine/bus.py): the automations hear it at "act", Detective at "judge", each in its place.
+    event = await ctx.engine.bus.publish("os.signal", {"type": etype, "data": payload.get("data") or {}, "pc_id": ident.pc_id}, source="os", pc=ident.pc_id)
+    return {"accepted": True, "fired": (event.facts.get("fired") if event is not None else 0) or 0}
 
 
 async def interest_for_pc(engine: Engine, pc_id: int) -> dict[str, list[dict[str, Any]]]:

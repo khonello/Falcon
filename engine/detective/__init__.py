@@ -95,7 +95,12 @@ def _detector() -> Detective:
 
 
 def install(engine: Engine) -> None:
-    engine.file_index.subscribe(lambda event: on_file(engine, event), every_op=True)
+    engine.file_index.subscribe(lambda event: on_file(engine, event), every_op=True, stage="judge", name="detective")
+
+    async def hear_signal(event: Any) -> None:
+        await on_signal(engine, event.data["pc_id"], event.data["type"], event.data["data"])
+
+    engine.bus.on("os.signal", hear_signal, stage="judge", name="detective.signal")
 
 
 # --- what the Engine hears, as signals ---------------------------------------------------------------------
@@ -155,16 +160,27 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     pc_id, path, op = event["pc_id"], event["path"], event["op"]
     digest = event.get("hash")
     tags: set[str] = set()
+    facts = event.get("facts") or {}                      # what the earlier stages found out (engine/bus.py): read, not asked again
     entry = None
     if op != "modify":
-        entry = await engine.db.file_index.get(event["file_index_id"]) if event.get("file_index_id") else await engine.db.file_index.by_path(pc_id, path)
+        if "entry" in facts:
+            entry = facts["entry"]
+        else:
+            entry = await engine.db.file_index.get(event["file_index_id"]) if event.get("file_index_id") else await engine.db.file_index.by_path(pc_id, path)
         digest = digest or (entry or {}).get("content_hash")
-        if (entry or {}).get("resource_tag") == "restricted" or (digest and await engine.db.marks.active_with_hash(digest)):
+        if "restricted" in facts:
+            restricted = facts["restricted"] is not None
+        else:
+            restricted = (entry or {}).get("resource_tag") == "restricted" or bool(digest and await engine.db.marks.active_with_hash(digest))
+        if restricted:
             tags.add("restricted")
+            if facts.get("own_scope") if "own_scope" in facts else await _own_scope(engine, pc_id, entry or {}):
+                tags.add("own_scope")
     if op == "delete" and digest and not await engine.db.file_index.by_hash(digest):
         tags.add("only_copy")                           # nothing else the index knows of holds this content
     seen = event.get("witness") or {}
-    by = "falcon" if op in ("create", "modify", "move", "copy") and await _flow_wrote(engine, pc_id, path, digest) else seen.get("by", "unknown")
+    wrote = facts["flow_wrote"] if "flow_wrote" in facts else (op in ("create", "modify", "move", "copy") and await _flow_wrote(engine, pc_id, path, digest))
+    by = "falcon" if wrote else seen.get("by", "unknown")
     det = _detector()
     mem = det.mem.get(pc_id)
     if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
@@ -176,6 +192,15 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     sig = Sig(event.get("at") or time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("program") or (seen.get("front", "") if by == "hand" else ""), by, "",
               frozenset(tags), info)
     await _apply(engine, det.feed(sig))
+
+
+async def _own_scope(engine: Engine, pc_id: int, entry: dict[str, Any]) -> bool:
+    """Restricted material that belongs to the department this machine is in: that is what the people there work with."""
+    scope = entry.get("resource_tag_scope_department_id")
+    if scope is None:
+        return False
+    pc = await engine.db.accounts.pc(pc_id) or {}
+    return pc.get("department_id") == scope
 
 
 async def _outside_role(engine: Engine, pc_id: int, entry: dict[str, Any], path: str) -> bool:

@@ -534,6 +534,24 @@ class FileIndexRepo(_Repo):
             f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND gone_at IS NULL "
             "AND starts_with(lower(replace(path, chr(92), '/')), $2) ORDER BY path LIMIT $3", pc_id, prefix, limit)
 
+    async def count_under(self, pc_id: int, folder: str, junk: tuple[str, ...] = ()) -> dict[str, int]:
+        """How many files the index holds below a folder, and how many of those are inside folders of the kinds that hold generated files (node_modules and the like):
+        counted by the database, never loaded."""
+        prefix = folder.replace("\\", "/").rstrip("/").lower() + "/"
+        pattern = "(^|/)(" + "|".join(j.replace(".", "\\.").replace("$", "\\$") for j in junk) + ")/" if junk else "$^"
+        row = await self._one(
+            "SELECT count(*)::int AS files, count(*) FILTER (WHERE lower(replace(path, chr(92), '/')) ~ $3)::int AS junk FROM file_index "
+            "WHERE pc_id = $1 AND gone_at IS NULL AND starts_with(lower(replace(path, chr(92), '/')), $2)", pc_id, prefix, pattern)
+        return {"files": int((row or {}).get("files") or 0), "junk": int((row or {}).get("junk") or 0)}
+
+    async def heaviest_under(self, pc_id: int, folder: str, n: int = 5) -> list[dict[str, Any]]:
+        """The folders directly below this one that hold the most files (so a refusal can say where the weight is)."""
+        prefix = folder.replace("\\", "/").rstrip("/").lower() + "/"
+        return await self._fetch(
+            "SELECT split_part(substr(lower(replace(path, chr(92), '/')), $3), '/', 1) AS name, count(*)::int AS files FROM file_index "
+            "WHERE pc_id = $1 AND gone_at IS NULL AND starts_with(lower(replace(path, chr(92), '/')), $2) AND position('/' in substr(lower(replace(path, chr(92), '/')), $3)) > 0 "
+            "GROUP BY 1 ORDER BY 2 DESC LIMIT $4", pc_id, prefix, len(prefix) + 1, n)
+
     async def present_on_pc(self, pc_id: int, limit: int = 5000) -> list[dict[str, Any]]:
         return await self._fetch(
             f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND gone_at IS NULL ORDER BY path LIMIT $2", pc_id, limit)
@@ -922,6 +940,12 @@ class MarksRepo(_Repo):
 
     async def active_on_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE m.pc_id = $1 AND m.unmarked_at IS NULL", pc_id)
+
+    async def active_hashes(self, limit: int) -> list[tuple[str, str]]:
+        """(content hash, mark name) for every version of every active mark, at most `limit` of them."""
+        rows = await self._fetch(
+            "SELECT h.content_hash, m.name FROM resource_mark_hashes h JOIN resource_marks m ON m.id = h.mark_id WHERE m.unmarked_at IS NULL LIMIT $1", limit)
+        return [(r["content_hash"], r["name"]) for r in rows]
 
     async def active_with_hash(self, content_hash: str) -> list[dict[str, Any]]:
         return await self._fetch(

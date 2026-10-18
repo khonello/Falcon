@@ -60,7 +60,7 @@ CAPTURE_TOOLS = ("snippingtool.exe", "screenclippinghost.exe", "snip.exe", "shar
                  "screenpresso.exe", "bandicam.exe", "camtasia.exe", "obs64.exe", "picpick.exe", "flameshot.exe")
 
 # programs that move data around for a living: they lower a taking-out finding (a backup is not a theft) unless something else says otherwise
-USUAL_MOVERS = ("robocopy", "backup", "veeam", "acronis", "syncthing", "onedrive", "dropbox", "rsync", "7zg", "windowssearch", "googledrivefs", "backblaze", "crashplan",
+USUAL_MOVERS = ("git.exe", "msbuild", "nuget", "npm", "docker", "curl.exe", "slack", "robocopy", "backup", "veeam", "acronis", "syncthing", "onedrive", "dropbox", "rsync", "7zg", "windowssearch", "googledrivefs", "backblaze", "crashplan",
                 "teams", "zoom")
 
 
@@ -71,8 +71,21 @@ BACKUP_EXT = {"bak", "bkf", "vhd", "vhdx", "wbcat", "vss", "tib", "bkp", "rbf"}
 IMAGE_EXT = {"jpg", "jpeg", "png", "bmp", "gif", "webp", "mp4", "mkv", "avi", "mov", "webm"}
 VALUABLE_EXT = DOC_EXT | ARCHIVE_EXT | {"db", "mdb", "accdb", "sql", "pst", "ost", "kdbx", "vsd", "dwg", "psd"}
 # words in a name or a place that say a thing matters, whether or not anyone marked it
-WORTH_WORDS = ("contract", "audit", "ledger", "payroll", "salary", "salaries", "invoice", "legal", "board", "tax", "passport", "confidential", "secret", "personnel",
-               "customer", "client", "master", "budget", "merger", "acquisition", "password", "credential", "finance", "compliance", "hr\\", "\\hr", "director", "ceo")
+WORTH_WORDS = frozenset({"contract", "audit", "ledger", "payroll", "salary", "invoice", "legal", "board", "tax", "passport", "confidential", "secret", "personnel",
+                         "customer", "client", "master", "budget", "merger", "acquisition", "password", "credential", "finance", "compliance", "hr", "director", "ceo"})
+
+
+def names_something_that_matters(path: str) -> bool:
+    """A whole word of the name or the place says it matters (not a stretch of letters inside another word, and not the person's own profile folder's name)."""
+    parts = [p for p in re.split(r"[\\/]+", path.lower()) if p]
+    if "users" in parts:
+        i = parts.index("users")
+        parts = parts[:i] + parts[i + 2:]                              # (the folder named after a person is not a place that matters)
+    for part in parts:
+        for token in re.split(r"[^a-z]+", part):
+            if token in WORTH_WORDS or (len(token) > 3 and token.endswith("s") and token[:-1] in WORTH_WORDS) or (token.endswith("ies") and token[:-3] + "y" in WORTH_WORDS):
+                return True
+    return False
 BEHAVIOUR_LABEL = {"exfiltration": "Taking out", "collection": "Gathering", "concealment": "Hiding", "erasure": "Covering up", "capture": "Capturing",
                    "evasion": "Slipping the watch", "sabotage": "Wrecking", "reach": "Looking where they should not"}
 # the anchor each existing mini-graph is a reading of, so a case can show the board whatever made the finding
@@ -111,6 +124,28 @@ def megabytes(n: Any) -> str:
     except (TypeError, ValueError):
         return "a lot of data"
     return f"{mb / 1000:.1f} GB" if mb >= 1000 else f"{mb:.0f} MB"
+
+
+def kind_factor(path: str, tags: frozenset[str] = frozenset()) -> float:
+    """How much a file of this kind can matter before anything else is known about it. Documents, data and archives (which can hold anything) count fully; photographs,
+    music, programs and temporary files count for little (a person's own photographs on a drive are not what this is for) unless something marks them as mattering."""
+    if "restricted" in tags:
+        return 1.0
+    ext = ext_of(path)
+    if ext in VALUABLE_EXT:
+        return 1.0
+    if not ext:
+        return 0.6
+    return 0.35
+
+
+def _same_profile(a: str, b: str) -> bool:
+    """Both places are inside the same person's profile folder (under a Users folder)."""
+    def user(p: str) -> str:
+        parts = p.lower().replace("/", "\\").split("\\")
+        return parts[2] if len(parts) > 3 and parts[1] == "users" else ""
+    ua, ub = user(a), user(b)
+    return bool(ua) and ua == ub
 
 
 def is_archive(path: str) -> bool:
@@ -232,14 +267,21 @@ class Case:
     @property
     def weight(self) -> float:
         """Several independent hints are stronger together than any one: 1 - the chance every one of them is nothing, plus a little for each further kind of behaviour."""
-        rest = 1.0
+        # The same reading made again and again (the tenth file copied to the same drive) is a count, and a count only amplifies: a graph speaks at its heaviest,
+        # with a little added for each further time it spoke, never a new vote each time.
+        by_graph: dict[str, list[float]] = {}
         for f in self.findings:
             if not f.graph.startswith("coverage_"):
-                rest *= 1.0 - min(0.95, f.weight)
+                by_graph.setdefault(f.graph, []).append(min(0.95, f.weight))
+        rest = 1.0
+        for ws in by_graph.values():
+            top = max(ws)
+            rest *= 1.0 - (top + (1.0 - top) * (0.08 if top >= 0.5 else 0.03) * min(len(ws) - 1, 6))      # a count amplifies a heavy reading, and barely a light one
         # Coverage (what falls in an intent's areas on one piece of work) is a reading of the very same events the other findings are readings of, so it does not stack with
         # them: it is a floor under the case, and what makes a case when no single graph fires.
         core = max(1.0 - rest, max((f.weight for f in self.findings if f.graph.startswith("coverage_")), default=0.0))
-        return min(0.99, core + 0.06 * max(0, len(self.behaviours) - 1))
+        firm = {f.reads_as for f in self.findings if f.weight >= 0.30} - {""}          # a second kind of behaviour adds weight only when it is firm in itself
+        return min(0.99, core + 0.06 * max(0, len(firm) - 1))
 
     @property
     def level(self) -> str:
@@ -589,6 +631,8 @@ class Detective:
         out: list[Update] = []
         for f in self._graphs(m, s) + self._coverage(m, s, new):
             f.weight = self._contextual(f, s)
+            if any(x.startswith("you ruled ") for x in f.why):
+                f.weight = max(f.weight, 0.12)                    # a rule lowers a finding, it never makes it vanish: it stays on the record with the rule named
             if f.weight < 0.12:
                 continue
             out.append(self._attach(f))
@@ -611,12 +655,14 @@ class Detective:
         """How much the thing itself matters, apart from what was done to it: one deletion of the right file outweighs ten of the wrong ones."""
         w, why = 0.0, []
         if "restricted" in s.tags:
-            w += 0.12
-            why.append("a restricted file")
-        low = (s.path + " " + s.old).lower().replace("/", "\\")
-        if any(k in low for k in WORTH_WORDS):
+            w += 0.05 if "own_scope" in s.tags else 0.12
+            why.append("a restricted file" + (" of their own department's" if "own_scope" in s.tags else ""))
+        if names_something_that_matters(s.path) or (s.old and names_something_that_matters(s.old)):
             w += 0.08
             why.append("its name or place says it matters")
+        if s.path.startswith("\\\\"):
+            w += 0.06
+            why.append("on a share other people use")
         if "only_copy" in s.tags:
             # nearly every file is the only copy the index knows of, so it counts for little alone and for a lot beside anything else that says it matters
             w += 0.20 if w > 0 else 0.04
@@ -635,6 +681,7 @@ class Detective:
         thing = s.thing or s.path
         base = frozenset({thing}) if thing else frozenset()
         worth, _ = self._worth(s)
+        kf = kind_factor(s.path, s.tags if "own_scope" not in s.tags else frozenset())
         ext, old_ext = ext_of(s.path), ext_of(s.old) if s.old else ""
         dev = _on_external(m, s.path) if s.path else ""
         low = s.path.lower().replace("/", "\\")
@@ -646,15 +693,16 @@ class Detective:
             if m.hits else frozenset()
         if v in ("copied", "moved", "created") and dev:
             lineage = m.lineage.get(thing, set())
-            add("exfiltration", "Transfer", 0.30 + (0.08 if is_archive(s.path) else 0.0) + worth, frozenset(lineage))
+            add("exfiltration", "Transfer", 0.30 * kf + (0.08 if is_archive(s.path) else 0.0) + worth, frozenset(lineage))
             if any(h.behaviour == "capture" and h.anchor == "Keep" and h.things & (base | frozenset(lineage)) for h in m.hits):
                 add("capture", "Pass on", 0.30 + worth)
         elif v in ("copied", "moved") and s.path.startswith("\\\\"):
-            add("exfiltration", "Transfer", 0.26 + worth)             # a share elsewhere on the network: inside, but off this machine
+            add("exfiltration", "Transfer", 0.26 * kf + worth)             # a share elsewhere on the network: inside, but off this machine
         elif v in ("copied", "moved") and not is_system_folder(s.path) and not is_system_folder(s.old or "") and ext not in SYSTEMISH_EXT \
                 and folder_of(s.path).lower() != folder_of(s.old or "").lower():
-            add("exfiltration", "Gather", 0.03 + worth)
-            add("collection", "Access", 0.03 + worth)
+            mine = 0.01 if _same_profile(s.path, s.old) and not worth else 0.03         # filing a download into one's own documents is housekeeping, not gathering
+            add("exfiltration", "Gather", mine + worth)
+            add("collection", "Access", mine + worth)
             same = {x.thing or x.path for x in m.since(s.at - 10 * 60, "copied", "moved") if folder_of(x.path).lower() == folder_of(s.path).lower()}
             if len(same) >= 3:
                 add("collection", "Assemble", 0.10 + worth)
@@ -665,8 +713,9 @@ class Detective:
             things |= {t for h in m.hits if h.behaviour == "exfiltration" and h.anchor == "Gather" and folder_of(h.sig.path).lower() == here for t in h.things}
             if things:
                 m.lineage[thing] = things
-            add("exfiltration", "Compress", 0.18 + worth + min(0.10, 0.02 * len(things)), frozenset(things))
-            add("collection", "Consolidate", 0.12 + worth, frozenset(things))
+            # a person zipping their own working files is ordinary: it counts for little until the files are ones that matter (or what the zip is later used for does)
+            add("exfiltration", "Compress", 0.08 + worth + min(0.10, 0.02 * len(things)) + (0.10 if any("restricted" in x.tags for x in sources) else 0.0), frozenset(things))
+            add("collection", "Consolidate", 0.06 + worth, frozenset(things))
         if v in ("renamed", "moved") and s.old and old_ext != ext:
             if (old_ext in DOC_EXT or old_ext in ARCHIVE_EXT) and ext not in DOC_EXT:
                 add("exfiltration", "Transform", 0.14 + worth)
@@ -770,7 +819,8 @@ class Detective:
                         own.setdefault(h.anchor, []).append(h.weight)
                     elif h.sig not in mine_sigs:              # the same event already counted in the intent's own areas is not evidence twice
                         kids.setdefault(f"{h.behaviour}/{h.anchor}", []).append(h.weight)
-                w, covered = coverage(behaviour, own, kids)
+                linked = any(i in shared for i in idx)
+                w, covered = coverage(behaviour, own, kids, linked or len(comp) == 1)
                 if w < 0.12 or not any(h.behaviour == behaviour for h in comp):
                     continue                               # (a parent is only said when something in its own areas is there: the children speak for themselves)
                 key = (s.pc, behaviour, round(min(h.at for h in comp)))
@@ -778,7 +828,6 @@ class Detective:
                     continue                               # nothing new worth saying
                 self._covered[key] = w
                 things = frozenset().union(*(h.things for h in comp))
-                linked = any(i in shared for i in idx)
                 sigs = sorted({h.sig for h in comp}, key=lambda x: x.at)[-14:]
                 names = [c.split("/")[-1] if "/" not in c else c for c in covered]
                 out.append(Finding(behaviour, "coverage_" + behaviour, s.at, s.pc, w, things,
@@ -820,7 +869,8 @@ class Detective:
         return [f for f in found if f is not None]
 
     def _restricted(self, *sigs: Sig) -> bool:
-        return any("restricted" in x.tags for x in sigs)
+        """Restricted material that is not simply this person's own department's work (that is what their job is made of)."""
+        return any("restricted" in x.tags and "own_scope" not in x.tags for x in sigs)
 
     def _hidden(self, m: Memory, s: Sig) -> Finding:
         w, why = 0.30, ["a file was made hidden"]
@@ -881,7 +931,7 @@ class Detective:
 
     def _gathering(self, m: Memory, s: Sig) -> Finding | None:
         lo = s.at - 10 * 60
-        near = [x for x in m.since(lo, "opened", "copied") if "restricted" in x.tags]
+        near = [x for x in m.since(lo, "opened", "copied") if "restricted" in x.tags and "own_scope" not in x.tags]
         things = {x.thing or x.path for x in near}
         if len(things) < 8 or s.verb not in ("copied", "opened"):
             return None
@@ -895,7 +945,8 @@ class Detective:
         if not dev or s.verb not in ("copied", "created"):
             return None
         lineage = m.lineage.get(s.thing or s.path, set())
-        w, why = 0.45, [f"{s.name} was put on a removable drive"]
+        lineage_restricted = self._restricted(s) or any(("restricted" in x.tags and "own_scope" not in x.tags) for x in m.since(s.at - 3600) if (x.thing or x.path) in lineage)
+        w, why = (0.45 if lineage_restricted else 0.30) * kind_factor(s.path, s.tags if lineage_restricted else frozenset()), [f"{s.name} was put on a removable drive"]
         if is_archive(s.path):
             w += 0.10
             why.append("an archive")
@@ -954,8 +1005,10 @@ class Detective:
                        "a clean-up script or an application removing its own files" if not hand else "a person tidying up old files", why)
 
     def _history_cleared(self, m: Memory, s: Sig) -> Finding:
-        is_log = "log" in str(s.info.get("what") or "").lower()
-        return Finding("erasure", "history_cleared", s.at, s.pc, 0.55 if is_log else 0.40, frozenset(), f"{s.info.get('what') or 'a history'} was cleared", [s],
+        what = str(s.info.get("what") or "").lower()
+        record = any(k in what for k in ("security", "system")) and "log" in what          # the machine's own record of who did what; an application log is housekeeping
+        is_log = record
+        return Finding("erasure", "history_cleared", s.at, s.pc, 0.55 if record else 0.25 if "log" in what else 0.40, frozenset(), f"{s.info.get('what') or 'a history'} was cleared", [s],
                        "an administrator clearing a log on purpose" if is_log else "routine housekeeping", ["the machine's own record of what happened was cleared" if is_log else "a history was cleared"])
 
     def _capture_tool(self, m: Memory, s: Sig) -> Finding | None:
@@ -970,12 +1023,12 @@ class Detective:
         working = [x for x in m.since(lo) if "restricted" in x.tags and x.verb not in ("attached", "detached", "captured")]
         again = [x for x in m.since(s.at - 30 * 60, "launched", "captured") if x is not s and (x.verb == "captured" or any(t in x.program.lower() for t in CAPTURE_TOOLS))]
         what = ("a picture of the whole screen" if s.info.get("kind") == "screen" else "a picture") + " was put on the clipboard" if pictured else f"{s.program} was started"
-        w, why = 0.22 if not pictured else 0.16, [what]
+        w, why = 0.10 if not pictured else 0.08, [what]
         if working:
-            w += 0.30
+            w += 0.40 if any("own_scope" not in x.tags for x in working) else 0.12
             why.append("restricted files were being worked on just before")
         if again:
-            w += 0.10 * min(3, len(again))
+            w += (0.10 if working else 0.03) * min(3, len(again))               # again and again, over material that matters, is a habit worth saying
             why.append("it has been started again and again")
         if pictured:
             tail = f" ({s.program})" if s.program else ""
@@ -994,11 +1047,13 @@ class Detective:
             return None
         w, why = 0.18 + min(0.22, 0.05 * math.log2(size / 25_000_000 + 1)), [f"{megabytes(size)} sent out in {int(s.info.get('seconds') or 60)} seconds"]
         lo = s.at - 30 * 60
-        near = [x for x in m.since(lo) if x.verb in ("created", "copied", "opened", "moved", "hid") and ("restricted" in x.tags or is_archive(x.path))]
+        near = [x for x in m.since(lo) if x.verb in ("created", "copied", "opened", "moved", "hid") and (("restricted" in x.tags and "own_scope" not in x.tags)
+                                                                                                        or (is_archive(x.path) and m.lineage.get(x.thing or x.path)))]
+        matters = any("restricted" in x.tags and "own_scope" not in x.tags for x in near)
         staged = [f for c in self.cases if c.pc == s.pc for f in c.findings if not f.graph.startswith("coverage_") and f.behaviour in ("collection", "concealment") and s.at - f.at <= WINDOW]
         if near:
-            w += 0.28
-            why.append("just after restricted files were worked on or an archive was made")
+            w += 0.28 if matters else 0.08
+            why.append("just after restricted files were worked on" if matters else "just after files were packed")
         if staged:
             w += 0.18
             why.append("right after files were gathered or hidden")
@@ -1053,7 +1108,7 @@ class Detective:
             w, why = 0.28, [f"{len(hits)} files in two minutes by hand"]
             summary = summary.replace(", not by hand", " by hand")
         else:
-            w, why = 0.60 + min(0.25, 0.01 * (len(hits) - 10)), [f"{len(hits)} files in two minutes by a program"]
+            w, why = 0.65 + min(0.25, 0.01 * (len(hits) - 10)), [f"{len(hits)} files in two minutes by a program"]
         restricted = sum(1 for x in hits if "restricted" in x.tags)
         if restricted * 4 >= len(hits):
             w += 0.22 if by_hand else 0.08
@@ -1062,6 +1117,10 @@ class Detective:
         if outside * 2 >= len(hits):
             w += 0.15 if by_hand else 0.05
             why.append("mostly files outside this person's work")
+        shared = sum(1 for x in hits if x.path.startswith("\\\\"))
+        if shared * 2 >= len(hits):
+            w += 0.30 if by_hand else 0.08
+            why.append("on a share other people use")
         places = len({folder_of(x.path) for x in hits})
         if places >= 4:
             w += 0.08 if by_hand else 0.0
@@ -1091,13 +1150,17 @@ class Detective:
         w = f.weight
         proportional = f.graph.startswith("coverage_")
 
+        def lift(w: float, d: float) -> float:
+            """Context raises a finding. On a sum of many readings it raises in proportion, so a trivial sum stays trivial."""
+            return w * (1.0 + d * 2.5) if proportional else w + d
+
         def cut(w: float, d: float) -> float:
             """Context lowers a finding. Coverage already adds many readings of the same work, so there it lowers in proportion (a task for the file takes most of it away
             whatever it came to) instead of by a fixed amount that a large sum would shrug off."""
             return w * (1.0 - min(0.9, d * 1.6)) if proportional else w - d
 
         if f.behaviour in ("concealment", "collection", "exfiltration", "erasure") and s.by in ("alone", "started"):
-            w += 0.08 if s.by == "alone" else 0.05                       # done by a program rather than by hand: a little more telling, never a verdict
+            w = lift(w, 0.08 if s.by == "alone" else 0.05)                       # done by a program rather than by hand: a little more telling, never a verdict
             f.why.append("done by a program on its own" if s.by == "alone" else "done by a program the person started")
         for thing in f.things:
             if self.ctx.has_task(s.pc, thing):
@@ -1124,7 +1187,7 @@ class Detective:
                 w = cut(w, 0.35)
                 f.why.append(f"a drive this machine has used {uses} times")
             elif uses == 0 and f.behaviour == "exfiltration" and not any("a task covers" in x for x in f.why):
-                w += 0.10
+                w = lift(w, 0.10)
                 f.why.append("a drive this machine has not seen before")
         mover = next((e.program for e in f.evidence if e.program and any(p in e.program.lower() for p in USUAL_MOVERS)), "")
         if mover:
@@ -1132,7 +1195,7 @@ class Detective:
             f.why.append(f"{mover} is a program that moves files for a living")
         hour = time.localtime(s.at).tm_hour
         if (hour >= 22 or hour < 6) and f.weight >= 0.3:
-            w += 0.04                                           # context only: it can never start a finding
+            w = lift(w, 0.04)                                           # context only: it can never start a finding
         return max(0.0, min(0.95, w))
 
     # --- cases --------------------------------------------------------------------------------------------------

@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
+from engine.bus import Bus, Event
 from engine.dispatch import Context, handler
 from engine.permissions import int_field, require_department_scope, require_role
 from engine.resource.resource import allowed_tags_for
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 ACCESS_TAGS = ("admin", "restricted", "worker_dept", "common")  # file_index.resource_tag
+MAX_SWEEP_BATCH = 2000                           # entries taken from one sweep message
 OPS = ("create", "modify", "move", "copy", "delete", "attrib", "security")
 # What Flow, Resource compliance and Task verification care about: the content of a file, or where it is. A change of
 # attributes or permissions, or anything to a folder, is for the history and for automations only.
@@ -45,20 +47,28 @@ CONTENT_OPS = frozenset({"create", "modify", "move", "copy", "delete"})
 
 
 class FileIndex:
-    def __init__(self, db: Database) -> None:
+    def __init__(self, db: Database, bus: Bus | None = None) -> None:
         self.db = db
-        # Modules interested in file events (Flow sync trigger, Resource compliance, Task
-        # expectation) subscribe here rather than defining their own detection.
-        self._subscribers: list[Any] = []
-        self._observers: list[Any] = []
+        # Every file event is published on the Engine's bus (engine/bus.py), where each feature hears it at its own stage; `subscribe` below is the old way in.
+        self.bus = bus if bus is not None else Bus()
         self._sweeps: dict[int, datetime] = {}      # pc -> when its running idle sweep began (what the sweep sees is newer than this)
 
-    def subscribe(self, callback: Any, *, every_op: bool = False) -> None:
+    def subscribe(self, callback: Any, *, every_op: bool = False, stage: str = "act", name: str = "") -> None:
         """callback(event: dict) -> Awaitable[None]. Called for every ingested file event that is about a file's
         content or place (CONTENT_OPS), after the index row is written, with `file_index_id` and `pc_id` added.
         `every_op=True` also hears attribute and permission changes and everything that happens to folders -- for
-        automations, which can wait on any of them."""
-        (self._observers if every_op else self._subscribers).append(callback)
+        automations, which can wait on any of them. `stage` says where in the event's journey (engine/bus.py) the callback hears it; the event dict carries
+        `facts`, what the earlier stages found out about it."""
+
+        async def hear(event: Event) -> None:
+            await callback(event.data)
+
+        async def hear_content(event: Event) -> None:
+            if not event.data.get("is_dir"):
+                await callback(event.data)
+
+        kinds = ("file.*",) if every_op else tuple(f"file.{op}" for op in sorted(CONTENT_OPS))
+        self.bus.on(kinds, hear if every_op else hear_content, stage=stage, name=name or getattr(callback, "__name__", "file handler"))
 
     async def ingest_event(self, pc_id: int, event: dict[str, Any]) -> int | None:
         entry = _normalize(event)
@@ -80,19 +90,15 @@ class FileIndex:
         await db.record_event(pc_id, op, path, old_path=entry.get("old_path"), is_dir=entry["is_dir"],
                               content_hash=entry.get("hash"), file_index_id=known_id, occurred_at=entry.get("at"),
                               detail=({**(entry.get("detail") or {}), **{k: v for k, v in (entry.get("witness") or {}).items() if k != "title"}} or None))
-        full = {"pc_id": pc_id, "file_index_id": file_index_id, **entry}
-        if op in CONTENT_OPS and not entry["is_dir"]:
-            for cb in self._subscribers:
-                await cb(full)
-        for cb in self._observers:
-            await cb(full)
+        full = {"pc_id": pc_id, "file_index_id": file_index_id, **entry, "facts": {}}
+        await self.bus.publish(f"file.{op}", full, source="os", pc=pc_id, facts=full["facts"])         # one event, through every stage, carrying what each finds out
         return file_index_id
 
     async def ingest_sweep_batch(self, pc_id: int, entries: list[dict[str, Any]], *, first: bool = False) -> int:
         if first or pc_id not in self._sweeps:
             self._sweeps[pc_id] = datetime.now(timezone.utc)           # everything this sweep sees is newer than this
         n = 0
-        for raw in entries:
+        for raw in entries[:MAX_SWEEP_BATCH]:                    # (a batch is a few hundred; more than this in one message is not one)
             entry = _normalize(raw)
             if entry["op"] == "delete":
                 continue
@@ -209,6 +215,9 @@ async def index_catchup(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     arrived live, so Flow, Restricted and Task react to it as they would have."""
     pc_id = _pc_id(ctx, payload)
     events = (payload.get("events") or [])[:500]
+    heat = getattr(ctx.engine, "heat", None)
+    if heat is not None:                                       # the files being worked on first; the rest in the order they came
+        events = heat.hottest(events, key=lambda e: f"file:{pc_id}:{(e or {}).get('path', '')}")
     for ev in events:
         await ctx.engine.file_index.ingest_event(pc_id, ev)
     if events:

@@ -34,6 +34,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+from common.heat import Heat
 from worker_client import fsmeta, idle
 from worker_client.snapshot import Snapshot
 from worker_client.stopping import stop_tasks
@@ -83,6 +84,9 @@ class Watcher:
         self.mode = "off"
         self.events_reported = 0
         self.sweeps_completed = 0
+        # What is being worked on now: anything that happens to a file marks it hot, and the sweep and the catch-up reach hot files (and the folders above them) first.
+        # The cold ones are still done, after, as they always were: heat only decides who goes first.
+        self.heat = Heat()
 
     # --- lifecycle ------------------------------------------------------------------------------
 
@@ -227,7 +231,25 @@ class Watcher:
 
     # --- reporting ------------------------------------------------------------------------------
 
+    def touch(self, path: str) -> None:
+        """Something happened to this (a change, an open): it is hot."""
+        self.heat.touch(path)
+
+    def _walk(self, root: Any):
+        """os.walk that goes to the hot folders and files first. (Top-down, so sorting the lists in place decides the order it takes.)"""
+        heat = self.heat
+        for dirpath, dirs, files in os.walk(root):
+            dirs.sort(key=lambda d: -heat.temperature(os.path.join(dirpath, d)))
+            files.sort(key=lambda f: -heat.temperature(os.path.join(dirpath, f)))
+            yield dirpath, dirs, files
+
+    def _hot_roots(self) -> list[Path]:
+        return self.heat.hottest(self.roots, key=str)
+
     async def report_event(self, op: str, path: str, *, old_path: str | None = None, is_dir: bool = False, detail: dict[str, bool] | None = None) -> None:
+        self.heat.touch(path)
+        if old_path:
+            self.heat.touch(old_path)
         digest = None
         if op not in ("delete", "attrib", "security") and not is_dir:        # the content did not change in the last two
             digest = await asyncio.to_thread(hash_file, Path(path), self.hash_limit)
@@ -271,6 +293,20 @@ class Watcher:
 
     # --- idle-time full sweep -------------------------------------------------------------------
 
+    def _hash_unless_known(self, p: str) -> str | None:
+        """The content hash of a file, read from the disk only if it is not the file the snapshot already has (same size, same modified time): a sweep of a big folder
+        does not read every byte of every cold file again just to find nothing changed."""
+        if self.state is not None:
+            known = self.state.known(p)
+            if known is not None and known[2]:
+                try:
+                    st = os.stat(p)
+                except OSError:
+                    return None
+                if known[0] == st.st_size and known[1] == st.st_mtime_ns:
+                    return known[2]
+        return hash_file(Path(p), self.hash_limit)
+
     async def _idle_sweep_loop(self) -> None:
         while True:
             await asyncio.sleep(min(30.0, max(1.0, self.idle_after / 10)))
@@ -292,8 +328,8 @@ class Watcher:
         def walk() -> None:
             batch: list[dict[str, Any]] = []
             n = 0
-            for root in self.roots:
-                for dirpath, _dirs, files in os.walk(root):
+            for root in self._hot_roots():
+                for dirpath, _dirs, files in self._walk(root):
                     for name in files:
                         if self._sweep_cancel.is_set():
                             loop.call_soon_threadsafe(queue.put_nowait, None)
@@ -304,7 +340,10 @@ class Watcher:
                             loop.call_soon_threadsafe(queue.put_nowait, None)
                             return
                         p = os.path.join(dirpath, name)
-                        batch.append({"op": "modify", "path": p, "name": name, "hash": hash_file(Path(p), self.hash_limit)})
+                        batch.append({"op": "modify", "path": p, "name": name, "hash": self._hash_unless_known(p)})
+                        if self.heat.hot(p) and len(batch) > 1:
+                            loop.call_soon_threadsafe(queue.put_nowait, batch)       # a hot file is not left waiting for the batch to fill
+                            batch = []
                         if len(batch) >= SWEEP_BATCH:
                             loop.call_soon_threadsafe(queue.put_nowait, batch)
                             batch = []
@@ -400,8 +439,8 @@ class Watcher:
 
         def walk() -> None:
             batch: list[dict[str, Any]] = []
-            for root in self.roots:
-                for dirpath, _dirs, files in os.walk(root):
+            for root in self._hot_roots():
+                for dirpath, _dirs, files in self._walk(root):
                     unchanged: list[str] = []
                     for name in files:
                         if self._sweep_cancel.is_set() or cancel.is_set():

@@ -95,7 +95,38 @@ def derive_tag(path: str, pc_type: str, pc_department_id: int | None) -> tuple[s
 
 
 def install(engine: Engine) -> None:
-    engine.file_index.subscribe(lambda event: _on_file_event(engine, event))
+    engine.file_index.subscribe(lambda event: _on_file_event(engine, event), stage="guard", name="resource")
+    engine.file_index.subscribe(lambda event: _file_facts(engine, event), every_op=True, stage="guard", name="facts")
+
+
+async def _file_facts(engine: Engine, event: dict[str, Any]) -> None:
+    """What is this? Found out once, here, and written onto the event for every stage after this one (the facts): the index entry, whether the file is restricted and why,
+    and whether that is simply this machine's own department's work. Flow, Task and Detective read these instead of each asking the database again.
+    Answered from memory first (the marked index), the hot way: a marked place or marked content is one lookup."""
+    facts = event.get("facts")
+    if facts is None or not engine.db.connected or event.get("is_dir"):
+        return
+    pc_id, path = event["pc_id"], event["path"]
+    entry = await engine.db.file_index.get(event["file_index_id"]) if event.get("file_index_id") else await engine.db.file_index.by_path(pc_id, path)
+    facts["entry"] = entry
+    digest = event.get("hash") or (entry or {}).get("content_hash")
+    facts["hash"] = digest
+    reason = None
+    tag = (entry or {}).get("resource_tag")
+    if tag in ("restricted", "admin"):
+        reason = f"it is tagged {tag}"
+    if reason is None:
+        pc = await engine.db.accounts.pc(pc_id) or {}
+        tier = derive_tag(path, str(pc.get("pc_type") or ""), pc.get("department_id"))
+        if tier is not None and tier[0] in ("restricted", "admin"):
+            reason = f"it is in the {tier[0]} tier folder"
+    if reason is None:
+        reason = await engine.marked.reason(pc_id, path, digest)
+    facts["restricted"] = reason
+    if reason is not None:
+        scope = (entry or {}).get("resource_tag_scope_department_id")
+        pc = await engine.db.accounts.pc(pc_id) or {}
+        facts["own_scope"] = scope is not None and pc.get("department_id") == scope
 
 
 async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:

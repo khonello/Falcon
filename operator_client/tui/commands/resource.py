@@ -55,9 +55,19 @@ async def marks_list(ctx: ShellContext, args: Args) -> str:
             + (table(rows, ["id", "code", "kind", "name", "on", "allowed", "files", "versions", "copies", "worst"]) if rows else "(none)"))
 
 
-@command("mark", usage="<path> [<path>...] [keep=machine|path]", help_="Mark files or folders restricted, where they are (nothing is moved)")
+@command("mark", "assess", "<path> [<path>...]", "What marking these would cost, before doing it: files, how long, and whether it is too large")
+async def mark_assess(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("marks.assess", {"paths": list(args.positional)})
+    lines = [f"this machine tracks {res['tracked_now']:,} files by content now (most it can: {res['machine_limit']:,})"]
+    for a in res["assessed"]:
+        lines.append(f"{a['path']}: {a['verdict'].upper().replace('_', ' ')} - {a['files']:,} files ({a['tracked']:,} tracked, {a['junk']:,} generated), about {a['seconds']:.0f}s")
+        lines += [f"    {r}" for r in a["reasons"]]
+    return "\n".join(lines)
+
+
+@command("mark", usage="<path> [<path>...] [keep=machine|path] [confirm_large=1]", help_="Mark files or folders restricted, where they are (nothing is moved)")
 async def mark_create(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("marks.create", {"paths": list(args.positional), "keep": args.opt("keep") or "machine"})
+    res = await ctx.call("marks.create", {"paths": list(args.positional), "keep": args.opt("keep") or "machine", "confirm_large": bool(args.opt("confirm_large"))})
     return "\n".join(f"{m['code']} {m['kind']} {m['name']} on {m['host']}: {m['files']} file(s), kept to {m['keep_label'].lower()}" for m in res["marks"]) \
         + (f"\n{res['copies_found']} copy(ies) already elsewhere" if res["copies_found"] else "")
 

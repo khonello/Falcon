@@ -80,7 +80,9 @@ INCLUDES: dict[str, tuple[str, ...]] = {
     "sabotage": ("erasure",),
 }
 CHILD_SHARE = 0.6                  # a child's evidence is this much of the weight it would have in its own intent
-AREA_CAP = 0.30                    # many light events in one area never add up past this by number alone (a heavy single event still counts at its own weight)
+AREA_CAP = 0.18                    # many light events in one area never add up past this by number alone (a heavy single event still counts at its own weight)
+LIGHT = 0.12                       # an area below this has only trivial things in it
+UNLINKED = 0.3                     # how much of the rest counts when the areas share no file, only the time
 BREADTH = 0.04                     # each further area covered adds this much evidence (more kinds of thing, not "further along")
 
 # how high coverage may go while it is only part of the picture: collecting alone is not harm, looking around is noted until it comes back another day
@@ -92,7 +94,7 @@ def anchor_names(behaviour: str) -> list[str]:
     return [a.name for a in ANCHORS.get(behaviour, ())]
 
 
-def coverage(behaviour: str, own: dict[str, list[float]], children: dict[str, list[float]] | None = None) -> tuple[float, list[str]]:
+def coverage(behaviour: str, own: dict[str, list[float]], children: dict[str, list[float]] | None = None, linked: bool = True) -> tuple[float, list[str]]:
     """How strongly an intent is covered, from the weights of the events in each of its areas (`own`: area -> weights) and in its children's areas (`children`:
     "child/Area" -> weights). Returns (weight, the areas covered, own first). No area is required and none comes first."""
     parts: list[tuple[str, float]] = []
@@ -104,11 +106,18 @@ def coverage(behaviour: str, own: dict[str, list[float]], children: dict[str, li
             parts.append((key, _area(ws) * CHILD_SHARE))
     if not parts:
         return 0.0, []
+    # an area with only trivial things in it (a photo on a drive, a zip of one's own working files, a download filed) is covered, but counts for very little: a whole
+    # ordinary day touches several areas lightly, and that must not add up to something
+    parts = [(a, w if w >= LIGHT else w * 0.4) for a, w in parts]
     rest = 1.0
     for _, w in parts:
         rest *= 1.0 - min(0.95, w)
-    weight = (1.0 - rest) + BREADTH * (len(parts) - 1)
+    weight = (1.0 - rest) + BREADTH * max(0, sum(1 for _, w in parts if w >= LIGHT) - 1)
     covered = [a for a, _ in parts]
+    if not linked:
+        # areas that share no file and are only close in time are probably different pieces of work: the heaviest speaks, the rest add a little
+        best = max(w for _, w in parts)
+        weight = best + UNLINKED * (weight - best)
     return min(CEILING.get(behaviour, DEFAULT_CEILING), weight), covered
 
 

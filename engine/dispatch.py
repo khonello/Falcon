@@ -75,6 +75,14 @@ async def dispatch(ctx: Context, message_type: str, payload: dict[str, Any]) -> 
     fn = _registry.get(message_type)
     if fn is None:
         raise ProtocolError(ErrorCode.UNKNOWN_TYPE, f"no handler for {message_type!r}")
+    heat = getattr(ctx.engine, "heat", None)
+    if heat is not None:                                  # a machine that speaks, or that somebody is asking about, is hot
+        if ctx.identity.pc_id is not None:
+            heat.touch(f"pc:{ctx.identity.pc_id}", folder=False)
+        for key in ("pc_id", "source_pc_id", "target_pc_id", "destination_pc_id"):
+            value = payload.get(key) if isinstance(payload, dict) else None
+            if isinstance(value, int) and not isinstance(value, bool):
+                heat.touch(f"pc:{value}", folder=False)
     if message_type in VIEWED_AS_TRAVERSED and payload.get(VIEW_KEY) == VIEW_SESSION:
         viewed = await viewing_identity(ctx)
         if viewed is not None:

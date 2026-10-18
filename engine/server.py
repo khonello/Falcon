@@ -40,7 +40,10 @@ class Engine:
         self.db = Database(settings.database_url)
         self.audit = AuditTrail(self.db, settings.audit_retention_days)
         self.audit.engine = self
-        self.file_index = FileIndex(self.db)
+        from engine.bus import Bus
+
+        self.bus = Bus()
+        self.file_index = FileIndex(self.db, self.bus)
         self.scheduler = Scheduler(self)
         self.llm = LocalLLM(settings.llm_backend, model_path=settings.llm_model_path,
                             endpoint=settings.llm_endpoint, model=settings.llm_model)
@@ -49,6 +52,16 @@ class Engine:
         self.master_secret: bytes | None = settings.master_secret
         self._server: asyncio.base_events.Server | None = None
         self.blocked_addresses: set[str] = set()      # refused at the door (Registry); loaded in start()
+
+        # What is being worked on right now: anything that happens to a file, a machine or a flow marks it hot, and the Engine's own background work (healing, catching
+        # up, reconciling) reaches the hot things first. Cold things are still done, after.
+        from common.heat import Heat
+
+        self.heat = Heat(ttl=900.0, cap=100000)
+        from engine.marked import MarkedIndex
+
+        self.marked = MarkedIndex(self.db)
+        self.file_index.subscribe(self._warm_on_file, every_op=True, stage="heat", name="heat")
 
         # Every consumer of file events subscribes to the one index -- no per-combo detection.
         from engine.control import events as control_events
@@ -81,6 +94,12 @@ class Engine:
         for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens, console_marks, handover, engine.detective):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
+
+    async def _warm_on_file(self, event: dict[str, Any]) -> None:
+        pc = event.get("pc_id")
+        if pc is not None:
+            self.heat.touch(f"file:{pc}:{event.get('path') or ''}")
+            self.heat.touch(f"pc:{pc}", folder=False)
 
     # --- lifecycle ------------------------------------------------------------------------------
 
