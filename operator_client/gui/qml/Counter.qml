@@ -25,8 +25,7 @@ Item {
             }
             Nav.departments = ds.length
             Nav.deptName = !Nav.boss && ds.length === 1 ? ds[0].name : ""
-            Nav.count(Nav.boss ? "registry" : "machines", Nav.boss ? 0 : machines)
-            Nav.count(Nav.boss ? "access" : "sessions", held)
+            if (!Nav.boss) Nav.count("machines", machines)
         })
         // a ping is "I need you": the count pulses until every one is answered
         falcon.call("assistance.channels", {}, function (ok, r) {
@@ -69,10 +68,6 @@ Item {
                 Nav.count("tasks", n)
             })
         if (Nav.boss) {
-            falcon.call("audit.deviations", {}, function (ok, r) {
-                var ds = ok ? (r.deviations || []) : []
-                Nav.count("accountability", ds.length, true)
-            })
             // what waits on the Super User: reports nobody below can take
             falcon.call("reports.list", {}, function (ok, r) {
                 var n = 0

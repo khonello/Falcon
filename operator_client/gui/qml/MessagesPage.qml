@@ -4,7 +4,7 @@ import "."
 // MESSAGES (Help Ping & Message Channel, at both levels). One row per conversation between a lower and
 // a higher party: Worker -> Admin, or Admin -> Super User. It starts as a ping (attention only,
 // repeatable); answering opens the channel; then one message each way at a time. Only the higher party
-// closes it. Either party may add Admins as Listeners, who read it silently; the other party is not told.
+// closes it.
 Page {
     id: page
     objectName: "messagesView"
@@ -12,7 +12,6 @@ Page {
     property var chans: []            // channel summaries
     property var detail: ({})         // channel id -> {channel, messages}
     property var pings: []            // unanswered pings to me
-    property var listenersBy: ({})    // channel id -> the listeners I added there (assistance.my_listeners)
     property string f: ""
     property string sel: Nav.sub ? String(Nav.sub) : ""
     property var drafts: ({})
@@ -27,10 +26,6 @@ Page {
                     if (!ok2) return
                     var d = Object.assign({}, page.detail); d[c.id] = r2; page.detail = d
                 })
-                if (!c.closed_at && (c.superior_account_id === page.me || c.initiator_account_id === page.me))
-                    falcon.call("assistance.my_listeners", { channel_id: c.id }, function (ok3, r3) {
-                        var l = Object.assign({}, page.listenersBy); l[c.id] = ok3 ? (r3.listeners || []) : []; page.listenersBy = l
-                    })
             })
         })
         falcon.call("assistance.ping_status", {}, function (ok, r) { page.pings = ok ? (r.pings || []) : [] })
@@ -215,27 +210,8 @@ Page {
                 Txt { visible: page.c !== null && page.c.closed; anchors.horizontalCenter: parent.horizontalCenter; text: "Closed"; color: Theme.text3; font.pixelSize: 12; topPadding: 4 }
             }
 
-            footShown: page.c !== null && page.c.party && page.c.kind === "channel" && !page.c.closed
+            footShown: false
             dockShown: page.c !== null && !page.c.closed
-            // listeners, for a party to an open conversation
-            foot: Row {
-                visible: page.c !== null && page.c.party && page.c.kind === "channel" && !page.c.closed
-                width: side.width - 32
-                spacing: 10
-                readonly property var added: page.c && page.c.cid ? (page.listenersBy[page.c.cid] || []).map(function (l) { return l.name || "" }) : []
-                Txt {
-                    width: parent.width - lisBtn.width - 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap; elide: Text.ElideNone
-                    textFormat: Text.RichText
-                    text: "<span style='color:" + Theme.text3 + "'>Listeners · </span>" + (parent.added.length
-                          ? Theme.listNames(parent.added) + " <span style='color:" + Theme.text3 + "'>" + (parent.added.length === 1 ? "reads" : "read") + " it silently; " + (page.c ? page.c.other : "") + " is not told.</span>"
-                          : "<span style='color:" + Theme.text3 + "'>none. Admins you add read it silently; " + (page.c ? page.c.other : "") + " is not told.</span>")
-                }
-                Btn { id: lisBtn; ghost: true; kind: "primary"; iconName: "team"; text: parent.added.length ? "Listeners · " + parent.added.length : "Add listeners"
-                      anchors.verticalCenter: parent.verticalCenter; onClicked: lisDrawer.openFor(page.c) }
-            }
 
             // the composer, docked under the thread
             dock: Item {
@@ -275,59 +251,6 @@ Page {
                     color: Theme.text3; font.pixelSize: 12
                     text: !page.c ? "" : !page.c.party ? "You are listening. You read it as it happens; you cannot write in it."
                           : page.c.other + "'s turn. You can write again once they answer."
-                }
-            }
-        }
-    }
-
-    // --- listeners: Admins who read it silently --------------------------------------------------------
-    Drawer {
-        id: lisDrawer
-        page: page
-        width: 460
-        property var conv: null
-        property var cands: []
-        property string q: ""
-        title: conv ? "Listeners · you and " + conv.other : ""
-        function openFor(x) {
-            conv = x; q = ""; cands = []
-            falcon.call("assistance.listener_candidates", { channel_id: x.cid }, function (ok, r) { lisDrawer.cands = ok ? (r.candidates || []) : [] })
-            open()
-        }
-        readonly property var added: conv ? (page.listenersBy[conv.cid] || []) : []
-        footer: Btn { kind: "primary"; text: "Done"; onClicked: lisDrawer.close() }
-        Rectangle {
-            width: parent.width; height: lisNote.height + 20; radius: 6; color: Theme.surface2
-            Txt { id: lisNote; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                  text: "A listener is an Admin who reads this conversation as it happens and cannot write in it. " + (lisDrawer.conv ? lisDrawer.conv.other : "They") + " is not told. You see only the listeners you added." }
-        }
-        Column {
-            width: parent.width
-            spacing: 6
-            Txt { text: "LISTENING NOW · " + lisDrawer.added.length; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            Txt { visible: lisDrawer.added.length === 0; text: "Nobody you added. Pick an Admin below."; color: Theme.text3; font.pixelSize: 12 }
-            Repeater { model: lisDrawer.added; PersonRow { required property var modelData; width: parent.width; name: modelData.name || ""; sub: "listening" } }
-        }
-        Column {
-            width: parent.width
-            spacing: 8
-            Txt { text: "ADD AN ADMIN"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            SearchBox { width: parent.width; small: false; placeholderText: "Find an Admin or a department"; onTextChanged: lisDrawer.q = text }
-            Repeater {
-                model: lisDrawer.cands.filter(function (a) {
-                    return (a.name + " " + (a.department_name || "")).toLowerCase().indexOf(lisDrawer.q.toLowerCase()) >= 0
-                        && !lisDrawer.added.some(function (l) { return l.listener_account_id === a.account_id })
-                })
-                PersonRow {
-                    required property var modelData
-                    width: parent.width
-                    name: modelData.name
-                    sub: "Admin, " + (modelData.department_name || "")
-                    act: "Add"
-                    onActed: falcon.call("assistance.add_listener", { channel_id: lisDrawer.conv.cid, admin_account_id: modelData.account_id }, function (ok, r) {
-                        if (!ok) { Msg.failed(r && r.message ? r.message : "Not added"); return }
-                        Msg.ok(modelData.name + " is listening · " + lisDrawer.conv.other + " is not told"); page.load()
-                    })
                 }
             }
         }

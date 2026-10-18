@@ -124,6 +124,8 @@ Page {
               onClicked: page.openHandover(!(page.handover && page.handover.open)) }
     }
 
+    PageTabs { options: [{ value: "departments", label: "Departments" }, { value: "registry", label: "Machines and accounts" }]; current: "registry" }
+
     Strip {
         width: parent.width
         items: [

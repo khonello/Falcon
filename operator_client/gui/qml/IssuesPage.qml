@@ -82,7 +82,6 @@ Page {
             why: online ? [] : [i.host + " is offline, so you cannot enter it."],
             options: [{ key: "answer", icon: "message", title: "Answer " + (user || "them"), desc: "Opens a message channel. Only you can close it.", verb: "Send", need: "message" }]
                 .concat(online ? [{ key: "enter", icon: "login", title: "Enter " + i.host + " and look yourself", desc: (user || "Whoever is signed in") + " is locked out while you are in. You get 30 minutes.", verb: "Enter " + i.host }] : [])
-                .concat([{ key: "handoff", icon: "team", title: "Ask an Admin from another department", desc: "Help across departments. " + (user || "They") + " has to accept it before they can see anything.", verb: "Ask", cannot: "Not from here yet: the worker asks for assisted access" }])
         }
         if (i.type === "deviation") return {
             lead: i.host + " presented something that does not match what it was registered with.",

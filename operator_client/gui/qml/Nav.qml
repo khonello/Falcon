@@ -38,11 +38,21 @@ QtObject {
         if (p === "dept") return ["departments", s]
         if (p === "machines") return ["registry", s]
         if (p === "issues") return ["departments", null]
-        if (p === "sessions") return ["access", s]
+        if (p in gone) return ["overview", null]
         return [p, s]
     }
+    // Pages that were pruned (docs/design/pruning.md): whoever still points at one lands on the page that took over its job.
+    readonly property var gone: ({ access: 1, accountability: 1, rules: 1, rollout: 1, reports: 1, sessions: 1 })
+    function remap(p, s) {
+        if (boss || !(p in gone)) return [p, s]
+        return [p === "sessions" || p === "rollout" ? "machines" : p === "reports" ? "issues" : "overview", null]
+    }
+    // A tab of a page is a page of its own that the menu does not list: it lights up its parent's entry.
+    readonly property var parents: ({ actions: "automation", registry: "departments" })
+    function parentOf(p) { return parents[p] || "" }
     function go(p, s) {
         var r = route(p, s === undefined ? null : s)
+        r = remap(r[0], r[1])
         page = r[0]
         sub = r[1] === undefined ? null : r[1]
         went(page, sub)
@@ -57,20 +67,20 @@ QtObject {
     readonly property var adminMenu: [
         ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
                   ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
-        ["Monitor", [["machines", "Machines", "desktop"], ["sessions", "Sessions", "login"], ["issues", "Issues", "alert"]]],
-        ["Automate", [["automation", "Automation", "thunderbolt"], ["actions", "Actions", "playcircle"]]],
-        ["Govern", [["rollout", "Rollout", "cloudupload"], ["audit", "Audit log", "history"], ["reports", "Reports", "filetext"]]]
+        ["Monitor", [["machines", "Machines", "desktop"], ["issues", "Issues", "alert"]]],
+        ["Automate", [["automation", "Automation", "thunderbolt"]]],
+        ["Govern", [["audit", "Audit log", "history"]]]
     ]
     readonly property var suMenu: [
         ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
                   ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
-        ["Organisation", [["departments", "Departments", "apartment"], ["accountability", "Accountability", "eye"],
-                          ["access", "Access", "login"], ["registry", "Registry", "desktop"], ["reports", "Reports", "filetext"]]],
-        ["Govern", [["rules", "Rules", "safety"], ["rollout", "Rollout", "cloudupload"], ["audit", "Audit log", "history"]]]
+        ["Organisation", [["departments", "Departments", "apartment"]]],
+        ["Govern", [["audit", "Audit log", "history"]]]
     ]
     readonly property var menu: boss ? suMenu : adminMenu
 
     function allowed(p) {
+        if (parents[p]) return allowed(parents[p])
         for (var g = 0; g < menu.length; g++)
             for (var i = 0; i < menu[g][1].length; i++) if (menu[g][1][i][0] === p) return true
         return false

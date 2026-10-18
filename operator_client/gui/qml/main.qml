@@ -69,18 +69,12 @@ ApplicationWindow {
         restricted: "RestrictedPage.qml",
         flows: "FlowsPage.qml",
         machines: "MachinesPage.qml",
-        sessions: "AccessPage.qml",
         issues: "IssuesPage.qml",
         automation: "AutomationPage.qml",
         actions: "ActionsPage.qml",
-        rollout: "RolloutPage.qml",
         audit: "AuditPage.qml",
-        reports: "ReportsPage.qml",
         departments: "DepartmentsPage.qml",
-        accountability: "AccountabilityPage.qml",
-        access: "AccessPage.qml",
         registry: "RegistryPage.qml",
-        rules: "RulesPage.qml",
     })
 
     // a page and the thing open on it: some open a page of their own (a machine, an editor)
@@ -91,7 +85,6 @@ ApplicationWindow {
         if (p === "restricted" && s === "mark") return "MarkPage.qml"
         if (p === "flows" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewFlowPage.qml"
         if (p === "automation" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewRulePage.qml"
-        if (p === "rules" && s && (s === "new" || String(s).indexOf("edit-") === 0 || String(s).indexOf("from-") === 0)) return "RuleBuilderPage.qml"
         if (p === "actions" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewActionPage.qml"
         var f = shell.pages[p]
         return f === undefined || f === "" ? "Pending.qml" : f

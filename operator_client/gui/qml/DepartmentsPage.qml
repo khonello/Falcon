@@ -40,6 +40,8 @@ Page {
     readonly property int admins: Fleet.depts.reduce(function (a, x) { return a + x.admins.length }, 0)
     readonly property int off: Fleet.machines.filter(function (m) { return !m.online }).length
 
+    PageTabs { options: [{ value: "departments", label: "Departments" }, { value: "registry", label: "Machines and accounts" }]; current: "departments" }
+
     Strip {
         width: parent.width
         items: [

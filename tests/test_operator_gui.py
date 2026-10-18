@@ -242,10 +242,9 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
     return win.findChild(QObject, name)
 
 
-ADMIN_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "machines", "sessions", "issues",
-              "automation", "actions", "rollout", "audit", "reports"]
-SU_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "departments", "accountability", "access",
-           "registry", "reports", "rules", "rollout", "audit"]
+ADMIN_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "machines", "issues", "automation", "audit"]
+SU_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "departments", "audit"]
+TABS = ["actions", "registry"]                  # pages the menu does not list: tabs of Automation and of Departments (docs/design/pruning.md)
 
 
 async def test_the_shell_is_the_console(console):
@@ -278,17 +277,17 @@ async def test_the_super_user_has_their_own_level_and_enters_an_admin_s(console)
 
 
 async def test_the_super_user_never_opens_an_admin_s_page(console):
-    """A machine opens in Registry and a session in Access (docs/design/su-navigation.md)."""
+    """A machine opens in Registry, a tab of Departments; a pruned page lands on Overview (docs/design/su-navigation.md, pruning.md)."""
     win, _, _ = console("super_user")
     win.setProperty("view", "machines/OPS-01")
     assert prop(win, "where") == "registry/OPS-01"
-    win.setProperty("view", "sessions")
-    assert prop(win, "where") == "access"
+    win.setProperty("view", "access")
+    assert prop(win, "where") == "overview"
 
 
-PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [
+PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [("admin", "actions"), ("super_user", "registry")] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
-    ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("super_user", "messages/announcements"), ("admin", "machines/OPS-01"), ("super_user", "rules/new"), ("super_user", "rules/edit-O-5"), ("super_user", "tasks/new")]
+    ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("super_user", "messages/announcements"), ("admin", "machines/OPS-01"), ("super_user", "tasks/new")]
 
 
 @pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])
@@ -315,25 +314,6 @@ async def test_a_department_without_an_admin_comes_first(console):
     assert prop(view, "d")["name"] == "Logistics"
 
 
-async def test_a_deviation_is_a_record_against_a_rule(console):
-    """The Engine's deviations: each read against its rule, what was expected beside what happened, the open one
-    before the one dealt with; the record's evidence below, and an outcome recorded with the person's note."""
-    win, bridge, _ = console("super_user")
-    view = await _open(win, bridge, "accountability", "accountabilityView")
-    await _wait(lambda: len(prop(view, "all") or []) == 2)
-    dev = prop(view, "dev")
-    assert dev["rule"] == "B-4" and dev["out"] == "open" and dev["code"] == "D-87"
-    assert dev["expected"] == "The certificate names OPS-01"
-    assert dev["happened"] == "The certificate names WS-OPS-01"
-    assert [d["id"] for d in prop(view, "list")] == ["87"]          # open only, by default
-    await _wait(lambda: prop(view, "evidence") == ["Kojo was signed in to OPS-01 at the time."])
-    view.setProperty("note", "A new image set the long name")
-    QMetaObject.invokeMethod(view, "record", Q_ARG("QVariant", "explained"))
-    await _wait(lambda: any(t == "deviations.outcome" for t, _ in bridge.conn.seen))
-    sent = next(p for t, p in bridge.conn.seen if t == "deviations.outcome")
-    assert sent == {"deviation_id": 87, "outcome": "explained", "note": "A new image set the long name"}
-    view.setProperty("oc", "all")
-    assert [d["id"] for d in prop(view, "list")] == ["87", "80"]
 
 
 async def test_refused_connections_are_one_row_per_key(console):
@@ -352,13 +332,6 @@ async def test_refused_connections_are_one_row_per_key(console):
     assert next(r for r in rows if r["id"] == "OPS-01")["gen"] == 2
 
 
-async def test_the_built_in_rules_are_listed_and_locked(console):
-    """Every deviation points to a rule; the ones Falcon enforces are listed, and none can be edited."""
-    win, bridge, _ = console("super_user")
-    view = await _open(win, bridge, "rules", "rulesView")
-    rules = prop(view, "all")
-    assert [r["id"] for r in rules] == ["B-1", "B-2", "B-3", "B-4"]
-    assert all(r["locked"] for r in rules)
 
 
 async def test_entering_a_worker_s_machine_opens_its_session_window(console):
@@ -501,36 +474,8 @@ async def test_one_person_s_pings_are_one_row_with_every_time(console):
     assert len(pings[0]["times"]) == 2
 
 
-async def test_a_report_says_whose_it_is_as_the_engine_decides(console):
-    """reports.board's owner decides the wording: a department without an Admin keeps its reports with the Super User."""
-    win, bridge, _ = console("super_user")
-    view = await _open(win, bridge, "reports", "reportsView")
-    await _wait(lambda: len(prop(view, "rows") or []) == 2)
-    rows = {r["id"]: r for r in prop(view, "rows")}
-    assert rows[40]["st"] == "you" and rows[41]["st"] == "done"
-    from PySide6.QtCore import Q_RETURN_ARG
-    for rid, want in ((40, "You only · Logistics has no Admin"), (41, "You and Operations")):
-        out = QMetaObject.invokeMethod(view, "goesTo", Q_RETURN_ARG("QVariant"), Q_ARG("QVariant", rows[rid]))
-        assert out == want
 
 
-async def test_a_rule_is_edited_in_the_engine_s_rule_store(console):
-    """The Super User's rule from rules.list opens in the builder as it was saved, and saving sends the changed
-    line to rules.update in the Engine's spec: minutes, the response, the scope."""
-    win, bridge, _ = console("super_user")
-    bridge.connected.emit()
-    win.setProperty("view", "rules/edit-O-5")
-    await _wait(lambda: win.findChild(QObject, "ruleBuilder") is not None)
-    page = win.findChild(QObject, "ruleBuilder")
-    await _wait(lambda: (prop(page, "s") or {}).get("name") == "Unanswered help request")
-    s = prop(page, "s")
-    assert s["shape"] == "follow" and s["within"] == {"n": 1, "unit": "hours"} and s["resp"]["admin"] is True
-    QMetaObject.invokeMethod(page, "set", Q_ARG("QVariant", "within"), Q_ARG("QVariant", {"n": 2, "unit": "hours"}))
-    QMetaObject.invokeMethod(page, "save")
-    await _wait(lambda: any(t == "rules.update" for t, _ in bridge.conn.seen))
-    sent = next(p for t, p in bridge.conn.seen if t == "rules.update")
-    assert sent["rule_id"] == 5 and sent["within"] == 120 and sent["trigger"] == "help" and sent["expect"] == "answer"
-    assert sent["resp"] == {"report": True, "admin": True, "action": False} and sent["who"] == "admins" and sent["depts"] == "all"
 
 
 def test_nothing_clickable_uses_a_taphandler():

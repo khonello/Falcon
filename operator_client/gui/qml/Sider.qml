@@ -71,7 +71,7 @@ Rectangle {
                             id: item
                             required property var modelData
                             readonly property string key: modelData[0]
-                            readonly property bool on: Nav.page === key
+                            readonly property bool on: Nav.page === key || Nav.parentOf(Nav.page) === key
                             readonly property var c: Nav.counts[key]
                             objectName: "nav_" + key
                             width: groups.width
