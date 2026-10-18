@@ -64,7 +64,7 @@ Popup {
             // what the Engine found, in the concept's groups; each opens where the Engine says, at this level
             found.forEach(function (x) {
                 if (x.kind === "machine") { var fm = Fleet.byHost[x.title]
-                    all.push({ g: "Machines", l: x.title, s: (fm ? (fm.user || "no user") + " · " + Fleet.words[fm.status] : x.sub), icon: "desktop", mono: true, page: Nav.boss ? "registry" : "machines", sub: x.title }) }
+                    all.push({ g: "Machines", l: x.title, s: (fm ? (fm.user || "no user") + " · " + Fleet.words[fm.status] : x.sub), icon: "desktop", mono: true, page: "machines", sub: x.title }) }
                 else if (x.kind === "issue") all.push({ g: "Issues", l: x.title, s: x.sub, icon: "alert", page: Nav.boss ? "departments" : "issues", sub: Nav.boss ? x.department_id : x.id })
                 else if (x.kind === "task") all.push({ g: "Tasks", l: x.title, s: x.sub, icon: "checkcircle", page: "tasks", sub: null })
                 else if (x.kind === "flow") all.push({ g: "Flows", l: x.title, s: x.sub, icon: "branches", mono: true, page: "flows", sub: String(x.id) })
@@ -73,7 +73,7 @@ Popup {
             })
         } else if (!cmd) {
             for (var k = 0; k < machines.length; k++)
-                all.push({ g: "Machines", l: machines[k].host, s: machines[k].sub, icon: "desktop", mono: true, page: Nav.boss ? "registry" : "machines", sub: machines[k].host })
+                all.push({ g: "Machines", l: machines[k].host, s: machines[k].sub, icon: "desktop", mono: true, page: "machines", sub: machines[k].host })
             if (Nav.boss)
                 for (var d = 0; d < depts.length; d++)
                     all.push({ g: "Departments", l: depts[d].name, s: depts[d].admins.length ? Theme.listNames(depts[d].admins) : "no Admin",
@@ -97,7 +97,7 @@ Popup {
         }
         for (var gg in extra)
             out.push({ g: gg, l: "+" + extra[gg] + " more " + gg.toLowerCase(), s: "type more to narrow, or open the full list",
-                       icon: "ellipsis", page: gg === "Machines" ? (Nav.boss ? "registry" : "machines") : gg === "Issues" ? (Nav.boss ? "departments" : "issues") : gg === "Tasks" ? "tasks" : gg === "Flows" ? "flows" : gg === "Rules" ? "rules" : "departments", sub: null })
+                       icon: "ellipsis", page: gg === "Machines" ? (Nav.boss ? "departments" : "machines") : gg === "Issues" ? (Nav.boss ? "departments" : "issues") : gg === "Tasks" ? "tasks" : gg === "Flows" ? "flows" : gg === "Rules" ? "rules" : "departments", sub: null })
         if (cmd) {           // in command mode what can be done comes first, then the pages
             var rank = { "Commands": 0, "Actions": 1 }
             out = out.map(function (x, i) { return { x: x, i: i } }).sort(function (a, b) {

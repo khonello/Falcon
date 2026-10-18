@@ -71,8 +71,6 @@ Page {
         })
     }
 
-    PageTabs { options: [{ value: "automation", label: "Rules" }, { value: "actions", label: "Actions" }]; current: "automation" }
-
     Strip {
         width: parent.width
         on: page.pf === "" ? null : "probs"

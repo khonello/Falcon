@@ -4845,26 +4845,26 @@ function Registry({ go, enter, open }) {
   const [q, setQ] = useState("");
   const [modal, modalCtx] = Modal.useModal();
   const GEN = { "OPS-05": 2, "OPS-06": 2, "LOG-02": 3 };
-  const accts = [{ id: "acct:You", name: "You", role: "Super User", dept: "Head office", ws: "ADM-01", gen: 1, now: "Signed in now" },
-    ...Object.entries(ADMIN_INFO).filter(([, a]) => FULL_DEPTS().some((d) => d.id === a.dept)).map(([n, a]) => ({ id: "acct:" + n, name: n, role: "Admin", dept: deptNameOf(a.dept), ws: a.ws, gen: 1 + (hs(n) % 3), now: a.now }))];
+  const su = ME === "Super User";
+  const accts = su ? [] : [...Object.entries(ADMIN_INFO).filter(([, a]) => ADMIN_INFO[ME] && a.dept === ADMIN_INFO[ME].dept).map(([n, a]) => ({ id: "acct:" + n, name: n, role: "Admin", dept: deptNameOf(a.dept), ws: a.ws, gen: 1 + (hs(n) % 3), now: a.now })), ...MACHINES.filter((m) => m.user).map((m) => ({ id: "acct:" + m.user, name: m.user, role: "Worker", dept: deptNameOf(m.dept), ws: m.host, gen: 1, now: m.status === "offline" ? "Not signed in" : "Signed in" }))];
   const rows = MACHINES.map((m) => ({ ...m, id: m.host, gen: GEN[m.host] || 1, dn: deptNameOf(m.dept) })).filter((m) => `${m.host} ${m.user || ""} ${m.dn}`.toLowerCase().includes(q.toLowerCase()));
-  const [tab, setTab] = useState(() => (open && String(open).startsWith("acct:") ? "acct" : open && String(open).startsWith("door:") ? "door" : "pc"));
+  const [tab, setTab] = useState(() => (su ? "door" : open && String(open).startsWith("acct:") ? "acct" : "pc"));
   const sid = sel || (tab === "acct" ? accts[0].id : tab === "door" ? (REFUSED[0] || {}).id : rows[0] && rows[0].id);
   const door = REFUSED.find((y) => y.id === sid);
   const m = sid && MBY[sid] ? rows.find((y) => y.id === sid) || { ...MBY[sid], gen: GEN[sid] || 1, dn: deptNameOf(MBY[sid].dept) } : null, ac = accts.find((y) => y.id === sid);
-  const tabSw = html`<${Segmented} size="small" value=${tab} onChange=${(v) => { setTab(v); setSel(null); }} options=${[{ value: "pc", label: "Machines" }, { value: "acct", label: `Accounts · ${accts.length}` }, { value: "door", label: `Refused · ${REFUSED.length}` }]} />`;
+  const tabSw = html`<${Segmented} size="small" value=${tab} onChange=${(v) => { setTab(v); setSel(null); }} options=${su ? [{ value: "door", label: `Refused · ${REFUSED.length}` }] : [{ value: "pc", label: "Machines" }, { value: "acct", label: `People · ${accts.length}` }]} />`;
   const rekey = (n) => modal.confirm({ title: `Make a new key for ${n}?`, content: "The old key stops working at once. Whatever uses it has to be given the new one, which is shown once.", okText: "Make a new key", okButtonProps: { danger: true }, cancelText: "Keep the old one", onOk: () => setSpec({ mode: "rekey", subject: n }) });
   const off = MACHINES.filter((y) => y.status === "offline").length;
   return html`<${React.Fragment}>
     ${modalCtx}
-    <${Strip} items=${[
-      { label: "Machines", value: fmt(MACHINES.length), delta: `${fmt(FULL_DEPTS().length)} departments` },
+    <${Strip} items=${(su ? [] : [
+      { label: "Machines", value: fmt(MACHINES.length), delta: "in this department" },
       { label: "Checking in", value: fmt(MACHINES.length - off), unit: "/ " + fmt(MACHINES.length), delta: off ? `${fmt(off)} not checking in` : "every one", dc: off ? "var(--crit)" : undefined },
-      { label: "Accounts", value: fmt(accts.length), delta: "you and every Admin" },
-      { label: "Refused this week", value: fmt(REFUSED.length), delta: REFUSED.length ? `${fmt(REFUSED.reduce((t, y) => t + y.tries, 0))} tries without a valid key` : "nothing tried without a key", dc: REFUSED.some((y) => y.tone === "bad") ? "var(--crit)" : undefined }]} />
+      { label: "People", value: fmt(accts.length), delta: "in this department" }]).concat(!su ? [] : [
+      { label: "Refused this week", value: fmt(REFUSED.length), delta: REFUSED.length ? `${fmt(REFUSED.reduce((t, y) => t + y.tries, 0))} tries without a valid key` : "nothing tried without a key", dc: REFUSED.some((y) => y.tone === "bad") ? "var(--crit)" : undefined }])} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      ${tab === "acct" ? html`<${ListPanel} title="Accounts" sub="you and every Admin · click one to see it on the right" tools=${tabSw} pick=${sid} onPick=${setSel} rowKey="id" rows=${accts}
-          action=${{ label: "Provision an Admin", onClick: () => setSpec({ mode: "admin" }) }} icon="UserOutlined" name=${{ title: "Account", text: (y) => y.name, line: (y) => `${y.role} · ${y.dept}` }}
+      ${tab === "acct" ? html`<${ListPanel} title="People" sub="your department's people · click one to see it on the right" tools=${tabSw} pick=${sid} onPick=${setSel} rowKey="id" rows=${accts}
+          icon="UserOutlined" name=${{ title: "Account", text: (y) => y.name, line: (y) => `${y.role} · ${y.dept}` }}
           cols=${[{ title: "Workstation", width: 130, text: (y) => y.ws }, { title: "Key", width: 80, text: (y) => `no. ${y.gen}` }]} now=${(y) => [y.now.replace(/ since.*$/, ""), "good"]} />`
         : tab === "door" ? html`<${ListPanel} title="Refused connections" sub="tried this week without a valid key · click one to see it on the right" tools=${tabSw} pick=${sid} onPick=${setSel} rowKey="id" rows=${REFUSED}
           icon="StopOutlined" name=${{ title: "Who tried", text: (y) => y.host, line: (y) => y.ip }} cols=${[{ title: "Refused because", width: 220, text: (y) => y.why[0].toUpperCase() + y.why.slice(1) }, { title: "Tries", width: 70, text: (y) => fmt(y.tries) }, { title: "Last try", width: 120, text: (y) => y.last }]}
@@ -4885,9 +4885,9 @@ function Registry({ go, enter, open }) {
           facts=${m ? [["Department", m.dn], ["Signed in", m.user || "No one"], ["IP address", html`<span className="mono">${m.ip}</span>`], ["Version", m.ver], ["Key", `no. ${m.gen}`], ["Last seen", m.seen > 0.1 ? dur(m.seen) + " ago" : "now"]]
         : ac ? [["Role", ac.role], ["Department", ac.dept], ["Workstation", html`<span className="mono">${ac.ws}</span>`], ["Key", `no. ${ac.gen}`], ["Now", ac.now]] : []}
           actions=${m ? html`${(() => { const ad = (DBY[m.dept] || { admins: [] }).admins;
-        return ad.length ? html`<${Button} icon=${ic("LoginOutlined")} onClick=${() => enter(ad[0], { page: "machines", sub: m.host })}>Work on it in ${ad[0]}'s console →<//>`
-          : html`<${Tooltip} title=${`${m.dn} has no Admin, so there is no console to work on it in. Appoint one first.`}><span><${Button} disabled>No Admin to work on it<//></span><//>`; })()}<${Button} type="primary" danger onClick=${() => rekey(m.host)}>Make a new key<//>`
-        : ac ? html`${ac.role === "Admin" ? html`<${Button} danger onClick=${() => toast(`Removed ${ac.name} (concept)`)}>Stop being an Admin<//>` : null}<${Button} type="primary" danger onClick=${() => rekey(ac.name === "You" ? "your account" : ac.name)}>Make a new key<//>` : null} />`
+        return su ? (ad.length ? html`<${Button} icon=${ic("LoginOutlined")} onClick=${() => enter(ad[0], { page: "machines", sub: m.host })}>Work on it in ${ad[0]}'s console →<//>`
+          : html`<${Tooltip} title=${`${m.dn} has no Admin, so there is no console to work on it in. Appoint one first.`}><span><${Button} disabled>No Admin to work on it<//></span><//>`) : null; })()}<${Button} type="primary" danger onClick=${() => rekey(m.host)}>Make a new key<//>`
+        : ac ? html`${su && ac.role === "Admin" ? html`<${Button} danger onClick=${() => toast(`Removed ${ac.name} (concept)`)}>Stop being an Admin<//>` : null}<${Button} type="primary" danger onClick=${() => rekey(ac.name === "You" ? "your account" : ac.name)}>Make a new key<//>` : null} />`
         : html`<${SidePanel} empty=${html`<${Empty} icon="DesktopOutlined" title="Nothing picked" text="Pick something in the list." h=${200} />`} />`}
     </div>
     <${KeyModal} spec=${spec} onClose=${() => setSpec(null)} />
@@ -5394,7 +5394,7 @@ function SUOverview({ go }) {
 const NAV_ADMIN = [
   ["Core", [["overview", "Overview", "DashboardOutlined"], ["messages", "Messages", "MessageOutlined", () => msgWaiting(), true, true], ["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"], ["detective", "Detective", "FileSearchOutlined", () => DET.cases.filter((c) => c.status === "open" && c.level === "urgent").length, true]]],
   ["Monitor", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
-  ["Automate", [["automation", "Automation", "ThunderboltOutlined"]]],
+  ["Automate", [["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
   ["Govern", [["audit", "Audit log", "HistoryOutlined"]]],
 ];
 // The Super User's menu has the same shape as the Admin's: the core areas first, then running the organisation.
@@ -5423,8 +5423,9 @@ function suRoute(p, s) {
 }
 const SU_PARENT = { dept: "departments" };
 // Pages the menu does not list: tabs of the page that took them in (docs/design/pruning.md)
-const TAB_OF = { registry: "departments", actions: "automation" };
-const TAB_SETS = { departments: [["departments", "Departments"], ["registry", "Machines and accounts"]], registry: [["departments", "Departments"], ["registry", "Machines and accounts"]], automation: [["automation", "Rules"], ["actions", "Actions"]], actions: [["automation", "Rules"], ["actions", "Actions"]] };
+// (Registry: the Admin's machines and people, a tab of Machines; the Super User's is only the refused connections, a tab of Departments)
+const tabParent = (p, level) => (p === "registry" ? (level ? "machines" : "departments") : null);
+const tabsFor = (p, level) => (level ? (p === "machines" || p === "registry" ? [["machines", "Machines"], ["registry", "Registry"]] : null) : (p === "departments" || p === "registry" ? [["departments", "Departments"], ["registry", "Refused connections"]] : null));
 const TITLES = { detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"], messages: ["Messages", "Pings and the conversations they open, one message each way at a time"], departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"], accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"], access: ["Access", "Who is inside which machine, and who was let in"], registry: ["Registry", "Machines and accounts · register, re-key, provision"], rules: ["Rules", "The standard the organisation is measured against"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
 function Palette({ go, close, nav, su }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
@@ -5512,7 +5513,7 @@ function App() {
     if (refused) sub = rawPage === "automation" && ru ? ru.id : null;
   }
   const nav = level ? NAV_ADMIN : NAV_SU;
-  const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)).concat(Object.keys(TAB_OF).filter((k) => nav.some(([, xs]) => xs.some((x) => x[0] === TAB_OF[k])))));
+  const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)).concat(["registry"]));
   const page = allowed.has(rawPage) ? rawPage : "overview";
   const goRaw = (p, s0) => { setRoute([p, s0 || null]); try { history.replaceState(null, "", "#" + p + (s0 ? "/" + encodeURIComponent(s0) : "")); } catch (e) {} if (p !== page || p !== "issues") window.scrollTo(0, 0); };
   const go = (p0, s00) => { const [p, s0] = level ? [p0, s00] : suRoute(p0, s00 || null); goRaw(p, s0); };
@@ -5574,7 +5575,7 @@ function App() {
           : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} department${(FULL.DEPTS || DEPTS).length === 1 ? "" : "s"}</div></div></div>`}
         ${nav.map(([g, xs]) => {
-          const items = xs.map(([id, l, icon, cnt, hot, pulse]) => { const on = page === id || (!level && SU_PARENT[page] === id) || TAB_OF[page] === id, n = typeof cnt === "function" ? cnt() : cnt;
+          const items = xs.map(([id, l, icon, cnt, hot, pulse]) => { const on = page === id || (!level && SU_PARENT[page] === id) || tabParent(page, level) === id, n = typeof cnt === "function" ? cnt() : cnt;
             return html`<div key=${id} className=${"nav" + (on ? " on" : "")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
             ${ic(icon)}<span>${l}</span>${n ? html`<span className=${"cnt" + (hot ? " hot" : "") + (pulse ? " pulse" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null}</div>`; });
           return html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}${items}<//>`; })}
@@ -5616,7 +5617,7 @@ function App() {
         <main className="content">
           ${!csub || !["machines", "tasks", "automation", "flows", "actions", "restricted", "rules"].includes(page) ? html`<div className="ph1"><div><h1>${title}</h1>${subtitle ? html`<div className="sub">${subtitle}</div>` : null}</div></div>` : null}
           ${refused ? html`<div className="gate"><span style=${{ fontSize: 16 }}>${ic("StopOutlined")}</span><div><b style=${{ fontWeight: 600 }}>That is not this console's.</b> <span className="t2">${refused}</span></div></div>` : null}
-          ${TAB_SETS[page] ? html`<${Segmented} size="small" value=${page} onChange=${(v) => go(v)} options=${TAB_SETS[page].map(([v, l]) => ({ value: v, label: l }))} style=${{ alignSelf: "flex-start" }} />` : null}
+          ${tabsFor(page, level) && !(page === "machines" && sub) ? html`<${Segmented} size="small" value=${page} onChange=${(v) => go(v)} options=${tabsFor(page, level).map(([v, l]) => ({ value: v, label: l }))} style=${{ alignSelf: "flex-start" }} />` : null}
           ${body}
         </main>
       </div>

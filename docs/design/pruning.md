@@ -12,15 +12,18 @@ else earns its place by serving them or is cut. Nothing here deletes data or dat
 | Reports page and report routing | **Cut the page; routing becomes fixed** | The queue (Super User) and Issues (Admin) already show what reports produce; each kind goes to the department's Admins and the Super User, an Admin's own conduct to the Super User only. |
 | Rollout page (both levels) and the version-approval gate | **Cut the page** | Version and "behind" already show on Machines / Departments; a stuck update arrives as an issue. The gate is decided at the split. |
 | Access (Super User) and Sessions (Admin) pages | **Cut the pages** | Who is inside a machine is already on the machine's row ("Someone inside" filter) and its page. |
-| Registry | **Becomes a tab of Departments** ("Machines and accounts"), not a page of its own | The owner's call; machines and accounts belong to departments. |
-| Actions | **Becomes a tab of Automation** | The library exists to serve rules. |
+| Registry | **Moves to the Admin level**, as a tab of Machines (the department's machines and people, register and re-key a PC, let a new machine in). The Super User keeps only what the Engine reserves for them: refused connections and moving to another machine, as a tab of Departments | The owner's call (18 Oct): registering and re-keying is operations, not oversight. The Engine already lets an Admin do all of it inside their department. |
+| Actions | **Stays its own Admin page** (the merge into Automation was reverted at the owner's request) | The owner's call. |
 | Issues (Admin) | **Stays**, as the Admin's one inbox; the Super User's one inbox is the "Waiting on you" queue | Each level has exactly one place where things that need a person are decided. Replacing Issues with the queue is a large change for little gain. |
 
 ## Menus after
-- **Admin:** Core (Overview, Messages, Tasks, Flows, Restricted, Detective) · Monitor (Machines, Issues) · Automate (Automation, with an Actions tab) · Govern (Audit log).
-- **Super User:** Core (the same six) · Organisation (Departments, with a Machines and accounts tab) · Govern (Audit log).
+- **Admin:** Core (Overview, Messages, Tasks, Flows, Restricted, Detective) · Monitor (Machines with a Registry tab, Issues) · Automate (Automation, Actions) · Govern (Audit log).
+- **Super User:** Core (the same six) · Organisation (Departments, with a Refused connections tab) · Govern (Audit log).
 
-From 14 pages to 10 (Admin) and to 8 (Super User).
+From 14 pages to 11 (Admin) and to 8 (Super User).
+
+## The Super User sees and does less (owner, 18 Oct)
+A CEO-level view: pages grouped by department, read first, at most one decision each; anything operational is an "Open in [Admin]'s console" link. The Super User keeps: giving and completing department tasks, assigning an Admin, escalations and cases on Admin machines, a flow asking to carry something they marked, marking their own files, pinging Admins. Tasks and Flows are rebuilt this way first; Detective, Restricted and Departments follow.
 
 ## Still to decide at the split
 Custom Actions (unsandboxed scripts), the version-approval gate, the rule builder under Automation, and whether the removed pages' Engine handlers are deleted or only gated.

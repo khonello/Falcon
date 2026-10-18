@@ -71,6 +71,8 @@ Page {
         })
     }
 
+    PageTabs { options: [{ value: "machines", label: "Machines" }, { value: "registry", label: "Registry" }]; current: "machines" }
+
     Strip {
         width: parent.width
         on: page.f === "" ? null : page.f

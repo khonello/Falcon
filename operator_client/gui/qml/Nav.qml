@@ -36,7 +36,7 @@ QtObject {
     function route(p, s) {
         if (!boss) return [p, s]
         if (p === "dept") return ["departments", s]
-        if (p === "machines") return ["registry", s]
+        if (p === "machines") { var m = Fleet.byHost[s]; return ["departments", m ? m.dept : null] }
         if (p === "issues") return ["departments", null]
         if (p in gone) return ["overview", null]
         return [p, s]
@@ -48,8 +48,8 @@ QtObject {
         return [p === "sessions" || p === "rollout" ? "machines" : p === "reports" ? "issues" : "overview", null]
     }
     // A tab of a page is a page of its own that the menu does not list: it lights up its parent's entry.
-    readonly property var parents: ({ actions: "automation", registry: "departments" })
-    function parentOf(p) { return parents[p] || "" }
+    // (the Super User's Registry is only what the Engine reserves for them: refused connections and moving to another machine)
+    function parentOf(p) { return p === "registry" ? (boss ? "departments" : "machines") : "" }
     function go(p, s) {
         var r = route(p, s === undefined ? null : s)
         r = remap(r[0], r[1])
@@ -68,7 +68,7 @@ QtObject {
         ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
                   ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
         ["Monitor", [["machines", "Machines", "desktop"], ["issues", "Issues", "alert"]]],
-        ["Automate", [["automation", "Automation", "thunderbolt"]]],
+        ["Automate", [["automation", "Automation", "thunderbolt"], ["actions", "Actions", "playcircle"]]],
         ["Govern", [["audit", "Audit log", "history"]]]
     ]
     readonly property var suMenu: [
@@ -80,7 +80,7 @@ QtObject {
     readonly property var menu: boss ? suMenu : adminMenu
 
     function allowed(p) {
-        if (parents[p]) return allowed(parents[p])
+        if (parentOf(p) !== "") return allowed(parentOf(p))
         for (var g = 0; g < menu.length; g++)
             for (var i = 0; i < menu[g][1].length; i++) if (menu[g][1][i][0] === p) return true
         return false
@@ -114,6 +114,8 @@ QtObject {
     function subtitle(p) {
         if (p === "overview") return boss ? "What needs you, and how the organisation is doing"
                                           : (deptName ? deptName + " · as " + me + " sees it" : titles.overview[1])
+        if (boss && p === "registry") return "What was turned away at the door, and moving the Super User to another machine"
+        if (!boss && p === "registry") return "This department's machines and people · register, re-key, and let a new machine in"
         if (boss && p === "tasks") return "Work you give departments, and how far each has got"
         if (boss && p === "flows") return "Every flow in the organisation · you can send between any two machines"
         return titles[p] ? titles[p][1] : ""

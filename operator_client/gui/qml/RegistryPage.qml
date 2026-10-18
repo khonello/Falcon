@@ -10,7 +10,8 @@ Page {
     id: page
     objectName: "registryView"
 
-    property string tab: typeof Nav.sub === "string" && Nav.sub === "ask" ? "ask" : typeof Nav.sub === "string" && Nav.sub.indexOf("acct:") === 0 ? "acct" : typeof Nav.sub === "string" && Nav.sub.indexOf("door:") === 0 ? "door" : "pc"
+    // the Admin's Registry is their department's machines and people, and who is asking to join; the Super User's is only what the Engine keeps for them
+    property string tab: typeof Nav.sub === "string" && Nav.sub === "ask" ? "ask" : Nav.boss ? "door" : typeof Nav.sub === "string" && Nav.sub.indexOf("acct:") === 0 ? "acct" : "pc"
     property var sel: typeof Nav.sub === "string" && Nav.sub ? Nav.sub : null
     property var list: []          // machines.list, when the Engine has it
     property var refused: []       // registry.refused, this week
@@ -50,7 +51,7 @@ Page {
             return { id: "acct:" + a.account_id, account: a.account_id, name: a.name, you: a.you, role: a.role === "super_user" ? "Super User" : a.role === "admin" ? "Admin" : "Worker",
                      dept: a.department_name || "Head office", deptId: a.department_id, ws: a.workstation || "", pc_id: a.pc_id, gen: a.key_generation, now: a.now }
         })
-        : [{ id: "acct:me", account: falcon.accountId, name: "You", you: true, role: "Super User", dept: "Head office", ws: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].hostname : "", pc_id: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].pc_id : (falcon.pcId || null), gen: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].key_generation : null, now: "Signed in now" }]
+        : !Nav.boss ? [] : [{ id: "acct:me", account: falcon.accountId, name: "You", you: true, role: "Super User", dept: "Head office", ws: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].hostname : "", pc_id: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].pc_id : (falcon.pcId || null), gen: page.wsGen[falcon.accountId] ? page.wsGen[falcon.accountId].key_generation : null, now: "Signed in now" }]
         .concat([].concat.apply([], Fleet.depts.map(function (d) { return d.admins.map(function (a) {
             var w = page.wsGen[a.account_id]
             return { id: "acct:" + a.account_id, account: a.account_id, name: a.name, role: "Admin", dept: d.name, deptId: d.id, ws: a.hostname || (w ? w.hostname : ""), pc_id: w ? w.pc_id : a.pc_id,
@@ -87,7 +88,8 @@ Page {
         return src.length ? src[0] : null
     }
     readonly property int off: Fleet.machines.filter(function (m) { return !m.online }).length
-    readonly property var tabs: [{ value: "pc", label: "Machines" }, { value: "acct", label: "Accounts · " + accts.length }, { value: "door", label: "Refused · " + doors.length }]
+    readonly property var tabs: (Nav.boss ? [{ value: "door", label: "Refused · " + doors.length }]
+                                           : [{ value: "pc", label: "Machines" }, { value: "acct", label: "People · " + accts.length }])
                                 .concat(asks.length ? [{ value: "ask", label: "Asking to join · " + asks.length }] : [])
     onCurChanged: code = ""
 
@@ -124,7 +126,8 @@ Page {
               onClicked: page.openHandover(!(page.handover && page.handover.open)) }
     }
 
-    PageTabs { options: [{ value: "departments", label: "Departments" }, { value: "registry", label: "Machines and accounts" }]; current: "registry" }
+    PageTabs { options: Nav.boss ? [{ value: "departments", label: "Departments" }, { value: "registry", label: "Refused connections" }]
+                                 : [{ value: "machines", label: "Machines" }, { value: "registry", label: "Registry" }]; current: "registry" }
 
     Strip {
         width: parent.width
@@ -132,11 +135,11 @@ Page {
             { label: "Machines", value: Theme.fmt(Fleet.machines.length), delta: Theme.many(Fleet.depts.length, "department") },
             { label: "Checking in", value: Theme.fmt(Fleet.machines.length - page.off), unit: "/ " + Theme.fmt(Fleet.machines.length),
               delta: page.off ? Theme.fmt(page.off) + " not checking in" : "every one", dc: page.off ? Theme.crit : undefined },
-            { label: "Accounts", value: Theme.fmt(page.accts.length), delta: "you and every Admin" },
-            { label: "Refused this week", value: Theme.fmt(page.doors.length),
+            { label: "People", value: Theme.fmt(page.accts.length), delta: "in this department" },
+            { label: "Asking to join", value: Theme.fmt(page.asks.length), delta: page.asks.length ? "type the code it shows" : "nobody", dc: page.asks.length ? Theme.med : undefined }
+        ].slice(Nav.boss ? 3 : 0, Nav.boss ? 4 : 4).concat(Nav.boss ? [{ label: "Refused this week", value: Theme.fmt(page.doors.length),
               delta: page.doors.length ? Theme.fmt(page.doors.reduce(function (t, y) { return t + y.tries }, 0)) + " tries without a valid key" : "nothing tried without a key",
-              dc: page.doors.some(function (y) { return y.tone === "bad" }) ? Theme.crit : undefined }
-        ]
+              dc: page.doors.some(function (y) { return y.tone === "bad" }) ? Theme.crit : undefined }] : [])
     }
 
     Row {
@@ -175,10 +178,8 @@ Page {
                 visible: page.tab === "acct"
                 width: parent.width
                 title: "Accounts"
-                sub: "you and every Admin · click one to see it on the right"
+                sub: "your department's people · click one to see it on the right"
                 tools: Segmented { value: page.tab; options: page.tabs; onPicked: function (v) { page.tab = v; page.sel = null } }
-                actionLabel: "Provision an Admin"
-                onAction: keys.ask({ mode: "admin" })
                 rows: page.accts
                 pick: page.cur ? page.cur.id : null
                 onPicked: function (k) { page.sel = k }
@@ -256,14 +257,14 @@ Page {
             }
             actions: [
                 // a machine
-                Btn { visible: page.tab === "pc" && page.cur !== null && page.cur.m && (Fleet.dept(page.cur.m.dept) || { admins: [] }).admins.length > 0; iconName: "login"
+                Btn { visible: Nav.boss && page.tab === "pc" && page.cur !== null && page.cur.m && (Fleet.dept(page.cur.m.dept) || { admins: [] }).admins.length > 0; iconName: "login"
                       text: page.cur && page.cur.m && Fleet.dept(page.cur.m.dept) && Fleet.dept(page.cur.m.dept).admins.length ? "Work on it in " + Fleet.dept(page.cur.m.dept).admins[0].name + "'s console →" : ""
                       onClicked: Nav.enter(Fleet.dept(page.cur.m.dept).admins[0], ["machines", page.cur.m.host]) },
-                Btn { visible: page.tab === "pc" && page.cur !== null && page.cur.m && (Fleet.dept(page.cur.m.dept) || { admins: [] }).admins.length === 0; enabled: false; text: "No Admin to work on it"
+                Btn { visible: Nav.boss && page.tab === "pc" && page.cur !== null && page.cur.m && (Fleet.dept(page.cur.m.dept) || { admins: [] }).admins.length === 0; enabled: false; text: "No Admin to work on it"
                       tip: page.cur && page.cur.m ? page.cur.m.deptName + " has no Admin, so there is no console to work on it in. Appoint one first." : "" },
                 Btn { visible: page.tab === "pc" && page.cur !== null; kind: "primary"; danger: true; text: "Make a new key"; onClicked: page.rekey(page.cur.m.host, page.cur.m.pc_id) },
                 // an account
-                Btn { visible: page.tab === "acct" && page.cur !== null && page.cur.role === "Admin"; danger: true; text: "Stop being an Admin"; onClicked: page.demote(page.cur) },
+                Btn { visible: Nav.boss && page.tab === "acct" && page.cur !== null && page.cur.role === "Admin"; danger: true; text: "Stop being an Admin"; onClicked: page.demote(page.cur) },
                 Btn { visible: page.tab === "acct" && page.cur !== null; kind: "primary"; danger: true; text: "Make a new key"; enabled: !!(page.cur && page.cur.pc_id); tip: page.cur && !page.cur.pc_id ? "No workstation on record to re-key" : ""
                       onClicked: page.rekey(page.cur.you ? "your account" : page.cur.name, page.cur.pc_id) },
                 // refused

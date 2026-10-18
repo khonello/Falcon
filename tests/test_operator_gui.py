@@ -242,9 +242,9 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
     return win.findChild(QObject, name)
 
 
-ADMIN_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "machines", "issues", "automation", "audit"]
+ADMIN_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "machines", "issues", "automation", "actions", "audit"]
 SU_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "departments", "audit"]
-TABS = ["actions", "registry"]                  # pages the menu does not list: tabs of Automation and of Departments (docs/design/pruning.md)
+TABS = ["registry"]                             # a page the menu does not list: a tab of Machines (Admin) and of Departments (Super User) (docs/design/pruning.md)
 
 
 async def test_the_shell_is_the_console(console):
@@ -277,15 +277,15 @@ async def test_the_super_user_has_their_own_level_and_enters_an_admin_s(console)
 
 
 async def test_the_super_user_never_opens_an_admin_s_page(console):
-    """A machine opens in Registry, a tab of Departments; a pruned page lands on Overview (docs/design/su-navigation.md, pruning.md)."""
+    """A machine opens on its department's page; a pruned page lands on Overview (docs/design/su-navigation.md, pruning.md)."""
     win, _, _ = console("super_user")
     win.setProperty("view", "machines/OPS-01")
-    assert prop(win, "where") == "registry/OPS-01"
+    assert prop(win, "where") == "departments"
     win.setProperty("view", "access")
     assert prop(win, "where") == "overview"
 
 
-PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [("admin", "actions"), ("super_user", "registry")] + [
+PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [("admin", "registry"), ("super_user", "registry")] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
     ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("super_user", "messages/announcements"), ("admin", "machines/OPS-01"), ("super_user", "tasks/new")]
 

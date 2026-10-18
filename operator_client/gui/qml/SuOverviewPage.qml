@@ -150,12 +150,12 @@ Page {
                 visible: Fleet.machines.length > 0
                 width: parent.width
                 by: "Status"
-                openLabel: "See {h} in Registry →"
+                openLabel: "See {h}'s department →"
                 moreLabel: "on Departments →"
-                onOpen: function (h) { Nav.go("registry", h) }
+                onOpen: function (h) { var m = Fleet.byHost[h]; Nav.go("departments", m ? m.dept : null) }
                 onMore: Nav.go("departments")
             }
-            Empty { visible: Fleet.loaded && Fleet.machines.length === 0; width: parent.width; h: 220; icon: "desktop"; title: "No machines yet"; text: "Machines appear here by department as they are registered."; act: "Open Registry →"; onActed: Nav.go("registry") }
+            Empty { visible: Fleet.loaded && Fleet.machines.length === 0; width: parent.width; h: 220; icon: "desktop"; title: "No machines yet"; text: "Machines appear here by department as they are registered."; act: "Open Departments →"; onActed: Nav.go("departments") }
         }
         Grid {
             id: four

@@ -52,8 +52,6 @@ Page {
 
     RunOnce { id: runOnce; page: page }
 
-    PageTabs { options: [{ value: "automation", label: "Rules" }, { value: "actions", label: "Actions" }]; current: "actions" }
-
     Strip {
         width: parent.width
         on: page.cat === "All" ? null : page.cat
