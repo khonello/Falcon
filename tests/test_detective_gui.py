@@ -231,7 +231,7 @@ async def test_an_admin_s_waiting_count_includes_what_detective_suggests_and_the
     await _wait(lambda: prop(page, "suggestions") == 2 and prop(page, "toAllow") == 1)
 
 
-async def test_the_super_user_s_overview_is_the_four_core_features_two_by_two_with_what_waits_above_them(console):
+async def test_the_super_user_s_overview_is_what_waits_a_map_of_the_organisation_and_the_four_core_features_as_tiles(console):
     win, bridge, _ = console("super_user")
     real = bridge.conn.call
 
@@ -253,7 +253,7 @@ async def test_the_super_user_s_overview_is_the_four_core_features_two_by_two_wi
     await _wait(lambda: loader.property("item") is not None and loader.property("item").metaObject().className().startswith("SuOverviewPage"))
     page = loader.property("item")
     await _wait(lambda: prop(page, "ov")["by_level"]["urgent"] == 2 and len(prop(page, "flows")) == 2 and len(prop(page, "marks")) == 1)
-    for name in ("waitingBand", "quadTasks", "quadFlows", "quadRestricted", "quadDetective", "orgStrip"):
+    for name in ("waitingBand", "orgMap", "quadTasks", "quadFlows", "quadRestricted", "quadDetective"):
         assert page.findChild(QObject, name) is not None, name
     h = lambda n: page.findChild(QObject, n).property("height")          
     assert h("quadTasks") == h("quadFlows") and h("quadRestricted") == h("quadDetective")          # side by side, one height

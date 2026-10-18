@@ -5344,50 +5344,47 @@ function DetectivePage({ go, dept }) {
     </div>
   <//>`;
 }
-// The Super User's overview is not the Admin's console. The Admin looks after machines; the Super User looks after the organisation: what waits on them first, then the
-// four things Falcon is sold on as a 2 x 2 (Tasks, Flows, Restricted, Detective, each with three figures and the few that most need a look), then one slim line on the organisation.
+// The Super User's overview is drawn, not listed: what waits on them as a few large cards, the organisation as a map of its machines, and the four core features as one tile each
+// (a picture, one number, one dot per task, flow, mark or case).
 function SUOverview({ go }) {
   useDT();
   const [dec, setDec] = useState(null);
-  const ms = MACHINES, off = ms.filter((m) => m.status === "offline"), bh = ms.filter((m) => m.ver !== "1.4.2").length;
+  const ms = MACHINES, off = ms.filter((m) => m.status === "offline");
   const Q = suQueue(), urgent = Q.filter((x) => x.sev === "high" || x.sev === "critical").length;
-  const wk = weekDevsAll(), openWk = openDevs().length, noAdmin = (FULL.DEPTS || DEPTS).filter((d) => !d.admins.length);
   const tasks = DEPT_TASKS.filter((t) => !t.complete), toClose = tasks.filter((t) => taskState(t) === "done"), late = tasks.filter((t) => t.due < NOWH && taskState(t) !== "done");
-  const taskRows = tasks.slice().sort((a, b) => (taskState(b) === "done") - (taskState(a) === "done") || a.due - b.due).slice(0, 3);
   const flows = EXISTING_FLOWS, running = flows.filter((f) => f.st === "Active"), held = flows.filter((f) => f.st !== "Active"), asking = flows.filter((f) => f.st === "Waiting for a folder");
-  const marks = FULL.MARKS || MARKS, copies = marks.reduce((n, k) => n + copiesOf(k).length, 0), markRows = marks.slice().sort((a, b) => copiesOf(b).length - copiesOf(a).length).slice(0, 3);
-  const cases = DET.cases.filter((c) => c.status === "open" && c.level !== "noted"), urg = cases.filter((c) => c.level === "urgent").length;
-  const Fig = ({ v, l, c }) => html`<div style=${{ minWidth: 120 }}><div style=${{ fontSize: 26, fontWeight: 600, lineHeight: 1.1, color: c || "var(--text)" }}>${v}</div><div className="t3" style=${{ fontSize: 12 }}>${l}</div></div>`;
-  const Line = ({ c, t, r, rc, onClick }) => html`<div className="irow" role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto" }} onClick=${onClick} onKeyDown=${(e) => e.key === "Enter" && onClick()}><i style=${{ background: c }} /><span className="ttl">${t}</span><span style=${{ fontSize: 12, color: rc || "var(--text-3)", whiteSpace: "nowrap" }}>${r}</span></div>`;
-  const Quad = ({ title, sub, to, figs, rows, empty }) => html`<${Panel} flush title=${title} sub=${sub} extra=${html`<${Button} size="small" type="link" onClick=${() => go(to)}>${detCap(to)} →<//>`}>
-    <div className="row" style=${{ gap: 30, padding: "14px 14px 12px", borderBottom: "1px solid var(--grid)", flexWrap: "nowrap" }}>${figs.map((f) => html`<${Fig} key=${f[1]} v=${f[0]} l=${f[1]} c=${f[2]} />`)}</div>
-    ${rows.length ? rows : html`<${Empty} icon="CheckOutlined" title=${empty[0]} text=${empty[1]} h=${130} />`}<//>`;
-  const SW = { told: "Told", sent: "Told", seen: "Seen", ongoing: "Ongoing", done: "Done · yours to close" };
-  const flowWhy = (f) => (f.st === "Waiting for a folder" ? "waiting for a folder to be picked" : f.st === "Degraded" ? "a branch is paused" : f.st);
+  const marks = FULL.MARKS || MARKS, copies = marks.reduce((n, k) => n + copiesOf(k).length, 0);
+  const cases = DET.cases.filter((c) => c.status === "open"), real = cases.filter((c) => c.level !== "noted"), urg = cases.filter((c) => c.level === "urgent").length;
+  const Tile = ({ icon, title, number, caption, tone, dots, to }) => html`<div className="panel" role="button" tabIndex="0" style=${{ height: 168, padding: "14px 16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8 }} onClick=${() => go(to)} onKeyDown=${(e) => e.key === "Enter" && go(to)}>
+    <div className="row" style=${{ gap: 8 }}><span className="t3">${ic(icon)}</span><b className="t2" style=${{ fontWeight: 600 }}>${title}</b></div>
+    <div style=${{ fontSize: 40, fontWeight: 600, lineHeight: 1.1, color: tone || "var(--text)" }}>${number}</div>
+    <div className="t3" style=${{ fontSize: 12 }}>${caption}</div>
+    <div className="row" style=${{ gap: 5, marginTop: "auto" }}>${dots.slice(0, 28).map((c, i) => html`<i key=${i} style=${{ width: 12, height: 12, borderRadius: 3, background: c, display: "inline-block" }} />`)}${dots.length > 28 ? html`<span className="t3" style=${{ fontSize: 11 }}>+${dots.length - 28}</span>` : null}</div></div>`;
   return html`<${React.Fragment}>
-    <${Panel} flush title="Waiting on you" sub=${Q.length ? `${fmt(Q.length)}${urgent ? ` · ${urgent} urgent` : ""} · click one to decide it` : "decisions only you can make"}>
-      ${Q.length ? html`<div style=${{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>${Q.slice(0, 6).map((x) => html`<div key=${x.id} className="irow" role="button" tabIndex="0" style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto", padding: "11px 14px" }} onClick=${() => setDec(x.id)} onKeyDown=${(e) => e.key === "Enter" && setDec(x.id)}>
-        <i style=${{ background: SEV[x.sev].c }} /><span className="ttl" title=${x.title}>${x.short}</span><span className="mono t3" style=${{ fontSize: 11.5, whiteSpace: "nowrap" }}>${x.age}</span></div>`)}</div>
-        ${Q.length > 6 ? html`<div style=${{ padding: "8px 14px" }}><${More} n=${Q.length - 6} what="waiting" onClick=${() => setDec(Q[6].id)} /></div>` : null}`
-        : html`<${Empty} icon="CheckOutlined" title="Nothing is waiting on you" text="Reports nobody below you can take, Detective's suggestions and decisions only you can make appear here." h=${120} />`}
-    <//>
-    <div className="g c-66">
-      <${Quad} title="Tasks" sub="what you have given departments" to="tasks" figs=${[[fmt(tasks.length), "open"], [fmt(toClose.length), "done, yours to close", toClose.length ? "var(--s6)" : null], [fmt(late.length), "past their date", late.length ? "var(--crit)" : null]]}
-        rows=${taskRows.map((t) => html`<${Line} key=${t.id} c=${taskState(t) === "done" ? "var(--s6)" : "var(--text-4)"} t=${t.title} r=${SW[taskState(t)] || taskState(t)} rc=${taskState(t) === "done" ? "var(--s6)" : null} onClick=${() => go("tasks")} />`)} empty=${["No open tasks", "Give a department a piece of work and follow it here."]} />
-      <${Quad} title="Flows" sub="files moving between machines" to="flows" figs=${[[fmt(running.length), "running"], [fmt(held.length), "held up", held.length ? "var(--med)" : null], [fmt(asking.length), "waiting for a yes", asking.length ? "var(--s6)" : null]]}
-        rows=${held.slice(0, 3).map((f) => html`<${Line} key=${f.name} c="var(--med)" t=${`${f.srcs[0][0]} → ${f.dests[0][0][0] === "?" ? "a folder to be picked" : f.dests[0][0]}`} r=${flowWhy(f)} onClick=${() => go("flows", f.name)} />`)} empty=${["Every flow is running", "A flow that is held up, and why, shows here."]} />
+    <div style=${{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="row" style=${{ gap: 10 }}><span className="t3" style=${{ fontSize: 11, fontWeight: 600, letterSpacing: 0.66 }}>WAITING ON YOU</span>${Q.length ? html`<span style=${{ fontSize: 11, color: urgent ? "var(--crit)" : "var(--text-3)" }}>${Q.length}${urgent ? ` · ${urgent} urgent` : ""}</span>` : null}</div>
+      ${Q.length ? html`<div style=${{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>${Q.slice(0, 4).map((x) => html`<div key=${x.id} className="panel" role="button" tabIndex="0" onClick=${() => setDec(x.id)} onKeyDown=${(e) => e.key === "Enter" && setDec(x.id)}
+          style=${{ height: 96, padding: 14, cursor: "pointer", display: "flex", gap: 12, borderColor: `color-mix(in srgb, ${SEV[x.sev].c} 35%, var(--border))` }}>
+          <span style=${{ width: 34, height: 34, borderRadius: "50%", flex: "none", display: "grid", placeItems: "center", background: `color-mix(in srgb, ${SEV[x.sev].c} 14%, transparent)`, color: SEV[x.sev].c }}>${ic(x.icon)}</span>
+          <div style=${{ minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "space-between" }}><b style=${{ fontWeight: 600 }} title=${x.title}>${x.short}</b><span className="t3" style=${{ fontSize: 12 }}>${x.age}</span></div></div>`)}</div>
+        ${Q.length > 4 ? html`<div><${More} n=${Q.length - 4} what="waiting" onClick=${() => setDec(Q[4].id)} /></div>` : null}`
+        : html`<div className="panel row" style=${{ height: 84, justifyContent: "center", gap: 12 }}><span style=${{ color: "var(--ok)", fontSize: 26 }}>${ic("CheckCircleFilled")}</span><div><b>Nothing is waiting on you</b><div className="t3" style=${{ fontSize: 12 }}>Decisions only you can make, and Detective's suggestions, appear here.</div></div></div>`}
     </div>
-    <div className="g c-66">
-      <${Quad} title="Restricted" sub="what must stay where it belongs" to="restricted" figs=${[[fmt(marks.length), "marked"], [fmt(copies), "copies found elsewhere", copies ? "var(--crit)" : null], [fmt(0), "carried by flows"]]}
-        rows=${markRows.map((k) => html`<${Line} key=${k.id} c=${copiesOf(k).length ? "var(--crit)" : "var(--ok)"} t=${`${k.name} · ${k.host}`} r=${copiesOf(k).length ? `${copiesOf(k).length} cop${copiesOf(k).length === 1 ? "y" : "ies"} elsewhere` : "only in its place"} rc=${copiesOf(k).length ? "var(--crit)" : null} onClick=${() => go("restricted", k.id)} />`)} empty=${["Nothing is marked", "Mark a file or folder and Falcon follows its content wherever it is copied."]} />
-      <${Quad} title="Detective" sub="what people seem to be trying to do" to="detective" figs=${[[fmt(urg), "urgent", urg ? "var(--crit)" : null], [fmt(cases.length - urg), "cases", cases.length - urg ? "var(--med)" : null], [fmt(DET.cases.filter((c) => c.status === "open" && c.level === "noted").length), "noted quietly"]]}
-        rows=${cases.slice(0, 3).map((c) => html`<${Line} key=${c.id} c=${c.level === "urgent" ? "var(--crit)" : "var(--med)"} t=${`${c.intent} · ${c.host}`} r=${DET_LEVEL[c.level][0]} rc=${c.level === "urgent" ? "var(--crit)" : "var(--med)"} onClick=${() => go("detective")} />`)} empty=${["Nothing to look at", "When several small things add up to a pattern, the strongest show here."]} />
+    <div style=${{ display: "grid", gridTemplateColumns: "minmax(0, 7fr) minmax(0, 5fr)", gap: 14, alignItems: "stretch" }}>
+      <${Panel} title="The organisation" sub=${`${fmt(ms.length)} machines · ${fmt(ms.length - off.length)} online`} extra=${html`<${Button} size="small" type="link" onClick=${() => go("departments")}>Departments →<//>`}>
+        ${ms.length ? html`<${HostMap} by="Status" onOpen=${(h) => go("registry", h)} openLabel=${(h) => `See ${h} in Registry →`} onMore=${() => go("departments")} moreLabel="on Departments →" />` : html`<${Empty} icon="DesktopOutlined" title="No machines yet" text="Machines appear here by department as they are registered." act="Open Registry →" onAct=${() => go("registry")} h=${220} />`}
+      <//>
+      <div style=${{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignContent: "start" }}>
+        <${Tile} icon="CheckSquareOutlined" title="Tasks" to="tasks" number=${fmt(tasks.length)} caption=${toClose.length ? `${toClose.length} done, yours to close` : late.length ? `${late.length} past their date` : "all on track"} tone=${toClose.length ? "var(--accent)" : late.length ? "var(--crit)" : null}
+          dots=${tasks.map((t) => (taskState(t) === "done" ? "var(--accent)" : t.due < NOWH ? "var(--crit)" : taskState(t) === "sent" ? "var(--text-4)" : "var(--ok)"))} />
+        <${Tile} icon="BranchesOutlined" title="Flows" to="flows" number=${fmt(running.length)} caption=${held.length ? `${held.length} held up${asking.length ? ` · ${asking.length} waiting for a yes` : ""}` : "all running"} tone=${held.length ? "var(--med)" : null}
+          dots=${flows.map((f) => (f.st === "Active" ? "var(--ok)" : f.st === "Waiting for a folder" ? "var(--accent)" : "var(--med)"))} />
+        <${Tile} icon="FileProtectOutlined" title="Restricted" to="restricted" number=${fmt(marks.length)} caption=${copies ? `${copies} cop${copies === 1 ? "y" : "ies"} found elsewhere` : "all where they belong"} tone=${copies ? "var(--crit)" : null}
+          dots=${marks.map((k) => (copiesOf(k).length ? "var(--crit)" : "var(--ok)"))} />
+        <${Tile} icon="FileSearchOutlined" title="Detective" to="detective" number=${fmt(real.length)} caption=${urg ? `${urg} urgent` : real.length ? "worth a look" : "nothing to look at"} tone=${urg ? "var(--crit)" : real.length ? "var(--med)" : null}
+          dots=${cases.map((c) => (c.level === "urgent" ? "var(--crit)" : c.level === "case" ? "var(--med)" : "var(--text-4)"))} />
+      </div>
     </div>
-    <${Strip} items=${[
-      { label: "Machines online", value: `${fmt(ms.length - off.length)} / ${fmt(ms.length)}`, delta: off.length ? `${off.length === 1 ? off[0].host + " is" : fmt(off.length) + " are"} offline` : "all online", dc: off.length ? "var(--crit)" : undefined },
-      { label: "Departments", value: fmt((FULL.DEPTS || DEPTS).length), delta: noAdmin.length ? `${noAdmin.map((d) => d.name).join(", ")} has no Admin` : "every one has an Admin", dc: noAdmin.length ? "var(--crit)" : undefined },
-      { label: "Broken rules this week", value: fmt(wk.length), delta: wk.length ? `${fmt(openWk)} still open` : "every rule kept", dc: openWk ? "var(--med)" : undefined },
-      { label: "On current version", value: `${ms.length ? Math.round(((ms.length - bh) / ms.length) * 100) : 0}%`, delta: bh ? `${fmt(bh)} holding 1.4.3 back` : "1.4.3 can be approved", dc: bh ? "var(--med)" : undefined }]} />
     <${Drawer} open=${!!dec} onClose=${() => setDec(null)} width=${Math.min(980, (typeof window !== "undefined" ? window.innerWidth : 1000) - 32)} title="Decide">
       ${dec ? html`<${Work} key=${dec} go=${go} single=${dec} />` : null}
     <//>

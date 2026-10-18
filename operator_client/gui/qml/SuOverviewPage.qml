@@ -1,9 +1,9 @@
 import QtQuick
 import "."
 
-// THE SUPER USER'S OVERVIEW. Not the Admin's console: the Admin looks after machines, the Super User looks after the organisation. So it opens on what is waiting on
-// them (decisions only they can make), then the four things Falcon is sold on as a 2 x 2 -- Tasks, Flows, Restricted, Detective, each with its three figures and the
-// few that most need a look, each opening its own page -- and last, a slim line on the organisation itself (machines, departments, versions, broken rules).
+// THE SUPER USER'S OVERVIEW, drawn rather than listed. What is waiting on you comes first, as a few large cards; then the organisation as a map of its machines, and
+// beside it the four things Falcon is sold on (Tasks, Flows, Restricted, Detective), each as one tile: a picture, one number, and one dot for every task, flow, mark
+// or case, coloured by how it stands. Nothing here is a table; a click on anything opens the page it belongs to.
 Page {
     id: page
     objectName: "overviewView"
@@ -11,7 +11,6 @@ Page {
     readonly property var q: Desk.queue
     readonly property int urgent: q.filter(function (x) { return x.sev === "high" || x.sev === "critical" }).length
 
-    // --- the four, each asked of the Engine by itself; every one keeps what it last said if the Engine is slow -------------------------------------------------
     property var cases: []
     property var ov: ({ by_level: { noted: 0, "case": 0, urgent: 0 }, by_intent: {}, reviewed: 0 })
     property var flows: []
@@ -19,7 +18,7 @@ Page {
     property var tasks: []
     function loadCore() {
         if (!falcon.isConnected || falcon.role !== "super_user") return
-        falcon.call("detective.cases", { include_noted: false, status: "open" }, function (ok, r) { if (ok && r) page.cases = r.cases || [] })
+        falcon.call("detective.cases", { include_noted: true, status: "open" }, function (ok, r) { if (ok && r) page.cases = r.cases || [] })
         falcon.call("detective.overview", {}, function (ok, r) { if (ok && r && r.by_level) page.ov = r })
         falcon.call("flow.list", {}, function (ok, r) { if (ok && r) page.flows = r.flows || [] })
         falcon.call("marks.list", { scope: "all" }, function (ok, r) { if (ok && r) page.marks = r.marks || [] })
@@ -37,34 +36,22 @@ Page {
     readonly property var openTasks: tasks.filter(function (t) { return !t.completed_at })
     readonly property var toClose: openTasks.filter(function (t) { return t.standing === "done" })
     readonly property var late: openTasks.filter(function (t) { return t.deadline_at && Time.ms(t.deadline_at) < Time.now && t.standing !== "done" })
-    readonly property var taskRows: openTasks.slice().sort(function (a, b) {
-        return (b.standing === "done" ? 1 : 0) - (a.standing === "done" ? 1 : 0) || Time.ms(a.deadline_at || "2100-01-01") - Time.ms(b.deadline_at || "2100-01-01") }).slice(0, 3)
-    readonly property var standingWord: ({ told: "Told", seen: "Seen", ongoing: "Ongoing", done: "Done · yours to close" })
+    function taskTone(t) { return t.standing === "done" ? Theme.accent : (t.deadline_at && Time.ms(t.deadline_at) < Time.now) ? Theme.crit : t.standing === "told" ? Theme.text4 : Theme.ok }
 
     // flows
     readonly property var running: flows.filter(function (f) { return f.status === "active" })
     readonly property var held: flows.filter(function (f) { return f.status !== "active" && f.status !== "inactive" })
     readonly property var asking: flows.filter(function (f) { return f.pause_reason === "restricted:consent" || f.pause_reason === "consent:pending" || f.consent_status === "pending" })
-    readonly property var flowRows: held.slice(0, 3)
-    function flowWhy(f) {
-        var r = f.pause_reason || ""
-        return r === "restricted:consent" ? "waiting for the owner of something restricted" : r === "consent:pending" ? "waiting for the other side to agree"
-             : r.indexOf("destination:") === 0 ? "its destination is not there" : r.indexOf("source:") === 0 ? "its source is not there" : f.status === "paused" ? "paused" : f.status
-    }
+    function flowTone(f) { return f.status === "active" ? Theme.ok : (f.pause_reason === "restricted:consent" || f.pause_reason === "consent:pending") ? Theme.accent : Theme.med }
 
     // restricted
     readonly property int copies: marks.reduce(function (a, m) { return a + (m.copies || 0) }, 0)
     readonly property int carried: marks.filter(function (m) { return m.carried_by && m.carried_by.length > 0 }).length
-    readonly property var markRows: marks.slice().sort(function (a, b) { return (b.copies || 0) - (a.copies || 0) }).slice(0, 3)
+    function markTone(m) { return m.copies ? Theme.crit : Theme.ok }
 
-    // the organisation itself
-    readonly property var devs: Fleet.deviations
-    readonly property var week: devs.filter(function (d) { return Time.ms(d.detected_at) >= Time.now - 7 * 86400000 })
-    readonly property int openWeek: week.filter(function (d) { return !d.resolved_at }).length
-    readonly property var off: Fleet.machines.filter(function (m) { return !m.online })
-    readonly property int behind: Fleet.machines.filter(function (m) { return m.behind }).length
-    readonly property string nextVer: Fleet.rollout && Fleet.rollout.version ? Fleet.rollout.version.version_string : "the next version"
-    readonly property var noAdmin: Fleet.depts.filter(function (d) { return !d.admins.length })
+    // detective
+    readonly property var openCases: cases.filter(function (c) { return c.level !== "noted" })
+    function caseTone(c) { return c.level === "urgent" ? Theme.crit : c.level === "case" ? Theme.med : Theme.text4 }
 
     Drawer {
         id: decide
@@ -77,196 +64,118 @@ Page {
         Txt { visible: decide.d === null; text: "Decided. Nothing else is waiting here."; color: Theme.text3 }
     }
 
-    // one figure of a quadrant, and one line of it
-    component Fig: Column {
-        property string value: "0"
-        property string label: ""
-        property color tone: Theme.text
-        spacing: 1
-        Txt { text: parent.value; font.pixelSize: 26; font.weight: Font.DemiBold; color: parent.tone; elide: Text.ElideNone }
-        Txt { text: parent.label; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-    }
-    component Line: Rectangle {
-        property string text: ""
-        property string aside: ""
-        property color dot: Theme.text4
-        property color rightTone: Theme.text3
-        signal clicked()
-        width: parent.width; height: 38
-        color: la.containsMouse ? Theme.surface2 : "transparent"
-        Rectangle { x: 14; width: 8; height: 8; radius: 2; color: parent.dot; anchors.verticalCenter: parent.verticalCenter }
-        Txt { x: 32; width: parent.width - 32 - rightLabel.width - 28; anchors.verticalCenter: parent.verticalCenter; text: parent.text }
-        Txt { id: rightLabel; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: parent.aside; color: parent.rightTone; font.pixelSize: 12; elide: Text.ElideNone }
-        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-        MouseArea { id: la; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: parent.clicked() }
-    }
-    component Figures: Row {
-        width: parent.width
-        spacing: 0
-        leftPadding: 14
-        topPadding: 14
-        bottomPadding: 12
-    }
-
-    // --- 1. what is waiting on you ------------------------------------------------------------------------------------------------------------------------
-    Panel {
-        id: waitP
+    // --- 1. what is waiting on you: a few large cards, the worst first --------------------------------------------------------------------------------------
+    Column {
+        id: waitCol
         objectName: "waitingBand"
         width: parent.width
-        flush: true
-        title: "Waiting on you"
-        sub: page.q.length ? Theme.fmt(page.q.length) + (page.urgent ? " · " + page.urgent + " urgent" : "") + " · click one to decide it" : "decisions only you can make"
-        Column {
-            width: parent.width
-        Empty { visible: page.q.length === 0; width: parent.width; h: 120; icon: "check"; title: "Nothing is waiting on you"; text: "Reports nobody below you can take, Detective's suggestions and decisions only you can make appear here." }
-        Grid {
+        spacing: 10
+        Row {
+            spacing: 10
+            Txt { text: "WAITING ON YOU"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; elide: Text.ElideNone }
+            Txt { visible: page.q.length > 0; text: page.q.length + (page.urgent ? " · " + page.urgent + " urgent" : ""); color: page.urgent ? Theme.crit : Theme.text3; font.pixelSize: 11; elide: Text.ElideNone }
+        }
+        Rectangle {
+            visible: page.q.length === 0
+            width: parent.width; height: 84; radius: Theme.radius; color: Theme.surface; border.width: 1; border.color: Theme.border
+            Row { anchors.centerIn: parent; spacing: 12
+                  Icon { name: "checkcircle"; size: 26; color: Theme.ok; anchors.verticalCenter: parent.verticalCenter }
+                  Column { anchors.verticalCenter: parent.verticalCenter
+                           Txt { text: "Nothing is waiting on you"; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                           Txt { text: "Decisions only you can make, and Detective's suggestions, appear here."; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } } }
+        }
+        Row {
             visible: page.q.length > 0
-            width: parent.width
-            columns: 2
+            spacing: 12
+            readonly property real cw: (waitCol.width - 3 * 12) / 4
             Repeater {
-                model: page.q.slice(0, 6)
+                model: page.q.slice(0, 4)
                 Rectangle {
                     required property var modelData
-                    width: waitP.width / 2 - 1; height: 44
-                    color: wa.containsMouse ? Theme.surface2 : "transparent"
-                    Rectangle { x: 14; width: 8; height: 8; radius: 2; color: Fleet.sevColor(modelData.sev); anchors.verticalCenter: parent.verticalCenter }
-                    Txt { x: 32; width: parent.width - 120; anchors.verticalCenter: parent.verticalCenter; text: modelData.short }
-                    Txt { anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: modelData.age; mono: true; color: Theme.text3; font.pixelSize: 11; elide: Text.ElideNone }
-                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    width: parent.cw; height: 96; radius: Theme.radius; color: wa.containsMouse ? Theme.surface2 : Theme.surface
+                    border.width: 1; border.color: Theme.mix(Fleet.sevColor(modelData.sev), Theme.border, 0.35)
+                    Rectangle { x: 14; y: 14; width: 34; height: 34; radius: 17; color: Theme.alpha(Fleet.sevColor(modelData.sev), 0.14)
+                                Icon { anchors.centerIn: parent; name: modelData.icon || "alert"; size: 18; color: Fleet.sevColor(modelData.sev) } }
+                    Txt { x: 58; y: 12; width: parent.width - 72; text: modelData.short; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
+                    Txt { x: 58; anchors.bottom: parent.bottom; anchors.bottomMargin: 12; text: modelData.age; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                     MouseArea { id: wa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { decide.id0 = modelData.id; decide.open() } }
                 }
             }
         }
-        Item { visible: page.q.length > 6; width: parent.width; height: 38
-               More { x: 14; anchors.verticalCenter: parent.verticalCenter; n: page.q.length - 6; what: "waiting"; onClicked: { decide.id0 = page.q[6].id; decide.open() } } }
-        }
+        Item { visible: page.q.length > 4; width: parent.width; height: 24
+               More { x: 2; anchors.verticalCenter: parent.verticalCenter; n: page.q.length - 4; what: "waiting"; onClicked: { decide.id0 = page.q[4].id; decide.open() } } }
     }
 
-    // --- 2. the four, two by two (each row one height) -------------------------------------------------------------------------------------------------
+    // one of the four: a picture, one number, one dot per thing
+    component Tile: Rectangle {
+        id: tile
+        property string icon: ""
+        property string title: ""
+        property string number: "0"
+        property string caption: ""
+        property color tone: Theme.text
+        property var dots: []                 // one colour per thing
+        property string go: ""
+        width: 100; height: 168; radius: Theme.radius; color: ta.containsMouse ? Theme.surface2 : Theme.surface; border.width: 1; border.color: Theme.border
+        Row { x: 16; y: 14; spacing: 8
+              Icon { name: tile.icon; size: 16; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+              Txt { text: tile.title; color: Theme.text2; font.weight: Font.DemiBold; elide: Text.ElideNone } }
+        Txt { x: 16; y: 40; text: tile.number; font.pixelSize: 40; font.weight: Font.DemiBold; color: tile.tone; elide: Text.ElideNone }
+        Txt { x: 16; y: 90; width: parent.width - 32; text: tile.caption; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideRight }
+        Flow {
+            x: 16; y: 120; width: parent.width - 32; spacing: 5
+            Repeater {
+                model: tile.dots.slice(0, 28)
+                Rectangle { required property var modelData; width: 12; height: 12; radius: 3; color: modelData }
+            }
+            Txt { visible: tile.dots.length > 28; text: "+" + (tile.dots.length - 28); color: Theme.text3; font.pixelSize: 11; elide: Text.ElideNone }
+        }
+        MouseArea { id: ta; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Nav.go(tile.go) }
+    }
+
+    // --- 2. the organisation as a map, and the four beside it -----------------------------------------------------------------------------------------------------
     Row {
         width: parent.width
         spacing: 14
-        readonly property real h: Math.max(tp.implicitHeight, fp.implicitHeight)
+        readonly property real h: Math.max(mapP.implicitHeight, 2 * 168 + 12)
         Panel {
-            id: tp
-            objectName: "quadTasks"
-            width: (parent.width - 14) / 2
+            id: mapP
+            objectName: "orgMap"
+            width: (parent.width - 14) * 7 / 12
             height: parent.h
-            flush: true
-            title: "Tasks"
-            sub: "what you have given departments"
-            extra: Btn { small: true; kind: "link"; text: "Tasks →"; onClicked: Nav.go("tasks") }
-            Column {
+            title: "The organisation"
+            sub: Theme.fmt(Fleet.machines.length) + " machines · " + (Fleet.machines.length - Fleet.machines.filter(function (m) { return !m.online }).length) + " online"
+            extra: Btn { small: true; kind: "link"; text: "Departments →"; onClicked: Nav.go("departments") }
+            HostMap {
+                visible: Fleet.machines.length > 0
                 width: parent.width
-            Figures {
-                Fig { width: 120; value: Theme.fmt(page.openTasks.length); label: "open" }
-                Fig { width: 150; value: Theme.fmt(page.toClose.length); label: "done, yours to close"; tone: page.toClose.length ? Theme.accent : Theme.text }
-                Fig { width: 120; value: Theme.fmt(page.late.length); label: "past their date"; tone: page.late.length ? Theme.crit : Theme.text }
+                by: "Status"
+                openLabel: "See {h} in Registry →"
+                moreLabel: "on Departments →"
+                onOpen: function (h) { Nav.go("registry", h) }
+                onMore: Nav.go("departments")
             }
-            Rectangle { width: parent.width; height: 1; color: Theme.grid }
-            Empty { visible: page.taskRows.length === 0; width: parent.width; h: 130; icon: "checksquare"; title: "No open tasks"; text: "Give a department a piece of work and follow it here." }
-            Repeater {
-                model: page.taskRows
-                Line { required property var modelData; text: modelData.title; aside: page.standingWord[modelData.standing] || modelData.standing
-                       dot: modelData.standing === "done" ? Theme.accent : Theme.text4; rightTone: modelData.standing === "done" ? Theme.accent : Theme.text3; onClicked: Nav.go("tasks") }
-            }
-            }
+            Empty { visible: Fleet.loaded && Fleet.machines.length === 0; width: parent.width; h: 220; icon: "desktop"; title: "No machines yet"; text: "Machines appear here by department as they are registered."; act: "Open Registry →"; onActed: Nav.go("registry") }
         }
-        Panel {
-            id: fp
-            objectName: "quadFlows"
-            width: (parent.width - 14) / 2
-            height: parent.h
-            flush: true
-            title: "Flows"
-            sub: "files moving between machines"
-            extra: Btn { small: true; kind: "link"; text: "Flows →"; onClicked: Nav.go("flows") }
-            Column {
-                width: parent.width
-            Figures {
-                Fig { width: 120; value: Theme.fmt(page.running.length); label: "running" }
-                Fig { width: 120; value: Theme.fmt(page.held.length); label: "held up"; tone: page.held.length ? Theme.med : Theme.text }
-                Fig { width: 150; value: Theme.fmt(page.asking.length); label: "waiting for a yes"; tone: page.asking.length ? Theme.accent : Theme.text }
-            }
-            Rectangle { width: parent.width; height: 1; color: Theme.grid }
-            Empty { visible: page.flowRows.length === 0; width: parent.width; h: 130; icon: "branches"; title: page.flows.length ? "Every flow is running" : "No flows yet"; text: "A flow that is held up, and why, shows here." }
-            Repeater {
-                model: page.flowRows
-                Line { required property var modelData; text: modelData.source_hostname + " → " + (modelData.destinations.length ? (modelData.destinations[0].destination_hostname || "a folder") : "nowhere")
-                       aside: page.flowWhy(modelData); dot: Theme.med; onClicked: Nav.go("flows") }
-            }
-            }
+        Grid {
+            id: four
+            width: (parent.width - 14) * 5 / 12
+            columns: 2
+            columnSpacing: 12
+            rowSpacing: 12
+            readonly property real tw: (width - 12) / 2
+            Tile { objectName: "quadTasks"; width: four.tw; icon: "checksquare"; title: "Tasks"; go: "tasks"; number: Theme.fmt(page.openTasks.length)
+                   caption: page.toClose.length ? page.toClose.length + " done, yours to close" : page.late.length ? page.late.length + " past their date" : "all on track"
+                   tone: page.toClose.length ? Theme.accent : page.late.length ? Theme.crit : Theme.text; dots: page.openTasks.map(page.taskTone) }
+            Tile { objectName: "quadFlows"; width: four.tw; icon: "branches"; title: "Flows"; go: "flows"; number: Theme.fmt(page.running.length)
+                   caption: page.held.length ? page.held.length + " held up" + (page.asking.length ? " · " + page.asking.length + " waiting for a yes" : "") : "all running"
+                   tone: page.held.length ? Theme.med : Theme.text; dots: page.flows.map(page.flowTone) }
+            Tile { objectName: "quadRestricted"; width: four.tw; icon: "fileprotect"; title: "Restricted"; go: "restricted"; number: Theme.fmt(page.marks.length)
+                   caption: page.copies ? page.copies + " cop" + (page.copies === 1 ? "y" : "ies") + " found elsewhere" : "all where they belong"
+                   tone: page.copies ? Theme.crit : Theme.text; dots: page.marks.map(page.markTone) }
+            Tile { objectName: "quadDetective"; width: four.tw; icon: "filesearch"; title: "Detective"; go: "detective"; number: Theme.fmt(page.openCases.length)
+                   caption: page.ov.by_level.urgent ? page.ov.by_level.urgent + " urgent" : page.openCases.length ? "worth a look" : "nothing to look at"
+                   tone: page.ov.by_level.urgent ? Theme.crit : page.openCases.length ? Theme.med : Theme.text; dots: page.cases.map(page.caseTone) }
         }
-    }
-    Row {
-        width: parent.width
-        spacing: 14
-        readonly property real h: Math.max(rp.implicitHeight, dtp.implicitHeight)
-        Panel {
-            id: rp
-            objectName: "quadRestricted"
-            width: (parent.width - 14) / 2
-            height: parent.h
-            flush: true
-            title: "Restricted"
-            sub: "what must stay where it belongs"
-            extra: Btn { small: true; kind: "link"; text: "Restricted →"; onClicked: Nav.go("restricted") }
-            Column {
-                width: parent.width
-            Figures {
-                Fig { width: 120; value: Theme.fmt(page.marks.length); label: "marked" }
-                Fig { width: 150; value: Theme.fmt(page.copies); label: "copies found elsewhere"; tone: page.copies ? Theme.crit : Theme.text }
-                Fig { width: 120; value: Theme.fmt(page.carried); label: "carried by flows" }
-            }
-            Rectangle { width: parent.width; height: 1; color: Theme.grid }
-            Empty { visible: page.markRows.length === 0; width: parent.width; h: 130; icon: "fileprotect"; title: "Nothing is marked"; text: "Mark a file or folder and Falcon follows its content wherever it is copied." }
-            Repeater {
-                model: page.markRows
-                Line { required property var modelData; text: modelData.name + " · " + modelData.host
-                       aside: modelData.copies ? Theme.many(modelData.copies, "copy", "copies") + " elsewhere" : "only in its place"
-                       dot: modelData.copies ? Theme.crit : Theme.ok; rightTone: modelData.copies ? Theme.crit : Theme.text3; onClicked: Nav.go("restricted") }
-            }
-            }
-        }
-        Panel {
-            id: dtp
-            objectName: "quadDetective"
-            width: (parent.width - 14) / 2
-            height: parent.h
-            flush: true
-            title: "Detective"
-            sub: "what people seem to be trying to do"
-            extra: Btn { small: true; kind: "link"; text: "Detective →"; onClicked: Nav.go("detective") }
-            Column {
-                width: parent.width
-            Figures {
-                Fig { width: 120; value: Theme.fmt(page.ov.by_level.urgent); label: "urgent"; tone: page.ov.by_level.urgent ? Theme.crit : Theme.text }
-                Fig { width: 120; value: Theme.fmt(page.ov.by_level["case"]); label: "cases"; tone: page.ov.by_level["case"] ? Theme.med : Theme.text }
-                Fig { width: 150; value: Theme.fmt(page.ov.by_level.noted); label: "noted quietly" }
-            }
-            Rectangle { width: parent.width; height: 1; color: Theme.grid }
-            Empty { visible: page.cases.length === 0; width: parent.width; h: 130; icon: "filesearch"; title: "Nothing to look at"; text: "When several small things add up to a pattern, the strongest show here." }
-            Repeater {
-                model: page.cases.slice(0, 3)
-                Line { required property var modelData; text: modelData.intent + " · " + modelData.host
-                       aside: modelData.level === "urgent" ? "Urgent" : "Case"; dot: modelData.level === "urgent" ? Theme.crit : Theme.med
-                       rightTone: modelData.level === "urgent" ? Theme.crit : Theme.med; onClicked: Nav.go("detective") }
-            }
-            }
-        }
-    }
-
-    // --- 3. the organisation itself, one slim line ------------------------------------------------------------------------------------------------------------
-    Strip {
-        objectName: "orgStrip"
-        width: parent.width
-        items: [
-            { label: "Machines online", value: Theme.fmt(Fleet.machines.length - page.off.length) + " / " + Theme.fmt(Fleet.machines.length),
-              delta: page.off.length ? (page.off.length === 1 ? page.off[0].host + " is" : Theme.fmt(page.off.length) + " are") + " offline" : "all online", dc: page.off.length ? Theme.crit : undefined },
-            { label: "Departments", value: Theme.fmt(Fleet.depts.length), delta: page.noAdmin.length ? page.noAdmin.map(function (d) { return d.name }).join(", ") + " has no Admin" : "every one has an Admin", dc: page.noAdmin.length ? Theme.crit : undefined },
-            { label: "Broken rules this week", value: Theme.fmt(page.week.length), delta: page.week.length ? Theme.fmt(page.openWeek) + " still open" : "every rule kept", dc: page.openWeek ? Theme.med : undefined },
-            { label: "On current version", value: String(Fleet.machines.length ? Math.round((Fleet.machines.length - page.behind) / Fleet.machines.length * 100) : 0) + "%",
-              delta: page.behind ? Theme.fmt(page.behind) + " holding " + page.nextVer + " back" : page.nextVer + " can be approved", dc: page.behind ? Theme.med : undefined }
-        ]
     }
 }
