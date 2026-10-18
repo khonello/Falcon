@@ -3917,12 +3917,12 @@ function Work({ go, single }) {
           </div>`; })}
       </div>`}
       <section className="panel">
-        <div className="g c-66" style=${{ gap: 0 }}>
-          <div style=${{ padding: 20, borderRight: "1px solid var(--border)", minWidth: 0 }}>
+        <div className="g c-66" style=${{ gap: 0, gridTemplateColumns: single ? "minmax(0, 1fr)" : undefined }}>
+          <div style=${{ padding: single ? "20px 20px 4px" : 20, borderRight: single ? "none" : "1px solid var(--border)", minWidth: 0 }}>
             <div className="row"><${Sev} s=${d.sev} />${d.kind === "reports" ? html`<span className="tag" style=${{ "--c": "var(--text-3)" }}>${ic(REPORT_CATS[d.cat].icon)} ${d.cat}<//>` : null}</div>
             <div style=${{ fontSize: 18, fontWeight: 600, margin: "6px 0 4px", letterSpacing: "-0.01em" }}>${d.title}</div>
             <div className="t3" style=${{ fontSize: 12.5, marginBottom: 16 }}>${d.why}</div>
-            ${d.kind === "empty-seat" ? html`<${SeatBypass} big=${true} d=${d} />` : Big ? html`<${Big} big=${true} go=${go} d=${d} />` : null}
+            ${single ? null : d.kind === "empty-seat" ? html`<${SeatBypass} big=${true} d=${d} />` : Big ? html`<${Big} big=${true} go=${go} d=${d} />` : null}
             ${d.reports ? html`<div style=${{ marginTop: d.host || d.cat === "About an Admin" ? 18 : 0 }}>
               ${rpg.items.map((r) => html`<label key=${r.id} className="kv" style=${{ gridTemplateColumns: "22px minmax(0, 1fr) auto auto", cursor: "pointer", gap: 10 }}>
                 <${Checkbox} checked=${!untick[r.id]} onChange=${(e) => setUntick({ ...untick, [r.id]: !e.target.checked })} />
@@ -5385,7 +5385,7 @@ function SUOverview({ go }) {
           dots=${cases.map((c) => (c.level === "urgent" ? "var(--crit)" : c.level === "case" ? "var(--med)" : "var(--text-4)"))} />
       </div>
     </div>
-    <${Drawer} open=${!!dec} onClose=${() => setDec(null)} width=${Math.min(980, (typeof window !== "undefined" ? window.innerWidth : 1000) - 32)} title="Decide">
+    <${Drawer} open=${!!dec} onClose=${() => setDec(null)} width=${Math.min(460, (typeof window !== "undefined" ? window.innerWidth : 1000) - 32)} title="Decide">
       ${dec ? html`<${Work} key=${dec} go=${go} single=${dec} />` : null}
     <//>
   <//>`;

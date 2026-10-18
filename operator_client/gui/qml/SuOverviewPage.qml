@@ -56,7 +56,7 @@ Page {
     Drawer {
         id: decide
         page: page
-        width: Math.min(980, (page.Window.window ? page.Window.window.width : 1200) - 32)
+        width: Math.min(460, (page.Window.window ? page.Window.window.width : 1200) - 32)
         title: "Decide"
         property string id0: ""
         readonly property var d: { for (var i = 0; i < Desk.queue.length; i++) if (Desk.queue[i].id === id0) return Desk.queue[i]; return null }

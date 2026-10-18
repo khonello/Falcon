@@ -1,9 +1,8 @@
 import QtQuick
 import "."
 
-// ONE DECISION ONLY THE SUPER USER MAKES, whole. On the left why it is theirs, its picture, and for
-// reports the reports themselves to tick; on the right the choices, the input the chosen one needs, and
-// one act. A decided item shows what was decided and when, with Change.
+// ONE DECISION ONLY THE SUPER USER MAKES, in one narrow column (it opens in a drawer): why it is theirs, for reports the reports
+// to tick, then the choices, the input the chosen one needs, and one act. A decided item shows what was decided and when, with Change.
 Rectangle {
     id: root
     property var d: null
@@ -18,7 +17,7 @@ Rectangle {
     radius: Theme.radius
     border.width: 1
     border.color: Theme.border
-    implicitHeight: Math.max(leftCol.height, rightCol.height) + 40
+    implicitHeight: rightCol.y + rightCol.height + 20
 
     readonly property var opt: {
         if (!d) return null
@@ -81,14 +80,13 @@ Rectangle {
     Column {
         id: leftCol
         x: 20; y: 20
-        width: root.width / 2 - 40
-        spacing: 10
+        width: root.width - 40
+        spacing: 8
         Row { spacing: 8
               St { square: true; text: root.d ? Fleet.sevWord(root.d.sev) : ""; c: root.d ? Fleet.sevColor(root.d.sev) : Theme.text4 }
               Tag { visible: !!root.d && root.d.kind === "reports"; text: root.d && root.d.cat ? Desk.word(root.d.cat) : ""; iconName: root.d ? root.d.icon : "" } }
         Txt { width: parent.width; text: root.d ? root.d.title : ""; font.pixelSize: Theme.fTitle; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; elide: Text.ElideNone }
         Txt { width: parent.width; text: root.d ? root.d.why : ""; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone; bottomPadding: 6 }
-        DecisionPicture { width: parent.width; d: root.d; big: true; visible: !!root.d && root.d.kind !== "reports" }
         Column {
             visible: !!root.d && !!root.d.reports
             width: parent.width
@@ -108,11 +106,10 @@ Rectangle {
                   text: root.d && root.d.reports ? root.ticked.length + " of " + root.d.reports.length + " ticked" + (root.d.reports.length > 5 ? " · the first five shown" : "") : "" }
         }
     }
-    Rectangle { x: root.width / 2; y: 0; width: 1; height: root.height; color: Theme.border }
     Column {
         id: rightCol
-        x: root.width / 2 + 20; y: 20
-        width: root.width / 2 - 40
+        x: 20; y: leftCol.y + leftCol.height + 16
+        width: root.width - 40
         spacing: 10
         // decided
         Rectangle {
