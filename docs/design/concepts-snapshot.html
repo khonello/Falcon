@@ -5393,15 +5393,15 @@ function SUOverview({ go }) {
 // The Admin's core areas lead the menu as their own group.
 const NAV_ADMIN = [
   ["Core", [["overview", "Overview", "DashboardOutlined"], ["messages", "Messages", "MessageOutlined", () => msgWaiting(), true, true], ["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"], ["detective", "Detective", "FileSearchOutlined", () => DET.cases.filter((c) => c.status === "open" && c.level === "urgent").length, true]]],
-  ["Monitor", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["sessions", "Sessions", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
-  ["Automate", [["automation", "Automation", "ThunderboltOutlined"], ["actions", "Actions", "PlayCircleOutlined"]]],
-  ["Govern", [["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
+  ["Monitor", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true]]],
+  ["Automate", [["automation", "Automation", "ThunderboltOutlined"]]],
+  ["Govern", [["audit", "Audit log", "HistoryOutlined"]]],
 ];
 // The Super User's menu has the same shape as the Admin's: the core areas first, then running the organisation.
 const NAV_SU = [
   ["Core", [["overview", "Overview", "DashboardOutlined", () => suQueue().length, true], ["messages", "Messages", "MessageOutlined", () => msgWaiting(), true, true], ["tasks", "Tasks", "CheckSquareOutlined", () => DEPT_TASKS.filter((t) => !t.complete && taskState(t) === "done").length, true], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["flows", "Flows", "BranchesOutlined"], ["detective", "Detective", "FileSearchOutlined", () => DET.cases.filter((c) => c.status === "open" && c.level === "urgent").length, true]]],
-  ["Organisation", [["departments", "Departments", "ApartmentOutlined"], ["accountability", "Accountability", "EyeOutlined", () => DEVIATIONS.filter((d) => d.out === "open").length, true], ["access", "Access", "LoginOutlined", () => MACHINES.filter((m) => m.held).length], ["registry", "Registry", "DesktopOutlined"], ["reports", "Reports", "FileTextOutlined"]]],
-  ["Govern", [["rules", "Rules", "SafetyCertificateOutlined"], ["rollout", "Rollout", "CloudUploadOutlined"], ["audit", "Audit log", "HistoryOutlined"]]],
+  ["Organisation", [["departments", "Departments", "ApartmentOutlined"]]],
+  ["Govern", [["audit", "Audit log", "HistoryOutlined"]]],
 ];
 // Super User level only (docs/design/su-navigation.md): a machine or an issue never opens the Admin's own page. A
 // machine opens in Registry; a copy of one of your own marked files opens on Restricted with the copy picked; any other
@@ -5421,7 +5421,10 @@ function suRoute(p, s) {
   }
   return [p, s];
 }
-const SU_PARENT = { dept: "departments", sessions: "access" };
+const SU_PARENT = { dept: "departments" };
+// Pages the menu does not list: tabs of the page that took them in (docs/design/pruning.md)
+const TAB_OF = { registry: "departments", actions: "automation" };
+const TAB_SETS = { departments: [["departments", "Departments"], ["registry", "Machines and accounts"]], registry: [["departments", "Departments"], ["registry", "Machines and accounts"]], automation: [["automation", "Rules"], ["actions", "Actions"]], actions: [["automation", "Rules"], ["actions", "Actions"]] };
 const TITLES = { detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"], messages: ["Messages", "Pings and the conversations they open, one message each way at a time"], departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"], accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"], access: ["Access", "Who is inside which machine, and who was let in"], registry: ["Registry", "Machines and accounts · register, re-key, provision"], rules: ["Rules", "The standard the organisation is measured against"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
 function Palette({ go, close, nav, su }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
@@ -5509,7 +5512,7 @@ function App() {
     if (refused) sub = rawPage === "automation" && ru ? ru.id : null;
   }
   const nav = level ? NAV_ADMIN : NAV_SU;
-  const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)));
+  const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)).concat(Object.keys(TAB_OF).filter((k) => nav.some(([, xs]) => xs.some((x) => x[0] === TAB_OF[k])))));
   const page = allowed.has(rawPage) ? rawPage : "overview";
   const goRaw = (p, s0) => { setRoute([p, s0 || null]); try { history.replaceState(null, "", "#" + p + (s0 ? "/" + encodeURIComponent(s0) : "")); } catch (e) {} if (p !== page || p !== "issues") window.scrollTo(0, 0); };
   const go = (p0, s00) => { const [p, s0] = level ? [p0, s00] : suRoute(p0, s00 || null); goRaw(p, s0); };
@@ -5571,7 +5574,7 @@ function App() {
           : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} department${(FULL.DEPTS || DEPTS).length === 1 ? "" : "s"}</div></div></div>`}
         ${nav.map(([g, xs]) => {
-          const items = xs.map(([id, l, icon, cnt, hot, pulse]) => { const on = page === id || (!level && SU_PARENT[page] === id), n = typeof cnt === "function" ? cnt() : cnt;
+          const items = xs.map(([id, l, icon, cnt, hot, pulse]) => { const on = page === id || (!level && SU_PARENT[page] === id) || TAB_OF[page] === id, n = typeof cnt === "function" ? cnt() : cnt;
             return html`<div key=${id} className=${"nav" + (on ? " on" : "")} role="link" tabIndex="0" onClick=${() => go(id)} onKeyDown=${(e) => e.key === "Enter" && go(id)}>
             ${ic(icon)}<span>${l}</span>${n ? html`<span className=${"cnt" + (hot ? " hot" : "") + (pulse ? " pulse" : "")}>${n > 999 ? "999+" : fmt(n)}</span>` : null}</div>`; });
           return html`<${React.Fragment} key=${g || "su"}>${g ? html`<div className="grp">${g}</div>` : html`<div style=${{ height: 8 }} />`}${items}<//>`; })}
@@ -5613,6 +5616,7 @@ function App() {
         <main className="content">
           ${!csub || !["machines", "tasks", "automation", "flows", "actions", "restricted", "rules"].includes(page) ? html`<div className="ph1"><div><h1>${title}</h1>${subtitle ? html`<div className="sub">${subtitle}</div>` : null}</div></div>` : null}
           ${refused ? html`<div className="gate"><span style=${{ fontSize: 16 }}>${ic("StopOutlined")}</span><div><b style=${{ fontWeight: 600 }}>That is not this console's.</b> <span className="t2">${refused}</span></div></div>` : null}
+          ${TAB_SETS[page] ? html`<${Segmented} size="small" value=${page} onChange=${(v) => go(v)} options=${TAB_SETS[page].map(([v, l]) => ({ value: v, label: l }))} style=${{ alignSelf: "flex-start" }} />` : null}
           ${body}
         </main>
       </div>
