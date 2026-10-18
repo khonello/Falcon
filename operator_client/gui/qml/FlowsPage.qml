@@ -33,6 +33,7 @@ Page {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
             Msg.ok(grant ? "Allowed · the flow goes on" : "Declined · the flow stays paused")
             page.load()
+            page.loadConsents()
         })
     }
     Component.onCompleted: load()
@@ -67,7 +68,28 @@ Page {
     readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].key === sel) return rows[i]; return rows.length ? rows[0] : null }
     // the steps along the way, read from the Engine's stage tree (Sync.steps): named, and before or after the split
     readonly property var steps: Sync.steps(cur)
-    onCurChanged: if (cur) falcon.call("flow.history", { flow_id: cur.id }, function (ok, r) { page.log = ok ? (r.history || []) : [] })
+    // what the flow is waiting to carry that is restricted, what has been allowed, and which of those this person may take back
+    property var consents: []
+    property var canDecide: []
+    function loadConsents() {
+        if (!cur) { consents = []; return }
+        var id = cur.id
+        falcon.call("flow.restricted", { flow_id: id }, function (ok, r) {
+            if (page.cur && page.cur.id === id) { page.consents = ok && r ? (r.consents || []) : []; page.canDecide = ok && r ? (r.can_decide || []) : [] }
+        })
+    }
+    function takeBack(c) {
+        falcon.call("flow.restricted_revoke", { consent_id: c.id }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not taken back"); return }
+            Msg.ok("Taken back · the flow stops, and the places it allowed are not allowed any more")
+            page.load()
+            page.loadConsents()
+        })
+    }
+    onCurChanged: if (cur) {
+        falcon.call("flow.history", { flow_id: cur.id }, function (ok, r) { page.log = ok ? (r.history || []) : [] })
+        loadConsents()
+    }
     readonly property var asks: flows.filter(function (f) {
         return f.consent_status === "pending" && (f.destinations || []).some(function (d) { return d.owner_account_id === falcon.accountId })
     })
@@ -245,6 +267,31 @@ Page {
                       Rectangle { width: 10; height: 2; color: Theme.crit; anchors.verticalCenter: parent.verticalCenter } Txt { text: "branch paused"; color: Theme.text3; font.pixelSize: 12 } }
                 Row { visible: page.cur !== null && page.cur.consent_status === "pending"; spacing: 6
                       Rectangle { width: 10; height: 2; color: Theme.med; anchors.verticalCenter: parent.verticalCenter } Txt { text: "waiting for someone to agree"; color: Theme.text3; font.pixelSize: 12 } }
+            }
+        }
+    }
+
+    Panel {
+        objectName: "flowRestricted"
+        visible: page.cur !== null && page.consents.length > 0
+        width: parent.width
+        title: "Restricted material"
+        sub: "a flow carries nothing restricted unless the person who restricted it says so"
+        Column {
+            width: parent.width
+            spacing: 8
+            Repeater {
+                model: page.consents
+                Row {
+                    required property var modelData
+                    objectName: "consent_" + modelData.id
+                    width: parent.width
+                    spacing: 10
+                    Txt { width: parent.width - 150; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          text: modelData.name + " · " + (modelData.state === "asked" ? "waiting for the person who restricted it" : modelData.state === "granted" ? "allowed" + (modelData.expires_at ? " until " + Time.atDay(modelData.expires_at) : "")
+                                                         : modelData.state === "declined" ? "declined" : "taken back" + (modelData.note ? " (" + modelData.note + ")" : "")) }
+                    Btn { objectName: "takeBack_" + modelData.id; visible: modelData.state === "granted" && page.canDecide.indexOf(modelData.id) >= 0; small: true; danger: true; text: "Take back"; onClicked: page.takeBack(modelData) }
+                }
             }
         }
     }

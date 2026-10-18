@@ -28,6 +28,29 @@ Page {
             if (rows.length && !rows.some(function (c) { return c.id === page.sel })) page.sel = rows[0].id
         })
         falcon.call("detective.overview", {}, function (ok, r) { if (ok && r.by_level) page.ov = r })
+        loadExtras()
+    }
+    // what Detective suggests to the other features (pause a flow, mark a folder, a follow-up task): said, never done; a person decides. And the things already said to be fine.
+    property var proposals: []
+    property var rules: []
+    function loadExtras() {
+        if (!falcon.isConnected) return
+        falcon.call("proposals.list", {}, function (ok, r) { page.proposals = ok && r ? (r.proposals || []) : [] })
+        falcon.call("detective.rules", {}, function (ok, r) { page.rules = ok && r ? (r.rules || []) : [] })
+    }
+    function decide(p, accept) {
+        falcon.call("proposals.decide", { proposal_id: p.id, accept: accept }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
+            Msg.ok(!accept ? "Dismissed" : r.paused ? "Paused" : r.mark ? "Mark " + r.mark + " from the machine it is on, on the Restricted page" : r.task_description ? "Give this as a task: " + r.task_description : "Accepted")
+            page.loadExtras()
+        })
+    }
+    function takeBack(rule) {
+        falcon.call("detective.rule_revoke", { rule_id: rule.id }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not taken back"); return }
+            Msg.ok("Taken back · it is weighed in full again")
+            page.loadExtras()
+        })
     }
     function loadCase() {
         if (!cur) { det = null; return }
@@ -53,7 +76,7 @@ Page {
         })
     }
     Component.onCompleted: load()
-    Connections { target: falcon; function onConnected() { page.load() } function onPushReceived(type, payload) { if (/^detective/.test(type)) again.restart() } }
+    Connections { target: falcon; function onConnected() { page.load() } function onPushReceived(type, payload) { if (/^detective|^proposal/.test(type)) again.restart() } }
     Timer { id: again; interval: 400; onTriggered: { page.load(); page.loadCase() } }
 
     component Head: Txt { color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; elide: Text.ElideNone }
@@ -73,6 +96,44 @@ Page {
         Tile { objectName: "tileCases"; label: "Cases"; n: page.ov.by_level["case"]; tone: Theme.med }
         Tile { label: "Noted quietly"; n: page.ov.by_level.noted }
         Tile { label: "Reviewed"; n: page.ov.reviewed }
+    }
+
+    Column {
+        objectName: "suggestions"
+        visible: page.proposals.length > 0
+        width: parent.width; spacing: 8
+        Head { text: "DETECTIVE SUGGESTS" }
+        Repeater {
+            model: page.proposals
+            Rectangle {
+                required property var modelData
+                objectName: "proposal_" + modelData.id
+                width: parent.width; height: 52; radius: Theme.radius; color: Theme.accentSoft; border.width: 1; border.color: Theme.mix(Theme.accent, Theme.border, 0.3)
+                Txt { x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 330; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: modelData.title + " Nothing happens until you say so." }
+                Row { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                      Btn { objectName: "proposalNo_" + modelData.id; small: true; text: "Not now"; onClicked: page.decide(modelData, false) }
+                      Btn { objectName: "proposalYes_" + modelData.id; small: true; kind: "primary"
+                            text: modelData.kind === "pause_flow" ? "Pause it" : modelData.kind === "mark_folder" ? "Show me where" : "Give me the words"; onClicked: page.decide(modelData, true) } }
+            }
+        }
+    }
+
+    Column {
+        objectName: "writtenRules"
+        visible: page.rules.length > 0
+        width: parent.width; spacing: 8
+        Head { text: "THINGS YOU HAVE SAID ARE FINE" }
+        Repeater {
+            model: page.rules
+            Rectangle {
+                required property var modelData
+                objectName: "rule_" + modelData.id
+                width: parent.width; height: 40; radius: Theme.radius; color: Theme.surface; border.width: 1; border.color: Theme.border
+                Txt { x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 150; elide: Text.ElideRight
+                      text: modelData.graph.replace(/_/g, " ") + " · " + modelData.kind + " " + modelData.value + " · on " + (modelData.host || "a machine") }
+                Btn { objectName: "ruleBack_" + modelData.id; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; small: true; text: "Take back"; onClicked: page.takeBack(modelData) }
+            }
+        }
     }
 
     Row {

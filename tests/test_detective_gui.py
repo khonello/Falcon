@@ -158,3 +158,36 @@ async def test_an_admin_does_not_see_the_move_of_the_super_user(console):
     win.setProperty("view", "machines")
     _pump(0.3)
     assert win.findChild(QObject, "handoverCard") is None
+
+
+async def test_what_detective_suggests_is_shown_for_a_person_to_accept_or_dismiss_and_the_rules_can_be_taken_back(console):
+    win, bridge, page = await _page(console)
+    page.setProperty("proposals", [{"id": 4, "kind": "pause_flow", "title": "Pause flow #3? Its source machine FIN-01 is under an urgent case"},
+                                   {"id": 5, "kind": "mark_folder", "title": r"Mark C:\Data\Reports as restricted?"}])
+    page.setProperty("rules", [{"id": 8, "graph": "to_drive", "kind": "folder", "value": "E:", "host": "FIN-01"}])
+    _pump(0.4)
+    names = _names(win.contentItem())
+    assert {"suggestions", "proposal_4", "proposal_5", "proposalYes_4", "proposalNo_5", "writtenRules", "rule_8", "ruleBack_8"} <= names
+    QMetaObject.invokeMethod(page, "decide", Q_ARG("QVariant", {"id": 4}), Q_ARG("QVariant", True))
+    await _wait(lambda: any(t == "proposals.decide" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "proposals.decide") == {"proposal_id": 4, "accept": True}
+    QMetaObject.invokeMethod(page, "takeBack", Q_ARG("QVariant", {"id": 8}))
+    await _wait(lambda: any(t == "detective.rule_revoke" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "detective.rule_revoke") == {"rule_id": 8}
+
+
+async def test_a_flow_shows_what_restricted_material_it_waits_for_or_carries_and_who_can_take_it_back(console):
+    win, bridge, _ = console("super_user")
+    page = await _open(win, bridge, "flows", "flowsView")
+    page.setProperty("flows", [{"id": 9, "source_hostname": "FIN-01", "source_path": "C:/out", "status": "paused", "pause_reason": "restricted:consent", "consent_status": "not_required",
+                                "created_by_account_id": 2, "destinations": [{"id": 1, "destination_hostname": "FIN-02", "destination_path": "C:/in"}], "stages": [], "created_at": "2026-10-18T10:00:00Z"}])
+    _pump(0.4)
+    assert prop(page, "cur")["st"][0].startswith("Waiting for consent")                              # the list says why it is not copying
+    page.setProperty("consents", [{"id": 5, "name": "Payroll", "state": "granted", "expires_at": None}, {"id": 6, "name": "Board", "state": "asked"}])
+    page.setProperty("canDecide", [5])
+    _pump(0.4)
+    names = _names(win.contentItem())
+    assert {"flowRestricted", "consent_5", "consent_6", "takeBack_5"} <= names and "takeBack_6" in names     # (an unanswered one has no button to show: the button is hidden, not absent)
+    QMetaObject.invokeMethod(page, "takeBack", Q_ARG("QVariant", {"id": 5}))
+    await _wait(lambda: any(t == "flow.restricted_revoke" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "flow.restricted_revoke") == {"consent_id": 5}

@@ -113,7 +113,9 @@ Page {
                 return
             }
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not saved"); return }
-            Msg.ok(page.editId ? "Saved · checks passed, recorded in the audit log" : r.consent_pending ? "Flow created · the owner is asked to agree" : "Flow created and running")
+            Msg.ok(page.editId ? "Saved · checks passed, recorded in the audit log"
+                   : r.restricted_pending ? "Flow created but paused · it would carry something restricted, so its owner is asked first"
+                   : r.consent_pending ? "Flow created · the owner is asked to agree" : "Flow created and running")
             Nav.go("flows")
         })
     }
