@@ -388,7 +388,7 @@ class Case:
         return graph_of(sigs)
 
     def headline(self) -> str:
-        top = sorted(self.findings, key=lambda f: f.weight, reverse=True)[:4]
+        top = sorted((f for f in self.findings if not f.graph.startswith("coverage_")), key=lambda f: f.weight, reverse=True)[:4]      # (what the areas add up to is shown as the board, not said twice)
         said = f"{self.intent}. " + ("; ".join(dict.fromkeys(f.summary for f in sorted(top, key=lambda f: f.at))) + ".")
         extra = self.not_yet()
         return said + (f" {extra}" if extra else "")

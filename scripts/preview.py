@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 WORDS = [a for a in sys.argv[1:] if not a.startswith("-")]
 ROLE = "admin" if "admin" in WORDS else "super_user"
 INSIDE = "inside" in WORDS
-AREAS = ("overview", "messages", "tasks", "restricted", "flows", "machines", "sessions", "issues", "automation",
+AREAS = ("overview", "messages", "tasks", "detective", "restricted", "flows", "machines", "sessions", "issues", "automation",
          "actions", "rollout", "audit", "reports", "departments", "accountability", "access", "registry", "rules")
 VIEW = next((w for w in WORDS if w.split("/")[0] in AREAS), "")
 if "--role" in sys.argv:                        # the older spelling, still used by the shot scripts
@@ -251,6 +251,10 @@ ANSWERS = {
               "last_sync": None},
              {"id": 3, "destination_pc_id": None, "destination_hostname": None, "parent_stage_id": 3,
               "destination_path": "//archive/weekly", "suggestion": None, "last_sync": None}]},
+        {"id": 4, "created_by_account_id": 8, "source_pc_id": 12, "source_hostname": "FIN-02", "source_path": "C:/Finance/Payroll",
+         "status": "paused", "pause_reason": "restricted:consent", "consent_status": "not_required",
+         "stages": [], "destinations": [
+             {"id": 5, "destination_pc_id": 1, "destination_hostname": "OPS-01", "destination_path": "D:/handover/payroll", "suggestion": None, "last_sync": None}]},
         {"id": 3, "created_by_account_id": 7, "source_pc_id": 3, "source_hostname": "OPS-03", "source_path": "C:/intake",
          "status": "paused", "pause_reason": "consent:pending", "consent_status": "pending",
          "stages": [], "destinations": [

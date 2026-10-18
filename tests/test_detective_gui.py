@@ -75,7 +75,7 @@ async def test_a_case_reads_as_a_story_a_picture_and_a_question(console):
     win, bridge, page = await _page(console)
     assert prop(page, "cur")["id"] == 1
     names = _names(win.contentItem())
-    assert {"case_1", "case_2"} <= names
+    assert [c["id"] for c in prop(page, "cases")] == [1, 2] and "caseList" in names                      # both cases are rows of the standard list, the first one picked
     assert "Taking data out" in win.findChild(QObject, "caseHeadline").property("text")
     graph = win.findChild(QObject, "caseGraph")
     assert graph is not None
@@ -229,3 +229,32 @@ async def test_an_admin_s_waiting_count_includes_what_detective_suggests_and_the
     bridge.conn.call = call
     page = await _open(win, bridge, "overview", "overviewView")
     await _wait(lambda: prop(page, "suggestions") == 2 and prop(page, "toAllow") == 1)
+
+
+async def test_the_super_user_s_overview_is_the_four_core_features_two_by_two_with_what_waits_above_them(console):
+    win, bridge, _ = console("super_user")
+    real = bridge.conn.call
+
+    async def call(type_, payload=None):
+        if type_ == "detective.overview":
+            return {"by_level": {"urgent": 2, "case": 1, "noted": 0}, "by_intent": {}, "reviewed": 0}
+        if type_ == "detective.cases":
+            return {"cases": [{"id": 1, "intent": "Taking data out", "host": "FIN-02", "level": "urgent"}]}
+        if type_ == "flow.list":
+            return {"flows": [{"id": 1, "status": "active", "source_hostname": "A", "destinations": []},
+                              {"id": 2, "status": "paused", "pause_reason": "restricted:consent", "source_hostname": "B", "destinations": [{"destination_hostname": "C"}]}]}
+        if type_ == "marks.list":
+            return {"marks": [{"id": 1, "name": "Payroll", "host": "FIN-02", "copies": 2, "carried_by": [2]}]}
+        return await real(type_, payload or {})
+
+    bridge.conn.call = call
+    await _open(win, bridge, "overview", "overviewView")
+    loader = win.findChild(QObject, "page")
+    await _wait(lambda: loader.property("item") is not None and loader.property("item").metaObject().className().startswith("SuOverviewPage"))
+    page = loader.property("item")
+    await _wait(lambda: prop(page, "ov")["by_level"]["urgent"] == 2 and len(prop(page, "flows")) == 2 and len(prop(page, "marks")) == 1)
+    for name in ("waitingBand", "quadTasks", "quadFlows", "quadRestricted", "quadDetective", "orgStrip"):
+        assert page.findChild(QObject, name) is not None, name
+    h = lambda n: page.findChild(QObject, n).property("height")          
+    assert h("quadTasks") == h("quadFlows") and h("quadRestricted") == h("quadDetective")          # side by side, one height
+    assert prop(page, "carried") == 1 and prop(page, "copies") == 2 and len(prop(page, "asking")) == 1

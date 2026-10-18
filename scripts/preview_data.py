@@ -792,6 +792,16 @@ def board(role: str, dept_id: int | None) -> dict[str, Any]:
 
 def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id: int | None) -> Any:
     """The sample's answer to one call, or None when the sample does not cover it."""
+    if type_.startswith(("detective.", "proposals.")):
+        import preview_detective
+        return preview_detective.answer(type_, payload, role, dept_id)
+    if type_ == "flow.restricted_waiting":
+        return {"waiting": [{"id": 5, "flow_id": 4, "name": "Payroll", "sample_path": "C:/Finance/Payroll/payroll-q3.xlsx", "asked_at": at(-1.5), "source_hostname": "FIN-02"}] if role == "super_user" else []}
+    if type_ == "flow.restricted":
+        return {"consents": [{"id": 5, "flow_id": int(payload.get("flow_id") or 0), "name": "Payroll", "state": "asked", "asked_at": at(-1.5), "sample_path": "C:/Finance/Payroll/payroll-q3.xlsx"}] if int(payload.get("flow_id") or 0) == 4 else [],
+                "can_decide": [5] if role == "super_user" else []}
+    if type_ == "handover.status":
+        return {"open": False, "waiting": []}
     if type_ == "hierarchy.tree":
         return tree(role, dept_id)
     if type_ == "hierarchy.sessions_today":

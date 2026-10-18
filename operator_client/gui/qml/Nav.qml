@@ -55,17 +55,15 @@ QtObject {
 
     // --- the menus ----------------------------------------------------------------------------------
     readonly property var adminMenu: [
-        ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"]]],
-        ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Restricted", "fileprotect"],
-                  ["detective", "Detective", "filesearch"]]],
+        ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
+                  ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
         ["Monitor", [["machines", "Machines", "desktop"], ["sessions", "Sessions", "login"], ["issues", "Issues", "alert"]]],
         ["Automate", [["automation", "Automation", "thunderbolt"], ["actions", "Actions", "playcircle"]]],
         ["Govern", [["rollout", "Rollout", "cloudupload"], ["audit", "Audit log", "history"], ["reports", "Reports", "filetext"]]]
     ]
     readonly property var suMenu: [
-        ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"]]],
-        ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Restricted", "fileprotect"],
-                  ["detective", "Detective", "filesearch"]]],
+        ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
+                  ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
         ["Organisation", [["departments", "Departments", "apartment"], ["accountability", "Accountability", "eye"],
                           ["access", "Access", "login"], ["registry", "Registry", "desktop"], ["reports", "Reports", "filetext"]]],
         ["Govern", [["rules", "Rules", "safety"], ["rollout", "Rollout", "cloudupload"], ["audit", "Audit log", "history"]]]

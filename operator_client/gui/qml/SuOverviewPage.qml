@@ -1,44 +1,70 @@
 import QtQuick
 import "."
 
-// THE SUPER USER'S OVERVIEW: what is waiting on you, the fleet, and this week's deviations. Four
-// figures; the fleet map beside what waits on you (a row opens the decision in a panel); the week's
-// deviations beside the ones worth a look (a row opens in place; only its link leaves the page).
+// THE SUPER USER'S OVERVIEW. Not the Admin's console: the Admin looks after machines, the Super User looks after the organisation. So it opens on what is waiting on
+// them (decisions only they can make), then the four things Falcon is sold on as a 2 x 2 -- Tasks, Flows, Restricted, Detective, each with its three figures and the
+// few that most need a look, each opening its own page -- and last, a slim line on the organisation itself (machines, departments, versions, broken rules).
 Page {
     id: page
     objectName: "overviewView"
 
-    property string by: "Status"
-    property var cpu: ({})
-    property string openDev: ""
-
     readonly property var q: Desk.queue
     readonly property int urgent: q.filter(function (x) { return x.sev === "high" || x.sev === "critical" }).length
-    readonly property var devs: Fleet.deviations.map(function (d) {
-        var m = Fleet.byPc[d.observed_pc_id], x = Rules.devRecord(d)
-        return { id: x.id, short: x.short, who: m ? (m.user || m.host) : "—", at: d.detected_at, open: !d.resolved_at,
-                 sev: x.sev, out: x.out, by: x.by, note: x.note, expected: x.expected, happened: x.happened }
-    }).sort(function (a, b) { return (b.open ? 1 : 0) - (a.open ? 1 : 0) || Time.ms(b.at) - Time.ms(a.at) })
-    readonly property var week: devs.filter(function (d) { return Time.ms(d.at) >= Time.now - 7 * 86400000 })
-    // each day's deviations by severity, as the concept stacks them
-    function dayOf(d) { return 6 - Math.floor((Time.startOfDay(Time.now) - Time.startOfDay(Time.ms(d.at))) / 86400000) }
-    readonly property var perDay: ["critical", "high", "medium"].map(function (k) {
-        var v = [0, 0, 0, 0, 0, 0, 0]
-        page.week.forEach(function (d) { var i = page.dayOf(d), s = d.sev === "critical" || d.sev === "high" ? d.sev : "medium"; if (i >= 0 && i < 7 && s === k) v[i] += 1 })
-        return { name: Fleet.sevWord(k), c: Fleet.sevColor(k), v: v }
-    })
-    readonly property var dayTotals: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return page.perDay.reduce(function (a, s) { return a + s.v[i] }, 0) })
-    readonly property int hiOpen: week.filter(function (d) { return d.open && (d.sev === "critical" || d.sev === "high") }).length
-    readonly property var off: Fleet.machines.filter(function (m) { return !m.online })
-    readonly property string nextVer: Fleet.rollout && Fleet.rollout.version ? Fleet.rollout.version.version_string : "the next version"
-    readonly property int behind: Fleet.machines.filter(function (m) { return m.behind }).length
 
-    function loadCpu() {
-        Fleet.machines.filter(function (m) { return m.online }).slice(0, 120).forEach(function (m) {
-            falcon.call("hierarchy.pc_state", { pc_id: m.pc_id }, function (ok, r) { if (ok && r.levels) { var c = Object.assign({}, page.cpu); c[m.host] = r.levels.cpu; page.cpu = c } })
-        })
+    // --- the four, each asked of the Engine by itself; every one keeps what it last said if the Engine is slow -------------------------------------------------
+    property var cases: []
+    property var ov: ({ by_level: { noted: 0, "case": 0, urgent: 0 }, by_intent: {}, reviewed: 0 })
+    property var flows: []
+    property var marks: []
+    property var tasks: []
+    function loadCore() {
+        if (!falcon.isConnected || falcon.role !== "super_user") return
+        falcon.call("detective.cases", { include_noted: false, status: "open" }, function (ok, r) { if (ok && r) page.cases = r.cases || [] })
+        falcon.call("detective.overview", {}, function (ok, r) { if (ok && r && r.by_level) page.ov = r })
+        falcon.call("flow.list", {}, function (ok, r) { if (ok && r) page.flows = r.flows || [] })
+        falcon.call("marks.list", { scope: "all" }, function (ok, r) { if (ok && r) page.marks = r.marks || [] })
+        falcon.call("task.dept_list", {}, function (ok, r) { if (ok && r) page.tasks = r.tasks || [] })
     }
-    onByChanged: if (by === "CPU") loadCpu()
+    Component.onCompleted: loadCore()
+    Connections {
+        target: falcon
+        function onConnected() { page.loadCore() }
+        function onPushReceived(type, payload) { if (/^(detective|flow|mark|task|proposal)/.test(type)) again.restart() }
+    }
+    Timer { id: again; interval: 500; onTriggered: page.loadCore() }
+
+    // tasks: yours to close are the ones every Admin told has marked done
+    readonly property var openTasks: tasks.filter(function (t) { return !t.completed_at })
+    readonly property var toClose: openTasks.filter(function (t) { return t.standing === "done" })
+    readonly property var late: openTasks.filter(function (t) { return t.deadline_at && Time.ms(t.deadline_at) < Time.now && t.standing !== "done" })
+    readonly property var taskRows: openTasks.slice().sort(function (a, b) {
+        return (b.standing === "done" ? 1 : 0) - (a.standing === "done" ? 1 : 0) || Time.ms(a.deadline_at || "2100-01-01") - Time.ms(b.deadline_at || "2100-01-01") }).slice(0, 3)
+    readonly property var standingWord: ({ told: "Told", seen: "Seen", ongoing: "Ongoing", done: "Done · yours to close" })
+
+    // flows
+    readonly property var running: flows.filter(function (f) { return f.status === "active" })
+    readonly property var held: flows.filter(function (f) { return f.status !== "active" && f.status !== "inactive" })
+    readonly property var asking: flows.filter(function (f) { return f.pause_reason === "restricted:consent" || f.pause_reason === "consent:pending" || f.consent_status === "pending" })
+    readonly property var flowRows: held.slice(0, 3)
+    function flowWhy(f) {
+        var r = f.pause_reason || ""
+        return r === "restricted:consent" ? "waiting for the owner of something restricted" : r === "consent:pending" ? "waiting for the other side to agree"
+             : r.indexOf("destination:") === 0 ? "its destination is not there" : r.indexOf("source:") === 0 ? "its source is not there" : f.status === "paused" ? "paused" : f.status
+    }
+
+    // restricted
+    readonly property int copies: marks.reduce(function (a, m) { return a + (m.copies || 0) }, 0)
+    readonly property int carried: marks.filter(function (m) { return m.carried_by && m.carried_by.length > 0 }).length
+    readonly property var markRows: marks.slice().sort(function (a, b) { return (b.copies || 0) - (a.copies || 0) }).slice(0, 3)
+
+    // the organisation itself
+    readonly property var devs: Fleet.deviations
+    readonly property var week: devs.filter(function (d) { return Time.ms(d.detected_at) >= Time.now - 7 * 86400000 })
+    readonly property int openWeek: week.filter(function (d) { return !d.resolved_at }).length
+    readonly property var off: Fleet.machines.filter(function (m) { return !m.online })
+    readonly property int behind: Fleet.machines.filter(function (m) { return m.behind }).length
+    readonly property string nextVer: Fleet.rollout && Fleet.rollout.version ? Fleet.rollout.version.version_string : "the next version"
+    readonly property var noAdmin: Fleet.depts.filter(function (d) { return !d.admins.length })
 
     Drawer {
         id: decide
@@ -51,130 +77,196 @@ Page {
         Txt { visible: decide.d === null; text: "Decided. Nothing else is waiting here."; color: Theme.text3 }
     }
 
-    Row {
+    // one figure of a quadrant, and one line of it
+    component Fig: Column {
+        property string value: "0"
+        property string label: ""
+        property color tone: Theme.text
+        spacing: 1
+        Txt { text: parent.value; font.pixelSize: 26; font.weight: Font.DemiBold; color: parent.tone; elide: Text.ElideNone }
+        Txt { text: parent.label; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+    }
+    component Line: Rectangle {
+        property string text: ""
+        property string aside: ""
+        property color dot: Theme.text4
+        property color rightTone: Theme.text3
+        signal clicked()
+        width: parent.width; height: 38
+        color: la.containsMouse ? Theme.surface2 : "transparent"
+        Rectangle { x: 14; width: 8; height: 8; radius: 2; color: parent.dot; anchors.verticalCenter: parent.verticalCenter }
+        Txt { x: 32; width: parent.width - 32 - rightLabel.width - 28; anchors.verticalCenter: parent.verticalCenter; text: parent.text }
+        Txt { id: rightLabel; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: parent.aside; color: parent.rightTone; font.pixelSize: 12; elide: Text.ElideNone }
+        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+        MouseArea { id: la; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: parent.clicked() }
+    }
+    component Figures: Row {
         width: parent.width
-        spacing: 14
-        readonly property real cw: (width - 42) / 4
-        Kpi { width: parent.cw; label: "Waiting on you"; value: Theme.fmt(page.q.length); delta: page.q.length ? page.urgent + " urgent" : "Nothing waiting"; dc: page.urgent ? Theme.crit : Theme.text3 }
-        Kpi { width: parent.cw; label: "Deviations this week"; value: Theme.fmt(page.week.length)
-              delta: page.week.length ? Theme.fmt(page.devs.filter(function (d) { return d.open }).length) + " still open" + (page.hiOpen ? " · " + page.hiOpen + " critical or high" : "") : "Every rule kept"
-              dc: page.hiOpen ? Theme.crit : Theme.text3; spark: page.dayTotals }
-        Kpi { width: parent.cw; label: "Machines online"; none: Fleet.machines.length === 0; noneValue: "0"; noneText: "No machines yet"
-              value: Theme.fmt(Fleet.machines.length - page.off.length); unit: "/ " + Theme.fmt(Fleet.machines.length)
-              delta: page.off.length ? (page.off.length === 1 ? page.off[0].host + " is" : Theme.fmt(page.off.length) + " are") + " offline" : "All online"; dc: page.off.length ? Theme.crit : Theme.text3 }
-        Kpi { width: parent.cw; label: "On current version"; none: Fleet.machines.length === 0; noneText: "No machines yet"
-              value: String(Fleet.machines.length ? Math.round((Fleet.machines.length - page.behind) / Fleet.machines.length * 100) : 0); unit: "%"
-              delta: page.behind ? Theme.fmt(page.behind) + " holding " + page.nextVer + " back" : page.nextVer + " can be approved"; dc: page.behind ? Theme.med : Theme.text3 }
+        spacing: 0
+        leftPadding: 14
+        topPadding: 14
+        bottomPadding: 12
     }
 
+    // --- 1. what is waiting on you ------------------------------------------------------------------------------------------------------------------------
+    Panel {
+        id: waitP
+        objectName: "waitingBand"
+        width: parent.width
+        flush: true
+        title: "Waiting on you"
+        sub: page.q.length ? Theme.fmt(page.q.length) + (page.urgent ? " · " + page.urgent + " urgent" : "") + " · click one to decide it" : "decisions only you can make"
+        Column {
+            width: parent.width
+        Empty { visible: page.q.length === 0; width: parent.width; h: 120; icon: "check"; title: "Nothing is waiting on you"; text: "Reports nobody below you can take, Detective's suggestions and decisions only you can make appear here." }
+        Grid {
+            visible: page.q.length > 0
+            width: parent.width
+            columns: 2
+            Repeater {
+                model: page.q.slice(0, 6)
+                Rectangle {
+                    required property var modelData
+                    width: waitP.width / 2 - 1; height: 44
+                    color: wa.containsMouse ? Theme.surface2 : "transparent"
+                    Rectangle { x: 14; width: 8; height: 8; radius: 2; color: Fleet.sevColor(modelData.sev); anchors.verticalCenter: parent.verticalCenter }
+                    Txt { x: 32; width: parent.width - 120; anchors.verticalCenter: parent.verticalCenter; text: modelData.short }
+                    Txt { anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: modelData.age; mono: true; color: Theme.text3; font.pixelSize: 11; elide: Text.ElideNone }
+                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    MouseArea { id: wa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { decide.id0 = modelData.id; decide.open() } }
+                }
+            }
+        }
+        Item { visible: page.q.length > 6; width: parent.width; height: 38
+               More { x: 14; anchors.verticalCenter: parent.verticalCenter; n: page.q.length - 6; what: "waiting"; onClicked: { decide.id0 = page.q[6].id; decide.open() } } }
+        }
+    }
+
+    // --- 2. the four, two by two (each row one height) -------------------------------------------------------------------------------------------------
     Row {
         width: parent.width
         spacing: 14
-        readonly property real h: Math.max(fp.implicitHeight, wp.implicitHeight)
+        readonly property real h: Math.max(tp.implicitHeight, fp.implicitHeight)
+        Panel {
+            id: tp
+            objectName: "quadTasks"
+            width: (parent.width - 14) / 2
+            height: parent.h
+            flush: true
+            title: "Tasks"
+            sub: "what you have given departments"
+            extra: Btn { small: true; kind: "link"; text: "Tasks →"; onClicked: Nav.go("tasks") }
+            Column {
+                width: parent.width
+            Figures {
+                Fig { width: 120; value: Theme.fmt(page.openTasks.length); label: "open" }
+                Fig { width: 150; value: Theme.fmt(page.toClose.length); label: "done, yours to close"; tone: page.toClose.length ? Theme.accent : Theme.text }
+                Fig { width: 120; value: Theme.fmt(page.late.length); label: "past their date"; tone: page.late.length ? Theme.crit : Theme.text }
+            }
+            Rectangle { width: parent.width; height: 1; color: Theme.grid }
+            Empty { visible: page.taskRows.length === 0; width: parent.width; h: 130; icon: "checksquare"; title: "No open tasks"; text: "Give a department a piece of work and follow it here." }
+            Repeater {
+                model: page.taskRows
+                Line { required property var modelData; text: modelData.title; aside: page.standingWord[modelData.standing] || modelData.standing
+                       dot: modelData.standing === "done" ? Theme.accent : Theme.text4; rightTone: modelData.standing === "done" ? Theme.accent : Theme.text3; onClicked: Nav.go("tasks") }
+            }
+            }
+        }
         Panel {
             id: fp
-            width: (parent.width - 14) * 7 / 12
-            height: parent.h
-            title: "Fleet"
-            sub: Theme.fmt(Fleet.machines.length) + " machines · click one to see its card"
-            extra: Segmented { options: ["Status", "CPU", "Version", "Check-in"]; value: page.by; onPicked: function (v) { page.by = v } }
-            HostMap {
-                visible: Fleet.machines.length > 0
-                width: parent.width
-                by: page.by
-                cpu: page.cpu
-                openLabel: "See {h} in Registry →"
-                moreLabel: "on Departments →"
-                onOpen: function (h) { Nav.go("registry", h) }
-                onMore: Nav.go("departments")
-            }
-            Empty { visible: Fleet.loaded && Fleet.machines.length === 0; width: parent.width; h: 220; icon: "desktop"; title: "No machines yet"; text: "Machines appear here by department as they are registered."; act: "Open Registry →"; onActed: Nav.go("registry") }
-        }
-        Panel {
-            id: wp
-            width: (parent.width - 14) * 5 / 12
+            objectName: "quadFlows"
+            width: (parent.width - 14) / 2
             height: parent.h
             flush: true
-            title: "Waiting on you"
-            sub: "click one to decide it"
+            title: "Flows"
+            sub: "files moving between machines"
+            extra: Btn { small: true; kind: "link"; text: "Flows →"; onClicked: Nav.go("flows") }
             Column {
                 width: parent.width
-                Empty { visible: page.q.length === 0; width: parent.width; h: 180; icon: "check"; title: "Nothing is waiting on you"; text: "Reports nobody below you can take, and decisions only you can make, appear here." }
-                Repeater {
-                    model: page.q.slice(0, 6)
-                    Rectangle {
-                        required property var modelData
-                        width: parent.width; height: 40
-                        color: wa.containsMouse ? Theme.surface2 : "transparent"
-                        Rectangle { x: 14; width: 8; height: 8; radius: 2; color: Fleet.sevColor(modelData.sev); anchors.verticalCenter: parent.verticalCenter }
-                        Txt { x: 32; width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter; text: modelData.short }
-                        Txt { anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: modelData.age; mono: true; color: Theme.text3; font.pixelSize: 11 }
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                        MouseArea { id: wa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { decide.id0 = modelData.id; decide.open() } }
-                    }
-                }
-                Item { visible: page.q.length > 6; width: parent.width; height: 36
-                       More { x: 14; anchors.verticalCenter: parent.verticalCenter; n: page.q.length - 6; what: "waiting"; onClicked: { decide.id0 = page.q[6].id; decide.open() } } }
+            Figures {
+                Fig { width: 120; value: Theme.fmt(page.running.length); label: "running" }
+                Fig { width: 120; value: Theme.fmt(page.held.length); label: "held up"; tone: page.held.length ? Theme.med : Theme.text }
+                Fig { width: 150; value: Theme.fmt(page.asking.length); label: "waiting for a yes"; tone: page.asking.length ? Theme.accent : Theme.text }
+            }
+            Rectangle { width: parent.width; height: 1; color: Theme.grid }
+            Empty { visible: page.flowRows.length === 0; width: parent.width; h: 130; icon: "branches"; title: page.flows.length ? "Every flow is running" : "No flows yet"; text: "A flow that is held up, and why, shows here." }
+            Repeater {
+                model: page.flowRows
+                Line { required property var modelData; text: modelData.source_hostname + " → " + (modelData.destinations.length ? (modelData.destinations[0].destination_hostname || "a folder") : "nowhere")
+                       aside: page.flowWhy(modelData); dot: Theme.med; onClicked: Nav.go("flows") }
+            }
+            }
+        }
+    }
+    Row {
+        width: parent.width
+        spacing: 14
+        readonly property real h: Math.max(rp.implicitHeight, dtp.implicitHeight)
+        Panel {
+            id: rp
+            objectName: "quadRestricted"
+            width: (parent.width - 14) / 2
+            height: parent.h
+            flush: true
+            title: "Restricted"
+            sub: "what must stay where it belongs"
+            extra: Btn { small: true; kind: "link"; text: "Restricted →"; onClicked: Nav.go("restricted") }
+            Column {
+                width: parent.width
+            Figures {
+                Fig { width: 120; value: Theme.fmt(page.marks.length); label: "marked" }
+                Fig { width: 150; value: Theme.fmt(page.copies); label: "copies found elsewhere"; tone: page.copies ? Theme.crit : Theme.text }
+                Fig { width: 120; value: Theme.fmt(page.carried); label: "carried by flows" }
+            }
+            Rectangle { width: parent.width; height: 1; color: Theme.grid }
+            Empty { visible: page.markRows.length === 0; width: parent.width; h: 130; icon: "fileprotect"; title: "Nothing is marked"; text: "Mark a file or folder and Falcon follows its content wherever it is copied." }
+            Repeater {
+                model: page.markRows
+                Line { required property var modelData; text: modelData.name + " · " + modelData.host
+                       aside: modelData.copies ? Theme.many(modelData.copies, "copy", "copies") + " elsewhere" : "only in its place"
+                       dot: modelData.copies ? Theme.crit : Theme.ok; rightTone: modelData.copies ? Theme.crit : Theme.text3; onClicked: Nav.go("restricted") }
+            }
+            }
+        }
+        Panel {
+            id: dtp
+            objectName: "quadDetective"
+            width: (parent.width - 14) / 2
+            height: parent.h
+            flush: true
+            title: "Detective"
+            sub: "what people seem to be trying to do"
+            extra: Btn { small: true; kind: "link"; text: "Detective →"; onClicked: Nav.go("detective") }
+            Column {
+                width: parent.width
+            Figures {
+                Fig { width: 120; value: Theme.fmt(page.ov.by_level.urgent); label: "urgent"; tone: page.ov.by_level.urgent ? Theme.crit : Theme.text }
+                Fig { width: 120; value: Theme.fmt(page.ov.by_level["case"]); label: "cases"; tone: page.ov.by_level["case"] ? Theme.med : Theme.text }
+                Fig { width: 150; value: Theme.fmt(page.ov.by_level.noted); label: "noted quietly" }
+            }
+            Rectangle { width: parent.width; height: 1; color: Theme.grid }
+            Empty { visible: page.cases.length === 0; width: parent.width; h: 130; icon: "filesearch"; title: "Nothing to look at"; text: "When several small things add up to a pattern, the strongest show here." }
+            Repeater {
+                model: page.cases.slice(0, 3)
+                Line { required property var modelData; text: modelData.intent + " · " + modelData.host
+                       aside: modelData.level === "urgent" ? "Urgent" : "Case"; dot: modelData.level === "urgent" ? Theme.crit : Theme.med
+                       rightTone: modelData.level === "urgent" ? Theme.crit : Theme.med; onClicked: Nav.go("detective") }
+            }
             }
         }
     }
 
-    Row {
+    // --- 3. the organisation itself, one slim line ------------------------------------------------------------------------------------------------------------
+    Strip {
+        objectName: "orgStrip"
         width: parent.width
-        spacing: 14
-        readonly property real h: Math.max(dp.implicitHeight, lp.implicitHeight)
-        Panel {
-            id: dp
-            width: (parent.width - 14) * 7 / 12
-            height: parent.h
-            title: "Deviations, 7 days"
-            sub: "by severity · broken rules with someone to ask"
-            extra: Btn { small: true; kind: "link"; text: "Accountability →"; onClicked: Nav.go("accountability") }
-            DayBars { visible: page.week.length > 0; width: parent.width; height: 214; series: page.perDay }
-            Empty { visible: page.week.length === 0; width: parent.width; h: 170; icon: "barchart"; title: "No deviations this week"; text: "Each day's broken rules, by severity." }
-        }
-        Panel {
-            id: lp
-            width: (parent.width - 14) * 5 / 12
-            height: parent.h
-            flush: true
-            title: "Worth a look"
-            sub: "this week · open first, then dealt with"
-            Column {
-                width: parent.width
-                Empty { visible: page.week.length === 0; width: parent.width; h: 180; icon: "check"; title: "Nothing this week"; text: "When a rule is broken, it appears here, the open ones first." }
-                Repeater {
-                    model: page.week.slice(0, 6)
-                    Column {
-                        required property var modelData
-                        readonly property bool on: page.openDev === modelData.id
-                        width: parent.width
-                        Rectangle {
-                            width: parent.width; height: 40
-                            color: parent.on ? Theme.accentSoft : da.containsMouse ? Theme.surface2 : "transparent"
-                            Rectangle { x: 14; width: 8; height: 8; radius: 2; color: modelData.open ? Fleet.sevColor(modelData.sev) : Theme.text4; anchors.verticalCenter: parent.verticalCenter }
-                            Txt { x: 32; width: parent.width - 220; anchors.verticalCenter: parent.verticalCenter; text: modelData.short; color: modelData.open ? Theme.text : Theme.text3 }
-                            Txt { x: parent.width - 180; width: 100; anchors.verticalCenter: parent.verticalCenter; text: modelData.open ? modelData.who : (Rules.outcomes[modelData.out] || ["Dealt with"])[0]; color: Theme.text3; font.pixelSize: 12 }
-                            Txt { anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: Time.at(modelData.at); mono: true; color: Theme.text3; font.pixelSize: 11 }
-                            MouseArea { id: da; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.openDev = parent.parent.on ? "" : modelData.id }
-                        }
-                        Rectangle {
-                            visible: parent.on
-                            width: parent.width; height: visible ? ex.height + 20 : 0
-                            color: Theme.surface2
-                            Column { id: ex; x: 32; y: 8; width: parent.width - 46; spacing: 3
-                                     Txt { width: parent.width; font.pixelSize: 12; textFormat: Text.RichText
-                                           text: "<span style='color:" + Theme.text3 + "'>Expected </span>" + modelData.expected + "<br><span style='color:" + Theme.text3 + "'>What happened </span>" + modelData.happened
-                                                 + (modelData.open ? "" : "<br><span style='color:" + Theme.text3 + "'>What came of it </span>" + (Rules.outcomes[modelData.out] || ["Dealt with"])[0]
-                                                    + (modelData.by ? " · " + modelData.by : "") + (modelData.note ? ": “" + modelData.note + "”" : "")) }
-                                     Link { text: "Open in Accountability →"; font.pixelSize: 12; onClicked: Nav.go("accountability", modelData.id) } }
-                        }
-                        Rectangle { width: parent.width; height: 1; color: Theme.grid }
-                    }
-                }
-                Item { visible: page.week.length > 6; width: parent.width; height: 38
-                       More { x: 14; anchors.verticalCenter: parent.verticalCenter; n: page.week.length - 6; what: "this week in Accountability →"; onClicked: Nav.go("accountability") } }
-            }
-        }
+        items: [
+            { label: "Machines online", value: Theme.fmt(Fleet.machines.length - page.off.length) + " / " + Theme.fmt(Fleet.machines.length),
+              delta: page.off.length ? (page.off.length === 1 ? page.off[0].host + " is" : Theme.fmt(page.off.length) + " are") + " offline" : "all online", dc: page.off.length ? Theme.crit : undefined },
+            { label: "Departments", value: Theme.fmt(Fleet.depts.length), delta: page.noAdmin.length ? page.noAdmin.map(function (d) { return d.name }).join(", ") + " has no Admin" : "every one has an Admin", dc: page.noAdmin.length ? Theme.crit : undefined },
+            { label: "Broken rules this week", value: Theme.fmt(page.week.length), delta: page.week.length ? Theme.fmt(page.openWeek) + " still open" : "every rule kept", dc: page.openWeek ? Theme.med : undefined },
+            { label: "On current version", value: String(Fleet.machines.length ? Math.round((Fleet.machines.length - page.behind) / Fleet.machines.length * 100) : 0) + "%",
+              delta: page.behind ? Theme.fmt(page.behind) + " holding " + page.nextVer + " back" : page.nextVer + " can be approved", dc: page.behind ? Theme.med : undefined }
+        ]
     }
 }
