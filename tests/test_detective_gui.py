@@ -191,3 +191,41 @@ async def test_a_flow_shows_what_restricted_material_it_waits_for_or_carries_and
     QMetaObject.invokeMethod(page, "takeBack", Q_ARG("QVariant", {"id": 5}))
     await _wait(lambda: any(t == "flow.restricted_revoke" for t, _ in bridge.conn.seen))
     assert next(p for t, p in bridge.conn.seen if t == "flow.restricted_revoke") == {"consent_id": 5}
+
+
+async def test_what_waits_on_the_super_user_includes_suggestions_flows_to_allow_and_a_machine_asking_to_take_over(console):
+    win, bridge, _ = console("super_user")
+    real = bridge.conn.call
+
+    async def call(type_, payload=None):
+        if type_ == "proposals.list":
+            return {"proposals": [{"id": 4, "kind": "pause_flow", "title": "Pause flow #3? Its source machine FIN-01 is under an urgent case", "created_at": "2026-10-18T10:00:00Z"}]}
+        if type_ == "flow.restricted_waiting":
+            return {"waiting": [{"id": 5, "flow_id": 9, "name": "Payroll", "sample_path": "C:/Finance/Payroll/p.xlsx", "asked_at": "2026-10-18T10:05:00Z"}]}
+        if type_ == "handover.status":
+            return {"open": True, "waiting": [{"id": 7, "hostname": "SU-NEW", "created_at": "2026-10-18T10:10:00Z"}]}
+        return await real(type_, payload or {})
+
+    bridge.conn.call = call
+    await _open(win, bridge, "overview", "overviewView")
+    loader = win.findChild(QObject, "page")                 # (a page that was left is still around a moment: the loader holds the one on show)
+    await _wait(lambda: loader.property("item") is not None and loader.property("item").metaObject().className().startswith("SuOverviewPage"))
+    page = loader.property("item")
+    await _wait(lambda: {x["kind"] for x in prop(page, "q") or []} >= {"proposal", "restricted", "handover"})
+    q = {x["kind"]: x for x in prop(page, "q")}
+    assert q["handover"]["title"] == "SU-NEW is asking to become your machine" and q["handover"]["options"][0]["go"] == ["registry", "ask"]
+    assert [o["key"] for o in q["proposal"]["options"]] == ["yes", "no"] and q["restricted"]["title"].startswith("Flow 9 wants to carry Payroll")
+
+
+async def test_an_admin_s_waiting_count_includes_what_detective_suggests_and_the_flows_they_may_allow(console):
+    win, bridge, _ = console("admin")
+    real = bridge.conn.call
+
+    async def call(type_, payload=None):
+        if type_ == "overview.admin":
+            return {"waiting": {"total": 3, "suggestions": 2, "flows_to_allow": 1}}
+        return await real(type_, payload or {})
+
+    bridge.conn.call = call
+    page = await _open(win, bridge, "overview", "overviewView")
+    await _wait(lambda: prop(page, "suggestions") == 2 and prop(page, "toAllow") == 1)

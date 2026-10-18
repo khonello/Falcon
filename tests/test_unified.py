@@ -120,16 +120,16 @@ async def test_what_a_flow_delivers_put_there_by_hand_is_a_way_round_the_flow_an
     a1 = await connect("cid-a1")
     made = await a1.ok("flow.create", {"source_pc_id": org["a1_pc"], "source_path": "C:/out", "stages": [], "destinations": [{"destination_pc_id": org["w1_pc"], "destination_path": "C:/in"}]})
     flow_id, dest_id = made["flow"]["id"], made["flow"]["destinations"][0]["id"]
-    await engine.file_index.ingest_sweep_batch(org["a1_pc"], [{"op": "create", "path": "C:\\out\\a.txt", "name": "a.txt", "hash": "h-a"}, {"op": "create", "path": "C:\\out\\b.txt", "name": "b.txt", "hash": "h-b"}], first=True)
+    await engine.file_index.ingest_sweep_batch(org["a1_pc"], [{"op": "create", "path": "C:\\out\\a.xlsx", "name": "a.xlsx", "hash": "h-a"}, {"op": "create", "path": "C:\\out\\b.xlsx", "name": "b.xlsx", "hash": "h-b"}], first=True)
     caught = []
 
     async def look(event):
         caught.append(event)
 
     engine.bus.on("file.*", look, stage="tell", name="test")
-    await engine.db.flows.log_sync(dest_id, "h-b", "flow_sync", None, source_relative_path="b.txt", written_path="C:\\in\\b.txt", source_hash="h-b")        # the flow wrote b
-    await engine.file_index.ingest_event(org["w1_pc"], {"op": "copy", "path": "C:\\in\\a.txt", "name": "a.txt", "hash": "h-a", "old_path": "E:\\a.txt"})        # a person put a there
-    await engine.file_index.ingest_event(org["w1_pc"], {"op": "create", "path": "C:\\in\\b.txt", "name": "b.txt", "hash": "h-b"})
+    await engine.db.flows.log_sync(dest_id, "h-b", "flow_sync", None, source_relative_path="b.xlsx", written_path="C:\\in\\b.xlsx", source_hash="h-b")        # the flow wrote b
+    await engine.file_index.ingest_event(org["w1_pc"], {"op": "copy", "path": "C:\\in\\a.xlsx", "name": "a.xlsx", "hash": "h-a", "old_path": "E:\\a.xlsx"})        # a person put a there
+    await engine.file_index.ingest_event(org["w1_pc"], {"op": "create", "path": "C:\\in\\b.xlsx", "name": "b.xlsx", "hash": "h-b"})
     by_hand, by_flow = caught[-2], caught[-1]
     assert by_hand.facts["flow_bypass"] == flow_id and by_hand.facts["flow_route"]["destination"] == [flow_id] and by_hand.facts["flow_wrote"] is False
     assert "flow_bypass" not in by_flow.facts and by_flow.facts["flow_wrote"] is True

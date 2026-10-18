@@ -77,7 +77,7 @@ Page {
                      sev: c.severity === "medium" ? "warning" : c.severity }
         }) : []
         return { id: String(m.id), mid: m.id, name: m.name, kind: m.kind, host: m.host, pc: m.pc_id, path: m.path, keep: m.keep, files: m.files, n: m.copies, copies: cs,
-                 versions: m.versions, by: m.by, at: m.created_at }
+                 tracked: m.tracked, generated: m.generated || 0, carried: m.carried_by || [], versions: m.versions, by: m.by, at: m.created_at }
     }) : readVio()
     function readVio() {
         var by = {}, out = []
@@ -168,7 +168,9 @@ Page {
             facts: k ? [["Kind", k.kind === "folder" ? "Folder · " + Theme.fmt(k.files) + " files" : "File"], ["On", k.host || "—", null, true], ["Path", k.path || "—", null, true],
                         ["Allowed", k.keep === "path" ? "only in " + page.where(k) : "anywhere on " + (k.host || "its PC"), null, false, false, k.mid !== undefined ? "change" : ""],
                         ["Marked", page.marked(k)],
-                        ["Copies", k.n ? k.n + " found elsewhere" : "None, only where it belongs", k.n ? Theme.crit : null]] : []
+                        ["Copies", k.n ? k.n + " found elsewhere" : "None, only where it belongs", k.n ? Theme.crit : null]]
+                       .concat(k.kind === "folder" && k.generated ? [["Tracked by content", Theme.fmt(k.tracked) + " files · " + Theme.fmt(k.generated) + " generated (node_modules and the like) are covered but not tracked one by one"]] : [])
+                       .concat(k.carried && k.carried.length ? [["Carried by flows", k.carried.map(function (id) { return "flow " + id }).join(", ") + " · allowed by you, until taken back on the Flows page"]] : []) : []
             onFactLink: function (label) { if (label === "Allowed") page.changeKeep() }
             actions: Btn { danger: true; text: "Unmark"; enabled: page.cur !== null && page.cur.mid !== undefined; tip: page.cur && page.cur.mid === undefined ? "This Engine cannot unmark" : ""
                            onClicked: { var k = page.cur

@@ -414,8 +414,13 @@ async def overview_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     for t in dept_tasks:
         row = next((a for a in await db.department_tasks.admins([t["id"]]) if a["account_id"] == ident.account_id), None)
         unseen += 1 if row and row["state"] == "told" else 0
-    waiting = verify + len(mine) + pings
-    return {"waiting": {"total": waiting, "to_verify": verify, "issues": len(mine), "pings": pings, "department_tasks_unseen": unseen},
+    from engine.flow import guard
+
+    suggestions = [p for p in await db.proposals.list("open", 500) if p.get("department_id") == ident.department_id]
+    to_allow = [c for c in await db.flows.asked_consents() if guard.can_decide(ident, c)]
+    waiting = verify + len(mine) + pings + len(suggestions) + len(to_allow)
+    return {"waiting": {"total": waiting, "to_verify": verify, "issues": len(mine), "pings": pings, "department_tasks_unseen": unseen,
+                        "suggestions": len(suggestions), "flows_to_allow": len(to_allow)},
             "machines": {"online": fleet["summary"]["online"], "total": fleet["summary"]["machines"], "by_health": fleet["summary"]["by_health"]},
             "issues": {"open": len(issues), "by_severity": by_sev, "unassigned": sum(1 for i in issues if i["owner_account_id"] is None)},
             "sessions_held": await db.overview.sessions_held(ident.department_id), "current_version": fleet["current_version"]}

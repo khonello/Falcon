@@ -12,6 +12,9 @@ QtObject {
     property var routing: []
     property var fixed: ["about_admin"]
     property var deptTasks: []
+    property var proposals: []       // what Detective suggests (proposals.list)
+    property var restricted: []      // flows waiting for the person who restricted something to say it may be carried (flow.restricted_waiting)
+    property var handover: null      // handover.status: machines asking to become the Super User's
     property bool loaded: false
 
     readonly property var words: ({ resource_violation: "Restricted file", flow_failure: "Flow failed", listener_report: "Listener report",
@@ -27,6 +30,9 @@ QtObject {
         falcon.call("reports.list", {}, function (ok, r) { desk.reports = ok ? (r.reports || []) : []; desk.loaded = true })
         falcon.call("reports.routing_get", {}, function (ok, r) { if (ok) { desk.routing = r.routing || []; desk.fixed = r.fixed || ["about_admin"] } })
         falcon.call("task.dept_list", {}, function (ok, r) { desk.deptTasks = ok ? (r.tasks || []) : [] })
+        falcon.call("proposals.list", {}, function (ok, r) { desk.proposals = ok && r ? (r.proposals || []) : [] })
+        falcon.call("flow.restricted_waiting", {}, function (ok, r) { desk.restricted = ok && r ? (r.waiting || []) : [] })
+        falcon.call("handover.status", {}, function (ok, r) { desk.handover = ok ? r : null })
     }
     function routedTo(c) { return routing.filter(function (x) { return x.category === c }).map(function (x) { return x.routed_department_id }) }
 
@@ -73,6 +79,32 @@ QtObject {
                        options: [{ key: "complete", icon: "check", title: "Complete", desc: "It leaves the list, recorded as complete with your name and the time.", verb: "Complete" },
                                  { key: "notyet", icon: "rollback", title: "Not done yet", desc: "It goes back as ongoing, with your note. Every Admin told sees it.", verb: "Send back", need: "message" }] })
         })
+        // what Detective suggests to the other features: said, never done, until you say so
+        proposals.forEach(function (p) {
+            var yes = p.kind === "pause_flow" ? ["Pause the flow", "Pauses it now, as your act. Resume it from Flows when it is safe.", "Pause"]
+                    : p.kind === "mark_folder" ? ["Show me where to mark it", "Marks are made on the machine they are on, from the Restricted page. This tells you which folder.", "Show me"]
+                    : ["Give me the words for a task", "The wording for a task to the department's Admin. You give it on the Tasks page.", "Show me"]
+            out.push({ id: "prop-" + p.id, kind: "proposal", p: p, sev: p.kind === "pause_flow" ? "high" : "medium", icon: p.kind === "pause_flow" ? "branches" : p.kind === "mark_folder" ? "fileprotect" : "checksquare",
+                       title: p.title, short: "Detective: " + (p.kind === "pause_flow" ? "pause a flow?" : p.kind === "mark_folder" ? "mark a folder?" : "a follow-up?"), age: Time.age(p.created_at),
+                       why: "Detective sees this and the other features cannot. It only suggests: nothing happens until you say so.",
+                       options: [{ key: "yes", icon: "check", title: yes[0], desc: yes[1], verb: yes[2] },
+                                 { key: "no", icon: "close", title: "Not now", desc: "It is dismissed and not suggested again while the cause stands.", verb: "Dismiss" }] })
+        })
+        // a flow that wants to carry something restricted, and this person made the restriction
+        restricted.forEach(function (c) {
+            out.push({ id: "rc-" + c.id, kind: "restricted", c: c, sev: "medium", icon: "lock", title: "Flow " + c.flow_id + " wants to carry " + c.name + ", which is restricted",
+                       short: "Restricted: " + c.name, age: Time.age(c.asked_at),
+                       why: "The flow is paused. It goes on only if you allow it, and you can take that back any time from the Flows page. " + (c.sample_path ? "It met it at " + c.sample_path + "." : ""),
+                       options: [{ key: "yes", icon: "check", title: "Allow this flow", desc: "Its destination folders become a place this content may be, until you take it back.", verb: "Allow" },
+                                 { key: "no", icon: "pause", title: "Keep it paused", desc: "Nothing moves. It asks again if someone tries to resume it.", verb: "Keep paused" }] })
+        })
+        // a machine asking to become the Super User's
+        if (handover && handover.waiting) handover.waiting.forEach(function (w) {
+            out.push({ id: "ho-" + w.id, kind: "handover", w: w, sev: "high", icon: "desktop", title: w.hostname + " is asking to become your machine", short: "Move to " + w.hostname, age: Time.age(w.created_at),
+                       why: "Only someone in front of it can see the code. Typing it on the Registry page moves the Super User there; this machine then stops being the Super User's.",
+                       options: [{ key: "go", icon: "login", title: "Type its code on the Registry", desc: "Under Asking to join.", verb: "Open Registry", go: ["registry", "ask"] },
+                                 { key: "refuse", icon: "close", title: "Refuse it", desc: "It is told no, and the window stays as it was.", verb: "Refuse" }] })
+        })
         var o = { critical: 0, high: 1, medium: 2, low: 3 }
         return out.sort(function (a, b) { return o[a.sev] - o[b.sev] })
     }
@@ -82,7 +114,7 @@ QtObject {
         target: falcon
         function onConnected() { desk.refresh() }
         function onScopeChanged() { desk.refresh() }
-        function onPushReceived(type) { if (/^(report|task\.dept|update)/.test(type)) desk.later.restart() }
+        function onPushReceived(type) { if (/^(report|task\.dept|update|proposal|flow\.restricted|enroll|handover)/.test(type)) desk.later.restart() }
     }
     Component.onCompleted: refresh()
 }

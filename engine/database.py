@@ -1332,6 +1332,25 @@ class FlowsRepo(_Repo):
             "SELECT c.*, m.by_account_id AS mark_owner_account_id, m.pc_id AS mark_pc_id FROM flow_restricted_consents c LEFT JOIN resource_marks m ON m.id = c.mark_id "
             "WHERE c.flow_id = $1 AND c.state = ANY($2::text[]) ORDER BY c.id", flow_id, list(states))
 
+    async def asked_consents(self, limit: int = 500) -> list[dict[str, Any]]:
+        """Every request that is waiting for an answer, with the flow it belongs to (oldest first)."""
+        return await self._fetch(
+            "SELECT c.*, m.by_account_id AS mark_owner_account_id, m.pc_id AS mark_pc_id, f.source_pc_id, f.source_path, f.created_by_account_id, p.hostname AS source_hostname "
+            "FROM flow_restricted_consents c JOIN flows f ON f.id = c.flow_id JOIN pcs p ON p.id = f.source_pc_id LEFT JOIN resource_marks m ON m.id = c.mark_id "
+            "WHERE c.state = 'asked' AND f.status <> 'inactive' ORDER BY c.id LIMIT $1", limit)
+
+    async def carried_by_consent(self, mark_ids: list[int]) -> dict[int, list[int]]:
+        """For each mark, the flows allowed to carry it right now (a consent in force)."""
+        if not mark_ids:
+            return {}
+        got = await self._fetch(
+            "SELECT mark_id, flow_id FROM flow_restricted_consents WHERE state = 'granted' AND mark_id = ANY($1::int[]) AND (expires_at IS NULL OR expires_at > now()) ORDER BY flow_id",
+            mark_ids)
+        out: dict[int, list[int]] = {}
+        for r in got:
+            out.setdefault(r["mark_id"], []).append(r["flow_id"])
+        return out
+
     async def consent(self, consent_id: int) -> dict[str, Any] | None:
         return await self._one(
             "SELECT c.*, m.by_account_id AS mark_owner_account_id, m.pc_id AS mark_pc_id FROM flow_restricted_consents c LEFT JOIN resource_marks m ON m.id = c.mark_id WHERE c.id = $1",

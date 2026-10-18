@@ -24,6 +24,9 @@ Page {
             page.audit = es
             page.live = es.slice(0, 14)
         })
+        falcon.call("overview.admin", {}, function (ok, r) {
+            if (ok && r && r.waiting) { page.suggestions = r.waiting.suggestions || 0; page.toAllow = r.waiting.flows_to_allow || 0 }
+        })
         falcon.call("task.list", {}, function (ok, r) {
             page.tasks = ok ? (r.tasks || []) : []
             // a task is handed in when every target is found: it waits on the person who gave it (as on Tasks)
@@ -65,6 +68,8 @@ Page {
     readonly property var held: ms.filter(function (m) { return m.held !== "" })
     readonly property var iss: Fleet.issues
     property int toVerify: 0
+    property int suggestions: 0       // what Detective suggests for this department's machines
+    property int toAllow: 0           // flows waiting for this Admin to say a restricted thing may be carried
     // what waits in Messages: the menu's count (people who pinged, and conversations where it is your turn)
     readonly property int pings: Nav.counts.messages ? Nav.counts.messages.n : 0
     readonly property real since: Time.now - Time.rangeHours(Nav.range) * 3600000
@@ -85,9 +90,10 @@ Page {
             label: "Waiting on you"
             none: page.ms.length === 0
             noneValue: "0"; noneText: "Nothing waiting"
-            readonly property int n: page.toVerify + page.iss.length + page.pings
+            readonly property int n: page.toVerify + page.iss.length + page.pings + page.suggestions + page.toAllow
             value: Theme.fmt(n)
-            delta: n ? page.toVerify + " to verify · " + page.iss.length + " issue" + (page.iss.length === 1 ? "" : "s") + " · " + page.pings + " ping" + (page.pings === 1 ? "" : "s") : "Nothing waiting on you"
+            delta: n ? page.toVerify + " to verify · " + page.iss.length + " issue" + (page.iss.length === 1 ? "" : "s") + " · " + page.pings + " ping" + (page.pings === 1 ? "" : "s")
+                       + (page.suggestions ? " · " + page.suggestions + " suggestion" + (page.suggestions === 1 ? "" : "s") : "") + (page.toAllow ? " · " + page.toAllow + " flow" + (page.toAllow === 1 ? "" : "s") + " to allow" : "") : "Nothing waiting on you"
             dc: n ? Theme.crit : Theme.text3
         }
         Kpi {

@@ -123,7 +123,8 @@ Last updated 18 Oct 2026.
 - **Done since:** the marking assessment is measured (the Engine's own time per file, slowed when it is busy) and shown on the Mark page before anything is done; flows waiting for a restricted owner are answered on
   the Flows page; the Super User's move to another machine is on the Registry page; every list read has a hard cap; Task, Flow, mark and case events are on the spine with the facts `task_expects`, `flow_route`,
   `flow_bypass`; Detective proposes (pause a flow, mark a folder, a follow-up task) and a person decides (`proposals`).
-- **Still not done:** a console page for the proposals (shell and handlers only); a bounded priority queue on the bus; Reports/Notices as the spine's "tell" stage; the dormant sources (the Engine produces `opened`
+- **Console, 18 Oct 2026:** the proposals are on the Detective page and in the Super User's queue; flows waiting for a restricted owner and a machine asking to become the Super User's are in the queue too; the Admin's Overview counts suggestions and flows to allow (`overview.admin`); the Restricted page shows what is tracked by content, what is generated, and which flows carry a mark. The spine's health stays a debugging tool, not a page.
+- **Still not done:** a bounded priority queue on the bus; Reports/Notices as the spine's "tell" stage; the dormant sources (the Engine produces `opened`
   events and the outside-role tag only from the new file-open batches, which need the Worker's file trace, i.e. an elevated service on a real machine).
 - **Waiting on the owner:** how they would get around the Detective scenarios (`docs/design/detective-assumptions.md`); whether the Super User's old machine is re-enrolled as a managed machine (default: unbound);
   the VM runs (two-PC Flow, keyboard control, away-and-back, the tray / overlay / program at sign-in / Detective page on a real desktop).

@@ -403,6 +403,17 @@ async def restricted(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"consents": rows(found), "can_decide": [c["id"] for c in found if guard.can_decide(ident, c)]}
 
 
+@handler("flow.restricted_waiting")
+async def restricted_waiting(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Every request to carry something restricted that is waiting for THIS caller to answer, across all flows: {"waiting": [{id, flow_id, name, sample_path, asked_at, source_hostname, ...}]}.
+    What the Overview shows as waiting on you."""
+    from engine.flow import guard
+
+    ident = require_role(ctx, "super_user", "admin")
+    mine = [c for c in await ctx.engine.db.flows.asked_consents() if guard.can_decide(ident, c)]
+    return {"waiting": rows(mine)}
+
+
 @handler("flow.restricted_consent")
 async def restricted_consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """The owner of a restriction answers a flow that wants to carry it. {"consent_id", "grant": bool, "days"?: int (0 or none = until taken back), "note"?}

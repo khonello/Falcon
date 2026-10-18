@@ -960,7 +960,7 @@ class Detective:
 
     def _bypass(self, m: Memory, s: Sig) -> Finding | None:
         """What a flow delivers here, put here by hand instead: the sanctioned way to move it is the flow (checked, consented, audited), so doing it by hand is a way round."""
-        w, why = 0.34, [f"{s.name} is what a flow delivers to this folder, put here by hand instead"]
+        w, why = 0.36, [f"{s.name} is what a flow delivers to this folder, put here by hand instead"]
         if self._restricted(s):
             w += 0.20
             why.append("a restricted file")

@@ -190,10 +190,12 @@ def _iso(value: Any) -> str | None:
     return value.isoformat() if value is not None else None
 
 
-async def _files_of(db: Any, mark: dict[str, Any]) -> int:
+async def _counts(db: Any, mark: dict[str, Any]) -> tuple[int, int]:
+    """(files inside, of which generated -- covered by the mark but not tracked one by one)."""
     if mark["kind"] == "file":
-        return 1
-    return len(await db.file_index.under(mark["pc_id"], mark["path"]))
+        return 1, 0
+    c = await db.file_index.count_under(mark["pc_id"], mark["path"], JUNK_FOLDERS)
+    return c["files"], c["junk"]
 
 
 async def _view(ctx: Context, found: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -201,15 +203,18 @@ async def _view(ctx: Context, found: list[dict[str, Any]]) -> list[dict[str, Any
     names = await db.accounts.display_names_for(ctx.identity.account_id, sorted({m["by_account_id"] for m in found})) if found else {}
     depts = {d["id"]: d["name"] for d in await db.accounts.list_departments()}
     out = []
+    carried = await db.flows.carried_by_consent([m["id"] for m in found])
     for m in found:
         copies = await db.marks.copy_issues(m["id"])
+        files, generated = await _counts(db, m)
         worst = min((c["severity"] for c in copies), key=lambda s: SEVERITY_RANK[s], default=None)
         out.append({"id": m["id"], "code": f"M-{m['id']}", "kind": m["kind"], "name": m["name"], "pc_id": m["pc_id"], "host": m["hostname"],
                     "path": m["path"], "keep": m["keep"], "keep_label": KEEP_WORDS[m["keep"]],
                     "by": {"account_id": m["by_account_id"], "name": names.get(m["by_account_id"]), "you": m["by_account_id"] == ctx.identity.account_id},
                     "department_id": m["department_id"], "department_name": depts.get(m["department_id"]),
                     "created_at": _iso(m["created_at"]), "unmarked_at": _iso(m["unmarked_at"]),
-                    "files": await _files_of(db, m), "versions": m["versions"], "copies": len(copies), "worst": worst})
+                    "files": files, "generated": generated, "tracked": files - generated, "carried_by": carried.get(m["id"], []),
+                    "versions": m["versions"], "copies": len(copies), "worst": worst})
     return out
 
 

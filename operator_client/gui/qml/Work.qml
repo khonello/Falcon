@@ -52,6 +52,22 @@ Rectangle {
             return
         }
         if (x.kind === "gate" && o.waits) { finish("Waiting for the gate"); return }
+        if (x.kind === "proposal") {
+            falcon.call("proposals.decide", { proposal_id: x.p.id, accept: o.key === "yes" }, function (ok, res) {
+                if (!ok) { fail(res); return }
+                finish(o.key !== "yes" ? "Dismissed" : res.paused ? "Paused" : res.mark ? "Mark " + res.mark + " from the machine it is on, on the Restricted page" : res.task_description ? "Give this as a task: " + res.task_description : "Accepted")
+            })
+            return
+        }
+        if (x.kind === "restricted") {
+            falcon.call("flow.restricted_consent", { consent_id: x.c.id, grant: o.key === "yes" }, function (ok, res) {
+                if (!ok) { fail(res); return } finish(o.key === "yes" ? "Allowed · the flow goes on" : "Kept paused") })
+            return
+        }
+        if (x.kind === "handover" && o.key === "refuse") {
+            falcon.call("enroll.refuse", { enrollment_id: x.w.id, reason: "refused" }, function (ok, res) { if (!ok) { fail(res); return } finish("Refused") })
+            return
+        }
         if (x.kind === "task" && o.key === "complete") {
             falcon.call("task.dept_complete", { task_id: x.task.id }, function (ok, res) { if (!ok) { fail(res); return } finish("Marked complete") })
             return

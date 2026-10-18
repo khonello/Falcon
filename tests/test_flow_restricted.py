@@ -157,3 +157,19 @@ async def test_the_check_is_made_against_what_is_true_now_not_remembered(engine,
     await engine.db.file_index.upsert(org["w1_pc"], path, "report.xlsx", "h", "restricted", None, "event")
     (b,) = await guard.blockers(engine, org["w1_pc"], path)
     assert b.kind == "tag" and b.tag == "restricted" and "tagged restricted" in b.reason
+
+
+async def test_what_waits_on_a_person_is_listed_across_flows_counted_on_the_overview_and_shown_on_the_mark(engine, org, connect, tmp_path: Path):
+    a1, su = await connect("cid-a1"), await connect("cid-su")
+    src, dst = tmp_path / "out", tmp_path / "in"
+    mark = await _mark(engine, org, org["w1_pc"], "folder", src)                                  # the Super User's mark
+    flow_id = (await a1.ok("flow.create", _flow(org, src, dst)))["flow"]["id"]
+    (asked,) = await _asked(engine, flow_id)
+    waiting = (await su.ok("flow.restricted_waiting"))["waiting"]
+    assert [c["id"] for c in waiting] == [asked["id"]] and waiting[0]["flow_id"] == flow_id
+    assert (await a1.ok("flow.restricted_waiting"))["waiting"] == []                                # the Admin who made it has nothing to answer
+    assert (await a1.ok("overview.admin"))["waiting"]["flows_to_allow"] == 0
+    await su.ok("flow.restricted_consent", {"consent_id": asked["id"], "grant": True})
+    assert (await su.ok("flow.restricted_waiting"))["waiting"] == []
+    listed = {m["id"]: m for m in (await su.ok("marks.list", {"scope": "all"}))["marks"]}[mark]
+    assert listed["carried_by"] == [flow_id] and listed["tracked"] == listed["files"] - listed["generated"]

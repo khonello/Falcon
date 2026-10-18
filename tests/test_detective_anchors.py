@@ -157,3 +157,18 @@ async def test_files_opened_that_matter_wake_reach_and_the_rest_are_nobody_s_bus
     assert not any("notes.txt" in line for c in cases for line in c["story"])                       # an ordinary file opened is not remembered at all
     got = await su.ok("detective.case", {"case_id": cases[0]["id"]})
     assert any("not part of this person" in f["summary"] or f["graph"] == "coverage_reach" for f in got["findings"])
+
+
+def test_no_area_is_ever_required_to_recognise_an_intent():
+    """Drop each area in turn, and leave only each one in turn: a heavy event in whatever area is left is still recognised, and a missing area never lowers what the others say."""
+    for behaviour, areas in ANCHORS.items():
+        names = list(areas)
+        full, _ = coverage(behaviour, {a: [0.5] for a in names})
+        for gone in names:
+            rest = {a: [0.5] for a in names if a != gone}
+            weight, covered = coverage(behaviour, rest)
+            assert weight >= 0.35 and gone not in covered, (behaviour, gone)                       # still at least "noted" without it
+            assert weight <= full + 1e-9, (behaviour, gone)                                        # and more areas is more evidence, never less
+        for only in names:
+            assert coverage(behaviour, {only: [0.5]})[0] >= 0.35, (behaviour, only)                # one area on its own is enough when the event is heavy
+        assert coverage(behaviour, {})[0] == 0.0

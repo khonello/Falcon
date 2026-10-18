@@ -10,7 +10,7 @@ Page {
     id: page
     objectName: "registryView"
 
-    property string tab: typeof Nav.sub === "string" && Nav.sub.indexOf("acct:") === 0 ? "acct" : typeof Nav.sub === "string" && Nav.sub.indexOf("door:") === 0 ? "door" : "pc"
+    property string tab: typeof Nav.sub === "string" && Nav.sub === "ask" ? "ask" : typeof Nav.sub === "string" && Nav.sub.indexOf("acct:") === 0 ? "acct" : typeof Nav.sub === "string" && Nav.sub.indexOf("door:") === 0 ? "door" : "pc"
     property var sel: typeof Nav.sub === "string" && Nav.sub ? Nav.sub : null
     property var list: []          // machines.list, when the Engine has it
     property var refused: []       // registry.refused, this week
