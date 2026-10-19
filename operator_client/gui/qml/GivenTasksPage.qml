@@ -37,19 +37,19 @@ Page {
     function back() { falcon.call("task.dept_reopen", { task_id: cur.id, note: note.trim() }, function (ok, r) { if (!ok) { Msg.failed(r.message || "Not sent"); return } Msg.ok("Sent back as ongoing"); page.note = ""; drawer.close(); page.load() }) }
     function show(t) { page.note = ""; page.cur = t; drawer.open() }
 
-    // --- the head: one line of where things stand, and the one thing to do -------------------------------------------------------------------------------------
+    Strip {
+        width: parent.width
+        items: [
+            { label: "Open", value: Theme.fmt(page.open.length), delta: "given to " + Theme.many(Fleet.depts.length, "department") },
+            { label: "Done, yours to close", value: Theme.fmt(page.ready), delta: page.ready ? "only you can complete them" : "nothing waiting", dc: page.ready ? Theme.accent : undefined },
+            { label: "Past their date", value: Theme.fmt(page.late), delta: page.late ? "not done, and late" : "all within their date", dc: page.late ? Theme.crit : undefined },
+            { label: "Not seen yet", value: Theme.fmt(page.open.filter(function (t) { return page.catOf(t) === "unseen" }).length), delta: "nobody told has opened it" }
+        ]
+    }
     Item {
         width: parent.width
-        height: 34
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 18
-            Txt { text: Theme.fmt(page.open.length) + " open"; font.weight: Font.DemiBold; elide: Text.ElideNone }
-            Row { spacing: 6; visible: page.ready > 0; Rectangle { width: 8; height: 8; radius: 2; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter } Txt { text: page.ready + " done, yours to close"; color: Theme.text2; elide: Text.ElideNone } }
-            Row { spacing: 6; visible: page.late > 0; Rectangle { width: 8; height: 8; radius: 2; color: Theme.crit; anchors.verticalCenter: parent.verticalCenter } Txt { text: page.late + " past their date"; color: Theme.text2; elide: Text.ElideNone } }
-            Row { spacing: 6; Rectangle { width: 8; height: 8; radius: 2; color: Theme.ok; anchors.verticalCenter: parent.verticalCenter } Txt { text: "under way"; color: Theme.text3; elide: Text.ElideNone } }
-            Row { spacing: 6; Rectangle { width: 8; height: 8; radius: 2; color: Theme.text4; anchors.verticalCenter: parent.verticalCenter } Txt { text: "not seen"; color: Theme.text3; elide: Text.ElideNone } }
-        }
+        height: 30
+        Txt { anchors.verticalCenter: parent.verticalCenter; text: "By department · click a task to see it"; color: Theme.text3; elide: Text.ElideNone }
         Btn { objectName: "giveTask"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; kind: "primary"; iconName: "plus"; text: "Give a task"; onClicked: Nav.go("tasks", "new") }
     }
 

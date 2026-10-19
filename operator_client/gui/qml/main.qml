@@ -64,7 +64,7 @@ ApplicationWindow {
     readonly property var pages: ({
         overview: Nav.boss ? "SuOverviewPage.qml" : "OverviewPage.qml",
         messages: "MessagesPage.qml",
-        detective: "DetectivePage.qml",
+        detective: Nav.boss ? "DetectiveOverviewPage.qml" : "DetectivePage.qml",
         tasks: Nav.boss ? "GivenTasksPage.qml" : "TasksPage.qml",
         restricted: "RestrictedPage.qml",
         flows: Nav.boss ? "FlowsOverviewPage.qml" : "FlowsPage.qml",

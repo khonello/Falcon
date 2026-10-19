@@ -12,7 +12,7 @@ Rectangle {
     property var segs: []
     property string total: ""
     default property alias lines: body.data
-    height: 252
+    height: 264
     radius: Theme.radius
     color: Theme.surface
     border.width: 1

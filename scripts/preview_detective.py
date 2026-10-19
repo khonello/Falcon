@@ -26,7 +26,7 @@ PLAN = [
     ("leak", "FIN-02", 12, 2, 1.2, "open"),
     ("ransom", "OPS-03", 3, 1, 0.6, "open"),
     ("goes_dark", "OPS-06", 6, 1, 3.4, "open"),
-    ("snooping", "OPS-05", 5, 1, 5.0, "open"),
+    ("snooping", "OPS-05", 5, 1, 5.0, "escalated"),
     ("printscreens", "FIN-01", 11, 2, 7.5, "open"),
     ("weekly_collector", "LOG-01", 21, 3, 20.0, "open"),
     ("sole_copy_deleted", "OPS-01", 1, 1, 26.0, "open"),
@@ -52,7 +52,7 @@ def _shift(case: Case, ago_hours: float, now: float | None = None) -> list[Findi
 def build(now: float | None = None) -> dict[str, Any]:
     cases: list[dict[str, Any]] = []
     detail: dict[int, dict[str, Any]] = {}
-    reviewers = {"dismissed": "R. Mensah", "explained": "K. Boateng"}
+    reviewers = {"dismissed": "R. Mensah", "explained": "K. Boateng", "escalated": "R. Mensah"}
     notes = {"dismissed": "The flow is Finance's weekly pack; it goes to the shared drive on purpose.", "explained": "Month-end clean-up that Logistics does every quarter."}
     for n, (name, host, pc, dept, ago, left) in enumerate(PLAN, start=1):
         det, _ = play(SCENARIOS[name]())
@@ -138,6 +138,8 @@ def answer(type_: str, payload: dict[str, Any], role: str, dept: int | None) -> 
         rows = [c for c in b["cases"] if role == "super_user" or c["department_id"] == dept]
         if status == "reviewed":
             rows = [c for c in rows if c["status"] != "open"]
+        elif status == "escalated":
+            rows = [c for c in rows if c["status"] == "escalated"]
         else:
             levels = ("noted", "case", "urgent") if payload.get("include_noted") else ("case", "urgent")
             rows = [c for c in rows if c["status"] == "open" and c["level"] in levels]

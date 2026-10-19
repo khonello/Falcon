@@ -113,20 +113,16 @@ Page {
         }
     }
 
-    // --- the head: where things stand, as a line ------------------------------------------------------------------------------------------------------------
-    Item {
+    Strip {
         width: parent.width
-        height: 30
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 18
-            Txt { text: Theme.fmt(page.flows.length) + (page.flows.length === 1 ? " flow" : " flows"); font.weight: Font.DemiBold; elide: Text.ElideNone }
-            Row { spacing: 6; Rectangle { width: 8; height: 8; radius: 2; color: Theme.ok; anchors.verticalCenter: parent.verticalCenter } Txt { text: page.nAct + " copying"; color: Theme.text2; elide: Text.ElideNone } }
-            Row { spacing: 6; visible: page.nWait > 0; Rectangle { width: 8; height: 8; radius: 2; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter } Txt { text: page.nWait + " waiting for a yes"; color: Theme.text2; elide: Text.ElideNone } }
-            Row { spacing: 6; visible: page.nDeg > 0; Rectangle { width: 8; height: 8; radius: 2; color: Theme.med; anchors.verticalCenter: parent.verticalCenter } Txt { text: page.nDeg + " held up"; color: Theme.text2; elide: Text.ElideNone } }
-        }
-        Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Flows are made and mended in the department's own console"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+        items: [
+            { label: "Flows", value: Theme.fmt(page.flows.length), delta: "across " + Theme.many(Fleet.depts.length, "department") },
+            { label: "Copying", value: Theme.fmt(page.nAct), unit: "/ " + Theme.fmt(page.flows.length), delta: page.nAct === page.flows.length ? "every flow" : "the rest are waiting or held" },
+            { label: "Waiting for a yes", value: Theme.fmt(page.nWait), delta: page.nWait ? "someone has to agree" : "nobody to wait for", dc: page.nWait ? Theme.accent : undefined },
+            { label: "Held up", value: Theme.fmt(page.nDeg), delta: page.nDeg ? "the department's Admin mends it" : "none", dc: page.nDeg ? Theme.med : undefined }
+        ]
     }
+    Txt { text: "By the department each flow starts in · flows are made and mended in the department's own console"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
 
     // --- a card a department, by where its flows start ------------------------------------------------------------------------------------------------------
     Grid {

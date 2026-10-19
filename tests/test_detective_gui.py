@@ -57,7 +57,7 @@ def sample():
     return case, quiet, {"case": {**case, "reviewed_by": None}, "findings": findings, "graph": c.graph(), "rule_options": rule_options(c.findings), "board": c.board()}
 
 
-async def _page(console, role="super_user"):
+async def _page(console, role="admin"):
     win, bridge, _ = console(role)
     page = await _open(win, bridge, "detective", "detectiveView")
     win.showNormal()
@@ -96,11 +96,29 @@ async def test_what_a_person_makes_of_it_is_sent_with_their_note(console):
     assert sent == {"case_id": 1, "outcome": "explained", "note": "It was the Q3 close"}
 
 
-async def test_only_an_admin_can_send_it_up_and_the_super_user_sees_every_machine(console):
+async def test_only_an_admin_can_send_it_up(console):
     win, bridge, page = await _page(console, "admin")
     assert win.findChild(QObject, "detEscalate").property("visible") is True
-    win2, bridge2, page2 = await _page(console, "super_user")
-    assert win2.findChild(QObject, "detEscalate").property("visible") is False
+
+
+async def test_the_super_user_sees_every_case_by_department_and_decides_only_what_is_sent_up_or_on_an_admin_s_machine(console):
+    win, bridge, _ = console("super_user")
+    page = await _open(win, bridge, "detective", "detectiveOverview")
+    base = {"id": 1, "host": "FIN-02", "intent": "Taking data out", "level": "urgent", "weight": 0.9, "status": "open", "story": ["12:00  opened a.xlsx"], "headline": "Taking data out.",
+            "first_at": "2026-10-18T10:00:00Z", "last_at": "2026-10-18T10:05:00Z", "department_id": 2}
+    page.setProperty("cases", [base, {**base, "id": 2, "host": "FIN-01", "status": "escalated"}])
+    _pump(0.4)
+    assert "deptCards" in _names(win.contentItem())
+    assert prop(page, "toDecide") == 1                                                       # only the one an Admin sent up is theirs
+    QMetaObject.invokeMethod(page, "show", Q_ARG("QVariant", base))
+    _pump(0.4)
+    assert win.findChild(QObject, "detDecision").property("visible") is False                 # the department's Admin reviews that one
+    QMetaObject.invokeMethod(page, "show", Q_ARG("QVariant", {**base, "id": 2, "status": "escalated"}))
+    _pump(0.4)
+    assert win.findChild(QObject, "detDecision").property("visible") is True
+    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "explained"))
+    await _wait(lambda: any(t == "detective.review" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "detective.review")["outcome"] == "explained"
 
 
 async def test_a_dismissal_can_be_remembered_for_a_folder_or_a_drive_the_case_involves(console):
@@ -202,7 +220,7 @@ async def test_what_waits_on_the_super_user_includes_suggestions_flows_to_allow_
 
     async def call(type_, payload=None):
         if type_ == "proposals.list":
-            return {"proposals": [{"id": 4, "kind": "pause_flow", "title": "Pause flow #3? Its source machine FIN-01 is under an urgent case", "created_at": "2026-10-18T10:00:00Z"}]}
+            return {"proposals": [{"id": 4, "kind": "follow_up_task", "title": "Ask the department's Admin to follow up on FIN-01?", "created_at": "2026-10-18T10:00:00Z"}, {"id": 6, "kind": "pause_flow", "title": "Pause flow #3?", "created_at": "2026-10-18T10:00:00Z"}]}
         if type_ == "flow.restricted_waiting":
             return {"waiting": [{"id": 5, "flow_id": 9, "name": "Payroll", "sample_path": "C:/Finance/Payroll/p.xlsx", "asked_at": "2026-10-18T10:05:00Z"}]}
         if type_ == "handover.status":
@@ -218,6 +236,7 @@ async def test_what_waits_on_the_super_user_includes_suggestions_flows_to_allow_
     q = {x["kind"]: x for x in prop(page, "q")}
     assert q["handover"]["title"] == "SU-NEW is asking to become your machine" and q["handover"]["options"][0]["go"] == ["registry", "ask"]
     assert [o["key"] for o in q["proposal"]["options"]] == ["yes", "no"] and q["restricted"]["title"].startswith("Flow 9 wants to carry Payroll")
+    assert len([x for x in prop(page, "q") if x["kind"] == "proposal"]) == 1                    # pausing a flow is the department's Admin's: only the follow-up on a case sent up reaches the Super User
 
 
 async def test_an_admin_s_waiting_count_includes_what_detective_suggests_and_the_flows_they_may_allow(console):

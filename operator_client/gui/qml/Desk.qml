@@ -12,7 +12,7 @@ QtObject {
     property var routing: []
     property var fixed: ["about_admin"]
     property var deptTasks: []
-    property var proposals: []       // what Detective suggests (proposals.list)
+    property var proposals: []       // what Detective suggests that is the Super User's to answer: a follow-up on a case sent up (pausing a flow or marking a folder is the Admin's)
     property var restricted: []      // flows waiting for the person who restricted something to say it may be carried (flow.restricted_waiting)
     property var handover: null      // handover.status: machines asking to become the Super User's
     property bool loaded: false
@@ -30,7 +30,7 @@ QtObject {
         falcon.call("reports.list", {}, function (ok, r) { desk.reports = ok ? (r.reports || []) : []; desk.loaded = true })
         falcon.call("reports.routing_get", {}, function (ok, r) { if (ok) { desk.routing = r.routing || []; desk.fixed = r.fixed || ["about_admin"] } })
         falcon.call("task.dept_list", {}, function (ok, r) { desk.deptTasks = ok ? (r.tasks || []) : [] })
-        falcon.call("proposals.list", {}, function (ok, r) { desk.proposals = ok && r ? (r.proposals || []) : [] })
+        falcon.call("proposals.list", {}, function (ok, r) { desk.proposals = ok && r ? (r.proposals || []).filter(function (p) { return p.kind === "follow_up_task" }) : [] })
         falcon.call("flow.restricted_waiting", {}, function (ok, r) { desk.restricted = ok && r ? (r.waiting || []) : [] })
         falcon.call("handover.status", {}, function (ok, r) { desk.handover = ok ? r : null })
     }
