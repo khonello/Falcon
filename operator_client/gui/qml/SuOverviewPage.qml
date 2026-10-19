@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import "."
 
 // THE SUPER USER'S OVERVIEW, drawn rather than listed. What is waiting on you comes first, as a few large cards; then the organisation as a map of its machines, and
@@ -75,35 +76,86 @@ Page {
             Txt { text: "WAITING ON YOU"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; elide: Text.ElideNone }
             Txt { visible: page.q.length > 0; text: page.q.length + (page.urgent ? " · " + page.urgent + " urgent" : ""); color: page.urgent ? Theme.crit : Theme.text3; font.pixelSize: 11; elide: Text.ElideNone }
         }
-        Rectangle {
-            visible: page.q.length === 0
-            width: parent.width; height: 84; radius: Theme.radius; color: Theme.surface; border.width: 1; border.color: Theme.border
-            Row { anchors.centerIn: parent; spacing: 12
-                  Icon { name: "checkcircle"; size: 26; color: Theme.ok; anchors.verticalCenter: parent.verticalCenter }
-                  Column { anchors.verticalCenter: parent.verticalCenter
-                           Txt { text: "Nothing is waiting on you"; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                           Txt { text: "Decisions only you can make, and Detective's suggestions, appear here."; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } } }
-        }
-        Row {
-            visible: page.q.length > 0
-            spacing: 12
-            readonly property real cw: (waitCol.width - 3 * 12) / 4
-            Repeater {
-                model: page.q.slice(0, 4)
-                Rectangle {
-                    required property var modelData
-                    width: parent.cw; height: 96; radius: Theme.radius; color: wa.containsMouse ? Theme.surface2 : Theme.surface
-                    border.width: 1; border.color: Theme.mix(Fleet.sevColor(modelData.sev), Theme.border, 0.35)
-                    Rectangle { x: 14; y: 14; width: 34; height: 34; radius: 17; color: Theme.alpha(Fleet.sevColor(modelData.sev), 0.14)
-                                Icon { anchors.centerIn: parent; name: modelData.icon || "alert"; size: 18; color: Fleet.sevColor(modelData.sev) } }
-                    Txt { x: 58; y: 12; width: parent.width - 72; text: modelData.short; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
-                    Txt { x: 58; anchors.bottom: parent.bottom; anchors.bottomMargin: 12; text: modelData.age; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                    MouseArea { id: wa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { decide.id0 = modelData.id; decide.open() } }
+        // a card is always the same size, however many there are; more than fit are reached by the chevrons or by dragging
+        Item {
+            id: rail
+            width: parent.width
+            height: 96
+            readonly property int cardW: 300
+            readonly property int gap: 12
+            Flickable {
+                id: fl
+                anchors.fill: parent
+                contentWidth: cards.width
+                contentHeight: height
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.HorizontalFlick
+                Behavior on contentX { NumberAnimation { duration: Theme.durBase; easing.type: Easing.OutCubic } }
+                Row {
+                    id: cards
+                    spacing: rail.gap
+                    Repeater {
+                        model: page.q
+                        Rectangle {
+                            required property var modelData
+                            objectName: "waitCard"
+                            width: rail.cardW; height: rail.height; radius: Theme.radius; color: wa.containsMouse ? Theme.surface2 : Theme.surface
+                            border.width: 1; border.color: Theme.mix(Fleet.sevColor(modelData.sev), Theme.border, 0.35)
+                            Rectangle { x: 14; y: 14; width: 34; height: 34; radius: 17; color: Theme.alpha(Fleet.sevColor(modelData.sev), 0.14)
+                                        Icon { anchors.centerIn: parent; name: modelData.icon || "alert"; size: 18; color: Fleet.sevColor(modelData.sev) } }
+                            Txt { x: 58; y: 12; width: parent.width - 72; text: modelData.short; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
+                            Txt { x: 58; anchors.bottom: parent.bottom; anchors.bottomMargin: 12; text: modelData.age; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                            MouseArea { id: wa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { decide.id0 = modelData.id; decide.open() } }
+                        }
+                    }
+                    // nothing waiting: the same card, dotted, so the space is held and says so
+                    Item {
+                        objectName: "waitEmpty"
+                        visible: page.q.length === 0
+                        width: rail.cardW; height: rail.height
+                        Shape {
+                            anchors.fill: parent
+                            ShapePath {
+                                strokeWidth: 1.5; strokeColor: Theme.border2 !== undefined ? Theme.border2 : Theme.border; fillColor: "transparent"
+                                strokeStyle: ShapePath.DashLine; dashPattern: [3, 3]
+                                startX: Theme.radius; startY: 1
+                                PathLine { x: rail.cardW - Theme.radius; y: 1 }
+                                PathArc { x: rail.cardW - 1; y: Theme.radius; radiusX: Theme.radius; radiusY: Theme.radius }
+                                PathLine { x: rail.cardW - 1; y: rail.height - Theme.radius }
+                                PathArc { x: rail.cardW - Theme.radius; y: rail.height - 1; radiusX: Theme.radius; radiusY: Theme.radius }
+                                PathLine { x: Theme.radius; y: rail.height - 1 }
+                                PathArc { x: 1; y: rail.height - Theme.radius; radiusX: Theme.radius; radiusY: Theme.radius }
+                                PathLine { x: 1; y: Theme.radius }
+                                PathArc { x: Theme.radius; y: 1; radiusX: Theme.radius; radiusY: Theme.radius }
+                            }
+                        }
+                        Row { anchors.centerIn: parent; spacing: 10
+                              Icon { name: "checkcircle"; size: 22; color: Theme.ok; anchors.verticalCenter: parent.verticalCenter }
+                              Column { anchors.verticalCenter: parent.verticalCenter
+                                       Txt { text: "Nothing is waiting on you"; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                                       Txt { text: "Decisions only you can make appear here"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } } }
+                    }
                 }
             }
+            // the chevrons appear only when there is more to reveal on that side
+            Rectangle {
+                objectName: "waitLeft"
+                visible: fl.contentX > 2
+                x: 6; anchors.verticalCenter: parent.verticalCenter
+                width: 30; height: 30; radius: 15; color: la.containsMouse ? Theme.surface2 : Theme.surface; border.width: 1; border.color: Theme.border
+                Icon { anchors.centerIn: parent; name: "chevl"; size: 14; color: Theme.text2 }
+                MouseArea { id: la; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: fl.contentX = Math.max(0, fl.contentX - (rail.cardW + rail.gap)) }
+            }
+            Rectangle {
+                objectName: "waitRight"
+                visible: fl.contentX + fl.width < fl.contentWidth - 2
+                x: parent.width - width - 6; anchors.verticalCenter: parent.verticalCenter
+                width: 30; height: 30; radius: 15; color: ra.containsMouse ? Theme.surface2 : Theme.surface; border.width: 1; border.color: Theme.border
+                Icon { anchors.centerIn: parent; name: "chevr"; size: 14; color: Theme.text2 }
+                MouseArea { id: ra; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: fl.contentX = Math.min(fl.contentWidth - fl.width, fl.contentX + (rail.cardW + rail.gap)) }
+            }
         }
-        Item { visible: page.q.length > 4; width: parent.width; height: 24
-               More { x: 2; anchors.verticalCenter: parent.verticalCenter; n: page.q.length - 4; what: "waiting"; onClicked: { decide.id0 = page.q[4].id; decide.open() } } }
     }
 
     // one of the four: a picture, one number, one dot per thing

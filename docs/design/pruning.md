@@ -25,5 +25,8 @@ From 14 pages to 11 (Admin) and to 8 (Super User).
 ## The Super User sees and does less (owner, 18 Oct)
 A CEO-level view: pages grouped by department, read first, at most one decision each; anything operational is an "Open in [Admin]'s console" link. The Super User keeps: giving and completing department tasks, assigning an Admin, escalations and cases on Admin machines, a flow asking to carry something they marked, marking their own files, pinging Admins. Done (19 Oct): Tasks, Flows and Departments are a card a department (`DeptCard`), with a narrow drawer for one item; the Super User gives and completes tasks, answers a flow's request to carry something they marked, assigns an Admin, and enters an Admin's console for everything else. Detective is the same (cases by department; the Super User decides only a case sent up and a case on an Admin's own workstation; Detective's suggestions to pause a flow or mark a folder go to the Admin). Departments keeps the standard four-part card, list and side panel. Restricted for the Super User is already only their own marks and the copies of them (the owner of a restriction decides), so it is unchanged. The Admin Overview is left as it is.
 
+## The Super User's "Waiting on you" (19 Oct)
+Cards of one fixed size however many there are, in a row that scrolls with a chevron on the side where there is more; none waiting is one card of the same size with a dotted border.
+
 ## Still to decide at the split
 Custom Actions (unsandboxed scripts), the version-approval gate, the rule builder under Automation, and whether the removed pages' Engine handlers are deleted or only gated.
