@@ -108,7 +108,7 @@ A hierarchy-based management/automation/monitoring system for organizations stru
 - **Hierarchy** (backbone) — traversal, Session Blocking, Display Names, Report Routing, Cross-Department Assisted Access
 - **Task** — LLM-populated verification targets; only manual verification by the assigner closes a task. A Super User's task to a department has no checks: the Admins told mark it seen / ongoing / done and only the Super User completes it (decided 2 Oct 2026, `task-natural-combo.md`)
 - **Flow** — one-directional sync pipelines (Source → Branch/Transform/Categorize → Destinations)
-- **Resource & Assistance** — tiered folders (`admin`/`restricted`/`workers`/`common`) as access policy; Ping → Message Channel → Listeners
+- **Resource & Assistance** — tiered folders (`admin`/`restricted`/`workers`/`common`) as access policy; Ping → Message Channel
 - **Control, Events, Monitoring & Actions** — Admin-authored automation; Custom Actions are PowerShell/Python, stdlib + Windows-native only, unsandboxed
 
 ## Document map and authority

@@ -2,7 +2,7 @@
 regardless of which combo generated the entry. Retention: flat 90 days for v1.
 
 Every traversal, Session Block/end, Task verification, Flow sync/conflict/failure, Resource
-compliance check, Ping/Message Channel/Listener event, Assisted Access session, and Event/Action
+compliance check, Ping/Message Channel event, and Event/Action
 execution goes through `AuditTrail.record`. Combo modules never write `audit_log` directly.
 
 Without a connected database (scaffold runs, protocol tests) entries are logged only.

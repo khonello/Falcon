@@ -56,12 +56,6 @@ def describe_push(type_: str, p: dict[str, Any]) -> tuple[str, bool]:
         return f"flow {p.get('flow_id')} synced {p.get('relative_path')}", False
     if type_ == "resource.violation":
         return f"RESOURCE VIOLATION: {p.get('message')}", True
-    if type_ == "assisted_access.offer":
-        return f"{p.get('requester_name')} asks for hands-on help -- `assist accept {p.get('request_id')}` / `assist decline {p.get('request_id')}`", True
-    if type_ == "assisted_access.started":
-        return f"assistance session {p.get('session_id')} started on your workstation (until {str(p.get('deadline_at', ''))[11:16]})", False
-    if type_ in ("assisted_access.declined", "assisted_access.closed"):
-        return f"assistance request {p.get('request_id')} {type_.rsplit('.', 1)[1]}", False
     if type_ == "event.fired":
         return f"event {p.get('event_id')} ({p.get('type')}) fired on pc {p.get('pc_id')}", False
     if type_ == "action.status":

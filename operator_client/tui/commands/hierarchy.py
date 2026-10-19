@@ -181,66 +181,6 @@ async def pc_add(ctx: ShellContext, args: Args) -> str:
     return f"pc {res['pc_id']} registered"
 
 
-# --- assisted access ------------------------------------------------------------------------------
-
-@command("assist", "available", "on|off", "Broadcast / withdraw your availability to help peers")
-async def assist_available(ctx: ShellContext, args: Args) -> str:
-    on = args.get(0, "on|off").lower() in ("on", "yes", "true", "1")
-    res = await ctx.call("assisted_access.set_available", {"available": on})
-    return "available for assistance" if res["available"] else "not available"
-
-
-@command("assist", "helpers", "[dept=<id>]", "Admins reachable right now")
-async def assist_helpers(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("assisted_access.available_helpers", {"department_id": args.opt_int("dept")})
-    return table(res["helpers"], ["id", "name", "department_name"])
-
-
-@command("assist", "request", "[dept=<id>] [helper=<account_id>] [deny=key,key]",
-         "Ask for hands-on help; `deny` narrows the scope (never widens it)")
-async def assist_request(ctx: ShellContext, args: Args) -> str:
-    narrowing = {k: False for k in (args.opt("deny") or "").split(",") if k}
-    res = await ctx.call("assisted_access.request", {"department_id": args.opt_int("dept"),
-                                                    "helper_account_id": args.opt_int("helper"), "narrowing": narrowing})
-    if not res["matched"]:
-        return f"request {res['request_id']}: {res['message']}"
-    return f"request {res['request_id']} offered to {res['helper_name']} (account {res['helper_account_id']}) -- waiting"
-
-
-@command("assist", "accept", "<request_id>", "Accept an assistance offer (you enter their workstation)")
-async def assist_accept(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("assisted_access.accept", {"request_id": args.get_int(0, "request_id")})
-    st = await ctx.call("hierarchy.session_state")
-    ctx.state.set_session(st.get("my_session"))
-    ctx.state.clear_indicator(f"offer:{res['request_id']}")
-    return f"assisting: session {res['session_id']} until {res['deadline_at']}\nscope: " + ", ".join(
-        k for k, v in res["scope"].items() if v)
-
-
-@command("assist", "decline", "<request_id>", "Decline an assistance offer")
-async def assist_decline(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("assisted_access.decline", {"request_id": args.get_int(0, "request_id")})
-    ctx.state.clear_indicator(f"offer:{res['request_id']}")
-    return "declined"
-
-
-@command("assist", "close", "<request_id>", "End an assistance session (either party)")
-async def assist_close(ctx: ShellContext, args: Args) -> str:
-    await ctx.call("assisted_access.close", {"request_id": args.get_int(0, "request_id")})
-    st = await ctx.call("hierarchy.session_state")
-    ctx.state.set_session(st.get("my_session"))
-    return "assistance session closed"
-
-
-@command("assist", "status", "<request_id>", "Status of an assistance request")
-async def assist_status(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("assisted_access.status", {"request_id": args.get_int(0, "request_id")})
-    return kv(res["request"]) + "\n\nsession:\n" + (kv(res["session"]) if res["session"] else "  (none)") + (
-        "\n(offer pending)" if res["pending_offer"] else "")
-
-
-
-
 @command("enroll", help_="Machines waiting to be registered (the code is on the machine's own screen, not here)")
 async def enroll_list(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("enroll.list")

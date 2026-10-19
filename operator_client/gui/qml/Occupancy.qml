@@ -17,7 +17,7 @@ Panel {
     property var hov: null
 
     readonly property var kinds: ({ native: [Theme.own, "Owner signed in"], traversal: [Theme.ser3, "Admin session"],
-                                    you: [Theme.accent, "Your session"], assisted: [Theme.ser2, "Assisted access"] })
+                                    you: [Theme.accent, "Your session"] })
     function kindOf(s) { return s.occupied_via === "traversal" && s.occupant_name === "You" ? "you" : (kinds[s.occupied_via] ? s.occupied_via : "traversal") }
 
     readonly property var lanes: {
@@ -187,7 +187,7 @@ Panel {
             visible: root.lanes.length > 0
             spacing: 14
             Repeater {
-                model: ["native", "traversal", "you", "assisted"]
+                model: ["native", "traversal", "you"]
                 Row {
                     required property var modelData
                     spacing: 6

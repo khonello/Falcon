@@ -97,7 +97,7 @@ def sessions_today(role: str, dept_id: int | None) -> dict[str, Any]:
              ("OPS-05", 9.18, None, "Nana", "native"), ("OPS-06", 8.67, None, "Kwame", "native"),
              ("OPS-07", 8.1, 10.7, "Ama", "native"), ("OPS-07", 10.7, None, "You", "traversal"),
              ("FIN-01", 8.52, None, "Afi", "native"), ("FIN-02", 8.5, 9.3, "Kofi", "native"),
-             ("FIN-02", 9.3, 9.67, "K. Boateng", "assisted"), ("FIN-02", 9.68, None, "Kofi", "native")]
+             ("FIN-02", 9.68, None, "Kofi", "native")]
     out = []
     for k, (host, a, b, who, via) in enumerate(lanes):
         if role == "admin" and HOST[host][4] != dept_id:
@@ -574,22 +574,22 @@ def dept_tasks(role: str, account: int) -> dict[str, Any]:
 
 # --- messages -------------------------------------------------------------------------------------------
 ACCOUNTS = {1: "Super User", 7: "R. Mensah", 9: "A. Quaye", 8: "K. Boateng", 21: "Kojo", 23: "Yaw", 27: "Ama", 31: "Afi"}
-# id, initiator (lower), superior (higher), turn, opened (concept clock), closed, messages [(clock, sender, text)], listeners {adder: [admin]}
+# id, initiator (lower), superior (higher), turn, opened (concept clock), closed, messages [(clock, sender, text)]
 CHANNELS = [
     (20, 27, 7, "sender", 8.9, None, [(9.0, 7, "Is budget-2026.xlsx still open on your PC? It should not be there."),
                                       (9.25, 27, "It was sent to me to read before the meeting. I closed it."),
-                                      (10.1, 7, "Thanks. Please delete your copy; it is marked to stay on WS-OPS-A1.")], {7: [9]}),
+                                      (10.1, 7, "Thanks. Please delete your copy; it is marked to stay on WS-OPS-A1.")]),
     (18, 7, 1, "superior", 11.5, None, [(11.7, 1, "What do you need?"),
-                                        (12.1, 7, "Can Update stuck reports for Operations come to us too? Two have waited on you since Wednesday.")], {}),
+                                        (12.1, 7, "Can Update stuck reports for Operations come to us too? Two have waited on you since Wednesday.")]),
     (16, 31, 8, "superior", 10.4, None, [(10.5, 8, "Go ahead, Afi."),
-                                         (10.6, 31, "Someone on my team keeps taking my files off the shared drive and renaming them.")], {8: [7]}),
+                                         (10.6, 31, "Someone on my team keeps taking my files off the shared drive and renaming them.")]),
     (15, 23, 7, "sender", -20.5, -19.4, [(-20.4, 7, "What is it, Yaw?"), (-20.1, 23, "The printer on the second floor will not take my jobs."),
-                                         (-19.5, 7, "Fixed: it was paused. Try again.")], {}),
+                                         (-19.5, 7, "Fixed: it was paused. Try again.")]),
 ]
 
 
 def _visible(c: tuple, account: int) -> bool:
-    return account in (c[1], c[2]) or any(account in xs for xs in c[7].values())
+    return account in (c[1], c[2])
 
 
 def channels(account: int) -> dict[str, Any]:
@@ -732,11 +732,10 @@ REPORTS = [
     (3004, "update_status", "LOG-02 update past the escalation limit", 76, None, 3),
     (3005, "update_status", "OPS-06 one version behind, 2 failed attempts", 26, (2.2, "A. Quaye"), 1),
     (3006, "flow_failure", "weekly: the branch to LOG-01 /archive/ paused", 30, (0.5, "R. Mensah"), 1),
-    (3007, "listener_report", "Afi: files on the shared drive renamed by a colleague", 2.6, None, 2),
     (3008, "about_admin", "A. Quaye entered LOG-02 outside working hours, 17 min", 11, None, 1),
     (3009, "about_admin", "A. Quaye entered LOG-01 outside working hours, 18 min", 141, None, 1),
 ]
-ROUTING = {"resource_violation": [1, 2, 3], "flow_failure": [1, 2], "listener_report": [1], "update_status": [1, 2, 3], "deviation": [1, 2, 3]}
+ROUTING = {"resource_violation": [1, 2, 3], "flow_failure": [1, 2], "update_status": [1, 2, 3], "deviation": [1, 2, 3]}
 
 
 def reports(role: str, dept_id: int | None) -> dict[str, Any]:
@@ -749,9 +748,9 @@ def reports(role: str, dept_id: int | None) -> dict[str, Any]:
     return {"reports": out}
 
 
-REPORT_HOST = {3001: "OPS-07", 3002: "OPS-03", 3003: "OPS-05", 3004: "LOG-02", 3005: "OPS-06", 3006: "OPS-07", 3007: "FIN-01", 3008: "LOG-02", 3009: "LOG-01"}
+REPORT_HOST = {3001: "OPS-07", 3002: "OPS-03", 3003: "OPS-05", 3004: "LOG-02", 3005: "OPS-06", 3006: "OPS-07", 3008: "LOG-02", 3009: "LOG-01"}
 REPORT_LABEL = {"resource_violation": "Restricted file", "deviation": "Deviation", "update_status": "Update stuck", "flow_failure": "Flow failed",
-                "listener_report": "Listener report", "about_admin": "About an Admin"}
+                "about_admin": "About an Admin"}
 
 
 def board(role: str, dept_id: int | None) -> dict[str, Any]:
@@ -872,14 +871,6 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return channels(account)
     if type_ == "assistance.channel":
         return channel(int(payload.get("channel_id") or 0), account)
-    if type_ == "assistance.my_listeners":
-        c = next((x for x in CHANNELS if x[0] == int(payload.get("channel_id") or 0)), None)
-        return {"listeners": [{"listener_account_id": a, "name": ACCOUNTS[a]} for a in (c[7].get(account, []) if c else [])]}
-    if type_ == "assistance.listener_candidates":
-        c = next((x for x in CHANNELS if x[0] == int(payload.get("channel_id") or 0)), None)
-        added = c[7].get(account, []) if c else []
-        return {"candidates": [{"account_id": a, "name": n, "department_id": d, "department_name": dict(DEPTS)[d]}
-                               for a, n, d, *_ in ADMINS if c and a not in (c[1], c[2]) and a not in added]}
     if type_ == "assistance.my_admins":
         return {"admins": [{"account_id": 1, "name": "Super User", "role": "super_user"}] if role == "admin" else []}
     if type_ == "index.folders":

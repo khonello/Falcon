@@ -26,13 +26,11 @@ from engine.permissions import int_field, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 LABELS = {
-    "resource_violation": "Restricted file", "flow_failure": "Flow failed", "listener_report": "Listener report",
+    "resource_violation": "Restricted file", "flow_failure": "Flow failed",
     "update_status": "Update stuck", "deviation": "Deviation", "about_admin": "About an Admin",
-    "directory_structure_conflict": "Directory conflict", "cross_department_assistance": "Assisted access",
 }
 SEVERITY = {
     "resource_violation": "high", "update_status": "high", "flow_failure": "medium", "deviation": "medium", "about_admin": "medium",
-    "directory_structure_conflict": "medium", "listener_report": "low", "cross_department_assistance": "low",
 }
 SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 HELD_FOR = timedelta(hours=24)

@@ -1,7 +1,9 @@
 # Pruning (18 Oct 2026)
 
 Decided with the owner, before the core / full split: remove duplication first, then decide what "core" is. Four things are the product (Tasks, Flows, Restricted, Detective); everything
-else earns its place by serving them or is cut. Nothing here deletes data or database tables (no hard deletes); Engine handlers of a removed page stay until the split decides their fate.
+else earns its place by serving them or is cut. Nothing here deletes data or database tables (no hard deletes); Engine handlers of a removed *page* stay until the split decides their fate.
+
+**Removed from the Engine as well (19 Oct, owner: "get rid of listener, anything associated with it")**: assisted access (`assisted_access.*`, its repo methods, the `assisted_access` push/audit words, the client commands and the Occupancy/MachinePage/DayLanes labels), listeners (`assistance.add_listener`, `my_listeners`, `listener_candidates`, listener fan-out of messages) and three report kinds: `listener_report`, `cross_department_assistance` ("Help across departments") and `directory_structure_conflict` ("Folder conflict"). The tables (`listeners`, `assisted_access_requests`, `accounts.assistance_available`) and the `occupied_via = 'assisted_access'` value stay, so old rows still read. **Report routing is now a default, not a screen**: a new department is routed every kind but `about_admin` (`DEFAULT_ROUTED` in `engine/database.py`), and migration 040 brings existing departments up to it.
 
 ## Decided
 | Call | Decision | Why |

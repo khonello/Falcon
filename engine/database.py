@@ -7,7 +7,7 @@ Rules from database-schema.md 12 that the schema cannot express are enforced *he
     `POLYMORPHIC_TABLES` before insert;
   * no hard DELETE anywhere except the retention purges (`AuditRepo.purge_older_than`, and the file-event history
     `purge_file_events_older_than` on the same clock) -- every other "removal" is a status/flag column;
-  * Display Names never join across namers; Listeners are listed per adder only.
+  * Display Names never join across namers.
 
 Repos return plain dicts (asyncpg Records converted) so callers never depend on asyncpg types.
 Migrations live in `engine/migrations/` and are applied by `Database.migrate()`.
@@ -23,6 +23,10 @@ from typing import Any, ClassVar
 log = logging.getLogger(__name__)
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+
+# What a new department is routed, to begin with: every kind of report except the ones about an Admin
+# (engine.hierarchy.reports.CATEGORIES minus FIXED_CATEGORIES; a test keeps the two in step).
+DEFAULT_ROUTED = ["resource_violation", "flow_failure", "update_status", "deviation"]
 
 # Legal targets for polymorphic references. Extend deliberately, never ad hoc.
 POLYMORPHIC_TABLES = frozenset({
@@ -223,7 +227,7 @@ class AccountsRepo(_Repo):
         return await self._fetch(f"SELECT {self._ACCOUNT_COLS} {self._ACCOUNT_FROM} ORDER BY a.id")
 
     async def active_admins(self) -> list[dict[str, Any]]:
-        """Every active Admin, in every department: who may be added as a Listener."""
+        """Every active Admin, in every department: who a report may be routed to."""
         return await self._fetch(
             f"SELECT {self._ACCOUNT_COLS} {self._ACCOUNT_FROM} WHERE a.role = 'admin' AND a.status = 'active' "
             "ORDER BY d.name, a.id")
@@ -266,21 +270,19 @@ class AccountsRepo(_Repo):
     async def set_self_name(self, account_id: int, label: str | None) -> None:
         await self._exec("UPDATE accounts SET self_display_name = $2 WHERE id = $1", account_id, label)
 
-    async def set_assistance_available(self, account_id: int, available: bool) -> None:
-        await self._exec("UPDATE accounts SET assistance_available = $2 WHERE id = $1", account_id, available)
-
     # -- departments / pcs -------------------------------------------------------------------
 
     async def create_department(self, name: str, created_by_account_id: int) -> int:
-        """A new department starts with update escalations routed to it (spec 9.5): a failure past the
-        threshold reaches that PC's Admins, not only the Super User. The Super User can change it later."""
+        """A new department starts with every kind of report routed to it but the ones about an Admin (which only the
+        Super User receives): its Admins see what concerns their machines, the Super User still sees everything."""
         async with self.pool.acquire() as conn, conn.transaction():
             dept_id = await conn.fetchval(
                 "INSERT INTO departments (name, created_by_account_id) VALUES ($1, $2) RETURNING id",
                 name, created_by_account_id)
             await conn.execute(
                 "INSERT INTO report_routing_config (category, routed_department_id, configured_by_account_id) "
-                "VALUES ('update_status', $1, $2) ON CONFLICT DO NOTHING", dept_id, created_by_account_id)
+                "SELECT c, $1, $2 FROM unnest($3::text[]) AS c ON CONFLICT DO NOTHING",
+                dept_id, created_by_account_id, DEFAULT_ROUTED)
             return dept_id
 
     async def list_departments(self) -> list[dict[str, Any]]:
@@ -468,35 +470,6 @@ class SessionsRepo(_Repo):
         return await self._fetch(
             f"SELECT {self._COLS} {self._FROM} WHERE s.ended_at IS NULL AND s.deadline_at IS NOT NULL "
             "AND s.deadline_at < now()")
-
-    # -- assisted access -------------------------------------------------------------------------
-
-    async def create_assisted_request(self, requester_account_id: int, target_department_id: int | None,
-                                      entry_path: str, access_ceiling: dict[str, Any],
-                                      access_narrowing: dict[str, Any] | None) -> int:
-        return await self._val(
-            "INSERT INTO assisted_access_requests (requester_account_id, target_department_id, entry_path, "
-            "access_ceiling, access_narrowing) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            requester_account_id, target_department_id, entry_path, access_ceiling, access_narrowing)
-
-    async def match_assisted_request(self, request_id: int, helper_account_id: int, session_id: int) -> None:
-        await self._exec(
-            "UPDATE assisted_access_requests SET helper_account_id = $2, matched_at = now(), "
-            "resulting_session_id = $3 WHERE id = $1", request_id, helper_account_id, session_id)
-
-    async def assisted_request(self, request_id: int) -> dict[str, Any] | None:
-        return await self._one("SELECT * FROM assisted_access_requests WHERE id = $1", request_id)
-
-    async def available_helpers(self, department_id: int | None, exclude_account_id: int) -> list[dict[str, Any]]:
-        """Admins opted in as reachable and not currently occupying any session -- moment-in-time."""
-        return await self._fetch(
-            "SELECT a.id, a.department_id, d.name AS department_name FROM accounts a "
-            "JOIN departments d ON d.id = a.department_id "
-            "WHERE a.role = 'admin' AND a.status = 'active' AND a.assistance_available "
-            "AND a.id <> $2 AND ($1::int IS NULL OR a.department_id = $1) "
-            "AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.occupant_account_id = a.id AND s.ended_at IS NULL "
-            "                AND s.occupied_via <> 'native') ORDER BY a.id",
-            department_id, exclude_account_id)
 
 
 # ============================================================================================
@@ -1509,8 +1482,6 @@ class ReportsRepo(_Repo):
                       "FROM deviations d WHERE d.id = $1",
         "flow_destinations": "SELECT x.destination_pc_id AS pc_id, p.department_id, NULL::int AS about_account_id FROM flow_destinations x "
                              "LEFT JOIN pcs p ON p.id = x.destination_pc_id WHERE x.id = $1",
-        "assisted_access_requests": "SELECT NULL::int AS pc_id, r.target_department_id AS department_id, NULL::int AS about_account_id "
-                                    "FROM assisted_access_requests r WHERE r.id = $1",
         "sessions": "SELECT s.pc_id, p.department_id, s.occupant_account_id AS about_account_id FROM sessions s "
                     "JOIN pcs p ON p.id = s.pc_id WHERE s.id = $1",
         "message_channels": "SELECT NULL::int AS pc_id, a.department_id, NULL::int AS about_account_id FROM message_channels c "
@@ -1793,11 +1764,10 @@ class AssistanceRepo(_Repo):
             " (initiator_account_id = $2 AND superior_account_id = $1)) ORDER BY opened_at DESC LIMIT 1", a, b)
 
     async def channels_for(self, account_id: int) -> list[dict[str, Any]]:
-        """Channels the account is a party to, plus those it listens on."""
+        """Channels the account is a party to."""
         return await self._fetch(
             "SELECT DISTINCT c.* FROM message_channels c "
-            "LEFT JOIN listeners l ON l.message_channel_id = c.id "
-            "WHERE c.initiator_account_id = $1 OR c.superior_account_id = $1 OR l.listener_account_id = $1 "
+            "WHERE c.initiator_account_id = $1 OR c.superior_account_id = $1 "
             "ORDER BY c.opened_at DESC", account_id)
 
     async def post_message(self, channel_id: int, sender_account_id: int, body: str, next_turn: str) -> int:
@@ -1815,24 +1785,6 @@ class AssistanceRepo(_Repo):
     async def close_channel(self, channel_id: int) -> None:
         await self._exec("UPDATE message_channels SET closed_at = now() WHERE id = $1 AND closed_at IS NULL",
                          channel_id)
-
-    async def add_listener(self, channel_id: int, listener_account_id: int, added_by_account_id: int) -> bool:
-        """Dedup by UNIQUE(channel, listener): a second add is a no-op. Returns True if inserted."""
-        status = await self._exec(
-            "INSERT INTO listeners (message_channel_id, listener_account_id, added_by_account_id) "
-            "VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", channel_id, listener_account_id, added_by_account_id)
-        return status.endswith("1")
-
-    async def listeners_added_by(self, channel_id: int, added_by_account_id: int) -> list[dict[str, Any]]:
-        """Scoped to the requesting party's own additions only -- never a join across both."""
-        return await self._fetch(
-            "SELECT * FROM listeners WHERE message_channel_id = $1 AND added_by_account_id = $2 ORDER BY added_at",
-            channel_id, added_by_account_id)
-
-    async def listener_account_ids(self, channel_id: int) -> list[int]:
-        """Engine-internal: who to push real-time messages to. Not exposed to either party."""
-        rows = await self._fetch("SELECT listener_account_id FROM listeners WHERE message_channel_id = $1", channel_id)
-        return [r["listener_account_id"] for r in rows]
 
 
 # ============================================================================================

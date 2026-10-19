@@ -1,7 +1,7 @@
 """Repository tests (skipped without FALCON_TEST_DATABASE_URL).
 
 These pin the rules database-schema.md 12 delegates to the data-access layer: display-name
-non-propagation, listener scoping, report visibility being additive, polymorphic-ref
+non-propagation, report visibility being additive, polymorphic-ref
 validation, and the audit purge being the only delete.
 """
 
@@ -75,18 +75,6 @@ async def test_expired_sessions_are_listed(db: Database):
     await db.sessions.extend(past, _now() + timedelta(minutes=10))
     assert await db.sessions.list_expired() == []
     assert (await db.sessions.by_id(past))["extended_count"] == 1
-
-
-async def test_available_helpers_excludes_busy_and_opted_out(db: Database):
-    ids = await seed(db)
-    assert await db.sessions.available_helpers(None, ids["a1"]) == []       # nobody opted in
-    await db.accounts.set_assistance_available(ids["a2"], True)
-    helpers = await db.sessions.available_helpers(None, ids["a1"])
-    assert [h["id"] for h in helpers] == [ids["a2"]]
-    assert await db.sessions.available_helpers(ids["fin"], ids["a1"]) == []  # wrong department
-    # A2 traverses somewhere -> no longer available, moment-in-time.
-    await db.sessions.open(ids["w1_pc"], ids["a2"], "traversal", _now() + timedelta(minutes=5), False)
-    assert await db.sessions.available_helpers(None, ids["a1"]) == []
 
 
 # --- file index ---------------------------------------------------------------------------------
@@ -179,6 +167,8 @@ async def test_report_visibility_is_additive_and_views_are_separate(db: Database
     ids = await seed(db)
     with pytest.raises(ValueError):
         await db.reports.write("resource_violation", "not_a_table", 1)
+    for category in ("resource_violation", "flow_failure"):
+        await db.reports.set_routing(category, [], ids["su"])           # departments start routed; begin from the Super User alone
     r1 = await db.reports.write("resource_violation", "resource_violations", 1)
     r2 = await db.reports.write("flow_failure", "flow_sync_log", 1)
     # Nothing routed: Super User sees everything, Finance's Admin sees nothing.
@@ -202,7 +192,7 @@ async def test_report_visibility_is_additive_and_views_are_separate(db: Database
 
 # --- assistance ---------------------------------------------------------------------------------
 
-async def test_ping_channel_turns_and_listener_scoping(db: Database):
+async def test_ping_channel_turns(db: Database):
     ids = await seed(db)
     p1 = await db.assistance.ping(ids["w1"], ids["a1"])
     await db.assistance.ping(ids["w1"], ids["a1"])                    # repeatable, no lock
@@ -214,13 +204,8 @@ async def test_ping_channel_turns_and_listener_scoping(db: Database):
     await db.assistance.post_message(chan, ids["w1"], "help?", next_turn="superior")
     assert (await db.assistance.channel(chan))["turn"] == "superior"
 
-    # W1 adds A2 as listener; A1 independently adds A2 too -> dedup, A1's add is a no-op.
-    assert await db.assistance.add_listener(chan, ids["a2"], ids["w1"]) is True
-    assert await db.assistance.add_listener(chan, ids["a2"], ids["a1"]) is False
-    assert [l["listener_account_id"] for l in await db.assistance.listeners_added_by(chan, ids["w1"])] == [ids["a2"]]
-    assert await db.assistance.listeners_added_by(chan, ids["a1"]) == []   # A1 sees none of W1's
-    assert await db.assistance.listener_account_ids(chan) == [ids["a2"]]
-    assert [c["id"] for c in await db.assistance.channels_for(ids["a2"])] == [chan]
+    assert await db.assistance.channels_for(ids["a2"]) == []                     # only the two parties
+    assert [c["id"] for c in await db.assistance.channels_for(ids["a1"])] == [chan]
     await db.assistance.close_channel(chan)
     assert (await db.assistance.channel(chan))["closed_at"] is not None
     assert await db.assistance.open_channel_between(ids["w1"], ids["a1"]) is None

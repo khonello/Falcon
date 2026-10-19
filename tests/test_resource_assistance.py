@@ -3,7 +3,7 @@
 Pins resource-assistance-combo.md: tags from tier folders, restricted files tracked by hash,
 violations logged + surfaced + reported + that one file ignored (never deleted); tier-scoped
 search; ping repeatable with a pulsing status; channel opens on response with the
-one-message-per-turn lock; only the superior closes; listeners are per-adder and silent.
+one-message-per-turn lock; only the superior closes.
 """
 
 from __future__ import annotations
@@ -67,12 +67,11 @@ async def test_search_is_tier_scoped(engine, org, connect):
     assert names(await su.ok("assistance.search", {"query": "budget"})) == ["budget-secret.xlsx", "budget-template.docx"]
 
 
-async def test_ping_channel_lock_close_and_listeners(engine, org, connect):
+async def test_ping_channel_lock_and_close(engine, org, connect):
     a1 = await connect("cid-a1")
     a2 = await connect("cid-a2")
     w1 = await connect("cid-w1")
     w2 = await connect("cid-w2")
-    su = await connect("cid-su")
     # Pings only between direct vertical pairs.
     assert await w1.err("assistance.ping", {"to_account_id": org["w2"]}) == "forbidden"
     assert await w1.err("assistance.ping", {"to_account_id": org["a2"]}) == "forbidden"
@@ -103,25 +102,13 @@ async def test_ping_channel_lock_close_and_listeners(engine, org, connect):
     assert [m["body"] for m in view["messages"]] == ["printer is down", "restart it"] and view["channel"]["my_turn"]
     assert await w2.err("assistance.channel", {"channel_id": chan}) == "forbidden"
 
-    # Listeners: W1 adds A2 (HR); A1 cannot see W1's listener; A2 hears messages live.
-    # who can be added: Admins of every department (HR's A2 too), never the parties; only a party may ask
-    cands = (await w1.ok("assistance.listener_candidates", {"channel_id": chan}))["candidates"]
-    assert [c["account_id"] for c in cands] == [org["a2"]] and cands[0]["department_name"] == "HR"
-    assert await w2.err("assistance.listener_candidates", {"channel_id": chan}) == "forbidden"
-    assert await w1.err("assistance.add_listener", {"channel_id": chan, "admin_account_id": org["w2"]}) == "invalid"
-    assert await w1.err("assistance.add_listener", {"channel_id": chan, "admin_account_id": org["a1"]}) == "invalid"
-    added = await w1.ok("assistance.add_listener", {"channel_id": chan, "admin_account_id": org["a2"]})
-    assert added["added"] is True
-    assert su.push_types(await su.drain_pushes()) == ["report.new"]                # listener_report
-    assert "assistance.listening" in a2.push_types(await a2.drain_pushes())
-    again = await a1.ok("assistance.add_listener", {"channel_id": chan, "admin_account_id": org["a2"]})
-    assert again["added"] is False                                                  # dedup
-    assert [l["listener_account_id"] for l in (await w1.ok("assistance.my_listeners", {"channel_id": chan}))["listeners"]] == [org["a2"]]
-    assert (await a1.ok("assistance.my_listeners", {"channel_id": chan}))["listeners"] == []
+    # Nobody outside the two is told, and nobody outside them can read: an Admin of another department hears nothing.
     await w1.ok("assistance.message", {"channel_id": chan, "body": "done, thanks"})
-    assert "assistance.message" in a2.push_types(await a2.drain_pushes())
-    assert [c["id"] for c in (await a2.ok("assistance.channels"))["channels"]] == [chan]
-    assert len((await a2.ok("assistance.channel", {"channel_id": chan}))["messages"]) == 3
+    assert a2.push_types(await a2.drain_pushes()) == []
+    assert (await a2.ok("assistance.channels"))["channels"] == []
+    assert await a2.err("assistance.channel", {"channel_id": chan}) == "forbidden"
+    for gone in ("assistance.add_listener", "assistance.listener_candidates", "assistance.my_listeners"):
+        assert await w1.err(gone, {"channel_id": chan}) == "unknown_type"
 
     # Only the superior closes.
     assert await w1.err("assistance.close_channel", {"channel_id": chan}) == "forbidden"

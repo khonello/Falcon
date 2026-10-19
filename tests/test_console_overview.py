@@ -14,6 +14,7 @@ pytestmark = requires_db
 async def test_a_report_says_whose_it_is_and_the_board_measures_how_fast_a_department_takes_them(engine, org, connect):
     su = await connect("cid-su")
     a1 = await connect("cid-a1")
+    await su.ok("reports.routing_set", {"category": "deviation", "department_ids": []})     # departments start routed; this one is taken back
     # a deviation on FIN-01: Finance has an Admin, but the category is not routed there, so it is the Super User's
     first = await reports.emit(engine, "deviation", source_table="pcs", source_id=org["w1_pc"], summary="FIN-01 showed another name")
     board = await su.ok("reports.board")

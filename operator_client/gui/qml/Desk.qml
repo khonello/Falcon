@@ -17,11 +17,10 @@ QtObject {
     property var handover: null      // handover.status: machines asking to become the Super User's
     property bool loaded: false
 
-    readonly property var words: ({ resource_violation: "Restricted file", flow_failure: "Flow failed", listener_report: "Listener report",
-                                    update_status: "Update stuck", deviation: "Deviation", about_admin: "About an Admin",
-                                    directory_structure_conflict: "Folder conflict", cross_department_assistance: "Help across departments" })
-    readonly property var icons: ({ resource_violation: "fileprotect", flow_failure: "branches", listener_report: "message", update_status: "cloudsync",
-                                    deviation: "warn", about_admin: "eye", directory_structure_conflict: "folder", cross_department_assistance: "team" })
+    readonly property var words: ({ resource_violation: "Restricted file", flow_failure: "Flow failed",
+                                    update_status: "Update stuck", deviation: "Deviation", about_admin: "About an Admin" })
+    readonly property var icons: ({ resource_violation: "fileprotect", flow_failure: "branches", update_status: "cloudsync",
+                                    deviation: "warn", about_admin: "eye" })
     readonly property var sevOf: ({ resource_violation: "high", update_status: "high", flow_failure: "medium", deviation: "medium", about_admin: "medium" })
     function word(c) { return words[c] || String(c).replace(/_/g, " ") }
 

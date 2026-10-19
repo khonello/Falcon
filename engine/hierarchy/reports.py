@@ -2,8 +2,7 @@
 
 Two strictly distinct categories:
   * Reports (routable): system-generated, auto-categorized by origin -- Resource violation,
-    Directory Structure Conflict, Flow failure, Listener report, Cross-Department Assistance,
-    update status, ...
+    Flow failure, update status, deviation, ...
   * Views (never routable, Super User-only): meta-information about reports -- who addressed
     what, when. Kept in `report_addressed_views`, never insertable as a Report row.
 
@@ -30,10 +29,7 @@ log = logging.getLogger(__name__)
 
 CATEGORIES = (
     "resource_violation",
-    "directory_structure_conflict",
     "flow_failure",
-    "listener_report",
-    "cross_department_assistance",
     "update_status",
     "deviation",
     "about_admin",

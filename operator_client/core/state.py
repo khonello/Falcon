@@ -141,9 +141,4 @@ class ClientState:
         elif type_ == "resource.violation":
             self.add_indicator("violation", payload.get("message", "resource violation"),
                                key=f"violation:{payload.get('violation_id')}")
-        elif type_ == "assisted_access.offer":
-            self.add_indicator("offer", f"assistance request #{payload.get('request_id')} from "
-                                        f"{payload.get('requester_name')}", key=f"offer:{payload.get('request_id')}")
-        elif type_ in ("assisted_access.declined", "assisted_access.closed"):
-            self.clear_indicator(f"offer:{payload.get('request_id')}")
         self._changed()

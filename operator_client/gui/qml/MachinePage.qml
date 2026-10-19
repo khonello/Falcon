@@ -256,8 +256,8 @@ Page {
                                     width: 160; height: 20
                                     Tag {
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.occupied_via === "native" ? "Owner signed in" : modelData.occupied_via === "assisted" ? "Assisted access" : "Admin session"
-                                        c: modelData.occupied_via === "native" ? Theme.text3 : modelData.occupied_via === "assisted" ? Theme.ser2 : Theme.ser3
+                                        text: modelData.occupied_via === "native" ? "Owner signed in" : "Admin session"
+                                        c: modelData.occupied_via === "native" ? Theme.text3 : Theme.ser3
                                     }
                                 }
                                 Txt { width: 90; text: Time.hhmm(modelData.entered_at); mono: true }

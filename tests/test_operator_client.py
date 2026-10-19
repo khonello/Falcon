@@ -117,6 +117,10 @@ async def test_scripted_task_flow_end_to_end(engine, org, tmp_path: Path):
 
 
 async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: Path):
+    from engine.hierarchy.reports import CATEGORIES
+
+    for category in CATEGORIES:                                       # departments start routed; this script reads an Admin's empty list
+        await engine.db.reports.set_routing(category, [], org["su"])
     a1 = _cfg(engine, tmp_path, "cid-a1")
     out = await run_script(a1, [
         "connect",
@@ -150,8 +154,8 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
     assert out[13].startswith("event 1: fired 0 time(s) today") and "machines reporting" in out[14]
 
     # HR admin answers the consent request; Super User approves a version and sees reports.
-    a2 = await run_script(_cfg(engine, tmp_path, "cid-a2"), ["connect", "flow consent 2 yes", "assist available on"])
-    assert a2[1] == "flow 2: consent granted" and a2[2] == "available for assistance"
+    a2 = await run_script(_cfg(engine, tmp_path, "cid-a2"), ["connect", "flow consent 2 yes"])
+    assert a2[1] == "flow 2: consent granted"
     su = await run_script(_cfg(engine, tmp_path, "cid-su"), [
         "connect", "update approve 1.0.0", "routing", "routing set flow_failure 1", "addressed",
         "alert announcement all_users Maintenance tonight", "alerts"])
@@ -329,6 +333,7 @@ async def test_scripted_rules_and_deviations(engine, org, tmp_path: Path):
 async def test_scripted_overview_board_and_decisions(engine, org, tmp_path: Path):
     from engine.hierarchy import reports
 
+    await engine.db.reports.set_routing("deviation", [], org["su"])      # departments start routed; this is the one taken back
     await reports.emit(engine, "deviation", source_table="pcs", source_id=org["w1_pc"], summary="FIN-01 showed another name")
     out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
         "connect", "overview", "board", "decisions", "decide reports:deviation route", "decisions", "departments-board"])

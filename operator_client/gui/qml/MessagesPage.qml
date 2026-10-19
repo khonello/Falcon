@@ -47,13 +47,13 @@ Page {
         chans.forEach(function (c) {
             var d = detail[c.id], ch = d ? d.channel : c, names = ch.names || {}
             var hi = c.superior_account_id, lo = ch.subordinate_account_id || c.initiator_account_id
-            var party = hi === me || lo === me
-            var other = party ? (names[String(hi === me ? lo : hi)] || (hi === me ? c.initiator_name : "the Super User")) : ""
+            var party = true      // the Engine lists only the conversations this person is in
+            var other = names[String(hi === me ? lo : hi)] || (hi === me ? c.initiator_name : "the Super User")
             var msgs = d ? (d.messages || []).map(function (m) { return { t: Time.ms(m.sent_at || m.created_at), who: names[String(m.sender_account_id)] || "", mine: m.sender_account_id === me, text: m.body } }) : []
             var closed = !!c.closed_at
             var turnIsMine = party && !closed && (d ? !!ch.my_turn : ((c.turn === "superior") === (hi === me)))
-            var st = !party ? ["Listening", "wait", "listen"] : closed ? ["Closed", "good", "closed"] : turnIsMine ? ["Your turn", "bad", "you"] : ["Their turn", "wait", "them"]
-            out.push({ id: "c" + c.id, cid: c.id, kind: "channel", title: party ? other : (names[String(lo)] || c.initiator_name) + " and " + (names[String(hi)] || "their Admin"),
+            var st = closed ? ["Closed", "good", "closed"] : turnIsMine ? ["Your turn", "bad", "you"] : ["Their turn", "wait", "them"]
+            out.push({ id: "c" + c.id, cid: c.id, kind: "channel", title: other,
                        other: other, iHigh: hi === me, party: party, msgs: msgs, closed: closed, myTurn: turnIsMine, st: st,
                        started: c.opened_at, last: msgs.length ? msgs[msgs.length - 1].t : Time.ms(c.closed_at || c.opened_at),
                        pings: 1, line: msgs.length ? (msgs[msgs.length - 1].mine ? "You" : msgs[msgs.length - 1].who) + ": " + msgs[msgs.length - 1].text : "no messages yet" })
@@ -74,12 +74,12 @@ Page {
                        times: ps.map(function (p) { return p.sent_at }),
                        last: Time.ms(ps[n0 - 1].sent_at), pings: n0, line: (n0 === 1 ? "a ping" : n0 + " pings") + ", no answer yet" })
         })
-        var order = { you: 0, them: 1, listen: 2, closed: 3 }
+        var order = { you: 0, them: 1, closed: 2 }
         return out.sort(function (a, b) { return order[a.st[2]] - order[b.st[2]] || b.last - a.last })
     }
     function n(k) { return rows.filter(function (x) { return x.st[2] === k }).length }
     readonly property var shown: rows.filter(function (x) {
-        return (f === "" || x.st[2] === f) && (x.title + " " + x.msgs.map(function (m) { return m.text }).join(" ")).toLowerCase().indexOf(list.query.toLowerCase()) >= 0
+        return (f === "" || (f === "ping" ? x.kind === "ping" : x.st[2] === f)) && (x.title + " " + x.msgs.map(function (m) { return m.text }).join(" ")).toLowerCase().indexOf(list.query.toLowerCase()) >= 0
     })
     readonly property var c: { for (var i = 0; i < shown.length; i++) if (shown[i].id === sel) return shown[i]; return shown.length ? shown[0] : null }
     readonly property string draft: c ? (drafts[c.id] || "") : ""
@@ -116,7 +116,7 @@ Page {
         items: [
             { key: "you", label: "Waiting on you", value: Theme.fmt(page.n("you")), delta: page.n("you") ? "pinged you, or your turn" : "nothing waiting", dc: page.n("you") ? Theme.crit : undefined },
             { key: "them", label: "Waiting on them", value: Theme.fmt(page.n("them")), delta: "your ping, or their turn" },
-            { key: "listen", label: "Listening", value: Theme.fmt(page.n("listen")), delta: "read only, as it happens" },
+            { key: "ping", label: "Pings", value: Theme.fmt(page.rows.filter(function (x) { return x.kind === "ping" }).length), delta: "not answered yet" },
             { key: "closed", label: "Closed", value: Theme.fmt(page.n("closed")), delta: "this week" }
         ]
     }
@@ -128,7 +128,7 @@ Page {
             id: list
             width: (parent.width - 14) * 8 / 12
             more: 2
-            title: page.f === "" ? "Conversations" : ({ you: "Waiting on you", them: "Waiting on them", listen: "Listening", closed: "Closed" })[page.f]
+            title: page.f === "" ? "Conversations" : ({ you: "Waiting on you", them: "Waiting on them", ping: "Pings", closed: "Closed" })[page.f]
             sub: "waiting on you first · click one to see it on the right"
             placeholder: "Find a person or a word"
             actionLabel: "New ping"
@@ -136,7 +136,7 @@ Page {
             rows: page.shown
             pick: page.c ? page.c.id : null
             onPicked: function (k) { page.sel = k }
-            icon: function (x) { return !x.party ? "eye" : x.kind === "ping" ? "bell" : "message" }
+            icon: function (x) { return x.kind === "ping" ? "bell" : "message" }
             nameTitle: "With"
             nameText: function (x) { return x.title }
             nameLine: function (x) { return x.line }
@@ -160,7 +160,7 @@ Page {
             emptyTitle: "No conversations yet"
             emptyText: Nav.boss ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."
             title: page.c ? page.c.title : ""
-            sub: page.c ? (page.c.party ? (page.askFor.filter(function (p) { return p.name === page.c.other })[0] || { sub: "" }).sub : "you are listening") : ""
+            sub: page.c ? (page.askFor.filter(function (p) { return p.name === page.c.other })[0] || { sub: "" }).sub : ""
             facts: page.c ? [["Now", page.c.st[0], page.c.st[1] === "bad" ? Theme.crit : page.c.st[1] === "good" ? Theme.ok : Theme.text4, false, true],
                              ["Started by", (page.c.kind === "ping" ? page.c.other : page.c.iHigh ? page.c.other : "You") + ", " + Time.at(page.c.started)],
                              ["Who closes it", page.c.iHigh ? "You" : page.c.party ? page.c.other : "the higher party"]] : []
@@ -249,8 +249,7 @@ Page {
                     width: parent.width
                     wrapMode: Text.WordWrap; elide: Text.ElideNone
                     color: Theme.text3; font.pixelSize: 12
-                    text: !page.c ? "" : !page.c.party ? "You are listening. You read it as it happens; you cannot write in it."
-                          : page.c.other + "'s turn. You can write again once they answer."
+                    text: !page.c ? "" : page.c.other + "'s turn. You can write again once they answer."
                 }
             }
         }

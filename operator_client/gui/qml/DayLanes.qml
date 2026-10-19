@@ -30,7 +30,7 @@ Item {
     readonly property var profs: rows.map(function (r) {
         var hosts = r.hosts, inLane = function (h) { return hosts.indexOf(h) >= 0 }
         var ss = Fleet.sessionsToday.filter(function (s) { return inLane(s.hostname) })
-        var VERB = { native: "signed in on", traversal: "entered", assisted: "started assisted access on" }
+        var VERB = { native: "signed in on", traversal: "entered" }
         var moves = []
         hosts.forEach(function (host) {
             var bl = ss.filter(function (s) { return s.hostname === host }).map(function (s) {

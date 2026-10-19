@@ -713,7 +713,7 @@ const myMarks = () => MARKS.filter((k) => k.by === ME);
 const infoOf = (who) => (who === "Super User" ? { ws: "ADM-01", dept: "su" } : ADMIN_INFO[who]);
 const myCopies = () => ISSUES.filter((i) => i.type === "file" && (markOf(i) || {}).by === ME);
 
-// who held each machine today: [from, to, kind, who]. kinds: own / admin / you / assist
+// who held each machine today: [from, to, kind, who]. kinds: own / admin / you
 let LANES = [
   { host: "LOG-02", blocks: [[2.23, 2.52, "admin", "A. Quaye", true]] },
   { host: "LOG-01", blocks: [[7.97, NOWH, "own", "Esi"]] },
@@ -725,7 +725,7 @@ let LANES = [
   { host: "OPS-06", blocks: [[8.67, NOWH, "own", "Kwame"]] },
   { host: "OPS-07", blocks: [[8.1, 10.7, "own", "Ama"], [10.7, NOWH, "you", "You"]] },
   { host: "FIN-01", blocks: [[8.52, NOWH, "own", "Afi"]] },
-  { host: "FIN-02", blocks: [[8.5, 9.3, "own", "Kofi"], [9.3, 9.67, "assist", "K. Boateng"], [9.68, NOWH, "own", "Kofi"]] },
+  { host: "FIN-02", blocks: [[8.5, NOWH, "own", "Kofi"]] },
 ];
 if (LARGE) {
   MACHINES.filter((m) => !LANES.some((l) => l.host === m.host)).forEach((m, k) => {
@@ -737,7 +737,7 @@ if (LARGE) {
     LANES.push({ host: m.host, blocks });
   });
 }
-const OCC = { own: { c: "var(--own)", w: "Owner signed in" }, admin: { c: "var(--s3)", w: "Admin session" }, you: { c: "var(--accent)", w: "Your session" }, assist: { c: "var(--s2)", w: "Assisted access" } };
+const OCC = { own: { c: "var(--own)", w: "Owner signed in" }, admin: { c: "var(--s3)", w: "Admin session" }, you: { c: "var(--accent)", w: "Your session" } };
 
 // ============================================================== the audit trail, 7 days, generated once
 const KINDS = {
@@ -779,7 +779,6 @@ let AUDIT = (() => {
     [2.23, "A. Quaye", "Entered LOG-02 (outside working hours)", "LOG-02", "session"],
     [2.52, "A. Quaye", "Left LOG-02", "LOG-02", "session"],
     [9.18, "System", "Certificate presented WS-OPS-05, expected OPS-05", "OPS-05", "deviation"],
-    [9.3, "K. Boateng", "Started assisted access on FIN-02", "FIN-02", "session"],
     [9.5, "System", "Copy of restricted salaries.csv found", "OPS-03", "violation"],
     [9.67, "Kojo", "Pinged R. Mensah", "OPS-01", "assistance"],
     [10.03, "System", "Copy of restricted budget-2026.xlsx found", "OPS-07", "violation"],
@@ -1327,7 +1326,6 @@ const ISSUE_TYPES = {
         options: [
           { key: "answer", icon: "MessageOutlined", title: `Answer ${i.d.who}`, desc: "Opens a message channel. You write first, then you take turns. Only you can close it.", verb: "Send", done: "Resolved", need: "message", log: `Answered ${i.d.who}; channel open` },
           ...(online ? [{ key: "enter", icon: "LoginOutlined", title: `Enter ${m.host} and look yourself`, desc: `${i.d.who} is locked out while you are in. You get 30 minutes.`, verb: `Enter ${m.host}`, done: "Resolved", log: `Entered ${m.host} to help` }] : []),
-          { key: "handoff", icon: "TeamOutlined", title: "Ask an Admin from another department", desc: `Help across departments. ${i.d.who} has to accept it before they can see anything.`, verb: "Ask", done: "Waiting", need: "pick", pick: others, pickHint: "Who should help?", log: `Asked for help from another department; waiting for ${i.d.who} to accept` },
         ] };
     } },
   deviation: { label: "Deviation", icon: "WarningOutlined", from: "Deviation log",
@@ -3239,7 +3237,7 @@ const typicalDay = (host, day) => { const k = host.split("").reduce((a, c) => a 
 const OTHER_KINDS = { flow: ["file copy", "file copies"], action: ["action", "actions"], assistance: ["search or ping", "searches or pings"], rollout: ["update step", "update steps"] };
 function hostsProfile(hosts) {
   const H = Math.ceil(NOWH), hs = [...hosts];
-  // machines with anyone on them at any point in the hour: the owner, an Admin, you, or assisted access
+  // machines with anyone on them at any point in the hour: the owner, an Admin, you
   const usedIn = (blocks, a, b) => blocks.some((x) => x[0] < b && x[1] > a);
   const today = Array.from({ length: H }, (_, h) => hs.filter((host) => usedIn(laneOf(host).blocks, h, Math.min(h + 1, NOWH))).length);
   const days = [-6, -5, -4, -3, -2, -1].filter((d) => !["Sat", "Sun"].includes(WEEK[((d % 7) + 7) % 7]));
@@ -3264,7 +3262,7 @@ function hostsProfile(hosts) {
   const odd = today.map((v, h) => h < done && (h < 6 || h >= 18) && (v > 0 && (peopleAtNight(h) || v > usual[h])));
   // the count at the real times: each machine's sessions joined end to end (a hand-over between people
   // is not a gap), +1 when someone arrives on an empty machine, -1 when the last one leaves it
-  const VERB = { own: "signed in on", admin: "entered", you: "entered", assist: "started assisted access on" };
+  const VERB = { own: "signed in on", admin: "entered", you: "entered" };
   const moves = [];
   hs.forEach((host) => {
     const bl = laneOf(host).blocks.slice().sort((a, b) => a[0] - b[0]);
@@ -3465,7 +3463,6 @@ const SU_QUEUE = DECISIONS;
 const REPORT_CATS = {
   "Restricted file": { icon: "FileProtectOutlined", sev: "high", desc: "A copy of a marked file turned up somewhere it is not allowed." },
   "Flow failed": { icon: "BranchesOutlined", sev: "medium", desc: "A flow stopped copying, or one of its branches paused." },
-  "Listener report": { icon: "MessageOutlined", sev: "low", desc: "Something a listener on a help channel wrote down." },
   "Update stuck": { icon: "CloudSyncOutlined", sev: "high", desc: "A machine failed to update and went past the retry limit." },
   "Deviation": { icon: "WarningOutlined", sev: "medium", desc: "A machine showed something it was not registered with, like another name." },
   "About an Admin": { icon: "EyeOutlined", sev: "medium", fixed: true, desc: "An Admin's own conduct, such as entering machines at night." },
@@ -3475,7 +3472,7 @@ const routingNow = () => ROUTING || (ROUTING = JSON.parse(JSON.stringify(ROUTING
 let REPORTS = null;
 function reportsNow() {
   if (REPORTS) return REPORTS;
-  const TYPE_CAT = { file: "Restricted file", update: "Update stuck", help: "Listener report", deviation: "Deviation", flow: "Flow failed" };
+  const TYPE_CAT = { file: "Restricted file", update: "Update stuck", deviation: "Deviation", flow: "Flow failed" };
   const ms = FULL.MACHINES || MACHINES, mby = Object.fromEntries(ms.map((m) => [m.host, m])), out = [];
   (FULL.ISSUES || ISSUES).forEach((i, k) => { const cat = TYPE_CAT[i.type], m = mby[i.host]; if (cat && m) out.push({ id: `R-${3000 + k}`, cat, dept: m.dept, host: i.host, what: `${i.title} · ${i.subject}`, at: i.at }); });
   // the update escalations that piled up on LOG-02 while Logistics had nobody to take them
@@ -4043,7 +4040,7 @@ function Work({ go, single }) {
     <//>`}
   <//>`;
 }
-const ROUTING0 = { "Restricted file": ["ops", "fin", "log"], "Flow failed": ["ops", "fin"], "Listener report": ["ops"], "Update stuck": ["ops", "fin", "log"], "Deviation": ["ops", "fin", "log"] };
+const ROUTING0 = { "Restricted file": ["ops", "fin", "log"], "Flow failed": ["ops", "fin", "log"], "Update stuck": ["ops", "fin", "log"], "Deviation": ["ops", "fin", "log"] };
 const FULL_DEPTS = () => FULL.DEPTS || DEPTS;
 // Entering an Admin's console: the design requires blocking or ending their session first.
 function EnterConsole({ admin, onClose, onEnter }) {
@@ -4147,7 +4144,7 @@ let DEVIATIONS = [
     evidence: ["No issue was open on LOG-01 or LOG-02 at those times.", "LOG-02 went offline 14 minutes after the last entry."], out: "open" },
   { id: "D-308", rule: "O-2", sev: "medium", kind: "admin", who: "K. Boateng", whoSub: "Finance Admin", dept: "fin", host: null, at: 12.5, val: 130, short: "Finance takes over two hours to address a report",
     expected: "Reports addressed within 1 hour", happened: "Typical time this week: 2 h 10 m",
-    ctx: [[9.3, "K. Boateng", "Started assisted access on FIN-02", "var(--s2)"], [12.5, "System", "Median time to address passed the target", "var(--med)"]],
+    ctx: [[12.5, "System", "Median time to address passed the target", "var(--med)"]],
     evidence: ["K. Boateng is Finance's only Admin.", "One report waited 3 h 05 m."], out: "open" },
   { id: "D-309", rule: "O-5", sev: "high", kind: "dept", who: "Logistics", whoSub: "No Admin since 18 Sep", dept: "log", host: null, at: -144, val: 18720, short: "Logistics has had no Admin for 13 days",
     expected: "Another Admin appointed within 7 days", happened: "Empty for 13 days",
@@ -5072,30 +5069,27 @@ function ReportsHere({ me, sel, setSel, written }) {
 // ---------------------------------------------------------------- Messages (Help Ping & Message Channel)
 // One row per conversation between a lower and a higher party: Worker -> Admin, or Admin -> Super User. It starts as a
 // ping (attention only, repeatable); the person pinged answers first, which opens the channel; then one message each
-// way at a time. Only the higher party closes it. Either party may add Admins as Listeners: the one who adds them sees
-// them, the other party is not told (resource-assistance-combo.md). Times are hours from today's midnight.
+// way at a time. Only the higher party closes it. Times are hours from today's midnight.
 let CHANNELS = EMPTY ? [] : [
-  { id: "CH-21", lo: "Kojo", loAt: "OPS-01", hi: "R. Mensah", by: "lo", pings: [9.67, 10.25], msgs: [], status: "ping", listeners: {} },
-  { id: "CH-20", lo: "Ama", loAt: "OPS-07", hi: "R. Mensah", by: "hi", pings: [8.9], status: "open", listeners: { "R. Mensah": ["A. Quaye"] },
+  { id: "CH-21", lo: "Kojo", loAt: "OPS-01", hi: "R. Mensah", by: "lo", pings: [9.67, 10.25], msgs: [], status: "ping" },
+  { id: "CH-20", lo: "Ama", loAt: "OPS-07", hi: "R. Mensah", by: "hi", pings: [8.9], status: "open",
     msgs: [[9.0, "R. Mensah", "Is budget-2026.xlsx still open on your PC? It should not be there."], [9.25, "Ama", "It was sent to me to read before the meeting. I closed it."],
       [10.1, "R. Mensah", "Thanks. Please delete your copy; it is marked to stay on WS-OPS-A1."]] },
-  { id: "CH-18", lo: "R. Mensah", loAt: "WS-OPS-A1", hi: "Super User", by: "lo", pings: [11.5], status: "open", listeners: {},
+  { id: "CH-18", lo: "R. Mensah", loAt: "WS-OPS-A1", hi: "Super User", by: "lo", pings: [11.5], status: "open",
     msgs: [[11.7, "Super User", "What do you need?"], [12.1, "R. Mensah", "Can Update stuck reports for Operations come to us too? Two have waited on you since Wednesday."]] },
-  { id: "CH-17", lo: "K. Boateng", loAt: "WS-FIN-A1", hi: "Super User", by: "lo", pings: [12.6, 13.0], msgs: [], status: "ping", listeners: {} },
-  { id: "CH-16", lo: "Afi", loAt: "FIN-01", hi: "K. Boateng", by: "lo", pings: [10.4], status: "open", listeners: { "K. Boateng": ["R. Mensah"] },
+  { id: "CH-17", lo: "K. Boateng", loAt: "WS-FIN-A1", hi: "Super User", by: "lo", pings: [12.6, 13.0], msgs: [], status: "ping" },
+  { id: "CH-16", lo: "Afi", loAt: "FIN-01", hi: "K. Boateng", by: "lo", pings: [10.4], status: "open",
     msgs: [[10.5, "K. Boateng", "Go ahead, Afi."], [10.6, "Afi", "Someone on my team keeps taking my files off the shared drive and renaming them."]] },
-  { id: "CH-15", lo: "Yaw", loAt: "OPS-03", hi: "R. Mensah", by: "lo", pings: [-20.5], status: "closed", closedAt: -19.4, listeners: {},
+  { id: "CH-15", lo: "Yaw", loAt: "OPS-03", hi: "R. Mensah", by: "lo", pings: [-20.5], status: "closed", closedAt: -19.4,
     msgs: [[-20.4, "R. Mensah", "What is it, Yaw?"], [-20.1, "Yaw", "The printer on the second floor will not take my jobs."], [-19.5, "R. Mensah", "Fixed: it was paused. Try again."]] },
 ];
 const chParty = (c, me) => c.lo === me || c.hi === me;
-const chListening = (c, me) => !chParty(c, me) && Object.values(c.listeners).some((xs) => xs.includes(me));
-const chVisible = (c, me) => chParty(c, me) || chListening(c, me);
+const chVisible = (c, me) => chParty(c, me);
 const chOther = (c, me) => (c.lo === me ? c.hi : c.lo);
 const chReceiver = (c) => (c.by === "lo" ? c.hi : c.lo);
 const chTurn = (c) => { if (c.status !== "open") return null; const last = c.msgs[c.msgs.length - 1]; return last ? chOther(c, last[1]) : chReceiver(c); };
 // where a conversation stands for the person looking at it
-const chState = (c, me) => chListening(c, me) ? ["Listening", "wait", "listen"]
-  : c.status === "closed" ? ["Closed", "good", "closed"]
+const chState = (c, me) => c.status === "closed" ? ["Closed", "good", "closed"]
   : c.status === "ping" ? (chReceiver(c) === me ? [`Pinged you${c.pings.length > 1 ? " " + c.pings.length + " times" : ""}`, "bad", "you"] : ["Waiting for an answer", "wait", "them"])
   : chTurn(c) === me ? ["Your turn", "bad", "you"] : ["Their turn", "wait", "them"];
 const msgWaiting = () => CHANNELS.filter((c) => chVisible(c, ME) && chState(c, ME)[2] === "you").length;
@@ -5111,19 +5105,18 @@ function Messages({ me, open }) {
   const [sel, setSel] = useOpen("messages", open);
   const [f, setF] = useState(null), [q, setQ] = useState("");
   const [draft, setDraft] = useState({}), [newPing, setNewPing] = useState(null);
-  const [lis, setLis] = useState(null), [lq, setLq] = useState("");
   const [modal, modalCtx] = Modal.useModal();
   const mine = CHANNELS.filter((c) => chVisible(c, me));
-  const order = { you: 0, them: 1, listen: 2, closed: 3 };
+  const order = { you: 0, them: 1, closed: 2 };
   const lastAt = (c) => Math.max(...c.pings, ...c.msgs.map((m) => m[0]), c.closedAt || -999);
-  const rows = mine.filter((c) => (!f || chState(c, me)[2] === f) && `${c.lo} ${c.hi} ${c.msgs.map((m) => m[2]).join(" ")}`.toLowerCase().includes(q.toLowerCase()))
+  const rows = mine.filter((c) => (!f || (f === "ping" ? c.status === "ping" : chState(c, me)[2] === f)) && `${c.lo} ${c.hi} ${c.msgs.map((m) => m[2]).join(" ")}`.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => order[chState(a, me)[2]] - order[chState(b, me)[2]] || lastAt(b) - lastAt(a));
   const c = rows.find((x) => x.id === sel) || (sel ? mine.find((x) => x.id === sel) : null) || rows[0];
   const n = (k) => mine.filter((x) => chState(x, me)[2] === k).length;
   // who this console may ping: an Admin pings their workers and the Super User; the Super User pings Admins
   const canPing = me === "Super User" ? Object.keys(ADMIN_INFO).filter((a) => FULL_DEPTS().some((d) => d.id === ADMIN_INFO[a].dept))
     : ["Super User", ...MACHINES.filter((m) => m.user).map((m) => m.user)];
-  const title = (x) => (chListening(x, me) ? `${x.lo} and ${x.hi}` : chOther(x, me));
+  const title = (x) => chOther(x, me);
   const send = (x) => { const text = (draft[x.id] || "").trim(); if (!text) return;
     setSel(x.id); msgChange(() => { x.msgs = [...x.msgs, [nowH(), me, text]]; if (x.status === "ping") x.status = "open"; }); setDraft({ ...draft, [x.id]: "" });
     toast(x.msgs.length === 1 ? `Answered ${chOther(x, me)} · the channel is open (concept)` : `Sent · now ${chOther(x, me)}'s turn (concept)`); };
@@ -5131,16 +5124,14 @@ function Messages({ me, open }) {
   const close = (x) => modal.confirm({ title: `Close the conversation with ${chOther(x, me)}?`, okText: "Close it", cancelText: "Keep it open",
     content: `Only you can close it. ${chOther(x, me)} cannot write in it again; a new ping opens a new one. It stays in the audit log.`,
     onOk: () => { setSel(x.id); msgChange(() => { x.status = "closed"; x.closedAt = nowH(); }); toast("Closed · recorded (concept)"); } });
-  const addListener = (x, who) => { setSel(x.id); msgChange(() => { x.listeners = { ...x.listeners, [me]: [...(x.listeners[me] || []), who] }; }); toast(`${who} is listening · ${chOther(x, me)} is not told (concept)`); };
-  const dropListener = (x, who) => { msgChange(() => { x.listeners = { ...x.listeners, [me]: (x.listeners[me] || []).filter((a) => a !== who) }; }); toast(`${who} no longer reads it (concept)`); };
   const ping = (who) => { const ex = mine.find((x) => chParty(x, me) && chOther(x, me) === who && x.status !== "closed");
     if (ex) { setNewPing(null); return ex.status === "ping" && ex.by === (ex.lo === me ? "lo" : "hi") ? pingAgain(ex) : (setSel(ex.id), toast(`You already have a conversation with ${who}`)); }
     const lo = who === "Super User" || ADMIN_INFO[who] && me !== "Super User" ? me : who, hi = lo === me ? who : me;
     const m = (FULL.MACHINES || MACHINES).find((x) => x.user === lo), at = ADMIN_INFO[lo] ? ADMIN_INFO[lo].ws : m ? m.host : "";
     const id = "CH-" + (30 + CHANNELS.length);
-    msgChange(() => { CHANNELS = [{ id, lo, loAt: at, hi, by: lo === me ? "lo" : "hi", pings: [nowH()], msgs: [], status: "ping", listeners: {} }, ...CHANNELS]; });
+    msgChange(() => { CHANNELS = [{ id, lo, loAt: at, hi, by: lo === me ? "lo" : "hi", pings: [nowH()], msgs: [], status: "ping" }, ...CHANNELS]; });
     setNewPing(null); setSel(id); toast(`Pinged ${who} · they see it until they answer (concept)`); };
-  const thread = (x) => { const st = chState(x, me), listening = st[2] === "listen", turn = chTurn(x), receiver = chReceiver(x);
+  const thread = (x) => { const turn = chTurn(x), receiver = chReceiver(x);
     return html`<div>
       <div className="nt-h">${x.status === "ping" ? "Pinged" : "The conversation"}</div>
       <div style=${{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -5149,10 +5140,9 @@ function Messages({ me, open }) {
         ${x.status === "closed" ? html`<div className="t3" style=${{ fontSize: 12, alignSelf: "center", marginTop: 4 }}>Closed by ${x.hi === me ? "you" : x.hi} · ${atH(x.closedAt)}</div>` : null}
       </div>
     </div>`; };
-  const composer = (x) => { const st = chState(x, me), listening = st[2] === "listen", turn = chTurn(x), receiver = chReceiver(x);
+  const composer = (x) => { const turn = chTurn(x), receiver = chReceiver(x);
     return html`<div>
-      ${listening ? html`<div className="t3" style=${{ fontSize: 12.5 }}>${ic("EyeOutlined")} You are listening. You read it as it happens; you cannot write in it. Only ${Object.keys(x.listeners).filter((k) => x.listeners[k].includes(me)).join(" and ")} knows you are here.</div>`
-        : x.status === "closed" ? null
+      ${x.status === "closed" ? null
         : x.status === "ping" && receiver !== me ? html`<div className="t3" style=${{ fontSize: 12.5 }}>A ping is only "I need you". ${chOther(x, me)} sees it, bright and pulsing, until they answer; you can ping again.</div>`
         : turn === me || (x.status === "ping" && receiver === me) ? html`<div className="composer">
             <${Input.TextArea} id=${"msg-" + x.id} variant="borderless" value=${draft[x.id] || ""} onChange=${(e) => setDraft({ ...draft, [x.id]: e.target.value })} autoSize=${{ minRows: 1, maxRows: 5 }}
@@ -5162,14 +5152,11 @@ function Messages({ me, open }) {
         : html`<div className="t3" style=${{ fontSize: 12.5 }}>${ic("LockOutlined")} ${chOther(x, me)}'s turn. You can write again once they answer.</div>`}
     </div>`; };
   const side = !c ? html`<${SidePanel} h=${MSG_H} empty=${html`<${Empty} icon="MessageOutlined" title="No conversations yet" text=${me === "Super User" ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."} h=${200} />`} />`
-    : (() => { const st = chState(c, me), party = !st[2].startsWith("listen"), added = c.listeners[me] || [];
-      return html`<${SidePanel} h=${MSG_H} title=${title(c)} sub=${party ? whoLine(chOther(c, me)) : "you are listening"}
+    : (() => { const st = chState(c, me), party = true;
+      return html`<${SidePanel} h=${MSG_H} title=${title(c)} sub=${whoLine(chOther(c, me))}
         facts=${[["Now", html`<span className="st" style=${{ "--c": st[1] === "bad" ? "var(--crit)" : st[1] === "good" ? "var(--ok)" : "var(--text-4)" }}><i />${st[0]}</span>`],
           ["Started by", `${c.by === "lo" ? c.lo : c.hi}, ${atH(c.pings[0])}`], ["Who closes it", c.hi === me ? "You" : c.hi],
           ]}
-        foot=${party && c.status === "open" ? html`<div className="row" style=${{ gap: 10, flexWrap: "nowrap" }}>
-            <span style=${{ flex: 1, minWidth: 0, fontSize: 12.5 }}><span className="t3">${ic("TeamOutlined")} Listeners · </span>${added.length ? html`${listNames(added)} <span className="t3">${added.length === 1 ? "reads" : "read"} it silently; ${chOther(c, me)} is not told.</span>` : html`<span className="t3">none. Admins you add read it silently; ${chOther(c, me)} is not told.</span>`}</span>
-            <${Button} id="lis-open" type="primary" ghost icon=${ic("TeamOutlined")} onClick=${() => { setLq(""); setLis(c.id); }}>${added.length ? `Listeners · ${added.length}` : "Add listeners"}<//></div>` : null}
         extra=${party && c.status === "open" && c.hi === me ? html`<${Tooltip} title="Close the conversation"><${Button} id="ch-close" size="small" type="text" danger aria-label="Close the conversation" icon=${ic("CloseCircleOutlined")} onClick=${() => close(c)} /><//>` : null}
         actions=${party && c.status === "ping" && chReceiver(c) !== me ? html`<${Button} onClick=${() => pingAgain(c)}>Ping again<//>` : null}
         dock=${c.status === "closed" ? null : composer(c)}>
@@ -5179,45 +5166,18 @@ function Messages({ me, open }) {
     <${Strip} on=${f} onPick=${setF} items=${[
       { key: "you", label: "Waiting on you", value: fmt(n("you")), delta: n("you") ? "pinged you, or your turn" : "nothing waiting", dc: n("you") ? "var(--crit)" : undefined },
       { key: "them", label: "Waiting on them", value: fmt(n("them")), delta: "your ping, or their turn" },
-      { key: "listen", label: "Listening", value: fmt(n("listen")), delta: "read only, as it happens" },
+      { key: "ping", label: "Pings", value: fmt(mine.filter((x) => x.status === "ping").length), delta: "not answered yet" },
       { key: "closed", label: "Closed", value: fmt(n("closed")), delta: "this week" }]} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title=${f ? { you: "Waiting on you", them: "Waiting on them", listen: "Listening", closed: "Closed" }[f] : "Conversations"} sub="waiting on you first · click one to see it on the right"
+      <${ListPanel} title=${f ? { you: "Waiting on you", them: "Waiting on them", ping: "Pings", closed: "Closed" }[f] : "Conversations"} sub="waiting on you first · click one to see it on the right"
         q=${q} setQ=${setQ} placeholder="Find a person or a word" action=${{ label: "New ping", onClick: () => setNewPing({ who: undefined }) }}
-        more=${2} pick=${c ? c.id : null} onPick=${setSel} rowKey="id" rows=${rows} icon=${(x) => (chListening(x, me) ? "EyeOutlined" : x.status === "ping" ? "BellOutlined" : "MessageOutlined")}
+        more=${2} pick=${c ? c.id : null} onPick=${setSel} rowKey="id" rows=${rows} icon=${(x) => (x.status === "ping" ? "BellOutlined" : "MessageOutlined")}
         name=${{ title: "With", text: title, line: (x) => { const last = x.msgs[x.msgs.length - 1]; return last ? `${last[1] === me ? "You" : last[1]}: ${last[2]}` : `${x.pings.length === 1 ? "a ping" : x.pings.length + " pings"}, no answer yet`; } }}
         cols=${[{ title: "Pings", width: 70, text: (x) => fmt(x.pings.length) }, { title: "Last", width: 100, text: (x) => atH(lastAt(x)) }]}
         now=${(x) => { const st = chState(x, me); return [st[0], st[1]]; }}
         empty=${!mine.length ? html`<${Empty} icon="MessageOutlined" title="No conversations yet" text="A ping asks for attention; answering it opens a conversation, one message each way at a time." act="New ping" onAct=${() => setNewPing({ who: undefined })} h=${200} />` : null} />
       ${side}
     </div>
-    ${(() => { const x = lis ? CHANNELS.find((y) => y.id === lis) : null; if (!x) return html`<${Drawer} open=${false} />`;
-      const other = chOther(x, me), added = x.listeners[me] || [];
-      const listensOn = (a) => CHANNELS.filter((y) => y.status === "open" && Object.values(y.listeners).some((xs) => xs.includes(a))).length;
-      const pool = Object.keys(ADMIN_INFO).filter((a) => a !== x.lo && a !== x.hi && !added.includes(a) && `${a} ${deptNameOf(ADMIN_INFO[a].dept)}`.toLowerCase().includes(lq.toLowerCase()));
-      const depts = [...new Set(pool.map((a) => ADMIN_INFO[a].dept))].sort((a, b) => (a === (ADMIN_INFO[me] || {}).dept ? -1 : b === (ADMIN_INFO[me] || {}).dept ? 1 : deptNameOf(a).localeCompare(deptNameOf(b))));
-      const person = (a, act) => { const info = ADMIN_INFO[a] || {}, n0 = listensOn(a);
-        return html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--grid)" }}>
-          <span style=${{ position: "relative", flex: "none" }}><span className="av" style=${{ width: 30, height: 30, fontSize: 11 }}>${initials(a)}</span>
-            <i style=${{ position: "absolute", right: -1, bottom: -1, width: 9, height: 9, borderRadius: "50%", background: info.busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
-          <span style=${{ minWidth: 0, flex: 1 }}><span className="cut" style=${{ display: "block", fontWeight: 500 }} title=${a}>${a}</span>
-            <span className="t3 cut" style=${{ display: "block", fontSize: 12 }}>Admin, ${deptNameOf(info.dept)} · ${info.busy ? "inside a machine" : "at their desk"}${n0 ? ` · listens on ${n0}` : ""}</span></span>
-          ${act}</div>`; };
-      return html`<${Drawer} open=${true} onClose=${() => setLis(null)} width=${460} title=${`Listeners · you and ${other}`}
-        footer=${html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${() => setLis(null)}>Done<//></div>`}>
-        <div style=${{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>A listener is an Admin who reads this conversation as it happens and cannot write in it. ${other} is not told. You see only the listeners you added; ${other} may have added their own.</div>
-          <div><div className="nt-h">Listening now · ${fmt(added.length)}</div>
-            ${added.length ? added.map((a) => person(a, html`<${Button} size="small" onClick=${() => dropListener(x, a)}>Remove<//>`))
-              : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nobody you added. Pick an Admin below.</div>`}</div>
-          <div><div className="nt-h">Add an Admin</div>
-            <${Input} allowClear placeholder="Find an Admin or a department" prefix=${ic("SearchOutlined")} value=${lq} onChange=${(e) => setLq(e.target.value)} />
-            ${depts.map((d) => html`<div key=${d} style=${{ marginTop: 10 }}>
-              <div className="t3" style=${{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em" }}>${deptNameOf(d)}${d === (ADMIN_INFO[me] || {}).dept ? " · your department" : ""}</div>
-              ${pool.filter((a) => ADMIN_INFO[a].dept === d).map((a) => person(a, html`<${Button} size="small" type="primary" ghost onClick=${() => addListener(x, a)}>Add<//>`))}</div>`)}
-            ${!pool.length ? html`<div className="t3" style=${{ padding: "10px 0", fontSize: 12.5 }}>${lq ? "No Admin by that name." : "Every Admin already listens."}</div>` : null}</div>
-        </div>
-      <//>`; })()}
     <${Drawer} open=${!!newPing} onClose=${() => setNewPing(null)} width=${420} title="Ping someone"
       footer=${newPing ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setNewPing(null)}>Cancel<//><${Button} type="primary" disabled=${!newPing.who} onClick=${() => ping(newPing.who)}>Ping<//></div>` : null}>
       ${newPing ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>

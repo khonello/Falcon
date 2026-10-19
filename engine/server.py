@@ -97,10 +97,10 @@ class Engine:
         from engine.console import screens as console_screens
         from engine.control import executions as control_executions
         from engine.control import inventory as control_inventory
-        from engine.hierarchy import assisted_access, handover
+        from engine.hierarchy import handover
         from engine.task import expected as task_expected
 
-        for mod in (control_events, control_executions, control_inventory, flow_sync, assisted_access, console_screens, console_marks, handover, engine.detective, task_expected):
+        for mod in (control_events, control_executions, control_inventory, flow_sync, console_screens, console_marks, handover, engine.detective, task_expected):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
 
@@ -221,9 +221,6 @@ class Engine:
             from engine.hierarchy import traversal
 
             await traversal.release_native_session(self, conn.ctx)
-            from engine.hierarchy import assisted_access
-
-            await assisted_access.clear_offers_for(self, conn.ctx.identity.account_id)
             from engine.console import screens
 
             await screens.on_disconnect(self, conn)

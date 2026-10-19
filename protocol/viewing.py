@@ -20,8 +20,7 @@ VIEWED_AS_TRAVERSED: frozenset[str] = frozenset({
     "flow.list", "flow.status", "flow.history",
     "control.action_list", "control.event_list", "control.dashboard",
     "control.execution", "control.execution_output",
-    "assistance.channels", "assistance.channel", "assistance.ping_status", "assistance.my_listeners",
-    "assisted_access.status", "assisted_access.available_helpers",
+    "assistance.channels", "assistance.channel", "assistance.ping_status",
     "reports.list", "audit.recent", "audit.deviations", "resource.violations",
     "updates.current", "updates.rollout_health", "alerts.list",
 })

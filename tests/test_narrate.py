@@ -63,8 +63,6 @@ def test_every_sentence_is_twelve_words_or_fewer():
         ("hierarchy", {"tree": [DEPT, EMPTY_DEPT]}),
         ("hierarchy", {"tree": [DEPT]}),
         ("hierarchy", {"tree": []}),
-        ("assistance", {"pairs": [{"from_name": "Operations", "to_name": "Finance", "count": 2}]}),
-        ("assistance", {"pairs": []}),
         ("routing", {"categories": ["a", "b", "c"], "routing": [{"category": "a"}]}),
         ("routing", {"categories": ["a"], "routing": [{"category": "a"}]}),
         ("routing", {"categories": []}),
@@ -268,16 +266,6 @@ def test_a_department_with_no_admin_is_a_danger_not_an_empty_panel():
     assert r["tone"] == "danger"
     assert r["action"] == "Assign an Admin"
     assert "Nobody governs" in r["sentence"]
-
-
-def test_the_selected_admin_is_what_the_sentence_is_about():
-    """Whoever the cell draws is whoever is selected, so selecting someone away helping changes the
-    sentence rather than only the picture."""
-    away = {"name": "A. Quaye", "session": {"occupied_via": "assisted_access"}}
-    r = n.narrate("dept_people", {"admins": [{"name": "R. Mensah", "session": {"occupied_via": "native"}}, away],
-                                  "selected": away, "machines": 96})
-    assert r["sentence"] == "A. Quaye is helping another department right now."
-    assert r["tone"] == "accent"
 
 
 def test_the_fallback_count_agrees_with_its_verb():

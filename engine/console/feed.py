@@ -71,10 +71,6 @@ def sentence(action: str, d: dict[str, Any], host: str | None, names: dict[int, 
                 "voluntary": f"Left {host or 'the machine'}"}.get(reason, f"Left {host or 'the machine'}")
     if action == "session.extended":
         return f"Extended the session{on}"
-    if action.startswith("assisted_access."):
-        return {"assisted_access.offered": f"Offered assisted access{on}", "assisted_access.accepted": f"Started assisted access{on}",
-                "assisted_access.closed": f"Ended assisted access{on}", "assisted_access.availability": "Changed whether they can be asked for help",
-                "assisted_access.no_match": "Asked for assisted access; nobody was available"}.get(action, _words(action))
     if action == "action.started":
         return f"Action {d.get('action_id', '')} started{on}".replace("  ", " ")
     if action == "action.finished":
@@ -102,8 +98,6 @@ def sentence(action: str, d: dict[str, Any], host: str | None, names: dict[int, 
         return "Opened a conversation"
     if action == "assistance.channel_closed":
         return "Closed a conversation"
-    if action == "assistance.listener_added":
-        return "Added a listener to a conversation"
     if action == "update.approved":
         return f"Approved version {d.get('version', '')}".strip()
     if action == "update.attempt":

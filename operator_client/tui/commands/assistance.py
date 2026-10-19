@@ -1,8 +1,8 @@
-"""Assistance: search, ping, respond, message channel (turn lock), close, listeners."""
+"""Assistance: search, ping, respond, message channel (turn lock), close."""
 
 from __future__ import annotations
 
-from operator_client.tui.render import bullet, table
+from operator_client.tui.render import table
 from operator_client.tui.shell import Args, ShellContext, command
 
 
@@ -74,24 +74,3 @@ async def channels(ctx: ShellContext, args: Args) -> str:
 async def close_channel(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("assistance.close_channel", {"channel_id": args.get_int(0, "channel_id")})
     return f"channel {res['channel_id']} closed"
-
-
-@command("listen", usage="<channel_id> <admin_account_id>", help_="Add an Admin as a silent Listener (the other party is not told)")
-async def listen(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("assistance.add_listener", {"channel_id": args.get_int(0, "channel_id"),
-                                                    "admin_account_id": args.get_int(1, "admin_account_id")})
-    return "listener added" if res["added"] else "already listening"
-
-
-@command("listen", "who", "<channel_id>", "Admins you could add as a Listener, from every department")
-async def listen_who(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("assistance.listener_candidates", {"channel_id": args.get_int(0, "channel_id")})
-    return bullet(f"{c['name']} · {c['department_name']} (account {c['account_id']})" for c in res["candidates"]) or "nobody to add"
-
-
-@command("listeners", usage="<channel_id>", help_="Listeners YOU added to a channel")
-async def listeners(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("assistance.my_listeners", {"channel_id": args.get_int(0, "channel_id")})
-    return bullet(f"{l['name']} (account {l['listener_account_id']}) added {l['added_at']}" for l in res["listeners"])
-
-

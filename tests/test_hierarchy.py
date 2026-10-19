@@ -225,6 +225,7 @@ async def test_report_routing_is_additive_and_views_are_super_user_only(engine, 
     su = await connect("cid-su")
     a1 = await connect("cid-a1")
     a2 = await connect("cid-a2")
+    await su.ok("reports.routing_set", {"category": "flow_failure", "department_ids": []})   # departments start routed; begin from the Super User alone
     await reports.emit(engine, "flow_failure", source_table="flow_sync_log", source_id=1, summary="f1")
     assert su.push_types(await su.drain_pushes()) == ["report.new"]
     assert a1.push_types(await a1.drain_pushes()) == []
@@ -247,6 +248,17 @@ async def test_report_routing_is_additive_and_views_are_super_user_only(engine, 
     assert await a1.err("reports.addressed_view") == "forbidden"
     view = (await su.ok("reports.addressed_view"))["addressed"]
     assert view[0]["report_id"] == rid and view[0]["addressed_by_department_id"] == org["fin"]
+
+
+async def test_a_new_department_is_routed_every_kind_but_the_ones_about_an_admin(engine, org, connect):
+    from engine.database import DEFAULT_ROUTED
+    from engine.hierarchy.reports import CATEGORIES, FIXED_CATEGORIES
+
+    assert sorted(DEFAULT_ROUTED) == sorted(c for c in CATEGORIES if c not in FIXED_CATEGORIES)
+    su = await connect("cid-su")
+    routing = (await su.ok("reports.routing_get"))["routing"]
+    for dept in (org["fin"], org["hr"]):
+        assert sorted(r["category"] for r in routing if r["routed_department_id"] == dept) == sorted(DEFAULT_ROUTED)
 
 
 async def test_a_report_keeps_its_words_and_each_reader_sees_it_alone(engine, org, connect):
@@ -276,6 +288,7 @@ async def test_routing_a_department_with_or_without_earlier_reports(engine, org,
     su = await connect("cid-su")
     a1 = await connect("cid-a1")      # Finance
     a2 = await connect("cid-a2")      # HR
+    await su.ok("reports.routing_set", {"category": "deviation", "department_ids": []})     # departments start routed; begin from the Super User alone
     old = await reports.emit(engine, "deviation", source_table="flow_sync_log", source_id=1, summary="old")
 
     # Finance is added with the earlier reports (the default): it sees the one already written.
@@ -382,43 +395,6 @@ async def test_alerts_are_role_filtered_and_pushed(engine, org, connect):
         assert c.push_types(await c.drain_pushes()) == expected
     assert sorted(a["body"] for a in (await w1.ok("alerts.list"))["alerts"]) == ["everyone", "fin only"]
     assert [a["body"] for a in (await a2.ok("alerts.list"))["alerts"]] == ["everyone"]
-
-
-# --- assisted access ----------------------------------------------------------------------------
-
-async def test_assisted_access_consent_flow(engine, org, connect):
-    a1 = await connect("cid-a1")
-    a2 = await connect("cid-a2")
-    su = await connect("cid-su")
-    # Nobody available -> no match, never queued.
-    res = await a1.ok("assisted_access.request", {"department_id": org["hr"]})
-    assert res["matched"] is False
-    await a2.ok("assisted_access.set_available", {"available": True})
-    helpers = (await a1.ok("assisted_access.available_helpers"))["helpers"]
-    assert [h["id"] for h in helpers] == [org["a2"]]
-    res = await a1.ok("assisted_access.request", {"department_id": org["hr"], "narrowing": {"monitoring_actions": False,
-                                                                                            "resource_files": True}})
-    assert res["matched"] is True and res["helper_account_id"] == org["a2"]
-    offer = next(p for p in await a2.drain_pushes() if p.type == "assisted_access.offer")
-    # Narrowing can only remove: resource_files stays False despite the requester asking for True.
-    assert offer.payload["scope"]["monitoring_actions"] is False and offer.payload["scope"]["resource_files"] is False
-    assert offer.payload["scope"]["control_actions"] is True
-    assert await a1.err("assisted_access.accept", {"request_id": res["request_id"]}) == "not_found"  # not the helper
-
-    acc = await a2.ok("assisted_access.accept", {"request_id": res["request_id"]})
-    assert "assisted_access.started" in a1.push_types(await a1.drain_pushes())
-    session = await engine.db.sessions.by_id(acc["session_id"])
-    assert session["occupied_via"] == "assisted_access" and session["pc_id"] == org["a1_pc"]
-    assert session["un_evictable"] is False
-    # Super User always sees the report; helper is no longer available while occupying.
-    assert su.push_types(await su.drain_pushes()) == ["report.new"]
-    assert (await su.ok("reports.list"))["reports"][0]["category"] == "cross_department_assistance"
-    assert (await a1.ok("assisted_access.available_helpers"))["helpers"] == []
-    # Either party closes it; the requester re-claims their workstation.
-    await a1.ok("assisted_access.close", {"request_id": res["request_id"]})
-    assert "assisted_access.closed" in a2.push_types(await a2.drain_pushes())
-    assert (await engine.db.sessions.by_id(acc["session_id"]))["ended_reason"] == "voluntary"
-    assert (await a1.ok("hierarchy.claim_native"))["blocked"] is False
 
 
 # --- looking THROUGH a held session (protocol/viewing.py) ----------------------------------------

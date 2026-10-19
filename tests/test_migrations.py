@@ -118,22 +118,3 @@ async def test_jsonb_roundtrips_as_python(db: Database):
         ids["admin"], {"k": [1, 2, {"n": None}]})
     detail = await db.pool.fetchval("SELECT detail FROM audit_log")
     assert detail == {"k": [1, 2, {"n": None}]}
-
-
-async def test_listener_dedup_is_unique_constraint(db: Database):
-    ids = await _seed(db)
-    async with db.pool.acquire() as c:
-        ping = await c.fetchval(
-            "INSERT INTO pings (sender_account_id, receiver_account_id) VALUES ($1, $2) RETURNING id",
-            ids["worker"], ids["admin"])
-        chan = await c.fetchval(
-            "INSERT INTO message_channels (opened_via_ping_id, initiator_account_id, superior_account_id, turn) "
-            "VALUES ($1, $2, $3, 'sender') RETURNING id", ping, ids["worker"], ids["admin"])
-        await c.execute(
-            "INSERT INTO listeners (message_channel_id, listener_account_id, added_by_account_id) VALUES ($1, $2, $3)",
-            chan, ids["admin"], ids["worker"])
-        # Second add of the same listener by the other party: no-op, not an error.
-        status = await c.execute(
-            "INSERT INTO listeners (message_channel_id, listener_account_id, added_by_account_id) "
-            "VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", chan, ids["admin"], ids["admin"])
-        assert status == "INSERT 0 0"

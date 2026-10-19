@@ -33,7 +33,7 @@ QtObject {
         var a = String(action || "")
         if (/^resource\.violation|violation/.test(a)) return "violation"
         if (/^deviation|^auth\.failed|mismatch/.test(a)) return "deviation"
-        if (/^(session|hierarchy\.(traverse|end_session|extend)|assisted_access)/.test(a)) return "session"
+        if (/^(session|hierarchy\.(traverse|end_session|extend))/.test(a)) return "session"
         if (/^(control|action|event)/.test(a)) return "action"
         if (/^flow/.test(a)) return "flow"
         if (/^assistance/.test(a)) return "assistance"

@@ -257,16 +257,6 @@ def hierarchy(data: dict[str, Any]) -> dict[str, Any]:
                        else f"{len(empty_depts)} departments have no Admin"), tone="danger")
 
 
-def assistance(data: dict[str, Any]) -> dict[str, Any]:
-    pairs = data.get("pairs") or []          # [{from_name, to_name, count}]
-    if not pairs:
-        return _out("No department has asked another for help today.")
-    top = max(pairs, key=lambda p: p["count"])
-    total = sum(p["count"] for p in pairs)
-    return _out(f"{_n(total, 'assisted session')} today, most from {top['from_name']}.",
-                [_fact(f"{p['from_name']} → {p['to_name']}", _n(p["count"], "session")) for p in pairs[:4]])
-
-
 def routing(data: dict[str, Any]) -> dict[str, Any]:
     categories = data.get("categories") or []
     routed = data.get("routing") or []
@@ -294,7 +284,6 @@ def the_day(data: dict[str, Any]) -> dict[str, Any]:
                     brief="nobody signed in", tone="warn")
     traversals = [s for s in sessions if s.get("occupied_via") != "native"]
     yours = [s for s in traversals if s.get("occupant_role") == "super_user"]
-    assisted = [s for s in traversals if s.get("occupied_via") == "assisted_access"]
     still_open = [s for s in traversals if not s.get("ended_at")]
     facts = [_fact("Traversals", f"{len(traversals)}, {len(still_open)} still open" if still_open
                    else str(len(traversals)))]
@@ -302,8 +291,6 @@ def the_day(data: dict[str, Any]) -> dict[str, Any]:
         facts.append(_fact("You entered", yours[0].get("hostname", "a PC")))
     if quiet:
         facts.append(_fact("Never signed in", _n(quiet, "PC"), "warn"))
-    if assisted:
-        facts.append(_fact("Assisted", _n(len(assisted), "session")))
     if not traversals:
         return _out("Everyone worked at their own PC today.", facts, brief="nobody entered a machine")
     if yours:
@@ -447,20 +434,13 @@ def dept_people(data: dict[str, Any]) -> dict[str, Any]:
                     [_fact("Admins", 0, "danger"), _fact("Client PCs", machines)],
                     action="Assign an Admin", brief="no Admin", tone="danger")
 
-    away = [a for a in admins
-            if (a.get("session") or {}).get("occupied_via") == "assisted_access"]
     free = [a for a in admins if not a.get("session")]
     name = (selected or {}).get("name") or "This Admin"
     facts = [_fact("Admins here", len(admins)), _fact("Client PCs", machines)]
-    if away:
-        facts.append(_fact("Assisting elsewhere", away[0].get("name") or "an Admin", "warn"))
     if free:
         facts.append(_fact("Not signed in", _n(len(free), "Admin"), "warn"))
 
     brief = f"{(selected or {}).get('name') or 'one'} of {len(admins)}" if len(admins) > 1 else "one Admin"
-    if selected and (selected.get("session") or {}).get("occupied_via") == "assisted_access":
-        return _out(f"{name} is helping another department right now.", facts,
-                    brief=brief, tone="accent")
     if selected and not selected.get("session"):
         return _out(f"{name} is not signed in anywhere.", facts, brief=brief, tone="warn")
     if len(admins) == 1:
@@ -605,7 +585,7 @@ def out_of_place(data: dict[str, Any]) -> dict[str, Any]:
                 brief=", ".join(bits), tone="danger" if found else "warn")
 
 
-# --- the Authority area (OV03), and helping across departments ----------------------------------
+# --- the Authority area (OV03) ----------------------------------
 
 def authority(data: dict[str, Any]) -> dict[str, Any]:
     """The Authority area's first cell: who governs what. A department with nobody governing it
@@ -670,41 +650,6 @@ def naming(data: dict[str, Any]) -> dict[str, Any]:
                 action="Call them something else", brief="your names only", tone="accent")
 
 
-def helping(data: dict[str, Any]) -> dict[str, Any]:
-    """Assisted access, from the Admin's side. It is consent, not eviction: no clock, no forcing,
-    and what the helper may do is said in words before anyone agrees."""
-    session = data.get("session") or None
-    offers = data.get("offers") or []
-    answer = data.get("answer") or None
-    available = bool(data.get("available"))
-
-    if session:
-        who = session.get("with_name") or "another Admin"
-        return _out(f"You are helping {who} right now.",
-                    [_fact("Allowed", session.get("allowed") or "control and monitoring actions", "accent"),
-                     _fact("Ends", "when either of you closes it")],
-                    action="End it", brief="helping now", tone="accent")
-    if offers:
-        first = offers[0]
-        who = first.get("requester_name") or "An Admin"
-        return _out(f"{who} needs help and picked you.",
-                    [_fact("They would let you", first.get("allowed") or "run control actions", "accent"),
-                     _fact("Waiting", _n(len(offers), "request"), "warn")],
-                    action="Accept", brief=_n(len(offers), "asking"), tone="warn")
-    if answer and answer.get("matched"):
-        return _out(f"{answer.get('helper_name') or 'An Admin'} was asked to help you.",
-                    [_fact("Waiting on", answer.get("helper_name") or "them", "accent")],
-                    brief="waiting on them", tone="accent")
-    if answer and not answer.get("matched"):
-        return _out("Nobody is free to help right now.",
-                    [_fact("Try", "again in a few minutes")], brief="nobody free", tone="warn")
-    if available:
-        return _out("You are available to help other departments.",
-                    [_fact("Asked so far", "nobody today")], brief="available", tone="ok")
-    return _out("You are not available, and nobody is being helped.",
-                action="Ask for help", brief="not available", tone="")
-
-
 def running_now(data: dict[str, Any]) -> dict[str, Any]:
     """What is executing at this moment, across every automation. A count of zero is the normal
     state and is said plainly rather than as an absence."""
@@ -728,11 +673,11 @@ TOPICS = {
     "rollout": rollout, "confirmations": confirmations, "fleet": fleet, "needs_you": needs_you,
     "rollout_departments": rollout_departments, "blocking": blocking,
     "entries": entries, "never_signed_in": never_signed_in,
-    "hierarchy": hierarchy, "assistance": assistance, "routing": routing, "the_day": the_day,
+    "hierarchy": hierarchy, "routing": routing, "the_day": the_day,
     "violations": violations, "deviations": deviations, "work": work, "out_of_place": out_of_place, "dept_fleet": dept_fleet, "dept_people": dept_people,
     "enter_cost": enter_cost, "enter_answer": enter_answer, "held": held, "workstation": workstation,
     "authority": authority, "nobody_governs": nobody_governs, "naming": naming,
-    "helping": helping, "running_now": running_now,
+    "running_now": running_now,
 }
 
 

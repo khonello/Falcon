@@ -10,9 +10,6 @@ Same shared status-indicator mechanism Task deadlines use.
 Message Channel: opens when the receiver responds to a ping. One-message-per-turn lock,
 Engine-enforced. `turn` = 'sender' means the subordinate party may post, 'superior' the
 superior; it flips after every message. Only the superior closes it, even if they pinged first.
-
-Listeners: either party may add an Admin as a silent real-time observer; deduplicated; each
-party sees only the Listeners *they* added. Adding one raises a 'listener_report' Report.
 """
 
 from __future__ import annotations
@@ -20,7 +17,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.hierarchy import reports
 from engine.permissions import RANK, int_field, require_account, str_field
 from engine.serialize import row, rows
 from protocol import ErrorCode, ProtocolError
@@ -49,7 +45,7 @@ def _channel_parties(channel: dict[str, Any]) -> tuple[int, int]:
     return sub, sup
 
 
-async def _load_channel(ctx: Context, channel_id: int, *, allow_listener: bool = False) -> dict[str, Any]:
+async def _load_channel(ctx: Context, channel_id: int) -> dict[str, Any]:
     db = ctx.engine.db
     channel = await db.assistance.channel(channel_id)
     if channel is None:
@@ -60,9 +56,6 @@ async def _load_channel(ctx: Context, channel_id: int, *, allow_listener: bool =
     channel["_other"] = next(iter(parties - {channel["superior_account_id"]}))
     me = ctx.identity.account_id
     if me in parties:
-        return channel
-    if allow_listener and me in await db.assistance.listener_account_ids(channel_id):
-        channel["_listener"] = True
         return channel
     raise ProtocolError(ErrorCode.FORBIDDEN, "not a party to this channel")
 
@@ -202,8 +195,6 @@ async def message(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     out = {"channel_id": channel_id, "message_id": msg_id, "from_account_id": ident.account_id, "body": body,
            "turn": next_turn}
     await ctx.engine.push_to_account(other, "assistance.message", out)
-    for listener in await ctx.engine.db.assistance.listener_account_ids(channel_id):
-        await ctx.engine.push_to_account(listener, "assistance.message", out)  # real time, silent
     return {"message_id": msg_id, "turn": next_turn}
 
 
@@ -223,76 +214,19 @@ async def close_channel(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     return {"channel_id": channel_id, "closed": True}
 
 
-@handler("assistance.add_listener")
-async def add_listener(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"channel_id", "admin_account_id"} -- either party adds an Admin; deduplicated; the
-    other party is not informed. Fully audited and reported."""
-    ident = require_account(ctx)
-    channel_id = int_field(payload, "channel_id")
-    admin_id = int_field(payload, "admin_account_id")
-    channel = await _load_channel(ctx, channel_id)
-    if channel["closed_at"] is not None:
-        raise ProtocolError(ErrorCode.CONFLICT, "channel is closed")
-    listener = await ctx.engine.db.accounts.by_id(admin_id)
-    if listener is None or listener["role"] != "admin" or listener["status"] != "active":
-        raise ProtocolError(ErrorCode.INVALID, "a Listener must be an active Admin")
-    if admin_id in _channel_parties(channel):
-        raise ProtocolError(ErrorCode.INVALID, "a channel party cannot listen to their own channel")
-    inserted = await ctx.engine.db.assistance.add_listener(channel_id, admin_id, ident.account_id)
-    await ctx.engine.audit.record(ctx, "assistance.listener_added", target_type="listeners", target_id=admin_id,
-                                  detail={"channel_id": channel_id, "deduplicated": not inserted})
-    if inserted:
-        await reports.emit(ctx.engine, "listener_report", source_table="message_channels", source_id=channel_id,
-                           summary=f"listener added to channel #{channel_id}")
-        await ctx.engine.push_to_account(admin_id, "assistance.listening", {"channel_id": channel_id})
-    return {"channel_id": channel_id, "listener_account_id": admin_id, "added": inserted}
-
-
-@handler("assistance.listener_candidates")
-async def listener_candidates(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"channel_id"} -- who a party may add as a Listener: every active Admin in every department (the
-    design's "HR is listening"), except the channel's two parties and those the caller already added. Names are
-    the caller's own (display names never cross relationship layers)."""
-    ident = require_account(ctx)
-    channel_id = int_field(payload, "channel_id")
-    channel = await _load_channel(ctx, channel_id)
-    if ident.account_id not in _channel_parties(channel):
-        raise ProtocolError(ErrorCode.FORBIDDEN, "only the channel's two parties add Listeners")
-    db = ctx.engine.db
-    added = {l["listener_account_id"] for l in await db.assistance.listeners_added_by(channel_id, ident.account_id)}
-    found = [a for a in await db.accounts.active_admins() if a["id"] not in _channel_parties(channel) and a["id"] not in added]
-    names = await db.accounts.display_names_for(ident.account_id, [a["id"] for a in found])
-    return {"candidates": [{"account_id": a["id"], "name": names.get(a["id"]), "department_id": a["department_id"],
-                            "department_name": a["department_name"]} for a in found]}
-
-
-@handler("assistance.my_listeners")
-async def my_listeners(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Only the Listeners the caller added -- never the other party's."""
-    ident = require_account(ctx)
-    channel_id = int_field(payload, "channel_id")
-    await _load_channel(ctx, channel_id)
-    found = await ctx.engine.db.assistance.listeners_added_by(channel_id, ident.account_id)
-    names = await ctx.engine.db.accounts.display_names_for(ident.account_id, [l["listener_account_id"] for l in found])
-    out = rows(found)
-    for l in out:
-        l["name"] = names.get(l["listener_account_id"])
-    return {"listeners": out}
-
-
 @handler("assistance.channel")
 async def channel(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Channel state + messages for a party or a Listener."""
+    """Channel state + messages for a party."""
     ident = require_account(ctx)
     channel_id = int_field(payload, "channel_id")
-    ch = await _load_channel(ctx, channel_id, allow_listener=True)
+    ch = await _load_channel(ctx, channel_id)
     msgs = await ctx.engine.db.assistance.messages(channel_id)
     sub, sup = _channel_parties(ch)
     names = await ctx.engine.db.accounts.display_names_for(ident.account_id, [sub, sup])
     view = row({k: v for k, v in ch.items() if not k.startswith("_")}) or {}
     view["subordinate_account_id"] = sub
     view["names"] = {str(k): v for k, v in names.items()}
-    view["my_turn"] = ch["closed_at"] is None and not ch.get("_listener") and turn_of(ch) == ident.account_id
+    view["my_turn"] = ch["closed_at"] is None and turn_of(ch) == ident.account_id
     return {"channel": view, "messages": rows(msgs)}
 
 
