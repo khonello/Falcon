@@ -1,30 +1,14 @@
 import QtQuick
 import "."
 
-// DEPARTMENTS: everything about a department is here, on the right of the list; there is no separate
-// department page. The panel's one button is its next step: assign an Admin, enter its Admin's
-// console, or pick whose. Under both, the organisation's day.
+// DEPARTMENTS, AT THE SUPER USER'S LEVEL: the organisation as a card a department, each with who looks after it and how its machines and issues stand. A view, not a workbench: what
+// happens inside a department is its Admin's work, and the Super User gets there by entering the Admin's console. What is theirs to do here is the structure: make a department,
+// give it an Admin, and go into an Admin's console. (The tab beside this one holds what the Engine keeps for the Super User alone.)
 Page {
     id: page
     objectName: "departmentsView"
 
-    property var sel: Nav.sub !== null && Nav.sub !== undefined && !isNaN(Number(Nav.sub)) ? Number(Nav.sub) : null
-    property string isel: ""
-    property int per: 3
-    property int dayPage: 1
-    property string dayView: "Chart"
-    // how fast each department's reports are dealt with: the Engine's median minutes, from reports.board's handling
-    property var handled: ({})
-    function loadHandled() {
-        falcon.call("reports.board", { days: 30 }, function (ok, r) {
-            var h = {}
-            if (ok) (r.handling || []).forEach(function (x) { h[x.department_id] = x.median_minutes })
-            page.handled = h
-        })
-    }
-    Component.onCompleted: if (falcon.isConnected) loadHandled()
-    Connections { target: falcon; function onConnected() { page.loadHandled() } }
-
+    property var d: null                         // the department an Assign an Admin is for
     function rank(d) {
         var iss = Fleet.issues.filter(function (i) { return i.dept === d.id })
         return !d.admins.length ? 0 : iss.some(function (i) { return i.sev === "critical" }) ? 1 : iss.some(function (i) { return i.sev === "high" }) ? 3 : 4
@@ -35,134 +19,66 @@ Page {
                                crit: iss.filter(function (i) { return i.sev === "critical" }).length, high: iss.filter(function (i) { return i.sev === "high" }).length,
                                ok: d.machines.filter(function (m) { return !m.behind }).length, rank: page.rank(d) }, d)
     }).sort(function (a, b) { return a.rank - b.rank })
-    readonly property var rows: all.filter(function (d) { return (d.name + " " + d.admins.map(function (a) { return a.name }).join(" ")).toLowerCase().indexOf(list.query.toLowerCase()) >= 0 })
-    readonly property var d: { for (var i = 0; i < all.length; i++) if (all[i].id === sel) return all[i]; return rows.length ? rows[0] : null }
     readonly property int admins: Fleet.depts.reduce(function (a, x) { return a + x.admins.length }, 0)
     readonly property int off: Fleet.machines.filter(function (m) { return !m.online }).length
+    readonly property var markTone: ({ quiet: Theme.ok, watch: Theme.med, high: Theme.crit, crit: Theme.crit, offline: Theme.text4 })
+    function segsOf(d) {
+        var c = { quiet: 0, watch: 0, high: 0, crit: 0, offline: 0 }
+        d.machines.forEach(function (m) { c[Fleet.mark(m.status)] += 1 })
+        return [{ n: c.quiet, c: Theme.ok }, { n: c.watch, c: Theme.med }, { n: c.high + c.crit, c: Theme.crit }, { n: c.offline, c: Theme.text4 }]
+    }
+
+    // --- the head: one line, and the one thing to make -----------------------------------------------------------------------------------------------------------
+    Item {
+        width: parent.width
+        height: 34
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 18
+            Txt { text: Theme.many(Fleet.depts.length, "department"); font.weight: Font.DemiBold; elide: Text.ElideNone }
+            Txt { text: Theme.many(page.admins, "Admin"); color: Theme.text2; elide: Text.ElideNone }
+            Txt { text: Theme.fmt(Fleet.machines.length - page.off) + " of " + Theme.fmt(Fleet.machines.length) + " machines online"; color: page.off ? Theme.crit : Theme.text2; elide: Text.ElideNone }
+        }
+        Btn { objectName: "newDepartment"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; kind: "primary"; iconName: "plus"; text: "New department"; onClicked: newDept.open() }
+    }
 
     PageTabs { options: [{ value: "departments", label: "Departments" }, { value: "registry", label: "Refused connections" }]; current: "departments" }
 
-    Strip {
+    // --- a card a department -------------------------------------------------------------------------------------------------------------------------------------
+    Grid {
+        objectName: "deptCards"
         width: parent.width
-        items: [
-            { label: "Departments", value: Theme.fmt(Fleet.depts.length), delta: Theme.fmt(page.admins) + " Admins between them" },
-            { label: "Without an Admin", value: Theme.fmt(page.all.filter(function (x) { return !x.admins.length }).length),
-              delta: page.all.some(function (x) { return !x.admins.length }) ? "their reports come to you" : "every seat filled", dc: page.all.some(function (x) { return !x.admins.length }) ? Theme.crit : undefined },
-            { label: "Machines online", value: Theme.fmt(Fleet.machines.length - page.off), unit: "/ " + Theme.fmt(Fleet.machines.length), delta: page.off ? Theme.fmt(page.off) + " offline" : "all online" },
-            { label: "Open issues", value: Theme.fmt(Fleet.issues.length), delta: Fleet.issues.filter(function (i) { return i.sev === "critical" }).length + " critical",
-              dc: Fleet.issues.some(function (i) { return i.sev === "critical" }) ? Theme.crit : undefined }
-        ]
-    }
-
-    Row {
-        width: parent.width
-        spacing: 14
-        ListPanel {
-            id: list
-            width: (parent.width - 14) * 8 / 12
-            title: "Departments"
-            sub: "what needs you first · click one to see it on the right"
-            placeholder: "Filter by department or Admin"
-            actionLabel: "New department"
-            onAction: newDept.open()
-            rows: page.rows
-            pick: page.d ? page.d.id : null
-            onPicked: function (k) { page.sel = k; page.isel = "" }
-            icon: "apartment"
-            nameTitle: "Department"
-            nameText: function (r) { return r.name }
-            nameLine: function (r) { return Theme.many(r.machines.length, "machine") }
-            cols: [{ title: "Admins", text: function (r) { return r.admins.length ? Theme.listNames(r.admins.map(function (a) { return a.name })) : "None" } },
-                   { title: "Online", width: 150, bar: function (r) { return { v: r.online, max: Math.max(1, r.machines.length), text: r.online + "/" + r.machines.length } } },
-                   { title: "Open issues", width: 110, text: function (r) { return String(r.iss.length) } }]
-            now: function (r) { return !r.admins.length ? ["No Admin", "bad"] : r.crit ? [r.crit + " critical", "bad"] : r.high ? [r.high + " high", "bad"] : r.online < r.machines.length ? [(r.machines.length - r.online) + " offline", "wait"] : ["All well", "good"] }
-            showEmpty: Fleet.loaded && Fleet.depts.length === 0
-            emptyIcon: "apartment"
-            emptyTitle: "No departments yet"
-            emptyText: "Create a department, then give it an Admin and its machines."
-            emptyAct: "New department"
-            onEmptyAction: newDept.open()
-        }
-        SidePanel {
-            width: (parent.width - 14) * 4 / 12
-            showEmpty: page.d === null
-            emptyIcon: "apartment"
-            emptyText: "Pick a department in the list."
-            title: page.d ? page.d.name : ""
-            sub: page.d && page.sel === page.d.id ? "the one you picked" : "needs you most · click another"
-            facts: page.d ? [["Admins", !page.d.admins.length ? "None · its reports come to you" : Theme.listNames(page.d.admins.map(function (a) { return a.name })), !page.d.admins.length ? Theme.crit : null],
-                             ["Machines", page.d.online + " of " + page.d.machines.length + " online"],
-                             ["Open issues", page.d.iss.length ? page.d.iss.length + (page.d.crit ? " · " + page.d.crit + " critical" : "") : "None"],
-                             ["Reports handled in", page.handled[page.d.id] !== undefined && page.handled[page.d.id] !== null ? Time.mins(page.handled[page.d.id]) : "—"],
-                             ["On " + (Fleet.version || "current"), page.d.ok + " of " + page.d.machines.length]] : []
-            extra: Btn { visible: page.d !== null && page.d.admins.length > 1; small: true; iconName: "team"; text: "All " + (page.d ? page.d.admins.length : 0) + " Admins"; onClicked: admins.openFor(page.d, null) }
-            actions: [
-                Btn { visible: page.d !== null && !page.d.admins.length; kind: "primary"; iconName: "useradd"; text: "Assign an Admin"; onClicked: { assign.who = null; assign.open() } },
-                Btn { visible: page.d !== null && page.d.admins.length === 1; kind: "primary"; iconName: "login"; text: page.d && page.d.admins.length ? "Enter " + page.d.admins[0].name + "'s console →" : ""
-                      onClicked: Nav.enter(page.d.admins[0], null) },
-                Btn { visible: page.d !== null && page.d.admins.length > 1; kind: "primary"; iconName: "login"; text: "Enter a console…"; onClicked: admins.openFor(page.d, null) }
-            ]
-            Column {
-                width: parent.width
-                Txt { text: "WORST OPEN ISSUES"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; bottomPadding: 4 }
-                Txt { visible: page.d !== null && page.d.iss.length === 0; text: "Nothing open."; color: Theme.text3 }
-                Repeater {
-                    model: page.d ? page.d.iss.slice(0, 5) : []
-                    Column {
-                        required property var modelData
-                        readonly property bool on: page.isel === modelData.id
-                        width: parent.width
-                        Item {
-                            width: parent.width; height: 30
-                            Rectangle { width: 7; height: 7; radius: 4; color: Fleet.sevColor(modelData.sev); anchors.verticalCenter: parent.verticalCenter }
-                            Txt { x: 15; width: parent.width - 90; anchors.verticalCenter: parent.verticalCenter; text: modelData.title; font.pixelSize: 12; font.weight: parent.parent.on ? Font.Medium : Font.Normal }
-                            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: modelData.host; mono: true; color: Theme.text3; font.pixelSize: 11 }
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.isel = parent.parent.on ? "" : modelData.id }
-                        }
-                        Column {
-                            visible: parent.on
-                            x: 15; width: parent.width - 15; spacing: 3; bottomPadding: 8
-                            Txt { width: parent.width; font.pixelSize: 12; textFormat: Text.RichText; text: "<span style='color:" + Theme.text3 + "'>What </span>" + (modelData.subject || modelData.note) }
-                            Txt { width: parent.width; font.pixelSize: 12; textFormat: Text.RichText; text: "<span style='color:" + Theme.text3 + "'>Found </span>" + Time.atDay(modelData.at) + " · " + Fleet.sevWord(modelData.sev) }
-                            Link { font.pixelSize: 12
-                                   text: !page.d.admins.length ? "Decide it on Overview →" : page.d.admins.length === 1 ? "Handle it in " + page.d.admins[0].name + "'s console →" : "Handle it in an Admin's console…"
-                                   onClicked: !page.d.admins.length ? Nav.go("overview") : page.d.admins.length === 1 ? Nav.enter(page.d.admins[0], ["issues", modelData.id]) : admins.openFor(page.d, ["issues", modelData.id]) }
-                        }
-                        Rectangle { width: parent.width; height: 1; color: Theme.grid }
+        columns: 2
+        columnSpacing: 14
+        rowSpacing: 14
+        Repeater {
+            model: page.all
+            DeptCard {
+                required property var modelData
+                width: (page.w - 14) / 2
+                title: modelData.name
+                sub: modelData.admins.length ? Theme.listNames(modelData.admins.map(function (a) { return a.name })) : ""
+                noAdmin: modelData.admins.length === 0
+                segs: page.segsOf(modelData)
+                total: Theme.many(modelData.machines.length, "machine")
+                Column {
+                    width: parent.width
+                    DeptLine { dot: modelData.online < modelData.machines.length ? Theme.crit : Theme.ok; text: "Machines online"; aside: modelData.online + " of " + modelData.machines.length; asideTone: modelData.online < modelData.machines.length ? Theme.crit : Theme.text3 }
+                    DeptLine { dot: modelData.crit ? Theme.crit : modelData.high ? Theme.med : Theme.ok; text: "Open issues"; aside: modelData.iss.length ? modelData.iss.length + (modelData.crit ? " · " + modelData.crit + " critical" : "") : "none"
+                               asideTone: modelData.crit ? Theme.crit : Theme.text3 }
+                    DeptLine { dot: modelData.ok < modelData.machines.length ? Theme.med : Theme.ok; text: "On the current version"; aside: modelData.ok + " of " + modelData.machines.length }
+                    Item { width: 1; height: 8 }
+                    Row {
+                        spacing: 8
+                        Btn { visible: modelData.admins.length === 0; kind: "primary"; iconName: "useradd"; text: "Assign an Admin"; onClicked: { page.d = modelData; assign.who = null; assign.open() } }
+                        Btn { visible: modelData.admins.length === 1; kind: "primary"; iconName: "login"; text: "Enter " + (modelData.admins.length ? modelData.admins[0].name : "") + "'s console →"; onClicked: Nav.enter(modelData.admins[0], null) }
+                        Btn { visible: modelData.admins.length > 1; kind: "primary"; iconName: "login"; text: "Enter a console…"; onClicked: admins.openFor(modelData, null) }
                     }
                 }
             }
-            Column {
-                width: parent.width
-                spacing: 6
-                Txt { text: "MACHINES"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                Flow {
-                    width: parent.width
-                    spacing: 3
-                    Repeater { model: page.d ? page.d.machines.slice(0, 40) : []
-                               HealthMark { required property var modelData; k: Fleet.mark(modelData.status); size: 18 } }
-                    Txt { visible: page.d !== null && page.d.machines.length > 40; text: "+" + (page.d ? page.d.machines.length - 40 : 0); mono: true; color: Theme.text3; font.pixelSize: 11 }
-                }
-            }
         }
     }
-
-    Panel {
-        width: parent.width
-        title: "Machines in use today"
-        sub: "how many of each department's machines had someone on them, hour by hour · amber where an hour is unusual"
-        extra: [
-            Pager { compact: true; current: page.dayPage; pages: Math.max(1, Math.ceil(page.all.length / page.per)); total: page.all.length; size: page.per; what: "departments"; onGo: function (p) { page.dayPage = p } },
-            Select { visible: page.all.length > 3; width: 116; small: true; value: page.per; options: [3, 6, 10].map(function (n) { return { value: n, label: n + " at a time" } }); onPicked: function (v) { page.per = v; page.dayPage = 1 } },
-            Segmented { options: ["Chart", "Report"]; value: page.dayView; onPicked: function (v) { page.dayView = v } }
-        ]
-        DayLanes {
-            width: parent.width
-            report: page.dayView === "Report"
-            slots: Math.ceil(page.all.length / page.per) > 1 ? page.per : 0
-            rows: page.all.slice((page.dayPage - 1) * page.per, page.dayPage * page.per).map(function (d) { return { key: d.id, label: d.name, hosts: d.machines.map(function (m) { return m.host }), color: d.admins.length ? undefined : Theme.crit } })
-        }
-    }
+    Empty { visible: Fleet.loaded && Fleet.depts.length === 0; width: parent.width; h: 200; icon: "apartment"; title: "No departments yet"; text: "Create a department, then give it an Admin and its machines."; act: "New department"; onActed: newDept.open() }
 
     // --- the Admins of a department: whose console ---------------------------------------------------
     Drawer {

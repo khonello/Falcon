@@ -182,7 +182,10 @@ async def test_a_flow_shows_what_restricted_material_it_waits_for_or_carries_and
     page.setProperty("flows", [{"id": 9, "source_hostname": "FIN-01", "source_path": "C:/out", "status": "paused", "pause_reason": "restricted:consent", "consent_status": "not_required",
                                 "created_by_account_id": 2, "destinations": [{"id": 1, "destination_hostname": "FIN-02", "destination_path": "C:/in"}], "stages": [], "created_at": "2026-10-18T10:00:00Z"}])
     _pump(0.4)
-    assert prop(page, "cur")["st"][0].startswith("Waiting for consent")                              # the list says why it is not copying
+    QMetaObject.invokeMethod(page, "show", Q_ARG("QVariant", prop(page, "flows")[0]))
+    from PySide6.QtCore import Q_RETURN_ARG
+    said = QMetaObject.invokeMethod(page, "stateOf", Q_RETURN_ARG("QVariant"), Q_ARG("QVariant", prop(page, "flows")[0]))
+    assert said.toVariant()[0].startswith("Waiting for consent")                                                  # it says why it is not copying
     page.setProperty("consents", [{"id": 5, "name": "Payroll", "state": "granted", "expires_at": None}, {"id": 6, "name": "Board", "state": "asked"}])
     page.setProperty("canDecide", [5])
     _pump(0.4)

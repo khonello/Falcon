@@ -3741,41 +3741,89 @@ function GiveTask({ go }) {
     </div></section>`;
   return html`<${React.Fragment}>${modalCtx}<${EditorShell} ratio="minmax(0, 7fr) minmax(0, 5fr)" left=${left} right=${right} problem=${miss} note=${dd ? `Given to ${dd.name} as soon as you press it` : ""} onCancel=${cancel} saveLabel="Give it to them" onSave=${save} /><//>`;
 }
-function GivenToDepts({ go, open: open0 }) {
+// ---------------------------------------------------------------- the Super User sees the organisation by department, and does little (docs/design/pruning.md)
+// A card a department: who looks after it, a bar of how its things stand, a few lines. A card is always one height, so a row of them lines up.
+function DeptCard({ title, sub, noAdmin, segs, total, children }) {
+  const sum = segs.reduce((a, s) => a + s.n, 0);
+  return html`<div className="panel" style=${{ height: 252, padding: "14px 16px", overflow: "hidden", display: "flex", flexDirection: "column", gap: 4 }}>
+    <div className="row" style=${{ gap: 8, alignItems: "baseline", flexWrap: "nowrap" }}><b style=${{ fontSize: 15 }}>${title}</b><span className="t3">${total}</span></div>
+    <div style=${{ fontSize: 12, color: noAdmin ? "var(--crit)" : "var(--text-3)" }}>${noAdmin ? "No Admin" : sub}</div>
+    <div style=${{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "var(--surface-3)", margin: "8px 0" }}>${segs.map((s, i) => html`<span key=${i} style=${{ flex: sum ? s.n : 0, background: s.c }} />`)}</div>
+    ${children}</div>`;
+}
+const DLine = ({ c, t, r, rc, onClick }) => html`<div className="irow" role=${onClick ? "button" : null} tabIndex=${onClick ? "0" : null} style=${{ gridTemplateColumns: "8px minmax(0, 1fr) auto", padding: "7px 6px", borderBottom: "none", cursor: onClick ? "pointer" : "default" }} onClick=${onClick}>
+  <i style=${{ background: c }} /><span className="ttl">${t}</span><span style=${{ fontSize: 12, color: rc || "var(--text-3)", whiteSpace: "nowrap" }}>${r}</span></div>`;
+const DKey = ({ c, t }) => html`<span className="row" style=${{ gap: 6, flexWrap: "nowrap" }}><i style=${{ width: 8, height: 8, borderRadius: 2, background: c, display: "inline-block" }} /><span className="t2">${t}</span></span>`;
+// Tasks: what has been given to each department, and how far it has got. The Super User gives a task and calls one complete; nothing else.
+function GivenToDepts({ go }) {
   useDT();
-  // what a department task needs from you decides where it sits, as on the Admin's Tasks page
-  const DCAT = { verify: ["Ready to complete", "SafetyCertificateOutlined", "A department marked it done. Only you can complete it."], late: ["Late", "ClockCircleOutlined", "Past its deadline and not done."],
-    unseen: ["Not seen yet", "EyeInvisibleOutlined", "Nobody told has opened it."], track: ["Under way", "SyncOutlined", "Seen or ongoing, before its deadline."] };
-  const catOf = (t) => (taskState(t) === "done" ? "verify" : t.due < NOWH ? "late" : taskState(t) === "sent" ? "unseen" : "track");
-  const [f, setF] = useState(null);
-  const open = DEPT_TASKS.filter((t) => !t.complete).sort((a, b) => Object.keys(DCAT).indexOf(catOf(a)) - Object.keys(DCAT).indexOf(catOf(b)) || a.due - b.due);
-  const dtasks = open.filter((t) => !f || catOf(t) === f);
-  const [pick, setPick0] = useState(open0 || null);
-  const setPick = (id) => { setPick0(id); keepOpen("tasks", id); };
-  const [tq, setTq] = useState("");
-  const wpg = usePaged(dtasks, 6, f);
-  const waiting = open.filter((t) => catOf(t) === "verify");
-  const setSel = (id) => { WORK_PRESET = id; go("overview"); };
-  const state = (t) => { const stt = taskState(t), adm = Object.keys(t.st), who = adm.filter((x) => t.st[x] === stt), seen = adm.filter((x) => t.st[x] !== "sent").length;
-    return stt === "done" ? [`Done · ${who[0]}`, "var(--ok)"] : stt === "ongoing" ? [`Ongoing · ${who.join(", ")}`, "var(--med)"] : stt === "seen" ? [`Seen by ${seen} of ${adm.length}`, "var(--accent)"] : [`Not seen · ${adm.length} told`, "var(--text-3)"]; };
+  const [cur, setCur] = useState(null), [note, setNote] = useState("");
+  const cat = (t) => (taskState(t) === "done" ? "verify" : t.due < NOWH ? "late" : taskState(t) === "sent" ? "unseen" : "track");
+  const tone = { verify: "var(--accent)", late: "var(--crit)", unseen: "var(--text-4)", track: "var(--ok)" }, order = ["verify", "late", "unseen", "track"];
+  const open = DEPT_TASKS.filter((t) => !t.complete), ready = open.filter((t) => cat(t) === "verify").length, late = open.filter((t) => cat(t) === "late").length;
+  const mine = (id) => open.filter((t) => t.dept === id).sort((a, b) => order.indexOf(cat(a)) - order.indexOf(cat(b)) || a.due - b.due);
+  const aside = (t) => { const k = cat(t); return k === "verify" ? "Done · yours to close" : k === "late" ? dueText(t.due) : taskState(t) === "ongoing" ? "Ongoing" : taskState(t) === "seen" ? "Seen" : "Not seen"; };
+  const t0 = cur ? DEPT_TASKS.find((x) => x.id === cur) : null, d0 = t0 ? (FULL.DEPTS || DEPTS).find((x) => x.id === t0.dept) : null;
   return html`<${React.Fragment}>
-    <${Strip} on=${f} onPick=${setF} items=${Object.entries(DCAT).map(([k, [w]]) => { const n = open.filter((t) => catOf(t) === k).length;
-      return { key: k, label: w, value: fmt(n), delta: k === "late" && n ? "past the deadline" : k === "verify" && n ? "only you can complete" : "", dc: k === "late" && n ? "var(--crit)" : undefined }; })} />
-    <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title=${f ? DCAT[f][0] : "Given to departments"} sub=${f ? html`<span>${fmt(dtasks.length)} · <a onClick=${() => setF(null)}>show all ${fmt(open.length)}</a></span>` : "most urgent first · click one to see it on the right"}
-        q=${tq} setQ=${setTq} placeholder="Filter by task or department" action=${{ label: "New task", onClick: () => go("tasks", "new") }} pick=${pick} onPick=${setPick} rowKey="id"
-        rows=${dtasks.map((t) => ({ ...t, dn: ((FULL.DEPTS || DEPTS).find((x) => x.id === t.dept) || { name: t.dept }).name })).filter((t) => `${t.title} ${t.dn} ${t.id}`.toLowerCase().includes(tq.toLowerCase()))}
-        icon="CheckSquareOutlined" name=${{ title: "Task", text: (r) => r.title, line: (r) => `${r.id} · ${r.dn}` }}
-        cols=${[{ title: "Told", text: (r) => listNames(Object.keys(r.st)) },
-          { title: "Deadline", width: 150, bar: (r) => ({ v: Math.max(0, Math.min(1, (NOWH - r.at) / Math.max(1, r.due - r.at))), max: 1, text: dueText(r.due) }) }]}
-        now=${(r) => { const k = catOf(r); return k === "verify" ? ["Ready to complete", "good"] : k === "late" ? ["Past its deadline", "bad"] : k === "unseen" ? ["Not seen yet", "wait"] : ["Under way", "good"]; }}
-        empty=${!open.length ? html`<${Empty} icon="CheckSquareOutlined" title="Nothing given to a department" text="A task goes to a department's Admins. They say how far it has got; only you call it complete." act="New task" onAct=${() => go("tasks", "new")} h=${200} />` : null} />
-      ${(() => { const t = dtasks.find((x) => x.id === pick) || dtasks[0]; return t ? html`<${TaskBoard} key=${"s" + t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="side" />`
-        : html`<${SidePanel} empty=${html`<${Empty} icon="CheckSquareOutlined" title="Nothing given" text="Give a department a task; it shows here when you pick it." h=${200} />`} />`; })()}
-    </div>
-    ${(() => { const t = dtasks.find((x) => x.id === pick) || dtasks[0]; return t ? html`<${TaskBoard} key=${t.id} t=${t} picked=${pick === t.id} onDone=${() => setPick(null)} part="chart" />` : null; })()}
+    <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}>
+      <div className="row" style=${{ gap: 18 }}><b>${fmt(open.length)} open</b>${ready ? html`<${DKey} c="var(--accent)" t=${`${ready} done, yours to close`} />` : null}${late ? html`<${DKey} c="var(--crit)" t=${`${late} past their date`} />` : null}<${DKey} c="var(--ok)" t="under way" /><${DKey} c="var(--text-4)" t="not seen" /></div>
+      <${Button} type="primary" icon=${ic("PlusOutlined")} onClick=${() => go("tasks", "new")}>Give a task<//></div>
+    <div style=${{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>${(FULL.DEPTS || DEPTS).map((d) => { const m = mine(d.id);
+      return html`<${DeptCard} key=${d.id} title=${d.name} sub=${listNames(d.admins)} noAdmin=${!d.admins.length} total=${m.length ? `${m.length} open` : ""} segs=${order.map((k) => ({ n: m.filter((t) => cat(t) === k).length, c: tone[k] }))}>
+        ${m.slice(0, 4).map((t) => html`<${DLine} key=${t.id} c=${tone[cat(t)]} t=${t.title} r=${aside(t)} rc=${cat(t) === "late" ? "var(--crit)" : cat(t) === "verify" ? "var(--accent)" : null} onClick=${() => { setNote(""); setCur(t.id); }} />`)}
+        ${m.length > 4 ? html`<div style=${{ padding: "4px 6px" }}><${More} n=${m.length - 4} what="tasks" onClick=${() => setCur(m[4].id)} /></div>` : null}
+        ${!m.length ? html`<div className="t3" style=${{ fontSize: 12, textAlign: "center", padding: "24px 0" }}>${d.admins.length ? "Nothing given to this department" : "No Admin to take a task"}</div>` : null}<//>`; })}</div>
+    <${Drawer} open=${!!t0} onClose=${() => setCur(null)} width=${460} title=${t0 ? t0.title : ""}>
+      ${t0 ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>${[["Department", d0.name], ["Told", listNames(Object.keys(t0.st))], ["Given", atDay(t0.at)], ["Deadline", `${atDay(t0.due)} · ${dueText(t0.due)}`], ["Where it stands", DSTATE[taskState(t0)][0]]].map(([k, v]) => html`<div key=${k} className="kv" style=${{ gridTemplateColumns: "110px minmax(0, 1fr)" }}><span className="t3">${k}</span><span>${v}</span></div>`)}</div>
+        ${taskState(t0) === "done" ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 8 }}><div className="nt-h">Your decision</div><div className="t2" style=${{ fontSize: 12.5 }}>${d0.name} marked it done. Only you can complete it.</div>
+          <${Input} size="small" value=${note} onChange=${(e) => setNote(e.target.value)} placeholder="A note for them, if you send it back" />
+          <div className="row" style=${{ flexWrap: "nowrap" }}><${Button} block disabled=${!note.trim()} onClick=${() => { dtChange(() => { t0.st = Object.fromEntries(Object.entries(t0.st).map(([a, v]) => [a, v === "done" ? "ongoing" : v])); }); toast(`Sent back to ${d0.name} as ongoing (concept)`); setCur(null); }}>Not done yet<//>
+            <${Button} block type="primary" onClick=${() => { dtChange(() => { t0.complete = true; }); toast("Marked complete, with your name and the time (concept)"); setCur(null); }}>Complete<//></div></div>`
+          : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nobody has marked it done yet.</div>`}
+        <div><div className="nt-h">How far each Admin has got</div>${Object.keys(t0.st).map((a) => html`<div key=${a} className="row" style=${{ gap: 8, padding: "2px 0" }}><i style=${{ width: 8, height: 8, borderRadius: 2, background: DSTATE[t0.st[a]][1], display: "inline-block" }} /><span className="t2">${a} · ${DSTATE[t0.st[a]][0]}</span></div>`)}</div>
+      </div>` : null}
+    <//>
   <//>`;
 }
+// Flows: every flow, by the department it starts in. Making and mending a flow is the department's Admin's work; the Super User answers a flow asking to carry something they marked.
+function FlowsOrg({ go }) {
+  const [rc, setRc] = useState("asked"), [cur, setCur] = useState(null);
+  const kind = (f) => (f.st === "Active" ? "act" : f.st === "Waiting for a folder" ? "wait" : "deg");
+  const tone = { act: "var(--ok)", wait: "var(--accent)", deg: "var(--med)" }, word = { act: "Copying", wait: "Waiting for a yes", deg: "Held up" }, order = { deg: 0, wait: 1, act: 2 };
+  const deptOf = (f) => (MBY[f.srcs[0][0]] || {}).dept || null;
+  const path = (f) => `${f.srcs.map((x) => x[0]).join(" + ")} → ${[...new Set(f.dests.map((d) => (askOf(d) ? askOf(d) + " picks" : d[0])))].join(", ")}`;
+  const depts = FULL.DEPTS || DEPTS, mine = (id) => EXISTING_FLOWS.filter((f) => deptOf(f) === id).sort((a, b) => order[kind(a)] - order[kind(b)]);
+  const other = EXISTING_FLOWS.filter((f) => !depts.some((d) => d.id === deptOf(f)));
+  const n = (k) => EXISTING_FLOWS.filter((f) => kind(f) === k).length, f0 = cur ? FBY[cur] : null, ds = f0 ? depts.find((d) => d.id === deptOf(f0)) : null;
+  return html`<${React.Fragment}>
+    ${rc !== "back" ? html`<div className="askbar" role="status" style=${{ borderColor: "var(--med)" }}>
+        <span style=${{ color: "var(--med)", flex: "none" }}>${ic("LockOutlined")}</span>
+        <span className="askbar-t"><b style=${{ fontWeight: 600 }}>Flow payroll-pdf</b> wants to carry <b style=${{ fontWeight: 600 }}>Payroll</b>, which is restricted <span className="t3">· from <span className="mono">FIN-01 /payroll/</span>. Nothing moves until you say so.</span></span>
+        ${rc === "asked" ? html`<${Button} size="small" onClick=${() => { setRc("kept"); toast("Kept paused (concept)"); }}>Keep it paused<//><${Button} size="small" type="primary" onClick=${() => { setRc("allowed"); toast("Allowed · its destination folders become a place this content may be, until you take it back (concept)"); }}>Allow this flow<//>`
+          : html`<span className="st" style=${{ "--c": rc === "allowed" ? "var(--ok)" : "var(--text-4)", flex: "none" }}><i />${rc === "allowed" ? "Allowed · the flow goes on" : "Kept paused"}</span>${rc === "allowed" ? html`<${Button} size="small" danger onClick=${() => { setRc("back"); toast("Taken back · the flow stops (concept)"); }}>Take back<//>` : null}<${Button} size="small" type="text" onClick=${() => setRc("asked")}>Undo<//>`}
+      </div>` : null}
+    <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}>
+      <div className="row" style=${{ gap: 18 }}><b>${EXISTING_FLOWS.length} flows</b><${DKey} c="var(--ok)" t=${`${n("act")} copying`} />${n("wait") ? html`<${DKey} c="var(--accent)" t=${`${n("wait")} waiting for a yes`} />` : null}${n("deg") ? html`<${DKey} c="var(--med)" t=${`${n("deg")} held up`} />` : null}</div>
+      <span className="t3" style=${{ fontSize: 12 }}>Flows are made and mended in the department's own console</span></div>
+    <div style=${{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>${depts.map((d) => { const m = mine(d.id);
+      return html`<${DeptCard} key=${d.id} title=${d.name} sub=${listNames(d.admins)} noAdmin=${!d.admins.length} total=${m.length ? `${m.length} flow${m.length === 1 ? "" : "s"}` : ""} segs=${["act", "wait", "deg"].map((k) => ({ n: m.filter((f) => kind(f) === k).length, c: tone[k] }))}>
+        ${m.slice(0, 4).map((f) => html`<${DLine} key=${f.name} c=${tone[kind(f)]} t=${path(f)} r=${word[kind(f)]} rc=${kind(f) === "deg" ? "var(--med)" : null} onClick=${() => setCur(f.name)} />`)}
+        ${m.length > 4 ? html`<div style=${{ padding: "4px 6px" }}><${More} n=${m.length - 4} what="flows" onClick=${() => setCur(m[4].name)} /></div>` : null}
+        ${!m.length ? html`<div className="t3" style=${{ fontSize: 12, textAlign: "center", padding: "24px 0" }}>No flow starts here</div>` : null}<//>`; })}
+      ${other.length ? html`<${DeptCard} title="Head office" sub="flows that start on an Admin's workstation" segs=${["act", "wait", "deg"].map((k) => ({ n: other.filter((f) => kind(f) === k).length, c: tone[k] }))} total=${`${other.length} flow${other.length === 1 ? "" : "s"}`}>
+        ${other.slice(0, 4).map((f) => html`<${DLine} key=${f.name} c=${tone[kind(f)]} t=${path(f)} r=${word[kind(f)]} onClick=${() => setCur(f.name)} />`)}<//>` : null}</div>
+    <${Drawer} open=${!!f0} onClose=${() => setCur(null)} width=${460} title=${f0 ? f0.name : ""}>
+      ${f0 ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>${[["Made by", f0.by === "Super User" ? "You" : f0.by], ["Now", word[kind(f0)]], ["From", f0.srcs.map((x) => x.join(" ")).join("\n")], ["To", f0.dests.map((d) => (askOf(d) ? askOf(d) + " picks a folder" : d.join(" "))).join("\n")], ["Along the way", f0.stages.length ? f0.stages.map((x) => x.op).join(", ") : "Copied as they are"]]
+          .map(([k, v]) => html`<div key=${k} className="kv" style=${{ gridTemplateColumns: "100px minmax(0, 1fr)" }}><span className="t3">${k}</span><span className=${k === "From" || k === "To" ? "mono" : ""} style=${{ whiteSpace: "pre-line", fontSize: k === "From" || k === "To" ? 12.5 : undefined }}>${v}</span></div>`)}</div>
+        ${f0.name === "payroll-pdf" && rc !== "asked" ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 6 }}><div className="nt-h">Restricted material</div><div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}><span>Payroll · ${rc === "allowed" ? "allowed" : rc === "kept" ? "declined" : "taken back"}</span>${rc === "allowed" ? html`<${Button} size="small" danger onClick=${() => { setRc("back"); toast("Taken back · the flow stops (concept)"); }}>Take back<//>` : null}</div></div>` : null}
+        ${ds && ds.admins.length ? html`<div><${Button} icon=${ic("LoginOutlined")} onClick=${() => { setCur(null); toast(`Opens in ${ds.admins[0]}'s console, after asking to block or end their session (concept)`); }}>Open in ${ds.admins[0]}'s console →<//></div>` : null}
+      </div>` : null}
+    <//>
+  <//>`;
+}
+// Departments: the structure, as a card a department. The Super User makes a department, gives it an Admin, and goes into an Admin's console; what happens inside is the Admin's.
 const LIST_ROWS = 6, LIST_H = 452;
 // The standard list container (decided 6 Oct 2026, docs/design/super-user-menu.md). Use it wherever a page's main
 // job is a list of things you open: one framed panel with a title and a short subtitle; a search box and the one
@@ -4677,92 +4725,36 @@ function AuditSU({ range, go, open, me }) {
 
 // Departments: everything about a department is here, on the right of the list; there is no separate department page.
 // The panel's one button is the department's next step: assign an Admin, enter its Admin's console, or pick whose.
-function DepartmentsPage({ go, enter, open }) {
-  const [sel, setSel] = useOpen("departments", open);
-  // the Admins drawer: which department, and where entering should land (an issue picked below, or the Overview)
-  const [adm, setAdm] = useState(null), [aq, setAq] = useState("");
-  const [asg, setAsg] = useState(null), [who, setWho] = useState(undefined);   // the Assign an Admin drawer
-  // an issue opened from elsewhere arrives open in its department's Worst open issues
-  const [isel, setIsel] = useState(() => { const p0 = DEPT_ISSUE_PRESET; DEPT_ISSUE_PRESET = null; return p0; });
-  const [q, setQ] = useState("");
+// Departments: the structure, as a card a department. The Super User makes a department, gives it an Admin, and goes into an Admin's console; what happens inside is the Admin's.
+function DepartmentsPage({ go, enter }) {
+  const [asg, setAsg] = useState(null), [who, setWho] = useState(undefined), [adm, setAdm] = useState(null);
   const depts = FULL_DEPTS(), off = MACHINES.filter((m) => m.status === "offline").length;
+  const rank = (d) => { const iss = ISSUES.filter((i) => MBY[i.host] && MBY[i.host].dept === d.id); return !d.admins.length ? 0 : iss.some((i) => i.sev === "critical") ? 1 : iss.some((i) => i.sev === "high") ? 3 : 4; };
   const all = depts.map((d) => { const ms = MACHINES.filter((m) => m.dept === d.id), iss = ISSUES.filter((i) => MBY[i.host] && MBY[i.host].dept === d.id);
-    return { ...d, ms, iss, online: ms.filter((m) => m.status !== "offline").length, crit: iss.filter((i) => i.sev === "critical").length, high: iss.filter((i) => i.sev === "high").length, ok: ms.filter((m) => m.ver === "1.4.2").length, rank: deptRank(d) }; })
-    .sort((a, b) => a.rank - b.rank);
-  const rows = all.filter((d) => `${d.name} ${d.admins.join(" ")}`.toLowerCase().includes(q.toLowerCase()));
-  const admins = Object.entries(ADMIN_INFO).filter(([, a]) => depts.some((d) => d.id === a.dept));
-  const d = rows.find((x) => x.id === sel) || (sel ? all.find((x) => x.id === sel) : null) || rows[0], st = d ? deptStats(d) : null;
-  // worst first; an issue that arrived picked is shown even if it is not among the worst five
-  const worst = d ? (() => { const w = d.iss.slice().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]).slice(0, 5), it0 = d.iss.find((i) => i.id === isel);
-    return it0 && !w.includes(it0) ? [it0, ...w.slice(0, 4)] : w; })() : [];
-  const issueActs = (i) => { const mineCopy = i.type === "file" && (markOf(i) || {}).by === "Super User", to = { page: "issues", sub: i.id };
-    return mineCopy ? html`<a onClick=${() => go("issues", i.id)}>Deal with it on Restricted →</a>`
-      : !d.admins.length ? html`<a onClick=${() => go("overview")}>Decide it on Overview →</a>`
-      : d.admins.length === 1 ? html`<a onClick=${() => enter(d.admins[0], to)}>Handle it in ${d.admins[0]}'s console →</a>`
-      : html`<a onClick=${() => setAdm({ id: d.id, to })}>Handle it in an Admin's console…</a>`; };
-  const main = !d ? null : !d.admins.length ? html`<${Button} type="primary" icon=${ic("UserAddOutlined")} onClick=${() => { setWho(undefined); setAsg(d.id); }}>Assign an Admin<//>`
-    : d.admins.length === 1 ? html`<${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(d.admins[0])}>Enter ${d.admins[0]}'s console →<//>`
-    : html`<${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => setAdm({ id: d.id })}>Enter a console…<//>`;
+    return { ...d, ms, iss, online: ms.filter((m) => m.status !== "offline").length, crit: iss.filter((i) => i.sev === "critical").length, high: iss.filter((i) => i.sev === "high").length, ok: ms.filter((m) => m.ver === "1.4.2").length, rank: rank(d) }; }).sort((a, b) => a.rank - b.rank);
+  const segs = (d) => { const c = { quiet: 0, watch: 0, crit: 0, offline: 0 }; d.ms.forEach((m) => { const k = HEALTH[m.status][0]; c[k === "high" ? "crit" : k] += 1; });
+    return [{ n: c.quiet, c: "var(--ok)" }, { n: c.watch, c: "var(--med)" }, { n: c.crit, c: "var(--crit)" }, { n: c.offline, c: "var(--text-4)" }]; };
+  const dd = asg ? all.find((x) => x.id === asg) : null, pool = dd ? dd.ms.filter((m) => m.user).map((m) => ({ value: m.user + " (promote)", label: `${m.user} · works on ${m.host}, promote to Admin` })) : [];
+  const ad = adm ? all.find((x) => x.id === adm) : null;
   return html`<${React.Fragment}>
-    <${Strip} items=${[
-      { label: "Departments", value: fmt(depts.length), delta: `${fmt(admins.length)} Admins between them` },
-      { label: "Without an Admin", value: fmt(all.filter((x) => !x.admins.length).length), delta: all.some((x) => !x.admins.length) ? "their reports come to you" : "every seat filled", dc: all.some((x) => !x.admins.length) ? "var(--crit)" : undefined },
-      { label: "Machines online", value: fmt(MACHINES.length - off), unit: "/ " + fmt(MACHINES.length), delta: off ? `${fmt(off)} offline` : "all online" },
-      { label: "Open issues", value: fmt(ISSUES.length), delta: `${ISSUES.filter((i) => i.sev === "critical").length} critical`, dc: ISSUES.some((i) => i.sev === "critical") ? "var(--crit)" : undefined }]} />
-    <div className="g c-84" style=${{ alignItems: "start" }}>
-      <${ListPanel} title="Departments" sub="what needs you first · click one to see it on the right" q=${q} setQ=${setQ} placeholder="Filter by department or Admin"
-        action=${{ label: "New department", onClick: () => toast("New department (concept)") }} pick=${d ? d.id : null} onPick=${(id) => { setSel(id); setIsel(null); }} rowKey="id" rows=${rows}
-        icon="ApartmentOutlined" name=${{ title: "Department", text: (r) => r.name, line: (r) => `${fmt(r.ms.length)} machine${r.ms.length === 1 ? "" : "s"}` }}
-        cols=${[{ title: "Admins", text: (r) => (r.admins.length ? listNames(r.admins) : "None") },
-          { title: "Online", width: 150, bar: (r) => ({ v: r.online, max: Math.max(1, r.ms.length), text: `${fmt(r.online)}/${fmt(r.ms.length)}` }) },
-          { title: "Open issues", width: 110, text: (r) => fmt(r.iss.length) }]}
-        now=${(r) => (!r.admins.length ? ["No Admin", "bad"] : r.crit ? [`${r.crit} critical`, "bad"] : r.high ? [`${r.high} high`, "bad"] : r.online < r.ms.length ? [`${r.ms.length - r.online} offline`, "wait"] : ["All well", "good"])}
-        empty=${!depts.length ? html`<${Empty} icon="ApartmentOutlined" title="No departments yet" text="Create a department, then give it an Admin and its machines." act="New department" onAct=${() => toast("New department (concept)")} h=${200} />` : null} />
-      ${d ? html`<${SidePanel} title=${d.name} sub=${sel ? "the one you picked" : "needs you most · click another"}
-        facts=${[["Admins", !d.admins.length ? html`<span style=${{ color: "var(--crit)" }}>None · its reports come to you</span>`
-            : d.admins.length === 1 ? d.admins[0]
-            : html`<div className="row" style=${{ flexWrap: "nowrap", gap: 10 }}><span className="cut" style=${{ minWidth: 0, flex: "0 1 auto" }} title=${d.admins[0]}>${d.admins[0]}</span>
-                <${Button} size="small" style=${{ flex: "none" }} icon=${ic("TeamOutlined")} onClick=${() => setAdm({ id: d.id })}>All ${fmt(d.admins.length)} Admins<//></div>`],
-          ["Machines", `${fmt(d.online)} of ${fmt(d.ms.length)} online`],
-          ["Open issues", d.iss.length ? `${fmt(d.iss.length)}${d.crit ? ` · ${d.crit} critical` : ""}` : "None"], ["Reports handled in", st.mtta || "—"], ["On 1.4.2", `${fmt(d.ok)} of ${fmt(d.ms.length)}`]]}
-        actions=${main}>
-        <div><div className="nt-h">Worst open issues</div>${worst.length ? worst.map((i) => { const on = isel === i.id;
-          return html`<div key=${i.id} style=${{ borderBottom: "1px solid var(--grid)" }}>
-            <div className="row" role="button" tabIndex="0" onClick=${() => setIsel(on ? null : i.id)} onKeyDown=${(e) => e.key === "Enter" && setIsel(on ? null : i.id)}
-              style=${{ flexWrap: "nowrap", gap: 8, padding: "6px 0", fontSize: 12.5, cursor: "pointer" }}>
-              <i style=${{ width: 7, height: 7, borderRadius: "50%", flex: "none", background: SEV[i.sev].c }} /><span className="cut" style=${{ flex: 1, fontWeight: on ? 500 : 400 }}>${i.title}</span><span className="mono t3" style=${{ fontSize: 11.5 }}>${i.host}</span></div>
-            ${on ? html`<div style=${{ padding: "0 0 10px 15px", fontSize: 12.5, display: "flex", flexDirection: "column", gap: 3 }}>
-              <div><span className="t3">What </span>${i.subject}</div><div><span className="t3">Found </span>${devWhen(i.at)} · ${SEV[i.sev].w}</div>
-              <div style=${{ marginTop: 3 }}>${issueActs(i)}</div></div>` : null}</div>`; }) : html`<div className="t3">Nothing open.</div>`}</div>
-        <div><div className="nt-h">Machines</div><${MiniTiles} ms=${d.ms} go=${go} /></div>
-      <//>` : html`<${SidePanel} empty=${html`<${Empty} icon="ApartmentOutlined" title="Nothing picked" text="Pick a department in the list." h=${200} />`} />`}
-    </div>
-    ${(() => { const dd = adm ? all.find((x) => x.id === adm.id) : null; const list = dd ? dd.admins.filter((a) => a.toLowerCase().includes(aq.toLowerCase())) : [];
-      const shut = () => { setAdm(null); setAq(""); };
-      return html`<${Drawer} open=${!!dd} onClose=${shut} width=${440} title=${dd ? (adm.to ? `Whose console · ${dd.name}` : `Admins · ${dd.name}`) : ""}>
-        ${dd ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="t3" style=${{ fontSize: 12.5 }}>${fmt(dd.admins.length)} Admin${dd.admins.length === 1 ? "" : "s"}.${adm.to ? " The issue opens in the console you enter." : ""} Entering one's console asks first to block or end their session.</div>
-          ${dd.admins.length > 6 ? html`<${Input} allowClear placeholder="Find an Admin" prefix=${ic("SearchOutlined")} value=${aq} onChange=${(e) => setAq(e.target.value)} />` : null}
-          <div>${list.map((a) => { const info = ADMIN_INFO[a] || {}; return html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--grid)" }}>
-            <span style=${{ position: "relative", flex: "none" }}><span className="av" style=${{ width: 30, height: 30, fontSize: 11 }}>${initials(a)}</span>
-              <i style=${{ position: "absolute", right: -1, bottom: -1, width: 9, height: 9, borderRadius: "50%", background: info.busy ? "var(--s3)" : "var(--ok)", boxShadow: "0 0 0 2px var(--surface)" }} /></span>
-            <span style=${{ minWidth: 0, flex: 1 }}><span className="cut" style=${{ display: "block", fontWeight: 500 }} title=${a}>${a}</span>
-              <span className="t3 cut" style=${{ display: "block", fontSize: 12 }}>${info.busy ? info.now.replace(/^Inside/, "inside").replace(/ since.*$/, "") : "at their desk"}${info.ws ? " · " + info.ws : ""}</span></span>
-            <${Button} size="small" onClick=${() => { const to = adm.to; shut(); enter(a, to); }}>Enter →<//></div>`; })}
-            ${!list.length ? html`<div className="t3" style=${{ padding: "10px 0" }}>No Admin by that name.</div>` : null}</div>
-        </div>` : null}
-      <//>`; })()}
-    ${(() => { const dd = asg ? all.find((x) => x.id === asg) : null;
-      // An Admin belongs to one department (decided 9 Oct 2026): only this department's workers can be promoted.
-      const pool = dd ? dd.ms.filter((m) => m.user).map((m) => ({ value: m.user + " (promote)", label: `${m.user} · works on ${m.host}, promote to Admin` })) : [];
-      return html`<${Drawer} open=${!!dd} onClose=${() => setAsg(null)} width=${420} title=${dd ? `Assign an Admin · ${dd.name}` : ""}
-        footer=${dd ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setAsg(null)}>Cancel<//><${Button} type="primary" disabled=${!who} onClick=${() => { setAsg(null); toast(`${who.replace(" (promote)", "")} is ${dd.name}'s Admin · its reports start reaching them once routed (concept)`); }}>Assign<//></div>` : null}>
-        ${dd ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div><div className="nt-h">Who</div><${Select} id="asg-who" showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Pick someone" value=${who} onChange=${setWho} options=${pool} /></div>
-          <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>Until ${dd.name} has an Admin, everything from it comes to you: its reports, stuck updates and help requests. Promoting one of its workers gives them a console and a key, shown once; an Admin belongs to one department.</div>
-        </div>` : null}
-      <//>`; })()}
-    <${OrgDay} go=${go} />
+    <div className="row" style=${{ justifyContent: "space-between", flexWrap: "nowrap" }}>
+      <div className="row" style=${{ gap: 18 }}><b>${depts.length} department${depts.length === 1 ? "" : "s"}</b><span className="t2">${Object.keys(ADMIN_INFO).filter((a) => depts.some((d) => d.id === ADMIN_INFO[a].dept)).length} Admins</span><span style=${{ color: off ? "var(--crit)" : "var(--text-2)" }}>${MACHINES.length - off} of ${MACHINES.length} machines online</span></div>
+      <${Button} type="primary" icon=${ic("PlusOutlined")} onClick=${() => toast("New department (concept)")}>New department<//></div>
+    <div style=${{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>${all.map((d) => html`<${DeptCard} key=${d.id} title=${d.name} sub=${listNames(d.admins)} noAdmin=${!d.admins.length} total=${`${d.ms.length} machine${d.ms.length === 1 ? "" : "s"}`} segs=${segs(d)}>
+      <${DLine} c=${d.online < d.ms.length ? "var(--crit)" : "var(--ok)"} t="Machines online" r=${`${d.online} of ${d.ms.length}`} rc=${d.online < d.ms.length ? "var(--crit)" : null} />
+      <${DLine} c=${d.crit ? "var(--crit)" : d.high ? "var(--med)" : "var(--ok)"} t="Open issues" r=${d.iss.length ? `${d.iss.length}${d.crit ? ` · ${d.crit} critical` : ""}` : "none"} rc=${d.crit ? "var(--crit)" : null} />
+      <${DLine} c=${d.ok < d.ms.length ? "var(--med)" : "var(--ok)"} t="On the current version" r=${`${d.ok} of ${d.ms.length}`} />
+      <div className="row" style=${{ marginTop: 8 }}>${!d.admins.length ? html`<${Button} type="primary" icon=${ic("UserAddOutlined")} onClick=${() => { setWho(undefined); setAsg(d.id); }}>Assign an Admin<//>`
+        : d.admins.length === 1 ? html`<${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => enter(d.admins[0])}>Enter ${d.admins[0]}'s console →<//>`
+        : html`<${Button} type="primary" icon=${ic("LoginOutlined")} onClick=${() => setAdm(d.id)}>Enter a console…<//>`}</div><//>`)}</div>
+    <${Drawer} open=${!!ad} onClose=${() => setAdm(null)} width=${440} title=${ad ? `Admins · ${ad.name}` : ""}>
+      ${ad ? html`<div><div className="t3" style=${{ fontSize: 12.5, marginBottom: 8 }}>${ad.admins.length} Admins. Entering one's console asks first to block or end their session.</div>${ad.admins.map((a) => html`<div key=${a} className="row" style=${{ flexWrap: "nowrap", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--grid)" }}><span className="av">${initials(a)}</span><span style=${{ flex: 1 }}>${a}</span><${Button} size="small" onClick=${() => { setAdm(null); enter(a); }}>Enter →<//></div>`)}</div>` : null}
+    <//>
+    <${Drawer} open=${!!dd} onClose=${() => setAsg(null)} width=${420} title=${dd ? `Assign an Admin · ${dd.name}` : ""}
+      footer=${dd ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${() => setAsg(null)}>Cancel<//><${Button} type="primary" disabled=${!who} onClick=${() => { setAsg(null); toast(`${who.replace(" (promote)", "")} is ${dd.name}'s Admin (concept)`); }}>Assign<//></div>` : null}>
+      ${dd ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 14 }}><div><div className="nt-h">Who</div><${Select} showSearch optionFilterProp="label" style=${{ width: "100%" }} placeholder="Pick someone" value=${who} onChange=${setWho} options=${pool} /></div>
+        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>Until ${dd.name} has an Admin, everything from it comes to you. Promoting one of its workers gives them a console and a key, shown once; an Admin belongs to one department.</div></div>` : null}
+    <//>
   <//>`;
 }
 // Sessions, at both levels: the Super User sees every machine; an Admin's console sees its department's (LANES is
@@ -5545,7 +5537,7 @@ function App() {
   else if (page === "sessions" || page === "access") body = html`<${AccessPage} go=${go} open=${sub} me=${level ? level.admin : null} />`;
   else if (page === "issues") body = html`<${Issues} sel=${sub} go=${go} />`;
   else if (page === "tasks") body = !level && sub === "new" ? html`<${GiveTask} go=${go} />` : !level && (!sub || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${GivenToDepts} go=${go} open=${sub} />` : sub === "new" ? html`<${NewTask} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
-  else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : html`<${FlowsSU} go=${go} me=${level ? level.admin : null} open=${FBY[sub] ? sub : null} />`;
+  else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : (level ? html`<${FlowsSU} go=${go} me=${level.admin} open=${FBY[sub] ? sub : null} />` : html`<${FlowsOrg} go=${go} />`);
   else if (page === "detective") body = html`<${DetectivePage} key=${level ? level.dept : "su"} go=${go} dept=${level ? level.dept : null} />`;
   else if (page === "restricted") body = sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;

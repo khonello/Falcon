@@ -311,7 +311,6 @@ async def test_a_department_without_an_admin_comes_first(console):
     view = await _open(win, bridge, "departments", "departmentsView")
     await _wait(lambda: len(prop(view, "all") or []) == 2)
     assert [d["name"] for d in prop(view, "all")] == ["Logistics", "Operations"]
-    assert prop(view, "d")["name"] == "Logistics"
 
 
 

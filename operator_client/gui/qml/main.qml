@@ -67,7 +67,7 @@ ApplicationWindow {
         detective: "DetectivePage.qml",
         tasks: Nav.boss ? "GivenTasksPage.qml" : "TasksPage.qml",
         restricted: "RestrictedPage.qml",
-        flows: "FlowsPage.qml",
+        flows: Nav.boss ? "FlowsOverviewPage.qml" : "FlowsPage.qml",
         machines: "MachinesPage.qml",
         issues: "IssuesPage.qml",
         automation: "AutomationPage.qml",

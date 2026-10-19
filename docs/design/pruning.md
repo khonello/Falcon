@@ -23,7 +23,7 @@ else earns its place by serving them or is cut. Nothing here deletes data or dat
 From 14 pages to 11 (Admin) and to 8 (Super User).
 
 ## The Super User sees and does less (owner, 18 Oct)
-A CEO-level view: pages grouped by department, read first, at most one decision each; anything operational is an "Open in [Admin]'s console" link. The Super User keeps: giving and completing department tasks, assigning an Admin, escalations and cases on Admin machines, a flow asking to carry something they marked, marking their own files, pinging Admins. Tasks and Flows are rebuilt this way first; Detective, Restricted and Departments follow.
+A CEO-level view: pages grouped by department, read first, at most one decision each; anything operational is an "Open in [Admin]'s console" link. The Super User keeps: giving and completing department tasks, assigning an Admin, escalations and cases on Admin machines, a flow asking to carry something they marked, marking their own files, pinging Admins. Done (19 Oct): Tasks, Flows and Departments are a card a department (`DeptCard`), with a narrow drawer for one item; the Super User gives and completes tasks, answers a flow's request to carry something they marked, assigns an Admin, and enters an Admin's console for everything else. To do: Detective, Restricted, and the Admin Overview.
 
 ## Still to decide at the split
 Custom Actions (unsandboxed scripts), the version-approval gate, the rule builder under Automation, and whether the removed pages' Engine handlers are deleted or only gated.

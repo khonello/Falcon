@@ -116,8 +116,8 @@ QtObject {
                                           : (deptName ? deptName + " · as " + me + " sees it" : titles.overview[1])
         if (boss && p === "registry") return "What was turned away at the door, and moving the Super User to another machine"
         if (!boss && p === "registry") return "This department's machines and people · register, re-key, and let a new machine in"
-        if (boss && p === "tasks") return "Work you give departments, and how far each has got"
-        if (boss && p === "flows") return "Every flow in the organisation · you can send between any two machines"
+        if (boss && p === "tasks") return "What you have given each department, and how far it has got"
+        if (boss && p === "flows") return "Every flow in the organisation, by the department it starts in"
         return titles[p] ? titles[p][1] : ""
     }
 }
