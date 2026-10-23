@@ -40,7 +40,7 @@ TRIGGERS = {
     "file": "A copy of a restricted file appears where it is not allowed",
     "second": "A second session starts on a machine already in use",
     "cert": "A machine presents a name that does not match what it was registered with",
-    "help": "A worker pings for help",
+    "help": "A worker messages for help",
     "report": "A report is written for a department",
     "version": "A new version is approved",
     "outhours": "Someone enters a machine outside working hours",
@@ -48,7 +48,7 @@ TRIGGERS = {
     "seat": "A department loses its last Admin",
 }
 EXPECTS = {
-    "answer": "An Admin answers the ping", "addressed": "Someone marks the report addressed", "updated": "The machine runs that version",
+    "answer": "An Admin answers the message", "addressed": "Someone marks the report addressed", "updated": "The machine runs that version",
     "seen": "An Admin marks it seen", "appoint": "Another Admin is appointed",
 }
 NEVER_TRIGGERS = ("file", "second", "cert", "outhours")
@@ -72,7 +72,7 @@ LIBRARY = [
      "summary": "A copy of a marked file appears where its mark does not allow it.",
      "spec": {"trigger": "file", "who": "everyone", "depts": "all", "resp": {"report": True, "admin": True}}},
     {"key": "unanswered-help", "name": "Unanswered help request", "shape": "follow",
-     "summary": "A worker pinged for help and nobody answered in time.",
+     "summary": "A worker messaged for help and nobody answered in time.",
      "spec": {"trigger": "help", "expect": "answer", "within": 60, "who": "admins", "depts": "all", "resp": {"report": True, "admin": True}}},
     {"key": "past-update-limit", "name": "Machine past the update limit", "shape": "follow",
      "summary": "A machine is still not on the approved version after the time allowed.",

@@ -84,7 +84,7 @@ The resource folder structure *is* the access policy, built on the system-wide G
 
 - **Resource:** tiered folders (`admin`, `restricted`, `workers`, `common`); the Global File Index is built via event-driven indexing plus opportunistic full sweeps during idle time, self-throttling the moment input resumes. Restricted files tracked by content hash system-wide; violations reported, never silently deleted.
 - **Assistance:** search the index (filtered by role) instead of asking around.
-- **Ping vs. Message Channel:** a Ping is a repeatable, lock-free attention signal with a persistent pulsing status in place of a timeout; the Message Channel (one-message-per-turn) opens only once the superior responds, and only the superior can close it.
+- **Help message vs. Message Channel:** a help message is a repeatable, lock-free attention signal with a persistent pulsing status in place of a timeout; the Message Channel (one-message-per-turn) opens only once the superior responds, and only the superior can close it.
 - **Listeners:** either party can silently add an Admin as a real-time observer on a Message Channel (e.g., HR oversight) — awareness is asymmetric, but the full flow is audited.
 - Resource can't be a direct Flow source/destination — Flow moves resource files under the hood instead, respecting the same access tiers.
 
@@ -116,7 +116,7 @@ Individually, each section above is a self-contained system. What makes this a p
 | **Events → Control** | A detected Flow failure, Resource violation, or missed deadline can trigger a Control action (rename, restore, revoke, notify) automatically |
 | **Task/Flow/Resource → Global File Index** | Verification targets, collision checks, and compliance detection all validate against one shared index, not three separate ones |
 | **Any Combo → Report Routing** | Flow failures, Resource violations, Listener reports, and Assisted Access sessions are all Report categories — Super User always sees them, and each can additionally route to a responsible department |
-| **Everything → Hierarchy** | Every action, traversal, sync, verification, ping, and report is logged under the same audit trail, retained 90 days, filtered by the same role structure |
+| **Everything → Hierarchy** | Every action, traversal, sync, verification, help message, and report is logged under the same audit trail, retained 90 days, filtered by the same role structure |
 
 **The pattern:** Hierarchy defines who can see, do, and traverse what — including the fine-grained mechanics of who can block or evict whom, and how peers can still consensually help each other outside that authority chain. Task, Flow, and Resource define what gets done and how it moves, all grounded in one shared file index instead of separate bookkeeping. Events + Actions make the system respond on its own, without a person watching every file. Nothing in any of this operates outside the audit trail — one log, one hierarchy, one system.
 

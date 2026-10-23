@@ -148,7 +148,7 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
     assert out[6].startswith("event 1 (native_pushed)")
     assert "usb.inserted" in out[7]
     assert "ENABLED AUTOMATIONS" in out[8] and "never run" in out[8]
-    assert out[9] == "forbidden: pings go between a subordinate and their direct superior" or out[9].startswith("ping ")
+    assert out[9].startswith("request ") and "until they accept" in out[9]          # an Admin asking a Worker: a request
     assert "current version: (none approved)" in out[10]
     assert out[11] == "(none)" and out[12] == "(none)"
     assert out[13].startswith("event 1: fired 0 time(s) today") and "machines reporting" in out[14]
@@ -182,7 +182,7 @@ async def test_push_updates_state_and_indicators(engine, org, tmp_path: Path):
     kinds = {i.kind for i in state.indicators}
     assert {"blocked", "session", "unaddressed_ping"} <= kinds and state.unaddressed_pings == 1
     status = await run_line(ctx, "status")
-    assert "BLOCKED" in status and "unaddressed ping" in status
+    assert "BLOCKED" in status and "unaddressed message" in status
     sid = (await admin.call("hierarchy.session_state", {"pc_id": org["w1_pc"]}))["pc_session"]["session_id"]
     await admin.call("hierarchy.end_session", {"session_id": sid})
     await asyncio.sleep(0.3)

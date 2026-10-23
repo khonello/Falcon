@@ -108,7 +108,7 @@ This combo enables automated workflows and operational control through event-tri
 - Task target file/program activity (tracked via the Global File Index and OS events)
 - Flow sync status
 - Resource violation scan
-- Help ping response time
+- Help message response time
 
 ---
 
@@ -183,7 +183,7 @@ Since the full breadth of event types isn't pinned down yet, this is a governing
 - Flow sync completed
 - Flow sync error
 - Resource file unauthorized access
-- Help ping received
+- Help message received
 - Expectation signal triggered
 
 **Example:**

@@ -409,16 +409,16 @@ A chart of fixed size, whatever the number of copies:
 
 ## Messages (both consoles, decided 9 Oct 2026)
 
-Help Ping & Message Channel (resource-assistance-combo.md) gets its own menu item, second in Core, at both levels:
+Help Message & Message Channel (resource-assistance-combo.md) gets its own menu item, second in Core, at both levels:
 in an Admin's console the conversations with their workers and with the Super User; in the Super User's, the ones
 with Admins. It is the one menu item whose count **pulses** (bright, bold) while anything waits on you, as the design
-asks of unanswered pings; the pulse stops when everything is answered.
+asks of unanswered help messages; the pulse stops when everything is answered.
 
-- **Strip:** Waiting on you (pinged you, or your turn), Waiting on them, Listening, Closed this week (all filters).
-- **List:** one row per conversation, with the last message under the name; *New ping* opens a drawer to pick who (an
-  Admin: their workers and the Super User; the Super User: Admins). A ping carries no message.
-- **Right:** the thread. The person pinged answers first, which opens it; then one message each way: the box is there
-  only on your turn ("Kojo's turn. You can write again once they answer."). *Ping again* while unanswered; *Close* only
+- **Strip:** Waiting on you (messaged you, or they wrote last), Waiting on them, Listening, Closed this week (all filters).
+- **List:** one row per conversation, with the last message under the name; *New message* opens a drawer to pick who (an
+  Admin: their workers and the Super User; the Super User: Admins). The first message carries no text.
+- **Right:** the thread. The person messaged answers first, which opens it; after that, either side writes whenever they like (the
+  turn lock was dropped, 22 Oct 2026). The status says who wrote last ("Waiting on you" / "Waiting on them"). *Message again* while unanswered; *Close* only
   for the higher party (an Admin with a worker, the Super User with an Admin), asked first. *Add a listener* (Admins
   only) once it is open: you see who you added, the other party is not told; a listener reads it as it happens and
   cannot write.
@@ -431,9 +431,9 @@ asks of unanswered pings; the pulse stops when everything is answered.
   pages (8 conversations a page), and the listeners line sits in a fixed strip at the foot of the panel, above Close,
   so it never scrolls away with the thread (`SidePanel foot`). The panel stands a little taller than the list; the
   reply box sits apart from the last message (space and a hairline); **Close is an icon in the panel's header**
-  (a tooltip names it, and it still asks first); *Ping again* stays at the foot, and a ping you have not answered
+  (a tooltip names it, and it still asks first); *Message again* stays at the foot, and a message you have not answered
   shows no empty button bar.
-- A help request is no longer an issue: it lives here. The console's Overview counts pings with *Waiting on you*.
+- A help request is no longer an issue: it lives here. The console's Overview counts messages with *Waiting on you*.
 
 ## The session window (an Admin's console, decided 9 Oct 2026)
 

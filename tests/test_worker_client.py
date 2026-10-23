@@ -259,7 +259,7 @@ async def test_session_blocking_surface_and_worker_ui(engine, org, tmp_path: Pat
                                          "verification_mode": "none", "confirm_none": True})
         assert "tidy up" in await run_line(ctx, "tasks")
         out = await run_line(ctx, f"ping {org['a1']}")
-        assert out.startswith("ping ")
+        assert out.startswith("message ")
         assert "unknown" in (out := await run_line(ctx, "task verify 1 complete")) or "usage" in out  # no verify in the worker UI
         p = await admin.call("assistance.ping", {"to_account_id": org["w1"]})
         assert "1 unaddressed" in await run_line(ctx, "pings")

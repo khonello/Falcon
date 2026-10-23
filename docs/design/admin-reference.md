@@ -112,11 +112,11 @@ The one mechanism designed specifically for **horizontal** Admin-to-Admin help, 
 
 **Assistance — File Search visibility:** their own restricted files + worker files + common files + all admin-tier files (the broadest search scope below Super User).
 
-**Help Ping & Message Channel — Admin is the superior in the Worker↔Admin pair:**
-- Receives Pings from Workers (persistent, bold/pulsing status until all are addressed).
+**Help Message & Message Channel — Admin is the superior in the Worker↔Admin pair:**
+- Receives help messages from Workers (persistent, bold/pulsing status until all are addressed).
 - Once Admin responds, a Message Channel opens (one-message-per-turn lock).
-- **Only Admin can close** a Worker↔Admin channel, even if Admin was the one who pinged first.
-- Admin is also the **subordinate** in the Admin↔Super User pair — can Ping Super User, but only Super User can close that channel.
+- **Only Admin can close** a Worker↔Admin channel, even if Admin was the one who sent the first help message.
+- Admin is also the **subordinate** in the Admin↔Super User pair — can send a help message to the Super User, but only Super User can close that channel.
 
 **Listeners:**
 - Admin can be **added as a Listener** on a Worker↔Admin (or any) Message Channel by either party in that channel, for oversight purposes (e.g., HR-style routing) — must be an Admin to qualify.

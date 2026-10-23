@@ -42,6 +42,84 @@ part is recorded for later, not built.
    of one open are dropped; a rule that names only a resource tier cannot be decided on the Worker and is not watched
    live (it says so in the log). The kernel's `\Device\HarddiskVolumeN` paths are turned into drive letters.
    Without the privilege to trace it stays unavailable (the log says why). *Found:* Automation (AU08).
+3. **Protection gets a third tag, "Private"** (the user, 21 Oct 2026).
+   - **The three tags.** A protected thing (a file, folder or program) carries exactly ONE of them. The target is chosen first, then its tag.
+     - **Watch:** free to go and to open; every open and move is noted. This is today's watched.
+     - **Private:** only the people the owner names may open the file or folder, or run the program. Anyone else, or a
+       program running as them, is refused, and the refusal is noted. This one is new.
+     - **Restricted:** it never leaves its place; a copy elsewhere is caught. This is today's restricted.
+   - **What was ruled out.** A combined form ("watched + optional guards") was declined, so the tags never combine. "Ask
+     first" (every open waits for a yes) was tried and replaced by Private: it made the owner a gate on every open and
+     could not answer for background programs. Nobody can ask to be added to a Private item; only the owner changes who
+     is named.
+   - **Background programs** (backup, antivirus) run as the machine's own system account. Per item, the owner chooses
+     whether that account may read it. If it may not, the program is refused like anyone else.
+   - **The Engine needs:**
+     - a `protection_tag` on marks (watch, private, restricted);
+     - marks on programs as well as files and folders;
+     - a named-people list per Private mark, plus the system-account choice;
+     - a refusal record (who, what, which machine, when) for the audit and the page.
+   - **The Worker needs** to refuse the open or the program start when the person is not named, using the kernel file
+     and process events it already watches. How the refusal is shown to that person is still to be decided.
+   - **Flow consent** (`engine/flow/guard.py`) stays as it is, for Restricted things.
+   - *Found:* the Super User's Protected page.
+4. **Group conversations for the Super User** (the user, 22 Oct 2026). Messaging several people at once, or every Admin of a department, is now ONE group conversation in which everyone sees what everyone writes. It no longer copies the message into each person's own conversation.
+   - **A department's group** exists while the department has two or more Admins. Its members follow the department: an Admin who joins is added, and one who leaves is removed.
+   - **Other groups** are made by writing to a set of people. Writing again to the same set reuses that group.
+   - **The page shows** who has answered since your last message.
+   - **The Engine needs:**
+     - a conversation with members, instead of a pair;
+     - a membership that follows a department's Admins;
+     - a quick ask to several people that lands in their group.
+   - *Found:* the Super User's Messages page.
+5. **Drop the one-message-per-turn lock on Message Channels, and message requests** (the user, 22 Oct 2026: the lock "can be frustrating real quick").
+   - **Engine: done 22 Oct 2026** (`engine/resource/assistance.py`, `tests/test_resource_assistance.py`).
+     - `assistance.message` accepts a message from either party while the channel is open.
+     - The channel's `turn` now only says who owes an answer, so `my_turn` means "waiting on me".
+     - **Requests:** `assistance.respond` is the accept. Super User → Admin through `assistance.ping` opens the channel at once and returns `channel_id`; the Admin has nothing to accept, and the Admin's own pending request is answered with it.
+     - **Admin → Admin** requests are allowed (`may_message`), and either Admin may close.
+     - Found on the way and fixed: when the superior asked first, the channel's initiator and superior are the same account. `open_channel_between` and `channels_for` (`engine/database.py`) missed such a channel for the other party; both now look through the request's two ends.
+   - **Clients: done 22 Oct 2026.**
+     - **The Engine decides who may message whom and who may close.** New `assistance.people` lists who you may message, with `request` (whether they must accept first). `can_close` is part of `assistance.channel`.
+     - **`MessagesPage.qml`:**
+       - the box is always open;
+       - a request has Accept, and writing back accepts it too;
+       - "New message" lists `assistance.people`. For the Super User it says "Open the conversation" and selects the new channel; for everyone else it says "Send the request".
+       - Close follows `can_close`.
+       - It and `IssuesPage.qml` sent `text` where the Engine reads `body`, so a message from the GUI never went through. Both are fixed.
+     - **The Operator TUI** has a new `people` command, and `ping` opens the channel when the Super User writes to an Admin. Its wording and push lines no longer mention turns.
+     - **The Worker TUI and window** use the same wording.
+     - Tests: `tests/test_resource_assistance.py` (`people`, `can_close`), `tests/test_operator_gui.py` (writing back accepts and sends `body`) and `tests/test_operator_client.py`.
+6. **What the Super User sends reaches the Admin** (the user, 22 Oct 2026; drawn on the concept's Admin level, v293).
+   - **A banner across the Admin's console** for each new directive *and* each new notice, with Open and "I've seen it". The console's banner covers directives only.
+     - Notices need a per-Admin "seen" record, so the Super User can see who has read one, just as they see it for directives.
+   - **The Admin's conversation with the Super User is always there**, with no request, and it carries cards for what the Super User sent outside it: each directive given to them (with "I've seen it" and "Open in Tasks") and each notice that went out.
+     - The Engine needs to list directives and notices together with a channel's messages, or the client needs to merge them.
+   - **A quick ask to one Admin** lands in that Admin's conversation with what it is about, attached. Messages need an optional `about` field.
+   - **Group conversations** show in each member Admin's Messages, and any member can write in them (item 4).
+7. **Sending a file in a conversation** (the user, 22-23 Oct 2026; drawn on the concept, v296).
+   - **How it works:** anyone in an open conversation or group sends one file, once, up to 100 MB. It arrives as a card with Save, which puts it in `Downloads\From Falcon` on the receiver's machine.
+   - **Asking:** there is no separate step to ask for a file. People ask in an ordinary message, and the other side answers with a file.
+   - **Sending is intentional access**, and what it means is said before it is sent:
+     - **Private:** sending adds the receiver to who may open the file.
+     - **Restricted:** sending is the owner's consent for that one copy.
+     - **Not the owner:** if the sender does not own the protection, the owner is asked first, and the file goes once they agree.
+   - **Refused:**
+     - programs and scripts (`.exe`, `.msi`, `.bat`, `.cmd`, `.ps1`, `.py`, `.vbs`, `.js`), because a script runs as a Custom Action, where it is checked first;
+     - anything over 100 MB, which goes by a Flow instead.
+   - **The Engine needs:**
+     - a relay that pulls the file from the sender's Worker, holds it until delivered (7 days at most) and then drops the bytes, while the transfer record stays;
+     - a message with a file;
+     - consent requests to an owner;
+     - adding a person to a Private mark;
+     - the delivered copy indexed with its origin (sender, conversation), so Protected and the Detective see a handed-over copy, not a stray one;
+     - an audit entry for each transfer.
+   - Still to decide: whether an admin-tier file may go to a Worker at all.
+8. **A description is always one task** (the user, 24 Oct 2026; the concept's New task, Admin v70).
+   - `engine/task/llm_graph.py` proposes a split when two or more files are joined by "and also / then / ;" (`proposed_split`). That step goes.
+   - All targets go onto the one task. A part that names nothing to check stays in the description, for the assigner to judge at verification.
+   - `tasks.py` stops returning `proposed_split`, and the clients drop the "split / keep as one" choice.
+   - `scripts/llm_cases.py` has split cases. Move them to one-task expectations; they are rules, not held-out measurements.
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine
@@ -139,7 +217,7 @@ part is recorded for later, not built.
   windows off, notify says "not shown" and a lock falls back to locking the workstation once. *Ask for help:* a
   tray icon (`worker_client/windows/tray.py`, started by the service) prints `ask` when clicked; the service
   asks `assistance.my_admins` (new: a Worker's department Admins, an Admin's Super User), opens the ask window
-  (one button per Admin -- a ping carries no message, so there is no text box any more) and sends
+  (one button per Admin -- a help message carries no text, so there is no text box any more) and sends
   `assistance.ping`. TUI: `action add control notify message=.. stay_s=..`, `lock_session duration_s=..`,
   `reboot delay_s=..`; `actions` lists the optional settings. **A lock also blocks the keyboard and mouse at the OS level** (`BlockInput`) while its
   window holds; Windows ends the block if the process dies and Ctrl+Alt+Del always overrides it. Still for Phase 9: under the Windows service these

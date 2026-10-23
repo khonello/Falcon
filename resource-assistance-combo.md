@@ -121,46 +121,45 @@ Resource and Assistance work together to ensure workers have access to what they
 
 **Benefit:** Reduces interruptions; users find files independently.
 
-### Help Ping & Message Channel
+### Help Message & Message Channel
 
-**Purpose:** Structured help requests up the hierarchy, with two distinct parts — an attention-getting Ping, and a Message Channel that opens once the receiver responds.
+**Purpose:** Structured help requests up the hierarchy, with two distinct parts — an attention-getting help message, and a Message Channel that opens once the receiver responds.
 
 **Applies symmetrically at both levels:** Worker↔Admin and Admin↔Super User.
 
-#### Ping
+#### Help message
 
-- A ping is a lightweight "I want your attention" signal — like a notification, not a message
-- **Repeatable:** if unaddressed, the sender can ping again; there's no lock on pinging itself
-- The receiving superior sees a **persistent, unmistakable status** (bright, bold, pulsing) showing unaddressed pings
-- This status is the accountability mechanism in place of a timeout: it makes non-response visibly a choice rather than silently disappearing, so there's no need to badger the receiver further beyond re-pinging
-- The status clears only when **all** pending pings/messages are addressed
+- A help message is a lightweight "I want your attention" signal — it carries no text, like a notification
+- **Repeatable:** if unaddressed, the sender can send it again; there's no lock on sending it
+- The receiving superior sees a **persistent, unmistakable status** (bright, bold, pulsing) showing unaddressed help messages
+- This status is the accountability mechanism in place of a timeout: it makes non-response visibly a choice rather than silently disappearing, so there's no need to badger the receiver further beyond sending it again
+- The status clears only when **all** pending help messages and messages are addressed
 
-#### Message Channel (opens once the receiver responds)
+#### Message Channel (opens once the receiver accepts)
 
-Once the superior responds to a ping, a Message Channel opens between sender and receiver, governed by the same **one-message-per-turn lock** as before:
+A help message is a **message request**. The Message Channel between sender and receiver opens only once the receiver accepts it, either with Accept or by writing back.
 
-```
-User: [sends message] → LOCKED
-Superior: [receives] → [responds] → UNLOCKED
-User: [sends next message] → LOCKED
-Superior: [receives] → [responds] → UNLOCKED
-```
+**Who needs a request (the user, 22 Oct 2026):**
+- **Super User → Admin:** no request. The channel opens at once and the Admin does not accept. This is the only exception.
+- **Admin → Super User:** a request, which the Super User accepts.
+- **Admin → Admin:** a request, which the other Admin accepts. Peers have no superior, so either of them may close the channel.
+- **Worker ↔ Admin:** a request, as before.
 
 **Rules:**
-- One message at a time per direction
-- No back-and-forth chatting
-- Each exchange: question → answer → next question
-- Lock prevents casual messaging
+- **Either party writes whenever they like.** The one-message-per-turn lock that used to govern a channel was dropped (the user, 22 Oct 2026), because waiting for the other side's answer before you could add a line became frustrating quickly.
+- The channel still records who wrote last, so each side can see whether it is waiting on them or on the other party.
+
+**Files (the user, 23 Oct 2026):** anyone in the channel may send one file, once, up to 100 MB. There is no separate request step: you ask in a message, and the other side answers with a file. Sending is intentional access. A Private file adds the receiver to who may open it, and a Restricted one is the owner's consent for that copy; both are said before sending. If the sender does not own the protection, its owner is asked first. Programs and scripts are never sent this way.
 
 **Closing Authority:**
-- Only the **superior** (the receiver of the original ping, regardless of who initiated) can close the channel — Admin closes Worker↔Admin channels; Super User closes Admin↔Super User channels
-- This holds even when the superior was the one who pinged first (e.g., Admin pings Worker for information) — it would be equally inappropriate for the subordinate to unilaterally end a channel while their superior is the one enquiring
+- Only the **superior** (the receiver of the original help message, regardless of who initiated) can close the channel — Admin closes Worker↔Admin channels; Super User closes Admin↔Super User channels
+- This holds even when the superior was the one who sent the first help message (e.g., an Admin messages a Worker for information) — it would be equally inappropriate for the subordinate to unilaterally end a channel while their superior is the one enquiring
 - The sender has no unilateral closing authority
 
-**Purpose:** Keeps communication **structured and straight-to-the-point**; prevents channels from becoming noisy or unfocused, while the Ping mechanism separately ensures unaddressed requests remain visible rather than silently timing out.
+**Purpose:** The channel is opened only by an accepted request (or by the Super User writing to an Admin) and closed only by the superior, which keeps it purposeful. The help message separately ensures that unaddressed requests stay visible rather than silently timing out.
 
 **Logging:**
-- All pings and messages logged with timestamps
+- All help messages and messages logged with timestamps
 - Part of audit trail
 - Tracks communication patterns and response times
 
@@ -197,7 +196,7 @@ Superior: [receives] → [responds] → UNLOCKED
    - No need to ask admin
 
 2. **Worker has question about file:**
-   - Pings admin via Help Ping — attention-getting notification
+   - Messages the admin via a help message — attention-getting notification
    - Admin responds → Message Channel opens
    - Sends: "How do I fill out the contract-template?"
    - Message locked; waits for response
@@ -227,7 +226,7 @@ Superior: [receives] → [responds] → UNLOCKED
 
 **With Hierarchy:**
 - Resource access determined by user role in hierarchy
-- Help Ping and Message Channel follow the hierarchy chain (Worker↔Admin, Admin↔Super User), with closing authority always resting with the superior in that pair
+- Help message and Message Channel follow the hierarchy chain (Worker↔Admin, Admin↔Super User), with closing authority always resting with the superior in that pair
 - Super User sees all resources; Admin sees admin + worker + common; Worker sees worker + common
 - Listener reports generated on Message Channels are one Report category that can be routed to a department (e.g., HR) via Hierarchy's Report Routing, while Super User always retains full visibility regardless of routing
 - Resource compliance violations (restricted/admin file breaches) are likewise a Report category under the same Report Routing model — routable to a relevant department, always visible to Super User
@@ -238,13 +237,13 @@ Superior: [receives] → [responds] → UNLOCKED
 
 1. **Index as Policy** — Resource folder structure + centralized index = distributed access control
 2. **Search Over Asking** — Users find files independently via Assistance search
-3. **Ping vs. Message Channel** — Ping is a repeatable, lock-free attention signal with a persistent status replacing the need for a timeout; the Message Channel (one-message-per-turn) only opens once the superior responds
+3. **Help message vs. Message Channel** — A help message is a repeatable, lock-free attention signal with a persistent status replacing the need for a timeout; the Message Channel only opens once the superior responds (no turn lock since 22 Oct 2026)
 4. **Superior Closes** — Regardless of who initiated, only the superior in the pair (Admin, or Super User) can close a Message Channel
 5. **Listeners for Oversight** — either channel party can silently add an Admin as a real-time observer (e.g., for HR-style oversight); awareness is asymmetric (each side only knows what they added), but the full flow is captured in the audit trail
 6. **Native-First Compliance Detection** — restricted/admin file violations detected via OS file events filtered against the Global File Index, with polling as fallback; same pattern as Flow and Task
 7. **Security Isolation** — Restricted files tracked and contained; violations reported not deleted
 8. **Role-Based Visibility** — Each user sees only resources their role permits
-9. **Audit Trail** — All resource access, pings, messages, and compliance checks logged
+9. **Audit Trail** — All resource access, help messages, messages, and compliance checks logged
 10. **Flat Worker Structure** — Worker PCs don't need subfolders; index determines content
 
 ---
@@ -254,8 +253,8 @@ Superior: [receives] → [responds] → UNLOCKED
 - **Global File Index:** Built via event-driven indexing (OS file events) plus opportunistic full-system sweeps during machine idle time, self-throttling the moment user input resumes; Resource's folder contents are indexed the same way, tagged with their access tier
 - **Hash Tracking:** Implement content-based file tracking for restricted files (MD5, SHA-256)
 - **Compliance Detection:** Native OS file events (create/move/copy) filtered against the Global File Index for near-real-time detection; polling fallback where native detection isn't practical; no special handling needed for offline PCs beyond catching up on reconnect
-- **Ping Status:** Persistent, high-visibility (bright/bold/pulsing) indicator for unaddressed pings on the receiver's interface; clears only when all pending pings/messages are addressed
-- **Message Lock Mechanism:** Implement message lock in the Message Channel UI (disable send button until superior responds); Ping itself has no lock
+- **Help message status:** Persistent, high-visibility (bright/bold/pulsing) indicator for unaddressed help messages on the receiver's interface; clears only when all pending help messages and messages are addressed
+- **Message Lock Mechanism:** Implement message lock in the Message Channel UI (disable send button until superior responds); the help message itself has no lock
 - **Channel Closing:** Restrict close action to the superior in the pair, regardless of who initiated
 - **Flow Integration:** Ensure Flow respects resource access rules when syncing files
-- **Logging:** Log all resource access, searches, pings, messages, and compliance violations
+- **Logging:** Log all resource access, searches, help messages, messages, and compliance violations

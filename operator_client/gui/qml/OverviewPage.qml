@@ -92,7 +92,7 @@ Page {
             noneValue: "0"; noneText: "Nothing waiting"
             readonly property int n: page.toVerify + page.iss.length + page.pings + page.suggestions + page.toAllow
             value: Theme.fmt(n)
-            delta: n ? page.toVerify + " to verify · " + page.iss.length + " issue" + (page.iss.length === 1 ? "" : "s") + " · " + page.pings + " ping" + (page.pings === 1 ? "" : "s")
+            delta: n ? page.toVerify + " to verify · " + page.iss.length + " issue" + (page.iss.length === 1 ? "" : "s") + " · " + page.pings + " message" + (page.pings === 1 ? "" : "s")
                        + (page.suggestions ? " · " + page.suggestions + " suggestion" + (page.suggestions === 1 ? "" : "s") : "") + (page.toAllow ? " · " + page.toAllow + " flow" + (page.toAllow === 1 ? "" : "s") + " to allow" : "") : "Nothing waiting on you"
             dc: n ? Theme.crit : Theme.text3
         }
@@ -162,7 +162,7 @@ Page {
                     width: parent.width
                     icon: "check"
                     title: "Nothing open"
-                    text: "Violations, unanswered pings, deviations and stuck updates appear here, worst first."
+                    text: "Violations, unanswered messages, deviations and stuck updates appear here, worst first."
                 }
                 Repeater {
                     model: page.iss.slice(0, 8)
@@ -284,7 +284,7 @@ Page {
                     h: 170
                     icon: "barchart"
                     title: "No events in this period"
-                    text: "Everything the system records lands here: sessions, actions, flows, pings, updates, deviations and violations."
+                    text: "Everything the system records lands here: sessions, actions, flows, messages, updates, deviations and violations."
                 }
             }
         }

@@ -86,7 +86,7 @@ Page {
             showEmpty: page.base.length === 0
             emptyIcon: "history"
             emptyTitle: "Nothing recorded in this period"
-            emptyText: "Everything the system records lands here: sessions, actions, flows, pings, updates, deviations and violations."
+            emptyText: "Everything the system records lands here: sessions, actions, flows, messages, updates, deviations and violations."
         }
         SidePanel {
             width: (parent.width - 14) * 4 / 12
@@ -98,8 +98,8 @@ Page {
             facts: page.e ? [["When", Time.atDay(page.e.t)], ["Who", page.e.actor], ["Machine", page.e.host || "—", null, true], ["Kind", Kinds.words[page.e.kind]],
                              ["Recorded as", String(page.e.raw.action || ""), null, true]] : []
             actions: Btn {
-                visible: page.e !== null && !!Fleet.byHost[page.e.host]
-                text: page.e ? (Nav.boss ? "See it in Registry →" : "Open " + page.e.host + "'s page →") : ""
+                visible: page.e !== null && !Nav.boss && !!Fleet.byHost[page.e.host]
+                text: page.e ? "Open " + page.e.host + "'s page →" : ""
                 onClicked: Nav.go("machines", page.e.host)
             }
         }

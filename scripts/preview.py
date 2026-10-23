@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 WORDS = [a for a in sys.argv[1:] if not a.startswith("-")]
 ROLE = "admin" if "admin" in WORDS else "super_user"
 INSIDE = "inside" in WORDS
-AREAS = ("overview", "messages", "tasks", "detective", "restricted", "flows", "machines", "sessions", "issues", "automation",
+AREAS = ("overview", "messages", "calendar", "tasks", "detective", "restricted", "flows", "machines", "sessions", "issues", "automation",
          "actions", "rollout", "audit", "reports", "departments", "accountability", "access", "registry", "rules")
 VIEW = next((w for w in WORDS if w.split("/")[0] in AREAS), "")
 if "--role" in sys.argv:                        # the older spelling, still used by the shot scripts
@@ -52,7 +52,7 @@ AUDIT = [
     ("11:03", "Automation", "Lock the screen ran on OPS-07", "OPS-07", "control.action_run"),
     ("10:02", "System", "budget-2026.xlsx found on a worker machine", "OPS-07", "resource.violation"),
     ("09:52", "K. Boateng", "Approved 1.4.2 for rollout", "", "updates.approve"),
-    ("09:40", "Kojo", "Pinged their Admin", "OPS-01", "assistance.ping"),
+    ("09:40", "Kojo", "Messaged their Admin", "OPS-01", "assistance.ping"),
     ("09:18", "R. Mensah", "Gave Ama a task: reconcile the Q3 invoices", "OPS-07", "task.create"),
     ("09:11", "System", "Hostname did not match the certificate", "OPS-05", "deviation.hostname"),
     ("08:55", "Automation", "Notify ran on OPS-03", "OPS-03", "control.action_run"),

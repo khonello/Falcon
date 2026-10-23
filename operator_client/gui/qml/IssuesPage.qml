@@ -77,8 +77,8 @@ Page {
                          { key: "allow", icon: "safety", title: "Allow it on " + i.host + " too", desc: "Marks it dealt with. If the copy is still there, the next file event flags it again.", verb: "Allow it", need: "reason" }])
         }
         if (i.type === "help") return {
-            lead: (user || "Someone") + " asked for help and nobody has answered. A ping carries no message; answering opens a channel.",
-            facts: [["From", (user || "Someone") + " on " + i.host], ["Pinged", i.subject], ["Waiting", Time.age(i.at)]],
+            lead: (user || "Someone") + " asked for help and nobody has answered. A first message carries no text; answering opens a channel.",
+            facts: [["From", (user || "Someone") + " on " + i.host], ["Messaged", i.subject], ["Waiting", Time.age(i.at)]],
             why: online ? [] : [i.host + " is offline, so you cannot enter it."],
             options: [{ key: "answer", icon: "message", title: "Answer " + (user || "them"), desc: "Opens a message channel. Only you can close it.", verb: "Send", need: "message" }]
                 .concat(online ? [{ key: "enter", icon: "login", title: "Enter " + i.host + " and look yourself", desc: (user || "Whoever is signed in") + " is locked out while you are in. You get 30 minutes.", verb: "Enter " + i.host }] : [])
@@ -134,9 +134,9 @@ Page {
         else if (o.key === "answer")
             falcon.call("assistance.respond", { ping_id: i.ref.id }, function (ok, r) {
                 if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
-                falcon.call("assistance.message", { channel_id: r.channel_id, text: v }, function (ok2, r2) {
-                    page.mark(i, "Resolved", "Answered; channel open")
-                    Msg.ok(ok2 ? "Answered · the channel is open" : "The channel is open · it is their turn to write first")
+                falcon.call("assistance.message", { channel_id: r.channel_id, body: v }, function (ok2, r2) {
+                    page.mark(i, "Resolved", "Accepted and answered; the conversation is open")
+                    Msg.ok(ok2 ? "Accepted and answered · the conversation is open" : "The conversation is open, but the answer was not sent")
                     Fleet.refresh()
                 })
             })
@@ -161,6 +161,7 @@ Page {
         spacing: 14
         ListPanel {
             id: list
+            more: Theme.issuesMore
             width: (parent.width - 14) * 8 / 12
             title: "Open issues"
             sub: page.tf !== "all" || page.hf !== "" ? Theme.fmt(page.rows.length) + (page.tf !== "all" ? " · " + page.types[page.tf].label.toLowerCase() : "") + (page.hf ? " · on " + page.hf : "")
@@ -198,10 +199,11 @@ Page {
             showEmpty: Fleet.loaded && Fleet.issues.length === 0
             emptyIcon: "check"
             emptyTitle: "Nothing is open in this department"
-            emptyText: "Restricted copies, unanswered pings, deviations and stuck updates appear here, worst first."
+            emptyText: "Restricted copies, unanswered messages, deviations and stuck updates appear here, worst first."
         }
         SidePanel {
             id: side
+            implicitHeight: Theme.listHeight + 56 * Theme.issuesMore
             width: (parent.width - 14) * 4 / 12
             showEmpty: page.it === null
             emptyIcon: "check"
@@ -287,18 +289,18 @@ Page {
                 Txt { text: "WHAT TO DO"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
                 Txt { visible: !!parent.d && parent.d.status === "Waiting"; text: "Waiting on the last step you took; you can still change course."; color: Theme.ser1; font.pixelSize: 12 }
                 Txt { width: parent.width; text: page.play ? page.play.lead : ""; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone }
-                Grid {
+                Column {
                     width: parent.width
-                    columns: 2
-                    columnSpacing: 20
-                    rowSpacing: 10
                     Repeater {
                         model: page.play ? page.play.facts : []
-                        Column {
+                        Item {
                             required property var modelData
-                            width: (side.width - 52) / 2
-                            Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12 }
-                            Txt { text: modelData[1]; font.weight: Font.Medium; font.pixelSize: 12; width: parent.width; wrapMode: Text.Wrap; elide: Text.ElideNone }
+                            width: parent.width
+                            height: Math.max(34, fv.implicitHeight + 16)
+                            Txt { x: 0; y: 8; width: 104; text: modelData[0]; color: Theme.text3; font.pixelSize: Theme.fBody; elide: Text.ElideNone }
+                            Txt { id: fv; x: 112; y: 8; width: parent.width - 112; text: modelData[1]; font.pixelSize: Theme.fBody; wrapMode: Text.Wrap; elide: Text.ElideNone
+                                  mono: /[.:\\/]|\d\.\d/.test(String(modelData[1])) && !/ago|by /.test(String(modelData[1])) }
+                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.split }
                         }
                     }
                 }
@@ -313,7 +315,7 @@ Page {
                             on: page.opt !== null && modelData.key === page.opt.key
                             icon: modelData.icon
                             title: modelData.title
-                            desc: modelData.desc
+                            desc: on ? modelData.desc : ""
                             onClicked: { var p = Object.assign({}, page.pick); p[page.it.id] = modelData.key; page.pick = p }
                         }
                     }
@@ -364,7 +366,7 @@ Page {
         visible: page.it !== null
         width: parent.width
         title: page.it ? page.it.title : ""
-        sub: "its timeline and details · the same issue as on the right"
+        sub: "the story of the issue picked above · what you do on the right is added to it"
         Column {
             width: parent.width
             spacing: 10
@@ -374,18 +376,22 @@ Page {
                 width: parent.width
                 readonly property var evs: page.det && page.det.timeline ? page.det.timeline.map(function (e) { return { t: Time.ms(e.at), actor: e.who, what: e.what, kind: e.kind } })
                                          : page.it ? page.audit.filter(function (e) { return e.host === page.it.host && Math.abs(e.t - Time.ms(page.it.at)) < 2 * 3600000 }).slice(0, 6).reverse() : []
+                Txt { text: "The story of this issue, oldest first. Whatever you choose on the right is added here, with the time."; color: Theme.text3; font.pixelSize: 12; width: parent.width; wrapMode: Text.Wrap; bottomPadding: 6 }
                 Txt { visible: parent.evs.length === 0; text: page.it ? "Nothing recorded on " + page.it.host + " around it yet." : ""; color: Theme.text3; font.pixelSize: 12; topPadding: 6 }
                 Repeater {
                     model: parent.evs
                     Item {
                         required property var modelData
-                        width: parent.width; height: 28
-                        Txt { width: 62; anchors.verticalCenter: parent.verticalCenter; mono: true; color: Theme.text3; font.pixelSize: 12; text: Time.hhmm(modelData.t) }
-                        Rectangle { x: 66; width: 7; height: 7; radius: 4; color: Kinds.color(modelData.kind); anchors.verticalCenter: parent.verticalCenter }
-                        Txt { x: 82; width: parent.width - 82; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.RichText
+                        width: parent.width; height: 34
+                        Txt { width: 90; anchors.verticalCenter: parent.verticalCenter; mono: true; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                              text: Time.sameDay(modelData.t, Time.now) ? Time.hhmm(modelData.t) : Time.dayName(modelData.t) + " " + Time.hhmm(modelData.t) }
+                        Rectangle { x: 94; width: 7; height: 7; radius: 4; color: Kinds.color(modelData.kind); anchors.verticalCenter: parent.verticalCenter }
+                        Txt { x: 110; width: parent.width - 110; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.RichText
                               text: "<span style='font-weight:500'>" + modelData.actor + "</span> <span style='color:" + Theme.text2 + "'>" + modelData.what + "</span>" }
+                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.split }
                     }
                 }
+                Txt { visible: page.it !== null && page.it.state !== "resolved"; text: "Next: what you do on the right will appear here."; color: Theme.text3; font.pixelSize: 12; topPadding: 8 }
             }
             Grid {
                 visible: page.tab === "dt"

@@ -89,8 +89,14 @@ QtObject {
     readonly property int controlLg: 36
     readonly property int durFast: 120
     readonly property int durBase: 200
+    readonly property int siderW: 216            // the menu's width
+    readonly property int searchW: 540           // the top bar's search, centred over that area
+    readonly property int paletteW: 780          // and the palette it opens, on the same centre line
     readonly property int listRows: 6            // a list panel shows six rows a page
     readonly property int listHeight: 452        // and stands this tall, with its side panel beside it
+    readonly property int calendarH: 596         // the Calendar's month and its day stand this tall
+    readonly property int ruleColumnH: 470       // a rule's three steps stand at least this tall, with a look at the foot of each
+    readonly property int issuesMore: 7          // the Issues list shows this many rows more, and the issue beside it is as tall: it holds the facts, the choices and the button
 
     // --- type ----------------------------------------------------------------------------------------
     readonly property int fTiny:  11
@@ -99,6 +105,8 @@ QtObject {
     readonly property int fLead:  15
     readonly property int fTitle: 18
     readonly property int fPage:  20
+    readonly property int fMonth: 22               // the Calendar's month
+    readonly property int fDay:   26               // and the day beside it
     readonly property int fFigure: 24
     readonly property string sans: "IBM Plex Sans"
     readonly property string mono: "IBM Plex Mono"

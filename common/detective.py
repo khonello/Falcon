@@ -886,7 +886,7 @@ class Detective:
             w += 0.08
         m.hidden.add(s.thing or s.path)
         return Finding("concealment", "hidden", s.at, s.pc, w, frozenset({s.thing or s.path}), f"{s.name} was hidden", [s],
-                       "someone hiding a personal or in-progress file", why)
+                       "someone hiding a private file, or a draft they have not finished", why)
 
     def _disguised(self, m: Memory, s: Sig) -> Finding | None:
         old = s.old or ""

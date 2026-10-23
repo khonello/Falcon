@@ -155,7 +155,7 @@ QtObject {
                         at: be.last_attempt_at, ref: be })
                 if (w.name && pingBy[w.name])
                     issues.push({ id: "P-" + pingBy[w.name].first.id, sev: "warning", type: "help", title: "Help request unanswered",
-                                  subject: w.name + " · " + Theme.many(pingBy[w.name].n, "ping"),
+                                  subject: w.name + " · " + Theme.many(pingBy[w.name].n, "message"),
                                   note: "Help request unanswered", at: pingBy[w.name].first.sent_at, ref: pingBy[w.name].first })
                 for (var x = 0; x < dv.length; x++)
                     if (dv[x].observed_pc_id === w.pc_id) {

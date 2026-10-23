@@ -126,7 +126,7 @@ class ClientState:
         elif type_ == "assistance.ping_status":
             self.unaddressed_pings = int(payload.get("unaddressed", 0))
             if self.unaddressed_pings:
-                self.add_indicator("unaddressed_ping", f"{self.unaddressed_pings} unaddressed ping(s)", key="ping")
+                self.add_indicator("unaddressed_ping", f"{self.unaddressed_pings} unaddressed message(s)", key="ping")
             else:
                 self.clear_indicator("ping")
         elif type_ == "task.deadline":

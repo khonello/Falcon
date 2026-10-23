@@ -147,7 +147,8 @@ Window {
                     Text { text: spec.admins && spec.admins.length > 1 ? "Ask for help" : "Ask " + (spec.to || "your Admin") + " for help"
                            color: win.ink; font.family: win.sans; font.pixelSize: 14; font.bold: true }
                 }
-                // A ping carries no message: it says "I need you". Whoever you ask sees it, answers, and writes first.
+                // A ping carries no message: it is a request that says "I need you". Whoever you ask sees it and accepts it
+                // (or writes back); then either of you writes whenever you like.
                 Text { width: parent.width; wrapMode: Text.WordWrap; color: win.dim; font.family: win.sans; font.pixelSize: 13
                        text: "They will see that you need them, and write to you when they can. You do not have to say anything now." }
                 Flow {

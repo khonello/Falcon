@@ -129,7 +129,7 @@ async def test_a_follow_rule_is_watched_and_a_deviation_is_recorded_only_when_it
     assert await accountability.sweep(engine, _later(minutes=90)) == 1                                # w2's was not answered
     [dev] = (await su.ok("deviations.list"))["deviations"]
     assert dev["rule"]["code"] == "O-1" and dev["kind"] == "admin" and dev["short"].startswith("Help request from FIN-02")
-    assert dev["expected"] == "An Admin answers the ping within 1 hour" and dev["happened"].startswith("Still not done after 90 minutes")
+    assert dev["expected"] == "An Admin answers the message within 1 hour" and dev["happened"].startswith("Still not done after 90 minutes")
     assert dev["value"] >= 60 and dev["who_sub"] == "Finance Admin"
     assert await accountability.sweep(engine, _later(minutes=95)) == 0                                # once
     assert await engine.db.pool.fetchval("SELECT count(*) FROM rule_watches WHERE state = 'open'") == 0
@@ -229,7 +229,7 @@ async def test_changing_a_rule_is_tried_against_the_past_and_never_rewrites_it(e
     # raising the limit changes the rule; last week's deviations still say what the rule was
     await su.ok("rules.update", {"rule_id": rule["id"], "within": 240, "name": "Help requests are answered in four hours"})
     old = (await su.ok("deviations.list"))["deviations"][0]
-    assert old["rule"]["name"] == "Help requests are answered" and old["expected"] == "An Admin answers the ping within 1 hour"
+    assert old["rule"]["name"] == "Help requests are answered" and old["expected"] == "An Admin answers the message within 1 hour"
     listing = (await su.ok("rules.list"))["rules"]
     mine = next(r for r in listing if r["id"] == rule["id"])
     assert mine["deviations_this_week"] == 2 and mine["open_this_week"] == 2

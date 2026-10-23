@@ -11,9 +11,9 @@ Popup {
     id: root
     objectName: "palette"
     parent: Overlay.overlay
-    x: (parent.width - width) / 2
+    x: Theme.siderW + (parent.width - Theme.siderW - width) / 2     // centred on the area beside the menu, where the search bar is
     y: parent.height * 0.12
-    width: Math.min(640, parent.width - 32)
+    width: Math.min(Theme.paletteW, parent.width - Theme.siderW - 32)
     height: input.height + Math.min(360, list.contentHeight + 12) + 2
     padding: 0
     clip: true

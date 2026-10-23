@@ -64,7 +64,7 @@ An earlier consideration was a single monolithic program that adapts its interfa
 │                                 │          │   │ Overlay exe  │ │Dialog exe │ │
 │   Local state only: last-      │          │   │(Session      │ │(grace     │ │
 │   connected Engine address,    │          │   │ Block /      │ │ warnings, │ │
-│   window prefs, cached view    │          │   │ Traversal    │ │ Ping      │ │
+│   window prefs, cached view    │          │   │ Traversal    │ │ Message   │ │
 │   state. No database.          │          │   │ indicator)   │ │ alerts)   │ │
 │                                 │          │   └──────────────┘ └───────────┘ │
 │   Bundled: pinned Python for   │          │                                  │
@@ -85,7 +85,7 @@ An earlier consideration was a single monolithic program that adapts its interfa
 
 **Operator Client** (Section 4) — one QML codebase, used by both Super User and Admin. What differs between the two is *permission scope and traversal depth*, resolved server-side by the Engine and reflected in what the client is allowed to render/do — not two separate programs. This directly implements Hierarchy's principle that Super User traversing into an Admin sees exactly what that Admin sees: it's the same client rendering the same views, gated by which session/permission context is currently active.
 
-**Worker Client** (Section 5) — headless. A Worker does not "log into" a GUI the way an Operator does; per Hierarchy, Client is a passive information recipient with the narrow Task-interaction exception (view, start, monitor a task — never verify). This narrow surface is a small, focused UI need (task status, alerts, Assistance ping/search) — it does not require the full Operator Client codebase, and keeping it minimal is itself a security boundary: a compromised Worker PC exposes far less capability than a compromised Operator Client would.
+**Worker Client** (Section 5) — headless. A Worker does not "log into" a GUI the way an Operator does; per Hierarchy, Client is a passive information recipient with the narrow Task-interaction exception (view, start, monitor a task — never verify). This narrow surface is a small, focused UI need (task status, alerts, Assistance message/search) — it does not require the full Operator Client codebase, and keeping it minimal is itself a security boundary: a compromised Worker PC exposes far less capability than a compromised Operator Client would.
 
 ---
 
@@ -143,7 +143,7 @@ Last-connected Engine address, window layout/preferences, a cache of the client/
 
 ### 4.4 What Renders Here
 
-Everything in Hierarchy that is Admin-or-above (Session Blocking initiation, Traversal, Display Names configuration, Report Routing configuration, Cross-Department Assisted Access requests), all of Task creation/verification/deadline UI, all of Flow creation/management, all of Resource's Admin-side folders and Assistance's Ping/Message Channel/Listener UI, and the entire Control/Events/Monitoring interface (Section 7.5) including the Dashboard.
+Everything in Hierarchy that is Admin-or-above (Session Blocking initiation, Traversal, Display Names configuration, Report Routing configuration, Cross-Department Assisted Access requests), all of Task creation/verification/deadline UI, all of Flow creation/management, all of Resource's Admin-side folders and Assistance's help message/Message Channel/Listener UI, and the entire Control/Events/Monitoring interface (Section 7.5) including the Dashboard.
 
 ---
 
@@ -154,7 +154,7 @@ Everything in Hierarchy that is Admin-or-above (Session Blocking initiation, Tra
 Headless Python service, bundled with its own pinned embeddable Python runtime (so Custom Action re-validation/execution never depends on a system-installed interpreter — see Section 7.3). Ships two on-demand, non-persistent helper executables, built the same way as the Engine's reference design:
 
 - **Overlay exe** — renders the Session Blocking "inaccessible / traversal in progress" indicator (Hierarchy → Traversal Boundaries) and the Time-Based Restriction-style lockout surface if a Control Action or Event enforces one. Fullscreen or bannered depending on context; re-asserts topmost periodically; exits the moment the underlying session state clears.
-- **Dialog exe** — renders grace-period warnings, Deadline pulsing-status alerts, and Assistance Ping notifications. Spawned on demand via `asyncio.create_subprocess_exec`, non-blocking to the Worker Client's own event loop; the user's response (or timeout) is reported back the same way Custom Action output is reported (Section 7.3).
+- **Dialog exe** — renders grace-period warnings, Deadline pulsing-status alerts, and Assistance message notifications. Spawned on demand via `asyncio.create_subprocess_exec`, non-blocking to the Worker Client's own event loop; the user's response (or timeout) is reported back the same way Custom Action output is reported (Section 7.3).
 
 Both helper executables are QML-based (small, frozen with the same Qt toolchain as the Operator Client) rather than a second UI toolkit — kept deliberately minimal since the Worker Client's whole design goal is a narrow, low-footprint surface.
 
@@ -163,7 +163,7 @@ Both helper executables are QML-based (small, frozen with the same Qt toolchain 
 - Maintain a persistent, authenticated connection to the Engine
 - Enforce Session Blocking locally when a traversal begins (render the overlay, restrict local input while occupied)
 - Execute Control/Monitoring Actions and Custom Actions when instructed by the Engine (Section 7)
-- Surface the narrow Client-side Task interaction (view, start, watch progress — never verify) and Assistance (search, Ping) per Hierarchy's Client exception
+- Surface the narrow Client-side Task interaction (view, start, watch progress — never verify) and Assistance (search, message) per Hierarchy's Client exception
 - Report Global File Index-relevant OS events (file create/modify/move/copy) back to the Engine (Section 6.2)
 - Handle reconnection gracefully; per Hierarchy's traversal/session model, a network drop during an active traversal session must fail safe (see Section 9 open item)
 
@@ -286,7 +286,7 @@ Flow's sync/transformation/categorization pipeline and Control/Events/Monitoring
 
 - **Resource tiers and violation detection:** implemented as Global File Index queries (Section 6.3) plus the tag-comparison logic described in the Resource document — violations logged as warnings, only the specific violating file ignored going forward (never the whole structure), surfaced to the affected user, and written as a routable Report (Section 7.1).
 - **Assistance search:** a Global File Index query scoped to the requesting user's Resource access tier.
-- **Ping vs. Message Channel:** Ping is a lightweight Engine-relayed notification with no lock; the persistent pulsing status is Engine-tracked state (unaddressed-count > 0) pushed to the receiving Operator Client, using the same status-indicator mechanism Task's Deadline alerts use (shared component, not duplicated per-feature). The Message Channel's one-message-per-turn lock is Engine-enforced session state, not a client-side-only restriction (so it can't be bypassed by a modified client).
+- **Help message vs. Message Channel:** A help message is a lightweight Engine-relayed notification with no lock; the persistent pulsing status is Engine-tracked state (unaddressed-count > 0) pushed to the receiving Operator Client, using the same status-indicator mechanism Task's Deadline alerts use (shared component, not duplicated per-feature). The Message Channel's one-message-per-turn lock is Engine-enforced session state, not a client-side-only restriction (so it can't be bypassed by a modified client).
 - **Listeners:** an Engine-side subscription on a Message Channel's message stream, added by either party, visible to the adding party only in their own Operator Client view — enforced by scoping the "list of Listeners you added" query to the requesting user's own additions, never a join across both parties' additions.
 
 ### 7.5 Control, Events, Monitoring & Actions
@@ -318,7 +318,7 @@ TLS for all Engine ↔ Operator Client and Engine ↔ Worker Client traffic. Sel
 
 ### 8.4 Audit Trail
 
-Every traversal, Session Block/end, Task verification action, Flow sync/conflict/failure, Resource compliance check, Ping/Message Channel/Listener event, Assisted Access session, and Event/Action execution is written to one Engine-owned audit log, structured consistently (who, what, when, target) regardless of which combo generated the entry. **Retention: flat 90 days, system-wide, for v1** (per Hierarchy's Audit & Logging), with category-based tiering as an explicitly noted future option, not a v1 requirement.
+Every traversal, Session Block/end, Task verification action, Flow sync/conflict/failure, Resource compliance check, Help message/Message Channel/Listener event, Assisted Access session, and Event/Action execution is written to one Engine-owned audit log, structured consistently (who, what, when, target) regardless of which combo generated the entry. **Retention: flat 90 days, system-wide, for v1** (per Hierarchy's Audit & Logging), with category-based tiering as an explicitly noted future option, not a v1 requirement.
 
 ---
 

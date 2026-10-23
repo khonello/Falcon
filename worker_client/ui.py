@@ -72,26 +72,26 @@ async def search(ctx: UIContext, args: Args) -> str:
     return table(res["results"], ["pc_id", "path", "resource_tag", "last_seen_at"], width=60)
 
 
-@command("ping", usage="<admin_account_id>", help_="Ping your Admin for attention (repeatable)")
+@command("ping", usage="<admin_account_id>", help_="Ask your Admin to talk (a request; repeatable)")
 async def ping(ctx: UIContext, args: Args) -> str:
     res = await ctx.call("assistance.ping", {"to_account_id": args.get_int(0, "admin_account_id")})
-    return f"ping {res['ping_id']} sent -- your Admin sees a pulsing indicator until they respond"
+    return f"message {res['ping_id']} sent -- your Admin sees a pulsing indicator until they accept"
 
 
-@command("pings", help_="Pings waiting for YOUR response (an Admin may ping you for information)")
+@command("pings", help_="Requests waiting for YOU to accept (an Admin may ask you for information)")
 async def pings(ctx: UIContext, args: Args) -> str:
     res = await ctx.call("assistance.ping_status")
     return f"{res['unaddressed']} unaddressed\n" + table(res["pings"], ["id", "from_name", "sent_at"])
 
 
-@command("respond", usage="<ping_id>", help_="Respond to an Admin's ping")
+@command("respond", usage="<ping_id>", help_="Accept an Admin's request to talk")
 async def respond(ctx: UIContext, args: Args) -> str:
     res = await ctx.call("assistance.respond", {"ping_id": args.get_int(0, "ping_id")})
     ctx.scratch["channel"] = res["channel_id"]
-    return f"channel {res['channel_id']}; turn: {res['turn']}"
+    return f"channel {res['channel_id']} open -- write with: msg <text>"
 
 
-@command("msg", usage="[channel_id] <text...>", help_="Post one message (one per turn)")
+@command("msg", usage="[channel_id] <text...>", help_="Post a message")
 async def msg(ctx: UIContext, args: Args) -> str:
     if args.positional and args.positional[0].isdigit():
         channel_id, text = int(args.positional[0]), args.rest(1, "text")
@@ -99,9 +99,9 @@ async def msg(ctx: UIContext, args: Args) -> str:
         channel_id, text = ctx.scratch.get("channel"), args.rest(0, "text")
     if channel_id is None:
         raise UsageError("no channel yet -- give the channel id")
-    res = await ctx.call("assistance.message", {"channel_id": channel_id, "body": text})
+    await ctx.call("assistance.message", {"channel_id": channel_id, "body": text})
     ctx.scratch["channel"] = channel_id
-    return f"sent; now the {res['turn']}'s turn"
+    return "sent"
 
 
 @command("channel", usage="[channel_id]", help_="Show the conversation")
@@ -112,7 +112,7 @@ async def channel(ctx: UIContext, args: Args) -> str:
     res = await ctx.call("assistance.channel", {"channel_id": channel_id})
     ctx.scratch["channel"] = channel_id
     names = res["channel"].get("names", {})
-    state = "closed" if res["channel"].get("closed_at") else ("your turn" if res["channel"].get("my_turn") else "waiting")
+    state = "closed" if res["channel"].get("closed_at") else ("waiting on you" if res["channel"].get("my_turn") else "waiting on them")
     return f"channel {channel_id} -- {state}\n" + ("\n".join(
         f"{m['sent_at'][11:16]}  {names.get(str(m['sender_account_id']), m['sender_account_id'])}: {m['body']}"
         for m in res["messages"]) or "(no messages)")
@@ -120,7 +120,7 @@ async def channel(ctx: UIContext, args: Args) -> str:
 
 @command("channels", help_="Your channels")
 async def channels(ctx: UIContext, args: Args) -> str:
-    return table((await ctx.call("assistance.channels"))["channels"], ["id", "superior_account_id", "turn", "closed_at"])
+    return table((await ctx.call("assistance.channels"))["channels"], ["id", "superior_account_id", "opened_at", "closed_at"])
 
 
 @command("alerts", help_="Alerts delivered to you")
@@ -198,7 +198,7 @@ def describe(type_: str, p: dict[str, Any]) -> str | None:
     if type_ == "task.incomplete":
         return f"task {p.get('task_id')} was verified incomplete -- keep going"
     if type_ == "assistance.ping":
-        return f"PING from {p.get('from_name')} -- `respond {p.get('ping_id')}`"
+        return f"MESSAGE from {p.get('from_name')} -- `respond {p.get('ping_id')}`"
     if type_ == "assistance.channel_opened":
         return f"your Admin responded: channel {p.get('channel_id')} open"
     if type_ == "assistance.message":

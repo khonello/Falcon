@@ -58,13 +58,14 @@ give Workers.
 
 **Mechanism:** Both Soft and Final Deadline are implemented as scheduled Events (see Control, Events, Monitoring & Actions) — "soft deadline reached" and "final deadline reached" are time-based Event conditions, and whatever Actions are attached to them execute when each fires (e.g., notifying the Admin).
 
-**Status Indicator:** Deadline events surface using the same generalized status indicator pattern as Help Ping's unaddressed-message indicator (see Resource & Assistance) — a persistent, high-visibility (bold/pulsing) indicator, with color distinguishing the kind of state (e.g., a distinct color for deadline reached vs. task completed vs. unaddressed ping). This is one shared visual mechanism used across multiple features, not a Task-specific indicator.
+**Status Indicator:** Deadline events surface using the same generalized status indicator pattern as the help message's unaddressed-message indicator (see Resource & Assistance) — a persistent, high-visibility (bold/pulsing) indicator, with color distinguishing the kind of state (e.g., a distinct color for deadline reached vs. task completed vs. unaddressed help message). This is one shared visual mechanism used across multiple features, not a Task-specific indicator.
 
 ### Multi-Task Detection
 
 **Definition:** Handling for when a task description, given in natural language, appears to actually describe more than one distinct piece of work.
 
 **How It Works:**
+- **Superseded (the user, 24 Oct 2026): a description always becomes ONE task.** Whatever it names (files, folders, programs) become that task's targets, and a part that names nothing to check is judged by the assigner when the work is handed in. There is no split proposal. The three points below are kept for the record.
 - The LLM does not silently split the description into multiple tasks, and does not silently force it into one task either
 - Instead, it **proposes a concrete split** — drafting the separate tasks it detected, each pre-filled with whatever is common between them (assigner, assignee, etc.), differing only in what actually needs to differ (Verification targets, Deadline, etc.)
 - The assigner is presented with a direct choice: **"Split into two tasks as shown, or edit as one task?"** — not an open-ended question, but a concrete proposal to accept or decline
@@ -320,5 +321,5 @@ Task closed (or returned for revision).
 11. **Task completion** = verified as a whole unit, not individual items
 12. **Transparency** = assigner sees real-time verification stack status without manual per-item verification
 13. **LLM proposes, never silently resolves** = the single governing rule behind all LLM-assisted parts of Task creation — ambiguous verification targets, ambiguous deadlines, name collisions, and descriptions covering multiple tasks are all surfaced to the assigner as a question or proposal, never silently decided
-14. **Deadline is one Task-level property, not per-item** = Soft and Final deadline apply to the whole task; both are implemented as scheduled Events, and their alerts use the same shared status-indicator pattern as Help Ping
-15. **Multi-Task Detection proposes a concrete split** = when a description seems to cover multiple tasks, the LLM drafts the proposed split (sharing common fields, differing only where needed) and asks the assigner to accept the split or keep it as one task — it never restructures silently
+14. **Deadline is one Task-level property, not per-item** = Soft and Final deadline apply to the whole task; both are implemented as scheduled Events, and their alerts use the same shared status-indicator pattern as the help message
+15. **(Superseded 24 Oct 2026: one description is always one task.) Multi-Task Detection proposes a concrete split** = when a description seems to cover multiple tasks, the LLM drafts the proposed split (sharing common fields, differing only where needed) and asks the assigner to accept the split or keep it as one task — it never restructures silently

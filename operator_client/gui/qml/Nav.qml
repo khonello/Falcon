@@ -64,12 +64,12 @@ QtObject {
     }
 
     // --- the menus ----------------------------------------------------------------------------------
+    // Three groups (19 Oct 2026): Home, Core (the four features), Manage.
     readonly property var adminMenu: [
-        ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
-                  ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
-        ["Monitor", [["machines", "Machines", "desktop"], ["issues", "Issues", "alert"]]],
-        ["Automate", [["automation", "Automation", "thunderbolt"], ["actions", "Actions", "playcircle"]]],
-        ["Govern", [["audit", "Audit log", "history"]]]
+        ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["calendar", "Calendar", "calendar"]]],
+        ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
+        ["Manage", [["machines", "Machines", "desktop"], ["actions", "Actions", "playcircle"], ["automation", "Automation", "thunderbolt"],
+                    ["issues", "Issues", "alert"], ["audit", "Audit log", "history"]]]
     ]
     readonly property var suMenu: [
         ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
@@ -88,7 +88,8 @@ QtObject {
 
     // --- titles: what each page is, in a line --------------------------------------------------------
     readonly property var titles: ({
-        messages: ["Messages", "Conversations, and announcements to the people you look after"],
+        calendar: ["Calendar", "What is coming · deadlines, scheduled automation and announcements waiting to go out"],
+        messages: ["Messages", "Conversations with the people you work with; a request opens one once it is accepted"],
         detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"],
         departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"],
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
@@ -118,6 +119,7 @@ QtObject {
         if (!boss && p === "registry") return "This department's machines and people · register, re-key, and let a new machine in"
         if (boss && p === "tasks") return "What you have given each department, and how far it has got"
         if (boss && p === "flows") return "Every flow in the organisation, by the department it starts in"
+        if (boss && p === "calendar") return "What is coming · task deadlines and announcements waiting to go out"
         return titles[p] ? titles[p][1] : ""
     }
 }

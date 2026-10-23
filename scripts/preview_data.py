@@ -70,6 +70,28 @@ def _session(host: str) -> dict[str, Any] | None:
     return None
 
 
+def calendar_board() -> dict[str, Any]:
+    """What is coming, as `calendar.board` answers it: a few deadlines, a rule that runs every weekday at 09:00, announcements waiting to go out."""
+    items = []
+    def add(kind: str, hours: float, title: str, line: str, to: list[str], overdue: bool = False) -> None:
+        items.append({"kind": kind, "at": at(hours), "title": title, "line": line, "to": to, "overdue": overdue})
+    add("task", -5, "Confirm who covers the front desk during the training week", "Operations", ["tasks", "D-11"], True)
+    add("task", 3, "Prepare the stock count for the auditors", "Finance", ["tasks", "D-13"])
+    add("task", 28, "Collect the signed leave forms from every team", "Operations", ["tasks", "D-14"])
+    add("task", 74, "Move last year's tender files to the archive", "From the Super User", ["tasks", "D-12"])
+    add("announcement", 18.7, "Fire drill on Friday morning", "Your department", ["messages", "announcements"])
+    add("announcement", 24 * 6 + 9, "Month-end: timesheets in by 17:00", "Your department", ["messages", "announcements"])
+    add("announcement", 24 * 20 + 8, "Offices closed on the public holiday", "Your department", ["messages", "announcements"])
+    add("announcement", 24 * 45 + 8, "Year-end training week starts on Monday", "Your department", ["messages", "announcements"])
+    for d in range(60):
+        day = NOW + timedelta(days=d)
+        when = day.replace(hour=9, minute=0)
+        if day.weekday() < 5 and when > NOW:
+            items.append({"kind": "rule", "at": when.isoformat(), "title": "Daily maintenance", "line": "2 actions", "to": ["automation", "4"], "overdue": False})
+    items.sort(key=lambda x: x["at"])
+    return {"now": NOW.isoformat(), "until": at(124 * 24), "items": items, "cut": False}
+
+
 def tree(role: str, dept_id: int | None) -> dict[str, Any]:
     out = []
     for did, name in DEPTS:
@@ -202,7 +224,7 @@ RULES = [  # id, code, name, shape, spec, builtin, enabled, this week, open
 ]
 SENT = {1: "A copy of a restricted file appears where it is not allowed: always a deviation.", 2: "A second session starts on a machine already in use: always a deviation.",
         3: "A new version is approved, then the machine runs that version within 2 days.", 4: "A machine presents a name that does not match what it was registered with: always a deviation.",
-        5: "A worker pings for help, then an Admin answers the ping within 1 hour.", 6: "Admin entries outside working hours: none per week."}
+        5: "A worker messages for help, then an Admin answers the message within 1 hour.", 6: "Admin entries outside working hours: none per week."}
 
 
 def rules_list() -> dict[str, Any]:
@@ -216,7 +238,7 @@ def rules_list() -> dict[str, Any]:
 def rules_library() -> dict[str, Any]:
     lib = [{"key": "restricted-leaves", "name": "Restricted file leaves its folder", "shape": "never", "summary": "A copy of a marked file appears where its mark does not allow it.",
             "spec": {"trigger": "file", "who": "everyone", "depts": "all", "resp": {"report": True, "admin": True}}},
-           {"key": "unanswered-help", "name": "Unanswered help request", "shape": "follow", "summary": "A worker pinged for help and nobody answered in time.",
+           {"key": "unanswered-help", "name": "Unanswered help request", "shape": "follow", "summary": "A worker messaged for help and nobody answered in time.",
             "spec": {"trigger": "help", "expect": "answer", "within": 60, "who": "admins", "depts": "all", "resp": {"report": True, "admin": True}}},
            {"key": "past-update-limit", "name": "Machine past the update limit", "shape": "follow", "summary": "A machine is still not on the approved version after the time allowed.",
             "spec": {"trigger": "version", "expect": "updated", "within": 2880, "who": "machines", "depts": "all", "resp": {"report": True, "admin": True}}},
@@ -472,8 +494,8 @@ def audit(role: str, dept_id: int | None, limit: int) -> dict[str, Any]:
         (-3.3, "System", "Copy of restricted budget-2026.xlsx found", "OPS-07", "resource.violation"),
         (-3.8, "System", "Copy of restricted salaries.csv found", "OPS-03", "resource.violation"),
         (-4.1, "System", "Certificate presented WS-OPS-05, expected OPS-05", "OPS-05", "deviation.hostname"),
-        (-3.6, "Kojo", "Pinged R. Mensah", "OPS-01", "assistance.ping"),
-        (-3.1, "Kojo", "Pinged R. Mensah again", "OPS-01", "assistance.ping"),
+        (-3.6, "Kojo", "Messaged R. Mensah", "OPS-01", "assistance.ping"),
+        (-3.1, "Kojo", "Messaged R. Mensah again", "OPS-01", "assistance.ping"),
         (-2.6, "You", "Entered OPS-07", "OPS-07", "session.traversed"),
         (-0.8, "R. Mensah", "Entered OPS-03", "OPS-03", "session.traversed"),
         (-0.6, "Automation", "CPU above 90% for 5 min on OPS-03, notified R. Mensah", "OPS-03", "control.event_fired"),
@@ -599,6 +621,23 @@ def channels(account: int) -> dict[str, Any]:
                          for c in CHANNELS if _visible(c, account)]}
 
 
+# everyone a console may message, as `assistance.people` answers: the Super User's Admins (no request needed);
+# an Admin's Super User, the other Admins and their own workers (each a request)
+_ADMINS = {7: ("R. Mensah", "Operations"), 9: ("A. Quaye", "Operations"), 8: ("K. Boateng", "Finance")}
+
+
+def people(role: str, account: int) -> list[dict[str, Any]]:
+    if role == "super_user":
+        return [{"account_id": i, "name": n, "role": "admin", "department_name": d, "hostname": None, "request": False}
+                for i, (n, d) in _ADMINS.items()]
+    out = [{"account_id": 1, "name": "Super User", "role": "super_user", "department_name": None, "hostname": None, "request": True}]
+    out += [{"account_id": i, "name": n, "role": "admin", "department_name": d, "hostname": None, "request": True}
+            for i, (n, d) in _ADMINS.items() if i != account]
+    out += [{"account_id": i, "name": ACCOUNTS[i], "role": "worker", "department_name": None, "hostname": h, "request": True}
+            for i, h in ((21, "OPS-01"), (23, "OPS-03"), (27, "OPS-07"))]
+    return out
+
+
 def channel(cid: int, account: int) -> dict[str, Any] | None:
     c = next((x for x in CHANNELS if x[0] == cid), None)
     if c is None:
@@ -607,7 +646,8 @@ def channel(cid: int, account: int) -> dict[str, Any] | None:
     return {"channel": {"id": c[0], "initiator_account_id": c[1], "superior_account_id": c[2], "subordinate_account_id": c[1],
                         "turn": c[3], "opened_at": today(c[4]), "closed_at": today(c[5]) if c[5] is not None else None,
                         "names": {str(c[1]): ACCOUNTS.get(c[1]), str(c[2]): ACCOUNTS.get(c[2])},
-                        "my_turn": c[5] is None and account == turn_of},
+                        "my_turn": c[5] is None and account == turn_of,      # waiting on me; no turn lock since 22 Oct 2026
+                        "can_close": c[5] is None and account == c[2]},
             "messages": [{"id": k, "sender_account_id": who, "body": text, "sent_at": today(t)} for k, (t, who, text) in enumerate(c[6])]}
 
 
@@ -801,6 +841,8 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
                 "can_decide": [5] if role == "super_user" else []}
     if type_ == "handover.status":
         return {"open": False, "waiting": []}
+    if type_ == "calendar.board":
+        return calendar_board()
     if type_ == "hierarchy.tree":
         return tree(role, dept_id)
     if type_ == "hierarchy.sessions_today":
@@ -873,6 +915,8 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return channel(int(payload.get("channel_id") or 0), account)
     if type_ == "assistance.my_admins":
         return {"admins": [{"account_id": 1, "name": "Super User", "role": "super_user"}] if role == "admin" else []}
+    if type_ == "assistance.people":
+        return {"people": people(role, account)}
     if type_ == "index.folders":
         fs = [r"C:\Finance", r"C:\Finance\Invoices", r"C:\HR", r"C:\HR\Payroll", r"C:\HR\Reviews", r"C:\HR\Contracts",
               r"C:\Users\RMensah\Documents", r"C:\Users\RMensah\Desktop", r"D:\Board", r"D:\Archive"]

@@ -13,10 +13,10 @@ QtObject {
 
     readonly property var trig: ({
         file: "A copy of a restricted file appears where it is not allowed", second: "A second session starts on a machine already in use",
-        cert: "A machine presents a certificate that does not match its name", help: "A worker pings for help",
+        cert: "A machine presents a certificate that does not match its name", help: "A worker messages for help",
         report: "A report is written for a department", version: "A new version is approved", outhours: "Someone enters a machine outside working hours",
         task: "A department task is given", seat: "A department loses its last Admin" })
-    readonly property var exp: ({ answer: "An Admin answers the ping", addressed: "Someone marks the report addressed", updated: "The machine runs that version",
+    readonly property var exp: ({ answer: "An Admin answers the message", addressed: "Someone marks the report addressed", updated: "The machine runs that version",
                                   seen: "An Admin marks it seen", appoint: "Another Admin is appointed" })
     readonly property var readings: ["Admin entries outside working hours", "Admin entries into other departments' machines", "Entries into one machine by the same Admin", "Failed sign-ins on one machine"]
     readonly property var readingKeys: ["outhours", "crossdept", "samemachine", "failedauth"]     // the Engine's names for the readings, in the same order
@@ -47,7 +47,7 @@ QtObject {
                                                                  resp: sp.resp ? { report: !!sp.resp.report, admin: !!sp.resp.admin, action: false, actionId: "" } : undefined } }
     }) : conceptTemplates
     readonly property var conceptTemplates: [
-        { id: "t-help", name: "Unanswered help request", d: "A worker pings; an Admin has an hour to answer.", state: { shape: "follow", trigger: "help", expect: "answer", within: { n: 1, unit: "hours" }, who: "admins" } },
+        { id: "t-help", name: "Unanswered help request", d: "A worker sends a message; an Admin has an hour to answer.", state: { shape: "follow", trigger: "help", expect: "answer", within: { n: 1, unit: "hours" }, who: "admins" } },
         { id: "t-report", name: "Reports left waiting", d: "A report is written; someone has an hour to address it.", state: { shape: "follow", trigger: "report", expect: "addressed", within: { n: 1, unit: "hours" }, who: "admins" } },
         { id: "t-cross", name: "An Admin outside their department", d: "More than three entries into another department's machines in a week.", state: { shape: "limit", reading: readings[1], limit: { n: 3, per: "week" }, who: "admins" } },
         { id: "t-night", name: "Out-of-hours session", d: "Anyone entering a machine outside working hours.", state: { shape: "never", trigger: "outhours", who: "everyone" } },

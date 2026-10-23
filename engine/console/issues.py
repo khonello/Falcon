@@ -192,21 +192,38 @@ async def _load(ctx: Context, issue_id: int) -> dict[str, Any]:
     return issue
 
 
+# what the audit trail may add to an issue's story: only the kinds of event that belong to its kind. A machine records a great deal besides (a flow
+# syncing, a routine update check, someone signing in), and none of that is part of why a restricted copy was found.
+RELATED_KINDS = {"file": {"violation", "session"}, "update": {"rollout", "session"}, "deviation": {"deviation", "session"}, "flow": {"flow"},
+                 "offline": {"session", "rollout"}, "component": {"session"}}
+
+
 async def _timeline(ctx: Context, issue: dict[str, Any]) -> list[dict[str, Any]]:
-    """What was recorded about the issue, and what the audit trail shows on its machine around it."""
+    """The issue's story, oldest first: what was recorded about it (raised, handed on, what you did), who it is assigned to, the time it should take, and
+    what the audit trail shows on its machine around it that belongs to this kind of issue."""
     db = ctx.engine.db
     ident = ctx.identity
     entries = await db.issues.entries(issue["id"])
-    names = await db.accounts.display_names_for(ident.account_id, sorted({e["actor_account_id"] for e in entries if e["actor_account_id"]})) if entries else {}
+    people = {e["actor_account_id"] for e in entries if e["actor_account_id"]} | ({issue["owner_account_id"]} if issue["owner_account_id"] else set())
+    names = await db.accounts.display_names_for(ident.account_id, sorted(people)) if people else {}
     out = [{"at": _iso(e["at"]), "who": (names.get(e["actor_account_id"]) if e["actor_account_id"] else "System"),
             "what": e["text"], "kind": e["kind"], "you": e["actor_account_id"] == ident.account_id} for e in entries]
+    opened = issue["opened_at"]
+    if issue["owner_account_id"]:
+        owner = "you" if issue["owner_account_id"] == ident.account_id else names.get(issue["owner_account_id"], "someone")
+        out.append({"at": _iso(opened + timedelta(seconds=1)), "who": "System", "what": f"Assigned to {owner}", "kind": "system", "you": False})
+    target = opened + timedelta(hours=issue["target_hours"])
+    late = datetime.now(timezone.utc) > target and issue["resolved_at"] is None
+    out.append({"at": _iso(target), "who": "System", "what": (f"Passed its target time ({issue['target_hours']} h)" if late else f"Target time ({issue['target_hours']} h)"),
+                "kind": "violation" if late else "system", "you": False})
     if issue["pc_id"] is not None:
-        since = issue["opened_at"] - timedelta(hours=2)
+        since = opened - timedelta(hours=2)
         until = (issue["resolved_at"] or datetime.now(timezone.utc)) + timedelta(minutes=1)
         around = await db.audit.feed(since=since, until=until, kinds=None, pc_id=issue["pc_id"], department_id=None,
-                                     actor_account_id=None, before_id=None, limit=8)
+                                     actor_account_id=None, before_id=None, limit=40)
+        allowed = RELATED_KINDS.get(issue["type"], set())
         for e in await describe_many(db, around, ident.account_id):
-            if e["action_type"].startswith("issue."):
+            if e["action_type"].startswith("issue.") or e["kind"] not in allowed:
                 continue
             out.append({"at": e["at"], "who": e["actor"], "what": e["what"], "kind": e["kind"], "you": False})
     return sorted(out, key=lambda e: e["at"])

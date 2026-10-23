@@ -15,16 +15,16 @@ def describe_push(type_: str, p: dict[str, Any]) -> tuple[str, bool]:
     if type_ == "session.extended":
         return f"traversal extended until {str(p.get('deadline_at', ''))[11:16]}", False
     if type_ == "assistance.ping":
-        return f"PING from {p.get('from_name')} (account {p.get('from_account_id')}) -- `respond {p.get('ping_id')}`", True
+        return f"REQUEST TO TALK from {p.get('from_name')} (account {p.get('from_account_id')}) -- accept: `respond {p.get('ping_id')}`", True
     if type_ == "assistance.ping_status":
         n = p.get("unaddressed", 0)
-        return (f"{n} unaddressed ping(s)" if n else ""), bool(n)
+        return (f"{n} request(s) to talk waiting for you" if n else ""), bool(n)
     if type_ == "assistance.channel_opened":
-        return f"channel {p.get('channel_id')} opened; turn: {p.get('turn')}", False
+        return f"channel {p.get('channel_id')} opened -- write with: msg <text>", False
     if type_ == "assistance.message":
         return f"[channel {p.get('channel_id')}] account {p.get('from_account_id')}: {p.get('body')}", False
     if type_ == "assistance.channel_closed":
-        return f"channel {p.get('channel_id')} closed by the superior", False
+        return f"channel {p.get('channel_id')} closed", False
     if type_ == "assistance.listening":
         return f"you are now listening on channel {p.get('channel_id')}", False
     if type_ == "task.assigned":

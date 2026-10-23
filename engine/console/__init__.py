@@ -7,6 +7,7 @@ what the console can *do* goes through the combo's own handlers.
 
     feed      -- the audit trail as events: a kind, a plain sentence, the machine, the person; counts; export; live push
     machines  -- the fleet with each machine's health, and one machine's page
+    calendar  -- what is coming: task deadlines, rules that run on a clock, announcements waiting to go out
     rules     -- the standard: built-in locked rules and the Super User's patterns (never / follow / limit)
     automation -- the Automation and Actions pages: rules with how often they fired and how their runs ended, runs per day, a test on one machine
     deviations -- departures from a rule, with context, evidence and an outcome a person gives
@@ -25,6 +26,7 @@ what the console can *do* goes through the combo's own handlers.
 from engine.console import (  # noqa: F401
     accountability,
     automation,
+    calendar,
     components,
     deviations,
     feed,

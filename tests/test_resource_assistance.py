@@ -2,8 +2,9 @@
 
 Pins resource-assistance-combo.md: tags from tier folders, restricted files tracked by hash,
 violations logged + surfaced + reported + that one file ignored (never deleted); tier-scoped
-search; ping repeatable with a pulsing status; channel opens on response with the
-one-message-per-turn lock; only the superior closes.
+search; ping repeatable with a pulsing status; channel opens when the request is accepted, and then
+either party writes whenever they like (no turn lock); the Super User's message to an Admin opens at
+once; two Admins ask each other and either closes; otherwise only the superior closes.
 """
 
 from __future__ import annotations
@@ -67,12 +68,12 @@ async def test_search_is_tier_scoped(engine, org, connect):
     assert names(await su.ok("assistance.search", {"query": "budget"})) == ["budget-secret.xlsx", "budget-template.docx"]
 
 
-async def test_ping_channel_lock_and_close(engine, org, connect):
+async def test_ping_channel_and_close(engine, org, connect):
     a1 = await connect("cid-a1")
     a2 = await connect("cid-a2")
     w1 = await connect("cid-w1")
     w2 = await connect("cid-w2")
-    # Pings only between direct vertical pairs.
+    # Pings only between direct vertical pairs (and two Admins, below).
     assert await w1.err("assistance.ping", {"to_account_id": org["w2"]}) == "forbidden"
     assert await w1.err("assistance.ping", {"to_account_id": org["a2"]}) == "forbidden"
     assert await w1.err("assistance.ping", {"to_account_id": org["su"]}) == "forbidden"
@@ -91,15 +92,17 @@ async def test_ping_channel_lock_and_close(engine, org, connect):
     assert (await a1.ok("assistance.ping_status"))["unaddressed"] == 0
     assert "assistance.channel_opened" in w1.push_types(await w1.drain_pushes())
 
-    # Turn lock: the sender speaks first; the superior must wait, then it flips.
-    assert await a1.err("assistance.message", {"channel_id": chan, "body": "too early"}) == "conflict"
+    # No turn lock: either side writes whenever they like; `turn` only says who owes an answer.
     await w1.ok("assistance.message", {"channel_id": chan, "body": "printer is down"})
-    assert await w1.err("assistance.message", {"channel_id": chan, "body": "and also..."}) == "conflict"
-    msg = next(p for p in await a1.drain_pushes() if p.type == "assistance.message")
-    assert msg.payload["body"] == "printer is down" and msg.payload["turn"] == "superior"
+    await w1.ok("assistance.message", {"channel_id": chan, "body": "the one on the second floor"})
+    msg = [p for p in await a1.drain_pushes() if p.type == "assistance.message"]
+    assert [m.payload["body"] for m in msg] == ["printer is down", "the one on the second floor"]
+    assert msg[-1].payload["turn"] == "superior" and (await a1.ok("assistance.channel", {"channel_id": chan}))["channel"]["my_turn"]
     await a1.ok("assistance.message", {"channel_id": chan, "body": "restart it"})
+    await a1.ok("assistance.message", {"channel_id": chan, "body": "then try again"})
     view = await w1.ok("assistance.channel", {"channel_id": chan})
-    assert [m["body"] for m in view["messages"]] == ["printer is down", "restart it"] and view["channel"]["my_turn"]
+    assert [m["body"] for m in view["messages"]] == ["printer is down", "the one on the second floor", "restart it",
+                                                     "then try again"] and view["channel"]["my_turn"]
     assert await w2.err("assistance.channel", {"channel_id": chan}) == "forbidden"
 
     # Nobody outside the two is told, and nobody outside them can read: an Admin of another department hears nothing.
@@ -116,14 +119,78 @@ async def test_ping_channel_lock_and_close(engine, org, connect):
     assert "assistance.channel_closed" in w1.push_types(await w1.drain_pushes())
     assert await a1.err("assistance.message", {"channel_id": chan, "body": "x"}) == "conflict"
 
-    # Superior-initiated: Admin pings Worker; Worker responds; Admin speaks first; Admin still closes.
+    # Superior-initiated: Admin pings Worker; Worker accepts; the Admin is the one awaited; Admin still closes.
     p2 = await a1.ok("assistance.ping", {"to_account_id": org["w1"]})
     opened2 = await w1.ok("assistance.respond", {"ping_id": p2["ping_id"]})
     assert opened2["turn"] == "superior" and opened2["superior_account_id"] == org["a1"]
-    assert await w1.err("assistance.message", {"channel_id": opened2["channel_id"], "body": "?"}) == "conflict"
+    # The Worker finds it among their channels, though the Admin is both its initiator and its superior.
+    assert opened2["channel_id"] in [c["id"] for c in (await w1.ok("assistance.channels"))["channels"]]
+    await w1.ok("assistance.message", {"channel_id": opened2["channel_id"], "body": "yes?"})
     await a1.ok("assistance.message", {"channel_id": opened2["channel_id"], "body": "status?"})
     assert await w1.err("assistance.close_channel", {"channel_id": opened2["channel_id"]}) == "forbidden"
     await a1.ok("assistance.close_channel", {"channel_id": opened2["channel_id"]})
+
+
+async def test_super_user_writes_to_an_admin_without_a_request(engine, org, connect):
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")
+    # An Admin's request to the Super User waits to be accepted, pulsing...
+    await a1.ok("assistance.ping", {"to_account_id": org["su"]})
+    assert (await su.ok("assistance.ping_status"))["unaddressed"] == 1
+    await su.drain_pushes()
+    await a1.drain_pushes()
+    # ...but the Super User writing to that Admin opens the channel at once, with nothing for the Admin to accept,
+    # and it answers the Admin's own request too.
+    r = await su.ok("assistance.ping", {"to_account_id": org["a1"]})
+    assert r["opened"] is True and r["superior_account_id"] == org["su"]
+    assert (await a1.ok("assistance.ping_status"))["unaddressed"] == 0
+    assert (await su.ok("assistance.ping_status"))["unaddressed"] == 0
+    kinds = a1.push_types(await a1.drain_pushes())
+    assert "assistance.channel_opened" in kinds and "assistance.ping" not in kinds
+    await su.ok("assistance.message", {"channel_id": r["channel_id"], "body": "a word about Friday"})
+    await su.ok("assistance.message", {"channel_id": r["channel_id"], "body": "and the audit"})
+    assert [m["body"] for m in (await a1.ok("assistance.channel", {"channel_id": r["channel_id"]}))["messages"]] == \
+        ["a word about Friday", "and the audit"]
+    # Writing again reuses the open channel.
+    again = await su.ok("assistance.ping", {"to_account_id": org["a1"]})
+    assert again["channel_id"] == r["channel_id"] and again["opened"] is False
+    assert await a1.err("assistance.close_channel", {"channel_id": r["channel_id"]}) == "forbidden"
+    await su.ok("assistance.close_channel", {"channel_id": r["channel_id"]})
+
+
+async def test_two_admins_ask_each_other_and_either_closes(engine, org, connect):
+    a1 = await connect("cid-a1")
+    a2 = await connect("cid-a2")
+    # A request between peers: it pulses for the receiver until accepted.
+    p = await a1.ok("assistance.ping", {"to_account_id": org["a2"]})
+    assert (await a2.ok("assistance.ping_status"))["unaddressed"] == 1
+    assert await a1.err("assistance.message", {"channel_id": 0, "body": "x"}) == "not_found"
+    opened = await a2.ok("assistance.respond", {"ping_id": p["ping_id"]})
+    chan = opened["channel_id"]
+    assert opened["opened"] is True and (await a2.ok("assistance.ping_status"))["unaddressed"] == 0
+    await a1.ok("assistance.message", {"channel_id": chan, "body": "can you cover Monday?"})
+    await a2.ok("assistance.message", {"channel_id": chan, "body": "yes"})
+    for side in (a1, a2):
+        assert (await side.ok("assistance.channel", {"channel_id": chan}))["channel"]["can_close"]
+    # Neither is the other's superior: the one who asked may close it too.
+    await a1.ok("assistance.close_channel", {"channel_id": chan})
+    assert "assistance.channel_closed" in a2.push_types(await a2.drain_pushes())
+    assert await a2.err("assistance.message", {"channel_id": chan, "body": "x"}) == "conflict"
+
+
+async def test_who_each_person_may_message(engine, org, connect):
+    su = await connect("cid-su")
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1")
+    mine = lambda r: {p["account_id"]: p["request"] for p in r["people"]}
+    # The Super User: every Admin, with no request to accept.
+    s = mine(await su.ok("assistance.people"))
+    assert org["a1"] in s and org["a2"] in s and not any(s.values()) and org["w1"] not in s
+    # An Admin: the Super User, the other Admins and their own Workers -- each a request.
+    a = mine(await a1.ok("assistance.people"))
+    assert set(a) == {org["su"], org["a2"], org["w1"], org["w2"]} and all(a.values())        # w2 is in a1's department too
+    # A Worker: their own Admin only.
+    assert set(mine(await w1.ok("assistance.people"))) == {org["a1"]}
 
 
 async def test_a_person_can_ask_who_they_may_ask_for_help(engine, org, connect):

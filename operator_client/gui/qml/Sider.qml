@@ -7,7 +7,7 @@ import "."
 Rectangle {
     id: root
     signal leave()
-    width: 216
+    width: Theme.siderW
     color: Theme.surface
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.border }
 

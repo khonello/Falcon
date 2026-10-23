@@ -349,7 +349,7 @@ A file or folder marked **where it already is**, on the marker's own workstation
 
 ---
 
-## 7. Assistance (Ping, Message Channel, Listeners)
+## 7. Assistance (Help message, Message Channel, Listeners)
 
 ### `pings`
 | Column | Type | Notes |
@@ -358,17 +358,17 @@ A file or folder marked **where it already is**, on the marker's own workstation
 | `sender_account_id` | INTEGER FK → accounts.id NOT NULL | |
 | `receiver_account_id` | INTEGER FK → accounts.id NOT NULL | Must be `sender`'s direct superior — enforced in application logic |
 | `sent_at` | TIMESTAMP NOT NULL | |
-| `addressed_at` | TIMESTAMP NULLABLE | NULL = contributes to the receiver's persistent pulsing status; **repeatable, no lock** — no UNIQUE constraint preventing multiple unaddressed pings from the same sender |
+| `addressed_at` | TIMESTAMP NULLABLE | NULL = contributes to the receiver's persistent pulsing status; **repeatable, no lock** — no UNIQUE constraint preventing multiple unaddressed help messages from the same sender |
 
 ### `message_channels`
 | Column | Type | Notes |
 |---|---|---|
 | `id` | INTEGER PK | |
-| `opened_via_ping_id` | INTEGER FK → pings.id NOT NULL | A channel always opens because a superior responded to a Ping |
-| `initiator_account_id` | INTEGER FK → accounts.id NOT NULL | Whoever sent the original Ping (may be subordinate or superior — Admin can Ping Worker for information, too) |
-| `superior_account_id` | INTEGER FK → accounts.id NOT NULL | Whoever holds closing authority, **always the superior regardless of who initiated** |
-| `turn` | TEXT NOT NULL CHECK (`turn` IN ('sender','superior')) | Whose turn it currently is — this single column *is* the one-message-per-turn lock |
-| `closed_at` | TIMESTAMP NULLABLE | Set only by `superior_account_id` — enforced in application logic |
+| `opened_via_ping_id` | INTEGER FK → pings.id NOT NULL | A channel always opens from a request: the receiver accepted it, or it is the Super User's own to an Admin, recorded and addressed at once (22 Oct 2026) |
+| `initiator_account_id` | INTEGER FK → accounts.id NOT NULL | Whoever sent the original help message (may be subordinate or superior — an Admin can message a Worker for information, too) |
+| `superior_account_id` | INTEGER FK → accounts.id NOT NULL | Whoever holds closing authority, **always the superior regardless of who initiated**. Between two Admins it is the one who accepted, though either may close |
+| `turn` | TEXT NOT NULL CHECK (`turn` IN ('sender','superior')) | Who owes an answer (the party the channel waits on). It is no longer a lock: the one-message-per-turn rule was dropped on 22 Oct 2026 |
+| `closed_at` | TIMESTAMP NULLABLE | Set only by `superior_account_id` (or either Admin when both are Admins) — enforced in application logic |
 | `opened_at` | TIMESTAMP NOT NULL | |
 
 ### `messages`

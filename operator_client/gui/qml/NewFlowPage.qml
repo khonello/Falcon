@@ -213,9 +213,9 @@ Page {
                         Segmented { options: [{ value: "dir", label: "A folder" }, { value: "flow", label: "An existing flow" }]; value: "dir"
                                     onPicked: function (v) { if (v === "flow") { Msg.warn("Continuing another flow is not built in the Engine yet"); value = "dir" } } }
                         Flow { width: parent.width; spacing: 10
-                               Select { width: Math.min(280, parent.width); search: true; placeholder: "Machine"; value: page.src.pc || null; options: page.hosts; enabled: !page.editId
+                               Select { width: Math.floor((parent.width - 10) * 0.58); search: true; placeholder: "Machine"; value: page.src.pc || null; options: page.hosts; enabled: !page.editId
                                         onPicked: function (v) { page.src = { pc: v, path: page.src.path } } }
-                               FolderField { width: Math.min(200, parent.width); pcId: page.src.pc; text: page.src.path; placeholder: "Folder"
+                               FolderField { width: parent.width - 10 - Math.floor((parent.width - 10) * 0.58); pcId: page.src.pc; text: page.src.path; placeholder: "Folder"
                                              onEdited: function (t) { page.src = { pc: page.src.pc, path: t } } } }
                         // what a deletion at the source does at the destinations: chosen here, where the source is chosen, and told in words
                         Txt { text: "When a file is deleted here"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
@@ -247,15 +247,15 @@ Page {
                             required property int index
                             onRemove: { var s = page.stages.slice(); s.splice(index, 1); page.stages = s }
                             Flow { width: parent.width; spacing: 10
-                                   Select { width: 130; value: modelData.kind; options: ["Transform", "Categorize"]; onPicked: function (v) { page.setStage(index, { kind: v, op: page.stageOps[v][0] }) } }
-                                   Select { width: Math.min(200, parent.width); value: modelData.op; options: page.stageOps[modelData.kind].indexOf(modelData.op) < 0 ? [modelData.op].concat(page.stageOps[modelData.kind]) : page.stageOps[modelData.kind]
+                                   Select { width: Math.floor((parent.width - 10) * 0.42); value: modelData.kind; options: ["Transform", "Categorize"]; onPicked: function (v) { page.setStage(index, { kind: v, op: page.stageOps[v][0] }) } }
+                                   Select { width: parent.width - 10 - Math.floor((parent.width - 10) * 0.42); value: modelData.op; options: page.stageOps[modelData.kind].indexOf(modelData.op) < 0 ? [modelData.op].concat(page.stageOps[modelData.kind]) : page.stageOps[modelData.kind]
                                             onPicked: function (v) { page.setStage(index, { op: v }) } } }
                             // below the close button, so this row may use the card's right padding too
                             Flow { width: parent.width + 40; spacing: 8
                                    Txt { height: aseg.height; verticalAlignment: Text.AlignVCenter; text: "Applies to"; color: Theme.text3; font.pixelSize: 12 }
                                    Segmented { id: aseg; block: page.applyW > parent.width; width: block ? parent.width : implicitWidth; options: [{ value: "all", label: "Every destination (before the split)" }, { value: "one", label: "One destination" }]
                                                value: modelData.scope === "all" ? "all" : "one"; onPicked: function (v) { page.setStage(index, { scope: v === "all" ? "all" : 0 }) } }
-                                   Select { visible: modelData.scope !== "all"; width: Math.min(200, parent.width); small: true; value: modelData.scope
+                                   Select { visible: modelData.scope !== "all"; width: Math.min(240, parent.width); small: true; value: modelData.scope
                                             options: page.dests.map(function (d, j) { return { value: j, label: d.mode === "ask" ? "Destination " + (j + 1) : d.pc ? page.hostName(d.pc) + " " + d.path : "Destination " + (j + 1) } })
                                             onPicked: function (v) { page.setStage(index, { scope: v }) } } }
                         }
@@ -279,12 +279,12 @@ Page {
                             Segmented { visible: !Nav.boss; options: [{ value: "mine", label: "A machine you manage" }, { value: "ask", label: "Ask someone to pick" }]
                                         value: modelData.mode; onPicked: function (v) { page.setDest(index, { mode: v }) } }
                             Flow { visible: modelData.mode === "mine"; width: parent.width; spacing: 10
-                                   Select { width: Math.min(280, parent.width); search: true; placeholder: "Machine"; value: modelData.pc || null; options: page.hosts; onPicked: function (v) { page.setDest(index, { pc: v }) } }
-                                   FolderField { width: Math.min(200, parent.width); pcId: modelData.pc; text: modelData.path; onEdited: function (t) { page.setDest(index, { path: t }) } } }
+                                   Select { width: Math.floor((parent.width - 10) * 0.58); search: true; placeholder: "Machine"; value: modelData.pc || null; options: page.hosts; onPicked: function (v) { page.setDest(index, { pc: v }) } }
+                                   FolderField { width: parent.width - 10 - Math.floor((parent.width - 10) * 0.58); pcId: modelData.pc; text: modelData.path; onEdited: function (t) { page.setDest(index, { path: t }) } } }
                             Txt { visible: modelData.mode === "mine" && modelData.pc > 0; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
                                   text: Nav.boss ? "You manage every machine, so nobody has to agree." : "If it is not yours, its owner is asked to agree before anything is copied there." }
                             Txt { visible: modelData.mode === "ask"; width: parent.width; color: Theme.med; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                                  text: "Asking the Super User or another Admin to pick a folder on their own workstation is not built in the Engine yet. Pick their machine and folder instead: they are asked to agree." }
+                                  text: "Asking the Super User or another Admin to pick a folder on their own workstation is not built in the Engine yet. Pick their machine and folder instead: they are asked to agree. An Admin in another department must agree before anything is copied into it." }
                         }
                     }
                     Rectangle { visible: page.dests.length > 8; width: parent.width; height: wt.height + 20; radius: 6; color: Theme.alpha(Theme.med, 0.09)

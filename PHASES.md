@@ -91,7 +91,7 @@ deployment** → **8 human passes (on the installed thing)** → **10 hardening 
 - [x] Task: model chosen empirically, closing the size half of spec §7.2.1. **Qwen3-1.7B-Q8_0 is now the default**: held-out 29/32 against the 0.6B's 24/32 (and 13/24 with no model at all), at ~5s per call versus ~1.4s. Recorded trap: forcing the answer with a GBNF grammar masks Qwen3's `<think>` token and makes any model look collapsed — ask unconstrained and let an unparsed answer mean "surface to the assigner"
 - [x] Flow: create/edit with consent (by authority; owner asked, flow paused until answered), pre-flight collision (confirm or change path), overlap-aware cycle prevention, resource-folder exclusion; propagation relayed via flow.read → flow.content → flow.apply with per-destination stage chains; write attribution vs external edits → `-modified` + re-sync; branch-scoped failure with reactive suggestion + report; resume/pause/delete/history
 - [x] Resource: tags derived from tier folders, admin/restricted tracked by hash system-wide, violations logged + surfaced to the user + reported, only that file ignored (Flow skips it), resolve lifts it; explicit tagging (admin tier Super User only)
-- [x] Assistance: tier-scoped search; pings between direct vertical pairs with pulsing status push; channel opens on response (sender speaks first), Engine-enforced turn lock, superior-only close; listeners per-adder, live silent pushes, listener_report
+- [x] Assistance: tier-scoped search; help messages between direct vertical pairs with pulsing status push; channel opens on response (sender speaks first), Engine-enforced turn lock, superior-only close; listeners per-adder, live silent pushes, listener_report
 - [x] Control: `condition_spec` shape defined; native signals (worker relay, file-index stream, task/flow/resource internal) matched with pc scope + filters; polled thresholds/idle/time via worker metrics + Scheduler; actions dispatched independently with immediate/delayed timing; execution lifecycle with streamed output, timeout guard, manual terminate by id; dashboard snapshot + live `action.status`/`event.fired` pushes
 - [x] Custom Actions: Admin-only, Engine-side validation on create/update (stdlib + Windows-native)
 - [x] Updates: approval hard gate, department rollout push, attempt reports (running version on first failure), count-based escalation threshold (`FALCON_UPDATE_ESCALATION_FAILURES`, default 3) → Admin notice + update_status report, aggregate health, Super User prompt
@@ -128,7 +128,7 @@ layer the GUI will reuse unchanged.
 - [x] `worker_client/config.py`: JSON under `%PROGRAMDATA%/Falcon` (or `FALCON_WORKER_CONFIG`), watched roots, cadences, cache
 - [x] File events: `watchdog` native adapter (verified live) with mtime/size polling fallback; sha256 hashes off-loop; idle-time full sweep in batches that stops when input resumes (`worker_client/idle.py`: GetLastInputInfo on Windows)
 - [x] Session blocking: `Lockout` state + notifier surface (+ optional `LockWorkStation`); overlay exe deferred to Phase 6
-- [x] Notifications: `session.blocked/released`, deadlines, pings, alerts, violations, offers printed live in the narrow UI; Dialog exe deferred to Phase 6
+- [x] Notifications: `session.blocked/released`, deadlines, help messages, alerts, violations, offers printed live in the narrow UI; Dialog exe deferred to Phase 6
 - [x] Action execution: detached `create_subprocess_exec` against the bundled interpreter, per-execution log tailed by size growth and streamed, timeout → `timeout`, terminate by execution id → `terminated`, non-zero exit → `failed`; built-ins run through the same path (psutil-based monitoring, file ops, notify, screenshot via PowerShell; power actions gated by `--allow-power`)
 - [x] Custom Action re-validation on arrival (shared `common.custom_actions`)
 - [x] Flow on this PC: `flow.read` relay, `flow.apply` through Transformation (registered converters; unsupported → predefined suggestion) and Categorization stages, `-modified` conflict preservation; verified between two workers end to end
@@ -229,7 +229,7 @@ What the concept shows and the Engine cannot do yet is drawn disabled, with the 
 
 ## Phase 8 — Human interactive passes (after Phase 7; GUI first, TUI secondary)
 
-- [ ] Operator GUI pass (`--gui`): Hierarchy scenarios 1–3, a Task from propose to verify, a Flow between two PCs, an Action + Event, a Ping → channel, reports/alerts/updates
+- [ ] Operator GUI pass (`--gui`): Hierarchy scenarios 1–3, a Task from propose to verify, a Flow between two PCs, an Action + Event, a help message → channel, reports/alerts/updates
 - [ ] Worker Overlay/Dialog + narrow UI pass (`python -m worker_client --ui`): blocked/released, assigned task, alert, violation
 - [ ] Operator TUI pass (`python -m operator_client ...`) — secondary; it is the integration/scripting surface, not the primary product
 - [ ] Every gap found (behaviour or UX) becomes an item here with its fix; full suite re-run after

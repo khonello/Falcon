@@ -91,7 +91,7 @@ def sentence(action: str, d: dict[str, Any], host: str | None, names: dict[int, 
                 "flow.deleted": "Removed a flow", "flow.paused": "Paused a flow", "flow.resumed": "Resumed a flow",
                 "flow.consent": "Answered a flow's request"}.get(action, _words(action))
     if action == "assistance.ping":
-        return f"Pinged {who('to_account_id')}"
+        return f"Messaged {who('to_account_id')}"
     if action == "assistance.message":
         return "Sent a message in a conversation"
     if action == "assistance.channel_opened":

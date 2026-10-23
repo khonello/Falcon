@@ -100,7 +100,7 @@ DEVS = [_dev(87, "open", 2, "The certificate names OPS-01", "The certificate nam
 RULE = {"id": 5, "code": "O-5", "name": "Unanswered help request", "shape": "follow", "locked": False, "on": True,
         "spec": {"trigger": "help", "expect": "answer", "within": 60, "who": "admins", "depts": "all", "severity": "medium",
                  "resp": {"report": True, "admin": True, "action": False}},
-        "sentence": "A worker pings for help, then an Admin answers the ping within 1 hour.", "scope": "Admins, every department",
+        "sentence": "A worker messages for help, then an Admin answers the message within 1 hour.", "scope": "Admins, every department",
         "set_by": "You", "since": _ago(200), "deviations_this_week": 1, "open_this_week": 1}
 
 
@@ -176,6 +176,10 @@ class _Connection:
             return {"reports": BOARD, "strip": {}, "handling": [], "categories": []}
         if type_ == "assistance.ping_status":
             return {"unaddressed": 2, "pings": PINGS}
+        if type_ == "assistance.respond":
+            return {"channel_id": 12, "opened": True, "turn": "sender", "superior_account_id": 7}
+        if type_ == "assistance.message":
+            return {"message_id": 1, "turn": "superior"}
         if type_ == "flow.list":
             return {"flows": [FLOW]}
         if type_ == "enroll.list":
@@ -242,7 +246,7 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
     return win.findChild(QObject, name)
 
 
-ADMIN_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "machines", "issues", "automation", "actions", "audit"]
+ADMIN_MENU = ["overview", "messages", "calendar", "tasks", "flows", "restricted", "detective", "machines", "actions", "automation", "issues", "audit"]
 SU_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "departments", "audit"]
 TABS = ["registry"]                             # a page the menu does not list: a tab of Machines (Admin) and of Departments (Super User) (docs/design/pruning.md)
 
@@ -469,8 +473,22 @@ async def test_one_person_s_pings_are_one_row_with_every_time(console):
     await _wait(lambda: any(r.get("kind") == "ping" for r in (prop(view, "rows") or [])))
     pings = [r for r in prop(view, "rows") if r["kind"] == "ping"]
     assert len(pings) == 1
-    assert pings[0]["pings"] == 2 and pings[0]["pid"] == 5 and pings[0]["st"][0] == "Pinged you 2 times"
+    assert pings[0]["pings"] == 2 and pings[0]["pid"] == 5 and pings[0]["st"][0] == "Asks to talk, 2 times"
     assert len(pings[0]["times"]) == 2
+
+
+async def test_writing_back_to_a_request_accepts_it_and_sends_the_body(console):
+    """A request is accepted by writing back: respond first, then the message, sent as `body`. There is no turn
+    lock, so the box is there for every open conversation (22 Oct 2026)."""
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "messages", "messagesView")
+    await _wait(lambda: any(r.get("kind") == "ping" for r in (prop(view, "rows") or [])))
+    assert win.findChild(QObject, "msgAccept") is not None
+    QMetaObject.invokeMethod(view, "setDraft", Q_ARG("QVariant", "on my way"))
+    QMetaObject.invokeMethod(view, "send")
+    await _wait(lambda: any(t == "assistance.message" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "assistance.respond")["ping_id"] == 5
+    assert next(p for t, p in bridge.conn.seen if t == "assistance.message") == {"channel_id": 12, "body": "on my way"}
 
 
 

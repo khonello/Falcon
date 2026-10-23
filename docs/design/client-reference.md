@@ -13,7 +13,7 @@ Applies identically to Super User, Admin, and Client:
 - **Identity:** account bound to exactly one PC, for the account's lifetime. Using an account from an unbound PC, or a PC receiving a second binding, is a deviation — logged and surfaced, never silently accommodated. For Client specifically, this is the everyday case: one Worker, one PC, one account.
 - **Display Names:** every account/PC has an internal ID and a separate display name. Client never names themself or anyone else — naming is strictly top-down (Admin names each Worker, for Admin's own identification). What Client sees when their Admin is referenced is whichever self-facing name that Admin has chosen to set — or a composed fallback (e.g., `Admin — {account-id}`) if the Admin hasn't set one.
 - **System Expectations & Deviation Handling:** if something about Client's own PC or account deviates from what the system expects (e.g., the account is somehow used from an unbound PC), it's logged and surfaced to Client — never silently corrected behind the scenes.
-- **Audit Trail:** Client's task starts, work activity, resource access, pings, and messages are all logged. Flat 90-day retention, system-wide, for v1.
+- **Audit Trail:** Client's task starts, work activity, resource access, help messages, and messages are all logged. Flat 90-day retention, system-wide, for v1.
 - **System Alerts & Announcements:** can receive alerts scoped to "all users," department-specific, or targeted specifically at them.
 - **Offboarding:** if Client is deactivated, their history is preserved (not deleted), subject to standard 90-day retention. The PC itself — not the person — is the pause boundary: everything tied to it (active Flows sourced from it, Resource tracking, Task activity) pauses until a new person is explicitly onboarded onto that same PC. The new occupant does **not** inherit any of it automatically.
 
@@ -46,7 +46,7 @@ This is the single area where Client actively interacts with the software rather
 
 **What Client sees while working:**
 - The task's Verification Stack status is visible to the assigner (Admin), not necessarily broken out item-by-item to Client — Client's own view is oriented around "here's what I'm supposed to do and how it's tracking," not the assigner's full pass/fail breakdown.
-- Deadline indicators (Soft and Final) use the same shared, persistent status-indicator pattern as Help Ping's unaddressed-message signal — a bold/pulsing visual as a deadline approaches or is reached.
+- Deadline indicators (Soft and Final) use the same shared, persistent status-indicator pattern as the help message's unaddressed signal — a bold/pulsing visual as a deadline approaches or is reached.
 
 **Logging:** task start and all subsequent work activity on the target(s) is logged, same as everything else in the system.
 
@@ -63,8 +63,8 @@ Index-driven — what appears here is determined by what the Admin has pushed to
 
 **File Search (Assistance):** Client can search files scoped to **their department's worker files + common files** — the narrowest search scope of any role, but sufficient to find what's actually relevant to them without needing to ask.
 
-**Help Ping & Message Channel — Client is the subordinate in the Worker↔Admin pair:**
-- **Can Ping** their Admin — a lightweight, repeatable "I need attention" signal, no lock, can be re-sent if unaddressed.
+**Help Message & Message Channel — Client is the subordinate in the Worker↔Admin pair:**
+- **Can send a help message to** their Admin — a lightweight, repeatable "I need attention" signal, no lock, can be re-sent if unaddressed.
 - Once Admin responds, a **Message Channel** opens: one-message-per-turn lock (Client sends → locked → Admin responds → unlocked → Client can send next).
 - **Cannot close the channel** — only the Admin (the superior in the pair) can do that, regardless of who initiated.
 - **Cannot see Listeners** added to a channel by the Admin side — Listener visibility is asymmetric; Client would only know about Listeners *they themselves* added (and Client cannot add a Listener at all, since a Listener must be an Admin).

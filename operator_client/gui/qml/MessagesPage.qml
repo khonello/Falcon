@@ -1,10 +1,11 @@
 import QtQuick
 import "."
 
-// MESSAGES (Help Ping & Message Channel, at both levels). One row per conversation between a lower and
-// a higher party: Worker -> Admin, or Admin -> Super User. It starts as a ping (attention only,
-// repeatable); answering opens the channel; then one message each way at a time. Only the higher party
-// closes it.
+// MESSAGES (Help Ping & Message Channel, at both levels). One row per conversation: Worker <-> Admin,
+// Admin <-> Super User, or Admin <-> Admin. It starts as a request (attention only, repeatable) that the
+// other person accepts -- with Accept, or by writing back -- except the Super User writing to an Admin,
+// which opens at once. Then either side writes whenever they like (no turn lock, 22 Oct 2026). Who may
+// close it comes from the Engine (`can_close`): the higher party, or either of two Admins.
 Page {
     id: page
     objectName: "messagesView"
@@ -29,12 +30,13 @@ Page {
             })
         })
         falcon.call("assistance.ping_status", {}, function (ok, r) { page.pings = ok ? (r.pings || []) : [] })
-        falcon.call("assistance.my_admins", {}, function (ok, r) {
-            var up = ok ? (r.admins || []).map(function (a) { return { account: a.account_id, name: a.name, sub: a.role === "super_user" ? "the Super User" : "Admin" } }) : []
-            var down = []
-            if (Nav.boss) Fleet.depts.forEach(function (d) { d.admins.forEach(function (a) { down.push({ account: a.account_id, name: a.name, sub: "Admin, " + d.name }) }) })
-            else Fleet.machines.forEach(function (m) { if (m.user && m.account) down.push({ account: m.account, name: m.user, sub: "on " + m.host }) })
-            page.askFor = up.concat(down)
+        // who this person may message, as the Engine decides it: the Super User's Admins; an Admin's Super User,
+        // the other Admins and their own workers
+        falcon.call("assistance.people", {}, function (ok, r) {
+            page.askFor = ok ? (r.people || []).map(function (a) {
+                return { account: a.account_id, name: a.name, request: a.request !== false,
+                         sub: a.role === "super_user" ? "the Super User" : a.role === "admin" ? "Admin" + (a.department_name ? ", " + a.department_name : "")
+                              : a.hostname ? "on " + a.hostname : "a worker" } }) : []
         })
     }
     Component.onCompleted: load()
@@ -51,10 +53,11 @@ Page {
             var other = names[String(hi === me ? lo : hi)] || (hi === me ? c.initiator_name : "the Super User")
             var msgs = d ? (d.messages || []).map(function (m) { return { t: Time.ms(m.sent_at || m.created_at), who: names[String(m.sender_account_id)] || "", mine: m.sender_account_id === me, text: m.body } }) : []
             var closed = !!c.closed_at
-            var turnIsMine = party && !closed && (d ? !!ch.my_turn : ((c.turn === "superior") === (hi === me)))
-            var st = closed ? ["Closed", "good", "closed"] : turnIsMine ? ["Your turn", "bad", "you"] : ["Their turn", "wait", "them"]
-            out.push({ id: "c" + c.id, cid: c.id, kind: "channel", title: other,
-                       other: other, iHigh: hi === me, party: party, msgs: msgs, closed: closed, myTurn: turnIsMine, st: st,
+            // the Engine's `my_turn` now only says the other person wrote last: waiting on you, not a lock
+            var waitsOnMe = party && !closed && (d ? !!ch.my_turn : ((c.turn === "superior") === (hi === me)))
+            var st = closed ? ["Closed", "good", "closed"] : waitsOnMe ? ["Waiting on you", "bad", "you"] : ["Waiting on them", "wait", "them"]
+            out.push({ id: "c" + c.id, cid: c.id, kind: "channel", title: other, canClose: d ? !!ch.can_close : hi === me,
+                       other: other, iHigh: hi === me, party: party, msgs: msgs, closed: closed, st: st,
                        started: c.opened_at, last: msgs.length ? msgs[msgs.length - 1].t : Time.ms(c.closed_at || c.opened_at),
                        pings: 1, line: msgs.length ? (msgs[msgs.length - 1].mine ? "You" : msgs[msgs.length - 1].who) + ": " + msgs[msgs.length - 1].text : "no messages yet" })
         })
@@ -70,9 +73,9 @@ Page {
             var ps = bySender[k], first = ps[0], n0 = ps.length, name = first.from_name || "Someone"
             if (out.some(function (x) { return x.party && x.other === name && !x.closed })) return
             out.push({ id: "p" + first.id, pid: first.id, kind: "ping", title: name, other: name, iHigh: true, party: true, msgs: [], closed: false,
-                       myTurn: true, st: ["Pinged you" + (n0 > 1 ? " " + n0 + " times" : ""), "bad", "you"], started: first.sent_at,
+                       canClose: false, st: ["Asks to talk" + (n0 > 1 ? ", " + n0 + " times" : ""), "bad", "you"], started: first.sent_at,
                        times: ps.map(function (p) { return p.sent_at }),
-                       last: Time.ms(ps[n0 - 1].sent_at), pings: n0, line: (n0 === 1 ? "a ping" : n0 + " pings") + ", no answer yet" })
+                       last: Time.ms(ps[n0 - 1].sent_at), pings: n0, line: "a request to talk" + (n0 > 1 ? ", sent " + n0 + " times" : "") + "; not accepted yet" })
         })
         var order = { you: 0, them: 1, closed: 2 }
         return out.sort(function (a, b) { return order[a.st[2]] - order[b.st[2]] || b.last - a.last })
@@ -85,22 +88,31 @@ Page {
     readonly property string draft: c ? (drafts[c.id] || "") : ""
     function setDraft(t) { var d = Object.assign({}, drafts); d[c.id] = t; drafts = d }
 
+    // accepting a request opens the conversation; writing back accepts it too
+    function accept(x, then) {
+        falcon.call("assistance.respond", { ping_id: x.pid }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not accepted"); return }
+            page.sel = "c" + r.channel_id
+            if (then) then(r.channel_id)
+            else { Msg.ok("Accepted · you and " + x.other + " can write"); page.load() }
+        })
+    }
     function send() {
         var x = c, text = draft.trim()
         if (!text) return
         if (x.kind === "ping") {
-            falcon.call("assistance.respond", { ping_id: x.pid }, function (ok, r) {
-                if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
-                falcon.call("assistance.message", { channel_id: r.channel_id, text: text }, function (ok2) {
-                    Msg.ok(ok2 ? "Answered " + x.other + " · the channel is open" : "The channel is open · " + x.other + " writes first")
-                    page.sel = "c" + r.channel_id; page.setDraftFor(x.id, ""); page.load()
+            accept(x, function (cid) {
+                falcon.call("assistance.message", { channel_id: cid, body: text }, function (ok2, r2) {
+                    if (!ok2) Msg.failed(r2 && r2.message ? r2.message : "Accepted, but not sent")
+                    else Msg.ok("Accepted and answered " + x.other)
+                    page.setDraftFor(x.id, ""); page.load()
                 })
             })
             return
         }
-        falcon.call("assistance.message", { channel_id: x.cid, text: text }, function (ok, r) {
+        falcon.call("assistance.message", { channel_id: x.cid, body: text }, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not sent"); return }
-            Msg.ok("Sent · now " + x.other + "'s turn"); page.setDraftFor(x.id, ""); page.load()
+            Msg.ok("Sent"); page.setDraftFor(x.id, ""); page.load()
         })
     }
     function setDraftFor(id, t) { var d = Object.assign({}, drafts); d[id] = t; drafts = d }
@@ -114,9 +126,9 @@ Page {
         on: page.f === "" ? null : page.f
         onPick: function (k) { page.f = k === null ? "" : k }
         items: [
-            { key: "you", label: "Waiting on you", value: Theme.fmt(page.n("you")), delta: page.n("you") ? "pinged you, or your turn" : "nothing waiting", dc: page.n("you") ? Theme.crit : undefined },
-            { key: "them", label: "Waiting on them", value: Theme.fmt(page.n("them")), delta: "your ping, or their turn" },
-            { key: "ping", label: "Pings", value: Theme.fmt(page.rows.filter(function (x) { return x.kind === "ping" }).length), delta: "not answered yet" },
+            { key: "you", label: "Waiting on you", value: Theme.fmt(page.n("you")), delta: page.n("you") ? "a request, or they wrote last" : "nothing waiting", dc: page.n("you") ? Theme.crit : undefined },
+            { key: "them", label: "Waiting on them", value: Theme.fmt(page.n("them")), delta: "you wrote last" },
+            { key: "ping", label: "Requests", value: Theme.fmt(page.rows.filter(function (x) { return x.kind === "ping" }).length), delta: "not accepted yet" },
             { key: "closed", label: "Closed", value: Theme.fmt(page.n("closed")), delta: "this week" }
         ]
     }
@@ -128,10 +140,10 @@ Page {
             id: list
             width: (parent.width - 14) * 8 / 12
             more: 2
-            title: page.f === "" ? "Conversations" : ({ you: "Waiting on you", them: "Waiting on them", ping: "Pings", closed: "Closed" })[page.f]
+            title: page.f === "" ? "Conversations" : ({ you: "Waiting on you", them: "Waiting on them", ping: "Requests", closed: "Closed" })[page.f]
             sub: "waiting on you first · click one to see it on the right"
             placeholder: "Find a person or a word"
-            actionLabel: "New ping"
+            actionLabel: "New message"
             onAction: pingDrawer.open()
             rows: page.shown
             pick: page.c ? page.c.id : null
@@ -140,14 +152,14 @@ Page {
             nameTitle: "With"
             nameText: function (x) { return x.title }
             nameLine: function (x) { return x.line }
-            cols: [{ title: "Pings", width: 70, text: function (x) { return Theme.fmt(x.pings) } },
+            cols: [{ title: "Sent", width: 70, text: function (x) { return Theme.fmt(x.pings) } },
                    { title: "Last", width: 100, text: function (x) { return Time.at(x.last) } }]
             now: function (x) { return [x.st[0], x.st[1]] }
             showEmpty: page.rows.length === 0
             emptyIcon: "message"
             emptyTitle: "No conversations yet"
-            emptyText: "A ping asks for attention; answering it opens a conversation, one message each way at a time."
-            emptyAct: "New ping"
+            emptyText: Nav.boss ? "Write to an Admin and the conversation opens at once; an Admin's request opens one when you accept it." : "A message starts as a request; accepting it opens a conversation."
+            emptyAct: "New message"
             onEmptyAction: pingDrawer.open()
         }
 
@@ -158,17 +170,17 @@ Page {
             showEmpty: page.c === null
             emptyIcon: "message"
             emptyTitle: "No conversations yet"
-            emptyText: Nav.boss ? "When an Admin pings you, or you ping one, it appears here." : "When a worker or the Super User pings you, or you ping them, it appears here."
+            emptyText: Nav.boss ? "When an Admin messages you, or you message one, it appears here." : "When a worker or the Super User messages you, or you message them, it appears here."
             title: page.c ? page.c.title : ""
             sub: page.c ? (page.askFor.filter(function (p) { return p.name === page.c.other })[0] || { sub: "" }).sub : ""
             facts: page.c ? [["Now", page.c.st[0], page.c.st[1] === "bad" ? Theme.crit : page.c.st[1] === "good" ? Theme.ok : Theme.text4, false, true],
                              ["Started by", (page.c.kind === "ping" ? page.c.other : page.c.iHigh ? page.c.other : "You") + ", " + Time.at(page.c.started)],
-                             ["Who closes it", page.c.iHigh ? "You" : page.c.party ? page.c.other : "the higher party"]] : []
+                             ["Who closes it", page.c.kind === "ping" ? "nobody yet" : page.c.canClose ? (page.c.iHigh ? "You" : "Either of you") : page.c.other]] : []
             extra: Btn {
-                visible: page.c !== null && page.c.kind === "channel" && page.c.party && !page.c.closed && page.c.iHigh
+                visible: page.c !== null && page.c.kind === "channel" && page.c.party && !page.c.closed && page.c.canClose
                 small: true; kind: "text"; danger: true; iconName: "closecircle"; tip: "Close the conversation"
                 onClicked: confirm.ask({ title: "Close the conversation with " + page.c.other + "?", ok: "Close it", cancel: "Keep it open",
-                                         text: "Only you can close it. " + page.c.other + " cannot write in it again; a new ping opens a new one. It stays in the audit log." },
+                                         text: (page.c.iHigh ? "Only you can close it. " : "") + page.c.other + " cannot write in it again; a new message opens a new one. It stays in the audit log." },
                                        function () { falcon.call("assistance.close_channel", { channel_id: page.c.cid }, function (ok, r) {
                                            if (!ok) { Msg.failed(r && r.message ? r.message : "Not closed"); return }
                                            Msg.ok("Closed · recorded"); page.load() }) })
@@ -178,9 +190,17 @@ Page {
             Column {
                 width: parent.width
                 spacing: 6
-                Txt { text: page.c && page.c.kind === "ping" ? "PINGED" : "THE CONVERSATION"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
+                Txt { text: page.c && page.c.kind === "ping" ? "A REQUEST TO TALK" : "THE CONVERSATION"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
                 Txt { anchors.horizontalCenter: parent.horizontalCenter; color: Theme.text3; font.pixelSize: 12
-                      text: page.c ? (page.c.kind === "ping" ? page.c.other + " pinged " + page.c.times.map(function (t) { return Time.at(t) }).join(", ") : "Opened " + Time.at(page.c.started)) : "" }
+                      text: page.c ? (page.c.kind === "ping" ? page.c.other + " asked " + page.c.times.map(function (t) { return Time.at(t) }).join(", ") : "Opened " + Time.at(page.c.started)) : "" }
+                // a request is accepted here, or by writing back below
+                Row {
+                    visible: page.c !== null && page.c.kind === "ping"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 10
+                    Btn { objectName: "msgAccept"; small: true; kind: "primary"; text: "Accept"; onClicked: page.accept(page.c) }
+                    Txt { anchors.verticalCenter: parent.verticalCenter; text: "or write back to accept"; color: Theme.text3; font.pixelSize: 12 }
+                }
                 Repeater {
                     model: page.c ? page.c.msgs : []
                     Item {
@@ -217,10 +237,10 @@ Page {
             dock: Item {
                 visible: page.c !== null && !page.c.closed
                 width: side.width - 32
-                height: !page.c ? 0 : (page.c.party && page.c.myTurn) ? composer.height : lockLine.height
+                height: !page.c ? 0 : composer.height
                 Rectangle {
                     id: composer
-                    visible: page.c !== null && page.c.party && page.c.myTurn
+                    visible: page.c !== null && page.c.party
                     width: parent.width
                     height: Math.max(40, ta.height + 8)
                     radius: 20
@@ -236,20 +256,12 @@ Page {
                         borderless: true
                         enterSends: true
                         text: page.draft
-                        placeholder: page.c && page.c.kind === "ping" ? "Answer " + page.c.other + " · answering opens the conversation" : "Write to " + (page.c ? page.c.other : "") + " · then it is their turn"
+                        placeholder: page.c && page.c.kind === "ping" ? "Write back to " + page.c.other + " · this accepts the request" : "Write to " + (page.c ? page.c.other : "")
                         onEdited: function (t) { page.setDraft(t) }
                         onSubmitted: page.send()
                     }
                     Btn { objectName: "msgSend"; circle: true; kind: "primary"; iconName: "send"; tip: "Send · Enter"
                           enabled: page.draft.trim() !== ""; anchors.right: parent.right; anchors.rightMargin: 4; anchors.bottom: parent.bottom; anchors.bottomMargin: 4; onClicked: page.send() }
-                }
-                Txt {
-                    id: lockLine
-                    visible: !composer.visible
-                    width: parent.width
-                    wrapMode: Text.WordWrap; elide: Text.ElideNone
-                    color: Theme.text3; font.pixelSize: 12
-                    text: !page.c ? "" : page.c.other + "'s turn. You can write again once they answer."
                 }
             }
         }
@@ -260,15 +272,19 @@ Page {
         id: pingDrawer
         page: page
         width: 420
-        title: "Ping someone"
+        title: Nav.boss ? "Message an Admin" : "Ask someone to talk"
         property var who: null
+        // writing to someone is a request they accept, except the Super User writing to an Admin
+        readonly property bool direct: who !== null && page.askFor.some(function (p) { return p.account === who && !p.request })
         note: who === null ? "Pick a person." : ""
         footer: [
             Btn { text: "Cancel"; onClicked: pingDrawer.close() },
-            Btn { kind: "primary"; text: "Ping"; enabled: pingDrawer.who !== null
+            Btn { objectName: "pingSend"; kind: "primary"; text: pingDrawer.direct ? "Open the conversation" : "Send the request"; enabled: pingDrawer.who !== null
                   onClicked: falcon.call("assistance.ping", { to_account_id: pingDrawer.who }, function (ok, r) {
                       if (!ok) { Msg.failed(r && r.message ? r.message : "Not sent"); return }
-                      Msg.ok("Pinged · they see it until they answer"); pingDrawer.close(); page.load()
+                      if (r.channel_id) { page.sel = "c" + r.channel_id; Msg.ok("The conversation is open") }
+                      else Msg.ok("Asked · they see it until they accept")
+                      pingDrawer.close(); page.load()
                   }) }
         ]
         Column {
@@ -282,7 +298,8 @@ Page {
         Rectangle {
             width: parent.width; height: pn.height + 20; radius: 6; color: Theme.surface2
             Txt { id: pn; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                  text: "A ping carries no message: it only says you need them. They see it, bright and pulsing, until they answer; their answer opens the conversation." }
+                  text: pingDrawer.direct ? "It opens the conversation at once; an Admin does not need to accept a message from you."
+                        : "It is a request to talk and carries no text yet. They see it, bright and pulsing, until they accept it or write back; then you can both write." }
         }
     }
 }

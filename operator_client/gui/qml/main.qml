@@ -64,6 +64,7 @@ ApplicationWindow {
     readonly property var pages: ({
         overview: Nav.boss ? "SuOverviewPage.qml" : "OverviewPage.qml",
         messages: "MessagesPage.qml",
+        calendar: "CalendarPage.qml",
         detective: Nav.boss ? "DetectiveOverviewPage.qml" : "DetectivePage.qml",
         tasks: Nav.boss ? "GivenTasksPage.qml" : "TasksPage.qml",
         restricted: "RestrictedPage.qml",
@@ -169,43 +170,48 @@ ApplicationWindow {
                         onDoubleClicked: shell.toggleMaximised()
                     }
 
-                    Row {
+                    // the path, at the left; it gives way to the search when it is long
+                    Crumb {
+                        id: crumbItem
+                        objectName: "crumb"
                         x: 20
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 12
-                        Crumb {
-                            objectName: "crumb"
+                    }
+                    // search, which is a jump: pages, machines, issues. In the middle of the bar, so it is the centre line the page
+                    // and the palette share; it shrinks, never moves, when the two ends need the room
+                    Rectangle {
+                        id: searchBox
+                        objectName: "searchBox"
+                        readonly property real room: header.width - 2 * Math.max(crumbItem.implicitWidth + 40, rightEnd.width + 20) - 24
+                        width: Math.max(240, Math.min(Theme.searchW, room))
+                        height: 32; radius: 5
+                        x: (header.width - width) / 2
+                        color: Theme.surface2
+                        border.width: 1
+                        border.color: Theme.border
+                        anchors.verticalCenter: parent.verticalCenter
+                        Row {
+                            x: 12
                             anchors.verticalCenter: parent.verticalCenter
+                            spacing: 8
+                            Icon { name: "search"; size: 13; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { text: "Search or jump to"; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
                         }
-                        // search, which is a jump: pages, machines, issues
                         Rectangle {
-                            width: 240; height: 30; radius: 5
-                            color: Theme.surface2
-                            border.width: 1
-                            border.color: Theme.border
+                            anchors.right: parent.right
+                            anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
-                            Row {
-                                x: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 8
-                                Icon { name: "search"; size: 13; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: "Search or jump to"; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
-                            }
-                            Rectangle {
-                                anchors.right: parent.right
-                                anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: kbd.implicitWidth + 10; height: 18; radius: 3
-                                color: "transparent"
-                                border.width: 1
-                                border.color: Theme.borderStrong
-                                Txt { id: kbd; anchors.centerIn: parent; text: "Ctrl K"; mono: true; font.pixelSize: 11; color: Theme.text3 }
-                            }
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: palette.open() }
+                            width: kbd.implicitWidth + 10; height: 18; radius: 3
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Theme.borderStrong
+                            Txt { id: kbd; anchors.centerIn: parent; text: "Ctrl K"; mono: true; font.pixelSize: 11; color: Theme.text3 }
                         }
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: palette.open() }
                     }
 
                     Row {
+                        id: rightEnd
                         anchors.right: parent.right
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter

@@ -150,7 +150,7 @@ A card never goes inside another card — that is a `Divider`.
 | **Flows** | sync pipelines | table → detail page with the flow drawn |
 | **Automation** | when → then rules | table → detail, and a 3-step wizard to create |
 | **Actions** | the library, and each action's settings | table grouped by kind → form |
-| **Assistance** | pings, channels, listeners, help across departments | list + conversation pane |
+| **Assistance** | help messages, channels, listeners, help across departments | list + conversation pane |
 | **Resources** | tiers, violations, file search | table with tier filter |
 | **Reports** | what was raised, to whom, and what was done | table → drawer |
 | **Rollout** | versions, what is behind, the lever | table by department + progress |
@@ -199,7 +199,7 @@ Stated once, so no screen invents its own.
    `Empty` state that says what would be here and how to make one.
 6. **`Skeleton` while loading**, never a spinner over a blank page.
 7. **`message` for the result of something you did**; `notification` for something that arrived on its
-   own (a ping, a report, a session blocked).
+   own (a help message, a report, a session blocked).
 7a. **An alert is one line** — an icon, what happened, and at most one act, all on that line. antd's
    description block (a paragraph under the message) is never used: what would have gone there belongs
    on the page the act opens. Three kinds only — red where somebody must act, amber where somebody will
@@ -358,7 +358,7 @@ They take precedence over anything above that they contradict.
     the five. The machine, its user and its department share one cell. Memory moved to the machine's
     own page.
 
-31. **Every issue can be acted on, and its type decides how.** *"No way to address pings or any
+31. **Every issue can be acted on, and its type decides how.** *"No way to address help messages or any
     issue."*
     - **Types:** Restricted file, Help request, Deviation, Stuck update, Flow blocked.
     - **Resolutions:** each type supplies its own (move back / delete / allow with a reason; answer
@@ -679,7 +679,7 @@ They take precedence over anything above that they contradict.
     rule that is an Engine handler and TUI command first.
   - **The rule backtest** ("if it had been on last week") needs enough stored metric history to
     replay.
-  - **Typed issues** need one Engine read that gathers violations, pings, deviations, escalations and
+  - **Typed issues** need one Engine read that gathers violations, help messages, deviations, escalations and
     blocked flows into a single list.
 
 ---

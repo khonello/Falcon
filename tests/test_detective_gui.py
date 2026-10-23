@@ -82,7 +82,9 @@ async def test_a_case_reads_as_a_story_a_picture_and_a_question(console):
     ids = {n for n in names if n.startswith("node_")}
     assert any("dev:" in i for i in ids) and any("dir:" in i for i in ids) and len(ids) >= 6                  # the drive, the bursts, the archive, the hidden file
     assert win.findChild(QObject, "detExplained") is not None and win.findChild(QObject, "detNote") is not None
-    assert {"cover_exfiltration", "area_Gather", "area_Transfer", "area_Transform"} <= names                    # the areas, covered or not: coverage, not steps
+    assert {"evidencePanel", "noticedPanel", "coverLine"} <= names and "coverPanel" not in names              # the evidence is one panel of two tabs; the areas are one grey line, not a panel of chips
+    assert "Hiding" in win.findChild(QObject, "coverLine").property("text") or "areas" in win.findChild(QObject, "coverLine").property("text")
+    assert prop(page, "evTab") == "picture"                                                                  # the picture is the first tab
 
 
 async def test_what_a_person_makes_of_it_is_sent_with_their_note(console):
@@ -90,15 +92,18 @@ async def test_what_a_person_makes_of_it_is_sent_with_their_note(console):
     page.setProperty("note", "It was the Q3 close")
     from PySide6.QtCore import Q_ARG
 
-    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "explained"), Q_ARG("QVariant", ""))
+    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "explained"))
     await _wait(lambda: any(t == "detective.review" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "detective.review")
     assert sent == {"case_id": 1, "outcome": "explained", "note": "It was the Q3 close"}
 
 
-async def test_only_an_admin_can_send_it_up(console):
+async def test_an_admin_has_three_simple_buttons_and_nothing_to_send_up_or_to_remember(console):
     win, bridge, page = await _page(console, "admin")
-    assert win.findChild(QObject, "detEscalate").property("visible") is True
+    for name in ("detExplained", "detAccepted", "detDismissed"):
+        assert win.findChild(QObject, name).property("visible") is True
+    assert win.findChild(QObject, "detEscalate") is None                                                  # no "Send to the Super User"
+    assert win.findChild(QObject, "detRememberFolder") is None and win.findChild(QObject, "detRememberDrive") is None    # a dismissal is only a dismissal
 
 
 async def test_the_super_user_sees_every_case_by_department_and_decides_only_what_is_sent_up_or_on_an_admin_s_machine(console):
@@ -121,15 +126,14 @@ async def test_the_super_user_sees_every_case_by_department_and_decides_only_wha
     assert next(p for t, p in bridge.conn.seen if t == "detective.review")["outcome"] == "explained"
 
 
-async def test_a_dismissal_can_be_remembered_for_a_folder_or_a_drive_the_case_involves(console):
+async def test_a_dismissal_is_sent_as_it_is_without_a_rule(console):
     from PySide6.QtCore import Q_ARG
 
     win, bridge, page = await _page(console)
-    assert win.findChild(QObject, "detRememberFolder").property("visible") is True and win.findChild(QObject, "detRememberDrive").property("visible") is True
-    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "dismissed"), Q_ARG("QVariant", "folder"))
+    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "dismissed"))
     await _wait(lambda: any(t == "detective.review" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "detective.review")
-    assert sent["outcome"] == "dismissed" and sent["remember"] == {"kind": "folder"}
+    assert sent["outcome"] == "dismissed" and "remember" not in sent
 
 
 async def test_marking_says_what_it_costs_before_it_is_done_and_a_huge_folder_cannot_be_ticked_through(console):
@@ -178,20 +182,10 @@ async def test_an_admin_does_not_see_the_move_of_the_super_user(console):
     assert win.findChild(QObject, "handoverCard") is None
 
 
-async def test_what_detective_suggests_is_shown_for_a_person_to_accept_or_dismiss_and_the_rules_can_be_taken_back(console):
+async def test_the_page_has_no_suggestions_or_written_rules_panels(console):
     win, bridge, page = await _page(console)
-    page.setProperty("proposals", [{"id": 4, "kind": "pause_flow", "title": "Pause flow #3? Its source machine FIN-01 is under an urgent case"},
-                                   {"id": 5, "kind": "mark_folder", "title": r"Mark C:\Data\Reports as restricted?"}])
-    page.setProperty("rules", [{"id": 8, "graph": "to_drive", "kind": "folder", "value": "E:", "host": "FIN-01"}])
-    _pump(0.4)
     names = _names(win.contentItem())
-    assert {"suggestions", "proposal_4", "proposal_5", "proposalYes_4", "proposalNo_5", "writtenRules", "rule_8", "ruleBack_8"} <= names
-    QMetaObject.invokeMethod(page, "decide", Q_ARG("QVariant", {"id": 4}), Q_ARG("QVariant", True))
-    await _wait(lambda: any(t == "proposals.decide" for t, _ in bridge.conn.seen))
-    assert next(p for t, p in bridge.conn.seen if t == "proposals.decide") == {"proposal_id": 4, "accept": True}
-    QMetaObject.invokeMethod(page, "takeBack", Q_ARG("QVariant", {"id": 8}))
-    await _wait(lambda: any(t == "detective.rule_revoke" for t, _ in bridge.conn.seen))
-    assert next(p for t, p in bridge.conn.seen if t == "detective.rule_revoke") == {"rule_id": 8}
+    assert "suggestions" not in names and "writtenRules" not in names                                     # the evidence and what was noticed are the page's end
 
 
 async def test_a_flow_shows_what_restricted_material_it_waits_for_or_carries_and_who_can_take_it_back(console):

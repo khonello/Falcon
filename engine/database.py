@@ -1758,16 +1758,18 @@ class AssistanceRepo(_Repo):
         return await self._one("SELECT * FROM message_channels WHERE id = $1", channel_id)
 
     async def open_channel_between(self, a: int, b: int) -> dict[str, Any] | None:
+        """The open channel between two people, found through the request that opened it: when the superior
+        asked first, initiator and superior are the same account, so those two columns alone miss it."""
         return await self._one(
-            "SELECT * FROM message_channels WHERE closed_at IS NULL AND "
-            "((initiator_account_id = $1 AND superior_account_id = $2) OR "
-            " (initiator_account_id = $2 AND superior_account_id = $1)) ORDER BY opened_at DESC LIMIT 1", a, b)
+            "SELECT c.* FROM message_channels c JOIN pings p ON p.id = c.opened_via_ping_id "
+            "WHERE c.closed_at IS NULL AND ((p.sender_account_id = $1 AND p.receiver_account_id = $2) OR "
+            " (p.sender_account_id = $2 AND p.receiver_account_id = $1)) ORDER BY c.opened_at DESC LIMIT 1", a, b)
 
     async def channels_for(self, account_id: int) -> list[dict[str, Any]]:
-        """Channels the account is a party to."""
+        """Channels the account is a party to (either end of the request that opened it)."""
         return await self._fetch(
-            "SELECT DISTINCT c.* FROM message_channels c "
-            "WHERE c.initiator_account_id = $1 OR c.superior_account_id = $1 "
+            "SELECT DISTINCT c.* FROM message_channels c JOIN pings p ON p.id = c.opened_via_ping_id "
+            "WHERE p.sender_account_id = $1 OR p.receiver_account_id = $1 "
             "ORDER BY c.opened_at DESC", account_id)
 
     async def post_message(self, channel_id: int, sender_account_id: int, body: str, next_turn: str) -> int:

@@ -25,7 +25,7 @@ async def test_a_restricted_copy_is_an_issue_for_its_department_and_resolves_whe
     await _copy_of_restricted(a1, w1)
     assert "issue.raised" in su.push_types(await su.drain_pushes())
     assert "issue.raised" in a1.push_types(await a1.drain_pushes())
-    assert a2.push_types(await a2.drain_pushes()) == []
+    assert "issue.raised" not in a2.push_types(await a2.drain_pushes())                          # another department is not told of it (a report may still reach it)
 
     res = await a1.ok("issues.list")
     [issue] = res["issues"]
@@ -50,6 +50,12 @@ async def test_a_restricted_copy_is_an_issue_for_its_department_and_resolves_whe
     assert any(f[0] == "File" and f[1] == "salaries-copy.xlsx" for f in page["facts"])
     raised = next(e for e in page["timeline"] if e["kind"] == "raised")
     assert raised["what"].startswith("Restricted file copied") and raised["who"] == "System"
+    # the story has the same spine whatever the issue: raised, who it is assigned to, the time it should take; and nothing the machine did that is not about this
+    whats = [e["what"] for e in page["timeline"]]
+    assert "Assigned to you" in whats and "Target time (1 h)" in whats
+    await engine.audit.record(None, "flow.synced", target_type="flows", target_id=1, pc_id=org["w1_pc"], detail={"files": 3})
+    again = [e["what"] for e in (await a1.ok("issues.get", {"issue_id": issue["id"]}))["timeline"]]
+    assert not any("synced" in w for w in again)
 
     # deleting the copy clears the issue by itself, and says so
     await w1.ok("index.event", {"event": {"op": "delete", "path": "C:/Users/ama/Downloads/salaries-copy.xlsx"}})

@@ -108,7 +108,7 @@ A hierarchy-based management/automation/monitoring system for organizations stru
 - **Hierarchy** (backbone) — traversal, Session Blocking, Display Names, Report Routing, Cross-Department Assisted Access
 - **Task** — LLM-populated verification targets; only manual verification by the assigner closes a task. A Super User's task to a department has no checks: the Admins told mark it seen / ongoing / done and only the Super User completes it (decided 2 Oct 2026, `task-natural-combo.md`)
 - **Flow** — one-directional sync pipelines (Source → Branch/Transform/Categorize → Destinations)
-- **Resource & Assistance** — tiered folders (`admin`/`restricted`/`workers`/`common`) as access policy; Ping → Message Channel
+- **Resource & Assistance** — tiered folders (`admin`/`restricted`/`workers`/`common`) as access policy; Help message → Message Channel
 - **Control, Events, Monitoring & Actions** — Admin-authored automation; Custom Actions are PowerShell/Python, stdlib + Windows-native only, unsandboxed
 
 ## Document map and authority
@@ -151,7 +151,7 @@ These are load-bearing design rules that are easy to violate by accident:
 - **Reports**: written once, always visible to Super User, additively routed to department Admins. `report_addressed_views` is Super-User-only and must never be insertable as a report row.
 - **No hard deletes** except the 90-day retention job (`audit_log`, and the `file_events` history on the same clock -- decided 13 Oct 2026); everything else is a status/flag change. Polymorphic refs (`reports.source_*`, `audit_log.target_*`) have no DB-level FK — enforce in the data-access layer.
 - **Actions** run independently with their own timeout (report `"timeout"`, distinct from `"error"`), keyed by execution id for manual termination; no output piping between chained Actions in v1. Custom Action scripts are validated twice (client before send, worker client on arrival) via `py_compile` + AST import check.
-- **Client (Worker) role** is a passive recipient except: view/start/monitor assigned Tasks (never verify), and Assistance search/Ping.
+- **Client (Worker) role** is a passive recipient except: view/start/monitor assigned Tasks (never verify), and Assistance search/help message.
 
 ## Explicitly deferred (do not decide unilaterally)
 

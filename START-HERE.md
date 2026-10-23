@@ -18,7 +18,7 @@ index, five things it does:
 | **Hierarchy** | See and enter any machine you have authority over. One session per PC; a superior can take it, a peer cannot. Everything is logged against the person, not the seat. |
 | **Task** | Give someone work, and have the system watch for the signs it was done — the files that should appear, the program that should have run. A person still decides it is finished. |
 | **Flow** | One-directional sync pipelines between machines: a source folder, optional transforms, one or more destinations, with consent when a destination is not yours. |
-| **Resource & Assistance** | Files carry a tier (admin / restricted / workers / common); anything in the wrong place is flagged. Ping → channel → listeners for asking for help. |
+| **Resource & Assistance** | Files carry a tier (admin / restricted / workers / common); anything in the wrong place is flagged. Help message → channel → listeners for asking for help. |
 | **Control, Events, Monitoring, Actions** | Admin-authored automation in plain words: *when this happens, do that* — lock a screen, notify, close a program, run your own script. |
 
 Three programs: the **Engine** (one server, PostgreSQL, owns everything), the **Operator Client**
@@ -71,7 +71,7 @@ Worker package you can put on a staff PC that registers itself and starts at boo
 Only I have driven this software. A person doing a real day's work will hit things no test does.
 
 **Done means:** you run a full day on three machines — register them, give a task, watch it verify,
-set an automation, traverse into a PC, answer a ping — and the list of what went wrong is short and
+set an automation, traverse into a PC, answer a help message — and the list of what went wrong is short and
 fixed. Phase 8.
 
 ### 3. Some features are drawn but hollow
