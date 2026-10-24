@@ -5,7 +5,11 @@ Last updated 18 Oct 2026.
 
 ## Waiting on a decision
 
-- Nothing. (Hostname mismatch decided 13 Oct 2026: the console says "recorded, not blocked", as the Engine behaves.)
+- **Who runs the console: one IT team, or each department** (proposed 24 Oct 2026, written down, not to be built
+  yet): `docs/design/who-runs-the-console.md`. It has two modes and five open questions. It is a backbone decision for
+  the Engine and the Super User.
+- **Discovering PCs on the network** for Add a machine (`docs/ENGINE-GAPS.md` item 10): is a network scan acceptable,
+  which machine does it, and how often.
 
 ## Not exercised yet
 

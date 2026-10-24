@@ -687,14 +687,95 @@ a { color: var(--accent); text-decoration: none; }
 .nt-one > .reveal > .panel { flex: 1; }
 .nt-next { padding: 4px 2px; }
 .tk-drawer .ant-drawer-body { padding: 16px 20px; background: var(--bg); }
-.atp .iq-grp + .iq-grp { margin-top: 16px; }
+.atp .iq-grp + .iq-grp, .amp .iq-grp + .iq-grp { margin-top: 16px; }
 .tk-late { margin: 0 -13px; padding: 10px 12px 12px; border-radius: 10px; background: color-mix(in srgb, var(--crit) 7%, transparent); border: 1px solid color-mix(in srgb, var(--crit) 22%, transparent); }
 .tk-late > .lay-grp { color: var(--crit); }
 .tk-late .tk-item, .tk-late .iq-card { background: color-mix(in srgb, var(--crit) 5%, var(--surface-2)); }
 .tk-new { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
 @media (max-width: 760px) { .tk-open { padding-left: 14px; } }
 .iq-rule { align-items: center; }
-.am-card { grid-template-columns: 34px minmax(0, 1fr) 150px 150px; }
+.am-card { grid-template-columns: 34px minmax(0, 1fr) 200px 150px; }
+.am-right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.am-found { display: flex; flex-direction: column; gap: 6px; }
+.am-dept { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; font-size: 13.5px; }
+.am-dept .t3 { font-size: 12px; }
+.am-fd { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); cursor: pointer; }
+.am-fd:hover { background: color-mix(in srgb, var(--surface-2) 50%, var(--surface-3)); }
+.am-fd.on { background: var(--surface-3); }
+.am-fd .iq-main { display: flex; flex-direction: column; min-width: 0; font-size: 12.5px; }
+.am-fd .iq-t { display: flex; gap: 8px; align-items: baseline; }
+.amp .am-right .iq-fix { position: static; }
+.amp > .g.c-84 > .ib-box:first-child { align-self: stretch; }
+.tk-item.am-pick > .iq-card { background: var(--surface-3); }
+.am-facts > span { white-space: nowrap; }
+.am-sp { display: flex; align-items: center; gap: 8px; }
+.am-in { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 24px; align-items: start; }
+@media (max-width: 1100px) { .am-in { grid-template-columns: minmax(0, 1fr); } }
+.am-side { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.am-k { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+.am-use { display: flex; flex-direction: column; gap: 6px; }
+.am-now { display: flex; align-items: center; gap: 6px; }
+.am-now i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-4); }
+.am-now.on i { background: var(--ok); }
+.am-strip { display: flex; gap: 1px; height: 12px; }
+.am-strip i { flex: 1; border-radius: 1px; background: var(--grid); }
+.am-strip i.on { background: color-mix(in srgb, var(--ok) 55%, var(--surface-3)); }
+.am-sx { display: flex; justify-content: space-between; font-size: 11px; }
+.am-ses { display: flex; flex-direction: column; }
+.am-ses > span { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--grid); }
+.am-ses > span:last-child { border-bottom: 0; }
+.am-about { font-size: 12px; margin-top: -4px; }
+.am-box2 { gap: 0; }
+.am-sec { display: flex; flex-direction: column; gap: 8px; }
+.am-sec + .am-sec { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.am-sfoot { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); }
+.am-sfoot b { font-weight: 600; color: var(--text-2); }
+.am-procs > .am-ph { font-size: 11.5px; color: var(--text-4); padding: 0 0 4px; }
+.am-procs > .am-ph:hover .am-end { opacity: 0; }
+.am-disk { height: 8px; border-radius: 4px; background: var(--grid); overflow: hidden; }
+.am-disk i { display: block; height: 100%; border-radius: 4px; background: var(--s6); }
+.am-disk.hot i { background: var(--crit); }
+.am-procs { display: flex; flex-direction: column; }
+.am-procs > span { display: grid; grid-template-columns: minmax(0, 1fr) 44px 60px 44px; gap: 8px; align-items: center; padding: 2px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.am-end { opacity: 0; }
+.am-procs > span:hover .am-end, .am-end:focus-visible { opacity: 1; }
+.am-procs > span:last-child { border-bottom: 0; }
+.am-procs > span > span:not(:first-child) { text-align: right; }
+.am-runs { display: flex; flex-direction: column; gap: 6px; }
+.am-run { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; }
+.am-run .iq-main { display: flex; flex-direction: column; min-width: 0; }
+.am-run b { font-weight: 500; }
+.am-out { font-size: 11.5px; color: var(--text-2); white-space: nowrap; }
+.am-out.ok { color: var(--ok); }
+.am-out.bad { color: var(--crit); }
+.am-out.tmo { color: var(--med); }
+.am-wk { display: flex; flex-direction: column; }
+.am-wr { display: grid; grid-template-columns: 76px repeat(var(--n), minmax(0, 1fr)) 96px; gap: 12px; align-items: center; padding: 5px 6px; border-radius: 6px; font-size: 12.5px; }
+.am-wd { display: grid; place-items: center; font-size: 12px; }
+.am-wk > .am-wr { border-bottom: 1px solid var(--grid); border-radius: 0; padding-top: 7px; padding-bottom: 7px; }
+.am-wk > .am-wr:last-child { border-bottom: 0; }
+.am-wax .am-wd { font-size: 11px; color: var(--text-4); }
+.am-ok { color: var(--text-2); }
+.am-no { color: var(--text-4); }
+.am-load { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); font-size: 12px; }
+.am-load .anticon { font-size: 20px; color: var(--accent); }
+.am-wr[role="button"] { cursor: pointer; }
+.am-wr[role="button"]:hover, .am-wr.on { background: var(--surface-2); }
+.am-wt { position: relative; height: 10px; }
+.am-wt em { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--grid); }
+.am-wt i { position: absolute; top: 2px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--s6) 70%, var(--surface-3)); }
+.am-wt i.off { background: repeating-linear-gradient(90deg, var(--crit) 0 3px, transparent 3px 6px); opacity: .6; }
+.am-wt b { position: absolute; top: -2px; width: 2px; height: 14px; margin-left: -1px; background: var(--med); border-radius: 1px; }
+.am-wax { padding-top: 0; padding-bottom: 2px; }
+.am-wax .am-wt { height: 14px; }
+.am-wax .am-wt span { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--text-4); }
+.am-wn { text-align: right; color: var(--text-3); font-size: 12px; }
+.am-wn.hot { color: var(--crit); }
+.am-sp > span { min-width: 30px; text-align: right; color: var(--text-2); }
+.am-ch { display: flex; flex-direction: column; gap: 4px; }
+.am-chh { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.am-chh b { font-size: 15px; font-weight: 600; }
+.am-line { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; padding: 8px 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
 .am-facts { display: flex; justify-content: flex-end; gap: 14px; font-size: 12px; color: var(--text-3); }
 .am-old { color: var(--med); }
 .iq-s.hot { color: var(--crit); }
@@ -5402,20 +5483,35 @@ function DepartmentsPage({ go, enter }) {
 }
 const newKey = () => Array.from({ length: 32 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
 // A key is made once and shown once. Registering or re-keying ends here, with the key and what to do with it.
+// Found, not registered (sample): "knocked" is a worker that tried to connect without a key (auth.failed);
+// "seen" is a PC on the department's network with no worker yet (needs network discovery, ENGINE-GAPS item 10).
+const AM_FOUND = EMPTY ? [] : [
+  { host: "OPS-08", ip: "10.20.4.18", kind: "knocked", line: "its worker tried to connect 5 times today, last at 09:14" },
+  { host: "DESKTOP-7QK2M", ip: "10.20.4.27", kind: "seen", line: "on the network since Tuesday; no worker installed yet" },
+  { host: "LAPTOP-OPS-AMA", ip: "10.20.4.31", kind: "seen", line: "on the network this morning; no worker installed yet" }];
 function KeyModal({ spec, onClose }) {
   const [step, setStep] = useState(0), [name, setName] = useState(""), [dept, setDept] = useState(undefined), [key, setKey] = useState(newKey);
   const sig = spec ? spec.mode + (spec.subject || "") : "";
-  useEffect(() => { if (spec) { setStep(spec.mode === "rekey" ? 1 : 0); setName(""); setDept(undefined); setKey(newKey()); } }, [sig]);
+  const [found, setFound] = useState(null);
+  useEffect(() => { if (spec) { setStep(spec.mode === "rekey" ? 1 : 0); setName(""); setDept(spec.dept); setFound(null); setKey(newKey()); } }, [sig]);
   if (!spec) return html`<${Drawer} open=${false} />`;
   const rk = spec.mode === "rekey", pc = spec.mode === "pc", who = rk ? spec.subject : name.trim();
   const title = rk ? `New key for ${spec.subject}` : pc ? "Register a PC" : "Provision an Admin";
-  return html`<${Drawer} open=${true} onClose=${onClose} title=${title} width=${480} maskClosable=${step === 0}
+  const fl = pc && spec.found ? spec.found : null, fp = fl && fl.find((f) => f.host === found);
+  return html`<${Drawer} open=${true} onClose=${onClose} title=${title} width=${fl ? 560 : 480} maskClosable=${step === 0}
     footer=${step === 0 ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${onClose}>Cancel<//><${Button} type="primary" disabled=${!name.trim() || !dept} onClick=${() => { setStep(1); toast(`${name.trim()} registered, recorded in the audit log (concept)`); }}>${pc ? "Register" : "Provision"}<//></div>`
       : html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${onClose}>I have saved it<//></div>`}>
     ${step === 0 ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
+        ${fl ? html`<div><div className="nt-h">Found, not registered</div>
+          ${fl.length ? html`<div className="am-found">${fl.map((f) => html`<div key=${f.host} className=${"am-fd" + (found === f.host ? " on" : "")} role="button" tabIndex="0" onClick=${() => { setFound(f.host); setName(f.host); }} onKeyDown=${(e) => e.key === "Enter" && (setFound(f.host), setName(f.host))}>
+              <span className="iq-ic" style=${{ width: 30, height: 30, fontSize: 14 }}>${ic(f.kind === "knocked" ? "DesktopOutlined" : "WifiOutlined")}</span>
+              <span className="iq-main"><span className="iq-t"><b className="mono">${f.host}</b><span className="t3 mono">${f.ip}</span></span><span className="iq-s">${f.line}</span></span>
+              <span className="t3" style=${{ fontSize: 12 }}>${found === f.host ? "picked" : "Use it"}</span></div>`)}</div>
+            <div className="t3" style=${{ fontSize: 12, marginTop: 6 }}>Pick one to fill in its name, or type a new one below.</div>`
+            : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nothing found. A PC shows here once its worker tries to connect, or once it is seen on the network.</div>`}</div>` : null}
         <div><div className="nt-h">${pc ? "Machine name" : "Name"}</div><${Input} id="rg-name" value=${name} onChange=${(e) => setName(e.target.value)} placeholder=${pc ? "OPS-08" : "J. Owusu"} /></div>
-        <div><div className="nt-h">Department</div><${Select} id="rg-dept" showSearch optionFilterProp="label" value=${dept} onChange=${setDept} placeholder="Which department?" style=${{ width: "100%" }} options=${FULL_DEPTS().map((d) => ({ value: d.id, label: d.name }))} /></div>
-        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>${pc ? "The machine joins the department and shows up in its fleet. It gets a key, shown once." : "They get a console and a key, shown once. The department's reports start reaching them once you route them."}</div>
+        ${pc && spec.dept ? html`<div><div className="nt-h">Department</div><div className="am-dept">${deptNameOf(spec.dept)}<span className="t3">your department</span></div></div>` : html`<div><div className="nt-h">Department</div><${Select} id="rg-dept" showSearch optionFilterProp="label" value=${dept} onChange=${setDept} placeholder="Which department?" style=${{ width: "100%" }} options=${FULL_DEPTS().map((d) => ({ value: d.id, label: d.name }))} /></div>`}
+        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>${pc ? (fp && fp.kind === "seen" ? `${fp.host} has no worker yet. Register it now, then install the worker on it with the key you get next.` : fp ? `${fp.host} is already trying to connect. Once its worker has the key you get next, it checks in.` : "The machine joins the department and shows up in its fleet. It gets a key, shown once.") : "They get a console and a key, shown once. The department's reports start reaching them once you route them."}</div>
       </div>`
       : html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="t2">${rk ? `The old key for ${spec.subject} stops working at once.` : `${who} is registered.`} Copy this into ${rk || pc ? "the machine's Worker Client settings" : "their Operator Client settings"}.</div>
@@ -7578,18 +7674,60 @@ function AdminOverviewPage({ go }) {
 
 // The Admin's Machines (23 Oct 2026, the drawn layout, filled in to be judged): which of my machines needs me, and what do I
 // do on it? Cards grouped by what each machine needs; the picked one on the right; how it has been below; act on several.
+// What the Machines page shows about one machine beyond its metrics (sample, drawn from the host name).
+// The worker knows all of it: processes (psutil), idle time, its own sessions, actions run, boot time.
+const AM_OS = ["Windows 11 Pro", "Windows 11 Pro", "Windows 10 Pro"], AM_RAM = [8, 16, 16, 32];
+const AM_PROCS = [["EXCEL.EXE", 0.42, 610], ["msedge.exe", 0.21, 940], ["OUTLOOK.EXE", 0.12, 380], ["Teams.exe", 0.09, 520], ["WINWORD.EXE", 0.06, 210], ["explorer.exe", 0.03, 120], ["AcroRd32.exe", 0.04, 260], ["OneDrive.exe", 0.03, 140], ["svchost.exe", 0.02, 90], ["falcon-worker.exe", 0.02, 60], ["chrome.exe", 0.05, 480], ["notepad.exe", 0.01, 20]];
+const AM_KEEP = new Set(["svchost.exe", "explorer.exe", "falcon-worker.exe", "csrss.exe", "winlogon.exe", "lsass.exe", "services.exe", "System"]);
+function amAbout(m) { const h = hs(m.host);
+  return { os: AM_OS[h % 3], ram: AM_RAM[h % 4], up: 2 + (h % 90) / 2, reg: dayjs("2026-03-02").add(h % 160, "day").format("D MMM YYYY"), size: [256, 512, 512, 1024][h % 4] }; }
+function amProcs(m) { const cpu = metric(m.host, "cpu", NOWH) || 0, h = hs(m.host);
+  return AM_PROCS.map(([n, f, mb], i) => [n, cpu * f * (0.7 + 0.6 * nz(h, i)), Math.round(mb * (0.6 + 0.8 * nz(h, i + 9)))]).filter(([n]) => !AM_KEEP.has(n)).sort((a, b) => b[1] - a[1]).slice(0, 7); }
+// at the keyboard: active or idle in quarter hours since 08:00 today; nobody signed in means idle
+function amUse(m) { const h = hs(m.host), from = Math.floor(NOWH / 24) * 24 + 8, q = [];
+  for (let t = from; t < NOWH; t += 0.25) q.push(!!m.user && m.status !== "offline" && sm(h, t, 1.1) > 0.33);
+  let idle = 0; for (let i = q.length - 1; i >= 0 && !q[i]; i--) idle += 0.25;
+  return { q, from, now: q.length ? q[q.length - 1] : false, idle }; }
+// the last times someone entered it: when and how long
+function amSessions(m) { const h = hs(m.host), out = [];
+  if (m.held) out.push([NOWH - 0.4, null]);
+  for (let i = 0; i < 3 - out.length; i++) out.push([NOWH - 3 - i * 19 - (h % 7) - nz(h, i) * 9, 0.15 + nz(h, i + 4) * 1.2]);
+  return out; }
+// check-ins over the week: online stretches; most are switched off at night, a few drop out
+function amWeek(m) { const h = hs(m.host), alwaysOn = h % 4 === 0, segs = [], drops = [];
+  const a = NOWH - 168, end = m.status === "offline" ? NOWH - m.seen : NOWH;
+  if (alwaysOn) segs.push([a, end]);
+  else for (let d = Math.floor(a / 24); d * 24 < end; d++) { const day = d * 24; if (weekend(day + 12)) continue;
+    const on = day + 7.5 + nz(h, d) * 1.2, off = day + 17.5 + nz(h, d + 3) * 1.5; const x0 = Math.max(a, on), x1 = Math.min(end, off); if (x1 > x0) segs.push([x0, x1]); }
+  // a short drop or two in the middle of a day
+  const n = h % 3; for (let i = 0; i < n; i++) { const t = a + 30 + i * 47 + nz(h, i + 20) * 20; const k = segs.findIndex(([x, y]) => t > x + 0.5 && t < y - 0.5);
+    if (k >= 0) { const [x, y] = segs[k]; segs.splice(k, 1, [x, t], [t + 0.4, y]); drops.push(t); } }
+  return { segs, drops, a, end }; }
 const AM_SHOW = 6;
 function AdminMachinesPage({ go }) {
   useDT();
   const me = ME;
-  const [sel, setSel] = useState(null), [more, setMore] = useState({}), [modal, modalCtx] = Modal.useModal();
+  const [sel, setSel] = useState(null), [exp, setExp] = useState(null), [more, setMore] = useState({ fine: true }), [modal, modalCtx] = Modal.useModal();
   const ms = MACHINES, CUR = "1.4.2";
   const openOn = (h) => ISSUES.filter((i) => i.host === h && ISTATE0[i.id].status !== "Resolved").sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]);
   const pingOn = (m) => CHANNELS.find((c) => chVisible(c, me) && c.status === "ping" && chReceiver(c) === me && chOther(c, me) === m.user);
   const groupOf = (m) => m.status === "high" || m.status === "critical" ? "look" : m.status === "offline" ? "off" : m.status === "warning" || m.ver !== CUR ? "small" : "fine";
-  const G = [["look", "Needs a look", "something serious is open on it"], ["small", "Worth a look", "something small, a help request, or an older version"], ["off", "Offline", "not checking in"], ["fine", "Fine", "nothing open; folded"]];
+  const G = [["look", "Needs a look", "something serious is open on it"], ["small", "Worth a look", "something small, a help request, or an older version"], ["off", "Offline", "not checking in"], ["fine", "Fine", "nothing open"]];
   const by = Object.fromEntries(G.map(([k]) => [k, ms.filter((m) => groupOf(m) === k).sort((a, b) => a.host.localeCompare(b.host))]));
-  const cur = ms.find((m) => m.host === sel) || by.look[0] || by.small[0] || ms[0];
+  const pick = ms.find((m) => m.host === sel) || null, cur = pick || ms[0];
+  const [loading, setLoading] = useState(false);
+  useEffect(() => { if (!sel) return; setLoading(true); const t = setTimeout(() => setLoading(false), 700); return () => clearTimeout(t); }, [sel]);
+  const [ended, setEnded] = useState({}), [add, setAdd] = useState(null);
+  // ending a program: the built-in kill_process action, then a notice on the person's screen; "never allow it" prepares a rule
+  const endProc = (m, n) => { let never = false;
+    modal.confirm({ title: `End ${n} on ${m.host}?`, okText: "End it", okButtonProps: { danger: true }, cancelText: "Cancel",
+      content: html`<div style=${{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <span>${m.user ? `${m.user} is signed in and is told on their screen that you ended it.` : "Nobody is signed in."} Anything unsaved in ${n} is lost.</span>
+        <${Checkbox} onChange=${(e) => { never = e.target.checked; }}>Never allow it: prepare a rule in Automation that ends ${n} whenever it starts on any machine<//></div>`,
+      onOk: () => { setEnded((x) => ({ ...x, [m.host + ":" + n]: true }));
+        toast(`${n} ended on ${m.host}${m.user ? `; ${m.user} was told` : ""} (concept)`);
+        if (never) toast(`A rule to end ${n} wherever it starts is ready in Automation, waiting for you to switch it on (concept)`); } }); };
+  const spin = (h) => html`<div className="am-load" style=${{ height: h }}>${ic("LoadingOutlined")}<span>Loading ${cur.host}</span></div>`;
   const behind = ms.filter((m) => m.ver !== CUR), held = ms.filter((m) => m.held);
   const situation = !ms.length ? "There are no machines in this department yet." : `${by.look.length ? `${fmt(by.look.length)} need${by.look.length === 1 ? "s" : ""} a look (${listNames(by.look.map((m) => m.host), 3)})` : "Nothing serious is open"}; ${by.off.length ? `${fmt(by.off.length)} offline` : "all online"}${held.length ? `, ${fmt(held.length)} with someone inside` : ""}${behind.length ? `, ${fmt(behind.length)} behind on the version` : ""}.`;
   // what the card offers: the machine's worst issue's fix, then a help request, then an update, then entering
@@ -7603,50 +7741,102 @@ function AdminMachinesPage({ go }) {
     return [m.held ? `${m.held === "You" ? "you are" : `${m.held} is`} inside` : null, i ? `${i.title.charAt(0).toLowerCase()}${i.title.slice(1)}: ${i.subject}` : null, p ? `asked for help${p.pings.length > 1 ? ` ${p.pings.length} times` : ""}` : null,
       m.ver !== CUR ? `on ${m.ver}, one behind` : null, m.status === "offline" ? `last seen ${dur(m.seen)} ago` : null].filter(Boolean).join(" · ") || "nothing open"; };
   const card = (m) => { const [verb, fn] = actOf(m), cpu = metric(m.host, "cpu", NOWH), urg = groupOf(m) === "look";
-    return html`<article key=${m.host} className=${"iq-card am-card" + (urg ? " urg" : "") + (m.host === cur.host ? " on" : "") + (m.status === "offline" ? " done" : "")} role="button" tabIndex="0" onClick=${() => setSel(m.host)} onKeyDown=${(e) => e.key === "Enter" && setSel(m.host)}>
+    const on = exp === m.host, picked = sel === m.host, enterOk = m.status !== "offline" && m.held !== "You";
+    return html`<div key=${m.host} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "") + (m.status === "offline" ? " done" : "")}>
+    <article className=${"iq-card am-card" + (urg ? " urg" : "")} role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => setSel(m.host)} onKeyDown=${(e) => e.key === "Enter" && setSel(m.host)}>
       <span className="iq-ic">${ic("DesktopOutlined")}</span>
       <span className="iq-main"><span className="iq-t"><b className="cut">${m.host}</b><span className="t3">${m.user || "nobody signed in"}</span></span><span className=${"iq-s cut" + (urg ? " hot" : "")}>${whatOf(m)}</span></span>
-      <span className="am-facts"><span>${cpu == null ? "—" : `CPU ${cpu.toFixed(0)}%`}</span><span className=${m.ver !== CUR ? "am-old" : ""}>${m.ver}</span></span>
-      <span className="iq-a"><${Button} size="small" onClick=${(e) => { e.stopPropagation(); fn(); }}>${verb}<//></span></article>`; };
+      <span className="am-facts">${m.status === "offline" ? html`<span className="am-sp t4">no data since ${dur(m.seen)} ago</span>` : html`<span className="am-sp" title="CPU over the last 24 hours"><${Spark} fn=${(x) => metric(m.host, "cpu", x)} w=${96} h=${22} max=${100} c=${urg ? "var(--crit)" : "var(--s6)"} /><span>${cpu == null ? "—" : `${cpu.toFixed(0)}%`}</span></span>`}<span>${m.ver}</span></span>
+      <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setExp(on ? null : m.host); setSel(m.host); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span></article>
+    ${on ? html`<div className="tk-open">
+      <div className="am-in">
+        <div className="tk-facts">${[["Signed in", m.user || "nobody"], ["Inside", m.held ? (m.held === "You" ? "you" : m.held) : "nobody"], ["Address", m.ip || "—"], ["Version", m.ver === CUR ? m.ver : `${m.ver}, one behind`], ["Last seen", m.seen > 0.1 ? dur(m.seen) + " ago" : "now"]]
+          .map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> ${b}</span>`)}</div>
+        <div className="am-side">${(() => { const u = amUse(m);
+          return html`<div className="am-use"><div className="am-k">At the keyboard</div>
+            <div className=${u.now ? "am-now on" : "am-now"}><i />${m.status === "offline" ? "offline" : !m.user ? "nobody signed in" : u.now ? "in use now" : `idle for ${dur(u.idle)}`}</div>
+</div>`; })()}
+          <div className="am-k">Entered</div>
+          <div className="am-ses">${amSessions(m).map(([t, d], i) => html`<span key=${i}><span>${hod(t) === hod(NOWH) || NOWH - t < 24 && dayOf(t) === dayOf(NOWH) ? "Today" : dayOf(t)} ${hhmm(t)}</span><span className="t3">${d == null ? "inside now" : dur(d)}</span></span>`)}</div>
+        </div>
+      </div>
+      <div className="row" style=${{ justifyContent: "flex-end" }}>${verb !== "Fix it" && verb !== "Enter" ? html`<${Button} size="small" onClick=${fn}>${verb}<//>` : null}<${Button} size="small" type="primary" disabled=${!enterOk} onClick=${() => modal.confirm(enterSessionConfirm(m, () => toast(`You are in ${m.host} (concept)`)))}>${m.held === "You" ? "You are inside" : "Enter"}<//><${Button} size="small" type="text" onClick=${() => go("actions")}>Run an action<//></div>
+    </div>` : null}</div>`; };
   // act on several
   const AV = { update: "Update", restart: "Restart", action: "Run an action on" };
   const sets = [...(by.look.length ? [["look", `the ${fmt(by.look.length)} that need a look`, by.look]] : []), ...(behind.length ? [["behind", `the ${fmt(behind.length)} behind on the version`, behind]] : []), ["all", `all ${fmt(ms.length)} machines`, ms]];
   const [av, setAv] = useState("update"), [at, setAt] = useState(undefined);
   const set = sets.find((x) => x[0] === at), signed = set ? set[2].filter((m) => m.user && m.status !== "offline") : [];
   const avPrev = !set ? null : av === "action" ? `Opens Actions with ${set[1]} picked, to choose what to run.` : `${AV[av]}s ${set[1]} (${listNames(set[2].map((m) => m.host), 4)}).${signed.length ? ` ${listNames(signed.map((m) => m.user), 3)} may see a restart prompt.` : ""}${set[2].some((m) => m.status === "offline") ? " Offline ones do it when they are back." : ""}`;
-  const cpuC = metric(cur.host, "cpu", NOWH), disk = metric(cur.host, "disk", NOWH), curI = openOn(cur.host), curT = TASKS.filter((t) => t.host === cur.host && t.state !== "Completed"), [hk, hw] = HEALTH[cur.status];
+  const WK_DAYS = Array.from({ length: 8 }, (_, i) => Math.floor((NOWH - 168) / 24) + i).filter((d) => d * 24 < NOWH);
+  const ab = amAbout(cur);
+  const cpuC = metric(cur.host, "cpu", NOWH), memC = metric(cur.host, "mem", NOWH), disk = metric(cur.host, "disk", NOWH), curI = openOn(cur.host), curT = TASKS.filter((t) => t.host === cur.host && t.state !== "Completed"), [hk, hw] = HEALTH[cur.status];
   return html`<div className="og amp">${modalCtx}
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <section className="ib-box">
-        <header><b>My machines</b><span>one card per machine, grouped by what it needs from you; click one to see it on the right</span></header>
+        <header><b>My machines</b><span>one card per machine, grouped by what it needs from you; click one to draw it on the right, expand it for its details</span></header>
         ${G.map(([k, g, d]) => { const xs = by[k]; if (!xs.length) return null; const fold = k === "fine" && !more.fine;
           return html`<div key=${k} className="iq-grp"><div className="lay-grp iq-gh">${g} · ${fmt(xs.length)}<span>${d}</span>${k === "fine" ? html`<a style=${{ marginLeft: "auto", fontWeight: 400 }} onClick=${() => setMore({ ...more, fine: !more.fine })}>${more.fine ? "Hide" : "Show"}</a>` : null}</div>
             ${fold ? null : html`<div className="iq-cards">${(more[k] || k === "fine" ? xs : xs.slice(0, AM_SHOW)).map(card)}</div>`}
             ${k !== "fine" && xs.length > AM_SHOW ? html`<a className="ib-more" onClick=${() => setMore({ ...more, [k]: !more[k] })}>${more[k] ? "Show fewer" : `and ${fmt(xs.length - AM_SHOW)} more`}</a>` : null}</div>`; })}
       </section>
-      <section className="ib-box iq-fix">
-        <header><b>${cur.host}</b><span>${cur.user ? `${cur.user} is signed in` : "nobody signed in"}${cur.held ? ` · ${cur.held === "You" ? "you are" : `${cur.held} is`} inside` : ""}</span></header>
-        <div className="row"><span className="st" style=${{ "--c": hk === "crit" || hk === "high" ? "var(--crit)" : hk === "watch" ? "var(--med)" : hk === "offline" ? "var(--text-4)" : "var(--ok)" }}><i />${hw}</span><span className="sp" /><a onClick=${() => go("machines", cur.host)}>Its page</a></div>
-        <div>${[["Version", cur.ver === CUR ? cur.ver : `${cur.ver}, one behind`], ["CPU now", cpuC == null ? "—" : cpuC.toFixed(0) + "%"], ["Disk", disk == null ? "—" : disk.toFixed(0) + "%"], ["Last seen", cur.seen > 0.1 ? dur(cur.seen) + " ago" : "now"], ["IP address", cur.ip]]
-          .map(([k, v]) => html`<div key=${k} className="kv" style=${{ gridTemplateColumns: "104px minmax(0, 1fr)" }}><span className="t3">${k}</span><span style=${{ fontSize: 12.5 }}>${v}</span></div>`)}</div>
-        <div className="am-open"><span className="t3">Open on it</span>
-          ${curI.map((i) => html`<a key=${i.id} onClick=${() => go("issues", i.id)}>${ic(ISSUE_TYPES[i.type].icon)} ${i.title}: ${i.subject}</a>`)}
-          ${curT.map((t) => html`<a key=${t.id} onClick=${() => go("tasks", t.id)}>${ic("CheckSquareOutlined")} ${t.title}</a>`)}
-          ${!curI.length && !curT.length ? html`<span className="t3">Nothing: no issue and no task.</span>` : null}</div>
-        <div className="row" style=${{ borderTop: "1px solid var(--border)", paddingTop: 12 }}><${Button} onClick=${() => go("actions")}>Run an action<//><span className="sp" />
-          <${Button} type="primary" disabled=${cur.status === "offline" || cur.held === "You"} onClick=${() => modal.confirm(enterSessionConfirm(cur, () => toast(`You are in ${cur.host} (concept)`)))}>${cur.held === "You" ? "You are inside" : "Enter"}<//></div>
+      <div className="am-right">${!pick ? html`<section className="ib-box iq-fix">
+        <header><b>No machine picked</b><span>click a machine on the left to draw it here</span></header>
+        <div className="am-ch"><div className="am-chh"><span>CPU</span><b>—</b><span className="t3">last 24 hours</span></div>
+          <${TimeChart} range="24h" series=${[{ name: "CPU", c: "var(--s6)", fn: () => null }]} unit="%" yMax=${100} height=${164} /></div>
+        <div className="am-ch"><div className="am-chh"><span>Memory</span><b>—</b><span className="t3">last 24 hours</span></div>
+          <${TimeChart} range="24h" series=${[{ name: "Memory", c: "var(--s3)", fn: () => null }]} unit="%" yMax=${100} height=${164} /></div>
       </section>
+      <section className="ib-box">
+        <div className="am-ch"><div className="am-chh"><span>Storage</span><b>—</b></div><div className="am-disk" /></div>
+        <div className="am-ch"><div className="am-chh"><span>Running now</span><span className="t3">the most busy programs</span></div>
+          <div className="t3" style=${{ fontSize: 12.5 }}>Shown for the machine you pick.</div></div>
+      </section>` : html`<section className="ib-box iq-fix">
+        <header><b>${cur.host}</b><span>${cur.user ? `${cur.user} is signed in` : "nobody signed in"}${cur.held ? ` · ${cur.held === "You" ? "you are" : `${cur.held} is`} inside` : ""}</span></header>
+        <div className="row"><span className="st" style=${{ "--c": hk === "crit" || hk === "high" ? "var(--crit)" : hk === "watch" ? "var(--med)" : hk === "offline" ? "var(--text-4)" : "var(--ok)" }}><i />${hw}</span></div>
+        <div className="am-about t3">${ab.os} · ${ab.ram} GB memory · ${cur.status === "offline" ? "off" : `up ${dur(ab.up).replace(/h .*/, "h")}`} · registered ${ab.reg}</div>
+        ${cur.status === "offline" ? html`<div className="ib-quiet">${cur.host} has not checked in for ${dur(cur.seen)}; there is nothing new to draw.</div>` : html`
+        <div className="am-ch"><div className="am-chh"><span>CPU</span><b>${loading || cpuC == null ? "—" : cpuC.toFixed(0) + "%"}</b><span className="t3">last 24 hours</span></div>
+          ${loading ? spin(164) : html`<${TimeChart} range="24h" series=${[{ name: "CPU", c: "var(--s6)", fn: (x) => metric(cur.host, "cpu", x) }]} unit="%" yMax=${100} height=${164} />`}</div>
+        <div className="am-ch"><div className="am-chh"><span>Memory</span><b>${loading || memC == null ? "—" : memC.toFixed(0) + "%"}</b><span className="t3">last 24 hours</span></div>
+          ${loading ? spin(164) : html`<${TimeChart} range="24h" series=${[{ name: "Memory", c: "var(--s3)", fn: (x) => metric(cur.host, "mem", x) }]} unit="%" yMax=${100} height=${164} />`}</div>`}
+      </section>
+      <section className="ib-box am-box2">
+        <div className="am-sec">
+          <div className="am-chh"><span>Storage</span><b>${loading || disk == null ? "—" : disk.toFixed(0) + "%"}</b><span className="t3">used, drive C:</span></div>
+          ${loading ? spin(44) : html`<div className=${"am-disk" + (disk != null && disk >= 90 ? " hot" : "")}><i style=${{ width: (disk || 0) + "%" }} /></div>`}
+          ${disk == null || loading ? null : html`<div className="am-sfoot"><span><b>${Math.round(ab.size * disk / 100)} GB</b> used</span><span><b>${Math.round(ab.size * (1 - disk / 100))} GB</b> free of ${ab.size} GB</span></div>`}
+        </div>
+        ${cur.status === "offline" ? null : html`<div className="am-sec">
+          <div className="am-chh"><span>Running now</span><span className="t3">the busiest programs; point at one to end it</span></div>
+          ${loading ? spin(210) : html`<div className="am-procs">
+            <span className="am-ph"><span>Program</span><span>CPU</span><span>Memory</span><span /></span>
+            ${amProcs(cur).filter(([n]) => !ended[cur.host + ":" + n]).map(([n, c, mb]) => html`<span key=${n}><span className="mono cut">${n}</span><span>${c.toFixed(0)}%</span><span className="t3">${mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : mb + " MB"}</span>
+            <${Button} size="small" type="text" danger className="am-end" onClick=${() => endProc(cur, n)}>End<//></span>`)}</div>`}</div>`}
+      </section>`}</div>
     </div>
-    <section className="ib-box"><header><b>How it has been</b><span>${cur.host} over the last 24 hours: CPU shaded, memory as the purple line</span></header>
-      <${TimeChart} range="24h" series=${[{ name: "CPU", c: "var(--s6)", fn: (t) => metric(cur.host, "cpu", t) }, { name: "Memory", c: "var(--s3)", fn: (t) => metric(cur.host, "mem", t) }]} unit="%" yMax=${100} height=${170} /></section>
-    <section className="ib-box og-change">
-      <header><b>Act on several</b><span>one sentence; what it does is said before it is done</span></header>
-      <div className="og-change-r iq-rule"><${Select} value=${av} onChange=${setAv} style=${{ width: 190 }} options=${Object.entries(AV).map(([value, label]) => ({ value, label }))} />
-        <${Select} placeholder="which machines" value=${at} onChange=${setAt} style=${{ flex: 1, minWidth: 260 }} options=${sets.map(([value, label]) => ({ value, label }))} />
-        <${Button} type="primary" disabled=${!set} onClick=${() => { if (av === "action") go("actions"); else toast(`${AV[av]} sent to ${set[1]} (concept)`); setAt(undefined); }}>Do it<//></div>
-      ${avPrev ? html`<div className="og-preview">${avPrev}</div>` : null}
+    <section className="ib-box">
+      <header><b>Check-ins this week</b><span>a check-in is the machine's worker reaching the Engine: the PC is on and connected, whether or not anyone is signed in to it</span></header>
+      <div className="am-wk" style=${{ "--n": WK_DAYS.length }}>
+        <div className="am-wr am-wax"><span />${WK_DAYS.map((d) => html`<span key=${d} className="am-wd">${d === Math.floor(NOWH / 24) ? "Today" : dayOf(d * 24 + 12)}</span>`)}<span /></div>
+        ${[...ms].sort((x, y) => x.host.localeCompare(y.host)).map((m) => { const w = amWeek(m);
+          const yes = (d) => w.segs.some(([x, y]) => y > d * 24 && x < d * 24 + 24), nYes = WK_DAYS.filter(yes).length;
+          const day = (d) => (yes(d) ? ["ok", "CheckOutlined", "checked in"] : ["no", "CloseOutlined", "did not check in"]);
+          return html`<div key=${m.host} className=${"am-wr" + (m.host === sel ? " on" : "")} role="button" onClick=${() => setSel(m.host)}><span className="mono">${m.host}</span>
+            ${WK_DAYS.map((d) => { const [k, icn, why] = day(d); return html`<span key=${d} className=${"am-wd am-" + k} title=${`${dayOf(d * 24 + 12)}: ${why}`}>${ic(icn)}</span>`; })}
+            <span className="am-wn">${fmt(nYes)} of ${fmt(WK_DAYS.length)} days</span></div>`; })}
+      </div>
     </section>
+    <section className="ib-box og-change">
+      <header><b>Add a machine</b><span>a PC joins the department in three steps; nothing connects without the key made here${AM_FOUND.length ? ` · ${fmt(AM_FOUND.length)} found, not registered` : ""}</span></header>
+      <div className="tk-give">
+        <ol className="tk-steps"><li><b>Pick or name the PC</b><span>PCs already found on the network, or trying to connect, are offered</span></li>
+          <li><b>Copy its key</b><span>it is made for this PC and shown once</span></li>
+          <li><b>Give the key to its worker</b><span>in the Worker Client settings; it checks in from then on</span></li></ol>
+        <${Button} type="primary" onClick=${() => setAdd({ mode: "pc", found: AM_FOUND, dept: (ADMIN_INFO[ME] || {}).dept })}>Add a machine<//></div>
+    </section>
+    <${KeyModal} spec=${add} onClose=${() => setAdd(null)} />
   </div>`;
 }
 
@@ -8095,7 +8285,7 @@ function App() {
           
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
-          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 24 Oct 04:10</span>
+          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 24 Oct 10:00</span>
           <span className="t4" style=${{ fontSize: 11, whiteSpace: "normal" }} title="The large sample checks that nothing grows with the data">Concept · sample:
             ${["empty", "small", "large", "absurd"].map((v, k) => html`<${React.Fragment} key=${v}>${k ? " · " : " "}<a style=${{ color: SAMPLE_SIZE === v ? "var(--accent)" : "var(--text-3)", fontWeight: SAMPLE_SIZE === v ? 600 : 400, cursor: "pointer" }} onClick=${() => SAMPLE_SIZE !== v && setSample(v)}>${v}</a><//>`)}</span>
         </div>

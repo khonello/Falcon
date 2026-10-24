@@ -120,6 +120,22 @@ part is recorded for later, not built.
    - All targets go onto the one task. A part that names nothing to check stays in the description, for the assigner to judge at verification.
    - `tasks.py` stops returning `proposed_split`, and the clients drop the "split / keep as one" choice.
    - `scripts/llm_cases.py` has split cases. Move them to one-task expectations; they are rules, not held-out measurements.
+
+9. **What the Machines page shows about one machine** (the user, 24 Oct 2026; the concept's Machines, Admin v87). Each item says what the Engine must keep, and for how long. The Worker already knows most of it.
+   - **Running now:** the seven busiest programs, with CPU and memory, from a snapshot the Worker sends with its metrics (psutil). Keep only the latest snapshot. System processes and the Worker itself are left out of the snapshot, so they can never be ended from here.
+   - **End a program** (the user, 24 Oct 2026). The built-in `kill_process` (by name) already exists. Ending runs it as a manual action, so it is audited. It is followed by a `notify` on that machine telling the person the Admin ended it. The Worker refuses to end anything on its protected list, even when asked directly.
+   - **Never allow it:** "never allow it" prepares a rule switched off: when the program starts on any machine, end it and tell the person. This needs a program-started condition; check what OS signals (item 1) already give.
+   - **At the keyboard:** in use or idle now, plus today's quarter hours of use from 08:00. The Worker's idle detection reports it; keep one day.
+   - **Storage:** percent used and the disk's size. Size is new; percent is already a metric.
+   - **About the machine:** OS, memory, last boot, registered date. Reported once at connect and kept on the machine's row; the registered date comes from `pcs`.
+   - **Entered:** when and for how long, from sessions on that PC. No names on this page.
+   - **Check-ins this week:** one yes or no per machine per day, for the last week. A check-in is the machine's Worker reaching the Engine: the PC is on and connected, whether or not anyone is signed in. It comes from connect times; keep a week.
+
+10. **PCs found but not registered** (the user, 24 Oct 2026; the Add a machine drawer, Admin v100). The drawer offers PCs the system has noticed but nobody registered, and picking one fills in its name.
+   - **Knocked:** a Worker that tried to connect without a valid key. The handshake already records `auth.failed`, and the Super User's Refused list reads it. The Admin needs the same list, cut to unregistered names and the department's address range, with tries and last try.
+   - **Seen on the network:** a PC with no Worker yet. This is new. It needs discovery on the department's subnet, from the Engine or a registered Worker: ARP or NetBIOS/mDNS names, passive where possible. It reports name, address and when first seen. **To decide with the user:** whether discovery is allowed at all (it is a network scan), which machine does it, and how often.
+   - Registering a found PC uses the existing `hierarchy.pc_register`. Nothing about keys changes.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine
