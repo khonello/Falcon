@@ -136,6 +136,19 @@ part is recorded for later, not built.
    - **Seen on the network:** a PC with no Worker yet. This is new. It needs discovery on the department's subnet, from the Engine or a registered Worker: ARP or NetBIOS/mDNS names, passive where possible. It reports name, address and when first seen. **To decide with the user:** whether discovery is allowed at all (it is a network scan), which machine does it, and how often.
    - Registering a found PC uses the existing `hierarchy.pc_register`. Nothing about keys changes.
 
+11. **A flow's last sync, as a diff** (the user, 24 Oct 2026; the Admin's Flows, v116). For each sync run of a flow, keep:
+   - when it ran;
+   - each file it handled: new, changed, kept beside a changed copy, held for consent, or waiting for a destination;
+   - each file's size before and after at the destination.
+
+   The page shows the last run in full, then the runs before it as counts and bytes. The run boundaries and sizes come from what the Worker reports when it writes (`flow.conflict` already carries kept-beside). Keep runs on the 90-day clock.
+
+12. **What the Admin's Restricted page shows** (the user, 24 Oct 2026; the concept's Restricted, Admin v125). An Admin restricts only what is on the PC they are at (the user, 25 Oct 2026, to avoid confusion). `resource.tag` allows any machine of the department today, so the console limits it. The file or folder is found by searching that PC's entries in the file index, or picked in Explorer (a native file dialog in the Operator Client). For each copy caught, and each mark, keep:
+   - **how the copy got there:** copied over the network, from a USB drive, saved from an email or a download, or delivered by a flow. Read it from the file events that led to the copy.
+   - **a copy allowed where it is,** with the reason the owner typed. It stays on the record, quiet, and is not caught again.
+   - **what happened to the mark lately:** opened, changed, copied, files added, a flow held at it.
+   - **the flows the owner allowed,** per flow, with since when, and taking that consent back. Copies already delivered are then caught like any other.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

@@ -577,7 +577,280 @@ a { color: var(--accent); text-decoration: none; }
 .lay { display: flex; flex-direction: column; gap: 16px; }
 .lay-q { font-size: 13px; color: var(--text-3); }
 .lay-q b { color: var(--text); font-weight: 600; }
+.fl-tile { display: flex; flex-direction: column; gap: 7px; width: 150px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); }
+.fl-tile i { display: block; height: 8px; width: 85%; border-radius: 4px; background: var(--surface-3); }
+.fl-tile.hot i:first-child { background: color-mix(in srgb, var(--crit) 30%, var(--surface-3)); }
+.fl-tile.on { background: var(--surface-3); }
+.flg-cols { position: relative; height: 16px; font-size: 11.5px; color: var(--text-4); }
+.flg-cols span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.flg { width: 100%; height: auto; display: block; }
+.flg-n { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1; }
+.flg-n.step { fill: var(--surface-2); }
+.flg-n.held { stroke: var(--crit); stroke-width: 1.5; }
+.flg-n.stop { stroke: var(--crit); stroke-dasharray: 5 4; }
+.flg-n.wait { stroke-dasharray: 5 4; fill: transparent; }
+.flg-t { fill: var(--text-2); font-size: 12.5px; }
+.flg-wrap { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+.flg-wrap .flg { width: auto; overflow: visible; }
+.flg-k { fill: var(--text-3); font-size: 9px; text-anchor: middle; }
+.flg-l { fill: none; stroke: var(--s6); stroke-width: 1.2; opacity: .85; }
+.flg-l.hold { stroke: var(--crit); stroke-dasharray: 3 5; }
+.flg-l.stop { stroke: var(--crit); stroke-dasharray: 6 4; opacity: .7; }
+.flg-l.idle { stroke: var(--text-4); stroke-dasharray: 4 4; }
+.fg-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 90px; gap: 10px; }
+.fg-rail.all { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.fg-rail.all .fg-card.more { min-height: 0; grid-column: 1 / -1; padding: 8px; }
+.fw-log { display: flex; flex-direction: column; }
+.fd { display: flex; flex-direction: column; gap: 12px; }
+.fd-top { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.fd-top b { font-size: 18px; font-weight: 600; }
+.fd-sum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.fd-c b { font-size: 13px; }
+.fd-c.arrived b { color: var(--ok); }
+.fd-c.did b { color: var(--med); }
+.fd-g { display: flex; flex-direction: column; }
+.fd-row { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.fd-row:last-child { border-bottom: 0; }
+.fd-row .t3 { font-size: 12px; }
+.fd-g.did .mono { color: var(--text-3); }
+.fl-acts { padding-top: 4px; }
+.nf-steps-wrap { display: flex; flex-direction: column; gap: 14px; min-height: 100%; }
+.nf-graph { gap: 6px; }
+.nf-body { flex: 1; }
+.nf-body .decide { margin-top: 0; }
+.nfv { display: flex; flex-direction: column; gap: 12px; }
+.nfv > div:first-child { margin-bottom: 8px !important; }
+.nfv-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; border-radius: 8px; background: var(--surface-2); }
+.nfv-h { display: flex; align-items: center; gap: 10px; }
+.nfv-t { font-weight: 600; font-size: 13px; }
+.nfv-f { display: flex; flex-direction: column; gap: 5px; }
+.nfv-f > .ant-select, .nfv-f > .ant-input, .nfv-f > .ant-select-auto-complete { width: 100%; }
+.nfv-l { font-size: 12px; color: var(--text-3); }
+.nfv-n { font-size: 12px; color: var(--text-3); }
+.nfv-n b { font-weight: 500; color: var(--text-2); }
+.nfv-none { padding: 18px; border: 1.5px dashed var(--border-strong); border-radius: 8px; text-align: center; color: var(--text-3); font-size: 12.5px; }
+.nfv-sec { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.nfv-st { font-size: 13px; font-weight: 600; }
+.nfv-pick { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 8px; background: var(--surface-2); border: 1px solid transparent; cursor: pointer; }
+.nfv-pick:hover { border-color: var(--border-strong); }
+.nfv-pick.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
+.nfv-pick > i { flex: none; width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; border: 1.5px solid var(--border-strong); }
+.nfv-pick.on > i { border: 4px solid var(--accent); }
+.nfv-pick > span { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.nfv-pick b { font-weight: 600; font-size: 13px; }
+.fl-grp { display: inline-flex; gap: 6px; }
+.fd-w { font-weight: 600; color: var(--ok); }
+.fd-w.neg { color: var(--crit); }
+.fd-list { display: flex; flex-direction: column; }
+.fd-r { display: grid; grid-template-columns: 80px minmax(0, 1fr) 64px; grid-template-areas: "f f f" "k b d"; gap: 4px 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 12px; }
+.fd-f { grid-area: f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fd-r .fd-k { grid-area: k; }
+.fd-r .fd-bar { grid-area: b; }
+.fd-r .fd-d { grid-area: d; }
+.fd-r:last-child { border-bottom: 0; }
+.fd-k { font-size: 11px; color: var(--text-2); }
+.fd-r.new .fd-k { color: var(--ok); }
+.fd-r.held .fd-k { color: var(--crit); }
+.fd-r.beside .fd-k, .fd-r.queued .fd-k { color: var(--med); }
+.fd-r.held .mono, .fd-r.queued .mono { color: var(--text-3); }
+.fd-bar { display: flex; height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.fd-bar i { display: block; height: 100%; }
+.fd-bar i.was, .fd-key i.was { background: var(--text-4); }
+.fd-bar i.add, .fd-key i.add { background: var(--ok); }
+.fd-bar i.cut { background: var(--crit); }
+.fd-r.held .fd-bar i, .fd-r.queued .fd-bar i { opacity: .35; }
+.fd-d { text-align: right; color: var(--text-2); white-space: nowrap; }
+.fd-key { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; }
+.fd-key i { display: inline-block; width: 10px; height: 6px; border-radius: 3px; margin-right: 4px; }
+.fd-e { display: grid; grid-template-columns: minmax(0, 1fr) 60px 70px; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--grid); font-size: 12px; }
+.fd-e:last-child { border-bottom: 0; }
+.fd-e span:not(:first-child) { text-align: right; }
+.fd-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 200px; padding: 20px; text-align: center; color: var(--text-3); font-size: 12.5px; border: 1.5px dashed var(--border); border-radius: 8px; }
+.fd-empty .anticon { font-size: 20px; }
+.fw-r { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 12px; }
+.fw-r:last-child { border-bottom: 0; }
+.fw-f { display: flex; flex-direction: column; min-width: 0; }
+.flg-t.mono { font-family: var(--mono); }
+.flg-s { fill: var(--text-3); }
+.fl-empty { display: flex; align-items: center; justify-content: center; gap: 8px; height: 110px; border: 1.5px dashed var(--border); border-radius: 8px; color: var(--text-3); font-size: 12.5px; }
+.fg-card { display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 168px; padding: 12px 14px; border-radius: 8px; background: var(--surface-2); cursor: pointer; }
+.fg-card:hover { background: color-mix(in srgb, var(--surface-2) 50%, var(--surface-3)); }
+.fg-k { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-2); }
+.fg-card.hot .fg-k > span:first-child { color: var(--crit); }
+.fg-t { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.fg-l { font-size: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fg-card.more { align-items: center; justify-content: center; border: 1.5px dashed var(--border-strong); background: transparent; color: var(--text-3); gap: 2px; }
+.flp .fl-head, .flp .fl-lane { grid-template-columns: 150px 170px minmax(24px, 1fr) auto minmax(24px, 1fr) 190px 100px; }
+.flp .fl-lane { cursor: pointer; min-height: 64px; }
+.flp .fl-lane:hover { background: color-mix(in srgb, var(--surface-2) 50%, var(--surface-3)); }
+.flp .fl-lane.on { background: var(--surface-3); margin-bottom: 0; border-radius: 8px 8px 0 0; }
+.fl-nm { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; font-size: 12px; min-width: 0; padding-right: 10px; }
+.fl-nm b { font-size: 13.5px; font-weight: 600; }
+.fl-srcs, .flp .fl-ends { display: flex; flex-direction: column; gap: 6px; }
+.flp .fl-n { display: flex; flex-direction: column; justify-content: center; height: auto; min-height: 34px; padding: 4px 9px; font-size: 11.5px; line-height: 1.35; min-width: 0; }
+.flp .fl-n b { font-size: 12px; font-weight: 600; color: var(--text); }
+.flp .fl-n span { color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flp .fl-n em { font-style: normal; font-size: 11px; color: var(--accent); }
+.flp .fl-n.held { border-color: var(--crit); }
+.flp .fl-n.stop { border-color: var(--crit); border-style: dashed; }
+.flp .fl-n.stop em { color: var(--crit); }
+.flp .fl-n.wait { border-style: dashed; background: transparent; }
+.flp .fl-n.wait em { color: var(--med); }
+.flp .fl-p { position: relative; height: 2px; background: color-mix(in srgb, var(--s6) 80%, transparent); opacity: 1; }
+.flp .fl-p.stop { background: linear-gradient(90deg, var(--s6) 0 35%, transparent 35% 65%, var(--grid) 65% 100%); }
+.flp .fl-p.dim { background: var(--grid); }
+.flp .fl-p.idle { background: repeating-linear-gradient(90deg, var(--text-4) 0 4px, transparent 4px 8px); }
+.fl-break { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--crit) 20%, var(--surface-2)); color: var(--crit); font-size: 10px; }
+.fl-steps { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.fl-step { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border-strong); font-size: 11.5px; color: var(--text-2); white-space: nowrap; background: var(--surface); }
+.fl-step.none { border-style: dotted; color: var(--text-4); background: transparent; }
+.fl-today { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 11.5px; }
+.fl-today b { font-size: 15px; font-weight: 600; }
+.flp .fl-tap { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; margin: 0 0 8px; padding: 12px 14px 14px 160px; border-radius: 0 0 8px 8px; background: var(--surface-3); border: 0; }
+@media (max-width: 1200px) { .flp .fl-tap { padding-left: 14px; grid-template-columns: minmax(0, 1fr); } }
+.fl-tap-l, .fl-tap-r { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fl-log { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 90px; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--grid); font-size: 12px; }
+.fl-log:last-child { border-bottom: 0; }
+.fl-out { text-align: right; color: var(--text-2); }
+.fl-out.ok { color: var(--ok); }
+.fl-out.kb { color: var(--med); }
+.fl-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 90px; gap: 10px; }
+.fl-gate { display: flex; flex-direction: column; gap: 7px; padding: 12px; border-radius: 8px; background: var(--surface-2); min-height: 110px; }
+.fl-gate i { display: block; height: 8px; width: 90%; border-radius: 4px; background: var(--surface-3); }
+.fl-gate.hot i:first-child { background: color-mix(in srgb, var(--crit) 30%, var(--surface-3)); }
+.fl-gate.more { align-items: center; justify-content: center; border: 1.5px dashed var(--border-strong); background: transparent; color: var(--text-3); font-weight: 600; }
+.fl-head, .fl-lane { display: grid; grid-template-columns: 150px 100px minmax(30px, 1fr) 80px minmax(30px, 1fr) 210px 70px; align-items: center; gap: 0; }
+.fl-head { font-size: 11.5px; color: var(--text-4); padding: 0 10px 4px; }
+.fl-lane { padding: 12px 10px; border-radius: 8px; background: var(--surface-2); margin-bottom: 8px; }
+.fl-lane.on { background: var(--surface-3); }
+.fl-name { display: flex; flex-direction: column; gap: 6px; }
+.fl-name i { display: block; height: 8px; width: 80%; border-radius: 4px; background: var(--surface-3); }
+.fl-n { display: block; height: 30px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); }
+.fl-n.step { height: 24px; border-radius: 12px; }
+.fl-n.wait { border-style: dashed; background: transparent; }
+.fl-p { display: block; height: 2px; background: var(--s6); opacity: .7; }
+.fl-p.stop { background: linear-gradient(90deg, var(--s6) 0 40%, transparent 40% 60%, var(--crit) 60% 100%); }
+.fl-ends { display: flex; flex-direction: column; gap: 6px; padding-left: 0; }
+.fl-cnt { justify-self: end; width: 34px; height: 8px; border-radius: 4px; background: var(--surface-3); }
+.fl-tap { margin: -4px 0 10px; padding: 10px 12px; gap: 6px; }
 .lay-g84 { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: 16px; align-items: stretch; }
+.rsl-g { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.rs-tree { display: flex; flex-direction: column; }
+.rs-tree .rsl-node { gap: 8px; height: 32px; color: var(--text-2); font-size: 12.5px; }
+.rs-tree .rsl-node::before { bottom: 16px; height: calc(var(--up) * 32px - 24px); }
+.rs-tree .rsl-node b { font-weight: 600; }
+.rs-i { flex: none; display: inline-flex; width: 16px; justify-content: center; color: var(--text-3); }
+.rs-k { cursor: pointer; border-radius: 6px; padding-right: 8px; }
+.rs-k:hover { background: var(--surface-2); }
+.rs-k.on { background: var(--surface-3); }
+.rs-k.hot .rs-i { color: var(--crit); }
+.rs-tree .rsl-node .hot { color: var(--crit); font-size: 12px; }
+.rs-tree .rsl-node .t3 { font-size: 12px; }
+.rs-kn { font-weight: 600; color: var(--text); }
+.rs-map { display: block; }
+.rs-tile rect { fill: var(--surface-3); }
+.rs-tile text { fill: var(--text-3); font-size: 11px; font-family: var(--mono); }
+.rs-tile.home rect { fill: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); }
+.rs-tile.home text { fill: var(--accent); font-weight: 600; }
+.rs-tile.hot rect { fill: color-mix(in srgb, var(--crit) 28%, var(--surface-3)); }
+.rs-tile.hot text { fill: var(--crit); font-weight: 600; }
+.rs-tile.hot.pick rect { stroke: var(--crit); stroke-width: 1.5; }
+.rs-tile.ok rect { fill: color-mix(in srgb, var(--ok) 26%, var(--surface-3)); }
+.rs-tile.ok text { fill: var(--ok); font-weight: 600; }
+.rs-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11.5px; color: var(--text-3); }
+.rs-key i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--surface-3); }
+.rs-key i.home { background: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); }
+.rs-key i.hot { background: color-mix(in srgb, var(--crit) 28%, var(--surface-3)); }
+.rs-key i.ok { background: color-mix(in srgb, var(--ok) 26%, var(--surface-3)); }
+.rs-about { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.rs-allow { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: var(--text-2); }
+.rs-log { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.rs-log:last-child { border-bottom: 0; }
+.rs-log b { font-weight: 600; }
+.rs-c { display: flex; align-items: center; gap: 14px; padding: 8px 10px; border-radius: 8px; }
+.rs-pc { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-2); }
+.rs-pc b { font-weight: 600; color: var(--text); }
+.rs-find { display: flex; gap: 8px; }
+.rs-find .ant-input-affix-wrapper { flex: 1; }
+.rs-hits { display: flex; flex-direction: column; gap: 2px; }
+.rs-hit { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.rs-hit:hover { background: var(--surface-3); }
+.rs-hit.on { background: var(--surface-3); }
+.rs-hit.had { cursor: default; opacity: .55; }
+.rs-hit.had:hover { background: transparent; }
+.rs-hn { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rs-hn b { font-weight: 600; }
+.rs-picked { display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid var(--border); }
+.rs-picked > .t3 { font-size: 12px; }
+.rsp2 .iq-grp + .iq-grp { margin-top: 16px; }
+.rsp2 > .g.c-84 > .ib-box { align-self: stretch; }
+.rsp2 .am-card { padding-top: 7px; padding-bottom: 7px; }
+.rsp2 .iq-cards { gap: 5px; }
+.rs-facts { align-items: baseline; }
+.rs-lately { display: flex; flex-direction: column; }
+.rs-band { fill: var(--text-4); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; }
+.rs-ok .rs-end { background: var(--surface-2); }
+.rs-why { font-size: 12px; color: var(--text-2); font-style: italic; }
+.rs-ok .rs-who { min-width: 0; }
+.rs-ok .rs-trail { grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1.4fr) minmax(0, 1.2fr); }
+.rs-fl { display: flex; align-items: center; gap: 12px; padding: 9px 4px; border-bottom: 1px solid var(--grid); }
+.rs-fl:last-child { border-bottom: 0; }
+.rs-fls { display: flex; flex-direction: column; align-items: flex-end; min-width: 150px; font-size: 12px; }
+.rs-fls b { font-weight: 600; }
+.rs-fls.hot b { color: var(--crit); }
+.rs-c + .rs-c { margin-top: 4px; }
+.rs-c.on { background: var(--surface-3); }
+.rs-c.done .rs-trail { opacity: .55; }
+.rs-trail { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1.4fr) 120px; gap: 10px; align-items: center; cursor: pointer; }
+.rs-end { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 5px 9px; border-radius: 6px; background: var(--surface-2); font-size: 12px; }
+.rs-end b { font-weight: 600; }
+.rs-end.hot { background: color-mix(in srgb, var(--crit) 14%, var(--surface-2)); }
+.rs-end.hot b { color: var(--crit); }
+.rs-how { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
+.rs-how i { flex: 1; min-width: 8px; border-top: 1.5px dashed var(--text-4); }
+.rs-who { display: flex; flex-direction: column; font-size: 12px; }
+.rs-acts { display: flex; flex: none; gap: 6px; align-items: center; justify-content: flex-end; font-size: 12.5px; }
+.rs-led { display: flex; flex-direction: column; }
+.rs-lr { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--grid); }
+.rs-lr:last-child { border-bottom: 0; }
+.rs-lt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.rs-lt b { font-weight: 600; }
+.rs-lt .t3 { font-size: 12px; }
+@media (max-width: 1100px) { .rs-c { flex-direction: column; align-items: stretch; } .rs-trail { grid-template-columns: minmax(0, 1fr); } }
+.rsl-tree { display: flex; flex-direction: column; }
+.rsl-node { position: relative; display: flex; align-items: center; gap: 8px; height: 30px; padding-left: calc(var(--d) * 22px); font-size: 12px; color: var(--text-3); }
+.rsl-node::before { content: ""; position: absolute; left: calc(var(--d) * 22px - 13px); bottom: 15px; height: calc(var(--up) * 30px - 22px); width: 9px; border-left: 1px solid var(--border-strong); border-bottom: 1px solid var(--border-strong); border-bottom-left-radius: 4px; }
+.rsl-node.root::before { display: none; }
+.rsl-node.hot::before { border-left-color: color-mix(in srgb, var(--crit) 60%, transparent); border-bottom-color: color-mix(in srgb, var(--crit) 60%, transparent); }
+.rsl-node.hot .rsl-nt { color: var(--crit); }
+.rsl-node.on .rsl-nt { font-weight: 600; }
+.rsl-k { flex: none; width: 18px; height: 16px; border-radius: 4px; background: var(--surface-3); }
+.rsl-k.item { outline: 1.5px solid var(--accent); }
+.rsl-node.hot .rsl-k { background: color-mix(in srgb, var(--crit) 25%, var(--surface-3)); }
+.rsl-k.more { background: transparent; }
+.rsl-node.rest .rsl-k { display: none; }
+.rsl-node.on { background: var(--surface-3); border-radius: 6px; }
+.rsl-ic { flex: none; width: 22px; height: 22px; border-radius: 6px; background: var(--surface-3); }
+.rsl-ic.hot { background: color-mix(in srgb, var(--crit) 22%, var(--surface-3)); }
+.rsl-n { margin-left: auto; font-size: 12px; font-weight: 600; }
+.rsl-n.hot { color: var(--crit); }
+.rsl-on { background: var(--surface-3); border-radius: 6px; padding-left: 6px; padding-right: 6px; }
+.rsl-map { width: 100%; height: auto; display: block; max-height: 230px; }
+.rsl-t { fill: var(--surface-3); }
+.rsl-t.home { fill: var(--surface-2); stroke: var(--accent); stroke-width: 1.5; }
+.rsl-t.hot { fill: color-mix(in srgb, var(--crit) 22%, var(--surface-3)); }
+.rsl-t.off { fill: transparent; stroke: var(--text-4); stroke-dasharray: 4 4; }
+.rsl-tx { fill: var(--text-2); font-size: 10.5px; }
+.rsl-tx.hot { fill: var(--crit); }
+.rsl-ln { stroke: color-mix(in srgb, var(--crit) 60%, transparent); stroke-width: 1.3; stroke-dasharray: 4 4; fill: none; }
+.rsl-trail { gap: 8px; }
+.rsl-trail .lay-act:first-of-type { margin-left: auto; }
+.rsl-trail .lay-act + .lay-act { margin-left: 0; }
+.rsl-end { flex: none; width: 110px; height: 22px; border-radius: 6px; background: var(--surface-3); }
+.rsl-end.hot { background: color-mix(in srgb, var(--crit) 22%, var(--surface-3)); }
+.rsl-arrow { flex: none; width: 22px; height: 0; border-top: 1.5px dashed var(--text-4); }
+.rsl-ledger { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+@media (max-width: 1100px) { .rsl-g, .rsl-ledger { grid-template-columns: minmax(0, 1fr); } }
 .lay-box { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border: 1.5px dashed var(--border-strong); border-radius: 10px; background: color-mix(in srgb, var(--surface) 60%, transparent); }
 .lay-box > header { display: flex; flex-direction: column; gap: 2px; }
 .lay-box > header b { font-size: 13.5px; font-weight: 600; }
@@ -687,7 +960,11 @@ a { color: var(--accent); text-decoration: none; }
 .nt-one > .reveal > .panel { flex: 1; }
 .nt-next { padding: 4px 2px; }
 .tk-drawer .ant-drawer-body { padding: 16px 20px; background: var(--bg); }
-.atp .iq-grp + .iq-grp, .amp .iq-grp + .iq-grp { margin-top: 16px; }
+.atp .iq-grp + .iq-grp, .amp .iq-grp + .iq-grp, .flp2 .iq-grp + .iq-grp { margin-top: 16px; }
+.flp2 > .g.c-84 > .ib-box { align-self: stretch; }
+.flp2 .am-card { padding-top: 7px; padding-bottom: 7px; }
+.flp2 .iq-cards { gap: 5px; }
+.fl-pages { margin-top: auto; padding-top: 10px; }
 .tk-late { margin: 0 -13px; padding: 10px 12px 12px; border-radius: 10px; background: color-mix(in srgb, var(--crit) 7%, transparent); border: 1px solid color-mix(in srgb, var(--crit) 22%, transparent); }
 .tk-late > .lay-grp { color: var(--crit); }
 .tk-late .tk-item, .tk-late .iq-card { background: color-mix(in srgb, var(--crit) 5%, var(--surface-2)); }
@@ -3245,7 +3522,7 @@ function EditorShell({ left, right, ratio, problem, note, onCancel, onSave, save
       <${Button} onClick=${onCancel}>Cancel<//><${Button} type="primary" disabled=${!!problem} title=${problem || ""} onClick=${onSave}>${saveLabel}<//></div>
   </div>`;
 }
-function NewFlow({ go, me, edit }) {
+function NewFlow({ go, me, edit, drawer }) {
   // a source is a folder on a machine you manage, or a folder another flow already delivers to; a flow can have several
   const blank = { name: "", srcs: [{ mode: "dir", host: "", path: "" }], when: "Real time", stages: [], dests: [{ mode: "mine", host: "", path: "" }] };
   // An Admin sends only between machines they manage; anywhere else, they ask the owner, who picks the folder.
@@ -3418,6 +3695,71 @@ function NewFlow({ go, me, edit }) {
   const many = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const bar = html`<div className="edbar"><span style=${{ fontSize: 12.5, color: problem ? "var(--med)" : "var(--text-3)", minWidth: 0 }}>${problem || (asks.length ? `Waiting on ${asks.map((d) => d.who).join(" and ")} once it is created` : "Checked against every other flow and the one file index")}</span><span className="sp" />
     <${Button} onClick=${cancel}>Cancel<//><${Button} type="primary" disabled=${!!problem} title=${problem || ""} onClick=${save}>${edit ? "Save changes" : "Create flow"}<//></div>`;
+  // In the Admin's drawer (24 Oct 2026): three steps, then the summary, as Give a task does; the flow is drawn at the
+  // top the whole way (the Flows page's own drawing) and redrawn as each part is filled in.
+  if (drawer) {
+    const gx = { st: "Active", paused: [], stages: f.stages, srcs: rsrc.map((q) => [q[0] || "Pick a machine", q[0] && q[1] ? q[1] : q[0] ? "and a folder" : "", !(q[0] && q[1]) ? "empty" : null]),
+      dests: ff.dests.map((d) => (d.host && d.host[0] === "?" ? [d.host, "picks a folder"] : [d.host || "Pick a machine", d.host && d.path ? d.path : d.host ? "and a folder" : "", !(d.host && d.path) ? "empty" : null])) };
+    const NAMES = ["Where files start", "What happens on the way", "Where they land", "Summary"];
+    const fld = (label, el, note) => html`<div className="nfv-f"><span className="nfv-l">${label}</span>${el}${note ? html`<span className="nfv-n">${note}</span>` : null}</div>`;
+    const cardHead = (i, mid, onX, xOff) => html`<div className="nfv-h">${num(i)}${mid}<span className="sp" /><${Button} size="small" type="text" icon=${ic("CloseOutlined")} aria-label="Remove" disabled=${xOff} onClick=${onX} /></div>`;
+    const srcV = (q, i) => html`<div key=${i} className="nfv-card">
+      ${cardHead(i, html`<${Segmented} size="small" value=${q.mode} onChange=${(v) => setSrc(i, { mode: v })} options=${[{ value: "dir", label: "A folder" }, { value: "flow", label: "An existing flow" }]} />`, () => setF((x) => ({ ...x, srcs: x.srcs.filter((_, j) => j !== i) })), f.srcs.length === 1)}
+      ${q.mode === "flow" ? html`${fld("Flow", html`<${Select} showSearch optionFilterProp="label" value=${q.flow || undefined} placeholder="Pick a flow" options=${flowOpts} onChange=${(v) => setSrc(i, { flow: v, branch: 0 })} />`)}
+          ${branchesOf(q.flow).length > 1 ? fld("Which of its destinations", html`<${Select} value=${q.branch || 0} options=${branchesOf(q.flow).map((d, j) => ({ value: j, label: d.join(" ") }))} onChange=${(v) => setSrc(i, { branch: v })} />`) : null}`
+        : html`${fld("Machine", html`<${Select} showSearch optionFilterProp="label" value=${q.host || undefined} placeholder="Pick a machine you manage" options=${hostOpts()} onChange=${(v) => setSrc(i, { host: v })} />`)}
+          ${fld("Folder", html`<${AutoComplete} value=${q.path} placeholder="For example /weekly/" options=${folderOpts} onChange=${(v) => setSrc(i, { path: v })} />`)}`}
+      ${rsrc[i][2] ? html`<span className="nfv-n">${q.mode === "flow" ? "Carries on" : "This folder is where"} <b>${rsrc[i][2]}</b> ${q.mode === "flow" ? "from where it delivers." : "delivers, so this flow carries on from it."}</span>` : null}
+    </div>`;
+    const stageV = (st, i) => html`<div key=${i} className="nfv-card">
+      ${cardHead(i, html`<b className="nfv-t">Step ${i + 1}</b>`, () => setF((x) => ({ ...x, stages: x.stages.filter((_, j) => j !== i) })), false)}
+      ${fld("Kind", html`<${Select} value=${st.kind} options=${Object.keys(STAGE_OPS).map((k) => ({ value: k, label: k }))} onChange=${(v) => setStage(i, { kind: v, op: STAGE_OPS[v][0] })} />`)}
+      ${fld("What it does", html`<${Select} value=${st.op} options=${STAGE_OPS[st.kind].map((o) => ({ value: o, label: o }))} onChange=${(v) => setStage(i, { op: v })} />`)}
+      ${fld("Applies to", html`<${Segmented} value=${st.scope === "all" ? "all" : "one"} onChange=${(v) => setStage(i, { scope: v === "all" ? "all" : 0 })} options=${[{ value: "all", label: "Every destination" }, { value: "one", label: "One destination" }]} />`,
+        st.scope === "all" ? "before the flow splits, so every destination gets the result" : null)}
+      ${st.scope !== "all" ? fld("Which destination", html`<${Select} value=${st.scope} options=${f.dests.map((d, j) => ({ value: j, label: d.mode === "ask" ? (d.who ? `${d.who} picks a folder` : `Destination ${j + 1}`) : `${d.host || "Destination " + (j + 1)} ${d.path || ""}` }))} onChange=${(v) => setStage(i, { scope: v })} />`) : null}
+    </div>`;
+    const destV = (d, i) => html`<div key=${i} className="nfv-card">
+      ${cardHead(i, me ? html`<${Segmented} size="small" value=${d.mode} onChange=${(v) => setDest(i, { mode: v })} options=${[{ value: "mine", label: "A machine you manage" }, { value: "ask", label: "Ask someone to pick" }]} />` : null,
+        () => setF((x) => ({ ...x, dests: x.dests.filter((_, j) => j !== i) })), f.dests.length === 1)}
+      ${d.mode === "ask" ? html`${fld("Who picks the folder", html`<${Select} showSearch optionFilterProp="label" value=${d.who || undefined} placeholder="The Super User, or another Admin" options=${people} onChange=${(v) => setDest(i, { who: v })} />`,
+            d.who ? `${d.who} picks a folder on their own workstation. Picking it is how they agree; until then this destination waits.` : null)}
+          ${fld("A line for them", html`<${Input} value=${d.note || ""} onChange=${(e) => setDest(i, { note: e.target.value })} placeholder="What this is for (optional)" />`)}
+          ${crosses(d.who) ? html`<div className="decide" style=${{ "--c": "var(--crit)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>This crosses departments.</b> ${d.who} is the Admin of ${deptNm(d.who)}.</div>` : null}`
+        : html`${fld("Machine", html`<${Select} showSearch optionFilterProp="label" value=${d.host || undefined} placeholder="Pick a machine you manage" options=${hostOpts()} onChange=${(v) => setDest(i, { host: v })} />`)}
+          ${fld("Folder", html`<${AutoComplete} value=${d.path} placeholder="For example /archive/" options=${folderOpts} onChange=${(v) => setDest(i, { path: v })} />`, d.host ? (me ? "You manage it, so nobody has to agree." : "You manage every machine, so nobody has to agree.") : null)}`}
+    </div>`;
+    const WHEN = [["Real time", "A file is copied the moment it changes, from the machine's own file events."], ["On a schedule", "Changed files are copied together, every hour."], ["Only when I run it", "Nothing moves until someone presses Run on the flow."]];
+    const whenV = html`<div className="nfv-sec"><div className="nfv-st">Copy files</div>${WHEN.map(([w, d]) => html`<div key=${w} className=${"nfv-pick" + (f.when === w ? " on" : "")} role="radio" aria-checked=${f.when === w} tabIndex="0" onClick=${() => set("when")(w)} onKeyDown=${(e) => e.key === "Enter" && set("when")(w)}>
+        <i /><span><b>${w}</b><span className="t3">${d}</span></span></div>`)}</div>`;
+    const addB = (label, fn) => html`<${Button} icon=${ic("PlusOutlined")} onClick=${fn} style=${{ alignSelf: "flex-start" }}>${label}<//>`;
+    B[0] = html`<div className="nfv">${head("Where do the files come from?", "One source or several. Each is a folder on a machine you manage, or an existing flow, so this one carries on with whatever that flow delivers.")}
+      ${f.srcs.map(srcV)}${addB("Add a source", addSrc)}${whenV}</div>`;
+    B[1] = html`<div className="nfv">${head("Should anything happen to the files on the way?", "Optional. Steps run in order, top to bottom. With none, files are copied exactly as they are.")}
+      ${f.stages.length ? f.stages.map(stageV) : html`<div className="nfv-none">No steps. Files are copied exactly as they are.</div>`}${addB("Add a step", addStep)}</div>`;
+    B[2] = html`<div className="nfv">${head("Where should the files go?", "Each destination gets its own copy of every file. For anywhere you do not manage, ask the person it belongs to; they pick the folder.")}
+      ${f.dests.map(destV)}${addB("Add a destination", addDest)}
+      ${f.dests.length > DEST_SOFT_LIMIT ? html`<div className="decide" style=${{ "--c": "var(--med)" }}>That is a lot of destinations. Every file is copied ${f.dests.length} times.</div>` : null}</div>`;
+    const sum = html`<div className="nf-sum">
+      <div className="tk-facts" style=${{ maxWidth: "none" }}>${[["Made by", me ? "you" : "the Super User"], ["From", rsrc.map((q) => `${q[0]} ${q[1]}`).join(", ")], ["Along the way", f.stages.map((st, i) => `${i + 1}. ${st.op}`).join("  ") || "copied as they are"],
+          ["To", ff.dests.map((d) => (d.host && d.host[0] === "?" ? `${d.host.slice(1)} picks a folder` : `${d.host} ${d.path}`)).join(", ")], ["Copies files", f.when.toLowerCase()]]
+        .map(([k, v]) => html`<span key=${k}><span className="t3">${k}</span> <span className=${k === "From" || k === "To" ? "mono" : ""}>${v}</span></span>`)}</div>
+      <div style=${{ marginTop: 18 }}>${nameField}</div>
+      ${checkList}
+    </div>`;
+    const body = step === 3 ? html`<div>${head(edit ? "Check it and save" : "Name it and check it", edit ? "The checks run again against every other flow. It keeps running as it was until you save." : "Checked against the one file index and every other flow before anything is copied.")}${sum}</div>` : B[step];
+    const stepProb = stepProblem[step];
+    return html`<${React.Fragment}>${modalCtx}<div className="nf-steps-wrap">
+      <section className="ib-box nf-graph"><header><b>${edit ? `Editing ${edit}` : f.name || "The flow so far"}</b><span>${NAMES[step]} · step ${step + 1} of 4</span>${!edit && step === 0 ? html`<span className="sp" />${startSel}` : null}</header>
+        <${FlowGraph} x=${gx} held=${null} /></section>
+      <section className="ib-box nf-body">${body}</section>
+      <div className="row nt-next"><span className="t3" style=${{ fontSize: 12.5, color: stepProb ? "var(--med)" : undefined }}>${stepProb || ""}</span><span className="sp" />
+        <${Button} onClick=${cancel}>Cancel<//>
+        ${step > 0 ? html`<${Button} icon=${ic("LeftOutlined")} onClick=${() => setStep(step - 1)}>Back<//>` : null}
+        ${step < 3 ? html`<${Button} type="primary" disabled=${!!stepProb} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
+          : html`<${Button} type="primary" disabled=${!!problem} onClick=${save}>${edit ? "Save changes" : "Create flow"}<//>`}</div>
+    </div><//>`;
+  }
   // Three columns in the files' own order: Sources, Along the way, Destinations, each with its own Add. The
   // drawing above follows them; the name, how files are copied and the checks sit under them, Create at the bottom.
   // The three columns are always one height, the tallest one's, and each Add button sits at the right of the shared bottom line, at its regular size.
@@ -7548,6 +7890,518 @@ function AdminOverviewLayout() {
     <//>
   </div>`;
 }
+// The Admin's Restricted, filled in on the agreed layout (24 Oct 2026): everything you restricted as a tree on the left,
+// the department's machines as tiles on the right lit for the one picked; copies caught told as a trail; flows asking
+// to carry something of yours, and the ones you allowed, as one ledger; Restrict something opens a drawer.
+// Sample for this page: more of R. Mensah's marks on the department's machines, how each copy got where it was found,
+// a copy allowed with its reason, a second copy caught, and what happened lately to each mark.
+if (!EMPTY && MBY["OPS-01"] && !MARKS.some((k) => k.id === "M-40")) {
+  MARKS.push(
+    { id: "M-40", kind: "file", name: "salaries.csv", host: "OPS-01", path: "C:\\payroll\\salaries.csv", keep: "path", by: "R. Mensah", at: "20 Sep", dept: "ops", files: 1, versions: 9 },
+    { id: "M-41", kind: "folder", name: "Disciplinary", host: "WS-OPS-A1", path: "C:\\HR\\Disciplinary\\", keep: "path", by: "R. Mensah", at: "11 Oct", dept: "ops", files: 8, versions: 11 },
+    { id: "M-43", kind: "file", name: "tender-scores-2026.xlsx", host: "OPS-02", path: "D:\\Tenders\\tender-scores-2026.xlsx", keep: "machine", by: "R. Mensah", at: "6 Oct", dept: "ops", files: 1, versions: 6 },
+    { id: "M-44", kind: "folder", name: "Contracts", host: "OPS-02", path: "D:\\Contracts\\", keep: "path", by: "R. Mensah", at: "2 Oct", dept: "ops", files: 26, versions: 48 });
+  ISSUES.push({ id: "INC-1070", sev: "high", type: "file", title: "Restricted file copied where it isn't allowed", subject: "payroll-2026-09.xlsx", host: "OPS-05", at: 12.4, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
+    d: { file: "payroll-2026-09.xlsx", folder: "C:\\Users\\Nana\\Downloads", size: "96 KB", mark: "M-2" } });
+  ISTATE0["INC-1070"] = { status: "Open", owner: "R. Mensah", log: [] };   // the issue states were made before this copy was added
+}
+// how each copy got where it was found, from the file events that led to it
+const RS_HOW = { "INC-1042": "copied over the network", "INC-1041": "from a USB drive", "INC-1070": "saved from an email" };
+// copies the owner allowed where they are, with the reason given; they stay on the record, quiet
+const RS_ALLOWED = [{ mark: "M-43", host: "WS-OPS-A2", folder: "D:\\Tenders\\review", why: "A. Quaye scores the tenders with you", at: "14 Oct" }];
+// what happened lately to each mark: [when (hours), who, what, where]
+const RS_LOG = {
+  "M-1": [[10.03, "Ama", "copied it", "to OPS-07"], [9.4, "R. Mensah", "opened it", "on WS-OPS-A1"], [-20, "R. Mensah", "changed it", "on WS-OPS-A1"]],
+  "M-2": [[12.4, "Nana", "saved a copy of payroll-2026-09.xlsx", "on OPS-05"], [9.5, "Yaw", "copied salaries.csv", "to OPS-03"], [8.1, "R. Mensah", "added 2 files", "on WS-OPS-A1"]],
+  "M-40": [[12.9, "The flow payroll", "was held at it", "OPS-01 /payroll/"], [11.2, "Kojo", "opened it", "on OPS-01"]],
+  "M-43": [[-30, "A. Quaye", "opened the allowed copy", "on WS-OPS-A2"]],
+  "M-44": [[10.2, "The flow ops-pack", "asked to carry contract-northline.pdf", "OPS-02"]],
+};
+// flows carrying something you restricted right now (you allowed them), and one held at it waiting for your answer on Flows
+const RS_CARRY = [
+  { flow: "ops-pack", mark: "M-44", what: "contract-northline.pdf and 2 more from Contracts", from: "OPS-02 /reports/", to: "WS-OPS-A1 /packs/", today: 3, last: 12.5, since: "18 Oct" },
+  { flow: "payroll", mark: "M-40", what: "salaries.csv", from: "OPS-01 /payroll/", to: "FIN-01 /payroll/", held: 12.9 },
+];
+const rsDir = (k) => (k.kind === "folder" ? k.path.replace(/[^\\]+\\$/, "") : k.path.replace(/[^\\]+$/, ""));
+function AdminRestrictedPage({ go }) {
+  const [modal, modalCtx] = Modal.useModal();
+  const me = ME, info = infoOf(me) || {}, dept = info.dept;
+  const [, bump] = useState(0);
+  const marks = myMarks();
+  const [gone, setGone] = useState({}), [allowing, setAllowing] = useState(null), [why, setWhy] = useState("");
+  const [allowed, setAllowed] = useState(() => RS_ALLOWED.map((x, n) => ({ ...x, id: "A" + n, since: x.at }))), [make, setMake] = useState(false);
+  const live = (i) => !gone[i.id];
+  const cps = (k) => copiesOf(k).filter(live), alw = (k) => allowed.filter((a) => a.mark === k.id);
+  const ord = (a, b) => cps(b).length - cps(a).length || a.name.localeCompare(b.name);
+  const [sel, setSel0] = useState(() => ([...marks].sort(ord)[0] || {}).id || null), [exp, setExp] = useState(null), [copy, setCopy] = useState(null), [pg, setPg] = useState(0);
+  const setSel = (id) => { setSel0(id); setCopy(null); };
+  const K = marks.find((k) => k.id === sel) || null;
+  const all = myCopies().sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev] || b.at - a.at);
+  const open = all.filter(live), hostsHit = [...new Set(open.map((i) => i.host))];
+  const [let_, setLet] = useState({});
+  const carrying = RS_CARRY.filter((c) => marks.some((k) => k.id === c.mark)).map((c) => (c.held && let_[c.flow] ? { ...c, held: null, today: 0, last: null, since: "today" } : c));
+  const hostsOf = new Set(marks.map((k) => k.host));
+  // the department's machines: the Admins' own workstations apart, then every other machine
+  const adm = Object.entries(ADMIN_INFO).filter(([, v]) => v.dept === dept).map(([n, v]) => ({ h: v.ws, who: n === me ? "you" : n }));
+  const rest = MACHINES.filter((m) => m.dept === dept).map((m) => m.host);
+  const ref = useRef(null), W = useWidth(ref, 380), G = 10;
+  const T = 42, C = Math.max(3, Math.floor((W + G) / (T + G))), aRows = Math.ceil(adm.length / C), LBL = 22;
+  const yA = LBL + 4, yR = yA + aRows * (T + G) + LBL + 6, H = yR + Math.ceil(rest.length / C) * (T + G);
+  const box = (h) => { const ai = adm.findIndex((x) => x.h === h); if (ai >= 0) return [(ai % C) * (T + G) + 1, yA + Math.floor(ai / C) * (T + G), T, T];
+    const i = rest.indexOf(h); return i < 0 ? null : [(i % C) * (T + G) + 1, yR + Math.floor(i / C) * (T + G), T, T]; };
+  const mid = (h) => { const r = box(h); return [r[0] + r[2] / 2, r[1] + r[3] / 2]; };
+  const kc = K ? cps(K) : [], ka = K ? alw(K) : [];
+  const pickCopy = (id) => { setCopy(id); const i = all.find((x) => x.id === id); if (i) setSel0(i.d.mark); };
+  const situation = !marks.length ? "You have not restricted anything yet. Restrict a file or folder below; it stays where it is and a copy anywhere else is caught."
+    : `You restricted ${fmt(marks.length)} thing${marks.length === 1 ? "" : "s"} on ${fmt(hostsOf.size)} machine${hostsOf.size === 1 ? "" : "s"}. ${open.length ? `${fmt(open.length)} cop${open.length === 1 ? "y" : "ies"} turned up elsewhere, on ${listNames(hostsHit)}; the worst is ${open[0].d.file} on ${open[0].host}.` : "Everything is where it belongs."}${allowed.length ? ` ${fmt(allowed.length)} cop${allowed.length === 1 ? "y is" : "ies are"} allowed elsewhere.` : ""}${carrying.filter((c) => !c.held).length ? ` ${listNames(carrying.filter((c) => !c.held).map((c) => c.flow))} carr${carrying.filter((c) => !c.held).length === 1 ? "ies" : "y"} something of yours.` : ""}`;
+  const del = (i) => modal.confirm({ title: `Delete the copy on ${i.host}?`, okText: "Delete the copy", okButtonProps: { danger: true }, cancelText: "Keep it",
+    content: `Only ${i.d.file} in ${i.d.folder} on ${i.host} is deleted. What you restricted is not touched.`, onOk: () => { setGone({ ...gone, [i.id]: "deleted" }); toast(`Deleted the copy on ${i.host} · recorded (concept)`); } });
+  const ruleOf = (k) => (k.keep === "machine" ? `may be anywhere on ${k.host}, nowhere else` : `may be only in ${k.kind === "folder" ? k.path : rsDir(k)} on ${k.host}`);
+  const unmark = (k) => modal.confirm({ title: `Stop restricting ${k.name}?`, okText: "Stop restricting", okButtonProps: { danger: true }, cancelText: "Keep it restricted",
+    content: `Copies of it are no longer looked for, and flows may carry it. ${cps(k).length ? "The copies already caught stay listed until you deal with them. " : ""}The audit log records that you did it.`,
+    onOk: () => { dropMark(k.id); setSel0(null); setExp(null); bump((n) => n + 1); toast(`${k.name} is no longer restricted · recorded (concept)`); } });
+  const owner = (h) => (h === info.ws ? "yours" : (adm.find((x) => x.h === h) || {}).who || (MBY[h] || {}).user || "nobody signed in");
+  const G2 = [...hostsOf].sort((a, b) => (b === info.ws) - (a === info.ws) || a.localeCompare(b)).map((h) => [h, h, owner(h), (k) => k.host === h]);
+  const card = (k) => { const on = exp === k.id, picked = sel === k.id;
+    return html`<div key=${k.id} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "")}>
+      <article className="iq-card am-card" role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => setSel(k.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(k.id)}>
+        <span className="iq-ic">${ic(k.kind === "folder" ? "FolderOutlined" : "FileOutlined")}</span>
+        <span className="iq-main"><span className="iq-t"><b className="cut">${k.name}</b><span className="t3">${k.kind === "folder" ? `${fmt(k.files)} files` : "file"}</span></span>
+          <span className="iq-s cut mono" title=${k.path}>${k.path}</span></span>
+        <span className="am-facts rs-facts"><span>${k.keep === "machine" ? `anywhere on ${k.host}` : "only where it is"}</span><span>since ${k.at}</span></span>
+        <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setExp(on ? null : k.id); setSel(k.id); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
+      </article>
+      ${on ? html`<div className="tk-open">
+        <div className="tk-facts">${[["Where", `${k.host} ${k.path}`], ["Rule", `It ${ruleOf(k)}`], ["Covers", k.kind === "folder" ? `${fmt(k.files)} files, and any added later` : "1 file"], ["Restricted", k.at], ["Recognised by", `content, ${fmt(k.versions)} version${k.versions === 1 ? "" : "s"} remembered`]]
+          .map(([x, y]) => html`<span key=${x}><span className="t3">${x}</span> <span className=${x === "Where" ? "mono" : ""}>${y}</span></span>`)}</div>
+        <div className="rs-lately"><div className="am-k">Lately</div>
+          ${(RS_LOG[k.id] || []).map((e, i) => html`<div key=${i} className="rs-log"><span className="t3">${ago(e[0])}</span><span><b>${e[1]}</b> ${e[2]} <span className="t3">${e[3]}</span></span></div>`)}
+          ${!(RS_LOG[k.id] || []).length ? html`<span className="t3" style=${{ fontSize: 12.5 }}>Nothing has happened to it since you restricted it.</span>` : null}</div>
+        <div className="row fl-acts"><span className="sp" />
+          <${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => unmark(k)}>Stop restricting<//></div>
+      </div>` : null}</div>`; };
+  return html`<div className="og rsp2">${modalCtx}
+    <${SitBar} text=${situation} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <section className="ib-box">
+        <header><b>What you restricted</b><span>everything you marked restricted, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it</span></header>
+        ${(() => { const xs0 = G2.flatMap(([g, , , f]) => marks.filter(f).sort((a, b) => a.name.localeCompare(b.name)).map((k) => [g, k])), PER = 5, pages = Math.ceil(xs0.length / PER), p = Math.min(pg, Math.max(0, pages - 1)), page = xs0.slice(p * PER, p * PER + PER);
+          return html`${G2.map(([g, t, d, f]) => { const xs = page.filter((e) => e[0] === g).map((e) => e[1]); if (!xs.length) return null;
+            return html`<div key=${g} className="iq-grp"><div className="lay-grp iq-gh"><b style=${{ fontWeight: 600 }}><span className="mono" style=${{ marginLeft: 0, color: "var(--text-2)" }}>${t}</span> · ${fmt(marks.filter(f).length)}</b><span>${d}</span></div><div className="iq-cards">${xs.map(card)}</div></div>`; })}
+            ${pages > 1 ? html`<div className="dv-pages fl-pages"><span className="t3">${fmt(p * PER + 1)} to ${fmt(Math.min(xs0.length, p * PER + PER))} of ${fmt(xs0.length)}</span>
+              <span className="dr-step"><button aria-label="Earlier" disabled=${p === 0} onClick=${() => setPg(p - 1)}>${ic("LeftOutlined")}</button>${p + 1} of ${pages}<button aria-label="Later" disabled=${p >= pages - 1} onClick=${() => setPg(p + 1)}>${ic("RightOutlined")}</button></span></div>` : null}
+            ${!marks.length ? html`<div className="ib-quiet">Nothing restricted yet. Restrict something below.</div>` : null}`; })()}
+      </section>
+      <section className="ib-box">
+        <header><b>Where it is, across the department</b><span>${K ? html`<b className="rs-kn">${K.name}</b> · ${kc.length ? `${fmt(kc.length)} cop${kc.length === 1 ? "y" : "ies"} away from home` : "only at home"}` : "pick something on the left"}</span></header>
+        <div ref=${ref}>
+          <svg width=${W} height=${H} className="rs-map" role="img" aria-label="The department's machines">
+            <text x="0" y="14" className="rs-band">ADMIN PCS</text>
+            <text x="0" y=${yR - 12} className="rs-band">OTHER MACHINES</text>
+            ${[...adm.map((x) => x.h), ...rest].map((h) => { const [x, y, w, hh] = box(h), m = MBY[h], cp = K ? kc.find((i) => i.host === h) : null, al = K && ka.some((x2) => x2.host === h), home = K && K.host === h, a = adm.find((x2) => x2.h === h);
+              const cls = home ? " home" : cp ? " hot" + (copy === cp.id ? " pick" : "") : al ? " ok" : "";
+              return html`<g key=${h} className=${"rs-tile" + cls + (a ? " adm" : "")} style=${{ cursor: cp ? "pointer" : "default" }} onClick=${() => cp && pickCopy(cp.id)}>
+                <title>${h}${a ? `, ${a.who === "you" ? "yours" : a.who + "'s"}` : m && m.user ? `, ${m.user}` : ""}${home ? " · its home" : cp ? ` · a copy, ${dur(NOWH - cp.at)} ago` : al ? " · a copy you allowed" : ""}</title>
+                <rect x=${x} y=${y} width=${w} height=${hh} rx="7" />
+                <text x=${x + w / 2} y=${y + hh / 2 + 4} textAnchor="middle">${h.replace(/^WS-[A-Z]+-/, "").replace(/^[A-Z]+-/, "")}</text></g>`; })}
+          </svg>
+        </div>
+        <div className="rs-key"><span><i className="home" />its home</span><span><i className="hot" />a copy caught</span><span><i className="ok" />a copy you allowed</span></div>
+      </section>
+    </div>
+    <section className="ib-box">
+      <header><b>Caught elsewhere</b><span>${open.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything you restricted is anywhere else"}</span></header>
+      ${all.filter((i) => gone[i.id] !== "allowed").map((i) => { const k = markOf(i), m = MBY[i.host] || {}, done = gone[i.id], on = copy === i.id, can = m.user && m.status !== "offline";
+        return html`<div key=${i.id} className=${"rs-c" + (on ? " on" : "") + (done ? " done" : "")}>
+          <div className="rs-trail" role="button" tabIndex="0" onClick=${() => pickCopy(i.id)} onKeyDown=${(e) => e.key === "Enter" && pickCopy(i.id)}>
+            <span className="rs-end"><b className="mono">${k.host}</b><span className="mono t3 cut" title=${k.path}>${k.name}</span></span>
+            <span className="rs-how"><i /><span>${RS_HOW[i.id] || "copied"}</span><i /></span>
+            <span className=${"rs-end" + (done ? "" : " hot")}><b className="mono">${i.host}</b><span className="mono cut" title=${i.d.folder + "\\" + i.d.file}>${i.d.folder}\\${i.d.file}</span></span>
+            <span className="rs-who"><span>${m.user || "nobody signed in"}</span><span className="t3">${ago(i.at)}</span></span>
+          </div>
+          <span className="rs-acts">${done ? html`<span className="t3">${ic("CheckOutlined")} ${done === "deleted" ? "Deleted" : `Asked ${m.user}; closes when the copy is gone`}</span>`
+            : allowing === i.id ? html`<${Input} size="small" autoFocus value=${why} onChange=${(e) => setWhy(e.target.value)} placeholder=${`Why may it stay on ${i.host}?`} style=${{ width: 240 }} />
+                <${Button} size="small" onClick=${() => { setAllowing(null); setWhy(""); }}>Cancel<//><${Button} size="small" type="primary" disabled=${!why.trim()} onClick=${() => { setGone({ ...gone, [i.id]: "allowed" }); setAllowed([...allowed, { id: "A" + i.id, mark: i.d.mark, host: i.host, folder: i.d.folder, file: i.d.file, why: why.trim(), since: "today " + hhmm(NOWH), copy: i.id }]); setAllowing(null); setWhy(""); toast(`Allowed on ${i.host} · listed under Allowed elsewhere (concept)`); }}>Allow it<//>`
+            : html`<${Tooltip} title=${can ? "" : "Nobody is signed in to ask"}><span><${Button} size="small" disabled=${!can} onClick=${() => { setGone({ ...gone, [i.id]: "asked" }); toast(`Asked ${m.user} (concept)`); }}>Ask ${m.user || "them"} to delete it<//></span><//>
+                <${Button} size="small" danger onClick=${() => del(i)}>Delete the copy<//><${Button} size="small" onClick=${() => { setAllowing(i.id); setWhy(""); }}>Allow it there<//>`}</span>
+        </div>`; })}
+      ${!all.filter((i) => gone[i.id] !== "allowed").length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing you restricted has been found anywhere else.</div>` : null}
+    </section>
+    <section className="ib-box">
+      <header><b>Allowed elsewhere</b><span>copies found away from home that you let stay, each with the reason you gave; they are not caught again unless you take it back</span></header>
+      ${allowed.map((x) => { const k = marks.find((y) => y.id === x.mark) || MARKS.find((y) => y.id === x.mark) || {}, m = MBY[x.host] || {};
+        return html`<div key=${x.id} className="rs-c rs-ok">
+          <div className="rs-trail">
+            <span className="rs-end"><b className="mono">${k.host}</b><span className="mono t3 cut" title=${k.path}>${k.name}</span></span>
+            <span className="rs-how"><i /><span>allowed ${x.since}</span><i /></span>
+            <span className="rs-end"><b className="mono">${x.host}</b><span className="mono cut" title=${x.folder}>${x.folder}${x.file ? "\\" + x.file : ""}</span></span>
+            <span className="rs-who"><span className="rs-why">“${x.why}”</span><span className="t3">${(adm.find((y) => y.h === x.host) || {}).who || m.user || ""}</span></span>
+          </div>
+          <span className="rs-acts"><${Button} size="small" onClick=${() => modal.confirm({ title: `Take back the allowance on ${x.host}?`, okText: "Take it back", okButtonProps: { danger: true }, cancelText: "Leave it",
+            content: `The copy on ${x.host} is caught again and listed under Caught elsewhere.`, onOk: () => { setAllowed(allowed.filter((y) => y.id !== x.id)); if (x.copy) setGone((g) => { const n = { ...g }; delete n[x.copy]; return n; }); toast(`Taken back; the copy on ${x.host} is caught again (concept)`); } })}>Take it back<//></span>
+        </div>`; })}
+      ${!allowed.length ? html`<div className="ib-quiet">You have not allowed a copy anywhere else.</div>` : null}
+    </section>
+    <section className="ib-box">
+      <header><b>Flows carrying what you restricted</b><span>right now; a flow held at something of yours waits for you to allow it, for that flow only</span></header>
+      ${carrying.map((c) => html`<div key=${c.flow} className="rs-fl">
+          <span className="iq-ic">${ic("BranchesOutlined")}</span>
+          <span className="rs-lt"><span><b>${c.flow}</b> ${c.held ? "is held at" : "carries"} <b>${c.what}</b></span><span className="t3 mono cut">${c.from} → ${c.to}</span></span>
+          <span className=${"rs-fls" + (c.held ? " hot" : "")}>${c.held ? html`<b>waiting for you</b><span className="t3">since ${hhmm(c.held)}</span>` : html`<b>${c.today ? `${fmt(c.today)} today` : "allowed just now"}</b><span className="t3">${c.last ? `last ${hhmm(c.last)} · ` : ""}allowed ${c.since}</span>`}</span>
+          ${c.held ? html`<${Button} size="small" type="primary" onClick=${() => { setLet({ ...let_, [c.flow]: 1 }); toast(`${c.flow} may carry ${c.what}; it goes on now (concept)`); }}>Allow<//>`
+            : html`<${Button} size="small" onClick=${() => go("flows")}>Open in Flows<//>`}
+        </div>`)}
+      ${!carrying.length ? html`<div className="ib-quiet">No flow carries anything you restricted.</div>` : null}
+    </section>
+    <section className="ib-box og-change">
+      <header><b>Restrict something</b><span>it stays where it is and you keep using it; a copy anywhere else is caught</span></header>
+      <div className="tk-give">
+        <ol className="tk-steps"><li><b>Pick what to restrict</b><span>a file or a folder on this PC, found by a search or picked in Explorer</span></li>
+          <li><b>Say where it may be</b><span>only exactly where it is, or anywhere on this PC</span></li>
+          <li><b>Check and restrict</b><span>copies already elsewhere are found and listed straight away</span></li></ol>
+        <${Button} type="primary" onClick=${() => setMake(true)}>Restrict something<//></div>
+    </section>
+    <${Drawer} open=${make} onClose=${() => setMake(false)} width="min(1120px, 80vw)" title="Restrict something" className="tk-drawer"
+      extra=${html`<span className="t3" style=${{ fontSize: 12 }}>nothing is restricted until you confirm</span>`}>
+      ${make ? html`<${RestrictNew} mine=${info.ws} onDone=${() => setMake(false)} />` : null}
+    <//>
+  </div>`;
+}
+// Restricting is done on this PC only, to avoid confusion (the user, 25 Oct 2026): what is restricted stays on the
+// machine the Admin is sitting at. The file or folder is found with a search of this PC, or picked in Explorer.
+const RS_FIND = [["C:\\HR\\", "folder"], ["C:\\HR\\Payroll\\", "folder"], ["C:\\HR\\Disciplinary\\", "folder"], ["C:\\HR\\Contracts of employment\\", "folder"], ["C:\\HR\\appraisals-2026.xlsx", "file"],
+  ["C:\\Finance\\", "folder"], ["C:\\Finance\\budget-2026.xlsx", "file"], ["C:\\Finance\\forecast-q4.xlsx", "file"], ["C:\\Finance\\bank-reconciliation-sep.xlsx", "file"],
+  ["C:\\Users\\RMensah\\Documents\\headcount-plan-2027.xlsx", "file"], ["C:\\Users\\RMensah\\Documents\\supplier-scores.xlsx", "file"], ["C:\\Users\\RMensah\\Desktop\\board-notes.docx", "file"], ["D:\\Archive\\Payroll 2025\\", "folder"]];
+function RestrictNew({ mine, onDone }) {
+  const host = mine;
+  const [step, setStep] = useState(0), [q, setQ] = useState(""), [path, setPath] = useState(""), [keep, setKeep] = useState("path"), [browsing, setBrowsing] = useState(false);
+  const nm = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop(), kind = /[\\/]$/.test(path) ? "folder" : "file";
+  const done = new Set(myMarks().map((k) => k.path));
+  const found = q.trim() ? RS_FIND.filter(([f]) => f.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8) : [];
+  const browse = () => { setBrowsing(true); setTimeout(() => { setBrowsing(false); setPath("C:\\Finance\\forecast-q4.xlsx"); toast("Picked in Explorer (concept)"); }, 900); };
+  const NAMES = ["What to restrict", "Where it may be", "Check and restrict"];
+  const prob = step === 0 && !path ? "Search for the file or folder, or pick it in Explorer." : null;
+  const KP = [["path", "Only exactly where it is", "A copy anywhere else is caught, even in another folder on this PC."], ["machine", "Anywhere on this PC", "It may be moved or copied around this PC; a copy on any other machine is caught."]];
+  const row = ([f, k]) => { const n = f.replace(/[\\/]+$/, "").split(/[\\/]/).pop(), on = path === f, had = done.has(f);
+    return html`<div key=${f} className=${"rs-hit" + (on ? " on" : "") + (had ? " had" : "")} role="button" tabIndex="0" onClick=${() => !had && setPath(f)} onKeyDown=${(e) => e.key === "Enter" && !had && setPath(f)}>
+      <span className="rs-i">${ic(k === "folder" ? "FolderOutlined" : "FileOutlined")}</span><span className="rs-hn"><b>${n}</b><span className="mono t3 cut">${f}</span></span>
+      <span className="t3">${had ? "already restricted" : on ? ic("CheckOutlined") : ""}</span></div>`; };
+  const body = [html`<div className="nfv">
+      <div className="nfv-card">
+        <div className="rs-pc">${ic("DesktopOutlined")}<span>On <b className="mono">${host}</b>, this PC. You restrict only what is on the machine you are at; it stays on it.</span></div>
+        <div className="nfv-f"><span className="nfv-l">File or folder</span>
+          <div className="rs-find"><${Input} allowClear autoFocus prefix=${ic("SearchOutlined")} placeholder="Search this PC by name, for example payroll" value=${q} onChange=${(e) => setQ(e.target.value)} />
+            <${Button} icon=${ic("FolderOpenOutlined")} loading=${browsing} onClick=${browse}>Pick in Explorer<//></div></div>
+        ${q.trim() ? html`<div className="rs-hits">${found.map(row)}${!found.length ? html`<div className="t3" style=${{ fontSize: 12.5, padding: "8px 2px" }}>Nothing on this PC by that name.</div>` : null}</div>` : null}
+        ${path ? html`<div className="rs-picked"><span className="t3">Picked</span>${row([path, kind])}</div>` : null}
+        <span className="nfv-n">A folder covers every file in it, and any added later. Files are recognised by their content, so a renamed copy is still caught.</span></div></div>`,
+    html`<div className="nfv"><div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">Where may ${nm || "it"} be?</div>${KP.map(([v, t, d]) => html`<div key=${v} className=${"nfv-pick" + (keep === v ? " on" : "")} role="radio" aria-checked=${keep === v} tabIndex="0" onClick=${() => setKeep(v)} onKeyDown=${(e) => e.key === "Enter" && setKeep(v)}><i /><span><b>${t}</b><span className="t3">${d}</span></span></div>`)}</div></div>`,
+    html`<div className="nfv"><div className="tk-facts" style=${{ maxWidth: "none" }}>${[["What", `${nm} (${kind})`], ["On", `${host}, this PC`], ["Path", path], ["May be", keep === "path" ? "only exactly where it is" : "anywhere on this PC"], ["Flows", "none may carry it until you allow one"]]
+      .map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> ${b}</span>`)}</div>
+      <div className="decide" style=${{ "--c": "var(--accent)" }}>Before it is restricted, every machine is checked for copies of it. Any found are listed under Caught elsewhere straight away.</div></div>`];
+  return html`<div className="nf-steps-wrap"><section className="ib-box nf-body">${body[step]}</section>
+    <div className="row nt-next"><span className="t3" style=${{ fontSize: 12.5, color: prob ? "var(--med)" : undefined }}>${prob || ""}</span><span className="sp" />
+      <${Button} onClick=${onDone}>Cancel<//>${step > 0 ? html`<${Button} icon=${ic("LeftOutlined")} onClick=${() => setStep(step - 1)}>Back<//>` : null}
+      ${step < 2 ? html`<${Button} type="primary" disabled=${!!prob} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
+        : html`<${Button} type="primary" onClick=${() => { toast(`${nm} is restricted to this PC (concept)`); onDone(); }}>Restrict it<//>`}</div></div>`;
+}
+// The Admin's Restricted, layout first (24 Oct 2026). Its own shape: what you restricted is a short index on the left;
+// the department is drawn beside it as a floor of machines, lit for the item picked (where it lives, where a copy turned
+// up); copies caught are told as a trail from where the file was to where it was found; flows asking to carry
+// something you restricted, and the ones you allowed, are one ledger; marking something opens the drawer.
+function AdminRestrictedLayout() {
+  const T = 52, G = 12, C = 8, R = 3, home = 9, caught = [4, 19], off = [13];
+  const at = (i) => [(i % C) * (T + G) + 2, Math.floor(i / C) * (T + G) + 2];
+  const ctr = (i) => { const [x, y] = at(i); return [x + T / 2, y + T / 2]; };
+  return html`<div className="lay">
+    <div className="lay-q">The Admin's question: <b>is everything I restricted still where it belongs, and who wants to move it?</b></div>
+    <${LBox} cls="lay-sit" title="The situation, in one sentence" note="how many things you restricted, how many copies turned up elsewhere and on which machines, which flow is asking you" />
+    <div className="rsl-g">
+      <${LBox} title="What you restricted" note="everything you restricted as a tree: each machine, the folders down to what you restricted, and the item itself with a count of copies caught; branches with a copy elsewhere first and in red; click an item to light it up on the right">
+        <div className="rsl-tree">
+          ${[[0, "machine", "a machine", ""], [1, "folder", "a folder", ""], [2, "item", "a restricted folder · 2 copies elsewhere", "hot on"], [2, "item", "a restricted file · in its place", ""],
+            [1, "folder", "another folder", ""], [2, "item", "a restricted file · 1 copy elsewhere", "hot"],
+            [0, "machine", "another machine", ""], [1, "folder", "a folder", ""], [2, "item", "a restricted program · in its place", ""], [2, "item", "a restricted file · in its place", ""],
+            [0, "more", "and N more machines, paged; a find box once there are many", "rest"]].map(([d, k, t, c], i, xs) => { let up = i; while (up > 0 && xs[up - 1][0] >= d) up--; return html`<div key=${i} className=${"rsl-node " + c + (d ? "" : " root")} style=${{ "--d": d, "--up": i - up + 1 }}>
+              <span className=${"rsl-k " + k} /><span className="rsl-nt">${t}</span></div>`; })}
+        </div>
+      <//>
+      <${LBox} title="Where it is, across the department" note="every machine in the department as a tile, laid out once and always in the same place; the picked item's home is outlined, machines holding a copy are red with a line from home; offline machines dashed; click a red tile to deal with that copy">
+        <svg viewBox=${`0 0 ${C * (T + G)} ${R * (T + G)}`} className="rsl-map">
+          ${caught.map((c) => { const [x1, y1] = ctr(home), [x2, y2] = ctr(c); return html`<path key=${"l" + c} d=${`M${x1} ${y1} L${x2} ${y2}`} className="rsl-ln" />`; })}
+          ${Array.from({ length: C * R - 2 }, (_, i) => { const [x, y] = at(i), cls = i === home ? " home" : caught.includes(i) ? " hot" : off.includes(i) ? " off" : "";
+            return html`<g key=${i}><rect x=${x} y=${y} width=${T} height=${T} rx="8" className=${"rsl-t" + cls} />${i === home ? html`<text x=${x + T / 2} y=${y + T / 2 + 4} textAnchor="middle" className="rsl-tx">home</text>` : caught.includes(i) ? html`<text x=${x + T / 2} y=${y + T / 2 + 4} textAnchor="middle" className="rsl-tx hot">copy</text>` : null}</g>`; })}
+        </svg>
+        <div className="lay-more">under the tiles: the picked item's rule in words (only in its folder, or anywhere on its machine) and what happened to it lately: opened, moved, refused</div>
+      <//>
+    </div>
+    <${LBox} title="Caught elsewhere" note="one line per copy, worst first, told as a trail: where the file was → how it went (a copy, a USB drive, a download) → where it was found, who was signed in, when; and three answers on the line">
+      ${["hot", "", ""].map((h, i) => html`<div key=${i} className="lay-row rsl-trail">
+        <span className="rsl-end" /><span className="rsl-arrow" /><span className="lay-bar sub" style=${{ width: "9%" }} /><span className="rsl-arrow" /><span className=${"rsl-end " + h} /><span className="lay-bar sub" style=${{ width: "16%" }} />
+        <span className="lay-act">Ask them to delete it</span><span className="lay-act">Delete the copy</span><span className="lay-act">Allow it there</span></div>`)}
+      <div className="lay-more">and N more, paged</div>
+    <//>
+    <${LBox} title="Flows and what you restricted" note="one ledger, two halves: on the left the flows asking to carry something of yours (Allow for this flow, Keep it out); on the right the flows you allowed and since when (Take back); nothing restricted moves without it">
+      <div className="rsl-ledger">
+        <div><div className="lay-grp">Asking you</div><${LBar} w="62%" act="Allow" /><${LBar} w="50%" act="Allow" /></div>
+        <div><div className="lay-grp">You allowed</div><${LBar} w="58%" act="Take back" /><${LBar} w="44%" act="Take back" /><${LBar} w="50%" act="Take back" /></div>
+      </div>
+    <//>
+    <${LBox} cls="lay-in" title="Restrict something" note="three explained steps and a button that opens a drawer, as Give a task and Make a flow do: pick the machine and the file or folder, say where it may be, check and restrict">
+      <div className="lay-row"><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-act">Restrict something</span></div>
+    <//>
+  </div>`;
+}
+// The Admin's Flows, second layout (24 Oct 2026; the lanes of every flow were rejected). One flow is drawn at a time,
+// the one picked; a flow may have several sources, several steps in a row, a step that splits files (sort, branch),
+// and several destinations, so the drawing is a graph read left to right in columns, not a single pipe.
+function AdminFlowsLayout2() {
+  // a sample graph: two sources join, two steps in a row, the second splits by file type, three destinations
+  const W = 1000, Hh = 250, n = (x, y, w, h, t, cls) => html`<g key=${t + x + y}><rect x=${x} y=${y} width=${w} height=${h} rx=${cls === "step" ? h / 2 : 7} className=${"flg-n " + (cls || "")} /><text x=${x + w / 2} y=${y + h / 2 + 4} textAnchor="middle" className="flg-t">${t}</text></g>`;
+  const c = (x1, y1, x2, y2, cls) => html`<path key=${x1 + "-" + y1 + "-" + x2 + "-" + y2} d=${`M${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`} className=${"flg-l " + (cls || "")} />`;
+  return html`<div className="lay">
+    <div className="lay-q">The Admin's question: <b>are files getting where they should, and where is something held up?</b></div>
+    <${LBox} cls="lay-sit" title="The situation, in one sentence" note="how many flows are moving, which one is stopped and at what point, files moved today" />
+    <${LBox} title="Held at a gate" note="a row of equal cards, one for each point where a flow waits on someone; each with what is held, where, since when, and its action; clicking one picks its flow below">
+      <div className="fl-rail">${["Allow it", "Try it again", "Keep one", "Pick a folder"].map((a, i) => html`<div key=${i} className=${"fl-gate" + (i < 2 ? " hot" : "")}><i /><i style=${{ width: "70%" }} /><i style=${{ width: "45%" }} /><span className="lay-act" style=${{ marginLeft: 0, alignSelf: "flex-start" }}>${a}</span></div>`)}<div className="fl-gate more">+N</div></div>
+    <//>
+    <div className="lay-g84">
+      <${LBox} title="Your flows" note="one card per flow, grouped by what it needs, as on Machines: click one to draw it below and list what went through it on the right; Expand opens how it is set">
+        <div className="lay-grp">Held or stopped</div>
+        <div className="lay-row lay-card"><span className={"lay-tile lay-hot"} style=${{ width: 30, height: 30, borderRadius: 15 }} /><span className="lay-txt">flow name · 2 sources → 2 steps → 3 destinations · why it is held</span><span className="lay-bar" style=${{ width: 80 }} /><span className="lay-act">Expand</span></div>
+        <div className="lay-box" style=${{ padding: "10px 12px", gap: 6 }}><header><b>An expanded flow</b><span>how it is set, stacked: made by, its sources, its steps in order, its destinations, since it began, last copy; Pause, Edit, Stop on the right (Message when someone else made it)</span></header>
+          <${LBar} w="55%" /><${LBar} w="50%" /><${LBar} w="45%" act="Pause" /></div>
+        <div className="lay-grp">Waiting for a folder</div>
+        <div className="lay-row lay-card"><span className={"lay-tile"} style=${{ width: 30, height: 30, borderRadius: 15 }} /><span className="lay-txt">flow name · 1 source → 1 destination · who has to pick a folder</span><span className="lay-bar" style=${{ width: 80 }} /><span className="lay-act">Expand</span></div>
+        <div className="lay-grp">Moving</div>
+        <div className="lay-row lay-card"><span className={"lay-tile"} style=${{ width: 30, height: 30, borderRadius: 15 }} /><span className="lay-txt">flow name · 1 source → 1 step → 2 destinations · last copy</span><span className="lay-bar" style=${{ width: 80 }} /><span className="lay-act">Expand</span></div>
+        <div className="lay-row lay-card"><span className={"lay-tile"} style=${{ width: 30, height: 30, borderRadius: 15 }} /><span className="lay-txt">flow name · 2 sources → 1 step → 1 destination · last copy</span><span className="lay-bar" style=${{ width: 80 }} /><span className="lay-act">Expand</span></div>
+        <div className="lay-grp">Quiet</div>
+        <div className="lay-more">flows that moved nothing today</div>
+      <//>
+      <${LBox} title="What went through it" note="the picked flow's last files, newest first: time, file, where it landed, how it ended (copied, kept beside, held); empty until a flow is picked">
+        <${LBar} w="85%" /><${LBar} w="80%" /><${LBar} w="78%" /><${LBar} w="70%" /><${LBar} w="74%" /><div className="lay-more">paged</div>
+      <//>
+    </div>
+    <${LBox} title="The picked flow, drawn" note="the flow you picked, drawn from its own sources, steps and destinations (below is only an example shape); nothing is drawn until one is picked">
+      <div className="flg-cols">${[["Sources", 9.5], ["Step 1", 38.5], ["Step 2", 61.5], ["Destinations", 90.5]].map(([t, x]) => html`<span key=${t} style=${{ left: x + "%" }}>${t}</span>`)}</div>
+      <svg viewBox="0 0 1000 112" className="flg">
+        ${c(150, 30, 340, 56)}${c(150, 82, 340, 56, "hold")}${c(430, 56, 570, 56)}
+        ${c(660, 56, 850, 18)}${c(660, 56, 850, 56)}${c(660, 56, 850, 94, "stop")}
+        ${n(40, 18, 110, 24, "Source A")}${n(40, 70, 110, 24, "Source B", "held")}
+        ${n(340, 45, 90, 22, "Transform", "step")}${n(570, 45, 90, 22, "Sort by type", "step")}
+        <text x="770" y="30" className="flg-k">.pdf</text><text x="770" y="52" className="flg-k">.xlsx</text><text x="770" y="88" className="flg-k">the rest</text>
+        ${n(850, 6, 110, 24, "Destination 1")}${n(850, 44, 110, 24, "Destination 2")}${n(850, 82, 110, 24, "Destination 3", "stop")}
+      </svg>
+    <//>
+    <${LBox} cls="lay-in" title="Make a flow" note="three explained steps and a button that opens a drawer, as Give a task does">
+      <div className="lay-row"><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-act">Make a flow</span></div>
+    <//>
+  </div>`;
+}
+// The Admin's Flows, filled in on the agreed layout (24 Oct 2026): held at a gate; your flows as the Machines accordion
+// (a click picks one, Expand opens how it is set); what went through the picked one beside the list; the picked one
+// drawn below from its own sources, steps and destinations; make a flow at the foot.
+// drawn in real pixels at the width it is given, so nodes and text stay the size of the page's own small text
+function FlowGraph({ x, held, gone }) {
+  const ref = useRef(null), W = useWidth(ref, 1100);
+  const srcs = x.srcs, sts = x.stages, dsts = x.dests, rows = Math.max(srcs.length, dsts.length, 1), RH = 38, H = rows * RH + 6;
+  const NW = 176, NH = 28, SW = 124, SH = 26, sx = 0, dx = W - NW;
+  const ys = (k, n) => 3 + (H - 6) * (k + 0.5) / n, mid = H / 2;
+  const stX = (i) => (sts.length === 1 ? (W - SW) / 2 : NW + 80 + (i * (W - 2 * NW - 160 - SW)) / Math.max(1, sts.length - 1));
+  const wait = x.st === "Waiting for a folder", isHeld = !!held;
+  const path = (x1, y1, x2, y2, cls) => html`<path d=${`M${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`} className=${"flg-l " + (cls || "")} />`;
+  const box = (bx, by, w, h, t, sub, cls, round) => html`<g><rect x=${bx + 0.5} y=${by - h / 2 + 0.5} width=${w - 1} height=${h - 1} rx=${round ? h / 2 : 5} className=${"flg-n " + (cls || "")} /><text x=${bx + w / 2} y=${by + 1} textAnchor="middle" dominantBaseline="middle" className=${"flg-t" + (round ? "" : " mono")}>${t}${sub ? html`<tspan className="flg-s"> ${sub}</tspan>` : null}</text></g>`;
+  const firstX = sts.length ? stX(0) : dx, lastX = sts.length ? stX(sts.length - 1) + SW : sx + NW;
+  const cols = [["From", NW / 2], ...(sts.length ? [["Along the way", (stX(0) + stX(sts.length - 1) + SW) / 2]] : []), ["To", dx + NW / 2]];
+  return html`<div ref=${ref} className="flg-wrap">
+    <div className="flg-cols">${cols.map(([t, cx]) => html`<span key=${t} style=${{ left: cx }}>${t}</span>`)}</div>
+    <svg width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} className="flg">
+    ${srcs.map((q, k) => path(sx + NW, ys(k, srcs.length), firstX, sts.length ? mid : ys(0, dsts.length), isHeld && k === 0 ? "hold" : k === gone ? "stop" : wait ? "idle" : ""))}
+    ${sts.slice(1).map((_, i) => path(stX(i) + SW, mid, stX(i + 1), mid, isHeld ? "dim" : wait ? "idle" : ""))}
+    ${sts.length ? dsts.map((d, k) => path(lastX, mid, dx, ys(k, dsts.length), askOf(d) || wait ? "idle" : (x.paused || []).includes(k) ? "stop" : isHeld ? "dim" : "")) : null}
+    ${srcs.map((q, k) => box(sx, ys(k, srcs.length), NW, NH, q[0], k === gone ? "moved away" : q[1], isHeld && k === 0 ? "held" : k === gone ? "stop" : q[2] === "empty" ? "wait" : ""))}
+    ${sts.map((st, i) => box(stX(i), mid, SW, SH, st.op, null, "step", true))}
+    ${dsts.map((d, k) => askOf(d) ? box(dx, ys(k, dsts.length), NW, NH, askOf(d), "picks a folder", "wait") : box(dx, ys(k, dsts.length), NW, NH, d[0], d[1], (x.paused || []).includes(k) ? "stop" : d[2] === "empty" ? "wait" : ""))}
+  </svg></div>`;
+}
+// The last sync of each flow, as a diff against the one before (sample): each file with what happened to it and its size
+// before and after, in KB. "held" never left; "beside" landed next to a copy someone changed. Earlier syncs are counts.
+const FL_DIFF = {
+  payroll: { at: "13:11", prev: "12:41", files: [["timesheet-0930.xlsx", "changed", 184, 212], ["2026-09-29-timesheet.xlsx", "new", 0, 190], ["salaries.csv", "held", 0, 48]], earlier: [["12:41", 2, 310], ["12:11", 1, 96], ["11:41", 3, 540]] },
+  "payroll-pdf": { at: "13:12", prev: "12:42", files: [["timesheet-0930.pdf", "new", 0, 96], ["timesheet-0929.pdf", "changed", 88, 92]], earlier: [["12:42", 1, 88], ["12:12", 2, 170]] },
+  weekly: { at: "13:02", prev: "12:41", files: [["manifest-0930.pdf", "new", 0, 340], ["report.xlsx", "beside", 1100, 1320], ["manifest-0930.pdf → /archive/", "queued", 0, 340]], earlier: [["12:41", 1, 1100], ["12:02", 2, 620]] },
+  "weekly-digest": { at: "12:05", prev: "yesterday 12:05", files: [["weekly-w40.zip", "new", 0, 2400]], earlier: [["yesterday 12:05", 1, 2310]] },
+  "ops-pack": { at: "12:30", prev: "yesterday 12:30", files: [["pack-0930.zip", "changed", 5100, 5600], ["exports-0930.csv", "new", 0, 210]], earlier: [["yesterday 12:30", 2, 5300]] },
+  "board-pack": { at: "11:40", prev: "Tue 16:10", files: [["minutes-2026-09.pdf", "new", 0, 820], ["agenda-oct.pdf", "changed", 120, 134]], earlier: [["Tue 16:10", 1, 120]] },
+};
+const FL_EXTRA = [{ name: "scan-archive", by: "R. Mensah", srcs: [["OPS-04", "/scans/"]], dests: [["WS-OPS-A1", "/scans/"]], stages: [], st: "Active", files: 212, last: "—", quiet: 16, fn: () => 0 }];
+const FL_GONE = { "ops-pack": { src: 1, since: 11.83 } };   // its second source folder was moved away
+const kb = (n) => (Math.abs(n) >= 1000 ? `${(n / 1000).toFixed(1)} MB` : `${Math.round(n)} KB`);
+const FD_WORD = { new: "new", changed: "changed", held: "held for you", beside: "kept beside", queued: "waiting" };
+function AdminFlowsPage2({ go, open }) {
+  useDT();
+  const me = ME;
+  const inside0 = new Set([...MACHINES.map((m) => m.host), ...Object.values(ADMIN_INFO).filter((a) => DEPTS.some((d) => d.id === a.dept)).map((a) => a.ws)]);
+  const names = new Set(EXISTING_FLOWS.filter((x) => [...x.srcs, ...x.dests].some((q) => inside0.has(q[0]))).map((x) => x.name));
+  for (let i = 0; i < 4; i++) [...names].forEach((n) => [...fedBy(FBY[n]), ...feeds(FBY[n])].forEach((y) => names.add(y.name)));
+  const [held, setHeld] = useState(FL_HELD), [done, setDone] = useState({}), [make, setMake] = useState(open && (open === "new" || open.startsWith("edit-")) ? open : false), [more, setMore] = useState(false);
+  const [sel, setSel] = useState(null), [exp, setExp] = useState(null), [fpg, setFpg] = useState(0);
+  const stateOf = (x) => (held[x.name] ? "held" : x.st === "Degraded" ? "branch" : x.st === "Waiting for a folder" ? "wait" : flToday(x) ? "moving" : "quiet");
+  const flows = [...EXISTING_FLOWS.filter((x) => names.has(x.name)), ...FL_EXTRA];
+  const fby = (n) => flows.find((x) => x.name === n);
+  const G = [["stop", "Held or stopped", "nothing more goes through until you act", (x) => ["held", "branch"].includes(stateOf(x))], ["wait", "Waiting for a folder", "its owner has to pick where files land", (x) => stateOf(x) === "wait"],
+    ["moving", "Moving", "files went through today", (x) => stateOf(x) === "moving"], ["quiet", "Quiet", "set up and running; nothing went through today", (x) => stateOf(x) === "quiet"]];
+  const who = (b) => (b === me ? "you" : b === "Super User" ? "the Super User" : b);
+  const today = flows.reduce((n, x) => n + flToday(x), 0), nMove = flows.filter((x) => stateOf(x) === "moving").length;
+  const H = flows.filter((x) => stateOf(x) === "held"), B = flows.filter((x) => stateOf(x) === "branch"), W = flows.filter((x) => stateOf(x) === "wait");
+  const situation = `${fmt(nMove)} of ${fmt(flows.length)} flows moved files today; ${H.length ? `${listNames(H.map((x) => x.name), 2)} is held for you` : "nothing is held for you"}${B.length ? `, ${listNames(B.map((x) => x.name), 2)} has a destination stopped` : ""}${W.length ? `, ${fmt(W.length)} wait${W.length === 1 ? "s" : ""} for a folder` : ""}. ${fmt(today)} files went through today.`;
+  const conflict = FLOW_LOG.find((l) => /^Conflict/.test(l[4]));
+  const gates = [
+    ...H.map((x) => ({ id: "h:" + x.name, flow: x.name, hot: true, kind: "Restricted, yours", icon: "StopOutlined", wait: NOWH - held[x.name].since, title: `${x.name} met ${held[x.name].file}`, where: held[x.name].at, line: "you restricted it; the flow waits for you",
+      acts: [["Allow it for this flow", () => { setHeld((h) => { const n = { ...h }; delete n[x.name]; return n; }); toast(`${x.name} may carry ${held[x.name].file}; its destinations become places it may be (concept)`); }], ["Keep it paused", () => toast(`${x.name} stays paused (concept)`)]] })),
+    ...B.map((x) => ({ id: "b:" + x.name, flow: x.name, hot: true, kind: "A destination stopped", icon: "DisconnectOutlined", wait: 0.3, title: `${x.name} cannot reach ${x.dests[(x.paused || [0])[0]].join(" ")}`, where: "files wait in line until it takes them", line: "the folder stopped taking files",
+      acts: [["Try it again", () => toast(`${x.name} tries ${x.dests[(x.paused || [0])[0]].join(" ")} again (concept)`)]] })),
+    ...(conflict ? [{ id: "c:" + conflict[2], flow: conflict[1], kind: "Kept beside", icon: "CopyOutlined", wait: NOWH - 12.68, title: `${conflict[2]} was changed where it landed`, where: conflict[3], line: "the flow kept both: report-modified.xlsx beside the new one",
+      acts: [["Keep the new one", () => toast("Kept the new one; the other is in the audit log (concept)")], ["Keep both", () => toast("Both kept (concept)")]] }] : []),
+    ...FLOW_ASKS.filter((r) => r.to === me).map((r) => ({ id: "a:" + r.id, flow: null, kind: "Wants to send you files", icon: "InboxOutlined", wait: 1.7, title: `${r.from}: ${r.name}`, where: `${r.src.join(" ")}${r.stages.length ? " · " + r.stages.join(", ") : ""}`, line: `“${r.note}”`,
+      acts: [["Pick a folder", () => toast("Pick a folder on your workstation (concept)")], ["Decline", () => toast("Declined (concept)")]] })),
+    ...W.map((x) => { const long = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/.test(x.asked);
+      return long ? { id: "w:" + x.name, flow: x.name, hot: true, kind: "Waited too long", icon: "ClockCircleOutlined", wait: 51, title: `${x.name} still waits for ${askOf(x.dests[0])}`, where: `asked ${x.asked.toLowerCase()}; no folder picked`, line: "remind them once more, send it somewhere else, or take the ask back",
+          acts: [["Remind", () => toast(`Reminded ${askOf(x.dests[0])} (concept)`)], ["Pick another destination", () => setMake("edit-" + x.name)], ["Withdraw the ask", () => toast(`Ask withdrawn; ${x.name} is stopped (concept)`)]] }
+        : { id: "w:" + x.name, flow: x.name, kind: "Waiting on someone else", icon: "ClockCircleOutlined", wait: 3.0, title: `${x.name} waits for ${askOf(x.dests[0])}`, where: `to pick a folder, asked ${x.asked.toLowerCase()}`, line: "nothing moves until they do",
+          acts: [["Remind", () => toast(`Reminded ${askOf(x.dests[0])} (concept)`)]] }; }),
+    ...Object.entries(FL_GONE).filter(([n]) => fby(n)).map(([n, g]) => { const x = fby(n), q = x.srcs[g.src];
+      return { id: "g:" + n, flow: n, hot: true, kind: "A source is gone", icon: "FolderOpenOutlined", wait: NOWH - g.since, title: `${q.join(" ")} is not there any more`, where: `${n} reads from it`, line: "it was moved or renamed; the flow's other sources still go",
+        acts: [["Pick another folder", () => setMake("edit-" + n)], ["Wait for it", () => toast("Waiting; you are told when it is back (concept)")], ["Stop the flow", () => toast(`${n} stopped (concept)`)]] }; }),
+    ...flows.filter((x) => x.quiet >= 14).map((x) => ({ id: "q:" + x.name, flow: x.name, kind: "Quiet for a long time", icon: "PauseCircleOutlined", wait: x.quiet * 24, title: `${x.name} has moved nothing in ${x.quiet} days`, where: `${x.srcs.map((q) => q.join(" ")).join(", ")}`, line: "a suggestion only; nothing stops by itself",
+      acts: [["Keep it", () => toast(`${x.name} kept; not asked again for 30 days (concept)`)], ["Stop it", () => toast(`${x.name} stopped (concept)`)]] })),
+    { id: "o:board-pack", flow: "board-pack", kind: "A destination is off", icon: "DisconnectOutlined", wait: NOWH - 11.67, title: "WS-FIN-A1 has been off since 11:40", where: "board-pack · 1 file waiting for it", line: "it goes when the machine is back; the Super User made this flow",
+      acts: [["Keep waiting", () => toast("Keeps waiting (concept)")], ["Tell the Super User", () => go("messages")]] },
+  ].filter((g) => !done[g.id] && (!g.flow || fby(g.flow))).sort((a, b) => (b.hot ? 1 : 0) - (a.hot ? 1 : 0) || b.wait - a.wait);
+  const shown = more ? gates : gates.slice(0, 4), act = (g, fn) => { fn(); setDone((d) => ({ ...d, [g.id]: true })); };
+  const shape = (x) => `${fmt(x.srcs.length)} source${x.srcs.length === 1 ? "" : "s"} → ${x.stages.length ? `${fmt(x.stages.length)} step${x.stages.length === 1 ? "" : "s"} → ` : ""}${fmt(x.dests.length)} destination${x.dests.length === 1 ? "" : "s"}`;
+  const why = (x) => { const k = stateOf(x); return k === "held" ? `held: ${held[x.name].file} is restricted by you` : k === "branch" ? `${x.dests[(x.paused || [0])[0]].join(" ")} stopped taking files` : k === "wait" ? `${askOf(x.dests[0])} picks a folder` : x.last === "—" ? "nothing yet" : `last copy ${x.last}`; };
+  const card = (x) => { const k = stateOf(x), on = exp === x.name, picked = sel === x.name, hot = k === "held" || k === "branch", n = flToday(x), mine = x.by === me;
+    return html`<div key=${x.name} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "")}>
+      <article className=${"iq-card am-card" + (hot ? " urg" : "")} role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => setSel(x.name)} onKeyDown=${(e) => e.key === "Enter" && setSel(x.name)}>
+        <span className="iq-ic">${ic("BranchesOutlined")}</span>
+        <span className="iq-main"><span className="iq-t"><b className="cut">${x.name}</b><span className="t3">by ${who(x.by)}</span></span><span className=${"iq-s cut" + (hot ? " hot" : "")}>${shape(x)} · ${why(x)}</span></span>
+        <span className="am-facts"><span className="am-sp" title="files through it today"><${Spark} fn=${(t) => x.fn(t)} w=${96} h=${22} c=${hot ? "var(--crit)" : "var(--s6)"} /><span>${fmt(n)}</span></span><span className="t3">today</span></span>
+        <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setExp(on ? null : x.name); setSel(x.name); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
+      </article>
+      ${on ? html`<div className="tk-open">
+        <div className="tk-facts">${[["Made by", who(x.by)], ["From", x.srcs.map((q) => q.join(" ")).join(", ")], ["Along the way", x.stages.map((st, i) => `${i + 1}. ${st.op}`).join("  ") || "copied as it is"], ["To", x.dests.map(placeTxt).join(", ")], ["Since it began", `${fmt(x.files)} files`], ["Last copy", x.last === "—" ? "none yet" : `today ${x.last}`]]
+          .map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> <span className=${a === "From" || a === "To" ? "mono" : ""}>${b}</span></span>`)}</div>
+        <div className="row fl-acts">${mine ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake("edit-" + x.name)}>Edit<//><span className="sp" />
+            <span className="fl-grp"><${Button} size="small" icon=${ic("PauseOutlined")} onClick=${() => toast(`${x.name} paused (concept)`)}>Pause<//><${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => toast(`${x.name} stopped (concept)`)}>Stop<//></span>`
+          : html`<span className="t3" style=${{ fontSize: 12 }}>made by ${who(x.by)}; only they change it</span><span className="sp" /><${Button} size="small" onClick=${() => go("messages")}>Message ${x.by === "Super User" ? "them" : x.by}<//>`}</div>
+      </div>` : null}</div>`; };
+  const P = sel && fby(sel);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => { if (!sel) return; setLoading(true); const t = setTimeout(() => setLoading(false), 700); return () => clearTimeout(t); }, [sel]);
+  return html`<div className="og flp flp2">
+    <${SitBar} text=${situation} />
+    <section className="ib-box">
+      <header><b>Held at a gate</b><span>every point where a flow waits on someone, the longest waiting first; click one to pick its flow</span></header>
+      ${gates.length ? html`<div className=${"fg-rail" + (more ? " all" : "")}>${shown.map((g) => html`<div key=${g.id} className=${"fg-card" + (g.hot ? " hot" : "")} role="button" tabIndex="0" onClick=${() => g.flow && setSel(g.flow)}>
+          <div className="fg-k"><span>${ic(g.icon)} ${g.kind}</span><span className="t3">${waitLen(g.wait)}</span></div>
+          <b className="fg-t">${g.title}</b>
+          <span className="mono t3 cut" style=${{ fontSize: 11.5 }}>${g.where}</span>
+          <span className="t2 fg-l">${g.line}</span>
+          <div className="row" style=${{ marginTop: "auto", gap: 6 }}>${g.acts.map(([l, fn], i) => html`<${Button} key=${i} size="small" type=${i === 0 ? "primary" : "default"} onClick=${(e) => { e.stopPropagation(); act(g, fn); }}>${l}<//>`)}</div>
+        </div>`)}
+        ${gates.length > 4 ? html`<div className="fg-card more" role="button" onClick=${() => setMore(!more)}>${more ? "Fewer" : html`<b>+${fmt(gates.length - 4)}</b><span>more</span>`}</div>` : null}</div>`
+        : html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing is held. Every flow is moving or waiting on no one.</div>`}
+    </section>
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <section className="ib-box">
+        <header><b>Your flows</b><span>every flow through the department, grouped by what it needs; click one to draw it below, expand it for how it is set</span></header>
+        ${(() => { const ord = G.flatMap(([k, , , f]) => flows.filter(f).map((x) => [k, x])), PER = 5, pages = Math.ceil(ord.length / PER), p = Math.min(fpg, Math.max(0, pages - 1)), page = ord.slice(p * PER, p * PER + PER);
+          return html`${G.map(([k, g, d, f]) => { const xs = page.filter((e) => e[0] === k).map((e) => e[1]); if (!xs.length) return null;
+            return html`<div key=${k} className="iq-grp"><div className="lay-grp iq-gh">${g} · ${fmt(flows.filter(f).length)}<span>${d}</span></div><div className="iq-cards">${xs.map(card)}</div></div>`; })}
+            ${pages > 1 ? html`<div className="dv-pages fl-pages"><span className="t3">${fmt(p * PER + 1)} to ${fmt(Math.min(ord.length, p * PER + PER))} of ${fmt(ord.length)} flows</span>
+              <span className="dr-step"><button aria-label="Earlier" disabled=${p === 0} onClick=${() => setFpg(p - 1)}>${ic("LeftOutlined")}</button>${p + 1} of ${pages}<button aria-label="Later" disabled=${p >= pages - 1} onClick=${() => setFpg(p + 1)}>${ic("RightOutlined")}</button></span></div>` : null}`; })()}
+      </section>
+      <section className="ib-box">
+        <header><b>Last sync</b><span>${P ? `${P.name}: what changed since the sync before` : "pick a flow on the left"}</span></header>
+        ${!P ? html`<div className="fd-empty">${ic("SwapOutlined")}<span>The last sync of the flow you pick shows here: which files were new, which changed and by how much, and what stayed behind.</span></div>`
+          : loading ? html`<div className="am-load" style=${{ height: 260 }}>${ic("LoadingOutlined")}<span>Loading ${P.name}</span></div>`
+          : !FL_DIFF[P.name] ? html`<div className="fd-empty">${ic("SwapOutlined")}<span>${P.name} has not synced yet.${stateOf(P) === "wait" ? ` It starts once ${askOf(P.dests[0])} picks a folder.` : ""}</span></div>`
+          : (() => { const D = FL_DIFF[P.name], went = D.files.filter((f) => f[1] === "new" || f[1] === "changed" || f[1] === "beside"), add = went.reduce((n, f) => n + f[3] - f[2], 0);
+            const GR = [["Arrived", (f) => f[1] === "new", (f) => `${kb(f[3])}, new where it landed`],
+              ["Updated", (f) => f[1] === "changed" || f[1] === "beside", (f) => `${kb(f[3])}, was ${kb(f[2])}${f[1] === "beside" ? "; the changed copy was kept beside it" : ""}`],
+              ["Did not go", (f) => f[1] === "held" || f[1] === "queued", (f) => (f[1] === "held" ? "held: you restricted it" : "waiting: that destination stopped taking files")]];
+            return html`<div className="fd">
+              <div className="fd-top"><div><b>${D.at}</b><span className="t3"> · the sync before was ${D.prev}</span></div>
+                <div className="fd-sum">${GR.map(([g, f]) => [g, D.files.filter(f).length]).filter(([, n]) => n).map(([g, n]) => html`<span key=${g} className=${"fd-c " + g.split(" ")[0].toLowerCase()}><b>${fmt(n)}</b> ${g.toLowerCase()}</span>`)}
+                  <span className="t3">${add ? `${add > 0 ? "+" : "−"}${kb(Math.abs(add))} in all` : ""}</span></div></div>
+              ${GR.map(([g, f, line]) => { const xs = D.files.filter(f); if (!xs.length) return null;
+                return html`<div key=${g} className=${"fd-g " + g.split(" ")[0].toLowerCase()}><div className="am-k">${g}</div>${xs.map(([fn, k, b0, b1], i) => html`<div key=${i} className="fd-row"><span className="mono cut" title=${fn}>${fn}</span><span className="t3">${line([fn, k, b0, b1])}</span></div>`)}</div>`; })}
+              <div className="t3" style=${{ fontSize: 12 }}>Nothing deleted at the source is deleted where it lands.</div>
+              ${D.earlier.length ? html`<div><div className="am-k">Syncs before it</div>${D.earlier.map(([t, n, w], i) => html`<div key=${i} className="fd-e"><span>${t}</span><span className="t3">${fmt(n)} file${n === 1 ? "" : "s"}</span><span className="t3">+${kb(w)}</span></div>`)}</div>` : null}
+            </div>`; })()}
+      </section>
+    </div>
+    <section className="ib-box">
+      <header><b>${P ? P.name : "The picked flow"}</b><span>${P ? `drawn from its own sources, steps and destinations · ${shape(P)}` : "pick a flow above to draw it here"}</span></header>
+      ${P ? html`<${FlowGraph} key=${P.name} x=${P} held=${held[P.name]} gone=${FL_GONE[P.name] ? FL_GONE[P.name].src : null} />
+        ${held[P.name] || P.paused || stateOf(P) === "wait" ? html`<div className="lay-more">${[held[P.name] ? "red outline: held for your consent at that source" : null, P.paused ? "dashed red: a destination that stopped taking files" : null, stateOf(P) === "wait" ? "dashed grey: waiting for its owner to pick a folder" : null].filter(Boolean).join(" · ")}</div>` : null}`
+        : html`<div className="fl-empty">${ic("BranchesOutlined")}<span>Nothing picked</span></div>`}
+    </section>
+    <section className="ib-box og-change">
+      <header><b>Make a flow</b><span>files go one way only; nothing restricted rides along without its owner's say</span></header>
+      <div className="tk-give">
+        <ol className="tk-steps"><li><b>Pick where files start</b><span>one or more folders on your machines, or ones a flow already fills</span></li>
+          <li><b>Say what happens on the way</b><span>convert, compress, rename or sort, in order; or copy them as they are</span></li>
+          <li><b>Pick where they land</b><span>folders you manage; anyone else's is asked first</span></li></ol>
+        <${Button} type="primary" onClick=${() => setMake(true)}>Make a flow<//></div>
+    </section>
+    <${Drawer} open=${!!make} onClose=${() => setMake(false)} width="min(1120px, 80vw)" title=${typeof make === "string" && make.startsWith("edit-") ? `Edit ${make.slice(5)}` : "Make a flow"} className="tk-drawer"
+      extra=${html`<span className="t3" style=${{ fontSize: 12 }}>closing keeps what you set; nothing runs until you confirm</span>`}>
+      ${make ? html`<${NewFlow} key=${make} drawer=${true} go=${(p, x) => { setMake(false); if (p !== "flows" || (x && !String(x).startsWith("edit-") && x !== "new")) go(p, x); }} me=${me} edit=${typeof make === "string" && make.startsWith("edit-") ? make.slice(5) : undefined} />` : null}
+    <//>
+  </div>`;
+}
+// The Admin's Flows, filled in (24 Oct 2026): are files getting where they should, and where is something held up?
+// A flow is a pipe, so the page is the department's pipes drawn, one lane per flow, left to right. What is held at a gate
+// sits above them as a rail of equal cards; a picked lane opens under itself with what went through it.
+// Sample: "payroll" met salaries.csv, which this Admin restricted, so it is held for their consent (the rule:
+// a flow carries nothing restricted without its owner's say).
+const FL_HELD = { payroll: { file: "salaries.csv", at: "OPS-01 /payroll/", since: 12.9 } };
+const flToday = (x) => { let n = 0; for (let t = Math.floor(NOWH / 24) * 24; t < NOWH; t += 0.25) n += (x.fn(t) || 0) * 0.25; return Math.round(n); };
+// The Admin's Flows, layout first (24 Oct 2026). Its own shape: a flow is a pipe, so the page is the department's pipes
+// drawn, one lane per flow, left to right; what is held at a gate is a row of cards above them (the Super User
+// Overview's "Waiting on you" rail); a picked lane opens under itself with what went through it.
+function AdminFlowsLayout() {
+  const node = (w, cls) => html`<span className=${"fl-n " + (cls || "")} style=${{ width: w }} />`;
+  const pipe = (cls) => html`<span className=${"fl-p " + (cls || "")} />`;
+  const lane = (k, kind, open) => html`<div key=${k} className=${"fl-lane" + (open ? " on" : "")}>
+      <span className="fl-name"><i /><i style=${{ width: "60%" }} /></span>
+      ${node(96)}${pipe(kind === "stop" ? "stop" : "")}${node(70, "step")}${pipe(kind === "stop" ? "stop" : "")}
+      <span className="fl-ends">${node(96, kind === "wait" ? "wait" : "")}${k % 2 ? node(96) : null}</span>
+      <span className="fl-cnt" />
+    </div>`;
+  return html`<div className="lay">
+    <div className="lay-q">The Admin's question: <b>are files getting where they should, and where is something held up?</b></div>
+    <${LBox} cls="lay-sit" title="The situation, in one sentence" note="how many flows are moving, which one is stopped and at what point, files moved today" />
+    <${LBox} title="Held at a gate" note="every point where a pipe waits on someone, as a row of equal cards (the Super User Overview's rail); each says what is held, where, since when, and its one action">
+      <div className="fl-rail">${["Pick a folder", "Allow it", "Keep one", "Accept"].map((a, i) => html`<div key=${i} className=${"fl-gate" + (i === 1 ? " hot" : "")}><i /><i style=${{ width: "70%" }} /><i style=${{ width: "45%" }} /><span className="lay-act" style=${{ marginLeft: 0, alignSelf: "flex-start" }}>${a}</span></div>`)}
+        <div className="fl-gate more">+N</div></div>
+    <//>
+    <${LBox} title="The pipes" note="one lane per flow, drawn left to right: the source, the steps along the way, each destination; a stopped pipe shows the break where it stopped, a destination still waiting for a folder is dashed; files today at the end of each lane; stopped lanes first">
+      <div className="fl-head"><span>Flow</span><span>From</span><span /><span>Along the way</span><span /><span>To</span><span>Today</span></div>
+      ${lane(0, "stop")}${lane(1, "wait")}${lane(2, "", true)}
+      <div className="lay-box fl-tap"><header><b>The picked lane, opened under itself</b><span>the last files that went through, each with how it ended (copied, kept beside, held for consent); the flow's settings stacked; Pause, Edit, Stop</span></header>
+        <${LBar} w="80%" /><${LBar} w="76%" /><${LBar} w="70%" /></div>
+      ${lane(3, "")}${lane(4, "")}
+      <div className="lay-more">a pipe that feeds another (its destination is the next one's source) is drawn joined to it</div>
+    <//>
+    <${LBox} cls="lay-in" title="Make a flow" note="three explained steps and a button that opens a drawer, as Give a task does">
+      <div className="lay-row"><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-bar field" style=${{ width: "24%" }} /><span className="lay-act">Make a flow</span></div>
+    <//>
+  </div>`;
+}
 // The Admin's Overview (23 Oct 2026, the agreed layout): what is happening in my department right now, and what do I do
 // first? The situation in a sentence; Do first (the five things to do now, from every page, each with its action on the
 // line) beside what the Super User sent; my machines beside what stopped running; today beside live activity; and one
@@ -8247,9 +9101,9 @@ function App() {
   else if (page === "issues") body = level ? html`<${AdminIssuesPage} sel=${sub} go=${go} />` : html`<${Issues} sel=${sub} go=${go} />`;
   else if (page === "tasks" && level && (!sub || TASKS.some((t) => t.id === sub))) body = html`<${AdminTasksPage} key=${sub || "tasks"} go=${go} open=${sub} />`;
   else if (page === "tasks") body = !level && (!sub || sub === "new" || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${Directives3} go=${go} />` : sub === "new" ? html`<${NewTask} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
-  else if (page === "flows") body = sub === "new" ? html`<${NewFlow} go=${go} me=${level && level.admin} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${level && level.admin} edit=${sub.slice(5)} />` : (level ? html`<${FlowsSU} go=${go} me=${level.admin} open=${FBY[sub] ? sub : null} />` : html`<${FlowsSU} go=${go} me=${null} open=${FBY[sub] ? sub : null} />`);
+  else if (page === "flows") body = level ? html`<${AdminFlowsPage2} key=${sub || "flows"} go=${go} open=${sub} />` : sub === "new" ? html`<${NewFlow} go=${go} me=${null} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${null} edit=${sub.slice(5)} />` : html`<${FlowsSU} go=${go} me=${null} open=${FBY[sub] ? sub : null} />`;
   else if (page === "detective") body = level ? html`<${DetectivePage} key=${level.dept} go=${go} dept=${level.dept} />` : html`<${DetectivePage} go=${go} dept=${null} />`;
-  else if (page === "restricted" || page === "protected") body = !level ? html`<${ProtectedLevels} go=${go} start=${sub} />` : sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} all=${!level} />`;
+  else if (page === "restricted" || page === "protected") body = !level ? html`<${ProtectedLevels} go=${go} start=${sub} />` : !sub ? html`<${AdminRestrictedPage} key=${ME} go=${go} />` : sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} all=${!level} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;
   else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : html`<${Automation} go=${go} open=${sub && RBY[sub] ? sub : null} />`;
   else if (page === "audit") body = !level ? html`<${AuditBrief} range=${range} go=${go} />` : html`<${AuditSU} range=${range} go=${go} open=${sub} me=${level ? level.admin : null} />`;
@@ -8285,7 +9139,7 @@ function App() {
           
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
-          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 24 Oct 10:00</span>
+          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 25 Oct 12:00</span>
           <span className="t4" style=${{ fontSize: 11, whiteSpace: "normal" }} title="The large sample checks that nothing grows with the data">Concept · sample:
             ${["empty", "small", "large", "absurd"].map((v, k) => html`<${React.Fragment} key=${v}>${k ? " · " : " "}<a style=${{ color: SAMPLE_SIZE === v ? "var(--accent)" : "var(--text-3)", fontWeight: SAMPLE_SIZE === v ? 600 : 400, cursor: "pointer" }} onClick=${() => SAMPLE_SIZE !== v && setSample(v)}>${v}</a><//>`)}</span>
         </div>
