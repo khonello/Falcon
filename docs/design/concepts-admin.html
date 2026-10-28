@@ -734,6 +734,299 @@ a { color: var(--accent); text-decoration: none; }
 .fl-cnt { justify-self: end; width: 34px; height: 8px; border-radius: 4px; background: var(--surface-3); }
 .fl-tap { margin: -4px 0 10px; padding: 10px 12px; gap: 6px; }
 .lay-g84 { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: 16px; align-items: stretch; }
+.auo-sw { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+.auo-b { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-2); cursor: pointer; font: inherit; }
+.auo-b.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.auo-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.auo-colm { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 10px; border: 1.5px dashed var(--border-strong); }
+.auo-colm > header { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.auo-colm > header b { font-size: 13.5px; font-weight: 600; }
+.auo-colm > header span { font-size: 12px; color: var(--text-3); }
+.auo-colm.hot > header b { color: var(--crit); }
+.auo-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; }
+.auo-card b { font-weight: 600; font-size: 13px; }
+.auo-card.on { background: var(--surface-3); }
+.auo-card.dim b { color: var(--text-3); }
+.auo-s { color: var(--text-2); }
+.auo-f { font-size: 12px; color: var(--text-3); }
+.auo-card.hot .auo-f { color: var(--crit); }
+.auo-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.auo-bars { display: flex; align-items: flex-end; gap: 10px; height: 110px; }
+.auo-bars.small { height: 80px; }
+.auo-bars span { flex: 1; display: flex; flex-direction: column-reverse; align-items: stretch; gap: 2px; height: 100%; position: relative; padding-bottom: 16px; }
+.auo-bars i { display: block; border-radius: 3px; background: var(--s6); opacity: .8; }
+.auo-bars i.bad { background: var(--crit); }
+.auo-bars em { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-style: normal; font-size: 11px; color: var(--text-3); }
+.auo-runs { display: flex; flex-direction: column; gap: 4px; }
+.auo-run { display: grid; grid-template-columns: 70px minmax(0, 1fr) 90px; gap: 10px; align-items: center; padding: 5px 8px; border-radius: 5px; background: var(--surface-2); font-size: 12px; }
+.auo-run.bad { background: color-mix(in srgb, var(--crit) 15%, var(--surface-2)); }
+.auo-run.bad > span:last-child { color: var(--crit); }
+.auo-sheet { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 9fr); gap: 16px; align-items: start; }
+.auo-list { gap: 2px; }
+.auo-li { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; font-size: 12.5px; }
+.auo-li .cut { flex: 1; }
+.auo-li.on { background: var(--surface-3); }
+.auo-li.off { color: var(--text-4); }
+.auo-red { display: grid; place-items: center; min-width: 18px; height: 18px; border-radius: 9px; background: var(--crit); color: #fff; font-size: 11px; }
+.auo-page { gap: 14px; }
+.auo-big { font-size: 17px; line-height: 1.45; font-weight: 500; }
+.auo-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 24px; }
+.aub .auo-two { column-gap: 56px; flex: 1; align-items: stretch; }
+.aub-chart { display: flex; flex-direction: column; min-height: 220px; }
+.aub-plot { position: relative; flex: 1; display: flex; padding-left: 26px; padding-top: 14px; margin-top: 4px; }
+.aub-grid { position: absolute; left: 0; right: 0; top: 14px; bottom: 16px; pointer-events: none; }
+.aub-grid span { position: absolute; left: 22px; right: 0; border-top: 1px solid var(--grid); }
+.aub-grid em { position: absolute; right: calc(100% + 6px); top: -7px; font-style: normal; font-size: 10.5px; font-family: var(--mono); color: var(--text-4); }
+.auo-bars.tall { position: relative; }
+.auo-bars.tall b { position: relative; }
+.auo-bars.tall small { flex: none; white-space: nowrap; text-align: center; font-size: 11px; color: var(--text-2); line-height: 14px; }
+.auo-bars.tall small.over { font-weight: 700; color: var(--text); font-size: 12px; }
+.auo-bars.tall i.hand { background: var(--s6); opacity: .35; }
+.auo-bars.tall i.cut { height: 6px; margin-bottom: -2px; opacity: 1; border-radius: 0; background: linear-gradient(135deg, transparent 33%, var(--surface) 33% 66%, transparent 66%) 0 0 / 8px 6px, var(--s6); }
+.aub-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--text-3); margin-top: 6px; padding-left: 26px; }
+.aub-key > span { white-space: nowrap; }
+.aub-key > .t4 { flex-basis: 100%; white-space: normal; }
+.aub-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; background: var(--s6); opacity: .8; }
+.aub-key i.bad { background: var(--crit); opacity: 1; }
+.aub-key i.hand { opacity: .35; }
+.auo-bars.tall { flex: 1; height: auto; align-items: stretch; }
+.auo-bars.tall span { height: auto; }
+.auo-bars.tall b { flex: 1; display: flex; flex-direction: column-reverse; gap: 2px; }
+.auo-bars.tall b i { flex: none; }
+.aub .auo-act { grid-template-columns: minmax(0, 1fr) 90px; }
+.aur .iq-grp + .iq-grp { margin-top: 16px; }
+.au-why { font-size: 12.5px; padding-bottom: 6px; }
+.aur .am-card { padding-top: 7px; padding-bottom: 7px; grid-template-columns: 34px minmax(0, 1fr) 260px 128px; }
+.aur .iq-cards { gap: 5px; }
+.aur .am-facts { gap: 18px; }
+.auo-act, .auo-log { display: grid; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.auo-act { grid-template-columns: minmax(0, 1fr) 120px 80px; }
+.auo-log { grid-template-columns: 70px 70px minmax(0, 1fr) 160px; }
+.auo-act .med, .auo-log .med { color: var(--med); }
+.aue-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 100px; gap: 10px; }
+.aub { align-items: stretch; }
+.aub .auo-sheet, .auo-sheet.aub { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); }
+.auo-lt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.auo-lt > b { font-weight: 600; font-size: 13px; }
+.auo-lt > span { font-size: 11.5px; }
+.auo-lt > .hot { color: var(--crit); }
+.aub .auo-li { align-items: flex-start; padding: 9px 10px; }
+.aub .auo-li > .t3 { margin-top: 2px; }
+.aub .auo-li { border: 0; background: transparent; color: inherit; font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; width: 100%; }
+.aub .auo-li:hover { background: var(--surface-2); }
+.aub .auo-li.on { background: var(--surface-3); }
+.aub .auo-page > header { flex-direction: row; align-items: center; gap: 10px; }
+.auo-big.off { color: var(--text-4); }
+.auo-log.on { background: var(--surface-2); border-radius: 6px; }
+.auo-log .hot { color: var(--crit); }
+.auo-feed { cursor: pointer; }
+.auo-feed:hover, .auo-feed.on { background: var(--surface-2); }
+.auo-feed.bad.on { background: color-mix(in srgb, var(--crit) 14%, var(--surface-2)); }
+.aue-row.all { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.aue-cc { cursor: pointer; text-align: left; font: inherit; color: inherit; border: 0; }
+.aue-cc:hover { background: var(--surface-3); }
+.aue-cc.more { color: var(--text-2); }
+.aue-tab { border: 0; background: transparent; cursor: pointer; font: inherit; font-size: 12.5px; }
+.aue-tab:hover { background: var(--surface-2); }
+.aue-tab.add { border: 1px dashed var(--accent); }
+.aue-sent.off .aue-blk { opacity: .55; }
+.aue-ce { grid-template-columns: 76px minmax(0, 1fr) auto !important; align-items: center; }
+.aue-ce.on { background: var(--surface-2); border-radius: 6px; }
+.aue-ce > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aue-ce .hot { color: var(--crit); }
+.aue-cc { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; min-width: 0; }
+.aue-cc.bad { background: color-mix(in srgb, var(--crit) 10%, var(--surface-2)); }
+.aue-cc.on { background: var(--surface-3); }
+.aue-cc b { font-weight: 600; font-size: 13px; }
+.aue-cc .hot { color: var(--crit); }
+.aue-cc.more { align-self: stretch; min-height: 100%; align-items: center; justify-content: center; background: transparent; border: 1.5px dashed var(--border-strong); }
+.aue-t { display: flex; gap: 8px; font-size: 12px; margin-bottom: 2px; }
+.aue-arrow { color: var(--text-4); font-size: 11px; }
+.aue-sheet { gap: 16px; }
+.aue-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.aue-tab { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 6px; font-size: 12.5px; color: var(--text-2); }
+.aue-tab i { width: 7px; height: 7px; border-radius: 50%; background: var(--s6); }
+.aue-tab.on { background: var(--surface-3); color: var(--text); font-weight: 600; }
+.aue-tab.bad i { background: var(--crit); }
+.aue-tab.quiet i { background: transparent; border: 1px solid var(--text-4); }
+.aue-tab.off { color: var(--text-4); }
+.aue-tab.off i { background: transparent; border: 1px dashed var(--text-4); }
+.aue-tab em { font-style: normal; font-size: 11px; }
+.aue-tab.add { color: var(--accent); border: 1px dashed var(--accent); }
+.aue-head { display: flex; align-items: center; gap: 10px; }
+.aue-head b { font-size: 16px; font-weight: 600; }
+.aue-sw { width: 30px; height: 16px; border-radius: 8px; background: var(--accent); }
+.aue-sent { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1.3fr); align-items: stretch; }
+.aue-blk { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 10px; background: var(--surface-2); font-size: 12.5px; }
+.aue-blk b { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.aue-k { display: flex; gap: 6px; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.aue-n { margin-top: auto; color: var(--text-2); }
+.aue-to { display: grid; place-items: center; color: var(--text-4); }
+.aue-ms { display: flex; flex-wrap: wrap; gap: 5px; }
+.aue-ms i { display: grid; place-items: center; width: 30px; height: 26px; border-radius: 5px; background: var(--surface-3); font-style: normal; font-size: 11px; font-family: var(--mono); color: var(--text-3); }
+.aue-ms i.hit { background: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); color: var(--accent); }
+.aue-act { display: grid; grid-template-columns: minmax(0, 1fr) 54px 70px; gap: 8px; align-items: center; }
+.aue-act .med { color: var(--med); }
+.aue-lim { height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.aue-lim i { display: block; height: 100%; background: var(--s6); }
+.aue-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 28px; }
+.aue-ce { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.aue-ce > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.aue-ce b { font-weight: 500; }
+.aue-ce .med { color: var(--med); }
+@media (max-width: 1100px) { .aue-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .aue-sent { grid-template-columns: minmax(0, 1fr); } .aue-to { display: none; } .aue-two { grid-template-columns: minmax(0, 1fr); } }
+.auo-d { display: grid; grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); gap: 16px; align-items: stretch; }
+.auo-sheet.in { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); }
+.auo-feedc { gap: 2px; }
+.auo-feed.sm { grid-template-columns: 44px minmax(0, 1fr); padding: 8px; }
+.auo-feed.on { background: var(--surface-3); }
+@media (max-width: 1100px) { .auo-d, .auo-sheet.in { grid-template-columns: minmax(0, 1fr); } }
+.auo-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.auo-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 16px; background: var(--surface-2); font-size: 12.5px; }
+.auo-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--s6); }
+.auo-chip.bad i { background: var(--crit); }
+.auo-chip.quiet i { background: transparent; border: 1px solid var(--text-4); }
+.auo-chip.off { color: var(--text-4); }
+.auo-chip.off i { background: transparent; border: 1px dashed var(--text-4); }
+.auo-chip em { font-style: normal; font-size: 11px; }
+.auo-chip.add { background: transparent; border: 1px dashed var(--accent); color: var(--accent); }
+.auo-feed { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 10px; border-radius: 8px; }
+.auo-feed + .auo-feed { margin-top: 2px; }
+.auo-feed.bad { background: color-mix(in srgb, var(--crit) 8%, transparent); }
+.auo-fd { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.auo-fd b { font-weight: 500; }
+.auo-fd .hot { color: var(--crit); }
+@media (max-width: 1100px) { .auo-board, .auo-band, .auo-sheet, .auo-two { grid-template-columns: minmax(0, 1fr); } }
+.au-lanes { display: flex; flex-direction: column; }
+.au-ax, .au-lane { display: grid; grid-template-columns: 250px minmax(0, 1fr) 150px; gap: 14px; align-items: center; }
+.au-ax { height: 18px; }
+.au-lane { height: 34px; border-bottom: 1px solid var(--grid); }
+.au-lane:last-child { border-bottom: 0; }
+.au-ln { font-size: 12.5px; color: var(--text-2); }
+.au-ln:hover { color: var(--text); }
+.au-track { position: relative; height: 18px; border-radius: 9px; background: var(--surface-2); }
+.au-track.bare { background: transparent; height: 14px; }
+.au-track.bare i { position: absolute; transform: translateX(-50%); font-style: normal; font-size: 11px; color: var(--text-4); font-family: var(--mono); }
+.au-track.bare i:first-child { transform: none; }
+.au-track.bare .au-nowt { color: var(--accent); font-family: var(--sans); }
+.au-now { position: absolute; top: -8px; bottom: -8px; border-left: 1.5px solid var(--accent); }
+.au-m { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; padding: 0; border-radius: 50%; border: 0; background: var(--s6); cursor: pointer; }
+.au-m.bad { background: var(--crit); }
+.au-m.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--text-2); }
+.au-c { font-size: 12px; color: var(--text-3); text-align: right; }
+.au-c.hot { color: var(--crit); }
+.au-lane.off .au-track { background: transparent; border: 1px dashed var(--border-strong); }
+.au-lane.off .au-ln { color: var(--text-4); }
+.aup > .g.c-84 > .ib-box { align-self: stretch; }
+.au-p { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; }
+.au-p + .au-p { margin-top: 2px; }
+.au-p.on { background: var(--surface-3); }
+.au-pi { flex: none; color: var(--crit); font-size: 15px; }
+.au-pi.med { color: var(--med); }
+.au-pt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; cursor: pointer; }
+.au-pt b { font-weight: 600; }
+.au-pt .hot { color: var(--crit); }
+.au-pt .med { color: var(--med); }
+.au-pt .t3 { font-size: 12px; }
+.au-pa { display: flex; gap: 6px; flex: none; }
+.au-f { display: flex; flex-direction: column; gap: 10px; }
+.au-why { display: flex; flex-direction: column; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.au-why b { font-weight: 600; font-size: 13px; }
+.au-fh { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 12px; }
+.au-fhn { padding-top: 3px; color: var(--text-2); }
+.au-fx { display: flex; flex-direction: column; gap: 3px; }
+.au-x { display: flex; justify-content: space-between; gap: 8px; padding: 3px 8px; border-radius: 5px; background: var(--surface-2); }
+.au-x > span:last-child { color: var(--text-3); white-space: nowrap; }
+.au-x.hot { background: color-mix(in srgb, var(--crit) 16%, var(--surface-2)); }
+.au-x.hot > span:last-child { color: var(--crit); }
+.au-x.med { background: color-mix(in srgb, var(--med) 16%, var(--surface-2)); }
+.au-x.med > span:last-child { color: var(--med); }
+.au-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.au-col { display: flex; flex-direction: column; gap: 8px; }
+.au-rule { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px 8px; border-radius: 8px; background: var(--surface-2); }
+.au-rule.open { background: var(--surface-3); }
+.au-rule.off .au-rh b, .au-rule.off .au-sent { color: var(--text-4); }
+.au-rh { display: flex; align-items: center; gap: 8px; }
+.au-rh b { font-weight: 600; font-size: 13px; }
+.au-sent { font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
+.au-rf { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.au-week { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+.au-week i { display: block; width: 7px; border-radius: 2px; background: var(--s6); opacity: .7; }
+.au-week i.now { opacity: 1; }
+.au-ro { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
+.au-act { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 3px 0; }
+.au-above { display: flex; flex-direction: column; }
+.au-next { display: flex; flex-direction: column; }
+.rn-top { gap: 6px; }
+.rn-top > .t3 { font-size: 12px; }
+.rn-name { font-size: 15px; font-weight: 600; }
+.rn-name.none { font-weight: 400; color: var(--text-4); }
+.rn-sent { font-size: 17px; line-height: 1.45; }
+.rn-sent b { font-weight: 500; }
+.rn-sent b.now { color: var(--accent); }
+.rn-list { display: flex; flex-direction: column; gap: 4px; }
+.rn-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.rn-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid transparent; cursor: pointer; font-size: 12.5px; }
+.rn-row:hover { border-color: var(--border-strong); }
+.rn-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
+.rn-ic { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); }
+.rn-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rn-t b { font-weight: 600; font-size: 13px; }
+.rn-ck { color: var(--accent); }
+.rn-sl { display: flex; align-items: center; gap: 16px; }
+.rn-sl .ant-slider { flex: 1; }
+.rn-sl > b { min-width: 56px; text-align: right; font-size: 15px; font-weight: 600; }
+.rn-times, .rn-days { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rn-chip, .rn-day { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-2); cursor: pointer; font: inherit; font-size: 12.5px; }
+.rn-chip { font-family: var(--mono); }
+.rn-day { min-width: 50px; }
+.rn-chip.on, .rn-day.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.rn-days a { font-size: 12.5px; margin-left: 8px; }
+.rn-acts { display: flex; flex-direction: column; gap: 20px; }
+.rn-step { display: flex; gap: 14px; padding: 12px 14px; border-radius: 8px; background: var(--surface-2); }
+.rn-n { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--accent-soft); color: var(--accent); margin-top: 1px; }
+.rn-sb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rn-lb { white-space: nowrap; }
+.rn-addbtn { align-self: flex-start; margin-top: 4px; }
+.rn-add { margin-top: 0; padding-top: 16px; border-top: 1px solid var(--border); }
+.rn-g { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.rn-ar { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.rn-ar.has .rn-t { opacity: .55; }
+.rn-more { padding-top: 6px; }
+.au-nx { display: grid; grid-template-columns: 110px minmax(0, 260px) minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.au-nx:last-child { border-bottom: 0; }
+.au-nx.off .au-nt b, .au-nx.off .au-nn { color: var(--text-4); }
+.au-nt { display: flex; align-items: baseline; gap: 8px; }
+.au-nt b { font-family: var(--mono); font-weight: 600; font-size: 13px; }
+.au-nn { color: var(--text); }
+.au-na { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+@media (max-width: 1100px) { .au-nx { grid-template-columns: 90px minmax(0, 1fr) auto; } .au-nx > .cut { display: none; } }
+.au-ab { display: grid; grid-template-columns: 20px minmax(0, 1fr) 180px 170px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.au-ab:last-child { border-bottom: 0; }
+.au-ab b { font-weight: 500; }
+.au-ac .nfv-h { gap: 10px; }
+@media (max-width: 1100px) { .au-cols { grid-template-columns: minmax(0, 1fr); } .au-ax, .au-lane { grid-template-columns: 150px minmax(0, 1fr) 90px; } .au-ab { grid-template-columns: 20px minmax(0, 1fr); } .au-ab > span:nth-child(n+3) { display: none; } }
+.aul-lanes { display: flex; flex-direction: column; }
+.aul-ax, .aul-lane { display: grid; grid-template-columns: 230px minmax(0, 1fr) 100px; gap: 14px; align-items: center; }
+.aul-ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-4); font-family: var(--mono); }
+.aul-ticks i { font-style: normal; }
+.aul-lane { height: 34px; border-bottom: 1px solid var(--grid); }
+.aul-lane:last-child { border-bottom: 0; }
+.aul-n { font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aul-track { position: relative; height: 18px; border-radius: 9px; background: var(--surface-2); }
+.aul-now { position: absolute; left: 56%; top: -6px; bottom: -6px; border-left: 1.5px solid var(--accent); }
+.aul-m { position: absolute; top: 4px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--s6); }
+.aul-m.bad { background: var(--crit); }
+.aul-m.mixed { background: var(--med); }
+.aul-c { font-size: 12px; color: var(--text-3); text-align: right; }
+.aul-lane.off .aul-track { background: transparent; border: 1px dashed var(--border-strong); }
+.aul-lane.off .aul-n { color: var(--text-4); }
+.aul-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.aul-col { display: flex; flex-direction: column; gap: 8px; }
+.aul-rule { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; border-radius: 8px; background: var(--surface-2); }
+.aul-week { display: flex; align-items: flex-end; gap: 3px; height: 18px; margin-top: 2px; }
+.aul-week i { display: block; width: 8px; border-radius: 2px; background: var(--surface-3); }
+@media (max-width: 1100px) { .aul-cols { grid-template-columns: minmax(0, 1fr); } .aul-ax, .aul-lane { grid-template-columns: 140px minmax(0, 1fr) 80px; } }
 .rsl-g { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
 .rs-tree { display: flex; flex-direction: column; }
 .rs-tree .rsl-node { gap: 8px; height: 32px; color: var(--text-2); font-size: 12.5px; }
@@ -2576,7 +2869,7 @@ const ISC = { Open: "var(--text-2)", Waiting: "var(--s1)", Resolved: "var(--ok)"
 const ISSUE_KINDS = { file: ["violation", "session"], help: ["assistance", "session"], deviation: ["deviation", "session"], update: ["rollout", "session"], flow: ["flow"] };
 function IssueTimeline({ it, extra }) {
   const base = it.id === "INC-1042"
-    ? [[10.03, "System", "Detected budget-2026.xlsx in C:\\Users\\Ama\\Documents", "var(--crit)"], [10.04, "System", "Report written, routed to Super User and Operations", "var(--text-3)"], [10.05, "Automation", "Took a screenshot of OPS-07 (rule: Restricted file copied where it isn't allowed)", "var(--s3)"], [10.7, "You", "Entered OPS-07", "var(--accent)"], [11.1, "R. Mensah", "Viewed the report", "var(--text-3)"]]
+    ? [[10.03, "System", "Detected budget-2026.xlsx in C:\\Users\\Ama\\Documents", "var(--crit)"], [10.04, "System", "Report written, routed to Super User and Operations", "var(--text-3)"], [10.05, "Automation", `Took a screenshot of OPS-07 (rule: ${RBY.restricted.name})`, "var(--s3)"], [10.7, "You", "Entered OPS-07", "var(--accent)"], [11.1, "R. Mensah", "Viewed the report", "var(--text-3)"]]
     : it.id === "AST-0311" ? [[9.67, "Kojo", "Messaged R. Mensah", "var(--s5)"], [10.25, "Kojo", "Messaged again", "var(--s5)"]]
     // only what belongs to this kind of issue: the generated background (a flow syncing, a routine update check, a sign-in) is not part of its story
     : AUDIT.filter((e) => e.notable && e.host === it.host && (ISSUE_KINDS[it.type] || []).includes(e.kind) && Math.abs(e.t - it.at) < 2).slice(0, 5).map((e) => [e.t, e.actor, e.what, KINDS[e.kind].c]);
@@ -8105,6 +8398,236 @@ function RestrictNew({ mine, onDone }) {
       ${step < 2 ? html`<${Button} type="primary" disabled=${!!prob} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
         : html`<${Button} type="primary" onClick=${() => { toast(`${nm} is restricted to this PC (concept)`); onDone(); }}>Restrict it<//>`}</div></div>`;
 }
+// The Admin's Automation, filled in on the agreed layout (25 Oct 2026): today drawn rule by rule, what did not go to
+// plan beside the firing picked, the rules written out as sentences in three columns by how they start, the rules set
+// above the Admin, and Make a rule in a drawer.
+// Sample for this page: more of the department's rules, with today's firings, so every column and lane has something.
+const auRun = (host, action, timeout, sec, outcome) => ({ host, action, timeout, sec, outcome: outcome || "Success", exit: outcome === "Failed" ? 1 : outcome ? null : 0 });
+const AU_EXTRA = [
+  { id: "signin", name: "Several failed sign-ins", kind: "Threshold", when: "5 sign-ins fail within 10 minutes", scope: "Operations", by: "R. Mensah", created: "2 Oct", perDay: [0, 1, 0, 0, 0, 0, 1],
+    actions: [["Lock the screen", 30], ["Notify R. Mensah", 10]], changes: [["2 Oct", "R. Mensah", "Created the rule"]],
+    fir: [{ t: 8.2, host: "OPS-05", detail: "5 failed sign-ins as Nana from 08:03", runs: [auRun("OPS-05", "Lock the screen", 30, 2), auRun("OPS-05", "Notify R. Mensah", 10, 1)] }] },
+  { id: "backup", name: "Midday backup of Documents", kind: "Schedule", when: "it is 12:00 on a weekday", scope: "Operations", by: "R. Mensah", created: "8 Oct", perDay: [1, 0, 0, 1, 1, 1, 1],
+    actions: [["Back up the Documents folder", 300]], changes: [["14 Oct", "R. Mensah", "Time limit 180s → 300s"], ["8 Oct", "R. Mensah", "Created the rule"]],
+    fir: [{ t: 12, host: "7 machines", detail: "Scheduled run", runs: ["OPS-01", "OPS-02", "OPS-03", "OPS-04", "OPS-05", "OPS-06", "OPS-07"].map((h, i) => auRun(h, "Back up the Documents folder", 300, h === "OPS-06" ? 300 : 60 + i * 23, h === "OPS-06" ? "Timed out" : null)) }] },
+  { id: "printer", name: "Printer stops responding", kind: "Event", when: "a shared printer stops responding", scope: "Operations", by: "R. Mensah", created: "11 Oct", perDay: [0, 14, 0, 0, 0, 0, 0],
+    actions: [["Notify R. Mensah", 10]], changes: [["11 Oct", "R. Mensah", "Created the rule"]],
+    fir: Array.from({ length: 14 }, (_, i) => ({ t: -120 + 8.2 + i * 0.62, host: "OPS-02", detail: "The shared printer PRN-OPS-1 stopped responding", runs: [auRun("OPS-02", "Notify R. Mensah", 10, 1)] })).reverse() },
+  { id: "night", name: "Lock idle machines at night", kind: "Schedule", when: "it is 20:00 on any day", scope: "Operations", by: "R. Mensah", created: "5 Oct", perDay: [0, 0, 0, 0, 0, 0, 0], off: false,
+    actions: [["Lock the screen", 30]], changes: [["19 Oct", "R. Mensah", "Switched it off for the stock count week"], ["5 Oct", "R. Mensah", "Created the rule"]], fir: [] },
+];
+const AU_HAND = { usb: { 4: 1 }, backup: { 6: 1 }, daily: { 3: 1 } };
+const AU_KIND = [["Event", "When something happens", "a USB drive, a restricted file, a printer"], ["Threshold", "When a reading crosses a line", "CPU, failed sign-ins"], ["Schedule", "On a schedule", "a time of day, on given days"]];
+const auBad = (x) => x.outcome === "Failed" || x.outcome === "Timed out";
+// past tense of each action, so a run reads as what it did
+const AU_PAST = { "Take a screenshot": "screenshot taken", "Snapshot USB contents": "contents listed", "Log event": "logged", "Notify the Admin": "the Admin was told", "Notify R. Mensah": "R. Mensah was told",
+  "Clear the temp folder": "temp folder cleared", "Check disk health": "disk checked", "Lock the screen": "screen locked", "Back up the Documents folder": "Documents backed up" };
+const AU_DETECT = { Event: "reported by the machine the moment it happens", Threshold: "checked on each machine every 30 seconds", Schedule: "started by the Engine on time" };
+function AdminAutomationPage({ go }) {
+  const [modal, modalCtx] = Modal.useModal();
+  const me = ME;
+  const rules = [...RULES.filter((r) => !/^rule-/.test(r.id)), ...AU_EXTRA];
+  const [off, setOff] = useState(() => Object.fromEntries(rules.map((r) => [r.id, !!r.off])));
+  const fir = (r) => r.fir || firingsHere(r.id);
+  const today = (r) => fir(r).filter((f) => f.t >= 0 && f.t <= NOWH);
+  const [again, setAgain] = useState({}), [exp, setExp] = useState(null), [rpg, setRpg] = useState(0), [make, setMake] = useState(false);
+  // today's runs across every rule, newest first
+  const runs = rules.flatMap((r) => (off[r.id] ? [] : today(r).map((f) => ({ r, f, bad: f.runs.some(auBad) })))).sort((a, b) => b.f.t - a.f.t);
+  const [sel, setSel] = useState(() => (runs[0] ? runs[0].r.id : rules[0].id)), [pickT, setPickT] = useState(() => (runs[0] ? runs[0].f.t : null));
+  const R = rules.find((r) => r.id === sel) || rules[0], mine = R.by === me, isOff = off[R.id];
+  const who = (h) => (MBY[h] || {}).user;
+  const cause = (r, f) => (r.kind === "Schedule" ? `It was ${hhmm(f.t)}, so it ran on ${f.host}` : `${f.detail || r.when} on ${f.host}${who(f.host) ? `, ${who(f.host)} signed in` : ""}`);
+  const effect = (r, f) => { const bad = f.runs.filter(auBad);
+    if (!bad.length) return [...new Set(f.runs.map((x) => AU_PAST[x.action] || `${x.action} done`))].join(", ");
+    if (f.runs.length > r.actions.length) return bad.map((x) => `${x.action} on ${x.host} ${x.outcome === "Timed out" ? `ran out of time at ${x.sec}s` : "failed"}`).join("; ");
+    return bad.map((x) => `${x.action} ${x.outcome === "Timed out" ? `ran out of time at ${x.sec}s` : `failed, exit ${x.exit}`}`).join("; "); };
+  const runAgain = (r, f) => { setAgain({ ...again, [r.id + f.t]: 1 }); toast(`${f.runs.filter(auBad).map((x) => x.action).join(", ")} runs again on ${listNames([...new Set(f.runs.filter(auBad).map((x) => x.host))])} (concept)`); };
+  const pick = (r, t) => { setSel(r.id); setPickT(t == null ? null : t); };
+  const badToday = runs.filter((x) => x.bad && !again[x.r.id + x.f.t]), badHosts = [...new Set(badToday.flatMap((x) => x.f.runs.filter(auBad).map((y) => y.host)))];
+  const offN = rules.filter((r) => off[r.id]);
+  const situation = `${fmt(new Set(runs.map((x) => x.r.id)).size)} of your ${fmt(rules.length)} rules ran today, ${fmt(runs.length)} time${runs.length === 1 ? "" : "s"} in all. ${badToday.length ? `${fmt(badToday.length)} run${badToday.length === 1 ? "" : "s"} did not go to plan, on ${listNames(badHosts)}.` : "Everything they did worked."} ${offN.length ? `${listNames(offN.map((r) => r.name))} is switched off. ` : ""}Next: ${(rules.find((r) => r.id === "daily") || rules[0]).name} tomorrow at 09:00.`;
+  // the picked rule
+  const rf = fir(R), wk = rf.filter((f) => f.t > NOWH - 168);
+  const dayIx = (t) => Math.floor(t / 24) + 6;
+  const handN = (r, d) => ((AU_HAND[r.id] || {})[d] || 0) + (d === 6 ? Object.keys(again).filter((k) => k.startsWith(r.id)).length : 0);
+  const perDay = [0, 1, 2, 3, 4, 5, 6].map((d) => { const fs = wk.filter((f) => dayIx(f.t) === d), h = handN(R, d); return [fs.length + h, fs.filter((f) => f.runs.some(auBad)).length, h]; });
+  // a real scale: the busiest day rounded up to a clean number, with room above it, so a full bar is never the default
+  const mxd = 10, ticks = [0, 5, 10];
+  const actStats = R.actions.map((a) => { const xs = wk.flatMap((f) => f.runs.filter((x) => x.action === a[0])); const ok = xs.filter((x) => x.outcome === "Success");
+    return { name: a[0], limit: a[1], n: xs.length, ok: ok.length, avg: ok.length ? Math.round(ok.reduce((n, x) => n + x.sec, 0) / ok.length) : null }; });
+  const nWeek = wk.length;
+  // the next scheduled runs, in order (today is a Thursday; the weekday rules skip the weekend)
+  const RB = (id) => rules.find((r) => r.id === id);
+  const next = [["today", 20, "night"], ["tomorrow", 9, "daily"], ["tomorrow", 12, "backup"], ["Mon", 9, "daily"], ["Mon", 12, "backup"]].map(([d, h, id]) => ({ d, h, r: RB(id), key: d + h + id })).filter((x) => x.r);
+  const [skip, setSkip] = useState({});
+  const badN = (r) => today(r).filter((f) => f.runs.some(auBad) && !again[r.id + f.t]).length;
+  const ordered = [...rules].sort((a, b) => (badN(b) > 0) - (badN(a) > 0));
+  return html`<div className="og aup">${modalCtx}
+    <${SitBar} text=${situation} />
+    <div className="auo-sheet aub">
+      <section className="ib-box auo-list"><header><b>Your rules</b><span>${rules.length}</span><span className="sp" /><${Button} size="small" icon=${ic("PlusOutlined")} onClick=${() => setMake("new")}>Make a rule<//></header>
+        ${ordered.map((r) => { const n = badN(r);
+          return html`<button key=${r.id} className=${"auo-li" + (sel === r.id ? " on" : "")} onClick=${() => pick(r, null)}><span className="t3">${ic(KINDI[r.kind])}</span><span className="auo-lt"><b className="cut">${r.name}</b><span className="cut t3">Made ${r.created}${r.by === me ? " by you" : " by the Super User"}</span></span>${n ? html`<b className="auo-red" title=${`${n} run${n === 1 ? "" : "s"} went wrong today`}>${n}</b>` : null}</button>`; })}
+      </section>
+      <section className="ib-box auo-page">
+        <header><b>${R.name}</b><span>${mine ? "made by you" : "made by the Super User"} · ${isOff ? "switched off" : `on since ${R.created}`}</span>
+          <span className="sp" />${mine ? html`<${Button} size="small" disabled=${isOff} onClick=${() => toast(`${R.name} runs now (concept)`)}>Run now<//><${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake(R.id)}>Edit<//>` : html`<span className="t3" style=${{ fontSize: 12 }}>only the Super User changes it</span>`}
+          </header>
+        <div className=${"auo-big" + (isOff ? " off" : "")}><span className="t3">When</span> ${R.when} <span className="t3">on</span> ${R.scope === "All machines" ? "any machine" : `an ${R.scope} machine`}<span className="t3">, do</span> ${R.actions.map((x) => x[0]).join(", ")}</div>
+        <div className="auo-two">
+          <div className="aub-chart"><div className="am-k">This week · runs a day</div><div className="aub-plot">
+            <div className="aub-grid">${ticks.map((v) => html`<span key=${v} style=${{ bottom: (v / mxd) * 100 + "%" }}><em>${v}</em></span>`)}</div>
+            <div className="auo-bars tall">${perDay.map(([n, b, h], j) => { const k = Math.min(1, mxd / Math.max(1, n)), pc = (v) => (v / mxd) * 100 * k + "%", ok = n - b - h;
+              return html`<span key=${j} title=${`${n} run${n === 1 ? "" : "s"}: ${n - h} by the rule${h ? `, ${h} by hand` : ""}${b ? `; ${b} went wrong` : ""}`}><b>${ok ? html`<i style=${{ height: pc(ok) }} />` : null}${b ? html`<i className="bad" style=${{ height: pc(b) }} />` : null}${h ? html`<i className="hand" style=${{ height: pc(h) }} />` : null}${n > mxd ? html`<i className="cut" />` : null}${n ? html`<small className=${n > mxd ? "over" : ""}>${n}</small>` : null}</b><em>${DAYS7[j]}</em></span>`; })}</div></div>
+            <div className="aub-key"><span><i />by the rule</span><span><i className="hand" />run by hand</span><span><i className="bad" />went wrong</span><span className="t4">over 10 stops at the top; the number is the count</span></div></div>
+          <div><div className="am-k">Its actions</div>${actStats.map((x, i) => html`<div key=${x.name} className="auo-act"><span className="cut">${i + 1}. ${x.name}</span><span className="t3">${x.avg == null ? `limit ${x.limit}s` : `${x.avg}s of ${x.limit}s`}</span></div>`)}</div>
+        </div>
+      </section>
+    </div>
+    <section className="ib-box aur">
+      <header><b>Recent runs today</b><span>${runs.length ? "newest first; click one to see its rule above, expand it for each machine" : "nothing has run yet today"}</span></header>
+      ${(() => { const card = (x) => { const k = x.r.id + x.f.t, done = again[k], bad = x.bad && !done, on = exp === k, picked = sel === x.r.id && pickT === x.f.t;
+          const byHost = Object.entries(x.f.runs.reduce((m, y) => ((m[y.host] = m[y.host] || []).push(y), m), {})).sort(([, p1], [, p2]) => p2.some(auBad) - p1.some(auBad));
+          return html`<div key=${k} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "")}>
+            <article className=${"iq-card am-card" + (bad ? " urg" : "")} role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => pick(x.r, x.f.t)} onKeyDown=${(e) => e.key === "Enter" && pick(x.r, x.f.t)}>
+              <span className="iq-ic">${ic(KINDI[x.r.kind])}</span>
+              <span className="iq-main"><span className="iq-t"><b className="cut">${x.r.name}</b></span><span className=${"iq-s cut" + (bad ? " hot" : "")}>${done ? "running again now" : effect(x.r, x.f)}</span></span>
+              <span className="am-facts"><span className="cut">${x.f.host}</span><span className="mono">${hhmm(x.f.t)}</span></span>
+              <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setExp(on ? null : k); pick(x.r, x.f.t); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
+            </article>
+            ${on ? html`<div className="tk-open">
+              <div className="t3 au-why">${cause(x.r, x.f)}</div>
+              ${byHost.map(([h, xs]) => html`<div key=${h} className="au-fh"><span className="mono au-fhn">${h}</span>
+                <span className="au-fx">${xs.map((y, i) => html`<span key=${i} className=${"au-x" + (y.outcome === "Timed out" ? " med" : auBad(y) ? " hot" : "")}><span className="cut">${y.action}</span><span>${y.outcome === "Success" ? `${y.sec}s` : y.outcome === "Timed out" ? `ran out of time at ${y.sec}s` : `failed, exit ${y.exit}`}</span></span>`)}</span></div>`)}
+              ${bad ? html`<div className="row fl-acts"><span className="sp" /><${Button} size="small" type="primary" onClick=${() => runAgain(x.r, x.f)}>Run again where it went wrong<//></div>` : null}
+            </div>` : null}</div>`; };
+        const G = [["bad", "Did not go to plan", "an action failed or ran out of time", (x) => x.bad && !again[x.r.id + x.f.t]], ["ok", "Went as planned", "everything it did worked", (x) => !(x.bad && !again[x.r.id + x.f.t])]];
+        const PER = 5, ord = G.flatMap(([g, , , f]) => runs.filter(f).map((x) => [g, x])), pages = Math.max(1, Math.ceil(ord.length / PER)), p = Math.min(rpg, pages - 1), page = ord.slice(p * PER, p * PER + PER);
+        return html`${G.map(([g, t, d, f]) => { const xs = page.filter((e) => e[0] === g).map((e) => e[1]); if (!xs.length) return null;
+            return html`<div key=${g} className="iq-grp"><div className="lay-grp iq-gh">${t} · ${fmt(runs.filter(f).length)}<span>${d}</span></div><div className="iq-cards">${xs.map(card)}</div></div>`; })}
+          ${pages > 1 ? html`<div className="dv-pages fl-pages"><span className="t3">${fmt(p * PER + 1)} to ${fmt(Math.min(ord.length, p * PER + PER))} of ${fmt(ord.length)} runs</span>
+            <span className="dr-step"><button aria-label="Earlier" disabled=${p === 0} onClick=${() => setRpg(p - 1)}>${ic("LeftOutlined")}</button>${p + 1} of ${pages}<button aria-label="Later" disabled=${p >= pages - 1} onClick=${() => setRpg(p + 1)}>${ic("RightOutlined")}</button></span></div>` : null}`; })()}
+      ${!runs.length ? html`<div className="ib-quiet">No rule has run yet today.</div>` : null}
+    </section>
+    <section className="ib-box">
+      <header><b>Coming up</b><span>the next scheduled runs, in order; a rule that starts on an event runs whenever it happens, so it is not listed</span></header>
+      <div className="au-next">${next.map((x) => { const isOff = off[x.r.id], sk = skip[x.key], mineX = x.r.by === me, n = x.r.scope === "All machines" ? MACHINES.length : MACHINES.filter((m) => m.dept === "ops").length;
+        return html`<div key=${x.key} className=${"au-nx" + (isOff || sk ? " off" : "")}>
+          <span className="au-nt"><b>${String(x.h).padStart(2, "0")}:00</b><span className="t3">${x.d}</span></span>
+          <a className="au-nn" onClick=${() => pick(x.r, null)}><span className="t3">${ic(KINDI[x.r.kind])}</span> ${x.r.name}</a>
+          <span className="t3 cut">${x.r.actions.map((y) => y[0]).join(", ")} on ${fmt(n)} machine${n === 1 ? "" : "s"}</span>
+          <span className="au-na">${isOff ? html`<span className="t3">switched off; it will not run</span>` : sk ? html`<span className="t3">skipped this once</span><${Button} size="small" type="text" onClick=${() => setSkip({ ...skip, [x.key]: 0 })}>Undo<//>`
+            : mineX ? html`<${Button} size="small" onClick=${() => { setSkip({ ...skip, [x.key]: 1 }); toast(`${x.r.name} will skip ${x.d} ${String(x.h).padStart(2, "0")}:00 (concept)`); }}>Skip this once<//>` : html`<span className="t3">runs as set</span>`}</span>
+        </div>`; })}</div>
+    </section>
+    <section className="ib-box og-change">
+      <header><b>Make a rule</b><span>nothing runs until you switch it on at the end</span></header>
+      <div className="tk-give">
+        <ol className="tk-steps"><li><b>Say when it starts</b><span>when something happens, when a reading crosses a line, or at a time</span></li>
+          <li><b>Pick the machines</b><span>every machine, or the ones you name</span></li>
+          <li><b>Say what it does</b><span>one or more actions, in order, each with a time limit</span></li></ol>
+        <${Button} type="primary" onClick=${() => setMake("new")}>Make a rule<//></div>
+    </section>
+    <${Drawer} open=${!!make} onClose=${() => setMake(false)} width="min(1120px, 80vw)" title=${make && make !== "new" ? `Edit ${(rules.find((r) => r.id === make) || {}).name}` : "Make a rule"} className="tk-drawer"
+      extra=${html`<span className="t3" style=${{ fontSize: 12 }}>nothing runs until you confirm</span>`}>
+      ${make ? html`<${RuleNew} key=${make} from=${rules.find((r) => r.id === make)} taken=${rules.filter((r) => r.id !== make).map((r) => r.name)} onDone=${() => setMake(false)} />` : null}
+    <//>
+  </div>`;
+}
+// Make a rule, retouched (25 Oct 2026): fewer dropdowns. The rule is written out on top the whole way and changes as
+// it is filled in. When it starts is picked from lists, a reading with a capped slider, or a time with day toggles or a
+// date on a calendar; the machines are a checklist; actions come from a list, each with a capped time limit.
+const AU_EVENTS = [["usb", "a USB storage device is inserted", "UsbOutlined", "the machine reports it the moment the drive goes in"], ["printer", "a shared printer stops responding", "PrinterOutlined", "checked from the machines that print to it"],
+  ["prog", "a program you name starts", "AppstoreOutlined", "you name the program on the next line"], ["night", "someone signs in outside working hours", "MoonOutlined", "working hours are 07:00 to 19:00, Monday to Friday"],
+  ["restricted", "a restricted file turns up where it is not allowed", "FileProtectOutlined", "from the one file index, the moment it is seen"]];
+const AU_READS = [["cpu", "CPU", "%", 50, 100, 90, 5, "stays above"], ["mem", "memory", "%", 50, 100, 90, 5, "stays above"], ["disk", "the disk", "% full", 50, 100, 90, 5, "is more than"], ["signin", "failed sign-ins", "", 2, 20, 5, 1, "reach"]];
+const AU_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const AU_TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+const AU_PICK = ACTION_LIB.filter((x) => !x.risky || x.id === "restart");
+function RuleNew({ from, taken, onDone }) {
+  const Sl = A.Slider;
+  const fromEv = from && from.kind === "Event" ? (AU_EVENTS.find((e) => e[1] === from.when) || AU_EVENTS[0])[0] : "usb";
+  const [step, setStep] = useState(0), [kind, setKind] = useState(from ? from.kind : "Event");
+  const [ev, setEv] = useState(fromEv), [prog, setProg] = useState("");
+  const [rd, setRd] = useState(from && /sign-ins/.test(from.when) ? "signin" : "cpu"), [lv, setLv] = useState(from && /(\d+)%/.test(from.when) ? +/(\d+)%/.exec(from.when)[1] : null), [mins, setMins] = useState(5);
+  const [at, setAt] = useState(from && /(\d\d:\d\d)/.test(from.when) ? /(\d\d:\d\d)/.exec(from.when)[1] : "09:00"), [rep_, setRep] = useState("days"), [days, setDays] = useState(from && /any day/.test(from.when) ? AU_DAYS : AU_DAYS.slice(0, 5)), [date, setDate] = useState(null);
+  const ms = MACHINES.map((m) => m.host), [all, setAll] = useState(true), [hosts, setHosts] = useState([]);
+  const [addOpen, setAddOpen] = useState(false), [aq, setAq] = useState("");
+  const [acts, setActs] = useState(from ? from.actions.map((x) => ({ name: x[0], limit: x[1] })) : [{ name: "Take a screenshot", limit: 30 }]);
+  const R0 = AU_READS.find((x) => x[0] === rd), level = lv == null ? R0[5] : Math.min(R0[4], Math.max(R0[3], lv));
+  const dayText = days.length === 7 ? "any day" : days.join(",") === "Mon,Tue,Wed,Thu,Fri" ? "a weekday" : days.length ? listNames(days) : "no day yet";
+  const when = kind === "Event" ? (ev === "prog" ? `${prog.trim() || "a program you name"} starts` : AU_EVENTS.find((e) => e[0] === ev)[1])
+    : kind === "Threshold" ? (rd === "signin" ? `${level} sign-ins fail within ${mins} minutes` : `${R0[1]} ${R0[7]} ${level}${R0[2]} for ${mins} minutes`)
+    : rep_ === "date" ? `it is ${at} on ${date ? date.format("D MMM YYYY") : "a date you pick"}` : `it is ${at} on ${dayText}`;
+  const on = all ? `every one of your ${ms.length} machines` : hosts.length ? listNames(hosts, 4) : "the machines you pick";
+  const [nm, setNm] = useState(from ? from.name : "");
+  const sug = kind === "Event" ? (ev === "prog" ? `${prog.trim() || "A program"} starts` : { usb: "USB device inserted", printer: "Printer stops responding", night: "Sign-in outside working hours", restricted: "Restricted file turns up" }[ev])
+    : kind === "Threshold" ? (rd === "signin" ? "Several failed sign-ins" : rd === "disk" ? "Disk nearly full" : `High ${R0[1]} for ${mins} min`)
+    : rep_ === "date" ? `One-off at ${at}${date ? ` on ${date.format("D MMM")}` : ""}` : `${days.length === 7 ? "Daily" : days.join(",") === "Mon,Tue,Wed,Thu,Fri" ? "Weekdays" : days.join(", ") || "Days"} at ${at}`;
+  const free = (b) => { let n = b, k = 2; while ((taken || []).some((t) => t.toLowerCase() === n.toLowerCase())) n = `${b} (${k++})`; return n; };
+  const name = nm, dup = (taken || []).some((t) => t.toLowerCase() === name.trim().toLowerCase());
+  const NAMES = ["When it starts", "Which machines", "What it does", "Check and switch on"];
+  const prob = step === 0 && !name.trim() ? "Give the rule a name." : step === 0 && dup ? "Another rule already has that name." : step === 0 && kind === "Event" && ev === "prog" && !prog.trim() ? "Name the program." : step === 0 && kind === "Schedule" && rep_ === "days" && !days.length ? "Pick at least one day." : step === 0 && kind === "Schedule" && rep_ === "date" && !date ? "Pick the date." : step === 1 && !all && !hosts.length ? "Pick at least one machine." : step === 2 && !acts.length ? "Add at least one action." : null;
+  const KD = [["Event", "When something happens", "A machine reports it the moment it happens."], ["Threshold", "When a reading crosses a line", "Checked on each machine every 30 seconds."], ["Schedule", "At a time", "The Engine starts it on time, on every machine you pick."]];
+  const pickRow = (key, onP, icon, t, d, extra) => html`<div key=${key} className=${"rn-row" + (onP ? " on" : "")} role="radio" aria-checked=${onP} tabIndex="0" onClick=${extra} onKeyDown=${(e) => e.key === "Enter" && extra()}><span className="rn-ic">${ic(icon)}</span><span className="rn-t"><b>${t}</b>${d ? html`<span className="t3">${d}</span>` : null}</span>${onP ? html`<span className="rn-ck">${ic("CheckOutlined")}</span>` : null}</div>`;
+  const lim = (name) => ((ACTION_LIB.find((x) => (x.names || [x.name]).includes(name) || x.name === name) || {}).limit || 30);
+  const move = (i, d) => { const xs = acts.slice(), j = i + d; if (j < 0 || j >= xs.length) return; [xs[i], xs[j]] = [xs[j], xs[i]]; setActs(xs); };
+  const body = [html`<div className="nfv">
+      <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">What do you call it?</div>
+        <span className="nfv-n">The name you give it is how it shows in Your rules, in Recent runs today and in Coming up.</span>
+        <${Input} autoFocus value=${nm} maxLength=${60} status=${nm.trim() && dup ? "error" : ""} onChange=${(e) => setNm(e.target.value)} placeholder="For example Midday backup" />
+        ${!nm.trim() ? html`<a onClick=${() => setNm(free(sug))}>Suggest one from what I set</a>` : null}</div>
+      <div className="nfv-sec"><div className="nfv-st">How does it start?</div>
+        ${KD.map(([v, t, d]) => html`<div key=${v} className=${"nfv-pick" + (kind === v ? " on" : "")} role="radio" aria-checked=${kind === v} tabIndex="0" onClick=${() => setKind(v)} onKeyDown=${(e) => e.key === "Enter" && setKind(v)}><i /><span><b>${t}</b><span className="t3">${d}</span></span></div>`)}</div>
+      ${kind === "Event" ? html`<div className="nfv-sec"><div className="nfv-st">What happens?</div><div className="rn-list">${AU_EVENTS.map(([id, t, icon, d]) => pickRow(id, ev === id, icon, t, d, () => setEv(id)))}</div>
+          ${ev === "prog" ? html`<div className="nfv-f"><span className="nfv-l">The program</span><${Input} autoFocus value=${prog} onChange=${(e) => setProg(e.target.value)} placeholder="For example torrent.exe" /></div>` : null}</div>`
+      : kind === "Threshold" ? html`<div className="nfv-sec"><div className="nfv-st">Which reading?</div><div className="rn-grid">${AU_READS.map(([id, t, , , , , , verb]) => pickRow(id, rd === id, id === "signin" ? "LockOutlined" : id === "disk" ? "HddOutlined" : "DashboardOutlined", t.charAt(0).toUpperCase() + t.slice(1), null, () => { setRd(id); setLv(null); }))}</div>
+          <div className="nfv-card"><div className="nfv-f"><span className="nfv-l">${rd === "signin" ? "How many failed sign-ins" : `The line, between ${R0[3]}${R0[2]} and ${R0[4]}${R0[2]}`}</span>
+            <div className="rn-sl"><${Sl} min=${R0[3]} max=${R0[4]} step=${R0[6]} value=${level} onChange=${setLv} marks=${{ [R0[3]]: `${R0[3]}${R0[2]}`, [R0[4]]: `${R0[4]}${R0[2]}` }} /><b>${level}${R0[2]}</b></div></div>
+            <div className="nfv-f"><span className="nfv-l">${rd === "signin" ? "Within" : "For at least"}</span><${Segmented} value=${mins} onChange=${setMins} options=${[1, 5, 10, 30].map((v) => ({ value: v, label: `${v} min` }))} /></div></div></div>`
+      : html`<div className="nfv-sec"><div className="nfv-st">When?</div>
+          <div className="nfv-card"><div className="nfv-f"><span className="nfv-l">At</span><div className="rn-times">${["07:00", "09:00", "12:00", "17:00", "20:00"].map((t) => html`<button key=${t} className=${"rn-chip" + (at === t ? " on" : "")} onClick=${() => setAt(t)}>${t}</button>`)}<${Select} size="small" showSearch value=${at} onChange=${setAt} style=${{ width: 100 }} options=${AU_TIMES.map((t) => ({ value: t, label: t }))} /></div></div>
+            <div className="nfv-f"><span className="nfv-l">Repeats</span><${Segmented} value=${rep_} onChange=${setRep} options=${[{ value: "days", label: "On days of the week" }, { value: "date", label: "Once, on a date" }]} /></div>
+            ${rep_ === "days" ? html`<div className="nfv-f"><div className="rn-days">${AU_DAYS.map((d) => html`<button key=${d} className=${"rn-day" + (days.includes(d) ? " on" : "")} aria-pressed=${days.includes(d)} onClick=${() => setDays(days.includes(d) ? days.filter((x) => x !== d) : AU_DAYS.filter((x) => x === d || days.includes(x)))}>${d}</button>`)}
+                <span className="sp" /><a onClick=${() => setDays(AU_DAYS.slice(0, 5))}>Weekdays</a><a onClick=${() => setDays(AU_DAYS)}>Every day</a></div></div>`
+              : html`<div className="nfv-f"><${DatePicker} value=${date} onChange=${setDate} format="ddd D MMM YYYY" placeholder="Pick the date" style=${{ width: 240 }} /></div>`}</div></div>`}
+    </div>`,
+    html`<div className="nfv"><div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">On which machines?</div>
+      ${[[true, `Every machine (${ms.length})`, "Machines added later are included."], [false, "The ones you pick", "Only these; a machine added later is not."]].map(([v, t, d]) => html`<div key=${String(v)} className=${"nfv-pick" + (all === v ? " on" : "")} role="radio" aria-checked=${all === v} tabIndex="0" onClick=${() => setAll(v)} onKeyDown=${(e) => e.key === "Enter" && setAll(v)}><i /><span><b>${t}</b><span className="t3">${d}</span></span></div>`)}</div>
+      ${!all ? html`<div className="nfv-sec"><div className="row"><span className="nfv-st">${hosts.length ? `${hosts.length} picked` : "Pick machines"}</span><span className="sp" /><a onClick=${() => setHosts(hosts.length === ms.length ? [] : ms)}>${hosts.length === ms.length ? "Clear" : "All of them"}</a></div>
+        <div className="rn-grid">${MACHINES.map((m) => { const onM = hosts.includes(m.host); return html`<div key=${m.host} className=${"rn-row" + (onM ? " on" : "")} role="checkbox" aria-checked=${onM} tabIndex="0" onClick=${() => setHosts(onM ? hosts.filter((h) => h !== m.host) : [...hosts, m.host])} onKeyDown=${(e) => e.key === "Enter" && setHosts(onM ? hosts.filter((h) => h !== m.host) : [...hosts, m.host])}>
+          <${Checkbox} checked=${onM} tabIndex="-1" /><span className="rn-t"><b className="mono">${m.host}</b><span className="t3">${m.user || "nobody signed in"}${m.status === "offline" ? " · offline" : ""}</span></span></div>`; })}</div></div>` : null}</div>`,
+    html`<div className="rn-acts">
+      <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">What runs, in this order</div><span className="nfv-n">Each action runs on its own; one that runs out of time is stopped and reported.</span>
+        ${acts.map((x, i) => { const cap = Math.max(60, lim(x.name) * 4), L = ACTION_LIB.find((y) => (y.names || [y.name]).includes(x.name)); return html`<div key=${x.name} className="rn-step">
+          <span className="rn-n">${i + 1}</span>
+          <div className="rn-sb"><div className="row"><span className="rn-t"><b>${x.name}</b>${L ? html`<span className="t3">${L.desc}</span>` : null}</span><span className="sp" />
+              <${Button} size="small" type="text" icon=${ic("UpOutlined")} aria-label="Earlier" disabled=${i === 0} onClick=${() => move(i, -1)} /><${Button} size="small" type="text" icon=${ic("DownOutlined")} aria-label="Later" disabled=${i === acts.length - 1} onClick=${() => move(i, 1)} />
+              <${Button} size="small" type="text" icon=${ic("CloseOutlined")} aria-label="Remove" onClick=${() => setActs(acts.filter((_, j) => j !== i))} /></div>
+            <div className="rn-sl"><span className="t3 rn-lb">Gets up to</span><${Sl} min=${5} max=${cap} step=${5} value=${Math.min(cap, x.limit)} onChange=${(v) => setActs(acts.map((y, j) => (j === i ? { ...y, limit: v } : y)))} /><b>${x.limit}s</b></div></div></div>`; })}
+        ${!acts.length ? html`<div className="nfv-none">Nothing yet. Add the first action below.</div>` : null}
+        <${Button} className="rn-addbtn" icon=${ic(addOpen || !acts.length ? "UpOutlined" : "PlusOutlined")} onClick=${() => setAddOpen(!(addOpen || !acts.length))}>${addOpen || !acts.length ? "Close the list" : "Add an action"}<//></div>
+      ${addOpen || !acts.length ? html`<div className="nfv-sec rn-add"><${Input} allowClear prefix=${ic("SearchOutlined")} value=${aq} onChange=${(e) => setAq(e.target.value)} placeholder="Search the actions" />
+        ${["Control", "Monitoring", "Custom"].map((cat) => { const all_ = AU_PICK.filter((x) => x.cat === cat && (!aq.trim() || (x.name + " " + x.desc).toLowerCase().includes(aq.trim().toLowerCase()))), xs = all_.slice(0, 6); if (!xs.length) return null;
+          return html`<div key=${cat} className="rn-g"><div className="lay-grp">${cat === "Control" ? "Do something on the machine" : cat === "Monitoring" ? "Look at the machine" : "Your own scripts"}</div>
+            ${xs.map((x) => { const nm = x.id === "notify" ? "Notify R. Mensah" : x.name, has = acts.some((y) => y.name === nm);
+              return html`<div key=${x.id} className=${"rn-ar" + (has ? " has" : "")}><span className="rn-t"><b>${nm}</b><span className="t3">${x.desc}</span></span>
+                ${has ? html`<span className="t3">Added</span>` : html`<${Button} size="small" onClick=${() => setActs([...acts, { name: nm, limit: x.limit }])}>Add<//>`}</div>`; })}
+            ${all_.length > xs.length ? html`<span className="t3 rn-more">${all_.length - xs.length} more; search to find them</span>` : null}</div>`; })}</div>` : null}</div>`,
+    html`<div className="nfv">
+      <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="tk-facts" style=${{ maxWidth: "none" }}>${[["Called", name.trim()], ["Starts", when], ["On", on], ["Does", acts.map((x, i) => `${i + 1}. ${x.name} (${x.limit}s)`).join("  ")], ["Made by", "you"]]
+      .map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> ${b}</span>`)}</div></div>
+      <div className="decide" style=${{ "--c": "var(--accent)" }}>It is switched on when you confirm. Every time it runs shows under Recent runs today.</div></div>`];
+  return html`<div className="nf-steps-wrap">
+    <section className="ib-box rn-top"><span className="t3">${NAMES[step]} · step ${step + 1} of 4</span>
+      <div className=${"rn-name" + (name.trim() ? "" : " none")}>${name.trim() || "Not named yet"}</div>
+      <div className="rn-sent"><span className="t3">When</span> <b className=${step === 0 ? "now" : ""}>${when}</b> <span className="t3">on</span> <b className=${step === 1 ? "now" : ""}>${on}</b><span className="t3">, do</span> <b className=${step === 2 ? "now" : ""}>${acts.length ? acts.map((x) => x.name).join(", ") : "…"}</b></div></section>
+    <section className="ib-box nf-body">${body[step]}</section>
+    <div className="row nt-next"><span className="t3" style=${{ fontSize: 12.5, color: prob ? "var(--med)" : undefined }}>${prob || ""}</span><span className="sp" />
+      <${Button} onClick=${onDone}>Cancel<//>${step > 0 ? html`<${Button} icon=${ic("LeftOutlined")} onClick=${() => setStep(step - 1)}>Back<//>` : null}
+      ${step < 3 ? html`<${Button} type="primary" disabled=${!!prob} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
+        : html`<${Button} type="primary" disabled=${!!prob} onClick=${() => { toast(from ? `${name.trim()} saved (concept)` : `${name.trim()} is switched on (concept)`); onDone(); }}>${from ? "Save changes" : "Switch it on"}<//>`}</div></div>`;
+}
 // The Admin's Restricted, layout first (24 Oct 2026). Its own shape: what you restricted is a short index on the left;
 // the department is drawn beside it as a floor of machines, lit for the item picked (where it lives, where a copy turned
 // up); copies caught are told as a trail from where the file was to where it was found; flows asking to carry
@@ -9105,7 +9628,7 @@ function App() {
   else if (page === "detective") body = level ? html`<${DetectivePage} key=${level.dept} go=${go} dept=${level.dept} />` : html`<${DetectivePage} go=${go} dept=${null} />`;
   else if (page === "restricted" || page === "protected") body = !level ? html`<${ProtectedLevels} go=${go} start=${sub} />` : !sub ? html`<${AdminRestrictedPage} key=${ME} go=${go} />` : sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} all=${!level} />`;
   else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;
-  else if (page === "automation") body = sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : html`<${Automation} go=${go} open=${sub && RBY[sub] ? sub : null} />`;
+  else if (page === "automation") body = level && !sub ? html`<${AdminAutomationPage} key=${ME} go=${go} />` : sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : html`<${Automation} go=${go} open=${sub && RBY[sub] ? sub : null} />`;
   else if (page === "audit") body = !level ? html`<${AuditBrief} range=${range} go=${go} />` : html`<${AuditSU} range=${range} go=${go} open=${sub} me=${level ? level.admin : null} />`;
   else body = html`<${Overview} range=${range} go=${go} />`;
   const usesRange = (level ? ["overview", "machines", "audit"] : ["machines", "audit"]).includes(page);
@@ -9139,7 +9662,7 @@ function App() {
           
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
-          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 25 Oct 12:00</span>
+          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 28 Oct 12:30</span>
           <span className="t4" style=${{ fontSize: 11, whiteSpace: "normal" }} title="The large sample checks that nothing grows with the data">Concept · sample:
             ${["empty", "small", "large", "absurd"].map((v, k) => html`<${React.Fragment} key=${v}>${k ? " · " : " "}<a style=${{ color: SAMPLE_SIZE === v ? "var(--accent)" : "var(--text-3)", fontWeight: SAMPLE_SIZE === v ? 600 : 400, cursor: "pointer" }} onClick=${() => SAMPLE_SIZE !== v && setSample(v)}>${v}</a><//>`)}</span>
         </div>

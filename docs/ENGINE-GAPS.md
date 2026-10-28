@@ -149,6 +149,12 @@ part is recorded for later, not built.
    - **what happened to the mark lately:** opened, changed, copied, files added, a flow held at it.
    - **the flows the owner allowed,** per flow, with since when, and taking that consent back. Copies already delivered are then caught like any other.
 
+13. **What the Admin's Automation page is still missing** (the user asked for an opinion, 25 Oct 2026; Admin v138). The page says what fired and whether it worked. It does not yet say these four things. They are proposals, not decided:
+   - **What a run produced.** A screenshot, a list of a USB drive's files, a log line: the page says "screenshot taken" but you cannot see it. Each run should link to its output. Keep outputs on the 90-day clock, as run outputs already are.
+   - **What runs next.** Each scheduled rule's next time, and the next few runs across all rules, so "Next: Daily maintenance tomorrow at 09:00" is a fact the Engine gives, not a sentence the page guesses.
+   - **Try it before switching it on.** Run a new or edited rule once, on one machine you pick, and show the result before it goes live. Nothing about the rule is saved until you confirm.
+   - **Too quiet or too loud.** Say when a rule fires far more than its usual week (31 times against 3), or has not fired in weeks while its event surely happened. This needs each rule's weekly count kept, so a week can be compared with the usual.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

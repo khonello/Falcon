@@ -5,6 +5,12 @@ matters now: **a version a company can buy, install and run.**
 
 Read this file first. It is the whole picture; everything else is reference.
 
+> **Version 1 scope (the user, 25 Oct 2026):** Admin → Workers. The Admins are IT, serving every department, and
+> departments are IT's way of grouping people and machines. The Super User is set aside for version 1: kept in the
+> code and the docs, not deleted, and reconnected in a later version. The record is
+> `docs/design/who-runs-the-console.md`. Where this file says Super User → Department → Admin → Client PC, read it
+> with that in mind.
+
 ---
 
 ## What Falcon is

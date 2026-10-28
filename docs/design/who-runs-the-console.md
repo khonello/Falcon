@@ -1,5 +1,23 @@
 # Who runs the console: one IT team, or each department
 
+## Decided for version 1 (the user, 25 Oct 2026)
+
+**B, central IT, and the Super User is set aside for now.** Version 1 was doing too much, so it is cut back to what
+companies actually do:
+
+- **The Admins are IT.** They serve the whole organisation, with the reach of every department (B below).
+- **Version 1 delivers Admin → Workers.** Workers still sit in departments. IT creates the departments and uses them to
+  group people and machines, for reading and routing, not as walls.
+- **The Super User is severed from the system, not thrown away.** Nothing of it is deleted: its pages, handlers,
+  migrations and documents stay. It is reconnected in a later version. Until then, nothing in version 1 depends on a
+  Super User being there.
+- **What this leaves open, to settle as version 1 is built:** what stands in for the Super User where the design
+  names one today. That covers who owns a restriction when its marker leaves; the rules "set above you"; a directive;
+  Super User flows; the first account at setup; and the un-evictable Super User session. Of the questions below, 1 and
+  2 are answered for version 1: the mode is B, fixed, with no mix. Questions 3 to 5 stand.
+
+The proposal follows as it was written.
+
 **A proposal from the user, 24 Oct 2026. Written down only; not to be implemented yet.** It touches the backbone
 (`hierarchy-system-design.md`): who an Admin answers for, where reports go, and what the Super User oversees. So it is
 decided once, before the Engine changes, and every combo doc is read against it.

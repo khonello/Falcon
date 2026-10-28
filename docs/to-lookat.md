@@ -5,9 +5,10 @@ Last updated 18 Oct 2026.
 
 ## Waiting on a decision
 
-- **Who runs the console: one IT team, or each department** (proposed 24 Oct 2026, written down, not to be built
-  yet): `docs/design/who-runs-the-console.md`. It has two modes and five open questions. It is a backbone decision for
-  the Engine and the Super User.
+- **Version 1 is Admin (IT) → Workers; the Super User is set aside** (decided 25 Oct 2026):
+  `docs/design/who-runs-the-console.md`. The Admins are IT with every department's reach, and departments are IT's
+  groups. The Super User is kept, not deleted, and reconnected later. **Still to settle:** what stands in for the Super
+  User where the design names one, and questions 3 to 5 in that file.
 - **Discovering PCs on the network** for Add a machine (`docs/ENGINE-GAPS.md` item 10): is a network scan acceptable,
   which machine does it, and how often.
 
