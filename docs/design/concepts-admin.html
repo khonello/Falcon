@@ -993,10 +993,12 @@ a { color: var(--accent); text-decoration: none; }
 .rn-ar { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
 .rn-ar.has .rn-t { opacity: .55; }
 .rn-more { padding-top: 6px; }
-.au-nx { display: grid; grid-template-columns: 110px minmax(0, 260px) minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.au-nx { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
 .au-nx:last-child { border-bottom: 0; }
 .au-nx.off .au-nt b, .au-nx.off .au-nn { color: var(--text-4); }
-.au-nt { display: flex; align-items: baseline; gap: 8px; }
+.au-nt { display: flex; flex-direction: column; gap: 1px; }
+.auo-act.two { align-items: center; padding: 8px 0; }
+.au-nn.auo-lt { cursor: pointer; }
 .au-nt b { font-family: var(--mono); font-weight: 600; font-size: 13px; }
 .au-nn { color: var(--text); }
 .au-na { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
@@ -1150,6 +1152,124 @@ a { color: var(--accent); text-decoration: none; }
 .lay-box > header span { font-size: 12px; color: var(--text-3); }
 .lay-sit { min-height: 64px; border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong)); }
 .lay-in { border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong)); }
+.acx-gh { padding: 10px 0 4px; font-size: 11.5px; color: var(--text-3); }
+.acx-facts { display: flex; flex-wrap: wrap; gap: 24px; font-size: 12.5px; padding: 4px 0 2px; }
+.acx-facts > span > .t3 { margin-right: 6px; }
+.acx-run { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+.acx-rh { display: flex; align-items: baseline; gap: 10px; font-size: 12.5px; margin-bottom: 4px; }
+.acx-rh b { font-weight: 600; font-size: 13px; }
+.acx-band { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; color: var(--text-4); margin-top: 4px; }
+.acx-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.acx-t { width: 64px; height: 42px; border-radius: 7px; border: 1px solid transparent; background: var(--surface-3); color: var(--text-3); font: 600 11px var(--mono); cursor: pointer; }
+.acx-t:hover { border-color: var(--border-strong); }
+.acx-t.on { background: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); color: var(--accent); }
+.acx-t.off { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-4); cursor: default; }
+.acx-lr { display: grid; grid-template-columns: 90px 90px minmax(0, 1fr) minmax(0, 1.3fr); gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.acx-lr:last-child { border-bottom: 0; }
+.acx-lr .hot, .au-fh .hot { color: var(--crit); }
+.acx-t.run { background: color-mix(in srgb, var(--accent) 16%, var(--surface-3)); color: var(--accent); animation: acxp 1s ease-in-out infinite alternate; }
+.acx-t.ok { background: color-mix(in srgb, var(--ok) 26%, var(--surface-3)); color: var(--ok); }
+.acx-t.bad { background: color-mix(in srgb, var(--crit) 28%, var(--surface-3)); color: var(--crit); }
+@keyframes acxp { from { opacity: .55; } to { opacity: 1; } }
+.acx-go .hot, .ox .hot { color: var(--crit); }
+.ox .ok { color: var(--ok); }
+.acx-lr { grid-template-columns: 90px 80px minmax(0, 1fr) minmax(0, 1.3fr) 64px !important; align-items: center; }
+.ox-title { display: flex; align-items: baseline; gap: 10px; }
+.ox-title .t3 { font-size: 12.5px; font-weight: 400; }
+.ox { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; min-height: 360px; }
+.ox.one { grid-template-columns: minmax(0, 1fr); }
+.ox-list { display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--border); padding-right: 12px; max-height: 60vh; overflow: auto; }
+.ox-h { display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; }
+.ox-h:hover { background: var(--surface-2); } .ox-h.on { background: var(--surface-3); }
+.ox-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ox-meta { display: flex; align-items: baseline; gap: 12px; font-size: 12.5px; }
+.ox-img { width: 100%; border-radius: 6px; border: 1px solid var(--border); }
+.ox-pre { margin: 0; padding: 14px 16px; border-radius: 8px; background: var(--surface-2); font: 12.5px/1.65 var(--mono); white-space: pre-wrap; max-height: 56vh; overflow: auto; }
+.ox-tab { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.ox-tr { display: flex; justify-content: space-between; gap: 16px; padding: 7px 14px; font-size: 12.5px; border-top: 1px solid var(--grid); }
+.ox-th { border-top: 0; background: var(--surface-2); color: var(--text-3); font-size: 11.5px; }
+.ox-note { font-size: 12px; }
+.ax-sub { font-size: 12.5px; }
+.ax-ed { border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.ax-ed.over { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ax-edh { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--surface); font-size: 12px; }
+.ax-code { display: flex; min-height: 460px; max-height: 64vh; overflow: auto; }
+.ax-gut { flex: none; display: flex; flex-direction: column; padding: 12px 10px 12px 14px; text-align: right; color: var(--text-4); font: 12.5px/20px var(--mono); user-select: none; border-right: 1px solid var(--grid); }
+.ax-ta { flex: 1; min-width: 0; border: 0; outline: 0; resize: none; padding: 12px 14px; background: transparent; color: var(--text); font: 12.5px/20px var(--mono); white-space: pre; overflow: hidden; }
+.ax-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 460px; padding: 56px 16px; font-size: 13px; text-align: center; }
+.ax-ei { font-size: 26px; color: var(--text-4); }
+.ax-checks { display: flex; flex-direction: column; }
+.ax-cr { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.ax-cr:last-child { border-bottom: 0; }
+.ax-cr > span:last-child { display: flex; flex-direction: column; gap: 3px; }
+.ax-cr b { font-weight: 600; }
+.ax-ci { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: var(--surface-3); color: var(--text-3); }
+.ax-cr.ok .ax-ci { background: color-mix(in srgb, var(--ok) 20%, var(--surface-3)); color: var(--ok); }
+.ax-cr.hot .ax-ci { background: color-mix(in srgb, var(--crit) 22%, var(--surface-3)); color: var(--crit); }
+.ax-cr.hot b { color: var(--crit); }
+.ax-imps { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0; }
+.ax-imp { font: 11.5px var(--mono); padding: 2px 8px; border-radius: 5px; background: color-mix(in srgb, var(--ok) 14%, var(--surface-3)); color: var(--ok); }
+.ax-imp.bad { background: color-mix(in srgb, var(--crit) 18%, var(--surface-3)); color: var(--crit); }
+.ax-con { margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: var(--surface-2); font: 12.5px/1.7 var(--mono); }
+.ax-ltab > div { display: flex; gap: 24px; padding: 2px 0; border-bottom: 1px solid var(--grid); }
+.ax-ltab > div > span:first-child { min-width: 220px; }
+.ax-cf { margin-top: 6px; color: var(--text-3); }
+.ax-cf .ok { color: var(--ok); }
+.dt-open { display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; }
+.dt-board { display: flex; flex-direction: column; gap: 14px; }
+.dt-gl { display: flex; flex-direction: column; }
+.dt-glr { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.dt-glr:last-child { border-bottom: 0; }
+.dt-glr b { font-weight: 600; }
+.dt-gli { width: 28px; height: 28px; flex: none; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--text-3); }
+.dt-bh { display: flex; align-items: baseline; gap: 10px; font-size: 12.5px; margin-bottom: 6px; }
+.dt-bh b { font-weight: 600; }
+.dt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dt-chip { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: var(--surface-3); color: var(--text-3); }
+.dt-chip.on { background: color-mix(in srgb, var(--crit) 24%, var(--surface-3)); color: var(--crit); font-weight: 600; }
+.dt-chip.none { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-4); }
+.dt-key { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11.5px; color: var(--text-3); margin-top: 14px; }
+.dt-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--surface-3); }
+.dt-key i.on { background: color-mix(in srgb, var(--crit) 50%, var(--surface-3)); }
+.dt-key i.none { background: transparent; border: 1px dashed var(--border-strong); }
+.dt-sug { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.dt-sr { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-size: 12.5px; }
+.dt-sr > .t2 { flex: 1; }
+.dt-sa { display: flex; gap: 4px; flex: none; }
+.dt-two { align-items: stretch; }
+.dt-col { display: flex; flex-direction: column; }
+.dt-pic { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.dg { flex: 1; display: flex; flex-direction: column; }
+.dg-box { flex: 1; max-height: 460px; overflow: auto; }
+.dg-box.pan { cursor: grab; user-select: none; touch-action: none; }
+.dg-box.pan:active { cursor: grabbing; }
+.dg-hint { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; }
+.dt-sn { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--text-3); font-size: 9.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.dt-story { display: flex; flex-direction: column; max-height: 460px; overflow: auto; }
+.dt-st { display: grid; grid-template-columns: 18px 44px minmax(0, 1fr); align-items: center; gap: 10px; padding: 5px 0; font-size: 12.5px; border-bottom: 1px solid var(--grid); }
+.dt-st:last-child { border-bottom: 0; }
+.dt-fs { display: flex; flex-direction: column; }
+.dt-tell { display: flex; flex-direction: column; gap: 10px; padding: 2px 0; }
+.dt-tell p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); }
+.dt-tell .hl { padding: 0 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.dt-tell .hl.mono { font-size: 12.5px; }
+.dt-by { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--grid); font-size: 11.5px; }
+.dt-f { display: grid; grid-template-columns: 120px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 20px; padding: 9px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.dt-f:last-child { border-bottom: 0; }
+.dt-fh { font-size: 11.5px; color: var(--text-4); padding-top: 0; }
+.dt-okr { display: grid; grid-template-columns: 18px minmax(0, 260px) minmax(0, 1fr) 64px 82px auto; gap: 14px; align-items: center; padding: 8px 4px; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.dt-okr:last-child { border-bottom: 0; }
+.dt-oki { color: var(--text-4); font-size: 13px; display: inline-flex; }
+.dt-okv { color: var(--text-2); }
+.dt-okb { font-size: 12px; color: var(--text-3); }
+.dt-okb:hover { color: var(--accent); }
+.dt-rv { display: flex; align-items: center; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+.dt-rv:last-child { border-bottom: 0; }
+.dt-rvt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.dt-rvt b { font-weight: 600; }
+.dt-rv > .cut { flex: 1.2; }
+@media (max-width: 1100px) { .dt-f { grid-template-columns: 100px minmax(0, 1fr); } .dt-f > :nth-child(n+3) { grid-column: 2; } }
+.acx-go { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 12.5px; }
 .lay-row { display: flex; align-items: center; gap: 10px; min-height: 30px; border-bottom: 1px solid var(--grid); padding: 4px 0; }
 .lay-bar { height: 9px; border-radius: 5px; background: var(--surface-3); }
 .lay-bar.sub { height: 7px; opacity: .6; }
@@ -6554,23 +6674,180 @@ const DET_KIND = { drive: "var(--crit)", archive: "var(--med)", staging: "var(--
 const DET_COLS = ["Where it began", "Where it was put", "Packed", "Taken out", "Traces"];
 const detCap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 // the picture: what was touched and where it went, in columns
-function DetGraph({ g }) {
-  const ref = useRef(null), W = useWidth(ref, 640), colW = Math.max(112, (W - 8) / 5), rowH = 76, rows = {}, at = {}, chars = Math.max(8, Math.floor((colW - 56) / 7));
-  g.nodes.forEach((n) => { const r = rows[n.col] || 0; rows[n.col] = r + 1; at[n.id] = { x: n.col * colW + 8, y: 30 + r * rowH, w: colW - 30, h: 60, n }; });
-  const tall = Math.max(1, ...Object.values(rows)), H = Math.max(140, 30 + tall * rowH + 10);
-  return html`<div ref=${ref}><svg width=${colW * 5} height=${H} style=${{ display: "block" }}>
-    ${DET_COLS.map((c, i) => (g.nodes.some((n) => n.col === i) ? html`<text key=${c} x=${i * colW + 12} y="16" fontSize="10" fontWeight="600" letterSpacing="0.6" style=${{ fill: "var(--text-4)" }}>${c.toUpperCase()}</text>` : null))}
+// Which line of the story an edge is: the verb and one of its ends named on the same line. Each line is used once.
+const detSteps = (g, story) => { const by = Object.fromEntries(g.nodes.map((n) => [n.id, n])), used = new Set(), out = {};
+  g.edges.forEach((e, k) => { const a = by[e.from], b = by[e.to]; if (!a || !b) return;
+    const keys = [b.label, a.label, b.label.split(" in ")[0]].map((x) => x.toLowerCase()), verbs = e.verb === "packed" ? ["created", "packed"] : [e.verb];
+    const i = (story || []).findIndex((l, j) => { const t = l.toLowerCase(); return !used.has(j) && verbs.some((v) => t.includes(v)) && keys.some((x) => t.includes(x)); });
+    if (i >= 0) { used.add(i); out[k] = i + 1; } });
+  return out; };
+// Where a box sits, from its id (the Engine sends the path lowercased; the real case comes from the story or the
+// boxes' own names, else a folder gets a capital, as Windows folders mostly have).
+// A file: the drive and the folder it is in, C:\…\Temp. A folder: the drive, its parent and itself, C:\…\kojo\Staging.
+const detWhere = (n, story, labels) => {
+  const m = /^(f|dir):(.+)$/.exec(n.id); if (!m) return null;
+  const real = {}; [...(story || []), ...(labels || [])].join(" ").split(/[\s\\/]+/).forEach((w) => (real[w.toLowerCase()] = real[w.toLowerCase()] || w));
+  const raw = m[2].replace(/\//g, "\\"), unc = raw.startsWith("\\\\"), segs = raw.replace(/^\\+/, "").split("\\").filter(Boolean).map((x, i, a) => real[x] || (i < a.length - 1 || m[1] === "dir" ? x.charAt(0).toUpperCase() + x.slice(1) : x));
+  const root = unc ? `\\\\${segs[0]}` : segs[0].toUpperCase(), rest = segs.slice(1), dirs = m[1] === "f" ? rest.slice(0, -1) : rest, keep = m[1] === "f" ? 1 : 2;
+  const full = [root, ...rest].join("\\");
+  if (!dirs.length) return { short: `${root}\\`, full };
+  return { short: dirs.length <= keep ? `${root}\\${dirs.join("\\")}` : `${root}\\…\\${dirs.slice(-keep).join("\\")}`, full };
+};
+// The picture, left to right in the order things happened. A node sits on the row of what it came from, so a
+// path reads as a straight line; a rename or a copy within one stage gets a lane of its own beside it, never a
+// line doubling back. Each connection carries the number of its step in the story. Wider than the box, it pans.
+function DetGraph({ g, story }) {
+  const box = useRef(null), drag = useRef(null), W0 = useWidth(box, 640);
+  const by = Object.fromEntries(g.nodes.map((n) => [n.id, n])), lane = {}, preds = {};
+  g.nodes.forEach((n) => (lane[n.id] = n.col * 2));
+  g.edges.forEach((e) => { const a = by[e.from], b = by[e.to]; if (a && b && a.col === b.col) lane[b.id] = b.col * 2 + 1; (preds[e.to] = preds[e.to] || []).push(e.from); });
+  const lanes = [...new Set(Object.values(lane))].sort((x, y) => x - y), li = Object.fromEntries(lanes.map((l, i) => [l, i]));
+  const NW = 196, GAP = 96, NH = 54, RH = 78, TOP = 36, row = {};
+  lanes.forEach((l) => { const xs = g.nodes.filter((n) => lane[n.id] === l), taken = new Set();
+    const want = (n) => { const r = (preds[n.id] || []).map((q) => row[q]).filter((r) => r != null); return r.length ? Math.min(...r) : null; };
+    const put = (n, r) => { while (taken.has(r)) r++; taken.add(r); row[n.id] = r; };
+    xs.filter((n) => want(n) != null).sort((a, b) => want(a) - want(b)).forEach((n) => put(n, want(n)));
+    xs.filter((n) => want(n) == null).forEach((n) => put(n, 0)); });
+  const at = {}; g.nodes.forEach((n) => (at[n.id] = { x: li[lane[n.id]] * (NW + GAP) + 4, y: TOP + row[n.id] * RH, w: NW, h: NH }));
+  const W = lanes.length * (NW + GAP) - GAP + 8, H = TOP + (Math.max(0, ...Object.values(row)) + 1) * RH, wide = W > W0 || H > 460;
+  const steps = detSteps(g, story), chars = 24;
+  const down = (e) => { if (!wide) return; drag.current = { x: e.clientX, y: e.clientY, l: box.current.scrollLeft, t: box.current.scrollTop }; e.currentTarget.setPointerCapture(e.pointerId); };
+  const move = (e) => { const d = drag.current; if (!d) return; box.current.scrollLeft = d.l - (e.clientX - d.x); box.current.scrollTop = d.t - (e.clientY - d.y); };
+  return html`<div className="dg">
+    <div ref=${box} className=${"dg-box" + (wide ? " pan" : "")} onPointerDown=${down} onPointerMove=${move} onPointerUp=${() => (drag.current = null)} onPointerCancel=${() => (drag.current = null)}>
+    <svg width=${W} height=${H} style=${{ display: "block" }}>
+    <defs><marker id="dgArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style=${{ fill: "var(--text-3)" }} /></marker></defs>
+    ${lanes.map((l) => (l % 2 === 0 || !lanes.includes(l - 1) ? html`<text key=${l} x=${li[l] * (NW + GAP) + 6} y="14" fontSize="10" fontWeight="600" letterSpacing="0.6" style=${{ fill: "var(--text-4)" }}>${DET_COLS[Math.floor(l / 2)].toUpperCase()}</text>` : null))}
     ${g.edges.map((e, i) => { const a = at[e.from], b = at[e.to]; if (!a || !b) return null;
-      let x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2; if (b.x <= a.x) { x1 = a.x + a.w / 2; y1 = a.y + a.h; x2 = b.x + b.w / 2; y2 = b.y; }
-      const mx = (x1 + x2) / 2;
-      return html`<g key=${i}><path d=${`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`} fill="none" style=${{ stroke: "var(--text-3)" }} strokeWidth="1.5" opacity="0.75" />
-        <path d=${`M${x2},${y2} l-7,-4 l0,8 z`} style=${{ fill: "var(--text-3)" }} /><text x=${mx} y=${Math.min(y1, y2) - 4 + Math.abs(y2 - y1) / 2} textAnchor="middle" fontSize="10" style=${{ fill: "var(--text-2)" }}>${e.verb}</text></g>`; })}
-    ${g.nodes.map((n) => { const p = at[n.id], c = DET_KIND[n.kind] || "var(--text-3)";
-      return html`<g key=${n.id}><rect x=${p.x} y=${p.y} width=${p.w} height=${p.h} rx="7" style=${{ fill: "var(--surface)", stroke: c }} strokeWidth="1" />
-        <rect x=${p.x + 6} y=${p.y + 8} width="3" height=${p.h - 16} rx="2" style=${{ fill: c }} />
-        <text x=${p.x + 18} y=${p.y + (n.badges.length ? 26 : 34)} fontSize="12" fontWeight="500" style=${{ fill: "var(--text)", fontFamily: ["file", "system", "archive"].includes(n.kind) ? "var(--mono)" : "var(--sans)" }}>${fitEnd(n.label, chars)}<title>${n.label}</title></text>
-        ${n.badges.map((b, i) => html`<text key=${b} x=${p.x + 18 + i * 78} y=${p.y + 46} fontSize="10" style=${{ fill: b === "deleted" ? "var(--crit)" : "var(--med)" }}>${b === "deleted" ? "deleted after" : b}</text>`)}</g>`; })}
-  </svg></div>`;
+      let x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2, d;
+      if (x2 > x1) { const mx = (x1 + x2) / 2; d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2 - 2},${y2}`; }
+      else { x1 = a.x + a.w / 2; y1 = a.y + a.h; x2 = b.x + b.w / 2; y2 = b.y; d = `M${x1},${y1} C${x1},${y1 + 24} ${x2},${y2 - 24} ${x2},${y2 - 2}`; }
+      const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, n = steps[i];
+      return html`<g key=${i}><path d=${d} fill="none" style=${{ stroke: "var(--text-3)" }} strokeWidth="1.4" markerEnd="url(#dgArrow)" />
+        <text x=${cx} y=${cy - 12} textAnchor="middle" fontSize="10.5" style=${{ fill: "var(--text-2)" }}>${e.verb}</text>
+        ${n ? html`<circle cx=${cx} cy=${cy} r="8" style=${{ fill: "var(--surface)", stroke: "var(--text-3)" }} /><text x=${cx} y=${cy + 3.5} textAnchor="middle" fontSize="9.5" fontWeight="600" style=${{ fill: "var(--text)" }}>${n}</text>` : null}</g>`; })}
+    ${g.nodes.map((n) => { const p = at[n.id], c = DET_KIND[n.kind] || "var(--text-3)", w = detWhere(n, story, g.nodes.map((x) => x.label));
+      const sub = [w ? w.short : null, ...n.badges.map((b) => (b === "deleted" ? "deleted after" : b))].filter(Boolean).join(" · ");
+      return html`<g key=${n.id}><title>${w ? w.full : n.label}</title><rect x=${p.x} y=${p.y} width=${p.w} height=${p.h} rx="7" style=${{ fill: "var(--surface)", stroke: c }} strokeWidth="1" />
+        <text x=${p.x + 14} y=${p.y + (sub ? 24 : 32)} fontSize="12" fontWeight="500" style=${{ fill: "var(--text)", fontFamily: ["file", "system", "archive"].includes(n.kind) ? "var(--mono)" : "var(--sans)" }}>${fitEnd(n.label, chars)}</text>
+        ${sub ? html`<text x=${p.x + 14} y=${p.y + 42} fontSize="10.5" style=${{ fill: "var(--text-3)" }}>${fitEnd(sub, 30)}</text>` : null}</g>`; })}
+  </svg></div>
+  ${wide ? html`<div className="dg-hint t3">${ic("DragOutlined")} drag to move around the picture</div>` : null}</div>`;
+}
+// The Admin's Detective (28 Oct 2026), built from pieces already agreed. For version 1 the Admin is IT over every
+// department, so every department's cases are here. Open cases are the accordion, Urgent, Case, Noted; the picked one's
+// coverage (the areas of each intent, filled where something fell) is beside it, with what Detective suggests doing.
+// Below: what happened, drawn and in order; what it noticed, each with what would make it harmless; what was reviewed;
+// what you said is fine. Nobody at the machine is told. A case is a pattern and its evidence, never an accusation.
+const DT_G = [["urgent", "Urgent", "worth looking at now"], ["case", "Case", "several things add up"], ["noted", "Noted", "kept in view, not raised"]];
+const DT_WORD = { explained: "Explained", accepted: "Accepted", dismissed: "Dismissed", escalated: "Escalated" };
+const dtAgo = (c) => (c.ago < 1 ? `${Math.max(1, Math.round(c.ago * 60))}m ago` : c.ago < 48 ? `${Math.round(c.ago)}h ago` : `${Math.round(c.ago / 24)} days ago`);
+const dtRest = (c) => { const t = c.headline.slice(c.intent.length + 2).trim(); return t && t !== "." ? t.charAt(0).toUpperCase() + t.slice(1) : "One thing on its own; open it for the evidence."; };
+const DT_RULE = { drive: "the drive", program: "the program", folder: "the folder" };
+const DT_STAGE = { Reaching: "files outside their work were opened", Gathering: "files were gathered together", "Taking out": "files left the machine", "Covering up": "the tracks were covered" };
+const DT_NEXT = { Gathering: "gathering files", "Taking out": "taking them off the machine", "Covering up": "covering the tracks" };
+const dtRestr = (c) => ((DET.detail[String(c.id)] || {}).findings || []).some((f) => (f.why || []).some((w) => /restricted/.test(w)));
+const dtStand = (c) => (c.intent === "Copying what is on screen" && c.stage_name === "Taking out" ? "The screen was copied to the clipboard" : DT_STAGE[c.stage_name] ? detCap(DT_STAGE[c.stage_name]) : DT_DID[c.intent] || c.intent);
+const DT_DID = { "Wrecking things": "Files were damaged", "Hiding something": "A file was hidden", "Copying what is on screen": "The screen was copied", "Covering up": "A record was wiped" };
+const DT_OKI = { drive: "UsbOutlined", program: "AppstoreOutlined", folder: "FolderOutlined" };
+// what an exception lets pass; restricted files are never let pass, whatever the drive, program or folder
+const DT_OKW = { drive_after_staging: "files copied onto it are not counted", mass_removal: "files it removes in bulk are not counted", many_zipped: "files packed together here are not counted" };
+const DT_KIND = { concealment: "Hiding", collection: "Gathering", exfiltration: "Taking out", erasure: "Covering up", capture: "Capturing", evasion: "Slipping the watch", sabotage: "Wrecking", reach: "Looking where they should not" };
+const DT_TELL = {
+  1: "On Sunday 18 October at {t:12:00}, with {p:Kofi} signed in on {m:FIN-02}, the payroll spreadsheet {f:payroll-q3.xlsx} was opened. Three minutes later it was moved into the Windows Temp folder under a new name, {f:notes.txt.dll}, so that it looks like a piece of Windows rather than a spreadsheet, and then it was hidden. In the same minute fourteen files from the Payroll folder, eight of them restricted, were copied into a Staging folder and packed into {f:q3.zip}. At {t:12:06} a USB drive was plugged in, and the archive was copied onto it. A minute later the archive was deleted from the machine, and at {t:12:08} the list of recent files was cleared. It all took about eight minutes, and every step came from programs Kofi had started.\n\nWhat makes it serious is what was carried, not the drive it went on: eight of the fourteen files are restricted, and they left the machine disguised and packed, with the traces wiped behind them. The same files on a drive Kofi uses every day would be just as serious, and harmless files on a brand new drive would not have raised a case at all.",
+  2: "At {t:12:43} on Sunday 18 October, with {p:Yaw} signed in on {m:OPS-03}, a program began renaming the documents in the Documents folder. In under two minutes thirty of them, starting with {f:doc0.docx}, had .locked added to their names, far faster than anyone could do by hand. None of them was opened or edited first; only the names changed.\n\nThis is how ransomware usually begins: the files are locked and renamed so their owner can no longer open them. A migration or conversion tool started on purpose would look the same, so it is worth asking Yaw whether they ran anything just before a quarter to one.",
+  3: "At {t:09:53} on Sunday 18 October, on {m:OPS-06} where {p:Kwame} was signed in, the restricted spreadsheet {f:payroll-q3.xlsx} was moved into the Windows Temp folder and renamed {f:notes.txt.dll}, so it passes for a part of Windows. A minute later it was hidden.\n\nAt {t:09:56}, three minutes after it began, the machine stopped reporting to Falcon while it was still switched on, and it has not been heard from since. A laptop lid closing or a network fault would explain the silence, but not a restricted file being disguised and hidden just before it.",
+  4: "Between {t:08:15} and {t:08:20} on Sunday 18 October, {p:Nana} opened fifteen documents on {m:OPS-05}, starting with {f:doc0.docx}, spread across four folders of the HR share that have nothing to do with their own work.  Nothing was copied, changed or taken anywhere; the files were only opened, one after another, in five minutes.\n\nOn its own it is mild. Nana may have been covering for a colleague or hunting for one particular file, and Detective has kept it in view rather than raising it.",
+  5: "Early on Sunday 18 October, at {t:05:48}, {p:Afi} opened the restricted spreadsheet {f:payroll-q3.xlsx} in {g:Excel} on {m:FIN-01}. Over the next two minutes a picture of the whole screen was taken four times while it was open, each one put on the clipboard, ready to be pasted somewhere else.\n\nOne screenshot is ordinary. Four in a row of a restricted payroll sheet, at ten to six in the morning, is what calls for a look. Afi may have been capturing their own work or showing a problem to support, and nothing so far shows the pictures leaving the machine.",
+  6: "On Saturday 26 September at {t:06:19}, three spreadsheets from the Finance payroll folder, {f:r0.xlsx}, {f:r1.xlsx} and {f:r2.xlsx}, were copied into a folder called Misc on {m:LOG-01}, where {p:Esi} signs in. They sat there untouched for three weeks. On Saturday 17 October at {t:17:19} they were packed into {f:misc.zip}, and a minute later the archive was copied onto a USB drive.\n\nNone of the three spreadsheets is restricted, so what was carried is not alarming on its own, and the drive being new to this machine says nothing either way. The case is open because files from the Finance payroll folder ended up on a logistics machine and then left it. Nothing has been deleted or cleared since, which fits an honest transfer; if Esi had a reason to be working on them, it is explained.",
+  7: "At {t:11:20} on Saturday 17 October, {f:contract-amendment-7.docx} was deleted from the Legal folder on {m:OPS-01} while {p:Kojo} was signed in. It was a single file, deleted in one go, with nothing unusual before or after it.\n\nOn its own it is small, but a contract amendment is not something that is usually thrown away. If Kojo was clearing out a draft they had finished with, it is explained.",
+  8: "At {t:07:20} on Saturday 17 October, the Security log on {m:OPS-07} was cleared by a program {p:Ama} had started. That log is the machine's own record of who signed in and what they changed, so clearing it wipes the history anyone would use to check what happened there.\n\nNothing else unusual was seen around it. An administrator clearing a full log on purpose would explain it, so it is worth asking Ama whether they meant to.",
+  10: "Between {t:05:19} and {t:05:20} on Thursday 15 October, two nightly backup images, {f:nightly-0.vhdx} and {f:nightly-1.vhdx}, and the spreadsheet {f:plan0.xlsx} were deleted on {m:LOG-02}, where {p:Abena} signs in. Backups being removed is what drew attention to it." };
+const DT_TK = { p: "person", f: "file", t: "date", g: "program" };
+function DtTell({ text }) {
+  return html`<div className="dt-tell">${text.split("\n\n").map((para, i) => html`<p key=${i}>${para.split(/(\{[pfmtg]:[^}]+\})/).map((x, j) => { const m = /^\{([pfmtg]):([^}]+)\}$/.exec(x);
+    return !m ? x : html`<span key=${j} className=${"hl ok" + (m[1] === "f" || m[1] === "m" ? " mono" : "")} style=${{ "--c": m[1] === "m" ? "var(--s6)" : KIND_C[DT_TK[m[1]]] }}>${m[2]}</span>`; })}</p>`)}</div>`;
+}
+function AdminDetectivePage({ go }) {
+  const [sel, setSel] = useState(null), [exp, setExp] = useState(null), [pg, setPg] = useState(0), [done, setDone] = useState({}), [note, setNote] = useState("");
+  const [said, setSaid] = useState({}), [back, setBack] = useState({});
+  const all = DET.cases.map((c) => (done[c.id] ? { ...c, status: done[c.id].o, note: done[c.id].n, reviewed_by: "you" } : c));
+  const rank = { urgent: 0, case: 1, noted: 2 }, open = all.filter((c) => c.status === "open" && c.level !== "noted").sort((a, b) => rank[a.level] - rank[b.level] || b.weight - a.weight);
+  const reviewed = all.filter((c) => c.status !== "open");
+  const cur = all.find((c) => c.id === sel) || open[0] || all[0], det = DET.detail[String(cur.id)] || { board: [], graph: { nodes: [], edges: [] }, findings: [] };
+  const who = (h) => (MBY[h] || {}).user, urg = open.filter((c) => c.level === "urgent");
+  const deptN = new Set(open.map((c) => c.dept)).size;
+  const situation = `${fmt(open.length)} open case${open.length === 1 ? "" : "s"} across ${deptN} department${deptN === 1 ? "" : "s"}. ${urg.length ? `${fmt(urg.length)} urgent: ${listNames(urg.map((c) => `${c.intent.toLowerCase()} on ${c.host}`), 3)}.` : "Nothing urgent."} Nobody at a machine is told.`;
+  const answer = (c, o) => { setDone({ ...done, [c.id]: { o, n: note.trim() } }); setNote(""); setExp(null); toast(`${c.intent} on ${c.host}: ${DT_WORD[o].toLowerCase()} (concept)`); };
+  const sugg = DET.proposals.filter((x) => x.pc_id === cur.pc_id && x.state === "open");
+  const card = (c) => { const on = exp === c.id, picked = cur.id === c.id;
+    return html`<div key=${c.id} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "")}>
+      <article className="iq-card am-card" role="button" tabIndex="0" onClick=${() => setSel(c.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(c.id)}>
+        <span className="iq-ic">${ic("FileSearchOutlined")}</span>
+        <span className="iq-main"><span className="iq-t"><b className="cut">${c.intent}</b></span><span className="iq-s cut">${dtStand(c)}${dtRestr(c) ? " · restricted files involved" : ""}</span></span>
+        <span className="am-facts"><span className="cut"><span className="mono">${c.host}</span>${who(c.host) ? ` · ${who(c.host)}` : ""}</span><span>${dtAgo(c)}</span></span>
+        <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setSel(c.id); setExp(on ? null : c.id); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
+      </article>
+      ${on ? html`<div className="tk-open dt-open">
+        <div className="t2">${c.headline}</div>
+        ${c.not_yet ? html`<div className="t3">${c.not_yet}</div>` : null}
+        ${c.model_says ? html`<div className="t3">The local model reads it as ${c.model_says.toLowerCase()}. That is its opinion, not the rules'.</div>` : null}
+        <${Input} value=${note} onChange=${(e) => setNote(e.target.value)} placeholder="What you found out (optional); it stays with the case" maxLength=${500} />
+        <div className="row fl-acts"><span className="t3">Your answer</span><span className="sp" />
+          <${Button} size="small" onClick=${() => answer(c, "dismissed")}>Dismiss<//><${Button} size="small" onClick=${() => answer(c, "accepted")}>Accept it<//><${Button} size="small" type="primary" onClick=${() => answer(c, "explained")}>It is explained<//></div>
+      </div>` : null}</div>`; };
+  const PER = 5, ord = open, pages = Math.max(1, Math.ceil(ord.length / PER)), p = Math.min(pg, pages - 1), page = ord.slice(p * PER, p * PER + PER);
+  const rules = DET.rules.filter((r) => !back[r.id]);
+  return html`<div className="og aup">
+    <${SitBar} text=${situation} />
+    <div className="g c-84" style=${{ alignItems: "start" }}>
+      <section className="ib-box aur">
+        <header><b>Open cases · ${fmt(open.length)}</b><span>every department, strongest first; click one to see what it covers, expand it to answer</span></header>
+        ${page.length ? html`<div className="iq-cards">${page.map(card)}</div>` : null}
+        ${pages > 1 ? html`<div className="dv-pages fl-pages"><span className="t3">${fmt(p * PER + 1)} to ${fmt(Math.min(ord.length, p * PER + PER))} of ${fmt(ord.length)} cases</span>
+          <span className="dr-step"><button aria-label="Earlier" disabled=${p === 0} onClick=${() => setPg(p - 1)}>${ic("LeftOutlined")}</button>${p + 1} of ${pages}<button aria-label="Later" disabled=${p >= pages - 1} onClick=${() => setPg(p + 1)}>${ic("RightOutlined")}</button></span></div>` : null}
+        ${!open.length ? html`<div className="ib-quiet">Nothing open. Detective watches by itself and raises a case when several small things add up.</div>` : null}
+      </section>
+      <section className="ib-box">
+        <header><b>At a glance</b><span>${cur.intent} on <span className="mono">${cur.host}</span></span></header>
+        ${(() => { const m = MBY[cur.host] || {}, before = DET.cases.filter((x) => x.host === cur.host && x.id !== cur.id), restr = dtRestr(cur);
+          const got = DT_STAGE[cur.stage_name], next = DT_NEXT[cur.next_stage];
+          const rows = [
+            ["FlagOutlined", dtStand(cur), got ? (next ? `no further yet; next would be ${next}` : "it went all the way") : "nothing came of it after that"],
+            ["LockOutlined", restr ? "Restricted files are involved" : "No restricted files involved", restr ? "they need their owner's consent to leave" : "what was touched is ordinary"],
+            ["UserOutlined", m.user || "Nobody signed in", `${deptNameOf(cur.dept)} · signed in on ${cur.host} at the time`],
+            ["DesktopOutlined", cur.host, m.status === "offline" ? `off, last seen ${dur(m.seen)} ago` : `on now${m.user ? `, ${m.user} signed in` : ""}`],
+            ["HistoryOutlined", before.length ? `${fmt(before.length)} earlier case${before.length === 1 ? "" : "s"} on this machine` : "The first case on this machine", before.length ? listNames(before.map((x) => `${x.intent.toLowerCase()} (${(DT_WORD[x.status] || x.status).toLowerCase()})`), 2) : "nothing before this"],
+            ["ClockCircleOutlined", `Open for ${dtAgo(cur).replace(/ ago$/, "")}`, `raised at ${cur.when}; nobody has answered yet`]];
+          return html`<div className="dt-gl">${rows.map(([i, t, d]) => html`<div key=${i} className="dt-glr"><span className="dt-gli">${ic(i)}</span><span className="auo-lt"><b className="cut">${t}</b><span className="t3 cut">${d}</span></span></div>`)}</div>`; })()}
+      </section>
+    </div>
+    <div className="g c-84 dt-two">
+    <section className="ib-box dt-col">
+      <header><b>What happened</b><span>${cur.intent} on <span className="mono">${cur.host}</span>, ${cur.first_at.slice(11, 16)} to ${cur.when}; each connection carries its step's number</span></header>
+        <div className="dt-pic">${det.graph.nodes.length ? html`<${DetGraph} g=${det.graph} story=${cur.story} />` : html`<div className="ib-quiet">Nothing to draw.</div>`}</div>
+    </section>
+    <section className="ib-box dt-col">
+      <header><b>Step by step</b><span>${fmt(cur.story.length)} step${cur.story.length === 1 ? "" : "s"}, in the order they happened</span></header>
+        <div className="dt-story">${cur.story.map((l, i) => { const m = /^(\d\d:\d\d)\s+(.*)$/.exec(l); return html`<div key=${i} className="dt-st"><span className="dt-sn">${i + 1}</span><span className="mono t3">${m ? m[1] : ""}</span><span>${m ? m[2] : l}</span></div>`; })}</div>
+    </section>
+    </div>
+    <section className="ib-box">
+      <header><b>What Detective noticed</b><span>what went on, in the local model's words</span></header>
+      <${DtTell} text=${DT_TELL[cur.id] || cur.headline} />
+      <div className="dt-by t3">Written by the local model from what Detective found. It is a reading of the evidence, not proof.</div>
+    </section>
+    <section className="ib-box">
+      <header><b>Said to be fine · ${fmt(rules.length)}</b><span>what Detective lets pass on one machine; restricted files are never let pass</span></header>
+      ${rules.length ? html`<div className="dt-oks">${rules.map((r) => html`<div key=${r.id} className="dt-okr">
+        <span className="dt-oki">${ic(DT_OKI[r.kind] || "CheckOutlined")}</span>
+        <span className="mono dt-okv cut" title=${r.value}>${r.value}</span>
+        <span className="t3 cut">${DT_OKW[r.graph] || "not counted"}; restricted files still are</span>
+        <span className="t3 mono">${r.host}</span><span className="t3">since ${r.made_at.slice(8, 10).replace(/^0/, "")} Oct</span>
+        <a className="dt-okb" onClick=${() => { setBack({ ...back, [r.id]: 1 }); toast("Taken back (concept)"); }}>Take it back</a></div>`)}</div>`
+        : html`<div className="ib-quiet">Nothing. When you dismiss a case you can say what is fine from now on.</div>`}
+    </section>
+  </div>`;
 }
 function DetectivePage({ go, dept }) {
   const [show, setShow] = useState("open");
@@ -8480,7 +8757,8 @@ function AdminAutomationPage({ go }) {
             <div className="auo-bars tall">${perDay.map(([n, b, h], j) => { const k = Math.min(1, mxd / Math.max(1, n)), pc = (v) => (v / mxd) * 100 * k + "%", ok = n - b - h;
               return html`<span key=${j} title=${`${n} run${n === 1 ? "" : "s"}: ${n - h} by the rule${h ? `, ${h} by hand` : ""}${b ? `; ${b} went wrong` : ""}`}><b>${ok ? html`<i style=${{ height: pc(ok) }} />` : null}${b ? html`<i className="bad" style=${{ height: pc(b) }} />` : null}${h ? html`<i className="hand" style=${{ height: pc(h) }} />` : null}${n > mxd ? html`<i className="cut" />` : null}${n ? html`<small className=${n > mxd ? "over" : ""}>${n}</small>` : null}</b><em>${DAYS7[j]}</em></span>`; })}</div></div>
             <div className="aub-key"><span><i />by the rule</span><span><i className="hand" />run by hand</span><span><i className="bad" />went wrong</span><span className="t4">over 10 stops at the top; the number is the count</span></div></div>
-          <div><div className="am-k">Its actions</div>${actStats.map((x, i) => html`<div key=${x.name} className="auo-act"><span className="cut">${i + 1}. ${x.name}</span><span className="t3">${x.avg == null ? `limit ${x.limit}s` : `${x.avg}s of ${x.limit}s`}</span></div>`)}</div>
+          <div><div className="am-k">Its actions</div>${actStats.map((x, i) => { const L = ACTION_LIB.find((y) => (y.names || [y.name]).includes(x.name));
+            return html`<div key=${x.name} className="auo-act two"><span className="auo-lt"><b className="cut">${i + 1}. ${x.name}</b><span className="cut t3">${L ? L.desc : "a step of this rule"}</span></span><span className="t3">${x.avg == null ? `limit ${x.limit}s` : `${x.avg}s of ${x.limit}s`}</span></div>`; })}</div>
         </div>
       </section>
     </div>
@@ -8501,7 +8779,7 @@ function AdminAutomationPage({ go }) {
                 <span className="au-fx">${xs.map((y, i) => html`<span key=${i} className=${"au-x" + (y.outcome === "Timed out" ? " med" : auBad(y) ? " hot" : "")}><span className="cut">${y.action}</span><span>${y.outcome === "Success" ? `${y.sec}s` : y.outcome === "Timed out" ? `ran out of time at ${y.sec}s` : `failed, exit ${y.exit}`}</span></span>`)}</span></div>`)}
               ${bad ? html`<div className="row fl-acts"><span className="sp" /><${Button} size="small" type="primary" onClick=${() => runAgain(x.r, x.f)}>Run again where it went wrong<//></div>` : null}
             </div>` : null}</div>`; };
-        const G = [["bad", "Did not go to plan", "an action failed or ran out of time", (x) => x.bad && !again[x.r.id + x.f.t]], ["ok", "Went as planned", "everything it did worked", (x) => !(x.bad && !again[x.r.id + x.f.t])]];
+        const G = [["bad", "Failed", "an action failed or ran out of time", (x) => x.bad && !again[x.r.id + x.f.t]], ["ok", "Successful", "everything it did worked", (x) => !(x.bad && !again[x.r.id + x.f.t])]];
         const PER = 5, ord = G.flatMap(([g, , , f]) => runs.filter(f).map((x) => [g, x])), pages = Math.max(1, Math.ceil(ord.length / PER)), p = Math.min(rpg, pages - 1), page = ord.slice(p * PER, p * PER + PER);
         return html`${G.map(([g, t, d, f]) => { const xs = page.filter((e) => e[0] === g).map((e) => e[1]); if (!xs.length) return null;
             return html`<div key=${g} className="iq-grp"><div className="lay-grp iq-gh">${t} · ${fmt(runs.filter(f).length)}<span>${d}</span></div><div className="iq-cards">${xs.map(card)}</div></div>`; })}
@@ -8514,8 +8792,7 @@ function AdminAutomationPage({ go }) {
       <div className="au-next">${next.map((x) => { const isOff = off[x.r.id], sk = skip[x.key], mineX = x.r.by === me, n = x.r.scope === "All machines" ? MACHINES.length : MACHINES.filter((m) => m.dept === "ops").length;
         return html`<div key=${x.key} className=${"au-nx" + (isOff || sk ? " off" : "")}>
           <span className="au-nt"><b>${String(x.h).padStart(2, "0")}:00</b><span className="t3">${x.d}</span></span>
-          <a className="au-nn" onClick=${() => pick(x.r, null)}><span className="t3">${ic(KINDI[x.r.kind])}</span> ${x.r.name}</a>
-          <span className="t3 cut">${x.r.actions.map((y) => y[0]).join(", ")} on ${fmt(n)} machine${n === 1 ? "" : "s"}</span>
+          <a className="au-nn auo-lt" onClick=${() => pick(x.r, null)}><b className="cut">${x.r.name}</b><span className="t3 cut">${x.r.actions.map((y) => y[0]).join(", ")} on ${fmt(n)} machine${n === 1 ? "" : "s"}</span></a>
           <span className="au-na">${isOff ? html`<span className="t3">switched off; it will not run</span>` : sk ? html`<span className="t3">skipped this once</span><${Button} size="small" type="text" onClick=${() => setSkip({ ...skip, [x.key]: 0 })}>Undo<//>`
             : mineX ? html`<${Button} size="small" onClick=${() => { setSkip({ ...skip, [x.key]: 1 }); toast(`${x.r.name} will skip ${x.d} ${String(x.h).padStart(2, "0")}:00 (concept)`); }}>Skip this once<//>` : html`<span className="t3">runs as set</span>`}</span>
         </div>`; })}</div>
@@ -8627,6 +8904,206 @@ function RuleNew({ from, taken, onDone }) {
       <${Button} onClick=${onDone}>Cancel<//>${step > 0 ? html`<${Button} icon=${ic("LeftOutlined")} onClick=${() => setStep(step - 1)}>Back<//>` : null}
       ${step < 3 ? html`<${Button} type="primary" disabled=${!!prob} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
         : html`<${Button} type="primary" disabled=${!!prob} onClick=${() => { toast(from ? `${name.trim()} saved (concept)` : `${name.trim()} is switched on (concept)`); onDone(); }}>${from ? "Save changes" : "Switch it on"}<//>`}</div></div>`;
+}
+// The Admin's Actions (28 Oct 2026), built from pieces already agreed: the situation sentence; the actions as a list
+// grouped Control, Monitoring, Custom beside a sheet, like Your rules on Automation; the sheet says what the action does
+// and runs it on machines picked on the department's floor of tiles, like Restricted; what a run returned opens in a
+// modal; what ran by hand is the accordion; writing your own is the footer and a drawer.
+const ACX_G = [["Control", (a) => a.cat === "Control"], ["Monitoring", (a) => a.cat === "Monitoring"], ["Custom", (a) => a.cat === "Custom"]];
+const isBadRun = (x) => x.outcome === "Failed" || x.outcome === "Timed out";
+const tileName = (h) => h.replace(/^WS-[A-Z]+-/, "").replace(/^[A-Z]+-/, "");
+const runWhen = (t) => (t >= 0 ? `today ${hhmm(t)}` : `${dayOf(t)} ${hhmm(t)}`);
+// What a run returned, machine by machine: the machines down the left (the ones that went wrong first), the picked
+// one's output on the right as it came back: a picture, a list, or the text it printed, with its exit code and time.
+function OutputModal({ run, onClose }) {
+  const [h, setH] = useState(null);
+  useEffect(() => { if (run) setH((run.xs.find(isBadRun) || run.xs[0]).host); }, [run]);
+  if (!run) return null;
+  const xs = run.xs.slice().sort((p, q) => isBadRun(q) - isBadRun(p)), x = xs.find((y) => y.host === h) || xs[0];
+  const out = runOutput(run.action, x.host, x.outcome, x.t, x.exit), m = MBY[x.host] || {};
+  const word = (y) => (y.outcome === "Success" ? "worked" : y.outcome === "Timed out" ? "ran out of time" : y.outcome === "Failed" ? "failed" : y.outcome.toLowerCase());
+  return html`<${Modal} open=${true} onCancel=${onClose} footer=${null} width="min(1040px, 92vw)" className="ox-modal"
+    title=${html`<span className="ox-title"><b>${run.action}</b><span className="t3">${xs.length > 1 ? `${xs.length} machines` : xs[0].host} · ${runWhen(run.t)} · ${run.from}</span></span>`}>
+    <div className=${"ox" + (xs.length > 1 ? "" : " one")}>
+      ${xs.length > 1 ? html`<div className="ox-list">${xs.map((y) => html`<button key=${y.host} className=${"ox-h" + (y.host === x.host ? " on" : "")} onClick=${() => setH(y.host)}>
+        <span className="mono">${y.host}</span><span className=${isBadRun(y) ? "hot" : "t3"}>${word(y)}</span></button>`)}</div>` : null}
+      <div className="ox-main">
+        <div className="ox-meta"><b className="mono">${x.host}</b><span className="t3">${m.user ? `${m.user} signed in` : "nobody signed in"}</span><span className="sp" />
+          <span className=${isBadRun(x) ? "hot" : "ok"}>${word(x)}</span><span className="t3 mono">exit ${x.outcome === "Success" ? 0 : x.exit || 1} · ${x.sec}s of ${x.timeout}s</span></div>
+        ${out.kind === "image" ? html`<img className="ox-img" src=${out.src} alt=${out.summary} />`
+          : out.kind === "list" ? html`<div className="ox-tab"><div className="ox-tr ox-th"><span>${out.cols[0]}</span><span>${out.cols[1]}</span></div>
+              ${out.rows.map(([c1, c2], i) => html`<div key=${i} className="ox-tr"><span className="mono">${c1}</span><span className="mono t3">${c2}</span></div>`)}</div>`
+          : html`<pre className="ox-pre">${out.text}</pre>`}
+        <div className="t3 ox-note">${out.summary}. Kept with the run for 90 days; who opens it is recorded.</div>
+      </div>
+    </div><//>`;
+}
+// Write an action (28 Oct 2026). What a custom action is, from the design: a name and a line on what it does, a Python
+// or PowerShell script using only the standard library and what Windows has, checked here and again on each machine,
+// run without a sandbox so every run carries its author's name, its output, exit code and errors kept with the run, and
+// a time limit after which it is stopped. Three steps: say what it is; write or upload the script and watch it checked;
+// try it on one machine and set its limit.
+const AX_TPL = { Python: "import os\n\n# what it prints is kept with the run; the first line becomes its summary\nprint(f\"{os.environ['COMPUTERNAME']}: done\")\n",
+  PowerShell: "# what it writes is kept with the run; the first line becomes its summary\nWrite-Output \"$env:COMPUTERNAME: done\"\n" };
+function ActionNew({ from, onDone }) {
+  const Sl = A.Slider, fileRef = useRef(null);
+  const [step, setStep] = useState(0), [name, setName] = useState(from ? from.name : ""), [desc, setDesc] = useState(from ? from.desc : ""), [eff, setEff] = useState(from ? "text" : null);
+  const [lang, setLang] = useState(from ? from.lang : "Python"), [src, setSrc] = useState(from ? from.script : ""), [file, setFile] = useState(null), [over, setOver] = useState(false);
+  const [limit, setLimit] = useState(from ? from.limit : 60), [host, setHost] = useState("WS-OPS-A1"), [test, setTest] = useState(null);
+  const chk = checkScript(lang, src), dup = ACTION_LIB.some((x) => x !== from && x.name.toLowerCase() === name.trim().toLowerCase()), lines = src.split("\n");
+  const fname = file || `${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "script"}.${lang === "Python" ? "py" : "ps1"}`;
+  const read = (f) => { if (!f) return; const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (!["py", "ps1"].includes(ext)) { toast("Only a .py or .ps1 file"); return; }
+    const r = new FileReader(); r.onload = () => { setSrc(String(r.result)); setLang(ext === "py" ? "Python" : "PowerShell"); setFile(f.name); setTest(null); }; r.readAsText(f); };
+  // a test run, as the worker client would report it: what the script prints, its exit code and its time
+  const printed = (h) => { const xs = [], re = /(?:print\(\s*f?|Write-Output\s+)(["'])(.*?)\1/g; let m;
+    while ((m = re.exec(src))) xs.push(m[2].replace(/\{os\.environ\[.COMPUTERNAME.\]\}|\$env:COMPUTERNAME/g, h)); return xs; };
+  const runTest = () => { const s0 = src, h = host; setTest({ st: "run", src: s0, host: h }); setTimeout(() => setTest({ st: "done", src: s0, host: h, out: printed(h), sec: 1 + (hs(h + s0.length) % 4) }), 1400); };
+  const NAMES = ["What it is", "The script", "Try it and save"];
+  const prob = step === 0 && !name.trim() ? "Give it a name." : step === 0 && dup ? "Another action already has that name."
+    : step === 0 && !eff ? "Say what it reports back." : step === 1 && !src.trim() ? "Write the script, or upload one." : step === 1 && !chk.compiles ? "The script does not compile yet."
+    : step === 1 && chk.bad.length ? `${chk.bad.join(", ")} ${chk.bad.length === 1 ? "is" : "are"} not allowed.` : null;
+  const card = (v, t, d) => html`<div key=${v} className=${"nfv-pick" + (eff === v ? " on" : "")} role="radio" aria-checked=${eff === v} tabIndex="0" onClick=${() => setEff(v)} onKeyDown=${(e) => e.key === "Enter" && setEff(v)}><i /><span><b>${t}</b><span className="t3">${d}</span></span></div>`;
+  const chkRow = (ok, t, d) => html`<div className=${"ax-cr " + (ok === true ? "ok" : ok === false ? "hot" : "info")}><span className="ax-ci">${ic(ok === true ? "CheckOutlined" : ok === false ? "CloseOutlined" : "InfoCircleOutlined")}</span><span><b>${t}</b>${d ? html`<span className="t3">${d}</span>` : null}</span></div>`;
+  const drop = { onDragOver: (e) => { e.preventDefault(); setOver(true); }, onDragLeave: () => setOver(false), onDrop: (e) => { e.preventDefault(); setOver(false); read(e.dataTransfer.files[0]); } };
+  const body = [html`<div className="nfv">
+      <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">What do you call it?</div><span className="nfv-n">How it shows in Your actions, in a rule's actions, and in every run.</span>
+        <${Input} autoFocus value=${name} maxLength=${60} status=${dup ? "error" : ""} onChange=${(e) => setName(e.target.value)} placeholder="For example Clear the print queue" /></div>
+      <div className="nfv-sec"><div className="nfv-st">What does it do? <span className="t4" style=${{ fontWeight: 400 }}>optional</span></div><span className="nfv-n">One plain line, shown under the name. Leave it empty if the name says it all.</span>
+        <${Input} value=${desc} maxLength=${120} onChange=${(e) => setDesc(e.target.value)} placeholder="For example Stops the spooler, empties the queue, starts it again." /></div>
+      <div className="nfv-sec"><div className="nfv-st">What does it report back?</div><span className="nfv-n">This is how its output is shown when you open a run.</span>
+        ${card("text", "Text", "What it prints is shown as it is, like a console. The first line is the summary.")}
+        ${card("list", "A list", "Each line it prints is a row, and a tab splits the columns: files, programs, users. The summary counts the rows.")}
+        ${card("none", "Only whether it worked", "It prints nothing worth keeping. Exit 0 counts as worked, anything else as failed.")}</div></div>`,
+    html`<div className="nfv"><div className="nfv-sec" style=${{ marginTop: 0 }}>
+        <div className=${"ax-ed" + (over ? " over" : "")} ...${drop}>
+          <div className="ax-edh"><${Segmented} size="small" value=${lang} onChange=${(v) => { setLang(v); setTest(null); }} options=${["Python", "PowerShell"]} />
+            <span className="mono t3">${fname}</span>${src ? html`<span className="t4">${lines.length} line${lines.length === 1 ? "" : "s"}</span>` : null}<span className="sp" />
+            <${Button} size="small" icon=${ic("UploadOutlined")} onClick=${() => fileRef.current && fileRef.current.click()}>${file ? "Upload another" : "Upload a file"}<//>
+            <input ref=${fileRef} type="file" accept=".py,.ps1" style=${{ display: "none" }} onChange=${(e) => { read(e.target.files[0]); e.target.value = ""; }} /></div>
+          ${src ? html`<div className="ax-code"><div className="ax-gut">${lines.map((_, i) => html`<span key=${i}>${i + 1}</span>`)}</div>
+              <textarea className="ax-ta" value=${src} rows=${lines.length + 1} spellCheck=${false} wrap="off" onChange=${(e) => setSrc(e.target.value)} /></div>`
+            : html`<div className="ax-empty"><span className="ax-ei">${ic("FileTextOutlined")}</span><b>Drop a .py or .ps1 file here</b><span className="t3">or upload one, or start writing from a blank script</span>
+              <div className="row" style=${{ justifyContent: "center", gap: 8 }}><${Button} size="small" onClick=${() => fileRef.current && fileRef.current.click()}>Upload a file<//>
+                <${Button} size="small" onClick=${() => { setLang("Python"); setSrc(AX_TPL.Python); }}>Blank Python<//><${Button} size="small" onClick=${() => { setLang("PowerShell"); setSrc(AX_TPL.PowerShell); }}>Blank PowerShell<//></div></div>`}
+        </div></div>
+      ${src.trim() ? html`<div className="nfv-sec"><div className="nfv-st">Checked as you type</div><div className="ax-checks">
+        ${chkRow(chk.compiles, chk.compiles ? "It compiles" : "It does not compile yet", chk.compiles ? null : "a bracket or block is not closed")}
+        <div className=${"ax-cr " + (chk.bad.length ? "hot" : "ok")}><span className="ax-ci">${ic(chk.bad.length ? "CloseOutlined" : "CheckOutlined")}</span><span><b>${chk.bad.length ? "It imports something not allowed" : "Its imports are allowed"}</b>
+          <span className="ax-imps">${chk.used.length ? chk.used.map((u) => html`<span key=${u} className=${"ax-imp" + (chk.bad.includes(u) ? " bad" : "")}>${u}</span>`) : html`<span className="t3">it imports nothing</span>`}</span>
+          <span className="t3">${lang === "Python" ? "Only Python's standard library and what Windows has (winreg, msvcrt)." : "Only the modules a stock Windows install has."} Nothing can be installed.</span></span></div>
+        ${chkRow(null, "Checked again on each machine", "the worker client runs the same checks when the script arrives, so a script changed on the way is refused")}
+        ${chkRow(null, "No sandbox", "it runs with the worker client's rights; every run is recorded with your name as its author")}
+        ${chkRow(null, "What it prints is kept", "with the run, for 90 days; the first line becomes its summary. Exit 0 counts as worked, anything else as failed")}</div></div>` : null}</div>`,
+    html`<div className="nfv">
+      <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">Try it on one machine</div><span className="nfv-n">A real run: it runs there and is recorded. Your own PC is the safe place to start.</span>
+        <div className="acx-tiles">${["WS-OPS-A1", ...MACHINES.map((m) => m.host).filter((h) => h !== "WS-OPS-A1")].map((h) => { const off = (MBY[h] || {}).status === "offline";
+          return html`<button key=${h} className=${"acx-t" + (host === h ? " on" : "") + (off ? " off" : "")} disabled=${off} title=${h} onClick=${() => setHost(h)}>${tileName(h)}</button>`; })}</div>
+        <div className="row" style=${{ marginTop: 10 }}><${Button} icon=${ic("CaretRightOutlined")} loading=${test && test.st === "run"} onClick=${runTest}>Run a test on ${host}<//>
+          ${test && test.st === "done" && test.src !== src ? html`<span className="t3">the script changed since this test</span>` : null}</div>
+        ${test ? html`<div className="ax-con"><div className="t4">$ ${lang === "Python" ? "python" : "powershell -File"} ${fname}   on ${test.host}</div>
+          ${test.st === "run" ? html`<div className="t3">running…</div>` : html`${eff === "none" ? null : !test.out.length ? html`<div className="t3">(it printed nothing)</div>`
+              : eff === "list" ? html`<div className="ax-ltab">${test.out.map((l, i) => html`<div key=${i}>${l.split("\t").map((c, j) => html`<span key=${j}>${c}</span>`)}</div>`)}</div><div className="t3">${test.out.length} row${test.out.length === 1 ? "" : "s"}</div>`
+              : test.out.map((l, i) => html`<div key=${i}>${l}</div>`)}
+            <div className="ax-cf"><span className="ok">worked</span> · exit 0 · ${test.sec}s of ${limit}s</div>`}</div>` : null}</div>
+      <div className="nfv-sec"><div className="nfv-st">How long may it run?</div><span className="nfv-n">Past this it is stopped and the run counts as out of time, not failed. You can also stop a run by hand.</span>
+        <div className="rn-sl"><${Sl} min=${5} max=${600} step=${5} value=${limit} onChange=${setLimit} marks=${{ 5: "5s", 600: "10m" }} /><b>${limit < 60 ? `${limit}s` : `${Math.floor(limit / 60)}m${limit % 60 ? ` ${limit % 60}s` : ""}`}</b></div></div>
+      <div className="nfv-sec"><div className="tk-facts" style=${{ maxWidth: "none" }}>${[["Called", name.trim()], ...(desc.trim() ? [["Does", desc.trim()]] : []), ["Reports", eff === "list" ? "a list" : eff === "none" ? "only whether it worked" : "text"],
+        ["Script", `${lang}, ${lines.length} lines${file ? `, from ${file}` : ""}`], ["Time limit", `${limit}s`], ["Tried", test && test.st === "done" ? `on ${test.host}, it worked` : "not yet"], ["Written by", from ? (from.by === "You" ? "you" : from.by) : "you"]]
+        .map(([k, v]) => html`<span key=${k}><span className="t3">${k}</span> ${v}</span>`)}</div></div>
+      <div className="decide" style=${{ "--c": "var(--accent)" }}>It joins Your actions under Custom when you confirm. Rules can use it, and you can run it by hand.</div></div>`];
+  return html`<div className="nf-steps-wrap">
+    <section className="ib-box rn-top"><span className="t3">${NAMES[step]} · step ${step + 1} of 3</span>
+      <div className=${"rn-name" + (name.trim() ? "" : " none")}>${name.trim() || "Not named yet"}</div>
+      <div className="ax-sub t3">${[desc.trim(), `Custom · ${lang}`, eff === "list" ? "reports a list" : eff === "none" ? "reports only whether it worked" : eff === "text" ? "reports text" : null].filter(Boolean).join(" · ")}</div></section>
+    <section className="ib-box nf-body">${body[step]}</section>
+    <div className="row nt-next"><span className="t3" style=${{ fontSize: 12.5, color: prob ? "var(--med)" : undefined }}>${prob || ""}</span><span className="sp" />
+      <${Button} onClick=${onDone}>Cancel<//>${step > 0 ? html`<${Button} icon=${ic("LeftOutlined")} onClick=${() => setStep(step - 1)}>Back<//>` : null}
+      ${step < 2 ? html`<${Button} type="primary" disabled=${!!prob} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
+        : html`<${Button} type="primary" onClick=${() => { toast(from ? `${name.trim()} saved (concept)` : `${name.trim()} added to Custom (concept)`); onDone(); }}>${from ? "Save changes" : "Add the action"}<//>`}</div></div>`;
+}
+function AdminActionsLayout() {
+  const [sel, setSel] = useState("shot"), [hosts, setHosts] = useState(["OPS-03", "OPS-04"]), [make, setMake] = useState(false);
+  const [run, setRun] = useState(null), [mine, setMine] = useState([]), [show, setShow] = useState(null);
+  const A0 = ABY[sel], lib = ACTION_LIB.filter((a) => !/^cust-/.test(a.id));
+  const badOf = (a) => runsOf(a).filter((x) => x.t >= -144 && isBadRun(x)).length;
+  const used = usedBy(A0), adm = ["WS-OPS-A1"], rest = MACHINES.map((m) => m.host).filter((h) => !adm.includes(h));
+  const grouped = Object.values(MANUAL_RUNS.reduce((m, x) => { const k = x.action + x.by + Math.round(x.t * 2); (m[k] = m[k] || { action: x.action, by: x.by, t: x.t, xs: [] }).xs.push(x); return m; }, {}));
+  const hand = [...mine, ...grouped].map((r) => ({ ...r, bad: r.xs.some(isBadRun), from: `by ${r.by === "You" ? "you" : r.by}` })).sort((x, y) => y.bad - x.bad || y.t - x.t).slice(0, 6);
+  const wk = ALL_RUNS.filter((x) => x.t >= -144);
+  const situation = `${fmt(lib.length)} actions, ${fmt(lib.filter((a) => a.cat === "Custom").length)} of them written here. ${fmt(wk.filter((x) => !x.rule).length)} runs by hand this week; Map the shared drive ran out of time on FIN-01. ${fmt(RULES.length)} rules use them.`;
+  // a run by hand: each picked machine runs, then reports; when they have all reported it joins Ran by hand lately
+  const here = run && run.id === sel ? run : null, busy = here && here.xs.some((y) => y.st === "Running");
+  const start = () => { const t = NOWH + Math.random() / 1000, lim = A0.limit, xs = hosts.map((h, i) => ({ host: h, st: "Running", d: 900 + i * 450 + (hs(h) % 5) * 260 }));
+    setRun({ id: A0.id, action: A0.name, t, lim, xs });
+    xs.forEach((x, i) => setTimeout(() => setRun((r) => (r && r.t === t ? { ...r, xs: r.xs.map((y, j) => (j === i && y.st === "Running" ? { ...y, st: A0.id === "disk" && y.host === "OPS-05" ? "Failed" : "Success", sec: Math.max(1, Math.round(y.d / 400)) } : y)) } : r)), x.d)); };
+  const stop = () => setRun((r) => ({ ...r, xs: r.xs.map((y) => (y.st === "Running" ? { ...y, st: "Stopped by you", sec: Math.max(1, Math.round(y.d / 900)) } : y)) }));
+  const asRun = (r) => ({ action: r.action, by: "You", t: r.t, from: "by you", xs: r.xs.map((y) => ({ host: y.host, outcome: y.st, sec: y.sec, timeout: r.lim, t: r.t, exit: y.st === "Failed" ? 1 : 0 })) });
+  useEffect(() => { if (run && !run.saved && !run.xs.some((y) => y.st === "Running")) { setMine((ms) => [asRun(run), ...ms]); setRun({ ...run, saved: true }); } }, [run]);
+  const tile = (h) => { const m = MBY[h] || {}, on = hosts.includes(h), off = m.status === "offline", st = here && here.xs.find((y) => y.host === h);
+    const cls = st ? (st.st === "Running" ? " run" : isBadRun({ outcome: st.st }) ? " bad" : st.st === "Success" ? " ok" : " on") : on ? " on" : "";
+    return html`<button key=${h} className=${"acx-t" + cls + (off ? " off" : "")} title=${`${h}${m.user ? `, ${m.user}` : ""}${off ? " · offline" : ""}${st ? ` · ${st.st.toLowerCase()}` : ""}`} disabled=${off || busy}
+      onClick=${() => { if (here && !busy) setRun(null); setHosts(on ? hosts.filter((x) => x !== h) : [...hosts, h]); }}>${tileName(h)}</button>`; };
+  const G = [["bad", "Failed", "on at least one machine it failed or ran out of time", (r) => r.bad], ["ok", "Successful", "or you stopped it", (r) => !r.bad]];
+  const doneN = here ? here.xs.filter((y) => y.st !== "Running").length : 0, failN = here ? here.xs.filter((y) => isBadRun({ outcome: y.st })).length : 0;
+  return html`<div className="og aup">
+    <${SitBar} text=${situation} />
+    <div className="auo-sheet aub">
+      <section className="ib-box auo-list"><header><b>Your actions</b><span>${lib.length}</span></header>
+        ${ACX_G.map(([t, f]) => { const xs = lib.filter(f); return html`<div key=${t}><div className="lay-grp acx-gh">${t}</div>
+          ${xs.map((a) => { const n = badOf(a), u = usedBy(a).length;
+            return html`<button key=${a.id} className=${"auo-li" + (sel === a.id ? " on" : "")} onClick=${() => setSel(a.id)}><span className="t3">${ic(CATI[a.cat])}</span><span className="auo-lt"><b className="cut">${a.name}</b><span className="cut t3">${a.cat === "Custom" ? `${a.lang} · by ${a.by === "You" ? "you" : a.by}` : u ? `used by ${u} rule${u === 1 ? "" : "s"}` : "run by hand only"}</span></span>${n ? html`<b className="auo-red">${n}</b>` : null}</button>`; })}</div>`; })}
+      </section>
+      <section className="ib-box auo-page">
+        <header><b>${A0.name}</b><span>${A0.cat === "Custom" ? `${A0.lang}, written by ${A0.by === "You" ? "you" : A0.by} on ${A0.created}` : "comes with Falcon"}</span><span className="sp" />
+          ${A0.cat === "Custom" ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake(A0.id)}>Edit the script<//>` : null}</header>
+        <div className="auo-big">${A0.desc ? html`${A0.desc} ` : null}<span className=${A0.desc ? "t3" : ""}>${A0.impact(1)}</span></div>
+        <div className="acx-facts"><span><span className="t3">Time limit</span> ${A0.limit}s</span><span><span className="t3">Used by</span> ${used.length ? used.map((r) => r.name).join(", ") : "no rule yet"}</span></div>
+        <div className="acx-run">
+          <div className="acx-rh"><b>Run it now</b><span className="t3">click machines to pick them; offline ones are dashed</span><span className="sp" />
+            ${busy ? null : html`<a onClick=${() => { setRun(null); setHosts(MACHINES.filter((m) => m.status !== "offline").map((m) => m.host)); }}>Every machine</a><a onClick=${() => { setRun(null); setHosts([]); }}>Clear</a>`}</div>
+          <div className="acx-band">ADMIN PCS</div><div className="acx-tiles">${adm.map(tile)}</div>
+          <div className="acx-band">OTHER MACHINES</div><div className="acx-tiles">${rest.map(tile)}</div>
+          <div className="acx-go">
+            ${busy ? html`<span className="t2">Running on ${here.xs.length}: ${doneN} of ${here.xs.length} reported back.</span><span className="sp" /><${Button} onClick=${stop}>Stop<//>`
+              : here ? html`<span className="t2">${failN ? html`<span className="hot">${failN} of ${here.xs.length} went wrong.</span>` : `Done on all ${here.xs.length}.`} Its output is in Ran by hand lately too.</span><span className="sp" />
+                  <${Button} type="primary" icon=${ic("FileSearchOutlined")} onClick=${() => setShow(asRun(here))}>See the output<//>`
+              : html`<span className="t2">${hosts.length ? `${A0.name} on ${listNames(hosts, 4)}, up to ${A0.limit}s each.` : "Pick at least one machine."}</span><span className="sp" />
+                  <${Button} type="primary" danger=${!!A0.risky} disabled=${!hosts.length} icon=${ic("CaretRightOutlined")} onClick=${start}>Run on ${hosts.length}<//>`}</div>
+        </div>
+        <div className="acx-run"><div className="acx-rh"><b>Its last runs</b><span className="t3">from rules and by hand, this week</span></div>
+          ${runsOf(A0).slice(0, 6).map((x, i) => html`<div key=${i} className="acx-lr"><span className="mono t3">${x.t >= 0 ? hhmm(x.t) : `${dayOf(x.t)} ${hhmm(x.t)}`}</span><span className="mono">${x.host}</span>
+            <span className="t3 cut">${x.rule ? RBY[x.rule].name : `by hand, ${x.by === "You" ? "you" : x.by}`}</span><span className=${"cut" + (isBadRun(x) ? " hot" : "")}>${runOutput(x.action, x.host, x.outcome, x.t, x.exit).summary}</span>
+            <${Button} size="small" type="text" onClick=${() => setShow({ action: x.action, t: x.t, from: x.rule ? RBY[x.rule].name : `by ${x.by === "You" ? "you" : x.by}`, xs: [x] })}>Output<//></div>`)}
+          ${!runsOf(A0).length ? html`<div className="ib-quiet">It has not run this week.</div>` : null}</div>
+      </section>
+    </div>
+    <section className="ib-box aur">
+      <header><b>Ran by hand lately</b><span>yours and the other Admins'; Output shows what each machine returned</span></header>
+      ${G.map(([g, t, d, f]) => { const xs = hand.filter(f); if (!xs.length) return null;
+        return html`<div key=${g} className="iq-grp"><div className="lay-grp iq-gh">${t} · ${xs.length}<span>${d}</span></div><div className="iq-cards">${xs.map((r, i) => { const worst = r.xs.find(isBadRun) || r.xs[0], out = runOutput(r.action, worst.host, worst.outcome, worst.t, worst.exit), n = r.xs.length;
+          return html`<div key=${g + i} className="tk-item">
+            <article className=${"iq-card am-card" + (r.bad ? " urg" : "")}>
+              <span className="iq-ic">${ic(CATI[(ACTION_LIB.find((a) => a.names.includes(r.action)) || {}).cat] || "PlayCircleOutlined")}</span>
+              <span className="iq-main"><span className="iq-t"><b className="cut">${r.action}</b></span><span className=${"iq-s cut" + (r.bad ? " hot" : "")}>${r.bad ? `${out.summary} on ${worst.host}` : n > 1 ? `done on all ${n}` : out.summary}</span></span>
+              <span className="am-facts"><span className="cut">${n > 1 ? `${n} machines` : r.xs[0].host} · ${r.from}</span><span className="mono">${r.t >= 0 ? hhmm(r.t) : dayOf(r.t)}</span></span>
+              <span className="iq-a"><${Button} size="small" icon=${ic("FileSearchOutlined")} onClick=${() => setShow(r)}>Output<//></span>
+            </article></div>`; })}</div></div>`; })}
+    </section>
+    <section className="ib-box og-change">
+      <header><b>Write an action</b><span>a Python or PowerShell script of your own; nothing is saved until you confirm</span></header>
+      <div className="tk-give">
+        <ol className="tk-steps"><li><b>Say what it is</b><span>its name, one line, and whether it changes the machine</span></li>
+          <li><b>Write or upload the script</b><span>checked as you type, and again on each machine</span></li>
+          <li><b>Try it and save</b><span>a test on one machine, and its time limit</span></li></ol>
+        <${Button} type="primary" onClick=${() => setMake("new")}>Write an action<//></div>
+    </section>
+    <${OutputModal} run=${show} onClose=${() => setShow(null)} />
+    <${Drawer} open=${!!make} onClose=${() => setMake(false)} width="min(1120px, 80vw)" title=${make && make !== "new" ? `Edit ${ABY[make].name}` : "Write an action"} className="tk-drawer"
+      extra=${html`<span className="t3" style=${{ fontSize: 12 }}>nothing is saved until you confirm</span>`}>
+      ${make ? html`<${ActionNew} key=${make} from=${make === "new" ? null : ABY[make]} onDone=${() => setMake(false)} />` : null}
+    <//>
+  </div>`;
 }
 // The Admin's Restricted, layout first (24 Oct 2026). Its own shape: what you restricted is a short index on the left;
 // the department is drawn beside it as a floor of machines, lit for the item picked (where it lives, where a copy turned
@@ -9089,8 +9566,9 @@ function AdminMachinesPage({ go }) {
   const openOn = (h) => ISSUES.filter((i) => i.host === h && ISTATE0[i.id].status !== "Resolved").sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]);
   const pingOn = (m) => CHANNELS.find((c) => chVisible(c, me) && c.status === "ping" && chReceiver(c) === me && chOther(c, me) === m.user);
   const groupOf = (m) => m.status === "high" || m.status === "critical" ? "look" : m.status === "offline" ? "off" : m.status === "warning" || m.ver !== CUR ? "small" : "fine";
-  const G = [["look", "Needs a look", "something serious is open on it"], ["small", "Worth a look", "something small, a help request, or an older version"], ["off", "Offline", "not checking in"], ["fine", "Fine", "nothing open"]];
-  const by = Object.fromEntries(G.map(([k]) => [k, ms.filter((m) => groupOf(m) === k).sort((a, b) => a.host.localeCompare(b.host))]));
+  const G = [["look", "Serious", "something serious is open on it"], ["fine", "Fine", "nothing serious"]];
+  const srt = (xs) => xs.sort((a, b) => a.host.localeCompare(b.host));
+  const by = { look: srt(ms.filter((m) => groupOf(m) === "look")), fine: srt(ms.filter((m) => groupOf(m) !== "look")), off: ms.filter((m) => groupOf(m) === "off") };
   const pick = ms.find((m) => m.host === sel) || null, cur = pick || ms[0];
   const [loading, setLoading] = useState(false);
   useEffect(() => { if (!sel) return; setLoading(true); const t = setTimeout(() => setLoading(false), 700); return () => clearTimeout(t); }, [sel]);
@@ -9114,15 +9592,17 @@ function AdminMachinesPage({ go }) {
     if (p) return ["Answer", () => go("messages", p.id)];
     if (m.ver !== CUR) return ["Update now", () => toast(`${m.host} updates to ${CUR} now; ${m.user ? `${m.user} may see a restart prompt` : "nobody is signed in"} (concept)`)];
     return ["Enter", () => modal.confirm(enterSessionConfirm(m, () => toast(`You are in ${m.host} (concept)`)))]; };
-  const whatOf = (m) => { const i = openOn(m.host)[0], p = pingOn(m);
-    return [m.held ? `${m.held === "You" ? "you are" : `${m.held} is`} inside` : null, i ? `${i.title.charAt(0).toLowerCase()}${i.title.slice(1)}: ${i.subject}` : null, p ? `asked for help${p.pings.length > 1 ? ` ${p.pings.length} times` : ""}` : null,
-      m.ver !== CUR ? `on ${m.ver}, one behind` : null, m.status === "offline" ? `last seen ${dur(m.seen)} ago` : null].filter(Boolean).join(" · ") || "nothing open"; };
+  const whatOf = (m) => { const p = pingOn(m), off = m.status === "offline", v = (k) => (off ? 0 : metric(m.host, k, NOWH) || 0);
+    const own = ["warning", "high", "critical"].includes(m.status) && m.note ? m.note.charAt(0).toLowerCase() + m.note.slice(1) : null;
+    return [off ? `Off, last seen ${dur(m.seen)} ago` : `On, ${m.user ? `${m.user} signed in` : "nobody signed in"}`, own, m.held ? (m.held === "You" ? "you are inside" : `${m.held} is inside`) : null,
+      v("cpu") >= 90 ? `CPU at ${Math.round(v("cpu"))}%` : null, v("mem") >= 90 ? `memory at ${Math.round(v("mem"))}%` : null, v("disk") >= 90 ? `disk ${Math.round(v("disk"))}% full` : null,
+      !own && p ? "asked for help" : null, !own && m.ver !== CUR ? "one version behind" : null].filter(Boolean).join(" · "); };
   const card = (m) => { const [verb, fn] = actOf(m), cpu = metric(m.host, "cpu", NOWH), urg = groupOf(m) === "look";
     const on = exp === m.host, picked = sel === m.host, enterOk = m.status !== "offline" && m.held !== "You";
     return html`<div key=${m.host} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "") + (m.status === "offline" ? " done" : "")}>
     <article className=${"iq-card am-card" + (urg ? " urg" : "")} role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => setSel(m.host)} onKeyDown=${(e) => e.key === "Enter" && setSel(m.host)}>
       <span className="iq-ic">${ic("DesktopOutlined")}</span>
-      <span className="iq-main"><span className="iq-t"><b className="cut">${m.host}</b><span className="t3">${m.user || "nobody signed in"}</span></span><span className=${"iq-s cut" + (urg ? " hot" : "")}>${whatOf(m)}</span></span>
+      <span className="iq-main"><span className="iq-t"><b className="cut">${m.host}</b></span><span className=${"iq-s cut" + (urg ? " hot" : "")}>${whatOf(m)}</span></span>
       <span className="am-facts">${m.status === "offline" ? html`<span className="am-sp t4">no data since ${dur(m.seen)} ago</span>` : html`<span className="am-sp" title="CPU over the last 24 hours"><${Spark} fn=${(x) => metric(m.host, "cpu", x)} w=${96} h=${22} max=${100} c=${urg ? "var(--crit)" : "var(--s6)"} /><span>${cpu == null ? "—" : `${cpu.toFixed(0)}%`}</span></span>`}<span>${m.ver}</span></span>
       <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setExp(on ? null : m.host); setSel(m.host); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span></article>
     ${on ? html`<div className="tk-open">
@@ -9152,11 +9632,11 @@ function AdminMachinesPage({ go }) {
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <section className="ib-box">
-        <header><b>My machines</b><span>one card per machine, grouped by what it needs from you; click one to draw it on the right, expand it for its details</span></header>
-        ${G.map(([k, g, d]) => { const xs = by[k]; if (!xs.length) return null; const fold = k === "fine" && !more.fine;
-          return html`<div key=${k} className="iq-grp"><div className="lay-grp iq-gh">${g} · ${fmt(xs.length)}<span>${d}</span>${k === "fine" ? html`<a style=${{ marginLeft: "auto", fontWeight: 400 }} onClick=${() => setMore({ ...more, fine: !more.fine })}>${more.fine ? "Hide" : "Show"}</a>` : null}</div>
-            ${fold ? null : html`<div className="iq-cards">${(more[k] || k === "fine" ? xs : xs.slice(0, AM_SHOW)).map(card)}</div>`}
-            ${k !== "fine" && xs.length > AM_SHOW ? html`<a className="ib-more" onClick=${() => setMore({ ...more, [k]: !more[k] })}>${more[k] ? "Show fewer" : `and ${fmt(xs.length - AM_SHOW)} more`}</a>` : null}</div>`; })}
+        <header><b>My machines</b><span>one card per machine, serious first; click one to draw it on the right, expand it for its details</span></header>
+        ${G.map(([k, g, d]) => { const xs = by[k]; if (!xs.length) return null;
+          return html`<div key=${k} className="iq-grp"><div className="lay-grp iq-gh">${g} · ${fmt(xs.length)}<span>${d}</span></div>
+            <div className="iq-cards">${(more[k] ? xs : xs.slice(0, AM_SHOW)).map(card)}</div>
+            ${xs.length > AM_SHOW ? html`<a className="ib-more" onClick=${() => setMore({ ...more, [k]: !more[k] })}>${more[k] ? "Show fewer" : `and ${fmt(xs.length - AM_SHOW)} more`}</a>` : null}</div>`; })}
       </section>
       <div className="am-right">${!pick ? html`<section className="ib-box iq-fix">
         <header><b>No machine picked</b><span>click a machine on the left to draw it here</span></header>
@@ -9625,9 +10105,9 @@ function App() {
   else if (page === "tasks" && level && (!sub || TASKS.some((t) => t.id === sub))) body = html`<${AdminTasksPage} key=${sub || "tasks"} go=${go} open=${sub} />`;
   else if (page === "tasks") body = !level && (!sub || sub === "new" || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${Directives3} go=${go} />` : sub === "new" ? html`<${NewTask} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
   else if (page === "flows") body = level ? html`<${AdminFlowsPage2} key=${sub || "flows"} go=${go} open=${sub} />` : sub === "new" ? html`<${NewFlow} go=${go} me=${null} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${null} edit=${sub.slice(5)} />` : html`<${FlowsSU} go=${go} me=${null} open=${FBY[sub] ? sub : null} />`;
-  else if (page === "detective") body = level ? html`<${DetectivePage} key=${level.dept} go=${go} dept=${level.dept} />` : html`<${DetectivePage} go=${go} dept=${null} />`;
+  else if (page === "detective") body = level ? html`<${AdminDetectivePage} key=${ME} go=${go} />` : html`<${DetectivePage} go=${go} dept=${null} />`;
   else if (page === "restricted" || page === "protected") body = !level ? html`<${ProtectedLevels} go=${go} start=${sub} />` : !sub ? html`<${AdminRestrictedPage} key=${ME} go=${go} />` : sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} all=${!level} />`;
-  else if (page === "actions") body = sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;
+  else if (page === "actions") body = level && !sub ? html`<${AdminActionsLayout} />` : sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;
   else if (page === "automation") body = level && !sub ? html`<${AdminAutomationPage} key=${ME} go=${go} />` : sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : html`<${Automation} go=${go} open=${sub && RBY[sub] ? sub : null} />`;
   else if (page === "audit") body = !level ? html`<${AuditBrief} range=${range} go=${go} />` : html`<${AuditSU} range=${range} go=${go} open=${sub} me=${level ? level.admin : null} />`;
   else body = html`<${Overview} range=${range} go=${go} />`;
@@ -9662,7 +10142,7 @@ function App() {
           
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>SU</span><div><div style=${{ fontWeight: 500 }}>Super User</div><div className="t3 mono" style=${{ fontSize: 11 }}>ADM-01</div></div></div>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
-          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 28 Oct 12:30</span>
+          <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 29 Oct 13:15</span>
           <span className="t4" style=${{ fontSize: 11, whiteSpace: "normal" }} title="The large sample checks that nothing grows with the data">Concept · sample:
             ${["empty", "small", "large", "absurd"].map((v, k) => html`<${React.Fragment} key=${v}>${k ? " · " : " "}<a style=${{ color: SAMPLE_SIZE === v ? "var(--accent)" : "var(--text-3)", fontWeight: SAMPLE_SIZE === v ? 600 : 400, cursor: "pointer" }} onClick=${() => SAMPLE_SIZE !== v && setSample(v)}>${v}</a><//>`)}</span>
         </div>

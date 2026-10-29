@@ -155,6 +155,35 @@ part is recorded for later, not built.
    - **Try it before switching it on.** Run a new or edited rule once, on one machine you pick, and show the result before it goes live. Nothing about the rule is saved until you confirm.
    - **Too quiet or too loud.** Say when a rule fires far more than its usual week (31 times against 3), or has not fired in weeks while its event surely happened. This needs each rule's weekly count kept, so a week can be compared with the usual.
 
+14. **What the Admin's Actions page needs** (the user, 28 Oct 2026; the concept's Actions, Admin v159).
+   - **What a custom action reports back.** Its author picks one of three, and it is kept with the action:
+     - **text:** what it prints is shown as it is, and the first line is the summary;
+     - **a list:** each line printed is a row, a tab splits the columns, and the summary counts the rows;
+     - **only whether it worked:** the output is not shown, and exit 0 counts as worked.
+
+     The Engine stores the choice with the action. The console shows a run's output the way the choice says.
+   - **A run by hand reports back machine by machine.** As each machine finishes, push its outcome, exit code and time, so the picked machines can fill in while the run is going. Stopping a run by hand ends what is still running; it is recorded as stopped, not failed.
+   - **A test run of a custom action before it is saved.** Run the script once, on one machine the author picks, and return what it printed, its exit code and its time. Nothing about the action is saved until the author confirms. This is the same idea as "try it before switching it on" for rules (item 13). The test is a real run, so it is recorded with the author's name.
+15. **A case told in words** (the user, 29 Oct 2026; the concept's Detective, Admin v171).
+   - **What it is.** "What Detective noticed" is no longer a list of findings. It is a few paragraphs, written by the local model from the case's evidence, telling what went on: who was signed in, on which machine, when it started, how long it took, what was done to which files, what makes it worth a look, and what would make it innocent. People, files, machines, programs and times are marked in the text, the way the task box marks them.
+   - **This goes against a rule in CLAUDE.md, so it needs a decision.** The model is only ever asked narrow questions (pick from a list, or extract text that is then checked word for word), never to write freely. A free account from a 1.7B model can say something the evidence does not, about a named person. Two ways to keep it honest:
+     - the model writes only the joining words, and every fact (a name, a file, a time, a count) is filled in from the case, never by the model; or
+     - the model writes freely, and every name, file, time and number in its text is checked against the case before it is shown; anything it cannot back is dropped, or the account falls back to the findings.
+   - **Where it comes from.** A case needs who was signed in at the time (from sessions), not who is signed in now, and the duration from first to last event. Both are in the Engine already.
+   - The account is labelled as the model's reading, not proof, and nobody at the machine is told.
+16. **Detective weighs what was carried, not the drive** (the user, 29 Oct 2026; the concept's Detective, Admin v179).
+   - **The rule.** When files leave a machine, the weight comes from what they are: restricted, marked, or from a folder outside the person's work. Whether the drive is new to the machine is context only. A new drive carrying ordinary files raises little or nothing. A drive the machine knows well carrying restricted files still counts in full.
+   - **Said to be fine follows the same rule.** An exception for a drive, a program or a folder lets ordinary files pass. It never lets restricted files pass: copying restricted files to an excused drive still counts in full.
+   - **Today** "a drive this machine has not seen before" is one of the reasons a finding counts (the drive-after-staging and to-drive findings). It should be kept as a fact that is shown, and stop adding to the weight on its own.
+   - **What the At a glance panel needs for each case:**
+     - how far it got, as the last stage reached and the next one;
+     - whether restricted files are involved;
+     - who was signed in at the time, which may not be who is signed in now;
+     - the earlier cases on the same machine and their outcomes;
+     - when it was raised.
+
+     Most of these are in the case already. Who was signed in at the time comes from sessions, and the earlier cases come from the cases table.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine
