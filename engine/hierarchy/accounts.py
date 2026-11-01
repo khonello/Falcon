@@ -218,6 +218,41 @@ async def admin_limit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"account_id": account_id, "hours_limited": on}
 
 
+@handler("hierarchy.ownership")
+async def ownership(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"account_id"} -> what that account still owns that runs or waits on it: restrictions it marked, flows, rules and actions it made, tasks
+    it must verify, issues it holds. For an Admin who left (offboarded) before someone takes it over."""
+    _manager(ctx)
+    account_id = int_field(payload, "account_id")
+    subject = await ctx.engine.db.accounts.by_id(account_id)
+    if subject is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such account")
+    owned = await ctx.engine.db.accounts.owned(account_id)
+    return {"account_id": account_id, "status": subject["status"], "owned": owned, "total": sum(len(v) for v in owned.values())}
+
+
+@handler("hierarchy.hand_over")
+async def hand_over(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"from_account_id", "to_account_id"} -- an Admin who left hands what they owned to another active Admin (the user, 1 Nov 2026: such edge
+    cases are dealt with by a tool, not a page). The one who left must already be offboarded; the one taking over becomes the owner of each
+    restriction (so consent requests for it go to them), flow, rule, action, task to verify and issue. Audited, with every id moved."""
+    ident = _manager(ctx)
+    db = ctx.engine.db
+    from_id, to_id = int_field(payload, "from_account_id"), int_field(payload, "to_account_id")
+    gone, taker = await db.accounts.by_id(from_id), await db.accounts.by_id(to_id)
+    if gone is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such account to hand over from")
+    if gone["status"] == "active":
+        raise ProtocolError(ErrorCode.CONFLICT, "that account is still active: offboard it first (account offboard)")
+    if taker is None or taker["status"] != "active" or taker["role"] != ident.role:
+        raise ProtocolError(ErrorCode.INVALID, "hand over to an active Admin")
+    moved = await db.accounts.hand_over(from_id, to_id)
+    await ctx.engine.audit.record(ctx, "account.handed_over", target_type="accounts", target_id=from_id,
+                                  detail={"to_account_id": to_id, "moved": moved})
+    await ctx.engine.push_to_account(to_id, "account.handed_over", {"from_account_id": from_id, "moved": {k: len(v) for k, v in moved.items()}})
+    return {"from_account_id": from_id, "to_account_id": to_id, "moved": moved, "total": sum(len(v) for v in moved.values())}
+
+
 @handler("hierarchy.account_get")
 async def account_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")

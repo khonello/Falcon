@@ -18,7 +18,7 @@ Last updated 1 Nov 2026.
   issues by Take; only Admin-to-Admin flows need consent; single-file flows followed at both ends. The plan is ENGINE-GAPS #18.
 - **Steps 1-3 built (1 Nov 2026):** Admins over every department (`FALCON_ADMIN_SCOPE`), the first IT Admin at setup, Admin-to-Admin
   consent with the destination naming the folder, single-file flows. Next: park the Super User, then the console.
-- **Still to settle:** who owns a restriction when the Admin who marked it leaves.
+- **Settled:** An Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
 ## Engine pass, 1 Nov 2026 (ENGINE-GAPS 8, 9, 10, 11, 12, 13, 14, 16, 17)
 

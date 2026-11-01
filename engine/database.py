@@ -373,6 +373,32 @@ class AccountsRepo(_Repo):
         """The machine's client connected or dropped just now."""
         await self._exec("UPDATE pcs SET last_seen_at = now() WHERE id = $1", pc_id)
 
+    # What an account still owns that keeps running or waits on it: when an Admin leaves (offboarded), another Admin takes it over with a tool
+    # (TUI `account handover`), not a page (the user, 1 Nov 2026). Each entry: (what, table, owner column, which rows are still live).
+    OWNED = (
+        ("restrictions", "resource_marks", "by_account_id", "unmarked_at IS NULL"),
+        ("flows", "flows", "created_by_account_id", "status <> 'inactive'"),
+        ("rules", "event_definitions", "created_by_account_id", "TRUE"),
+        ("actions", "actions", "created_by_account_id", "archived_at IS NULL AND NOT trial"),
+        ("tasks to verify", "tasks", "assigner_account_id", "status <> 'completed'"),
+        ("issues", "issues", "owner_account_id", "state <> 'resolved'"),
+    )
+
+    async def owned(self, account_id: int) -> dict[str, list[int]]:
+        out = {}
+        for what, table, column, live in self.OWNED:
+            out[what] = [r["id"] for r in await self._fetch(f"SELECT id FROM {table} WHERE {column} = $1 AND {live} ORDER BY id", account_id)]
+        return out
+
+    async def hand_over(self, from_id: int, to_id: int) -> dict[str, list[int]]:
+        """Move every live thing `from_id` owns to `to_id`, in one transaction. What was finished or taken back stays theirs: it is history."""
+        moved: dict[str, list[int]] = {}
+        async with self.pool.acquire() as conn, conn.transaction():
+            for what, table, column, live in self.OWNED:
+                rows = await conn.fetch(f"UPDATE {table} SET {column} = $2 WHERE {column} = $1 AND {live} RETURNING id", from_id, to_id)
+                moved[what] = sorted(r["id"] for r in rows)
+        return moved
+
     async def pcs_in_department(self, department_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
             "SELECT p.id, p.hostname, p.department_id, p.pc_type, a.id AS bound_account_id, a.role AS bound_role "

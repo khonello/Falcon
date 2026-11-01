@@ -168,6 +168,24 @@ async def account_offboard(ctx: ShellContext, args: Args) -> str:
     return f"account {res['account_id']} {res['status']}"
 
 
+@command("account", "owns", "<account_id>", "What an account still owns: restrictions, flows, rules, actions, tasks to verify, issues")
+async def account_owns(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("hierarchy.ownership", {"account_id": args.get_int(0, "account_id")})
+    lines = [f"account {res['account_id']} ({res['status']}): {res['total']} thing(s)"]
+    lines.extend(f"  {what}: {', '.join(map(str, ids))}" for what, ids in res["owned"].items() if ids)
+    return "\n".join(lines)
+
+
+@command("account", "handover", "<from_account_id> <to_account_id>",
+         "An Admin who left (offboard them first) hands everything they still own to another Admin")
+async def account_handover(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("hierarchy.hand_over", {"from_account_id": args.get_int(0, "from_account_id"),
+                                                 "to_account_id": args.get_int(1, "to_account_id")})
+    lines = [f"handed {res['total']} thing(s) from account {res['from_account_id']} to {res['to_account_id']}"]
+    lines.extend(f"  {what}: {', '.join(map(str, ids))}" for what, ids in res["moved"].items() if ids)
+    return "\n".join(lines)
+
+
 @command("account", None, "<account_id>", "Show an account")
 async def account_get(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("hierarchy.account_get", {"account_id": args.get_int(0, "account_id")})

@@ -246,7 +246,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      path from move events against the sync log's `written_path`.
    - Park the Super User: its handlers, QML pages, TUI commands, preview data, installer role, handover and their tests go to `parked/`; every
      reference is stripped from what ships.
-   - Open: who owns a restriction when the Admin who marked it leaves.
+   - Settled and built: an Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
 ## Done inline (for the record)
 

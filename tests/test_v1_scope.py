@@ -118,3 +118,27 @@ async def test_a_single_file_flow_follows_its_file_at_the_source_and_its_copy_at
     assert got["apply"]["destination_path"] == "C:/Users/ama/Desktop" and got["apply"]["relative_path"] == "report.docx"
     trail = {r["action_type"] for r in await engine.db.audit.recent(limit=50)}
     assert {"flow.source_followed", "flow.copy_followed"} <= trail
+
+
+async def test_an_admin_who_left_hands_what_they_owned_to_another_admin(engine, org, connect):
+    """An Admin leaving is known by their account being offboarded, not by the machine. What they still own (restrictions, flows, rules,
+    actions, tasks to verify, issues) is handed to another Admin with a tool (TUI `account handover`)."""
+    a1, a2 = await connect("cid-a1"), await connect("cid-a2")
+    await connect("cid-w1")
+    await a2.ok("index.event", {"event": {"op": "create", "path": "C:/HR/payroll.xlsx", "hash": "P1"}})
+    [mark] = (await a2.ok("marks.create", {"paths": ["C:/HR/payroll.xlsx"], "keep": "path"}))["marks"]
+    flow = (await a2.ok("flow.create", {"source_pc_id": org["a2_pc"], "source_path": "C:/out", "stages": [],
+                                        "destinations": [{"destination_pc_id": org["w1_pc"], "destination_path": "C:/in"}]}))["flow"]
+    shot = (await a2.ok("control.action_create", {"kind": "control", "builtin_type": "screenshot", "timeout_s": 10}))["action"]
+    rule = (await a2.ok("control.event_create", {"type": "usb.inserted", "action_ids": [shot["id"]]}))["event"]
+
+    owns = await a1.ok("hierarchy.ownership", {"account_id": org["a2"]})
+    assert owns["owned"]["restrictions"] == [mark["id"]] and owns["owned"]["flows"] == [flow["id"]] and owns["owned"]["rules"] == [rule["id"]]
+    assert await a1.err("hierarchy.hand_over", {"from_account_id": org["a2"], "to_account_id": org["a1"]}) == "conflict"   # still active
+    await a1.ok("hierarchy.account_offboard", {"account_id": org["a2"]})
+    assert await a1.err("hierarchy.hand_over", {"from_account_id": org["a2"], "to_account_id": org["w1"]}) == "invalid"   # not an Admin
+    done = await a1.ok("hierarchy.hand_over", {"from_account_id": org["a2"], "to_account_id": org["a1"]})
+    assert done["moved"]["restrictions"] == [mark["id"]] and done["moved"]["actions"] == [shot["id"]] and done["total"] == 4
+    assert (await engine.db.marks.get(mark["id"]))["by_account_id"] == org["a1"]
+    assert (await a1.ok("hierarchy.ownership", {"account_id": org["a2"]}))["total"] == 0
+    assert any(r["action_type"] == "account.handed_over" for r in await engine.db.audit.recent(limit=10))

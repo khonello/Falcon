@@ -15,7 +15,7 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 5. **Console:** no Super User words, pages or data; departments as filters and groups.
 6. Then packaging.
 
-**Still to settle:** who owns a restriction when the Admin who marked it leaves.
+**Settled:** An Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
 ## Engine work waiting on your decision
 - **#3 Private tag:** none of it is built. The open question is how a refusal is shown to the person at the machine.

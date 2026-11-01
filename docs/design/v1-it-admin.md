@@ -38,7 +38,7 @@ remove choice.
 
 | Where the design named the Super User | Version 1 |
 |---|---|
-| Owner of a restriction | The Admin who marked it. **Open:** who owns it when that Admin leaves (proposal: it passes to whoever takes the issue, or stays with nobody and any Admin may decide). |
+| Owner of a restriction | The Admin who marked it. When that Admin leaves: an Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026). |
 | Rules "set above you", organisation-wide automations | Gone: every rule is an Admin's, and any Admin sees every rule. A rule stays its maker's to change. |
 | Department tasks and directives | Gone. An Admin's own to-dos (ENGINE-GAPS #17) take their place. |
 | Notices and announcements from above | Gone. Admins write announcements to Workers as now. |
@@ -76,5 +76,5 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next.
 
 ## Still open
 
-- Who owns a restriction when the Admin who marked it leaves.
+- *(settled 1 Nov 2026)* An Admin who leaves: an Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 - `who-runs-the-console.md` question 5 (department-level Admins) is answered by this: there are none; IT decides everything.
