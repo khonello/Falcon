@@ -62,7 +62,7 @@ Page {
         return parsed.filter(function (x) { var d = new Date(x.at); return x.k === k && d.getMonth() === m && d.getFullYear() === y }).length
     }
     readonly property var dayItems: byDay[sel] || []
-    readonly property var kindsHere: Nav.boss ? ["task", "announcement"] : kindKeys
+    readonly property var kindsHere: kindKeys
     readonly property var agenda: {
         var rows = dayItems.map(function (x) { return { x: x, at: x.at } })
         if (sel === today) rows.push({ now: true, at: Date.now() })

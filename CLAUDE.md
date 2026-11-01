@@ -23,25 +23,25 @@ The pyenv-win shim on PATH (`python.bat`) corrupts inline `python -c "..."`; use
 (`common/dotenv.py`); a variable set in the real environment still wins. `python -m engine setup` makes a fresh clone
 ready in one step and is safe to run again: it writes `.env`, makes the certificate, creates the databases (given
 `--admin-url postgresql://postgres:<pw>@localhost:5432/postgres`, else it prints the SQL), migrates, creates the master
-secret, bootstraps the first Super User (id + key printed once and written into this machine's Operator Client
+secret, bootstraps the first IT Admin (id + key printed once and written into this machine's Operator Client
 settings), and checks the model (`--download-model` fetches it).
 
 ```powershell
 environ-engine\Scripts\Activate.ps1
 pip install -r requirements-engine.txt     # Engine + tests + the GUI tests (extras: engine,dev,gui)
-python -m engine setup                     # fresh clone -> ready: .env, cert, databases, schema, secret, Super User
+python -m engine setup                     # fresh clone -> ready: .env, cert, databases, schema, secret, first IT Admin
 python -m engine                           # run it (real auth + TLS, from .env)
 pytest                                     # all tests, DB tests included (FALCON_TEST_DATABASE_URL comes from .env)
 pytest tests/test_engine_smoke.py -k handshake   # one test
 ruff check .
 python -m engine gencert 127.0.0.1,localhost,<hostname> data   # a certificate by hand (setup does this)
-python -m engine bootstrap SU-PC           # a first Super User by hand (setup does this)
+python -m engine bootstrap IT-01           # the first IT Admin by hand (setup does this)
 # dev switches (no TLS, no handshake -- loud): uncomment FALCON_DEV_PLAINTEXT / FALCON_DEV_BYPASS_AUTH in .env
 
 environ-operator\Scripts\Activate.ps1
 pip install -r requirements-operator.txt    # Operator Client TUI + GUI (PySide6, qasync)
 python scripts/make_org.py                 # once: makes a department + an Admin + a Worker, prints how to run them
-python -m operator_client --gui            # after setup on this machine: connects as the Super User, nothing to type
+python -m operator_client --gui            # after setup on this machine: connects as the first IT Admin, nothing to type
 python -m operator_client --gui --config data/admin.json   # the Admin's console (own settings file; make_org.py writes it)
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # interactive TUI (TLS)
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --plaintext           # against a DEV_PLAINTEXT Engine
@@ -49,7 +49,7 @@ python -m operator_client --connect --script "tree; tasks"                      
 python -m operator_client --gui --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # QML GUI
 ```
 
-`scripts/preview.py` opens the console with sample data and NO Engine — a dev tool for looking at the UI, not a way to run the product (`admin`, `inside`, `<page>` or `<page>/<sub>`, `--shot <png>`, `--in <objectName> --do "<js>" --at <ms>`; the sample data is `scripts/preview_data.py`). GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`requirements-engine.txt` includes it); they skip otherwise. The screenshot scripts set Qt's offscreen platform and Windows font folder themselves, and take their state as options (`design/shot_gui.py design/shots admin 2 --flow=4`; `design/shot_board.py <BOARD>` for design boards).
+`scripts/preview.py` opens the console with sample data and NO Engine — a dev tool for looking at the UI, not a way to run the product (always as an IT Admin; `<page>` or `<page>/<sub>`, `--shot <png>`, `--in <objectName> --do "<js>" --at <ms>`; the sample data is `scripts/preview_data.py`). GUI tests (`tests/test_operator_gui.py`) need PySide6 in `environ-engine` too (`requirements-engine.txt` includes it); they skip otherwise. The screenshot scripts set Qt's offscreen platform and Windows font folder themselves, and take their state as options (`design/shot_gui.py design/shots admin 2 --flow=4`; `design/shot_board.py <BOARD>` for design boards).
 
 ```powershell
 environ-worker\Scripts\Activate.ps1
@@ -142,7 +142,7 @@ Build order was: Engine → Operator Client (TUI) → Worker Client → full int
 These are load-bearing design rules that are easy to violate by accident:
 
 - **Propose, never silently resolve.** Any LLM/automation output (Task verification structure, deadlines, multi-task splits) is surfaced to a human for confirmation; never auto-committed. The LLM is local (Ollama/llama.cpp-style small model, Qwen3 shortlisted) and called as a **decomposed question graph** of narrow yes/no or pick-from-list questions — not one open-ended structuring call.
-- **Version 1 is IT Admins only; the Super User is parked (the user, 1 Nov 2026; `docs/design/v1-it-admin.md`).** Nothing that ships may name the Super User: no page, word, sample data, handler reachable from the console, installer role or setup step. Its code moves to `parked/`, which no package includes; do not delete it. Admins (several) reach every department; departments are labels Admins create. Two Admins on one machine: refused. Issues and reports reach every Admin and become one's by Take. Only an Admin-to-Admin flow needs consent (the destination Admin's, who picks the folder); a flow may carry a single file followed by identity at both ends. Where an invariant below names the Super User, it applies after reconnection, not in version 1.
+- **Version 1 is IT Admins only; the Super User is parked (the user, 1 Nov 2026; `docs/design/v1-it-admin.md`).** Nothing that ships may name the Super User: no page, word, sample data, handler reachable from the console, installer role or setup step. Its code is in `parked/` (done 1 Nov 2026; `parked/README.md` says what goes back where), which no package, ruff run or test run includes; do not delete it. An account of the `super_user` role is refused at sign-in under `FALCON_ADMIN_SCOPE=organisation` (`engine.permissions.signs_in`); what only the head of the organisation may do goes through `require_head` (any Admin in version 1). Admins (several) reach every department; departments are labels Admins create. Two Admins on one machine: refused. Issues and reports reach every Admin and become one's by Take. Only an Admin-to-Admin flow needs consent (the destination Admin's, who picks the folder); a flow may carry a single file followed by identity at both ends. Where an invariant below names the Super User, it applies after reconnection, not in version 1.
 - **A Flow carries nothing restricted without its owner's consent (the user, 18 Oct 2026).** A restricted file or folder (tagged, in a restricted tier, named by a mark or under a marked folder, or a copy of marked content) is never read, written or put away by a flow unless the owner of the restriction (the person who marked it, or the Super User) has consented for that flow. When a flow meets one, at creation or while running, it is paused and the owner is asked. The status is looked up fresh at every step (`engine/flow/guard.py`), never remembered from when the flow was made.
 - **One Global File Index.** Task verification, Flow collision/cycle checks, and Resource compliance all query the same `file_index` — never build per-feature bookkeeping.
 - **Native OS events over polling**; polling is fallback only. Idle-time work (index sweep, update retries) must cancel the instant user input resumes.

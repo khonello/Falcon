@@ -19,6 +19,7 @@ from engine.isotime import parse_iso
 from engine.permissions import (
     in_scope,
     int_field,
+    org_wide,
     require_account,
     require_department_scope,
     require_role,
@@ -42,8 +43,8 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     title = " ".join(str(payload.get("title") or "").split())[:120] or None
     department_id = int_field(payload, "department_id", required=audience == "department")
     account_ids = payload.get("account_ids")
-    if audience == "all_users" and ident.role != "super_user":
-        raise ProtocolError(ErrorCode.FORBIDDEN, "all-users alerts are Super User only")
+    if audience == "all_users" and not org_wide(ident):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "an announcement to everyone is sent by whoever heads the organisation")
     if audience == "department":
         require_department_scope(ident, department_id)
     if audience == "specific_users":

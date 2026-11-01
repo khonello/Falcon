@@ -1,6 +1,6 @@
 """The Engine's installer (Linux, run once on the server, as root).
 
-    sudo python3 -m installers.engine.install --names falcon.internal,192.168.1.20 --hostname SU-PC [--dry-run]
+    sudo python3 -m installers.engine.install --names falcon.internal,192.168.1.20 --hostname IT-01 [--dry-run]
 
 Run from a payload folder (`python -m installers.payload engine <folder>`) or from a checkout. It:
 
@@ -10,13 +10,13 @@ Run from a payload folder (`python -m installers.payload engine <folder>`) or fr
      3. copies the code and makes its own Python runtime in /opt/falcon/venv with the libraries from the payload
      4. PostgreSQL: a `falcon` role with a password made here (never the development one) and the `falcon` database
      5. writes /etc/falcon/falcon.env and links it as the app's .env
-     6. runs `python -m engine setup`: certificate (valid for --names), schema, master secret, the first Super User, the firewall
+     6. runs `python -m engine setup`: certificate (valid for --names), schema, master secret, the first IT Admin, the firewall
      7. hands the folders to the falcon user, with the secrets readable by it alone
      8. writes the client bundle (falcon-client.json: the address and the certificate -- no key) that every PC's installer is given,
         and prints the certificate's fingerprint to read out when installing them
      9. installs and starts the service (systemd: starts with the server, restarts itself)
 
-Every step checks what is there first, so running it again repairs or upgrades and never makes a second Super User or a new secret.
+Every step checks what is there first, so running it again repairs or upgrades and never makes a second first Admin or a new secret.
 The master secret is NEVER replaced: lose it and every machine must be registered again, so it is backed up by a person (printed at the end).
 """
 
@@ -47,7 +47,7 @@ class EngineInstall:
         self.say = say
         self.source = Path(args.source).resolve() if args.source else HERE
         self.names = [n.strip() for n in args.names.split(",") if n.strip()]
-        self.super_user: dict[str, str] = {}
+        self.first_admin: dict[str, str] = {}
         self._db_password = ""
         self.fingerprint = ""
 
@@ -62,7 +62,7 @@ class EngineInstall:
         p.add("PostgreSQL", self.database, "the falcon role and database, with a password made here",
               skip="--database-url given" if a.database_url else ("--no-database" if a.no_database else None))
         p.add("Settings", self.settings, f"{self.layout.env_file}, linked as the app's .env")
-        p.add("Setup", self.setup, "certificate, schema, master secret, first Super User, firewall (python -m engine setup)", skip="--no-setup" if a.no_setup else None)
+        p.add("Setup", self.setup, "certificate, schema, master secret, first IT Admin, firewall (python -m engine setup)", skip="--no-setup" if a.no_setup else None)
         p.add("Ownership", self.ownership, "the falcon user owns its folders; secrets readable by it alone")
         p.add("Client bundle", self.client_bundle, f"{self.layout.bundle}: the address and certificate every PC installer is given")
         p.add("Service", self.service, f"{self.layout.unit_file}: starts with the server, restarts itself",
@@ -169,12 +169,12 @@ class EngineInstall:
         for key in ("client_id", "client_key"):
             for line in out.splitlines():
                 if line.strip().startswith(key + ":"):
-                    self.super_user[key] = line.split(":", 1)[1].strip()
-        if self.super_user.keys() >= {"client_id", "client_key"}:
-            write_text(L.first_super_user, "The first Super User (printed once by the installer; delete this file after it is safely held)\n"
-                       f"client_id:  {self.super_user['client_id']}\nclient_key: {self.super_user['client_key']}\n", 0o600)
-            return f"set up; the first Super User's id and key are in {L.first_super_user} (readable by root only)"
-        return "set up (the Super User already existed: no new key was made)"
+                    self.first_admin[key] = line.split(":", 1)[1].strip()
+        if self.first_admin.keys() >= {"client_id", "client_key"}:
+            write_text(L.first_admin, "The first IT Admin (printed once by the installer; delete this file after it is safely held)\n"
+                       f"client_id:  {self.first_admin['client_id']}\nclient_key: {self.first_admin['client_key']}\n", 0o600)
+            return f"set up; the first IT Admin's id and key are in {L.first_admin} (readable by root only)"
+        return "set up (an Admin already existed: no new key was made)"
 
     def ownership(self) -> str:
         L = self.layout
@@ -185,8 +185,8 @@ class EngineInstall:
             f = L.state / secret
             if f.exists():
                 f.chmod(0o600)
-        if L.first_super_user.exists():
-            run_cmd(["chown", "root:root", str(L.first_super_user)])
+        if L.first_admin.exists():
+            run_cmd(["chown", "root:root", str(L.first_admin)])
         L.etc.chmod(0o750)
         L.state.chmod(0o750)
         return "the falcon user owns its folders; the secret and the key are readable by it alone"
@@ -226,7 +226,7 @@ class EngineInstall:
         if self.fingerprint:
             lines += ["  Certificate fingerprint (read this out when installing a PC, to be sure it is this Engine):", f"    {self.fingerprint}", ""]
         lines += [f"  Give every PC's installer:  {L.bundle}",
-                  f"  The first Super User's id and key:  {L.first_super_user}  (root only; keep them, then delete the file)",
+                  f"  The first IT Admin's id and key:  {L.first_admin}  (root only; keep them, then delete the file)",
                   f"  BACK UP, offline:  {L.state / 'master.secret'}  (every machine's key derives from it)", ""]
         return "\n".join(lines)
 
@@ -234,7 +234,7 @@ class EngineInstall:
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="installers.engine.install", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--names", default="", help="every name and address the PCs will use to reach this server, comma-separated (the first is the one in the bundle)")
-    ap.add_argument("--hostname", default="SU-PC", help="the Super User's workstation name (not this server's)")
+    ap.add_argument("--hostname", default="IT-01", help="the first IT Admin's workstation name (not this server's)")
     ap.add_argument("--port", type=int, default=7400)
     ap.add_argument("--source", help="the payload folder (default: the one this installer is in)")
     ap.add_argument("--wheels", help="a folder of wheels, to install with no network")

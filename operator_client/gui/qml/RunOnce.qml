@@ -69,7 +69,7 @@ Drawer {
             width: parent.width
             spacing: 10
             Txt { text: "ON WHICH MACHINES"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            Radio { width: parent.width; options: [{ value: "pick", label: "Machines I pick" }].concat(Nav.boss ? [{ value: "dept", label: "A department" }] : []).concat([{ value: "all", label: Nav.boss ? "Every machine" : "Every machine in this department" }])
+            Radio { width: parent.width; options: [{ value: "pick", label: "Machines I pick" }, { value: "dept", label: "A department" }, { value: "all", label: "Every machine" }]
                     value: root.scope; onPicked: function (v) { root.scope = v } }
             Select { visible: root.scope === "pick"; width: parent.width; multiple: true; search: true; placeholder: "Pick machines"; values: root.picks
                      options: Fleet.machines.map(function (m) { return { value: m.pc_id, label: m.host + " · " + (m.user || "no user") + (m.online ? "" : " · offline") } })

@@ -6,7 +6,7 @@ import "."
 // make it innocent. It is Detective's own conclusion; what you make of it is recorded (explained, accepted, dismissed).
 // The page, top to bottom: the cases with the one picked beside them; its Evidence (the picture and the story in order, as two tabs); and what Detective
 // noticed, each thing on its own with what would make it harmless, in rows across the width.
-// The Super User sees every machine; an Admin sees their department's machines, never their own and never another Admin's.
+// An IT Admin sees every machine but their own and another Admin's.
 Page {
     id: page
     objectName: "detectiveView"
@@ -75,7 +75,7 @@ Page {
             objectName: "caseList"
             width: (parent.width - 14) * 7 / 12
             title: "Cases"
-            sub: Nav.boss ? "every machine, strongest first" : "your department's machines, strongest first"
+            sub: "every machine, strongest first"
             tools: Segmented { objectName: "detShow"; options: [{ value: "open", label: "Open" }, { value: "noted", label: "+ Noted" }, { value: "reviewed", label: "Reviewed" }]; value: page.show; onPicked: function (v) { page.show = v } }
             rows: page.cases
             pick: page.cur ? page.cur.id : null

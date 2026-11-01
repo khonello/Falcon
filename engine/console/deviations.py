@@ -20,7 +20,7 @@ from typing import Any
 from engine.console.feed import describe_many
 from engine.dispatch import Context, handler
 from engine.isotime import parse_iso
-from engine.permissions import int_field, require_role, str_field
+from engine.permissions import int_field, require_head, str_field
 from protocol import ErrorCode, ProtocolError
 
 OUTCOMES = ("open", "explained", "accepted", "escalated", "dismissed")
@@ -65,7 +65,7 @@ async def deviations_list(ctx: Context, payload: dict[str, Any]) -> dict[str, An
     "by_rule": [{rule_id, code, name, n, open}], "per_day": [{day, open, dealt, by_severity}], "groups"?: [{key, label, n, open}]}.
     `day` (ISO date) limits the list to one day; `days` is how far back to look (default 7). The strip's figures are over the whole period
     whatever `kind`/`rule_id` narrow the list to."""
-    require_role(ctx, "super_user")
+    require_head(ctx)
     db = ctx.engine.db
     days = min(int_field(payload, "days", required=False) or 7, 90)
     since = datetime.now(timezone.utc) - timedelta(days=days)
@@ -143,7 +143,7 @@ async def _evidence(ctx: Context, d: dict[str, Any]) -> list[str]:
 @handler("deviations.get")
 async def deviations_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"deviation_id"} -> {"deviation", "context": [{at, who, what, kind}] (what the audit trail shows around it), "evidence": [...]}."""
-    require_role(ctx, "super_user")
+    require_head(ctx)
     db = ctx.engine.db
     d = await db.rules.deviation(int_field(payload, "deviation_id"))
     if d is None:
@@ -163,7 +163,7 @@ async def deviations_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
 async def deviations_outcome(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"deviation_id", "outcome": explained|accepted|escalated|dismissed|open, "note"?}. *Explained* and *accepted* need a note in the person's
     own words: that, and only that, is an explanation. The record, the rule as it was and the outcome stay."""
-    ident = require_role(ctx, "super_user")
+    ident = require_head(ctx)
     d = await ctx.engine.db.rules.deviation(int_field(payload, "deviation_id"))
     if d is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such deviation")

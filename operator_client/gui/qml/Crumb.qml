@@ -11,7 +11,6 @@ Row {
     // [label, page to go back to, mono]
     readonly property var parts: {
         var p = Nav.page, s = Nav.sub, t = Nav.title(p)
-        if (Nav.boss && p === "access" && s) return [[t, ""]]
         if (s === null || s === undefined || s === "") return [[t, ""]]
         if (p === "machines") return [["Machines", "machines"], [String(s), "", true]]
         if (p === "tasks" && s === "new") return [["Tasks", "tasks"], ["New task", ""]]

@@ -157,13 +157,10 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
     a2 = await run_script(_cfg(engine, tmp_path, "cid-a2"), ["connect", "flow consent 2 yes"])
     assert a2[1] == "flow 2: consent granted"
     su = await run_script(_cfg(engine, tmp_path, "cid-su"), [
-        "connect", "update approve 1.0.0", "routing", "routing set flow_failure 1", "addressed",
-        "alert announcement all_users Maintenance tonight", "alerts"])
+        "connect", "update approve 1.0.0", "alert announcement all_users Maintenance tonight", "alerts"])   # routing is parked with the Super User
     assert su[1].startswith("version 1.0.0 approved")
-    assert "flow_failure" in su[2] and "flow_failure -> departments [1]" in su[3]
-    assert su[4] == "(none)"
-    assert su[5].startswith("alert ") and "delivered" in su[5]
-    assert "Maintenance tonight" in su[6]
+    assert su[2].startswith("alert ") and "delivered" in su[2]
+    assert "Maintenance tonight" in su[3]
 
 
 async def test_push_updates_state_and_indicators(engine, org, tmp_path: Path):
@@ -212,19 +209,6 @@ def test_deadline_phrases_resolve_mechanically():
     assert resolve_phrase("2026-10-01T09:00:00+00:00", now) == datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)
     assert resolve_phrase("by Monday or Wednesday", now) is None
     assert resolve_phrase("when you can", now) is None
-
-
-async def test_scripted_department_task(engine, org, tmp_path: Path):
-    su = await run_script(_cfg(engine, tmp_path, "cid-su"), [
-        "connect", f"dtask give {org['fin']} due=2099-01-02T17:00 Move the tender files to the archive", "dtasks"])
-    assert su[1].startswith("task 1 'Move the tender files to the archive' for Finance: told") and "told 1 Admin(s)" in su[1]
-    admin = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
-        "connect", "dtasks", "dtask mark 1 seen", "dtask mark 1 done", "dtask 1"])
-    assert "1 not yet seen by you" in admin[1]
-    assert "you: seen" in admin[2] and "you: done" in admin[3] and "done" in admin[4]
-    back = await run_script(_cfg(engine, tmp_path, "cid-su"), [
-        "connect", "dtask reopen 1 The 2024 folder is still missing", "dtask 1", "dtask complete 1"])
-    assert "ongoing" in back[1] and "2024 folder" in back[2] and "complete" in back[3]
 
 
 async def test_scripted_to_dos(engine, org, tmp_path: Path):
@@ -339,20 +323,6 @@ async def test_scripted_rules_and_deviations(engine, org, tmp_path: Path):
     assert "D-301: Explained" in out[6] and "O-1 is off" in out[7] and "0 deviations in the last 30 days" in out[8]
 
 
-async def test_scripted_overview_board_and_decisions(engine, org, tmp_path: Path):
-    from engine.hierarchy import reports
-
-    await engine.db.reports.set_routing("deviation", [], org["su"])      # departments start routed; this is the one taken back
-    await reports.emit(engine, "deviation", source_table="pcs", source_id=org["w1_pc"], summary="FIN-01 showed another name")
-    out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
-        "connect", "overview", "board", "decisions", "decide reports:deviation route", "decisions", "departments-board"])
-    assert "waiting on you" in out[1] and "deviations, 7 days:" in out[1]
-    assert "waiting 2" in out[2] and "unrouted" in out[2] and "handling:" in out[2]
-    assert "reports:deviation" in out[3] and "route" in out[3]
-    assert "Routed" in out[4] and "1 still waiting" in out[4]                       # the client's own name mismatch has no department to route to
-    assert "reports:deviation" in out[5] and "Finance" in out[6] and "HR" in out[6]
-
-
 async def test_scripted_registry_and_department_page(engine, org, tmp_path: Path):
     out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
         "connect", "accounts", "refused", "block 10.9.9.9 keeps_guessing", "blocked", "unblock 10.9.9.9", f"department {org['hr']}", f"admin demote {org['a2']}", f"department {org['hr']}"])
@@ -360,16 +330,6 @@ async def test_scripted_registry_and_department_page(engine, org, tmp_path: Path
     assert "Nothing was refused." in out[2] and "10.9.9.9 is blocked" in out[3] and "keeps_guessing" in out[4] and "no longer blocked" in out[5]
     assert "HR: " in out[6] and "HR-ADM" in out[6]
     assert "is a Worker again" in out[7] and "NO ADMIN" in out[8] and "could be promoted" in out[8]
-
-
-async def test_scripted_rollout_gate(engine, org, tmp_path: Path):
-    first = await engine.db.updates.approve_version("1.0", org["su"])
-    for key in ("su_pc", "a1_pc", "w1_pc", "a2_pc"):
-        await engine.db.updates.record_attempt(org[key], first, True, first)
-    out = await run_script(_cfg(engine, tmp_path, "cid-su"), [
-        "connect", "update stage 1.1 the_new_tray", "gate", f"update leave-out {org['w2_pc']} being_replaced", "decisions", "update approve 1.1", "update take-back 1"])
-    assert "1.1 is ready" in out[1] and "next 1.1" in out[2] and "FIN-02" in out[2] and "holding 1" in out[2]
-    assert "left out of the gate" in out[3] and "gate:1.1" in out[4] and "approved" in out[5] and "leaving out" in out[5]
 
 
 async def test_scripted_automation_and_actions_board(engine, org, tmp_path: Path):

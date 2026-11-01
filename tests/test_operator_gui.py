@@ -261,34 +261,6 @@ async def test_the_shell_is_the_console(console):
     assert prop(win, "menuKeys") == ADMIN_MENU
 
 
-async def test_the_super_user_has_their_own_level_and_enters_an_admin_s(console):
-    """The Super User's own level is the organisation; operating happens inside an Admin's console, and
-    there the console IS that Admin's console, answered by the Engine as that Admin."""
-    win, bridge, _ = console("super_user")
-    assert prop(win, "menuKeys") == SU_MENU
-    assert bridge.viewThroughSession is False
-
-    bridge.state.set_session({"session_id": 4, "pc_id": 101, "occupied_via": "traversal", "super_user_banner": True,
-                              "entered_at": _ago(0)})
-    assert prop(win, "menuKeys") == ADMIN_MENU
-    assert bridge.viewThroughSession is True
-
-    # step back out from an Admin-only page: it is not a page of this level, so the Overview opens
-    win.setProperty("view", "automation")
-    bridge.state.set_session(None)
-    assert prop(win, "menuKeys") == SU_MENU
-    assert prop(win, "where") == "overview"
-
-
-async def test_the_super_user_never_opens_an_admin_s_page(console):
-    """A machine opens on its department's page; a pruned page lands on Overview (docs/design/su-navigation.md, pruning.md)."""
-    win, _, _ = console("super_user")
-    win.setProperty("view", "machines/OPS-01")
-    assert prop(win, "where") == "departments"
-    win.setProperty("view", "access")
-    assert prop(win, "where") == "overview"
-
-
 PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [("admin", "registry"), ("super_user", "registry")] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
     ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("super_user", "messages/announcements"), ("admin", "machines/OPS-01"), ("super_user", "tasks/new")]
@@ -307,16 +279,6 @@ async def test_every_page_loads_clean(console, role, view):
         _pump(0.05)
     assert loader.property("item") is not None
     assert not warnings, "\n".join(warnings)
-
-
-async def test_a_department_without_an_admin_comes_first(console):
-    """The one condition on Departments that needs the Super User: its reports come to them."""
-    win, bridge, _ = console("super_user")
-    view = await _open(win, bridge, "departments", "departmentsView")
-    await _wait(lambda: len(prop(view, "all") or []) == 2)
-    assert [d["name"] for d in prop(view, "all")] == ["Logistics", "Operations"]
-
-
 
 
 async def test_refused_connections_are_one_row_per_key(console):
@@ -447,34 +409,6 @@ async def test_a_flow_can_be_set_to_remove_copies_when_the_source_deletes(consol
     QMetaObject.invokeMethod(edit, "save")
     await _wait(lambda: any(t == "flow.edit" for t, _ in bridge.conn.seen))
     assert next(p for t, p in bridge.conn.seen if t == "flow.edit")["on_source_delete"] == "mirror"
-
-
-async def test_the_super_user_gives_a_task_on_its_own_page(console):
-    """New task at the Super User's level is a page, not a drawer over the list: it holds Give back until the work and
-    a department with an Admin are set, shows who is told, and sends task.dept_create, then opens the list."""
-    win, bridge, _ = console("super_user")
-    page = await _open(win, bridge, "tasks/new", "giveTask")
-    assert prop(page, "problem") == "Say what needs doing."
-    page.setProperty("text", "Collect the signed leave forms")
-    assert prop(page, "problem") == "Pick a department."
-    page.setProperty("dept", 1)
-    await _wait(lambda: prop(page, "problem") == "")
-    assert [a["name"] for a in prop(page, "told")] == ["R. Mensah"]
-    QMetaObject.invokeMethod(page, "save")
-    await _wait(lambda: any(t == "task.dept_create" for t, _ in bridge.conn.seen))
-    sent = next(p for t, p in bridge.conn.seen if t == "task.dept_create")
-    assert sent["department_id"] == 1 and sent["title"] == "Collect the signed leave forms" and "admin_ids" not in sent
-    await _wait(lambda: prop(win, "where") == "tasks")
-
-async def test_one_person_s_pings_are_one_row_with_every_time(console):
-    """The Engine answers a row per ping; two pings from Kojo are one row that says twice, answered as the first."""
-    win, bridge, _ = console("admin")
-    view = await _open(win, bridge, "messages", "messagesView")
-    await _wait(lambda: any(r.get("kind") == "ping" for r in (prop(view, "rows") or [])))
-    pings = [r for r in prop(view, "rows") if r["kind"] == "ping"]
-    assert len(pings) == 1
-    assert pings[0]["pings"] == 2 and pings[0]["pid"] == 5 and pings[0]["st"][0] == "Asks to talk, 2 times"
-    assert len(pings[0]["times"]) == 2
 
 
 async def test_writing_back_to_a_request_accepts_it_and_sends_the_body(console):

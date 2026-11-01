@@ -4,7 +4,7 @@
 
 The Engine's installer writes it (`falcon-client.json`); the same file goes to every machine. It holds the Engine's address and its
 certificate, so a machine reaches the real Engine on its first connection and no other. It holds NO key and NO client id: a machine is
-given its own by being registered (it asks, and an Admin or the Super User confirms), and the Super User's is typed once.
+given its own by being registered (it asks, and an Admin confirms), and the first IT Admin's is typed once.
 
 `ca_sha256` is the certificate's fingerprint. The person installing can compare it with the one the Engine's installer printed, read out
 or sent another way, to be sure the bundle itself was not swapped on its way: pass `--fingerprint` to an installer and it refuses a mismatch.

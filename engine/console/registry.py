@@ -19,7 +19,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from engine.dispatch import Context, dispatch, handler
-from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
+from engine.permissions import (
+    int_field,
+    kept,
+    require_department_scope,
+    require_head,
+    require_role,
+    str_field,
+)
 from protocol import ErrorCode, ProtocolError
 
 SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -79,7 +86,7 @@ async def refused(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Super User. {"days"?: 7} -> {"refused": [...], "summary": {groups, tries, bad}}. One row per (who tried, from where): the name it claimed, the address,
     why it was refused, how many times, the first and last try, the machine it claimed to be (if the client id is one of ours), whether that machine has
     ever used the address, whether the address is blocked now, and what to do about it (`advice`: register, rekey, block, unblock)."""
-    require_role(ctx, "super_user")
+    require_head(ctx)
     db = ctx.engine.db
     days = max(1, min(int_field(payload, "days", required=False) or 7, 90))
     groups: dict[tuple[str, str], dict[str, Any]] = {}
@@ -143,7 +150,7 @@ async def knocked(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("registry.blocked")
 async def blocked(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    require_role(ctx, "super_user")
+    require_head(ctx)
     rows = await ctx.engine.db.registry.blocked()
     return {"blocked": [{"address": r["address"], "reason": r["reason"], "at": _iso(r["at"])} for r in rows]}
 
@@ -159,7 +166,7 @@ def _address(payload: dict[str, Any]) -> str:
 @handler("registry.block")
 async def block(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Super User. {"address", "reason"?}. The address is refused at the door from now on, whoever it is; a connection already open stays until it ends."""
-    ident = require_role(ctx, "super_user")
+    ident = require_head(ctx)
     address = _address(payload)
     own = ctx.connection.peer[0] if getattr(ctx.connection, "peer", None) else None
     if own is not None and address == str(own):
@@ -174,7 +181,7 @@ async def block(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("registry.unblock")
 async def unblock(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    ident = require_role(ctx, "super_user")
+    ident = require_head(ctx)
     address = _address(payload)
     lifted = await ctx.engine.db.registry.unblock(address, ident.account_id)
     ctx.engine.blocked_addresses.discard(address)
@@ -202,7 +209,7 @@ async def department_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     machines = (await dispatch(ctx, "machines.list", {"department_id": department_id}))
     issues = sorted(await db.issues.list(department_id=department_id, open_only=True), key=lambda i: SEV_ORDER.get(i["severity"], 3))
     overview = {d["department_id"]: d for d in (await dispatch(ctx, "overview.departments", {}))["departments"]}.get(department_id, {})
-    tasks = [t for t in (await dispatch(ctx, "task.dept_list", {"department_id": department_id}))["tasks"] if t["standing"] != "complete"] if ident.role == "super_user" else []
+    tasks: list[dict[str, Any]] = []                     # tasks given to a department are parked with the Super User (parked/README.md)
     return {"department": {"id": department_id, "name": department["name"]}, "admins": admins, "vacant": not admins,
             "machines": machines["machines"], "summary": machines["summary"],
             "issues": [{"id": i["id"], "code": i["code"], "severity": i["severity"], "title": i["title"], "subject": i["subject"], "state": i["state"],

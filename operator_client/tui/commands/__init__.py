@@ -7,7 +7,6 @@ from operator_client.tui.commands import (  # noqa: F401
     console,
     control,
     conversations,
-    dept_tasks,
     detective,
     flow,
     hierarchy,

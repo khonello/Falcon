@@ -33,7 +33,7 @@ def today(h: float) -> str:
 
 
 # --- the estate --------------------------------------------------------------------------------------
-# account ids: Super User 1; Admins 7 (R. Mensah), 9 (A. Quaye), 8 (K. Boateng); workers 21..
+# account ids: Admins 7 (R. Mensah), 9 (A. Quaye), 8 (K. Boateng); workers 21..
 DEPTS = [(1, "Operations"), (2, "Finance"), (3, "Logistics")]
 ADMINS = [  # account, name, dept, pc, workstation, busy
     (7, "R. Mensah", 1, 101, "WS-OPS-A1", "OPS-04"),
@@ -78,7 +78,6 @@ def calendar_board() -> dict[str, Any]:
     add("task", -5, "Confirm who covers the front desk during the training week", "Operations", ["tasks", "D-11"], True)
     add("task", 3, "Prepare the stock count for the auditors", "Finance", ["tasks", "D-13"])
     add("task", 28, "Collect the signed leave forms from every team", "Operations", ["tasks", "D-14"])
-    add("task", 74, "Move last year's tender files to the archive", "From the Super User", ["tasks", "D-12"])
     add("announcement", 18.7, "Fire drill on Friday morning", "Your department", ["messages", "announcements"])
     add("announcement", 24 * 6 + 9, "Month-end: timesheets in by 17:00", "Your department", ["messages", "announcements"])
     add("announcement", 24 * 20 + 8, "Offices closed on the public holiday", "Your department", ["messages", "announcements"])
@@ -314,7 +313,7 @@ def rollout_gate(role: str, dept_id: int | None) -> dict[str, Any]:
                      "escalated_to": "you" if host == "LOG-02" else None, "left_out": None})
     days = [("2026-09-26", 2, ["OPS-01", "OPS-02"], "1.4.2 approved"), ("2026-09-27", 5, ["OPS-03", "OPS-04", "OPS-05"], None), ("2026-09-28", 7, ["OPS-07", "FIN-01"], None),
             ("2026-09-29", 8, ["FIN-02"], None), ("2026-09-30", 9, ["LOG-01"], None), ("2026-10-01", 9, [], None)]
-    return {"current": {"version": "1.4.2", "approved_at": at(-24 * 5), "approved_by": "You" if role == "super_user" else "the Super User"},
+    return {"current": {"version": "1.4.2", "approved_at": at(-24 * 5), "approved_by": "A. Quaye"},
             "next": {"version": "1.4.3", "staged_at": at(-20), "note": None},
             "strip": {"running": len(ms) - len(rows), "total": len(ms), "pct": round(100 * (len(ms) - len(rows)) / max(1, len(ms))), "holding": len(rows), "left_out": 0,
                       "failed_installs": sum(r["attempts"] for r in rows), "failed_hosts": [{"hostname": r["hostname"], "n": r["attempts"]} for r in rows]},
@@ -335,8 +334,7 @@ def registry_refused() -> dict[str, Any]:
 
 
 def registry_accounts(account: int) -> dict[str, Any]:
-    rows = [{"account_id": 1, "name": "You" if account == 1 else "the Super User", "you": account == 1, "role": "super_user", "department_id": None, "department_name": None,
-             "pc_id": 100, "workstation": "ADM-01", "key_generation": 1, "online": True, "last_seen_at": at(0), "hours_limited": False, "now": "Signed in now"}]
+    rows = []
     for a, n, d, pc, ws, busy in ADMINS:
         rows.append({"account_id": a, "name": n, "you": a == account, "role": "admin", "department_id": d, "department_name": dict(DEPTS)[d], "pc_id": pc, "workstation": ws,
                      "key_generation": 1, "online": True, "last_seen_at": at(0), "hours_limited": False, "now": "Signed in now"})
@@ -503,7 +501,7 @@ def audit(role: str, dept_id: int | None, limit: int) -> dict[str, Any]:
         (-0.15, "R. Mensah", "Left OPS-03", "OPS-03", "session.ended"),
         (-11.1, "A. Quaye", "Entered LOG-02 (outside working hours)", "LOG-02", "session.traversed"),
         (-10.8, "A. Quaye", "Left LOG-02", "LOG-02", "session.ended"),
-        (-76.0, "System", "LOG-02 update escalated to Super User", "LOG-02", "update.escalated"),
+        (-76.0, "System", "LOG-02 update escalated to the Admins", "LOG-02", "update.escalated"),
         (-26.0, "System", "1.4.2 install failed on OPS-06 (attempt 2)", "OPS-06", "update.failed"),
     ]
     for j, (hh, who, what, host, action) in enumerate(notable):
@@ -582,7 +580,7 @@ def dept_tasks(role: str, account: int) -> dict[str, Any]:
                    "seen_at": at(-2) if v != "told" else None} for a, v in st.items()]
         if role == "admin":
             admins = [a for a in admins if a["account_id"] == account]
-        view = {"id": tid, "title": title, "department_id": dept, "assigner_name": "Super User", "created_at": at(given),
+        view = {"id": tid, "title": title, "department_id": dept, "assigner_name": "A. Quaye", "created_at": at(given),
                 "deadline_at": at(due), "completed_at": None,
                 "standing": max(st.values(), key=order.index), "told": len(st), "notes": [], "admins": admins}
         if role == "admin":
@@ -595,7 +593,7 @@ def dept_tasks(role: str, account: int) -> dict[str, Any]:
 
 
 # --- messages -------------------------------------------------------------------------------------------
-ACCOUNTS = {1: "Super User", 7: "R. Mensah", 9: "A. Quaye", 8: "K. Boateng", 21: "Kojo", 23: "Yaw", 27: "Ama", 31: "Afi"}
+ACCOUNTS = {7: "R. Mensah", 9: "A. Quaye", 8: "K. Boateng", 21: "Kojo", 23: "Yaw", 27: "Ama", 31: "Afi"}
 # id, initiator (lower), superior (higher), turn, opened (concept clock), closed, messages [(clock, sender, text)]
 CHANNELS = [
     (20, 27, 7, "sender", 8.9, None, [(9.0, 7, "Is budget-2026.xlsx still open on your PC? It should not be there."),
@@ -621,8 +619,7 @@ def channels(account: int) -> dict[str, Any]:
                          for c in CHANNELS if _visible(c, account)]}
 
 
-# everyone a console may message, as `assistance.people` answers: the Super User's Admins (no request needed);
-# an Admin's Super User, the other Admins and their own workers (each a request)
+# everyone a console may message, as `assistance.people` answers: the other Admins and the workers (each a request)
 _ADMINS = {7: ("R. Mensah", "Operations"), 9: ("A. Quaye", "Operations"), 8: ("K. Boateng", "Finance")}
 
 
@@ -630,8 +627,7 @@ def people(role: str, account: int) -> list[dict[str, Any]]:
     if role == "super_user":
         return [{"account_id": i, "name": n, "role": "admin", "department_name": d, "hostname": None, "request": False}
                 for i, (n, d) in _ADMINS.items()]
-    out = [{"account_id": 1, "name": "Super User", "role": "super_user", "department_name": None, "hostname": None, "request": True}]
-    out += [{"account_id": i, "name": n, "role": "admin", "department_name": d, "hostname": None, "request": True}
+    out = [{"account_id": i, "name": n, "role": "admin", "department_name": d, "hostname": None, "request": True}
             for i, (n, d) in _ADMINS.items() if i != account]
     out += [{"account_id": i, "name": ACCOUNTS[i], "role": "worker", "department_name": None, "hostname": h, "request": True}
             for i, h in ((21, "OPS-01"), (23, "OPS-03"), (27, "OPS-07"))]
@@ -725,7 +721,7 @@ def actions_board() -> dict[str, Any]:
 
 def automation_board(role: str) -> dict[str, Any]:
     """automation.board, only what the console reads from it: who set each rule, by name."""
-    return {"rules": [{"event_id": eid, "owner": "Super User" if org else "R. Mensah", "org_wide": org} for eid, _t, _p, _m, _a, _o, org, _f in EVENTS],
+    return {"rules": [{"event_id": eid, "owner": "The organisation" if org else "R. Mensah", "org_wide": org} for eid, _t, _p, _m, _a, _o, org, _f in EVENTS],
             "days": [], "strip": {}}
 
 
@@ -839,8 +835,6 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
     if type_ == "flow.restricted":
         return {"consents": [{"id": 5, "flow_id": int(payload.get("flow_id") or 0), "name": "Payroll", "state": "asked", "asked_at": at(-1.5), "sample_path": "C:/Finance/Payroll/payroll-q3.xlsx"}] if int(payload.get("flow_id") or 0) == 4 else [],
                 "can_decide": [5] if role == "super_user" else []}
-    if type_ == "handover.status":
-        return {"open": False, "waiting": []}
     if type_ == "calendar.board":
         return calendar_board()
     if type_ == "hierarchy.tree":
@@ -907,14 +901,12 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return task_list()
     if type_ == "task.get":
         return task_get(int(payload.get("task_id") or 0))
-    if type_ == "task.dept_list":
-        return dept_tasks(role, account)
     if type_ == "assistance.channels":
         return channels(account)
     if type_ == "assistance.channel":
         return channel(int(payload.get("channel_id") or 0), account)
     if type_ == "assistance.my_admins":
-        return {"admins": [{"account_id": 1, "name": "Super User", "role": "super_user"}] if role == "admin" else []}
+        return {"admins": []}
     if type_ == "assistance.people":
         return {"people": people(role, account)}
     if type_ == "index.folders":

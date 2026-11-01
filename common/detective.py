@@ -40,7 +40,7 @@ BEHAVIOUR_WORDS = {"concealment": "Concealment", "collection": "Collection", "ex
 ARC_STAGES = (("Reaching", ("reach",)), ("Gathering", ("collection",)), ("Hiding", ("concealment",)), ("Taking out", ("exfiltration", "capture")),
               ("Covering up", ("erasure", "evasion")))
 
-NOTED, CASE, URGENT = 0.35, 0.60, 0.85       # weights: kept quietly; shown as a case; shown first and to the Super User as well
+NOTED, CASE, URGENT = 0.35, 0.60, 0.85       # weights: kept quietly; shown as a case; shown first
 
 WINDOW = 15 * 60                              # how far back/forward a mini-graph looks for its supporting steps
 SESSION = 2 * 3600                            # findings on one machine this close together are one sitting

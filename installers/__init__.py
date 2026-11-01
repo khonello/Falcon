@@ -5,7 +5,7 @@
     bundle.py    the client bundle: the Engine's host and certificate, carried by every Windows installer
     common.py    steps that can be listed (dry run), run, and reported; small helpers
     engine/      Linux: the Engine on one server (user, directories, runtime, database, certificate, systemd, firewall)
-    windows/     Windows: the Worker, an Admin's workstation, the Super User's console
+    windows/     Windows: the Worker and an IT Admin's workstation
 
 See installers/README.md. Named `installers`, not `packaging`: `packaging` is a library the test tools import.
 """

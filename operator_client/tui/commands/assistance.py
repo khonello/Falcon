@@ -23,7 +23,7 @@ async def people(ctx: ShellContext, args: Args) -> str:
                  ["account_id", "name", "role", "department_name", "hostname", "request"])
 
 
-@command("ping", usage="<account_id>", help_="Ask someone to talk (a request; repeatable). The Super User to an Admin opens it at once")
+@command("ping", usage="<account_id>", help_="Ask someone to talk (a request; repeatable)")
 async def ping(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("assistance.ping", {"to_account_id": args.get_int(0, "account_id")})
     if res.get("channel_id"):

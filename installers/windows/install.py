@@ -1,8 +1,8 @@
-"""The Windows installers: a person's PC (worker), an Admin's workstation (admin), the Super User's PC (superuser).
+"""The Windows installers: a person's PC (worker), an IT Admin's workstation (admin).
 
     python -m installers.windows.install --role worker --bundle falcon-client.json [--fingerprint AB:CD:..] [--department 3]
     python -m installers.windows.install --role admin  --bundle falcon-client.json [--department 3]
-    python -m installers.windows.install --role superuser --bundle falcon-client.json --client-id <id> --client-key-file key.txt
+    python -m installers.windows.install --role admin  --bundle falcon-client.json --client-id <id> --client-key-file key.txt   (the first IT Admin)
     python -m installers.windows.install --role worker --uninstall [--purge-data]
 
 Run from a payload folder (`python -m installers.payload <role> <folder>`), as an administrator. Each run lists what it does as it goes, checks
@@ -15,9 +15,9 @@ What it does:
   4. writes what everyone on the machine may read (<data>\\engine.crt, console.json: the Engine's address and certificate, no key) and what only
      the system and administrators may read (<data>\\private\\worker.json: this machine's settings and, once it is registered, its key)
   5. installs the Worker service (starts with Windows, restarts itself) and starts it. With no key of its own it asks the Engine to register
-     it: a code appears on the screen, and an Admin or the Super User confirms it. Nothing is typed or copied by hand.
-  6. Start-menu shortcut for the console (Admin, Super User). On an Admin's workstation the console is signed in by the service; the Super
-     User's own console takes the id and key the Engine's installer printed (`--client-id`, `--client-key-file`), written for the person who ran this
+     it: a code appears on the screen, and an Admin confirms it. Nothing is typed or copied by hand.
+  6. Start-menu shortcut for the console. On an Admin's workstation the console is signed in by the service; the first IT Admin's console
+     takes the id and key the Engine's installer printed (`--client-id`, `--client-key-file`), written for the person who ran this
   7. writes a receipt (<target>\\install.json) so the uninstall knows what to remove
 """
 
@@ -28,7 +28,6 @@ import getpass
 import json
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -116,10 +115,8 @@ class WindowsInstall:
               skip=None if r.service and not a.no_service else ("--no-service" if r.service else "this role has no service"))
         p.add("The Falcon program", self.program, "starts when anyone signs in (tray icon, nothing on screen); a Start-menu shortcut opens it",
               skip=None if r.service and not a.no_windows and not a.no_service else "this role has no service, or no windows")
-        p.add("The console", self.console, "Start-menu shortcut" + ("; the Super User's id and key for the person installing" if r.name == "superuser" else ""),
+        p.add("The console", self.console, "Start-menu shortcut" + ("; the first IT Admin's id and key for the person installing" if a.client_id else ""),
               skip=None if r.console else "this role has no console")
-        p.add("Become the Super User's machine", self.handover, "ask the Engine, show a code; the current Super User confirms it (opened with `handover open`)",
-              skip=None if a.handover else "--handover not given")
         p.add("Receipt", self.receipt, f"{self.target / 'install.json'}")
         return p
 
@@ -272,46 +269,33 @@ class WindowsInstall:
                   "$s.WorkingDirectory=$args[2];$s.Description='Falcon console';$s.Save()")
             run_cmd(["powershell", "-NoProfile", "-Command", ps, str(lnk), str(pythonw if pythonw.exists() else self.runtime_python), str(self.app)])
         said = [f"shortcut {lnk}" if not self.a.no_shortcuts else "no shortcut (--no-shortcuts)"]
-        if self.role.name == "superuser":
-            said.append(self._super_user_settings())
+        if self.a.client_id:
+            said.append(self._own_key_settings())
         elif self.role.serve_console:
             said.append("signed in by this machine's service once it is registered")
         return "; ".join(said)
 
-    def _super_user_settings(self) -> str:
-        """The Super User's console needs the id and key the Engine's installer printed. They go into the settings of the person running this."""
+    def _own_key_settings(self) -> str:
+        """The first IT Admin's console needs the id and key the Engine's installer printed. They go into the settings of the person running this."""
         assert self.bundle is not None
-        if self.a.handover:
-            return self._write_super_user_settings("", "", "this machine will ask to become the Super User's (next step)")
-        if not self.a.client_id:
-            return "no --client-id given: put the Super User's id and key in the console's settings yourself (the Engine's installer printed them)"
         key = self.a.client_key or (Path(self.a.client_key_file).read_text(encoding="utf-8").strip() if self.a.client_key_file else "")
         if not key and sys.stdin.isatty():
-            key = getpass.getpass("The Super User's client key (typed here, not shown): ").strip()
+            key = getpass.getpass("The client key (typed here, not shown): ").strip()
         if not key:
             raise InstallError("--client-id needs the key: --client-key-file <file> (or type it when asked)")
-        return self._write_super_user_settings(self.a.client_id, key, "")
+        return self._write_own_settings(self.a.client_id, key)
 
-    def _write_super_user_settings(self, client_id: str, key: str, note: str) -> str:
+    def _write_own_settings(self, client_id: str, key: str) -> str:
         assert self.bundle is not None
         path = self.operator_json()
         path.parent.mkdir(parents=True, exist_ok=True)
         cfg = {"engine_host": self.bundle.engine_host, "engine_port": self.bundle.engine_port, "client_id": client_id, "client_key": key,
                "tls": True, "ca_cert": str(self.cert), "prefs": {}, "cache": {}}
         path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-        return f"the Super User's settings are in {path} (readable by this person only)" + (f"; {note}" if note else "")
+        return f"the console's settings are in {path} (readable by this person only)"
 
     def operator_json(self) -> Path:
         return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Falcon" / "operator.json"
-
-    def handover(self) -> str:
-        """Ask the Engine to make this machine the Super User's. The code is shown here, in this window, and the person at the CURRENT Super User
-        console types it there. Nothing is moved until they do."""
-        argv = [str(self.runtime_python), "-m", "operator_client", "--handover-join", "--config", str(self.operator_json())]
-        proc = subprocess.run(argv, cwd=str(self.app), check=False)             # not captured: the person has to read the code
-        if proc.returncode != 0:
-            raise InstallError("the handover was not confirmed. On the current Super User's console type `handover open`, then run this installer again.")
-        return "this machine is now the Super User's console"
 
     def receipt(self) -> str:
         path = self.target / "install.json"
@@ -368,15 +352,13 @@ class WindowsInstall:
 
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="installers.windows.install", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--role", required=True, choices=("worker", "admin", "superuser"))
+    ap.add_argument("--role", required=True, choices=("worker", "admin"))
     ap.add_argument("--bundle", help="falcon-client.json from the Engine's installer")
     ap.add_argument("--fingerprint", help="the certificate's fingerprint the Engine's installer printed: refuse any other")
     ap.add_argument("--department", type=int, help="the department this machine asks to join (otherwise the person confirming chooses)")
-    ap.add_argument("--handover", action="store_true",
-                    help="superuser: this is the Super User's NEW machine; no id or key is given, it asks the Engine and the current Super User confirms with the code shown")
-    ap.add_argument("--client-id", help="superuser: the Super User's client id")
-    ap.add_argument("--client-key", help="superuser: the key (prefer --client-key-file: a command line is remembered)")
-    ap.add_argument("--client-key-file", help="superuser: a file holding the key")
+    ap.add_argument("--client-id", help="admin, the first IT Admin only: the client id the Engine's installer printed")
+    ap.add_argument("--client-key", help="the key (prefer --client-key-file: a command line is remembered)")
+    ap.add_argument("--client-key-file", help="a file holding the key")
     ap.add_argument("--watch", action="append", help=r"a folder to watch (repeatable; default C:\Users)")
     ap.add_argument("--source", help="the payload folder (default: the one this installer is in)")
     ap.add_argument("--target", help=r"where the program goes (default C:\Program Files\Falcon)")
@@ -407,7 +389,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if not args.dry_run and not args.uninstall and inst.role.service:
         print("\nInstalled. This machine now asks the Engine to register it: a code appears on its screen; give it to an Admin"
-              + (" (the Super User, for an Admin's workstation)" if inst.role.name == "admin" else "") + " to confirm.")
+ + " to confirm.")
     return 0
 
 

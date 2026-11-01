@@ -100,7 +100,7 @@ Page {
             options: (online ? [{ key: "idle", icon: "clock", title: "Retry when it is idle", desc: "The default. The next idle window is usually after the working day.", verb: "Keep this", waits: true },
                                 { key: "now", icon: "reload", title: "Retry now", desc: (user || "Whoever is signed in") + " may see a restart prompt.", verb: "Retry now", cannot: "The Engine retries on its own schedule; it cannot be told to now" }]
                              : [{ key: "wait", icon: "clock", title: "Retry when it is back online", desc: "The update runs as soon as " + i.host + " checks in again.", verb: "Keep waiting", waits: true }])
-                .concat([{ key: "exclude", icon: "stop", title: "Leave it out of the next version's gate", desc: "Only the Super User approves versions, so this asks them.", verb: "Ask them", need: "reason", cannot: "The Engine has no request for this yet" }])
+                .concat([{ key: "exclude", icon: "stop", title: "Leave it out of the next version's gate", desc: "The coming approval does not wait for this machine.", verb: "Leave it out", need: "reason", cannot: "The Engine has no request for this yet" }])
         }
     }
 
@@ -188,7 +188,7 @@ Page {
             nameLine: function (i) { return (i.subject ? i.subject + " · " : "") + i.host }
             cols: [
                 { title: "Severity", width: 100, text: function (i) { return Fleet.sevWord(i.sev) } },
-                { title: "Owner", width: 110, text: function (i) { return i.owner ? (i.owner.you ? "You" : i.owner.name) : i.escalated ? "Super User" : "Nobody" } },
+                { title: "Owner", width: 110, text: function (i) { return i.owner ? (i.owner.you ? "You" : i.owner.name) : "Nobody" } },
                 { title: "Age", width: 90, text: function (i) { return i.at ? Time.age(i.at) : "—" } }
             ]
             now: function (i) {
@@ -212,8 +212,6 @@ Page {
             title: page.it ? page.it.title : ""
             sub: page.it && page.sel === page.it.id ? "the one you picked" : "the worst open · click another"
             actions: [
-                Btn { visible: page.it !== null && page.it.iid !== undefined && falcon.role === "admin" && !page.it.escalated; text: "Send it up"
-                      onClicked: falcon.call("issues.escalate", { issue_id: page.it.iid }, function (ok, r) { if (ok) { Msg.ok("Sent up to the Super User"); Fleet.refresh(); page.loadDet() } else Msg.failed(r.message || "Not sent") }) },
                 Btn { text: page.it ? "Open " + page.it.host + "'s page →" : ""; onClicked: Nav.go("machines", page.it.host) }
             ]
 
@@ -247,7 +245,7 @@ Page {
                         width: 170; small: true
                         enabled: !(page.it && page.it.escalated)
                         value: page.it && page.it.owner ? page.it.owner.account_id : 0
-                        options: [{ value: 0, label: page.it && page.it.escalated ? "The Super User" : "Nobody yet" }].concat(
+                        options: [{ value: 0, label: "Nobody yet" }].concat(
                                  (Fleet.dept(falcon.departmentId) || { admins: [] }).admins.map(function (a) { return { value: a.account_id, label: a.account_id === falcon.accountId ? "You" : a.name } }))
                         onPicked: function (v) {
                             var pl = { issue_id: page.it.iid }; pl.account_id = v === 0 ? null : v

@@ -31,7 +31,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role, str_field
+from engine.permissions import int_field, require_head, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 SHAPES = ("never", "follow", "limit")
@@ -183,7 +183,7 @@ async def view(ctx: Context, rules: list[dict[str, Any]]) -> list[dict[str, Any]
         out.append({"id": r["id"], "code": r["code"], "name": r["name"], "shape": r["shape"], "locked": r["builtin"], "on": True if r["builtin"] else r["enabled"],
                     "spec": r["spec"], "sentence": sentence(r["shape"], r["spec"]), "scope": scope_text(r["spec"], depts),
                     "set_by": "Falcon" if r["builtin"] else ("You" if r["created_by_account_id"] == ctx.identity.account_id
-                                                            else names.get(r["created_by_account_id"], "the Super User")),
+                                                            else names.get(r["created_by_account_id"], "the organisation")),
                     "since": r["created_at"].isoformat(), "deviations_this_week": c["n"], "open_this_week": c["open"]})
     return out
 
@@ -212,7 +212,7 @@ async def rules_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("rules.library")
 async def rules_library(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """The patterns to start from, with the words the rule builder uses for triggers, what follows, readings and who."""
-    require_role(ctx, "super_user")
+    require_head(ctx)
     return {"patterns": [{**p, "sentence": sentence(p["shape"], p["spec"])} for p in LIBRARY], "triggers": TRIGGERS, "expects": EXPECTS,
             "follow": {t: list(e) for t, e in FOLLOW.items()}, "never": list(NEVER_TRIGGERS), "readings": READINGS, "who": WHOS,
             "periods": list(PERIODS)}
@@ -233,7 +233,7 @@ async def _check_action(ctx: Context, spec: dict[str, Any]) -> None:
 @handler("rules.create")
 async def rules_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"name", "shape", ...spec} -> {"rule"}. Super User only; applies to the whole organisation."""
-    ident = require_role(ctx, "super_user")
+    ident = require_head(ctx)
     name = " ".join(str_field(payload, "name").split())[:80]
     if not name:
         raise ProtocolError(ErrorCode.INVALID, "a rule needs a name")
@@ -248,7 +248,7 @@ async def rules_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _own_rule(ctx: Context, rule_id: int) -> dict[str, Any]:
-    require_role(ctx, "super_user")
+    require_head(ctx)
     rule = await ctx.engine.db.rules.rule(rule_id)
     if rule is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such rule")
@@ -290,7 +290,7 @@ async def rules_switch(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def rules_try(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"rule_id", "within"? (minutes) | "limit"? ({n})} -> {"deviations", "would_clear", "would_remain"} over the last 30 days: what changing the line
     would have done to the deviations already recorded, before saving it. A deviation's value is how late (minutes) or how many."""
-    require_role(ctx, "super_user")
+    require_head(ctx)
     rule = await ctx.engine.db.rules.rule(int_field(payload, "rule_id"))
     if rule is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such rule")

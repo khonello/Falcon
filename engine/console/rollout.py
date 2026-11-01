@@ -19,7 +19,14 @@ from typing import Any
 
 from engine.console import overview
 from engine.dispatch import Context, dispatch, handler
-from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
+from engine.permissions import (
+    int_field,
+    kept,
+    require_department_scope,
+    require_head,
+    require_role,
+    str_field,
+)
 from protocol import ErrorCode, ProtocolError
 
 NEXT = "next"
@@ -115,7 +122,7 @@ async def gate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("updates.stage")
 async def stage(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    ident = require_role(ctx, "super_user")
+    ident = require_head(ctx)
     version = str_field(payload, "version")
     db = ctx.engine.db
     if await db.updates.version_by_string(version):
@@ -155,7 +162,7 @@ async def retry(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("updates.leave_out")
 async def leave_out(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    ident = require_role(ctx, "super_user")
+    ident = require_head(ctx)
     pc_id = int_field(payload, "pc_id")
     reason = " ".join(str(payload.get("reason") or "").split())[:300]
     if not reason:
@@ -169,7 +176,7 @@ async def leave_out(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("updates.take_back")
 async def take_back(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    require_role(ctx, "super_user")
+    require_head(ctx)
     pc_id = int_field(payload, "pc_id")
     lifted = await ctx.engine.db.updates.lift_exclusion(pc_id, NEXT)
     if lifted:

@@ -37,9 +37,9 @@ async def test_the_automation_board_counts_firings_and_how_the_runs_ended_and_an
     assert mine["name"] == "Snapshot a USB drive" and mine["kind"] == "Event" and mine["when"] == "a USB drive is inserted" and mine["read_only"] is False
     assert mine["fired"] == 1 and mine["last_run"] == "1 failed, 1 success" and mine["last_run_problem"] is True and mine["problems"] == 1
     assert [a["name"] for a in mine["actions"]] == ["Snapshot the screen", "Tell the Admin"]
-    assert org_wide["name"] == "Excel.exe starts" and org_wide["owner"] == "Super User" and org_wide["read_only"] is True
+    assert org_wide["name"] == "Excel.exe starts" and org_wide["owner"] == "The organisation" and org_wide["read_only"] is True
     assert org_wide["fired"] == 0 and org_wide["last_run"] is None                              # it fired on an HR machine, which this department does not see
-    assert board["strip"] == {"rules": 2, "on": 2, "fired": 1, "problems": 2, "set_by_super_user": 1}
+    assert board["strip"] == {"rules": 2, "on": 2, "fired": 1, "problems": 2, "org_wide": 1}
     today = board["days"][-1]
     assert len(board["days"]) == 7 and (today["Success"], today["Failed"], today["Timed out"], today["Stopped by you"]) == (1, 1, 1, 1)
 

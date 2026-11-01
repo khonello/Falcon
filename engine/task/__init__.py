@@ -4,7 +4,6 @@ A unit of work assigned to a user account. No task directory -- targets are trac
 through the Global File Index. Verification is the anchor; only manual verification by the
 assigner closes a task. Governing rule: the LLM proposes and surfaces ambiguity, never decides.
 
-    dept_tasks   -- what the Super User gives a department: no checks, one deadline, a state per Admin
     todos        -- an Admin's own to-dos: a line, when it is due, when it was done; its owner's only
     tasks        -- lifecycle handlers (create / review / assign / start / verify / close)
     verification -- verification items, Intent, collision check, stack status
@@ -12,4 +11,4 @@ assigner closes a task. Governing rule: the LLM proposes and surfaces ambiguity,
     expectation  -- soft progress signals derived from targets (never completion)
 """
 
-from engine.task import dept_tasks, expectation, tasks, todos, verification  # noqa: F401
+from engine.task import expectation, tasks, todos, verification  # noqa: F401

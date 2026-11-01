@@ -1,7 +1,7 @@
 # Getting started
 
 Two ways to run Falcon: **everything on one machine** (to develop or try it), and **a real network** (the Engine on
-one machine, the Super User, Admins and their people on theirs). Settings live in `.env`; nothing is ever set in the
+one machine, the IT Admins and the people's PCs on theirs). Settings live in `.env`; nothing is ever set in the
 shell. Commands are shown for Windows; on Linux use `bin/python` instead of `Scripts\python.exe`.
 
 **On every machine, beforehand:** Python 3.10+ and a clone (or copy) of this repository. On the Engine's machine,
@@ -11,7 +11,7 @@ requirements file in the repository root. Run the install from the root of the c
 | Machine | Environment | Install |
 |---|---|---|
 | the Engine | `environ-engine` | `pip install -r requirements-engine.txt` |
-| the Super User, an Admin | `environ-operator` | `pip install -r requirements-operator.txt` |
+| an IT Admin | `environ-operator` | `pip install -r requirements-operator.txt` |
 | a person's PC (a Worker) | `environ-worker` | `pip install -r requirements-worker.txt` (includes its small windows) |
 
 ---
@@ -26,7 +26,7 @@ environ-engine\Scripts\python.exe -m engine setup --admin-url postgresql://postg
 
 `setup` prints each step and is safe to run again. It writes `.env`, makes the Engine's certificate, creates the
 `falcon` role and the `falcon` / `falcon_test` databases, applies the schema, creates the master secret, makes the
-first **Super User** (its id and key printed **once**) and writes them into this machine's Operator Client settings.
+first **IT Admin** in a department named IT (its id and key printed **once**) and writes them into this machine's Operator Client settings.
 Without `--admin-url` it prints the SQL to run as a PostgreSQL superuser, and stops until the databases exist.
 `--download-model` also fetches the local language model (~1.8 GB) used by Tasks.
 
@@ -35,7 +35,7 @@ environ-engine\Scripts\python.exe -m engine                              # the E
 
 python -m venv environ-operator
 environ-operator\Scripts\python.exe -m pip install -r requirements-operator.txt
-environ-operator\Scripts\python.exe -m operator_client --gui             # opens as the Super User, nothing to type
+environ-operator\Scripts\python.exe -m operator_client --gui             # opens as the first IT Admin, nothing to type
 ```
 
 Check it: `environ-engine\Scripts\python.exe -m pytest` -- every test should run (the header says *database tests ON*).
@@ -54,7 +54,7 @@ Check it: `environ-engine\Scripts\python.exe -m pytest` -- every test should run
                                        │  TCP 7400, TLS, the certificate pinned
           ┌────────────────────────────┼─────────────────────────────┐
   ┌───────┴────────┐          ┌────────┴────────┐           ┌────────┴────────┐
-  │ Super User PC  │          │  Admin PCs      │           │  people's PCs   │
+  │ first IT Admin │          │ other IT Admins │           │  people's PCs   │
   │ Operator GUI   │          │  Operator GUI   │           │  Worker service │
   └────────────────┘          └─────────────────┘           └─────────────────┘
 ```
@@ -72,11 +72,11 @@ On the machine that will run it (Linux or Windows; it is the only machine with a
 3. Run setup with **every name and address the clients will use**, so the certificate is valid for them:
 
    ```
-   environ-engine/bin/python -m engine setup --names falcon.internal,192.168.1.20 --admin-url postgresql://postgres:<postgres-password>@localhost:5432/postgres --hostname SU-PC --no-operator-config --download-model
+   environ-engine/bin/python -m engine setup --names falcon.internal,192.168.1.20 --admin-url postgresql://postgres:<postgres-password>@localhost:5432/postgres --hostname IT-01 --no-operator-config --download-model
    ```
 
-   `--hostname` is the **Super User's workstation name** (not the Engine's); `--no-operator-config` because the Super
-   User works from their own machine. Save the printed **client id + key** for step 2.
+   `--hostname` is the **first IT Admin's workstation name** (not the Engine's); `--no-operator-config` because that
+   Admin works from their own machine. Save the printed **client id + key** for step 2.
 4. `.env` already listens on every network interface (`FALCON_ENGINE_HOST=0.0.0.0`, port `7400`). `python -m engine setup`
    opens **TCP 7400** in the Linux host's firewall when `ufw` or `firewalld` is running (as root; otherwise it prints the one
    command to run). Any other firewall is left alone and setup says so.
@@ -87,7 +87,7 @@ On the machine that will run it (Linux or Windows; it is the only machine with a
 Copy **`data/engine.crt`** (only the `.crt` -- never `engine.key` or `master.secret`) to a USB stick or share; every
 client needs it.
 
-### Step 2 -- the Super User's workstation
+### Step 2 -- the first IT Admin's workstation
 
 ```powershell
 python -m venv environ-operator
@@ -98,18 +98,21 @@ environ-operator\Scripts\python.exe -m operator_client --gui
 On the connect screen: **Engine address** `falcon.internal : 7400`, **your client id** and **your key** from step 1,
 and **Choose…** the `engine.crt` you copied. It is remembered on this machine.
 
-### Step 3 -- departments and Admins
+### Step 3 -- departments, and more IT Admins
 
-In the Super User's window:
+Version 1 has IT Admins only (`docs/design/v1-it-admin.md`): every Admin reaches every department, and a department is a
+label for grouping machines and people.
 
-1. **Make each department** (Authority → New department).
-2. **Give each department an Admin**: open the department → *Who governs* → **Give it an Admin** → type the Admin's
-   workstation name. The Admin's **client id + key** are shown **once** -- write them down for that machine.
-3. On each Admin's workstation: the same as step 2, with *their* id and key.
+1. **Make each department**: in the TUI, `dept add <name>` (the console has no place for it yet).
+2. **Another IT Admin** is never one click in the console. Install Falcon on their PC and let it in as a machine (step 4),
+   then make that person an Admin from the TUI: `promote <account_id>` (their new key is shown **once**). The full steps
+   for making an Admin are still being designed.
+3. **When an Admin leaves**: `account offboard <id>`, then `account owns <id>` and `account handover <from> <to>` give what
+   they owned to another Admin.
 
 ### Step 4 -- people's PCs (Workers)
 
-1. An Admin (or the Super User) opens the department → **Register a machine** → types the PC's name (e.g. `OPS-15`).
+1. An Admin opens **Machines → Registry** → **Register a machine** → types the PC's name (e.g. `OPS-15`).
    Its **client id + key** are shown **once**.
 2. On that PC:
 
@@ -134,8 +137,8 @@ In the Super User's window:
 
 ### Checking it works
 
-- The Super User's **Must see** shows every department; a department shows its machines, quiet when fine.
-- A Worker that connected appears at its machine; double-clicking it enters (the bar across the top says so).
+- The Overview shows what waits on you; **Machines** lists every machine in every department, quiet when fine.
+- A Worker that connected appears at its machine; opening it and entering shows its screen (the bar across the top says so).
 - If a client cannot connect, its connect screen says which of three it is: the key does not match, the Engine cannot
   be reached (address, port 7400, firewall), or the certificate does not match (it was made without that name --
   re-run setup on the Engine with `--names`, delete `data/engine.crt` first, and copy the new one out).
@@ -146,23 +149,8 @@ Open the machine (double-click it) → **Issue a new key**. The old key stops at
 
 ---
 
-## Coming: registering machines from the network
+## Registering machines from the network
 
-Typing each PC's name and copying its key by hand is the step that stings at scale. The agreed replacement is in
-`design/ENGINE-WORK.md` (item 15), not built yet: the installed agent finds the Engine on the local network and asks to
-be registered; the request waits in the department's **"Waiting to be registered"** list; the Admin confirms it by
-typing a short **pairing code** shown on that PC's screen; the key then goes to the PC by itself. Until then, Step 4
-above is the way.
-
----
-
-## Setting up from a temporary machine, then moving the Super User
-
-A first install can be done from any machine you have to hand, and the Super User then moved to the machine that will keep the role. It is the same account, so every department, name, task and audit record stays; only the machine changes.
-
-1. On the temporary machine, run the Super User setup as above. It is the Super User while you make the departments and onboard the first Admin and Workers.
-2. On the dedicated machine, install the Super User console with `--role superuser --handover` (no id or key to copy). Before that, on the temporary machine's console, type `handover open`: it lets **one** new machine ask, for ten minutes.
-3. The dedicated machine shows a short code. On the temporary machine type `handover` (it lists who is waiting), then `handover confirm <id> <code>`.
-4. The Engine binds the Super User to the new machine, rotates the old machine's key (it stops being the Super User's at once) and ends any session it held. If anything fails, nothing changes. The old machine can be registered afterwards like any other (as a Worker, say).
-
-`handover cancel` closes the window and refuses whoever is waiting. Five wrong codes refuse the request.
+A Worker installed with the installer (`installers/README.md`) needs no key typed by hand: it asks the Engine to be registered, the
+request waits under **Machines → Registry → Asking to join**, and an Admin lets it in by typing the short code shown on that PC's screen.
+The key then goes to the PC by itself. Step 4 above is the by-hand way.

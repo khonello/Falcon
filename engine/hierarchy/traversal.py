@@ -212,7 +212,7 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if ident.role == "admin" and outside_working_hours(ctx.engine.settings.working_hours):
         me = await db.accounts.by_id(ident.account_id)
         if me and me["hours_limited"]:
-            raise ProtocolError(ErrorCode.FORBIDDEN, "the Super User has limited you to working hours")
+            raise ProtocolError(ErrorCode.FORBIDDEN, "you are limited to working hours")
     if target["id"] == ident.pc_id:
         raise ProtocolError(ErrorCode.INVALID, "that is your own pc")
     if ctx.engine.settings.refuse_unreachable and pc_id not in ctx.engine.online_pc_ids():

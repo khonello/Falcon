@@ -33,7 +33,14 @@ from typing import TYPE_CHECKING, Any
 
 from engine.console.feed import describe_many
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
+from engine.permissions import (
+    int_field,
+    kept,
+    org_wide,
+    require_department_scope,
+    require_role,
+    str_field,
+)
 from protocol import ErrorCode, ProtocolError
 
 if TYPE_CHECKING:
@@ -283,7 +290,7 @@ async def issues_assign(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
             if kept(ident) and who["department_id"] != issue["department_id"]:
                 raise ProtocolError(ErrorCode.INVALID, "that Admin is not in this issue's department")
         elif ident.role != "super_user":
-            raise ProtocolError(ErrorCode.FORBIDDEN, "only the Super User gives an issue to themselves")
+            raise ProtocolError(ErrorCode.INVALID, "an issue is given to an Admin")
     await db.issues.assign(issue["id"], None if target is None else int(target))
     names = await db.accounts.display_names_for(ident.account_id, [int(target)]) if target is not None else {}
     text = "Handed back, unassigned" if target is None else ("Took it" if target == ident.account_id else f"Given to {names.get(int(target))}")
@@ -296,7 +303,9 @@ async def issues_assign(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 @handler("issues.escalate")
 async def issues_escalate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """An Admin sends an issue up: it becomes the Super User's (unassigned in the department, escalated)."""
-    require_role(ctx, "admin")
+    ident = require_role(ctx, "admin")
+    if org_wide(ident):                                   # version 1: nobody is above the Admins; another Admin takes it
+        raise ProtocolError(ErrorCode.CONFLICT, "there is nobody to send it up to: give it to another Admin")
     issue = await _load(ctx, int_field(payload, "issue_id"))
     if issue["state"] == "resolved":
         raise ProtocolError(ErrorCode.CONFLICT, "this issue is already resolved")

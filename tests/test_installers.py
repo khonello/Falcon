@@ -18,6 +18,7 @@ import pytest
 
 from installers import bundle as bundle_mod
 from installers import payload as payload_mod
+from installers import roles as roles_mod
 from installers.common import InstallError, cert_fingerprint
 from installers.engine import install as engine_install
 from installers.engine import render
@@ -48,16 +49,16 @@ def files_of(folder: Path) -> set[str]:
 # --- what each installer carries -------------------------------------------------------------------------------
 
 def test_each_role_carries_its_packages_and_nothing_else(tmp_path):
-    worker, admin, su, eng = (files_of(built(r, tmp_path)) for r in ("worker", "admin", "superuser", "engine"))
+    assert "superuser" not in roles_mod.ROLES                                                  # version 1: no Super User role (docs/design/v1-it-admin.md)
+    worker, admin, eng = (files_of(built(r, tmp_path)) for r in ("worker", "admin", "engine"))
     has = lambda files, pkg: any(f.startswith(f"app/{pkg}/") for f in files)
     assert has(worker, "worker_client") and has(worker, "common") and has(worker, "protocol")
     assert not has(worker, "operator_client") and not has(worker, "engine")                    # a person's PC has no console, no Engine
     assert has(admin, "worker_client") and has(admin, "operator_client") and not has(admin, "engine")
-    assert has(su, "operator_client") and not has(su, "worker_client") and not has(su, "engine")
     assert has(eng, "engine") and not has(eng, "worker_client") and not has(eng, "operator_client")
     assert "app/engine/migrations/030_component_issues.sql" in eng                           # the schema goes with the Engine
     assert "app/worker_client/windows/qml/Window.qml" in worker                               # and the overlays' pictures with the Worker
-    for files in (worker, admin, su, eng):
+    for files in (worker, admin, eng):
         assert "manifest.json" in files and "requirements.txt" in files and "installers/windows/install.py" in files
 
 
@@ -75,8 +76,8 @@ def test_the_libraries_each_role_needs_come_from_pyproject(tmp_path):
     assert "asyncpg" not in worker and "-e " not in worker                                    # no database driver on a PC, no editable install
     eng = payload_mod.requirements_for("engine")
     assert "asyncpg" in eng and "cryptography" in eng and "--extra-index-url" in eng
-    su = payload_mod.requirements_for("superuser")
-    assert "qasync" in su and "psutil" not in su
+    admin = payload_mod.requirements_for("admin")
+    assert "qasync" in admin and "psutil" in admin
 
 
 def test_a_payload_that_was_changed_or_half_copied_is_refused(tmp_path):
@@ -97,9 +98,9 @@ def test_a_payload_that_was_changed_or_half_copied_is_refused(tmp_path):
 
 
 def test_a_payload_is_built_into_a_fresh_folder_only(tmp_path):
-    p = built("superuser", tmp_path)
+    p = built("admin", tmp_path)
     with pytest.raises(InstallError):
-        payload_mod.build("superuser", p)
+        payload_mod.build("admin", p)
 
 
 # --- the bundle: the Engine's address and certificate, no key ---------------------------------------------------
@@ -241,17 +242,16 @@ def test_an_admin_workstation_asks_to_be_an_admin_and_its_console_is_signed_in_b
 
 
 @windows_only
-def test_the_super_users_console_gets_its_id_and_key_for_the_person_installing_and_no_service(tmp_path, monkeypatch):
+def test_the_first_it_admins_console_gets_its_id_and_key_for_the_person_installing(tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
     key = tmp_path / "key.txt"
     key.write_text("ab" * 32 + "\n", encoding="utf-8")
-    inst, _ = win_args("superuser", tmp_path, "--client-id", "su-1", "--client-key-file", str(key))
+    inst, _ = win_args("admin", tmp_path, "--client-id", "it-1", "--client-key-file", str(key))
     done = dict(inst.plan().run())
-    assert done["The Worker service"].startswith("skipped") and done["This machine's settings"].startswith("skipped")
+    assert "first IT Admin" in done["The console"] or "settings are in" in done["The console"]
     mine = json.loads((tmp_path / "Roaming" / "Falcon" / "operator.json").read_text(encoding="utf-8"))
-    assert (mine["client_id"], mine["client_key"], mine["engine_host"], mine["tls"]) == ("su-1", "ab" * 32, "falcon.internal", True)
+    assert (mine["client_id"], mine["client_key"], mine["engine_host"], mine["tls"]) == ("it-1", "ab" * 32, "falcon.internal", True)
     assert "client_key" not in json.loads((inst.data / "console.json").read_text(encoding="utf-8"))       # the key is not for everyone on the machine
-    assert not inst.worker_json.exists() and not (inst.app / "worker_client").exists()
 
 
 @windows_only
@@ -271,7 +271,7 @@ def test_installing_again_keeps_the_key_a_machine_was_given(tmp_path):
 @windows_only
 def test_a_wrong_payload_a_changed_payload_and_a_wrong_engine_are_each_refused(tmp_path):
     inst, _ = win_args("worker", tmp_path)
-    inst.source = built("superuser", tmp_path / "other")                                       # a payload for another role
+    inst.source = built("admin", tmp_path / "other")                                           # a payload for another role
     with pytest.raises(InstallError, match="not 'worker'"):
         inst.check()
     inst2, _ = win_args("worker", tmp_path / "second")
@@ -316,7 +316,7 @@ def test_the_command_line_installs_and_says_what_is_left_to_do(tmp_path, monkeyp
             "--python", sys.executable, "--reuse-python", "--no-acl", "--no-service", "--no-windows"]
     assert win_install.main(argv) == 0
     out = capsys.readouterr().out
-    assert "[1/11] Check" in out and "this machine has no key yet" in out
+    assert "[1/10] Check" in out and "this machine has no key yet" in out
     assert win_install.main([*argv[:2], "--role", "worker", "--bundle", str(tmp_path / "missing.json"), *argv[4:]]) == 1
 
 
@@ -326,7 +326,7 @@ def test_the_command_line_installs_and_says_what_is_left_to_do(tmp_path, monkeyp
 @requires_db
 async def test_an_installed_admin_workstation_registers_itself_and_its_console_is_signed_in_by_its_service(engine, org, connect, tmp_path):
     """The whole route: the installer lays an Admin workstation down and installs its service; Windows starts it as the system account; with no key
-    it asks the Engine, the Super User confirms with the code it logs, it is handed its key (kept where only the system and administrators can read
+    it asks the Engine, it is confirmed with the code it logs, it is handed its key (kept where only the system and administrators can read
     it) and comes online; and a console on the machine, with no key, is signed in by the service through the pipe. Removed afterwards."""
     if not win_install.is_admin():
         pytest.skip("needs an elevated prompt")
@@ -389,13 +389,3 @@ async def test_an_installed_admin_workstation_registers_itself_and_its_console_i
     finally:
         winservice.stop(name)
         winservice.uninstall(name)
-
-
-def test_a_new_super_user_machine_is_installed_without_an_id_and_asks_to_take_over(tmp_path, capsys):
-    """`--handover`: no client id or key is given; the plan has a step that asks the Engine, and without the flag that step is skipped."""
-    for flags, shown in (([], False), (["--handover"], True)):
-        assert win_install.main(["--role", "superuser", "--bundle", str(tmp_path / "b.json"), "--target", str(tmp_path / "pf"), "--data", str(tmp_path / "pd"),
-                                 "--dry-run", *flags]) == 0
-        out = capsys.readouterr().out
-        step = next(line for line in out.splitlines() if "Become the Super User's machine" in line)
-        assert ("--handover not given" in step) is (not shown)

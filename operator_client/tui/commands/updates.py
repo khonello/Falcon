@@ -1,4 +1,4 @@
-"""Updates: approve (Super User, hard gate), stage, rollout (Admin), the gate, retry, leave out, health, prompt."""
+"""Updates: approve (hard gate), stage, rollout (Admin), the gate, retry, leave out, health, prompt."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ async def update_approve(ctx: ShellContext, args: Args) -> str:
     return f"version {res['version']} approved (id {res['version_id']})" + (f", leaving out pcs {res['left_out']}" if res.get("left_out") else "")
 
 
-@command("update", "stage", "<version> [note...]", "Say a version is ready and waits for approval (Super User)")
+@command("update", "stage", "<version> [note...]", "Say a version is ready and waits for approval")
 async def update_stage(ctx: ShellContext, args: Args) -> str:
     payload = {"version": args.get(0, "version")}
     if len(args.positional) > 1:
@@ -64,13 +64,13 @@ async def update_retry(ctx: ShellContext, args: Args) -> str:
     return f"asked pc {res['pc_id']} to try {res['version']} {res['when']}"
 
 
-@command("update", "leave-out", "<pc_id> <reason...>", "The coming approval does not wait for this machine (Super User)")
+@command("update", "leave-out", "<pc_id> <reason...>", "The coming approval does not wait for this machine")
 async def update_leave_out(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("updates.leave_out", {"pc_id": args.get_int(0, "pc_id"), "reason": args.rest(1, "reason")})
     return f"pc {res['pc_id']} is left out of the gate"
 
 
-@command("update", "take-back", "<pc_id>", "Put a machine back in the gate (Super User)")
+@command("update", "take-back", "<pc_id>", "Put a machine back in the gate")
 async def update_take_back(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("updates.take_back", {"pc_id": args.get_int(0, "pc_id")})
     return f"pc {res['pc_id']} is back in the gate" if res["was_left_out"] else f"pc {res['pc_id']} was not left out"

@@ -294,8 +294,8 @@ async def pc_rekey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
     if pc["department_id"] is not None:
         require_department_scope(ident, pc["department_id"])
-    elif ident.role != "super_user":
-        raise ProtocolError(ErrorCode.FORBIDDEN, "only the Super User can rekey an undeparted PC")
+    elif not org_wide(ident):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only whoever heads the organisation can rekey a PC with no department")
     generation = await ctx.engine.db.accounts.rekey_pc(pc_id)
     await ctx.engine.audit.record(ctx, "pc.rekeyed", target_type="pcs", target_id=pc_id,
                                   detail={"key_generation": generation})

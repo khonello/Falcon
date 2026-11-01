@@ -11,7 +11,7 @@ case "$1" in
             python3 -m installers.engine.install --source /opt/falcon/payload --no-database --no-setup
         else
             echo "falcon-engine: files are in place. To set the Engine up, run once, as root:"
-            echo "    falcon-engine-install --names <name-or-address-the-PCs-use>[,more] --hostname <the Super User's PC>"
+            echo "    falcon-engine-install --names <name-or-address-the-PCs-use>[,more] --hostname <the first IT Admin's PC>"
         fi
         ;;
 esac

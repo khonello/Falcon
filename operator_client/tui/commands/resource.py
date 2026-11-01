@@ -21,7 +21,7 @@ async def violation_resolve(ctx: ShellContext, args: Args) -> str:
 
 
 @command("tag", usage="<file_index_id> admin|restricted|worker_dept|common [dept=<id>]",
-         help_="Classify an indexed file explicitly (admin tier: Super User only)")
+         help_="Classify an indexed file explicitly (admin tier: whoever heads the organisation)")
 async def tag(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("resource.tag", {"file_index_id": args.get_int(0, "file_index_id"), "tag": args.get(1, "tag"),
                                           "scope_department_id": args.opt_int("dept")})

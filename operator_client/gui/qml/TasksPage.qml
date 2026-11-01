@@ -3,19 +3,15 @@ import "."
 
 // TASKS (an Admin's console). What a task needs from you decides where it sits: to verify first, then
 // overdue, then quiet, then on track. A click selects; the task shows beside the list with your
-// verdict and its history, and its targets under both. "From the Super User" lists the department
-// tasks given to you: say how far you have got; only the Super User calls one complete.
+// verdict and its history, and its targets under both.
 Page {
     id: page
     objectName: "tasksView"
 
     property var tasks: []
     property var detail: ({})          // task id -> task.get view
-    property var deptTasks: []
     property string f: ""
-    property string tab: Nav.sub && String(Nav.sub).indexOf("dt:") === 0 ? "su" : "mine"
     property var sel: null
-    property var suSel: Nav.sub && String(Nav.sub).indexOf("dt:") === 0 ? Number(String(Nav.sub).slice(3)) : null
     property bool asking: false
     property string why: ""
 
@@ -29,7 +25,6 @@ Page {
                 })
             })
         })
-        falcon.call("task.dept_list", {}, function (ok, r) { page.deptTasks = ok ? (r.tasks || []) : [] })
     }
     Component.onCompleted: load()
     Connections {
@@ -76,23 +71,12 @@ Page {
         return Time.left(t.final_deadline_at)
     }
 
-    // the Super User's tasks to this Admin
-    readonly property var mine: deptTasks.filter(function (t) { return t.standing !== "complete" })
-        .sort(function (a, b) { return (a.my_state === "told" ? 0 : 1) - (b.my_state === "told" ? 0 : 1) })
-    readonly property var suCur: { for (var i = 0; i < mine.length; i++) if (mine[i].id === suSel) return mine[i]; return mine.length ? mine[0] : null }
-    readonly property var stWord: ({ told: "Not seen yet", seen: "Seen", ongoing: "Ongoing", done: "Done" })
 
     function verdict(outcome) {
         falcon.call("task.verify", { task_id: cur.id, outcome: outcome, reason: why.trim() }, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not recorded"); return }
             Msg.ok(outcome === "complete" ? "Marked complete" : "Sent back as incomplete · " + cur.assignee_name + " sees it")
             page.asking = false; page.why = ""; page.load()
-        })
-    }
-    function setMy(id, v) {
-        falcon.call("task.dept_mark", { task_id: id, state: v }, function (ok, r) {
-            if (!ok) { Msg.failed(r && r.message ? r.message : "Not marked"); return }
-            Msg.ok("Marked " + page.stWord[v].toLowerCase() + " · the Super User sees it"); page.load()
         })
     }
 
@@ -110,19 +94,12 @@ Page {
         spacing: 14
         ListPanel {
             id: list
-            visible: page.tab === "mine"
             width: (parent.width - 14) * 8 / 12
             title: page.f ? page.cats[page.f][0] : "Tasks"
             sub: page.f ? Theme.fmt(page.rows.length) : "what needs you first · click one to see it on the right"
             subLink: page.f ? "every task" : ""
             onSubLinkClicked: page.f = ""
             placeholder: "Find a task or person"
-            tools: Segmented {
-                visible: page.mine.length > 0
-                options: [{ value: "mine", label: "Tasks" }, { value: "su", label: "From the Super User · " + page.mine.length }]
-                value: page.tab
-                onPicked: function (v) { page.tab = v }
-            }
             actionLabel: "New task"
             onAction: Nav.go("tasks", "new")
             rows: page.rows
@@ -147,31 +124,9 @@ Page {
             emptyAct: "New task"
             onEmptyAction: Nav.go("tasks", "new")
         }
-        ListPanel {
-            visible: page.tab === "su"
-            width: (parent.width - 14) * 8 / 12
-            title: "From the Super User"
-            sub: "only they close these · say how far you have got on the right"
-            tools: Segmented {
-                options: [{ value: "mine", label: "Tasks" }, { value: "su", label: "From the Super User · " + page.mine.length }]
-                value: page.tab
-                onPicked: function (v) { page.tab = v }
-            }
-            rows: page.mine
-            pick: page.suCur ? page.suCur.id : null
-            onPicked: function (k) { page.suSel = k }
-            icon: "notification"
-            nameTitle: "Task"
-            nameText: function (t) { return t.title }
-            nameLine: function (t) { return "D-" + t.id + " · given " + Time.atDay(t.created_at) }
-            cols: [{ title: "Deadline", width: 150, text: function (t) { return Time.left(t.deadline_at) } }]
-            nowTitle: "Your mark"
-            now: function (t) { return [t.my_state === "told" ? "New" : page.stWord[t.my_state], t.my_state === "told" ? "bad" : t.my_state === "done" ? "good" : "wait"] }
-        }
 
         // the task beside the list
         SidePanel {
-            visible: page.tab === "mine"
             width: (parent.width - 14) * 4 / 12
             readonly property var t: page.cur
             readonly property bool late: t && t.k !== "done" && t.k !== "verify" && t.final_deadline_at && Time.past(t.final_deadline_at)
@@ -256,38 +211,10 @@ Page {
                 }
             }
         }
-        SidePanel {
-            visible: page.tab === "su"
-            width: (parent.width - 14) * 4 / 12
-            readonly property var t: page.suCur
-            showEmpty: t === null
-            emptyIcon: "notification"
-            emptyText: "Nothing from the Super User."
-            title: t ? t.title : ""
-            sub: "from the Super User · only they close it"
-            facts: t ? [["Task", "D-" + t.id], ["Given", Time.atDay(t.created_at)], ["Deadline", Time.left(t.deadline_at), Time.past(t.deadline_at) ? Theme.crit : null],
-                        ["Told", Theme.many(t.told, "Admin")], ["Your mark", t.my_state === "told" ? "Not marked yet" : page.stWord[t.my_state]]] : []
-            Column {
-                width: parent.width
-                spacing: 8
-                Txt { text: "HOW FAR YOU HAVE GOT"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                Segmented {
-                    width: parent.width
-                    block: true
-                    small: false
-                    enabled: !Nav.inside
-                    options: [{ value: "seen", label: "Seen" }, { value: "ongoing", label: "Ongoing" }, { value: "done", label: "Done" }]
-                    value: page.suCur && page.suCur.my_state !== "told" ? page.suCur.my_state : null
-                    onPicked: function (v) { page.setMy(page.suCur.id, v) }
-                }
-                Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                      text: "The Super User sees your mark at once. Only they call it complete." }
-            }
-        }
     }
 
     Panel {
-        visible: page.tab === "mine" && page.cur !== null
+        visible: page.cur !== null
         width: parent.width
         title: page.cur ? "Targets · " + page.cur.description_raw : ""
         sub: "what done looks like, and the signs of progress for each"

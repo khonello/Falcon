@@ -4,7 +4,6 @@
     issue <id>                               what it means, its facts, what you can do, its timeline
     issue act <id> <key> [reason=..] [message=..] [pick=<n>]    do one of the things offered
     issue take <id> | give <id> <account> | free <id>           take it, give it to an Admin, hand it back
-    issue escalate <id> [note..]             an Admin sends it up to the Super User
     issue note <id> <text...>                a line in its timeline
 """
 
@@ -76,7 +75,7 @@ async def issue_free(ctx: ShellContext, args: Args) -> str:
     return f"{res['issue']['code']} is unassigned"
 
 
-@command("issue", "escalate", "<id> [note...]", "Send an issue up to the Super User")
+@command("issue", "escalate", "<id> [note...]", "Send an issue up (refused when nobody is above the Admins)")
 async def issue_escalate(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("issues.escalate", {"issue_id": args.get_int(0, "id"), "note": args.rest(1, "note") if len(args.positional) > 1 else ""})
     return f"{res['issue']['code']} sent up"

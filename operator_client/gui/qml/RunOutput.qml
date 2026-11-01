@@ -39,7 +39,7 @@ Column {
         visible: root.image !== ""
         spacing: 4
         Image { source: root.image; width: 240; fillMode: Image.PreserveAspectFit; smooth: true }
-        Txt { text: "Only the department's Admins and the Super User can see it; every view is recorded."; color: Theme.text3; font.pixelSize: 12; width: 360; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+        Txt { text: "Only Admins can see it; every view is recorded."; color: Theme.text3; font.pixelSize: 12; width: 360; wrapMode: Text.WordWrap; elide: Text.ElideNone }
     }
     // a list
     Rectangle {

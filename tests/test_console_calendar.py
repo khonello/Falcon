@@ -30,13 +30,12 @@ pytestmark = requires_db
 
 
 async def test_an_admin_sees_what_is_coming_in_their_own_department_only(engine, org, connect):
-    su = await connect("cid-su")
     a1 = await connect("cid-a1")
     a2 = await connect("cid-a2")
     now = datetime.now(timezone.utc)
 
-    # a department task from the Super User (told to a1 only), a scheduled announcement, one withdrawn, one already sent
-    await su.ok("task.dept_create", {"department_id": org["fin"], "title": "Prepare the stock count", "deadline_at": (now + timedelta(days=3)).isoformat()})
+    # a1's own to-do with a date, a scheduled announcement, one withdrawn, one already sent
+    await a1.ok("todo.add", {"text": "Prepare the stock count", "due_at": (now + timedelta(days=3)).isoformat()})
     out = (await a1.ok("alerts.create", {"type": "announcement", "audience": "department", "department_id": org["fin"], "title": "Fire drill",
                                           "body": "Friday", "deliver_at": (now + timedelta(days=2)).isoformat()}))["alert_id"]
     gone = (await a1.ok("alerts.create", {"type": "announcement", "audience": "department", "department_id": org["fin"], "title": "Withdrawn",
@@ -51,7 +50,7 @@ async def test_an_admin_sees_what_is_coming_in_their_own_department_only(engine,
     board = await a1.ok("calendar.board")
     items = board["items"]
     titles = {(i["kind"], i["title"]) for i in items}
-    assert ("task", "Prepare the stock count") in titles and ("announcement", "Fire drill") in titles
+    assert ("todo", "Prepare the stock count") in titles and ("announcement", "Fire drill") in titles
     assert ("announcement", "Withdrawn") not in titles and ("announcement", "Already sent") not in titles
     rules = [i for i in items if i["kind"] == "rule"]
     assert rules and {i["title"] for i in rules} == {"Daily maintenance"} and all(i["to"] == ["automation", str(daily["id"])] for i in rules)
@@ -61,18 +60,15 @@ async def test_an_admin_sees_what_is_coming_in_their_own_department_only(engine,
     last = datetime.fromisoformat(rules[-1]["at"])
     assert last < (now.replace(day=1) + timedelta(days=95)).replace(day=1)
 
-    # another department sees none of it, and the Super User sees the department task and every scheduled announcement, no rules
+    # another department sees none of it (the full design: Admins kept to their department); a to-do is its owner's only
     assert (await a2.ok("calendar.board"))["items"] == []
-    su_items = (await su.ok("calendar.board"))["items"]
-    assert {(i["kind"], i["title"]) for i in su_items} == {("task", "Prepare the stock count"), ("announcement", "Fire drill")}
 
 
 async def test_a_task_past_its_date_is_listed_on_the_day_it_was_due_and_the_window_is_bounded(engine, org, connect):
-    su = await connect("cid-su")
     a1 = await connect("cid-a1")
     now = datetime.now(timezone.utc)
-    await su.ok("task.dept_create", {"department_id": org["fin"], "title": "Late one", "deadline_at": (now - timedelta(days=1)).isoformat()})
-    await su.ok("task.dept_create", {"department_id": org["fin"], "title": "Far away", "deadline_at": (now + timedelta(days=300)).isoformat()})
+    await a1.ok("todo.add", {"text": "Late one", "due_at": (now - timedelta(days=1)).isoformat()})
+    await a1.ok("todo.add", {"text": "Far away", "due_at": (now + timedelta(days=300)).isoformat()})
     items = (await a1.ok("calendar.board", {"days": 30}))["items"]
     assert [(i["title"], i["overdue"]) for i in items] == [("Late one", True)]
     assert await a1.err("calendar.board", {"days": "soon"}) == "invalid"

@@ -1,9 +1,9 @@
 """Rules and Accountability.
 
-    rules                                     the standard: built-in (locked) rules and the Super User's, with this week's deviations
+    rules                                     the standard: built-in (locked) rules and the organisation's, with this week's deviations
     rule <id>                                 one rule
     rule library                              the patterns to start from
-    rule add never <trigger> name=..          Super User: a rule that must never be broken
+    rule add never <trigger> name=..          a rule that must never be broken
     rule add follow <trigger> <expect> within=<minutes> name=..
     rule add limit <reading> n=<n> per=hour|day|week name=..
         (all: [who=admins|workers|machines|everyone|depts] [report=no] [admin=yes] [severity=..])
@@ -28,7 +28,7 @@ def _spec(args: Args, shape: str) -> dict:
     return spec
 
 
-@command("rules", help_="The standard: built-in (locked) rules and the Super User's, with this week's deviations")
+@command("rules", help_="The standard: built-in (locked) rules and the organisation's, with this week's deviations")
 async def rules(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("rules.list")
     s = res["summary"]
@@ -53,7 +53,7 @@ async def rule_library(ctx: ShellContext, args: Args) -> str:
 
 
 @command("rule", "add", "never <trigger> | follow <trigger> <expect> within=<m> | limit <reading> n=<n> per=<period>  name=.. [who=..] [report=no] [admin=yes]",
-         "Create an organisation-wide rule (Super User)")
+         "Create an organisation-wide rule")
 async def rule_add(ctx: ShellContext, args: Args) -> str:
     shape = args.get(0, "never|follow|limit")
     payload: dict = {"shape": shape, "name": args.opt("name") or f"{shape} rule", **_spec(args, shape)}

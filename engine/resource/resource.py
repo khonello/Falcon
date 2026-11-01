@@ -304,8 +304,8 @@ async def tag(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     file_index_id = int_field(payload, "file_index_id")
     new_tag = str_field(payload, "tag", choices=TAGS)
     scope = int_field(payload, "scope_department_id", required=new_tag == "worker_dept")
-    if new_tag == "admin" and ident.role != "super_user":
-        raise ProtocolError(ErrorCode.FORBIDDEN, "only Super User assigns the admin tier")
+    if new_tag == "admin" and not org_wide(ident):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the admin tier is assigned by whoever heads the organisation")
     entry = await ctx.engine.db.file_index.get(file_index_id)
     if entry is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such indexed file")

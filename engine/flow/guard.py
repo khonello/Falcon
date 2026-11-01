@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from engine import permissions
 from engine.permissions import in_scope
 from engine.resource.resource import derive_tag
 
@@ -150,6 +151,8 @@ async def gate(engine: Engine, flow_id: int, pc_id: int | None, path: str, diges
 
 
 def deciders_text(b: Blocker) -> str:
+    if permissions.ADMIN_SCOPE == "organisation":                 # version 1: nobody above the Admins
+        return "the person who marked it" if b.kind == "mark" else "an Admin"
     return "the person who marked it, or the Super User" if b.kind == "mark" else "the Super User" if b.tag == "admin" or not b.scope_department_id else "the department's Admin, or the Super User"
 
 

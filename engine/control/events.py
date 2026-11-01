@@ -327,7 +327,7 @@ async def _load_event_in_scope(ctx: Context, event_id: int, *, write: bool = Tru
     ident = ctx.identity
     if ident.role == "admin" and creator is not None and creator["role"] == "super_user":
         if write:
-            raise ProtocolError(ErrorCode.FORBIDDEN, "set by the Super User; only they can change it")
+            raise ProtocolError(ErrorCode.FORBIDDEN, "set for the whole organisation; only whoever set it can change it")
         if kept(ident) and (ident.department_id is None or not await _reaches_department(ctx.engine, ev, ident.department_id)):
             raise ProtocolError(ErrorCode.FORBIDDEN, "outside your department")
         return ev

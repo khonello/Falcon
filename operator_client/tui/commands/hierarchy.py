@@ -147,7 +147,7 @@ async def depts(ctx: ShellContext, args: Args) -> str:
     return table((await ctx.call("hierarchy.departments"))["departments"], ["id", "name", "created_at"])
 
 
-@command("dept", "add", "<name...>", "Create a department (Super User)")
+@command("dept", "add", "<name...>", "Create a department")
 async def dept_add(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("hierarchy.department_create", {"name": args.rest(0, "name")})
     return f"department {res['department_id']} '{res['name']}' created"
@@ -224,29 +224,3 @@ async def enroll_refuse(ctx: ShellContext, args: Args) -> str:
     reason = args.rest(1, "reason") if len(args.positional) > 1 else ""
     await ctx.call("enroll.refuse", {"enrollment_id": args.get_int(0, "id"), "reason": reason})
     return "refused"
-
-
-@command("handover", help_="Move the Super User to another machine: open it, then confirm with the code the new machine shows")
-async def handover_status(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("handover.status")
-    head = f"handover is open until {res['until']}" if res["open"] else "handover is closed (handover open lets ONE new machine ask, for ten minutes)"
-    rows_ = [{"id": r["id"], "machine": r["hostname"], "os": r["os"], "since": r["created_at"]} for r in res["waiting"]]
-    return head + ("\n" + table(rows_, ["id", "machine", "os", "since"]) if rows_ else "")
-
-
-@command("handover", "open", "", "Let one new machine ask to become the Super User's (ten minutes)")
-async def handover_open(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("handover.open")
-    return f"open until {res['until']}: install the Super User console on the new machine and let it ask; it shows a code"
-
-
-@command("handover", "confirm", "<id> <code>", "Type the code the new machine shows: the Super User moves there and this machine stops being the Super User's")
-async def handover_confirm(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("handover.confirm", {"enrollment_id": args.get_int(0, "id"), "code": args.get(1, "code")})
-    return f"the Super User now lives on {res['hostname']} (pc {res['to_pc']}); this machine ({res['from_pc']}) is no longer the Super User's and is no longer part of Falcon"
-
-
-@command("handover", "cancel", "", "Close the handover and refuse any machine waiting")
-async def handover_cancel(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("handover.cancel")
-    return f"closed; {res['refused']} waiting machine(s) refused"

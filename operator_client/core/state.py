@@ -2,7 +2,7 @@
 
 The Engine decides; the client renders. This holds exactly what the UI needs to render the
 persistent surfaces the design calls for -- who we are, the session we occupy (and the red
-banner when Super User is inside someone else's view), whether our own PC is blocked, and the
+banner when someone is inside another user's view), whether our own PC is blocked, and the
 shared pulsing status indicator (unaddressed pings, deadlines reached, task completed) -- and
 it is updated from pushes so every UI on top of it stays live.
 """
@@ -60,7 +60,7 @@ class ClientState:
     # --- derived --------------------------------------------------------------------------------
 
     @property
-    def super_user_banner(self) -> bool:
+    def entered_banner(self) -> bool:
         return bool(self.session and self.session.get("super_user_banner"))
 
     @property
@@ -69,7 +69,7 @@ class ClientState:
 
     @property
     def role_label(self) -> str:
-        return {"super_user": "Super User", "admin": "Admin", "worker": "Worker"}.get(self.role or "", "?")
+        return {"admin": "Admin", "worker": "Worker"}.get(self.role or "", "?")
 
     def set_identity(self, ident: Any, engine: str) -> None:
         self.client_id = ident.client_id

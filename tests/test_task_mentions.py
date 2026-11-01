@@ -251,7 +251,7 @@ async def test_an_announcement_is_sent_from_its_page_and_lists_what_was_sent(con
     QMetaObject.invokeMethod(page, "send")
     await _wait(lambda: any(t == "alerts.create" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "alerts.create")
-    assert sent["type"] == "emergency" and sent["audience"] == "department" and sent["title"] == "Fire drill" and sent["body"] == "Fire drill at 10."
+    assert sent["type"] == "emergency" and sent["audience"] == "all_users" and sent["title"] == "Fire drill" and sent["body"] == "Fire drill at 10."
     assert "deliver_at" not in sent                                                       # now, not later
     assert prop(page, "body") == ""                                                       # sent: the box is empty again
     page.setProperty("body", "Again.")

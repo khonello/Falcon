@@ -142,7 +142,7 @@ async def proposals_decide(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         if flow is None:
             raise ProtocolError(ErrorCode.NOT_FOUND, "that flow is gone")
         if ident.role != "super_user" and flow["created_by_account_id"] != ident.account_id:
-            raise ProtocolError(ErrorCode.FORBIDDEN, "only the flow's owner, or the Super User, can pause it")
+            raise ProtocolError(ErrorCode.FORBIDDEN, "only the flow's owner can pause it")
         if flow["status"] == "active":
             await db.flows.set_status(flow["id"], "paused", "manual")
             await ctx.engine.audit.record(ctx, "flow.paused", target_type="flows", target_id=flow["id"], detail={"because": "a proposal from Detective, accepted", "proposal_id": prop["id"]})

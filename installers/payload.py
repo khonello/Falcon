@@ -125,7 +125,7 @@ def verify(payload: Path) -> list[str]:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="installers.payload", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("what", help="a role (worker, admin, superuser, engine) to build, or `verify`")
+    ap.add_argument("what", help="a role (worker, admin, engine) to build, or `verify`")
     ap.add_argument("folder", type=Path)
     ap.add_argument("--wheels", type=Path, help="a folder of wheels for the role's libraries (so the install needs no network)")
     args = ap.parse_args(argv)

@@ -98,7 +98,7 @@ Page {
             facts: page.e ? [["When", Time.atDay(page.e.t)], ["Who", page.e.actor], ["Machine", page.e.host || "—", null, true], ["Kind", Kinds.words[page.e.kind]],
                              ["Recorded as", String(page.e.raw.action || ""), null, true]] : []
             actions: Btn {
-                visible: page.e !== null && !Nav.boss && !!Fleet.byHost[page.e.host]
+                visible: page.e !== null && !!Fleet.byHost[page.e.host]
                 text: page.e ? "Open " + page.e.host + "'s page →" : ""
                 onClicked: Nav.go("machines", page.e.host)
             }

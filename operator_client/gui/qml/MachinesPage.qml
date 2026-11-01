@@ -126,7 +126,7 @@ Page {
             showEmpty: Fleet.loaded && Fleet.machines.length === 0
             emptyIcon: "desktop"
             emptyTitle: "No machines in this department"
-            emptyText: "The Super User registers machines into a department. They show up here when they do."
+            emptyText: "A machine shows up here once it is registered: install Falcon on it and let it in under Registry."
         }
         SidePanel {
             id: side

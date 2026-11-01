@@ -4,12 +4,12 @@ import "."
 
 // THE STANDARD, AND WHAT WAS MEASURED AGAINST IT. A rule is a pattern: what should happen. A deviation is
 // a departure from one, with an owner. The built-in rules are what Falcon already enforces, listed so every
-// deviation points to one; the Super User sets organisation-wide rules in the Engine's rule store (rules.list /
-// library / create / update / switch / try). An Admin reads them ("set by the Super User").
+// deviation points to one; organisation-wide rules live in the Engine's rule store (rules.list / library /
+// create / update / switch / try), which any IT Admin may set.
 QtObject {
     id: rules
-    readonly property bool canSet: Nav.boss
-    readonly property string cannot: "Only the Super User sets rules"
+    readonly property bool canSet: true
+    readonly property string cannot: ""
 
     readonly property var trig: ({
         file: "A copy of a restricted file appears where it is not allowed", second: "A second session starts on a machine already in use",
@@ -61,7 +61,7 @@ QtObject {
     function load() {
         if (!falcon.isConnected) return
         falcon.call("rules.list", {}, function (ok, r) { if (ok) { rules.list = (r.rules || []).map(rules.fromEngine); rules.summary = r.summary || null } })
-        if (Nav.boss) falcon.call("rules.library", {}, function (ok, r) { if (ok) rules.lib = r })
+        falcon.call("rules.library", {}, function (ok, r) { if (ok) rules.lib = r })
     }
     property Connections _c: Connections { target: falcon; function onConnected() { rules.load() } }
     Component.onCompleted: load()

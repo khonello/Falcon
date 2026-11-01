@@ -76,7 +76,6 @@ Page {
             onSubLinkClicked: page.cat = "All"
             placeholder: "Find an action"
             actionLabel: "New custom action"
-            actionDisabled: Nav.boss
             onAction: Nav.go("actions", "new")
             rows: page.rows
             pick: page.cur ? page.cur.id : null
@@ -110,7 +109,7 @@ Page {
                         ["Runs, 7 days", Theme.fmt(page.b(a).runs || 0)], ["Problems, 7 days", probs ? String(probs) : "None", probs ? Theme.crit : null],
                         [a.cat === "custom" ? "Written by" : "Comes with", a.cat === "custom" ? (a.created_by_name || "this department") : "Falcon"]] : []
             actions: [
-                Btn { visible: page.cur !== null && page.cur.cat === "custom"; iconName: "edit"; text: "Edit script"; enabled: !Nav.boss; onClicked: Nav.go("actions", "edit-" + page.cur.id) },
+                Btn { visible: page.cur !== null && page.cur.cat === "custom"; iconName: "edit"; text: "Edit script"; onClicked: Nav.go("actions", "edit-" + page.cur.id) },
                 Btn { kind: "primary"; iconName: "caretr"; text: "Run once"; onClicked: runOnce.start(page.cur) }
             ]
             Column {

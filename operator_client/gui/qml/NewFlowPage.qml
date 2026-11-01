@@ -45,9 +45,9 @@ Page {
     readonly property var stageOps: Sync.stepOps
     readonly property var hosts: {
         var out = []
-        if (!Nav.boss && falcon.pcId) out.push({ value: falcon.pcId, label: "your workstation" })
+        if (falcon.pcId) out.push({ value: falcon.pcId, label: "your workstation" })
         Fleet.machines.forEach(function (m) { out.push({ value: m.pc_id, label: m.host + " · " + (m.user || "no user") + (m.online ? "" : " · offline") }) })
-        if (Nav.boss) Fleet.depts.forEach(function (d) { d.admins.forEach(function (a) { if (a.pc_id) out.push({ value: a.pc_id, label: (a.hostname || "WS") + " · " + a.name + "'s workstation" }) }) })
+        Fleet.depts.forEach(function (d) { d.admins.forEach(function (a) { if (a.pc_id && a.pc_id !== falcon.pcId) out.push({ value: a.pc_id, label: (a.hostname || "WS") + " · " + a.name + "'s workstation" }) }) })
         return out
     }
     function hostName(pc) { var m = Fleet.byPc[pc]; if (m) return m.host; var h = hosts.filter(function (x) { return x.value === pc })[0]; return h ? h.label.split(" · ")[0] : "" }
@@ -276,15 +276,15 @@ Page {
                             canRemove: page.dests.length > 1
                             onRemove: { var d = page.dests.slice(); d.splice(index, 1); page.dests = d
                                         page.stages = page.stages.filter(function (s) { return s.scope !== index }).map(function (s) { return typeof s.scope === "number" && s.scope > index ? Object.assign({}, s, { scope: s.scope - 1 }) : s }) }
-                            Segmented { visible: !Nav.boss; options: [{ value: "mine", label: "A machine you manage" }, { value: "ask", label: "Ask someone to pick" }]
+                            Segmented { options: [{ value: "mine", label: "A machine you manage" }, { value: "ask", label: "Ask someone to pick" }]
                                         value: modelData.mode; onPicked: function (v) { page.setDest(index, { mode: v }) } }
                             Flow { visible: modelData.mode === "mine"; width: parent.width; spacing: 10
                                    Select { width: Math.floor((parent.width - 10) * 0.58); search: true; placeholder: "Machine"; value: modelData.pc || null; options: page.hosts; onPicked: function (v) { page.setDest(index, { pc: v }) } }
                                    FolderField { width: parent.width - 10 - Math.floor((parent.width - 10) * 0.58); pcId: modelData.pc; text: modelData.path; onEdited: function (t) { page.setDest(index, { path: t }) } } }
                             Txt { visible: modelData.mode === "mine" && modelData.pc > 0; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                                  text: Nav.boss ? "You manage every machine, so nobody has to agree." : "If it is not yours, its owner is asked to agree before anything is copied there." }
+                                  text: "A worker's machine needs nobody's agreement. Another Admin's workstation: that Admin is asked to agree before anything is copied there." }
                             Txt { visible: modelData.mode === "ask"; width: parent.width; color: Theme.med; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                                  text: "Asking the Super User or another Admin to pick a folder on their own workstation is not built in the Engine yet. Pick their machine and folder instead: they are asked to agree. An Admin in another department must agree before anything is copied into it." }
+                                  text: "Letting another Admin pick the folder on their own workstation is not in the console yet (the TUI does it: dest=<pc>: with no folder). Pick their machine and folder instead: they are asked to agree." }
                         }
                     }
                     Rectangle { visible: page.dests.length > 8; width: parent.width; height: wt.height + 20; radius: 6; color: Theme.alpha(Theme.med, 0.09)

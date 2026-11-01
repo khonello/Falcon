@@ -1,7 +1,7 @@
 import QtQuick
 import "."
 
-// FLOWS, at both levels. The Super User sees every flow; an Admin's console sees the flows that touch
+// FLOWS. An IT Admin sees every flow; the list starts with the ones that touch
 // the department. The list, the flow beside it, the flow drawn under both, and its sync log. A flow
 // waiting on someone's agreement is answered here by the person asked, in a bar above the page.
 Page {
@@ -128,7 +128,7 @@ Page {
         }
     }
 
-    // a flow wants to carry something restricted, and this person made the restriction (or is the Super User): their answer lets it go on
+    // a flow wants to carry something restricted, and this person made the restriction: their answer lets it go on
     Repeater {
         model: page.rAsks
         Rectangle {
@@ -176,8 +176,8 @@ Page {
         ListPanel {
             id: list
             width: (parent.width - 14) * 8 / 12
-            title: Nav.boss ? "All flows in the organisation" : "Flows through this department"
-            sub: Nav.boss ? "whoever made them · click one to see it on the right" : "made here, or chained to one that is · click one to see it on the right"
+            title: "All flows in the organisation"
+            sub: "whoever made them · click one to see it on the right"
             placeholder: "Filter by flow or machine"
             actionLabel: "New flow"
             onAction: Nav.go("flows", "new")
@@ -218,8 +218,8 @@ Page {
                 Btn { text: page.cur && page.cur.status === "paused" ? "Resume" : "Pause"; visible: page.cur !== null && page.cur.status !== "inactive"
                       onClicked: falcon.call(page.cur.status === "paused" ? "flow.resume" : "flow.pause", { flow_id: page.cur.id }, function (ok, r) {
                           if (!ok) { Msg.failed(r.message || "Not changed"); return } Msg.ok(page.cur.status === "paused" ? "Resumed" : "Paused"); page.load() }) },
-                Btn { kind: "primary"; iconName: "edit"; text: "Edit"; enabled: page.cur !== null && (Nav.boss || page.cur.created_by_account_id === falcon.accountId)
-                      tip: page.cur && !(Nav.boss || page.cur.created_by_account_id === falcon.accountId) ? "Only whoever made it, or the Super User, can change it" : ""
+                Btn { kind: "primary"; iconName: "edit"; text: "Edit"; enabled: page.cur !== null && page.cur.created_by_account_id === falcon.accountId
+                      tip: page.cur && page.cur.created_by_account_id !== falcon.accountId ? "Only whoever made it can change it" : ""
                       onClicked: Nav.go("flows", "edit-" + page.cur.id) }
             ]
             Rectangle {

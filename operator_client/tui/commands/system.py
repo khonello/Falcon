@@ -76,8 +76,8 @@ async def status(ctx: ShellContext, args: Args) -> str:
     out += "\n\nsession:\n" + (kv(s.session) if s.session else "  (none)")
     if s.blocked_by:
         out += "\n\nBLOCKED: your PC is occupied by " + str(s.blocked_by.get("occupant_name"))
-    if s.super_user_banner:
-        out += "\n\n[RED BANNER] Super User is inside another user's view"
+    if s.entered_banner:
+        out += "\n\n[RED BANNER] someone is inside another user's view"
     out += "\n\nindicators:\n" + bullet(f"[{i.kind}] {i.text}" for i in s.indicators)
     return out
 

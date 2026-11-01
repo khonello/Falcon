@@ -25,6 +25,7 @@ from engine.permissions import (
     org_wide,
     require_account,
     require_department_scope,
+    require_head,
     require_role,
     str_field,
 )
@@ -54,7 +55,7 @@ async def current(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def approve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Super User only. {"version": "1.2.0"}. Refused while any PC is not confirmed on the
     current version -- the system never has more than N and N+1 in flight."""
-    ident = require_role(ctx, "super_user")
+    ident = require_head(ctx)
     version = str_field(payload, "version")
     db = ctx.engine.db
     if await db.updates.version_by_string(version):
@@ -199,9 +200,9 @@ async def rollout_health(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
 async def prompt_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Super User's second lever: nudge a department's Admins whose rollout looks stalled.
     {"department_id", "message"?}"""
-    require_role(ctx, "super_user")
+    require_head(ctx)
     department_id = int_field(payload, "department_id")
-    message = payload.get("message") or "Super User is asking about your department's update rollout."
+    message = payload.get("message") or "You are being asked about your department's update rollout."
     await ctx.engine.push_to_role("admin", "update.prompt", {"message": message}, department_id=department_id)
     await ctx.engine.audit.record(ctx, "update.prompt", target_type="departments", target_id=department_id)
     return {"department_id": department_id, "prompted": True}

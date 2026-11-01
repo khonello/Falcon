@@ -9,5 +9,4 @@ singleton Time 1.0 Time.qml
 singleton Fleet 1.0 Fleet.qml
 singleton Kinds 1.0 Kinds.qml
 singleton Auto 1.0 Auto.qml
-singleton Desk 1.0 Desk.qml
 singleton Rules 1.0 Rules.qml

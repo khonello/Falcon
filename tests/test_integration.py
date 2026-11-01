@@ -74,7 +74,7 @@ async def test_scenario_1_super_user_audits_a_department(engine, org, tmp_path: 
             "connect", "tree", f"traverse {org['a1_pc']}", "status", f"audit actor={org['a1']}", "end", "tree"])
         assert "Finance" in su[1] and "HR" in su[1] and "FIN-ADM" in su[1]
         assert "[RED BANNER]" in su[2] and "Conditional Rendering" not in su[2]     # Super User exemption
-        assert "SUPER USER" in su[3].upper() and "super_user_banner    yes" in su[3]
+        assert "[RED BANNER]" in su[3] and "super_user_banner    yes" in su[3]
         assert "display_name.set" in su[4] and "action.run" in su[4]
         assert su[5].endswith("(voluntary)")
         assert "TRAVERSAL" not in su[6].split("FIN-ADM")[1].split("\n")[0]        # session gone

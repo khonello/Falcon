@@ -149,7 +149,7 @@ async def automation_board(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         rules.append({"next_at": _iso(upcoming[0]) if upcoming else None, "event_id": d["id"], "name": d.get("name") or (when_of(spec)[0].upper() + when_of(spec)[1:]), "named": bool(d.get("name")), "type": spec.get("type"),
                       "kind": kind_of(spec.get("type", "")), "when": when_of(spec), "scope": "every machine" if not spec.get("pc_ids") else f"{len(spec['pc_ids'])} machine(s)",
                       "actions": [{"action_id": a["id"], "name": a.get("name") or a.get("builtin_type")} for a in actions], "on": d["enabled"],
-                      "owner": "Super User" if d["org_wide"] else names.get(d["created_by_account_id"]), "org_wide": bool(d["org_wide"]),
+                      "owner": "The organisation" if d["org_wide"] else names.get(d["created_by_account_id"]), "org_wide": bool(d["org_wide"]),
                       "read_only": ident.role == "admin" and bool(d["org_wide"]),
                       "fired": sum(f["n"] for f in fired), "last_fired_at": _iso(last) or last_fired(d["id"]),
                       "last_run": _summary(latest) if latest else None, "last_run_problem": any(outcome_of(r) in PROBLEMS for r in latest),
@@ -158,7 +158,7 @@ async def automation_board(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     coming.sort(key=lambda c: c["at"])
     return {"rules": rules, "coming_up": coming[:COMING_UP], "days": _per_day(runs, _days(now, days)), "period_days": days,
             "strip": {"rules": len(rules), "on": sum(1 for r in rules if r["on"]), "fired": sum(r["fired"] for r in rules), "problems": problems,
-                      "set_by_super_user": sum(1 for r in rules if r["org_wide"])}}
+                      "org_wide": sum(1 for r in rules if r["org_wide"])}}
 
 
 async def _libraries(ctx: Context, department_id: int | None) -> list[dict[str, Any]]:

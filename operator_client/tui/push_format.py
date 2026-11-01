@@ -66,5 +66,5 @@ def describe_push(type_: str, p: dict[str, Any]) -> tuple[str, bool]:
     if type_ == "update.escalated":
         return f"UPDATE FAILING on pc {p.get('pc_id')} ({p.get('failures')}x) -- needs attention", True
     if type_ == "update.prompt":
-        return f"Super User: {p.get('message')}", True
+        return f"Asked: {p.get('message')}", True
     return f"{type_} {p}", False

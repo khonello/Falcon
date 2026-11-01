@@ -119,8 +119,9 @@ async def test_a_new_machine_joins_from_its_own_console_settings(engine, org, co
     """What `python -m operator_client --handover-join` does: asks, shows a code, and once the current Super User confirms it keeps its own key."""
     import asyncio
 
-    from operator_client.core.config import LocalConfig
     from operator_client.core.handover_join import HandoverEnded, join
+
+    from operator_client.core.config import LocalConfig
 
     su = await connect("cid-su")
     cfg = LocalConfig(path=tmp_path / "operator.json", engine_host="127.0.0.1", engine_port=engine.port, tls=False)

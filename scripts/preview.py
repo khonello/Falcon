@@ -16,18 +16,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# One word, not a flag: a level, a page, or both. Flags still work for the screenshot scripts.
+# One word, not a flag: a page. Flags still work for the screenshot scripts. The console is an IT Admin's (docs/design/v1-it-admin.md).
 WORDS = [a for a in sys.argv[1:] if not a.startswith("-")]
-ROLE = "admin" if "admin" in WORDS else "super_user"
-INSIDE = "inside" in WORDS
+ROLE = "admin"
 AREAS = ("overview", "messages", "calendar", "tasks", "detective", "restricted", "flows", "machines", "sessions", "issues", "automation",
          "actions", "rollout", "audit", "reports", "departments", "accountability", "access", "registry", "rules")
 VIEW = next((w for w in WORDS if w.split("/")[0] in AREAS), "")
-if "--role" in sys.argv:                        # the older spelling, still used by the shot scripts
-    ROLE = sys.argv[sys.argv.index("--role") + 1]
 if "--view" in sys.argv:
     VIEW = sys.argv[sys.argv.index("--view") + 1]
-INSIDE = INSIDE or "--inside" in sys.argv
 
 SHOT = "--shot" in sys.argv
 if SHOT:
@@ -304,13 +300,12 @@ ANSWERS = {
 
 
 class FakeIdentity:
-    """What the handshake would have returned. `--role admin` to see the Admin's console (R. Mensah,
-    Operations); the Super User's is a governance shell until they enter an Admin's console."""
+    """What the handshake would have returned: R. Mensah, an IT Admin, sat in Operations."""
     client_id = "preview"
-    account_id = 7 if ROLE == "admin" else 1
+    account_id = 7
     role = ROLE
-    pc_id = 101 if ROLE == "admin" else 100
-    department_id = 1 if ROLE == "admin" else None
+    pc_id = 101
+    department_id = 1
 
 
 class StubConnection:
@@ -347,11 +342,6 @@ def main() -> int:
     _skew.evaluate()
     if _skew.hasError():
         print("preview: clock", _skew.error().toString())
-    if INSIDE:                            # a Super User looking through an Admin's session
-        bridge.state.set_session({"session_id": 4, "pc_id": 7, "hostname": "ADM-01",
-                                  "occupied_via": "traversal", "super_user_banner": True,
-                                  "entered_at": "2026-09-30T09:00:00+00:00",
-                                  "deadline_at": "2026-09-30T10:30:00+00:00"})
     if VIEW:
         win.setProperty("view", VIEW)
     if "--open" in sys.argv:                      # a modal or drawer, by objectName
@@ -377,16 +367,8 @@ def main() -> int:
     app.aboutToQuit.connect(loop.stop)       # qasync raises if the Qt loop stops under a pending await
 
     if not SHOT:
-        # Which level you are at decides what the console IS, so the preview says which one it
-        # opened: a Super User's shell is eight areas on purpose, and that is easy to mistake
-        # for a console that has not been built.
-        who = "an Admin" if ROLE == "admin" else "the Super User"
         # a plain hyphen: a Windows console does not always have an em dash
-        print("Falcon console - sample data, no Engine. Opened as " + who + ".")
-        if ROLE != "admin" and not INSIDE and VIEW == "":
-            print("  A Super User governs and does not operate, so this is eight areas. Machines,")
-            print("  Flows, Automation, Actions, Assistance and Resources are an Admin's.")
-            print("  Try:  preview.py admin      preview.py inside      preview.py registry")
+        print("Falcon console - sample data, no Engine. Opened as an IT Admin.")
         print("  Close the window to quit.")
         with loop:
             loop.run_forever()

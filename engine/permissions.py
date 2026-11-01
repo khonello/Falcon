@@ -50,6 +50,17 @@ def org_wide(ident: Identity) -> bool:
     return ident.role == "super_user" or (ident.role == "admin" and ADMIN_SCOPE == "organisation")
 
 
+def signs_in(role: str | None) -> bool:
+    """May an account of this role sign in? Version 1 (organisation) has only Admins and Workers: the role above them is parked
+    (parked/README.md) and comes back with the "department" scope."""
+    return role in (("admin", "worker") if ADMIN_SCOPE == "organisation" else RANK)
+
+
+def require_head(ctx: Context) -> Identity:
+    """Whoever heads the organisation: any Admin when Admins are IT (version 1, nobody above them), else the account above the Admins."""
+    return require_role(ctx, "admin") if ADMIN_SCOPE == "organisation" else require_role(ctx, "super_user")
+
+
 def kept(ident: Identity) -> bool:
     """Is this caller an Admin kept to their own department?"""
     return ident.role == "admin" and ADMIN_SCOPE != "organisation"

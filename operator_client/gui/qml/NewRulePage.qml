@@ -18,7 +18,7 @@ Page {
     property int mins: 5
     property var days: [0, 1, 2, 3, 4]
     property string at: "09:00"
-    property string scope: ""               // "" until chosen: all | pick (the Super User also has dept)
+    property string scope: ""               // "" until chosen: all | dept | pick
     property int dept: 0
     property var hosts: []
     property var acts: []                  // action ids, in order
@@ -69,7 +69,7 @@ Page {
     readonly property var match: kind === "Threshold" ? { percent: val, duration_s: mins * 60 } : kind === "Schedule" ? { at: at, days: days } : {}
     readonly property var targets: scope === "all" ? Fleet.machines : scope === "dept" ? Fleet.inDept(dept) : scope === "pick" ? Fleet.machines.filter(function (m) { return page.hosts.indexOf(m.pc_id) >= 0 }) : []
     readonly property string whenTxt: type === "" ? "…" : Auto.whenOf({ condition_spec: { type: type, match: match } })
-    readonly property string whereTxt: scope === "" ? "…" : scope === "all" ? (Nav.boss ? "any machine" : "a " + Fleet.deptName(falcon.departmentId) + " machine") : scope === "dept" ? "a " + Fleet.deptName(dept) + " machine" : targets.map(function (m) { return m.host }).join(", ") || "no machines yet"
+    readonly property string whereTxt: scope === "" ? "…" : scope === "all" ? "any machine" : scope === "dept" ? "a " + Fleet.deptName(dept) + " machine" : targets.map(function (m) { return m.host }).join(", ") || "no machines yet"
     function actOf(id) { return lib.filter(function (x) { return x.id === id })[0] || null }
     function actName(id) { var a = actOf(id); return a ? a.name : "an action" }
     readonly property string doTxt: acts.length ? acts.map(page.actName).join(", then ") : ""
@@ -322,13 +322,13 @@ Page {
                                     id: tabsOn
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     width: Math.min(implicitWidth, parent.width)
-                                    tabs: (Nav.boss ? [{ key: "all", label: "Every machine" }, { key: "dept", label: "A department" }] : [{ key: "all", label: "Every machine" }]).concat([{ key: "pick", label: "Pick machines" }])
+                                    tabs: [{ key: "all", label: "Every machine" }, { key: "dept", label: "A department" }, { key: "pick", label: "Pick machines" }]
                                     current: page.scope
                                     onPicked: function (k) { page.scope = k }
                                 }
                             }
                             Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: Theme.fSmall
-                                  text: page.scope === "all" ? "All " + Fleet.machines.length + " machines" + (Nav.boss ? "" : " you manage") + ", and any registered later."
+                                  text: page.scope === "all" ? "All " + Fleet.machines.length + " machines, and any registered later."
                                       : page.scope === "dept" ? "Every machine in one department, including new ones."
                                       : page.scope === "pick" ? "A fixed list. New machines are not added." : "Choose which machines it watches." }
                             Lab { visible: page.scope === "dept"; t: "Department"; width: parent.width

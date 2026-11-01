@@ -41,7 +41,7 @@ async def detective_case(ctx: ShellContext, args: Args) -> str:
 
 
 @command("detective", "review", "<id> <explained|accepted|dismissed|escalated> [note...] [remember=program|folder|drive]",
-         "Record what you made of a case; escalating tells the Super User; remember= writes down that this program, folder or drive is fine for this kind of finding")
+         "Record what you made of a case; remember= writes down that this program, folder or drive is fine for this kind of finding")
 async def detective_review(ctx: ShellContext, args: Args) -> str:
     payload = {"case_id": args.get_int(0, "id"), "outcome": args.get(1, "outcome"), "note": args.rest(2, "note") if len(args.positional) > 2 else ""}
     if args.opt("remember"):

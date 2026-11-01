@@ -9,10 +9,8 @@ import "."
 // the live mark and the theme; the page under it. The window is frameless, so the top bar is also
 // its title bar.
 //
-// WHICH LEVEL YOU ARE AT DECIDES WHAT THE CONSOLE IS (hierarchy-system-design.md). A Super User at
-// their own level governs: Core, Organisation, Govern. Inside an Admin's console -- an Admin's own,
-// or one a Super User entered by blocking or ending that Admin's session -- it is the Admin's full
-// menu for one department, and a Super User sees "Super User in charge" across the top.
+// ONE CONSOLE, THE IT ADMIN'S (docs/design/v1-it-admin.md): every department, which is a label for
+// grouping and filtering, not a wall.
 ApplicationWindow {
     id: shell
 
@@ -40,19 +38,11 @@ ApplicationWindow {
     }
     Binding { target: Theme; property: "mode"; value: prefs.themeMode }
 
-    // --- the level ---------------------------------------------------------------------------------
-    readonly property bool superUser: falcon.role === "super_user"
-    readonly property bool inside: superUser && falcon.traversing
-    Binding { target: Nav; property: "boss"; value: shell.superUser && !shell.inside }
-    Binding { target: Nav; property: "inside"; value: shell.inside }
-    Binding { target: Nav; property: "me"; value: shell.inside ? (enter.who || "the Admin") : (Nav.myName || falcon.roleLabel) }
-    // the Engine re-answers reads as the Admin being looked through (protocol/viewing.py)
-    Binding { target: falcon; property: "viewThroughSession"; value: shell.inside }
+    Binding { target: Nav; property: "me"; value: Nav.myName || falcon.roleLabel }
 
-    // a page the level does not have opens the Overview instead
+    // a page the console does not have opens the Overview instead
     Connections {
         target: Nav
-        function onBossChanged() { if (!Nav.allowed(Nav.page)) Nav.go("overview") }
         function onPageChanged() { if (!Nav.allowed(Nav.page)) Nav.page = "overview" }
     }
 
@@ -62,19 +52,18 @@ ApplicationWindow {
     // --- the pages -----------------------------------------------------------------------------------
     // A page not yet ported to the concept keeps its earlier view until its own lands.
     readonly property var pages: ({
-        overview: Nav.boss ? "SuOverviewPage.qml" : "OverviewPage.qml",
+        overview: "OverviewPage.qml",
         messages: "MessagesPage.qml",
         calendar: "CalendarPage.qml",
-        detective: Nav.boss ? "DetectiveOverviewPage.qml" : "DetectivePage.qml",
-        tasks: Nav.boss ? "GivenTasksPage.qml" : "TasksPage.qml",
+        detective: "DetectivePage.qml",
+        tasks: "TasksPage.qml",
         restricted: "RestrictedPage.qml",
-        flows: Nav.boss ? "FlowsOverviewPage.qml" : "FlowsPage.qml",
+        flows: "FlowsPage.qml",
         machines: "MachinesPage.qml",
         issues: "IssuesPage.qml",
         automation: "AutomationPage.qml",
         actions: "ActionsPage.qml",
         audit: "AuditPage.qml",
-        departments: "DepartmentsPage.qml",
         registry: "RegistryPage.qml",
     })
 
@@ -82,7 +71,7 @@ ApplicationWindow {
     function pageFile(p, s) {
         if (p === "machines" && s) return "MachinePage.qml"
         if (p === "messages" && s === "announcements") return "AnnouncementsPage.qml"
-        if (p === "tasks" && s === "new") return Nav.boss ? "GiveTaskPage.qml" : "NewTaskPage.qml"
+        if (p === "tasks" && s === "new") return "NewTaskPage.qml"
         if (p === "restricted" && s === "mark") return "MarkPage.qml"
         if (p === "flows" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewFlowPage.qml"
         if (p === "automation" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewRulePage.qml"
@@ -99,7 +88,6 @@ ApplicationWindow {
             id: sider
             objectName: "sideMenu"
             height: parent.height
-            onLeave: enter.leaveConsole()
         }
 
         Item {
@@ -111,49 +99,6 @@ ApplicationWindow {
                 id: tops
                 width: parent.width
 
-                // --- Super User in charge: a tint across the full width, never a stripe ----------------
-                Rectangle {
-                    objectName: "sessionBanner"
-                    visible: shell.inside
-                    width: parent.width
-                    height: visible ? 38 : 0
-                    color: Theme.mix(Theme.crit, Theme.surface, 0.12)
-                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.alpha(Theme.crit, 0.3) }
-                    Row {
-                        x: 20
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 10
-                        Icon { name: "safety"; size: 15; color: Theme.crit; anchors.verticalCenter: parent.verticalCenter }
-                        Txt { text: "Super User in charge"; color: Theme.crit; font.weight: Font.DemiBold; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone }
-                        Txt {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: Math.max(0, mainArea.width - 520)
-                            text: "You are in " + Nav.me + "'s console" + (Nav.deptName ? " · " + Nav.deptName : "")
-                                  + " · their session is " + (enter.how === "block" ? "blocked" : "ended")
-                        }
-                    }
-                    Row {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 20
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 10
-                        Txt {
-                            mono: true
-                            color: Theme.crit
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideNone
-                            text: {
-                                var s = falcon.session && falcon.session.entered_at
-                                        ? Math.max(0, Math.floor((Time.now - Time.ms(falcon.session.entered_at)) / 1000)) : 0
-                                return Math.floor(s / 60) + ":" + Time.pad(s % 60)
-                            }
-                        }
-                        Btn { small: true; text: "Leave"; anchors.verticalCenter: parent.verticalCenter; onClicked: enter.leaveConsole() }
-                    }
-                }
-
-                // --- a task from the Super User nobody has marked seen ---------------------------------
-                NewTaskStrip { id: strip; width: parent.width; tasks: counter.unseenTasks; onMarked: counter.refresh() }
 
                 // --- the top bar, which is also the title bar --------------------------------------------
                 Rectangle {
@@ -283,8 +228,6 @@ ApplicationWindow {
         }
     }
 
-    EnterConsole { id: enter }
-    Connections { target: Nav; function onEnterRequested(admin, to) { enter.ask(admin, to) } }
     SessionWindow { }
     Palette { id: palette }
     Shortcut { sequences: ["Ctrl+K", "Ctrl+P"]; onActivated: palette.visible ? palette.close() : palette.open() }

@@ -90,7 +90,7 @@ async def flow_restricted(ctx: ShellContext, args: Args) -> str:
     return table(rows, ["id", "thing", "state", "asked", "until", "you"])
 
 
-@command("flow", "allow", "<consent_id> [days=<n>] [note=..]", "Allow a flow to carry something restricted (you made the restriction, or you are the Super User)")
+@command("flow", "allow", "<consent_id> [days=<n>] [note=..]", "Allow a flow to carry something restricted (you made the restriction)")
 async def flow_allow(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("flow.restricted_consent", {"consent_id": args.get_int(0, "consent_id"), "grant": True, "days": int(args.opt("days") or 0), "note": args.opt("note") or ""})
     return "allowed" + ("; the flow goes on" if res["flow_resumed"] else "")

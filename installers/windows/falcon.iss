@@ -3,7 +3,7 @@
 ;
 ;     iscc /DRole=worker /DPayload=out\falcon-worker /DBundle=falcon-client.json installers\windows\falcon.iss
 ;
-; Roles: worker, admin, superuser. The bundle is the Engine's falcon-client.json (address and certificate, no key).
+; Roles: worker, admin. The bundle is the Engine's falcon-client.json (address and certificate, no key).
 
 #ifndef Role
   #define Role "worker"

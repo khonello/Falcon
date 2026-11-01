@@ -29,10 +29,6 @@ ROLES: dict[str, Role] = {
     "admin": Role("admin", "An Admin's workstation", ("common", "protocol", "worker_client", "operator_client"),
                   ("worker", "worker-ui", "tui", "gui"), service=True, console=True, enroll_level="admin",
                   serve_console=True),
-    # The Super User's own PC runs the console only: its account is made by the Engine's setup and its key is placed once. Whether that PC
-    # is also a machine the hierarchy manages is an open question (installers/README.md).
-    "superuser": Role("superuser", "The Super User's PC", ("common", "protocol", "operator_client"), ("tui", "gui"),
-                      console=True),
     "engine": Role("engine", "The Engine (Linux)", ("common", "protocol", "engine"), ("engine",), platform="linux"),
 }
 

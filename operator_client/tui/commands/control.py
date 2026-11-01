@@ -104,7 +104,7 @@ async def events(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.event_list")
     rows = [{"id": e["id"], "type": e["condition_spec"].get("type"), "mechanism": e["condition_type"],
              "enabled": e["enabled"], "pcs": e["condition_spec"].get("pc_ids") or ("all" if e.get("org_wide") else "dept"),
-             "set_by": "super user (read-only)" if e.get("read_only") else "super user" if e.get("org_wide") else "department",
+             "set_by": "organisation (read-only)" if e.get("read_only") else "organisation" if e.get("org_wide") else "department",
              "match": e["condition_spec"].get("match"), "actions": [a["name"] or a["id"] for a in e["actions"]],
              "last_fired": e.get("last_fired_at")} for e in res["events"]]
     return table(rows, width=36) + "\n\ntypes: " + ", ".join(sorted(res["types"]))

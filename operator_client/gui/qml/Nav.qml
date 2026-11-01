@@ -1,8 +1,7 @@
 pragma Singleton
 
-// WHERE THE CONSOLE IS. The page, the item open on it, the time range, and which level this is: the
-// Super User's own, or an Admin's console (an Admin's own, or one a Super User entered). The shell
-// draws from this and every page goes somewhere through `go`, so there is one way to move.
+// WHERE THE CONSOLE IS. The page, the item open on it and the time range. The shell draws from this
+// and every page goes somewhere through `go`, so there is one way to move.
 import QtQuick
 
 QtObject {
@@ -11,8 +10,6 @@ QtObject {
     property string page: "overview"
     property var sub: null
     property string range: "24h"              // 1h | 6h | 24h | 7d, the top bar's, for the pages that read time
-    property bool boss: false                  // a Super User at the Super User's own level
-    property bool inside: false                // a Super User inside an Admin's console
     property string me: ""                      // the person at this console, by name
     property string myName: ""                  // the signed-in Admin's own name, from the tree
     property var counts: ({})                  // page -> {n, hot, pulse}, drawn on the menu
@@ -27,32 +24,16 @@ QtObject {
 
     signal went(string page, var sub)
     signal palette()
-    // enter an Admin's console (the Super User), landing on [page, sub]; the shell asks block or end first
-    signal enterRequested(var admin, var to)
-    function enter(admin, to) { enterRequested(admin, to || null) }
-
-    // The Super User's own level never opens an Admin's page (docs/design/su-navigation.md): a machine
-    // opens in Registry, an issue on its department's page; working on either goes through traversal.
-    function route(p, s) {
-        if (!boss) return [p, s]
-        if (p === "dept") return ["departments", s]
-        if (p === "machines") { var m = Fleet.byHost[s]; return ["departments", m ? m.dept : null] }
-        if (p === "issues") return ["departments", null]
-        if (p in gone) return ["overview", null]
-        return [p, s]
-    }
     // Pages that were pruned (docs/design/pruning.md): whoever still points at one lands on the page that took over its job.
     readonly property var gone: ({ access: 1, accountability: 1, rules: 1, rollout: 1, reports: 1, sessions: 1 })
     function remap(p, s) {
-        if (boss || !(p in gone)) return [p, s]
+        if (!(p in gone)) return [p, s]
         return [p === "sessions" || p === "rollout" ? "machines" : p === "reports" ? "issues" : "overview", null]
     }
     // A tab of a page is a page of its own that the menu does not list: it lights up its parent's entry.
-    // (the Super User's Registry is only what the Engine reserves for them: refused connections and moving to another machine)
-    function parentOf(p) { return p === "registry" ? (boss ? "departments" : "machines") : "" }
+    function parentOf(p) { return p === "registry" ? "machines" : "" }
     function go(p, s) {
-        var r = route(p, s === undefined ? null : s)
-        r = remap(r[0], r[1])
+        var r = remap(p, s === undefined ? null : s)
         page = r[0]
         sub = r[1] === undefined ? null : r[1]
         went(page, sub)
@@ -65,19 +46,12 @@ QtObject {
 
     // --- the menus ----------------------------------------------------------------------------------
     // Three groups (19 Oct 2026): Home, Core (the four features), Manage.
-    readonly property var adminMenu: [
+    readonly property var menu: [
         ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["calendar", "Calendar", "calendar"]]],
         ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
         ["Manage", [["machines", "Machines", "desktop"], ["actions", "Actions", "playcircle"], ["automation", "Automation", "thunderbolt"],
                     ["issues", "Issues", "alert"], ["audit", "Audit log", "history"]]]
     ]
-    readonly property var suMenu: [
-        ["Core", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"],
-                  ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
-        ["Organisation", [["departments", "Departments", "apartment"]]],
-        ["Govern", [["audit", "Audit log", "history"]]]
-    ]
-    readonly property var menu: boss ? suMenu : adminMenu
 
     function allowed(p) {
         if (parentOf(p) !== "") return allowed(parentOf(p))
@@ -91,10 +65,9 @@ QtObject {
         calendar: ["Calendar", "What is coming · deadlines, scheduled automation and announcements waiting to go out"],
         messages: ["Messages", "Conversations with the people you work with; a request opens one once it is accepted"],
         detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"],
-        departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"],
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
         access: ["Access", "Who is inside which machine, and who was let in"],
-        registry: ["Registry", "Machines and accounts · register, re-key, provision"],
+        registry: ["Registry", "Machines and people · register, re-key, and let a new machine in"],
         rules: ["Rules", "The standard the organisation is measured against"],
         actions: ["Actions", "Everything a rule can do, and what you can run by hand"],
         overview: ["Overview", "All departments · live"],
@@ -109,17 +82,11 @@ QtObject {
         audit: ["Audit log", "Everything that happened, and who did it"],
         reports: ["Reports", "What the system wrote down, and where it went"]
     })
-    property string deptName: ""                // the department of the Admin's console, for its subtitle
+    property string deptName: ""                // the only department there is, when there is one, for the subtitle
     property int departments: 0                // how many the organisation has, for the sider
     function title(p) { return titles[p] ? titles[p][0] : p }
     function subtitle(p) {
-        if (p === "overview") return boss ? "What needs you, and how the organisation is doing"
-                                          : (deptName ? deptName + " · as " + me + " sees it" : titles.overview[1])
-        if (boss && p === "registry") return "What was turned away at the door, and moving the Super User to another machine"
-        if (!boss && p === "registry") return "This department's machines and people · register, re-key, and let a new machine in"
-        if (boss && p === "tasks") return "What you have given each department, and how far it has got"
-        if (boss && p === "flows") return "Every flow in the organisation, by the department it starts in"
-        if (boss && p === "calendar") return "What is coming · task deadlines and announcements waiting to go out"
+        if (p === "overview") return deptName ? deptName + " · as " + me + " sees it" : titles.overview[1]
         return titles[p] ? titles[p][1] : ""
     }
 }

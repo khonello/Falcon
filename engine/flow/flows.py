@@ -467,7 +467,7 @@ async def restricted_consent(ctx: Context, payload: dict[str, Any]) -> dict[str,
     if flow is None or consent["state"] != "asked":
         raise ProtocolError(ErrorCode.CONFLICT, "that request is not waiting for an answer")
     if not guard.can_decide(ident, consent):
-        raise ProtocolError(ErrorCode.FORBIDDEN, "only the person who made the restriction, or the Super User, can allow a flow to carry it")
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only the person who made the restriction can allow a flow to carry it")
     grant = bool(payload.get("grant", False))
     days = int_field(payload, "days", required=False) or 0
     if days < 0 or days > 3650:
@@ -511,7 +511,7 @@ async def restricted_revoke(ctx: Context, payload: dict[str, Any]) -> dict[str, 
     if consent is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such consent")
     if not guard.can_decide(ident, consent):
-        raise ProtocolError(ErrorCode.FORBIDDEN, "only the person who made the restriction, or the Super User, can take this back")
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only the person who made the restriction can take this back")
     if not await db.flows.decide_consent(consent["id"], "revoked", ident.account_id, None, "taken back"):
         raise ProtocolError(ErrorCode.CONFLICT, "that consent is not in force")
     removed = await db.resource.revoke_allowances(consent["id"])

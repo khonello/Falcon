@@ -14,7 +14,7 @@ Read this file first. It is the whole picture; everything else is reference.
 > **Settled 1 Nov 2026 (`docs/design/v1-it-admin.md`):** the Super User does not exist in version 1 at all — its code is parked outside what
 > ships and nothing that ships names it. The console is for IT Admins only (several may share it). Admins create the departments,
 > which are labels for grouping. Only a flow from one Admin's machine to another's needs consent; a flow can carry a single file,
-> followed wherever it is moved at either end. The plan for the move is in that file; it comes before packaging.
+> followed wherever it is moved at either end. The move is done up to packaging (1 Nov 2026): the Super User's code is in `parked/`.
 
 ---
 
@@ -165,7 +165,7 @@ From here:
 
 ```powershell
 environ-engine\Scripts\Activate.ps1
-python -m engine setup          # .env, certificate, databases, schema, first Super User
+python -m engine setup          # .env, certificate, databases, schema, first IT Admin
 python -m engine                # run it
 
 environ-operator\Scripts\Activate.ps1

@@ -49,13 +49,12 @@ async def _assignee_for(ctx: Context, assignee_account_id: int) -> dict[str, Any
     """Enforce assignment scope and return the assignee row."""
     ident = ctx.identity
     if ident.role == "super_user":
-        raise ProtocolError(ErrorCode.FORBIDDEN, "the Super User gives a department a task (task.dept_create); "
-                                                 "tasks with checks go from an Admin to a Worker")
+        raise ProtocolError(ErrorCode.FORBIDDEN, "tasks with checks go from an Admin to a Worker")
     assignee = await ctx.engine.db.accounts.by_id(assignee_account_id)
     if assignee is None or assignee["status"] != "active":
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such active account")
     if ident.role == "super_user" and assignee["role"] != "admin":
-        raise ProtocolError(ErrorCode.FORBIDDEN, "Super User assigns department-level tasks to Admins")
+        raise ProtocolError(ErrorCode.FORBIDDEN, "tasks with checks go from an Admin to a Worker")
     if ident.role == "admin" and not (assignee["role"] == "worker" and in_scope(ident, assignee["department_id"])):
         raise ProtocolError(ErrorCode.FORBIDDEN, "Admin assigns tasks to Workers" + ("" if org_wide(ident) else " in their own department"))
     return assignee

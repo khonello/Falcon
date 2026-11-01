@@ -27,7 +27,6 @@ from common.when import resolve as resolve_when
 from operator_client.core.config import LocalConfig
 from operator_client.core.deadlines import resolve_phrase
 from operator_client.core.lookup_cache import LookupCache
-from operator_client.core.narrate import narrate as _narrate
 from operator_client.core.state import ClientState
 from operator_client.tui.push_format import describe_push
 from protocol.viewing import VIEW_KEY, VIEW_SESSION, VIEWED_AS_TRAVERSED
@@ -168,10 +167,6 @@ class FalconBridge(QObject):
     # Set by the shell while the window is INSIDE a held session. Reads then ask the Engine to answer
     # as the Admin being looked through (protocol/viewing.py); holding without looking does not.
     viewThroughSession = Property(bool, _get_through_session, _set_through_session, notify=scopeChanged)
-
-    @Property(bool, notify=stateChanged)
-    def superUserBanner(self) -> bool:
-        return self.state.super_user_banner
 
     @Property(bool, notify=stateChanged)
     def traversing(self) -> bool:
@@ -427,13 +422,6 @@ class FalconBridge(QObject):
         """A deadline phrase read the way the Engine reads it: {at (ISO or ""), said (plain words), why (the reason it was refused, or "")}."""
         got = resolve_when(phrase, datetime.now().astimezone())
         return {"at": got.at.isoformat() if got.at else "", "said": got.said or "", "why": got.why or ""}
-
-    @Slot(str, "QVariant", result="QVariant")
-    def narrate(self, topic: str, data: Any) -> Any:
-        """The sentence a chart is making, and the facts behind it: see `core/narrate.py`. QML hands
-        over the payloads it already fetched, so the words are generated from exactly what was drawn.
-        Returns {sentence, facts:[{label,value,tone}], action, state, note?}."""
-        return _narrate(topic, _to_python(data))
 
     @Slot(str, result=str)
     def readFile(self, path: str) -> str:

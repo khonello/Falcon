@@ -21,7 +21,7 @@ Item {
     property string problem: ""           // why there is no picture, when there is none
     property bool streaming: false
     property var queue: []                // input waiting to be sent
-    readonly property bool shown: falcon.traversing && m !== null && !hidden && !Nav.boss
+    readonly property bool shown: falcon.traversing && m !== null && !hidden
     visible: shown
     z: 50
     onMChanged: { hidden = false; full = false }

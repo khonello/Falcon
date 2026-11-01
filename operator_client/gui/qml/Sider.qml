@@ -30,8 +30,7 @@ Rectangle {
                 width: parent.width
                 color: Theme.text3
                 font.pixelSize: 11
-                text: Nav.boss ? "Head office" + (Nav.departments ? " · " + Theme.many(Nav.departments, "department") : "")
-                               : (Nav.deptName || falcon.roleLabel)
+                text: Nav.deptName || (Nav.departments ? Theme.many(Nav.departments, "department") : falcon.roleLabel)
             }
         }
     }
@@ -167,25 +166,17 @@ Rectangle {
                 x: 10; y: 10
                 width: parent.width - 20
                 spacing: 8
-                Btn {
-                    visible: Nav.inside
-                    width: parent.width
-                    danger: true
-                    iconName: "logout"
-                    text: "Leave console"
-                    onClicked: root.leave()
-                }
                 Row {
                     spacing: 8
                     Rectangle {
                         width: 24; height: 24; radius: 4
                         color: Theme.surface3
                         anchors.verticalCenter: parent.verticalCenter
-                        Txt { anchors.centerIn: parent; text: falcon.role === "super_user" ? "SU" : Theme.initials(Nav.myName || falcon.roleLabel); font.pixelSize: 11; font.weight: Font.DemiBold }
+                        Txt { anchors.centerIn: parent; text: Theme.initials(Nav.myName || falcon.roleLabel); font.pixelSize: 11; font.weight: Font.DemiBold }
                     }
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        Txt { text: falcon.role === "super_user" ? "Super User" : (Nav.myName || falcon.roleLabel); font.weight: Font.Medium; font.pixelSize: Theme.fSmall }
+                        Txt { text: Nav.myName || falcon.roleLabel; font.weight: Font.Medium; font.pixelSize: Theme.fSmall }
                         Txt { text: falcon.defaultClientId || ""; mono: true; color: Theme.text3; font.pixelSize: 11 }
                     }
                 }

@@ -13,7 +13,7 @@ Column {
 
     function w(i) { return i < 2 ? flexW : colW[i] }
 
-    // how fast each department's reports are addressed: reports.board's median (per department for the Super User,
+    // how fast each department's reports are addressed: reports.board's median (per department,
     // the department's own for an Admin)
     property var median: ({})
     function loadMedian() {
@@ -21,7 +21,7 @@ Column {
             var m = {}
             if (ok) {
                 (r.handling || []).forEach(function (h) { m[h.department_id] = h.median_minutes })
-                if (!Nav.boss && falcon.departmentId && r.strip) m[falcon.departmentId] = r.strip.typical_minutes
+                if (falcon.departmentId && r.strip) m[falcon.departmentId] = r.strip.typical_minutes
             }
             root.median = m
         })

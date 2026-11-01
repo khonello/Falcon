@@ -3,16 +3,19 @@
 Written after commit `560eb6f`; updated the same day when version 1 was settled (`docs/design/v1-it-admin.md`).
 
 ## The version 1 move (decided 1 Nov 2026; ENGINE-GAPS #18)
-Version 1 is IT Admins only. The Super User does not exist in anything that ships. **Steps 1-3 are done (1 Nov 2026); 4-6 remain.** In order:
+Version 1 is IT Admins only. The Super User does not exist in anything that ships. **Steps 1-5 are done (1 Nov 2026); packaging remains.** In order:
 1. *(done)* **Admins reach every department** (`admin_scope` fixed to organisation). Admins create departments (labels only) and other Admins. Every issue
    and report reaches every Admin and becomes one's by an explicit **Take**. Two Admins on one machine: refused, told who is in.
 2. *(done)* **Setup makes the first IT Admin**, not a Super User (`engine setup`, `bootstrap`, `make_org.py`, `.env.example`, `GETTING-STARTED.md`).
 3. *(done)* **Flows:** only an Admin-to-Admin flow needs consent (the destination Admin's, who picks the folder); onto a Worker's machine, the maker picks
    the folder and no consent is needed; the marker's consent for restricted material stays. **Single-file flows**: the source is one file
    followed by identity (rename or move at the source keeps it syncing), and the destination copy is followed the same way.
-4. **Park the Super User** (about 700 references in about 120 files, a third in the QML) in `parked/` (handlers, QML pages, TUI commands, preview data, installer role, handover, their tests) and strip every
+4. *(done)* **Park the Super User** in `parked/` (handlers, QML pages, TUI commands, preview data, installer role, handover, their tests) and strip every
    reference from what ships.
-5. **Console:** no Super User words, pages or data; departments as filters and groups.
+5. *(done)* **Console:** no Super User words, pages or data; one level, every department.
+   **Left from 4-5:** the Engine's comments and docstrings still describe the full design (they name the Super User where it applies under
+   `department`); the console has no place yet to make a department (`dept add` in the TUI does it) and no department filter on its lists;
+   letting another Admin pick the folder of a flow is in the TUI, not the console; making another IT Admin is still to be designed.
 6. Then packaging.
 
 **Settled:** An Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).

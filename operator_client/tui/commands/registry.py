@@ -1,8 +1,8 @@
 """The Registry and a department's page.
 
-    accounts [dept=<id>] [workers]             the Super User and every Admin: workstation, key number, signed in or not
+    accounts [dept=<id>] [workers]             every Admin: workstation, key number, signed in or not
     refused [days=7]                           connections turned away at the handshake: who tried, why, how many times, what to do
-    block <address> [reason...]                refuse an address at the door (Super User)
+    block <address> [reason...]                refuse an address at the door
     unblock <address>
     blocked                                    the addresses refused at the door
     department <id>                            a department's page: Admins, vacancy, machines, issues, reports handling, work
@@ -15,13 +15,13 @@ from operator_client.tui.render import table
 from operator_client.tui.shell import Args, ShellContext, command
 
 
-@command("accounts", usage="[dept=<id>] [workers]", help_="Accounts: the Super User and every Admin (add `workers` for them too)")
+@command("accounts", usage="[dept=<id>] [workers]", help_="Accounts: every Admin (add `workers` for them too)")
 async def accounts(ctx: ShellContext, args: Args) -> str:
     payload: dict = {}
     if args.opt("dept"):
         payload["department_id"] = args.opt_int("dept")
     if "workers" in args.positional:
-        payload["roles"] = ["super_user", "admin", "worker"]
+        payload["roles"] = ["admin", "worker"]
     r = await ctx.call("registry.accounts", payload)
     rows = [{"id": a["account_id"], "name": a["name"] or "?", "role": a["role"], "department": a["department_name"] or "-", "workstation": a["workstation"] or "-",
              "key": f"no. {a['key_generation']}" if a["key_generation"] else "-", "now": a["now"] + (", limited to working hours" if a["hours_limited"] else "")}
@@ -49,7 +49,7 @@ async def knocked(ctx: ShellContext, args: Args) -> str:
     return table(rows, ["name", "address", "tries", "last"])
 
 
-@command("block", None, "<address> [reason...]", "Refuse an address at the door (Super User)")
+@command("block", None, "<address> [reason...]", "Refuse an address at the door")
 async def block(ctx: ShellContext, args: Args) -> str:
     payload = {"address": args.get(0, "address")}
     if len(args.positional) > 1:
@@ -86,7 +86,7 @@ async def department(ctx: ShellContext, args: Args) -> str:
     return "\n".join(out)
 
 
-@command("admin", "demote", "<account_id>", "An Admin stops being one (Super User)")
+@command("admin", "demote", "<account_id>", "An Admin stops being one (never yourself)")
 async def admin_demote(ctx: ShellContext, args: Args) -> str:
     r = await ctx.call("hierarchy.admin_demote", {"account_id": args.get_int(0, "account_id")})
     return f"account {r['account_id']} is a Worker again\nclient id {r['client_id']}  key {r['client_key']}  (shown once)"

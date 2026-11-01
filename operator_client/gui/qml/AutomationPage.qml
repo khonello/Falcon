@@ -3,7 +3,7 @@ import "."
 
 // AUTOMATION. What runs on its own here: four figures, the rules (switch one off in the list), the rule
 // picked beside it with its last firings -- each opens to what every action returned -- and the runs of
-// every rule over the week under both. A rule the Super User set is seen here, not changed or switched.
+// every rule over the week under both. A rule set for the whole organisation is seen here, not changed or switched.
 Page {
     id: page
     objectName: "automationView"
@@ -54,7 +54,7 @@ Page {
         return { name: k, c: Auto.outColor(k), v: v }
     })
 
-    function ownerOf(e) { var b = board[e.id]; return b && b.owner ? b.owner : e.read_only ? "the Super User" : "this department" }
+    function ownerOf(e) { var b = board[e.id]; return b && b.owner ? b.owner : e.read_only ? "the organisation" : "an Admin" }
     // Test on one machine: the rule's actions once, on the first machine it applies to that is online (recorded as run by hand)
     function test(e) {
         var ids = (e.condition_spec || {}).pc_ids, ms = Fleet.machines.filter(function (m) { return m.online && (!ids || !ids.length || ids.indexOf(m.pc_id) >= 0) })
@@ -76,7 +76,7 @@ Page {
         on: page.pf === "" ? null : "probs"
         onPick: function (k) { page.pf = k ? "probs" : "" }
         items: [
-            { label: "Rules", value: Theme.fmt(page.events.length), delta: page.events.some(function (e) { return e.read_only }) ? page.events.filter(function (e) { return e.read_only }).length + " set by the Super User" : "all made in this department" },
+            { label: "Rules", value: Theme.fmt(page.events.length), delta: page.events.some(function (e) { return e.read_only }) ? page.events.filter(function (e) { return e.read_only }).length + " set for the whole organisation" : "all made by Admins" },
             { label: "Switched on", value: Theme.fmt(page.events.filter(function (e) { return e.enabled }).length), unit: "/ " + Theme.fmt(page.events.length),
               delta: page.events.every(function (e) { return e.enabled }) ? "every one" : page.events.filter(function (e) { return !e.enabled }).length + " switched off" },
             { label: "Fired this week", value: Theme.fmt(page.fired), delta: "each firing runs the rule's actions" },
@@ -140,7 +140,7 @@ Page {
                                anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { page.toggle(side.r, on) } } },
                 Btn { text: "Test on one machine"; enabled: side.r !== null && (side.r.actions || []).length > 0; onClicked: page.test(side.r) },
                 Btn { kind: "primary"; iconName: "edit"; text: "Edit"; enabled: side.r !== null && !side.r.read_only
-                      tip: side.r && side.r.read_only ? "Set by the Super User for the whole organisation. Only they can change it." : ""
+                      tip: side.r && side.r.read_only ? "Set for the whole organisation. Only whoever set it can change it." : ""
                       onClicked: Nav.go("automation", "edit-" + side.r.id) }
             ]
             Column {

@@ -74,6 +74,10 @@ async def load_identity(ctx: Context, client_id: str, announced_hostname: str | 
 
 
 def _identity_of(account: dict[str, Any], client_id: str) -> Identity:
+    from engine import permissions
+
+    if not permissions.signs_in(account["role"]):                      # version 1 has Admins and Workers only (docs/design/v1-it-admin.md)
+        raise ProtocolError(ErrorCode.UNAUTHENTICATED, "this account's role is not part of this version")
     return Identity(account_id=account["id"], role=account["role"], pc_id=account["bound_pc_id"],
                     department_id=account["department_id"], client_id=client_id)
 

@@ -20,19 +20,6 @@ from engine.config import Settings
 from engine.database import Database
 from engine.server import Engine
 
-
-async def provision_super_user(db: Database, secret: bytes, hostname: str) -> tuple[int, str, str]:
-    """The first Super User and its workstation: (account id, client id, hex key). The key is never stored."""
-    from engine.auth import derive_client_key
-
-    client_id = secrets.token_urlsafe(16)
-    pc_id = await db.accounts.create_pc(hostname, None, "super_user_workstation", client_id)
-    account_id = await db.accounts.create("super_user", None, pc_id)
-    await db.audit.write({"action": "bootstrap.super_user", "target_type": "accounts", "target_id": str(account_id),
-                          "detail": {"hostname": hostname, "pc_id": pc_id}})
-    return account_id, client_id, derive_client_key(secret, client_id).hex()
-
-
 FIRST_DEPARTMENT = "IT"
 
 
@@ -57,17 +44,14 @@ async def provision_first_admin(db: Database, secret: bytes, hostname: str, depa
 
 
 async def first_account(db: Database, secret: bytes, settings: Settings, hostname: str, department: str = FIRST_DEPARTMENT) -> tuple[str, int, str, str] | tuple[str, int]:
-    """The first account the Engine needs: an IT Admin (version 1), or a Super User when Admins are kept to departments. Returns
-    (who, account id, client id, key), or (who, existing account id) when one is already there."""
-    if settings.admin_scope == "organisation":
-        existing = [a for a in await db.accounts.list_all() if a["role"] == "admin" and a["status"] == "active"]
-        if existing:
-            return "an Admin", existing[0]["id"]
-        return ("IT Admin", *await provision_first_admin(db, secret, hostname, department))
-    existing = [a for a in await db.accounts.list_all() if a["role"] == "super_user" and a["status"] == "active"]
+    """The first account the Engine needs: the first IT Admin. Returns (who, account id, client id, key), or (who, existing account id)
+    when one is already there. The full design's first account (FALCON_ADMIN_SCOPE=department) is parked (parked/engine/bootstrap.py)."""
+    if settings.admin_scope != "organisation":
+        raise SystemExit("FALCON_ADMIN_SCOPE=department needs the parked first account (parked/engine/bootstrap.py); this version has IT Admins only")
+    existing = [a for a in await db.accounts.list_all() if a["role"] == "admin" and a["status"] == "active"]
     if existing:
-        return "a Super User", existing[0]["id"]
-    return ("Super User", *await provision_super_user(db, secret, hostname))
+        return "an Admin", existing[0]["id"]
+    return ("IT Admin", *await provision_first_admin(db, secret, hostname, department))
 
 
 async def bootstrap(settings: Settings, hostname: str, department: str = FIRST_DEPARTMENT) -> int:

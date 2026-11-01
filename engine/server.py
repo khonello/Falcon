@@ -102,10 +102,9 @@ class Engine:
         from engine.console import screens as console_screens
         from engine.control import executions as control_executions
         from engine.control import inventory as control_inventory
-        from engine.hierarchy import handover
         from engine.task import expected as task_expected
 
-        for mod in (control_events, control_executions, control_inventory, flow_sync, console_screens, console_marks, handover, engine.detective, task_expected):
+        for mod in (control_events, control_executions, control_inventory, flow_sync, console_screens, console_marks, engine.detective, task_expected):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
 
@@ -136,9 +135,9 @@ class Engine:
         if self.db.connected:
             self.blocked_addresses = await self.db.registry.blocked_set()
         await self.scheduler.start()
-        from engine.task import dept_tasks, tasks
+        from engine.task import tasks
 
-        rearmed = await tasks.reschedule_all(self) + await dept_tasks.reschedule_all(self)
+        rearmed = await tasks.reschedule_all(self)
         if rearmed:
             log.info("re-armed deadlines for %d open tasks", rearmed)
         from engine.control import executions

@@ -12,7 +12,8 @@ this and an older doc disagree for version 1, this wins. The combo docs keep the
   reconnected in a later version (decided 1 Nov 2026).
 - **Departments are labels.** Admins create them and use them to group people and machines for reading and filtering. They are not walls: an
   Admin's reach does not stop at one.
-- **Everything is created from the console:** departments, Admins, machines, flows, restrictions, rules, actions, tasks, to-dos.
+- **Everything is created from the console:** departments, machines, flows, restrictions, rules, actions, tasks, to-dos.
+  The one exception is an IT Admin: see "Making another IT Admin" below.
 
 ## Decisions (1 Nov 2026)
 
@@ -24,7 +25,8 @@ this and an older doc disagree for version 1, this wins. The combo docs keep the
 | Restricted material in a flow | **Kept as it is**: a flow pauses and asks the Admin who marked the restricted file or folder, unless that Admin made the flow. So there are two consents, never more: the destination Admin's (Admin to Admin) and the marker's (restricted). |
 | Two Admins on one machine | **Refused**, as peers are today: the second Admin is told who is in and since when, and can message them. Nobody pushes a colleague out. |
 | "Mine" for an issue or report | **An explicit Take.** Every issue and report reaches every Admin and stays unassigned until one takes it; the others see who has it. `issue take / give / free` already exist. |
-| First account at setup | (assumed) `python -m engine setup` makes the first IT Admin, not a Super User. Any Admin can then add Admins and departments. |
+| First account at setup | (assumed) `python -m engine setup` makes the first IT Admin, not a Super User. Any Admin can then add departments from the console. |
+| Making another IT Admin | **Never one click in the console** (the user, 1 Nov 2026: "it shouldn't be too simple to make a person admin"). It takes the console installed on that person's PC, so the PC is part of the system, and is then finalised from the TUI or a setup utility. The console has no "Add an IT Admin" button. The exact steps (who runs the command, where, and what proves it) are still to be designed. |
 
 ## Flows can carry one file, followed wherever it goes
 
@@ -58,11 +60,21 @@ Admin. `engine setup` / `bootstrap` make the first IT Admin in a department name
 and that Admin names the folder as they agree (`let_them_choose` at creation, `destination_path` in `flow.consent`); a Worker's folder is
 named by the maker. A flow's source may be one file (`source_kind: file`, migration 046): a move at the source takes the flow along, and its
 copy moved at a destination is where the next change is written (`followed_path`). TUI: `flow create ... file`, `dest=<pc>:` to let them
-choose, `flow consent <id> yes folder=..`. Steps 4-6 are next.
+choose, `flow consent <id> yes folder=..`.
+
+**Steps 4-5 done 1 Nov 2026.** The Super User's own code is in `parked/` (`parked/README.md`: department tasks, machine handover, the
+Overview's decisions, the first Super User at setup, their TUI commands, the narration module, thirteen QML pages and parts, their tests).
+An account of that role is refused at sign-in in version 1 (`engine.permissions.signs_in`). What only the head of the organisation did
+(approving versions, the rules library, refused connections and blocked addresses, the deviations, an announcement to everyone, the admin
+tier) is any Admin's now through `require_head`. Words an Admin can meet say "the organisation" or "an Admin". `issues.escalate` is
+refused: there is nobody above. The installers have two roles, worker and admin; the first IT Admin's console takes the id and key setup
+printed. The console is one level: no Super User menu, pages, banner, Leave console or entering an Admin's console; Registry shows
+refused connections and lets an Admin stop another being one; announcements, rules, run-once and flows reach every department; the Tasks
+page has no "From the Super User" tab. Step 6 (packaging) is next.
 
 
 1. **Engine: Admins reach every department.** One setting (`admin_scope`, fixed to organisation for version 1) in `engine/permissions.py`;
-   every handler that filters by `ident.department_id` reads it. Department and Admin creation become Admin handlers. Reports and issues reach
+   every handler that filters by `ident.department_id` reads it. Department creation becomes an Admin handler; making an Admin does not (it is finished from the TUI or a setup utility on a PC that has the console installed, never from the console). Reports and issues reach
    every Admin, with Take.
 2. **Engine: setup and accounts.** `engine setup` bootstraps the first Admin; `bootstrap`, `make_org.py`, `.env` and `GETTING-STARTED.md` follow.
 3. **Flows.** Consent only Admin to Admin, with the destination Admin choosing the folder; Worker destinations chosen by the maker; restricted

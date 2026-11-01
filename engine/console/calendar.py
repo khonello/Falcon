@@ -89,15 +89,6 @@ async def board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             if when is None or when >= until:
                 continue
             items.append({"kind": "task", "at": _iso(when), "title": _task_title(t), "line": people.get(t["assignee_account_id"]) or "Task", "to": ["tasks", str(t["id"])], "overdue": when < now})
-    dept_tasks = await db.department_tasks.list(account_id=ident.account_id, include_completed=False) if ident.role == "admin" \
-        else await db.department_tasks.list(department_id=None, include_completed=False)
-    names = {d["id"]: d["name"] for d in await db.accounts.list_departments()}
-    for t in dept_tasks:
-        when = t["deadline_at"]
-        if when is None or when >= until:
-            continue
-        line = "From the Super User" if ident.role == "admin" else names.get(t["department_id"], "A department")
-        items.append({"kind": "task", "at": _iso(when), "title": t["title"], "line": line, "to": ["tasks", str(t["id"])], "overdue": when < now})
 
     # --- an Admin's own to-dos with a date (not done; overdue ones on the day they were due)
     if ident.role == "admin":

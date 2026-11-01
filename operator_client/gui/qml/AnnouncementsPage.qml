@@ -13,7 +13,7 @@ Page {
     property string kind: "announcement"
     property string title: ""
     property string body: ""
-    property string audience: Nav.boss ? "all_users" : "department"
+    property string audience: "all_users"
     property int dept: 0
     property var some: []
     property string when: "now"
@@ -21,16 +21,14 @@ Page {
     property var sent: []
     property bool busy: false
 
-    readonly property var myDept: Fleet.depts.length ? Fleet.depts[0] : null
-    readonly property int deptId: Nav.boss ? dept : (myDept ? myDept.id : 0)
+    readonly property int deptId: dept
     readonly property var people: {
         var out = []
-        Fleet.machines.forEach(function (m) { if (m.user && m.account && (Nav.boss || !myDept || m.dept === myDept.id)) out.push({ value: m.account, label: m.user + " · " + m.host }) })
+        Fleet.machines.forEach(function (m) { if (m.user && m.account) out.push({ value: m.account, label: m.user + " · " + m.host }) })
         return out
     }
-    readonly property var audiences: Nav.boss
-        ? [{ value: "all_users", label: "Everyone" }, { value: "department", label: "A department" }, { value: "admin_only", label: "All Admins" }, { value: "specific_users", label: "Chosen people" }]
-        : [{ value: "department", label: myDept ? "Everyone in " + myDept.name : "My department" }, { value: "specific_users", label: "Chosen people" }]
+    readonly property var audiences: [{ value: "all_users", label: "Everyone" }, { value: "department", label: "A department" },
+                                      { value: "admin_only", label: "All Admins" }, { value: "specific_users", label: "Chosen people" }]
     readonly property string problem: !body.trim() ? "Write the announcement."
         : audience === "department" && !deptId ? "Pick a department."
         : audience === "specific_users" && !some.length ? "Pick at least one person."
@@ -86,7 +84,7 @@ Page {
                     width: parent.width; spacing: 8
                     Head { text: "TO" }
                     Segmented { objectName: "annAudience"; options: page.audiences; value: page.audience; onPicked: function (v) { page.audience = v } }
-                    Select { visible: page.audience === "department" && Nav.boss; width: Math.min(420, parent.width); search: true; placeholder: "Which department?"; value: page.dept || null
+                    Select { visible: page.audience === "department"; width: Math.min(420, parent.width); search: true; placeholder: "Which department?"; value: page.dept || null
                              options: Fleet.depts.map(function (d) { return { value: d.id, label: d.name } }); onPicked: function (v) { page.dept = v } }
                     Select { visible: page.audience === "specific_users"; width: Math.min(420, parent.width); multiple: true; search: true; placeholder: "Who?"; values: page.some
                              options: page.people; onPicked: function (v) { page.some = v } }
@@ -124,7 +122,7 @@ Page {
         Panel {
             width: (parent.width - 14) * 5 / 12
             title: "Sent"
-            sub: Nav.boss ? "everything sent" : "what you have sent"
+            sub: "what you have sent"
             pad: 0
             flush: true
             Column {

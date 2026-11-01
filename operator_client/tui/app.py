@@ -3,7 +3,7 @@ status surface, and pushes printed live above the prompt.
 
 Toolbar (always visible):
     [Admin · account 2 · pc 2 · Finance]  session: TRAVERSAL pc 3 until 12:30  ⚠ 2 pings  ⏰ task 5 deadline
-    and, when Super User is inside another user's view, a red "SUPER USER TRAVERSING" banner;
+    and, when someone is inside another user's view, a red banner;
     when this PC is blocked, a red "BLOCKED by <name>" marker.
 """
 
@@ -49,7 +49,7 @@ def _toolbar(state: ClientState, tick: list[int]) -> FormattedText:
         return FormattedText([("class:bottom-toolbar", " not connected -- connect [host:port] client=<id> [plaintext] ")])
     parts.append(("class:bottom-toolbar.role", f" {state.role_label} "))
     parts.append(("class:bottom-toolbar", f"acct {state.account_id} pc {state.pc_id} dept {state.department_id or '-'} "))
-    if state.super_user_banner:
+    if state.entered_banner:
         parts.append(("class:bottom-toolbar.banner", "  SUPER USER TRAVERSING  "))
     if state.blocked_by:
         parts.append(("class:bottom-toolbar.blocked", f"  BLOCKED by {state.blocked_by.get('occupant_name')}  "))
@@ -103,6 +103,6 @@ async def run_app(config: LocalConfig, *, initial: list[str] | None = None) -> N
 def _prompt(state: ClientState) -> str:
     if not state.connected:
         return "falcon> "
-    tag = {"super_user": "su", "admin": "admin", "worker": "worker"}.get(state.role or "", "?")
+    tag = {"admin": "admin", "worker": "worker"}.get(state.role or "", "?")
     where = f"@pc{state.session['pc_id']}" if state.traversing and state.session else ""
     return f"{tag}{where}> "

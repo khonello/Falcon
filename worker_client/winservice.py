@@ -229,7 +229,7 @@ REGISTER_AGAIN_SECONDS = 600.0
 
 async def _wait_to_be_registered(cfg: Any, stop_event: asyncio.Event) -> None:
     """A machine installed with no key of its own: ask the Engine to register it (it waits on probation, shows a code in the
-    person's session, and an Admin or the Super User confirms), then carry on with the key it is handed. A refused or expired
+    person's session, and an Admin confirms), then carry on with the key it is handed. A refused or expired
     request is asked again after a while: the service never gives up and never registers itself."""
     from worker_client.enroll import EnrollmentEnded, enroll
     from worker_client.windows.spawn import open_window

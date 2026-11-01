@@ -2,8 +2,8 @@ import QtQuick
 import "."
 
 // MESSAGES (Help Ping & Message Channel, at both levels). One row per conversation: Worker <-> Admin,
-// Admin <-> Super User, or Admin <-> Admin. It starts as a request (attention only, repeatable) that the
-// other person accepts -- with Accept, or by writing back -- except the Super User writing to an Admin,
+// Admin <-> Admin, or Admin <-> worker. It starts as a request (attention only, repeatable) that the
+// other person accepts -- with Accept, or by writing back -- except where the Engine opens it at once,
 // which opens at once. Then either side writes whenever they like (no turn lock, 22 Oct 2026). Who may
 // close it comes from the Engine (`can_close`): the higher party, or either of two Admins.
 Page {
@@ -30,12 +30,11 @@ Page {
             })
         })
         falcon.call("assistance.ping_status", {}, function (ok, r) { page.pings = ok ? (r.pings || []) : [] })
-        // who this person may message, as the Engine decides it: the Super User's Admins; an Admin's Super User,
-        // the other Admins and their own workers
+        // who this person may message, as the Engine decides it: the other Admins and the workers
         falcon.call("assistance.people", {}, function (ok, r) {
             page.askFor = ok ? (r.people || []).map(function (a) {
                 return { account: a.account_id, name: a.name, request: a.request !== false,
-                         sub: a.role === "super_user" ? "the Super User" : a.role === "admin" ? "Admin" + (a.department_name ? ", " + a.department_name : "")
+                         sub: a.role === "admin" ? "Admin" + (a.department_name ? ", " + a.department_name : "")
                               : a.hostname ? "on " + a.hostname : "a worker" } }) : []
         })
     }
@@ -50,7 +49,7 @@ Page {
             var d = detail[c.id], ch = d ? d.channel : c, names = ch.names || {}
             var hi = c.superior_account_id, lo = ch.subordinate_account_id || c.initiator_account_id
             var party = true      // the Engine lists only the conversations this person is in
-            var other = names[String(hi === me ? lo : hi)] || (hi === me ? c.initiator_name : "the Super User")
+            var other = names[String(hi === me ? lo : hi)] || (hi === me ? c.initiator_name : "")
             var msgs = d ? (d.messages || []).map(function (m) { return { t: Time.ms(m.sent_at || m.created_at), who: names[String(m.sender_account_id)] || "", mine: m.sender_account_id === me, text: m.body } }) : []
             var closed = !!c.closed_at
             // the Engine's `my_turn` now only says the other person wrote last: waiting on you, not a lock
@@ -158,7 +157,7 @@ Page {
             showEmpty: page.rows.length === 0
             emptyIcon: "message"
             emptyTitle: "No conversations yet"
-            emptyText: Nav.boss ? "Write to an Admin and the conversation opens at once; an Admin's request opens one when you accept it." : "A message starts as a request; accepting it opens a conversation."
+            emptyText: "A message starts as a request; accepting it opens a conversation."
             emptyAct: "New message"
             onEmptyAction: pingDrawer.open()
         }
@@ -170,7 +169,7 @@ Page {
             showEmpty: page.c === null
             emptyIcon: "message"
             emptyTitle: "No conversations yet"
-            emptyText: Nav.boss ? "When an Admin messages you, or you message one, it appears here." : "When a worker or the Super User messages you, or you message them, it appears here."
+            emptyText: "When a worker or another Admin messages you, or you message them, it appears here."
             title: page.c ? page.c.title : ""
             sub: page.c ? (page.askFor.filter(function (p) { return p.name === page.c.other })[0] || { sub: "" }).sub : ""
             facts: page.c ? [["Now", page.c.st[0], page.c.st[1] === "bad" ? Theme.crit : page.c.st[1] === "good" ? Theme.ok : Theme.text4, false, true],
@@ -272,9 +271,9 @@ Page {
         id: pingDrawer
         page: page
         width: 420
-        title: Nav.boss ? "Message an Admin" : "Ask someone to talk"
+        title: "Ask someone to talk"
         property var who: null
-        // writing to someone is a request they accept, except the Super User writing to an Admin
+        // writing to someone is a request they accept, unless the Engine says it opens at once
         readonly property bool direct: who !== null && page.askFor.some(function (p) { return p.account === who && !p.request })
         note: who === null ? "Pick a person." : ""
         footer: [

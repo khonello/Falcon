@@ -106,26 +106,6 @@ async def test_an_admin_has_three_simple_buttons_and_nothing_to_send_up_or_to_re
     assert win.findChild(QObject, "detRememberFolder") is None and win.findChild(QObject, "detRememberDrive") is None    # a dismissal is only a dismissal
 
 
-async def test_the_super_user_sees_every_case_by_department_and_decides_only_what_is_sent_up_or_on_an_admin_s_machine(console):
-    win, bridge, _ = console("super_user")
-    page = await _open(win, bridge, "detective", "detectiveOverview")
-    base = {"id": 1, "host": "FIN-02", "intent": "Taking data out", "level": "urgent", "weight": 0.9, "status": "open", "story": ["12:00  opened a.xlsx"], "headline": "Taking data out.",
-            "first_at": "2026-10-18T10:00:00Z", "last_at": "2026-10-18T10:05:00Z", "department_id": 2}
-    page.setProperty("cases", [base, {**base, "id": 2, "host": "FIN-01", "status": "escalated"}])
-    _pump(0.4)
-    assert "deptCards" in _names(win.contentItem())
-    assert prop(page, "toDecide") == 1                                                       # only the one an Admin sent up is theirs
-    QMetaObject.invokeMethod(page, "show", Q_ARG("QVariant", base))
-    _pump(0.4)
-    assert win.findChild(QObject, "detDecision").property("visible") is False                 # the department's Admin reviews that one
-    QMetaObject.invokeMethod(page, "show", Q_ARG("QVariant", {**base, "id": 2, "status": "escalated"}))
-    _pump(0.4)
-    assert win.findChild(QObject, "detDecision").property("visible") is True
-    QMetaObject.invokeMethod(page, "review", Q_ARG("QVariant", "explained"))
-    await _wait(lambda: any(t == "detective.review" for t, _ in bridge.conn.seen))
-    assert next(p for t, p in bridge.conn.seen if t == "detective.review")["outcome"] == "explained"
-
-
 async def test_a_dismissal_is_sent_as_it_is_without_a_rule(console):
     from PySide6.QtCore import Q_ARG
 
@@ -164,16 +144,6 @@ async def test_a_flow_waiting_for_a_restricted_owner_is_answered_on_the_flows_pa
     assert sent == {"consent_id": 5, "grant": True}
 
 
-async def test_the_super_user_can_open_a_move_to_another_machine_from_the_registry(console):
-    win, bridge, _ = console("super_user")
-    page = await _open(win, bridge, "registry", "registryView")
-    assert win.findChild(QObject, "handoverCard") is not None and win.findChild(QObject, "handoverCard").property("visible") is True
-    QMetaObject.invokeMethod(page, "openHandover", Q_ARG("QVariant", True))
-    await _wait(lambda: any(t == "handover.open" for t, _ in bridge.conn.seen))
-    QMetaObject.invokeMethod(page, "openHandover", Q_ARG("QVariant", False))
-    await _wait(lambda: any(t == "handover.cancel" for t, _ in bridge.conn.seen))
-
-
 async def test_an_admin_does_not_see_the_move_of_the_super_user(console):
     win, bridge, _ = console("admin")
     bridge.connected.emit()
@@ -208,31 +178,6 @@ async def test_a_flow_shows_what_restricted_material_it_waits_for_or_carries_and
     assert next(p for t, p in bridge.conn.seen if t == "flow.restricted_revoke") == {"consent_id": 5}
 
 
-async def test_what_waits_on_the_super_user_includes_suggestions_flows_to_allow_and_a_machine_asking_to_take_over(console):
-    win, bridge, _ = console("super_user")
-    real = bridge.conn.call
-
-    async def call(type_, payload=None):
-        if type_ == "proposals.list":
-            return {"proposals": [{"id": 4, "kind": "follow_up_task", "title": "Ask the department's Admin to follow up on FIN-01?", "created_at": "2026-10-18T10:00:00Z"}, {"id": 6, "kind": "pause_flow", "title": "Pause flow #3?", "created_at": "2026-10-18T10:00:00Z"}]}
-        if type_ == "flow.restricted_waiting":
-            return {"waiting": [{"id": 5, "flow_id": 9, "name": "Payroll", "sample_path": "C:/Finance/Payroll/p.xlsx", "asked_at": "2026-10-18T10:05:00Z"}]}
-        if type_ == "handover.status":
-            return {"open": True, "waiting": [{"id": 7, "hostname": "SU-NEW", "created_at": "2026-10-18T10:10:00Z"}]}
-        return await real(type_, payload or {})
-
-    bridge.conn.call = call
-    await _open(win, bridge, "overview", "overviewView")
-    loader = win.findChild(QObject, "page")                 # (a page that was left is still around a moment: the loader holds the one on show)
-    await _wait(lambda: loader.property("item") is not None and loader.property("item").metaObject().className().startswith("SuOverviewPage"))
-    page = loader.property("item")
-    await _wait(lambda: {x["kind"] for x in prop(page, "q") or []} >= {"proposal", "restricted", "handover"})
-    q = {x["kind"]: x for x in prop(page, "q")}
-    assert q["handover"]["title"] == "SU-NEW is asking to become your machine" and q["handover"]["options"][0]["go"] == ["registry", "ask"]
-    assert [o["key"] for o in q["proposal"]["options"]] == ["yes", "no"] and q["restricted"]["title"].startswith("Flow 9 wants to carry Payroll")
-    assert len([x for x in prop(page, "q") if x["kind"] == "proposal"]) == 1                    # pausing a flow is the department's Admin's: only the follow-up on a case sent up reaches the Super User
-
-
 async def test_an_admin_s_waiting_count_includes_what_detective_suggests_and_the_flows_they_may_allow(console):
     win, bridge, _ = console("admin")
     real = bridge.conn.call
@@ -245,32 +190,3 @@ async def test_an_admin_s_waiting_count_includes_what_detective_suggests_and_the
     bridge.conn.call = call
     page = await _open(win, bridge, "overview", "overviewView")
     await _wait(lambda: prop(page, "suggestions") == 2 and prop(page, "toAllow") == 1)
-
-
-async def test_the_super_user_s_overview_is_what_waits_a_map_of_the_organisation_and_the_four_core_features_as_tiles(console):
-    win, bridge, _ = console("super_user")
-    real = bridge.conn.call
-
-    async def call(type_, payload=None):
-        if type_ == "detective.overview":
-            return {"by_level": {"urgent": 2, "case": 1, "noted": 0}, "by_intent": {}, "reviewed": 0}
-        if type_ == "detective.cases":
-            return {"cases": [{"id": 1, "intent": "Taking data out", "host": "FIN-02", "level": "urgent"}]}
-        if type_ == "flow.list":
-            return {"flows": [{"id": 1, "status": "active", "source_hostname": "A", "destinations": []},
-                              {"id": 2, "status": "paused", "pause_reason": "restricted:consent", "source_hostname": "B", "destinations": [{"destination_hostname": "C"}]}]}
-        if type_ == "marks.list":
-            return {"marks": [{"id": 1, "name": "Payroll", "host": "FIN-02", "copies": 2, "carried_by": [2]}]}
-        return await real(type_, payload or {})
-
-    bridge.conn.call = call
-    await _open(win, bridge, "overview", "overviewView")
-    loader = win.findChild(QObject, "page")
-    await _wait(lambda: loader.property("item") is not None and loader.property("item").metaObject().className().startswith("SuOverviewPage"))
-    page = loader.property("item")
-    await _wait(lambda: prop(page, "ov")["by_level"]["urgent"] == 2 and len(prop(page, "flows")) == 2 and len(prop(page, "marks")) == 1)
-    for name in ("waitingBand", "orgMap", "quadTasks", "quadFlows", "quadRestricted", "quadDetective"):
-        assert page.findChild(QObject, name) is not None, name
-    h = lambda n: page.findChild(QObject, n).property("height")          
-    assert h("quadTasks") == h("quadFlows") and h("quadRestricted") == h("quadDetective")          # side by side, one height
-    assert prop(page, "carried") == 1 and prop(page, "copies") == 2 and len(prop(page, "asking")) == 1

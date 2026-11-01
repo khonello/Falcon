@@ -37,8 +37,8 @@ class Layout:
         return self.state / "falcon-client.json"
 
     @property
-    def first_super_user(self) -> Path:
-        return self.state / "first-super-user.txt"
+    def first_admin(self) -> Path:
+        return self.state / "first-admin.txt"
 
 
 def env_file(layout: Layout, database_url: str, port: int = 7400) -> str:
