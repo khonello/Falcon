@@ -9,7 +9,7 @@ Every step is checked first and skipped when already done, so it is safe to run 
                   is printed and setup stops there
   4. schema       migrations applied to the working database
   5. secret       the master secret created (data/master.secret -- back it up)
-  6. Super User   bootstrapped once on an empty database; its client id + key printed ONCE, and written into this
+  6. first Admin  the first IT Admin (in a department named IT) bootstrapped once; its client id + key printed ONCE, and written into this
                   machine's Operator Client settings so it connects without typing anything
   7. local model  checked; --download-model fetches it (~1.8 GB) from Hugging Face
   8. firewall     on Linux, the Engine's TCP port opened in the host firewall (ufw or firewalld, whichever is running; as root,
@@ -137,10 +137,10 @@ async def ensure_databases(admin_url: str | None) -> bool:
     return True
 
 
-# --- 4-6. schema, secret, Super User -----------------------------------------------------------------------------
+# --- 4-6. schema, secret, first account -----------------------------------------------------------------------------
 
-async def ensure_schema_and_super_user(settings: Any, hostname: str, write_operator: bool, engine_host: str) -> None:
-    from engine.__main__ import provision_super_user
+async def ensure_schema_and_first_account(settings: Any, hostname: str, write_operator: bool, engine_host: str) -> None:
+    from engine.__main__ import first_account
     from engine.database import Database
     from engine.master_secret import load_or_create
 
@@ -152,21 +152,21 @@ async def ensure_schema_and_super_user(settings: Any, hostname: str, write_opera
         secret = settings.master_secret or load_or_create(ROOT / settings.secret_path
                                                           if not settings.secret_path.is_absolute() else settings.secret_path)
         say("secret", "master secret ready (data/master.secret -- back it up; every key derives from it)")
-        existing = [a for a in await db.accounts.list_all() if a["role"] == "super_user" and a["status"] == "active"]
-        if existing:
-            say("Super User", f"already exists (account {existing[0]['id']}) -- nothing issued")
+        made = await first_account(db, secret, settings, hostname)
+        if len(made) == 2:
+            say("first account", f"{made[0]} already exists (account {made[1]}) -- nothing issued")
             return
-        account_id, client_id, key = await provision_super_user(db, secret, hostname)
+        who, account_id, client_id, key = made
     finally:
         await db.close()
-    say("Super User", f"account {account_id} on {hostname}")
+    say(who, f"account {account_id} on {hostname}")
     print(f"\n    client_id:  {client_id}\n    client_key: {key}\n")
-    print("    Shown once. Keep them for the Super User's Operator Client install.\n")
+    print("    Shown once. Keep them for this console's install.\n")
     if write_operator:
-        _write_operator_config(settings, engine_host, client_id, key)
+        _write_operator_config(settings, engine_host, client_id, key, who)
 
 
-def _write_operator_config(settings: Any, engine_host: str, client_id: str, key: str) -> None:
+def _write_operator_config(settings: Any, engine_host: str, client_id: str, key: str, who: str) -> None:
     try:
         from operator_client.core.config import LocalConfig
     except ImportError:
@@ -180,7 +180,7 @@ def _write_operator_config(settings: Any, engine_host: str, client_id: str, key:
         cert = settings.tls_cert if settings.tls_cert.is_absolute() else ROOT / settings.tls_cert
         cfg.ca_cert = str(cert)
     cfg.save()
-    say("operator", f"this machine's Operator Client will connect as the Super User ({cfg.path})")
+    say("operator", f"this machine's Operator Client will connect as the {who} ({cfg.path})")
 
 
 # --- 7. the local model --------------------------------------------------------------------------------------------
@@ -263,7 +263,7 @@ def ensure_model(settings: Any, download: bool) -> None:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="python -m engine setup", description=__doc__.split("\n\n")[0])
-    ap.add_argument("--hostname", default=socket.gethostname(), help="the Super User's workstation name (default: this machine)")
+    ap.add_argument("--hostname", default=socket.gethostname(), help="the first IT Admin's workstation name (default: this machine)")
     ap.add_argument("--names", default="", help="more names/IPs the clients will use to reach the Engine, comma-separated")
     ap.add_argument("--admin-url", default=None, help="a PostgreSQL superuser URL, to create the role and databases")
     ap.add_argument("--engine-host", default="127.0.0.1", help="where this machine's Operator Client reaches the Engine")
@@ -279,7 +279,7 @@ def main(argv: list[str]) -> int:
     ensure_certificate(settings, [n.strip() for n in args.names.split(",") if n.strip()])
     ok = asyncio.run(ensure_databases(args.admin_url))
     if ok and settings.database_url:
-        asyncio.run(ensure_schema_and_super_user(settings, args.hostname, not args.no_operator_config, args.engine_host))
+        asyncio.run(ensure_schema_and_first_account(settings, args.hostname, not args.no_operator_config, args.engine_host))
     ensure_model(settings, args.download_model)
     ensure_firewall(settings)
     print("\nDone." if ok else "\nNot finished: the databases above come first.")

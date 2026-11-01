@@ -1,16 +1,15 @@
-"""Provision a department, an Admin and a Worker on a running Engine, and write their settings.
+"""Provision a department, a second IT Admin and a Worker on a running Engine, and write their settings.
 
-A fresh install has one account: the Super User that `python -m engine setup` bootstrapped. There is
-no Admin and no Worker, so there is nothing to run at those levels and the console looks thin -- the
-Super User's shell is eight areas by design (docs/UI.md rule 25).
+A fresh install has one account: the first IT Admin that `python -m engine setup` bootstrapped (version 1,
+docs/design/v1-it-admin.md). There is no Worker yet, so the console looks thin.
 
-This makes the other two, once, so each can be started with one command:
+This makes a department (a label), another Admin and a Worker, once, so each can be started with one command:
 
-    environ-operator\\Scripts\\python.exe scripts\\make_org.py             # uses the saved Super User
+    environ-operator\\Scripts\\python.exe scripts\\make_org.py             # uses the saved first Admin
     environ-operator\\Scripts\\python.exe scripts\\make_org.py --department Logistics
 
-It writes `data/admin.json` (an Operator Client settings file, so the Admin console does not overwrite
-the Super User's) and prints the Worker's command. Client keys are printed ONCE by the Engine at
+It writes `data/admin.json` (an Operator Client settings file, so the second Admin's console does not overwrite
+the first's) and prints the Worker's command. Client keys are printed ONCE by the Engine at
 provisioning and never again -- that is the design, not an oversight -- so they are written into
 those files as they arrive.
 
@@ -33,7 +32,7 @@ from operator_client.core import EngineConnection, LocalConfig
 async def make(args: argparse.Namespace) -> int:
     su = LocalConfig.load()
     if not su.client_id:
-        print("No saved Super User on this machine. Run `python -m engine setup` first.",
+        print("No saved Admin on this machine. Run `python -m engine setup` first.",
               file=sys.stderr)
         return 2
 
@@ -46,8 +45,8 @@ async def make(args: argparse.Namespace) -> int:
               file=sys.stderr)
         print("Start it first: `environ-engine\\Scripts\\python.exe -m engine`", file=sys.stderr)
         return 1
-    if ident.role != "super_user":
-        print(f"These settings are a {ident.role}; only the Super User can make a department.",
+    if ident.role != "admin":
+        print(f"These settings are a {ident.role}; only an Admin can make a department.",
               file=sys.stderr)
         return 2
 
@@ -93,7 +92,7 @@ async def make(args: argparse.Namespace) -> int:
     print(f"  Admin    account {admin['account_id']}  on {admin_host}")
     print(f"  Worker   account {worker['account_id']}  on {worker_host}")
     print()
-    print("Run the Admin's console (its own settings file, so the Super User's stay put):")
+    print("Run the second Admin's console (its own settings file, so the first Admin's stay put):")
     print("  environ-operator\\Scripts\\python.exe -m operator_client --gui --config data\\admin.json")
     print()
     print("Run the Worker on this machine:")

@@ -40,7 +40,7 @@ from common.detective import (
 from engine.detective import labels
 from engine.dispatch import Context as HandlerContext
 from engine.dispatch import handler
-from engine.permissions import int_field, require_role, str_field
+from engine.permissions import int_field, kept, require_role, str_field
 from engine.serialize import row, rows
 from protocol import ErrorCode, ProtocolError
 
@@ -428,6 +428,8 @@ def _scope(ctx: HandlerContext) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     if ident.role == "super_user":
         return {}
+    if not kept(ident):
+        return {"only_pc_types": ["client_pc"]}                                                    # IT: every department's machines, never an Admin's
     return {"department_id": ident.department_id, "only_pc_types": ["client_pc"]}           # an Admin: their department's machines, never their own or another Admin's
 
 
@@ -440,7 +442,8 @@ def _view(c: dict[str, Any]) -> dict[str, Any]:
 async def _visible(ctx: HandlerContext, case_id: int) -> dict[str, Any]:
     case = await ctx.engine.db.detective.case(case_id)
     scope = _scope(ctx)
-    if case is None or (scope and (case["pc_department_id"] != scope["department_id"] or case["pc_type"] != "client_pc")):
+    if case is None or (scope and ((scope.get("department_id") is not None and case["pc_department_id"] != scope["department_id"])
+                                   or case["pc_type"] != "client_pc")):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such case")
     return case
 

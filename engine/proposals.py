@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from common.detective import folder_of
 from engine.bus import Event
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role
+from engine.permissions import in_scope, int_field, require_role
 from engine.serialize import rows
 from protocol import ErrorCode, ProtocolError
 
@@ -111,7 +111,7 @@ async def on_case_reviewed(engine: Engine, data: dict[str, Any]) -> None:
 
 
 def _visible(ident: Any, row: dict[str, Any]) -> bool:
-    return ident.role == "super_user" or (ident.role == "admin" and row.get("department_id") == ident.department_id)
+    return ident.role in ("super_user", "admin") and in_scope(ident, row.get("department_id"))
 
 
 @handler("proposals.list")

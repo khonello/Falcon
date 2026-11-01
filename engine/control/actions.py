@@ -17,7 +17,13 @@ from typing import Any
 
 from engine.control import custom_actions
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_department_scope, require_role, str_field
+from engine.permissions import (
+    int_field,
+    org_wide,
+    require_department_scope,
+    require_role,
+    str_field,
+)
 from engine.serialize import row, rows
 from protocol import ErrorCode, ProtocolError
 
@@ -141,7 +147,7 @@ async def action_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Library: built-in types plus the department's stored actions, grouped by category."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
-    stored = await db.control.actions() if ident.role == "super_user" else await db.control.actions_in_department(
+    stored = await db.control.actions() if org_wide(ident) else await db.control.actions_in_department(
         ident.department_id)
     grouped: dict[str, list[dict[str, Any]]] = {"control": [], "monitoring": [], "custom": []}
     for a in rows(stored):

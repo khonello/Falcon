@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, Any
 
 from engine.console.feed import describe_many
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_department_scope, require_role, str_field
+from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 if TYPE_CHECKING:
@@ -51,7 +51,12 @@ OFFLINE_MEDIUM_AFTER = timedelta(hours=24)
 # --- raising and resolving (called by the combos that record the causes) --------------------------
 
 async def _default_owner(engine: Engine, department_id: int | None) -> tuple[int | None, bool]:
-    """(owner, escalated): the department's only Admin owns it; with several it is unassigned; with none it goes to the Super User."""
+    """(owner, escalated): the department's only Admin owns it; with several it is unassigned; with none it goes to the Super User.
+    When Admins are IT (version 1) every issue starts unassigned, for any Admin to Take; nothing escalates (there is nobody above)."""
+    from engine import permissions
+
+    if permissions.ADMIN_SCOPE == "organisation":
+        return None, False
     if department_id is None:
         return None, True
     admins = [a for a in await engine.db.accounts.active_admins() if a["department_id"] == department_id]
@@ -161,7 +166,7 @@ async def issues_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     past_target, done_today, mine (waiting on this person), by_type, by_severity."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
-    department = ident.department_id if ident.role == "admin" else int_field(payload, "department_id", required=False)
+    department = ident.department_id if kept(ident) else int_field(payload, "department_id", required=False)
     type_ = str_field(payload, "type", required=False, choices=tuple(TYPE_LABEL))
     owner = payload.get("owner")
     owner_id = ident.account_id if owner == "me" else (int(owner) if isinstance(owner, int) else None)
@@ -187,7 +192,7 @@ async def _load(ctx: Context, issue_id: int) -> dict[str, Any]:
     issue = await ctx.engine.db.issues.get(issue_id)
     if issue is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such issue")
-    if ident.role == "admin" and issue["department_id"] != ident.department_id:
+    if kept(ident) and issue["department_id"] != ident.department_id:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such issue")
     return issue
 
@@ -275,7 +280,7 @@ async def issues_assign(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
             raise ProtocolError(ErrorCode.INVALID, "an issue is given to an Admin")
         if who["role"] == "admin":
             require_department_scope(ident, who["department_id"])
-            if who["department_id"] != issue["department_id"]:
+            if kept(ident) and who["department_id"] != issue["department_id"]:
                 raise ProtocolError(ErrorCode.INVALID, "that Admin is not in this issue's department")
         elif ident.role != "super_user":
             raise ProtocolError(ErrorCode.FORBIDDEN, "only the Super User gives an issue to themselves")

@@ -17,7 +17,7 @@ from typing import Any
 
 from engine.dispatch import Context, handler
 from engine.isotime import parse_iso
-from engine.permissions import int_field, require_role
+from engine.permissions import int_field, kept, require_role
 from protocol import ErrorCode, ProtocolError
 
 # kind -> the action types (exact, or a prefix ending in ".") it covers
@@ -185,7 +185,7 @@ async def describe(db: Any, entry: dict[str, Any], viewer_account_id: int | None
 
 def _scope(ident: Any, payload: dict[str, Any]) -> int | None:
     """The department a reader is limited to: an Admin's own, or the one a Super User asks for (None: all)."""
-    if ident.role == "admin":
+    if kept(ident):
         return ident.department_id
     return int_field(payload, "department_id", required=False)
 

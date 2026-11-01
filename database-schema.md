@@ -663,3 +663,5 @@ as it is made).
 `conversations`, `conversation_members`, `conversation_messages`, `conversation_reads` (migration 044: an Admin's conversations in version 1: a pair,
 reused by `pair_key`, or the one group of every Admin, whose members are read from the accounts; read times per person). `flow_sync_log` gained
 `outcome` (new / changed / kept_beside / removed), `bytes_before` and `bytes_after` (migration 045: a flow's last sync as a diff).
+`flows.source_kind` (folder / file) and `flow_destinations.followed_path` (migration 046: a single-file flow follows its file at the
+source, and its copy moved at a destination).

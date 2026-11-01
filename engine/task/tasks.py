@@ -21,7 +21,14 @@ from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
 from engine.isotime import parse_iso
-from engine.permissions import int_field, require_account, require_role, str_field
+from engine.permissions import (
+    in_scope,
+    int_field,
+    org_wide,
+    require_account,
+    require_role,
+    str_field,
+)
 from engine.serialize import row, rows
 from engine.task import llm_graph, verification
 from engine.task.hints import parse_hints
@@ -49,9 +56,8 @@ async def _assignee_for(ctx: Context, assignee_account_id: int) -> dict[str, Any
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such active account")
     if ident.role == "super_user" and assignee["role"] != "admin":
         raise ProtocolError(ErrorCode.FORBIDDEN, "Super User assigns department-level tasks to Admins")
-    if ident.role == "admin" and not (assignee["role"] == "worker"
-                                      and assignee["department_id"] == ident.department_id):
-        raise ProtocolError(ErrorCode.FORBIDDEN, "Admin assigns tasks to Workers in their own department")
+    if ident.role == "admin" and not (assignee["role"] == "worker" and in_scope(ident, assignee["department_id"])):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "Admin assigns tasks to Workers" + ("" if org_wide(ident) else " in their own department"))
     return assignee
 
 
@@ -72,7 +78,7 @@ async def _can_view(ctx: Context, task: dict[str, Any]) -> bool:
         return True
     if ident.role == "super_user":
         return True
-    return ident.role == "admin" and task["assignee_department_id"] == ident.department_id
+    return ident.role == "admin" and in_scope(ident, task["assignee_department_id"])
 
 
 async def _task_view(engine: Engine, ctx: Context, task: dict[str, Any]) -> dict[str, Any]:
@@ -261,7 +267,7 @@ async def list_tasks(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_account(ctx)
     include = bool(payload.get("include_completed", False))
     db = ctx.engine.db
-    if ident.role == "super_user":
+    if org_wide(ident):
         found = await db.tasks.list_all(include_completed=include)
     elif ident.role == "admin":
         mine = await db.tasks.list_for(ident.account_id, include_completed=include)

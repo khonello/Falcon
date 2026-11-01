@@ -17,6 +17,7 @@ from typing import Any
 from engine.dispatch import Context, handler
 from engine.permissions import (
     int_field,
+    org_wide,
     outranks,
     require_department_scope,
     require_role,
@@ -30,8 +31,8 @@ PC_TYPE_FOR_ROLE = {"super_user": "super_user_workstation", "admin": "admin_work
 
 @handler("hierarchy.department_create")
 async def department_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"name": str} -- Super User only. Zero-Admin departments are allowed."""
-    ident = require_role(ctx, "super_user")
+    """{"name": str} -- the Super User, or any Admin when Admins are IT (version 1: a department is a label). Zero-Admin departments are allowed."""
+    ident = _manager(ctx)
     name = str_field(payload, "name")
     import asyncpg
 
@@ -51,12 +52,29 @@ async def departments(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"departments": rows(await ctx.engine.db.accounts.list_departments())}
 
 
+def _manager(ctx: Context) -> Any:
+    """Who may make departments and Admins: the Super User, or any Admin when Admins are IT (version 1, docs/design/v1-it-admin.md)."""
+    ident = require_role(ctx, "super_user", "admin")
+    if not org_wide(ident):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "requires role super_user")
+    return ident
+
+
+def _peer_ok(ident: Any, subject: dict[str, Any]) -> bool:
+    """An IT Admin may act on another Admin's account (add, remove, promote, demote), never their own."""
+    return ident.role == "admin" and org_wide(ident) and subject["role"] in ("admin", "worker") and subject["id"] != ident.account_id
+
+
 async def seat_watch(engine: Any, department_id: int, name: str) -> None:
     """A department with no Admin must get one within the time the rule allows (a new department starts without; so does one that
-    loses its last)."""
+    loses its last). Not when Admins are IT: a department is a label and needs no Admin of its own."""
     from datetime import datetime, timezone
 
+    from engine import permissions
     from engine.console import accountability
+
+    if permissions.ADMIN_SCOPE == "organisation":
+        return
 
     if any(a["department_id"] == department_id for a in await engine.db.accounts.active_admins()):
         return
@@ -87,7 +105,7 @@ async def account_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     role = str_field(payload, "role", choices=("super_user", "admin", "worker"))
     hostname = str_field(payload, "hostname")
     department_id = int_field(payload, "department_id", required=role != "super_user")
-    if not outranks(ident.role, role):
+    if not outranks(ident.role, role) and not (role == "admin" and ident.role == "admin" and org_wide(ident)):
         raise ProtocolError(ErrorCode.FORBIDDEN, f"{ident.role} cannot create a {role}")
     if department_id is not None:
         require_department_scope(ident, department_id)
@@ -108,7 +126,7 @@ async def account_offboard(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     subject = await db.accounts.by_id(account_id)
     if subject is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such account")
-    if not outranks(ident.role, subject["role"]):
+    if not outranks(ident.role, subject["role"]) and not _peer_ok(ident, subject):
         raise ProtocolError(ErrorCode.FORBIDDEN, "offboarding is top-down only")
     require_department_scope(ident, subject["department_id"])
     from engine.hierarchy import traversal
@@ -128,8 +146,9 @@ async def account_offboard(ctx: Context, payload: dict[str, Any]) -> dict[str, A
 async def admin_promote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"account_id"} -- Super User only. A Worker becomes an Admin of the department they already work in. Their machine becomes an
     Admin workstation and gets a new key (returned once: the install on it must be redone with it); what was installed as a Worker's
-    stops working. A department with no Admin is how this is usually reached, but it is allowed to give a department another."""
-    require_role(ctx, "super_user")
+    stops working. A department with no Admin is how this is usually reached, but it is allowed to give a department another. Any Admin when
+    Admins are IT."""
+    _manager(ctx)
     account_id = int_field(payload, "account_id")
     db = ctx.engine.db
     subject = await db.accounts.by_id(account_id)
@@ -157,9 +176,11 @@ async def admin_promote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 async def admin_demote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"account_id"} -- Super User only. An Admin stops being one: they stay in the department as a Worker on the same machine, which gets a new key (returned
     once) and stops being an Admin workstation. Their session is ended, the issues they owned go back to the department's pool, and if they were the last
-    Admin the department is left with an empty seat (watched like any other)."""
-    require_role(ctx, "super_user")
+    Admin the department is left with an empty seat (watched like any other). When Admins are IT, any other Admin may do it, never on themself."""
+    ident = _manager(ctx)
     account_id = int_field(payload, "account_id")
+    if account_id == ident.account_id:
+        raise ProtocolError(ErrorCode.INVALID, "another Admin must do that")
     db = ctx.engine.db
     subject = await db.accounts.by_id(account_id)
     if subject is None or subject["role"] != "admin" or subject["status"] != "active":

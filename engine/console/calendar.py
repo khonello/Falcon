@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role
+from engine.permissions import int_field, kept, require_role
 
 DEFAULT_DAYS = 62
 MAX_DAYS = 124
@@ -78,7 +78,7 @@ async def board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     # --- tasks: the final deadline of what is not finished (the soft one when there is no final one), overdue ones on the day they were due
     if ident.role == "admin":
         mine = await db.tasks.list_for(ident.account_id, include_completed=False)
-        dept = await db.tasks.list_department(ident.department_id, include_completed=False)
+        dept = await db.tasks.list_department(ident.department_id, include_completed=False) if kept(ident) else []
         seen: set[int] = set()
         people = await db.accounts.display_names_for(ident.account_id, sorted({t["assignee_account_id"] for t in mine + dept}))
         for t in mine + dept:
@@ -110,7 +110,8 @@ async def board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     # --- rules that run on a clock (an Admin's department only)
     if ident.role == "admin":
         horizon = min(until, _end_of_next_month(now))
-        for d in await db.control.events_in_department(ident.department_id, enabled_only=True):
+        for d in (await db.control.events_in_department(ident.department_id, enabled_only=True) if kept(ident)
+                  else await db.control.event_definitions(enabled_only=True)):
             spec = d["condition_spec"] or {}
             if not str(spec.get("type", "")).startswith("time."):
                 continue

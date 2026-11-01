@@ -18,7 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role, str_field
+from engine.permissions import int_field, org_wide, require_role, str_field
 from engine.serialize import rows
 from protocol import ErrorCode, ProtocolError
 
@@ -60,7 +60,7 @@ async def emit(engine: Engine, category: str, *, source_table: str, source_id: i
                                        department_id=dept_id, label=f"A {category.replace('_', ' ')} report")
     await engine.broadcast(
         "report.new", {"id": report_id, "category": category, "summary": summary},
-        predicate=lambda c: c.ctx.identity.role == "super_user"
+        predicate=lambda c: org_wide(c.ctx.identity)
         or (c.ctx.identity.role == "admin" and c.ctx.identity.department_id in routed))
     return report_id
 
@@ -74,7 +74,7 @@ async def list_reports(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     this reader first opened it (`seen_at`, theirs alone) and when anyone addressed it."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
-    if ident.role == "super_user":
+    if org_wide(ident):
         found = await db.reports.all(ident.account_id)
     else:
         found = await db.reports.routed_to_department(ident.department_id, ident.account_id)
@@ -91,7 +91,7 @@ async def seen(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
         raise ProtocolError(ErrorCode.INVALID, "report_ids must be a non-empty list of ids")
     db = ctx.engine.db
-    if ident.role == "super_user":
+    if org_wide(ident):
         visible = {r["id"] for r in await db.reports.all(ident.account_id, limit=100000)}
     else:
         visible = {r["id"] for r in await db.reports.routed_to_department(ident.department_id, limit=100000)}
@@ -107,7 +107,8 @@ async def mark(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "admin")
     report_id = int_field(payload, "report_id")
     db = ctx.engine.db
-    visible = {r["id"] for r in await db.reports.routed_to_department(ident.department_id)}
+    visible = {r["id"] for r in (await db.reports.all(ident.account_id, limit=100000) if org_wide(ident)
+                                  else await db.reports.routed_to_department(ident.department_id))}
     if report_id not in visible:
         raise ProtocolError(ErrorCode.NOT_FOUND, "report is not routed to your department")
     view_id = await db.reports.mark_addressed(report_id, ident.account_id)

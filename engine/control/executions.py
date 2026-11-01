@@ -29,6 +29,7 @@ from engine.control.actions import FILE_ACTIONS, LOCATORS
 from engine.dispatch import Context, handler
 from engine.permissions import (
     int_field,
+    org_wide,
     require_account,
     require_department_scope,
     require_role,
@@ -403,7 +404,7 @@ async def dashboard(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     # An Admin's view is the department's machines: the Super User's automations that reach it are
     # included (read-only), and runs and live executions elsewhere are left out.
     mine = None
-    if ident.role == "super_user":
+    if org_wide(ident):
         defs = await db.control.event_definitions(enabled_only=True)
     else:
         defs = await db.control.events_in_department(ident.department_id, enabled_only=True)

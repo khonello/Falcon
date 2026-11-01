@@ -20,7 +20,7 @@ from typing import Any
 
 from engine.control.events import _load_event_in_scope, last_fired, outcome_of
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_department_scope, require_role
+from engine.permissions import int_field, own_department, require_department_scope, require_role
 from protocol import ErrorCode, ProtocolError
 
 OUTCOMES = ("Success", "Failed", "Timed out", "Stopped by you")
@@ -119,7 +119,7 @@ async def _scope(ctx: Context, payload: dict[str, Any]) -> tuple[int | None, dat
     days = max(1, min(int_field(payload, "days", required=False) or 7, 30))
     now = datetime.now(timezone.utc)
     start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    return (ident.department_id if ident.role == "admin" else None), start, days, now
+    return own_department(ident), start, days, now
 
 
 @handler("automation.board")

@@ -50,6 +50,17 @@ remove choice.
 
 ## The move, in order
 
+**Steps 1-3 done 1 Nov 2026.** One switch, `FALCON_ADMIN_SCOPE` (`engine/permissions.py`: `org_wide`, `kept`, `own_department`,
+`in_scope`), defaults to `organisation`; `department` keeps the full design for later and is what the older tests run under (a test marked
+`organisation` runs as version 1: `tests/test_v1_scope.py`). Admins make departments and other Admins, take one away (never themself),
+promote and demote; a department needs no Admin of its own; every issue starts unassigned for any Admin to take; reports reach every
+Admin. `engine setup` / `bootstrap` make the first IT Admin in a department named IT. Flows: only onto another Admin's machine needs consent,
+and that Admin names the folder as they agree (`let_them_choose` at creation, `destination_path` in `flow.consent`); a Worker's folder is
+named by the maker. A flow's source may be one file (`source_kind: file`, migration 046): a move at the source takes the flow along, and its
+copy moved at a destination is where the next change is written (`followed_path`). TUI: `flow create ... file`, `dest=<pc>:` to let them
+choose, `flow consent <id> yes folder=..`. Steps 4-6 are next.
+
+
 1. **Engine: Admins reach every department.** One setting (`admin_scope`, fixed to organisation for version 1) in `engine/permissions.py`;
    every handler that filters by `ident.department_id` reads it. Department and Admin creation become Admin handlers. Reports and issues reach
    every Admin, with Take.

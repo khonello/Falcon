@@ -22,7 +22,7 @@ from typing import Any
 
 from engine.dispatch import Context, dispatch, handler
 from engine.hierarchy.reports import CATEGORIES, FIXED_CATEGORIES
-from engine.permissions import int_field, require_role, str_field
+from engine.permissions import in_scope, int_field, kept, own_department, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 LABELS = {
@@ -107,7 +107,7 @@ async def board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     days = max(1, min(int_field(payload, "days", required=False) or 7, 90))
     since = _now() - timedelta(days=days)
     admin_depts, routed, _ = await _context(ctx)
-    if ident.role == "admin":
+    if kept(ident):
         found = await db.reports.board(since=since, routed_to=ident.department_id, reader_id=ident.account_id)
     else:
         found = await db.reports.board(since=since, department_id=int_field(payload, "department_id", required=False), reader_id=ident.account_id)
@@ -400,7 +400,7 @@ async def overview_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     ident = require_role(ctx, "admin")
     db = ctx.engine.db
     fleet = (await dispatch(ctx, "machines.list", {}))
-    issues = await db.issues.list(department_id=ident.department_id, open_only=True)
+    issues = await db.issues.list(department_id=own_department(ident), open_only=True)
     mine = [i for i in issues if i["owner_account_id"] in (None, ident.account_id)]
     verify = await db.overview.tasks_to_verify(ident.account_id)
     pings = await db.overview.pings_waiting(ident.account_id)
@@ -414,7 +414,7 @@ async def overview_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
         unseen += 1 if row and row["state"] == "told" else 0
     from engine.flow import guard
 
-    suggestions = [p for p in await db.proposals.list("open", 500) if p.get("department_id") == ident.department_id]
+    suggestions = [p for p in await db.proposals.list("open", 500) if in_scope(ident, p.get("department_id"))]
     to_allow = [c for c in await db.flows.asked_consents() if guard.can_decide(ident, c)]
     now_ = _now()
     todos = [t for t in await db.todos.list(ident.account_id) if t["due_at"] is not None and t["due_at"] < now_ + timedelta(days=1)]
@@ -424,7 +424,7 @@ async def overview_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
                         "todos_due": len(todos), "todos_overdue": sum(1 for t in todos if t["due_at"] < now_)},
             "machines": {"online": fleet["summary"]["online"], "total": fleet["summary"]["machines"], "by_health": fleet["summary"]["by_health"]},
             "issues": {"open": len(issues), "by_severity": by_sev, "unassigned": sum(1 for i in issues if i["owner_account_id"] is None)},
-            "sessions_held": await db.overview.sessions_held(ident.department_id), "current_version": fleet["current_version"]}
+            "sessions_held": await db.overview.sessions_held(own_department(ident)), "current_version": fleet["current_version"]}
 
 
 @handler("overview.departments")
@@ -434,7 +434,7 @@ async def overview_departments(ctx: Context, payload: dict[str, Any]) -> dict[st
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     now = _now()
-    depts = [d for d in await db.accounts.list_departments() if ident.role == "super_user" or d["id"] == ident.department_id]
+    depts = [d for d in await db.accounts.list_departments() if in_scope(ident, d["id"])]
     admin_depts, routed, by_dept = await _context(ctx)
     fleet = (await dispatch(ctx, "machines.list", {}))["machines"]
     issues = await db.issues.list(open_only=True)

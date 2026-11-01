@@ -136,6 +136,19 @@ def relative_under(path: str, directory: str) -> str | None:
     return None
 
 
+def source_relative(flow: dict[str, Any], path: str) -> str | None:
+    """Where a path sits in a flow's source: relative to the folder, or, for a single-file flow, the file's own name when it is that file."""
+    if flow.get("source_kind") == "file":
+        same = path.replace("\\", "/").lower() == str(flow["source_path"]).replace("\\", "/").lower()
+        return _rsplit_sep(path)[2] if same else None
+    return relative_under(path, flow["source_path"])
+
+
+def source_file(flow: dict[str, Any], rel: str) -> str:
+    """The source file a relative path stands for: the file itself for a single-file flow."""
+    return str(flow["source_path"]) if flow.get("source_kind") == "file" else join_client_path(flow["source_path"], rel)
+
+
 def install(engine: Engine) -> None:
     engine.file_index.subscribe(lambda event: _on_file_event(engine, event), stage="act", name="flow")
     engine.file_index.subscribe(lambda event: _flow_fact(engine, event), every_op=True, stage="act", name="flow.fact")
@@ -152,15 +165,15 @@ async def wrote_here(engine: Engine, pc_id: int, path: str, digest: str | None) 
     return False
 
 
-_routes: dict[int, tuple[float, list[tuple[int, str]], list[tuple[int, str]]]] = {}      # machine -> (when, [(flow, source folder)], [(flow, destination folder)])
+_routes: dict[int, tuple[float, list[tuple[int, str, str]], list[tuple[int, str]]]] = {}      # machine -> (when, [(flow, source, kind)], [(flow, destination folder)])
 ROUTES_TTL = 30.0
 
 
-async def _routes_of(engine: Engine, pc_id: int) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
+async def _routes_of(engine: Engine, pc_id: int) -> tuple[list[tuple[int, str, str]], list[tuple[int, str]]]:
     hit = _routes.get(pc_id)
     if hit is not None and time.monotonic() - hit[0] < ROUTES_TTL:
         return hit[1], hit[2]
-    sources = [(s["id"], s["source_path"]) for s in await engine.db.flows.sources_for_pc(pc_id)]
+    sources = [(s["id"], s["source_path"], s.get("source_kind") or "folder") for s in await engine.db.flows.sources_for_pc(pc_id)]
     dests = [(d["flow_id"], d["destination_path"]) for d in await engine.db.flows.destinations_for_pc(pc_id)]
     _routes[pc_id] = (time.monotonic(), sources, dests)
     return sources, dests
@@ -177,7 +190,7 @@ async def _flow_fact(engine: Engine, event: dict[str, Any]) -> None:
         return
     path, pc_id = event["path"], event["pc_id"]
     sources, dests = await _routes_of(engine, pc_id)
-    in_src = [fid for fid, folder in sources if relative_under(path, folder) is not None]
+    in_src = [fid for fid, src, kind in sources if source_relative({"source_path": src, "source_kind": kind}, path) is not None]
     in_dst = [fid for fid, folder in dests if relative_under(path, folder) is not None]
     if in_src or in_dst:
         facts["flow_route"] = {"source": in_src, "destination": in_dst}
@@ -191,7 +204,7 @@ async def _flow_fact(engine: Engine, event: dict[str, Any]) -> None:
             if flow is None or flow["status"] == "inactive":
                 continue
             for other in await engine.db.file_index.by_hash(digest):
-                if other["pc_id"] == flow["source_pc_id"] and relative_under(other["path"], flow["source_path"]) is not None:
+                if other["pc_id"] == flow["source_pc_id"] and source_relative(flow, other["path"]) is not None:
                     facts["flow_bypass"] = fid
                     return
 
@@ -202,9 +215,11 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
     if not engine.db.connected:
         return
     pc_id = event["pc_id"]
+    if event["op"] == "move" and event.get("old_path"):
+        await _follow_moves(engine, pc_id, str(event["old_path"]), event["path"])
     if event["op"] == "delete":
         for src in await engine.db.flows.sources_for_pc(pc_id):
-            rel = relative_under(event["path"], src["source_path"])
+            rel = source_relative(src, event["path"])
             if rel is not None and src.get("on_source_delete") == "mirror":
                 await remove_at_destinations(engine, src["id"], rel)
         return
@@ -214,17 +229,43 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
         return
     # Source side: does this event fall under an active flow's source directory?
     for src in await engine.db.flows.sources_for_pc(pc_id):
-        rel = relative_under(event["path"], src["source_path"])
+        rel = source_relative(src, event["path"])
         if rel is not None:
             if not await guard.gate(engine, src["id"], pc_id, event["path"], event.get("hash"), step="seen at the source"):
                 continue                                                      # paused, and the owner asked
             await _settle_then_propagate(engine, src["id"], event["path"], rel, event.get("hash"))
     # Destination side: attribution check.
     for dest in await engine.db.flows.destinations_for_pc(pc_id):
-        rel = relative_under(event["path"], dest["destination_path"])
+        followed = dest.get("followed_path")
+        rel = (_rsplit_sep(event["path"])[2] if followed and _same_path(followed, event["path"])
+               else relative_under(event["path"], dest["destination_path"]) if dest["destination_path"] else None)
         if rel is None or dest["flow_status"] != "active" or dest.get("paused_reason"):
             continue
         await _check_destination_write(engine, dest, event, rel)
+
+
+def _same_path(a: str, b: str) -> bool:
+    return a.replace("\\", "/").lower() == b.replace("\\", "/").lower()
+
+
+async def _follow_moves(engine: Engine, pc_id: int, old: str, new: str) -> None:
+    """A single-file flow follows its file (docs/design/v1-it-admin.md). At the source: a rename or move of the file takes the flow's source along,
+    so its changes keep syncing. At a destination: the flow's own copy moved or renamed there is where the next change is written."""
+    db = engine.db
+    for src in await db.flows.file_sources_at(pc_id, old):
+        await db.flows.follow_source(src["id"], new)
+        _routes.pop(pc_id, None)
+        await engine.audit.record(None, "flow.source_followed", target_type="flows", target_id=src["id"], pc_id=pc_id,
+                                  detail={"from": old, "to": new})
+    for dest in await db.flows.destinations_for_pc(pc_id):
+        flow = await db.flows.get(dest["flow_id"])
+        if flow is None or flow.get("source_kind") != "file":
+            continue
+        current = dest.get("followed_path") or (await db.flows.last_flow_write_at_any(dest["id"]) or {}).get("written_path")
+        if current and _same_path(current, old):
+            await db.flows.follow_destination(dest["id"], new)
+            await engine.audit.record(None, "flow.copy_followed", target_type="flow_destinations", target_id=dest["id"], pc_id=pc_id,
+                                      detail={"flow_id": flow["id"], "from": old, "to": new})
 
 
 async def _check_destination_write(engine: Engine, dest: dict[str, Any], event: dict[str, Any], rel: str) -> None:
@@ -244,7 +285,7 @@ async def _check_destination_write(engine: Engine, dest: dict[str, Any], event: 
         "rename_to": modified_name(event["path"])})
     flow = await engine.db.flows.get(dest["flow_id"])
     if flow is not None:
-        await propagate(engine, flow["id"], join_client_path(flow["source_path"], source_rel), source_rel, None,
+        await propagate(engine, flow["id"], source_file(flow, source_rel), source_rel, None,
                         only_destination=dest["id"])
 
 
@@ -366,14 +407,18 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
             await _fail_destination(engine, flow, dest, "destination:unreachable")
             transfer.pending_destinations.discard(dest["id"])
             continue
-        target = join_client_path(dest["destination_path"], transfer.relative_path)
+        followed = dest.get("followed_path") if flow.get("source_kind") == "file" else None
+        # a single-file flow writes where its copy now is when someone moved it; the destination folder otherwise
+        folder, name = (_rsplit_sep(followed)[0], _rsplit_sep(followed)[2]) if followed else (dest["destination_path"], transfer.relative_path)
+        target = join_client_path(folder, name)
         if not (await guard.gate(engine, flow["id"], dest["destination_pc_id"], dest["destination_path"], step="before writing")
                 and await guard.gate(engine, flow["id"], dest["destination_pc_id"], target, step="before writing")):
             transfer.pending_destinations.discard(dest["id"])               # the flow is paused; what is left of this transfer is caught up after consent
             continue
         base = {"transfer_id": transfer.id, "flow_id": flow["id"], "destination_id": dest["id"],
-                "destination_path": dest["destination_path"], "relative_path": transfer.relative_path,
-                "hash": transfer.hash, "stages": flowdefs.stage_chain(flow, dest),
+                "destination_path": folder, "relative_path": name,
+                "hash": transfer.hash,
+                "stages": [st for st in flowdefs.stage_chain(flow, dest) if not (followed and st.get("stage_type") == "categorization")],
                 # what the flow itself last wrote there: anything else already at that place is someone's, and is kept, not overwritten
                 "previous": await engine.db.flows.last_written_for(dest["id"], transfer.relative_path)}
         data = transfer.data
@@ -525,7 +570,7 @@ async def trigger(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.FORBIDDEN, "not your flow")
     if flow["status"] != "active":
         raise ProtocolError(ErrorCode.CONFLICT, f"flow is {flow['status']}")
-    tid = await propagate(ctx.engine, flow_id, join_client_path(flow["source_path"], rel), rel, None)
+    tid = await propagate(ctx.engine, flow_id, source_file(flow, rel), rel, None)
     return {"transfer_id": tid}
 
 
@@ -559,9 +604,30 @@ async def catch_up(engine: Engine, flow_id: int, only: set[int] | None = None) -
         return False
     if flow["source_pc_id"] not in engine.online_pc_ids():
         return False
+    if flow.get("source_kind") == "file":
+        return await _catch_up_file(engine, flow, only)
     request_id = uuid.uuid4().hex
     _listings[request_id] = Listing(flow_id, only)
     await engine.push_to_pc(flow["source_pc_id"], "flow.list", {"request_id": request_id, "flow_id": flow_id, "path": flow["source_path"]})
+    return True
+
+
+async def _catch_up_file(engine: Engine, flow: dict[str, Any], only: set[int] | None) -> bool:
+    """A single-file flow needs no listing: the index says what the file is now, and each destination not last given that version is sent it."""
+    name = _rsplit_sep(str(flow["source_path"]))[2]
+    entry = next((f for f in await engine.db.file_index.by_name(name, pc_ids=[flow["source_pc_id"]])
+                  if _same_path(f["path"], flow["source_path"])), None)
+    if entry is None:
+        return True                                  # the index has not seen the file yet: its first change will send it
+    digest = entry.get("content_hash")
+    targets = [d for d in flow["destinations"] if not d.get("paused_reason") and d["destination_path"] and (only is None or d["id"] in only)]
+    need = set()
+    for d in targets:
+        given = await engine.db.flows.synced_source_hashes(d["id"])
+        if digest is None or given.get(name.lower()) != digest:
+            need.add(d["id"])
+    if need:
+        await propagate(engine, flow["id"], str(flow["source_path"]), name, digest, only=need)
     return True
 
 
@@ -622,7 +688,7 @@ async def _reconcile(engine: Engine, found: Listing) -> None:
             await asyncio.sleep(0.05)
             if (await engine.db.flows.get(flow["id"]) or {}).get("status") != "active":
                 return
-        await propagate(engine, flow["id"], join_client_path(flow["source_path"], rel), rel, digest, only=need)
+        await propagate(engine, flow["id"], source_file(flow, rel), rel, digest, only=need)
         sent += 1
     if sent:
         await engine.audit.record(None, "flow.caught_up", target_type="flows", target_id=flow["id"],

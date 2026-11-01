@@ -28,7 +28,9 @@ from engine.database import Conflict
 from engine.dispatch import Context, handler
 from engine.permissions import (
     int_field,
+    kept,
     outranks,
+    own_department,
     relationship,
     require_account,
     require_department_scope,
@@ -149,7 +151,7 @@ async def tree(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     departments = await db.accounts.list_departments()
-    if ident.role == "admin":
+    if kept(ident):
         departments = [d for d in departments if d["id"] == ident.department_id]
     accounts = await db.accounts.list_all()
     active = {s["pc_id"]: s for s in await db.sessions.list_active()}
@@ -370,7 +372,7 @@ async def sessions_today(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     db = ctx.engine.db
     hours = int_field(payload, "hours", required=False) or 12
     since = _now() - timedelta(hours=min(max(hours, 1), 168))
-    department_id = None if ident.role == "super_user" else ident.department_id
+    department_id = own_department(ident)
     found = await db.sessions.list_since(since, department_id=department_id)
     names = await db.accounts.display_names_for(
         ident.account_id, sorted({s["occupant_account_id"] for s in found}))

@@ -53,6 +53,9 @@ include = ["protocol*", "common*", "engine*", "operator_client*", "worker_client
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 180                       # a hung test fails with a stack dump instead of freezing the run
+markers = [
+    "organisation: the Engine runs as version 1 ships it -- Admins are IT over every department (the rest run with department scope)",
+]
 filterwarnings = [
     # Windows Proactor transports finalised after the per-test loop closes -- harmless.
     "ignore::pytest.PytestUnraisableExceptionWarning",

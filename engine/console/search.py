@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role
+from engine.permissions import int_field, own_department, require_role
 from protocol import ErrorCode, ProtocolError
 
 KINDS = ("machine", "person", "task", "flow", "issue", "rule", "department")
@@ -29,7 +29,7 @@ async def find(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.INVALID, f"kinds must be some of {', '.join(KINDS)}")
     limit = max(1, min(int_field(payload, "limit", required=False) or 8, 25))
     db = ctx.engine.db
-    dept = ident.department_id if ident.role == "admin" else None
+    dept = own_department(ident)
     out = await db.search.find(q, [k for k in kinds if k != "person"], dept, limit)
     people: list[dict[str, Any]] = []
     if "person" in kinds:

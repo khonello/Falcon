@@ -16,6 +16,8 @@ Last updated 1 Nov 2026.
 
 - Super User parked out of everything that ships; IT Admins only; departments are labels Admins create; Admin to Admin refused on a machine;
   issues by Take; only Admin-to-Admin flows need consent; single-file flows followed at both ends. The plan is ENGINE-GAPS #18.
+- **Steps 1-3 built (1 Nov 2026):** Admins over every department (`FALCON_ADMIN_SCOPE`), the first IT Admin at setup, Admin-to-Admin
+  consent with the destination naming the folder, single-file flows. Next: park the Super User, then the console.
 - **Still to settle:** who owns a restriction when the Admin who marked it leaves.
 
 ## Engine pass, 1 Nov 2026 (ENGINE-GAPS 8, 9, 10, 11, 12, 13, 14, 16, 17)

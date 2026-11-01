@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from engine.permissions import in_scope
 from engine.resource.resource import derive_tag
 
 if TYPE_CHECKING:
@@ -212,7 +213,7 @@ def can_decide(ident: Any, consent: dict[str, Any]) -> bool:
         return True
     if consent.get("mark_id") is not None:
         return consent.get("mark_owner_account_id") == ident.account_id
-    return bool(consent.get("tag") == "restricted" and consent.get("scope_department_id") and ident.role == "admin" and ident.department_id == consent["scope_department_id"])
+    return bool(consent.get("tag") == "restricted" and consent.get("scope_department_id") and ident.role == "admin" and in_scope(ident, consent["scope_department_id"]))
 
 
 async def sweep(engine: Engine, pc_id: int) -> int:

@@ -2,15 +2,15 @@
 
 Written after commit `560eb6f`; updated the same day when version 1 was settled (`docs/design/v1-it-admin.md`).
 
-## The version 1 move (decided 1 Nov 2026, not built yet; ENGINE-GAPS #18)
-Version 1 is IT Admins only. The Super User does not exist in anything that ships. In order:
-1. **Admins reach every department** (`admin_scope` fixed to organisation). Admins create departments (labels only) and other Admins. Every issue
+## The version 1 move (decided 1 Nov 2026; ENGINE-GAPS #18)
+Version 1 is IT Admins only. The Super User does not exist in anything that ships. **Steps 1-3 are done (1 Nov 2026); 4-6 remain.** In order:
+1. *(done)* **Admins reach every department** (`admin_scope` fixed to organisation). Admins create departments (labels only) and other Admins. Every issue
    and report reaches every Admin and becomes one's by an explicit **Take**. Two Admins on one machine: refused, told who is in.
-2. **Setup makes the first IT Admin**, not a Super User (`engine setup`, `bootstrap`, `make_org.py`, `.env.example`, `GETTING-STARTED.md`).
-3. **Flows:** only an Admin-to-Admin flow needs consent (the destination Admin's, who picks the folder); onto a Worker's machine, the maker picks
+2. *(done)* **Setup makes the first IT Admin**, not a Super User (`engine setup`, `bootstrap`, `make_org.py`, `.env.example`, `GETTING-STARTED.md`).
+3. *(done)* **Flows:** only an Admin-to-Admin flow needs consent (the destination Admin's, who picks the folder); onto a Worker's machine, the maker picks
    the folder and no consent is needed; the marker's consent for restricted material stays. **Single-file flows**: the source is one file
    followed by identity (rename or move at the source keeps it syncing), and the destination copy is followed the same way.
-4. **Park the Super User** in `parked/` (handlers, QML pages, TUI commands, preview data, installer role, handover, their tests) and strip every
+4. **Park the Super User** (about 700 references in about 120 files, a third in the QML) in `parked/` (handlers, QML pages, TUI commands, preview data, installer role, handover, their tests) and strip every
    reference from what ships.
 5. **Console:** no Super User words, pages or data; departments as filters and groups.
 6. Then packaging.

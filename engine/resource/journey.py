@@ -27,7 +27,7 @@ import posixpath
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role
+from engine.permissions import int_field, org_wide, require_role
 from engine.serialize import row
 from protocol import ErrorCode, ProtocolError
 
@@ -77,7 +77,7 @@ async def journey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         return pcs[pc_id] or None
 
     def mine(pc: dict[str, Any] | None) -> bool:
-        return ident.role == "super_user" or bool(pc and pc.get("department_id") == ident.department_id)
+        return org_wide(ident) or bool(pc and pc.get("department_id") == ident.department_id)
 
     places = [p for p in await db.file_index.same_content(file_id) if mine(await pc_of(p["pc_id"]))]
     if not places:

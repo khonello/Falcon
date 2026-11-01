@@ -16,10 +16,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from engine import permissions
 from engine.dispatch import Context, handler
 from engine.hierarchy import reports
 from engine.permissions import (
     int_field,
+    kept,
+    org_wide,
     require_account,
     require_department_scope,
     require_role,
@@ -96,7 +99,7 @@ async def rollout_department(ctx: Context, payload: dict[str, Any]) -> dict[str,
     """Admin executes the approved rollout for their own department (Super User may too).
     {"department_id"?} -- targets every PC in the department not yet on the current version."""
     ident = require_role(ctx, "super_user", "admin")
-    department_id = int_field(payload, "department_id", required=ident.role == "super_user") or ident.department_id
+    department_id = int_field(payload, "department_id", required=org_wide(ident)) or ident.department_id
     require_department_scope(ident, department_id)
     db = ctx.engine.db
     cur = await db.updates.current_version()
@@ -162,7 +165,7 @@ async def report_status(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         found = await db.issues.by_source("pc_version_status", ident.pc_id)
         if found:
             await db.issues.set_severity(found["id"], "high", "Update past the escalation limit", f"{running or 'unknown'} -> {version}")
-            admins = [a for a in await db.accounts.active_admins() if a["department_id"] == ident.department_id]
+            admins = [a for a in await db.accounts.active_admins() if permissions.ADMIN_SCOPE == "organisation" or a["department_id"] == ident.department_id]
             if not admins:
                 await db.issues.escalate(found["id"], None)
             await db.issues.log(found["id"], "escalated", f"Failed {st['attempt_failure_count']} times: past the limit")
@@ -184,7 +187,7 @@ async def rollout_health(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     cur = await db.updates.current_version()
     health = await db.updates.rollout_health_by_department()
     behind = await db.updates.pcs_behind(cur["id"]) if cur else []
-    if ident.role == "admin":
+    if kept(ident):
         health = [h for h in health if h["department_id"] == ident.department_id]
         behind = [b for b in behind if b["department_id"] == ident.department_id]
     # Super User sees every PC that is behind, not only the per-department totals: the fleet is

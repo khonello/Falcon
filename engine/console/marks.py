@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role, str_field
+from engine.permissions import in_scope, int_field, kept, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 if TYPE_CHECKING:
@@ -224,7 +224,7 @@ async def _load(ctx: Context, mark_id: int, *, owner_only: bool = False) -> dict
     if mark is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such mark")
     mine = mark["by_account_id"] == ident.account_id
-    if ident.role == "admin" and not mine and (owner_only or mark["department_id"] != ident.department_id):
+    if ident.role == "admin" and not mine and (owner_only or not in_scope(ident, mark["department_id"])):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such mark")
     if owner_only and not mine and ident.role != "super_user":
         raise ProtocolError(ErrorCode.FORBIDDEN, "only whoever marked it can change it")
@@ -405,7 +405,7 @@ async def marks_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if scope == "mine":
         found = await db.list(by_account_id=ident.account_id)
     elif scope == "department":
-        found = await db.list(department_id=ident.department_id if ident.role == "admin" else int_field(payload, "department_id"))
+        found = await db.list(department_id=ident.department_id if kept(ident) else int_field(payload, "department_id", required=False))
     else:
         found = await db.list()
     view = await _view(ctx, found)

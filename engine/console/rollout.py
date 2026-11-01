@@ -19,7 +19,7 @@ from typing import Any
 
 from engine.console import overview
 from engine.dispatch import Context, dispatch, handler
-from engine.permissions import int_field, require_department_scope, require_role, str_field
+from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 NEXT = "next"
@@ -70,7 +70,7 @@ async def gate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Everything the Rollout page shows. The Super User sees the fleet (or one department's); an Admin their own department's."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
-    department_id = ident.department_id if ident.role == "admin" else int_field(payload, "department_id", required=False)
+    department_id = ident.department_id if kept(ident) else int_field(payload, "department_id", required=False)
     cur, blocking, left_out = await holding(ctx, department_id)
     fleet = [m for m in await db.accounts.fleet(department_id=department_id)]
     staged = await db.updates.staged()

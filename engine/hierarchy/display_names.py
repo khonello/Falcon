@@ -13,7 +13,14 @@ from __future__ import annotations
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, outranks, require_account, require_role, str_field
+from engine.permissions import (
+    in_scope,
+    int_field,
+    outranks,
+    require_account,
+    require_role,
+    str_field,
+)
 from protocol import ErrorCode, ProtocolError
 
 
@@ -35,7 +42,7 @@ async def set_display_name(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such account")
     if not outranks(ident.role, subject["role"]):
         raise ProtocolError(ErrorCode.FORBIDDEN, "naming is top-down only")
-    if ident.role == "admin" and subject["department_id"] != ident.department_id:
+    if ident.role == "admin" and not in_scope(ident, subject["department_id"]):
         raise ProtocolError(ErrorCode.FORBIDDEN, "outside your department")
     await ctx.engine.db.accounts.grant_display_name(ident.account_id, account_id, label)
     await ctx.engine.audit.record(ctx, "display_name.set", target_type="accounts", target_id=account_id)

@@ -27,7 +27,14 @@ from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
 from engine.hierarchy.accounts import provision
-from engine.permissions import int_field, require_department_scope, require_role, str_field
+from engine.permissions import (
+    int_field,
+    kept,
+    own_department,
+    require_department_scope,
+    require_role,
+    str_field,
+)
 from engine.serialize import rows
 from protocol import ErrorCode, ProtocolError
 
@@ -128,7 +135,7 @@ async def wait(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 def _visible_department(ctx: Context) -> int | None:
     """None for the Super User (every request); an Admin's own department for an Admin."""
     ident = require_role(ctx, "super_user", "admin")
-    return None if ident.role == "super_user" else ident.department_id
+    return own_department(ident)
 
 
 @handler("enroll.list")
@@ -141,7 +148,7 @@ async def listing(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def _load_pending(ctx: Context, enrollment_id: int) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     enr = await ctx.engine.db.enrollments.get(enrollment_id)
-    if enr is None or (ident.role == "admin" and enr["requested_department_id"] != ident.department_id):
+    if enr is None or (kept(ident) and enr["requested_department_id"] != ident.department_id):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such waiting request")
     if enr["status"] != "pending":
         raise ProtocolError(ErrorCode.CONFLICT, f"this request is already {enr['status']}")

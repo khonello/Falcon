@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from engine.dispatch import Context, dispatch, handler
-from engine.permissions import int_field, require_department_scope, require_role, str_field
+from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -36,7 +36,7 @@ async def accounts(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     roles = payload.get("roles") or (["super_user", "admin"] if ident.role == "super_user" else ["admin", "worker"])
     if not isinstance(roles, list) or not set(roles) <= {"super_user", "admin", "worker"}:
         raise ProtocolError(ErrorCode.INVALID, "roles must be some of super_user, admin, worker")
-    department_id = ident.department_id if ident.role == "admin" else int_field(payload, "department_id", required=False)
+    department_id = ident.department_id if kept(ident) else int_field(payload, "department_id", required=False)
     db = ctx.engine.db
     found = await db.registry.account_rows(department_id=department_id, roles=roles)
     online = ctx.engine.online_pc_ids()
@@ -191,7 +191,7 @@ async def department_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     """{"department_id"} -> the department's page: Admins (with their workstation and key), `vacant`, its machines with health, the worst open issues,
     how it handles reports, open department work, and the Workers who could be promoted into an empty seat."""
     ident = require_role(ctx, "super_user", "admin")
-    department_id = ident.department_id if ident.role == "admin" else int_field(payload, "department_id")
+    department_id = ident.department_id if kept(ident) else int_field(payload, "department_id")
     require_department_scope(ident, department_id)
     db = ctx.engine.db
     department = next((d for d in await db.accounts.list_departments() if d["id"] == department_id), None)

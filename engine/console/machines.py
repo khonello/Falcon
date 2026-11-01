@@ -15,7 +15,7 @@ from typing import Any
 from engine.console.feed import describe_many
 from engine.console.health import health_of, open_signals
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_department_scope, require_role
+from engine.permissions import int_field, kept, require_department_scope, require_role
 from protocol import ErrorCode, ProtocolError
 
 RANGES = {"1h": (timedelta(hours=1), 10), "6h": (timedelta(hours=6), 10), "24h": (timedelta(hours=24), 30),
@@ -70,7 +70,7 @@ async def machines_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     """{"department_id"?} -> {"machines": [...], "summary": {machines, online, behind, by_health}, "current_version"}.
     An Admin's list is always their own department's."""
     ident = require_role(ctx, "super_user", "admin")
-    department_id = ident.department_id if ident.role == "admin" else int_field(payload, "department_id", required=False)
+    department_id = ident.department_id if kept(ident) else int_field(payload, "department_id", required=False)
     found = await _machines(ctx, department_id)
     by_health: dict[str, int] = {}
     for m in found:

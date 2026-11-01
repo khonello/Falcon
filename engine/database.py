@@ -1310,10 +1310,10 @@ class FlowsRepo(_Repo):
         a stage the same way. Resolved to ids inside one transaction."""
         async with self.pool.acquire() as conn, conn.transaction():
             flow_id = await conn.fetchval(
-                "INSERT INTO flows (created_by_account_id, source_pc_id, source_path, consent_status, on_source_delete) "
-                "VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                "INSERT INTO flows (created_by_account_id, source_pc_id, source_path, consent_status, on_source_delete, source_kind) "
+                "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
                 flow["created_by_account_id"], flow["source_pc_id"], flow["source_path"], flow["consent_status"],
-                flow.get("on_source_delete") or "keep")
+                flow.get("on_source_delete") or "keep", flow.get("source_kind") or "folder")
             stage_ids: list[int] = []
             for st in stages:
                 parent = stage_ids[st["parent_index"]] if st.get("parent_index") is not None else None
@@ -1359,7 +1359,22 @@ class FlowsRepo(_Repo):
 
     async def sources_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT id, source_path, on_source_delete FROM flows WHERE source_pc_id = $1 AND status = 'active'", pc_id)
+            "SELECT id, source_path, on_source_delete, source_kind FROM flows WHERE source_pc_id = $1 AND status = 'active'", pc_id)
+
+    async def file_sources_at(self, pc_id: int, path: str) -> list[dict[str, Any]]:
+        """Single-file flows (running or paused) whose source is this file on this machine: what a move there must take along."""
+        return await self._fetch(
+            "SELECT id, source_path FROM flows WHERE source_pc_id = $1 AND source_kind = 'file' AND status <> 'inactive' "
+            "AND lower(replace(source_path, chr(92), '/')) = lower(replace($2, chr(92), '/'))", pc_id, path)
+
+    async def follow_source(self, flow_id: int, new_path: str) -> None:
+        await self._exec("UPDATE flows SET source_path = $2 WHERE id = $1", flow_id, new_path)
+
+    async def follow_destination(self, destination_id: int, new_path: str | None) -> None:
+        await self._exec("UPDATE flow_destinations SET followed_path = $2 WHERE id = $1", destination_id, new_path)
+
+    async def set_destination_path(self, destination_id: int, path: str) -> None:
+        await self._exec("UPDATE flow_destinations SET destination_path = $2 WHERE id = $1", destination_id, path)
 
     async def destinations_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -1505,6 +1520,12 @@ class FlowsRepo(_Repo):
         return await self._one(
             "SELECT * FROM flow_sync_log WHERE flow_destination_id = $1 ORDER BY occurred_at DESC, id DESC LIMIT 1",
             destination_id)
+
+    async def last_flow_write_at_any(self, destination_id: int) -> dict[str, Any] | None:
+        """The flow's own most recent write to this destination, wherever it was."""
+        return await self._one(
+            "SELECT * FROM flow_sync_log WHERE flow_destination_id = $1 AND written_by = 'flow_sync' AND written_path IS NOT NULL "
+            "ORDER BY occurred_at DESC, id DESC LIMIT 1", destination_id)
 
     async def last_flow_write_at(self, destination_id: int, written_path: str) -> dict[str, Any] | None:
         """The flow's own most recent write to this destination path (slash/case-agnostic)."""

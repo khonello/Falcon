@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import RANK, int_field, require_account, str_field
+from engine.permissions import RANK, int_field, org_wide, require_account, str_field
 from engine.serialize import row, rows
 from protocol import ErrorCode, ProtocolError
 
@@ -89,7 +89,7 @@ async def search(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"query": str} -> index results filtered by the caller's access tier."""
     ident = require_account(ctx)
     query = str_field(payload, "query")
-    results = await ctx.engine.file_index.search(query, role=ident.role, department_id=ident.department_id)
+    results = await ctx.engine.file_index.search(query, role=ident.role, department_id=None if org_wide(ident) else ident.department_id)
     return {"results": rows(results)}
 
 

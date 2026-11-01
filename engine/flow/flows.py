@@ -27,7 +27,15 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, outranks, require_account, require_role, str_field
+from engine.permissions import (
+    in_scope,
+    int_field,
+    org_wide,
+    outranks,
+    require_account,
+    require_role,
+    str_field,
+)
 from engine.serialize import row, rows
 from protocol import ErrorCode, ProtocolError
 
@@ -150,8 +158,9 @@ def _parse_structure(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], lis
     dests: list[dict[str, Any]] = []
     for i, d in enumerate(dests_in):
         path = str(d.get("destination_path") or d.get("path") or "").strip()
-        if not path:
-            raise ProtocolError(ErrorCode.INVALID, f"destination {i}: destination_path required")
+        # Left empty, the destination chooses: another Admin picks the folder when they agree (checked once owners are known)
+        if not path and not d.get("let_them_choose"):
+            raise ProtocolError(ErrorCode.INVALID, f"destination {i}: destination_path required (or let_them_choose for another Admin's machine)")
         parent = d.get("parent_index")
         if parent is not None and not (0 <= int(parent) < len(stages)):
             raise ProtocolError(ErrorCode.INVALID, f"destination {i}: parent_index must reference a stage")
@@ -181,9 +190,14 @@ async def _resolve_owners(engine: Engine, dests: list[dict[str, Any]], creator: 
 def consent_required(creator: dict[str, Any], owner_role: str, owner_department_id: int | None,
                      owner_account_id: int) -> bool:
     """The general rule: consent unless the creator already outranks the destination owner
-    within their authority. One's own space never needs consent."""
+    within their authority. One's own space never needs consent. Version 1 (Admins are IT): only a flow onto another Admin's machine
+    needs consent, the destination Admin's; a Worker's machine needs none (docs/design/v1-it-admin.md)."""
+    from engine import permissions
+
     if owner_account_id == creator["id"]:
         return False
+    if permissions.ADMIN_SCOPE == "organisation":
+        return owner_role == "admin"
     if creator["role"] == "super_user":
         return False
     if creator["role"] == "admin":
@@ -195,6 +209,9 @@ async def run_checks(engine: Engine, creator: dict[str, Any], source_pc_id: int,
                      dests: list[dict[str, Any]], *, confirm_collisions: bool,
                      exclude_flow_id: int | None = None) -> dict[str, Any]:
     """Consent / collision / cycle. Raises for hard refusals; returns what needs consent."""
+    for i, d in enumerate(dests):
+        if not d["destination_path"] and not consent_required(creator, d["owner_role"], d["owner_department_id"], d["owner_account_id"]):
+            raise ProtocolError(ErrorCode.INVALID, f"destination {i}: only another Admin chooses their own folder; name the folder for this machine")
     if is_resource_path(source_path) or any(is_resource_path(d["destination_path"]) for d in dests):
         raise ProtocolError(ErrorCode.INVALID, "Resource folders cannot be a direct flow source or destination")
 
@@ -218,7 +235,7 @@ async def run_checks(engine: Engine, creator: dict[str, Any], source_pc_id: int,
 
     collisions = []
     for i, d in enumerate(dests):
-        if d["destination_pc_id"] is None:
+        if d["destination_pc_id"] is None or not d["destination_path"]:
             continue
         existing = await engine.db.file_index.under_path(d["destination_pc_id"], d["destination_path"])
         if existing:
@@ -279,12 +296,13 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     assert creator is not None
     source_pc_id = int_field(payload, "source_pc_id")
     source_path = str_field(payload, "source_path")
+    source_kind = str_field(payload, "source_kind", required=False, choices=("folder", "file")) or "folder"
     dests, stages = _parse_structure(payload)
     on_delete = _on_delete(payload)
     src = await ctx.engine.db.accounts.pc(source_pc_id)
     if src is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such source pc")
-    if ident.role == "admin" and src["department_id"] != ident.department_id:
+    if ident.role == "admin" and not in_scope(ident, src["department_id"]):
         raise ProtocolError(ErrorCode.FORBIDDEN, "source must be in your department")
     await _resolve_owners(ctx.engine, dests, creator)
     checks = await run_checks(ctx.engine, creator, source_pc_id, source_path, dests,
@@ -294,7 +312,8 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         d["pre_flight_check_status"] = "passed"
     flow_id = await ctx.engine.db.flows.create(
         {"created_by_account_id": ident.account_id, "source_pc_id": source_pc_id, "source_path": source_path,
-         "consent_status": "pending" if pending else "not_required", "on_source_delete": on_delete or "keep"}, dests, stages)
+         "consent_status": "pending" if pending else "not_required", "on_source_delete": on_delete or "keep", "source_kind": source_kind},
+        dests, stages)
     if pending:
         await ctx.engine.db.flows.set_status(flow_id, "paused", "consent:pending")
         names = await ctx.engine.db.accounts.display_names_for(pending[0]["owner_account_id"], [ident.account_id])
@@ -327,6 +346,8 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     held = False
     ends = [(source_pc_id, source_path)] + [(d["destination_pc_id"], d["destination_path"]) for d in dests]
     for pc, path in ends:
+        if not path:
+            continue                                     # a folder the destination Admin has not chosen yet: checked when they choose
         missing = await guard.unconsented(ctx.engine, flow_id, pc, path)
         if missing:
             await guard.request(ctx.engine, flow_id, missing, path, step="when the flow was made")
@@ -344,7 +365,8 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("flow.consent")
 async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Destination owner answers a consent request. {"flow_id", "granted": bool}"""
+    """Destination owner answers a consent request. {"flow_id", "granted": bool, "destination_path"?}: when the flow left the folder to them, the
+    destination Admin names it as they agree (docs/design/v1-it-admin.md: the destination chooses)."""
     ident = require_account(ctx)
     flow_id = int_field(payload, "flow_id")
     granted = bool(payload.get("granted", False))
@@ -354,6 +376,20 @@ async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if ident.account_id not in {d["owner_account_id"] for d in flow["destinations"]}:
         raise ProtocolError(ErrorCode.FORBIDDEN, "you do not own a destination of this flow")
     db = ctx.engine.db
+    unchosen = [d for d in flow["destinations"] if d["owner_account_id"] == ident.account_id and not d["destination_path"]]
+    if granted and unchosen:
+        chosen = str(payload.get("destination_path") or "").strip()
+        if not chosen:
+            raise ProtocolError(ErrorCode.INVALID, "this flow leaves the folder to you: name it (destination_path) as you agree")
+        if is_resource_path(chosen):
+            raise ProtocolError(ErrorCode.INVALID, "Resource folders cannot be a direct flow destination")
+        for d in unchosen:
+            if d["destination_pc_id"] == flow["source_pc_id"] and overlaps(chosen, flow["source_path"]):
+                raise ProtocolError(ErrorCode.CONFLICT, "that folder overlaps the flow's own source -- that is a cycle")
+            edges = [e for e in await db.flows.graph_edges() if e[1] != f"{d['destination_pc_id']}:"]
+            if has_cycle(edges, [(f"{flow['source_pc_id']}:{flow['source_path']}", f"{d['destination_pc_id']}:{chosen}")]):
+                raise ProtocolError(ErrorCode.CONFLICT, "that folder would create a cycle in the flow graph")
+            await db.flows.set_destination_path(d["id"], chosen)
     if granted:
         await db.flows.set_consent(flow_id, "granted")
         waiting = await db.flows.consents(flow_id, states=("asked",))
@@ -387,7 +423,7 @@ async def _load_visible(ctx: Context, flow_id: int) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such flow")
     owners = {d["owner_account_id"] for d in flow["destinations"]}
     asked = await ctx.engine.db.flows.consents(flow_id, states=("asked", "granted", "declined", "revoked"))
-    if ident.role != "super_user" and ident.account_id != flow["created_by_account_id"] and ident.account_id not in owners and not any(guard.can_decide(ident, c) for c in asked):
+    if not org_wide(ident) and ident.account_id != flow["created_by_account_id"] and ident.account_id not in owners and not any(guard.can_decide(ident, c) for c in asked):
         raise ProtocolError(ErrorCode.FORBIDDEN, "not a party to this flow")
     return flow
 
@@ -582,7 +618,7 @@ async def delete(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def list_flows(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_account(ctx)
     db = ctx.engine.db
-    found = await db.flows.list_all() if ident.role == "super_user" else await db.flows.list_for(
+    found = await db.flows.list_all() if org_wide(ident) else await db.flows.list_for(
         ident.account_id, department_id=ident.department_id)
     # each flow's stages and destinations, batched: the Flows page draws every flow at once
     shapes = await db.flows.shapes([f["id"] for f in found])
@@ -606,7 +642,7 @@ async def status(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if flow is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such flow")
     owners = {d["owner_account_id"] for d in flow["destinations"]}
-    if ident.role != "super_user" and ident.account_id != flow["created_by_account_id"] and ident.account_id not in owners:
+    if not org_wide(ident) and ident.account_id != flow["created_by_account_id"] and ident.account_id not in owners:
         raise ProtocolError(ErrorCode.FORBIDDEN, "not a party to this flow")
     return {"flow": await _flow_view(ctx.engine, flow)}
 

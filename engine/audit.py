@@ -14,6 +14,8 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from engine.permissions import in_scope
+
 if TYPE_CHECKING:
     from engine.database import Database
     from engine.dispatch import Context
@@ -101,7 +103,7 @@ class AuditTrail:
             ident = conn.ctx.identity
             if not conn.authenticated or ident.role not in ("super_user", "admin"):
                 continue
-            if ident.role == "admin" and (dept is None or ident.department_id != dept):
+            if ident.role == "admin" and not in_scope(ident, dept):
                 continue
             # named the way this viewer names people (Display Names never propagate between namers)
             event = (await describe_many(eng.db, [row], ident.account_id))[0]

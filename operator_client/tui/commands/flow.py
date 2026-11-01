@@ -24,11 +24,11 @@ def _parse_structure(args: Args) -> tuple[list[dict[str, Any]], list[dict[str, A
         stages.append({"stage_type": stype, "parent_index": int(parent) if parent else None, "config": config})
     for spec in args.all("dest"):
         target, _, parent = spec.partition("@")
-        pc, _, path = target.partition(":")
-        if not path:
-            raise UsageError("dest must be <pc_id|remote>:<path>")
+        pc, colon, path = target.partition(":")
+        if not colon:
+            raise UsageError("dest must be <pc_id|remote>:<path> (an Admin's machine may be <pc_id>: to let them choose the folder)")
         dests.append({"destination_pc_id": None if pc == "remote" else int(pc), "destination_path": path,
-                      "parent_index": int(parent) if parent else None})
+                      "parent_index": int(parent) if parent else None, **({} if path else {"let_them_choose": True})})
     if not dests:
         raise UsageError("at least one dest=<pc_id>:<path> is required")
     return dests, stages
@@ -50,8 +50,8 @@ def _flow_text(flow: dict[str, Any]) -> str:
     return out
 
 
-@command("flow", "create", "src=<pc_id>:<path> dest=<pc|remote>:<path>[@stage#] [dest=..] [stage=<type>[@parent#][:k=v,..]] [confirm]",
-         "Create a flow; consent / collision / cycle issues come back for you to resolve")
+@command("flow", "create", "src=<pc_id>:<path> [file] dest=<pc|remote>:<path>[@stage#] [dest=..] [stage=<type>[@parent#][:k=v,..]] [confirm]",
+         "Create a flow (`file`: the source is one file, followed wherever it moves); consent / collision / cycle issues come back for you to resolve")
 async def flow_create(ctx: ShellContext, args: Args) -> str:
     src = args.opt("src")
     if not src or ":" not in src:
@@ -59,6 +59,7 @@ async def flow_create(ctx: ShellContext, args: Args) -> str:
     pc, _, path = src.partition(":")
     dests, stages = _parse_structure(args)
     res = await ctx.call("flow.create", {"source_pc_id": int(pc), "source_path": path, "destinations": dests,
+                                         "source_kind": "file" if args.flag("file") else "folder",
                                          "stages": stages, "confirm_collisions": args.flag("confirm")})
     f = res["flow"]
     out = f"flow {f['id']} {f['status']} (consent: {f['consent_status']})"
@@ -69,10 +70,13 @@ async def flow_create(ctx: ShellContext, args: Args) -> str:
     return out + "\n" + _flow_text(f)
 
 
-@command("flow", "consent", "<flow_id> yes|no", "Answer a consent request for a flow into your space")
+@command("flow", "consent", "<flow_id> yes|no [folder=<path>]", "Answer a consent request for a flow into your space (name the folder if it was left to you)")
 async def flow_consent(ctx: ShellContext, args: Args) -> str:
     granted = args.get(1, "yes|no").lower() in ("yes", "y", "true", "1")
-    res = await ctx.call("flow.consent", {"flow_id": args.get_int(0, "flow_id"), "granted": granted})
+    payload = {"flow_id": args.get_int(0, "flow_id"), "granted": granted}
+    if args.opt("folder"):
+        payload["destination_path"] = args.opt("folder")
+    res = await ctx.call("flow.consent", payload)
     return f"flow {res['flow_id']}: consent {'granted' if res['granted'] else 'denied'}"
 
 

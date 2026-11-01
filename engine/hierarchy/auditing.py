@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_role, str_field
+from engine.permissions import int_field, kept, require_role, str_field
 from engine.serialize import rows
 
 
@@ -22,7 +22,7 @@ async def recent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     limit = min(int_field(payload, "limit", required=False) or 100, 500)
     actor = int_field(payload, "actor_account_id", required=False)
     prefix = str_field(payload, "prefix", required=False)
-    if ident.role == "admin":
+    if kept(ident):
         dept_ids = {a["id"] for a in await db.accounts.list_department(ident.department_id)}
         if actor is not None and actor not in dept_ids:
             return {"entries": []}
@@ -47,7 +47,7 @@ async def recent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def deviations(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     found = await ctx.engine.db.audit.deviations(unresolved_only=not payload.get("include_resolved", False))
-    if ident.role == "admin":
+    if kept(ident):
         dept_ids = {a["id"] for a in await ctx.engine.db.accounts.list_department(ident.department_id)}
         found = [d for d in found if d["surfaced_to_account_id"] in dept_ids or d["observed_account_id"] in dept_ids]
     return {"deviations": rows(found)}

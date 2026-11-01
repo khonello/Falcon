@@ -37,6 +37,11 @@ log = logging.getLogger(__name__)
 class Engine:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        from engine import permissions
+
+        if settings.admin_scope not in permissions.ADMIN_SCOPES:
+            raise ValueError(f"FALCON_ADMIN_SCOPE must be one of {', '.join(permissions.ADMIN_SCOPES)}")
+        permissions.ADMIN_SCOPE = settings.admin_scope
         self.db = Database(settings.database_url)
         self.audit = AuditTrail(self.db, settings.audit_retention_days)
         self.audit.engine = self
@@ -257,7 +262,7 @@ class Engine:
                 log.exception("flow: could not resume the destinations of pc %s", ident.pc_id)
         payload = {"pc_id": ident.pc_id, "online": online}
         await self.push_to_role("super_user", "pc.presence", payload)
-        await self.push_to_role("admin", "pc.presence", payload, department_id=ident.department_id)
+        await self.push_to_role("admin", "pc.presence", payload, department_id=ident.department_id)       # every Admin when they are IT
 
     async def broadcast(self, type_: str, payload: dict[str, Any] | None = None, *,
                         predicate: Any = None) -> None:
@@ -276,8 +281,11 @@ class Engine:
 
     async def push_to_role(self, role: str, type_: str, payload: dict[str, Any] | None = None, *,
                            department_id: int | None = None) -> None:
+        from engine.permissions import in_scope
+
         await self.broadcast(type_, payload, predicate=lambda c: c.ctx.identity.role == role
-                             and (department_id is None or c.ctx.identity.department_id == department_id))
+                             and (department_id is None or c.ctx.identity.department_id == department_id
+                                  or (role == "admin" and in_scope(c.ctx.identity, department_id))))
 
     # --- helpers --------------------------------------------------------------------------------
 

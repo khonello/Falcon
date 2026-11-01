@@ -40,6 +40,8 @@ from engine.dispatch import Context, handler
 from engine.isotime import parse_iso
 from engine.permissions import (
     int_field,
+    kept,
+    org_wide,
     require_account,
     require_department_scope,
     require_role,
@@ -326,7 +328,7 @@ async def _load_event_in_scope(ctx: Context, event_id: int, *, write: bool = Tru
     if ident.role == "admin" and creator is not None and creator["role"] == "super_user":
         if write:
             raise ProtocolError(ErrorCode.FORBIDDEN, "set by the Super User; only they can change it")
-        if ident.department_id is None or not await _reaches_department(ctx.engine, ev, ident.department_id):
+        if kept(ident) and (ident.department_id is None or not await _reaches_department(ctx.engine, ev, ident.department_id)):
             raise ProtocolError(ErrorCode.FORBIDDEN, "outside your department")
         return ev
     require_department_scope(ident, creator["department_id"] if creator else None)
@@ -428,7 +430,7 @@ async def event_delete(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def event_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
-    defs = await db.control.event_definitions(enabled_only=False) if ident.role == "super_user" \
+    defs = await db.control.event_definitions(enabled_only=False) if org_wide(ident) \
         else await db.control.events_in_department(ident.department_id)
     out = []
     for d in rows(defs):
@@ -562,7 +564,7 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     db = ctx.engine.db
     # An Admin sees what the automation did on their department's machines only: an organisation-wide
     # one counts just those, and a firing across many machines says how many of them it reached.
-    mine = await department_pc_ids(ctx.engine, ident.department_id) if ident.role == "admin" else None
+    mine = await department_pc_ids(ctx.engine, ident.department_id) if kept(ident) else None
     firings = []
     for f in await db.control.event_firings(event_id):
         detail = f["detail"] or {}
@@ -598,7 +600,7 @@ async def levels(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     wanted = payload.get("pc_ids")
     if wanted:
         scope = {int(p) for p in wanted}
-    elif ident.role == "admin" and ident.department_id is not None:
+    elif kept(ident) and ident.department_id is not None:
         scope = {p["id"] for p in await ctx.engine.db.accounts.pcs_in_department(ident.department_id)}
     else:
         scope = set(_metrics)

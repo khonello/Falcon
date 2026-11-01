@@ -38,13 +38,38 @@ def relationship(requester_role: str | None, other_role: str | None) -> str:
     return "vertical" if r > o else "horizontal" if r == o else "inferior"
 
 
+# Who an Admin answers for (docs/design/v1-it-admin.md). "organisation" (version 1): the Admins are IT and reach every department, which is a
+# label for grouping, not a wall. "department": an Admin reaches only their own (the full design, kept for when the Super User returns).
+# Set from Settings.admin_scope when the Engine starts.
+ADMIN_SCOPES = ("organisation", "department")
+ADMIN_SCOPE = "organisation"
+
+
+def org_wide(ident: Identity) -> bool:
+    """Does this caller reach every department? The Super User always; an Admin when Admins are IT (version 1)."""
+    return ident.role == "super_user" or (ident.role == "admin" and ADMIN_SCOPE == "organisation")
+
+
+def kept(ident: Identity) -> bool:
+    """Is this caller an Admin kept to their own department?"""
+    return ident.role == "admin" and ADMIN_SCOPE != "organisation"
+
+
+def own_department(ident: Identity) -> int | None:
+    """The department a caller's lists are cut to: an Admin kept to theirs; None for anyone who reaches every department."""
+    return ident.department_id if kept(ident) else None
+
+
+def in_scope(ident: Identity, department_id: int | None) -> bool:
+    if org_wide(ident):
+        return True
+    return ident.role == "admin" and department_id is not None and department_id == ident.department_id
+
+
 def require_department_scope(ident: Identity, department_id: int | None) -> None:
-    """Super User reaches every department; an Admin only their own."""
-    if ident.role == "super_user":
-        return
-    if ident.role == "admin" and department_id is not None and department_id == ident.department_id:
-        return
-    raise ProtocolError(ErrorCode.FORBIDDEN, "outside your department")
+    """The Super User, and an Admin when Admins are IT, reach every department; otherwise an Admin only their own."""
+    if not in_scope(ident, department_id):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "outside your department")
 
 
 def int_field(payload: dict[str, Any], name: str, *, required: bool = True) -> int | None:

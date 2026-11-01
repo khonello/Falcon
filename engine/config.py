@@ -34,6 +34,8 @@ class Settings:
     working_hours: str = "06:00-18:00"
     # Entering a machine whose client is not connected is refused (Hierarchy -> traversal).
     refuse_unreachable: bool = True
+    # Who an Admin answers for: "organisation" (version 1: IT over every department) or "department" (engine/permissions.py).
+    admin_scope: str = "organisation"
     # Update escalation threshold (open item 10.4): count-based, tunable.
     update_escalation_failures: int = 3
     # Polled/evaluated Events (thresholds, idle, time) are checked on this interval.
@@ -78,6 +80,7 @@ class Settings:
             working_hours=os.environ.get("FALCON_WORKING_HOURS", cls.working_hours),
             refuse_unreachable=os.environ.get("FALCON_REFUSE_UNREACHABLE", "1").strip().lower()
             not in ("0", "false", "no", "off"),
+            admin_scope=os.environ.get("FALCON_ADMIN_SCOPE", cls.admin_scope).strip().lower(),
             update_escalation_failures=int(
                 os.environ.get("FALCON_UPDATE_ESCALATION_FAILURES", cls.update_escalation_failures)
             ),

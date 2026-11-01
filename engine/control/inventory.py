@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import require_account, require_department_scope, require_role
+from engine.permissions import kept, require_account, require_department_scope, require_role
 from protocol import ErrorCode, ProtocolError
 
 NAME_MAX = 120
@@ -96,7 +96,7 @@ async def scope_pcs(ctx: Context, payload: dict[str, Any]) -> set[int]:
                 raise ProtocolError(ErrorCode.NOT_FOUND, f"no such pc {pc_id}")
             require_department_scope(ident, pc["department_id"])
         return ids
-    if ident.role == "admin":
+    if kept(ident):
         return {p["id"] for p in await db.accounts.pcs_in_department(ident.department_id)}
     return {p["id"] for p in await db.accounts.list_pcs() if p["department_id"] is not None}
 

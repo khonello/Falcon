@@ -227,7 +227,15 @@ part is recorded for later, not built.
      - What the Engine has today is the help-ping channel (a request, then one message each way, closed by the higher party), plus the Super User's groups. The Admin's page needs a plain conversation between two people, and a group of Admins, with read times kept per person.
    - **Owners moved.** In the concept's sample data, the flows, rules and folder asks that belonged to the Super User now belong to other Admins (A. Quaye, K. Boateng). Nothing in the Engine changes for this. A thing made by another Admin stays theirs to change.
 
-18. **Version 1: IT Admins only, the Super User parked** (the user, 1 Nov 2026; `docs/design/v1-it-admin.md`). The plan, in order:
+18. **Version 1: IT Admins only, the Super User parked** (the user, 1 Nov 2026; `docs/design/v1-it-admin.md`). **Steps 1-3 done 1 Nov 2026.** One switch, `FALCON_ADMIN_SCOPE` (`engine/permissions.py`: `org_wide`, `kept`, `own_department`,
+`in_scope`), defaults to `organisation`; `department` keeps the full design for later and is what the older tests run under (a test marked
+`organisation` runs as version 1: `tests/test_v1_scope.py`). Admins make departments and other Admins, take one away (never themself),
+promote and demote; a department needs no Admin of its own; every issue starts unassigned for any Admin to take; reports reach every
+Admin. `engine setup` / `bootstrap` make the first IT Admin in a department named IT. Flows: only onto another Admin's machine needs consent,
+and that Admin names the folder as they agree (`let_them_choose` at creation, `destination_path` in `flow.consent`); a Worker's folder is
+named by the maker. A flow's source may be one file (`source_kind: file`, migration 046): a move at the source takes the flow along, and its
+copy moved at a destination is where the next change is written (`followed_path`). TUI: `flow create ... file`, `dest=<pc>:` to let them
+choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in order:
    - Admins reach every department (`admin_scope`, fixed to organisation); department and Admin creation are Admin handlers; reports and issues
      reach every Admin, with Take; Admin to Admin on a machine stays refused.
    - `engine setup` / `bootstrap` make the first IT Admin; `make_org.py`, `.env.example` and `GETTING-STARTED.md` follow.

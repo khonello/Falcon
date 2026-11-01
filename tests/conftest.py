@@ -140,13 +140,15 @@ class Client:
 
 
 @pytest.fixture
-async def engine() -> Engine:
+async def engine(request: pytest.FixtureRequest) -> Engine:
     """An Engine listening on loopback against a fresh test DB. Plaintext (TLS is covered by
     tests/test_auth.py), but the auth handshake is REAL: clients answer the nonce with the key
-    derived from TEST_MASTER_SECRET (see `key_for`)."""
+    derived from TEST_MASTER_SECRET (see `key_for`). Admins are kept to their department unless the test is marked
+    `organisation` (version 1: IT over every department)."""
     assert TEST_DB_URL
+    scope = "organisation" if request.node.get_closest_marker("organisation") else "department"
     eng = Engine(Settings(host="127.0.0.1", port=0, database_url=TEST_DB_URL, dev_plaintext=True,
-                          master_secret=TEST_MASTER_SECRET,
+                          master_secret=TEST_MASTER_SECRET, admin_scope=scope,
                           refuse_unreachable=False,    # most tests enter machines with no worker running
                           flow_settle_seconds=0.0))    # a flow reads a changed file at once (settling is tested on its own)
     await eng.db.connect()

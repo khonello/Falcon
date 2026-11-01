@@ -17,6 +17,7 @@ from typing import Any
 from engine.dispatch import Context, handler
 from engine.isotime import parse_iso
 from engine.permissions import (
+    in_scope,
     int_field,
     require_account,
     require_department_scope,
@@ -52,7 +53,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         if ident.role == "admin":
             for aid in account_ids:
                 acct = await ctx.engine.db.accounts.by_id(aid)
-                if acct is None or acct["department_id"] != ident.department_id:
+                if acct is None or not in_scope(ident, acct["department_id"]):
                     raise ProtocolError(ErrorCode.FORBIDDEN, f"account {aid} is outside your department")
     else:
         account_ids = None
