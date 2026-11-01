@@ -157,6 +157,10 @@ class WindowsInstall:
             if (self.app / pkg).exists():
                 shutil.rmtree(self.app / pkg)                    # no file of an older version is left behind
             shutil.copytree(src / pkg, self.app / pkg, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "tests"))
+        if (self.source / "installers").is_dir():                    # the uninstall runs this installer from the program's own folder
+            if (self.app / "installers").exists():
+                shutil.rmtree(self.app / "installers")
+            shutil.copytree(self.source / "installers", self.app / "installers", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         for name in ("requirements.txt", "pyproject.toml"):
             for where in (self.source, src):
                 if (where / name).is_file():

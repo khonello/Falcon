@@ -65,7 +65,14 @@ Split by **where the code must run and with what rights**, not by feature.
   6. The probation list is reachable by anyone on the network: rate-limit requests, expire old ones, and raise a flag
      for a machine that keeps asking.
 
+## Decided 1 Nov 2026
+
+- **Package what does not wait on the console** (the user): the Engine (`.deb`) and the Worker (`setup.exe`); the Admin's waits until
+  the concept's pages are all in the QML.
+- **The bundled interpreter is python.org's full Windows layout** (its NuGet package), installed with the program; the runtime is a venv
+  made from it, filled from wheels carried in the setup (`installers/windows/build_setup.py`).
+
 ## Still to decide when packaging starts
 
-- Bundled interpreter, signing, frozen helper windows, update pipeline (`ENGINE-GAPS.md`, `PHASES.md` Phase 9).
+- Signing, frozen helper windows, update pipeline (`ENGINE-GAPS.md`, `PHASES.md` Phase 9).
 - What the pairing code looks like on a PC with nobody signed in (a service machine at the login screen).

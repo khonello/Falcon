@@ -72,8 +72,18 @@ its fingerprint, and a systemd service answering as the `falcon` user; the secre
 it over TLS pinned to the bundle's certificate with the first account's key, and a wrong certificate was refused; the second run kept the password, the secret and the
 first account and issued nothing new. **Not run for real yet:** the Windows installer's own runtime venv with real wheels (the VM) and the `.deb` build (`dpkg-deb`).
 
+## setup.exe (built 1 Nov 2026)
+
+`python -m installers.windows.build_setup worker --python <folder> --bundle falcon-client.json --out <short folder>` makes
+`falcon-worker-setup.exe` (93 MB): the payload, the role's libraries as wheels (no network at install), and Python. The Python is
+python.org's full Windows layout, the `tools` folder of its NuGet package (`https://www.nuget.org/api/v2/package/python/3.10.11`; decided
+by the user, 1 Nov 2026). It is installed under the program (`<target>\python`), because the runtime is a venv made from it. Build into a
+short path (`C:b\dist`): a deep one passes Windows' 260-character limit and Inno Setup says "cannot find the path". One setup.exe is
+made per Engine, since it carries that Engine's bundle. Needs Inno Setup 6. The admin role waits for the console (the user, 1 Nov 2026).
+**Not run for real yet:** installing it (an elevated `falcon-worker-setup.exe /VERYSILENT /DIR=...`), then uninstalling from Apps.
+
 ## Still to do (final packaging; on hold)
 
-- Executables: a bundled interpreter, and a wrapper that turns `installers/windows/falcon.iss` into one `setup.exe` per role; freezing the helper windows.
+- Freezing the helper windows (they run from the bundled Python today).
 - Signing the executables and the packages.
 - The update pipeline (a new payload to a machine that already has the service).

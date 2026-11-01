@@ -389,3 +389,22 @@ async def test_an_installed_admin_workstation_registers_itself_and_its_console_i
     finally:
         winservice.stop(name)
         winservice.uninstall(name)
+
+
+def test_a_setup_is_not_built_from_a_folder_with_no_python_or_a_bundle_that_is_not_one(tmp_path):
+    from installers.windows import build_setup
+
+    with pytest.raises(InstallError, match="no python.exe"):
+        build_setup.build("worker", tmp_path / "nopython", tmp_path / "b.json", tmp_path / "out")
+    (tmp_path / "py").mkdir()
+    (tmp_path / "py" / "python.exe").write_bytes(b"")
+    (tmp_path / "b.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(InstallError, match="not a Falcon client bundle"):
+        build_setup.build("worker", tmp_path / "py", tmp_path / "b.json", tmp_path / "out")
+
+
+def test_the_setup_script_installs_python_with_the_program_and_runs_the_installer_from_there():
+    """A venv needs the Python it was made from for as long as it lives: never unpack that Python to a temporary folder."""
+    iss = (Path(__file__).resolve().parent.parent / "installers" / "windows" / "falcon.iss").read_text(encoding="utf-8")
+    assert r'DestDir: "{app}\python"' in iss and r'{tmp}\python' not in iss
+    assert '--target ""{app}""' in iss and "WorkingDirectory" not in iss
