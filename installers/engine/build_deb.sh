@@ -23,6 +23,10 @@ else
     python3 -m installers.payload engine "$stage/opt/falcon/payload"
 fi
 
+# a checkout on a Windows drive (WSL's /mnt/c) reads as rwxrwxrwx: the package says exactly who may write what, whatever the checkout says
+find "$stage" -type d -exec chmod 0755 {} +
+find "$stage" -type f -exec chmod 0644 {} +
+
 sed "s/@VERSION@/$version/" installers/engine/debian/control > "$stage/DEBIAN/control"
 for script in postinst prerm postrm; do
     install -m 0755 "installers/engine/debian/$script" "$stage/DEBIAN/$script"
