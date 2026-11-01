@@ -2,7 +2,7 @@
 
     search.find {q, kinds?: [...], limit?: 8}  -> {"results": [{kind, id, title, sub, department_id?, page}], "q"}
 
-Each kind is limited to what the caller may see: the Super User everything, an Admin their own department. People are found by the name the caller gives them
+Each kind is limited to what the caller may see: the head of the organisation everything, an Admin their own department. People are found by the name the caller gives them
 (Display Names are never searched across other people's naming), machines by hostname, tasks by their text, flows by their source path, issues by code,
 title or machine, rules by name, departments by name. `page` says where the console opens the result.
 """

@@ -13,8 +13,7 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 4. *(done)* **Park the Super User** in `parked/` (handlers, QML pages, TUI commands, preview data, installer role, handover, their tests) and strip every
    reference from what ships.
 5. *(done)* **Console:** no Super User words, pages or data; one level, every department.
-   **Left from 4-5:** the Engine's comments and docstrings still describe the full design (they name the Super User where it applies under
-   `department`); the lists have no department filter yet (the Departments page makes, renames and fills departments, 1 Nov 2026);
+   **Left from 4-5:** the lists have no department filter yet (the Departments page makes, renames and fills departments, 1 Nov 2026);
    letting another Admin pick the folder of a flow is in the TUI, not the console; making another IT Admin is still to be designed.
 6. Then packaging.
 

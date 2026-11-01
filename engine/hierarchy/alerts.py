@@ -2,10 +2,10 @@
 
 Types: emergency | warning | announcement | routine.
 Audience and who may create it:
-    admin_only      Super User or Admin        -> all Admins + Super User
-    department      Super User or that dept's Admin -> Admins & Workers of the department
-    all_users       Super User only            -> everyone
-    specific_users  Super User or Admin        -> the listed accounts (Admin: own dept only)
+    admin_only      the head of the organisation or Admin        -> all Admins + the head of the organisation
+    department      the head of the organisation or that dept's Admin -> Admins & Workers of the department
+    all_users       the head of the organisation only            -> everyone
+    specific_users  the head of the organisation or Admin        -> the listed accounts (Admin: own dept only)
 Delivery: immediate, or scheduled (`deliver_at`); recurring is stored and left to the
 Scheduler. Every alert is audited; delivery is a push plus the alert list.
 """
@@ -123,7 +123,7 @@ async def list_alerts(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("alerts.sent")
 async def sent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """What this person has sent, scheduled or withdrawn (the Super User: everything), with who it reached."""
+    """What this person has sent, scheduled or withdrawn (the head of the organisation: everything), with who it reached."""
     ident = require_role(ctx, "super_user", "admin")
     found = await ctx.engine.db.alerts.sent(None if ident.role == "super_user" else ident.account_id)
     depts = {d["id"]: d["name"] for d in await ctx.engine.db.accounts.list_departments()}
@@ -137,7 +137,7 @@ async def sent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("alerts.cancel")
 async def cancel(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Withdraw a scheduled announcement before it goes out. {"alert_id"}; its sender, or the Super User."""
+    """Withdraw a scheduled announcement before it goes out. {"alert_id"}; its sender, or the head of the organisation."""
     ident = require_role(ctx, "super_user", "admin")
     alert = await ctx.engine.db.alerts.get(int_field(payload, "alert_id"))
     if alert is None or (ident.role != "super_user" and alert["created_by_account_id"] != ident.account_id):

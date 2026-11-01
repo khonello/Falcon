@@ -1,13 +1,13 @@
 """What the core features suggest to each other, and to the people running them.
 
 Detective sees things the others cannot: a folder that keeps appearing in cases but is not restricted, a flow whose source machine is under an urgent case, a case escalated to the
-Super User. The unified system lets it say so -- but it may only SAY so. A proposal is a suggestion written down for a person: nothing is marked, paused or assigned until somebody
+the head of the organisation. The unified system lets it say so -- but it may only SAY so. A proposal is a suggestion written down for a person: nothing is marked, paused or assigned until somebody
 accepts it, and accepting it is the person's act (audited as theirs), never the system's. Dismissing is kept too, so the same suggestion is not made again while it stands.
 
     proposals.list    {state?: open|accepted|dismissed, limit?}      what is waiting for you
     proposals.decide  {proposal_id, accept, note?}                   accept (and do the safe part) or dismiss
 
-Accepting:  pause_flow  pauses the flow (the person must own the flow, or be the Super User)
+Accepting:  pause_flow  pauses the flow (the person must own the flow, or be the head of the organisation)
             mark_folder says where to mark (a mark is made on the marker's own workstation, so this tells the console which folder; it does not mark anything itself)
             follow_up_task gives the words for a task to the department's Admin (the person creates it on the Tasks page)
 """

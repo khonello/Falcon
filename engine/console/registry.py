@@ -1,11 +1,11 @@
 """The Registry (machines, accounts, refused connections) and a department's page.
 
-    registry.accounts {department_id?, roles?}   the Super User and every Admin (a Worker too, if asked): workstation, key number, whether signed in
+    registry.accounts {department_id?, roles?}   the head of the organisation and every Admin (a Worker too, if asked): workstation, key number, whether signed in
     registry.refused  {days?}                    connections turned away at the handshake, grouped by who tried and from where, with what to do
     registry.knocked  {days?}                    Admin's Add a machine: PCs that tried to connect with no registration, by the name they gave (not since registered)
     registry.blocked                             the addresses refused at the door
-    registry.block    {address, reason?}         Super User: refuse an address from now on (the tries are still recorded)
-    registry.unblock  {address}                  Super User
+    registry.block    {address, reason?}         the head of the organisation: refuse an address from now on (the tries are still recorded)
+    registry.unblock  {address}                  the head of the organisation
     departments.get   {department_id}            a department: its Admins, vacancy, machines, worst open issues, reports handling, open work, Workers who could be promoted
 
 The machines list is `machines.list` (its `key_generation`, `version`, `last_seen_at`); registering a PC, provisioning an Admin and making a new key are
@@ -38,11 +38,11 @@ def _iso(value: Any) -> str | None:
 
 @handler("registry.accounts")
 async def accounts(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """The Super User sees every account of the roles asked (default: Super User and Admins); an Admin their own department's."""
+    """The head of the organisation sees every account of the roles asked (default: the head of the organisation and Admins); an Admin their own department's."""
     ident = require_role(ctx, "super_user", "admin")
     roles = payload.get("roles") or (["super_user", "admin"] if ident.role == "super_user" else ["admin", "worker"])
     if not isinstance(roles, list) or not set(roles) <= {"super_user", "admin", "worker"}:
-        raise ProtocolError(ErrorCode.INVALID, "roles must be some of super_user, admin, worker")
+        raise ProtocolError(ErrorCode.INVALID, "roles must be some of admin, worker")
     department_id = ident.department_id if kept(ident) else int_field(payload, "department_id", required=False)
     db = ctx.engine.db
     found = await db.registry.account_rows(department_id=department_id, roles=roles)
@@ -83,7 +83,7 @@ def _why(kind: str, d: dict[str, Any]) -> tuple[str, str, str, str]:
 
 @handler("registry.refused")
 async def refused(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User. {"days"?: 7} -> {"refused": [...], "summary": {groups, tries, bad}}. One row per (who tried, from where): the name it claimed, the address,
+    """The head of the organisation. {"days"?: 7} -> {"refused": [...], "summary": {groups, tries, bad}}. One row per (who tried, from where): the name it claimed, the address,
     why it was refused, how many times, the first and last try, the machine it claimed to be (if the client id is one of ours), whether that machine has
     ever used the address, whether the address is blocked now, and what to do about it (`advice`: register, rekey, block, unblock)."""
     require_head(ctx)
@@ -165,7 +165,7 @@ def _address(payload: dict[str, Any]) -> str:
 
 @handler("registry.block")
 async def block(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User. {"address", "reason"?}. The address is refused at the door from now on, whoever it is; a connection already open stays until it ends."""
+    """The head of the organisation. {"address", "reason"?}. The address is refused at the door from now on, whoever it is; a connection already open stays until it ends."""
     ident = require_head(ctx)
     address = _address(payload)
     own = ctx.connection.peer[0] if getattr(ctx.connection, "peer", None) else None
@@ -209,7 +209,7 @@ async def department_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     machines = (await dispatch(ctx, "machines.list", {"department_id": department_id}))
     issues = sorted(await db.issues.list(department_id=department_id, open_only=True), key=lambda i: SEV_ORDER.get(i["severity"], 3))
     overview = {d["department_id"]: d for d in (await dispatch(ctx, "overview.departments", {}))["departments"]}.get(department_id, {})
-    tasks: list[dict[str, Any]] = []                     # tasks given to a department are parked with the Super User (parked/README.md)
+    tasks: list[dict[str, Any]] = []                     # tasks given to a department are parked (parked/README.md)
     return {"department": {"id": department_id, "name": department["name"]}, "admins": admins, "vacant": not admins,
             "machines": machines["machines"], "summary": machines["summary"],
             "issues": [{"id": i["id"], "code": i["code"], "severity": i["severity"], "title": i["title"], "subject": i["subject"], "state": i["state"],

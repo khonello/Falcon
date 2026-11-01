@@ -4,9 +4,9 @@ waiting to go out). Nothing here is written by the page and nothing is stored fo
     calendar.board {days?}     what is coming in the next `days` (default 62, at most 124), soonest first:
                                {"now", "until", "items": [{"kind": "task" | "todo" | "rule" | "announcement", "at", "title", "line", "to": [page, sub]}]}
 
-An Admin sees the tasks they were given or gave, the department's, the department tasks the Super User gave them, their own to-dos that have a date, the rules that run on a clock in their
+An Admin sees the tasks they were given or gave, the department's, the department tasks the head of the organisation gave them, their own to-dos that have a date, the rules that run on a clock in their
 department (a repeating one is drawn through the end of next month, so one daily rule does not fill the calendar to the horizon), and the announcements they
-have scheduled. The Super User sees the department tasks they gave and every scheduled announcement. A task overdue is still listed, on the day it was due.
+have scheduled. The head of the organisation sees the department tasks they gave and every scheduled announcement. A task overdue is still listed, on the day it was due.
 Flows are not here: they run on events, not a clock.
 """
 

@@ -16,7 +16,7 @@ The timeline is built from what the Engine already records:
   * synced, conflict      the flow sync log: a flow carried it to another machine, or an outside edit was in the way
 
 A folder being renamed above the file is not followed (the file's own path did not change event by event).
-Scope: the Super User sees the whole journey. An Admin sees only what happened on their own department's machines (a
+Scope: the head of the organisation sees the whole journey. An Admin sees only what happened on their own department's machines (a
 copy elsewhere is not theirs to read), and a file with no place in their department is "not found" to them.
 Names are the caller's (Display Names are never shared across namers).
 """

@@ -1,9 +1,9 @@
-"""An Admin's conversations, without the Super User (the user, 29 Oct 2026; ENGINE-GAPS #17).
+"""An Admin's conversations, with nobody above the Admins (the user, 29 Oct 2026; ENGINE-GAPS #17).
 
 Version 1: an Admin talks to the other Admins and to whoever is signed in on a machine, and there is one group of every Admin once there are two or
 more. There is no request to talk before writing (help requests are out of version 1): a conversation is only what was written in it. A person at a
-machine answers in a conversation an Admin started; they do not start one. The help-ping channels (`assistance.*`) stay as they are for the Super
-User's level.
+machine answers in a conversation an Admin started; they do not start one. The help-ping channels (`assistance.*`) stay as they are for the level
+above the Admins.
 
     chat.list   {}                                   the caller's conversations, latest first: who is in it, the last message, unread, who has seen it
     chat.people {}                                   Admin: who they may write to (the other Admins, and each machine's person, with the machine)

@@ -8,7 +8,7 @@ Admins. The receiver sees a persistent pulsing status (unaddressed count > 0) --
 mechanism in place of a timeout. Same shared status-indicator mechanism Task deadlines use.
 
 Message Channel: opens when the receiver accepts the request (`assistance.respond`). The one
-exception is the Super User writing to an Admin: that opens the channel at once, with no request to
+exception is the head of the organisation writing to an Admin: that opens the channel at once, with no request to
 accept (the user, 22 Oct 2026). Either party writes whenever they like -- the one-message-per-turn lock
 was dropped the same day. `turn` now only says who is waiting to answer: 'sender' the subordinate
 party, 'superior' the superior; it moves to the other party after each message. The superior closes
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 def superior_of(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any] | None:
     """The higher-ranked of two accounts if they are in a direct vertical relationship
-    (Worker <-> Admin of the same department, Admin <-> Super User), else None."""
+    (Worker <-> Admin of the same department, Admin <-> the head of the organisation), else None."""
     hi, lo = (a, b) if RANK[a["role"]] > RANK[b["role"]] else (b, a)
     if hi["role"] == lo["role"]:
         return None
@@ -95,7 +95,7 @@ async def search(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("assistance.my_admins")
 async def my_admins(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Who the caller may ask for help: a Worker's Admins (their own department's), an Admin's Super User.
+    """Who the caller may ask for help: a Worker's Admins (their own department's), an Admin's head of the organisation.
     -> {"admins": [{"account_id", "name"}]}, named as the caller names them. What the Worker's "ask for
     help" window offers; a ping carries no message, so this is all it needs."""
     ident = require_account(ctx)
@@ -112,9 +112,9 @@ async def my_admins(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("assistance.people")
 async def people(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Everyone the caller may message, named as the caller names them: the Super User's Admins; an Admin's
-    Super User, the other Admins and their own Workers; a Worker's Admins. `request` says whether writing
-    to them is a request they accept first (everyone but the Super User writing to an Admin).
+    """Everyone the caller may message, named as the caller names them: the head of the organisation's Admins; an Admin's
+    the head of the organisation, the other Admins and their own Workers; a Worker's Admins. `request` says whether writing
+    to them is a request they accept first (everyone but the head of the organisation writing to an Admin).
     -> {"people": [{"account_id", "name", "role", "department_id", "department_name", "hostname", "request"}]}"""
     ident = require_account(ctx)
     db = ctx.engine.db
@@ -141,7 +141,7 @@ async def _may_close(ctx: Context, channel: dict[str, Any], account_id: int) -> 
 @handler("assistance.ping")
 async def ping(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"to_account_id": int}. A message request to the caller's direct superior or subordinate, or to
-    another Admin. Repeatable: no lock on pinging. From the Super User to an Admin it is no request: the
+    another Admin. Repeatable: no lock on pinging. From the head of the organisation to an Admin it is no request: the
     channel opens at once (-> {"ping_id", "channel_id", "opened"}) and the Admin has nothing to accept."""
     ident = require_account(ctx)
     to_id = int_field(payload, "to_account_id")
@@ -173,8 +173,8 @@ async def ping(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _open_directly(ctx: Context, su: dict[str, Any], admin: dict[str, Any]) -> dict[str, Any]:
-    """The Super User writes to an Admin: the request is recorded and addressed at once, and the channel
-    opens (or the open one is reused) with the Super User to speak."""
+    """The head of the organisation writes to an Admin: the request is recorded and addressed at once, and the channel
+    opens (or the open one is reused) with the head of the organisation to speak."""
     db = ctx.engine.db
     ping_id = await db.assistance.ping(su["id"], admin["id"])
     await db.assistance.address_pings(admin["id"], su["id"])

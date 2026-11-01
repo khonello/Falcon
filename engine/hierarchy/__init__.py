@@ -5,7 +5,7 @@ renders what the Engine's permission/session state says.
 
     traversal        -- Traversal, Session Blocking, Time Limit, red-banner state
     display_names    -- top-down naming, non-propagating across layers
-    reports          -- Report Routing (additive to Super User's always-on visibility)
+    reports          -- Report Routing (additive to the head of the organisation's always-on visibility)
     alerts           -- System Alerts & Announcements
     accounts         -- Department creation/assignment, offboarding
     auditing         -- reading the audit trail and deviations, role-scoped

@@ -1,15 +1,15 @@
-"""The rollout gate (Rollout, and the Super User's decision to approve a version).
+"""The rollout gate (Rollout, and the head of the organisation's decision to approve a version).
 
     rollout.gate     {}                          the current version and who approved it, the version waiting (if any), who runs the current one, the machines
                                                  holding the next approval back (attempts, last error, next try, escalation), who was left out and why,
                                                  adoption day by day, failed installs this week
-    updates.stage    {version, note?}            Super User: a version is ready and waits for approval (the packaging pipeline calls the same)
-    updates.retry    {pc_id, when: now|idle}     tell a machine to try its update now, or when it is idle (Admin: their department; Super User: any)
-    updates.leave_out {pc_id, reason}            Super User: the coming approval does not wait for this machine
-    updates.take_back {pc_id}                    Super User: put it back in the gate
+    updates.stage    {version, note?}            the head of the organisation: a version is ready and waits for approval (the packaging pipeline calls the same)
+    updates.retry    {pc_id, when: now|idle}     tell a machine to try its update now, or when it is idle (Admin: their department; the head of the organisation: any)
+    updates.leave_out {pc_id, reason}            the head of the organisation: the coming approval does not wait for this machine
+    updates.take_back {pc_id}                    the head of the organisation: put it back in the gate
 
 A version is approved only when every machine runs the one before it; a machine left out does not hold the gate, and is recorded with the approval
-(`updates.approve {version, leave_out?: [pc_id], reason?}` is in engine/updates.py). The version waiting is also one of the Super User's decisions.
+(`updates.approve {version, leave_out?: [pc_id], reason?}` is in engine/updates.py). The version waiting is also one of the head of the organisation's decisions.
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ async def _adoption(ctx: Context, cur: dict[str, Any], pcs: list[dict[str, Any]]
 
 @handler("rollout.gate")
 async def gate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Everything the Rollout page shows. The Super User sees the fleet (or one department's); an Admin their own department's."""
+    """Everything the Rollout page shows. The head of the organisation sees the fleet (or one department's); an Admin their own department's."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     department_id = ident.department_id if kept(ident) else int_field(payload, "department_id", required=False)
@@ -104,7 +104,7 @@ async def gate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                      "last_attempt_at": _iso(s.get("last_attempt_at")), "last_error": s.get("last_error") or ("Not checking in" if b["id"] not in online else None),
                      "next_try": "When it is back online" if b["id"] not in online else "Next idle window", "online": b["id"] in online, "state": state,
                      "escalated_at": _iso(s.get("escalated_at")),
-                     "escalated_to": (("you" if ident.role == "super_user" else "the Super User") if not dept_admins else names_by.get(dept_admins[0]["id"])) if escalated else None,
+                     "escalated_to": (("you" if ident.role == "super_user" else "the Admins") if not dept_admins else names_by.get(dept_admins[0]["id"])) if escalated else None,
                      "left_out": {"reason": exclusions[b["id"]]["reason"], "at": _iso(exclusions[b["id"]]["at"])} if out_ else None})
     order = {"escalated": 0, "offline": 1, "retrying": 2, "left_out": 3}
     rows.sort(key=lambda r: (order[r["state"]], r["hostname"]))

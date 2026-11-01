@@ -4,7 +4,7 @@ Before a flow (or an edit to its destinations/stages) is accepted, three checks 
 the same Global File Index / flow graph, and the creator hears about every issue rather than
 having it resolved for them:
   * Destination Consent -- implicit only when the creator already has authority over the
-    destination's owner (Super User over anyone; an Admin over Workers in their own
+    destination's owner (the head of the organisation over anyone; an Admin over Workers in their own
     department). Lateral or upward destinations need the owner's explicit consent: the flow
     is stored paused with `consent_status='pending'` until they answer.
   * Pre-Flight Collision Check -- existing indexed content under a destination path is
@@ -289,7 +289,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"source_pc_id", "source_path", "destinations": [{destination_pc_id?, destination_path,
     parent_index?}], "stages": [{stage_type, parent_index?, config?}], "confirm_collisions": bool}
 
-    Super User: any source/destination. Admin: source on own PC or a Worker PC in their
+    the head of the organisation: any source/destination. Admin: source on own PC or a Worker PC in their
     department. Consent, collision and cycle checks run before anything is stored."""
     ident = require_role(ctx, "super_user", "admin")
     creator = await ctx.engine.db.accounts.by_id(ident.account_id)
@@ -414,7 +414,7 @@ async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _load_visible(ctx: Context, flow_id: int) -> dict[str, Any]:
-    """A flow as a party to it sees it: its creator, a destination's owner, the Super User, or somebody who may answer one of its requests."""
+    """A flow as a party to it sees it: its creator, a destination's owner, the head of the organisation, or somebody who may answer one of its requests."""
     from engine.flow import guard
 
     ident = ctx.identity
@@ -635,7 +635,7 @@ async def list_flows(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("flow.status")
 async def status(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Per-flow and per-destination status, incl. persistent failure state and suggestion.
-    Visible to the creator, any destination owner, and Super User."""
+    Visible to the creator, any destination owner, and the head of the organisation."""
     ident = require_account(ctx)
     flow_id = int_field(payload, "flow_id")
     flow = await ctx.engine.db.flows.get(flow_id)

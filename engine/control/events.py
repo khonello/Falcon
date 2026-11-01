@@ -216,7 +216,7 @@ async def fire(engine: Engine, definition: dict[str, Any], pc_id: int, data: dic
     elif definition["condition_spec"].get("pc_ids"):
         targets = list(definition["condition_spec"]["pc_ids"])
     else:
-        # No machines named: the creator's department, or for the Super User's organisation-wide
+        # No machines named: the creator's department, or for the organisation-wide
         # automation every department's machines (it has no department of its own).
         dept = await _dept_pcs(engine, definition)
         targets = sorted(dept) if dept is not None else [
@@ -318,7 +318,7 @@ def _parse_spec(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 
 async def _load_event_in_scope(ctx: Context, event_id: int, *, write: bool = True) -> dict[str, Any]:
-    """An Admin reaches their department's automations. The Super User's organisation-wide ones
+    """An Admin reaches their department's automations. The organisation-wide ones
     that reach the department can be read there (write=False), never changed or switched."""
     ev = await ctx.engine.db.control.event(event_id)
     if ev is None:
@@ -434,7 +434,7 @@ async def event_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         else await db.control.events_in_department(ident.department_id)
     out = []
     for d in rows(defs):
-        # In a console, the Super User's automations are shown and marked read-only.
+        # In a console, the head of the organisation's automations are shown and marked read-only.
         d["org_wide"] = bool(d.get("org_wide"))
         d["read_only"] = ident.role == "admin" and d["org_wide"]
         d["actions"] = rows(await db.control.actions_for_event(d["id"]))

@@ -1,14 +1,14 @@
 """Traversal & Session Blocking (Hierarchy -> Traversal Path & Depth, Traversal Boundaries).
 
-Depth:  Super User -> Department -> Admin -> Client PC;  Admin -> Client PC (own department);
+Depth:  The head of the organisation -> Department -> Admin -> Client PC;  Admin -> Client PC (own department);
 Client: none.
 
 Session, not traversal, is the unit that gets blocked. One active session per PC, enforced by
 the partial unique index `one_active_session_per_pc`. On an occupied target:
-  * vertical superior (Super User -> Admin, Admin -> Worker): may block-or-end first, then enter
+  * vertical superior (the head of the organisation -> Admin, Admin -> Worker): may block-or-end first, then enter
     (`force: true`); without `force` the caller is told the PC is occupied and by whom
   * horizontal peer (Admin <-> Admin): hard refusal until the session frees naturally
-  * a Super User occupant is un-evictable
+  * the head of the organisation's occupancy is un-evictable
 
 Traversal Time Limit: an Engine-side countdown per traversal session, extendable on request.
 The same deadline governs a network drop mid-traversal -- no separate disconnect logic.
@@ -74,9 +74,9 @@ def _session_view(s: dict[str, Any], names: dict[int, str]) -> dict[str, Any]:
         "view_mode": s.get("view_mode", "control"),
         "un_evictable": s["un_evictable"],
         # Conditional Rendering / Traversal-Restricted Files apply to a traversing Admin, never
-        # to Super User (Traversal Boundaries -> Super User Exemption).
+        # to the head of the organisation (Traversal Boundaries -> the head of the organisation's exemption).
         "restricted_view": s["occupied_via"] != "native" and s["occupant_role"] != "super_user",
-        # The red banner: Super User is inside someone else's view.
+        # The red banner: the head of the organisation is inside someone else's view.
         "super_user_banner": s["occupied_via"] != "native" and s["occupant_role"] == "super_user",
     }
 
@@ -146,7 +146,7 @@ async def expire_due_sessions(engine: Engine) -> None:
 
 @handler("hierarchy.tree")
 async def tree(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """The hierarchy as visible to the caller. Super User: every department; Admin: own
+    """The hierarchy as visible to the caller. The head of the organisation: every department; Admin: own
     department. Names are resolved for the caller only (Display Names)."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
@@ -195,7 +195,7 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Enter a target PC's session. {"pc_id": int, "force": bool, "mode"?: "control" (default: the person at the machine is locked out) | "see" (they keep working and are shown a bar)}
 
     `force` = block-or-end-first; honoured only for vertical relationships and never against
-    an un-evictable (Super User) occupant.
+    an un-evictable (the head of the organisation) occupant.
     """
     ident = require_role(ctx, "super_user", "admin")
     pc_id = int_field(payload, "pc_id")
@@ -263,7 +263,7 @@ async def traverse(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await ctx.engine.audit.record(ctx, "session.traversed", target_type="session", target_id=session_id,
                                   detail={"pc_id": pc_id, "forced": force, "deadline_at": deadline.isoformat(), "outside_hours": after_hours})
     if after_hours:
-        # An Admin's own conduct is reported to the Super User only (category about_admin, never routable).
+        # An Admin's own conduct is reported to the head of the organisation only (category about_admin, never routable).
         from engine.hierarchy import reports
 
         await reports.emit(ctx.engine, "about_admin", source_table="sessions", source_id=session_id,
@@ -366,7 +366,7 @@ async def session_state(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 @handler("hierarchy.sessions_today")
 async def sessions_today(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """The record of the day: who held each PC and for how long, ended sessions included.
-    {"hours"?: int} -- how far back to look, 1..168, 12 by default. Super User sees every
+    {"hours"?: int} -- how far back to look, 1..168, 12 by default. The head of the organisation sees every
     department, an Admin only their own. Nothing here is a status change; it is what happened."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db

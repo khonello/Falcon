@@ -2,7 +2,7 @@
 Offboarding & Deprovisioning).
 
 Identity Model: one account <-> exactly one PC. Offboarding deactivates, never deletes.
-Department creation and Admin assignment are Super User only; an Admin may provision Workers
+Department creation and Admin assignment are for the head of the organisation only; an Admin may provision Workers
 (and their PCs) inside their own department.
 
 Provisioning issues the PC's `client_id` (spec 8.2). Until Phase 5 the derived key is not
@@ -31,7 +31,7 @@ PC_TYPE_FOR_ROLE = {"super_user": "super_user_workstation", "admin": "admin_work
 
 @handler("hierarchy.department_create")
 async def department_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"name": str} -- the Super User, or any Admin when Admins are IT (version 1: a department is a label). Zero-Admin departments are allowed."""
+    """{"name": str} -- the head of the organisation, or any Admin when Admins are IT (version 1: a department is a label). Zero-Admin departments are allowed."""
     ident = _manager(ctx)
     name = str_field(payload, "name")
     import asyncpg
@@ -99,10 +99,10 @@ async def departments(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _manager(ctx: Context) -> Any:
-    """Who may make departments and Admins: the Super User, or any Admin when Admins are IT (version 1, docs/design/v1-it-admin.md)."""
+    """Who may make departments and Admins: the head of the organisation, or any Admin when Admins are IT (version 1, docs/design/v1-it-admin.md)."""
     ident = require_role(ctx, "super_user", "admin")
     if not org_wide(ident):
-        raise ProtocolError(ErrorCode.FORBIDDEN, "requires role super_user")
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only someone who reaches every department can do this")
     return ident
 
 
@@ -145,7 +145,7 @@ async def account_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     """{"role": str, "department_id": int?, "hostname": str} -- provisions the account AND its
     PC together (one account <-> one PC), returning the PC's new client_id.
 
-    Super User may create any role; an Admin may create Workers in their own department.
+    The head of the organisation may create any role; an Admin may create Workers in their own department.
     """
     ident = require_role(ctx, "super_user", "admin")
     role = str_field(payload, "role", choices=("super_user", "admin", "worker"))
@@ -190,7 +190,7 @@ async def account_offboard(ctx: Context, payload: dict[str, Any]) -> dict[str, A
 
 @handler("hierarchy.admin_promote")
 async def admin_promote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"account_id"} -- Super User only. A Worker becomes an Admin of the department they already work in. Their machine becomes an
+    """{"account_id"} -- the head of the organisation only. A Worker becomes an Admin of the department they already work in. Their machine becomes an
     Admin workstation and gets a new key (returned once: the install on it must be redone with it); what was installed as a Worker's
     stops working. A department with no Admin is how this is usually reached, but it is allowed to give a department another. Any Admin when
     Admins are IT."""
@@ -220,7 +220,7 @@ async def admin_promote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 
 @handler("hierarchy.admin_demote")
 async def admin_demote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"account_id"} -- Super User only. An Admin stops being one: they stay in the department as a Worker on the same machine, which gets a new key (returned
+    """{"account_id"} -- the head of the organisation only. An Admin stops being one: they stay in the department as a Worker on the same machine, which gets a new key (returned
     once) and stops being an Admin workstation. Their session is ended, the issues they owned go back to the department's pool, and if they were the last
     Admin the department is left with an empty seat (watched like any other). When Admins are IT, any other Admin may do it, never on themself."""
     ident = _manager(ctx)
@@ -245,23 +245,6 @@ async def admin_demote(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await seat_watch(ctx.engine, subject["department_id"], subject["department_name"] or "A department")
     return {"account_id": account_id, "role": "worker", "department_id": subject["department_id"], "pc_id": subject["bound_pc_id"],
             "client_id": subject["client_id"], "key_generation": generation, "client_key": ctx.engine.client_key(subject["client_id"], generation)}
-
-
-@handler("hierarchy.admin_limit")
-async def admin_limit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"account_id", "on": bool} -- Super User only. Limit an Admin to working hours (they cannot enter a machine outside them), or lift it."""
-    require_role(ctx, "super_user")
-    account_id = int_field(payload, "account_id")
-    on = payload.get("on", True)
-    if not isinstance(on, bool):
-        raise ProtocolError(ErrorCode.INVALID, "on must be true or false")
-    subject = await ctx.engine.db.accounts.by_id(account_id)
-    if subject is None or subject["role"] != "admin" or subject["status"] != "active":
-        raise ProtocolError(ErrorCode.NOT_FOUND, "no such active Admin")
-    await ctx.engine.db.accounts.set_hours_limited(account_id, on)
-    await ctx.engine.audit.record(ctx, "admin.limited" if on else "admin.limit_lifted", target_type="accounts", target_id=account_id)
-    await ctx.engine.push_to_account(account_id, "account.limited", {"on": on, "working_hours": ctx.engine.settings.working_hours})
-    return {"account_id": account_id, "hours_limited": on}
 
 
 @handler("hierarchy.ownership")
@@ -332,7 +315,7 @@ async def pc_register(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def pc_rekey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"pc_id": int} -- rotate a PC's client key (lost/compromised install package). The old key
     stops verifying immediately and any live connection from that PC is dropped; the new key is
-    returned once for a fresh install package. Super User anywhere; Admin within their department."""
+    returned once for a fresh install package. The head of the organisation anywhere; Admin within their department."""
     ident = require_role(ctx, "super_user", "admin")
     pc_id = int_field(payload, "pc_id")
     pc = await ctx.engine.db.accounts.pc(pc_id)

@@ -15,10 +15,10 @@ issue the owner works: ask the person, delete the copy, allow it here too).
     marks.list        {scope?: mine|department|all}     marks with their copy counts
     marks.get         {mark_id}                         one mark: where it is allowed, its copies, what changing it would do
     marks.keep_effect {mark_id, keep}                   what changing where it is allowed would do to the copies, before doing it
-    marks.change_keep {mark_id, keep}                   change where it is allowed (the owner, or the Super User)
+    marks.change_keep {mark_id, keep}                   change where it is allowed (the owner, or the head of the organisation)
     marks.unmark      {mark_id}                         stop restricting it; its open copy issues close
 
-Only your own files, on your own workstation, can be marked. The Super User reads every mark; an Admin their own and their
+Only your own files, on your own workstation, can be marked. The head of the organisation reads every mark; an Admin their own and their
 department's.
 """
 
@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import in_scope, int_field, kept, require_role, str_field
+from engine.permissions import in_scope, int_field, kept, org_wide, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 if TYPE_CHECKING:
@@ -396,11 +396,11 @@ async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("marks.list")
 async def marks_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"scope"?: "mine" (default) | "department" (an Admin) | "all" (Super User)} -> {"marks": [...], "summary": {marks, files, copies, with_copies}}."""
+    """{"scope"?: "mine" (default) | "department" (an Admin) | "all" (the head of the organisation)} -> {"marks": [...], "summary": {marks, files, copies, with_copies}}."""
     ident = require_role(ctx, "super_user", "admin")
     scope = str_field(payload, "scope", required=False, choices=("mine", "department", "all")) or "mine"
-    if scope == "all" and ident.role != "super_user":
-        raise ProtocolError(ErrorCode.FORBIDDEN, "only the Super User reads every mark")
+    if scope == "all" and not org_wide(ident):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "only someone who reaches every department reads every mark")
     db = ctx.engine.db.marks
     if scope == "mine":
         found = await db.list(by_account_id=ident.account_id)

@@ -11,18 +11,18 @@ The stored shape is the `spec` JSON the concept's rule builder fills in:
     {"trigger"?, "expect"?, "within"?, "reading"?, "limit"?: {"n", "per"}, "who": everyone|workers|admins|machines|depts,
      "depts": "all" | [department ids], "severity"?: critical|high|medium|low, "resp": {"report": bool, "admin": bool, "action": bool, "action_id"?}}
 
-`resp` is what the system does when the rule is broken, chosen by the Super User and nothing more: record it (always), report it to the
-Super User, notify the department's Admin, run an Action. Nothing runs silently.
+`resp` is what the system does when the rule is broken, chosen by the head of the organisation and nothing more: record it (always), report it to the
+the head of the organisation, notify the department's Admin, run an Action. Nothing runs silently.
 
     rules.list     {}                      the built-in (locked) rules and the organisation's, each with this week's deviations
     rules.get      {rule_id}
     rules.library  {}                      the patterns to start from
-    rules.create   {name, shape, ...spec}  Super User
-    rules.update   {rule_id, name?, ...spec}   Super User; not a built-in
-    rules.switch   {rule_id, on}           Super User; not a built-in. Off stops new deviations; old ones stay.
+    rules.create   {name, shape, ...spec}  the head of the organisation
+    rules.update   {rule_id, name?, ...spec}   the head of the organisation; not a built-in
+    rules.switch   {rule_id, on}           the head of the organisation; not a built-in. Off stops new deviations; old ones stay.
     rules.try      {rule_id, within? | limit?}  what a changed limit would have done to the last month's deviations
 
-An Admin reads the same list ("set by the Super User"); they cannot change or switch off an organisation-wide rule.
+An Admin reads the same list ("set by the head of the organisation"); they cannot change or switch off an organisation-wide rule.
 """
 
 from __future__ import annotations
@@ -232,7 +232,7 @@ async def _check_action(ctx: Context, spec: dict[str, Any]) -> None:
 
 @handler("rules.create")
 async def rules_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"name", "shape", ...spec} -> {"rule"}. Super User only; applies to the whole organisation."""
+    """{"name", "shape", ...spec} -> {"rule"}. The head of the organisation only; applies to the whole organisation."""
     ident = require_head(ctx)
     name = " ".join(str_field(payload, "name").split())[:80]
     if not name:

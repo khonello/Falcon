@@ -1,6 +1,6 @@
 """An Admin's own to-dos (the user, 29 Oct 2026; ENGINE-GAPS #17).
 
-Version 1 has no Super User, so what came from them on the Admin's pages became the Admin's own: a line of text, when it is due,
+Version 1 has nobody above the Admins, so what came from them on the Admin's pages became the Admin's own: a line of text, when it is due,
 when it was done. Not a kind of Task -- no checks, no assignee, no seen or ongoing, no verification. Only its owner sees it, adds it,
 ticks it and takes the tick back.
 

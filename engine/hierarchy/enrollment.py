@@ -6,14 +6,14 @@ A newly installed Worker finds the Engine and ASKS; the Engine does not hunt for
                     -> {enrollment_id, code, token, expires_at}
     enroll.wait     {token}                                         -- before the handshake: the machine collects its answer
                     -> {status: pending|confirmed|refused|expired, client_id?, client_key?}   (the key once, ever)
-    enroll.list     {}                                              -- Super User: every waiting request; Admin: those for their department
+    enroll.list     {}                                              -- the head of the organisation: every waiting request; Admin: those for their department
     enroll.confirm  {enrollment_id, code, department_id?, level?}   -- a person confirms, typing the code the machine shows
     enroll.refuse   {enrollment_id}
 
 What it says about itself is a REQUEST, never a grant (propose, never silently resolve): it waits here until a person
 confirms it. Pairing: the machine shows a short code on its own screen and whoever confirms must type it, so a machine
 that is not really in front of someone cannot finish; five wrong codes refuse it. An Admin confirms only Workers in
-their own department; an Admin workstation needs the Super User. The request is audited, rate-limited per address, and
+their own department; an Admin workstation needs the head of the organisation. The request is audited, rate-limited per address, and
 expires after 24 hours. The code is never sent to the people who confirm -- only to the machine that asked.
 """
 
@@ -128,14 +128,14 @@ async def wait(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _visible_department(ctx: Context) -> int | None:
-    """None for the Super User (every request); an Admin's own department for an Admin."""
+    """None for the head of the organisation (every request); an Admin's own department for an Admin."""
     ident = require_role(ctx, "super_user", "admin")
     return own_department(ident)
 
 
 @handler("enroll.list")
 async def listing(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Waiting requests. The Super User sees all of them; an Admin the ones that asked for their department. The code
+    """Waiting requests. The head of the organisation sees all of them; an Admin the ones that asked for their department. The code
     is not in this list: it is on the machine's own screen, and the person confirming types it."""
     return {"requests": rows(await ctx.engine.db.enrollments.pending(department_id=_visible_department(ctx)))}
 

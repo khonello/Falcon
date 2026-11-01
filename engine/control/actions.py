@@ -4,8 +4,8 @@ An Action is atomic: Control (do something) or Monitoring (observe something), e
 own timeout and manual termination, independent of any other Action in the same Event chain.
 Custom is a distinct third category (Admin-authored scripts), never merged into the other two.
 
-This combo lives at the Admin interface. Super User reaches it by traversing into an Admin's
-view, so Super User may *read* and run built-ins here, but cannot author Custom Actions.
+This combo lives at the Admin interface. The head of the organisation reaches it by traversing into an Admin's
+view, so the head of the organisation may *read* and run built-ins here, but cannot author Custom Actions.
 
 `timing`: {"mode": "immediate"} (default) or {"mode": "delayed", "delay_s": N}. Scheduled and
 recurring execution belong to time Events, not to the Action.

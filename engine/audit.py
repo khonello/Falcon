@@ -36,7 +36,7 @@ class AuditTrail:
         actor = (ctx.viewed_by or ctx.identity) if ctx else None
         entry = {
             "at": datetime.now(timezone.utc),
-            # through a held session the handler sees the Admin; the act is still the Super User's
+            # through a held session the handler sees the Admin; the act is still the head of the organisation's
             "actor_account_id": actor.account_id if actor else None,
             "action": action,
             "target_type": target_type,
@@ -90,7 +90,7 @@ class AuditTrail:
         return actor.department_id if actor is not None and actor.role != "super_user" else None
 
     async def _push(self, entry: dict[str, Any]) -> None:
-        """Every event the Engine records goes to the Super User and to the Admins of the department it concerns, as it
+        """Every event the Engine records goes to the head of the organisation and to the Admins of the department it concerns, as it
         happens (the console's live activity). Sentence and kind are worked out here, as the log's own reader does."""
         eng = self.engine
         if eng is None or not eng.connections:

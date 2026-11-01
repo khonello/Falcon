@@ -288,7 +288,7 @@ async def execution_image(ctx: Context, payload: dict[str, Any]) -> dict[str, An
 
 
 async def _execution_in_scope(ctx: Context, execution_id: int) -> dict[str, Any]:
-    """The run's department's Admins and the Super User may see what it returned."""
+    """The run's department's Admins and the head of the organisation may see what it returned."""
     ident = require_role(ctx, "super_user", "admin")
     ex = await ctx.engine.db.control.execution(execution_id)
     if ex is None:
@@ -316,7 +316,7 @@ async def execution_image_get(ctx: Context, payload: dict[str, Any]) -> dict[str
 @handler("control.file_locations")
 async def file_locations(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Before a file action runs: where its file is on each machine. {"find_name"|"find_hash", "pc_ids"?} (default: the
-    caller's department; the Super User's: every machine) -> {"machines": [{pc_id, hostname, status, paths}],
+    caller's department; the head of the organisation's: every machine) -> {"machines": [{pc_id, hostname, status, paths}],
     "found", "missing", "several"} with status "found" (one copy: that machine gets its own path), "missing" (the action
     will report 'not on this machine') or "several" (it will ask to be told the path)."""
     from engine.control.inventory import scope_pcs
@@ -401,7 +401,7 @@ async def dashboard(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
-    # An Admin's view is the department's machines: the Super User's automations that reach it are
+    # An Admin's view is the department's machines: the head of the organisation's automations that reach it are
     # included (read-only), and runs and live executions elsewhere are left out.
     mine = None
     if org_wide(ident):

@@ -3,10 +3,10 @@
 Two strictly distinct categories:
   * Reports (routable): system-generated, auto-categorized by origin -- Resource violation,
     Flow failure, update status, deviation, ...
-  * Views (never routable, Super User-only): meta-information about reports -- who addressed
+  * Views (never routable, head-only): meta-information about reports -- who addressed
     what, when. Kept in `report_addressed_views`, never insertable as a Report row.
 
-Super User always receives every report. Routing is additive: a routed category ALSO reaches
+The head of the organisation always receives every report. Routing is additive: a routed category ALSO reaches
 every Admin in the routed department (the department as a whole, no designated contact).
 
 `emit()` is the single write path every combo uses to raise a report.
@@ -18,7 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, org_wide, require_role, str_field
+from engine.permissions import int_field, org_wide, require_role
 from engine.serialize import rows
 from protocol import ErrorCode, ProtocolError
 
@@ -34,7 +34,7 @@ CATEGORIES = (
     "deviation",
     "about_admin",
 )
-# Never routable: an Admin's own conduct reaches the Super User only; routing it would have the
+# Never routable: an Admin's own conduct reaches the head of the organisation only; routing it would have the
 # department judge its own Admin.
 FIXED_CATEGORIES = frozenset({"about_admin"})
 
@@ -42,7 +42,7 @@ FIXED_CATEGORIES = frozenset({"about_admin"})
 async def emit(engine: Engine, category: str, *, source_table: str, source_id: int,
                summary: str) -> int:
     """Write once, with its sentence; visibility is decided at read time from `report_routing_config`. The push
-    goes to every Super User connection and to Admins of departments the category routes to."""
+    goes to every connection of the head of the organisation and to Admins of departments the category routes to."""
     assert category in CATEGORIES, category
     if not engine.db.connected:
         log.info("REPORT (no db) %s: %s", category, summary)
@@ -69,7 +69,7 @@ async def emit(engine: Engine, category: str, *, source_table: str, source_id: i
 
 @handler("reports.list")
 async def list_reports(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User: everything, unconditionally. Admin: only categories routed to their
+    """The head of the organisation: everything, unconditionally. Admin: only categories routed to their
     department (the routed pane). Workers have no reports. Each row carries its `summary`, when
     this reader first opened it (`seen_at`, theirs alone) and when anyone addressed it."""
     ident = require_role(ctx, "super_user", "admin")
@@ -103,7 +103,7 @@ async def seen(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("reports.mark")
 async def mark(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"report_id": int}. An Admin in a routed department marks a report addressed. Never
-    touches the report row; writes a `report_addressed_views` row (Super User's View)."""
+    touches the report row; writes a `report_addressed_views` row (the head of the organisation's View)."""
     ident = require_role(ctx, "admin")
     report_id = int_field(payload, "report_id")
     db = ctx.engine.db
@@ -117,52 +117,3 @@ async def mark(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                   {"report_id": report_id, "by_account_id": ident.account_id,
                                    "department_id": ident.department_id})
     return {"view_id": view_id}
-
-
-@handler("reports.routing_get")
-async def routing_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    require_role(ctx, "super_user")
-    return {"categories": list(CATEGORIES), "fixed": sorted(FIXED_CATEGORIES),
-            "routing": rows(await ctx.engine.db.reports.routing_config())}
-
-
-@handler("reports.routing_set")
-async def routing_set(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User only. {"category": str, "department_ids": [..], "include_earlier": bool = true}
-    -- sets the routed departments for that category, one category per call; an empty list sends
-    it back to the Super User only. Additive to Super User's own visibility, always.
-
-    `include_earlier` applies to departments added by this call: true, they also see the reports
-    of this category already written (and can address the ones nobody has); false, only reports
-    written from now on. Departments already routed keep what they had. A department removed stops
-    seeing the category; what it addressed stays recorded in the Super User's View."""
-    ident = require_role(ctx, "super_user")
-    category = str_field(payload, "category", choices=CATEGORIES)
-    if category in FIXED_CATEGORIES:
-        raise ProtocolError(ErrorCode.FORBIDDEN, f"{category} reports go to the Super User only and cannot be routed")
-    dept_ids = payload.get("department_ids")
-    if not isinstance(dept_ids, list):
-        raise ProtocolError(ErrorCode.INVALID, "department_ids must be a list")
-    dept_ids = sorted({int(d) for d in dept_ids})
-    include_earlier = payload.get("include_earlier", True)
-    if not isinstance(include_earlier, bool):
-        raise ProtocolError(ErrorCode.INVALID, "include_earlier must be true or false")
-    known = {d["id"] for d in await ctx.engine.db.accounts.list_departments()}
-    if unknown := set(dept_ids) - known:
-        raise ProtocolError(ErrorCode.NOT_FOUND, f"unknown departments {sorted(unknown)}")
-    db = ctx.engine.db
-    changed = await db.reports.set_routing(category, dept_ids, ident.account_id, include_earlier)
-    earlier = await db.reports.earlier_unaddressed(category) if changed["added"] and include_earlier else 0
-    await ctx.engine.audit.record(ctx, "report_routing.set", detail={
-        "category": category, "departments": dept_ids, "added": changed["added"], "removed": changed["removed"],
-        "include_earlier": include_earlier, "earlier_unaddressed": earlier})
-    return {"category": category, "department_ids": dept_ids, **changed, "include_earlier": include_earlier,
-            "earlier_unaddressed": earlier}
-
-
-@handler("reports.addressed_view")
-async def addressed_view(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User only -- the View: who addressed what, when. Refused for every other role,
-    and structurally never a Report."""
-    require_role(ctx, "super_user")
-    return {"addressed": rows(await ctx.engine.db.reports.addressed_views())}

@@ -1,9 +1,9 @@
-"""The fleet and a machine's page (Machines, Overview's fleet map, Registry; the Super User's Departments).
+"""The fleet and a machine's page (Machines, Overview's fleet map, Registry; the head of the organisation's Departments).
 
     machines.list {department_id?}                  every machine in scope, each with its health
     machines.get  {pc_id, range?: 1h|6h|24h|7d}     one machine: facts, four metric series, processes, sessions, files, events
 
-Scope: the Super User sees every machine (or one department's); an Admin their own department's. People are named the way the
+Scope: the head of the organisation sees every machine (or one department's); an Admin their own department's. People are named the way the
 caller names them. "Online" is the machine's client holding a connection now; "using it" is its own person's session.
 """
 

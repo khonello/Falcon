@@ -10,8 +10,8 @@ copy of marked content turns up. So every step a flow takes with a file asks aga
     * before a copy the flow wrote is put away on a mirrored delete
 
 What the flow meets is a BLOCKER: a mark that names the file or a folder above it, a mark whose content this is a copy of, or a restricted/admin tier. When a flow meets one that
-no one has consented to, the flow is PAUSED -- not failed, not left to run -- and the owner of the restriction is asked: the person who marked it (or the Super User); for a tier with
-no mark, the Super User, or the department's Admin for a department's restricted tier. A consent belongs to one flow and one mark (or tier), can expire, can be taken back, and
+no one has consented to, the flow is PAUSED -- not failed, not left to run -- and the owner of the restriction is asked: the person who marked it (or the head of the organisation); for a tier with
+no mark, the head of the organisation, or the department's Admin for a department's restricted tier. A consent belongs to one flow and one mark (or tier), can expire, can be taken back, and
 makes the flow's destination folders a place that content may be, so Restricted does not report the copies there. Nothing is consented to silently: "propose, never silently resolve".
 The copies a consented flow makes are still marked content: a second flow carrying them onward needs its own consent.
 
@@ -153,7 +153,7 @@ async def gate(engine: Engine, flow_id: int, pc_id: int | None, path: str, diges
 def deciders_text(b: Blocker) -> str:
     if permissions.ADMIN_SCOPE == "organisation":                 # version 1: nobody above the Admins
         return "the person who marked it" if b.kind == "mark" else "an Admin"
-    return "the person who marked it, or the Super User" if b.kind == "mark" else "the Super User" if b.tag == "admin" or not b.scope_department_id else "the department's Admin, or the Super User"
+    return "the person who marked it, or the head of the organisation" if b.kind == "mark" else "the head of the organisation" if b.tag == "admin" or not b.scope_department_id else "the department's Admin, or the head of the organisation"
 
 
 async def request(engine: Engine, flow_id: int, missing: list[Blocker], path: str, *, step: str) -> None:
@@ -211,7 +211,7 @@ def install(engine: Engine) -> None:
 
 
 def can_decide(ident: Any, consent: dict[str, Any]) -> bool:
-    """Who may answer: the Super User always; the person who made the mark; for a department's restricted tier, that department's Admin."""
+    """Who may answer: the head of the organisation always; the person who made the mark; for a department's restricted tier, that department's Admin."""
     if ident.role == "super_user":
         return True
     if consent.get("mark_id") is not None:

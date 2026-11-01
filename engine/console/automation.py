@@ -205,7 +205,7 @@ async def actions_runs(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("control.event_test")
 async def event_test(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"event_id", "pc_id"} -- run what the rule does, once, on one machine it applies to. Allowed on a rule you cannot change (the Super User's, seen in an
+    """{"event_id", "pc_id"} -- run what the rule does, once, on one machine it applies to. Allowed on a rule you cannot change (the head of the organisation's, seen in an
     Admin's console): it only runs its actions where you may. Recorded as run by hand, not as the rule firing."""
     ident = require_role(ctx, "super_user", "admin")
     event_id = int_field(payload, "event_id")

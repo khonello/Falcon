@@ -276,7 +276,7 @@ class AccountsRepo(_Repo):
 
     async def create_department(self, name: str, created_by_account_id: int) -> int:
         """A new department starts with every kind of report routed to it but the ones about an Admin (which only the
-        Super User receives): its Admins see what concerns their machines, the Super User still sees everything."""
+        the head of the organisation receives): its Admins see what concerns their machines, the head of the organisation still sees everything."""
         async with self.pool.acquire() as conn, conn.transaction():
             dept_id = await conn.fetchval(
                 "INSERT INTO departments (name, created_by_account_id) VALUES ($1, $2) RETURNING id",
@@ -313,12 +313,12 @@ class AccountsRepo(_Repo):
             hostname, department_id, pc_type, client_id)
 
     async def move_super_user(self, account_id: int, hostname: str, client_id: str) -> tuple[int, int]:
-        """The Super User's account moves to a new machine, all or nothing: (the old pc id, the new pc id). The old machine's key is rotated so it
-        stops being the Super User's at once, and any session it held ends."""
+        """The head of the organisation's account moves to a new machine, all or nothing: (the old pc id, the new pc id). The old machine's key is rotated so it
+        stops being the head of the organisation's at once, and any session it held ends."""
         async with self.pool.acquire() as conn, conn.transaction():
             old = await conn.fetchval("SELECT bound_pc_id FROM accounts WHERE id = $1 AND role = 'super_user' AND status = 'active' FOR UPDATE", account_id)
             if old is None:
-                raise ValueError("not an active Super User bound to a machine")
+                raise ValueError("not an active head of the organisation bound to a machine")
             await conn.execute("UPDATE accounts SET bound_pc_id = NULL WHERE id = $1", account_id)
             new = await conn.fetchval(
                 "INSERT INTO pcs (hostname, department_id, pc_type, client_id) VALUES ($1, NULL, 'super_user_workstation', $2) RETURNING id", hostname, client_id)
@@ -1252,7 +1252,7 @@ class EnrollmentsRepo(_Repo):
 
 
 class DepartmentTasksRepo(_Repo):
-    """Tasks the Super User gives a department (migration 017): no checks, one deadline, a state per Admin told."""
+    """Tasks the head of the organisation gives a department (migration 017): no checks, one deadline, a state per Admin told."""
 
     async def create(self, department_id: int, assigner_id: int, title: str, deadline_at: datetime,
                      admin_ids: list[int]) -> int:
@@ -1691,7 +1691,7 @@ class ReportsRepo(_Repo):
         "(SELECT max(v.addressed_at) FROM report_addressed_views v WHERE v.report_id = r.id) AS addressed_at")
 
     async def all(self, reader_id: int | None = None, limit: int = 500) -> list[dict[str, Any]]:
-        """Super User's view: everything, unconditionally, never filtered by routing."""
+        """The head of the organisation's view: everything, unconditionally, never filtered by routing."""
         return await self._fetch(
             f"SELECT r.*, {self._READER_COLS} FROM reports r ORDER BY r.generated_at DESC LIMIT $2",
             reader_id, limit)
@@ -1720,7 +1720,7 @@ class ReportsRepo(_Repo):
 
     async def set_routing(self, category: str, department_ids: list[int], configured_by: int,
                           includes_earlier: bool = True) -> dict[str, list[int]]:
-        """Set the routed departments for a category (additive to Super User's view). Departments
+        """Set the routed departments for a category (additive to the head of the organisation's view). Departments
         already routed keep their row, so when they were routed and whether they see earlier reports
         stay as they were; `includes_earlier` applies to departments added now. Returns what changed."""
         async with self.pool.acquire() as conn, conn.transaction():
@@ -1753,7 +1753,7 @@ class ReportsRepo(_Repo):
         return [r["routed_department_id"] for r in rows]
 
     async def mark_addressed(self, report_id: int, addressed_by_account_id: int) -> int:
-        """Writes the Super-User-only View row. The report itself is untouched."""
+        """Writes the head-only View row. The report itself is untouched."""
         return await self._val(
             "INSERT INTO report_addressed_views (report_id, addressed_by_account_id) VALUES ($1, $2) RETURNING id",
             report_id, addressed_by_account_id)
@@ -1839,7 +1839,7 @@ class RegistryRepo(_Repo):
 
 
 class DecisionsRepo(_Repo):
-    """The Super User's answers to decisions that are theirs alone (keep waiting; it was expected), so a card does not return at once."""
+    """The head of the organisation's answers to decisions that are theirs alone (keep waiting; it was expected), so a card does not return at once."""
 
     async def record(self, key: str, option: str, note: str | None, by_account_id: int, until_at: datetime | None = None) -> int:
         return await self._val(
@@ -2186,9 +2186,9 @@ class ControlRepo(_Repo):
             "WHERE a.archived_at IS NULL AND c.department_id = $1 ORDER BY a.action_kind, a.id", department_id)
 
     async def events_in_department(self, department_id: int, *, enabled_only: bool = False) -> list[dict[str, Any]]:
-        """The department's own automations, and the Super User's organisation-wide ones that reach
+        """The department's own automations, and the organisation-wide ones that reach
         it: no machine list (every PC), or a list naming at least one of its machines. `org_wide`
-        marks the Super User's, which the department may see but not change."""
+        marks the head of the organisation's, which the department may see but not change."""
         return await self._fetch(
             "SELECT e.*, (c.role = 'super_user') AS org_wide FROM event_definitions e "
             "JOIN accounts c ON c.id = e.created_by_account_id "
@@ -2577,7 +2577,7 @@ class AlertsRepo(_Repo):
         return await self._one("SELECT * FROM system_alerts WHERE id = $1", alert_id)
 
     async def sent(self, created_by: int | None, limit: int = 100) -> list[dict[str, Any]]:
-        """What was sent (and scheduled, and withdrawn): one person's own, or everything when `created_by` is None (the Super User's view)."""
+        """What was sent (and scheduled, and withdrawn): one person's own, or everything when `created_by` is None (the head of the organisation's view)."""
         return await self._fetch(
             "SELECT * FROM system_alerts WHERE ($1::int IS NULL OR created_by_account_id = $1) ORDER BY created_at DESC, id DESC LIMIT $2", created_by, limit)
 

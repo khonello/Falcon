@@ -4,7 +4,7 @@
     explicit None -> create (active) -> start (assignee; in_progress) -> [expectation signals,
     stack status] -> verify (assigner, manual, whole task) -> completed | stays open
 
-Scope: Super User assigns to an Admin (department-level); Admin assigns to a Worker in their
+Scope: the head of the organisation assigns to an Admin (department-level); Admin assigns to a Worker in their
 own department (Client-PC-level). The assignee (Client) can view, start, and watch -- never
 verify.
 
@@ -262,7 +262,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("task.list")
 async def list_tasks(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Tasks the caller assigned or is assigned; an Admin also sees their department's;
-    Super User sees all. {"include_completed": bool}"""
+    The head of the organisation sees all. {"include_completed": bool}"""
     ident = require_account(ctx)
     include = bool(payload.get("include_completed", False))
     db = ctx.engine.db

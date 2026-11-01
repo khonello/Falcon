@@ -11,6 +11,7 @@ lives here. No package includes this folder (`pyproject.toml` finds `engine*`, `
 | `engine/task/dept_tasks.py` | `engine/task/` (and `engine/task/__init__.py`, `Engine.start`'s `reschedule_all`) | Department tasks: `task.dept_*` |
 | `engine/hierarchy/handover.py` | `engine/hierarchy/` (and `__init__.py`, `Engine.__init__`'s `reset_state`, `enroll.request`'s `super_user` level) | Moving the Super User to another machine: `handover.*` |
 | `engine/console/overview_decisions.py` | the end of the helpers in `engine/console/overview.py` | `overview.queue`, `overview.decide`, `overview.su` |
+| `engine/cut_handlers.py` | each block names its file (`engine/hierarchy/reports.py`, `engine/hierarchy/accounts.py`) | `reports.routing_get`, `reports.routing_set`, `reports.addressed_view`, `hierarchy.admin_limit` (parked 1 Nov 2026, with their tests) |
 | `engine/bootstrap.py` | `engine/__main__.py`, called by `first_account` when the scope is `department` | The first Super User at setup |
 | `operator_client/tui/commands/dept_tasks.py` | `operator_client/tui/commands/` (and its `__init__.py`) | `dtask`, `dtasks` |
 | `operator_client/tui/commands/cut_commands.py` | each block names its file | `handover *`, `decisions`, `decide`, `admin limit`, `routing *`, `addressed`, the Super User's `overview`, `--handover-join` |
@@ -25,8 +26,8 @@ lives here. No package includes this folder (`pyproject.toml` finds `engine*`, `
   `FALCON_ADMIN_SCOPE=department`; in version 1 (`organisation`, the default) an account of that role is refused at sign-in
   (`engine.permissions.signs_in`) and setup never makes one.
 - `engine.permissions.require_head`: whoever heads the organisation. Any Admin in version 1, the Super User under `department`.
-- Handlers only the Super User may call (`reports.routing_*`, `reports.addressed_view`, `hierarchy.admin_limit`) stay registered; no
-  account can reach them in version 1.
+- The Engine's comments and docstrings name the role "the head of the organisation" (what `require_head` means), not by its name. Its
+  branches in code (`role == "super_user"`) stay: they run only under `department`.
 - The installers have no Super User role; the first IT Admin's console takes the id and key setup printed (`--role admin --client-id`).
 
 ## Reconnecting

@@ -86,13 +86,13 @@ async def dispatch(ctx: Context, message_type: str, payload: dict[str, Any]) -> 
     if message_type in VIEWED_AS_TRAVERSED and payload.get(VIEW_KEY) == VIEW_SESSION:
         viewed = await viewing_identity(ctx)
         if viewed is not None:
-            # a copy: the connection's own ctx keeps the Super User, so nothing leaks past this read
+            # a copy: the connection's own ctx keeps the head of the organisation, so nothing leaks past this read
             ctx = replace(ctx, identity=viewed, viewed_by=ctx.identity)
     return await fn(ctx, payload)
 
 
 async def viewing_identity(ctx: Context) -> Identity | None:
-    """The Admin a Super User is looking through, or None. Only a Super User, only a traversal, only
+    """The Admin the head of the organisation is looking through, or None. Only the head of the organisation, only a traversal, only
     into a workstation bound to an active Admin -- anything else is answered as the caller."""
     ident = ctx.identity
     db = ctx.engine.db

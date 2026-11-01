@@ -1,13 +1,13 @@
 """Update & deployment model (spec 9).
 
-  * Super User approves version N+1 -- hard gate: every PC must be confirmed on N first.
+  * the head of the organisation approves version N+1 -- hard gate: every PC must be confirmed on N first.
   * Rollout cascades: Admins execute it within their own departments (worker clients are told
     to update; they retry on idle by themselves).
   * One-step-back compatibility: N supports N-1 only; a PC on N-1 mid-rollout is fully normal.
   * Failed attempts are retried by the client when idle; past a threshold (open item 10.4,
     count-based here and tunable via FALCON_UPDATE_ESCALATION_FAILURES) the failure escalates
     to that PC's Admin as an actionable notice and an 'update_status' report.
-  * Super User sees an aggregate rollout-health view grouped by department, never per-PC
+  * the head of the organisation sees an aggregate rollout-health view grouped by department, never per-PC
     noise -- and can prompt an Admin whose department looks stalled.
 """
 
@@ -36,7 +36,7 @@ log = logging.getLogger(__name__)
 
 
 def _behind_view(rows_: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    # `failures` is how many attempts have been made and lost: what a Super User reads to tell a
+    # `failures` is how many attempts have been made and lost: what the head of the organisation reads to tell a
     # machine that is retrying from one that has given up. A PC with no status row has made none.
     return rows([{"pc_id": r["id"], "hostname": r["hostname"], "department_id": r["department_id"],
                   "current_version_id": r["current_version_id"],
@@ -53,7 +53,7 @@ async def current(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("updates.approve")
 async def approve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User only. {"version": "1.2.0"}. Refused while any PC is not confirmed on the
+    """The head of the organisation only. {"version": "1.2.0"}. Refused while any PC is not confirmed on the
     current version -- the system never has more than N and N+1 in flight."""
     ident = require_head(ctx)
     version = str_field(payload, "version")
@@ -97,7 +97,7 @@ async def approve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("updates.rollout_department")
 async def rollout_department(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Admin executes the approved rollout for their own department (Super User may too).
+    """Admin executes the approved rollout for their own department (the head of the organisation may too).
     {"department_id"?} -- targets every PC in the department not yet on the current version."""
     ident = require_role(ctx, "super_user", "admin")
     department_id = int_field(payload, "department_id", required=org_wide(ident)) or ident.department_id
@@ -182,7 +182,7 @@ async def report_status(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 
 @handler("updates.rollout_health")
 async def rollout_health(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User: aggregate by department. Admin: their own department plus its PCs behind."""
+    """The head of the organisation: aggregate by department. Admin: their own department plus its PCs behind."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     cur = await db.updates.current_version()
@@ -191,14 +191,14 @@ async def rollout_health(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
     if kept(ident):
         health = [h for h in health if h["department_id"] == ident.department_id]
         behind = [b for b in behind if b["department_id"] == ident.department_id]
-    # Super User sees every PC that is behind, not only the per-department totals: the fleet is
+    # The head of the organisation sees every PC that is behind, not only the per-department totals: the fleet is
     # what the N+1 gate is actually held on, so it is drawn one square per PC.
     return {"version": row(cur), "departments": rows(health), "pcs_behind": _behind_view(behind)}
 
 
 @handler("updates.prompt_admin")
 async def prompt_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User's second lever: nudge a department's Admins whose rollout looks stalled.
+    """The head of the organisation's second lever: nudge a department's Admins whose rollout looks stalled.
     {"department_id", "message"?}"""
     require_head(ctx)
     department_id = int_field(payload, "department_id")

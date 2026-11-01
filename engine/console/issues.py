@@ -14,12 +14,12 @@ A help request is not an issue: it is a ping, and lives in Messages.
     issues.get     {issue_id}                                  -> the issue, what it means, its facts, what can be done, its timeline
     issues.act     {issue_id, key, reason?, message?, pick?}   -> do one of the things `issues.get` offered
     issues.assign  {issue_id, account_id?}                     -> take it (no account: yourself), give it, or hand it back (null)
-    issues.escalate{issue_id, note?}                           -> an Admin sends it up to the Super User
+    issues.escalate{issue_id, note?}                           -> an Admin sends it up to the head of the organisation
     issues.note    {issue_id, text}                            -> add a line to its timeline
 
-Scope: the Super User sees every issue; an Admin their own department's. Owner: the one person named when it is raised (a
+Scope: the head of the organisation sees every issue; an Admin their own department's. Owner: the one person named when it is raised (a
 file's marker, a flow's destination owner), else the department's only Admin, else nobody -- unassigned, any Admin of the
-department may take it. A department with no Admin escalates to the Super User, who then owns it.
+department may take it. A department with no Admin escalates to the head of the organisation, who then owns it.
 
 Severity of a file copy: **critical** when it left the original's department, **high** when it is on another machine in the same
 department (or an unmarked restricted file), **medium** when it is another place on the same machine.
@@ -58,7 +58,7 @@ OFFLINE_MEDIUM_AFTER = timedelta(hours=24)
 # --- raising and resolving (called by the combos that record the causes) --------------------------
 
 async def _default_owner(engine: Engine, department_id: int | None) -> tuple[int | None, bool]:
-    """(owner, escalated): the department's only Admin owns it; with several it is unassigned; with none it goes to the Super User.
+    """(owner, escalated): the department's only Admin owns it; with several it is unassigned; with none it goes to the head of the organisation.
     When Admins are IT (version 1) every issue starts unassigned, for any Admin to Take; nothing escalates (there is nobody above)."""
     from engine import permissions
 
@@ -158,7 +158,7 @@ async def _view(ctx: Context, found: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def _is_mine(i: dict[str, Any], ident: Any) -> bool:
-    """Waiting on this person: theirs, or nobody's in their department (an Admin); the Super User's: escalated to them."""
+    """Waiting on this person: theirs, or nobody's in their department (an Admin); the head of the organisation's: escalated to them."""
     if i["state"] == "resolved":
         return False
     if ident.role == "super_user":
@@ -168,7 +168,7 @@ def _is_mine(i: dict[str, Any], ident: Any) -> bool:
 
 @handler("issues.list")
 async def issues_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"department_id"? (Super User), "pc_id"?, "type"?, "owner"?: "me"|"unassigned"|<account_id>} -> {"issues": [...], "summary": {...}}.
+    """{"department_id"? (the head of the organisation), "pc_id"?, "type"?, "owner"?: "me"|"unassigned"|<account_id>} -> {"issues": [...], "summary": {...}}.
     Open and waiting issues, worst first, and those resolved today (so *Done today* can be shown). summary: open, waiting,
     past_target, done_today, mine (waiting on this person), by_type, by_severity."""
     ident = require_role(ctx, "super_user", "admin")
@@ -275,7 +275,7 @@ async def issues_act(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("issues.assign")
 async def issues_assign(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"issue_id", "account_id"?}: no account takes it yourself; an Admin of the department (the Super User: any Admin) may be
+    """{"issue_id", "account_id"?}: no account takes it yourself; an Admin of the department (the head of the organisation: any Admin) may be
     given it; `null` hands it back (unassigned)."""
     ident = ctx.identity
     issue = await _load(ctx, int_field(payload, "issue_id"))
@@ -302,7 +302,7 @@ async def issues_assign(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 
 @handler("issues.escalate")
 async def issues_escalate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """An Admin sends an issue up: it becomes the Super User's (unassigned in the department, escalated)."""
+    """An Admin sends an issue up: it becomes the head of the organisation's (unassigned in the department, escalated)."""
     ident = require_role(ctx, "admin")
     if org_wide(ident):                                   # version 1: nobody is above the Admins; another Admin takes it
         raise ProtocolError(ErrorCode.CONFLICT, "there is nobody to send it up to: give it to another Admin")
@@ -313,7 +313,7 @@ async def issues_escalate(ctx: Context, payload: dict[str, Any]) -> dict[str, An
     note = str_field(payload, "note", required=False) or ""
     await db.issues.escalate(issue["id"], None)
     await db.issues.set_state(issue["id"], issue["state"], "Escalated")
-    await db.issues.log(issue["id"], "escalated", "Sent up to the Super User" + (f": {note}" if note else ""), ctx.identity.account_id)
+    await db.issues.log(issue["id"], "escalated", "Sent up to the head of the organisation" + (f": {note}" if note else ""), ctx.identity.account_id)
     await ctx.engine.audit.record(ctx, "issue.escalated", target_type="issues", target_id=issue["id"], pc_id=issue["pc_id"],
                                   detail={"code": issue["code"], "department_id": issue["department_id"]})
     await ctx.engine.push_to_role("super_user", "issue.escalated", {"issue_id": issue["id"], "code": issue["code"], "title": issue["title"]})

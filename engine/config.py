@@ -30,7 +30,7 @@ class Settings:
     traversal_limit_minutes: int = 30
     traversal_extension_minutes: int = 15
     # Working hours, local time on the Engine host: an Admin entering a machine outside them is reported to the
-    # Super User only (report category about_admin).
+    # The head of the organisation only (report category about_admin).
     working_hours: str = "06:00-18:00"
     # Entering a machine whose client is not connected is refused (Hierarchy -> traversal).
     refuse_unreachable: bool = True

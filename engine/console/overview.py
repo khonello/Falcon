@@ -1,16 +1,16 @@
-"""The Overviews and the Reports page's figures (Overview for both levels, Reports > Handling, the Super User's decisions).
+"""The Overviews and the Reports page's figures (Overview for both levels, Reports > Handling, the head of the organisation's decisions).
 
     reports.board     {days?, department_id?}   reports with where they came from, who may take them, who addressed them and how fast;
                                                 the strip (waiting, with the department, addressed, typical time) and per-department handling
-    overview.queue    {}                        Super User: what only they can decide -- reports nobody below them can take, a department with
+    overview.queue    {}                        the head of the organisation: what only they can decide -- reports nobody below them can take, a department with
                                                 no Admin, a department's work called done -- each with the options and their effects
-    overview.decide   {decision, option, ...}   Super User: carry out one option of one decision
-    overview.su       {}                        Super User: the four figures, deviations by day and severity, Worth a look
+    overview.decide   {decision, option, ...}   the head of the organisation: carry out one option of one decision
+    overview.su       {}                        the head of the organisation: the four figures, deviations by day and severity, Worth a look
     overview.admin    {}                        Admin: Waiting on you (with their own to-dos due within a day), machines online, open issues, sessions held
     overview.departments {}                     one row per department (an Admin gets their own): Admins, machines, issues, version, time to address
 
-A report is the Super User's to take when nobody below them can: it is about an Admin (never routed), its department has no Admin, or its
-category is not routed to its department. Everything else is the department's, and the Super User only watches how fast it goes.
+A report is the head of the organisation's to take when nobody below them can: it is about an Admin (never routed), its department has no Admin, or its
+category is not routed to its department. Everything else is the department's, and the head of the organisation only watches how fast it goes.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def _median(values: list[float]) -> int | None:
 
 
 def owner_of(report: dict[str, Any], admin_depts: set[int], routed: set[tuple[str, int]]) -> str:
-    """Whose a report is: the department's ('dept'), or the Super User's because it is about an Admin ('fixed'), its department has no
+    """Whose a report is: the department's ('dept'), or the head of the organisation's because it is about an Admin ('fixed'), its department has no
     Admin ('noadmin'), or its category is not routed there ('unrouted')."""
     if report["category"] in FIXED_CATEGORIES:
         return "fixed"
@@ -99,7 +99,7 @@ def _handling(department: dict[str, Any], reports: list[dict[str, Any]], has_adm
 
 @handler("reports.board")
 async def board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"days"?: 7, "department_id"?} -> {"reports", "strip", "handling", "categories"}. The Super User sees every report, each marked with
+    """{"days"?: 7, "department_id"?} -> {"reports", "strip", "handling", "categories"}. The head of the organisation sees every report, each marked with
     whose it is; an Admin the ones routed to their department (all theirs)."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
@@ -161,7 +161,7 @@ async def overview_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
 @handler("overview.departments")
 async def overview_departments(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """One row per department (an Admin gets only their own), most in need first: no Admin, something critical, reports that come to the
-    Super User, something high, the rest. Median time to address is read from the issues resolved in the last 30 days."""
+    the head of the organisation, something high, the rest. Median time to address is read from the issues resolved in the last 30 days."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     now = _now()

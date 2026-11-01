@@ -11,8 +11,8 @@ The combos tell this module what happened; it decides whether a rule was broken 
     the line (once per period).
 
 A deviation says what was expected and what happened; the people it names are held as ids and named for whoever reads it (`{who}` in the
-text), because a name is the reader's own (Display Names never propagate). Whatever the rule says to do about it -- report it to the Super
-User, tell the department's Admin, run an Action -- is done here and nothing else runs silently.
+text), because a name is the reader's own (Display Names never propagate). Whatever the rule says to do about it -- report it to the head of
+the organisation, tell the department's Admin, run an Action -- is done here and nothing else runs silently.
 """
 
 from __future__ import annotations

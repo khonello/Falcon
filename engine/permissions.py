@@ -39,14 +39,14 @@ def relationship(requester_role: str | None, other_role: str | None) -> str:
 
 
 # Who an Admin answers for (docs/design/v1-it-admin.md). "organisation" (version 1): the Admins are IT and reach every department, which is a
-# label for grouping, not a wall. "department": an Admin reaches only their own (the full design, kept for when the Super User returns).
+# label for grouping, not a wall. "department": an Admin reaches only their own (the full design, kept for when the role above the Admins returns).
 # Set from Settings.admin_scope when the Engine starts.
 ADMIN_SCOPES = ("organisation", "department")
 ADMIN_SCOPE = "organisation"
 
 
 def org_wide(ident: Identity) -> bool:
-    """Does this caller reach every department? The Super User always; an Admin when Admins are IT (version 1)."""
+    """Does this caller reach every department? The head of the organisation always; an Admin when Admins are IT (version 1)."""
     return ident.role == "super_user" or (ident.role == "admin" and ADMIN_SCOPE == "organisation")
 
 
@@ -78,7 +78,7 @@ def in_scope(ident: Identity, department_id: int | None) -> bool:
 
 
 def require_department_scope(ident: Identity, department_id: int | None) -> None:
-    """The Super User, and an Admin when Admins are IT, reach every department; otherwise an Admin only their own."""
+    """The head of the organisation, and an Admin when Admins are IT, reach every department; otherwise an Admin only their own."""
     if not in_scope(ident, department_id):
         raise ProtocolError(ErrorCode.FORBIDDEN, "outside your department")
 

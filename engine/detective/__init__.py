@@ -2,8 +2,8 @@
 
 It listens to every file event (create, change, move, copy, delete, hidden/visible, permissions) and to the drive signals, turns each into a `Sig`, asks the
 context (is it Falcon's own work? is it restricted? does a task cover it? is the drive familiar?) and feeds the detector. A case that grows is saved; one that
-crosses into "case" is raised: the Super User is told, and so is the Admin of the department when it is a department machine. Admin machines are the Super
-User's alone to see. It runs by itself: nothing triggers it and the person at the machine is not told.
+crosses into "case" is raised: the head of the organisation is told, and so is the Admin of the department when it is a department machine. Admin machines are the head of
+the organisation's alone to see. It runs by itself: nothing triggers it and the person at the machine is not told.
 
     detective.cases     {include_noted?, status?}         the cases this person may see, strongest first
     detective.case      {case_id}                         one case: the story, each finding with its evidence, what would make it innocent
@@ -347,7 +347,7 @@ async def _save(engine: Engine, u: Update) -> None:
         payload = {"case_id": case.id, "intent": case.intent, "level": case.level, "pc_id": case.pc, "host": (pc or {}).get("hostname"), "not_yet": case.not_yet()}
         await engine.announce("case.raised", {**payload, "behaviours": sorted(case.behaviours), "weight": round(case.weight, 2)}, source="system", pc=case.pc)
         await engine.push_to_role("super_user", "detective.raised", payload)
-        if pc and pc["pc_type"] == "client_pc" and department_id is not None:                 # an Admin's own machine is the Super User's alone
+        if pc and pc["pc_type"] == "client_pc" and department_id is not None:                 # an Admin's own machine is the head of the organisation's alone
             await engine.push_to_role("admin", "detective.raised", payload, department_id=department_id)
 
 

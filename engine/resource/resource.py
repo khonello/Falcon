@@ -1,7 +1,7 @@
 """Resource tiers and compliance (Resource -> Folder Structure, Access Control Rules,
 Restricted File Tracking, Compliance & Enforcement).
 
-    Super User PC   /resources/{admin,restricted,common}
+    The head of the organisation's PC   /resources/{admin,restricted,common}
     Admin PC        /resources/{restricted,workers,common}
     Worker PC       /resources/            (flat)
 
@@ -249,7 +249,7 @@ async def ignored_files(engine: Engine, pc_id: int) -> set[int]:
 
 @handler("resource.violations")
 async def violations(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Super User: all; Admin: own department; Worker: those surfaced to them.
+    """The head of the organisation: all; Admin: own department; Worker: those surfaced to them.
     {"include_resolved": bool}"""
     ident = require_account(ctx)
     unresolved_only = not payload.get("include_resolved", False)
@@ -266,7 +266,7 @@ async def violations(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("resource.shelves")
 async def shelves(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """The tiers the caller keeps (their workstation's tier folders, schema RS) with how many files sit on
-    each -- the Resources page's shelves. Admin: across their department; Super User: everywhere."""
+    each -- the Resources page's shelves. Admin: across their department; the head of the organisation: everywhere."""
     ident = require_role(ctx, "super_user", "admin")
     pc_type = "super_user_workstation" if ident.role == "super_user" else "admin_workstation"
     counts = {r["tag"]: r["files"] for r in await ctx.engine.db.file_index.tier_counts(
@@ -277,7 +277,7 @@ async def shelves(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("resource.resolve")
 async def resolve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"violation_id"} -- the affected user (or their Admin / Super User) marks it rectified;
+    """{"violation_id"} -- the affected user (or their Admin / the head of the organisation) marks it rectified;
     the file stops being ignored. If the copy is still there, the next event re-flags it."""
     ident = require_account(ctx)
     violation_id = int_field(payload, "violation_id")
@@ -298,8 +298,8 @@ async def resolve(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("resource.tag")
 async def tag(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"file_index_id", "tag", "scope_department_id"?} -- an Admin (own department) or Super
-    User classifies a file explicitly, e.g. one that lives outside a tier folder."""
+    """{"file_index_id", "tag", "scope_department_id"?} -- an Admin (own department) or the head of
+    the organisation classifies a file explicitly, e.g. one that lives outside a tier folder."""
     ident = require_role(ctx, "super_user", "admin")
     file_index_id = int_field(payload, "file_index_id")
     new_tag = str_field(payload, "tag", choices=TAGS)

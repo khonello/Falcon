@@ -8,7 +8,7 @@ on that machine, instead of being typed. The Worker reports both (`control.inven
                   refilled within a minute by the Workers)
   * installed  -- the latest list per machine, kept in `pc_programs`
 
-Scope as everywhere: an Admin sees their department's machines, the Super User every machine (or the ones named).
+Scope as everywhere: an Admin sees their department's machines, the head of the organisation every machine (or the ones named).
 """
 
 from __future__ import annotations
@@ -116,7 +116,7 @@ def _by_name(per_pc: dict[int, list[dict[str, Any]]]) -> list[dict[str, Any]]:
 
 @handler("control.programs")
 async def programs(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"pc_ids"?} (default: the caller's department; the Super User's: every machine).
+    """{"pc_ids"?} (default: the caller's department; the head of the organisation's: every machine).
     -> {"running": [{name, machines, pc_ids}], "installed": [{name, machines, pc_ids, command}], "reporting": n}.
     `reporting` is how many of the machines in scope have reported what runs since the Engine started."""
     scope = await scope_pcs(ctx, payload)

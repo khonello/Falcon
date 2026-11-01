@@ -1,6 +1,6 @@
 """Control, Events, Monitoring & Actions (control-events-monitoring-actions-combo.md; spec 7.5).
 
-The automation layer. Lives at the Admin interface; Super User traverses in.
+The automation layer. Lives at the Admin interface; the head of the organisation traverses in.
 
     actions        -- the action library: Control (do), Monitoring (observe), Custom (Admin-authored)
     events         -- Event definitions; native/pushed matched from worker-client signals, polled/evaluated

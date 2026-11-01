@@ -184,7 +184,7 @@ async def describe(db: Any, entry: dict[str, Any], viewer_account_id: int | None
 
 
 def _scope(ident: Any, payload: dict[str, Any]) -> int | None:
-    """The department a reader is limited to: an Admin's own, or the one a Super User asks for (None: all)."""
+    """The department a reader is limited to: an Admin's own, or the one the head of the organisation asks for (None: all)."""
     if kept(ident):
         return ident.department_id
     return int_field(payload, "department_id", required=False)
@@ -219,7 +219,7 @@ def _kinds(payload: dict[str, Any]) -> list[str] | None:
 
 @handler("audit.events")
 async def events(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"since"?, "until"?, "kinds"?:[..], "pc_id"?, "department_id"? (Super User), "actor_account_id"?, "before_id"?,
+    """{"since"?, "until"?, "kinds"?:[..], "pc_id"?, "department_id"? (the head of the organisation), "actor_account_id"?, "before_id"?,
     "limit"? (500 at most)} -> {"events": [{id, at, kind, actor, what, pc_id, host}], "more": bool}, newest first. An Admin sees
     the events that concern their own department's machines or were made by their own people."""
     ident = require_role(ctx, "super_user", "admin")

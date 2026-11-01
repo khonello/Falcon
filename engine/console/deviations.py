@@ -1,4 +1,4 @@
-"""Accountability: the deviations (the Super User's Accountability page, Overview's *Worth a look*).
+"""Accountability: the deviations (the head of the organisation's Accountability page, Overview's *Worth a look*).
 
 A deviation is a departure from a rule that someone can be asked about: the rule **as it was when it happened**, what was expected and what
 happened, who or what it concerns, the timeline around it, the evidence the record shows -- and an outcome a person gives it. The system
@@ -9,7 +9,7 @@ makes it an explanation.
     deviations.get     {deviation_id}                          the record, its timeline and its evidence
     deviations.outcome {deviation_id, outcome, note?}          explained / accepted (a note is required) / escalated / dismissed / open
 
-Super User only: Accountability is the Super User's page. An Admin sees the rules ("set by the Super User") but not the deviations about them.
+The head of the organisation only: Accountability is the head of the organisation's page. An Admin sees the rules ("set by the head of the organisation") but not the deviations about them.
 """
 
 from __future__ import annotations

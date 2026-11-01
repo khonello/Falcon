@@ -1,6 +1,6 @@
 """Display Names (Hierarchy -> Display Names; schema `display_name_grants`).
 
-Naming is strictly top-down and NEVER propagates between relationship layers: what Super User
+Naming is strictly top-down and NEVER propagates between relationship layers: what the head of the organisation
 privately calls an Admin is invisible to that Admin's Workers, who see only the Admin's own
 self-facing name -- or a composed fallback built from existing identifiers.
 
