@@ -51,6 +51,10 @@ async def test_a_leak_on_a_department_machine_is_raised_kept_and_seen_by_the_rig
     kinds = {f["behaviour"] for f in detail["findings"]}
     assert kinds >= {"concealment", "collection", "exfiltration", "erasure"}
     assert all(f["innocent"] and f["evidence"] for f in detail["findings"])
+    # At a glance (ENGINE-GAPS #16): how far it got, restricted involved, who was signed in when it began, earlier cases here, when raised
+    glance = detail["glance"]
+    assert glance["stage"] == c["stage_name"] and glance["stage_count"] == 4 and glance["restricted"] is True and glance["raised_at"]
+    assert glance["earlier"] == [] and isinstance(glance["signed_in_then"], list) and glance["lasted_s"] >= 0
     assert (await su.ok("detective.overview", {}))["by_intent"] == {"Taking data out": 1}
     audited = [r["action_type"] for r in await engine.db.pool.fetch("SELECT action_type FROM audit_log WHERE action_type LIKE 'detective.%'")]
     assert "detective.raised" in audited

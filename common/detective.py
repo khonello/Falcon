@@ -948,7 +948,12 @@ class Detective:
             return None
         lineage = m.lineage.get(s.thing or s.path, set())
         lineage_restricted = self._restricted(s) or any(("restricted" in x.tags and "own_scope" not in x.tags) for x in m.since(s.at - 3600) if (x.thing or x.path) in lineage)
-        w, why = (0.45 if lineage_restricted else 0.30) * kind_factor(s.path, s.tags if lineage_restricted else frozenset()), [f"{s.name} was put on a removable drive"]
+        # The weight is what was carried: restricted content in full, work from outside the person's role less, ordinary files little (the drive itself adds nothing).
+        outside = "outside_role" in s.tags or any("outside_role" in x.tags for x in m.since(s.at - 3600) if (x.thing or x.path) in lineage)
+        base = 0.45 if lineage_restricted else 0.30 if outside else 0.18
+        w, why = base * kind_factor(s.path, s.tags if lineage_restricted else frozenset()), [f"{s.name} was put on a removable drive"]
+        if outside and not lineage_restricted:
+            why.append("files from outside this person's work")
         if is_archive(s.path):
             w += 0.10
             why.append("an archive")
@@ -1188,21 +1193,28 @@ class Detective:
         if any("task_expected" in e.tags for e in f.evidence):
             w = cut(w, 0.45)
             f.why.append("a task asks for exactly this")
+        # What was carried weighs, not the drive (the user, 29 Oct 2026; ENGINE-GAPS #16): an exception for a drive, a program or a folder, and a drive
+        # the machine knows well, let ordinary files pass; restricted files still count in full. A drive new to the machine is shown, never weighed.
+        carries_restricted = any("restricted" in e.tags and "own_scope" not in e.tags for e in f.evidence) or any("restricted" in x for x in f.why)
         if (said := self.ctx.ruled(s.pc, f)):
-            w = cut(w, 0.45)
-            f.why.append(said)
+            if carries_restricted:
+                f.why.append(f"{said}, but not for restricted files")
+            else:
+                w = cut(w, 0.45)
+                f.why.append(said)
         dev = next((d for e in f.evidence for d in ((e.device,) if e.verb == "attached" else (_on_external(mem, e.path),)) if d), "")
         if dev and any(self.ctx.allowed(s.pc, t, dev) for t in f.things):
             w = cut(w, 0.45)
             f.why.append("recorded as allowed there")
         if dev:
             uses = self.ctx.device_uses(s.pc, dev)
-            if uses >= 3:
+            if uses >= 3 and not carries_restricted:
                 w = cut(w, 0.35)
                 f.why.append(f"a drive this machine has used {uses} times")
-            elif uses == 0 and f.behaviour == "exfiltration" and not any("a task covers" in x for x in f.why):
-                w = lift(w, 0.10)
-                f.why.append("a drive this machine has not seen before")
+            elif uses >= 3:
+                f.why.append(f"a drive this machine has used {uses} times, which does not lessen restricted files")
+            elif uses == 0 and f.behaviour == "exfiltration":
+                f.why.append("a drive this machine has not seen before (shown, not weighed)")
         mover = next((e.program for e in f.evidence if e.program and any(p in e.program.lower() for p in USUAL_MOVERS)), "")
         if mover:
             w = cut(w, 0.35)

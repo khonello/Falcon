@@ -82,12 +82,6 @@ Page {
             none: false, checks: checks
         }
         var out = [one]
-        ;(r.proposed_split || []).slice(1).forEach(function (s) {
-            var phrase = typeof s === "string" ? s : (s.text || s.description || "")
-            out.push({ title: phrase.slice(0, 80), titleSrc: "rule", phrase: phrase, who: one.who, whoAccount: one.whoAccount, whoSrc: "rule",
-                       final: one.final, finalSrc: one.finalSrc, soft: null, softSrc: "none", none: false, checks: [] })
-        })
-        if (out.length > 1 && (r.proposed_split || [])[0]) { var p0 = r.proposed_split[0]; out[0].phrase = typeof p0 === "string" ? p0 : (p0.text || p0.description || one.phrase) }
         tasks = out
         cur = 0
     }

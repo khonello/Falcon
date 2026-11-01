@@ -99,6 +99,7 @@ def reset_state() -> None:
     _last_sampled.clear()
     _last_fired.clear()
     _threshold_since.clear()
+    _days_written.clear()
 
 
 def outcome_of(ex: dict[str, Any]) -> str:
@@ -492,6 +493,33 @@ async def signal_interest(ctx: Context, payload: dict[str, Any]) -> dict[str, An
     return {"interest": await interest_for_pc(ctx.engine, ident.pc_id)}
 
 
+IN_USE_IDLE_S = 60.0                      # input within the last minute: someone is at the keyboard
+# pc_id -> (day, quarter) last written to pc_days, so a report every 15 s writes once a quarter hour, not every time
+_days_written: dict[int, tuple[Any, int | None]] = {}
+
+
+def quarter_of(now: datetime) -> tuple[Any, int]:
+    """The Engine host's local day and quarter hour (0-95)."""
+    local = now.astimezone()
+    return local.date(), local.hour * 4 + local.minute // 15
+
+
+async def check_in(engine: Any, pc_id: int, *, in_use: bool = False) -> None:
+    """The machine reached the Engine today (and, if `in_use`, someone used it this quarter hour): one write per change."""
+    if not engine.db.connected:
+        return
+    day, quarter = quarter_of(datetime.now(timezone.utc))
+    last = _days_written.get(pc_id)
+    if in_use:
+        if last == (day, quarter):
+            return
+        _days_written[pc_id] = (day, quarter)
+        await engine.db.accounts.check_in(pc_id, day, quarter)
+    elif last is None or last[0] != day:
+        _days_written[pc_id] = (day, None)
+        await engine.db.accounts.check_in(pc_id, day)
+
+
 def latest_metrics(pc_id: int) -> dict[str, Any] | None:
     """The machine's last metrics report (in memory since the Engine started)."""
     return _metrics.get(pc_id)
@@ -513,6 +541,7 @@ async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         # The program in front and its window title (usually the document), as the client saw it.
         m["foreground"] = {"program": str(fg["program"])[:120], "title": str(fg.get("title") or "")[:300]}
     _metrics[ident.pc_id] = m
+    await check_in(ctx.engine, ident.pc_id, in_use=m["idle_s"] < IN_USE_IDLE_S)
     now = time.monotonic()
     last = _last_sampled.get(ident.pc_id)
     if ctx.engine.db.connected and (last is None or now - last >= METRIC_SAMPLE_SECONDS):

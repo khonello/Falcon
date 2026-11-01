@@ -13,8 +13,9 @@ clause settles the Intent when there is one; otherwise the model picks the Inten
 list. The program name is the model's extraction, accepted only if it is a standalone
 capitalised token in the text (no hallucinations); the model then picks the program Intent.
 Deadline phrases are found by pattern, with the model as a verbatim-checked fallback; two
-candidate dates or an "or" inside the phrase is an ambiguous deadline. Several distinct file
-targets joined by "and also / and then / ; / as well as" become a proposed split.
+candidate dates or an "or" inside the phrase is an ambiguous deadline. A description is always
+one task (the user, 24 Oct 2026): every target goes onto it, and a part that names nothing to
+check stays in the description for the assigner to judge at verification.
 
 Every non-clean leaf appends a flag -- an unclear answer, a contradiction, no target at all --
 and a flagged structure is surfaced to the assigner, never committed. Nothing is guessed.
@@ -59,7 +60,6 @@ PATH_RE = re.compile(
     r"(?:\b(?:in|into|under|to|inside)\s+(?:the\s+)?)((?:[A-Za-z]:)?[\w\-.~]+(?:[\\/][\w\-.~]+)+)", re.IGNORECASE)
 FOLDER_RE = re.compile(r"\b(?:in|into|under|inside)\s+(?:the\s+)?([\w\-]+(?:[\\/][\w\-]+)*)\s+(?:folder|directory)\b",
                        re.IGNORECASE)
-SPLIT_MARKERS = re.compile(r"\b(?:and also|as well as|plus)\b|\b(?:and\s+)?then\b|;", re.IGNORECASE)
 WEEKDAYS = r"monday|tuesday|wednesday|thursday|friday|saturday|sunday"
 # "deadline is 17:00" carries a deadline with no by/before in front of it, and a 24-hour
 # time is as common in a workplace description as 3pm.
@@ -315,7 +315,6 @@ async def populate(llm: LocalLLM, description: str, hints: list[Hint] | tuple[Hi
     await _deadline_branch(model, text, out, deadlines, now)
     if model.out_of_time:
         out.notes.append("the model ran out of time for this reading; what it did not answer is marked unclear")
-    _multitask_branch(text, out, file_items)
     # A target whose Intent could not be settled is still a target -- "nothing was found" would
     # be a different and wrong thing to tell the assigner.
     if not out.items and not any(f["kind"] == "no_target" or f.get("target") for f in out.flags):
@@ -484,12 +483,3 @@ async def _deadline_phrase(llm: LocalLLM, text: str, out: ProposedStructure) -> 
         out.flags.append({"kind": "ambiguous_deadline", "candidates": phrases})
         return
     out.final_deadline = phrases[0]
-
-
-def _multitask_branch(text: str, out: ProposedStructure, file_items: list[VerificationItem]) -> None:
-    if len(file_items) >= 2 and SPLIT_MARKERS.search(text):
-        parts = [p.strip(" ,.") for p in SPLIT_MARKERS.split(text) if p and p.strip(" ,.")]
-        split = [{"description": part, "targets": [i.name for i in file_items if i.name.lower() in part.lower()]}
-                 for part in parts]
-        out.proposed_split = split if len(split) >= 2 else [{"description": text,
-                                                             "targets": [i.name for i in file_items]}]

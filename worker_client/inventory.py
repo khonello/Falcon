@@ -54,15 +54,19 @@ def running() -> list[dict[str, Any]]:
 
 def processes(limit: int = 80) -> list[dict[str, Any]]:
     """The machine's processes as a console lists them: pid, name, processor share, memory (MB) and who runs it -- the
-    heaviest first. Not grouped: ending one needs its pid."""
+    heaviest first. Not grouped: ending one needs its pid. Windows' own processes, the machine's service accounts and the
+    Worker itself are left out, so a console can never offer to end them (worker_client/protected.py)."""
     try:
         import psutil
     except ImportError:
         return []
+    from worker_client import protected
+
+    own = protected.falcon_pids()
     rows = []
     for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_info", "username"]):
         info = p.info
-        if not info.get("name"):
+        if not info.get("name") or protected.is_protected(info["pid"], info["name"], info.get("username"), own):
             continue
         mem = info["memory_info"].rss if info.get("memory_info") else 0
         user = (info.get("username") or "").split("\\")[-1]

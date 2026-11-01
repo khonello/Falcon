@@ -72,10 +72,10 @@ async def test_graph_flags_instead_of_guessing():
     s2 = await llm_graph.populate(ScriptedLLM({"the name of the software program or application mentioned": "Word"}),
                                   "tidy the archive")
     assert s2.items == [] and {f["kind"] for f in s2.flags} == {"no_target"}
-    # Two file targets joined by "and also" -> a concrete split proposal, never a silent merge.
+    # Two file targets joined by "and also" stay one task with both targets: a description is always one task.
     s3 = await llm_graph.populate(ScriptedLLM({}), "Update payroll.xlsx and also zip the logs into logs.zip")
     assert [(i.intent, i.name) for i in s3.items] == [("update", "payroll.xlsx"), ("create", "logs.zip")]
-    assert s3.proposed_split and [p["targets"] for p in s3.proposed_split] == [["payroll.xlsx"], ["logs.zip"]]
+    assert not hasattr(s3, "proposed_split") and s3.flags == []
 
 
 def test_graph_mechanical_helpers():
@@ -369,3 +369,45 @@ async def test_a_deadline_the_console_writes_is_understood(engine, org, connect)
     res = await a1.ok("task.create", {"assignee_account_id": org["w1"], "description": "x", "verification_mode": "none", "confirm_none": True,
                                       "soft_deadline_at": soft, "final_deadline_at": final})
     assert res["task"]["final_deadline_at"] is not None and res["task"]["soft_deadline_at"] is not None
+
+
+async def test_an_admins_own_to_dos_are_theirs_alone(engine, org, connect):
+    """A to-do is a line, when it is due, when it was done (ENGINE-GAPS #17). Only its owner sees, adds, ticks and untick it; it reaches
+    the strip when due within a day or past, and the Calendar and the Overview when it has a date. Not a Task: no checks, no assignee."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    a1 = await connect("cid-a1")
+    a2 = await connect("cid-a2")
+    w = await connect("cid-w1")
+    assert await w.err("todo.list") == "forbidden" and await w.err("todo.add", {"text": "x"}) == "forbidden"
+    for bad in ({"text": "   "}, {"text": "x" * 301}, {"text": "x", "due_at": "friday"}):
+        assert await a1.err("todo.add", bad) == "invalid", bad
+
+    late = (await a1.ok("todo.add", {"text": "Renew the  backup licence", "due_at": (now - timedelta(hours=2)).isoformat()}))["todo"]
+    soon = (await a1.ok("todo.add", {"text": "Order two docking stations", "due_at": (now + timedelta(hours=5)).isoformat()}))["todo"]
+    later = (await a1.ok("todo.add", {"text": "Plan the printer swap", "due_at": (now + timedelta(days=9)).isoformat()}))["todo"]
+    undated = (await a1.ok("todo.add", {"text": "Tidy the cable drawer"}))["todo"]
+    assert late["text"] == "Renew the backup licence" and late["overdue"] and late["on_strip"] and not undated["on_strip"]
+    assert "todo.changed" in a1.push_types(await a1.drain_pushes())
+
+    mine = await a1.ok("todo.list")
+    assert [t["id"] for t in mine["todos"]] == [late["id"], soon["id"], later["id"], undated["id"]]   # soonest first, no date last
+    assert [t["id"] for t in mine["strip"]] == [late["id"], soon["id"]] and mine["open"] == 4
+
+    # Another Admin sees none of it and cannot tick it.
+    assert (await a2.ok("todo.list"))["todos"] == []
+    assert await a2.err("todo.done", {"todo_id": late["id"]}) == "not_found"
+
+    ticked = (await a1.ok("todo.done", {"todo_id": late["id"]}))["todo"]
+    assert ticked["done"] and not ticked["on_strip"]
+    assert [t["id"] for t in (await a1.ok("todo.list", {"done_days": 0}))["todos"]] == [soon["id"], later["id"], undated["id"]]
+    assert (await a1.ok("todo.list"))["todos"][-1]["id"] == late["id"]                                # done ones after, this week's
+    back = (await a1.ok("todo.done", {"todo_id": late["id"], "done": False}))["todo"]
+    assert not back["done"] and back["overdue"]
+
+    cal = await a1.ok("calendar.board", {"days": 30})
+    assert {i["title"] for i in cal["items"] if i["kind"] == "todo"} == {late["text"], soon["text"], later["text"]}
+    assert not [i for i in (await a2.ok("calendar.board"))["items"] if i["kind"] == "todo"]
+    waiting = (await a1.ok("overview.admin"))["waiting"]
+    assert waiting["todos_due"] == 2 and waiting["todos_overdue"] == 1

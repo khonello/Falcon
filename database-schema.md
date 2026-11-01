@@ -651,3 +651,15 @@ Design: `docs/design/detective.md`.
 `flow_restricted_consents` (a flow's request to carry something restricted, and its answer: the mark or tier, who asked and when, asked / granted / declined / revoked, who decided, an optional expiry, the issue raised for it). `proposals` (migration 039: what one feature suggests for a person to accept or dismiss: kind mark_folder / pause_flow / follow_up_task, a key so it is not made twice, the case or flow it comes from, open / accepted / dismissed with who and when).
 
 `restricted_allowances` gained `folder` (anything below the folder), `consent_id` (the consent that made it) and `revoked_at` (taken back).
+
+## 16. Version 1 additions (migrations 041-043, 1 Nov 2026)
+
+`todos` (migration 041: an Admin's own to-do: owner, a line of text, when it is due, when it was done; only its owner sees it; a tick taken back clears
+`done_at`, nothing is deleted). `pcs` gained `memory_total_mb`, `disk_total_gb` and `boot_at` (migration 042: as the Worker says at connect), and
+`pc_days` (one row per machine per day: when it first checked in, and the quarter hours, Engine-local, in which someone used it). `actions` gained
+`output_kind` (text / list / status: what a custom action reports back) and `trial` (migration 043: a script tried once before it is saved; archived
+as it is made).
+
+`conversations`, `conversation_members`, `conversation_messages`, `conversation_reads` (migration 044: an Admin's conversations in version 1: a pair,
+reused by `pair_key`, or the one group of every Admin, whose members are read from the accounts; read times per person). `flow_sync_log` gained
+`outcome` (new / changed / kept_beside / removed), `bytes_before` and `bytes_after` (migration 045: a flow's last sync as a diff).

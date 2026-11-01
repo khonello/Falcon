@@ -83,3 +83,34 @@ async def test_a_rule_can_be_tested_on_one_machine_it_applies_to(engine, org, co
     assert await a1.err("control.event_test", {"event_id": empty["id"], "pc_id": org["w1_pc"]}) == "conflict"       # nothing to run
     assert await su.err("control.event_test", {"event_id": 9999, "pc_id": org["w1_pc"]}) == "not_found"
     assert "event.tested" in {e["action_type"] for e in (await su.ok("audit.events"))["events"]}
+
+
+async def test_coming_up_lists_the_next_scheduled_runs_and_each_rule_says_when_it_runs_next(engine, org, connect):
+    """ENGINE-GAPS #13: "Next: Daily maintenance tomorrow at 09:00" is a fact the Engine gives. A rule on an event has no next time; one switched off is
+    not coming up."""
+    from datetime import datetime, timedelta, timezone
+
+    a1 = await connect("cid-a1")
+    shot = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "screenshot", "timeout_s": 10}))["action"]
+    daily = (await a1.ok("control.event_create", {"type": "time.recurring", "match": {"at": "09:00"}, "action_ids": [shot["id"]],
+                                                  "name": "Daily maintenance"}))["event"]
+    soon = (datetime.now(timezone.utc) + timedelta(hours=3)).replace(microsecond=0)
+    once = (await a1.ok("control.event_create", {"type": "time.scheduled", "match": {"at": soon.isoformat()}, "action_ids": [shot["id"]],
+                                                 "name": "Once"}))["event"]
+    hourly = (await a1.ok("control.event_create", {"type": "time.recurring", "match": {"interval_s": 3600}, "action_ids": [shot["id"]],
+                                                   "name": "Hourly"}))["event"]
+    usb = (await a1.ok("control.event_create", {"type": "usb.inserted", "action_ids": [shot["id"]], "name": "USB"}))["event"]
+    off = (await a1.ok("control.event_create", {"type": "time.recurring", "match": {"at": "10:00"}, "action_ids": [shot["id"]], "name": "Off"}))["event"]
+    await a1.ok("control.event_update", {"event_id": off["id"], "enabled": False})
+
+    board = await a1.ok("automation.board")
+    rules = {r["event_id"]: r for r in board["rules"]}
+    assert rules[usb["id"]]["next_at"] is None and rules[off["id"]]["next_at"] is None
+    nxt = datetime.fromisoformat(rules[daily["id"]]["next_at"])
+    assert (nxt.hour, nxt.minute) == (9, 0) and timedelta(0) < nxt - datetime.now(timezone.utc) <= timedelta(days=1)
+    assert datetime.fromisoformat(rules[once["id"]]["next_at"]) == soon
+    assert rules[hourly["id"]]["next_at"]
+    coming = board["coming_up"]
+    assert len(coming) == 10 and [c["at"] for c in coming] == sorted(c["at"] for c in coming)
+    assert {c["event_id"] for c in coming} <= {daily["id"], once["id"], hourly["id"]} and once["id"] in {c["event_id"] for c in coming}
+    assert all(c["name"] for c in coming) and coming[0]["actions"] == 1

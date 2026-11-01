@@ -147,3 +147,33 @@ async def test_a_file_that_keeps_changing_is_read_once_after_it_settles(engine, 
     await a1.ok("index.event", {"event": {"op": "modify", "path": "C:/out/other.txt", "hash": "x"}})
     await asyncio.sleep(0.8)
     assert [p.payload["path"] for p in await a1.drain_pushes() if p.type == "flow.read"] == ["C:/out/other.txt"]
+
+
+async def test_a_flows_last_sync_reads_as_a_diff_with_the_runs_before_it_as_counts(engine, org, connect):
+    """ENGINE-GAPS #11: the last run in full (new, changed, kept beside, with sizes before and after), what it holds now, the runs before as counts."""
+    a1, w1, w2 = await connect("cid-a1"), await connect("cid-w1"), await connect("cid-w2")
+    flow = (await a1.ok("flow.create", flow_payload(org["a1_pc"], [(org["w1_pc"], "C:/in")])))["flow"]
+    dest = flow["destinations"][0]
+
+    async def sync(name: str, h: str, **result):
+        await a1.ok("index.event", {"event": {"op": "modify", "path": f"C:/out/{name}", "hash": h}})
+        read = next(p for p in await a1.drain_pushes() if p.type == "flow.read")
+        await a1.ok("flow.content", {"transfer_id": read.payload["transfer_id"], "hash": h, "content_b64": "QUJD"})
+        await w1.drain_pushes()
+        await w1.ok("flow.sync_result", {"transfer_id": read.payload["transfer_id"], "destination_id": dest["id"], "status": "success",
+                                         "written_hash": h, "written_path": f"C:/in/{name}", **result})
+
+    await sync("old.txt", "h0", size_before=None, size_after=3)
+    await engine.db.pool.execute("UPDATE flow_sync_log SET occurred_at = occurred_at - interval '1 hour'")      # an earlier run
+    await sync("a.txt", "h1", size_before=None, size_after=3)
+    await sync("b.txt", "h2", size_before=10, size_after=3)
+    await sync("c.txt", "h3", size_before=8, size_after=3, preserved="C:/in/c-modified.txt")
+
+    runs = await a1.ok("flow.runs", {"flow_id": flow["id"]})
+    assert runs["runs"] == 2
+    last = runs["last"]
+    got = [(i["relative_path"], i["outcome"], i["bytes_before"], i["bytes_after"]) for i in last["items"]]
+    assert got == [("a.txt", "new", None, 3), ("b.txt", "changed", 10, 3), ("c.txt", "changed", 8, 3), ("c.txt", "kept_beside", 8, None)]
+    assert last["counts"] == {"new": 1, "changed": 2, "kept_beside": 1} and last["bytes"] == 9 and last["items"][0]["machine"] == "FIN-01"
+    assert runs["earlier"] == [{**runs["earlier"][0], "files": 1, "counts": {"new": 1}, "bytes": 3}] and runs["waiting"] == []
+    assert await w2.err("flow.runs", {"flow_id": flow["id"]}) == "forbidden"

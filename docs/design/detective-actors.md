@@ -40,8 +40,8 @@ Levels: **quiet** (on the record, nobody told), **noted** (on the record and lis
 **Regular actors: 0 of 1,000+ runs reached "case".** Every actor with a purpose that *can* be seen was seen (noted at least) in every run.
 
 ## What it does not see (pinned in the tests as known gaps)
-- **Trusted drive abuser: 100% quiet.** One restricted file on a drive this machine has used 80 times. The drive discount is the point of the discount (a backup is not a theft); an
-  insider who uses the drive everyone uses is hidden by the same rule. Needs a per-person view of what they normally take.
+- *No longer a gap (1 Nov 2026, ENGINE-GAPS #16):* the **trusted drive abuser** (one restricted file on a drive this machine has used 80 times) was 100% quiet; what was carried
+  now weighs, not the drive, so a drive the machine knows well no longer lessens restricted files and it is a case every run. The discount stays for ordinary files (a backup is not a theft).
 - **Working outside the watched folders, an Admin's own flow, one file by e-mail: invisible by construction.**
 - **A browser drip, a restricted file at a time in a few MB each: 77% quiet.** The upload volume is never reported (under 8 MB a minute); only the copying of restricted files to the
   desktop is seen, and that alone is quiet.

@@ -115,13 +115,22 @@ part is recorded for later, not built.
      - the delivered copy indexed with its origin (sender, conversation), so Protected and the Detective see a handed-over copy, not a stray one;
      - an audit entry for each transfer.
    - Still to decide: whether an admin-tier file may go to a Worker at all.
-8. **A description is always one task** (the user, 24 Oct 2026; the concept's New task, Admin v70).
+8. **A description is always one task** (the user, 24 Oct 2026; the concept's New task, Admin v70). **Done 1 Nov 2026:** the split step is gone from
+   `llm_graph.py`, `proposed_split` from `task.propose`, the TUI and `NewTaskPage.qml`; the cases carry no split field. Benchmark with the 1.7B after it:
+   tuned 32/32, held-out 31/31.
    - `engine/task/llm_graph.py` proposes a split when two or more files are joined by "and also / then / ;" (`proposed_split`). That step goes.
    - All targets go onto the one task. A part that names nothing to check stays in the description, for the assigner to judge at verification.
    - `tasks.py` stops returning `proposed_split`, and the clients drop the "split / keep as one" choice.
    - `scripts/llm_cases.py` has split cases. Move them to one-task expectations; they are rules, not held-out measurements.
 
 9. **What the Machines page shows about one machine** (the user, 24 Oct 2026; the concept's Machines, Admin v87). Each item says what the Engine must keep, and for how long. The Worker already knows most of it.
+   **Done 1 Nov 2026** (`machines.get`; migration 042; `worker_client/protected.py`): `running_now` (the seven busiest, from the snapshot, which now
+   leaves out Windows' own processes, the machine's service accounts and the Worker itself; `kill_process` refuses those even by pid), `about` (OS,
+   memory, disk size and percent, last boot, registered: the Worker says them at connect), `keyboard` (in use / idle / offline now, and today's
+   quarter hours of use: a metrics report with input in the last minute marks its quarter), `check_ins` (seven days, yes or no: a connect or a report
+   that day). Days and quarters are the Engine host's local time. Entered was already `sessions`. *Not built:* "Never allow it" is a rule the console
+   prepares with the existing `program.launched` condition and `kill_process` + `notify`; nothing new in the Engine. The `pc_days` rows are kept (one
+   per machine per day), not purged.
    - **Running now:** the seven busiest programs, with CPU and memory, from a snapshot the Worker sends with its metrics (psutil). Keep only the latest snapshot. System processes and the Worker itself are left out of the snapshot, so they can never be ended from here.
    - **End a program** (the user, 24 Oct 2026). The built-in `kill_process` (by name) already exists. Ending runs it as a manual action, so it is audited. It is followed by a `notify` on that machine telling the person the Admin ended it. The Worker refuses to end anything on its protected list, even when asked directly.
    - **Never allow it:** "never allow it" prepares a rule switched off: when the program starts on any machine, end it and tell the person. This needs a program-started condition; check what OS signals (item 1) already give.
@@ -132,30 +141,45 @@ part is recorded for later, not built.
    - **Check-ins this week:** one yes or no per machine per day, for the last week. A check-in is the machine's Worker reaching the Engine: the PC is on and connected, whether or not anyone is signed in. It comes from connect times; keep a week.
 
 10. **PCs found but not registered** (the user, 24 Oct 2026; the Add a machine drawer, Admin v100). The drawer offers PCs the system has noticed but nobody registered, and picking one fills in its name.
+   **Knocked: done 1 Nov 2026** (`registry.knocked`, TUI `knocked`): by the name the PC gave, address, tries, first and last; a name registered since
+   drops out. Not cut by department: in version 1 the Admins are IT over every department, and departments keep no address range. *Seen on the
+   network* is still waiting on the decision below.
    - **Knocked:** a Worker that tried to connect without a valid key. The handshake already records `auth.failed`, and the Super User's Refused list reads it. The Admin needs the same list, cut to unregistered names and the department's address range, with tries and last try.
    - **Seen on the network:** a PC with no Worker yet. This is new. It needs discovery on the department's subnet, from the Engine or a registered Worker: ARP or NetBIOS/mDNS names, passive where possible. It reports name, address and when first seen. **To decide with the user:** whether discovery is allowed at all (it is a network scan), which machine does it, and how often.
    - Registering a found PC uses the existing `hierarchy.pc_register`. Nothing about keys changes.
 
-11. **A flow's last sync, as a diff** (the user, 24 Oct 2026; the Admin's Flows, v116). For each sync run of a flow, keep:
+11. **A flow's last sync, as a diff** (the user, 24 Oct 2026; the Admin's Flows, v116). **Done 1 Nov 2026** (migration 045, `flow.runs`, TUI
+   `flow runs`): the destination's Worker reports each file's size before and after; the log keeps new / changed / kept beside; a run is the writes
+   two minutes apart at most; what the flow holds now (a destination away, a consent asked) is `waiting`, not a per-file row. For each sync run of a flow, keep:
    - when it ran;
    - each file it handled: new, changed, kept beside a changed copy, held for consent, or waiting for a destination;
    - each file's size before and after at the destination.
 
    The page shows the last run in full, then the runs before it as counts and bytes. The run boundaries and sizes come from what the Worker reports when it writes (`flow.conflict` already carries kept-beside). Keep runs on the 90-day clock.
 
-12. **What the Admin's Restricted page shows** (the user, 24 Oct 2026; the concept's Restricted, Admin v125). An Admin restricts only what is on the PC they are at (the user, 25 Oct 2026, to avoid confusion). `resource.tag` allows any machine of the department today, so the console limits it. The file or folder is found by searching that PC's entries in the file index, or picked in Explorer (a native file dialog in the Operator Client). For each copy caught, and each mark, keep:
+12. **What the Admin's Restricted page shows** (the user, 24 Oct 2026; the concept's Restricted, Admin v125). **Done 1 Nov 2026** (`marks.get`):
+   each copy's `came_by` (a flow, a USB drive the machine has seen, a network path, Downloads or a mail or browser cache, another place on the same
+   machine; else "arrived from another machine" marked not sure), `allowed` (with the reason typed), `lately` (two weeks of changed, copied, files
+   added, moved, a flow held at it) and `flows_allowed` (since when; `flow.revoke` takes it back). Restricting only on the PC you are at is the
+   console's limit, as written below. An Admin restricts only what is on the PC they are at (the user, 25 Oct 2026, to avoid confusion). `resource.tag` allows any machine of the department today, so the console limits it. The file or folder is found by searching that PC's entries in the file index, or picked in Explorer (a native file dialog in the Operator Client). For each copy caught, and each mark, keep:
    - **how the copy got there:** copied over the network, from a USB drive, saved from an email or a download, or delivered by a flow. Read it from the file events that led to the copy.
    - **a copy allowed where it is,** with the reason the owner typed. It stays on the record, quiet, and is not caught again.
    - **what happened to the mark lately:** opened, changed, copied, files added, a flow held at it.
    - **the flows the owner allowed,** per flow, with since when, and taking that consent back. Copies already delivered are then caught like any other.
 
 13. **What the Admin's Automation page is still missing** (the user asked for an opinion, 25 Oct 2026; Admin v138). The page says what fired and whether it worked. It does not yet say these four things. They are proposals, not decided:
+   **What runs next: done 1 Nov 2026**, because the concept draws Coming up (`automation.board`: each rule's `next_at`, and `coming_up`, the next ten
+   scheduled runs across the rules that are on). The other three are not in the concept and were left.
    - **What a run produced.** A screenshot, a list of a USB drive's files, a log line: the page says "screenshot taken" but you cannot see it. Each run should link to its output. Keep outputs on the 90-day clock, as run outputs already are.
    - **What runs next.** Each scheduled rule's next time, and the next few runs across all rules, so "Next: Daily maintenance tomorrow at 09:00" is a fact the Engine gives, not a sentence the page guesses.
    - **Try it before switching it on.** Run a new or edited rule once, on one machine you pick, and show the result before it goes live. Nothing about the rule is saved until you confirm.
    - **Too quiet or too loud.** Say when a rule fires far more than its usual week (31 times against 3), or has not fired in weeks while its event surely happened. This needs each rule's weekly count kept, so a week can be compared with the usual.
 
-14. **What the Admin's Actions page needs** (the user, 28 Oct 2026; the concept's Actions, Admin v159).
+14. **What the Admin's Actions page needs** (the user, 28 Oct 2026; the concept's Actions, Admin v159). **Done 1 Nov 2026** (migration 043):
+   `output_kind` on a custom action (`control.action_create/update`; the Engine makes the summary and the rows by it, and `control.execution` says it);
+   `action.status` now carries each machine's `pc_id`, `outcome`, `exit_code` and `seconds` as it finishes; `control.terminate_run {execution_ids}`
+   stops what still runs; `control.action_try` runs an unsaved script once on one machine (the run is real and audited as `action.tried`; its action
+   row is archived as it is made, so it is never in the library). TUI: `action try`, `terminate run`, `action custom ... reports=`.
    - **What a custom action reports back.** Its author picks one of three, and it is kept with the action:
      - **text:** what it prints is shown as it is, and the first line is the summary;
      - **a list:** each line printed is a row, a tab splits the columns, and the summary counts the rows;
@@ -171,7 +195,11 @@ part is recorded for later, not built.
      - the model writes freely, and every name, file, time and number in its text is checked against the case before it is shown; anything it cannot back is dropped, or the account falls back to the findings.
    - **Where it comes from.** A case needs who was signed in at the time (from sessions), not who is signed in now, and the duration from first to last event. Both are in the Engine already.
    - The account is labelled as the model's reading, not proof, and nobody at the machine is told.
-16. **Detective weighs what was carried, not the drive** (the user, 29 Oct 2026; the concept's Detective, Admin v179).
+16. **Detective weighs what was carried, not the drive** (the user, 29 Oct 2026; the concept's Detective, Admin v179). **Done 1 Nov 2026**
+   (`common/detective.py`): a new drive is shown ("not weighed") and adds nothing; a known drive, an exception or a rule lowers ordinary files only;
+   ordinary files to a drive start at 0.18 (outside the person's work 0.30, restricted 0.45). The trusted-drive actor was a pinned blind spot and is now
+   caught every run. `detective.case` returns `glance` (stage and next, restricted, who was signed in when it began, earlier cases here and their
+   outcomes, when raised, how long it lasted).
    - **The rule.** When files leave a machine, the weight comes from what they are: restricted, marked, or from a folder outside the person's work. Whether the drive is new to the machine is context only. A new drive carrying ordinary files raises little or nothing. A drive the machine knows well carrying restricted files still counts in full.
    - **Said to be fine follows the same rule.** An exception for a drive, a program or a folder lets ordinary files pass. It never lets restricted files pass: copying restricted files to an excused drive still counts in full.
    - **Today** "a drive this machine has not seen before" is one of the reasons a finding counts (the drive-after-staging and to-drive findings). It should be kept as a fact that is shown, and stop adding to the weight on its own.
@@ -183,6 +211,21 @@ part is recorded for later, not built.
      - when it was raised.
 
      Most of these are in the case already. Who was signed in at the time comes from sessions, and the earlier cases come from the cases table.
+
+17. **An Admin's own to-dos, and conversations without the Super User** (the user, 29 Oct 2026; the concept's Tasks, Overview, Calendar and Messages, Admin v199). Version 1 has no Super User, so what came from them on the Admin's pages became the Admin's own.
+   **To-dos: done 1 Nov 2026** (migration 041, `engine/task/todos.py`: `todo.list` with `strip`, `todo.add`, `todo.done {done}`; on `calendar.board`
+   as kind `todo` and on `overview.admin` as `todos_due` / `todos_overdue`; TUI `todo add|done|undo`, `todos`). **Messages: done 1 Nov 2026**
+   (migration 044, `engine/resource/conversations.py`: `chat.list|people|open|get|send|read`, pushes `chat.message` and `chat.read`; TUI `chats`,
+   `chat with|send|who`, `chat <id>`). A pair is made the first time either writes; the group of every Admin reads its members from the accounts, so
+   it follows who is an Admin. A machine's person answers but does not start one. *Not built:* the Worker's own program does not show these yet (it
+   still shows the help channel).
+   - **To-dos.** A to-do has an owner (the Admin), a line of text, when it is due, and when it was done. Nothing else: no checks, no assignee, no seen or ongoing. Only its owner sees it, adds it, ticks it and takes the tick back.
+     - It shows on Tasks (Your to-dos), the Overview, the Calendar, and the strip across the console when it is due within a day or past its date.
+     - The Engine has nothing like it today: every Task goes from one person to another and is closed by verification. This is a new small table and three handlers (list, add, done), not a kind of Task.
+     - "Not now" on the strip is the console's own and needs nothing from the Engine.
+   - **Messages.** An Admin talks to the other Admins and to whoever is signed in on a machine. A group of every Admin exists once there are two or more. There is no request to talk before writing, since help requests are out of version 1. A conversation is only what was written in it.
+     - What the Engine has today is the help-ping channel (a request, then one message each way, closed by the higher party), plus the Super User's groups. The Admin's page needs a plain conversation between two people, and a group of Admins, with read times kept per person.
+   - **Owners moved.** In the concept's sample data, the flows, rules and folder asks that belonged to the Super User now belong to other Admins (A. Quaye, K. Boateng). Nothing in the Engine changes for this. A thing made by another Admin stays theirs to change.
 
 ## Done inline (for the record)
 

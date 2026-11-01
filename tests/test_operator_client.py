@@ -227,6 +227,15 @@ async def test_scripted_department_task(engine, org, tmp_path: Path):
     assert "ongoing" in back[1] and "2024 folder" in back[2] and "complete" in back[3]
 
 
+async def test_scripted_to_dos(engine, org, tmp_path: Path):
+    out = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+        "connect", "todo add due=2000-01-01T09:00 Renew the backup licence", "todo add Tidy the cable drawer", "todos",
+        "todo done 1", "todos", "todo undo 1"])
+    assert "to-do 1 'Renew the backup licence': overdue" in out[1] and "open" in out[2]
+    assert "Tidy the cable drawer" in out[3] and "1 due within a day or past its date" in out[3]
+    assert ": done" in out[4] and "Renew" not in out[5] and "overdue" in out[6]
+
+
 async def test_scripted_file_journey(engine, org, tmp_path: Path):
     a1 = await engine_event(engine, org)
     out = await run_script(_cfg(engine, tmp_path, "cid-su"), ["connect", f"journey {a1}"])

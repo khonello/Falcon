@@ -187,3 +187,29 @@ async def test_allowing_a_copy_allows_that_content_there_and_not_whatever_else_i
     assert [i for i in (await a1.ok("issues.list", {"type": "file"}))["issues"] if i["state"] != "resolved"] == []          # allowed: not reported again
     await w1.ok("index.event", {"event": {"op": "modify", "path": "C:/Users/p/docs/x.txt", "hash": "B1"}})                   # other restricted content, same path
     assert len([i for i in (await a1.ok("issues.list", {"type": "file"}))["issues"] if i["state"] != "resolved"]) == 1
+
+
+async def test_a_marks_page_says_how_each_copy_got_there_what_is_allowed_and_what_happened_lately(engine, org, connect):
+    """ENGINE-GAPS #12: how a caught copy got there (from a USB drive, over the network, an email or download, a flow), copies allowed where they are
+    with the reason typed, and what happened to the mark lately."""
+    a1, w1, w2 = await connect("cid-a1"), await connect("cid-w1"), await connect("cid-w2")
+    await _index(a1, ("C:/Finance/Plans/q1.xlsx", "Q1"), ("C:/Finance/Plans/q2.xlsx", "Q2"), ("C:/Finance/Plans/q3.xlsx", "Q3"))
+    [mark] = (await a1.ok("marks.create", {"paths": ["C:/Finance/Plans"], "keep": "path"}))["marks"]
+    await engine.db.detective.see_device(org["w1_pc"], "E:\\")
+    await w1.ok("index.event", {"event": {"op": "copy", "path": "C:/Users/ama/q1.xlsx", "old_path": "E:/q1.xlsx", "hash": "Q1"}})
+    await w1.ok("index.event", {"event": {"op": "create", "path": "C:/Users/ama/Downloads/q2.xlsx", "hash": "Q2"}})
+    await w2.ok("index.event", {"event": {"op": "copy", "path": "C:/Users/kofi/q3.xlsx", "old_path": "//fileserver/share/q3.xlsx", "hash": "Q3"}})
+    await a1.ok("index.event", {"event": {"op": "modify", "path": "C:/Finance/Plans/q1.xlsx", "hash": "Q1b"}})
+    await a1.ok("index.event", {"event": {"op": "create", "path": "C:/Finance/Plans/q4.xlsx", "hash": "Q4"}})
+
+    got = await a1.ok("marks.get", {"mark_id": mark["id"]})
+    how = {c["file"]: c["came_by"] for c in got["copies"]}
+    assert how["q1.xlsx"]["how"] == "usb" and how["q1.xlsx"]["said"] == "from a USB drive (E:)"
+    assert how["q2.xlsx"]["how"] == "email_or_download" and how["q3.xlsx"]["how"] == "network" and how["q3.xlsx"]["sure"] is True
+    lately = [x["what"] for x in got["lately"]]
+    assert "changed" in lately and "a file added" in lately and got["flows_allowed"] == [] and got["allowed"] == []
+
+    issue = next(c["issue_id"] for c in got["copies"] if c["file"] == "q2.xlsx")
+    await a1.ok("issues.act", {"issue_id": issue, "key": "allow", "reason": "the clerk needs it for the audit"})
+    allowed = (await a1.ok("marks.get", {"mark_id": mark["id"]}))["allowed"]
+    assert [(a["host"], a["reason"]) for a in allowed] == [("FIN-01", "the clerk needs it for the audit")] and allowed[0]["by"]

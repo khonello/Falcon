@@ -469,7 +469,25 @@ async def case(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
     again = [Finding(f["behaviour"], f["graph"], f["at"].timestamp(), c["pc_id"], float(f["weight"]), frozenset(), "", [sig_from_dict(e) for e in f["evidence"] or []], "", list(f["why"] or []))
              for f in found]
     held = Case(pc=c["pc_id"], findings=again)
-    return {"case": out, "findings": rows(found), "graph": graph_of(sigs), "rule_options": rule_options(again), "board": held.board()}
+    return {"case": out, "findings": rows(found), "graph": graph_of(sigs), "rule_options": rule_options(again), "board": held.board(),
+            "glance": await _glance(ctx, c, sigs)}
+
+
+async def _glance(ctx: HandlerContext, c: dict[str, Any], sigs: list[Sig]) -> dict[str, Any]:
+    """The At a glance panel (ENGINE-GAPS #16): how far it got (the last stage reached and the next), whether restricted files are involved, who was
+    signed in when it began (not who is signed in now), the earlier cases on the same machine and how they ended, and when it was raised."""
+    db = ctx.engine.db
+    then = await db.sessions.signed_in_at(c["pc_id"], c["first_at"])
+    earlier = await db.detective.earlier_on_pc(c["pc_id"], c["first_at"])
+    names = await db.accounts.display_names_for(ctx.identity.account_id, sorted({s["occupant_account_id"] for s in then})) if then else {}
+    return {"stage": c.get("stage_name"), "stage_count": c.get("stage_count"), "next_stage": c.get("next_stage"),
+            "restricted": any("restricted" in e.tags for e in sigs),
+            "signed_in_then": [{"account_id": s["occupant_account_id"], "name": names.get(s["occupant_account_id"]),
+                                "how": "their own" if s["occupied_via"] == "native" else "entered"} for s in then],
+            "earlier": [{"case_id": e["id"], "intent": e["intent"], "level": e["level"], "outcome": e["status"], "headline": e["headline"],
+                         "at": e["first_at"].isoformat()} for e in earlier],
+            "raised_at": c["raised_at"].isoformat() if c.get("raised_at") else None,
+            "lasted_s": int((c["last_at"] - c["first_at"]).total_seconds())}
 
 
 @handler("detective.review")

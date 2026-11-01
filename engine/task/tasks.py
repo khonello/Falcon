@@ -165,7 +165,6 @@ async def propose(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         "soft_said": structure.soft_said,
         "deadline_source": structure.deadline_source,
         "flags": structure.flags,
-        "proposed_split": structure.proposed_split,
         "collisions": collisions,
         "notes": structure.notes,
         "needs_assigner": structure.needs_assigner() or bool(collisions),

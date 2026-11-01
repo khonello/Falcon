@@ -24,11 +24,12 @@ HARMLESS = [a.name for a in da.ACTORS if not a.bad and a.name not in ("contracto
 JUDGEMENT = ["contractor_wrap_up"]
 # the ones with a purpose that must be seen and told
 MUST_ALERT = ["clumsy_thief", "careless_deleter", "printscreen_fan", "ransomware_clicker", "patient_dripper", "disguiser", "task_cover", "leak_then_tidy",
-              "disgruntled_wrecker", "tmp_then_zip_then_drive", "resentful_leaver", "vindictive_folder_delete"]
+              "disgruntled_wrecker", "tmp_then_zip_then_drive", "resentful_leaver", "vindictive_folder_delete",
+              "trusted_drive_abuser"]           # caught since 1 Nov 2026: a drive the machine knows well no longer lessens restricted files (ENGINE-GAPS #16)
 # seen but not alerted: noted
 MUST_NOTE = ["open_snoop", "slow_poison", "curious_it", "drip_under_the_line"]
 # known blind spots, written down: by design or by what we can see today (see docs/design/detective-actors.md)
-BLIND = ["outside_the_roots", "flow_misuse", "one_file_by_email", "trusted_drive_abuser", "browser_drip"]
+BLIND = ["outside_the_roots", "flow_misuse", "one_file_by_email", "browser_drip"]
 
 
 def levels(name: str) -> list[int]:

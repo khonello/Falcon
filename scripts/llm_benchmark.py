@@ -40,6 +40,7 @@ class NoModel:
     """Every question unanswered. What still passes is the graph's mechanical reading."""
 
     calls = 0
+    available = False
 
     async def yes_no(self, question: str, text: str) -> None:
         self.calls += 1
@@ -52,7 +53,7 @@ class NoModel:
 
 
 def check(case: Case, structure) -> list[str]:
-    _desc, items, flags, deadline, split = case
+    _desc, items, flags, deadline = case
     problems: list[str] = []
     got = [(i.target_type, i.intent, i.name) for i in structure.items]
     for exp in items:
@@ -71,10 +72,6 @@ def check(case: Case, structure) -> list[str]:
         problems.append(f"deadline: expected ~{deadline!r}, got {structure.final_deadline!r}")
     if not deadline and structure.final_deadline and "ambiguous_deadline" not in flags:
         problems.append(f"unexpected deadline {structure.final_deadline!r}")
-    if split and not structure.proposed_split:
-        problems.append("multi-task split not proposed")
-    if not split and structure.proposed_split:
-        problems.append("split proposed for a single task")
     return problems
 
 
@@ -94,8 +91,7 @@ async def run_suite(llm, cases: list[Case], label: str, verbose: bool) -> int:
         print(f"[{'OK ' if ok else 'BAD'}] {dt:5.1f}s {llm.calls - calls_before:2d} calls  {case[0]}")
         if verbose or not ok:
             print(f"      items={[(i.target_type, i.intent, i.name, i.path) for i in structure.items]}")
-            print(f"      deadline={structure.final_deadline!r} flags={structure.flags} "
-                  f"split={bool(structure.proposed_split)}")
+            print(f"      deadline={structure.final_deadline!r} flags={structure.flags}")
             for p in problems:
                 print(f"      - {p}")
     total = time.perf_counter() - t0

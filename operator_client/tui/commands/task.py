@@ -60,9 +60,6 @@ async def task_propose(ctx: ShellContext, args: Args) -> str:
         out.append("name collisions (give a path or a new name):")
         out.append(bullet(f"item {c['item_index'] + 1} {c['name']}: exists at " +
                           ", ".join(e["path"] for e in c["existing"]) for c in res["collisions"]))
-    if res["proposed_split"]:
-        out.append("this looks like more than one task -- proposed split (accept by creating each separately):")
-        out.append(bullet(f"{p['description']}  targets={p.get('targets')}" for p in res["proposed_split"]))
     out.append("edit with `task item ...`, then `task create [soft=..] [final=..]` (or `task create none`)")
     return "\n".join(out)
 

@@ -281,7 +281,7 @@ ANSWERS = {
              "path": None, "populated_by": "llm", "status": "pending"},
         ]}},
     "task.propose": {
-        "llm_available": True, "needs_assigner": True, "collisions": [], "proposed_split": [],
+        "llm_available": True, "needs_assigner": True, "collisions": [],
         "flags": ["deadline_ambiguous"],
         "soft_deadline": "2026-10-01T16:00:00+00:00", "final_deadline": "2026-10-03T16:00:00+00:00",
         "items": [

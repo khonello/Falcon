@@ -94,9 +94,9 @@ Each: the person, what they do and why it is human, what Detective does today, a
 - **E1 The phone.** Photographs the screen. — *Blind by design.*
 - **E2 The webmail.** Uploads the file to a personal mail in the browser, 4 MB. — *Blind (under 25 MB).*
 - **E3 The drip.** 10 MB at a time every two minutes through the browser. — *Blind.*
-- **E4 The trusted drive.** Uses the department's usual drive, after using it for harmless things for weeks. — *Partly (lowered, 0.35).*
+- **E4 The trusted drive.** Uses the department's usual drive, after using it for harmless things for weeks. — *Seen since 1 Nov 2026 when the files are restricted: a known drive lessens ordinary files only (ENGINE-GAPS #16).*
 - **E5 The cloud folder.** Drops files into the company's sync folder that is also tied to a personal account. — *Blind (sync clients are lowered).*
-- **E6 The test run.** Copies a harmless file to a new drive first, to see if anyone reacts. — *Partly (a new drive adds 0.10).*
+- **E6 The test run.** Copies a harmless file to a new drive first, to see if anyone reacts. — *Not weighed (1 Nov 2026, ENGINE-GAPS #16): a new drive is shown as a fact; a harmless file raises little whatever the drive.*
 - **E7 The flow.** An Admin builds a flow that mirrors a folder to a share they control. — *Blind (Falcon's own work).*
 - **E8 The print.** Prints it. — *Blind.*
 - **E9 The colleague's PC.** Copies to a coworker's machine across the network. — *Blind (internal).*

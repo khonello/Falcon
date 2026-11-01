@@ -154,3 +154,18 @@ async def flow_trigger(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("flow.trigger", {"flow_id": args.get_int(0, "flow_id"), "relative_path": args.get(1, "relative_path")})
     return f"transfer {res['transfer_id'] or '(no active destinations)'}"
 
+
+
+@command("flow", "runs", "<flow_id>", "A flow's last sync as a diff (new, changed, kept beside, sizes), and the runs before it as counts")
+async def flow_runs(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("flow.runs", {"flow_id": args.get_int(0, "flow_id")})
+    last = res["last"]
+    if last is None:
+        return "this flow has not written anything yet"
+    rows = [{"file": i["relative_path"], "what": i["outcome"], "before": "" if i["bytes_before"] is None else i["bytes_before"],
+             "after": "" if i["bytes_after"] is None else i["bytes_after"], "on": i["machine"]} for i in last["items"]]
+    out = [f"last run {last['started_at'][:16].replace('T', ' ')}: {last['files']} file(s), {last['bytes']} bytes",
+           table(rows, ["file", "what", "before", "after", "on"], width=40)]
+    out.extend(f"waiting: {w['why']}" for w in res["waiting"])
+    out.extend(f"earlier {r['started_at'][:16].replace('T', ' ')}: {r['files']} file(s), {r['bytes']} bytes, {r['counts']}" for r in res["earlier"])
+    return "\n".join(out)

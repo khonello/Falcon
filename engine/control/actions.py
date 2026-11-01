@@ -24,6 +24,8 @@ from protocol import ErrorCode, ProtocolError
 CATEGORIES = ("control", "monitoring", "custom")
 STATUSES = ("pending", "success", "failed", "terminated")
 SCRIPT_LANGUAGES = ("powershell", "python")
+# What a custom action reports back (migration 043): what it prints as it is, a list (a line a row, a tab between columns), or only whether it worked.
+OUTPUT_KINDS = ("text", "list", "status")
 
 # Built-in actions: what the worker client knows how to execute, with the parameters each takes.
 BUILTIN: dict[str, dict[str, Any]] = {
@@ -151,7 +153,7 @@ async def action_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def action_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Built-in: {"kind": "control"|"monitoring", "builtin_type", "params"?, "timeout_s", "name"?,
     "timing"?}. Custom (Admin only): {"kind": "custom", "name", "language", "script",
-    "timeout_s", "description"?, "timing"?} -- validated against stdlib + Windows-native."""
+    "timeout_s", "description"?, "timing"?, "output_kind"?: text|list|status} -- validated against stdlib + Windows-native."""
     ident = require_role(ctx, "super_user", "admin")
     kind = str_field(payload, "kind", choices=CATEGORIES)
     timeout_s = int_field(payload, "timeout_s")
@@ -170,7 +172,8 @@ async def action_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
             raise ProtocolError(ErrorCode.INVALID, "script rejected: " + "; ".join(result.problems))
         action_id = await db.control.create_action(
             ident.account_id, "custom", timeout_s, custom_script=script, custom_script_language=language,
-            name=name, description=payload.get("description"), timing=timing)
+            name=name, description=payload.get("description"), timing=timing,
+            output_kind=str_field(payload, "output_kind", required=False, choices=OUTPUT_KINDS) or "text")
     else:
         builtin_type = str_field(payload, "builtin_type")
         spec = BUILTIN.get(builtin_type)
@@ -194,7 +197,7 @@ async def action_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
 
 @handler("control.action_update")
 async def action_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"action_id", "timeout_s"?, "name"?, "description"?, "params"?, "timing"?, "script"?}"""
+    """{"action_id", "timeout_s"?, "name"?, "description"?, "params"?, "timing"?, "script"?, "output_kind"? (custom only)}"""
     ident = require_role(ctx, "super_user", "admin")
     action_id = int_field(payload, "action_id")
     action = await load_action_in_scope(ctx, action_id)
@@ -205,6 +208,9 @@ async def action_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         result = custom_actions.validate(action["custom_script_language"], str(script))
         if not result.ok:
             raise ProtocolError(ErrorCode.INVALID, "script rejected: " + "; ".join(result.problems))
+    output_kind = str_field(payload, "output_kind", required=False, choices=OUTPUT_KINDS)
+    if output_kind is not None and action["action_kind"] != "custom":
+        raise ProtocolError(ErrorCode.INVALID, "only a custom action chooses what it reports back")
     timeout_s = int_field(payload, "timeout_s", required=False)
     if timeout_s is not None and timeout_s <= 0:
         raise ProtocolError(ErrorCode.INVALID, "timeout_s must be positive")
@@ -217,7 +223,7 @@ async def action_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     await ctx.engine.db.control.update_action(
         action_id, timeout_seconds=timeout_s, custom_script=str(script) if script is not None else None,
         name=payload.get("name"), description=payload.get("description"), params=params,
-        timing=parse_timing(payload["timing"]) if "timing" in payload else None)
+        timing=parse_timing(payload["timing"]) if "timing" in payload else None, output_kind=output_kind)
     await ctx.engine.audit.record(ctx, "action.updated", target_type="actions", target_id=action_id)
     return {"action": row(await ctx.engine.db.control.action(action_id))}
 
@@ -265,3 +271,43 @@ async def action_run(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                   detail={"pcs": [e["pc_id"] for e in executions_started], "department_id": department_id})
     return {"execution_id": executions_started[0]["execution_id"] if len(executions_started) == 1 else None,
             "executions": executions_started}
+
+
+TRY_TIMEOUT_MAX = 600
+
+
+@handler("control.action_try")
+async def action_try(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """A custom action's script, run once on one machine before it is saved (ENGINE-GAPS #14). {"language", "script", "pc_id", "timeout_s",
+    "output_kind"?, "name"?}. It is checked as a saved one would be, and the run is real: it is recorded with its author's name and reports back as
+    any run does (`action.status` as it finishes, `control.execution` for what it printed). Nothing about the action is saved: its row exists only so
+    the run has something to point at, and is archived as it is made (never in the library, never usable by a rule). Admins only."""
+    ident = require_role(ctx, "admin")
+    language = str_field(payload, "language", choices=SCRIPT_LANGUAGES)
+    script = str_field(payload, "script")
+    output_kind = str_field(payload, "output_kind", required=False, choices=OUTPUT_KINDS) or "text"
+    timeout_s = int_field(payload, "timeout_s")
+    if not 0 < timeout_s <= TRY_TIMEOUT_MAX:
+        raise ProtocolError(ErrorCode.INVALID, f"a test run's time limit is 1 to {TRY_TIMEOUT_MAX} seconds")
+    result = custom_actions.validate(language, script)
+    if not result.ok:
+        raise ProtocolError(ErrorCode.INVALID, "script rejected: " + "; ".join(result.problems))
+    db = ctx.engine.db
+    pc_id = int_field(payload, "pc_id")
+    pc = await db.accounts.pc(pc_id)
+    if pc is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
+    require_department_scope(ident, pc["department_id"])
+    if pc_id not in ctx.engine.online_pc_ids():
+        raise ProtocolError(ErrorCode.UNAVAILABLE, f"{pc['hostname']} is offline")
+    name = (str_field(payload, "name", required=False) or "A script not saved yet")[:120]
+    action_id = await db.control.create_action(ident.account_id, "custom", timeout_s, custom_script=script, custom_script_language=language,
+                                               name=name, output_kind=output_kind, trial=True)
+    action = await db.control.action(action_id)
+    assert action is not None
+    from engine.control import executions
+
+    execution_id = await executions.start(ctx.engine, action, None, pc_id, actor=ctx)
+    await ctx.engine.audit.record(ctx, "action.tried", target_type="actions", target_id=action_id, pc_id=pc_id,
+                                  detail={"execution_id": execution_id, "language": language})
+    return {"execution_id": execution_id, "pc_id": pc_id, "hostname": pc["hostname"]}

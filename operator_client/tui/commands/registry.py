@@ -40,6 +40,15 @@ async def refused(ctx: ShellContext, args: Args) -> str:
     return f"{s['groups']} refused, {s['tries']} tries, {s['bad']} worth a look\n" + table(rows, ["who", "address", "because", "tries", "last", "do"], width=42)
 
 
+@command("knocked", usage="[days=7]", help_="PCs that tried to connect without being registered, by the name they gave (register one with pc register)")
+async def knocked(ctx: ShellContext, args: Args) -> str:
+    r = await ctx.call("registry.knocked", {"days": args.opt_int("days") or 7})
+    if not r["knocked"]:
+        return "No unregistered PC tried to connect."
+    rows = [{"name": k["name"], "address": k["address"], "tries": k["tries"], "last": (k["last"] or "")[:16].replace("T", " ")} for k in r["knocked"]]
+    return table(rows, ["name", "address", "tries", "last"])
+
+
 @command("block", None, "<address> [reason...]", "Refuse an address at the door (Super User)")
 async def block(ctx: ShellContext, args: Args) -> str:
     payload = {"address": args.get(0, "address")}

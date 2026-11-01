@@ -431,10 +431,49 @@ async def _effect(ctx: Context, mark: dict[str, Any], keep: str) -> dict[str, in
     return {"would_flag": would_flag, "would_clear": would_clear}
 
 
+LATELY_DAYS = 14
+LATELY_MAX = 30
+LATELY_WORDS = {"modify": "changed", "copy": "copied", "move": "moved or renamed", "delete": "deleted", "create": "a file added"}
+
+
+async def came_by(db: Any, pc_id: int, path: str | None, content_hash: str | None) -> dict[str, Any]:
+    """How a caught copy got where it is (ENGINE-GAPS #12), read from the file events that led to it: delivered by a flow, from a USB drive, copied
+    over the network, or saved from an email or a download. `sure` is false when it is read from where the content was first, not from a step."""
+    if not path:
+        return {"how": "unknown", "sure": False, "said": "not known"}
+    if await db.marks.written_by_flow(pc_id, path):
+        return {"how": "flow", "sure": True, "said": "delivered by a flow"}
+    came = await db.marks.arrival(pc_id, path)
+    old = str((came or {}).get("old_path") or "")
+    low = norm(path) + "/"
+    if old.startswith(("\\\\", "//")):
+        return {"how": "network", "sure": True, "said": f"copied over the network from {old}"}
+    if len(old) >= 2 and old[1] == ":" and f"{old[:2].upper()}\\" in await db.marks.known_drives(pc_id):
+        return {"how": "usb", "sure": True, "said": f"from a USB drive ({old[:2].upper()})"}
+    if any(part in low for part in ("/downloads/", "/content.outlook/", "/inetcache/", "/temporary internet files/")):
+        return {"how": "email_or_download", "sure": True, "said": "saved from an email or a download"}
+    if old:
+        return {"how": "on_machine", "sure": True, "said": f"copied from {old} on this machine"}
+    if content_hash and came and await db.marks.first_seen_elsewhere(content_hash, pc_id, came["occurred_at"]):
+        return {"how": "network", "sure": False, "said": "arrived from another machine, most likely over the network"}
+    return {"how": "unknown", "sure": False, "said": "not known"}
+
+
+def _lately(events: list[dict[str, Any]], consents: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
+    """What happened to the mark lately, newest first: changed, copied, files added, moved, and a flow held at it."""
+    out = [{"what": LATELY_WORDS[e["op"]], "path": e["path"], "at": _iso(e["occurred_at"])} for e in events if not e["is_dir"] or e["op"] != "modify"]
+    out.extend({"what": "a flow held at it", "flow_id": c["flow_id"], "at": _iso(c["asked_at"])} for c in consents
+               if c["asked_at"] >= now - timedelta(days=LATELY_DAYS))
+    out.sort(key=lambda x: x["at"] or "", reverse=True)
+    return out[:LATELY_MAX]
+
+
 @handler("marks.get")
 async def marks_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"mark_id"} -> {"mark", "copies": [{issue_id, code, severity, state, label, host, file, folder, path, signed_in, opened_at, age_hours}],
-    "resolved_copies": [...] (this week), "change": {keep, effect: {would_flag, would_clear}}}."""
+    """{"mark_id"} -> {"mark", "copies": [{issue_id, code, severity, state, label, host, file, folder, path, signed_in, opened_at, age_hours,
+    came_by: {how, sure, said}}], "resolved_copies": [...] (this week), "allowed" (copies allowed where they are, with the reason), "lately" (what
+    happened to it in the last two weeks), "flows_allowed" (each flow its owner let carry it, since when; `flow.revoke` takes it back),
+    "change": {keep, effect: {would_flag, would_clear}}}."""
     mark = await _load(ctx, int_field(payload, "mark_id"))
     db = ctx.engine.db
     now = datetime.now(timezone.utc)
@@ -451,11 +490,22 @@ async def marks_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             out.append({"issue_id": c["id"], "code": c["code"], "severity": c["severity"], "state": c["state"], "label": c["label"],
                         "pc_id": c["pc_id"], "host": c["hostname"], "file": d.get("file"), "folder": d.get("folder"), "path": d.get("path"),
                         "signed_in": who, "opened_at": _iso(c["opened_at"]), "resolution": c["resolution"],
+                        "came_by": await came_by(db, c["pc_id"], d.get("path"), d.get("hash")),
                         "age_hours": round(((c["resolved_at"] or now) - c["opened_at"]).total_seconds() / 3600, 2)})
         return out
 
     other = "path" if mark["keep"] == "machine" else "machine"
+    allowed = await db.marks.allowances(mark["id"])
+    consents = await db.marks.consents_for(mark["id"])
+    people = sorted({a["by_account_id"] for a in allowed} | {c["decided_by_account_id"] for c in consents if c["decided_by_account_id"]})
+    names = await db.accounts.display_names_for(ctx.identity.account_id, people) if people else {}
     return {"mark": (await _view(ctx, [mark]))[0], "copies": await rows(await db.marks.copy_issues(mark["id"])),
+            "allowed": [{"allowance_id": a["id"], "pc_id": a["pc_id"], "host": a["hostname"], "path": a["path"], "reason": a["reason"],
+                         "by": names.get(a["by_account_id"]), "at": _iso(a["at"])} for a in allowed],
+            "lately": _lately(await db.marks.activity(mark["pc_id"], norm(mark["path"]), now - timedelta(days=LATELY_DAYS)), consents, now),
+            "flows_allowed": [{"consent_id": c["id"], "flow_id": c["flow_id"], "source_path": c["source_path"], "since": _iso(c["decided_at"]),
+                               "by": names.get(c["decided_by_account_id"]), "expires_at": _iso(c["expires_at"]), "flow_status": c["flow_status"],
+                               "take_back": "flow.revoke"} for c in consents if c["state"] == "granted"],
             "resolved_copies": [c for c in await rows(await db.marks.copy_issues(mark["id"], include_resolved_since=now - timedelta(days=7)))
                                 if c["state"] == "resolved"],
             "change": {"keep": other, "keep_label": KEEP_WORDS[other], "effect": await _effect(ctx, mark, other)}}

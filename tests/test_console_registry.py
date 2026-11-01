@@ -55,6 +55,22 @@ async def test_refused_connections_say_who_tried_why_and_what_to_do_and_an_addre
     assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["admin"]}))["events"]} >= {"registry.address_blocked", "registry.address_unblocked"}
 
 
+async def test_pcs_that_knocked_without_being_registered_are_offered_by_name(engine, org, connect):
+    """ENGINE-GAPS #10, Add a machine: a Worker that tried to connect without a valid key, by the name it gave, how often and when last. A machine
+    that is registered (a wrong or old key) is not offered, and one registered since it knocked drops out."""
+    a1 = await connect("cid-a1")
+    for _ in range(2):
+        await _try(engine, "cid-nobody", key_for("cid-nobody"), hostname="FIN-NEW")
+    await _try(engine, "cid-other", key_for("cid-other"), hostname="HR-LAPTOP")
+    await _try(engine, "cid-w1", "ab" * 32, hostname="FIN-01")                                    # registered, wrong key: not "found"
+    got = {k["name"]: k for k in (await a1.ok("registry.knocked"))["knocked"]}
+    assert set(got) == {"FIN-NEW", "HR-LAPTOP"}
+    assert got["FIN-NEW"]["tries"] == 2 and got["FIN-NEW"]["address"] == "127.0.0.1" and got["FIN-NEW"]["first"] <= got["FIN-NEW"]["last"]
+    await a1.ok("hierarchy.pc_register", {"hostname": "FIN-NEW", "department_id": org["fin"], "pc_type": "client_pc"})
+    assert [k["name"] for k in (await a1.ok("registry.knocked"))["knocked"]] == ["HR-LAPTOP"]
+    assert await (await connect("cid-w1")).err("registry.knocked") == "forbidden"
+
+
 async def test_the_accounts_list_and_an_admin_who_stops_being_one(engine, org, connect):
     su = await connect("cid-su")
     a1 = await connect("cid-a1")

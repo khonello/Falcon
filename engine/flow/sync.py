@@ -473,15 +473,25 @@ async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     status = str_field(payload, "status", choices=("success", "failed"))
     if status == "success":
         written = payload.get("written_hash") or transfer.hash or ""
+
+        def size(key: str) -> int | None:
+            value = payload.get(key)
+            return int(value) if isinstance(value, int) and value >= 0 else None
+
+        before, after = size("size_before"), size("size_after")
+        # A Worker that says no size before was writing where nothing was: the file is new there. One that says nothing (older) leaves it unknown.
+        outcome = None if "size_before" not in payload else "new" if before is None else "changed"
         await ctx.engine.db.flows.log_sync(dest_id, written, "flow_sync", None,
                                            source_relative_path=transfer.relative_path,
-                                           written_path=payload.get("written_path"), source_hash=transfer.hash)
+                                           written_path=payload.get("written_path"), source_hash=transfer.hash,
+                                           outcome=outcome, bytes_before=before, bytes_after=after)
         await ctx.engine.audit.record(ctx, "flow.synced", target_type="flow_destinations", target_id=dest_id,
                                       detail={"flow_id": flow["id"], "relative_path": transfer.relative_path})
         if payload.get("preserved"):
             # the flow was about to write over a file it had not written: the Worker kept that file beside the new one
             await ctx.engine.db.flows.log_sync(dest_id, "", "external", None, conflict_resolved=True,
-                                               source_relative_path=transfer.relative_path, written_path=str(payload["preserved"]))
+                                               source_relative_path=transfer.relative_path, written_path=str(payload["preserved"]),
+                                               outcome="kept_beside", bytes_before=before)
             await ctx.engine.audit.record(ctx, "flow.conflict", target_type="flow_destinations", target_id=dest_id,
                                           detail={"flow_id": flow["id"], "kept": str(payload["preserved"]), "why": "a file the flow did not write was there"})
             note = {"flow_id": flow["id"], "destination_id": dest_id, "kept": str(payload["preserved"]), "relative_path": transfer.relative_path}

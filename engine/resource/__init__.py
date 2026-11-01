@@ -4,8 +4,9 @@ The resource folder structure IS the access policy, grounded in the Global File 
 
     journey    -- a file's journey: where its content has been and what was done about it, in order
     resource   -- tiers, access tags, restricted-file tracking by hash, violation reporting
+    conversations -- an Admin's conversations in version 1: two people, or every Admin; no request first
     assistance -- Assistance file search, Ping, Message Channel (one-message-per-turn, superior
                   closes)
 """
 
-from engine.resource import assistance, journey, resource  # noqa: F401
+from engine.resource import assistance, conversations, journey, resource  # noqa: F401

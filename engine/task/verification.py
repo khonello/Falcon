@@ -97,11 +97,10 @@ class ProposedStructure:
     soft_said: str | None = None
     deadline_source: str | None = None          # hint | rule | model
     flags: list[dict[str, Any]] = field(default_factory=list)
-    proposed_split: list[dict[str, Any]] | None = None  # multi-task detection
     notes: list[str] = field(default_factory=list)       # what the reading did that the reviewer should know (input shortened, model unavailable)
 
     def needs_assigner(self) -> bool:
-        return bool(self.flags or self.proposed_split)
+        return bool(self.flags)
 
 
 def validate_stack(items: list[VerificationItem]) -> list[str]:

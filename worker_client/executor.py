@@ -82,12 +82,18 @@ BUILTIN_SCRIPTS: dict[str, str] = {
     "restore_file": (
         "import glob, shutil, sys, os\np=sys.argv[1]\nsnaps=sorted(glob.glob(p+'.snapshot-*'))\n"
         "if not snaps: sys.exit('no snapshot for '+p)\nshutil.copy2(snaps[-1], p)\nprint('restored from '+snaps[-1])\n"),
-    # by program name (every process of it) or by pid (one process, picked from a machine's process list)
+    # by program name (every process of it) or by pid (one process, picked from a machine's process list). Windows' own processes, the
+    # machine's service accounts and the Worker itself are refused, even when named directly (worker_client/protected.py).
     "kill_process": (
-        "import psutil, sys\nname=sys.argv[1].lower()\npid=int(sys.argv[2]) if len(sys.argv)>2 and sys.argv[2].strip() else 0\nn=0\n"
-        "for p in psutil.process_iter(['name']):\n"
-        "  if (pid and p.pid==pid) or (not pid and name and (p.info['name'] or '').lower()==name):\n    p.terminate(); n+=1\n"
-        "print(f'FALCON:summary ended {n} process(es)')\n"),
+        "import psutil, sys\nfrom worker_client import protected\n"
+        "name=sys.argv[1].lower()\npid=int(sys.argv[2]) if len(sys.argv)>2 and sys.argv[2].strip() else 0\nn=0\nrefused=[]\n"
+        "own=protected.falcon_pids()\n"
+        "for p in psutil.process_iter(['pid','name','username']):\n"
+        "  if (pid and p.pid==pid) or (not pid and name and (p.info['name'] or '').lower()==name):\n"
+        "    if protected.is_protected(p.pid, p.info['name'], p.info['username'], own): refused.append(p.info); continue\n"
+        "    p.terminate(); n+=1\n"
+        "if refused and not n: sys.exit(f\"refused: {refused[0]['name']} is protected ({protected.why(refused[0], own)})\")\n"
+        "print(f'FALCON:summary ended {n} process(es)' + (f' · {len(refused)} protected left running' if refused else ''))\n"),
     # a restricted copy removed from where it is not allowed (an issue's "Delete this copy"); one file, never a folder
     "delete_file": (
         "import os, sys\np=sys.argv[1]\n"

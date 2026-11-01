@@ -1,7 +1,7 @@
 # To look at
 
 Open items to go over with the user. Bring this up first in a new session, then tidy it as items close.
-Last updated 18 Oct 2026.
+Last updated 1 Nov 2026.
 
 ## Waiting on a decision
 
@@ -11,6 +11,25 @@ Last updated 18 Oct 2026.
   User where the design names one, and questions 3 to 5 in that file.
 - **Discovering PCs on the network** for Add a machine (`docs/ENGINE-GAPS.md` item 10): is a network scan acceptable,
   which machine does it, and how often.
+
+## Engine pass, 1 Nov 2026 (ENGINE-GAPS 8, 9, 10, 11, 12, 13, 14, 16, 17)
+
+- **Built:** one task per description; the machine page facts (busiest programs, about, keyboard quarters, check-ins; the Worker's protected list);
+  PCs that knocked; a flow's last sync as a diff; the Restricted page (how a copy got there, allowed, lately, flows allowed); Coming up; custom action
+  output kinds, per-machine results, stopping a run, a test run before saving; Detective weighing what was carried, and At a glance; an Admin's
+  to-dos; an Admin's conversations. Migrations 041-045. Each has a TUI command; none of it is drawn in the QML yet.
+- **Not built, waiting on you:**
+  - **The v1 Admin scope (mode B) is not in the Engine.** `require_department_scope` still keeps an Admin to their own department, while the
+    concept draws IT over every department. It is one switch in `engine/permissions.py` plus the handlers that filter by `ident.department_id`.
+    Questions 3 to 5 in `who-runs-the-console.md` are still open. Conversations (`chat.people`) and knocked PCs already span every department.
+  - **#3 Private:** how a refusal is shown to the person at the machine.
+  - **#7 Sending a file:** whether an admin-tier file may go to a Worker.
+  - **#10 Seen on the network:** whether a network scan is allowed, from which machine, and how often.
+  - **#15 A case told in words:** it goes against the narrow-questions rule in CLAUDE.md; pick one of the two ways in ENGINE-GAPS #15.
+  - **#13, the other three** (try a rule before switching it on, too quiet or too loud, what a run produced): not in the concept, so left alone.
+  - **`pc_days` is kept forever** (one row per machine per day). Purging it would be a third hard delete beside the 90-day jobs.
+- **Noticed:** the Detective actor test `devops_at_night` takes about 140 s on its own, against the suite's 180 s limit, and timed out when the
+  machine was busy. The Worker's own program does not show the new conversations yet.
 
 ## Not exercised yet
 

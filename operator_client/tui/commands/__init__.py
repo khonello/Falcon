@@ -6,6 +6,7 @@ from operator_client.tui.commands import (  # noqa: F401
     automation,
     console,
     control,
+    conversations,
     dept_tasks,
     detective,
     flow,
@@ -19,5 +20,6 @@ from operator_client.tui.commands import (  # noqa: F401
     search,
     system,
     task,
+    todos,
     updates,
 )

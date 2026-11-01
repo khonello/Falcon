@@ -218,6 +218,9 @@ async def execution_result(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         log.warning("execution %s: result over %s bytes not kept", execution_id, RESULT_MAX)
         result = None
     db = ctx.engine.db
+    action = await db.control.action(ex["action_id"])
+    if action and action["action_kind"] == "custom":
+        summary, result = reported_back(action.get("output_kind") or "text", status, exit_code, output, summary, result)
     await db.control.finish_execution(execution_id, status, terminated_reason=reason,
                                       output_log_path=payload.get("output_log_path"),
                                       exit_code=int(exit_code) if exit_code is not None else None, summary=summary)
@@ -230,12 +233,36 @@ async def execution_result(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     await issues.on_execution(ctx.engine, execution_id, status, summary)
     await ctx.engine.audit.record(ctx, "action.finished", target_type="execution", target_id=execution_id,
                                   detail={"status": status, "reason": reason, "exit_code": payload.get("exit_code")})
-    action = await ctx.engine.db.control.action(ex["action_id"])
     if action:
+        # As each machine finishes, its outcome, exit code and time: a run on several machines fills in while it goes.
+        seconds = round((datetime.now(timezone.utc) - ex["started_at"]).total_seconds(), 1)
+        from engine.control.events import outcome_of
+
         await _notify_dashboard(ctx.engine, action, {"execution_id": execution_id, "status": status,
                                                      "terminated_reason": reason, "exit_code": payload.get("exit_code"),
-                                                     "summary": summary})
+                                                     "summary": summary, "pc_id": ex["target_pc_id"], "seconds": seconds,
+                                                     "outcome": outcome_of({"status": status, "terminated_reason": reason}),
+                                                     "event_id": ex["triggered_by_event_definition_id"], "trial": bool(action.get("trial"))})
     return {"recorded": True, "status": status}
+
+
+LIST_ROWS_MAX = 5000
+
+
+def reported_back(kind: str, status: str, exit_code: Any, output: str | None, summary: str | None, result: Any) -> tuple[str | None, Any]:
+    """A custom action's summary and rows, the way its author chose (migration 043). `text`: the first line printed is the summary. `list`: each line
+    printed is a row, a tab splits the columns, and the summary counts the rows. `status`: only whether it worked (exit 0). A summary the script gave
+    itself (FALCON:summary) stands."""
+    lines = [ln for ln in (output or "").splitlines() if ln.strip()]
+    if kind == "list":
+        if result is None:
+            result = [ln.split("\t") for ln in lines[:LIST_ROWS_MAX]]
+        n = len(result) if isinstance(result, list) else 0
+        return summary or f"{n} row{'' if n == 1 else 's'}", result
+    if kind == "status":
+        worked = status == "success" and (exit_code is None or int(exit_code) == 0)
+        return summary or ("Worked" if worked else "Did not work"), result
+    return summary or (lines[0].strip()[:SUMMARY_MAX] if lines else None), result
 
 
 @handler("control.execution_image")
@@ -323,6 +350,29 @@ async def terminate(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"execution_id": execution_id, "requested": True}
 
 
+@handler("control.terminate_run")
+async def terminate_run(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Stop a run by hand across its machines: {"execution_ids"} -> what was still running is ended (recorded as stopped, not failed); what had
+    finished is left as it ended."""
+    ident = require_role(ctx, "super_user", "admin")
+    ids = payload.get("execution_ids")
+    if not isinstance(ids, list) or not ids or len(ids) > 1000:
+        raise ProtocolError(ErrorCode.INVALID, "execution_ids must be a list of 1 to 1000 runs")
+    stopping, finished = [], []
+    for raw in ids:
+        ex = await ctx.engine.db.control.execution(int(raw))
+        if ex is None:
+            raise ProtocolError(ErrorCode.NOT_FOUND, f"no such execution {raw}")
+        pc = await ctx.engine.db.accounts.pc(ex["target_pc_id"])
+        require_department_scope(ident, pc["department_id"] if pc else None)
+        (stopping if ex["status"] == "pending" else finished).append(ex)
+    for ex in stopping:
+        await ctx.engine.push_to_pc(ex["target_pc_id"], "action.terminate", {"execution_id": ex["id"]})
+    await ctx.engine.audit.record(ctx, "action.run_stop_requested", target_type="execution", target_id=int(ids[0]),
+                                  detail={"stopping": [e["id"] for e in stopping], "already_finished": [e["id"] for e in finished]})
+    return {"stopping": [e["id"] for e in stopping], "already_finished": [e["id"] for e in finished]}
+
+
 @handler("control.execution")
 async def execution(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """One execution and what it returned: `output` (the stored text as lines; while it runs, the
@@ -331,12 +381,14 @@ async def execution(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     execution_id = int_field(payload, "execution_id")
     ex = await _execution_in_scope(ctx, execution_id)
     stored = await ctx.engine.db.control.output(execution_id)
+    action = await ctx.engine.db.control.action(ex["action_id"])
+    kind = (action or {}).get("output_kind") or "text" if (action or {}).get("action_kind") == "custom" else None
     if stored is None:
         return {"execution": row(ex), "output": list(_outputs.get(execution_id, [])), "result": None,
-                "expired": False}
+                "expired": False, "output_kind": kind}
     text = stored["output"]
     return {"execution": row(ex), "output": text.splitlines() if text else [], "result": stored["result"],
-            "expired": stored["cleared_at"] is not None}
+            "expired": stored["cleared_at"] is not None, "output_kind": kind}
 
 
 @handler("control.dashboard")

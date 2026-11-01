@@ -23,7 +23,7 @@ returned reactively. `flow.resume` clears it.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
@@ -617,3 +617,48 @@ async def history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     flow_id = int_field(payload, "flow_id")
     await _load_owned(ctx, flow_id)
     return {"history": rows(await ctx.engine.db.flows.history(flow_id))}
+
+
+RUN_GAP = timedelta(minutes=2)          # writes this close together are one run of the flow
+RUNS_DAYS = 90                          # as far back as a flow's history is kept
+RUNS_SHOWN = 20
+
+
+@handler("flow.runs")
+async def flow_runs(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """A flow's last sync, as a diff (ENGINE-GAPS #11). {"flow_id"} -> `last`: the latest run in full, each file with what happened to it at its
+    destination (new, changed, or kept beside: a file the flow did not write, kept next to the new one) and its size there before and after;
+    `waiting`: what the flow holds now (for an owner's consent, or for a destination that is away); `earlier`: the runs before it as counts and bytes.
+    A run is the writes that came close together (two minutes apart at most). Writes from before sizes were kept say `unknown`."""
+    flow = await _load_visible(ctx, int_field(payload, "flow_id"))
+    db = ctx.engine.db
+    found = await db.flows.written_since(flow["id"], datetime.now(timezone.utc) - timedelta(days=RUNS_DAYS))
+    runs: list[list[dict[str, Any]]] = []
+    for w in found:                                          # newest first
+        if runs and runs[-1][-1]["occurred_at"] - w["occurred_at"] <= RUN_GAP:
+            runs[-1].append(w)
+        else:
+            runs.append([w])
+
+    def file_of(w: dict[str, Any]) -> dict[str, Any]:
+        return {"path": w["written_path"], "relative_path": w["source_relative_path"], "outcome": w["outcome"] or "unknown",
+                "bytes_before": w["bytes_before"], "bytes_after": w["bytes_after"], "destination_id": w["destination_id"],
+                "machine": w["hostname"], "at": w["occurred_at"].isoformat()}
+
+    def summary(run: list[dict[str, Any]]) -> dict[str, Any]:
+        counts: dict[str, int] = {}
+        for w in run:
+            counts[w["outcome"] or "unknown"] = counts.get(w["outcome"] or "unknown", 0) + 1
+        return {"started_at": run[-1]["occurred_at"].isoformat(), "ended_at": run[0]["occurred_at"].isoformat(), "files": len(run), "counts": counts,
+                "bytes": sum(w["bytes_after"] or 0 for w in run if w["outcome"] != "kept_beside")}
+
+    waiting = []
+    for d in flow.get("destinations") or []:
+        if d.get("paused_reason"):
+            waiting.append({"kind": "destination", "destination_id": d["id"], "why": d["paused_reason"]})
+    for c in await db.flows.asked_consents():
+        if c.get("flow_id") == flow["id"]:
+            waiting.append({"kind": "consent", "consent_id": c["id"], "why": "held for its owner's consent"})
+    return {"flow_id": flow["id"],
+            "last": {**summary(runs[0]), "items": [file_of(w) for w in reversed(runs[0])]} if runs else None,
+            "waiting": waiting, "earlier": [summary(r) for r in runs[1:RUNS_SHOWN + 1]], "runs": len(runs)}

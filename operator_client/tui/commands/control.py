@@ -40,7 +40,7 @@ async def action_add(ctx: ShellContext, args: Args) -> str:
     return f"action {res['action']['id']} '{res['action']['name']}' created"
 
 
-@command("action", "custom", "<name> python|powershell <script-file> [timeout=<s>] [delay=<s>] [desc=..]",
+@command("action", "custom", "<name> python|powershell <script-file> [timeout=<s>] [delay=<s>] [desc=..] [reports=text|list|status]",
          "Create a Custom Action from a script file -- validated locally first (stdlib + Windows-native only)")
 async def action_custom(ctx: ShellContext, args: Args) -> str:
     name = args.get(0, "name")
@@ -56,8 +56,26 @@ async def action_custom(ctx: ShellContext, args: Args) -> str:
     timing = {"mode": "delayed", "delay_s": int(args.opt("delay"))} if args.opt("delay") else None  # type: ignore[arg-type]
     res = await ctx.call("control.action_create", {"kind": "custom", "name": name, "language": language, "script": source,
                                                   "timeout_s": int(args.opt("timeout", "60") or 60),
-                                                  "description": args.opt("desc"), "timing": timing})
+                                                  "description": args.opt("desc"), "timing": timing,
+                                                  "output_kind": args.opt("reports", "text")})
     return f"custom action {res['action']['id']} '{name}' created ({len(source.splitlines())} lines)"
+
+
+@command("action", "try", "<pc_id> python|powershell <script-file> [timeout=<s>] [reports=text|list|status]",
+         "Run a script once on one machine before saving it (a real run, recorded with your name; nothing is saved)")
+async def action_try(ctx: ShellContext, args: Args) -> str:
+    language = args.get(1, "python|powershell")
+    path = Path(args.get(2, "script-file"))
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise UsageError(f"cannot read {path}: {exc}") from exc
+    result = validate(language, source)
+    if not result.ok:
+        return "script rejected before sending:\n" + bullet(result.problems)
+    res = await ctx.call("control.action_try", {"pc_id": args.get_int(0, "pc_id"), "language": language, "script": source,
+                                               "timeout_s": int(args.opt("timeout", "60") or 60), "output_kind": args.opt("reports", "text")})
+    return f"trying it on {res['hostname']}: execution {res['execution_id']} (exec {res['execution_id']} shows what it printed)"
 
 
 @command("action", "rm", "<action_id>", "Archive an action")
@@ -226,6 +244,13 @@ async def exec_picture(ctx: ShellContext, args: Args) -> str:
 async def terminate(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("control.terminate", {"execution_id": args.get_int(0, "execution_id")})
     return f"termination requested for execution {res['execution_id']}"
+
+
+@command("terminate", "run", "<execution_id,...>", "Stop a run across its machines: what still runs is ended, what finished is left")
+async def terminate_run(ctx: ShellContext, args: Args) -> str:
+    ids = [int(x) for x in args.get(0, "execution_ids").split(",") if x]
+    res = await ctx.call("control.terminate_run", {"execution_ids": ids})
+    return f"stopping {len(res['stopping'])}, already finished {len(res['already_finished'])}"
 
 
 @command("validate", usage="python|powershell <script-file>", help_="Validate a script locally without sending it")

@@ -117,7 +117,43 @@ async def machines_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                      "seconds": int(((s["ended_at"] or now) - s["entered_at"]).total_seconds())} for s in sessions]
     events = await db.audit.feed(since=now - timedelta(days=7), until=now + timedelta(minutes=1), kinds=None, pc_id=pc_id,
                                  department_id=None, actor_account_id=None, before_id=None, limit=12)
-    return {"machine": machine, "range": window, "series": series, "processes": inventory.processes_of(pc_id),
+    processes = inventory.processes_of(pc_id)
+    return {"machine": machine, "range": window, "series": series, "processes": processes,
+            "running_now": _running_now(processes), "about": _about(pc, machine),
+            **await _days(ctx, pc_id, machine, now),
             "sessions": session_rows, "files": await db.file_index.summary_for_pc(pc_id),
             "events": await describe_many(db, events, ident.account_id), "generated_at": now.isoformat()}
+
+
+RUNNING_NOW = 7
+
+
+def _running_now(processes: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The seven busiest programs, by processor then memory, from the machine's latest snapshot. Windows' own processes and the Worker
+    are never in the snapshot (worker_client/protected.py), so they can never be ended from here."""
+    if not processes:
+        return None
+    busiest = sorted(processes["items"], key=lambda p: (-p["cpu"], -p["memory_mb"]))[:RUNNING_NOW]
+    return {"at": processes["at"], "items": busiest}
+
+
+def _about(pc: dict[str, Any], machine: dict[str, Any]) -> dict[str, Any]:
+    """About the machine, as its Worker said when it last connected; the registered date is the PC's own."""
+    return {"os": pc["os"], "memory_total_mb": pc["memory_total_mb"], "disk_total_gb": round(pc["disk_total_gb"], 1) if pc["disk_total_gb"] is not None else None,
+            "disk_percent": machine["disk"], "boot_at": _iso(pc["boot_at"]), "registered_at": _iso(pc["created_at"])}
+
+
+async def _days(ctx: Context, pc_id: int, machine: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """At the keyboard (in use or idle now, and today's quarter hours of use) and check-ins this week (one yes or no per day, today
+    last). Days are the Engine host's local days, as the quarter hours are."""
+    from engine.control import events as control_events
+
+    today, _ = control_events.quarter_of(now)
+    rows = {r["day"]: r for r in await ctx.engine.db.accounts.days(pc_id, today - timedelta(days=6))}
+    idle_s = machine["idle_s"]
+    in_use = machine["online"] and idle_s is not None and idle_s < control_events.IN_USE_IDLE_S
+    return {"keyboard": {"state": "offline" if not machine["online"] else "in_use" if in_use else "idle", "idle_s": idle_s,
+                         "day": today.isoformat(), "quarters": sorted((rows.get(today) or {}).get("used_quarters") or [])},
+            "check_ins": [{"day": (today - timedelta(days=n)).isoformat(), "yes": (today - timedelta(days=n)) in rows}
+                          for n in range(6, -1, -1)]}
 

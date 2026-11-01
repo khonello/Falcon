@@ -2,6 +2,7 @@
 
     registry.accounts {department_id?, roles?}   the Super User and every Admin (a Worker too, if asked): workstation, key number, whether signed in
     registry.refused  {days?}                    connections turned away at the handshake, grouped by who tried and from where, with what to do
+    registry.knocked  {days?}                    Admin's Add a machine: PCs that tried to connect with no registration, by the name they gave (not since registered)
     registry.blocked                             the addresses refused at the door
     registry.block    {address, reason?}         Super User: refuse an address from now on (the tries are still recorded)
     registry.unblock  {address}                  Super User
@@ -107,6 +108,37 @@ async def refused(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         out.append(g)
     out.sort(key=lambda g: (g["tone"] != "bad", -g["tries"]))
     return {"refused": out, "days": days, "summary": {"groups": len(out), "tries": sum(g["tries"] for g in out), "bad": sum(1 for g in out if g["tone"] == "bad")}}
+
+
+KNOCKED_MAX = 200
+
+
+@handler("registry.knocked")
+async def knocked(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"days"?: 7} -> {"knocked": [{name, address, tries, first, last}]}: what the Add a machine drawer offers as "PCs found but not registered"
+    (ENGINE-GAPS #10). A Worker that tried to connect without a valid key, by the name it gave, from where, how often and when last; one whose name
+    has since been registered is left out. Picking one fills in its name for `hierarchy.pc_register`. Version 1's Admins are IT over every department
+    (docs/design/who-runs-the-console.md), so the list is not cut by department: departments keep no address range to cut it by."""
+    require_role(ctx, "super_user", "admin")
+    db = ctx.engine.db
+    days = max(1, min(int_field(payload, "days", required=False) or 7, 90))
+    registered = {str(h).lower() for h in await db.registry.registered_names()}
+    groups: dict[str, dict[str, Any]] = {}
+    for r in await db.registry.refused(datetime.now(timezone.utc) - timedelta(days=days)):
+        d = r["detail"] or {}
+        name = str(d.get("claimed_name") or "").strip()
+        if (d.get("kind") or "") != "unknown" or not name or name.lower() in registered:
+            continue
+        address = d.get("address") or "unknown"
+        g = groups.setdefault(name.lower(), {"name": name, "address": address, "tries": 0, "first": r["occurred_at"], "last": r["occurred_at"]})
+        g["tries"] += 1
+        g["first"], g["last"] = min(g["first"], r["occurred_at"]), max(g["last"], r["occurred_at"])
+        if r["occurred_at"] >= g["last"]:
+            g["address"] = address
+    out = sorted(groups.values(), key=lambda g: g["last"], reverse=True)[:KNOCKED_MAX]
+    for g in out:
+        g["first"], g["last"] = _iso(g["first"]), _iso(g["last"])
+    return {"knocked": out, "days": days}
 
 
 @handler("registry.blocked")

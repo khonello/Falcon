@@ -478,3 +478,75 @@ async def test_a_process_can_be_ended_by_pid_or_a_program_by_name_never_both(eng
     assert (await make({"name": "notepad.exe"})).result["action"]["params"] == {"name": "notepad.exe"}
     for bad in ({}, {"name": "x", "pid": 5000}, {"pid": "abc"}, {"pid": 4}):
         assert (await make(bad)).error["code"] == "invalid", bad
+
+
+async def test_a_custom_action_reports_back_as_its_author_chose_and_can_be_tried_before_it_is_saved(engine, org, connect):
+    """ENGINE-GAPS #14: text (the first line is the summary), a list (a line a row, a tab between columns, the rows counted) or only whether it
+    worked; each machine's outcome, exit code and time pushed as it finishes; a run stopped across its machines; and a script tried once on one
+    machine before it is saved, recorded with its author, never in the library."""
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1")
+    w2 = await connect("cid-w2")
+    make = lambda kind, **kw: a1.ok("control.action_create", {"kind": "custom", "name": f"as {kind}", "language": "python", "script": "print(1)",
+                                                             "timeout_s": 30, **({"output_kind": kind} if kind else {}), **kw})
+    text, listed, status = [(await make(k))["action"] for k in (None, "list", "status")]
+    assert (text["output_kind"], listed["output_kind"], status["output_kind"]) == ("text", "list", "status")
+    assert await a1.err("control.action_create", {"kind": "custom", "name": "x", "language": "python", "script": "print(1)", "timeout_s": 5,
+                                                  "output_kind": "chart"}) == "invalid"
+    shot = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "screenshot", "timeout_s": 10}))["action"]
+    assert await a1.err("control.action_update", {"action_id": shot["id"], "output_kind": "list"}) == "invalid"
+    assert (await a1.ok("control.action_update", {"action_id": text["id"], "output_kind": "text"}))["action"]["output_kind"] == "text"
+
+    async def run_on_w1(action, **result):
+        run = await a1.ok("control.action_run", {"action_id": action["id"], "pc_id": org["w1_pc"]})
+        await w1.drain_pushes()
+        await w1.ok("control.execution_result", {"execution_id": run["execution_id"], **result})
+        return await a1.ok("control.execution", {"execution_id": run["execution_id"]})
+
+    got = await run_on_w1(text, status="success", exit_code=0, output="C: is 92% full\nD: is fine")
+    assert got["execution"]["summary"] == "C: is 92% full" and got["output_kind"] == "text"
+    got = await run_on_w1(listed, status="success", exit_code=0, output="EXCEL.EXE\t412\nchrome.exe\t980\n")
+    assert got["result"] == [["EXCEL.EXE", "412"], ["chrome.exe", "980"]] and got["execution"]["summary"] == "2 rows"
+    got = await run_on_w1(status, status="failed", exit_code=3, output="Traceback ...")
+    assert got["execution"]["summary"] == "Did not work" and got["output_kind"] == "status"
+    got = await run_on_w1(status, status="success", exit_code=0, output="noise")
+    assert got["execution"]["summary"] == "Worked"
+    got = await run_on_w1(listed, status="success", exit_code=0, output="ignored", summary="3 drives")
+    assert got["execution"]["summary"] == "3 drives"                                         # a summary the script gave itself stands
+    await a1.drain_pushes()
+
+    # A run on several machines: each fills in as it finishes, with its time; stopping it ends only what still runs.
+    run = await a1.ok("control.action_run", {"action_id": text["id"], "department_id": org["fin"]})
+    ids = {e["pc_id"]: e["execution_id"] for e in run["executions"]}
+    await w1.drain_pushes()
+    await w1.ok("control.execution_result", {"execution_id": ids[org["w1_pc"]], "status": "success", "exit_code": 0, "output": "ok"})
+    done = [p.payload for p in await a1.drain_pushes() if p.type == "action.status" and p.payload["status"] != "pending"]
+    assert [(d["pc_id"], d["outcome"], d["exit_code"]) for d in done] == [(org["w1_pc"], "Success", 0)] and done[0]["seconds"] >= 0
+    stop = await a1.ok("control.terminate_run", {"execution_ids": list(ids.values())})
+    assert stop["already_finished"] == [ids[org["w1_pc"]]] and set(stop["stopping"]) == set(ids.values()) - {ids[org["w1_pc"]]}
+    assert "action.terminate" in w2.push_types(await w2.drain_pushes())
+    await w2.ok("control.execution_result", {"execution_id": ids[org["w2_pc"]], "status": "terminated"})
+    assert (await a1.ok("control.execution", {"execution_id": ids[org["w2_pc"]]}))["execution"]["terminated_reason"] == "manual"
+    assert await a1.err("control.terminate_run", {"execution_ids": []}) == "invalid"
+
+    # A test run of a script not saved yet: checked like a saved one, run once where asked, never in the library.
+    assert await a1.err("control.action_try", {"language": "python", "script": "import requests", "pc_id": org["w1_pc"], "timeout_s": 30}) == "invalid"
+    assert await a1.err("control.action_try", {"language": "python", "script": "print(1)", "pc_id": org["w1_pc"], "timeout_s": 3600}) == "invalid"
+    assert await a1.err("control.action_try", {"language": "python", "script": "print(1)", "pc_id": org["a2_pc"], "timeout_s": 30}) == "forbidden"
+    tried = await a1.ok("control.action_try", {"language": "python", "script": "print('a\tb')", "pc_id": org["w1_pc"], "timeout_s": 30,
+                                               "output_kind": "list"})
+    sent = next(p for p in await w1.drain_pushes() if p.type == "action.execute").payload
+    assert sent["execution_id"] == tried["execution_id"] and sent["action"]["script"] == "print('a\tb')"
+    await w1.ok("control.execution_result", {"execution_id": tried["execution_id"], "status": "success", "exit_code": 0, "output": "a\tb"})
+    back = await a1.ok("control.execution", {"execution_id": tried["execution_id"]})
+    assert back["result"] == [["a", "b"]] and back["execution"]["summary"] == "1 row"
+    trial = next(p.payload for p in await a1.drain_pushes() if p.type == "action.status" and p.payload.get("trial"))
+    assert trial["execution_id"] == tried["execution_id"]
+    lib = await a1.ok("control.action_list")
+    assert tried_ids_absent(lib, sent["action"]["id"])
+    assert await a1.err("control.action_run", {"action_id": sent["action"]["id"], "pc_id": org["w1_pc"]}) == "not_found"
+    assert any(r["action_type"] == "action.tried" for r in await engine.db.audit.recent(limit=20))
+
+
+def tried_ids_absent(lib: dict, action_id: int) -> bool:
+    return all(a["id"] != action_id for group in lib["actions"].values() for a in group)

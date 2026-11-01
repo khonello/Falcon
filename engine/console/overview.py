@@ -6,7 +6,7 @@
                                                 no Admin, a department's work called done -- each with the options and their effects
     overview.decide   {decision, option, ...}   Super User: carry out one option of one decision
     overview.su       {}                        Super User: the four figures, deviations by day and severity, Worth a look
-    overview.admin    {}                        Admin: Waiting on you, machines online, open issues, sessions held
+    overview.admin    {}                        Admin: Waiting on you (with their own to-dos due within a day), machines online, open issues, sessions held
     overview.departments {}                     one row per department (an Admin gets their own): Admins, machines, issues, version, time to address
 
 A report is the Super User's to take when nobody below them can: it is about an Admin (never routed), its department has no Admin, or its
@@ -416,9 +416,12 @@ async def overview_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any
 
     suggestions = [p for p in await db.proposals.list("open", 500) if p.get("department_id") == ident.department_id]
     to_allow = [c for c in await db.flows.asked_consents() if guard.can_decide(ident, c)]
+    now_ = _now()
+    todos = [t for t in await db.todos.list(ident.account_id) if t["due_at"] is not None and t["due_at"] < now_ + timedelta(days=1)]
     waiting = verify + len(mine) + pings + len(suggestions) + len(to_allow)
     return {"waiting": {"total": waiting, "to_verify": verify, "issues": len(mine), "pings": pings, "department_tasks_unseen": unseen,
-                        "suggestions": len(suggestions), "flows_to_allow": len(to_allow)},
+                        "suggestions": len(suggestions), "flows_to_allow": len(to_allow),
+                        "todos_due": len(todos), "todos_overdue": sum(1 for t in todos if t["due_at"] < now_)},
             "machines": {"online": fleet["summary"]["online"], "total": fleet["summary"]["machines"], "by_health": fleet["summary"]["by_health"]},
             "issues": {"open": len(issues), "by_severity": by_sev, "unassigned": sum(1 for i in issues if i["owner_account_id"] is None)},
             "sessions_held": await db.overview.sessions_held(ident.department_id), "current_version": fleet["current_version"]}

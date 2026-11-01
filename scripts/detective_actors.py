@@ -438,7 +438,7 @@ ACTORS: list[Actor] = [
     Actor("ransomware_clicker", "careless", "opens an attachment that scrambles their documents", True, ransomware_clicker, "case"),
     Actor("patient_dripper", "smart", "a restricted file a week for weeks, zipped and sent in one go", True, patient_dripper, "noted at least"),
     Actor("drip_under_the_line", "smart", "the same, but sent in pieces too small to be seen", True, drip_under_the_line, "unknowable by volume"),
-    Actor("trusted_drive_abuser", "smart", "one restricted file on the drive everyone uses", True, trusted_drive_abuser, "noted"),
+    Actor("trusted_drive_abuser", "smart", "one restricted file on the drive everyone uses", True, trusted_drive_abuser, "case"),
     Actor("disguiser", "smart", "renames, hides, waits twenty minutes, then the drive", True, disguiser, "case"),
     Actor("task_cover", "smart", "has a task for one file and takes five more with it", True, task_cover, "noted"),
     Actor("sole_copy_remover", "smart", "deletes the one contract amendment, nothing else", True, sole_copy_remover, "case"),

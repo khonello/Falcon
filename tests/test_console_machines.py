@@ -78,6 +78,40 @@ async def test_a_machines_page_has_its_series_processes_sessions_files_and_event
     assert await w1.err("machines.get", {"pc_id": org["w1_pc"]}) == "forbidden"
 
 
+async def test_a_machines_page_says_whats_running_who_is_at_the_keyboard_and_when_it_checked_in(engine, org, connect):
+    """ENGINE-GAPS #9: the seven busiest programs, about the machine (as said at connect), at the keyboard now and today's quarter
+    hours of use, and one yes or no per day for the last week (a check-in is the Worker reaching the Engine)."""
+    from engine.control import events as control_events
+
+    a1 = await connect("cid-a1")
+    w1 = await connect("cid-w1", hello={"os": "Windows 11 Pro", "memory_total_mb": 16384, "disk_total_gb": 476.9,
+                                        "boot_at": "2026-10-30T07:12:00+00:00"})
+    await w1.ok("control.metrics", {"cpu": 12, "memory": 40, "idle_s": 3, "disk": 61.0})
+    await w1.ok("control.inventory", {"processes": [{"pid": 100 + i, "name": f"p{i}.exe", "cpu": float(i), "memory_mb": 10 * i, "user": "Ama"}
+                                                    for i in range(10)]})
+    today, quarter = control_events.quarter_of(datetime.now(timezone.utc))
+    # two days ago it checked in and was used; yesterday it never reached the Engine
+    await engine.db.accounts.check_in(org["w1_pc"], today - timedelta(days=2), 40)
+
+    page = await a1.ok("machines.get", {"pc_id": org["w1_pc"]})
+    assert [p["name"] for p in page["running_now"]["items"]] == [f"p{i}.exe" for i in range(9, 2, -1)]
+    about = page["about"]
+    assert (about["os"], about["memory_total_mb"], about["disk_total_gb"], about["disk_percent"]) == ("Windows 11 Pro", 16384, 476.9, 61.0)
+    assert about["boot_at"].startswith("2026-10-30T07:12") and about["registered_at"]
+    kb = page["keyboard"]
+    assert kb["state"] == "in_use" and kb["quarters"] == [quarter] and kb["day"] == today.isoformat()
+    assert [c["yes"] for c in page["check_ins"]] == [False, False, False, False, True, False, True]
+    assert page["check_ins"][-1]["day"] == today.isoformat()
+
+    # idle: the quarter is not marked again, and the state says idle; a report every 15 s writes once
+    await w1.ok("control.metrics", {"cpu": 1, "memory": 40, "idle_s": 600})
+    page = await a1.ok("machines.get", {"pc_id": org["w1_pc"]})
+    assert page["keyboard"]["state"] == "idle" and page["keyboard"]["quarters"] == [quarter]
+    await w1.close()
+    await asyncio.sleep(0.2)
+    assert (await a1.ok("machines.get", {"pc_id": org["w1_pc"]}))["keyboard"]["state"] == "offline"
+
+
 async def test_the_audit_trail_is_events_with_a_kind_a_sentence_a_machine_and_a_scope(engine, org, connect):
     su = await connect("cid-su")
     a1 = await connect("cid-a1")

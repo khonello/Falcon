@@ -123,17 +123,24 @@ def test_what_makes_a_name_a_disguise():
     assert is_system_folder(r"C:\Windows\Temp\x") and is_system_folder(r"C:\Users\kojo\AppData\Local\x") and not is_system_folder(r"C:\Finance\Payroll\x.xlsx")
 
 
-def test_a_drive_this_machine_always_uses_lowers_it_and_a_new_one_raises_it():
-    def run(uses):
+def test_what_was_carried_weighs_not_the_drive():
+    """ENGINE-GAPS #16: restricted files on a drive count in full whether the drive is new or known well; ordinary files raise little, a drive the
+    machine knows lowers them, and a drive new to the machine is shown, never weighed."""
+    def run(uses, tags):
         s = Script(clock(2, 14, 0))
         s.add("attached", "E:\\", device="E:\\", by="alone")
-        s.after(10).add("copied", "E:\\board.zip", old=r"C:\x\board.zip", thing="h", by="hand", tags=R)
+        s.after(10).add("copied", "E:\\board.zip", old=r"C:\x\board.zip", thing="h", by="hand", tags=tags)
         d = Detective(Context(known_device=lambda pc, dev: uses))
         for sig in s.out:
             d.feed(sig)
-        return d.cases[0].weight
+        return d.cases[0] if d.cases else None
 
-    assert run(0) > run(1) >= run(5) and run(0) >= CASE > run(5)
+    restricted = [run(u, R) for u in (0, 1, 5)]
+    assert restricted[0].weight == restricted[1].weight == restricted[2].weight >= CASE
+    assert "a drive this machine has not seen before (shown, not weighed)" in [w for f in restricted[0].findings for w in f.why]
+    assert any("does not lessen restricted files" in w for f in restricted[2].findings for w in f.why)
+    weight = [c.weight if c else 0.0 for c in (run(u, frozenset()) for u in (0, 1, 5))]
+    assert weight[0] == weight[1] > weight[2] and weight[0] < CASE
 
 
 def test_time_of_day_never_starts_anything_and_only_nudges():
@@ -267,8 +274,9 @@ def test_a_rule_lowers_what_it_names_and_only_that():
     ruled = Detective(Context(rules=lambda pc: [Rule(1, pc, drive["graph"], "folder", drive["value"], "14 Oct")]))
     for sig in sc.sigs:
         ruled.feed(sig)
-    assert max([f.weight for c in ruled.cases for f in c.findings if f.graph == drive["graph"]], default=0.0) < base                                                   # lowered, not removed: the case is still there
-    assert any(w.startswith("you ruled folder") for c in ruled.cases for f in c.findings for w in f.why)
+    # The leak carries restricted payroll: a rule that says the folder is fine lets ordinary files pass, never restricted ones (ENGINE-GAPS #16).
+    assert max(f.weight for c in ruled.cases for f in c.findings if f.graph == drive["graph"]) == base
+    assert any(w.startswith("you ruled folder") and w.endswith("but not for restricted files") for c in ruled.cases for f in c.findings for w in f.why)
     other = Detective(Context(rules=lambda pc: [Rule(2, pc, drive["graph"], "folder", "Z:")]))
     for sig in sc.sigs:
         other.feed(sig)

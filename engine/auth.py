@@ -128,8 +128,9 @@ async def _fail(ctx: Context, client_id: str, reason: str, *, kind: str = "other
 
 
 async def _remember_agent(ctx: Context, payload: dict[str, Any]) -> None:
-    """What the machine says about itself (the Worker's version, the OS, when the agent started) and the address the
-    Engine saw it come from: kept on the PC so a console can show them. The client's word, the Engine's address."""
+    """What the machine says about itself (the Worker's version, the OS, when the agent started, its memory, disk size and last
+    boot) and the address the Engine saw it come from: kept on the PC so a console can show them. The client's word, the Engine's
+    address. A connect is also the day's check-in."""
     pc_id = ctx.identity.pc_id if ctx.identity else None
     if pc_id is None or not ctx.engine.db.connected:
         return
@@ -140,10 +141,26 @@ async def _remember_agent(ctx: Context, payload: dict[str, Any]) -> None:
         started = parse_iso(str(raw)) if raw else None
     except ValueError:
         started = None
+    boot = None
+    try:
+        raw = payload.get("boot_at")
+        boot = parse_iso(str(raw)) if raw else None
+    except ValueError:
+        boot = None
+
+    def number(key: str, high: float) -> float | None:
+        value = payload.get(key)
+        return float(value) if isinstance(value, (int, float)) and 0 < value < high else None
+
+    memory = number("memory_total_mb", 64 * 1024 * 1024)
     await ctx.engine.db.accounts.set_agent(pc_id, ip=str(peer[0]) if peer else None,
                                            os=(str(payload["os"])[:120] if payload.get("os") else None),
                                            version=(str(payload["version"])[:40] if payload.get("version") else None),
-                                           started_at=started)
+                                           started_at=started, memory_total_mb=int(memory) if memory else None,
+                                           disk_total_gb=number("disk_total_gb", 1024 * 1024), boot_at=boot)
+    from engine.control import events as control_events
+
+    await control_events.check_in(ctx.engine, pc_id)
 
 
 @handler("auth.respond")

@@ -1,7 +1,9 @@
 """The Automation and Actions pages: rules with how often they fired and how their runs ended, the runs, and a test on one machine.
 
     automation.board {days?}                    the rules in scope (name or a sentence, what they watch for and do, who set them, on/off), each with how often it
-                                                fired, when last, how its last firing's runs ended and its problems; the strip; runs per day by outcome
+                                                fired, when last, how its last firing's runs ended, its problems and when it runs next (`next_at`, a rule on a
+                                                clock only); `coming_up`, the next scheduled runs across the rules that are on, soonest first; the strip; runs per
+                                                day by outcome
     actions.board    {days?}                    the library in scope: each action with the rules that use it, its runs, its last run, its time limit, its own days;
                                                 the strip (actions, custom, runs this week, by hand, problems)
     actions.runs     {action_id?, event_id?, hand?, days?, limit?}   recent runs, each with how it ended, how long it took, what it said and what set it off
@@ -22,6 +24,8 @@ from engine.permissions import int_field, require_department_scope, require_role
 from protocol import ErrorCode, ProtocolError
 
 OUTCOMES = ("Success", "Failed", "Timed out", "Stopped by you")
+COMING_UP = 10                         # the next scheduled runs listed across all rules
+COMING_UP_DAYS = 31
 PROBLEMS = ("Failed", "Timed out")
 WHEN_WORDS = {
     "usb.inserted": "a USB drive is inserted", "usb.removed": "a USB drive is removed", "user.login": "someone signs in", "user.logout": "someone signs out",
@@ -61,6 +65,19 @@ def when_of(spec: dict[str, Any]) -> str:
 
 def kind_of(etype: str) -> str:
     return "Schedule" if etype.startswith("time.") else "Level" if etype.startswith("threshold.") or etype == "system.idle" else "Event"
+
+
+def next_runs(spec: dict[str, Any], now: datetime, last: datetime | None, n: int = COMING_UP) -> list[datetime]:
+    """When a rule on a clock runs next, as the scheduler reads it: the Calendar's times for a set time or a time of day, and for one that repeats by an
+    interval, from when it last fired (or now, if it never has). A rule that starts on an event has none: it runs whenever the event happens."""
+    from engine.console.calendar import occurrences
+
+    m = spec.get("match") or {}
+    if spec.get("type") == "time.recurring" and m.get("interval_s"):
+        step = timedelta(seconds=max(60.0, float(m["interval_s"])))
+        first = max(now, (last + step) if last else now)
+        return [first + step * i for i in range(n)]
+    return occurrences(spec, now, now + timedelta(days=COMING_UP_DAYS))[:n]
 
 
 def _day(at: datetime) -> str:
@@ -117,6 +134,7 @@ async def automation_board(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     makers = {d["created_by_account_id"] for d in defs}
     names = await db.accounts.display_names_for(ident.account_id, sorted(makers)) if makers else {}
     rules = []
+    coming: list[dict[str, Any]] = []
     for d in defs:
         spec = d["condition_spec"] or {}
         fired = [f for f in firings if f["event_id"] == d["id"] and (mine is None or f["pc_id"] in mine or not f["pc_id"])]
@@ -124,7 +142,11 @@ async def automation_board(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         last = max((f["last"] for f in fired), default=None)
         latest = [r for r in mine_runs if abs((r["started_at"] - mine_runs[0]["started_at"]).total_seconds()) < 90] if mine_runs else []
         actions = await db.control.actions_for_event(d["id"])
-        rules.append({"event_id": d["id"], "name": d.get("name") or (when_of(spec)[0].upper() + when_of(spec)[1:]), "named": bool(d.get("name")), "type": spec.get("type"),
+        last_any = last or (datetime.fromisoformat(last_fired(d["id"])) if last_fired(d["id"]) else None)
+        upcoming = next_runs(spec, now, last_any) if d["enabled"] and str(spec.get("type", "")).startswith("time.") else []
+        label = d.get("name") or (when_of(spec)[0].upper() + when_of(spec)[1:])
+        coming.extend({"at": _iso(at), "event_id": d["id"], "name": label, "actions": len(actions)} for at in upcoming)
+        rules.append({"next_at": _iso(upcoming[0]) if upcoming else None, "event_id": d["id"], "name": d.get("name") or (when_of(spec)[0].upper() + when_of(spec)[1:]), "named": bool(d.get("name")), "type": spec.get("type"),
                       "kind": kind_of(spec.get("type", "")), "when": when_of(spec), "scope": "every machine" if not spec.get("pc_ids") else f"{len(spec['pc_ids'])} machine(s)",
                       "actions": [{"action_id": a["id"], "name": a.get("name") or a.get("builtin_type")} for a in actions], "on": d["enabled"],
                       "owner": "Super User" if d["org_wide"] else names.get(d["created_by_account_id"]), "org_wide": bool(d["org_wide"]),
@@ -133,7 +155,8 @@ async def automation_board(ctx: Context, payload: dict[str, Any]) -> dict[str, A
                       "last_run": _summary(latest) if latest else None, "last_run_problem": any(outcome_of(r) in PROBLEMS for r in latest),
                       "problems": sum(1 for r in mine_runs if outcome_of(r) in PROBLEMS)})
     problems = sum(1 for r in runs if outcome_of(r) in PROBLEMS)
-    return {"rules": rules, "days": _per_day(runs, _days(now, days)), "period_days": days,
+    coming.sort(key=lambda c: c["at"])
+    return {"rules": rules, "coming_up": coming[:COMING_UP], "days": _per_day(runs, _days(now, days)), "period_days": days,
             "strip": {"rules": len(rules), "on": sum(1 for r in rules if r["on"]), "fired": sum(r["fired"] for r in rules), "problems": problems,
                       "set_by_super_user": sum(1 for r in rules if r["org_wide"])}}
 

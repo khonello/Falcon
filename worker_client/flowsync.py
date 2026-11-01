@@ -124,6 +124,7 @@ class FlowSync:
             for stage in payload.get("stages") or []:
                 target, data = self._apply_stage(stage, target, data)
             target.parent.mkdir(parents=True, exist_ok=True)
+            size_before = target.stat().st_size if target.is_file() else None
             preserved = await asyncio.to_thread(self._preserve_unknown, target, data, payload.get("previous"))
             await asyncio.to_thread(target.write_bytes, data)
         except StageError as exc:
@@ -142,7 +143,8 @@ class FlowSync:
             return
         digest = hashlib.sha256(data).hexdigest()
         self.written_hashes[str(target)] = digest
-        result = {"transfer_id": transfer_id, "destination_id": dest_id, "status": "success", "written_hash": digest, "written_path": str(target)}
+        result = {"transfer_id": transfer_id, "destination_id": dest_id, "status": "success", "written_hash": digest, "written_path": str(target),
+                  "size_before": size_before, "size_after": len(data)}
         if preserved:
             result["preserved"] = str(preserved)
         await self.report("flow.sync_result", result)

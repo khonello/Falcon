@@ -2,9 +2,9 @@
 waiting to go out). Nothing here is written by the page and nothing is stored for it.
 
     calendar.board {days?}     what is coming in the next `days` (default 62, at most 124), soonest first:
-                               {"now", "until", "items": [{"kind": "task" | "rule" | "announcement", "at", "title", "line", "to": [page, sub]}]}
+                               {"now", "until", "items": [{"kind": "task" | "todo" | "rule" | "announcement", "at", "title", "line", "to": [page, sub]}]}
 
-An Admin sees the tasks they were given or gave, the department's, the department tasks the Super User gave them, the rules that run on a clock in their
+An Admin sees the tasks they were given or gave, the department's, the department tasks the Super User gave them, their own to-dos that have a date, the rules that run on a clock in their
 department (a repeating one is drawn through the end of next month, so one daily rule does not fill the calendar to the horizon), and the announcements they
 have scheduled. The Super User sees the department tasks they gave and every scheduled announcement. A task overdue is still listed, on the day it was due.
 Flows are not here: they run on events, not a clock.
@@ -98,6 +98,14 @@ async def board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             continue
         line = "From the Super User" if ident.role == "admin" else names.get(t["department_id"], "A department")
         items.append({"kind": "task", "at": _iso(when), "title": t["title"], "line": line, "to": ["tasks", str(t["id"])], "overdue": when < now})
+
+    # --- an Admin's own to-dos with a date (not done; overdue ones on the day they were due)
+    if ident.role == "admin":
+        for t in await db.todos.list(ident.account_id):
+            when = t["due_at"]
+            if when is None or when >= until:
+                continue
+            items.append({"kind": "todo", "at": _iso(when), "title": t["text"][:80], "line": "Your to-do", "to": ["tasks", "todos"], "overdue": when < now})
 
     # --- rules that run on a clock (an Admin's department only)
     if ident.role == "admin":

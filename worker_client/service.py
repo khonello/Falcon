@@ -171,11 +171,23 @@ class WorkerService:
             await self.conn.close()
 
     def hello(self) -> dict[str, Any]:
-        """What this machine says about itself when it connects: the Worker's version, the OS, and when the agent started."""
+        """What this machine says about itself when it connects: the Worker's version, the OS, when the agent started, and (for the
+        Machines page) its memory, its system drive's size and when it last booted."""
+        import os
         import platform
 
-        return {"version": VERSION, "os": f"{platform.system()} {platform.release()} {platform.version()}".strip(),
-                "started_at": self.started_at}
+        out: dict[str, Any] = {"version": VERSION, "os": f"{platform.system()} {platform.release()} {platform.version()}".strip(),
+                               "started_at": self.started_at}
+        try:
+            import psutil
+
+            out["memory_total_mb"] = round(psutil.virtual_memory().total / 1048576)
+            root = os.environ.get("SystemDrive", "C:") + os.sep if os.name == "nt" else "/"
+            out["disk_total_gb"] = round(psutil.disk_usage(root).total / 1024 ** 3, 1)
+            out["boot_at"] = datetime.fromtimestamp(psutil.boot_time(), timezone.utc).isoformat()
+        except (ImportError, OSError):
+            pass
+        return out
 
     def on_notify(self, fn: Notifier) -> None:
         self.notifiers.append(fn)

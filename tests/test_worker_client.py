@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import inspect
+import os
 from pathlib import Path
 
 import pytest
@@ -687,7 +688,7 @@ async def test_the_worker_says_what_it_is_and_reports_disk_network_and_processes
         res = await admin.call("machines.get", {"pc_id": org["w1_pc"]})
         m = res["machine"]
         assert m["version"] == VERSION and m["online"] and m["agent_started_at"] and 0 <= m["disk"] <= 100
-        assert any("python" in p["name"].lower() for p in res["processes"]["items"])    # this very test process, with its pid
+        assert os.getpid() not in {p["pid"] for p in res["processes"]["items"]}            # the Worker itself is never offered to be ended (ENGINE-GAPS #9)
         assert all(isinstance(p["pid"], int) for p in res["processes"]["items"])
     finally:
         await admin.close()
