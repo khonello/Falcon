@@ -43,6 +43,12 @@ A flow specifies:
 
 **Cycle Prevention:** Since a destination can become another flow's source, chaining creates a real risk of a cyclic flow (A → B → A). To prevent this, any flow change — a new flow, a new branch, or a change to an existing one — is validated for consistency **before it's saved**. This check runs automatically and reports an explicit status: pass, or a reported issue if a cycle would be created. The change is not accepted while a cycle issue is unresolved.
 
+> **Version 1 (the user, 1 Nov 2026; `docs/design/v1-it-admin.md`):** only Admins make flows, and only a flow from one Admin's machine to another Admin's
+> machine needs consent: the destination Admin's, who also chooses the destination folder. A flow onto a Worker's machine needs none, and its
+> maker picks the folder. The restricted-material consent (rule 12) is unchanged. A flow's source may be **one file** instead of a folder: it is
+> followed by its identity in the Global File Index, so a rename or move at the source keeps it syncing, and the destination copy is followed
+> the same way. The rule below is the full design, for when the Super User returns.
+
 **Destination Consent:** Whether a flow can be created without approval depends on the relationship between the flow's creator and the **destination's owner** — not simply the direction of the hierarchy:
 
 - **Creator already has authority over the destination** (e.g., an Admin creating a flow whose destination is a Worker's PC in their own department; Super User creating a flow into an Admin's PC): **no consent needed.** The creator's existing authority over that space covers it — the flow is created and logged, same as any other action within that authority.

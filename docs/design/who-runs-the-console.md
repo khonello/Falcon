@@ -1,5 +1,11 @@
 # Who runs the console: one IT team, or each department
 
+## Settled further, 1 Nov 2026
+
+See `docs/design/v1-it-admin.md`: the Super User is parked out of everything that ships; IT Admins only; Admins create departments (labels); Admin to Admin
+is refused on a machine (question 3); an issue becomes someone's by an explicit Take (question 4); there are no department-level Admins
+(question 5). Only an Admin-to-Admin flow needs consent.
+
 ## Decided for version 1 (the user, 25 Oct 2026)
 
 **B, central IT, and the Super User is set aside for now.** Version 1 was doing too much, so it is cut back to what

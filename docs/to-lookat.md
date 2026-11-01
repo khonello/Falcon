@@ -12,6 +12,12 @@ Last updated 1 Nov 2026.
 - **Discovering PCs on the network** for Add a machine (`docs/ENGINE-GAPS.md` item 10): is a network scan acceptable,
   which machine does it, and how often.
 
+## Version 1 settled, 1 Nov 2026 (`docs/design/v1-it-admin.md`)
+
+- Super User parked out of everything that ships; IT Admins only; departments are labels Admins create; Admin to Admin refused on a machine;
+  issues by Take; only Admin-to-Admin flows need consent; single-file flows followed at both ends. The plan is ENGINE-GAPS #18.
+- **Still to settle:** who owns a restriction when the Admin who marked it leaves.
+
 ## Engine pass, 1 Nov 2026 (ENGINE-GAPS 8, 9, 10, 11, 12, 13, 14, 16, 17)
 
 - **Built:** one task per description; the machine page facts (busiest programs, about, keyboard quarters, check-ins; the Worker's protected list);

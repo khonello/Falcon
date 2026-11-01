@@ -227,6 +227,19 @@ part is recorded for later, not built.
      - What the Engine has today is the help-ping channel (a request, then one message each way, closed by the higher party), plus the Super User's groups. The Admin's page needs a plain conversation between two people, and a group of Admins, with read times kept per person.
    - **Owners moved.** In the concept's sample data, the flows, rules and folder asks that belonged to the Super User now belong to other Admins (A. Quaye, K. Boateng). Nothing in the Engine changes for this. A thing made by another Admin stays theirs to change.
 
+18. **Version 1: IT Admins only, the Super User parked** (the user, 1 Nov 2026; `docs/design/v1-it-admin.md`). The plan, in order:
+   - Admins reach every department (`admin_scope`, fixed to organisation); department and Admin creation are Admin handlers; reports and issues
+     reach every Admin, with Take; Admin to Admin on a machine stays refused.
+   - `engine setup` / `bootstrap` make the first IT Admin; `make_org.py`, `.env.example` and `GETTING-STARTED.md` follow.
+   - Flows: consent only Admin to Admin, the destination Admin choosing the folder; Worker destinations picked by the maker; restricted consent
+     from the marker kept.
+   - **A single-file flow**: the source is one file followed by its index identity (a rename or move on its machine keeps it syncing), and the
+     destination copy is followed the same way (written where it now is). New: a source kind and file id on `flows`; the destination's current
+     path from move events against the sync log's `written_path`.
+   - Park the Super User: its handlers, QML pages, TUI commands, preview data, installer role, handover and their tests go to `parked/`; every
+     reference is stripped from what ships.
+   - Open: who owns a restriction when the Admin who marked it leaves.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

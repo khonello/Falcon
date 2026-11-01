@@ -10,6 +10,11 @@ Read this file first. It is the whole picture; everything else is reference.
 > code and the docs, not deleted, and reconnected in a later version. The record is
 > `docs/design/who-runs-the-console.md`. Where this file says Super User → Department → Admin → Client PC, read it
 > with that in mind.
+>
+> **Settled 1 Nov 2026 (`docs/design/v1-it-admin.md`):** the Super User does not exist in version 1 at all — its code is parked outside what
+> ships and nothing that ships names it. The console is for IT Admins only (several may share it). Admins create the departments,
+> which are labels for grouping. Only a flow from one Admin's machine to another's needs consent; a flow can carry a single file,
+> followed wherever it is moved at either end. The plan for the move is in that file; it comes before packaging.
 
 ---
 
