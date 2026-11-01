@@ -46,6 +46,52 @@ async def department_create(ctx: Context, payload: dict[str, Any]) -> dict[str, 
     return {"department_id": dept_id, "name": name}
 
 
+@handler("hierarchy.department_rename")
+async def department_rename(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"department_id", "name"} -- the new name shows everywhere the department does; its machines stay in it."""
+    _manager(ctx)
+    department_id = int_field(payload, "department_id")
+    name = " ".join(str_field(payload, "name").split())
+    if not name:
+        raise ProtocolError(ErrorCode.INVALID, "a department needs a name")
+    import asyncpg
+
+    try:
+        old = await ctx.engine.db.accounts.rename_department(department_id, name)
+    except asyncpg.UniqueViolationError as exc:
+        raise ProtocolError(ErrorCode.CONFLICT, f"there is already a department called {name!r}") from exc
+    if old is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such department")
+    await ctx.engine.audit.record(ctx, "department.renamed", target_type="departments", target_id=department_id,
+                                  detail={"from": old, "to": name})
+    await ctx.engine.push_to_role("admin", "machines.changed", {"department_id": department_id})
+    return {"department_id": department_id, "name": name, "was": old}
+
+
+@handler("hierarchy.pc_move")
+async def pc_move(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"pc_id", "department_id"} -- a machine goes into another department, with whoever's account is bound to it. Version 1: a department
+    is a label (docs/design/v1-it-admin.md), so nothing on the machine changes and every Admin still reaches it."""
+    ident = _manager(ctx)
+    if not org_wide(ident):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "moving a machine between departments needs the whole organisation in reach")
+    db = ctx.engine.db
+    pc_id, department_id = int_field(payload, "pc_id"), int_field(payload, "department_id")
+    pc = await db.accounts.pc(pc_id)
+    if pc is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
+    names = {d["id"]: d["name"] for d in await db.accounts.list_departments()}
+    if department_id not in names:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such department")
+    if pc["department_id"] == department_id:
+        return {"pc_id": pc_id, "department_id": department_id, "accounts": [], "moved": False}
+    moved = await db.accounts.move_pc(pc_id, department_id)
+    await ctx.engine.audit.record(ctx, "pc.moved", target_type="pcs", target_id=pc_id, pc_id=pc_id,
+                                  detail={"hostname": pc["hostname"], "from": pc["department_id"], "to": department_id, "accounts": moved})
+    await ctx.engine.push_to_role("admin", "machines.changed", {"pc_id": pc_id, "department_id": department_id})
+    return {"pc_id": pc_id, "department_id": department_id, "accounts": moved, "moved": True}
+
+
 @handler("hierarchy.departments")
 async def departments(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     require_role(ctx, "super_user", "admin")

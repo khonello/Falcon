@@ -290,6 +290,22 @@ class AccountsRepo(_Repo):
     async def list_departments(self) -> list[dict[str, Any]]:
         return await self._fetch("SELECT id, name, created_at FROM departments ORDER BY name")
 
+    async def rename_department(self, department_id: int, name: str) -> str | None:
+        """The old name, or None when there is no such department."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            old = await conn.fetchval("SELECT name FROM departments WHERE id = $1 FOR UPDATE", department_id)
+            if old is not None:
+                await conn.execute("UPDATE departments SET name = $2 WHERE id = $1", department_id, name)
+            return old
+
+    async def move_pc(self, pc_id: int, department_id: int) -> list[int]:
+        """A machine and the accounts bound to it go into another department (a label: nothing on the machine changes). The accounts moved."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            await conn.execute("UPDATE pcs SET department_id = $2 WHERE id = $1", pc_id, department_id)
+            rows = await conn.fetch("UPDATE accounts SET department_id = $2 WHERE bound_pc_id = $1 AND role <> 'super_user' RETURNING id",
+                                    pc_id, department_id)
+            return sorted(r["id"] for r in rows)
+
     async def create_pc(self, hostname: str, department_id: int | None, pc_type: str,
                         client_id: str | None = None) -> int:
         return await self._val(

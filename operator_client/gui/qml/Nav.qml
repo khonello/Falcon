@@ -49,7 +49,7 @@ QtObject {
     readonly property var menu: [
         ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["calendar", "Calendar", "calendar"]]],
         ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
-        ["Manage", [["machines", "Machines", "desktop"], ["actions", "Actions", "playcircle"], ["automation", "Automation", "thunderbolt"],
+        ["Manage", [["machines", "Machines", "desktop"], ["departments", "Departments", "apartment"], ["actions", "Actions", "playcircle"], ["automation", "Automation", "thunderbolt"],
                     ["issues", "Issues", "alert"], ["audit", "Audit log", "history"]]]
     ]
 
@@ -67,6 +67,7 @@ QtObject {
         detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"],
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
         access: ["Access", "Who is inside which machine, and who was let in"],
+        departments: ["Departments", "Labels that group machines and the people at them"],
         registry: ["Registry", "Machines and people · register, re-key, and let a new machine in"],
         rules: ["Rules", "The standard the organisation is measured against"],
         actions: ["Actions", "Everything a rule can do, and what you can run by hand"],

@@ -133,7 +133,7 @@ async def test_marking_says_what_it_costs_before_it_is_done_and_a_huge_folder_ca
 
 
 async def test_a_flow_waiting_for_a_restricted_owner_is_answered_on_the_flows_page(console):
-    win, bridge, _ = console("super_user")
+    win, bridge, _ = console("admin")
     page = await _open(win, bridge, "flows", "flowsView")
     page.setProperty("rAsks", [{"id": 5, "flow_id": 9, "name": "Payroll", "state": "asked", "sample_path": "C:/Finance/Payroll/p.xlsx", "flow": {"id": 9}}])
     _pump(0.4)
@@ -144,7 +144,7 @@ async def test_a_flow_waiting_for_a_restricted_owner_is_answered_on_the_flows_pa
     assert sent == {"consent_id": 5, "grant": True}
 
 
-async def test_an_admin_does_not_see_the_move_of_the_super_user(console):
+async def test_the_registry_has_no_move_to_another_machine(console):
     win, bridge, _ = console("admin")
     bridge.connected.emit()
     win.setProperty("view", "machines")
@@ -159,7 +159,7 @@ async def test_the_page_has_no_suggestions_or_written_rules_panels(console):
 
 
 async def test_a_flow_shows_what_restricted_material_it_waits_for_or_carries_and_who_can_take_it_back(console):
-    win, bridge, _ = console("super_user")
+    win, bridge, _ = console("admin")
     page = await _open(win, bridge, "flows", "flowsView")
     page.setProperty("flows", [{"id": 9, "source_hostname": "FIN-01", "source_path": "C:/out", "status": "paused", "pause_reason": "restricted:consent", "consent_status": "not_required",
                                 "created_by_account_id": 2, "destinations": [{"id": 1, "destination_hostname": "FIN-02", "destination_path": "C:/in"}], "stages": [], "created_at": "2026-10-18T10:00:00Z"}])

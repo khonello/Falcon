@@ -103,7 +103,8 @@ and **Choose…** the `engine.crt` you copied. It is remembered on this machine.
 Version 1 has IT Admins only (`docs/design/v1-it-admin.md`): every Admin reaches every department, and a department is a
 label for grouping machines and people.
 
-1. **Make each department**: in the TUI, `dept add <name>` (the console has no place for it yet).
+1. **Make each department** on **Manage → Departments**: name it, then click machines to move them in. (TUI: `dept add <name>`,
+   `dept rename <id> <name>`, `pc move <pc_id> <department_id>`.)
 2. **Another IT Admin** is never one click in the console. Install Falcon on their PC and let it in as a machine (step 4),
    then make that person an Admin from the TUI: `promote <account_id>` (their new key is shown **once**). The full steps
    for making an Admin are still being designed.

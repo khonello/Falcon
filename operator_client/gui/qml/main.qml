@@ -65,6 +65,7 @@ ApplicationWindow {
         actions: "ActionsPage.qml",
         audit: "AuditPage.qml",
         registry: "RegistryPage.qml",
+        departments: "DepartmentsPage.qml",
     })
 
     // a page and the thing open on it: some open a page of their own (a machine, an editor)

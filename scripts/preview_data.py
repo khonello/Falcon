@@ -94,8 +94,6 @@ def calendar_board() -> dict[str, Any]:
 def tree(role: str, dept_id: int | None) -> dict[str, Any]:
     out = []
     for did, name in DEPTS:
-        if role == "admin" and did != dept_id:
-            continue
         admins = [{"account_id": a, "role": "admin", "name": n, "status": "active", "pc_id": pc, "hostname": ws,
                    "pc_type": "admin_workstation", "online": True, "last_seen_at": at(0),
                    "session": ({"occupied_via": "traversal", "occupant_name": n} if busy else None)}

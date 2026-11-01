@@ -147,6 +147,21 @@ async def depts(ctx: ShellContext, args: Args) -> str:
     return table((await ctx.call("hierarchy.departments"))["departments"], ["id", "name", "created_at"])
 
 
+@command("dept", "rename", "<department_id> <name...>", "Rename a department; its machines stay in it")
+async def dept_rename(ctx: ShellContext, args: Args) -> str:
+    name = " ".join(args.positional[1:])
+    if not name:
+        raise UsageError("dept rename <department_id> <name...>")
+    res = await ctx.call("hierarchy.department_rename", {"department_id": args.get_int(0, "department_id"), "name": name})
+    return f"{res['was']} is now {res['name']}"
+
+
+@command("pc", "move", "<pc_id> <department_id>", "Put a machine (and whoever is bound to it) in another department: a label, nothing on the machine changes")
+async def pc_move(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("hierarchy.pc_move", {"pc_id": args.get_int(0, "pc_id"), "department_id": args.get_int(1, "department_id")})
+    return f"pc {res['pc_id']} is in department {res['department_id']}" + ("" if res["moved"] else " already")
+
+
 @command("dept", "add", "<name...>", "Create a department")
 async def dept_add(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("hierarchy.department_create", {"name": args.rest(0, "name")})

@@ -246,9 +246,8 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
     return win.findChild(QObject, name)
 
 
-ADMIN_MENU = ["overview", "messages", "calendar", "tasks", "flows", "restricted", "detective", "machines", "actions", "automation", "issues", "audit"]
-SU_MENU = ["overview", "messages", "tasks", "flows", "restricted", "detective", "departments", "audit"]
-TABS = ["registry"]                             # a page the menu does not list: a tab of Machines (Admin) and of Departments (Super User) (docs/design/pruning.md)
+ADMIN_MENU = ["overview", "messages", "calendar", "tasks", "flows", "restricted", "detective", "machines", "departments", "actions", "automation", "issues", "audit"]
+TABS = ["registry"]                             # a page the menu does not list: a tab of Machines (docs/design/pruning.md)
 
 
 async def test_the_shell_is_the_console(console):
@@ -261,9 +260,9 @@ async def test_the_shell_is_the_console(console):
     assert prop(win, "menuKeys") == ADMIN_MENU
 
 
-PAGES = [("admin", p) for p in ADMIN_MENU] + [("super_user", p) for p in SU_MENU] + [("admin", "registry"), ("super_user", "registry")] + [
+PAGES = [("admin", p) for p in ADMIN_MENU] + [("admin", "registry")] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
-    ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("super_user", "messages/announcements"), ("admin", "machines/OPS-01"), ("super_user", "tasks/new")]
+    ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("admin", "machines/OPS-01")]
 
 
 @pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])
@@ -283,7 +282,7 @@ async def test_every_page_loads_clean(console, role, view):
 
 async def test_refused_connections_are_one_row_per_key(console):
     """registry.refused groups the refused by who tried and from where; an address is blocked at the door from the page."""
-    win, bridge, _ = console("super_user")
+    win, bridge, _ = console("admin")
     view = await _open(win, bridge, "registry", "registryView")
     await _wait(lambda: len(prop(view, "doors") or []) == 2)
     doors = {d["client"]: d for d in prop(view, "doors")}
@@ -440,3 +439,18 @@ def test_colours_are_named_only_in_the_theme():
     pattern = re.compile(r"\"#[0-9a-fA-F]{3,8}\"|Qt\.rgba\(|'#[0-9a-fA-F]{3,8}'")
     offenders = [f.name for f in QML_FILES if f.name != "Theme.qml" and pattern.search(f.read_text(encoding="utf-8"))]
     assert not offenders
+
+
+async def test_departments_are_made_renamed_and_a_machine_moved_in_from_their_page(console):
+    """Version 1 (docs/design/v1-it-admin.md): a department is a label any IT Admin makes and puts machines in."""
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "departments", "departmentsView")
+    page.setProperty("nm", "Procurement")
+    QMetaObject.invokeMethod(page, "make")
+    await _wait(lambda: any(t == "hierarchy.department_create" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "hierarchy.department_create") == {"name": "Procurement"}
+    page.setProperty("ren", "Ops")
+    QMetaObject.invokeMethod(page, "rename", Q_ARG("QVariant", {"id": 1, "name": "Operations"}))
+    await _wait(lambda: any(t == "hierarchy.department_rename" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "hierarchy.department_rename") == {"department_id": 1, "name": "Ops"}
+

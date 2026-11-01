@@ -142,3 +142,27 @@ async def test_an_admin_who_left_hands_what_they_owned_to_another_admin(engine, 
     assert (await engine.db.marks.get(mark["id"]))["by_account_id"] == org["a1"]
     assert (await a1.ok("hierarchy.ownership", {"account_id": org["a2"]}))["total"] == 0
     assert any(r["action_type"] == "account.handed_over" for r in await engine.db.audit.recent(limit=10))
+
+
+async def test_a_department_is_renamed_and_a_machine_moved_into_another_with_whoever_is_bound_to_it(engine, org, connect):
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    sales = (await a1.ok("hierarchy.department_create", {"name": "Sales"}))["department_id"]
+    assert (await a1.ok("hierarchy.department_rename", {"department_id": sales, "name": " Sales  and   Marketing "}))["name"] == "Sales and Marketing"
+    assert await a1.err("hierarchy.department_rename", {"department_id": sales, "name": "HR"}) == "conflict"
+    assert await a1.err("hierarchy.department_rename", {"department_id": 9999, "name": "Nowhere"}) == "not_found"
+    moved = await a1.ok("hierarchy.pc_move", {"pc_id": org["w1_pc"], "department_id": sales})
+    assert moved["moved"] is True and moved["accounts"] == [org["w1"]]
+    assert (await engine.db.accounts.pc(org["w1_pc"]))["department_id"] == sales
+    assert (await engine.db.accounts.by_id(org["w1"]))["department_id"] == sales
+    assert (await a1.ok("hierarchy.pc_move", {"pc_id": org["w1_pc"], "department_id": sales}))["moved"] is False
+    assert await a1.err("hierarchy.pc_move", {"pc_id": org["w1_pc"], "department_id": 9999}) == "not_found"
+    assert await w1.err("hierarchy.pc_move", {"pc_id": org["w1_pc"], "department_id": org["fin"]}) == "forbidden"
+    kinds = [r["action_type"] for r in await engine.db.pool.fetch("SELECT action_type FROM audit_log WHERE action_type IN ('department.renamed', 'pc.moved') ORDER BY id")]
+    assert kinds == ["department.renamed", "pc.moved"]
+
+
+async def test_an_account_of_the_parked_role_cannot_sign_in(engine, org, connect):
+    """The Super User is parked (parked/README.md): its account is refused at the handshake; an Admin still signs in."""
+    with pytest.raises(AssertionError, match="not part of this version"):
+        await connect("cid-su")
+    assert (await (await connect("cid-a1")).ok("hierarchy.tree"))["departments"]

@@ -70,7 +70,9 @@ tier) is any Admin's now through `require_head`. Words an Admin can meet say "th
 refused: there is nobody above. The installers have two roles, worker and admin; the first IT Admin's console takes the id and key setup
 printed. The console is one level: no Super User menu, pages, banner, Leave console or entering an Admin's console; Registry shows
 refused connections and lets an Admin stop another being one; announcements, rules, run-once and flows reach every department; the Tasks
-page has no "From the Super User" tab. Step 6 (packaging) is next.
+page has no "From the Super User" tab. The Departments page (the concept's, 1 Nov 2026) makes, renames and fills departments:
+`hierarchy.department_rename` and `hierarchy.pc_move` (a machine and whoever is bound to it; nothing on the machine changes). Step 6
+(packaging) is next.
 
 
 1. **Engine: Admins reach every department.** One setting (`admin_scope`, fixed to organisation for version 1) in `engine/permissions.py`;
