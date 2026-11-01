@@ -72,7 +72,7 @@ printed. The console is one level: no Super User menu, pages, banner, Leave cons
 refused connections and lets an Admin stop another being one; announcements, rules, run-once and flows reach every department; the Tasks
 page has no "From the Super User" tab. The Departments page (the concept's, 1 Nov 2026) makes, renames and fills departments:
 `hierarchy.department_rename` and `hierarchy.pc_move` (a machine and whoever is bound to it; nothing on the machine changes). Step 6
-(packaging) is next.
+(packaging) waits (the user, 1 Nov 2026) until every version 1 concept page is in the QML.
 
 
 1. **Engine: Admins reach every department.** One setting (`admin_scope`, fixed to organisation for version 1) in `engine/permissions.py`;

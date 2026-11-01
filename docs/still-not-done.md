@@ -3,7 +3,7 @@
 Written after commit `560eb6f`; updated the same day when version 1 was settled (`docs/design/v1-it-admin.md`).
 
 ## The version 1 move (decided 1 Nov 2026; ENGINE-GAPS #18)
-Version 1 is IT Admins only. The Super User does not exist in anything that ships. **Steps 1-5 are done (1 Nov 2026); packaging remains.** In order:
+Version 1 is IT Admins only. The Super User does not exist in anything that ships. **Steps 1-5 are done (1 Nov 2026). Packaging is on hold (the user, 1 Nov 2026) until the version 1 concept pages are all in the QML.** In order:
 1. *(done)* **Admins reach every department** (`admin_scope` fixed to organisation). Admins create departments (labels only) and other Admins. Every issue
    and report reaches every Admin and becomes one's by an explicit **Take**. Two Admins on one machine: refused, told who is in.
 2. *(done)* **Setup makes the first IT Admin**, not a Super User (`engine setup`, `bootstrap`, `make_org.py`, `.env.example`, `GETTING-STARTED.md`).
