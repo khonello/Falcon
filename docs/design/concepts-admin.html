@@ -639,6 +639,8 @@ a { color: var(--accent); text-decoration: none; }
 .nfv-pick > span { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
 .nfv-pick b { font-weight: 600; font-size: 13px; }
 .fl-grp { display: inline-flex; gap: 6px; }
+.fl-one { margin-right: 18px; }
+.fl-gpage { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
 .fd-w { font-weight: 600; color: var(--ok); }
 .fd-w.neg { color: var(--crit); }
 .fd-list { display: flex; flex-direction: column; }
@@ -1160,7 +1162,7 @@ a { color: var(--accent); text-decoration: none; }
 .acx-rh b { font-weight: 600; font-size: 13px; }
 .acx-band { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; color: var(--text-4); margin-top: 4px; }
 .acx-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
-.acx-t { width: 64px; height: 42px; border-radius: 7px; border: 1px solid transparent; background: var(--surface-3); color: var(--text-3); font: 600 11px var(--mono); cursor: pointer; }
+.acx-t { min-width: 64px; padding: 0 8px; height: 42px; border-radius: 7px; border: 1px solid transparent; background: var(--surface-3); color: var(--text-3); font: 600 11px var(--mono); cursor: pointer; }
 .acx-t:hover { border-color: var(--border-strong); }
 .acx-t.on { background: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); color: var(--accent); }
 .acx-t.off { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-4); cursor: default; }
@@ -1343,6 +1345,8 @@ a { color: var(--accent); text-decoration: none; }
 .iq-card .tb { background: color-mix(in srgb, var(--surface-3) 70%, var(--text-4)); }
 .iq-a .t3 { font-size: 12px; display: inline-flex; gap: 5px; align-items: center; }
 .iq-fix { gap: 12px; display: flex; flex-direction: column; }
+/* the issue on the right is as tall as what it says, not the list's height (the user, 1 Nov 2026) */
+.iqp .iq-col > .iq-fix { flex: none; }
 .iqp .iq-card { grid-template-columns: 34px minmax(0, 1fr) auto; }
 .iq-opts { display: flex; flex-direction: column; gap: 6px; }
 .iq-opts .lay-grp { margin: 4px 0 2px; }
@@ -1358,6 +1362,9 @@ a { color: var(--accent); text-decoration: none; }
 .iq-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .iq-storyb { flex: 1; }
 .iq-col > .iq-fix { flex: 1; }
+.tk-do { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 6px; background: var(--surface-2); font-size: 12.5px; }
+.tk-do > .t3, .tk-do > .t2 { flex: 1 1 100%; }
+.tk-do > .sp { display: none; }
 .iqp .al-fr { grid-template-columns: 104px minmax(0, 1fr); }
 .iq-story { display: flex; flex-direction: column; gap: 4px; }
 .iq-a2 { display: flex; align-items: center; gap: 4px; }
@@ -1470,7 +1477,7 @@ a { color: var(--accent); text-decoration: none; }
 .am-procs > .am-ph { font-size: 11.5px; color: var(--text-4); padding: 0 0 4px; }
 .am-procs > .am-ph:hover .am-end { opacity: 0; }
 .am-disk { height: 8px; border-radius: 4px; background: var(--grid); overflow: hidden; }
-.am-disk i { display: block; height: 100%; border-radius: 4px; background: var(--s6); }
+.am-disk i { display: block; height: 100%; border-radius: 4px; background: color-mix(in srgb, var(--s1) 80%, var(--surface)); }
 .am-disk.hot i { background: var(--crit); }
 .am-procs { display: flex; flex-direction: column; }
 .am-procs > span { display: grid; grid-template-columns: minmax(0, 1fr) 44px 60px 44px; gap: 8px; align-items: center; padding: 2px 0; border-bottom: 1px solid var(--grid); font-size: 12.5px; }
@@ -1542,7 +1549,7 @@ a { color: var(--accent); text-decoration: none; }
 .ao-k { display: inline-block; width: 14px; height: 11px; border-radius: 3px; vertical-align: middle; margin-right: 6px; background: var(--surface-3); box-shadow: inset 0 -2px 0 var(--med); }
 .ao-stream { max-height: 280px; }
 .ao-ovh { gap: 10px; }
-.ao-ovh .ovh-m { border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+.ao-ovh .ovh-m { width: 66px; border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
 .ao-ovh .ovh-m:hover { border-color: var(--border-strong); }
 .ao-ovh .ovh-m.lag { border-color: color-mix(in srgb, var(--crit) 35%, transparent); }
 .ao-ovh .ovh-m.off { border: 1px dashed var(--text-4); }
@@ -1602,7 +1609,7 @@ a { color: var(--accent); text-decoration: none; }
 .ovh-dept-n b { font-size: 14px; font-weight: 600; }
 .ovh-dept-n:hover b { color: var(--accent); }
 .ovh-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
-.ovh-m { width: 52px; height: 42px; border-radius: 7px; display: inline-grid; place-items: center; font-size: 12px; font-weight: 500; background: var(--surface-3); color: var(--text-2); border: 1px solid transparent; }
+.ovh-m { width: 52px; height: 42px; white-space: nowrap; border-radius: 7px; display: inline-grid; place-items: center; font-size: 12px; font-weight: 500; background: var(--surface-3); color: var(--text-2); border: 1px solid transparent; }
 .ovh-m.lag { background: color-mix(in srgb, var(--crit) 16%, var(--surface-3)); color: var(--crit); border-color: color-mix(in srgb, var(--crit) 35%, transparent); }
 .ovh-m.off { background: transparent; border: 1px dashed var(--text-4); color: var(--text-4); }
 .ovh-m.rest { background: transparent; border: 1px solid var(--border); color: var(--text-3); font-size: 11.5px; }
@@ -1617,6 +1624,8 @@ a { color: var(--accent); text-decoration: none; }
 .ovh-col:first-child { border-left: 0; padding-left: 0; }
 .ovh-col.past { opacity: .5; }
 .ds { display: flex; flex-direction: column; gap: 8px; }
+.ao-today > .ds { flex: 1; }
+.ao-today .ovh-day { flex: 1; }
 .ds-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
 .ovh-col.now { background: color-mix(in srgb, var(--accent) 4%, transparent); }
 .ovh-col-h { font-size: 11px; color: var(--text-4); }
@@ -1884,7 +1893,31 @@ a { color: var(--accent); text-decoration: none; }
    changed pulses its border once, so the eye finds what changed. Once only: a pulse that keeps going means "unanswered" */
 .pulsed { animation: sec-pulse 1.2s ease-out; }
 .pz-wrap { border-radius: 6px; min-width: 0; }
+/* loading in place: the section keeps its size, its content waits behind one line (the first child is its heading) */
+.ld-on { position: relative; }
+.ld-on > :not(:first-child):not(.ld-over) { visibility: hidden; }
+.ld-over { position: absolute; left: 0; right: 0; top: 44px; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); font-size: 12.5px; }
+.iq-card.pulsed, .auo-li.pulsed, .ms-p.pulsed { animation: item-pulse 1.2s ease-out; }
+@keyframes item-pulse { 0%, 35% { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 0 4px color-mix(in srgb, var(--accent) 9%, transparent); }
+  100% { box-shadow: 0 0 0 1.5px transparent, 0 0 0 6px transparent; } }
 .iq-card.iq-head { cursor: default; }
+.pdp .g.c-66 > .ib-box { align-self: stretch; }
+.pd-dot { display: block; width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+.ao-ovh .ovh-m.pd-in { cursor: default; }
+.pd-from { font-size: 12px; color: var(--text-3); margin: 10px 0 6px; }
+.pd-open { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 2px; }
+.pd-open > .row { flex-wrap: nowrap; }
+.pd-open > .row > .t3 { min-width: 0; }
+.pd-open > .row > button { flex: none; }
+.pd-f { display: grid; grid-template-columns: 64px minmax(0, 260px) auto; gap: 8px; align-items: center; font-size: 12.5px; }
+.pd-admins { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+.pd-adm { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); min-width: 0; }
+.pd-adm .iq-main { flex: 1; min-width: 0; }
+.pd-foot { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.pd-foot header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 900px) { .pd-foot { grid-template-columns: minmax(0, 1fr); } }
+.iq-who { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; background: var(--surface-2); font-size: 12.5px; }
+.iq-who > .anticon { color: var(--text-3); }
 @keyframes sec-pulse { 0% { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 22%, transparent); }
   35% { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent); } 100% { box-shadow: 0 0 0 5px transparent; } }
 @media (prefers-reduced-motion: reduce) { .pulsed { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)) !important; } }
@@ -2228,7 +2261,7 @@ let MACHINES = [
   { host: "OPS-01", user: "Kojo",  dept: "ops", ip: "10.20.4.11", ver: "1.4.2", status: "healthy",  note: "", seen: 0.001 },
   { host: "OPS-02", user: null,    dept: "ops", ip: "10.20.4.12", ver: "1.4.2", status: "healthy",  note: "No one signed in", seen: 0.001 },
   { host: "OPS-03", user: "Yaw",   dept: "ops", ip: "10.20.4.13", ver: "1.4.2", status: "high",     note: "Copy of restricted salaries.csv", seen: 0.001 },
-  { host: "OPS-04", user: "Adjoa", dept: "ops", ip: "10.20.4.14", ver: "1.4.2", status: "healthy",  note: "Session held by R. Mensah", seen: 0.001, held: "R. Mensah", heldFrom: 12.97 },
+  { host: "OPS-04", user: "Adjoa", dept: "ops", ip: "10.20.4.14", ver: "1.4.2", status: "healthy",  note: "A. Quaye is inside", seen: 0.001, held: "A. Quaye", heldFrom: 12.97 },
   { host: "OPS-05", user: "Nana",  dept: "ops", ip: "10.20.4.15", ver: "1.4.2", status: "warning",  note: "Certificate hostname mismatch", seen: 0.002 },
   { host: "OPS-06", user: "Kwame", dept: "ops", ip: "10.20.4.16", ver: "1.4.1", status: "warning",  note: "One version behind, 2 failed attempts", seen: 0.001 },
   { host: "OPS-07", user: "Ama",   dept: "ops", ip: "10.20.4.17", ver: "1.4.2", status: "critical", note: "Copy of restricted budget-2026.xlsx", seen: 0.0005, held: "You", heldFrom: 10.7 },
@@ -2297,9 +2330,9 @@ let ISSUES = [
     d: { file: "budget-2026.xlsx", folder: "C:\\Users\\Ama\\Documents", size: "84 KB", mark: "M-1" } },
   { id: "UPD-0318", sev: "high", type: "update", title: "Update past the escalation limit", subject: "1.4.0 → 1.4.2", host: "LOG-02", at: -62.5, owner: "Unassigned", sla: 24, state: "Escalated", kind: "rollout",
     d: { cur: "1.4.0", target: "1.4.2", attempts: "1, Mon 07:45", err: "Could not reach the update share" } },
-  { id: "INC-1041", sev: "high", type: "file", title: "Restricted file copied where it isn't allowed", subject: "salaries.csv", host: "OPS-03", at: 9.5, owner: "R. Mensah", sla: 1, state: "Open", kind: "violation",
+  { id: "INC-1041", sev: "high", type: "file", title: "Restricted file copied where it isn't allowed", subject: "salaries.csv", host: "OPS-03", at: 9.5, owner: "A. Quaye", sla: 1, state: "Open", kind: "violation",
     d: { file: "salaries.csv", folder: "C:\\Users\\Yaw\\Desktop", size: "212 KB", mark: "M-2" } },
-  { id: "DEV-0087", sev: "medium", type: "deviation", title: "Certificate hostname mismatch", subject: "presented WS-OPS-05", host: "OPS-05", at: 9.18, owner: "R. Mensah", sla: 8, state: "Open", kind: "deviation",
+  { id: "DEV-0087", sev: "medium", type: "deviation", title: "Certificate hostname mismatch", subject: "presented WS-OPS-05", host: "OPS-05", at: 9.18, owner: "Unassigned", sla: 8, state: "Open", kind: "deviation",
     d: { what: "certificate", expected: "OPS-05", presented: "WS-OPS-05", fp: "5c:1e:…:a9" } },
   { id: "FLW-0012", sev: "low", type: "flow", title: "Flow waiting for a folder", subject: "intake → K. Boateng", host: "OPS-03", at: -44, owner: "K. Boateng", sla: 72, state: "Waiting", kind: "flow",
     d: { flow: "intake", from: "OPS-03 /intake/", to: "a folder K. Boateng picks on WS-FIN-A1", consent: "K. Boateng", asked: "2 days ago, by R. Mensah" } },
@@ -2331,8 +2364,8 @@ let MARKS = [
   { id: "M-5", kind: "file", name: "headcount-plan-2027.xlsx", host: "WS-OPS-A1", path: "C:\\Users\\RMensah\\Documents\\headcount-plan-2027.xlsx", keep: "path", by: "R. Mensah", at: "28 Sep", dept: "ops", files: 1, versions: 3 },
   { id: "M-6", kind: "folder", name: "Payroll", host: "WS-FIN-A1", path: "C:\\Finance\\Payroll\\", keep: "machine", by: "K. Boateng", at: "1 Sep", dept: "fin", files: 64, versions: 380 },
   { id: "M-7", kind: "file", name: "bank-mandates.pdf", host: "WS-FIN-A1", path: "C:\\Users\\KBoateng\\Documents\\bank-mandates.pdf", keep: "path", by: "K. Boateng", at: "22 Sep", dept: "fin", files: 1, versions: 1 },
-  { id: "M-8", kind: "folder", name: "Board", host: "ADM-01", path: "D:\\Board\\", keep: "machine", by: "Super User", at: "2 Sep", dept: "su", files: 3, versions: 18 },
-  { id: "M-9", kind: "file", name: "salaries.csv", host: "ADM-01", path: "C:\\HR\\Payroll\\salaries.csv", keep: "path", by: "Super User", at: "15 Sep", dept: "su", files: 1, versions: 6 },
+  { id: "M-8", kind: "folder", name: "Board", host: "WS-FIN-A1", path: "D:\\Board\\", keep: "machine", by: "K. Boateng", at: "2 Sep", dept: "fin", files: 3, versions: 18 },
+  { id: "M-9", kind: "file", name: "salaries.csv", host: "WS-FIN-A1", path: "C:\\HR\\Payroll\\salaries.csv", keep: "path", by: "K. Boateng", at: "15 Sep", dept: "fin", files: 1, versions: 6 },
 ];
 if (LARGE) { const nm = ["Contracts", "salaries-2026.csv", "Tender evaluations", "disciplinary-notes.docx", "bank-details.xlsx", "Legal"];
   DEPTS.filter((d) => d.admins.length && !["ops", "fin"].includes(d.id)).forEach((d, k) => { for (let j = 0; j < (ABSURD ? 14 : 3); j++) { const n = k * 7 + j, nmx = nm[n % nm.length], folder = !nmx.includes("."), root = `C:\\${d.name.replace(/\W+/g, "")}\\`;
@@ -2341,18 +2374,18 @@ if (LARGE) { const nm = ["Contracts", "salaries-2026.csv", "Tender evaluations",
 // More of the Super User's own marks, so the Restricted board can be seen in every shape: a file and a folder,
 // kept to the PC or to the exact place, with no copy, one copy, or several.
 MARKS.push(
-  { id: "M-10", kind: "file", name: "board-minutes-2026-09.docx", host: "ADM-01", path: "D:\\Board\\minutes\\board-minutes-2026-09.docx", keep: "machine", by: "Super User", at: "29 Sep", dept: "su", files: 1, versions: 4 },
-  { id: "M-11", kind: "folder", name: "Acquisitions", host: "ADM-01", path: "D:\\Acquisitions\\", keep: "path", by: "Super User", at: "12 Sep", dept: "su", files: 23, versions: 61 },
-  { id: "M-12", kind: "file", name: "strategy-2027.pptx", host: "ADM-01", path: "C:\\Users\\SuperUser\\Documents\\strategy-2027.pptx", keep: "path", by: "Super User", at: "24 Sep", dept: "su", files: 1, versions: 9 },
-  { id: "M-13", kind: "folder", name: "Payroll archive", host: "ADM-01", path: "E:\\Archive\\Payroll\\", keep: "machine", by: "Super User", at: "5 Sep", dept: "su", files: 412, versions: 1240 },
-  { id: "M-14", kind: "folder", name: "Legal", host: "ADM-01", path: "C:\\Legal\\", keep: "path", by: "Super User", at: "19 Sep", dept: "su", files: 58, versions: 97 });
+  { id: "M-10", kind: "file", name: "board-minutes-2026-09.docx", host: "WS-FIN-A1", path: "D:\\Board\\minutes\\board-minutes-2026-09.docx", keep: "machine", by: "K. Boateng", at: "29 Sep", dept: "fin", files: 1, versions: 4 },
+  { id: "M-11", kind: "folder", name: "Acquisitions", host: "WS-FIN-A1", path: "D:\\Acquisitions\\", keep: "path", by: "K. Boateng", at: "12 Sep", dept: "fin", files: 23, versions: 61 },
+  { id: "M-12", kind: "file", name: "strategy-2027.pptx", host: "WS-FIN-A1", path: "C:\\Users\\SuperUser\\Documents\\strategy-2027.pptx", keep: "path", by: "K. Boateng", at: "24 Sep", dept: "fin", files: 1, versions: 9 },
+  { id: "M-13", kind: "folder", name: "Payroll archive", host: "WS-FIN-A1", path: "E:\\Archive\\Payroll\\", keep: "machine", by: "K. Boateng", at: "5 Sep", dept: "fin", files: 412, versions: 1240 },
+  { id: "M-14", kind: "folder", name: "Legal", host: "WS-FIN-A1", path: "C:\\Legal\\", keep: "path", by: "K. Boateng", at: "19 Sep", dept: "fin", files: 58, versions: 97 });
 
 // Watched (21 Oct 2026): not restricted, only cautious. A watched file may go anywhere and nothing is a violation, but every move,
 // copy, rename, delete or flow transfer is noted and listed on the Super User's Protected page. [when (hours), who, what happened, to or from]
 MARKS.push(
   { id: "M-20", kind: "folder", name: "Supplier price lists", host: "WS-OPS-A1", path: "C:\\Procurement\\Prices\\", keep: "watch", watch: true, by: "R. Mensah", at: "8 Oct", dept: "ops", files: 46, versions: 120 },
   { id: "M-21", kind: "file", name: "headcount-forecast.xlsx", host: "WS-FIN-A1", path: "C:\\Finance\\headcount-forecast.xlsx", keep: "watch", watch: true, by: "K. Boateng", at: "12 Oct", dept: "fin", files: 1, versions: 7 },
-  { id: "M-22", kind: "folder", name: "Board papers", host: "ADM-01", path: "D:\\Board\\papers\\", keep: "watch", watch: true, by: "Super User", at: "14 Oct", dept: "su", files: 9, versions: 33 });
+  { id: "M-22", kind: "folder", name: "Board papers", host: "WS-FIN-A1", path: "D:\\Board\\papers\\", keep: "watch", watch: true, by: "K. Boateng", at: "14 Oct", dept: "fin", files: 9, versions: 33 });
 const WATCH_LOG = {
   "M-20": [[11.6, "Kojo", "Copied", "price-list-q4.xlsx", "to a USB drive (E:) on OPS-01"], [9.2, "R. Mensah", "Renamed", "price-list-q3.xlsx", "to price-list-q3-final.xlsx"], [-5, "System", "Sent by a flow", "price-list-q3-final.xlsx", "to FIN-01 /prices/ by the flow weekly"],
     [-30, "Ama", "Moved", "price-list-q2.xlsx", "from WS-OPS-A1 to OPS-02"], [-52, "Kojo", "Deleted", "price-list-q1-draft.xlsx", "on OPS-01"]],
@@ -2361,7 +2394,7 @@ const WATCH_LOG = {
 };
 const watchLog = (k) => (WATCH_LOG[k.id] || []).slice().sort((a, b) => b[0] - a[0]);
 const ago = (t) => (NOWH - t < 24 ? `${dur(NOWH - t)} ago` : `${dayOf(t)} ${hhmm(t)}`);
-const suCopy = (id, sev, host, file, folder, at, mark) => ({ id, sev, type: "file", title: "Restricted file copied where it isn't allowed", subject: file, host, at, owner: "You", sla: 1, state: "Open", kind: "violation", d: { file, folder, size: "—", mark } });
+const suCopy = (id, sev, host, file, folder, at, mark) => ({ id, sev, type: "file", title: "Restricted file copied where it isn't allowed", subject: file, host, at, owner: "Unassigned", sla: 1, state: "Open", kind: "violation", d: { file, folder, size: "—", mark } });
 if (MBY["FIN-01"]) ISSUES.push(
   suCopy("INC-1050", "high", "FIN-01", "board-minutes-2026-09.docx", "C:\\Users\\Afi\\Downloads", 11.4, "M-10"),
   suCopy("INC-1051", "critical", "OPS-02", "loi-northline.pdf", "C:\\Users\\Public\\Shared", 8.75, "M-11"),
@@ -2480,9 +2513,34 @@ function useWidth(ref, fallback = 640) {
 const PULSE_KEY = "falcon-pulse";
 const pulseOn = () => document.documentElement.getAttribute("data-pulse") !== "off";
 (() => { try { if (localStorage.getItem(PULSE_KEY) === "off") document.documentElement.setAttribute("data-pulse", "off"); } catch (e) { /* the pulse stays on */ } })();
+// a button that opens another page asks first, and the page opens with what the button was about picked, in view and
+// pulsing (the user, 1 Nov 2026: no sudden jump, and show where to look). ARRIVE carries the request across the jump; a
+// page can mark the place to look with data-arrive, otherwise the picked item is it
+let ARRIVE = null;
+function arriveNow() {
+  const a = ARRIVE; ARRIVE = null; if (!a) return;
+  const el = document.querySelector(".content [data-arrive]") || (a.sub ? document.querySelector(".content .tk-item.am-pick > article, .content .auo-li.on, .content .ms-p.on") : null);
+  if (!el) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  if (!pulseOn()) return;
+  setTimeout(() => { el.classList.remove("pulsed"); void el.offsetWidth; el.classList.add("pulsed"); setTimeout(() => el.classList.remove("pulsed"), 1200); }, 350);
+}
+// what the question says will be waiting on the other page
+const arriveWhat = (p, s) => { if (!s) return null; if (s === "new") return "It opens on the form to make one.";
+  const n = p === "tasks" ? (TASKS.find((x) => x.id === s) || {}).title : p === "issues" ? (ISSUES.find((x) => x.id === s) || {}).subject
+    : p === "machines" || p === "actions" ? (MBY[s] ? s : null) : p === "flows" ? (FBY[s] ? s : null) : p === "automation" ? (RBY[s] || {}).name : null;
+  return !n ? null : p === "actions" ? `${n} will be picked to run on.` : `${n} will be picked there.`; };
 // a section that a pick elsewhere has just changed says so: its border pulses once (.pulsed), when it is next in view if
 // the pick left it off screen. Not on the first draw, and never on the card that was clicked. One call per page: put the
 // returned ref on every section that follows the pick.
+// a section that asks the Engine for something when an item is picked says so for a moment, as Machines does; a panel
+// built from what the list already holds never does (the user, 1 Nov 2026). Not on the first draw.
+function useLoading(key, ms = 700) {
+  // loading from the very draw the pick happens on, so nothing (a pulse) can slip in before it
+  const [done, setDone] = useState(key);
+  useEffect(() => { if (key == null || done === key) return; const tm = setTimeout(() => setDone(key), ms); return () => clearTimeout(tm); }, [key]);
+  return key != null && done !== key;
+}
 function usePulse(key) {
   const els = useRef(new Set()), seen = useRef(key);
   const ref = useRef((el) => { if (el) els.current.add(el); }).current;
@@ -2806,7 +2864,7 @@ function MachineList({ go }) {
     : html`<${SidePanel} empty=${html`<${Empty} icon="DesktopOutlined" title="Nothing to show" text="Pick a machine in the list." h=${200} />`} />`;
   return html`<${React.Fragment}>${modalCtx}
     <${Strip} on=${f} onPick=${setF} items=${[
-      { key: "all", label: "Machines", value: fmt(MACHINES.length), delta: "in this department" },
+      { key: "all", label: "Machines", value: fmt(MACHINES.length), delta: "every department" },
       { key: "online", label: "Online", value: fmt(MACHINES.length - off), unit: "/ " + fmt(MACHINES.length), delta: off ? `${fmt(off)} not checking in` : "every one", dc: off ? "var(--crit)" : undefined },
       { key: "look", label: "Need a look", value: fmt(MACHINES.filter(look).length), delta: MACHINES.filter(look).length ? "not healthy, or offline" : "every one is healthy", dc: MACHINES.some((m) => m.status === "critical") ? "var(--crit)" : undefined },
       { key: "current", label: "On the current version", value: fmt(MACHINES.length - behind), unit: "/ " + fmt(MACHINES.length), delta: behind ? `${fmt(behind)} still on an older one` : "every one on 1.4.2" }].map((x) => (x.key === "all" ? { ...x, key: null } : x))} />
@@ -2827,10 +2885,15 @@ function MachineList({ go }) {
 }
 // Entering a worker's PC, wherever it is started from (machine page, an issue): the same check every time, who is in
 // it now and whether they are ended, so the issue page cannot skip Session Blocking (admin-navigation.md D5).
-const enterSessionConfirm = (m, onOk) => ({
-  title: m.held ? `End ${m.held}'s session and enter ${m.host}?` : `Enter ${m.host}?`,
-  content: m.held ? `${m.held} is in this machine now and is not warned first. ${m.user} stays locked out while you are in.` : m.user ? `${m.user} is signed in and is locked out while you are in. You get 30 minutes, and can extend them.` : "No one is signed in. You get 30 minutes, and can extend them.",
-  okText: m.held ? "End and enter" : "Enter", okButtonProps: { danger: !!m.held }, cancelText: "Cancel", onOk,
+// two Admins are never on one machine at once (version 1): the second is told who is in and since when, and nobody is
+// pushed out (docs/design/v1-it-admin.md)
+const enterSessionConfirm = (m, onOk) => (m.held && m.held !== "You" ? {
+  title: `${m.held} is in ${m.host}`,
+  content: `${m.held} has been inside since ${hhmm(m.heldFrom)}. Two Admins are never on one machine at once, and nobody is pushed out. Send them a message on Messages, or enter when they have left.`,
+  okText: "OK", cancelButtonProps: { style: { display: "none" } } } : {
+  title: `Enter ${m.host}?`,
+  content: m.user ? `${m.user} is signed in and is locked out while you are in. You get 30 minutes, and can extend them.` : "No one is signed in. You get 30 minutes, and can extend them.",
+  okText: "Enter", cancelText: "Cancel", onOk,
 });
 // Issues can be opened already narrowed (a type, a machine), from Restricted or a machine page
 let ISSUE_PRESET = null;
@@ -3030,7 +3093,7 @@ const ISSUE_TYPES = {
     } },
   update: { label: "Stuck update", icon: "CloudSyncOutlined", from: "Rollout",
     build: (i, m, dp) => {
-      const offline = m.status === "offline", noAdmin = !dp.admins.length;
+      const offline = m.status === "offline", noAdmin = false;   // version 1: departments are labels, with no Admins of their own
       const why = [...(offline ? [`${m.host} is offline, so it can only retry when it is back.`] : []), ...(noAdmin ? [`${dp.name} has no Admin, so you can assign one here.`] : [])];
       return {
         lead: `${m.host} is on ${i.d.cur} and should be on ${i.d.target}.${noAdmin ? ` ${dp.name} has no Admin, so it came to you.` : ""}`,
@@ -3052,7 +3115,7 @@ const ISSUE_TYPES = {
       why: [],
       options: [
         { key: "remind", icon: "BellOutlined", title: `Remind ${i.d.consent}`, desc: "Sends the request again, with your name on it.", verb: "Remind", done: "Waiting", log: `Reminded ${i.d.consent}` },
-        { key: "dest", icon: "SwapOutlined", title: "Send it somewhere you manage instead", desc: "A machine in your own department needs nobody to agree.", verb: "Change it", done: "Resolved", need: "pick", pick: ["OPS-01 /intake/", "OPS-04 /intake/", "WS-OPS-A1 /intake/"], pickHint: "Pick a destination", log: "Changed the destination" },
+        { key: "dest", icon: "SwapOutlined", title: "Send it to a Worker's machine instead", desc: "You pick the folder there, and nobody has to agree; only another Admin's machine asks first.", verb: "Change it", done: "Resolved", need: "pick", pick: ["OPS-01 /intake/", "OPS-04 /intake/", "WS-OPS-A1 /intake/"], pickHint: "Pick a destination", log: "Changed the destination" },
         { key: "withdraw", icon: "DeleteOutlined", title: "Withdraw the flow", desc: "Nothing has been copied yet. The request is closed.", verb: "Withdraw", done: "Resolved", log: `Withdrew the ${i.d.flow} flow` },
       ] }) },
 };
@@ -3063,7 +3126,7 @@ const ISSUE_KINDS = { file: ["violation", "session"], help: ["session"], deviati
 function IssueTimeline({ it, extra, under }) {
   const where = under ? "above" : "on the right";
   const base = it.id === "INC-1042"
-    ? [[10.03, "System", "Detected budget-2026.xlsx in C:\\Users\\Ama\\Documents", "var(--crit)"], [10.04, "System", "Report written, routed to Super User and Operations", "var(--text-3)"], [10.05, "Automation", `Took a screenshot of OPS-07 (rule: ${RBY.restricted.name})`, "var(--s3)"], [10.7, "You", "Entered OPS-07", "var(--accent)"], [11.1, "R. Mensah", "Viewed the report", "var(--text-3)"]]
+    ? [[10.03, "System", "Detected budget-2026.xlsx in C:\\Users\\Ama\\Documents", "var(--crit)"], [10.04, "System", "Report written; every Admin sees it", "var(--text-3)"], [10.05, "Automation", `Took a screenshot of OPS-07 (rule: ${RBY.restricted.name})`, "var(--s3)"], [10.7, "You", "Entered OPS-07", "var(--accent)"], [11.1, "R. Mensah", "Viewed the report", "var(--text-3)"]]
     : it.id === "AST-0311" ? [[9.67, "Kojo", "Messaged R. Mensah", "var(--s5)"], [10.25, "Kojo", "Messaged again", "var(--s5)"]]
     // only what belongs to this kind of issue: the generated background (a flow syncing, a routine update check, a sign-in) is not part of its story
     : AUDIT.filter((e) => e.notable && e.host === it.host && (ISSUE_KINDS[it.type] || []).includes(e.kind) && Math.abs(e.t - it.at) < 2).slice(0, 5).map((e) => [e.t, e.actor, e.what, KINDS[e.kind].c]);
@@ -3072,8 +3135,8 @@ function IssueTimeline({ it, extra, under }) {
   const seen = base.some((e) => Math.abs(e[0] - it.at) < 0.05);
   const std = special ? [] : [
     ...(seen ? [] : [[it.at, "System", `${ISSUE_TYPES[it.type].label} raised on ${it.host}: ${it.subject}`, "var(--crit)"]]),
-    [it.at + 0.01, "System", `Report written, routed to ${dept && dept !== "log" ? "the Super User and " + DBY[dept].name : "the Super User"}`, "var(--text-3)"],
-    [it.at + 0.02, "System", `Assigned to ${it.owner === "You" ? "you" : it.owner}`, "var(--text-3)"]];
+    [it.at + 0.01, "System", "Report written; every Admin sees it", "var(--text-3)"],
+    [it.at + 0.02, "System", it.owner === "Unassigned" ? "Waiting for an Admin to take it" : `Taken by ${it.owner === "You" || it.owner === ME ? "you" : it.owner}`, "var(--text-3)"]];
   const target = [sla, "System", NOWH > sla ? `Passed its target time (${it.sla} h)` : `Target time (${it.sla} h)`, NOWH > sla ? "var(--crit)" : "var(--text-3)"];
   const all = [...std, ...base, target, ...extra.map(([t, w]) => [t, "You", w, "var(--accent)"])].sort((a, b) => a[0] - b[0]);
   if (!all.length) return html`<div className="t3" style=${{ padding: "10px 0", fontSize: 12.5 }}>Nothing recorded on ${it.host} around it yet. What you do here is added as you go.</div>`;
@@ -3211,7 +3274,7 @@ let TASKS = [
       { target: "payroll-sep.xlsx", intent: "Update", st: "Passed", sig: "Saved 12 times", fn: (t) => (working(t) && t > -134 && t < -7 ? 1 + 3 * sm(8, t, 3) : 0) },
       { target: "EXCEL.EXE with payroll-sep.xlsx open", intent: "Used with file", st: "Passed", sig: "Open 6h 40m in total", fn: (t) => (working(t) && t > -134 && t < -7 && sm(9, t, 2) > 0.4 ? 1 : 0) } ],
     log: [[-7.33, "payroll-sep.csv created"], [-7.4, "Afi marked it ready for verification"], [-30, "payroll-sep.xlsx saved"], [-134, "Afi started the task"], [-135, "Assigned by K. Boateng"]] },
-  { id: "T-201", title: "Archive the August delivery notes", who: "Esi", host: "LOG-01", by: "You", state: "Overdue", assigned: -160, started: -150, soft: -55, final: -31,
+  { id: "T-201", title: "Archive the August delivery notes", who: "Esi", host: "LOG-01", by: "A. Quaye", state: "Overdue", assigned: -160, started: -150, soft: -55, final: -31,
     evidence: [
       { target: "/archive/2026-08/", intent: "Exists", st: "Passed", sig: "Folder created Mon 10:05", fn: (t) => (Math.abs(t + 61.9) < 0.4 ? 1 : 0) },
       { target: "delivery-notes-aug.zip", intent: "Create", st: "Failed", sig: "Not found by the final deadline", fn: () => 0 } ],
@@ -3228,7 +3291,7 @@ if (LARGE) {
       by: k % 4 === 0 ? "You" : t.by, state: ["In progress", "Overdue", "Not started", "In progress"][k % 4], final: k % 4 === 1 ? NOWH - 2 - k : NOWH + 4 + k }); } }
 }
 TASKS.push(
-  { id: "T-206", title: "Send the weekly route plan", who: "Esi", host: "LOG-01", by: "You", state: "In progress", assigned: -40, started: -39, soft: 30, final: 41,
+  { id: "T-206", title: "Send the weekly route plan", who: "Esi", host: "LOG-01", by: "A. Quaye", state: "In progress", assigned: -40, started: -39, soft: 30, final: 41,
     evidence: [{ target: "routes-w40.csv", intent: "Update", st: "Passed", sig: "Saved 6 times", fn: (t) => (working(t) && t > -39 ? 1 + 2 * sm(12, t, 3) : 0) }, { target: "route-plan-w40.pdf", intent: "Create", st: "Pending", sig: "Not seen on LOG-01 yet", fn: () => 0 }],
     log: [[-39, "Esi started the task"], [-40, "Assigned by you"]] },
   { id: "T-204", title: "Clear duplicate files from the shared drive", who: "Nana", host: "OPS-05", by: "R. Mensah", state: "In progress", assigned: -90, started: -80, soft: null, final: 113,
@@ -4010,17 +4073,18 @@ function EditorShell({ left, right, ratio, problem, note, onCancel, onSave, save
   </div>`;
 }
 function NewFlow({ go, me, edit, drawer }) {
-  // a source is a folder on a machine you manage, or a folder another flow already delivers to; a flow can have several
+  // a source is a folder or one file on a machine, or a folder another flow already delivers to; a flow can have several.
+  // One file is followed by its identity in the file index, not its path, at both ends (version 1, 1 Nov 2026)
   const blank = { name: "", srcs: [{ mode: "dir", host: "", path: "" }], when: "Real time", stages: [], dests: [{ mode: "mine", host: "", path: "" }] };
-  // An Admin sends only between machines they manage; anywhere else, they ask the owner, who picks the folder.
-  // The Super User manages everything, so (at their own level) any machine is theirs to pick.
+  // Version 1: onto a Worker's machine (or your own) you pick the folder and nobody has to agree; onto another Admin's
+  // workstation, that Admin picks the folder, and picking it is their consent (docs/design/v1-it-admin.md)
   const ws = me && ADMIN_INFO[me] ? ADMIN_INFO[me].ws : null;
   const managed = me ? [...(ws ? [{ value: ws, label: `${ws} · your workstation` }] : []), ...MACHINES.map((m) => ({ value: m.host, label: `${m.host} · ${m.user || "no user"}${m.status === "offline" ? " · offline" : ""}` }))]
     : [...FLOW_HOSTS.map((h) => ({ value: h.host, label: `${h.host} · ${h.sub}${h.offline ? " · offline" : ""}` })), ...Object.entries(ADMIN_INFO).map(([n, a]) => ({ value: a.ws, label: `${a.ws} · ${n}'s workstation` }))];
   const myDept = me && ADMIN_INFO[me] ? ADMIN_INFO[me].dept : null;
   const crosses = (who) => !!(who && who !== "Super User" && ADMIN_INFO[who] && myDept && ADMIN_INFO[who].dept !== myDept);
   const deptNm = (who) => (ADMIN_INFO[who] && DBY[ADMIN_INFO[who].dept] ? DBY[ADMIN_INFO[who].dept].name : "that department");
-  const people = [{ value: "Super User", label: "Super User · on ADM-01" }, ...Object.entries(ADMIN_INFO).filter(([n]) => n !== me).map(([n, a]) => ({ value: n, label: `${n} · Admin, ${DBY[a.dept] ? DBY[a.dept].name : a.dept}${a.dept !== myDept ? " · another department, must agree" : ""}` }))];
+  const people = Object.entries(ADMIN_INFO).filter(([n]) => n !== me).map(([n, a]) => ({ value: n, label: `${n} · ${a.ws}` }));
   // existing flows that already deliver somewhere, to take as a source; a flow with several branches says which
   const flowOpts = EXISTING_FLOWS.filter((x) => x.dests.some((d) => !askOf(d))).map((x) => ({ value: x.name, label: `${x.name} · by ${x.by}` }));
   const branchesOf = (n) => (FBY[n] ? FBY[n].dests.filter((d) => !askOf(d)) : []);
@@ -4191,10 +4255,13 @@ function NewFlow({ go, me, edit, drawer }) {
     const fld = (label, el, note) => html`<div className="nfv-f"><span className="nfv-l">${label}</span>${el}${note ? html`<span className="nfv-n">${note}</span>` : null}</div>`;
     const cardHead = (i, mid, onX, xOff) => html`<div className="nfv-h">${num(i)}${mid}<span className="sp" /><${Button} size="small" type="text" icon=${ic("CloseOutlined")} aria-label="Remove" disabled=${xOff} onClick=${onX} /></div>`;
     const srcV = (q, i) => html`<div key=${i} className="nfv-card">
-      ${cardHead(i, html`<${Segmented} size="small" value=${q.mode} onChange=${(v) => setSrc(i, { mode: v })} options=${[{ value: "dir", label: "A folder" }, { value: "flow", label: "An existing flow" }]} />`, () => setF((x) => ({ ...x, srcs: x.srcs.filter((_, j) => j !== i) })), f.srcs.length === 1)}
+      ${cardHead(i, html`<${Segmented} size="small" value=${q.mode} onChange=${(v) => setSrc(i, { mode: v })} options=${[{ value: "dir", label: "A folder" }, { value: "file", label: "One file" }, { value: "flow", label: "An existing flow" }]} />`, () => setF((x) => ({ ...x, srcs: x.srcs.filter((_, j) => j !== i) })), f.srcs.length === 1)}
       ${q.mode === "flow" ? html`${fld("Flow", html`<${Select} showSearch optionFilterProp="label" value=${q.flow || undefined} placeholder="Pick a flow" options=${flowOpts} onChange=${(v) => setSrc(i, { flow: v, branch: 0 })} />`)}
           ${branchesOf(q.flow).length > 1 ? fld("Which of its destinations", html`<${Select} value=${q.branch || 0} options=${branchesOf(q.flow).map((d, j) => ({ value: j, label: d.join(" ") }))} onChange=${(v) => setSrc(i, { branch: v })} />`) : null}`
-        : html`${fld("Machine", html`<${Select} showSearch optionFilterProp="label" value=${q.host || undefined} placeholder="Pick a machine you manage" options=${hostOpts()} onChange=${(v) => setSrc(i, { host: v })} />`)}
+        : q.mode === "file" ? html`${fld("Machine", html`<${Select} showSearch optionFilterProp="label" value=${q.host || undefined} placeholder="Pick a machine" options=${hostOpts()} onChange=${(v) => setSrc(i, { host: v })} />`)}
+          ${fld("File", html`<${AutoComplete} value=${q.path} placeholder="For example C:\Reports\q3-summary.xlsx" options=${[]} onChange=${(v) => setSrc(i, { path: v })} />`,
+            "Followed wherever it goes: moved or renamed on its machine, it keeps syncing from where it now is. The copy at each destination is followed the same way.")}`
+        : html`${fld("Machine", html`<${Select} showSearch optionFilterProp="label" value=${q.host || undefined} placeholder="Pick a machine" options=${hostOpts()} onChange=${(v) => setSrc(i, { host: v })} />`)}
           ${fld("Folder", html`<${AutoComplete} value=${q.path} placeholder="For example /weekly/" options=${folderOpts} onChange=${(v) => setSrc(i, { path: v })} />`)}`}
       ${rsrc[i][2] ? html`<span className="nfv-n">${q.mode === "flow" ? "Carries on" : "This folder is where"} <b>${rsrc[i][2]}</b> ${q.mode === "flow" ? "from where it delivers." : "delivers, so this flow carries on from it."}</span>` : null}
     </div>`;
@@ -4207,20 +4274,20 @@ function NewFlow({ go, me, edit, drawer }) {
       ${st.scope !== "all" ? fld("Which destination", html`<${Select} value=${st.scope} options=${f.dests.map((d, j) => ({ value: j, label: d.mode === "ask" ? (d.who ? `${d.who} picks a folder` : `Destination ${j + 1}`) : `${d.host || "Destination " + (j + 1)} ${d.path || ""}` }))} onChange=${(v) => setStage(i, { scope: v })} />`) : null}
     </div>`;
     const destV = (d, i) => html`<div key=${i} className="nfv-card">
-      ${cardHead(i, me ? html`<${Segmented} size="small" value=${d.mode} onChange=${(v) => setDest(i, { mode: v })} options=${[{ value: "mine", label: "A machine you manage" }, { value: "ask", label: "Ask someone to pick" }]} />` : null,
+      ${cardHead(i, me ? html`<${Segmented} size="small" value=${d.mode} onChange=${(v) => setDest(i, { mode: v })} options=${[{ value: "mine", label: "You pick the folder" }, { value: "ask", label: "Another Admin's machine" }]} />` : null,
         () => setF((x) => ({ ...x, dests: x.dests.filter((_, j) => j !== i) })), f.dests.length === 1)}
-      ${d.mode === "ask" ? html`${fld("Who picks the folder", html`<${Select} showSearch optionFilterProp="label" value=${d.who || undefined} placeholder="The Super User, or another Admin" options=${people} onChange=${(v) => setDest(i, { who: v })} />`,
+      ${d.mode === "ask" ? html`${fld("Which Admin", html`<${Select} showSearch optionFilterProp="label" value=${d.who || undefined} placeholder="Another Admin" options=${people} onChange=${(v) => setDest(i, { who: v })} />`,
             d.who ? `${d.who} picks a folder on their own workstation. Picking it is how they agree; until then this destination waits.` : null)}
           ${fld("A line for them", html`<${Input} value=${d.note || ""} onChange=${(e) => setDest(i, { note: e.target.value })} placeholder="What this is for (optional)" />`)}
-          ${crosses(d.who) ? html`<div className="decide" style=${{ "--c": "var(--crit)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>This crosses departments.</b> ${d.who} is the Admin of ${deptNm(d.who)}.</div>` : null}`
-        : html`${fld("Machine", html`<${Select} showSearch optionFilterProp="label" value=${d.host || undefined} placeholder="Pick a machine you manage" options=${hostOpts()} onChange=${(v) => setDest(i, { host: v })} />`)}
-          ${fld("Folder", html`<${AutoComplete} value=${d.path} placeholder="For example /archive/" options=${folderOpts} onChange=${(v) => setDest(i, { path: v })} />`, d.host ? (me ? "You manage it, so nobody has to agree." : "You manage every machine, so nobody has to agree.") : null)}`}
+`
+        : html`${fld("Machine", html`<${Select} showSearch optionFilterProp="label" value=${d.host || undefined} placeholder="A Worker's machine, or your own" options=${hostOpts()} onChange=${(v) => setDest(i, { host: v })} />`)}
+          ${fld("Folder", html`<${AutoComplete} value=${d.path} placeholder="For example /archive/" options=${folderOpts} onChange=${(v) => setDest(i, { path: v })} />`, d.host ? "Nobody has to agree: only another Admin's machine asks them first." : null)}`}
     </div>`;
     const WHEN = [["Real time", "A file is copied the moment it changes, from the machine's own file events."], ["On a schedule", "Changed files are copied together, every hour."], ["Only when I run it", "Nothing moves until someone presses Run on the flow."]];
     const whenV = html`<div className="nfv-sec"><div className="nfv-st">Copy files</div>${WHEN.map(([w, d]) => html`<div key=${w} className=${"nfv-pick" + (f.when === w ? " on" : "")} role="radio" aria-checked=${f.when === w} tabIndex="0" onClick=${() => set("when")(w)} onKeyDown=${(e) => e.key === "Enter" && set("when")(w)}>
         <i /><span><b>${w}</b><span className="t3">${d}</span></span></div>`)}</div>`;
     const addB = (label, fn) => html`<${Button} icon=${ic("PlusOutlined")} onClick=${fn} style=${{ alignSelf: "flex-start" }}>${label}<//>`;
-    B[0] = html`<div className="nfv">${head("Where do the files come from?", "One source or several. Each is a folder on a machine you manage, or an existing flow, so this one carries on with whatever that flow delivers.")}
+    B[0] = html`<div className="nfv">${head("Where do the files come from?", "One source or several. Each is a folder or one file on a machine, or an existing flow, so this one carries on with whatever that flow delivers.")}
       ${f.srcs.map(srcV)}${addB("Add a source", addSrc)}${whenV}</div>`;
     B[1] = html`<div className="nfv">${head("Should anything happen to the files on the way?", "Optional. Steps run in order, top to bottom. With none, files are copied exactly as they are.")}
       ${f.stages.length ? f.stages.map(stageV) : html`<div className="nfv-none">No steps. Files are copied exactly as they are.</div>`}${addB("Add a step", addStep)}</div>`;
@@ -4855,7 +4922,7 @@ function RunOutput({ out, host }) {
   if (!out) return null;
   return html`<div style=${{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
     ${out.kind === "image" ? html`<div><${A.Image} width=${240} src=${out.src} alt=${out.summary} style=${{ borderRadius: 4, border: "1px solid var(--border)" }} />
-        <div className="t3" style=${{ fontSize: 12, marginTop: 4 }}>Click to see it whole. Only the department's Admins and the Super User can see it; every view is recorded.</div></div>`
+        <div className="t3" style=${{ fontSize: 12, marginTop: 4 }}>Click to see it whole. Only Admins can see it; every view is recorded.</div></div>`
       : out.kind === "list" ? html`<div style=${{ border: "1px solid var(--border)", borderRadius: 5, overflow: "hidden", maxWidth: 420 }}>
           <div className="row t3" style=${{ flexWrap: "nowrap", padding: "5px 10px", fontSize: 11.5, background: "var(--surface-2)" }}><span style=${{ flex: 1 }}>${out.cols[0]}</span><span>${out.cols[1]}</span></div>
           ${out.rows.slice(0, 8).map(([x0, y0], i) => html`<div key=${i} className="row" style=${{ flexWrap: "nowrap", padding: "4px 10px", fontSize: 12.5, borderTop: "1px solid var(--grid)" }}><span className="mono cut" style=${{ flex: 1 }}>${x0}</span><span className="mono t3">${y0}</span></div>`)}
@@ -5082,8 +5149,8 @@ function applyScope(dept) {
   MARKS = FULL.MARKS.filter((k) => !dept || k.dept === dept);
 }
 const ADMIN_INFO = {
-  "R. Mensah": { dept: "ops", ws: "WS-OPS-A1", now: "Inside OPS-04 since 12:58", busy: true },
-  "A. Quaye": { dept: "ops", ws: "WS-OPS-A2", now: "Signed in on WS-OPS-A2 since 08:15" },
+  "R. Mensah": { dept: "ops", ws: "WS-OPS-A1", now: "Inside OPS-07 since 10:42", busy: true },
+  "A. Quaye": { dept: "ops", ws: "WS-OPS-A2", now: "Inside OPS-04 since 12:58", busy: true },
   "K. Boateng": { dept: "fin", ws: "WS-FIN-A1", now: "Signed in on WS-FIN-A1 since 08:20" },
 };
 if (LARGE) DEPTS.forEach((d, k) => d.admins.forEach((a, j) => { if (!ADMIN_INFO[a]) ADMIN_INFO[a] = { dept: d.id, ws: `WS-${d.id.toUpperCase()}-A${j + 1}`, now: `Signed in on WS-${d.id.toUpperCase()}-A${j + 1} since 08:${String(10 + ((k * 7 + j * 3) % 40)).padStart(2, "0")}` }; }));
@@ -6254,7 +6321,7 @@ const AL_IC = { session: "LoginOutlined", action: "ThunderboltOutlined", flow: "
 const AL_SAYS = { session: "someone went into or out of a machine", action: "an action ran", flow: "a flow moved files", rollout: "an update", deviation: "something did not match what it should be", violation: "a restricted file was found where it should not be" };
 const alDay = (t) => (t >= 0 ? "Today" : t >= -24 ? "Yesterday" : dayOf(t));
 const alWhen = (t) => `${t >= 0 ? "today" : t >= -24 ? "yesterday" : dayOf(t)} at ${hhmm(t)}`;
-const alWho = (a) => (a === "System" || a === "Automation" ? "Falcon itself" : a === "You" ? "you" : ADMIN_INFO[a] ? `Admin, ${deptNameOf(ADMIN_INFO[a].dept)}` : (MACHINES.find((m) => m.user === a) ? `works on ${MACHINES.find((m) => m.user === a).host}` : "a person"));
+const alWho = (a) => (a === "System" || a === "Automation" ? "Falcon itself" : a === "You" ? "you" : ADMIN_INFO[a] ? "IT Admin" : (MACHINES.find((m) => m.user === a) ? `works on ${MACHINES.find((m) => m.user === a).host}` : "a person"));
 // the log as entries: a visit (entered, then left) is one entry with its length
 const alEntries = (xs) => { const out = [], used = new Set();
   xs.forEach((e, i) => { if (used.has(i)) return; const m = /^Entered (\S+)( \(outside working hours\))?$/.exec(e.what);
@@ -6421,10 +6488,10 @@ function KeyModal({ spec, onClose }) {
   useEffect(() => { if (spec) { setStep(spec.mode === "rekey" ? 1 : 0); setName(""); setDept(spec.dept); setFound(null); setKey(newKey()); } }, [sig]);
   if (!spec) return html`<${Drawer} open=${false} />`;
   const rk = spec.mode === "rekey", pc = spec.mode === "pc", who = rk ? spec.subject : name.trim();
-  const title = rk ? `New key for ${spec.subject}` : pc ? "Register a PC" : "Provision an Admin";
+  const title = rk ? `New key for ${spec.subject}` : pc ? "Register a PC" : "Add an IT Admin";
   const fl = pc && spec.found ? spec.found : null, fp = fl && fl.find((f) => f.host === found);
   return html`<${Drawer} open=${true} onClose=${onClose} title=${title} width=${fl ? 560 : 480} maskClosable=${step === 0}
-    footer=${step === 0 ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${onClose}>Cancel<//><${Button} type="primary" disabled=${!name.trim() || !dept} onClick=${() => { setStep(1); toast(`${name.trim()} registered, recorded in the audit log (concept)`); }}>${pc ? "Register" : "Provision"}<//></div>`
+    footer=${step === 0 ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${onClose}>Cancel<//><${Button} type="primary" disabled=${!name.trim()} onClick=${() => { setStep(1); toast(`${name.trim()} registered, recorded in the audit log (concept)`); }}>${pc ? "Register" : "Provision"}<//></div>`
       : html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${onClose}>I have saved it<//></div>`}>
     ${step === 0 ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
         ${fl ? html`<div><div className="nt-h">Found, not registered</div>
@@ -6435,8 +6502,7 @@ function KeyModal({ spec, onClose }) {
             <div className="t3" style=${{ fontSize: 12, marginTop: 6 }}>Pick one to fill in its name, or type a new one below.</div>`
             : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nothing found. A PC shows here once its worker tries to connect, or once it is seen on the network.</div>`}</div>` : null}
         <div><div className="nt-h">${pc ? "Machine name" : "Name"}</div><${Input} id="rg-name" value=${name} onChange=${(e) => setName(e.target.value)} placeholder=${pc ? "OPS-08" : "J. Owusu"} /></div>
-        ${pc && spec.dept ? html`<div><div className="nt-h">Department</div><div className="am-dept">${deptNameOf(spec.dept)}<span className="t3">your department</span></div></div>` : html`<div><div className="nt-h">Department</div><${Select} id="rg-dept" showSearch optionFilterProp="label" value=${dept} onChange=${setDept} placeholder="Which department?" style=${{ width: "100%" }} options=${FULL_DEPTS().map((d) => ({ value: d.id, label: d.name }))} /></div>`}
-        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>${pc ? (fp && fp.kind === "seen" ? `${fp.host} has no worker yet. Register it now, then install the worker on it with the key you get next.` : fp ? `${fp.host} is already trying to connect. Once its worker has the key you get next, it checks in.` : "The machine joins the department and shows up in its fleet. It gets a key, shown once.") : "They get a console and a key, shown once. The department's reports start reaching them once you route them."}</div>
+        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>${pc ? (fp && fp.kind === "seen" ? `${fp.host} has no worker yet. Register it now, then install the worker on it with the key you get next.` : fp ? `${fp.host} is already trying to connect. Once its worker has the key you get next, it checks in.` : "It gets a key, shown once. Put it in a department on Departments.") : "They get the IT console and a key, shown once. Like every Admin, they reach every department, and every issue reaches them."}</div>
       </div>`
       : html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="t2">${rk ? `The old key for ${spec.subject} stops working at once.` : `${who} is registered.`} Copy this into ${rk || pc ? "the machine's Worker Client settings" : "their Operator Client settings"}.</div>
@@ -6457,7 +6523,7 @@ function Registry({ go, enter, open }) {
   const [modal, modalCtx] = Modal.useModal();
   const GEN = { "OPS-05": 2, "OPS-06": 2, "LOG-02": 3 };
   const su = ME === "Super User";
-  const accts = su ? [] : [...Object.entries(ADMIN_INFO).filter(([, a]) => ADMIN_INFO[ME] && a.dept === ADMIN_INFO[ME].dept).map(([n, a]) => ({ id: "acct:" + n, name: n, role: "Admin", dept: deptNameOf(a.dept), ws: a.ws, gen: 1 + (hs(n) % 3), now: a.now })), ...MACHINES.filter((m) => m.user).map((m) => ({ id: "acct:" + m.user, name: m.user, role: "Worker", dept: deptNameOf(m.dept), ws: m.host, gen: 1, now: m.status === "offline" ? "Not signed in" : "Signed in" }))];
+  const accts = su ? [] : [...Object.entries(ADMIN_INFO).map(([n, a]) => ({ id: "acct:" + n, name: n, role: "IT Admin", dept: "every department", ws: a.ws, gen: 1 + (hs(n) % 3), now: a.now })), ...MACHINES.filter((m) => m.user).map((m) => ({ id: "acct:" + m.user, name: m.user, role: "Worker", dept: deptNameOf(m.dept), ws: m.host, gen: 1, now: m.status === "offline" ? "Not signed in" : "Signed in" }))];
   const rows = MACHINES.map((m) => ({ ...m, id: m.host, gen: GEN[m.host] || 1, dn: deptNameOf(m.dept) })).filter((m) => `${m.host} ${m.user || ""} ${m.dn}`.toLowerCase().includes(q.toLowerCase()));
   const [tab, setTab] = useState(() => (su ? "door" : open && String(open).startsWith("acct:") ? "acct" : "pc"));
   const sid = sel || (tab === "acct" ? accts[0].id : tab === "door" ? (REFUSED[0] || {}).id : rows[0] && rows[0].id);
@@ -6469,9 +6535,9 @@ function Registry({ go, enter, open }) {
   return html`<${React.Fragment}>
     ${modalCtx}
     <${Strip} items=${(su ? [] : [
-      { label: "Machines", value: fmt(MACHINES.length), delta: "in this department" },
+      { label: "Machines", value: fmt(MACHINES.length), delta: "every department" },
       { label: "Checking in", value: fmt(MACHINES.length - off), unit: "/ " + fmt(MACHINES.length), delta: off ? `${fmt(off)} not checking in` : "every one", dc: off ? "var(--crit)" : undefined },
-      { label: "People", value: fmt(accts.length), delta: "in this department" }]).concat(!su ? [] : [
+      { label: "People", value: fmt(accts.length), delta: "every department" }]).concat(!su ? [] : [
       { label: "Refused this week", value: fmt(REFUSED.length), delta: REFUSED.length ? `${fmt(REFUSED.reduce((t, y) => t + y.tries, 0))} tries without a valid key` : "nothing tried without a key", dc: REFUSED.some((y) => y.tone === "bad") ? "var(--crit)" : undefined }])} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       ${tab === "acct" ? html`<${ListPanel} title="People" sub="your department's people · click one to see it on the right" tools=${tabSw} pick=${sid} onPick=${setSel} rowKey="id" rows=${accts}
@@ -6968,7 +7034,7 @@ function AdminDetectivePage({ go }) {
       </div>` : null}</div>`; };
   const PER = 5, ord = open, pages = Math.max(1, Math.ceil(ord.length / PER)), p = Math.min(pg, pages - 1), page = ord.slice(p * PER, p * PER + PER);
   const rules = DET.rules.filter((r) => !back[r.id]);
-  const pz = usePulse(cur.id);
+  const ld = useLoading(cur.id), pz = usePulse(ld ? null : cur.id);
   return html`<div className="og aup">
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
@@ -6994,12 +7060,12 @@ function AdminDetectivePage({ go }) {
       </section>
     </div>
     <div className="g c-84 dt-two">
-    <section className="ib-box dt-col" ref=${pz}>
-      <header><b>What happened</b><span>${cur.intent} on <span className="mono">${cur.host}</span>, ${cur.first_at.slice(11, 16)} to ${cur.when}; each connection carries its step's number</span></header>
+    <section className=${"ib-box dt-col" + (ld ? " ld-on" : "")} ref=${pz}>
+      <header><b>What happened</b><span>${cur.intent} on <span className="mono">${cur.host}</span>, ${cur.first_at.slice(11, 16)} to ${cur.when}; each connection carries its step's number</span></header>${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}
         <div className="dt-pic">${det.graph.nodes.length ? html`<${DetGraph} g=${det.graph} story=${cur.story} />` : html`<div className="ib-quiet">Nothing to draw.</div>`}</div>
     </section>
-    <section className="ib-box dt-col" ref=${pz}>
-      <header><b>Step by step</b><span>${fmt(cur.story.length)} step${cur.story.length === 1 ? "" : "s"}, in the order they happened</span></header>
+    <section className=${"ib-box dt-col" + (ld ? " ld-on" : "")} ref=${pz}>
+      <header><b>Step by step</b><span>${fmt(cur.story.length)} step${cur.story.length === 1 ? "" : "s"}, in the order they happened</span></header>${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}
         <div className="dt-story">${cur.story.map((l, i) => { const m = /^(\d\d:\d\d)\s+(.*)$/.exec(l); return html`<div key=${i} className="dt-st"><span className="dt-sn">${i + 1}</span><span className="mono t3">${m ? m[1] : ""}</span><span>${m ? m[2] : l}</span></div>`; })}</div>
     </section>
     </div>
@@ -7157,7 +7223,7 @@ function calEvents(level) {
   } else {
     DEPT_TASKS.filter((t) => !t.complete).forEach((t) => ev.push({ k: "task", at: t.due, title: t.title, line: ((FULL.DEPTS || DEPTS).find((d) => d.id === t.dept) || { name: t.dept }).name, to: ["tasks", t.id] }));
   }
-  const who = level ? "Your department" : "Every department";
+  const who = "Every department";
   if (!level) [[24 + 8, "Fire drill on Friday morning"], [24 * 6 + 9, "Month-end: timesheets in by 17:00"], [24 * 20 + 8, "Offices closed on the public holiday"], [24 * 45 + 8, "Year-end training week starts on Monday"]].forEach(([at, title]) => ev.push({ k: "ann", at, title, line: who, to: level ? ["messages", null] : ["announcements", null] }));
   return ev;
 }
@@ -7376,7 +7442,7 @@ function AdminsPage({ go, enter }) {
 const NAV_ADMIN = [
   ["Home", [["overview", "Overview", "DashboardOutlined"], ["messages", "Messages", "MessageOutlined", () => amWaiting(), true, true], ["calendar", "Calendar", "CalendarOutlined"]]],
   ["Core", [["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["flows", "Flows", "BranchesOutlined"], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["detective", "Detective", "FileSearchOutlined", () => DET.cases.filter((c) => c.status === "open" && c.level === "urgent").length, true]]],
-  ["Manage", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["actions", "Actions", "PlayCircleOutlined"], ["automation", "Automation", "ThunderboltOutlined"], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true], ["audit", "Audit log", "HistoryOutlined"]]],
+  ["Manage", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["departments", "Departments", "ApartmentOutlined"], ["actions", "Actions", "PlayCircleOutlined"], ["automation", "Automation", "ThunderboltOutlined"], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true], ["audit", "Audit log", "HistoryOutlined"]]],
 ];
 // The Super User has no Core: Tasks, Flows, Restricted and Detective are the Admin's pages. Home holds what reaches them (the Inbox); Direct is what they send down, who they rely on and what they have restricted; Manage is the structure and the record.
 const NAV_SU = [
@@ -7409,8 +7475,10 @@ const SU_PARENT = { dept: "departments", announcements: "directives" };
 // Pages the menu does not list: tabs of the page that took them in (docs/design/pruning.md)
 // (Registry: the Admin's machines and people, a tab of Machines; the Super User's is only the refused connections, a tab of Departments)
 const tabParent = (p, level) => (p === "registry" ? (level ? "machines" : "departments") : null);
-const tabsFor = (p, level) => (level ? (p === "machines" || p === "registry" ? [["machines", "Machines"], ["registry", "Registry"]] : null) : null);
-const TITLES = { inbox: ["Inbox", "What needs you, with what is recommended"], directives: ["Directives", "What you asked of each department, and what has come back"], announcements: ["Announcements", "What you send down · announcements to every department, and who has seen them"], admins: ["Admins", "The people you rely on, and whether each one is keeping up"], protected: ["Protected", "What you watch, what only the people you name may open, and what never leaves its place"], calendar: ["Calendar", "What is coming · task deadlines, your to-dos and scheduled automation"], detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"], messages: ["Messages", "Conversations with the people you look after, one at a time or as a group"], departments: ["Departments", "The organisation, who runs each part of it, and how each is doing"], accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"], access: ["Access", "Who is inside which machine, and who was let in"], registry: ["Registry", "Machines and accounts · register, re-key, provision"], rules: ["Rules", "The standard the organisation is measured against"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
+// at the Admin's level the Registry tab is gone (1 Nov 2026): registering is Machines' Add a machine, a machine's key is New key
+// on its card, and departments are made on Departments
+const tabsFor = (p, level) => null;
+const TITLES = { inbox: ["Inbox", "What needs you, with what is recommended"], directives: ["Directives", "What you asked of each department, and what has come back"], announcements: ["Announcements", "What you send down · announcements to every department, and who has seen them"], admins: ["Admins", "The people you rely on, and whether each one is keeping up"], protected: ["Protected", "What you watch, what only the people you name may open, and what never leaves its place"], calendar: ["Calendar", "What is coming · task deadlines, your to-dos and scheduled automation"], detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"], messages: ["Messages", "Conversations with the people you look after, one at a time or as a group"], departments: ["Departments", "Labels that group machines and the people at them"], accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"], access: ["Access", "Who is inside which machine, and who was let in"], registry: ["Registry", "Machines and accounts · register, re-key, provision"], rules: ["Rules", "The standard the organisation is measured against"], dept: ["Department", ""], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], overview: ["Overview", "All departments · live"], machines: ["Machines", "Every registered client PC"], sessions: ["Sessions", "Who is on which machine, and who entered whose"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], tasks: ["Tasks", "Assigned work and the evidence for it"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], flows: ["Flows", "One-way file pipelines between machines"], automation: ["Automation", "Rules, conditions and every run"], rollout: ["Rollout", "Versions and the gate to the next one"], audit: ["Audit log", "Everything that happened, and who did it"], reports: ["Reports", "What the system wrote down, and where it went"] };
 function Palette({ go, close, nav, su }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
   useEffect(() => { r.current && r.current.focus(); }, []);
@@ -8136,9 +8204,9 @@ const ptLv = (k) => (k.level === "ask" ? "private" : k.level) || (k.watch ? "wat
 const ptWho = (xs) => listNames(xs.map((x) => (x === "You" ? "you" : x)));
 if (!EMPTY && !MARKS.some((k) => k.id === "M-30")) {
   MARKS.push(
-    { id: "M-30", kind: "folder", name: "Disciplinary files", host: "ADM-01", path: "D:\\HR\\Disciplinary\\", level: "private", open: ["You", "K. Boateng"], by: "Super User", at: "10 Oct", dept: "su", files: 17, versions: 22 },
-    { id: "M-31", kind: "program", name: "Payroll Manager", host: "FIN-01", path: "C:\\Program Files\\PayrollManager\\payroll.exe", level: "private", open: ["K. Boateng", "Afi"], system: true, by: "Super User", at: "14 Oct", dept: "su", files: 1, versions: 1 },
-    { id: "M-32", kind: "file", name: "tender-evaluation-2026.xlsx", host: "ADM-01", path: "D:\\Tenders\\tender-evaluation-2026.xlsx", level: "watch", watch: true, by: "Super User", at: "16 Oct", dept: "su", files: 1, versions: 5 });
+    { id: "M-30", kind: "folder", name: "Disciplinary files", host: "WS-FIN-A1", path: "D:\\HR\\Disciplinary\\", level: "private", open: ["You", "K. Boateng"], by: "K. Boateng", at: "10 Oct", dept: "fin", files: 17, versions: 22 },
+    { id: "M-31", kind: "program", name: "Payroll Manager", host: "FIN-01", path: "C:\\Program Files\\PayrollManager\\payroll.exe", level: "private", open: ["K. Boateng", "Afi"], system: true, by: "K. Boateng", at: "14 Oct", dept: "fin", files: 1, versions: 1 },
+    { id: "M-32", kind: "file", name: "tender-evaluation-2026.xlsx", host: "WS-FIN-A1", path: "D:\\Tenders\\tender-evaluation-2026.xlsx", level: "watch", watch: true, by: "K. Boateng", at: "16 Oct", dept: "fin", files: 1, versions: 5 });
   WATCH_LOG["M-22"] = [[9.8, "R. Mensah", "Opened", "board-papers-oct.pdf", "on WS-OPS-A1"], [-26, "You", "Copied", "board-papers-oct.pdf", "to ADM-01 D:\\Board\\archive"]];
   WATCH_LOG["M-32"] = [[12.1, "A. Quaye", "Opened", "tender-evaluation-2026.xlsx", "on WS-OPS-A2"], [7.5, "Kojo", "Copied", "tender-evaluation-2026.xlsx", "to OPS-01 C:\\Users\\Kojo\\Documents"], [-44, "R. Mensah", "Renamed", "tender-evaluation.xlsx", "to tender-evaluation-2026.xlsx"]];
   WATCH_LOG["M-30"] = [[11.2, "K. Boateng", "Opened", "hearing-notes-oct.docx", "on WS-FIN-A1"]];
@@ -8196,7 +8264,7 @@ function ProtectedLevels({ go, start }) {
   const tprev = !tp.trim() ? null : !tl ? `Now choose the tag for ${tname}.` : tl === "watch" ? `${tname} on ${th} is tagged Watch: it may go anywhere and be opened by anyone, and every open and move is listed here.`
     : tl === "private" ? (tw.length ? `${tname} on ${th} is tagged Private: only ${ptWho(tw)} may ${tkind === "program" ? "run" : "open"} it. Anyone else is refused, and every refusal is listed here.${tsys ? " Background programs running as the machine itself, such as backup, may still read it." : " Background programs such as backup are refused too."}` : null)
     : `${tname} on ${th} is tagged Restricted: ${tk === "path" ? "it may stay only where it is" : `it may move only on ${th}`}. A copy anywhere else is caught.`;
-  const protect = () => { dtChange(() => prMarks().push({ id: `M-${300 + prMarks().length}`, kind: tkind, name: tname, host: th, path: tp.trim(), level: tl, watch: tl === "watch", keep: tl === "keep" ? tk : undefined, open: tl === "private" ? tw : undefined, system: tl === "private" ? tsys : undefined, by: "Super User", at: "21 Oct", dept: "su", files: 1, versions: 1 }));
+  const protect = () => { dtChange(() => prMarks().push({ id: `M-${300 + prMarks().length}`, kind: tkind, name: tname, host: th, path: tp.trim(), level: tl, watch: tl === "watch", keep: tl === "keep" ? tk : undefined, open: tl === "private" ? tw : undefined, system: tl === "private" ? tsys : undefined, by: "K. Boateng", at: "21 Oct", dept: "fin", files: 1, versions: 1 }));
     toast(`${tname} is tagged ${PT_LV[tl][0]}`); setTp(""); setTl(null); setTw(["You"]); setTsys(false); };
   const hosts = ["ADM-01", ...(FULL.MACHINES || MACHINES).map((m) => m.host)];
   const icon = (k) => ic(k.kind === "folder" ? "FolderOutlined" : k.kind === "program" ? "AppstoreOutlined" : "FileOutlined");
@@ -8560,7 +8628,7 @@ function amBetween(x) {
   return [open.length ? [`${fmt(open.length)} task${open.length === 1 ? "" : "s"} with them`, ""] : ["No task with them", "quiet"], late.length ? [`${fmt(late.length)} late`, "hot"] : null].filter(Boolean);
 }
 const amWhy = (x) => { const b = amBetween(x).find((c) => c[1] === "hot"); return b || null; };
-function AdminMessagesPage({ go }) {
+function AdminMessagesPage({ go, open }) {
   useDT();
   const me = ME;
   const convs = amConvs(me);
@@ -8571,7 +8639,7 @@ function AdminMessagesPage({ go }) {
   const you = convs.filter((x) => x.st === "you"), them = convs.filter((x) => x.st === "them");
   const oldestThem = them.slice().sort((a, b) => a.last.t - b.last.t)[0];
   const situation = !convs.length ? "There is nobody to talk to yet." : you.length ? `${listNames(you.map((x) => x.say))} ${you.length === 1 ? "is" : "are"} waiting on your answer.${oldestThem ? ` Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : ""}` : oldestThem ? `Nobody is waiting on you. Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : "Nobody is waiting on you, and nothing you sent is unanswered.";
-  const [q, setQ] = useState(""), [sel, setSel] = useState(null);
+  const [q, setQ] = useState(""), [sel, setSel] = useState(open || null);
   const shown = convs.filter((x) => x.find.toLowerCase().includes(q.trim().toLowerCase()));
   const cur = convs.find((x) => x.id === sel) || convs.find((x) => x.th.length) || convs[0];
   const [txt, setTxt] = useState("");
@@ -8870,7 +8938,7 @@ function AdminRestrictedPage({ go }) {
         <div className="row fl-acts"><span className="sp" />
           <${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => unmark(k)}>Stop restricting<//></div>
       </div>` : null}</div>`; };
-  const pz = usePulse(sel == null ? null : `${sel}:${copy || ""}`);
+  const pk = sel == null ? null : `${sel}:${copy || ""}`, ld = useLoading(pk), pz = usePulse(ld ? null : pk);
   return html`<div className="og rsp2">${modalCtx}
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
@@ -8883,9 +8951,9 @@ function AdminRestrictedPage({ go }) {
               <span className="dr-step"><button aria-label="Earlier" disabled=${p === 0} onClick=${() => setPg(p - 1)}>${ic("LeftOutlined")}</button>${p + 1} of ${pages}<button aria-label="Later" disabled=${p >= pages - 1} onClick=${() => setPg(p + 1)}>${ic("RightOutlined")}</button></span></div>` : null}
             ${!marks.length ? html`<div className="ib-quiet">Nothing restricted yet. Restrict something below.</div>` : null}`; })()}
       </section>
-      <section className="ib-box" ref=${pz}>
-        <header><b>Where it is, across the department</b><span>${K ? html`<b className="rs-kn">${K.name}</b> · ${kc.length ? `${fmt(kc.length)} cop${kc.length === 1 ? "y" : "ies"} away from home` : "only at home"}` : "pick something on the left"}</span></header>
-        <div ref=${ref}>
+      <section className=${"ib-box" + (ld ? " ld-on" : "")} ref=${pz}>
+        <header><b>Where it is, across every machine</b><span>${K ? html`<b className="rs-kn">${K.name}</b> · ${kc.length ? `${fmt(kc.length)} cop${kc.length === 1 ? "y" : "ies"} away from home` : "only at home"}` : "pick something on the left"}</span></header>
+        ${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}<div ref=${ref}>
           <svg width=${W} height=${H} className="rs-map" role="img" aria-label="The department's machines">
             <text x="0" y="14" className="rs-band">ADMIN PCS</text>
             <text x="0" y=${yR - 12} className="rs-band">OTHER MACHINES</text>
@@ -8940,7 +9008,7 @@ function AdminRestrictedPage({ go }) {
           <span className="rs-lt"><span><b>${c.flow}</b> ${c.held ? "is held at" : "carries"} <b>${c.what}</b></span><span className="t3 mono cut">${c.from} → ${c.to}</span></span>
           <span className=${"rs-fls" + (c.held ? " hot" : "")}>${c.held ? html`<b>waiting for you</b><span className="t3">since ${hhmm(c.held)}</span>` : html`<b>${c.today ? `${fmt(c.today)} today` : "allowed just now"}</b><span className="t3">${c.last ? `last ${hhmm(c.last)} · ` : ""}allowed ${c.since}</span>`}</span>
           ${c.held ? html`<${Button} size="small" type="primary" onClick=${() => { setLet({ ...let_, [c.flow]: 1 }); toast(`${c.flow} may carry ${c.what}; it goes on now (concept)`); }}>Allow<//>`
-            : html`<${Button} size="small" onClick=${() => go("flows")}>Open in Flows<//>`}
+            : html`<${Button} size="small" onClick=${() => go("flows", c.flow)}>Open in Flows<//>`}
         </div>`)}
       ${!carrying.length ? html`<div className="ib-quiet">No flow carries anything you restricted.</div>` : null}
     </section>
@@ -9021,7 +9089,7 @@ const auBad = (x) => x.outcome === "Failed" || x.outcome === "Timed out";
 const AU_PAST = { "Take a screenshot": "screenshot taken", "Snapshot USB contents": "contents listed", "Log event": "logged", "Notify the Admin": "the Admin was told", "Notify R. Mensah": "R. Mensah was told",
   "Clear the temp folder": "temp folder cleared", "Check disk health": "disk checked", "Lock the screen": "screen locked", "Back up the Documents folder": "Documents backed up" };
 const AU_DETECT = { Event: "reported by the machine the moment it happens", Threshold: "checked on each machine every 30 seconds", Schedule: "started by the Engine on time" };
-function AdminAutomationPage({ go }) {
+function AdminAutomationPage({ go, open }) {
   const [modal, modalCtx] = Modal.useModal();
   const me = ME;
   const rules = [...RULES.filter((r) => !/^rule-/.test(r.id)), ...AU_EXTRA];
@@ -9031,7 +9099,7 @@ function AdminAutomationPage({ go }) {
   const [again, setAgain] = useState({}), [exp, setExp] = useState(null), [rpg, setRpg] = useState(0), [make, setMake] = useState(false);
   // today's runs across every rule, newest first
   const runs = rules.flatMap((r) => (off[r.id] ? [] : today(r).map((f) => ({ r, f, bad: f.runs.some(auBad) })))).sort((a, b) => b.f.t - a.f.t);
-  const [sel, setSel] = useState(() => (runs[0] ? runs[0].r.id : rules[0].id)), [pickT, setPickT] = useState(() => (runs[0] ? runs[0].f.t : null));
+  const [sel, setSel] = useState(() => (open ? open : runs[0] ? runs[0].r.id : rules[0].id)), [pickT, setPickT] = useState(() => (!open && runs[0] ? runs[0].f.t : null));
   const R = rules.find((r) => r.id === sel) || rules[0], mine = R.by === me, isOff = off[R.id];
   const who = (h) => (MBY[h] || {}).user;
   const cause = (r, f) => (r.kind === "Schedule" ? `It was ${hhmm(f.t)}, so it ran on ${f.host}` : `${f.detail || r.when} on ${f.host}${who(f.host) ? `, ${who(f.host)} signed in` : ""}`);
@@ -9060,7 +9128,7 @@ function AdminAutomationPage({ go }) {
   const [skip, setSkip] = useState({});
   const badN = (r) => today(r).filter((f) => f.runs.some(auBad) && !again[r.id + f.t]).length;
   const ordered = [...rules].sort((a, b) => (badN(b) > 0) - (badN(a) > 0));
-  const pz = usePulse(`${R.id}:${pickT == null ? "" : pickT}`);
+  const ld = useLoading(R.id), pz = usePulse(ld ? null : `${R.id}:${pickT == null ? "" : pickT}`);
   return html`<div className="og aup">${modalCtx}
     <${SitBar} text=${situation} />
     <div className="auo-sheet aub">
@@ -9074,7 +9142,7 @@ function AdminAutomationPage({ go }) {
           </header>
         <div className=${"auo-big" + (isOff ? " off" : "")}><span className="t3">When</span> ${R.when} <span className="t3">on</span> ${R.scope === "All machines" ? "any machine" : `an ${R.scope} machine`}<span className="t3">, do</span> ${R.actions.map((x) => x[0]).join(", ")}</div>
         <div className="auo-two">
-          <div className="aub-chart"><div className="am-k">This week · runs a day</div><div className="aub-plot">
+          <div className=${"aub-chart" + (ld ? " ld-on" : "")}><div className="am-k">This week · runs a day</div>${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}<div className="aub-plot">
             <div className="aub-grid">${ticks.map((v) => html`<span key=${v} style=${{ bottom: (v / mxd) * 100 + "%" }}><em>${v}</em></span>`)}</div>
             <div className="auo-bars tall">${perDay.map(([n, b, h], j) => { const k = Math.min(1, mxd / Math.max(1, n)), pc = (v) => (v / mxd) * 100 * k + "%", ok = n - b - h;
               return html`<span key=${j} title=${`${n} run${n === 1 ? "" : "s"}: ${n - h} by the rule${h ? `, ${h} by hand` : ""}${b ? `; ${b} went wrong` : ""}`}><b>${ok ? html`<i style=${{ height: pc(ok) }} />` : null}${b ? html`<i className="bad" style=${{ height: pc(b) }} />` : null}${h ? html`<i className="hand" style=${{ height: pc(h) }} />` : null}${n > mxd ? html`<i className="cut" />` : null}${n ? html`<small className=${n > mxd ? "over" : ""}>${n}</small>` : null}</b><em>${DAYS7[j]}</em></span>`; })}</div></div>
@@ -9233,7 +9301,8 @@ function RuleNew({ from, taken, onDone }) {
 // modal; what ran by hand is the accordion; writing your own is the footer and a drawer.
 const ACX_G = [["Control", (a) => a.cat === "Control"], ["Monitoring", (a) => a.cat === "Monitoring"], ["Custom", (a) => a.cat === "Custom"]];
 const isBadRun = (x) => x.outcome === "Failed" || x.outcome === "Timed out";
-const tileName = (h) => h.replace(/^WS-[A-Z]+-/, "").replace(/^[A-Z]+-/, "");
+// a tile says the machine's whole name: with every department in one console, "01" alone is several machines
+const tileName = (h) => h.replace(/^WS-/, "");
 const runWhen = (t) => (t >= 0 ? `today ${hhmm(t)}` : `${dayOf(t)} ${hhmm(t)}`);
 // What a run returned, machine by machine: the machines down the left (the ones that went wrong first), the picked
 // one's output on the right as it came back: a picture, a list, or the text it printed, with its exit code and time.
@@ -9344,8 +9413,8 @@ function ActionNew({ from, onDone }) {
       ${step < 2 ? html`<${Button} type="primary" disabled=${!!prob} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
         : html`<${Button} type="primary" onClick=${() => { toast(from ? `${name.trim()} saved (concept)` : `${name.trim()} added to Custom (concept)`); onDone(); }}>${from ? "Save changes" : "Add the action"}<//>`}</div></div>`;
 }
-function AdminActionsLayout() {
-  const [sel, setSel] = useState("shot"), [hosts, setHosts] = useState(["OPS-03", "OPS-04"]), [make, setMake] = useState(false);
+function AdminActionsLayout({ host }) {
+  const [sel, setSel] = useState("shot"), [hosts, setHosts] = useState(host ? [host] : ["OPS-03", "OPS-04"]), [make, setMake] = useState(false);
   const [run, setRun] = useState(null), [mine, setMine] = useState([]), [show, setShow] = useState(null);
   const A0 = ABY[sel], lib = ACTION_LIB.filter((a) => !/^cust-/.test(a.id));
   const badOf = (a) => runsOf(a).filter((x) => x.t >= -144 && isBadRun(x)).length;
@@ -9368,7 +9437,7 @@ function AdminActionsLayout() {
       onClick=${() => { if (here && !busy) setRun(null); setHosts(on ? hosts.filter((x) => x !== h) : [...hosts, h]); }}>${tileName(h)}</button>`; };
   const G = [["bad", "Failed", "on at least one machine it failed or ran out of time", (r) => r.bad], ["ok", "Successful", "or you stopped it", (r) => !r.bad]];
   const doneN = here ? here.xs.filter((y) => y.st !== "Running").length : 0, failN = here ? here.xs.filter((y) => isBadRun({ outcome: y.st })).length : 0;
-  const pz = usePulse(sel);
+  const ld = useLoading(sel), pz = usePulse(ld ? null : sel);
   return html`<div className="og aup">
     <${SitBar} text=${situation} />
     <div className="auo-sheet aub">
@@ -9377,7 +9446,7 @@ function AdminActionsLayout() {
           ${xs.map((a) => { const n = badOf(a), u = usedBy(a).length;
             return html`<button key=${a.id} className=${"auo-li" + (sel === a.id ? " on" : "")} onClick=${() => setSel(a.id)}><span className="t3">${ic(CATI[a.cat])}</span><span className="auo-lt"><b className="cut">${a.name}</b><span className="cut t3">${a.cat === "Custom" ? `${a.lang} · by ${a.by === "You" ? "you" : a.by}` : u ? `used by ${u} rule${u === 1 ? "" : "s"}` : "run by hand only"}</span></span>${n ? html`<b className="auo-red">${n}</b>` : null}</button>`; })}</div>`; })}
       </section>
-      <section className="ib-box auo-page" ref=${pz}>
+      <section className="ib-box auo-page" ref=${pz} data-arrive=${host ? "" : undefined}>
         <header><b>${A0.name}</b><span>${A0.cat === "Custom" ? `${A0.lang}, written by ${A0.by === "You" ? "you" : A0.by} on ${A0.created}` : "comes with Falcon"}</span><span className="sp" />
           ${A0.cat === "Custom" ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake(A0.id)}>Edit the script<//>` : null}</header>
         <div className="auo-big">${A0.desc ? html`${A0.desc} ` : null}<span className=${A0.desc ? "t3" : ""}>${A0.impact(1)}</span></div>
@@ -9394,7 +9463,7 @@ function AdminActionsLayout() {
               : html`<span className="t2">${hosts.length ? `${A0.name} on ${listNames(hosts, 4)}, up to ${A0.limit}s each.` : "Pick at least one machine."}</span><span className="sp" />
                   <${Button} type="primary" danger=${!!A0.risky} disabled=${!hosts.length} icon=${ic("CaretRightOutlined")} onClick=${start}>Run on ${hosts.length}<//>`}</div>
         </div>
-        <div className="acx-run"><div className="acx-rh"><b>Its last runs</b><span className="t3">from rules and by hand, this week</span></div>
+        <div className=${"acx-run" + (ld ? " ld-on" : "")}><div className="acx-rh"><b>Its last runs</b><span className="t3">from rules and by hand, this week</span></div>${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}
           ${runsOf(A0).slice(0, 6).map((x, i) => html`<div key=${i} className="acx-lr"><span className="mono t3">${x.t >= 0 ? hhmm(x.t) : `${dayOf(x.t)} ${hhmm(x.t)}`}</span><span className="mono">${x.host}</span>
             <span className="t3 cut">${x.rule ? RBY[x.rule].name : `by hand, ${x.by === "You" ? "you" : x.by}`}</span><span className=${"cut" + (isBadRun(x) ? " hot" : "")}>${runOutput(x.action, x.host, x.outcome, x.t, x.exit).summary}</span>
             <${Button} size="small" type="text" onClick=${() => setShow({ action: x.action, t: x.t, from: x.rule ? RBY[x.rule].name : `by ${x.by === "You" ? "you" : x.by}`, xs: [x] })}>Output<//></div>`)}
@@ -9569,7 +9638,7 @@ function AdminFlowsPage2({ go, open }) {
   const names = new Set(EXISTING_FLOWS.filter((x) => [...x.srcs, ...x.dests].some((q) => inside0.has(q[0]))).map((x) => x.name));
   for (let i = 0; i < 4; i++) [...names].forEach((n) => [...fedBy(FBY[n]), ...feeds(FBY[n])].forEach((y) => names.add(y.name)));
   const [held, setHeld] = useState(FL_HELD), [done, setDone] = useState({}), [make, setMake] = useState(open && (open === "new" || open.startsWith("edit-")) ? open : false), [more, setMore] = useState(false);
-  const [sel, setSel] = useState(null), [gpick, setGpick] = useState({}), [fpg, setFpg] = useState(0);
+  const [sel, setSel] = useState(open && FBY[open] ? open : null), [gpick, setGpick] = useState({}), [gsel, setGsel] = useState({}), [fpg, setFpg] = useState(0);
   const stateOf = (x) => (held[x.name] ? "held" : x.st === "Degraded" ? "branch" : x.st === "Waiting for a folder" ? "wait" : flToday(x) ? "moving" : "quiet");
   const flows = [...EXISTING_FLOWS.filter((x) => names.has(x.name)), ...FL_EXTRA];
   const fby = (n) => flows.find((x) => x.name === n);
@@ -9615,11 +9684,12 @@ function AdminFlowsPage2({ go, open }) {
   const hotFirst = (a, b) => ((b.g && b.g.hot ? 1 : 0) - (a.g && a.g.hot ? 1 : 0)) || ((b.g ? b.g.wait : 0) - (a.g ? a.g.wait : 0));
   const rowsOf = (k) => [...(k === "waiting" ? gates.filter((g) => !g.flow).map((g) => ({ key: g.id, g })) : []),
     ...flows.filter((x) => fstate(x) === k).map((x) => ({ key: x.name, x, g: ctl[x.name] ? null : gatesOf(x.name)[0] }))].sort(hotFirst);
-  const GRP = [["waiting", "Waiting", "on someone else: a folder to be picked, a machine to come back, or an ask to you"], ["running", "Running", "moving files, or set up and ready"],
+  // Running first, then Waiting (the user, 1 Nov 2026)
+  const GRP = [["running", "Running", "moving files, or set up and ready"], ["waiting", "Waiting", "on someone else: a folder to be picked, a machine to come back, or an ask to you"],
     ["stopped", "Stopped", "stopped by you; nothing goes through until you start it again"], ["paused", "Paused", "held for you, or paused by you; nothing more goes through until you act"]].map(([k, g, d]) => [k, g, d, rowsOf(k)]);
   const ord = GRP.flatMap(([k, , , rs]) => rs.map((r) => [k, r]));
   // the most pressing is picked at first, as on Tasks
-  const first = (GRP[3][3][0] || GRP[0][3][0] || GRP[1][3][0] || {}).key || null;
+  const first = (GRP[3][3][0] || GRP[1][3][0] || GRP[0][3][0] || {}).key || null;
   const cur = sel && ord.some((e) => e[1].key === sel) ? sel : first;
   const [opn, setOpn] = useState(null);   // nothing open until you expand it
   const openK = opn;
@@ -9627,13 +9697,15 @@ function AdminFlowsPage2({ go, open }) {
     return x ? [["From", html`<span className="mono">${x.srcs.map((q) => q.join(" ")).join(", ")}</span>`], ["To", html`<span className="mono">${x.dests.map(placeTxt).join(", ")}</span>`],
         ["Along the way", x.stages.map((st, i) => `${i + 1}. ${st.op}`).join("  ") || "copied as it is"], ["Made by", who(x.by)], ["Since it began", `${fmt(x.files)} files`]]
       : [["From", html`<span className="mono">${a.where}</span>`], ["Note", a.line]]; };
-  const gateBox = (g) => { const k = gpick[g.id] || 0, [lbl, fn] = g.acts[k];
+  // with one gate on a flow you made, its button sits on the controls' line, apart from Pause and Stop (the user, 1 Nov 2026)
+  const gateBtn = (g, small) => { const k = gpick[g.id] || 0, [lbl, fn] = g.acts[k]; return html`<${Button} size=${small ? "small" : undefined} type="primary" onClick=${() => act(g, fn)}>${lbl}<//>`; };
+  const gateBox = (g, inline) => { const k = gpick[g.id] || 0, [lbl, fn] = g.acts[k];
     return html`<div key=${g.id} className="fl-gate">
       <div className=${"fg-k" + (g.hot ? " hot" : "")}><span>${ic(g.icon)} ${g.kind}</span><span className="t3">waiting ${waitLen(g.wait)}</span></div>
       <b className="fg-t">${g.title}</b><span className="t2">${g.line}</span>
       ${g.acts.length > 1 ? html`<div className="iq-opts"><div className="lay-grp">What to do</div>${g.acts.map(([l], i) => html`<button key=${i} className=${"iq-opt" + (i === k ? " on" : "")} onClick=${() => setGpick({ ...gpick, [g.id]: i })}>
           <span className="iq-optr"><i /></span><span className="iq-optm"><b>${l}</b></span></button>`)}</div>` : null}
-      <div className="row"><span className="sp" /><${Button} type="primary" onClick=${() => act(g, fn)}>${lbl}<//></div></div>`; };
+      ${inline ? null : html`<div className="row"><span className="sp" />${gateBtn(g)}</div>`}</div>`; };
   const row = (r) => { const x = r.x, g = r.g, on = openK === r.key, picked = cur === r.key, mine = x && ctl[x.name], hot = !mine && g && g.hot, more = x && g ? gatesOf(x.name).length - 1 : 0;
     const flip = (e) => { e.stopPropagation(); setSel(r.key); setOpn(on ? null : r.key); };
     const gs = x ? gatesOf(x.name) : [g];
@@ -9658,6 +9730,11 @@ function AdminFlowsPage2({ go, open }) {
         </div>
       </div>` : null}</div>`; };
   const P = cur && fby(cur), A = !P && gates.find((g) => g.id === cur);
+  // the controls' line is the same in every case (the user, 1 Nov 2026): on the left what this is (Edit, or whose it is);
+  // on the right the gate's action, then apart from it the flow's own Pause and Stop, or Resume. Several things waiting at
+  // one gate are shown one at a time with a pager, so the line always carries one action
+  const youHeld = !!(P && (ctl[P.name] === "paused" || ctl[P.name] === "stopped"));
+  const G1 = youHeld ? [] : P ? gatesOf(P.name) : A ? [A] : [], gi = Math.min(gsel[cur] || 0, Math.max(0, G1.length - 1)), g0 = G1[gi] || null;
   const [loading, setLoading] = useState(false);
   useEffect(() => { if (!cur) return; setLoading(true); const t = setTimeout(() => setLoading(false), 700); return () => clearTimeout(t); }, [cur]);
   const pz = usePulse(cur);
@@ -9676,14 +9753,17 @@ function AdminFlowsPage2({ go, open }) {
       <div className="iq-col">
       <section className="ib-box fl-ctl" ref=${pz}>
         <header><b>Controls</b><span>${P ? `${P.name}: what waits at its gate, and what you can do with it` : A ? "an ask to send you files" : "pick a flow on the left"}</span></header>
-        ${P && (ctl[P.name] === "paused" || ctl[P.name] === "stopped") ? html`<div className="ib-quiet">${ic(ctl[P.name] === "stopped" ? "StopOutlined" : "PauseOutlined")} You ${ctl[P.name]} ${P.name}. Nothing goes through until you ${ctl[P.name] === "stopped" ? "start it again" : "resume it"}.</div>`
-          : html`${(P ? gatesOf(P.name) : A ? [A] : []).map(gateBox)}
-        ${P && !gatesOf(P.name).length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing waits at a gate; ${P.name} runs by itself.</div>` : null}`}
+        ${youHeld ? html`<div className="ib-quiet">${ic(ctl[P.name] === "stopped" ? "StopOutlined" : "PauseOutlined")} You ${ctl[P.name]} ${P.name}. Nothing goes through until you ${ctl[P.name] === "stopped" ? "start it again" : "resume it"}.</div>` : null}
+        ${G1.length > 1 ? html`<div className="fl-gpage"><span className="t3">${fmt(G1.length)} things wait at its gate</span><span className="dr-step"><button aria-label="Previous" disabled=${gi === 0} onClick=${() => setGsel({ ...gsel, [cur]: gi - 1 })}>${ic("LeftOutlined")}</button>${gi + 1} of ${G1.length}<button aria-label="Next" disabled=${gi >= G1.length - 1} onClick=${() => setGsel({ ...gsel, [cur]: gi + 1 })}>${ic("RightOutlined")}</button></span></div>` : null}
+        ${g0 ? gateBox(g0, true) : null}
+        ${P && !youHeld && !G1.length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing waits at a gate; ${P.name} runs by itself.</div>` : null}
         ${!P && !A ? html`<div className="ib-quiet">Pick a flow on the left.</div>` : null}
-        ${P ? html`<div className="row fl-acts">${P.by === me ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake("edit-" + P.name)}>Edit<//><span className="sp" />
-            <span className="fl-grp">${fstate(P) === "paused" || fstate(P) === "stopped" ? html`<${Button} size="small" type="primary" icon=${ic("CaretRightOutlined")} onClick=${() => { const st = fstate(P); setCtl({ ...ctl, [P.name]: heldBy(P) ? "resumed" : null }); setSel(P.name); setOpn(P.name); toast(`${P.name} ${st === "stopped" ? "started again" : "resumed"}; it catches up on what it missed${heldBy(P) ? ", and what was held stays held until you decide" : ""} (concept)`); }}>${fstate(P) === "stopped" ? "Start again" : "Resume"}<//>`
-              : html`<${Button} size="small" icon=${ic("PauseOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "paused" }); setSel(P.name); setOpn(P.name); toast(`${P.name} paused (concept)`); }}>Pause<//><${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "stopped" }); setSel(P.name); setOpn(P.name); toast(`${P.name} stopped (concept)`); }}>Stop<//>`}</span>`
-          : html`<span className="t3" style=${{ fontSize: 12 }}>made by ${who(P.by)}; only they change it</span>`}</div>` : null}
+        ${P || A ? html`<div className="row fl-acts">
+          ${!P ? html`<span className="t3" style=${{ fontSize: 12 }}>an ask to you</span>` : P.by === me ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake("edit-" + P.name)}>Edit<//>` : html`<span className="t3" style=${{ fontSize: 12 }}>made by ${who(P.by)}; only they change it</span>`}
+          <span className="sp" />
+          ${g0 ? html`<span className=${P && P.by === me ? "fl-one" : ""}>${gateBtn(g0, true)}</span>` : null}
+          ${P && P.by === me ? html`<span className="fl-grp">${fstate(P) === "paused" || fstate(P) === "stopped" ? html`<${Button} size="small" type="primary" icon=${ic("CaretRightOutlined")} onClick=${() => { const st = fstate(P); setCtl({ ...ctl, [P.name]: heldBy(P) ? "resumed" : null }); setSel(P.name); setOpn(P.name); toast(`${P.name} ${st === "stopped" ? "started again" : "resumed"}; it catches up on what it missed${heldBy(P) ? ", and what was held stays held until you decide" : ""} (concept)`); }}>${fstate(P) === "stopped" ? "Start again" : "Resume"}<//>`
+              : html`<${Button} size="small" icon=${ic("PauseOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "paused" }); setSel(P.name); setOpn(P.name); toast(`${P.name} paused (concept)`); }}>Pause<//><${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "stopped" }); setSel(P.name); setOpn(P.name); toast(`${P.name} stopped (concept)`); }}>Stop<//>`}</span>` : null}</div>` : null}
       </section>
       <section className="ib-box fl-sync" ref=${pz}>
         <header><b>Last sync</b><span>${P ? P.name : A ? "an ask has not synced anything" : "pick a flow on the left"}</span></header>
@@ -9813,7 +9893,7 @@ function AdminOverviewPage({ go }) {
   const targets = dv === "pause" ? flowsOn.map((f) => ({ value: f.name, label: f.name })) : dv === "task" ? ms.filter((m) => m.user).map((m) => ({ value: m.host, label: `${m.user} on ${m.host}` })) : ms.map((m) => ({ value: m.host, label: `${m.host}${m.user ? ` · ${m.user}` : ""}` }));
   const doPrev = !dt ? null : dv === "run" ? `Opens Actions with ${dt} picked, to choose what to run.` : dv === "task" ? `Opens a new task for ${(MBY[dt] || {}).user} on ${dt}.` : dv === "enter" ? `Enters ${dt}. ${(MBY[dt] || {}).user ? `${MBY[dt].user} is locked out while you are inside.` : "Nobody is signed in."}` : `Pauses ${dt}. Files stop moving until you resume it; nothing is lost.`;
   const [modal, modalCtx] = Modal.useModal();
-  const doIt = () => { if (dv === "run") go("actions"); else if (dv === "task") go("tasks", "new"); else if (dv === "enter") modal.confirm(enterSessionConfirm(MBY[dt], () => toast(`You are in ${dt} (concept)`))); else toast(`Paused ${dt} (concept)`); setDt(undefined); };
+  const doIt = () => { if (dv === "run") go("actions", dt); else if (dv === "task") go("tasks", "new"); else if (dv === "enter") modal.confirm(enterSessionConfirm(MBY[dt], () => toast(`You are in ${dt} (concept)`))); else toast(`Paused ${dt} (concept)`); setDt(undefined); };
   const situation = `${items.length ? `${fmt(Math.min(items.length, SHOW))} thing${Math.min(items.length, SHOW) === 1 ? "" : "s"} to do first${urgent.length ? `; ${fmt(urgent.length)} issue${urgent.length === 1 ? " is" : "s are"} past ${urgent.length === 1 ? "its" : "their"} time or critical` : ""}` : "Nothing needs you right now"}.${off.length ? ` ${listNames(off.map((m) => m.host), 2)} ${off.length === 1 ? "is" : "are"} offline.` : ""}${flowsOff.length + rulesOff.length ? ` ${fmt(flowsOff.length + rulesOff.length)} of your flows and automations ${flowsOff.length + rulesOff.length === 1 ? "is" : "are"} not running cleanly.` : ""}`;
   return html`<div className="og aov">${modalCtx}
     <${SitBar} text=${situation} />
@@ -9841,24 +9921,24 @@ function AdminOverviewPage({ go }) {
     </div>
     <div className="g c-84" style=${{ alignItems: "stretch" }}>
       <section className="ib-box">
-        <header><b>My machines</b><span>${fmt(ms.length)} machines; ${off.length ? `${fmt(off.length)} offline` : "all online"}${lag.length ? `, ${fmt(lag.length)} need a look` : ""}${inside.length ? `, ${fmt(inside.length)} with someone inside` : ""}; click one to see it on Machines</span></header>
+        <header><b>Machines</b><span>${fmt(ms.length)} machines, every department; ${off.length ? `${fmt(off.length)} offline` : "all online"}${lag.length ? `, ${fmt(lag.length)} need a look` : ""}${inside.length ? `, ${fmt(inside.length)} with someone inside` : ""}; click one to see it on Machines</span></header>
         <span className="ovh-tiles ao-ovh">${[...ms].sort((x, y) => ((y.status === "high" || y.status === "critical") * 2 + (y.status === "offline")) - ((x.status === "high" || x.status === "critical") * 2 + (x.status === "offline"))).slice(0, ms.length > AO_MAXT ? AO_MAXT - 1 : AO_MAXT)
-            .map((m) => html`<button key=${m.host} className=${"ovh-m " + (m.status === "offline" ? "off" : m.status === "high" || m.status === "critical" ? "lag" : "")} onClick=${() => go("machines", m.host)} title=${`${m.host}${m.user ? `, ${m.user}` : ", nobody signed in"}${m.held ? ", someone inside" : ""}: ${HEALTH[m.status][1]}`}>${m.host.split("-").slice(-1)[0]}</button>`)}
+            .map((m) => html`<button key=${m.host} className=${"ovh-m " + (m.status === "offline" ? "off" : m.status === "high" || m.status === "critical" ? "lag" : "")} onClick=${() => go("machines", m.host)} title=${`${m.host}${m.user ? `, ${m.user}` : ", nobody signed in"}${m.held ? ", someone inside" : ""}: ${HEALTH[m.status][1]}`}>${tileName(m.host)}</button>`)}
           ${ms.length > AO_MAXT ? html`<button className="ovh-m rest" onClick=${() => go("machines")}>+${fmt(ms.length - AO_MAXT + 1)}</button>` : null}</span>
         <div className="ovh-key"><span><i className="ovh-m sm" />fine</span><span><i className="ovh-m sm lag" />needs a look</span><span><i className="ovh-m sm off" />offline</span></div>
       </section>
       <section className="ib-box">
-        <header><b>Running for you</b><span>${fmt(flowsOn.length)} flows and ${fmt(rulesOn.length)} automations running; only the rest are listed</span></header>
+        <header><b>Flows and automations</b><span>${flowsOff.length + rulesOff.length ? "only what has stopped or is stuck is listed; " : ""}${fmt(flowsOn.length)} flow${flowsOn.length === 1 ? "" : "s"} and ${fmt(rulesOn.length)} automation${rulesOn.length === 1 ? " is" : "s are"} running fine</span></header>
         ${flowsOff.map((f) => html`<div key=${f.name} className="ao-run"><span className="ao-su-i">${ic("BranchesOutlined")}</span><span className="ao-su-t"><b className="cut">${f.name}</b><span className=${f.st === "Failed" || f.st === "Degraded" ? "hot" : "t3"}>${f.st === "Degraded" ? "one destination paused" : f.st === "Waiting for a folder" ? `waits for ${f.dests[0][0].replace("?", "")} to pick a folder` : f.st.toLowerCase()}</span></span>
           <${Button} size="small" onClick=${() => go("flows", f.name)}>${f.st === "Waiting for a folder" ? "Remind" : "Fix"}<//></div>`)}
         ${rulesOff.map((r) => html`<div key=${r.id} className="ao-run"><span className="ao-su-i">${ic("ThunderboltOutlined")}</span><span className="ao-su-t"><b className="cut">${r.name}</b><span className="hot">${r.res[1]}</span></span>
           <${Button} size="small" onClick=${() => go("automation", r.id)}>Look<//></div>`)}
-        ${!flowsOff.length && !rulesOff.length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Everything you set up is running.</div>` : null}
+        ${!flowsOff.length && !rulesOff.length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Every flow and automation is running fine.</div>` : null}
       </section>
     </div>
     <div className="g c-84" style=${{ alignItems: "stretch" }}>
-      <section className="ib-box">
-        <header><b>Today in the department</b><span>the hours around now, with Now in the middle; it moves on as the day does</span><span className="sp" /><a className="ib-more" onClick=${() => go("calendar")}>The month in Calendar</a></header>
+      <section className="ib-box ao-today">
+        <header><b>Today</b><span>the hours around now, with Now in the middle; it moves on as the day does</span><span className="sp" /><a className="ib-more" onClick=${() => go("calendar")}>The month in Calendar</a></header>
         <${DayStrip} go=${go} items=${today} empty="nothing due in these hours" />
       </section>
       <section className="ib-box">
@@ -9915,7 +9995,9 @@ function AdminMachinesPage({ go, start }) {
   useDT();
   const me = ME;
   const [sel, setSel] = useState(start || null), [exp, setExp] = useState(null), [more, setMore] = useState({ fine: true }), [modal, modalCtx] = Modal.useModal();
-  const ms = MACHINES, CUR = "1.4.2";
+  // every department's machines; the department is a label on each card and a filter on the list (version 1)
+  const [dpt, setDpt] = useState(null);
+  const ms = dpt ? MACHINES.filter((m) => m.dept === dpt) : MACHINES, CUR = "1.4.2";
   const openOn = (h) => ISSUES.filter((i) => i.host === h && ISTATE0[i.id].status !== "Resolved").sort((a, b) => SEVORD[a.sev] - SEVORD[b.sev]);
   const pingOn = (m) => CHANNELS.find((c) => chVisible(c, me) && c.status === "ping" && chReceiver(c) === me && chOther(c, me) === m.user);
   const groupOf = (m) => m.status === "high" || m.status === "critical" ? "look" : m.status === "offline" ? "off" : m.status === "warning" || m.ver !== CUR ? "small" : "fine";
@@ -9937,7 +10019,7 @@ function AdminMachinesPage({ go, start }) {
         if (never) toast(`A rule to end ${n} wherever it starts is ready in Automation, waiting for you to switch it on (concept)`); } }); };
   const spin = (h) => html`<div className="am-load" style=${{ height: h }}>${ic("LoadingOutlined")}<span>Loading ${cur.host}</span></div>`;
   const behind = ms.filter((m) => m.ver !== CUR), held = ms.filter((m) => m.held);
-  const situation = !ms.length ? "There are no machines in this department yet." : `${by.look.length ? `${fmt(by.look.length)} need${by.look.length === 1 ? "s" : ""} a look (${listNames(by.look.map((m) => m.host), 3)})` : "Nothing serious is open"}; ${by.off.length ? `${fmt(by.off.length)} offline` : "all online"}${held.length ? `, ${fmt(held.length)} with someone inside` : ""}${behind.length ? `, ${fmt(behind.length)} behind on the version` : ""}.`;
+  const situation = !ms.length ? (dpt ? `There are no machines in ${deptNameOf(dpt)} yet.` : "There are no machines yet.") : `${by.look.length ? `${fmt(by.look.length)} need${by.look.length === 1 ? "s" : ""} a look (${listNames(by.look.map((m) => m.host), 3)})` : "Nothing serious is open"}; ${by.off.length ? `${fmt(by.off.length)} offline` : "all online"}${held.length ? `, ${fmt(held.length)} with someone inside` : ""}${behind.length ? `, ${fmt(behind.length)} behind on the version` : ""}.`;
   // what the card offers: the machine's worst issue's fix, then an update, then entering
   const actOf = (m) => { const i = openOn(m.host)[0];
     if (m.status === "offline") return ["Tell me when back", () => toast(`You are told when ${m.host} checks in (concept)`)];
@@ -9954,7 +10036,7 @@ function AdminMachinesPage({ go, start }) {
     return html`<div key=${m.host} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "") + (m.status === "offline" ? " done" : "")}>
     <article className=${"iq-card am-card" + (urg ? " urg" : "")} role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => setSel(m.host)} onKeyDown=${(e) => e.key === "Enter" && setSel(m.host)}>
       <span className="iq-ic">${ic("DesktopOutlined")}</span>
-      <span className="iq-main"><span className="iq-t"><b className="cut">${m.host}</b></span><span className=${"iq-s cut" + (urg ? " hot" : "")}>${whatOf(m)}</span></span>
+      <span className="iq-main"><span className="iq-t"><b className="cut">${m.host}</b><span className="t3">${m.dept ? deptNameOf(m.dept) : "no department"}</span></span><span className=${"iq-s cut" + (urg ? " hot" : "")}>${whatOf(m)}</span></span>
       <span className="am-facts">${m.status === "offline" ? html`<span className="am-sp t4">no data since ${dur(m.seen)} ago</span>` : html`<span className="am-sp" title="CPU over the last 24 hours"><${Spark} fn=${(x) => metric(m.host, "cpu", x)} w=${96} h=${22} max=${100} c=${urg ? "var(--crit)" : "var(--s6)"} /><span>${cpu == null ? "—" : `${cpu.toFixed(0)}%`}</span></span>`}<span>${m.ver}</span></span>
       <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setExp(on ? null : m.host); setSel(m.host); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span></article>
     ${on ? html`<div className="tk-open">
@@ -9969,7 +10051,8 @@ function AdminMachinesPage({ go, start }) {
           <div className="am-ses">${amSessions(m).map(([t, d], i) => html`<span key=${i}><span>${hod(t) === hod(NOWH) || NOWH - t < 24 && dayOf(t) === dayOf(NOWH) ? "Today" : dayOf(t)} ${hhmm(t)}</span><span className="t3">${d == null ? "inside now" : dur(d)}</span></span>`)}</div>
         </div>
       </div>
-      <div className="row" style=${{ justifyContent: "flex-end" }}>${verb !== "Fix it" && verb !== "Enter" ? html`<${Button} size="small" onClick=${fn}>${verb}<//>` : null}<${Button} size="small" type="primary" disabled=${!enterOk} onClick=${() => modal.confirm(enterSessionConfirm(m, () => toast(`You are in ${m.host} (concept)`)))}>${m.held === "You" ? "You are inside" : "Enter"}<//><${Button} size="small" type="text" onClick=${() => go("actions")}>Run an action<//></div>
+      <div className="row" style=${{ justifyContent: "flex-end" }}>${verb !== "Fix it" && verb !== "Enter" ? html`<${Button} size="small" onClick=${fn}>${verb}<//>` : null}<${Button} size="small" type="primary" disabled=${!enterOk} onClick=${() => modal.confirm(enterSessionConfirm(m, () => toast(`You are in ${m.host} (concept)`)))}>${m.held === "You" ? "You are inside" : "Enter"}<//><${Button} size="small" type="text" onClick=${() => go("actions", m.host)}>Run an action<//>
+          <${Button} size="small" type="text" onClick=${() => setAdd({ mode: "rekey", subject: m.host })} title="Its old key stops working at once">New key<//></div>
     </div>` : null}</div>`; };
   // act on several
   const AV = { update: "Update", restart: "Restart", action: "Run an action on" };
@@ -9985,7 +10068,9 @@ function AdminMachinesPage({ go, start }) {
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <section className="ib-box">
-        <header><b>My machines</b><span>one card per machine, serious first; click one to draw it on the right, expand it for its details</span></header>
+        <header><b>Machines</b><span>${dpt ? deptNameOf(dpt) : "every department"}; one card per machine, serious first; click one to draw it on the right, expand it for its details</span><span className="sp" />
+          <${Select} size="small" value=${dpt || ""} onChange=${(v) => { setDpt(v || null); setSel(null); setExp(null); }} style=${{ width: 170 }} showSearch optionFilterProp="label"
+            options=${[{ value: "", label: "Every department" }, ...DEPTS.map((d) => ({ value: d.id, label: d.name }))]} /></header>
         ${G.map(([k, g, d]) => { const xs = by[k]; if (!xs.length) return null;
           return html`<div key=${k} className="iq-grp"><div className="lay-grp iq-gh">${g} · ${fmt(xs.length)}<span>${d}</span></div>
             <div className="iq-cards">${(more[k] ? xs : xs.slice(0, AM_SHOW)).map(card)}</div>
@@ -10039,12 +10124,12 @@ function AdminMachinesPage({ go, start }) {
       </div>
     </section>
     <section className="ib-box og-change">
-      <header><b>Add a machine</b><span>a PC joins the department in three steps; nothing connects without the key made here${AM_FOUND.length ? ` · ${fmt(AM_FOUND.length)} found, not registered` : ""}</span></header>
+      <header><b>Add a machine</b><span>a PC joins in three steps, and gets its department on Departments; nothing connects without the key made here${AM_FOUND.length ? ` · ${fmt(AM_FOUND.length)} found, not registered` : ""}</span></header>
       <div className="tk-give">
         <ol className="tk-steps"><li><b>Pick or name the PC</b><span>PCs already found on the network, or trying to connect, are offered</span></li>
           <li><b>Copy its key</b><span>it is made for this PC and shown once</span></li>
           <li><b>Give the key to its worker</b><span>in the Worker Client settings; it checks in from then on</span></li></ol>
-        <${Button} type="primary" onClick=${() => setAdd({ mode: "pc", found: AM_FOUND, dept: (ADMIN_INFO[ME] || {}).dept })}>Add a machine<//></div>
+        <${Button} type="primary" onClick=${() => setAdd({ mode: "pc", found: AM_FOUND })}>Add a machine<//></div>
     </section>
     <${KeyModal} spec=${add} onClose=${() => setAdd(null)} />
   </div>`;
@@ -10085,7 +10170,6 @@ function AdminTasksPage({ go, open }) {
   const next = TASKS.filter((t) => t.state !== "Completed" && t.final > NOWH).sort((a, b) => a.final - b.final)[0];
   const situation = !TASKS.length ? "You have not given any tasks yet." : `${by.verify.length ? `${fmt(by.verify.length)} wait${by.verify.length === 1 ? "s" : ""} for your verdict` : "Nothing waits for your verdict"}; ${by.late.length ? `${fmt(by.late.length)} late or gone quiet` : "nothing late"}.${next ? ` The next deadline: ${next.title}, ${waitLen(next.final - NOWH)} from now.` : ""}`;
   const card = (t) => { const k = groupOf(t), done = k === "done", urg = k === "late", on = openId === t.id, picked = selId === t.id;
-    const act = k === "verify" ? ["Complete", () => { dtChange(() => { t.state = "Completed"; }); toast(`Completed: ${t.title}`); bump((n) => n + 1); }] : k === "late" ? ["Remind", () => toast(`Reminded ${t.who} (concept)`)] : null;
     return html`<div key=${t.id} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "") + (done ? " done" : "")}>
       <article className=${"iq-card" + (urg ? " urg" : "")} role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => setSelId(t.id)} onKeyDown=${(e) => e.key === "Enter" && setSelId(t.id)}>
         <span className="iq-ic">${ic("CheckSquareOutlined")}</span>
@@ -10093,18 +10177,11 @@ function AdminTasksPage({ go, open }) {
           <span className="iq-s cut">${t.who} on ${t.host} · ${fmt(found(t))} of ${fmt(t.evidence.length)} target${t.evidence.length === 1 ? "" : "s"} found${t.by !== me ? ` · from ${t.by}` : ""}</span>
           ${quiet(t) && !done ? html`<span className="iq-n cut">Nothing seen for ${seenAt[t.id] == null ? "as long as it has existed" : waitLen(NOWH - seenAt[t.id])}</span>` : null}</span>
         <span className="iq-bar"><${TaskBar} t=${t} until=${(done || k === "verify") && handedAt[t.id] != null ? handedAt[t.id] : NOWH} done=${done || k === "verify"} /><span className=${"iq-bt" + (!done && k !== "verify" && NOWH > t.final ? " hot" : "")}>${(done || k === "verify") ? (handedAt[t.id] == null ? (done ? "closed" : "handed in") : handedAt[t.id] <= t.final ? `${waitLen(t.final - handedAt[t.id])} early` : `${waitLen(handedAt[t.id] - t.final)} late`) : waitSay(NOWH - t.assigned, t.final - t.assigned)}</span></span>
-        <span className="iq-a">${act && !on ? html`<${Button} size="small" onClick=${(e) => { e.stopPropagation(); act[1](); }}>${act[0]}<//>` : null}<${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setSelId(t.id); setOpenId(on ? null : t.id); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
+        <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setSelId(t.id); setOpenId(on ? null : t.id); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
       </article>
       ${on ? html`<div className="tk-open">
         <div className="tk-facts">${[["Given", `${atDay(t.assigned)} by ${t.by === me ? "you" : t.by}`], ["Started", t.started != null ? atDay(t.started) : "not yet"], ...(t.soft != null ? [["Soft deadline", atDay(t.soft)]] : []), ["Final deadline", atDay(t.final)], ["Handed in", k === "verify" ? "yes" : done ? "closed" : "not yet"]]
           .map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> ${b}</span>`)}</div>
-        ${html`<div className="tk-verdict">
-          <span><b>${fmt(found(t))} of ${fmt(t.evidence.length)}</b> targets found${seenAt[t.id] != null ? ` · last sign of progress ${atDay(seenAt[t.id])}` : ""}</span><span className="sp" />
-          ${vd[t.id] ? html`<span className=${vd[t.id] === "c" ? "t2" : "t2"}>${vd[t.id] === "c" ? "Marked complete" : `Sent back: “${why[t.id] || ""}”`}</span><${Button} size="small" type="text" onClick=${() => setVd({ ...vd, [t.id]: null })}>Undo<//>`
-          : asking === t.id ? html`<${Input} size="small" autoFocus placeholder=${`What is missing? ${t.who} sees this.`} value=${why[t.id] || ""} onChange=${(e) => setWhy({ ...why, [t.id]: e.target.value })} style=${{ width: 300 }} /><${Button} size="small" onClick=${() => setAsking(null)}>Cancel<//><${Button} size="small" type="primary" disabled=${!(why[t.id] || "").trim()} onClick=${() => { setVd({ ...vd, [t.id]: "i" }); setAsking(null); }}>Send back<//>`
-          : k === "verify" ? html`<${Button} size="small" onClick=${() => setAsking(t.id)}>Incomplete<//><${Button} size="small" type="primary" onClick=${() => setVd({ ...vd, [t.id]: "c" })}>Complete<//>`
-          : k === "late" ? html`<${Button} size="small" onClick=${() => toast(`Reminded ${t.who} (concept)`)}>Remind ${t.who}<//>` : html`<span className="t3">not handed in yet; your verdict comes when it is</span>`}
-        </div>`}
       </div>` : null}
     </div>`; };
   // your to-dos, always beside the work: the open ones soonest first, then what you ticked off this week
@@ -10121,18 +10198,40 @@ function AdminTasksPage({ go, open }) {
   const [gw, setGw] = useState(undefined), [gt, setGt] = useState(""), [gd, setGd] = useState("fri");
   const DUE = { today: "by the end of today", tomorrow: "by tomorrow evening", fri: "by Friday 17:00", week: "by the end of next week" };
   const gPrev = !gw || !gt.trim() ? null : `${MBY[gw].user} on ${gw} should ${gt.trim().replace(/\.$/, "")}, ${DUE[gd]}. The system proposes what done looks like and the deadlines; nothing is given until you confirm the proposal.`;
-  const pz = usePulse(selId);
+  const ldT = useLoading(selId), pz = usePulse(ldT ? null : selId);
+  // the picked task on the right, as Issues has the issue: its facts, then what to do about it. The buttons that were on
+  // the cards and in an opened card live here now (the user, 1 Nov 2026)
+  const T = TASKS.find((x) => x.id === selId) || null, tk = T && groupOf(T);
+  const verdict = (t, k) => vd[t.id] ? html`<span className="t2">${vd[t.id] === "c" ? "Marked complete" : `Sent back: “${why[t.id] || ""}”`}</span><span className="sp" /><${Button} size="small" type="text" onClick=${() => setVd({ ...vd, [t.id]: null })}>Undo<//>`
+    : asking === t.id ? html`<${Input} size="small" autoFocus placeholder=${`What is missing? ${t.who} sees this.`} value=${why[t.id] || ""} onChange=${(e) => setWhy({ ...why, [t.id]: e.target.value })} style=${{ flex: 1, minWidth: 160 }} />
+        <${Button} size="small" onClick=${() => setAsking(null)}>Cancel<//><${Button} size="small" type="primary" disabled=${!(why[t.id] || "").trim()} onClick=${() => { setVd({ ...vd, [t.id]: "i" }); setAsking(null); }}>Send back<//>`
+    : k === "verify" ? html`<span className="t3">Every target was found. Only you close it.</span><span className="sp" /><${Button} size="small" onClick=${() => setAsking(t.id)}>Incomplete<//><${Button} size="small" type="primary" onClick=${() => setVd({ ...vd, [t.id]: "c" })}>Complete<//>`
+    : k === "late" ? html`<span className="t3">${NOWH > t.final ? "Past its deadline." : "Nothing seen for two days."}</span><span className="sp" /><${Button} size="small" type="primary" onClick=${() => toast(`Reminded ${t.who} (concept)`)}>Remind ${t.who}<//>`
+    : k === "done" ? html`<span className="t3">Closed. Nothing more to do.</span>`
+    : html`<span className="t3">Not handed in yet; your verdict comes when it is.</span>`;
+  const STATE = { verify: "Handed in", track: "On track", done: "Completed", late: "Late, or gone quiet" };
+  const panel = !T ? html`<section className="ib-box tk-ctl" ref=${pz}><header><b>No task picked</b></header><div className="ib-quiet">Pick a task on the left.</div></section>`
+    : html`<section className="ib-box tk-ctl" ref=${pz}>
+      <header><b>${T.title}</b><span>${T.who} on <span className="mono">${T.host}</span></span></header>
+      <div className="al-f">${[
+        ["State", STATE[tk], tk === "late" ? (NOWH > T.final ? `${waitLen(NOWH - T.final)} past its deadline` : `nothing seen for ${seenAt[T.id] == null ? "as long as it has existed" : waitLen(NOWH - seenAt[T.id])}`) : tk === "verify" ? "every target was found" : tk === "done" ? "closed" : "signs of progress"],
+        ["Progress", `${fmt(found(T))} of ${fmt(T.evidence.length)} targets found`, seenAt[T.id] != null ? `last sign ${atDay(seenAt[T.id])}` : "no sign yet"],
+        ["Deadline", atDay(T.final), T.soft != null ? `soft deadline ${atDay(T.soft)}` : "no soft deadline"],
+        ["Given", T.by === me ? "By you" : `By ${T.by}`, atDay(T.assigned)]].map(([l, x, d]) => html`<div key=${l} className="al-fr"><span className="t3">${l}</span><span className="auo-lt"><b className="cut">${x}</b><span className="t3 cut">${d}</span></span></div>`)}</div>
+      <div className="tk-do">${verdict(T, tk)}</div>
+    </section>`;
   return html`<div className="og atp">
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <section className="ib-box">
-        <header><b>The work you gave</b><span>one card per task, grouped by what you do about it; click a task to see its targets below, expand it for its details and your verdict</span></header>
+        <header><b>The work you gave</b><span>one card per task, grouped by what you do about it; click a task for what to do on the right and its targets below, expand it for its dates</span></header>
         <div className="iq-axis"><span /><span className="t3">the task's own time: start to deadline, then overdue</span><span className="iq-axis-s"><span className="tb-axis tk-axis"><i>start</i><i>due</i><i>over</i></span><span /></span><span /></div>
         ${G.map(([k, g, d]) => { const xs = by[k]; if (!xs.length) return null; const fold = false;
           return html`<div key=${k} className=${"iq-grp" + (k === "late" ? " tk-late" : "")}><div className="lay-grp iq-gh">${g} · ${fmt(xs.length)}<span>${d}</span></div>
             ${fold ? null : html`<div className="iq-cards">${xs.map(card)}</div>`}</div>`; })}
         ${!TASKS.length ? html`<div className="ib-quiet">No tasks yet. Give one below.</div>` : null}
       </section>
+      <div className="iq-col">${panel}
       <section className="ib-box iq-fix">
         <header><b>Your to-dos · ${fmt(todoOpen().length)}</b><span>reminders for yourself, soonest first; only you see them</span></header>
         ${tds.map(tdRow)}
@@ -10140,9 +10239,11 @@ function AdminTasksPage({ go, open }) {
         <div className="td-add"><${Input} placeholder="Remind yourself of something" value=${tdt} onChange=${(e) => setTdt(e.target.value)} onPressEnter=${() => tdt.trim() && addTd()} />
           <${Button} disabled=${!tdt.trim()} onClick=${addTd}>Add<//></div>
         <span className="t3" style=${{ fontSize: 12 }}>${`Due ${atH(tdDue)}; to pick another time, add it on the Calendar.`}</span>
-      </section>
+      </section></div>
     </div>
-    <div className="pz-wrap" ref=${pz}>${selId && TASKS.some((t) => t.id === selId) ? html`<${TaskDetail} key=${"c" + selId} id=${selId} go=${go} picked=${true} part="chart" />`
+    <div className="pz-wrap" ref=${pz}>${selId && ldT ? html`<section className="panel"><div className="phd"><div className="pt">Targets<small>${(TASKS.find((x) => x.id === selId) || {}).title || ""}</small></div></div>
+        <div className="am-load" style=${{ height: 220 }}>${ic("LoadingOutlined")}<span>Loading its targets</span></div></section>`
+      : selId && TASKS.some((t) => t.id === selId) ? html`<${TaskDetail} key=${"c" + selId} id=${selId} go=${go} picked=${true} part="chart" />`
       : html`<section className="panel"><div className="phd"><div className="pt">Targets<small>what done looks like, and the signs of progress for each</small></div></div>
         <div className="pbd"><div className="ib-quiet">${ic("ArrowUpOutlined")} Pick a task above to see its targets here.</div></div></section>`}</div>
     <section className="ib-box og-change">
@@ -10165,7 +10266,75 @@ function AdminTasksPage({ go, open }) {
 // every bar on one day's scale; the fix for the picked one; its story; handing issues over.
 const IQ_WIN = 24, IQ_MARKS = ["−12h", "+12h"];
 const IQ_GROUPS = [["now", "Act now", "critical, or older than the time this kind of issue should take"], ["todo", "To do, still in time", "not acted on yet, within its time"],
-  ["wait", "Done your part, waiting", "you have acted; the rest is not up to you"], ["done", "Done today", "resolved today, by you or anyone in the department"]];
+  ["wait", "Done, your part", "you have acted; what happens next is on the card"], ["done", "Done today", "resolved today, by you or another Admin"]];
+// Departments (the user, 1 Nov 2026, version 1). A department is a label an Admin makes by putting machines
+// in it, for grouping and filtering; it is never a wall. Machines are registered on Machines and get their department
+// here. Every IT Admin reaches every department, so none belongs to one. An Admin is never made here: it takes the
+// console installed on their PC, finished with the TUI or the setup utility (the user, 1 Nov 2026), so it is never one click.
+function AdminDepartmentsPage({ go }) {
+  const [, bump] = useState(0), redraw = () => bump((n) => n + 1);
+  const [modal, modalCtx] = Modal.useModal();
+  const depts = FULL.DEPTS || DEPTS, all = FULL.MACHINES || MACHINES;
+  const [sel, setSel] = useState(() => (depts[0] || {}).id || null), [exp, setExp] = useState(null);
+  const [nm, setNm] = useState(""), [ren, setRen] = useState(""), [q, setQ] = useState(""), [more, setMore] = useState(false);
+  const D = depts.find((d) => d.id === sel) || null;
+  const inD = (id) => all.filter((m) => m.dept === id);
+  const loose = all.filter((m) => !depts.some((d) => d.id === m.dept));
+  const situation = `${fmt(depts.length)} department${depts.length === 1 ? "" : "s"} and ${fmt(all.length)} machines; ${loose.length ? `${fmt(loose.length)} in no department yet` : "every machine is in one"}. Every IT Admin reaches every department.`;
+  const moveIn = (m) => { const from = depts.find((d) => d.id === m.dept), doIt = () => { m.dept = D.id; redraw(); toast(`${m.host} is in ${D.name} now (concept)`); };
+    if (!from) return doIt();
+    modal.confirm({ title: `Move ${m.host} to ${D.name}?`, content: `It leaves ${from.name}. A department is only a label: nothing on the machine changes, and every Admin still reaches it.`, okText: "Move it", cancelText: "Cancel", onOk: doIt }); };
+  const make = () => { const name = nm.trim(); if (!name) return; if (depts.some((d) => d.name.toLowerCase() === name.toLowerCase())) return toast(`There is already a department called ${name}`);
+    const d = { id: "d-" + Date.now().toString(36), name, admins: [], c: ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)"][depts.length % 6] };
+    depts.push(d); DBY[d.id] = d; setNm(""); setSel(d.id); redraw(); toast(`${name} made; put machines in it on the right`); };
+  const rename = (d) => { const name = ren.trim(); if (!name || name === d.name) return; toast(`${d.name} is now ${name}`); d.name = name; redraw(); };
+  const card = (d) => { const on = exp === d.id, picked = sel === d.id, ms = inD(d.id), ppl = ms.filter((m) => m.user).length;
+    return html`<div key=${d.id} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "")}>
+      <article className="iq-card am-card" role="button" tabIndex="0" aria-pressed=${picked} onClick=${() => setSel(d.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(d.id)}>
+        <span className="iq-ic"><i className="pd-dot" style=${{ "--c": d.c }} /></span>
+        <span className="iq-main"><span className="iq-t"><b className="cut">${d.name}</b></span><span className="iq-s cut">${ms.length ? listNames(ms.map((m) => m.host), 4) : "no machines yet"}</span></span>
+        <span className="am-facts"><span>${fmt(ms.length)} machine${ms.length === 1 ? "" : "s"}</span><span className="t3">${fmt(ppl)} ${ppl === 1 ? "person" : "people"}</span></span>
+        <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setSel(d.id); setRen(d.name); setExp(on ? null : d.id); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
+      </article>
+      ${on ? html`<div className="tk-open"><div className="pd-open">
+        <div className="pd-f"><span className="t3">Name</span><${Input} size="small" value=${ren} onChange=${(e) => setRen(e.target.value)} onPressEnter=${() => rename(d)} /></div>
+        <div className="row"><span className="t3" style=${{ fontSize: 12 }}>The new name shows everywhere the department does; its machines stay in it.</span><span className="sp" />
+          <${Button} size="small" disabled=${!ren.trim() || ren.trim() === d.name} onClick=${() => rename(d)}>Rename<//></div>
+      </div></div>` : null}</div>`; };
+  // a machine is the Overview's tile (the user, 1 Nov 2026): its name, coloured by how it is; who is at it is on hover
+  const chip = (m, inside) => html`<button key=${m.host} className=${"ovh-m " + (m.status === "offline" ? "off" : m.status === "high" || m.status === "critical" ? "lag" : "") + (inside ? " pd-in" : "")}
+    onClick=${inside ? null : () => moveIn(m)} title=${`${m.host}${m.user ? `, ${m.user}` : ", nobody signed in"}: ${HEALTH[m.status][1]}. ${inside ? `In ${D.name}.` : `Click to move it into ${D.name}.`}`}>${tileName(m.host)}</button>`;
+  const CAP = 40, hit = (m) => `${m.host} ${m.user || ""}`.toLowerCase().includes(q.trim().toLowerCase());
+  const elsewhere = D ? all.filter((m) => m.dept !== D.id && hit(m)) : [], shown = more ? elsewhere : elsewhere.slice(0, CAP);
+  const groups = [...depts.filter((d) => D && d.id !== D.id).map((d) => [d.name, shown.filter((m) => m.dept === d.id)]), ["In no department", shown.filter((m) => !depts.some((d) => d.id === m.dept))]].filter(([, xs]) => xs.length);
+  const pz = usePulse(sel);
+  return html`<div className="og pdp">${modalCtx}
+    <${SitBar} text=${situation} />
+    <div className="g c-66" style=${{ alignItems: "stretch" }}>
+      <section className="ib-box">
+        <header><b>Departments · ${fmt(depts.length)}</b><span>a label for grouping machines and the people at them; click one to see its machines on the right, expand it to rename it</span></header>
+        ${depts.length ? html`<div className="iq-cards">${depts.map(card)}</div>` : html`<div className="ib-quiet">No departments yet. Make one below.</div>`}
+      </section>
+      <section className="ib-box" ref=${pz}>
+        ${D ? html`<header><b>${D.name}</b><span>${fmt(inD(D.id).length)} machine${inD(D.id).length === 1 ? "" : "s"}; a machine is in one department at a time</span></header>
+          <div className="lay-grp iq-gh">In ${D.name}</div>
+          ${inD(D.id).length ? html`<div className="ovh-tiles ao-ovh">${inD(D.id).map((m) => chip(m, true))}</div>` : html`<div className="ib-quiet">No machines yet. Put some in from the list below.</div>`}
+          <div className="lay-grp iq-gh" style=${{ marginTop: 10 }}>Elsewhere<span>click one to move it into ${D.name}</span></div>
+          <${Input} size="small" allowClear prefix=${ic("SearchOutlined")} placeholder="Find a machine or a person" value=${q} onChange=${(e) => setQ(e.target.value)} style=${{ maxWidth: 300 }} />
+          ${groups.map(([g, xs]) => html`<div key=${g}><div className="pd-from">${g}</div><div className="ovh-tiles ao-ovh">${xs.map((m) => chip(m, false))}</div></div>`)}
+          ${!elsewhere.length ? html`<div className="ib-quiet">${q ? "Nothing matches." : `Every machine is in ${D.name}.`}</div>` : null}
+          ${elsewhere.length > CAP ? html`<a className="ib-more" onClick=${() => setMore(!more)}>${more ? "Show fewer" : `and ${fmt(elsewhere.length - CAP)} more`}</a>` : null}
+          <div className="ovh-key"><span><i className="ovh-m sm" />fine</span><span><i className="ovh-m sm lag" />needs a look</span><span><i className="ovh-m sm off" />offline</span></div>`
+        : html`<header><b>No department picked</b></header><div className="ib-quiet">Pick a department on the left, or make one below.</div>`}
+      </section>
+    </div>
+    <section className="ib-box og-change">
+      <header><b>Make a department</b><span>name it, then put machines in it on the right</span></header>
+      <div className="og-change-r"><${Input} placeholder="For example Procurement" value=${nm} onChange=${(e) => setNm(e.target.value)} onPressEnter=${make} style=${{ flex: 1, minWidth: 200, maxWidth: 420 }} />
+        <${Button} type="primary" disabled=${!nm.trim()} onClick=${make}>Make it<//></div>
+    </section>
+  </div>`;
+}
 function AdminIssuesPage({ sel: open, go }) {
   useDT();
   const me = ME;
@@ -10197,8 +10366,12 @@ function AdminIssuesPage({ sel: open, go }) {
     const play = buildPlay(i), extra = o.need === "pick" ? `: ${val}` : "";
     const lines = [[nowT(), o.log + extra + (o.need === "reason" ? `: “${val.trim()}”` : "")]];
     if (play.notify && notify && o.done === "Resolved") lines.push([nowT(), `Told ${play.notify} what happened and why`]);
-    upd(i.id, (x) => ({ status: o.done, log: [...x.log, ...lines], msg: o.need === "message" ? val.trim() : x.msg, how: o.title }));
+    upd(i.id, (x) => ({ status: o.done, owner: x.owner === "Unassigned" ? me : x.owner, log: [...(x.owner === "Unassigned" ? [[nowT(), "Took it"]] : []), ...x.log, ...lines], msg: o.need === "message" ? val.trim() : x.msg, how: o.title }));
   };
+  // every issue reaches every Admin and stays nobody's until one takes it; the others see who has it (version 1)
+  const take = (i) => { const was = state[i.id].owner; upd(i.id, (x) => ({ owner: me, log: [...x.log, [nowT(), was === "Unassigned" ? "Took it" : `Took it over from ${was}`]] })); toast(was === "Unassigned" ? `${i.subject} is yours` : `${i.subject} is yours; ${was} is told`); };
+  const free = (i) => { upd(i.id, (x) => ({ owner: "Unassigned", log: [...x.log, [nowT(), "Gave it back"]] })); toast(`${i.subject} is nobody's again`); };
+  const theirs = (i) => { const o = state[i.id].owner; return o !== me && o !== "You" && o !== "Unassigned" && state[i.id].status === "Open"; };
   const act = (i, o, val) => (o.key === "enter" || o.key === "look") ? modal.confirm(enterSessionConfirm(MBY[i.host], () => { doAct(i, o, val); toast(`${o.verb}: done (concept)`); })) : (doAct(i, o, val), toast(`${o.verb}: done (concept)`));
   const onCard = (i) => { const o = primary(i); setSel(i.id); if (o.need) { setPick({ ...pick, [i.id]: o.key }); toast("Say a little more on the right first"); } else act(i, o, ""); };
   // the fix panel
@@ -10206,7 +10379,7 @@ function AdminIssuesPage({ sel: open, go }) {
   // every time from now on: the recommended fix, made a rule in Automation as this one is fixed (only where Falcon can do it alone)
   const RULE_DO = { file: "delete the copy and tell whoever is signed in" };
   const RULE_WHEN = { file: "a restricted file is copied" };
-  const ruleOpt = (i) => (RULE_DO[i.type] && primary(i).key === "delete" ? { key: "rule", title: "Do this every time from now on",
+  const ruleOpt = (i) => (RULE_DO[i.type] && primary(i).key === "delete" ? { key: "rule", title: "Delete this every time from now on",
     desc: `When ${RULE_WHEN[i.type]} on any of your machines, Falcon will ${RULE_DO[i.type]}. This one is fixed now too; you can change or stop it in Automation.`, verb: `${primary(i).verb}, every time` } : null);
   const opts = it ? [...play.options, ruleOpt(it)].filter(Boolean) : [];
   const opt = it && (opts.find((o) => o.key === (pick[it.id] || primary(it).key)) || opts[0]);
@@ -10214,41 +10387,43 @@ function AdminIssuesPage({ sel: open, go }) {
   const missing = !it ? null : (opt.need === "reason" || opt.need === "message") && !val.trim() ? (opt.need === "reason" ? "Write a reason first." : "Write a message first.") : opt.need === "pick" && !val ? "Pick one first." : null;
   const go1 = () => { if (opt.key !== "rule") return act(it, opt, val); const o = primary(it);
     act(it, { ...o, log: `${o.log}; from now on Falcon does this by itself` }, ""); toast(`Rule made: when ${RULE_WHEN[it.type]}, ${RULE_DO[it.type]} (concept)`); };
-  const card = (i) => { const done = state[i.id].status === "Resolved", w = state[i.id].status === "Waiting", hot = !done && (i.sev === "critical" || lateI(i)), o = primary(i);
-    return html`<div key=${i.id} className=${"tk-item" + (i.id === id ? " am-pick" : "")}><article className=${"iq-card am-card" + (done ? " done" : "")} role="button" tabIndex="0" onClick=${() => setSel(i.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(i.id)}>
+  // a critical issue still open is drawn as Machines draws a serious machine: red icon, red line (the user, 1 Nov 2026)
+  const card = (i) => { const done = state[i.id].status === "Resolved", w = state[i.id].status === "Waiting", hot = !done && (i.sev === "critical" || lateI(i)), crit = !done && !w && i.sev === "critical", o = primary(i);
+    return html`<div key=${i.id} className=${"tk-item" + (i.id === id ? " am-pick" : "")}><article className=${"iq-card am-card" + (done ? " done" : "") + (crit ? " urg" : "")} role="button" tabIndex="0" onClick=${() => setSel(i.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(i.id)}>
       <span className="iq-ic">${ic(ISSUE_TYPES[i.type].icon)}</span>
       <span className="iq-main"><span className="iq-t"><b className="cut">${i.subject}</b></span>
-        <span className="iq-s cut">${w ? waitNote(i) : done ? state[i.id].how || "Resolved" : `${i.type === "file" ? `in ${i.d.folder}` : i.title}${i.sev === "critical" ? " · critical" : ""}`}</span></span>
+        <span className=${"iq-s cut" + (crit ? " hot" : "")}>${w ? waitNote(i) : done ? state[i.id].how || "Resolved" : theirs(i) ? `${state[i.id].owner} has it` : `${i.type === "file" ? `in ${i.d.folder}` : i.title}${i.sev === "critical" ? " · critical" : ""}`}</span></span>
       <span className="am-facts"><span className="mono cut">${i.host}</span><span className="mono">${i.at >= 0 ? hhmm(i.at) : dayOf(i.at)}</span></span>
     </article></div>`; };
   // one card per issue, always: several of one kind sit under a heading, never inside another card (the user, 1 Nov 2026,
   // "why mixing"). The kind holding the most pressing issue comes first; each shows its worst three, the rest a click away
   const IQ_PL = { file: "restricted copies", update: "machines behind on the version", deviation: "certificate mismatches", flow: "flows waiting for a folder" };
-  const todo = [...by.now, ...by.todo], later = [...by.wait, ...by.done];
+  // To do: the next step is yours. Done: you have done your part (what happens next is on the card), or it is resolved;
+  // once you have acted it is done for you, never "waiting" (the user, 1 Nov 2026). An issue a colleague has taken is
+  // theirs to do, so it is in neither list (a separate list for them was tried and removed, 1 Nov 2026)
+  const todo = [...by.now, ...by.todo].filter((i) => !theirs(i)), later = [...by.wait, ...by.done];
   const PER_KIND = 3;
   const kindName = (ty) => { const s = IQ_PL[ty] || ISSUE_TYPES[ty].label.toLowerCase(); return s[0].toUpperCase() + s.slice(1); };
   const byKind = (list, xs) => { const gs = []; xs.forEach((i) => { const g = gs.find((x) => x.ty === i.type); g ? g.xs.push(i) : gs.push({ ty: i.type, xs: [i] }); });
     return gs.map((g) => { const k = list + g.ty, all = !!more[k], hs = [...new Set(g.xs.map((x) => x.host))], crit = g.xs.filter((x) => x.sev === "critical").length;
-      const o = primary(g.xs[0]), oneFix = list === "todo" && g.xs.length > 1 && g.xs.every((x) => primary(x).key === o.key);
-      return html`<div key=${k} className="iq-grp"><div className="lay-grp iq-gh">${kindName(g.ty)} · ${fmt(g.xs.length)}<span>on ${listNames(hs, 3)}${crit ? `, ${fmt(crit)} critical` : ""}</span>
-          ${oneFix ? html`<${Button} size="small" className="iq-gh-act" onClick=${() => { g.xs.forEach((x) => doAct(x, primary(x), "")); toast(`${o.verb}: all ${fmt(g.xs.length)} done (concept)`); }}>${o.key === "delete" ? "Delete all" : `${o.verb} all`}<//>` : null}</div>
+      return html`<div key=${k} className="iq-grp"><div className="lay-grp iq-gh">${kindName(g.ty)} · ${fmt(g.xs.length)}<span>on ${listNames(hs, 3)}${crit ? `, ${fmt(crit)} critical` : ""}</span></div>
         <div className="iq-cards">${(all ? g.xs : g.xs.slice(0, PER_KIND)).map(card)}</div>
         ${g.xs.length > PER_KIND ? html`<a className="ib-more" onClick=${() => setMore({ ...more, [k]: !all })}>${all ? "Show fewer" : `and ${fmt(g.xs.length - PER_KIND)} more`}</a>` : null}</div>`; }); };
-  const pz = usePulse(id);
+  const ld = useLoading(id), pz = usePulse(ld ? null : id);
   return html`<div className="og iqp">${modalCtx}
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "stretch" }}>
       <div className="iq-col">
         <section className="ib-box">
-          <header><b>To do · ${fmt(todo.length)}</b><span>yours to act on, by kind; the kind with the most pressing issue first, critical and late first within it</span></header>
+          <header><b>To do · ${fmt(todo.length)}</b><span>the next step is yours, by kind; the kind with the most pressing issue first, critical and late first within it</span></header>
           ${todo.length ? byKind("todo", todo) : html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing for you to do.</div>`}
         </section>
         <section className="ib-box">
-          <header><b>Waiting · ${fmt(later.length)}</b><span>you have acted, and the rest is not up to you; what was resolved today stays here until tomorrow</span></header>
-          ${later.length ? byKind("later", later) : html`<div className="ib-quiet">Nothing waiting on anyone else.</div>`}
+          <header><b>Done · ${fmt(later.length)}</b><span>you have done your part; each says what happens next, and stays here until tomorrow</span></header>
+          ${later.length ? byKind("later", later) : html`<div className="ib-quiet">Nothing done today yet.</div>`}
         </section>
-        ${it ? html`<section className="ib-box iq-storyb" ref=${pz}>
-          <header><b>Its story</b><span>${it.subject} on <span className="mono">${it.host}</span></span></header>
+        ${it ? html`<section className=${"ib-box iq-storyb" + (ld ? " ld-on" : "")} ref=${pz}>
+          <header><b>Its story</b><span>${it.subject} on <span className="mono">${it.host}</span></span></header>${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}
           <div className="iq-story"><${IssueTimeline} it=${it} extra=${stt.log} /></div>
         </section>` : null}
       </div>
@@ -10258,10 +10433,14 @@ function AdminIssuesPage({ sel: open, go }) {
         <div className="al-f">${[
           ["What", it.subject, `${T.label.toLowerCase()} · ${SEV[it.sev].w.toLowerCase()}`],
           ["Where", html`<span className="mono">${it.host}</span>`, MBY[it.host] ? `${deptNameOf(MBY[it.host].dept)} · ${MBY[it.host].user ? `${MBY[it.host].user} signed in` : "nobody signed in"}` : ""],
-          ["When", detCap(alWhen(it.at)), `${owner(it) === "you" ? "yours" : owner(it) === "nobody yet" ? "nobody's yet" : `${owner(it)}'s`} · ${stt.status.toLowerCase()}`],
+          ["When", detCap(alWhen(it.at)), `${owner(it) === "you" ? "yours" : owner(it) === "nobody yet" ? "not taken" : `${owner(it)}'s`} · ${stt.status === "Waiting" ? "done, your part" : stt.status.toLowerCase()}`],
           ...(stt.status === "Resolved" ? [] : play.facts.filter(([k]) => !/^(File|Machine)$/.test(k)).map(([k, v]) => [k, v, null]))].map(([l, t, d]) => html`<div key=${l} className="al-fr"><span className="t3">${l}</span><span className="auo-lt"><b className="cut" title=${typeof t === "string" ? t : null}>${t}</b>${d ? html`<span className="t3 cut">${d}</span>` : null}</span></div>`)}</div>
         ${stt.status === "Resolved" ? html`<div className="iq-done">${ic("CheckCircleFilled")}<span><b>Resolved</b> · ${stt.how || "done"}</span><a onClick=${() => upd(it.id, (x) => ({ status: "Open", how: null, log: [...x.log, [nowT(), "Reopened it"]] }))}>Reopen</a></div>`
-        : html`<div className="t2" style=${{ lineHeight: 1.5 }}>${play.lead}</div>
+        : theirs(it) ? html`<div className="t2" style=${{ lineHeight: 1.5 }}>${play.lead}</div>
+          <div className="iq-who">${ic("UserOutlined")}<span><b>${stt.owner} has it.</b> Take it over to act on it; they are told.</span><span className="sp" /><${Button} size="small" onClick=${() => take(it)}>Take it over<//></div>`
+        : html`<div className="iq-who">${ic("UserOutlined")}${stt.owner === "Unassigned" ? html`<span><b>Nobody has it yet.</b> Acting on it makes it yours.</span><span className="sp" /><${Button} size="small" onClick=${() => take(it)}>Take it<//>`
+            : html`<span><b>You have it.</b></span><span className="sp" /><${Button} size="small" type="text" onClick=${() => free(it)}>Give it back<//>`}</div>
+          <div className="t2" style=${{ lineHeight: 1.5 }}>${play.lead}</div>
           ${stt.status === "Waiting" ? html`<div className="t3" style=${{ fontSize: 12 }}>${waitNote(it)}. You can still change course.</div>` : null}
           <div className="iq-opts"><div className="lay-grp">What to do</div>
             ${opts.map((o) => html`<button key=${o.key} className=${"iq-opt" + (o.key === opt.key ? " on" : "")} onClick=${() => setPick({ ...pick, [it.id]: o.key })}>
@@ -10396,6 +10575,10 @@ function App() {
   useDT();
   const th = useTheme();
   const [pulse, setPulse] = useState(pulseOn);
+  // whether a page's button asks before opening another page; "Don't ask again" turns it off, the line under your name
+  // turns it back on; kept per viewer
+  const [ask, setAsk0] = useState(() => { try { return localStorage.getItem("falcon-ask") !== "off"; } catch (e) { return true; } });
+  const setAsk = (v) => { setAsk0(v); try { localStorage.setItem("falcon-ask", v ? "on" : "off"); } catch (e) { /* this visit only */ } };
   const flipPulse = () => { const v = !pulse; setPulse(v); v ? document.documentElement.removeAttribute("data-pulse") : document.documentElement.setAttribute("data-pulse", "off");
     try { localStorage.setItem(PULSE_KEY, v ? "on" : "off"); } catch (e) { /* this visit only */ }
     toast(v ? "A section a click changes pulses once" : "Pulsing is off"); };
@@ -10409,30 +10592,36 @@ function App() {
   const [enterTo, setEnterTo] = useState(null);
   const enter = (a, to) => { setEntering(a); setEnterTo(to || null); };
   const now = useNow(1000);
-  applyScope(level ? level.dept : null);
+  // version 1 (1 Nov 2026, docs/design/v1-it-admin.md): the console is an IT Admin's, and an Admin reaches every
+  // department; departments are labels for grouping and filtering, never walls
+  applyScope(null);
   ME = level ? level.admin : "Super User";
   let [rawPage, sub] = level ? [rawPage0, sub0] : suRoute(rawPage0, sub0);
-  // an Admin's console is one department, and does not change what the Super User owns: an address, a bookmark or a
-  // link that points elsewhere opens the list instead, and says why (admin-navigation.md D3, D4)
+  // every Admin sees everything, but a flow or a rule stays its maker's to change: an address that opens another
+  // Admin's flow or rule in the editor opens the list (or the rule) instead, and says why
   let refused = null;
   if (level && sub) {
-    const deptOf = (h) => ((FULL.DEPTS || DEPTS).find((d) => d.id === (MBY[h] || {}).dept) || { name: "another department" }).name;
     const fl = rawPage === "flows" && sub.startsWith("edit-") ? FBY[sub.slice(5)] : null;
     const ru = rawPage === "automation" && sub.startsWith("edit-") ? RBY[sub.slice(5)] : null;
-    const isu = rawPage === "issues" ? (FULL.ISSUES || ISSUES).find((i) => i.id === sub) : null;
-    const tk = rawPage === "tasks" ? (FULL.TASKS || TASKS).find((t) => t.id === sub) : null;
-    if (rawPage === "machines" && MBY[sub] && !MACHINES.some((m) => m.host === sub)) refused = `${sub} belongs to ${deptOf(sub)}, so it does not open in this console.`;
-    else if (fl && fl.by !== level.admin) refused = `The ${fl.name} flow was made by ${fl.by === "Super User" ? "the Super User" : fl.by}. Only they, or the Super User, can change it.`;
-    else if (ru && ru.by === "You") refused = `${ru.name} was set by the Super User for the whole organisation. Only they can change it.`;
-    else if (isu && !ISSUES.includes(isu)) refused = `${isu.id} is about ${isu.host}, which belongs to ${deptOf(isu.host)}.`;
-    else if (tk && !TASKS.includes(tk)) refused = `${tk.id} is for ${tk.host}, which belongs to ${deptOf(tk.host)}.`;
-    if (refused) sub = rawPage === "automation" && ru ? ru.id : null;
+    if (fl && fl.by !== level.admin) refused = `The ${fl.name} flow was made by ${fl.by}. Only they can change it.`;
+    else if (ru && ru.by !== level.admin) refused = `${ru.name} was made by ${ru.by}. Only they can change it.`;
+    if (refused) sub = ru ? ru.id : null;
   }
   const nav = level ? NAV_ADMIN : NAV_SU;
-  const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)).concat(["registry"]));
-  const page = allowed.has(rawPage) ? rawPage : "overview";
+  const allowed = new Set(nav.flatMap(([, xs]) => xs.map((x) => x[0])).concat(level ? [] : Object.keys(SU_PARENT)).concat(level ? [] : ["registry"]));
+  const page = allowed.has(rawPage) ? rawPage : level && rawPage === "registry" ? "machines" : "overview";
   const goRaw = (p, s0) => { setRoute([p, s0 || null]); try { history.replaceState(null, "", "#" + p + (s0 ? "/" + encodeURIComponent(s0) : "")); } catch (e) {} if (p !== page || p !== "issues") window.scrollTo(0, 0); };
   const go = (p0, s00) => { const [p, s0] = level ? [p0, s00] : suRoute(p0, s00 || null); goRaw(p, s0); };
+  // what a page's own buttons use: the same page just picks; another page is asked first
+  const [askM, askCtx] = Modal.useModal();
+  const goAsk = (p0, s00) => { const [p, s0] = level ? [p0, s00] : suRoute(p0, s00 || null);
+    const land = () => { ARRIVE = { page: p, sub: s0 || null }; goRaw(p, s0); setTimeout(arriveNow, 450); };
+    if (p === page || !ask) return land();
+    const to = (TITLES[p] || [p])[0], what = arriveWhat(p, s0); let quiet = false;
+    askM.confirm({ title: `Open ${to}?`, okText: `Open ${to}`, cancelText: "Stay here",
+      content: html`<div>${what ? what + " " : ""}This leaves ${(TITLES[page] || [page])[0]}; the menu brings you back.</div>
+        <${Checkbox} style=${{ marginTop: 12 }} onChange=${(e) => { quiet = e.target.checked; }}>Don't ask again<//>`,
+      onOk: () => { if (quiet) { setAsk(false); toast("Pages open without asking now; turn it back on under your name"); } land(); } }); };
   const enterConsole = (admin, how) => { setEntering(null); setLevel({ admin, dept: ADMIN_INFO[admin].dept, since: Date.now(), how }); goRaw(enterTo ? enterTo.page : "overview", enterTo ? enterTo.sub : null); setEnterTo(null); toast(`${how === "end" ? "Ended" : "Blocked"} ${admin}'s session. You are in their console.`); };
   const leave = () => { const d = level.dept, a = level.admin; setLevel(null); go("dept", d); toast(`Left ${a}'s console. Their session is back.`); };
   useEffect(() => { const k = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPal((v) => !v); } };
@@ -10448,33 +10637,33 @@ function App() {
     components: { Table: { headerBg: dk ? "#161b23" : "#f8f9fb", rowHoverBg: dk ? "#1d232d" : "#f8f9fb" } } };
   const deptName = (id) => (FULL.DEPTS || DEPTS).find((d) => d.id === id).name;
   const [title0, subtitle0] = TITLES[page];
-  const title = page === "dept" ? deptName(sub) : title0, subtitle = page === "dept" ? "" : level && page === "overview" ? `${deptName(level.dept)} · as ${level.admin} sees it` : !level && page === "overview" ? "What needs you, and how the organisation is doing" : !level && page === "tasks" ? "Work you give departments, and how far each has got" : !level && page === "calendar" ? "What is coming · task deadlines and announcements waiting to go out" : !level && page === "flows" ? "Every flow in the organisation, who made it, and whether it is copying" : subtitle0;
+  const title = page === "dept" ? deptName(sub) : title0, subtitle = page === "dept" ? "" : level && page === "overview" ? `Every department · ${fmt(MACHINES.length)} machines · as ${level.admin} sees it` : !level && page === "overview" ? "What needs you, and how the organisation is doing" : !level && page === "tasks" ? "Work you give departments, and how far each has got" : !level && page === "calendar" ? "What is coming · task deadlines and announcements waiting to go out" : !level && page === "flows" ? "Every flow in the organisation, who made it, and whether it is copying" : subtitle0;
   const secs = Math.floor(((now - T0) / 1000) % 15);
   let body;
-  if (page === "departments") body = level ? html`<${DepartmentsPage} go=${go} enter=${enter} open=${sub} />` : html`<${DepartmentsBrief} go=${go} enter=${enter} />`;
-  else if (page === "registry") body = html`<${Registry} go=${go} enter=${enter} open=${sub} />`;
-  else if (page === "messages") body = level ? html`<${AdminMessagesPage} key=${ME} go=${go} />` : html`<${MessagesBrief} go=${go} enter=${enter} />`;
-  else if (page === "calendar") body = level ? html`<${AdminCalendarPage} key=${level.dept} go=${go} level=${level} />` : html`<${CalendarBrief} go=${go} />`;
-  else if (page === "inbox") body = level ? html`<${Inbox} go=${go} open=${sub} />` : html`<${Inbox2} go=${go} />`;
-  else if (page === "directives") body = html`<${Directives3} go=${go} />`;
-  else if (page === "announcements") body = html`<${Directives3} go=${go} />`;
-  else if (page === "admins") body = level ? html`<${AdminsPage} go=${go} enter=${enter} />` : html`<${AdminsBrief} go=${go} enter=${enter} />`;
-  else if (page === "overview") body = level ? html`<${AdminOverviewPage} go=${go} />` : html`<${OverviewHome} go=${go} />`;
+  if (page === "departments") body = level ? html`<${AdminDepartmentsPage} go=${goAsk} />` : html`<${DepartmentsBrief} go=${goAsk} enter=${enter} />`;
+  else if (page === "registry") body = html`<${Registry} go=${goAsk} enter=${enter} open=${sub} />`;
+  else if (page === "messages") body = level ? html`<${AdminMessagesPage} key=${ME + (sub || "")} go=${goAsk} open=${sub} />` : html`<${MessagesBrief} go=${goAsk} enter=${enter} />`;
+  else if (page === "calendar") body = level ? html`<${AdminCalendarPage} key=${level.dept} go=${goAsk} level=${level} />` : html`<${CalendarBrief} go=${goAsk} />`;
+  else if (page === "inbox") body = level ? html`<${Inbox} go=${goAsk} open=${sub} />` : html`<${Inbox2} go=${goAsk} />`;
+  else if (page === "directives") body = html`<${Directives3} go=${goAsk} />`;
+  else if (page === "announcements") body = html`<${Directives3} go=${goAsk} />`;
+  else if (page === "admins") body = level ? html`<${AdminsPage} go=${goAsk} enter=${enter} />` : html`<${AdminsBrief} go=${goAsk} enter=${enter} />`;
+  else if (page === "overview") body = level ? html`<${AdminOverviewPage} go=${goAsk} />` : html`<${OverviewHome} go=${goAsk} />`;
   // the Admin has no page for one machine: a machine named anywhere opens Machines with it picked
-  else if (page === "machines") body = level ? html`<${AdminMachinesPage} key=${sub || ""} go=${go} start=${sub && MBY[sub] ? sub : null} />` : sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${go} />` : html`<${MachineList} go=${go} />`;
-  else if (page === "issues") body = level ? html`<${AdminIssuesPage} sel=${sub} go=${go} />` : html`<${Issues} sel=${sub} go=${go} />`;
-  else if (page === "tasks" && level && (!sub || TASKS.some((t) => t.id === sub))) body = html`<${AdminTasksPage} key=${sub || "tasks"} go=${go} open=${sub} />`;
-  else if (page === "tasks") body = !level && (!sub || sub === "new" || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${Directives3} go=${go} />` : sub === "new" ? html`<${NewTask} go=${go} />` : html`<${Tasks} go=${go} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
-  else if (page === "flows") body = level ? html`<${AdminFlowsPage2} key=${sub || "flows"} go=${go} open=${sub} />` : sub === "new" ? html`<${NewFlow} go=${go} me=${null} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${go} me=${null} edit=${sub.slice(5)} />` : html`<${FlowsSU} go=${go} me=${null} open=${FBY[sub] ? sub : null} />`;
-  else if (page === "detective") body = level ? html`<${AdminDetectivePage} key=${ME} go=${go} />` : html`<${DetectivePage} go=${go} dept=${null} />`;
-  else if (page === "restricted" || page === "protected") body = !level ? html`<${ProtectedLevels} go=${go} start=${sub} />` : !sub ? html`<${AdminRestrictedPage} key=${ME} go=${go} />` : sub === "mark" ? html`<${MarkPage} go=${go} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${go} open=${sub} all=${!level} />`;
-  else if (page === "actions") body = level && !sub ? html`<${AdminActionsLayout} />` : sub === "new" ? html`<${NewAction} go=${go} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${go} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${go} open=${sub && ABY[sub] ? sub : null} />`;
-  else if (page === "automation") body = level && !sub ? html`<${AdminAutomationPage} key=${ME} go=${go} />` : sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${go} from=${sub === "new" ? null : sub.slice(5)} />` : html`<${Automation} go=${go} open=${sub && RBY[sub] ? sub : null} />`;
-  else if (page === "audit") body = !level ? html`<${AuditBrief} range=${range} go=${go} />` : html`<${AdminAuditPage} key=${ME} range=${range} go=${go} />`;
-  else body = html`<${Overview} range=${range} go=${go} />`;
+  else if (page === "machines") body = level ? html`<${AdminMachinesPage} key=${sub || ""} go=${goAsk} start=${sub && MBY[sub] ? sub : null} />` : sub && MBY[sub] ? html`<${MachineDetail} host=${sub} range=${range} go=${goAsk} />` : html`<${MachineList} go=${goAsk} />`;
+  else if (page === "issues") body = level ? html`<${AdminIssuesPage} sel=${sub} go=${goAsk} />` : html`<${Issues} sel=${sub} go=${goAsk} />`;
+  else if (page === "tasks" && level && (!sub || TASKS.some((t) => t.id === sub))) body = html`<${AdminTasksPage} key=${sub || "tasks"} go=${goAsk} open=${sub} />`;
+  else if (page === "tasks") body = !level && (!sub || sub === "new" || DEPT_TASKS.some((t) => t.id === sub)) ? html`<${Directives3} go=${goAsk} />` : sub === "new" ? html`<${NewTask} go=${goAsk} />` : html`<${Tasks} go=${goAsk} me=${level && level.admin} open=${sub && TASKS.find((t) => t.id === sub) ? sub : null} />`;
+  else if (page === "flows") body = level ? html`<${AdminFlowsPage2} key=${sub || "flows"} go=${goAsk} open=${sub} />` : sub === "new" ? html`<${NewFlow} go=${goAsk} me=${null} />` : sub && sub.startsWith("edit-") && FBY[sub.slice(5)] ? html`<${NewFlow} key=${sub} go=${goAsk} me=${null} edit=${sub.slice(5)} />` : html`<${FlowsSU} go=${goAsk} me=${null} open=${FBY[sub] ? sub : null} />`;
+  else if (page === "detective") body = level ? html`<${AdminDetectivePage} key=${ME} go=${goAsk} />` : html`<${DetectivePage} go=${goAsk} dept=${null} />`;
+  else if (page === "restricted" || page === "protected") body = !level ? html`<${ProtectedLevels} go=${goAsk} start=${sub} />` : !sub ? html`<${AdminRestrictedPage} key=${ME} go=${goAsk} />` : sub === "mark" ? html`<${MarkPage} go=${goAsk} me=${ME} />` : html`<${RestrictedSU} key=${ME} go=${goAsk} open=${sub} all=${!level} />`;
+  else if (page === "actions") body = level && (!sub || MBY[sub]) ? html`<${AdminActionsLayout} key=${sub || "actions"} host=${sub && MBY[sub] ? sub : null} />` : sub === "new" ? html`<${NewAction} go=${goAsk} />` : sub && sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<${NewAction} key=${sub} go=${goAsk} from=${ABY[sub.slice(5)]} />` : html`<${Actions} go=${goAsk} open=${sub && ABY[sub] ? sub : null} />`;
+  else if (page === "automation") body = level && (!sub || RBY[sub]) ? html`<${AdminAutomationPage} key=${ME + (sub || "")} go=${goAsk} open=${sub && RBY[sub] ? sub : null} />` : sub === "new" || (sub && sub.startsWith("edit-") && RBY[sub.slice(5)]) ? html`<${NewRule} key=${sub} go=${goAsk} from=${sub === "new" ? null : sub.slice(5)} />` : html`<${Automation} go=${goAsk} open=${sub && RBY[sub] ? sub : null} />`;
+  else if (page === "audit") body = !level ? html`<${AuditBrief} range=${range} go=${goAsk} />` : html`<${AdminAuditPage} key=${ME} range=${range} go=${goAsk} />`;
+  else body = html`<${Overview} range=${range} go=${goAsk} />`;
   const usesRange = (level ? ["overview", "machines", "audit"] : ["machines", "audit"]).includes(page);
   const parent = !level && SU_PARENT[page] && SU_PARENT[page] !== page ? SU_PARENT[page] : null;
-  const openSub = !!sub && (page === "restricted" || page === "protected" ? sub !== "mark" : (level && ((page === "flows" && !!FBY[sub]) || (page === "tasks" && TASKS.some((t) => t.id === sub)) || (page === "automation" && !!RBY[sub]) || (page === "actions" && !!ABY[sub]))) || !level && (((page === "tasks" || page === "directives") && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || ["departments", "registry", "audit", "inbox", "announcements", "admins"].includes(page)));
+  const openSub = !!sub && (page === "restricted" || page === "protected" ? sub !== "mark" : (level && ((page === "flows" && !!FBY[sub]) || (page === "tasks" && TASKS.some((t) => t.id === sub)) || (page === "automation" && !!RBY[sub]) || (page === "actions" && (!!ABY[sub] || !!MBY[sub])))) || !level && (((page === "tasks" || page === "directives") && DEPT_TASKS.some((t) => t.id === sub)) || (page === "flows" && !!FBY[sub]) || ["departments", "registry", "audit", "inbox", "announcements", "admins"].includes(page)));
   const csub = openSub ? null : sub;
   const crumbSub = csub && page === "machines" && !level ? html`<a onClick=${() => go("machines")}>Machines</a><span>/</span><b className="mono">${sub}</b>`
     : csub && page === "actions" ? html`<a onClick=${() => go("actions")}>Actions</a><span>/</span>${sub.startsWith("edit-") && ABY[sub.slice(5)] ? html`<a onClick=${() => go("actions", sub.slice(5))}>${ABY[sub.slice(5)].name}</a><span>/</span><b>Edit</b>` : html`<b>${sub === "new" ? "New custom action" : ABY[sub] ? ABY[sub].name : sub}</b>`}`
@@ -10487,11 +10676,11 @@ function App() {
     : html`<b>${title}</b>`;
   const crumb = html`${parent ? html`<a onClick=${() => go(parent)}>${TITLES[parent][0]}</a><span>/</span>` : null}${crumbSub}`;
   const heldFor = level ? Math.floor((now - level.since) / 1000) : 0;
-  return html`<${ConfigProvider} theme=${cfg} renderEmpty=${() => html`<div className="t3" style=${{ padding: "22px 0", fontSize: 12.5, textAlign: "center" }}>Nothing here yet.</div>`}>
+  return html`<${ConfigProvider} theme=${cfg} renderEmpty=${() => html`<div className="t3" style=${{ padding: "22px 0", fontSize: 12.5, textAlign: "center" }}>Nothing here yet.</div>`}>${askCtx}
     <div className="app">
       <aside className="side">
         ${level ? html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
-            <div className="orgtxt" title=${deptName(level.dept)}><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>${deptName(level.dept)}</div></div></div>`
+            <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>IT console · ${fmt(DEPTS.length)} department${DEPTS.length === 1 ? "" : "s"}</div></div></div>`
           : html`<div className="org"><span className="logo"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 12L7 2L13 12L7 9Z" style=${{ fill: "var(--surface)" }} /></svg></span>
             <div className="orgtxt"><div style=${{ fontWeight: 600 }}>Falcon</div><div className="t3" style=${{ fontSize: 11.5 }}>Head office · ${(FULL.DEPTS || DEPTS).length} department${(FULL.DEPTS || DEPTS).length === 1 ? "" : "s"}</div></div></div>`}
         ${nav.map(([g, xs]) => {
@@ -10502,6 +10691,7 @@ function App() {
         <div className="side-foot">
           
           <div className="row" style=${{ flexWrap: "nowrap" }}><span style=${{ width: 24, height: 24, borderRadius: 4, background: "var(--surface-3)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>${level ? initials(level.admin) : "SU"}</span><div><div style=${{ fontWeight: 500 }}>${level ? level.admin : "Super User"}</div><div className="t3 mono" style=${{ fontSize: 11 }}>${level ? (ADMIN_INFO[level.admin] || {}).ws : "ADM-01"}</div></div></div>
+          <span className="t3" style=${{ fontSize: 11.5, whiteSpace: "normal" }}>${ask ? "Asks before opening another page · " : "Opens other pages without asking · "}<a onClick=${() => { setAsk(!ask); toast(ask ? "Pages open without asking now" : "Asks before opening another page again"); }}>${ask ? "Stop asking" : "Ask again"}</a></span>
           <a href="https://claude.ai/artifact/TsSNGFWFv79iPr2JK1Jjsn" target="_blank" rel="noopener">Console Kit ↗</a>
           <span className="t2" style=${{ fontSize: 11.5, fontWeight: 600 }} title="Which published version of the concept this is">Admin concept, 29 Oct 20:15</span>
           <span className="t4" style=${{ fontSize: 11, whiteSpace: "normal" }} title="The large sample checks that nothing grows with the data">Concept · sample:
@@ -10509,13 +10699,6 @@ function App() {
         </div>
       </aside>
       <div className="main">
-        ${level ? html`<div className="su-banner" role="status">
-          <span style=${{ fontSize: 15 }}>${ic("SafetyCertificateFilled")}</span>
-          <b style=${{ fontWeight: 600 }}>Super User in charge</b>
-          <span title=${`You are in ${level.admin}'s console · ${deptName(level.dept)}`}>You are in ${level.admin}'s console · ${deptName(level.dept)} · their session is ${level.how === "end" ? "ended" : "blocked"}</span>
-          <span className="sp" /><span className="mono">${Math.floor(heldFor / 60)}:${String(heldFor % 60).padStart(2, "0")}</span>
-          <${Button} size="small" onClick=${leave}>Leave<//>
-        </div>` : null}
         ${level ? (() => { const due = todoOpen().filter((t) => t.due < NOWH + 24 && !TODO_HUSH.has(t.id)); if (!due.length) return null;
           const x = due[0], late = x.due < NOWH, d0 = Math.floor(NOWH / 24);
           return html`<div className="newtask" role="alert">
