@@ -20,9 +20,8 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 **Settled:** An Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
 ## Engine work: your answers of 2 Nov 2026
-- **#3 Private tag:** use the established mechanisms. Direction: the Worker sets Windows' own permissions on the private file or folder (only
-  the people named may open it) and a program's execute right, so a refusal is Windows' own "access denied"; Falcon adds a quiet note saying
-  who to ask. Not built yet: the next Engine pass.
+- **#3 Private tag:** *(built 2 Nov 2026)* Windows' own permissions and its audit of failed opens; see ENGINE-GAPS #3. To try for real: a
+  second Windows user on a machine being refused (the VM plan).
 - **#7 Sending a file in a conversation:** *(built 2 Nov 2026)* yes, an admin-tier file may go to a Worker. See ENGINE-GAPS #7.
 - **#10 Finding PCs:** to talk through. Today: a PC with Falcon installed asks to join by itself (`enroll.request`) and one that knocked
   without a key is listed (`registry.knocked`); no network scan.

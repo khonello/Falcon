@@ -62,6 +62,13 @@ part is recorded for later, not built.
    - **The Worker needs** to refuse the open or the program start when the person is not named, using the kernel file
      and process events it already watches. How the refusal is shown to that person is still to be decided.
    - **Flow consent** (`engine/flow/guard.py`) stays as it is, for Restricted things.
+   - **Built 2 Nov 2026** (the user: "established mechanisms"; migration 050, `engine/resource/private.py`, `worker_client/privacy.py`): marks
+     carry `protection` (watch / private / restricted); every restriction check reads restricted marks only. Private: the Worker sets
+     Windows' own permissions (icacls) so only the named people -- and the system account when the owner allows it -- may open or run it,
+     saving the original to put back on unmark; refusals are Windows' "access denied", read from its audit of failed opens (Security 4656)
+     and noted on the mark, in the audit trail, to the owner, and as a quiet note to the person refused. `marks.create {protection, readers,
+     allow_system}`, `marks.readers` (the owner only). A program is private the same way (its .exe). Not tried for real yet: a second Windows
+     user on a machine being refused (the VM plan).
    - *Found:* the Super User's Protected page.
 4. **Group conversations for the Super User** (the user, 22 Oct 2026). Messaging several people at once, or every Admin of a department, is now ONE group conversation in which everyone sees what everyone writes. It no longer copies the message into each person's own conversation.
    - **A department's group** exists while the department has two or more Admins. Its members follow the department: an Admin who joins is added, and one who leaves is removed.
@@ -281,6 +288,18 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      short grace (~2 min) once the Admin's console is gone, or keep the deadline and have the cover say the Admin's connection dropped and
      when the machine frees itself. Also: the cover only returns after the Worker reconnects, so a restarted machine is usable for those
      seconds.
+
+20. **What the console's pages draw that the Engine cannot do yet** (2 Nov 2026, the QML rebuilt from the version 1 Admin concept). Each
+    control is drawn disabled with this reason on it, never faked:
+   - **End one program on a machine** (Machines, "Running now", End). There is a `kill_process` built-in action, but no call ends one
+     program on one machine from the console; the concept also offers "never allow it", a rule prepared in Automation.
+   - **Register a machine without a department** (Machines, Add a machine). `hierarchy.pc_register` still requires `department_id`; in
+     version 1 a machine is only registered there and gets its department on Departments. The drawer keeps the department field until then.
+   - **Update a machine now** (Machines, an expanded card). The Engine retries on its own schedule only.
+   - **Remind someone** about a task (Tasks, a late task) or an Admin about a flow waiting for their folder (Flows, the gate).
+   - **Start a stopped flow again** (Flows, Resume on a stopped flow). Stop sets it inactive (`flow.delete`), which cannot be undone yet.
+   - **Take back an allowance** on a restricted copy (Restricted, Allowed copies).
+   - **Delete or ask to delete a restricted copy**, and accept or put back a deviation, where `issues.get` marks the option `cannot`.
 
 ## Done inline (for the record)
 

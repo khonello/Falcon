@@ -42,6 +42,15 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   conversation it gets from `conversation` carries each message's `file`. Pushes reach the program as the view's toasts only, so the
   program reads a file's state again from `conversation`.
 
+### Private and Watch (built 2 Nov 2026; ENGINE-GAPS #3, the concept's three tags)
+- `marks.create` takes `protection` (watch | private | restricted, default restricted), and for private `readers` (account ids; the owner is
+  always one) and `allow_system` (the machine's system account, for backup and antivirus).
+- `marks.list` / `marks.get` return `protection`, `allow_system`, `readers [{account_id, name}]`, `applied {ok, at, granted, missing, error}`
+  (what the machine did; `missing`: people whose Windows name is not known yet) and, for private, `refusals [{who, account_id, process, path,
+  at, machine}]` (the concept's "refused, in grey").
+- `marks.readers {mark_id, readers, allow_system?}`: the owner changes who may open it. Pushes: `private.refused`, `private.apply_failed`.
+- The Worker program: a refused person gets a toast of kind `private` in the view ("<name> is private", who to ask).
+
 ### Issues (built 2 Nov 2026)
 - **A file deleted at a flow's source.** A flow set to keep its copies (the default) now raises an issue of type `flow` ("A file was deleted
   at a flow's source", one per flow, gathering the files) with two options from `issues.get`: `remove_copies` and `keep_copies`. The Issues

@@ -35,7 +35,7 @@ POLYMORPHIC_TABLES = frozenset({
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages", "conversations",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases", "detective_rules", "flow_restricted_consents", "proposals",
-    "licences", "licence_codes", "chat_files",
+    "licences", "licence_codes", "chat_files", "private_refusals",
     # non-table targets used by the audit trail
     "client", "session", "event", "execution",
 })
@@ -418,6 +418,24 @@ class AccountsRepo(_Repo):
                 rows = await conn.fetch(f"UPDATE {table} SET {column} = $2 WHERE {column} = $1 AND {live} RETURNING id", from_id, to_id)
                 moved[what] = sorted(r["id"] for r in rows)
         return moved
+
+    async def set_windows_user(self, pc_id: int, name: str | None) -> None:
+        """Who is signed in on the machine, as Windows names them (from what the Worker says at connect)."""
+        if name:
+            await self._exec("UPDATE pcs SET windows_user = $2 WHERE id = $1", pc_id, name)
+
+    async def windows_names(self, account_ids: list[int]) -> dict[int, str | None]:
+        """Each account's Windows name: who was last signed in on the machine the account is bound to."""
+        if not account_ids:
+            return {}
+        return {r["id"]: r["windows_user"] for r in await self._fetch(
+            "SELECT a.id, p.windows_user FROM accounts a LEFT JOIN pcs p ON p.id = a.bound_pc_id WHERE a.id = ANY($1::int[])", account_ids)}
+
+    async def by_windows_user(self, name: str) -> int | None:
+        """The account whose machine's Windows user this is (the first, when several machines share one)."""
+        short = name.split("\\")[-1].lower()
+        return await self._val("SELECT a.id FROM accounts a JOIN pcs p ON p.id = a.bound_pc_id WHERE a.status = 'active' "
+                               "AND lower(split_part(p.windows_user, chr(92), -1)) = $1 ORDER BY a.id LIMIT 1", short)
 
     async def pcs_in_department(self, department_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -981,14 +999,16 @@ class MarksRepo(_Repo):
     """Restricted marks (migration 023): a file or folder marked where it is, and every version's hash."""
 
     _COLS = ("m.id, m.kind, m.name, m.pc_id, m.path, m.keep, m.by_account_id, m.department_id, m.created_at, m.unmarked_at, "
+             "m.protection, m.allow_system, m.applied, "
              "p.hostname, (SELECT count(*)::int FROM resource_mark_hashes h WHERE h.mark_id = m.id) AS versions")
     _FROM = "FROM resource_marks m JOIN pcs p ON p.id = m.pc_id"
 
     async def create(self, kind: str, name: str, pc_id: int, path: str, keep: str, by_account_id: int,
-                     department_id: int | None) -> int:
+                     department_id: int | None, *, protection: str = "restricted", allow_system: bool = True) -> int:
         return await self._val(
-            "INSERT INTO resource_marks (kind, name, pc_id, path, keep, by_account_id, department_id) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", kind, name, pc_id, path, keep, by_account_id, department_id)
+            "INSERT INTO resource_marks (kind, name, pc_id, path, keep, by_account_id, department_id, protection, allow_system) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id", kind, name, pc_id, path, keep, by_account_id, department_id,
+            protection, allow_system)
 
     async def get(self, mark_id: int) -> dict[str, Any] | None:
         return await self._one(f"SELECT {self._COLS} {self._FROM} WHERE m.id = $1", mark_id)
@@ -1000,19 +1020,54 @@ class MarksRepo(_Repo):
             "AND ($2::int IS NULL OR m.department_id = $2) AND ($3 OR m.unmarked_at IS NULL) ORDER BY m.created_at DESC, m.id DESC",
             by_account_id, department_id, include_unmarked)
 
-    async def active_on_pc(self, pc_id: int) -> list[dict[str, Any]]:
-        return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE m.pc_id = $1 AND m.unmarked_at IS NULL", pc_id)
+    async def active_on_pc(self, pc_id: int, *, restricted_only: bool = True) -> list[dict[str, Any]]:
+        """A machine's marks. By default only the RESTRICTED ones, which is what every restriction check means (Flow's guard, the copy
+        catcher, Detective); the Restricted page's own lists ask for every tag (watch and private too)."""
+        return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE m.pc_id = $1 AND m.unmarked_at IS NULL "
+                                 "AND (NOT $2 OR m.protection = 'restricted')", pc_id, restricted_only)
 
     async def active_hashes(self, limit: int) -> list[tuple[str, str]]:
         """(content hash, mark name) for every version of every active mark, at most `limit` of them."""
         rows = await self._fetch(
-            "SELECT h.content_hash, m.name FROM resource_mark_hashes h JOIN resource_marks m ON m.id = h.mark_id WHERE m.unmarked_at IS NULL LIMIT $1", limit)
+            "SELECT h.content_hash, m.name FROM resource_mark_hashes h JOIN resource_marks m ON m.id = h.mark_id WHERE m.unmarked_at IS NULL "
+            "AND m.protection = 'restricted' LIMIT $1", limit)
         return [(r["content_hash"], r["name"]) for r in rows]
 
     async def active_with_hash(self, content_hash: str) -> list[dict[str, Any]]:
         return await self._fetch(
-            f"SELECT {self._COLS} {self._FROM} WHERE m.unmarked_at IS NULL AND EXISTS "
+            f"SELECT {self._COLS} {self._FROM} WHERE m.unmarked_at IS NULL AND m.protection = 'restricted' AND EXISTS "
             "(SELECT 1 FROM resource_mark_hashes h WHERE h.mark_id = m.id AND h.content_hash = $1)", content_hash)
+
+    # -- private marks (migration 050) ------------------------------------------------------------------------------------
+
+    async def readers(self, mark_ids: list[int]) -> dict[int, list[int]]:
+        out: dict[int, list[int]] = {i: [] for i in mark_ids}
+        for r in await self._fetch("SELECT mark_id, account_id FROM resource_mark_readers WHERE mark_id = ANY($1::int[]) ORDER BY added_at",
+                                   mark_ids):
+            out[r["mark_id"]].append(r["account_id"])
+        return out
+
+    async def set_readers(self, mark_id: int, account_ids: list[int], allow_system: bool) -> None:
+        async with self.pool.acquire() as conn, conn.transaction():
+            await conn.execute("DELETE FROM resource_mark_readers WHERE mark_id = $1 AND NOT (account_id = ANY($2::int[]))", mark_id, account_ids)
+            for a in account_ids:
+                await conn.execute("INSERT INTO resource_mark_readers (mark_id, account_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", mark_id, a)
+            await conn.execute("UPDATE resource_marks SET allow_system = $2 WHERE id = $1", mark_id, allow_system)
+
+    async def private_on_pc(self, pc_id: int) -> list[dict[str, Any]]:
+        return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE m.pc_id = $1 AND m.unmarked_at IS NULL AND m.protection = 'private'", pc_id)
+
+    async def set_applied(self, mark_id: int, applied: dict[str, Any]) -> None:
+        await self._exec("UPDATE resource_marks SET applied = $2 WHERE id = $1", mark_id, applied)
+
+    async def add_refusal(self, mark_id: int | None, pc_id: int, who: str | None, account_id: int | None, process: str | None, path: str,
+                          at: datetime) -> int:
+        return await self._val("INSERT INTO private_refusals (mark_id, pc_id, who, account_id, process, path, at) VALUES ($1, $2, $3, $4, $5, $6, $7) "
+                               "RETURNING id", mark_id, pc_id, who, account_id, process, path, at)
+
+    async def refusals(self, mark_id: int, limit: int = 50) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT r.*, p.hostname FROM private_refusals r JOIN pcs p ON p.id = r.pc_id WHERE r.mark_id = $1 "
+                                 "ORDER BY r.at DESC LIMIT $2", mark_id, limit)
 
     async def add_hash(self, mark_id: int, content_hash: str, source_path: str) -> bool:
         """A version of a marked file. True when it is a new one."""

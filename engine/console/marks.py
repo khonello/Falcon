@@ -35,6 +35,17 @@ from protocol import ErrorCode, ProtocolError
 if TYPE_CHECKING:
     from engine.server import Engine
 
+PROTECTIONS = ("watch", "private", "restricted")           # one per mark (ENGINE-GAPS #3; migration 050)
+
+
+def _readers(payload: dict[str, Any]) -> list[int]:
+    """The people named on a private mark: account ids."""
+    raw = payload.get("readers") or []
+    if not isinstance(raw, list) or not all(isinstance(r, int) for r in raw) or len(raw) > 200:
+        raise ProtocolError(ErrorCode.INVALID, "readers is a list of up to 200 account ids")
+    return sorted(set(raw))
+
+
 # Worst cases, clamped. Marking a folder asks the Engine to track every file in it by content and to look for copies of each, and a folder like node_modules can hold
 # a million generated files. So a mark is assessed first (how many files, about how long, what the weight is) and refused, or asked to be confirmed, before anything starts.
 MARK_MAX_FILES = 20000             # tracked by content in one mark
@@ -110,7 +121,7 @@ def install(engine: Engine) -> None:
             row = await engine.db.file_index.by_path(event["pc_id"], event["path"])
             digest = (row or {}).get("content_hash")
             if digest:
-                for mark in await engine.db.marks.active_on_pc(event["pc_id"]):
+                for mark in await engine.db.marks.active_on_pc(event["pc_id"], restricted_only=False):
                     if mark["kind"] == "file" and norm(mark["path"]) == norm(event["path"]):
                         _just_left[(event["pc_id"], digest)] = (time.monotonic(), mark["id"], event["path"])
         if len(_just_left) > 2000:                                       # bounded: what left long ago and never reappeared is forgotten
@@ -204,6 +215,8 @@ async def _view(ctx: Context, found: list[dict[str, Any]]) -> list[dict[str, Any
     depts = {d["id"]: d["name"] for d in await db.accounts.list_departments()}
     out = []
     carried = await db.flows.carried_by_consent([m["id"] for m in found])
+    readers = await db.marks.readers([m["id"] for m in found if m.get("protection") == "private"])
+    reader_names = await db.accounts.display_names_for(ctx.identity.account_id, sorted({a for ids in readers.values() for a in ids})) if readers else {}
     for m in found:
         copies = await db.marks.copy_issues(m["id"])
         files, generated = await _counts(db, m)
@@ -214,7 +227,11 @@ async def _view(ctx: Context, found: list[dict[str, Any]]) -> list[dict[str, Any
                     "department_id": m["department_id"], "department_name": depts.get(m["department_id"]),
                     "created_at": _iso(m["created_at"]), "unmarked_at": _iso(m["unmarked_at"]),
                     "files": files, "generated": generated, "tracked": files - generated, "carried_by": carried.get(m["id"], []),
-                    "versions": m["versions"], "copies": len(copies), "worst": worst})
+                    "versions": m["versions"], "copies": len(copies), "worst": worst,
+                    "protection": m.get("protection") or "restricted", "allow_system": m.get("allow_system", True), "applied": m.get("applied"),
+                    "readers": [{"account_id": a, "name": reader_names.get(a)} for a in readers.get(m["id"], [])],
+                    "refusals": [{"who": r["who"], "account_id": r["account_id"], "process": r["process"], "path": r["path"], "at": _iso(r["at"]),
+                                  "machine": r["hostname"]} for r in await db.marks.refusals(m["id"], 10)] if m.get("protection") == "private" else []})
     return out
 
 
@@ -240,7 +257,7 @@ async def marks_tree(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.INVALID, "you have no workstation registered")
     db = ctx.engine.db
     files = await db.file_index.present_on_pc(ident.pc_id, TREE_MAX + 1)
-    marks = await db.marks.active_on_pc(ident.pc_id)
+    marks = await db.marks.active_on_pc(ident.pc_id, restricted_only=False)
     out, folders = [], {}
     for f in files[:TREE_MAX]:
         own = next((m["id"] for m in marks if m["kind"] == "file" and norm(m["path"]) == norm(f["path"])), None)
@@ -347,7 +364,16 @@ async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if len(paths) > 50:
         raise ProtocolError(ErrorCode.INVALID, "mark at most 50 paths at a time")
     db = ctx.engine.db
-    existing = await db.marks.active_on_pc(ident.pc_id)
+    protection = str_field(payload, "protection", required=False, choices=PROTECTIONS) or "restricted"
+    readers = _readers(payload) if protection == "private" else []
+    allow_system = payload.get("allow_system", True)
+    if not isinstance(allow_system, bool):
+        raise ProtocolError(ErrorCode.INVALID, "allow_system is true or false")
+    if readers:
+        known = {a["id"] for a in await db.accounts.list_all() if a["status"] == "active"}
+        if not set(readers) <= known:
+            raise ProtocolError(ErrorCode.NOT_FOUND, "a person named is not an active account")
+    existing = await db.marks.active_on_pc(ident.pc_id, restricted_only=False)
     # Assess everything first, so nothing is half done: a refusal names the path, how many files, how long it would take and where the weight is.
     running = await _tracked_on(db, ident.pc_id, existing)
     for raw in paths:
@@ -372,21 +398,32 @@ async def marks_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         kind = "file" if row else "folder"
         targets = [row] if row else below
         hashed = [t for t in targets if t.get("content_hash") and not _in_junk(t["path"])]
-        if kind == "file" and not hashed:
+        if kind == "file" and not hashed and protection == "restricted":
             raise ProtocolError(ErrorCode.INVALID, "that file has no content hash yet (too large, or still being indexed), so a copy could not be recognised")
         name = (row["filename"] if row else path.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]) or path
         began = time.perf_counter()
-        mark_id = await db.marks.create(kind, name, ident.pc_id, path, keep, ident.account_id, ident.department_id)
+        mark_id = await db.marks.create(kind, name, ident.pc_id, path, keep, ident.account_id, ident.department_id,
+                                        protection=protection, allow_system=allow_system)
+        if protection == "private":
+            await db.marks.set_readers(mark_id, sorted(set(readers) | {ident.account_id}), allow_system)       # the owner is always one of them
         for t in hashed:
             await db.marks.add_hash(mark_id, t["content_hash"], t["path"])
         ctx.engine.marked.invalidate()
         ctx.engine.cost.observe("mark_file", time.perf_counter() - began, max(1, len(hashed)))           # what it really cost, for the next estimate
         await ctx.engine.audit.record(ctx, "mark.created", target_type="resource_marks", target_id=mark_id, pc_id=ident.pc_id,
-                                      detail={"path": path, "kind": kind, "keep": keep, "files": len(targets)})
+                                      detail={"path": path, "kind": kind, "keep": keep, "files": len(targets), "protection": protection,
+                                              "readers": readers, "allow_system": allow_system})
         made.append(mark_id)
         mark = await db.marks.get(mark_id)
         assert mark is not None
-        await ctx.engine.announce("mark.created", {"mark_id": mark_id, "pc_id": ident.pc_id, "path": path, "kind": kind}, pc=ident.pc_id)   # (Flow hears it and stops at once)
+        await ctx.engine.announce("mark.created", {"mark_id": mark_id, "pc_id": ident.pc_id, "path": path, "kind": kind, "protection": protection},
+                                  pc=ident.pc_id)   # (Flow hears it and stops at once)
+        if protection == "private":
+            from engine.resource import private
+
+            await private.apply(ctx.engine, mark_id)
+        if protection != "restricted":
+            continue                                    # watch and private catch no copies: only restricted content may not be elsewhere
         for digest in {t["content_hash"] for t in hashed}:
             for entry in await db.file_index.by_hash(digest):
                 if not allowed_at(mark, entry["pc_id"], entry["path"]):
@@ -560,6 +597,10 @@ async def marks_unmark(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if not await db.marks.unmark(mark["id"], ctx.identity.account_id):
         raise ProtocolError(ErrorCode.CONFLICT, "it is already unmarked")
     ctx.engine.marked.invalidate()
+    if mark.get("protection") == "private":
+        from engine.resource import private
+
+        await private.lift(ctx.engine, mark)                # its machine puts back the permissions it had before
     await ctx.engine.announce("mark.removed", {"mark_id": mark["id"], "pc_id": mark["pc_id"], "path": mark["path"]}, pc=mark["pc_id"])
     closed = 0
     for issue_id in await db.marks.resolve_open_copies(mark["id"]):

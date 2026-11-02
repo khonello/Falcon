@@ -180,6 +180,15 @@ class _Connection:
             return {"channel_id": 12, "opened": True, "turn": "sender", "superior_account_id": 7}
         if type_ == "assistance.message":
             return {"message_id": 1, "turn": "superior"}
+        if type_ == "chat.list":
+            return {"conversations": [{"conversation_id": 12, "kind": "direct", "title": "Kojo", "unread": 1,
+                                       "members": [{"account_id": 7, "name": "R. Mensah"}, {"account_id": 21, "name": "Kojo"}],
+                                       "last": {"body": "The printer is jammed.", "from_account_id": 21, "from": "Kojo", "at": _ago(1)}, "seen_by": []}], "unread": 1}
+        if type_ == "chat.get":
+            return {"conversation": {"conversation_id": 12, "title": "Kojo"}, "more": False, "reads": [],
+                    "messages": [{"message_id": 1, "from_account_id": 21, "from": "Kojo", "body": "The printer is jammed.", "at": _ago(1), "mine": False, "file": None}]}
+        if type_ == "chat.send":
+            return {"message_id": 2, "at": _ago(0)}
         if type_ == "flow.list":
             return {"flows": [FLOW]}
         if type_ == "enroll.list":
@@ -410,18 +419,18 @@ async def test_a_flow_can_be_set_to_remove_copies_when_the_source_deletes(consol
     assert next(p for t, p in bridge.conn.seen if t == "flow.edit")["on_source_delete"] == "mirror"
 
 
-async def test_writing_back_to_a_request_accepts_it_and_sends_the_body(console):
-    """A request is accepted by writing back: respond first, then the message, sent as `body`. There is no turn
-    lock, so the box is there for every open conversation (22 Oct 2026)."""
+async def test_writing_in_a_conversation_sends_the_body(console):
+    """Version 1's conversations (chat.*): the one picked is read, and what is written goes as `body` with chat.send. There is
+    no turn lock, so the box is there for every conversation (22 Oct 2026)."""
     win, bridge, _ = console("admin")
     view = await _open(win, bridge, "messages", "messagesView")
-    await _wait(lambda: any(r.get("kind") == "ping" for r in (prop(view, "rows") or [])))
-    assert win.findChild(QObject, "msgAccept") is not None
+    await _wait(lambda: [r.get("conversation_id") for r in (prop(view, "rows") or [])] == [12])
+    await _wait(lambda: any(t == "chat.read" for t, _ in bridge.conn.seen))
+    assert win.findChild(QObject, "msgSend") is not None
     QMetaObject.invokeMethod(view, "setDraft", Q_ARG("QVariant", "on my way"))
     QMetaObject.invokeMethod(view, "send")
-    await _wait(lambda: any(t == "assistance.message" for t, _ in bridge.conn.seen))
-    assert next(p for t, p in bridge.conn.seen if t == "assistance.respond")["ping_id"] == 5
-    assert next(p for t, p in bridge.conn.seen if t == "assistance.message") == {"channel_id": 12, "body": "on my way"}
+    await _wait(lambda: any(t == "chat.send" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "chat.send") == {"conversation_id": 12, "body": "on my way"}
 
 
 

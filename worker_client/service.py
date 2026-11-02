@@ -35,6 +35,7 @@ from worker_client.isolated import IsolatedSignals, IsolatedWatcher
 from worker_client.localapp import LocalApp
 from worker_client.lockout import Lockout
 from worker_client.ossignals import OsSignals
+from worker_client.privacy import Privacy, RefusalReader, signed_in_user
 from worker_client.reminders import TaskReminders
 from worker_client.screenstream import RemoteInput, ScreenStreamer
 from worker_client.signals import Signals
@@ -68,6 +69,9 @@ class WorkerService:
         self.lockout = Lockout(lock_workstation=config.lock_workstation_on_block)
         self.executor = Executor(self.call, allow_power=allow_power, windows=config.windows)
         self.chatfiles = ChatFiles(self.call)
+        self.privacy = Privacy(Path(config.path).parent / "private")        # items made private here: Windows refuses anyone not named
+        self.refusals = RefusalReader()
+        self._private_task: asyncio.Task[None] | None = None
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
         self.ossignals: Any = IsolatedSignals(self.call, self._component_changed) if config.separate_programs else OsSignals(self.call)
@@ -138,6 +142,7 @@ class WorkerService:
             await asyncio.to_thread(self.ossignals.etw.want_programs, True)
             await asyncio.to_thread(self.ossignals.etw.want_files, self.ossignals.interest.get("file.accessed") or [])
         self._opens_task = asyncio.create_task(self._opens_loop())
+        self._private_task = asyncio.create_task(self._private_loop())
         await self.inventory.start()
         await self._refresh_tasks()
         if self.config.windows:
@@ -156,6 +161,8 @@ class WorkerService:
             self._reminder_task.cancel()
         if self._opens_task:
             self._opens_task.cancel()
+        if self._private_task:
+            self._private_task.cancel()
         await self.screens.shutdown()
         self.remote_input.stop()
         if self.helper is not None:
@@ -181,6 +188,11 @@ class WorkerService:
 
         out: dict[str, Any] = {"version": VERSION, "os": f"{platform.system()} {platform.release()} {platform.version()}".strip(),
                                "started_at": self.started_at}
+        from worker_client.privacy import signed_in_user
+
+        who = signed_in_user()
+        if who:
+            out["windows_user"] = who                       # how this machine's person is named on another machine's private item
         try:
             import psutil
 
@@ -398,6 +410,11 @@ class WorkerService:
                 await self._on_alert(payload)
             elif type_ == "chat.message":
                 self._on_message(payload)
+            elif type_ == "private.apply":
+                said = await asyncio.to_thread(self.privacy.apply, payload)
+                await self.call("private.applied", said)
+            elif type_ == "private.lift":
+                await asyncio.to_thread(self.privacy.lift, int(payload["mark_id"]), str(payload["path"]))
             elif type_ == "chat.file_read":
                 await self.chatfiles.on_read(payload)
             elif type_ == "chat.file_deliver":
@@ -517,6 +534,26 @@ class WorkerService:
         except (EngineError, ConnectionError_) as exc:
             log.warning("starting task %s failed: %s", task_id, exc)
             self.reminders.track(task_id, in_minutes=5)
+
+    async def _private_loop(self) -> None:
+        """While anything is private here, every few seconds: who did Windows refuse (its Security log)? Each is told to the Engine; the person
+        refused, when it is the one signed in here, gets a quiet note saying whose it is."""
+        while not self._stopping:
+            await asyncio.sleep(5)
+            try:
+                if not self.privacy.paths or self.conn is None or not self.conn.connected:
+                    continue
+                me = (signed_in_user() or "").lower()
+                for r in await asyncio.to_thread(self.refusals.read, list(self.privacy.paths.values())):
+                    said = await self.call("private.refused", r)
+                    if me and str(r.get("who") or "").split("\\")[-1].lower() == me and said.get("mark_id"):
+                        key = f"p{said['mark_id']}"
+                        self.toasts[key] = {"id": key, "kind": "private", "title": f"{said.get('name') or 'This'} is private",
+                                            "text": f"Only the people {said.get('owner') or 'its owner'} named may open it. Ask them."}
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("reading who was refused failed")
 
     async def _reminder_loop(self) -> None:
         """Every half minute: if a task has waited long enough for its next reminder, and nobody is using this machine, show it (one at a time)."""

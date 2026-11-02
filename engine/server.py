@@ -263,6 +263,12 @@ class Engine:
                 await flow_sync.on_pc_online(self, ident.pc_id)
             except Exception:  # a catch-up that fails must never stop a machine connecting
                 log.exception("flow: could not resume the destinations of pc %s", ident.pc_id)
+            from engine.resource import private
+
+            try:
+                await private.on_pc_online(self, ident.pc_id)
+            except Exception:
+                log.exception("private: could not apply the private marks of pc %s", ident.pc_id)
         payload = {"pc_id": ident.pc_id, "online": online}
         await self.push_to_role("super_user", "pc.presence", payload)
         await self.push_to_role("admin", "pc.presence", payload, department_id=ident.department_id)       # every Admin when they are IT

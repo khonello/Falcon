@@ -670,3 +670,5 @@ source, and its copy moved at a destination).
 `chat_files` (a file sent in a conversation: from whom and which machine, its state asked/reading/held/refused/expired, what made it
 restricted and whose consent let it go, held until `expires_at`), `chat_file_saves` (each copy saved: machine, path, hash) and
 `conversation_messages.chat_file_id` (migration 049).
+`resource_marks.protection` (watch / private / restricted), `allow_system`, `applied` (what the machine said it did), `resource_mark_readers`
+(who may open a private item), `private_refusals` (who Windows refused, where, when) and `pcs.windows_user` (migration 050).
