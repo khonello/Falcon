@@ -1729,6 +1729,10 @@ a { color: var(--accent); text-decoration: none; }
 .ms-stack.big .ib-av { width: 29px; height: 29px; font-size: 10px; }
 .ms-why { flex: none; font-size: 11px; padding: 0 7px; border-radius: 9px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; }
 .ms-why.hot { background: color-mix(in srgb, var(--crit) 14%, transparent); color: var(--crit); }
+.ms-why.req { background: var(--accent-soft); color: var(--accent); }
+.ms-req { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.ms-req-q { font-size: 16px; font-weight: 500; padding: 14px 16px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.ms-req-close { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
 .ms-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); }
 .ms-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text-3); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
 .ms-tabs button:hover { color: var(--text); }
@@ -3066,15 +3070,15 @@ const ISSUE_TYPES = {
           { key: "delete", icon: "DeleteOutlined", title: "Delete this copy", desc: `Deletes it from ${m.host} only. The original on ${k.host} is not touched.`, verb: "Delete copy", done: "Resolved", log: `Deleted the copy of ${i.d.file} on ${m.host}` },
           { key: "allow", icon: "SafetyCertificateOutlined", title: `Allow it on ${m.host} too`, desc: "Adds this one place to the mark, with your reason. It is not reported again.", verb: "Allow it", done: "Resolved", need: "reason", log: `Allowed ${i.d.file} on ${m.host} as an exception` },
         ] }; } },
-  help: { label: "Help request", icon: "BellOutlined", from: "Assistance",
+  help: { label: "Request to talk", icon: "MessageOutlined", from: "Messages",
     build: (i, m, dp) => {
       const online = m.status !== "offline", others = ["R. Mensah", "A. Quaye", "K. Boateng"].filter((a) => !dp.admins.includes(a));
       return {
-        lead: `${i.d.who} asked for help ${i.d.pings.length === 2 ? "twice" : i.d.pings.length + " times"} and nobody has answered. A first message carries no text; answering opens a channel.`,
-        facts: [["From", `${i.d.who} on ${m.host}`], ["Messaged", i.d.pings.join(" and ")], ["Waiting", dur(NOWH - i.at)], ["Their Admins", dp.admins.join(", ") || "None"]],
+        lead: `${i.d.who} asked to talk ${i.d.pings.length === 2 ? "twice" : i.d.pings.length + " times"} and no Admin has accepted yet. A request carries one line; accepting opens the conversation.`,
+        facts: [["From", `${i.d.who} on ${m.host}`], ["Asked", i.d.pings.join(" and ")], ["Waiting", dur(NOWH - i.at)], ["Seen by", "Every Admin"]],
         why: online ? [] : [`${m.host} is offline, so you cannot enter it.`],
         options: [
-          { key: "answer", icon: "MessageOutlined", title: `Answer ${i.d.who}`, desc: "Opens a message channel. You write first, then you take turns. Only you can close it.", verb: "Send", done: "Resolved", need: "message", log: `Answered ${i.d.who}; channel open` },
+          { key: "answer", icon: "MessageOutlined", title: `Accept and answer ${i.d.who}`, desc: "Opens your conversation with their line in it. The other Admins see that you have it.", verb: "Send", done: "Resolved", need: "message", log: `Accepted ${i.d.who}'s request to talk` },
           ...(online ? [{ key: "enter", icon: "LoginOutlined", title: `Enter ${m.host} and look yourself`, desc: `${i.d.who} is locked out while you are in. You get 30 minutes.`, verb: `Enter ${m.host}`, done: "Resolved", log: `Entered ${m.host} to help` }] : []),
         ] };
     } },
@@ -5926,11 +5930,11 @@ function EnterConsole({ admin, onClose, onEnter }) {
 // deviation points to a rule; the built-in rules are listed too, locked, so that none points at nothing.
 const TRIG = {
   file: "A copy of a restricted file appears where it is not allowed", second: "A second session starts on a machine already in use",
-  cert: "A machine presents a certificate that does not match its name", help: "A worker messages for help",
+  cert: "A machine presents a certificate that does not match its name", help: "A person at a machine asks to talk",
   report: "A report is written for a department", version: "A new version is approved", outhours: "Someone enters a machine outside working hours",
   task: "A department task is given", seat: "A department loses its last Admin",
 };
-const EXP = { answer: "An Admin answers the message", addressed: "Someone marks the report addressed", updated: "The machine runs that version", seen: "An Admin marks it seen", appoint: "Another Admin is appointed" };
+const EXP = { answer: "An Admin accepts the request", addressed: "Someone marks the report addressed", updated: "The machine runs that version", seen: "An Admin marks it seen", appoint: "Another Admin is appointed" };
 const READINGS = ["Admin entries outside working hours", "Admin entries into other departments' machines", "Entries into one machine by the same Admin", "Failed sign-ins on one machine"];
 const WHOS = { everyone: "Everyone", workers: "Workers", admins: "Admins", machines: "Machines", depts: "Departments" };
 const WHOL = { everyone: "Everyone: workers, Admins and machines", workers: "Workers", admins: "Admins", machines: "Machines", depts: "Departments" };
@@ -5956,7 +5960,7 @@ const BUILTIN_RULES = [
 ];
 // Set by the Super User for the whole organisation. An Admin cannot switch these off.
 let ORG_RULES = [
-  { id: "O-1", name: "Help requests are answered", shape: "follow", trigger: "help", expect: "answer", within: 60, who: "admins", on: true, by: "You", since: "3 Sep", resp: { report: true, admin: true } },
+  { id: "O-1", name: "Requests to talk are accepted", shape: "follow", trigger: "help", expect: "answer", within: 60, who: "admins", on: true, by: "You", since: "3 Sep", resp: { report: true, admin: true } },
   { id: "O-2", name: "Reports are addressed", shape: "follow", trigger: "report", expect: "addressed", within: 60, who: "admins", on: true, by: "You", since: "3 Sep", resp: { report: true, admin: true } },
   { id: "O-3", name: "Admins stay out of machines at night", shape: "limit", reading: READINGS[0], limit: { n: 0, per: "week" }, who: "admins", on: true, by: "You", since: "21 Sep", resp: { report: true, admin: false } },
   { id: "O-4", name: "Failed sign-ins stay rare", shape: "limit", reading: READINGS[3], limit: { n: 5, per: "hour" }, who: "everyone", on: true, by: "You", since: "21 Sep", resp: { report: true, admin: true, action: true, actionId: "lock" } },
@@ -5983,9 +5987,9 @@ let DEVIATIONS = [
     expected: "Stay in C:\\HR\\Payroll on ADM-01", happened: "A copy in C:\\Users\\Yaw\\Desktop",
     ctx: [[9.5, "System", "Found the copy through a file event", "var(--high)"], [12.5, "R. Mensah", "Entered OPS-03", "var(--s3)"], [12.73, "Automation", "CPU above 90% for 5 minutes, notified R. Mensah", "var(--s3)"]],
     evidence: ["Yaw was signed in from 09:24.", "The first Admin to enter OPS-03 did so three hours after the copy appeared."], out: "open" },
-  { id: "D-303", rule: "O-1", sev: "medium", kind: "admin", who: "R. Mensah", whoSub: "Operations Admin", dept: "ops", host: "OPS-01", at: 10.67, val: 220, short: "Kojo's help request on OPS-01 not answered",
-    expected: "Kojo's message answered within 1 hour", happened: "Messaged at 09:40 and 10:15, still unanswered",
-    ctx: [[9.67, "Kojo", "Messaged R. Mensah", "var(--s5)"], [10.1, "R. Mensah", "Entered OPS-04", "var(--s3)"], [10.25, "Kojo", "Messaged again", "var(--s5)"], [10.67, "System", "One hour passed with no answer", "var(--med)"]],
+  { id: "D-303", rule: "O-1", sev: "medium", kind: "admin", who: "R. Mensah", whoSub: "Operations Admin", dept: "ops", host: "OPS-01", at: 10.67, val: 220, short: "Kojo's request to talk on OPS-01 not accepted",
+    expected: "Kojo's request accepted within 1 hour", happened: "Asked at 09:40 and 10:15, still not accepted",
+    ctx: [[9.67, "Kojo", "Asked to talk", "var(--s5)"], [10.1, "R. Mensah", "Entered OPS-04", "var(--s3)"], [10.25, "Kojo", "Asked again", "var(--s5)"], [10.67, "System", "One hour passed and no Admin accepted", "var(--med)"]],
     evidence: ["R. Mensah was inside OPS-04 from 10:06 to 10:54, and again from 12:58."], out: "open" },
   { id: "D-304", rule: "B-3", sev: "high", kind: "pc", who: "LOG-02", whoSub: "Logistics · Abena", dept: "log", host: "LOG-02", at: -62.5, val: 7200, short: "LOG-02 still on 1.4.0, five days on",
     expected: "On 1.4.2 within 2 days of approval", happened: "Still on 1.4.0 and now offline",
@@ -6053,7 +6057,7 @@ const OUT_HELP = {
 };
 // ---------------------------------------------------------------- Rules
 const TEMPLATES = [
-  { id: "t-help", name: "Unanswered help request", d: "A worker sends a message; an Admin has an hour to answer.", state: { shape: "follow", trigger: "help", expect: "answer", within: { n: 1, unit: "hours" }, who: "admins" }, uses: "O-1" },
+  { id: "t-help", name: "Request to talk left waiting", d: "A person at a machine asks to talk; an Admin has an hour to accept.", state: { shape: "follow", trigger: "help", expect: "answer", within: { n: 1, unit: "hours" }, who: "admins" }, uses: "O-1" },
   { id: "t-report", name: "Reports left waiting", d: "A report is written; someone has an hour to address it.", state: { shape: "follow", trigger: "report", expect: "addressed", within: { n: 1, unit: "hours" }, who: "admins" }, uses: "O-2" },
   { id: "t-cross", name: "An Admin outside their department", d: "More than three entries into another department's machines in a week.", state: { shape: "limit", reading: READINGS[1], limit: { n: 3, per: "week" }, who: "admins" } },
   { id: "t-night", name: "Out-of-hours session", d: "Anyone entering a machine outside working hours.", state: { shape: "never", trigger: "outhours", who: "everyone" } },
@@ -8589,14 +8593,18 @@ function AdminCalendarPage({ go, level }) {
 }
 
 // The Admin's Messages (29 Oct 2026): the Super User's page, the same layout, with the people an IT Admin talks to: the other
-// Admins, and whoever is signed in on a machine. Version 1 has no Super User and no help requests, so a conversation is only
-// what was written in it.
-const AM_SENT = [], AM_GMSG = [], AM_GROUPS = [], AM_READ = {};
+// Admins, and whoever is signed in on a machine. Version 1 has no Super User. An Admin writes to a person at a machine
+// directly; the person starts a conversation with a request that every Admin sees and one accepts (the user, 2 Nov 2026:
+// part of Messages only, not the Assistance feature, which stays cut). One request per person at a time.
+const AM_SENT = [], AM_GMSG = [], AM_GROUPS = [], AM_READ = {}, AM_REQ_DONE = {}, AM_REQIN = [];
+const AM_REQS = () => (EMPTY ? [] : [{ id: "r:Esi", from: "Esi", host: "LOG-01", t: NOWH - 0.85, text: "The label printer prints blank labels" }])
+  .filter((r) => !AM_REQ_DONE[r.id]);
 const AM_IN = () => (EMPTY ? [] : [{ from: "K. Boateng", t: NOWH - 1.4, text: "About intake: I will pick its folder on WS-FIN-A1 this afternoon." }]);
 function amThread(me, name) {
   const out = [];
   CHANNELS.filter((c) => chParty(c, me) && chOther(c, me) === name).forEach((c) => (c.msgs || []).forEach(([t, who, text, about, file]) => out.push({ t, from: who === me ? "You" : who, text, about, file })));
   AM_IN().filter((m) => m.from === name).forEach((m) => out.push({ t: m.t, from: name, text: m.text }));
+  AM_REQIN.filter((m) => m.from === name).forEach((m) => out.push({ t: m.t, from: name, text: m.text, about: "Their request, accepted by you" }));
   AM_SENT.filter((a) => a.to === name).forEach((a) => out.push({ t: a.at, from: "You", text: a.text, file: a.file }));
   return out.sort((a, b) => a.t - b.t);
 }
@@ -8618,7 +8626,7 @@ function amConvs(me) {
   convs.forEach((x) => { x.st = msState(x.th); x.last = x.th[x.th.length - 1]; x.unread = x.st !== "you" ? 0 : x.th.filter((m) => m.from !== "You" && m.t > (AM_READ[x.id] ?? -1e9)).length; });
   return convs;
 }
-const amWaiting = () => amConvs(ME).filter((x) => x.unread).length;
+const amWaiting = () => amConvs(ME).filter((x) => x.unread).length + AM_REQS().length;
 // what is open between you and someone, said above the conversation and, the strongest of it, on their line
 function amBetween(x) {
   if (x.group) { const ans = msAnswered(x.th); return [[`${fmt(x.members.length)} Admins and you`, "quiet"], ans ? [`${fmt(ans.size)} of ${fmt(x.members.length)} answered your last message`, ans.size ? "" : "quiet"] : null].filter(Boolean); }
@@ -8638,10 +8646,18 @@ function AdminMessagesPage({ go, open }) {
   const people = convs.filter((x) => !x.group), groups = convs.filter((x) => x.group);
   const you = convs.filter((x) => x.st === "you"), them = convs.filter((x) => x.st === "them");
   const oldestThem = them.slice().sort((a, b) => a.last.t - b.last.t)[0];
-  const situation = !convs.length ? "There is nobody to talk to yet." : you.length ? `${listNames(you.map((x) => x.say))} ${you.length === 1 ? "is" : "are"} waiting on your answer.${oldestThem ? ` Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : ""}` : oldestThem ? `Nobody is waiting on you. Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : "Nobody is waiting on you, and nothing you sent is unanswered.";
+  const reqs = AM_REQS();
+  const reqLine = reqs.length ? `${reqs.length === 1 ? `${reqs[0].from} on ${reqs[0].host} asks` : `${fmt(reqs.length)} people at machines ask`} to talk; every Admin sees ${reqs.length === 1 ? "it" : "them"} until one accepts. ` : "";
+  const situation = reqLine + (!convs.length ? "There is nobody to talk to yet." : you.length ? `${listNames(you.map((x) => x.say))} ${you.length === 1 ? "is" : "are"} waiting on your answer.${oldestThem ? ` Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : ""}` : oldestThem ? `Nobody is waiting on you. Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : "Nobody is waiting on you, and nothing you sent is unanswered.");
   const [q, setQ] = useState(""), [sel, setSel] = useState(open || null);
   const shown = convs.filter((x) => x.find.toLowerCase().includes(q.trim().toLowerCase()));
-  const cur = convs.find((x) => x.id === sel) || convs.find((x) => x.th.length) || convs[0];
+  const curReq = reqs.find((r) => r.id === sel) || (!sel ? reqs[0] : null) || null;
+  const cur = curReq ? null : convs.find((x) => x.id === sel) || convs.find((x) => x.th.length) || convs[0];
+  // a request: accept it and the conversation opens with their line in it; or close it, and they are told why
+  const [why, setWhy] = useState("");
+  const accept = (r) => { dtChange(() => { AM_REQ_DONE[r.id] = "accepted"; AM_REQIN.push({ from: r.from, t: r.t, text: r.text }); AM_READ[r.from] = msNow(); });
+    toast(`Accepted · ${r.from} sees that you have it, and the conversation is open`); setSel(r.from); setTxt(""); };
+  const closeReq = (r) => { dtChange(() => { AM_REQ_DONE[r.id] = "closed"; }); toast(`Closed · ${r.from} is told: ${why.trim()}`); setWhy(""); setSel(null); };
   const [txt, setTxt] = useState("");
   const put = (x, text, file) => dtChange(() => { if (x.group) AM_GMSG.push({ g: x.id, t: msNow(), from: "You", text, file }); else AM_SENT.push({ to: x.name, at: msNow(), text, file }); AM_READ[x.id] = msNow(); });
   const sendFile = (file) => { put(cur, "", file); toast(file.state === "waiting" ? "The owner is asked first" : `Sent ${file.name}`); };
@@ -8671,19 +8687,30 @@ function AdminMessagesPage({ go, open }) {
         <span className="ms-chips">${amBetween(cur).map(([t, c], i) => html`<span key=${i} className=${"ms-chip " + c}>${t}</span>`)}</span></span></header>`
     : html`<header className="ms-head"><${MsFace} c=${cur} big /><span className="ms-head-t"><b>${cur.name}</b><span className="t3">${cur.admin ? `Admin, ${ADMIN_INFO[cur.name].now.charAt(0).toLowerCase()}${ADMIN_INFO[cur.name].now.slice(1)}` : `Signed in on ${cur.host}`}</span>
         <span className="ms-chips">${amBetween(cur).map(([t, c], i) => html`<span key=${i} className=${"ms-chip " + c}>${t}</span>`)}</span></span></header>`;
-  const pz = usePulse(cur ? cur.id : null);
+  const pz = usePulse(curReq ? curReq.id : cur ? cur.id : null);
+  const reqRow = (r) => html`<button key=${r.id} className=${"ms-p" + (curReq && curReq.id === r.id ? " on" : "")} onClick=${() => { setSel(r.id); setWhy(""); }}>
+      <span className="ib-av">${initials(r.from)}</span><span className="ms-p-t"><span className="ms-p-h"><b className="cut">${r.from}<span className="t3" style=${{ fontWeight: 400 }}> · ${r.host}</span></b><span className="t3 nowrap">${ago(r.t)}</span></span>
+      <span className="ms-p-l"><span className="ms-why req">Request</span><span className="cut ms-you">${r.text}</span></span></span></button>`;
   return html`<div className="og ms">
     <${SitBar} text=${situation} />
     <div className="ms-grid">
       <section className="ib-box">
         <header><b>Conversations</b><span>unread first</span></header>
         <${Input} allowClear prefix=${ic("SearchOutlined")} placeholder="Find a person or a group" value=${q} onChange=${(e) => setQ(e.target.value)} />
-        <div className="ms-list">${section("unread", "Unread", unread)}${section("read", "Read", read)}${q.trim() ? section("others", "No conversation yet", shown.filter((x) => !x.th.length)) : null}
+        <div className="ms-list">${reqs.length ? html`<div key="reqs"><div className="ms-grp">Requests to talk<span>${fmt(reqs.length)} · any Admin may accept</span></div>${reqs.map(reqRow)}</div>` : null}${section("unread", "Unread", unread)}${section("read", "Read", read)}${q.trim() ? section("others", "No conversation yet", shown.filter((x) => !x.th.length)) : null}
           ${!talked.length && !q.trim() && convs.length ? html`<div className="ib-quiet">No conversations yet. Start one below.</div>` : null}
           ${!shown.length ? html`<div className="ib-quiet">${convs.length ? "Nothing matches." : "Nobody to talk to yet."}</div>` : null}</div>
       </section>
       <section className="ib-box ms-conv" ref=${pz}>
-        ${cur ? html`${head}
+        ${curReq ? html`<header className="ms-head"><span className="ib-av ms-big">${initials(curReq.from)}</span><span className="ms-head-t"><b>${curReq.from} asks to talk</b><span className="t3">Signed in on ${curReq.host} · sent ${ago(curReq.t)} · every Admin sees this request until one of you accepts it</span></span></header>
+          <div className="ms-req">
+            <div className="ms-req-q">${curReq.text}</div>
+            <div className="t3">Accepting opens your conversation with ${curReq.from}, with this line in it. The other Admins see that you have it, as with Take on an issue.</div>
+            <div className="row" style=${{ gap: 8 }}><${Button} type="primary" onClick=${() => accept(curReq)}>Accept and open the conversation<//></div>
+            <div className="ms-req-close"><b>Or close it</b><span className="t3">${curReq.from} is told it was closed, with your reason. They can ask again.</span>
+              <div className="row" style=${{ gap: 8 }}><${Input} placeholder="Why, in a line they will read" value=${why} onChange=${(e) => setWhy(e.target.value)} style=${{ flex: 1 }} /><${Button} disabled=${!why.trim()} onClick=${() => closeReq(curReq)}>Close the request<//></div></div>
+          </div>`
+        : cur ? html`${head}
           <div className="ms-thread">${cur.th.length ? cur.th.map((m, i) => { const day = auDay(m.t), prev = cur.th[i - 1], newDay = !prev || auDay(prev.t) !== day;
               return html`<${React.Fragment} key=${i}>${newDay ? html`<div className="ms-day">${day}</div>` : null}
                 ${cur.group && m.from !== "You" ? html`<div className="ms-gb">${prev && !newDay && prev.from === m.from ? html`<span className="ms-gb-sp" />` : html`<span className="ib-av">${initials(m.from)}</span>`}
@@ -10518,8 +10545,8 @@ function AdminMachinesLayout() {
         <div className="lay-grp">Needs a look<span>something serious is open on it</span></div>
         <${LRow} ic="DesktopOutlined" hot t="OPS-07 · Ama" s="copy of restricted budget-2026.xlsx · you are inside" n="since 10:03" act="Fix it" />
         <${LRow} ic="DesktopOutlined" hot t="OPS-03 · Yaw" s="copy of restricted salaries.csv" n="since 09:30" act="Fix it" />
-        <div className="lay-grp">Worth a look<span>something small, or a help request</span></div>
-        <${LRow} ic="DesktopOutlined" t="OPS-01 · Kojo" s="asked for help twice" n="since 09:40" act="Answer" />
+        <div className="lay-grp">Worth a look<span>something small, or a request to talk</span></div>
+        <${LRow} ic="DesktopOutlined" t="OPS-01 · Kojo" s="asked to talk twice" n="since 09:40" act="Accept" />
         <${LRow} ic="DesktopOutlined" t="OPS-06 · Kwame" s="one version behind: 1.4.1" n="retries when idle" act="Update now" />
         <div className="lay-grp">Offline<span>not checking in</span></div>
         <${LRow} ic="DesktopOutlined" t="OPS-11" s="last seen yesterday 17:42" n="1 day" act="Remind me when back" />

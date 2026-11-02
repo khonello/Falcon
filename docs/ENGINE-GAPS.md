@@ -248,6 +248,37 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      reference is stripped from what ships.
    - Settled and built: an Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
+19. **The Worker's side, as the Worker concept draws it** (the user, 1-2 Nov 2026; `docs/design/concepts-worker.html`, the
+    "Falcon Concepts · Worker" artifact, v13; the Admin concept's Messages, Admin v237). The concept is the source of truth for what the
+    person at a machine sees; this is what the Engine and the Worker Client need for it.
+   - **A Worker replies to an Admin's message.** Today the message window (`worker_client/windows`, kind `message`) only has OK. The reply
+     goes into that Admin's conversation with the person, from the window and from the program's Messages tab. Admin → Worker still opens at
+     once, with no request.
+   - **A request to talk** (decided 2 Nov 2026: part of Messages only; the Assistance feature, shared-resource search and help as its own
+     thing, stays cut). The person sends one line from the program ("Ask IT"); every IT Admin sees it; one accepts it, as Take on an issue,
+     and the conversation opens with that line in it; or an Admin closes it with a reason the person reads. One open request per person.
+     Needs: a request record (from, line, sent, accepted by / closed with reason), handlers to send / accept / close, a push to every Admin
+     and back to the person, the Admin's Messages count including waiting requests. Automation's `help` trigger becomes "A person at a
+     machine asks to talk" and the sample rule "Requests to talk are accepted" (expect: an Admin accepts the request).
+   - **Remove "Ask for help"**: the program's My machine button and the `ask` window kind (`Program.qml`, `windows/qml/Window.qml`,
+     `windows/__init__.py`) are Assistance and go; Ask IT in Messages replaces them.
+   - **The program** (`worker_client/program`): one wide window. Today shows tasks, messages and announcements side by side, most urgent
+     first; tabs Tasks (to start, started, closed this month; the picked task with its targets and whether each has changed), Messages
+     (conversations, the waiting request, Ask IT), Announcements (all, with kind), My machine.
+   - **My machine shows what IT asks for on the phone**: name, department, IP address, Windows edition and version, Falcon version and
+     whether it is up to date, the account signed in and since when, the last restart, free space on C:, connected since, and the IT
+     Admins; "Copy these details" puts them on the clipboard. Not a history of Admin visits (the user rejected that). The local app view
+     (`worker_client/localapp.py`) needs these fields.
+   - **The covers** say when: an Admin inside shows came in / leaves by (the session's `deadline_at`); locked shows locked at / unlocks at
+     and the Admin's reason.
+   - **The Worker's command line** is not part of the product the person sees. It stays as IT's and the tests' tool; its Assistance commands
+     (search, ping) go, and a messages / reply pair comes in.
+   - **Open, not decided:** when the Admin's PC dies mid-session the Worker stays covered until the deadline (30 min by default, longer if
+     extended), because a dropped connection is not special-cased (`engine/hierarchy/traversal.py`). Options raised: end the session after a
+     short grace (~2 min) once the Admin's console is gone, or keep the deadline and have the cover say the Admin's connection dropped and
+     when the machine frees itself. Also: the cover only returns after the Worker reconnects, so a restarted machine is usable for those
+     seconds.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

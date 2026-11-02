@@ -160,6 +160,7 @@ main { min-width: 0; padding-block: 28px 40px; padding-left: max(24px, env(safe-
 .c-colh { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: .2cqw; }
 .c-new { font-style: normal; font-size: .85cqw; font-weight: 600; background: var(--accent); color: #fff; border-radius: 1cqw; padding: .05cqw .55cqw; margin-left: .3cqw; vertical-align: .1cqw; }
 .c-link.dis { opacity: .45; }
+.c-card.req { border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border)); background: transparent; }
 .c-card.sel { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); background: var(--accent-soft); }
 .c-card > .grow { display: flex; flex-direction: column; gap: .3cqw; }
 .c-away { display: flex; align-items: center; gap: .9cqw; padding: .7cqw 1cqw; border-radius: .7cqw; background: var(--surface-2); font-size: 1.05cqw; color: var(--text-2); }
@@ -284,7 +285,7 @@ const tasksCol = (off) => R("Your tasks", "Waiting to start first, then started;
   card("Send the October delivery notes", "From R. Mensah", { t: "Due Friday 7 Nov at 16:00", warn: 1 }, `<span class="btn pri${off ? " dis" : ""}">Start</span>`) +
   (off ? `<span class="c-s">Start waits until you are connected again.</span>` : "") +
   card("Update the drivers' phone list", "From A. Quaye · started Monday", "No deadline · A. Quaye closes it when it is checked", "", true), "1 1 0");
-const msgCol = (off) => R("Messages", "Conversations an Admin started; reply on the card, never start one", colHead("Messages", "1 new", "All") +
+const msgCol = (off) => R("Messages", "Conversations; reply on the card, or Ask IT to start one", colHead("Messages", "1 new", "Ask IT · All") +
   card("R. Mensah", "Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.", "Today at 10:31", `<span class="c-link${off ? " dis" : ""}">Reply</span>`) +
   card("R. Mensah", "Your new monitor is at reception.", "Yesterday · you replied", "", true), "1 1 0");
 const annCol = () => R("Announcements", "New first; older ones stay below until a day passes", colHead("Announcements", "1 new", "All") +
@@ -318,14 +319,24 @@ const VIEWS = {
       <div class="c-file">${svg("file")}<span class="mono">October shipments.xlsx</span><span class="c-s">not yet</span></div></div>
       <div class="c-row" style="margin-top:auto"><span class="c-s grow">R. Mensah closes it when the work is checked.</span>${btns(["Start", "pri"])}</div>`, "1 1 0") ] }],
   messages: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1.4fr)", cols: [
-    R("Conversations", "One per Admin who wrote; only an Admin can start one", `<div class="c-card sel"><div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah <i class="c-new">1 new</i></span><span class="c-s">Can you leave your machine on tonight? …</span></div><span class="c-s">10:31</span></div></div>
-      <div class="c-card"><div class="c-row">${av("AQ")}<div class="grow"><span class="c-h2">A. Quaye</span><span class="c-s">You: The keys are with security.</span></div><span class="c-s">21 Oct</span></div></div>
-      <span class="c-s" style="margin-top:auto">Only an Admin can start a conversation. You can reply to any of them.</span>`, "1 1 0"),
+    R("Conversations", "Your request while it waits, then one conversation per Admin; Ask IT starts a request", `<div class="c-row"><span class="c-h2 grow">Conversations</span><span class="btn dis">Ask IT</span></div>
+      <div class="c-card req"><span class="c-s c-acc" style="font-weight:600">Your request · waiting for IT</span><span class="c-h2">The label printer prints blank labels</span><span class="c-s">Sent today at 09:50 · every IT Admin can see it</span></div>
+      <div class="c-card sel"><div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah <i class="c-new">1 new</i></span><span class="c-s">Can you leave your machine on tonight? …</span></div><span class="c-s">10:31</span></div></div>
+      <div class="c-card"><div class="c-row">${av("AQ")}<div class="grow"><span class="c-h2">A. Quaye</span><span class="c-s">From your request · You: The keys are with security.</span></div><span class="c-s">21 Oct</span></div></div>
+      <span class="c-s" style="margin-top:auto">One request at a time: Ask IT comes back once this one is accepted or closed.</span>`, "1 1 0"),
     R("The conversation", "The whole thread, and the reply box at the foot", `<div class="c-thread" style="flex:1"><span class="c-day">Yesterday</span>
       <div class="bub">Your new monitor is at reception. Pick it up when you can.<small>16:05</small></div>
       <div class="bub me">Got it, thank you!<small>16:20</small></div><span class="c-day">Today</span>
       <div class="bub">Morning Esi. Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.<small>10:31</small></div></div>
       <div class="c-row"><div class="c-inp" style="flex:1">Write a reply to R. Mensah</div>${btns(["Send", "pri"])}</div>`, "1 1 0") ] }],
+  ask: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1.4fr)", cols: [
+    R("Conversations", "Ask IT, at the top of the list", `<div class="c-row"><span class="c-h2 grow">Conversations</span><span class="btn pri">Ask IT</span></div>
+      <div class="c-card"><div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah</span><span class="c-s">You: Yes, I'll leave it on.</span></div><span class="c-s">10:33</span></div></div>
+      <div class="c-card"><div class="c-row">${av("AQ")}<div class="grow"><span class="c-h2">A. Quaye</span><span class="c-s">From your request · You: The keys are with security.</span></div><span class="c-s">21 Oct</span></div></div>`, "1 1 0"),
+    R("Ask IT", "One short line; every IT Admin sees it, and the conversation opens when one accepts", `<span class="c-h1">Ask IT</span>
+      <span class="c-p">Say in one line what you need. Every IT Admin sees it, and the conversation opens here when one of them accepts.</span>
+      <span class="c-k" style="margin-top:.6cqw">What do you need?</span><div class="c-inp">The label printer prints blank labels</div>
+      <div class="c-row" style="margin-top:auto"><span class="c-s grow">You can have one request open at a time.</span>${btns(["Cancel"], ["Send request", "pri"])}</div>`, "1 1 0") ] }],
   ann: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1.3fr)", cols: [
     R("Every announcement", "Newest first; an emergency keeps its colour", `<div class="c-card sel"><div class="grow"><span>${kind("Announcement")} <i class="c-new">new</i></span><span class="c-h2">Office closed on Monday 10 Nov</span><span class="c-s">A. Quaye · today at 08:40</span></div></div>
       <div class="c-card"><span>${kind("Emergency")}</span><span class="c-h2">Leave the building now</span><span class="c-s">A. Quaye · yesterday at 15:20 · you read it at 15:21</span></div>
@@ -342,7 +353,7 @@ const VIEWS = {
     R("Your IT Admins, and copy", "Who looks after this machine; one click copies the details above for a call or an email to IT",
       `<div class="c-row"><span class="c-s grow">Your IT Admins: R. Mensah, A. Quaye</span>${btns(["Copy these details"])}</div>`)],
 };
-const program = (off, tab = "today") => ({ x: 12, y: 6, w: 76, h: 80, title: "Falcon", regions: [header(off), tabs(tab), ...VIEWS[tab](off)] });
+const program = (off, tab = "today") => ({ x: 12, y: 6, w: 76, h: 80, title: "Falcon", regions: [header(off), tabs(tab === "ask" ? "messages" : tab), ...VIEWS[tab](off)] });
 
 const MOMENTS = [
   { group: "The Falcon program", id: "normal", icon: "home", name: "Today", kind: "The Falcon program", when: "Opened from the tray, any time", clock: "11:20",
@@ -357,8 +368,13 @@ const MOMENTS = [
 
   { id: "p-messages", icon: "chat", name: "Messages", kind: "The Falcon program", when: "Every conversation", clock: "11:20",
     tray: { n: 2 }, wins: [work, program(false, "messages")],
-    what: "One conversation per Admin who wrote. The person replies here as in the message window, and never starts one.",
-    decide: "Engine gap: today a Worker cannot write back. To note in ENGINE-GAPS once the Engine session is done with that file." },
+    what: "One conversation per Admin. An Admin writes straight in; the person starts one with a request (Ask IT) that opens once an Admin accepts. Here a request is waiting, so Ask IT is held until it is accepted or closed.",
+    decide: "Engine gap: today a Worker can neither write back nor ask. Requests are part of Messages only; the Assistance feature (search, shared resources) stays cut." },
+
+  { id: "p-ask", icon: "chat", name: "Asking IT", kind: "The Falcon program", when: "A request, opened when an Admin accepts", clock: "11:20",
+    tray: { n: 2 }, wins: [work, program(false, "ask")],
+    what: "The hierarchy is kept: an Admin writes to the person directly, but the person asks first. One line goes to every IT Admin; one accepts, and the conversation opens in Messages. If nobody accepts, or an Admin closes it, the person is told why.",
+    decide: "The console's Messages page needs a Requests list for this: every Admin sees a request, one accepts (as with Take on an issue) or closes it with a reason." },
 
   { id: "p-ann", icon: "speaker", name: "Announcements", kind: "The Falcon program", when: "Every announcement", clock: "11:20",
     tray: { n: 2 }, wins: [work, program(false, "ann")],
@@ -403,7 +419,7 @@ const MOMENTS = [
         <div class="bub">Morning Esi. Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.<small>10:31</small></div></div>`, "1 1 0"),
       R("Your reply", "One box; it goes to this Admin only", `<div class="c-inp">Yes, I'll leave it on.</div><span class="c-s">Your reply goes to R. Mensah only.</span>`),
       R("Send or Later", "Later keeps it in Messages", btns(["Later"], ["Send", "pri"])) ] }],
-    what: "New in version 1: the person can answer a message an Admin started. There is no compose anywhere on their side. The reply lands in that Admin's Messages.",
+    what: "New in version 1: the person can answer a message an Admin started. The reply lands in that Admin's Messages. To start a conversation, the person asks IT from Messages.",
     decide: "Engine gap: today a Worker cannot write back. To note in ENGINE-GAPS once the Engine session is done with that file." },
 
   { id: "inside", icon: "user", name: "An Admin is using this machine", kind: "Covers the screen", when: "Until they leave",
@@ -451,25 +467,6 @@ const MOMENTS = [
       R("The code", "Short and large, so it can be read out", `<div class="c-code"><b>4</b><b>8</b><b>2</b><em></em><b>7</b><b>1</b><b>9</b></div>`, "1 1 0"),
       R("Waiting", "Until an Admin confirms; refused or expired ends here", `<div class="c-row"><span class="c-spin"></span><span class="c-s grow">Waiting for an Admin to confirm. The code expires at 11:10.</span>${btns(["Cancel"])}</div>`) ] }],
     what: "The machine asks to join and shows a code on its own screen. An Admin types that code in the console, so a machine nobody is in front of cannot finish." },
-
-  { id: "tui", icon: "term", name: "The machine's command line", kind: "A terminal", when: "For IT, on the machine itself",
-    tray: { n: 0 },
-    wins: [{ cls: "term", x: 10, y: 6, w: 72, h: 84, title: "Falcon (Worker) · LOG-01", regions: [
-      R("State line", "Connected or not, this machine's name, who is inside", `<div class="tl"><span class="g">● connected</span>  LOG-01 · Logistics · Falcon 1.4.2 · nobody inside</div>`),
-      R("Output", "What the last command printed; news prints as it arrives", `<div class="tl"><b>falcon&gt; status</b>
-  connected since 08:02, to falcon.local:7400
-  watching   C:\\Users\\esi\\Documents   D:\\Shipments
-  waiting    1 task to start · 1 message
-
-<b>falcon&gt; tasks</b>
-  T-118  Send the October delivery notes   <span class="y">due Fri 16:00</span>   not started
-
-<span class="a">[10:31] message from R. Mensah: Can you leave your machine on tonight?</span>
-<b>falcon&gt; messages</b>
-  R. Mensah  10:31  Can you leave your machine on tonight? The update needs ...</div>`, "1 1 0"),
-      R("Command line", "A small set: status, tasks, start, messages, reply, log", `<div class="tl"><b>falcon&gt; </b><span class="cur"></span></div>`) ] }],
-    what: "The narrow Worker command line, for IT checking a machine in place. It never has the console's commands.",
-    decide: "Its help and search commands go (Assistance is cut); messages and reply come in for replies." },
 ];
 
 // ---------- drawing
