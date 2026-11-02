@@ -160,6 +160,21 @@ main { min-width: 0; padding-block: 28px 40px; padding-left: max(24px, env(safe-
 .c-colh { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: .2cqw; }
 .c-new { font-style: normal; font-size: .85cqw; font-weight: 600; background: var(--accent); color: #fff; border-radius: 1cqw; padding: .05cqw .55cqw; margin-left: .3cqw; vertical-align: .1cqw; }
 .c-link.dis { opacity: .45; }
+/* the task and message windows */
+.tw-head { display: flex; align-items: center; gap: 1cqw; padding-bottom: .9cqw; border-bottom: 1px solid var(--border); } .tw-head .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tw-due { display: flex; flex-direction: column; align-items: flex-end; padding: .5cqw 1cqw; border-radius: .7cqw; background: color-mix(in srgb, var(--med) 12%, transparent); }
+.tw-due span { font-size: .85cqw; color: var(--med); } .tw-due b { font-size: 1.15cqw; color: var(--med); font-weight: 600; }
+.tw-box { display: flex; flex-direction: column; gap: .6cqw; padding: 1cqw 1.2cqw; border-radius: .8cqw; background: var(--surface-2); }
+.tw-box .c-file { background: var(--surface); }
+.tw-box-h { display: flex; justify-content: space-between; align-items: baseline; }
+.tw-pill { font-size: .85cqw; padding: .1cqw .6cqw; border-radius: 1cqw; background: var(--surface-3); color: var(--text-3); white-space: nowrap; }
+.tw-foot { display: flex; align-items: center; gap: 1cqw; padding-top: .9cqw; border-top: 1px solid var(--border); } .tw-foot .grow { flex: 1; }
+.mw-earlier { display: flex; align-items: center; gap: .7cqw; font-size: .95cqw; color: var(--text-3); padding: .5cqw .8cqw; border-radius: .6cqw; background: var(--surface-2); }
+.mw-earlier svg { width: 1.3cqw; height: 1.3cqw; flex: none; }
+.mw-msg { font-size: 1.35cqw; line-height: 1.55; color: var(--text); padding: 1.2cqw 1.4cqw; border-radius: 1.2cqw; border-top-left-radius: .3cqw; background: var(--surface-3); align-self: flex-start; }
+.mw-compose { display: flex; align-items: center; gap: .8cqw; padding: .5cqw .5cqw .5cqw 1.2cqw; border: 1px solid var(--border-strong); border-radius: 2cqw; font-size: 1.1cqw; background: var(--surface-2); }
+.mw-compose .grow { flex: 1; } .mw-compose .grow::after { content: ""; display: inline-block; width: 1px; height: 1.3cqw; background: var(--accent); margin-left: .15cqw; vertical-align: -.2cqw; }
+.mw-compose .btn { border-radius: 1.6cqw; }
 .c-card.req { border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border)); background: transparent; }
 .c-card.sel { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); background: var(--accent-soft); }
 .c-card > .grow { display: flex; flex-direction: column; gap: .3cqw; }
@@ -391,15 +406,17 @@ const MOMENTS = [
 
   { group: "What can appear over your work", id: "task", icon: "task", name: "A task is given", stays: ["p-tasks", "Tasks"], kind: "A window", when: "Opens once",
     tray: { n: 1 },
-    wins: [work, { x: 28, y: 9, w: 44, h: 74, title: "A task for you", regions: [
-      R("Who gave it", "The Admin's name, and when", `<div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">A task from R. Mensah</span><span class="c-s">Given today at 09:12</span></div></div>`),
+    wins: [work, { x: 27, y: 10, w: 46, h: 72, title: "Falcon · a task for you", regions: [
+      R("Who gave it, and by when", "The Admin and when they gave it; the deadline beside it, amber when it is near", `<div class="tw-head">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah gave you a task</span><span class="c-s">Today at 09:12</span></div>
+        <span class="tw-due"><span>Due</span><b>Friday 7 Nov, 16:00</b><span>in 3 days</span></span></div>`),
       R("What it is", "The task, in their words", `<span class="c-h1">Send the October delivery notes</span><span class="c-p">Scan the signed delivery notes for October and put them in the Logistics share, one PDF per shipment, with the list of shipments beside them.</span>`),
-      R("When it is due", "A day and time, or no deadline", `<span class="c-p c-warn" style="font-weight:600">Due Friday 7 Nov at 16:00 · in 3 days</span>`),
-      R("What will show the work", "What will change as you do it, each with whether it has yet", `<span class="c-k">What will show the work is happening</span><div class="c-files">
-        <div class="c-file">${svg("folder")}<span class="mono">\\\\files\\Logistics\\Delivery notes\\2026-10</span><span class="c-s">not yet</span></div>
-        <div class="c-file">${svg("files")}<span>About 40 PDF files in it</span><span class="c-s">not yet</span></div>
-        <div class="c-file">${svg("file")}<span class="mono">October shipments.xlsx</span><span class="c-s">not yet</span></div></div>`),
-      R("Start", "The only action: the Admin closes it, never the person", `<div class="c-row"><span class="c-s grow">R. Mensah closes it when the work is checked.</span>${btns(["Later"], ["Start", "pri"])}</div>`) ] }],
+      R("What will show the work", "What will change as the work is done, each with whether it has yet; Falcon notices by itself", `<div class="tw-box"><div class="tw-box-h"><span class="c-k">What will show the work is done</span><span class="c-s">0 of 3 so far</span></div>
+        <div class="c-files">
+        <div class="c-file">${svg("folder")}<span class="mono">\\\\files\\Logistics\\Delivery notes\\2026-10</span><span class="tw-pill">not yet</span></div>
+        <div class="c-file">${svg("files")}<span>About 40 PDF files in it</span><span class="tw-pill">not yet</span></div>
+        <div class="c-file">${svg("file")}<span class="mono">October shipments.xlsx</span><span class="tw-pill">not yet</span></div></div>
+        <span class="c-s">Falcon notices these change by itself. You do not have to report anything.</span></div>`),
+      R("Start, or later", "Start is the only action; Later keeps it in Tasks; the Admin closes it, never the person", `<div class="tw-foot"><span class="c-s grow">R. Mensah checks the work and closes the task.</span>${btns(["Later"], ["Start", "pri"])}</div>`) ] }],
     what: "Opens over their work once, when the task is given. Closed without Start, it waits in Tasks and comes back as a quiet corner note." },
 
   { id: "reminder", icon: "note", name: "A quiet reminder", stays: ["p-tasks", "Tasks, or wherever the item it names is"], kind: "A corner note", when: "Never takes the keyboard",
@@ -411,14 +428,12 @@ const MOMENTS = [
 
   { id: "message", icon: "chat", name: "An Admin writes to you", stays: ["p-messages", "Messages"], kind: "A window", when: "You can reply, never start one",
     tray: { n: 1 },
-    wins: [work, { x: 30, y: 6, w: 40, h: 84, title: "A message", regions: [
-      R("From", "The Admin's name, and when", `<div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah</span><span class="c-s">IT · today at 10:31</span></div></div>`),
-      R("The conversation", "What they wrote, with earlier lines above; newest at the foot", `<div class="c-thread"><span class="c-day">Yesterday</span>
-        <div class="bub">Your new monitor is at reception. Pick it up when you can.<small>16:05</small></div>
-        <div class="bub me">Got it, thank you!<small>16:20</small></div><span class="c-day">Today</span>
-        <div class="bub">Morning Esi. Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.<small>10:31</small></div></div>`, "1 1 0"),
-      R("Your reply", "One box; it goes to this Admin only", `<div class="c-inp">Yes, I'll leave it on.</div><span class="c-s">Your reply goes to R. Mensah only.</span>`),
-      R("Send or Later", "Later keeps it in Messages", btns(["Later"], ["Send", "pri"])) ] }],
+    wins: [work, { x: 31, y: 14, w: 38, h: 62, title: "Falcon · a message", regions: [
+      R("From", "The Admin, and when; the whole conversation is one click away in the program", `<div class="tw-head">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah</span><span class="c-s">IT · today at 10:31</span></div><span class="c-link">Open in Falcon</span></div>`),
+      R("Earlier", "Only a line: the earlier messages stay in the program", `<div class="mw-earlier">${svg("chat")}<span>2 earlier messages, yesterday · the last: "Got it, thank you!"</span></div>`),
+      R("The message", "What they wrote, in full", `<div class="mw-msg">Morning Esi. Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.</div>`),
+      R("Your reply", "One box with Send in it; it goes to this Admin only", `<div class="mw-compose"><span class="grow">Yes, I'll leave it on.</span><span class="btn pri">Send</span></div><span class="c-s">Your reply goes to R. Mensah only.</span>`),
+      R("Later", "Closes the window; the message waits in Messages", `<div class="tw-foot"><span class="c-link">Later</span><span class="c-s">It stays in Falcon, under Messages.</span></div>`) ] }],
     what: "New in version 1: the person can answer a message an Admin started. The reply lands in that Admin's Messages. To start a conversation, the person asks IT from Messages.",
     decide: "Engine gap: today a Worker cannot write back. To note in ENGINE-GAPS once the Engine session is done with that file." },
 
