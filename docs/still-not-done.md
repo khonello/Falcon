@@ -1,4 +1,4 @@
-# Still not done (temporary, updated 1 Nov 2026)
+# Still not done (temporary, updated 2 Nov 2026)
 
 Written after commit `560eb6f`; updated the same day when version 1 was settled (`docs/design/v1-it-admin.md`).
 
@@ -42,9 +42,9 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
   another flow, files copied, old steps retired. Convert to PDF does text and JPEG only (Office formats need Office or LibreOffice).
 - **Rules:** *(built 2 Nov 2026)* disk and network thresholds, and a threshold replayed against the last week.
 - **Tasks:** department tasks go with the Super User (parked); an Admin's own to-dos replace them.
-- **Overview:** the figures have no trend history.
+- **Overview:** the version 1 concept's Overview draws no trends under its figures, so none are kept; the Engine keeps a week of each machine's readings.
 - **Detective:**
-  - Not watched: clipboard and PrintScreen, and what each program sends over the network.
+  - Clipboard pictures (PrintScreen, Win+Shift+S) and what each program sends out are watched (built 17 Oct 2026; `docs/design/detective.md`); they need a signed-in desktop to be tried for real.
   - *(built 2 Nov 2026)* a bounded, hottest-first queue for what a machine missed, and reports on the spine's tell stage.
 
 ## Tests
