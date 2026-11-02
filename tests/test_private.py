@@ -116,3 +116,21 @@ def test_a_refused_open_is_read_from_windows_security_log():
     assert newest == 9002
     assert found == [{"path": "C:\\Users\\a1\\Documents\\Payroll\\march.xlsx", "who": "FIN\\kofi", "process": "C:\\Windows\\explorer.exe",
                       "at": "2026-11-02T10:00:01.5Z"}]
+
+
+@requires_db
+@pytest.mark.organisation
+async def test_sending_a_private_file_in_a_conversation_lets_the_people_in_it_open_it(engine, org, connect):
+    for pc, who in ((org["a1_pc"], "FIN\\anna"), (org["w1_pc"], "FIN\\kofi")):
+        await engine.db.accounts.set_windows_user(pc, who)
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    mark = await _private_mark(engine, org, a1, [])
+    await a1.drain_pushes()
+    convo = (await a1.ok("chat.open", {"account_id": org["w1"]}))["conversation"]["conversation_id"]
+    sent = await a1.ok("chat.send_file", {"conversation_id": convo, "path": "C:/Users/a1/Documents/pay.xlsx"})
+    assert sent["state"] == "reading"                                                     # the owner sending it is their own choice
+    pushes = await a1.drain_pushes()
+    assert next(p for p in pushes if p.type == "private.apply").payload["readers"] == ["FIN\\anna", "FIN\\kofi"]
+    assert "chat.file_read" in a1.push_types(pushes)
+    assert org["w1"] in (await engine.db.marks.readers([mark["id"]]))[mark["id"]]
+    assert w1

@@ -18,7 +18,8 @@ Sending is intentional access, and what it means is decided before anything move
   * every step is in the audit trail, and every saved copy is recorded with where it came from (`chat_file_saves`), which is how Restricted and
     Detective tell a handed-over copy from a stray one.
 The Engine holds the bytes on its own disk (beside its data) until they are saved, 7 days at most, then drops them; the record stays.
-A Private tag (ENGINE-GAPS #3), when it is built, adds the receiver to who may open the file.
+A private file (ENGINE-GAPS #3): sending it adds the people in the conversation to who may open it -- the owner's own choice when they send
+it, else the owner is asked first, as for something restricted.
 """
 
 from __future__ import annotations
@@ -89,18 +90,27 @@ async def send_file(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     from engine.flow import guard
 
     found = await guard.blockers(ctx.engine, ident.pc_id, path, (entry or {}).get("content_hash"))
+    from engine.console.marks import inside
+
+    private = next((m for m in await db.marks.private_on_pc(ident.pc_id) if inside(m, ident.pc_id, path)), None)
     restricted = None
     consent_by: int | None = None
     needs_yes = False
+    if private is not None:
+        restricted = {"reasons": [f"{private['name']} is private"], "mark_ids": [], "private_mark_id": private["id"],
+                      "consented_by": ident.account_id if private["by_account_id"] == ident.account_id else None}
+        if private["by_account_id"] != ident.account_id:
+            needs_yes, consent_by = True, private["by_account_id"]
     if found:
         mine = [b for b in found if (b.kind == "mark" and b.owner_account_id == ident.account_id) or (b.kind == "tag" and org_wide(ident))]
         others = [b for b in found if b not in mine]
-        restricted = {"reasons": [b.reason for b in found], "mark_ids": [b.mark_id for b in found if b.mark_id],
-                      "consented_by": ident.account_id if not others else None}
+        restricted = {**(restricted or {}), "reasons": (restricted or {}).get("reasons", []) + [b.reason for b in found],
+                      "mark_ids": [b.mark_id for b in found if b.mark_id],
+                      "consented_by": ident.account_id if not others and not needs_yes else None}
         if others:
             needs_yes = True
             owner = next((b.owner_account_id for b in others if b.kind == "mark" and b.owner_account_id), None)
-            consent_by = owner                                      # None: a restricted or admin tier, which any IT Admin may answer
+            consent_by = consent_by or owner                        # None: a restricted or admin tier, which any IT Admin may answer
     file_id = await db.chat_files.create(convo["id"], ident.account_id, ident.pc_id, path, name, size, "asked" if needs_yes else "reading",
                                          restricted=restricted, consent_account_id=consent_by)
     await ctx.engine.audit.record(ctx, "chat.file_offered", target_type="chat_files", target_id=file_id, pc_id=ident.pc_id,
@@ -108,8 +118,32 @@ async def send_file(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if needs_yes:
         await _ask_owner(ctx.engine, file_id, consent_by, ident.account_id, name, restricted)
         return {"file_id": file_id, "state": "asked", "waits_for": "the person who restricted it" if consent_by else "an IT Admin"}
+    await _open_to_conversation(ctx, restricted, f_conversation=convo["id"])
     await ctx.engine.push_to_pc(ident.pc_id, "chat.file_read", {"file_id": file_id, "path": path, "max_bytes": MAX_BYTES})
     return {"file_id": file_id, "state": "reading"}
+
+
+async def _open_to_conversation(ctx: Context, restricted: dict[str, Any] | None, *, f_conversation: int) -> None:
+    """A private file sent with its owner's yes: the people in the conversation may open it now (they are added to its readers, and the
+    machine is told), since a copy they cannot open would be no use to them."""
+    mark_id = (restricted or {}).get("private_mark_id")
+    if not mark_id:
+        return
+    db = ctx.engine.db
+    convo = await db.conversations.get(f_conversation)
+    from engine.resource.conversations import _members
+
+    members = await _members(ctx, convo)
+    had = (await db.marks.readers([mark_id]))[mark_id]
+    mark = await db.marks.get(mark_id)
+    if mark is None:
+        return
+    await db.marks.set_readers(mark_id, sorted(set(had) | set(members)), bool(mark.get("allow_system", True)))
+    await ctx.engine.audit.record(ctx, "private.readers_changed", target_type="resource_marks", target_id=mark_id, pc_id=mark["pc_id"],
+                                  detail={"added_by_sending": sorted(set(members) - set(had)), "conversation_id": f_conversation})
+    from engine.resource import private
+
+    await private.apply(ctx.engine, mark_id)
 
 
 async def _ask_owner(engine: Engine, file_id: int, owner: int | None, sender: int, name: str, restricted: dict[str, Any] | None) -> None:
@@ -138,6 +172,7 @@ async def file_consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         restricted["consented_by"] = ident.account_id
         await db.chat_files.set_state(f["id"], "reading")
         await db.pool.execute("UPDATE chat_files SET restricted = $2 WHERE id = $1", f["id"], restricted)
+        await _open_to_conversation(ctx, restricted, f_conversation=f["conversation_id"])
         await ctx.engine.push_to_pc(f["from_pc_id"], "chat.file_read", {"file_id": f["id"], "path": f["source_path"], "max_bytes": MAX_BYTES})
     else:
         await db.chat_files.set_state(f["id"], "refused", "the person who restricted it said no")
