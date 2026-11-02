@@ -98,6 +98,13 @@ environ-operator\Scripts\python.exe -m operator_client --gui
 On the connect screen: **Engine address** `falcon.internal : 7400`, **your client id** and **your key** from step 1,
 and **Choose…** the `engine.crt` you copied. It is remembered on this machine.
 
+### With licence codes
+
+A licence comes with codes: admin codes and worker codes. Take them in once, in the TUI: `licence import <file.json>` (the file the licence
+store hands over); `licences` lists them with how many machines each has let in. Then install each PC with its code (`setup.exe` asks for it,
+or `--code`): it joins at once, as an IT Admin's workstation or a person's PC, and nobody confirms it. A worker joins the department its
+code names, else "New machines"; an Admin joins IT. `licence revoke <id>` withdraws a code.
+
 ### Step 3 -- departments, and more IT Admins
 
 Version 1 has IT Admins only (`docs/design/v1-it-admin.md`): every Admin reaches every department, and a department is a

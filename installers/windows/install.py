@@ -212,12 +212,21 @@ class WindowsInstall:
         cfg.update({"engine_host": self.bundle.engine_host, "engine_port": self.bundle.engine_port, "tls": True, "ca_cert": str(self.cert),
                     "separate_programs": True, "windows": not self.a.no_windows, "serve_console": self.role.serve_console,
                     "enroll_level": self.role.enroll_level or "worker", "enroll_department": self.a.department,
+                    **({"enroll_code": self.licence_code()} if self.licence_code() and not kept_key else {}),
                     "watch_roots": cfg.get("watch_roots") or self.a.watch or [r"C:\Users"]})
         cfg.setdefault("client_id", "")
         cfg.setdefault("client_key", "")
         self.worker_json.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
         return ("settings updated; this machine keeps the key it already has" if kept_key
                 else "settings written; this machine has no key yet: it will ask the Engine to register it when the service starts")
+
+    def licence_code(self) -> str:
+        """The licence code given at setup (--code or --code-file), as typed; the Engine reads it the same with or without spaces and dashes."""
+        if self.a.code:
+            return str(self.a.code).strip()
+        if self.a.code_file:
+            return Path(self.a.code_file).read_text(encoding="utf-8").strip()
+        return ""
 
     def install_service(self) -> str:
         cfg = ["--name", self.service, "--config", str(self.worker_json)]
@@ -360,6 +369,9 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--bundle", help="falcon-client.json from the Engine's installer")
     ap.add_argument("--fingerprint", help="the certificate's fingerprint the Engine's installer printed: refuse any other")
     ap.add_argument("--department", type=int, help="the department this machine asks to join (otherwise the person confirming chooses)")
+    ap.add_argument("--code", help="the licence code (an admin code for --role admin, a worker code for --role worker): the machine joins at once, "
+                                   "nobody confirms it. Kept only in the private settings until it is used")
+    ap.add_argument("--code-file", help="a file holding the licence code (a command line is remembered; a file need not be)")
     ap.add_argument("--client-id", help="admin, the first IT Admin only: the client id the Engine's installer printed")
     ap.add_argument("--client-key", help="the key (prefer --client-key-file: a command line is remembered)")
     ap.add_argument("--client-key-file", help="a file holding the key")

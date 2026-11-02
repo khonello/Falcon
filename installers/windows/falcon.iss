@@ -44,10 +44,33 @@ Source: "{#Python}\*"; DestDir: "{app}\python"; Flags: recursesubdirs createalls
 
 [Run]
 Filename: "{app}\python\python.exe"; \
-  Parameters: "-m installers.windows.install --role {#Role} --bundle ""{tmp}\payload\falcon-client.json"" --source ""{tmp}\payload"" --target ""{app}"" --python ""{app}\python\python.exe"""; \
+  Parameters: "-m installers.windows.install --role {#Role} --bundle ""{tmp}\payload\falcon-client.json"" --source ""{tmp}\payload"" --target ""{app}"" --python ""{app}\python\python.exe"" --code-file ""{tmp}\licence-code.txt"""; \
   WorkingDir: "{tmp}\payload"; StatusMsg: "Installing Falcon..."; Flags: waituntilterminated runhidden
 
 [UninstallRun]
 Filename: "{app}\runtime\Scripts\python.exe"; \
   Parameters: "-m installers.windows.install --role {#Role} --uninstall"; \
   WorkingDir: "{app}\app"; RunOnceId: "FalconUninstall"; Flags: runhidden
+
+[Code]
+{ The licence code (the user, 2 Nov 2026): an admin code for the admin installer, a worker code for the worker one. With it the machine joins
+  the Engine at once and nobody has to confirm it; left empty, the machine asks and an IT Admin lets it in with the code shown on its screen.
+  It reaches the installer in a file in Setup's own temporary folder, never on a command line, and the installer keeps it only in the
+  machine's private settings until it is used. }
+var
+  CodePage: TInputQueryWizardPage;
+
+procedure InitializeWizard;
+begin
+  CodePage := CreateInputQueryPage(wpSelectDir, 'Licence code',
+    'The code from your Falcon licence',
+    'Type the {#Role} code from the licence your organisation bought. The machine then joins on its own. ' +
+    'Leave it empty to have an IT Admin let it in instead.');
+  CodePage.Add('Licence code:', False);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+    SaveStringToFile(ExpandConstant('{tmp}\licence-code.txt'), Trim(CodePage.Values[0]), False);
+end;

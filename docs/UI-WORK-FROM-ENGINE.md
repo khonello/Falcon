@@ -40,6 +40,12 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   Admin's workstation (the admin installer asks so); the level always follows what the machine asked (`requested_level`). Where Registry's
   "Asking to join" shows such a request, Let it in works now; it should say it will be an IT Admin's machine.
 
+### Licences (built 2 Nov 2026)
+- A machine joins with a licence code given at setup (admin or worker code), and nobody confirms it. The console needs a place for the
+  licence: `licence.import {name, reference?, codes}` (taking in the file the licence store hands over), `licence.list` -> `{codes: [{id,
+  licence, last4, role, seats, used, left, department, expires_at, revoked_at, machines: [{hostname, decided_at}]}]}`, `licence.revoke
+  {code_id}`. Probably beside Registry (Machines > Registry). A machine that joins this way is pushed as `enroll.joined` and `machines.changed`.
+
 ### Departments (built 1 Nov 2026, drawn)
 - `hierarchy.department_rename`, `hierarchy.pc_move`: on the Departments page. Still to draw: the "Every department" filter on Machines and the
   department label on each machine (the concept's Machines).

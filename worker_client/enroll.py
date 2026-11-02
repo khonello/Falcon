@@ -65,18 +65,24 @@ async def enroll(cfg: WorkerConfig, *, department_id: int | None = None, level: 
     conn.on_push(on_push)
     handle = None
     try:
-        asked = await conn.call("enroll.request", {
-            "hostname": hostname or socket.gethostname(), "os": f"{platform.system()} {platform.release()}",
-            "mac": _mac(), "department_id": department_id, "level": level})
-        message = f"Registering this machine. Code {spaced(asked['code'])}"
+        request = {"hostname": hostname or socket.gethostname(), "os": f"{platform.system()} {platform.release()}",
+                   "mac": _mac(), "department_id": department_id, "level": level}
+        if getattr(cfg, "enroll_code", ""):
+            request["licence_code"] = cfg.enroll_code           # the licence code given at setup: the machine joins at once, nobody confirms
+        asked = await conn.call("enroll.request", request)
+        licensed = asked.get("status") == "confirmed"
+        message = "Joining with the licence code." if licensed else f"Registering this machine. Code {spaced(asked['code'])}"
         show(message)
-        show("Ask your Admin to confirm it, and give them this code. Waiting...")
+        if not licensed:
+            show("Ask your Admin to confirm it, and give them this code. Waiting...")
         text = message + "\n\nGive this code to whoever is registering you, and wait."
-        if window is not None:
+        if window is not None and not licensed:
             handle = await window(text)
+        if licensed:
+            decided.set()                                        # already in: collect the key at once
         shown_at = loop_time()
         while True:
-            if window is not None and handle is None and loop_time() - shown_at >= RESHOW_SECONDS:
+            if window is not None and not licensed and handle is None and loop_time() - shown_at >= RESHOW_SECONDS:
                 handle = await window(text)                    # nobody was signed in to see it the first time
                 shown_at = loop_time()
             try:
@@ -90,6 +96,8 @@ async def enroll(cfg: WorkerConfig, *, department_id: int | None = None, level: 
                 continue
             if status == "confirmed":
                 cfg.client_id, cfg.client_key = got["client_id"], got["client_key"]
+                if getattr(cfg, "enroll_code", ""):
+                    cfg.enroll_code = ""                         # used: it is the licence's, not this machine's, and is not kept here
                 cfg.save()
                 show("Registered. This machine is set up; starting as a Worker.")
                 return got

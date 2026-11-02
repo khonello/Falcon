@@ -408,3 +408,14 @@ def test_the_setup_script_installs_python_with_the_program_and_runs_the_installe
     iss = (Path(__file__).resolve().parent.parent / "installers" / "windows" / "falcon.iss").read_text(encoding="utf-8")
     assert r'DestDir: "{app}\python"' in iss and r'{tmp}\python' not in iss
     assert '--target ""{app}""' in iss and "WorkingDirectory" not in iss
+
+
+@windows_only
+def test_the_licence_code_goes_only_into_the_machines_private_settings(tmp_path):
+    code = tmp_path / "code.txt"
+    code.write_text("WRKR-5T8M-3Z6P-2222\n", encoding="utf-8")
+    inst, _ = win_args("worker", tmp_path, "--code-file", str(code))
+    inst.plan().run()
+    assert json.loads(inst.worker_json.read_text(encoding="utf-8"))["enroll_code"] == "WRKR-5T8M-3Z6P-2222"
+    public = [p for p in inst.data.rglob("*") if p.is_file() and p.parent != inst.private]
+    assert public and all("WRKR" not in p.read_text(encoding="utf-8", errors="ignore") for p in public)

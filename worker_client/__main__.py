@@ -74,6 +74,7 @@ def main() -> None:
                     help="first run: ask the Engine to register this machine (shows a code; an Admin confirms it)")
     ap.add_argument("--department", type=int, help="with --enroll: the department this machine asks to join")
     ap.add_argument("--level", choices=("worker", "admin"), default="worker", help="with --enroll: what it asks to be")
+    ap.add_argument("--code", help="with --enroll: the licence code (a worker or an admin code); the machine joins at once, nobody confirms it")
     ap.add_argument("--allow-power", action="store_true", help="allow shutdown/reboot/lock_session actions")
     ap.add_argument("--separate", action="store_true", help="run the indexer and the event tracker as their own supervised programs (always so as a service)")
     ap.add_argument("--no-native-watch", action="store_true", help="force the polling watcher")
@@ -100,6 +101,8 @@ def main() -> None:
     if args.watch:
         cfg.watch_roots = args.watch
     if args.enroll:
+        if args.code:
+            cfg.enroll_code = args.code
         asyncio.run(_enroll(cfg, args.department, args.level))
     if not cfg.client_id:
         sys.exit("no client id: pass --client-id once (it is remembered), or register with --enroll")

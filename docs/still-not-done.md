@@ -31,6 +31,8 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 - **`pc_days`:** explained to you on 2 Nov; waiting on your answer.
 - **Convert to PDF for Office files:** that area of Flow needs a serious look (the user, 2 Nov 2026). Kept on the list: today text and JPEG
   convert; Word, Excel and others say unsupported.
+- **Joining with a licence code:** *(built 2 Nov 2026)* admin and worker codes from a bought licence; given at setup, the machine joins at once.
+  Still yours to decide: the licence store itself (where licences are bought, how its files are signed so the Engine can tell a real one).
 - **Making another IT Admin:** *(built 2 Nov 2026)* install the admin console on the PC; it asks as an Admin's workstation and an IT Admin
   lets it in with the code on its screen. What it is follows what is installed.
 

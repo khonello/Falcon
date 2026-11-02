@@ -49,6 +49,7 @@ class WorkerConfig:
     lock_workstation_on_block: bool = False    # Windows: LockWorkStation() when a superior enters
     enroll_level: str = "worker"               # with no client id yet: what this machine asks to be registered as (worker | admin)
     enroll_department: int | None = None       # ... and the department it asks to join (None: the Engine's confirmer decides)
+    enroll_code: str = ""                      # ... and the licence code given at setup: with it the machine joins at once, nobody confirms (cleared once used)
     serve_console: bool = False                # an Admin's workstation: the console on this machine asks this service to answer the Engine's challenge (the key stays here)
     index_state: bool = True                   # keep what the Engine was last told about the files, so changes made while it was not listening are found (reconcile)
     reconcile_seconds: float = 1800.0          # ... and look again this often
@@ -68,7 +69,7 @@ class WorkerConfig:
             return cfg
         for key in ("engine_host", "engine_port", "client_id", "client_key", "tls", "ca_cert", "watch_roots", "poll_seconds",
                     "metrics_seconds", "idle_sweep_after_seconds", "hash_limit_bytes", "lock_workstation_on_block",
-                    "windows", "index_state", "reconcile_seconds", "separate_programs", "serve_console", "enroll_level", "enroll_department", "update_command", "cache"):
+                    "windows", "index_state", "reconcile_seconds", "separate_programs", "serve_console", "enroll_level", "enroll_department", "enroll_code", "update_command", "cache"):
             if key in data:
                 setattr(cfg, key, data[key])
         return cfg

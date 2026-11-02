@@ -23,6 +23,10 @@ installer checks the manifest first and refuses a payload that was changed or ha
    certificate, **no key**, and prints the certificate's **fingerprint**. The first IT Admin's id and key are in
    `/var/lib/falcon/first-admin.txt` (root only). Back up `/var/lib/falcon/master.secret` offline.
 2. **The first IT Admin's workstation.** `--role admin` with the id and key from step 1: the console, and the person's own settings.
+**With a licence code (2 Nov 2026):** every installer takes `--code` (or `--code-file`; `setup.exe` asks for it on a page of its own). An admin
+code with the admin installer, a worker code with the worker one: the machine joins the Engine at once, as what the code is for, and nobody
+confirms it. The code is kept only in the machine's private settings until it is used, then dropped. Without one, the steps below.
+
 3. **Another IT Admin's workstation.** `--role admin`. The installed service asks the Engine to register the machine as an Admin's
    workstation and a code appears on the screen. Making a person an Admin is never one click in the console (docs/design/v1-it-admin.md):
    it is finished from the TUI or a setup utility, and those steps are still to be designed. The console on that machine is signed in by the service.

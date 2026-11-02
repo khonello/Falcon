@@ -2,8 +2,10 @@
 
 A newly installed Worker finds the Engine and ASKS; the Engine does not hunt for machines on the network.
 
-    enroll.request  {hostname, os?, mac?, department_id?, level?}   -- before the handshake (the machine has no key yet)
-                    -> {enrollment_id, code, token, expires_at}
+    enroll.request  {hostname, os?, mac?, department_id?, level?, licence_code?}   -- before the handshake (the machine has no key yet)
+                    -> {enrollment_id, code, token, expires_at, status}
+                    With a licence code (engine/hierarchy/licences.py) the machine joins at once, as what the code is for: `status` is
+                    "confirmed" and it collects its key with enroll.wait. Without one it waits for a person (`status` "pending").
     enroll.wait     {token}                                         -- before the handshake: the machine collects its answer
                     -> {status: pending|confirmed|refused|expired, client_id?, client_key?}   (the key once, ever)
     enroll.list     {}                                              -- the head of the organisation: every waiting request; Admin: those for their department
@@ -66,7 +68,7 @@ def _clean(value: Any, limit: int) -> str | None:
 
 @handler("enroll.request")
 async def request(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """A machine asks to be registered. Nothing is created but the waiting request."""
+    """A machine asks to be registered. Without a licence code nothing is created but the waiting request; with a good one it joins now."""
     db = ctx.engine.db
     hostname = _clean(payload.get("hostname"), 80)
     if not hostname:
@@ -83,6 +85,9 @@ async def request(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         if department_id not in {d["id"] for d in await db.accounts.list_departments()}:
             raise ProtocolError(ErrorCode.NOT_FOUND, "no such department")
     peer = _peer_host(ctx)
+    from engine.hierarchy import licences
+
+    licence = await licences.check(ctx.engine, str(payload["licence_code"]), level, peer) if payload.get("licence_code") else None
     if await db.enrollments.pending_count(peer) >= MAX_PENDING_PER_ADDRESS:
         raise ProtocolError(ErrorCode.CONFLICT, "too many requests are already waiting from this address")
     if await db.enrollments.pending_count() >= MAX_PENDING:
@@ -95,11 +100,40 @@ async def request(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await ctx.engine.audit.record(None, "enroll.requested", target_type="enrollments", target_id=enrollment_id,
                                   detail={"hostname": hostname, "level": level, "department_id": department_id, "peer": peer})
     ctx.connection.enrollment_id = enrollment_id                      # told the moment it is decided
+    if licence is not None:
+        return {"enrollment_id": enrollment_id, "code": code, "token": token, "expires_at": expires.isoformat(),
+                **await _join_with_licence(ctx, enrollment_id, licence, hostname, level, department_id)}
     announce = {"enrollment_id": enrollment_id, "hostname": hostname, "level": level, "department_id": department_id}
     await ctx.engine.push_to_role("super_user", "enroll.requested", announce)
     if department_id is not None:
         await ctx.engine.push_to_role("admin", "enroll.requested", announce, department_id=department_id)
-    return {"enrollment_id": enrollment_id, "code": code, "token": token, "expires_at": expires.isoformat()}
+    return {"enrollment_id": enrollment_id, "code": code, "token": token, "expires_at": expires.isoformat(), "status": "pending"}
+
+
+async def _join_with_licence(ctx: Context, enrollment_id: int, licence: dict[str, Any], hostname: str, level: str,
+                             department_id: int | None) -> dict[str, Any]:
+    """A good licence code: one seat is taken, the account and machine are made, and the request is confirmed by the code, not a person."""
+    from engine.hierarchy import licences
+
+    db = ctx.engine.db
+    if not await db.licences.take_seat(licence["id"]):
+        await db.enrollments.refuse(enrollment_id, None, "the licence code has no machines left")
+        raise ProtocolError(ErrorCode.CONFLICT, "that licence code has no machines left")
+    try:
+        department_id = await licences.department_for(ctx.engine, licence, department_id, level)
+        made = await provision(ctx.engine, level, department_id, hostname)
+    except Exception:
+        await db.licences.give_back_seat(licence["id"])
+        await db.enrollments.refuse(enrollment_id, None, "could not be set up")
+        raise
+    await db.enrollments.confirm(enrollment_id, None, made["account_id"], made["pc_id"], licence_code_id=licence["id"])
+    await ctx.engine.audit.record(None, "enroll.licensed", target_type="enrollments", target_id=enrollment_id,
+                                  detail={"hostname": hostname, "level": level, "department_id": department_id, "licence_code_id": licence["id"],
+                                          "code_last4": licence["last4"], "account_id": made["account_id"], "pc_id": made["pc_id"]})
+    await ctx.engine.push_to_role("admin", "enroll.joined", {"enrollment_id": enrollment_id, "hostname": hostname, "level": level,
+                                                             "department_id": department_id, "pc_id": made["pc_id"]})
+    await ctx.engine.push_to_role("admin", "machines.changed", {"pc_id": made["pc_id"]})
+    return {"status": "confirmed", "level": level, "department_id": department_id}
 
 
 @handler("enroll.wait")
