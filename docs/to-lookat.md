@@ -1,9 +1,26 @@
 # To look at
 
 Open items to go over with the user. Bring this up first in a new session, then tidy it as items close.
-Last updated 1 Nov 2026.
+Last updated 2 Nov 2026.
 
-## Waiting on a decision
+## Waiting on a decision (2 Nov 2026)
+
+- **#15 A case told in words:** (a) facts filled in from the case, the model writes only the joining words; or (b) the model writes
+  freely and every name, file, time and number is checked against the case. Which?
+- **#13 the Automation page's other three ideas** (what a run produced, try a rule first, too quiet or too loud): build or drop?
+- **`pc_days`** (one row per machine per day, kept forever): purge on the 90-day clock like the audit trail?
+- **To talk through:** finding PCs on the network (#10); Convert to PDF for Office files (needs Office or LibreOffice on the
+  machines); the licence store (where licences are bought, how its files are signed so the Engine can tell a real one).
+
+## Engine pass, 2 Nov 2026 (built; the Engine session does no UI work: `docs/UI-WORK-FROM-ENGINE.md` is the UI's list)
+
+- Flow steps all real, flow names, hourly / run-only flows and Run, several sources merged, carrying on from a flow, files copied,
+  old steps retired; disk and network rules and a week's backtest; the Worker writes back; the spine's bounded catch-up queue;
+  Detective's O(k log k) coverage; licence codes (a machine joins with one at setup, nobody confirms); files in conversations (#7);
+  Private (#3) with Windows' own permissions; the update pipeline; a deleted source file's copies kept with an issue to remove them.
+- **Not run for real yet:** a second Windows user refused a Private file, a machine updating itself, the two installers (the VM plan).
+
+## Waiting on a decision (older)
 
 - **Version 1 is Admin (IT) → Workers; the Super User is set aside** (decided 25 Oct 2026):
   `docs/design/who-runs-the-console.md`. The Admins are IT with every department's reach, and departments are IT's
