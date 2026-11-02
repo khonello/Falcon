@@ -1,0 +1,528 @@
+<title>Falcon Concepts · Worker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the Admin concept's shell (sidebar of moments, page header); the person's screen across the width, and under it
+   what the moment is and its numbered parts as picked cards. Sample content: Esi at LOG-01; Admins R. Mensah and A. Quaye. */
+:root {
+  color-scheme: light;
+  --bg: #f3f4f6; --surface: #ffffff; --surface-2: #f8f9fb; --surface-3: #eef0f3;
+  --border: #e2e5ea; --border-strong: #cdd2da;
+  --text: #191d25; --text-2: #4a5160; --text-3: #737b8a; --text-4: #a6adb9;
+  --accent: #2459d6; --accent-soft: rgba(36,89,214,0.09);
+  --crit: #c8331f; --med: #b58105;
+  --desk-a: #d5dce6; --desk-b: #e9edf2; --sk: #e3e7ed; --sk-2: #d3d9e2;
+  --shadow-pop: 0 8px 24px -6px rgba(16,24,40,0.18), 0 2px 6px rgba(16,24,40,0.06);
+  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --bg: #0c0f14; --surface: #12161d; --surface-2: #161b23; --surface-3: #1d232d;
+  --border: #232a35; --border-strong: #323b48;
+  --text: #e4e7ed; --text-2: #aab1be; --text-3: #7c8595; --text-4: #555e6d;
+  --accent: #5b8cff; --accent-soft: rgba(91,140,255,0.13);
+  --crit: #f2604c; --med: #d9a93a;
+  --desk-a: #1a222d; --desk-b: #131921; --sk: #252c37; --sk-2: #313a47;
+  --shadow-pop: 0 10px 30px -6px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4); } }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c0f14; --surface: #12161d; --surface-2: #161b23; --surface-3: #1d232d;
+  --border: #232a35; --border-strong: #323b48;
+  --text: #e4e7ed; --text-2: #aab1be; --text-3: #7c8595; --text-4: #555e6d;
+  --accent: #5b8cff; --accent-soft: rgba(91,140,255,0.13);
+  --crit: #f2604c; --med: #d9a93a;
+  --desk-a: #1a222d; --desk-b: #131921; --sk: #252c37; --sk-2: #313a47;
+  --shadow-pop: 0 10px 30px -6px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4); }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: inherit; color: inherit; }
+
+/* --- shell, as the Admin concept */
+.app { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100%; }
+.side { position: sticky; top: 0; height: 100vh; overflow: auto; background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 10px 8px; gap: 1px; box-sizing: border-box; }
+.org { display: flex; align-items: center; gap: 9px; padding: 6px 8px 12px; }
+.logo { width: 26px; height: 26px; border-radius: 5px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 600; font-size: 13px; flex: none; }
+.org b { display: block; font-size: 13px; font-weight: 600; } .org span { display: block; font-size: 11.5px; color: var(--text-3); }
+.grp { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-4); padding: 14px 10px 4px; }
+.nav { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 5px; color: var(--text-2); cursor: pointer; user-select: none; }
+.nav:hover { background: var(--surface-3); color: var(--text); }
+.nav.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.nav svg { width: 15px; height: 15px; flex: none; }
+.nav:focus-visible { outline: 2px solid var(--accent); }
+.side-foot { margin-top: auto; padding: 10px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--text-3); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.seg button { all: unset; cursor: pointer; padding: 2px 8px; font-size: 11.5px; color: var(--text-3); }
+.seg button.on { background: var(--surface-3); color: var(--text); }
+main { min-width: 0; padding-block: 28px 40px; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; justify-content: center; gap: 16px; width: 100%; max-width: 1240px; min-height: 100vh; margin-inline: auto; box-sizing: border-box; }
+.ph1 { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ph1 h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.ph1 .sub { color: var(--text-3); margin-top: 2px; }
+.tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 0 6px; height: 20px; border-radius: 3px;
+  background: color-mix(in srgb, var(--c, var(--text-3)) 12%, transparent); color: var(--c, var(--text-2)); white-space: nowrap; font-weight: 500; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+.phd { min-height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.pt { font-weight: 600; font-size: 13px; }
+.pt small { font-weight: 400; color: var(--text-3); font-size: 12px; margin-left: 8px; }
+.pbd { padding: 14px; }
+.about { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 20px; align-items: start; }
+
+/* --- the parts, as Issues cards: a click picks */
+.what { color: var(--text-2); margin: 0 0 12px; max-width: 60ch; }
+.decide { display: flex; flex-direction: column; gap: 3px; padding: 9px 12px; border-radius: 10px; font-size: 12.5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.decide b { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.k { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-4); margin: 0 0 6px; }
+.iq-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.iq-card { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); cursor: pointer; }
+.iq-card:hover { background: color-mix(in srgb, var(--surface-2) 50%, var(--surface-3)); }
+.iq-card.on { background: var(--surface-3); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.iq-card:focus-visible { outline: 2px solid var(--accent); }
+.iq-card .iq-ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); font-weight: 600; font-size: 12px; }
+.iq-card.on .iq-ic { background: var(--accent); color: #fff; }
+.iq-card .tx { min-width: 0; }
+.iq-card .tx b { display: block; font-size: 13px; font-weight: 600; }
+.iq-card .tx span { display: block; font-size: 12px; color: var(--text-3); }
+
+/* --- the desktop */
+.desk { position: relative; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: linear-gradient(155deg, var(--desk-a), var(--desk-b)); container-type: inline-size; }
+.taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 5.5%; background: color-mix(in srgb, var(--surface) 82%, transparent); border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 1.6%; }
+.taskbar .apps { display: flex; gap: .9cqw; } .taskbar .apps i { width: 1.9cqw; height: 1.9cqw; border-radius: .4cqw; background: var(--sk-2); }
+.tray { display: flex; align-items: center; gap: 1.2cqw; font-size: 1.05cqw; color: var(--text-2); }
+.ticon { position: relative; width: 2cqw; height: 2cqw; border-radius: .45cqw; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 1.05cqw; font-weight: 600; }
+.ticon.off { background: var(--text-4); }
+.ticon i { position: absolute; top: -.7cqw; right: -.8cqw; min-width: 1.4cqw; height: 1.4cqw; padding: 0 .3cqw; border-radius: 1cqw; background: var(--crit); color: #fff; font-size: .85cqw; font-style: normal; display: grid; place-items: center; box-sizing: border-box; }
+.win { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: .8cqw; box-shadow: var(--shadow-pop); display: flex; flex-direction: column; overflow: hidden; }
+.win > .hd { flex: none; height: 2.8cqw; display: flex; align-items: center; justify-content: space-between; padding: 0 1.2cqw; font-size: 1cqw; color: var(--text-3); border-bottom: 1px solid var(--border); }
+.win > .hd .dots { display: flex; gap: .7cqw; } .win > .hd .dots i { width: .8cqw; height: .8cqw; border-radius: 50%; background: var(--sk-2); }
+.win > .bd { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .5cqw; padding: 1cqw 1.2cqw 1.2cqw; }
+.win.work { opacity: .65; } .win.work.back { opacity: .4; }
+.win.note { border-radius: 1cqw; }
+.win.term { background: #12161c; border-color: #000; } .win.term > .hd { color: #9aa4b1; border-color: #262c35; }
+.topbar { position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
+.cover { position: absolute; inset: 0; background: rgba(14, 18, 24, .93); display: flex; align-items: center; justify-content: center; color: #e9edf2; }
+.cover.red { background: radial-gradient(circle at 50% 40%, rgba(120, 22, 14, .95), rgba(40, 8, 6, .97)); }
+.cover .stack { width: 46%; display: flex; flex-direction: column; gap: 1cqw; }
+/* an Admin inside: one calm, centred composition */
+.cover.inuse { background: radial-gradient(circle at 50% 42%, rgba(30, 38, 52, .96), rgba(10, 13, 18, .97)); }
+.inuse .stack { width: 40%; align-items: stretch; gap: 1.6cqw; text-align: center; }
+.iu-who { display: flex; flex-direction: column; align-items: center; gap: .6cqw; }
+.iu-av { width: 5.6cqw; height: 5.6cqw; border-radius: 50%; display: grid; place-items: center; font-size: 1.7cqw; font-weight: 600; color: #fff; background: rgba(91,140,255,.22); box-shadow: 0 0 0 .5cqw rgba(91,140,255,.08), 0 0 0 1px rgba(255,255,255,.12) inset; margin-bottom: .4cqw; }
+.iu-eye { font-size: .95cqw; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.5); }
+.iu-title { font-size: 1.75cqw; font-weight: 600; color: #fff; text-wrap: balance; }
+.iu-time { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.4cqw; padding: 1.1cqw 1.6cqw; border-radius: 1cqw; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+.iu-time div:not(.iu-track) { display: flex; flex-direction: column; gap: .1cqw; }
+.iu-time span { font-size: .9cqw; color: rgba(255,255,255,.5); }
+.iu-time b { font-size: 1.5cqw; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+.iu-track { height: .5cqw; border-radius: .3cqw; background: rgba(255,255,255,.12); overflow: hidden; }
+.iu-track i { display: block; height: 100%; border-radius: .3cqw; background: #8fb0ff; }
+.iu-note { font-size: 1.1cqw; color: rgba(255,255,255,.62); }
+.iu-lock svg { width: 2.4cqw; height: 2.4cqw; }
+.cover.inuse.red { background: radial-gradient(circle at 50% 42%, rgba(120, 24, 16, .96), rgba(36, 8, 6, .97)); }
+.iu-red { background: rgba(255, 120, 100, .2); box-shadow: 0 0 0 .5cqw rgba(255, 120, 100, .08), 0 0 0 1px rgba(255,255,255,.14) inset; }
+.iu-eye-red { color: #ffb4a8; }
+.iu-big { font-size: 2.3cqw; }
+.iu-text { text-align: left; font-size: 1.3cqw; }
+.iu-act { display: flex; flex-direction: column; align-items: center; gap: .8cqw; }
+.iu-why { font-size: 1.2cqw; line-height: 1.5; color: rgba(255,255,255,.85); padding: 1cqw 1.6cqw; border-radius: 1cqw; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); }
+
+/* a part: its number; picked shows on the desktop */
+.rg { position: relative; flex: var(--f, 0 0 auto); min-height: 0; display: flex; flex-direction: column; gap: .5cqw; padding: .8cqw; border-radius: .6cqw; outline: 1px dashed transparent; cursor: pointer; transition: outline-color .15s, background .15s; }
+.rg:hover { outline-color: var(--border-strong); }
+.rg.on { outline: 2px solid var(--accent); background: var(--accent-soft); }
+.rg .n { position: absolute; top: -.6cqw; left: -.6cqw; width: 1.6cqw; height: 1.6cqw; border-radius: 50%; background: var(--accent); color: #fff; font-size: .9cqw; font-weight: 600; display: grid; place-items: center; z-index: 2; box-shadow: 0 0 0 .2cqw var(--surface); opacity: .9; }
+.rg.plain { cursor: default; outline: none; }
+
+/* --- what is on the screen, in the desktop's own scale */
+.sk { display: block; height: .8cqw; border-radius: .5cqw; background: var(--sk); }
+.c-h1 { font-size: 1.75cqw; font-weight: 600; line-height: 1.25; color: var(--text); text-wrap: balance; }
+.c-h2 { font-size: 1.25cqw; font-weight: 600; color: var(--text); line-height: 1.3; }
+.c-p { font-size: 1.1cqw; color: var(--text-2); line-height: 1.5; }
+.c-s { font-size: .95cqw; color: var(--text-3); line-height: 1.4; }
+.c-warn { color: var(--med); } .c-acc { color: var(--accent); } .c-crit { color: var(--crit); }
+.c-row { display: flex; align-items: center; gap: .9cqw; min-width: 0; } .c-row > .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .15cqw; }
+.c-av { flex: none; width: 3cqw; height: 3cqw; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, var(--surface-3)); color: var(--accent); font-size: 1.05cqw; font-weight: 600; display: grid; place-items: center; }
+.c-logo { flex: none; width: 2.8cqw; height: 2.8cqw; border-radius: .6cqw; background: var(--accent); color: #fff; font-size: 1.4cqw; font-weight: 600; display: grid; place-items: center; }
+.c-tabs { display: flex; gap: 1.8cqw; border-bottom: 1px solid var(--border); font-size: 1.1cqw; color: var(--text-3); }
+.c-tabs span { padding-bottom: .6cqw; display: inline-flex; gap: .45cqw; align-items: center; }
+.c-tabs span.on { color: var(--text); font-weight: 600; box-shadow: inset 0 -.2cqw 0 var(--accent); }
+.c-tabs i { font-style: normal; font-size: .85cqw; font-weight: 600; background: var(--accent); color: #fff; border-radius: 1cqw; padding: 0 .45cqw; line-height: 1.4cqw; }
+.c-card { border: 1px solid var(--border); border-radius: .8cqw; padding: 1cqw 1.2cqw; display: flex; flex-direction: column; gap: .3cqw; background: var(--surface); }
+.c-card .c-row { align-items: flex-start; }
+.c-card.dim { background: transparent; border-style: dashed; } .c-card.dim .c-h2 { color: var(--text-2); font-weight: 500; }
+.c-cols { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1cqw; }
+.c-cols > .rg { gap: .7cqw; }
+.c-colh { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: .2cqw; }
+.c-new { font-style: normal; font-size: .85cqw; font-weight: 600; background: var(--accent); color: #fff; border-radius: 1cqw; padding: .05cqw .55cqw; margin-left: .3cqw; vertical-align: .1cqw; }
+.c-link.dis { opacity: .45; }
+.c-card.sel { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); background: var(--accent-soft); }
+.c-card > .grow { display: flex; flex-direction: column; gap: .3cqw; }
+.c-away { display: flex; align-items: center; gap: .9cqw; padding: .7cqw 1cqw; border-radius: .7cqw; background: var(--surface-2); font-size: 1.05cqw; color: var(--text-2); }
+.c-away svg { width: 1.5cqw; height: 1.5cqw; color: var(--text-3); flex: none; } .c-away .grow { flex: 1; }
+.c-tag { display: inline-block; font-size: .85cqw; font-weight: 600; padding: .05cqw .55cqw; border-radius: .3cqw; background: var(--surface-3); color: var(--text-2); }
+.c-tag.crit { background: color-mix(in srgb, var(--crit) 14%, transparent); color: var(--crit); } .c-tag.warn { background: color-mix(in srgb, var(--med) 16%, transparent); color: var(--med); }
+.c-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .8cqw 1.6cqw; font-size: 1.05cqw; } .c-facts span { color: var(--text-3); } .c-facts b { font-weight: 500; color: var(--text); }
+.c-meter { display: block; height: .7cqw; border-radius: .4cqw; background: var(--surface-3); margin: .3cqw 0 .35cqw; overflow: hidden; } .c-meter i { display: block; height: 100%; background: color-mix(in srgb, var(--accent) 80%, var(--surface)); }
+.c-facts .mono { font-family: var(--mono); font-size: .95cqw; }
+.c-tl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .9cqw 1.6cqw; font-size: 1.05cqw; color: var(--text); align-items: baseline; }
+.c-tl svg { width: 1.3cqw; height: 1.3cqw; color: var(--text-3); vertical-align: -.25cqw; margin-right: .6cqw; }
+.stays { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 12px; padding: 9px 12px; border-radius: 8px; background: var(--surface-2); cursor: pointer; font-size: 12.5px; }
+.stays:hover { background: var(--surface-3); } .stays:focus-visible { outline: 2px solid var(--accent); }
+.stays span:nth-child(2) { flex: 1; color: var(--accent); font-weight: 500; }
+.c-k2 { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-4); }
+.c-foot { display: flex; gap: 2cqw; font-size: .95cqw; color: var(--text-3); border-top: 1px solid var(--border); padding-top: .6cqw; }
+.c-k { font-size: .85cqw; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-4); }
+.btns { display: flex; justify-content: flex-end; gap: .7cqw; flex: none; }
+.btn { font-size: 1.05cqw; padding: .4cqw 1.3cqw; border-radius: .5cqw; border: 1px solid var(--border-strong); color: var(--text); white-space: nowrap; background: var(--surface); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.dis { opacity: .45; }
+.c-link { font-size: 1.05cqw; color: var(--accent); white-space: nowrap; }
+.c-files { display: flex; flex-direction: column; gap: .35cqw; }
+.c-file { display: grid; grid-template-columns: 1.6cqw minmax(0, 1fr) auto; gap: .8cqw; align-items: center; font-size: 1.05cqw; padding: .45cqw .7cqw; border-radius: .5cqw; background: var(--surface-2); }
+.c-file svg { width: 1.4cqw; height: 1.4cqw; color: var(--text-3); }
+.c-file .mono { font-family: var(--mono); font-size: .95cqw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-thread { display: flex; flex-direction: column; gap: .6cqw; justify-content: flex-end; }
+.c-day { align-self: center; font-size: .85cqw; color: var(--text-4); }
+.bub { max-width: 78%; border-radius: 1cqw; padding: .7cqw 1cqw; background: var(--surface-3); font-size: 1.05cqw; line-height: 1.45; color: var(--text); border-bottom-left-radius: .25cqw; }
+.bub.me { align-self: flex-end; background: var(--accent-soft); border-bottom-left-radius: 1cqw; border-bottom-right-radius: .25cqw; }
+.bub small { display: block; font-size: .8cqw; color: var(--text-3); margin-top: .2cqw; }
+.c-inp { min-height: 3cqw; border: 1px solid var(--border-strong); border-radius: .7cqw; display: flex; align-items: center; padding: 0 1cqw; font-size: 1.05cqw; color: var(--text); }
+.c-inp::after { content: ""; width: 1px; height: 1.4cqw; background: var(--accent); margin-left: .15cqw; }
+.c-steps { display: flex; gap: .7cqw; align-items: center; font-size: 1cqw; color: var(--text-3); }
+.c-steps i { width: 1.6cqw; height: 1.6cqw; border-radius: 50%; border: 1px solid var(--border-strong); display: grid; place-items: center; font-style: normal; font-size: .85cqw; }
+.c-steps i.done { background: var(--accent); border-color: var(--accent); color: #fff; } .c-steps i.now { border: 2px solid var(--accent); color: var(--accent); font-weight: 600; }
+.c-steps span.now { color: var(--text); font-weight: 600; } .c-steps em { width: 2.4cqw; height: 1px; background: var(--border-strong); }
+.c-opt { display: grid; grid-template-columns: 1.6cqw minmax(0, 1fr); gap: .9cqw; align-items: start; padding: 1cqw 1.2cqw; border: 1px solid var(--border); border-radius: .7cqw; }
+.c-opt.on { border-color: var(--accent); background: var(--accent-soft); }
+.c-opt > i { width: 1.4cqw; height: 1.4cqw; border-radius: 50%; border: 1px solid var(--border-strong); margin-top: .1cqw; box-sizing: border-box; }
+.c-opt.on > i { border: .45cqw solid var(--accent); }
+.c-code { display: flex; gap: .7cqw; justify-content: center; align-items: center; font-family: var(--mono); font-size: 3.2cqw; font-weight: 500; color: var(--text); }
+.c-code b { width: 4.4cqw; height: 5.6cqw; border-radius: .7cqw; border: 1px solid var(--border-strong); background: var(--surface-2); display: grid; place-items: center; font-weight: 500; }
+.c-code em { width: 1.2cqw; height: 2px; background: var(--text-4); }
+.c-spin { width: 1.3cqw; height: 1.3cqw; border-radius: 50%; border: 2px solid var(--border-strong); border-top-color: var(--accent); flex: none; }
+.c-sheet { display: grid; grid-template-columns: 4cqw repeat(5, minmax(0, 1fr)); font-size: .9cqw; color: var(--text-3); }
+.c-sheet span { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: .25cqw .5cqw; white-space: nowrap; overflow: hidden; }
+.c-sheet span.h { background: var(--surface-2); font-weight: 600; color: var(--text-2); }
+.c-note-head { display: flex; justify-content: space-between; align-items: center; }
+.tl { font-family: var(--mono); font-size: 1.02cqw; color: #8d97a4; white-space: pre; line-height: 1.6; }
+.tl b { color: #dfe5ec; font-weight: 400; } .tl .g { color: #6fcf97; } .tl .y { color: #e2b553; } .tl .a { color: #7aa7ff; }
+.tl .cur { display: inline-block; width: .65cqw; height: 1.25cqw; background: #dfe5ec; vertical-align: -.2cqw; }
+.c-bar { display: flex; align-items: center; gap: .8cqw; padding: .55cqw 1.4cqw; border-radius: 0 0 1cqw 1cqw; background: #1f2937; color: #f3f5f8; font-size: 1.05cqw; white-space: nowrap; box-shadow: var(--shadow-pop); }
+.c-bar .dot { width: .8cqw; height: .8cqw; border-radius: 50%; background: #f2604c; }
+.c-bar svg { width: 1.4cqw; height: 1.4cqw; }
+.cover .rg:hover { outline-color: rgba(255,255,255,.3); } .cover .rg.on { background: rgba(91,140,255,.16); outline-color: #5b8cff; }
+.cover .rg .n { box-shadow: 0 0 0 .2cqw rgba(14,18,24,.9); }
+.cover .c-h1 { color: #fff; font-size: 2.3cqw; } .cover .c-p { color: rgba(255,255,255,.78); font-size: 1.25cqw; } .cover .c-s { color: rgba(255,255,255,.55); font-size: 1.05cqw; }
+.cover .c-av { width: 4.6cqw; height: 4.6cqw; font-size: 1.5cqw; background: rgba(255,255,255,.14); color: #fff; }
+.cover .c-big { width: 4.6cqw; height: 4.6cqw; border-radius: 50%; background: rgba(255,255,255,.12); display: grid; place-items: center; }
+.cover .c-big svg { width: 2.2cqw; height: 2.2cqw; }
+.cover .c-k { color: #ffb4a8; font-size: 1.05cqw; }
+.cover .btn.pri { background: #fff; color: #191d25; border-color: #fff; font-size: 1.2cqw; padding: .6cqw 1.8cqw; font-weight: 600; }
+
+@media (max-width: 980px) { .about { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; height: auto; }
+  main { min-height: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="org"><div class="logo">F</div><div><b>Falcon Concepts</b><span>A Worker's machine</span></div></div>
+    <nav id="nav" aria-label="Moments"></nav>
+    <div class="side-foot"><span>Theme</span><span class="seg" id="theme"><button data-t="">System</button><button data-t="light">Light</button><button data-t="dark">Dark</button></span></div>
+  </aside>
+  <main>
+    <div class="ph1">
+      <div><h1 id="h1"></h1><div class="sub" id="sub"></div></div>
+      <span class="tag">Esi at LOG-01 · sample</span>
+    </div>
+    <section class="panel">
+      <div class="phd"><div class="pt">On their screen<small id="kind"></small></div><span class="tag" id="when"></span></div>
+      <div class="pbd"><div class="desk" id="desk"></div></div>
+    </section>
+    <section class="panel">
+      <div class="pbd about">
+        <div><div class="k">What it is</div><p class="what" id="what"></p><div id="stays"></div><div id="decide"></div></div>
+        <div><div class="k" id="partsK"></div><div class="iq-cards" id="parts"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ---------- icons (stroke, 16px)
+const P = { window: "M2 3h12v10H2zM2 6h12", task: "M3 3h10v10H3zM5.5 8l2 2 3.5-4", note: "M3 9h10v4H3zM8 3v4", chat: "M2 3h12v8H7l-3 2v-2H2z",
+  user: "M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 14c.8-2.6 3-4 5.5-4s4.7 1.4 5.5 4", eye: "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  lock: "M4 7h8v7H4zM5.5 7V5a2.5 2.5 0 0 1 5 0v2", alert: "M8 2l6.5 11.5h-13zM8 6.5v3.5M8 12v.5", off: "M2 2l12 12M4.5 7.5a5 5 0 0 1 7 0M2 5a8.5 8.5 0 0 1 4-2M8 12v.5",
+  box: "M2 5l6-3 6 3v6l-6 3-6-3zM2 5l6 3 6-3M8 8v6", key: "M6 10a3 3 0 1 1 2.4-4.8L14 5v3h-2v2h-2.5", term: "M2 3h12v10H2zM4.5 6.5l2 1.5-2 1.5M8 10h3.5",
+  home: "M2 7.5L8 2.5l6 5V14H2zM6.5 14v-4h3v4", speaker: "M2 6h3l6-3v10l-6-3H2zM5 10l1 3.5",
+  folder: "M2 4h4l1.5 1.5H14v7H2z", file: "M4 2h5l3 3v9H4zM9 2v3h3", files: "M5 1.5h5l3 3v7.5H5zM3 4v10.5h7" };
+const svg = (k) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="${P[k]}"/></svg>`;
+
+// ---------- sample content, in the desktop's own scale
+const av = (i) => `<span class="c-av">${i}</span>`;
+const btns = (...b) => `<div class="btns">${b.map(([t, c]) => `<span class="btn ${c || ""}">${t}</span>`).join("")}</div>`;
+const sheet = () => {
+  const rows = [["", "A", "B", "C", "D", "E"], ["1", "Shipment", "From", "To", "Due", "State"], ["2", "SH-2291", "Tema", "Kumasi", "4 Nov", "On the road"], ["3", "SH-2292", "Tema", "Takoradi", "5 Nov", "Loading"],
+    ["4", "SH-2295", "Accra", "Tamale", "6 Nov", "Booked"], ["5", "SH-2298", "Tema", "Kumasi", "6 Nov", "Booked"], ["6", "SH-2301", "Accra", "Ho", "7 Nov", "Booked"], ["7", "", "", "", "", ""], ["8", "", "", "", "", ""], ["9", "", "", "", "", ""], ["10", "", "", "", "", ""], ["11", "", "", "", "", ""], ["12", "", "", "", "", ""]];
+  return `<div class="c-sheet">${rows.map((r, i) => r.map((c, j) => `<span class="${i === 0 || j === 0 || i === 1 ? "h" : ""}">${c || "&nbsp;"}</span>`).join("")).join("")}</div>`;
+};
+const R = (b, s, h, f) => ({ b, s, h, f });
+const work = { cls: "work", x: 3, y: 5, w: 52, h: 80, title: "Shipments week 45.xlsx", regions: [R(null, null, sheet())] };
+
+// the program, landscape: everything that needs the person is in view at once, nothing behind a tab
+const card = (h2, p, s, act, dim) => `<div class="c-card${dim ? " dim" : ""}"><div class="c-row"><div class="grow"><span class="c-h2">${h2}</span>${p ? `<span class="c-p">${p}</span>` : ""}${s ? `<span class="c-s${s.warn ? " c-warn" : ""}">${s.t || s}</span>` : ""}</div>${act || ""}</div></div>`;
+const colHead = (t, n, more) => `<div class="c-colh"><span class="c-h2">${t}${n ? ` <i class="c-new">${n}</i>` : ""}</span><span class="c-link">${more}</span></div>`;
+const tasksCol = (off) => R("Your tasks", "Waiting to start first, then started; Start on the card", colHead("Your tasks", "1 to start", "All 4") +
+  card("Send the October delivery notes", "From R. Mensah", { t: "Due Friday 7 Nov at 16:00", warn: 1 }, `<span class="btn pri${off ? " dis" : ""}">Start</span>`) +
+  (off ? `<span class="c-s">Start waits until you are connected again.</span>` : "") +
+  card("Update the drivers' phone list", "From A. Quaye · started Monday", "No deadline · A. Quaye closes it when it is checked", "", true), "1 1 0");
+const msgCol = (off) => R("Messages", "Conversations an Admin started; reply on the card, never start one", colHead("Messages", "1 new", "All") +
+  card("R. Mensah", "Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.", "Today at 10:31", `<span class="c-link${off ? " dis" : ""}">Reply</span>`) +
+  card("R. Mensah", "Your new monitor is at reception.", "Yesterday · you replied", "", true), "1 1 0");
+const annCol = () => R("Announcements", "New first; older ones stay below until a day passes", colHead("Announcements", "1 new", "All") +
+  card("Office closed on Monday 10 Nov", "The building is closed for the electrical inspection. Work from home if you can.", "A. Quaye · 2 h ago") +
+  card("New parking rules from 1 Nov", "", "R. Mensah · last week", "", true), "1 1 0");
+const header = (off) => R(off ? "Header, saying so" : "Header", off ? "Not connected; showing what was known, and when" : "Falcon, whether it is connected, and today",
+  `<div class="c-row"><span class="c-logo">F</span><div class="grow"><span class="c-h2">Falcon</span>${off
+    ? `<span class="c-s c-warn">Not connected. Showing what was known at 09:58, 44 min ago.</span>`
+    : `<span class="c-s">Connected</span>`}</div><span class="c-s">Tuesday 4 Nov</span></div>`);
+const machine = R("This machine", "One quiet line: its name, Falcon's version, whether anyone is using it",
+  `<div class="c-foot"><span>LOG-01 · Logistics</span><span>Falcon 1.4.2</span><span>Nobody else is using this machine</span></div>`);
+const TABS = [["today", "Today"], ["tasks", "Tasks", "1"], ["messages", "Messages", "1"], ["ann", "Announcements", "1"], ["machine", "My machine"]];
+const tabs = (on) => R("Tabs", on === "today" ? "Today gathers what needs you; each other tab holds that whole list" : "The other views; the count says what is new in each",
+  `<div class="c-tabs">${TABS.map(([id, l, n]) => `<span class="${id === on ? "on" : ""}">${l}${n && id !== on ? ` <i>${n}</i>` : ""}</span>`).join("")}</div>`);
+const away = R("While you were away", "What happened on this machine since Falcon was last opened; the whole history is in My machine",
+  `<div class="c-away">${svg("user")}<span class="grow">R. Mensah used this machine today from 10:42 to 11:05. Your work was left as it was.</span><span class="c-link">See My machine</span></div>`);
+const sec = (t) => `<span class="c-k" style="margin-top:.4cqw">${t}</span>`;
+const kind = (k) => `<span class="c-tag ${k === "Emergency" ? "crit" : k === "Warning" ? "warn" : ""}">${k}</span>`;
+const VIEWS = {
+  today: (off) => [{ cols: [tasksCol(off), msgCol(off), annCol()] }, machine],
+  tasks: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1.25fr)", cols: [
+    R("Every task", "To start, started, and closed this month; a click picks one", sec("To start") +
+      card("Send the October delivery notes", "From R. Mensah", { t: "Due Friday 7 Nov at 16:00", warn: 1 }).replace('class="c-card"', 'class="c-card sel"') +
+      sec("Started") + card("Update the drivers' phone list", "From A. Quaye · started Monday", "No deadline") +
+      sec("Closed this month") + card("Tidy the Shipments folder", "", "Closed by R. Mensah on 28 Oct", "", true), "1 1 0"),
+    R("The picked task", "As its window showed it, with what has changed so far", `<div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">A task from R. Mensah</span><span class="c-s">Given today at 09:12</span></div></div>
+      <span class="c-h1">Send the October delivery notes</span><span class="c-p">Scan the signed delivery notes for October and put them in the Logistics share, one PDF per shipment, with the list of shipments beside them.</span>
+      <span class="c-p c-warn" style="font-weight:600">Due Friday 7 Nov at 16:00 · in 3 days</span>${sec("What will show the work is happening")}<div class="c-files">
+      <div class="c-file">${svg("folder")}<span class="mono">\\\\files\\Logistics\\Delivery notes\\2026-10</span><span class="c-s">not yet</span></div>
+      <div class="c-file">${svg("files")}<span>About 40 PDF files in it</span><span class="c-s">not yet</span></div>
+      <div class="c-file">${svg("file")}<span class="mono">October shipments.xlsx</span><span class="c-s">not yet</span></div></div>
+      <div class="c-row" style="margin-top:auto"><span class="c-s grow">R. Mensah closes it when the work is checked.</span>${btns(["Start", "pri"])}</div>`, "1 1 0") ] }],
+  messages: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1.4fr)", cols: [
+    R("Conversations", "One per Admin who wrote; only an Admin can start one", `<div class="c-card sel"><div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah <i class="c-new">1 new</i></span><span class="c-s">Can you leave your machine on tonight? …</span></div><span class="c-s">10:31</span></div></div>
+      <div class="c-card"><div class="c-row">${av("AQ")}<div class="grow"><span class="c-h2">A. Quaye</span><span class="c-s">You: The keys are with security.</span></div><span class="c-s">21 Oct</span></div></div>
+      <span class="c-s" style="margin-top:auto">Only an Admin can start a conversation. You can reply to any of them.</span>`, "1 1 0"),
+    R("The conversation", "The whole thread, and the reply box at the foot", `<div class="c-thread" style="flex:1"><span class="c-day">Yesterday</span>
+      <div class="bub">Your new monitor is at reception. Pick it up when you can.<small>16:05</small></div>
+      <div class="bub me">Got it, thank you!<small>16:20</small></div><span class="c-day">Today</span>
+      <div class="bub">Morning Esi. Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.<small>10:31</small></div></div>
+      <div class="c-row"><div class="c-inp" style="flex:1">Write a reply to R. Mensah</div>${btns(["Send", "pri"])}</div>`, "1 1 0") ] }],
+  ann: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1.3fr)", cols: [
+    R("Every announcement", "Newest first; an emergency keeps its colour", `<div class="c-card sel"><div class="grow"><span>${kind("Announcement")} <i class="c-new">new</i></span><span class="c-h2">Office closed on Monday 10 Nov</span><span class="c-s">A. Quaye · today at 08:40</span></div></div>
+      <div class="c-card"><span>${kind("Emergency")}</span><span class="c-h2">Leave the building now</span><span class="c-s">A. Quaye · yesterday at 15:20 · you read it at 15:21</span></div>
+      <div class="c-card"><span>${kind("Warning")}</span><span class="c-h2">Emails asking for parcel fees</span><span class="c-s">R. Mensah · Friday 31 Oct</span></div>
+      <div class="c-card dim"><span>${kind("Announcement")}</span><span class="c-h2">New parking rules from 1 Nov</span><span class="c-s">R. Mensah · last week</span></div>`, "1 1 0"),
+    R("The picked announcement", "Its whole text", `<span>${kind("Announcement")}</span><span class="c-h1">Office closed on Monday 10 Nov</span><span class="c-s">From A. Quaye · today at 08:40</span>
+      <span class="c-p">The building is closed on Monday 10 November for the electrical inspection. Nobody can come in that day, including the warehouse.</span>
+      <span class="c-p">Work from home if you can. If your work needs the building, talk to your manager this week about moving it to Tuesday.</span>`, "1 1 0") ] }],
+  machine: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1fr)", cols: [
+    R("This machine", "What IT asks for on the phone: its name, address, Windows and Falcon versions",
+      `${sec("This machine")}<div class="c-facts"><span>Name</span><b>LOG-01</b><span>Department</span><b>Logistics</b><span>IP address</span><b class="mono">10.20.8.31</b><span>Windows</span><b>Windows 11 Pro 23H2</b><span>Falcon</span><b>1.4.2 · up to date</b></div>`, "1 1 0"),
+    R("You, today", "The account in use, when it signed in, the last restart, storage, the connection",
+      `${sec("You, today")}<div class="c-facts"><span>Signed in as</span><b class="mono">LOGISTICS\\esi.asante</b><span>Signed in</span><b>Today at 07:58</b><span>Last restart</span><b>Sunday at 02:14</b><span>Storage (C:)</span><b><span class="c-meter"><i style="width:62%"></i></span>182 GB free of 476 GB</b><span>Connection</span><b>Connected to your organisation since 08:02</b></div>`, "1 1 0") ] },
+    R("Your IT Admins, and copy", "Who looks after this machine; one click copies the details above for a call or an email to IT",
+      `<div class="c-row"><span class="c-s grow">Your IT Admins: R. Mensah, A. Quaye</span>${btns(["Copy these details"])}</div>`)],
+};
+const program = (off, tab = "today") => ({ x: 12, y: 6, w: 76, h: 80, title: "Falcon", regions: [header(off), tabs(tab), ...VIEWS[tab](off)] });
+
+const MOMENTS = [
+  { group: "The Falcon program", id: "normal", icon: "home", name: "Today", kind: "The Falcon program", when: "Opened from the tray, any time", clock: "11:20",
+    tray: { n: 2, part: R("Tray icon", "A number when something waits: tasks to start, new messages, announcements") },
+    wins: [work, program(false)],
+    what: "The home of Falcon on this machine. Everything the other surfaces show, and everything the person closed, missed or was away for, is gathered here. It opens from the tray icon or the Start menu at any time, and closing it only hides it.",
+    decide: "Today shows what needs the person at once: tasks, messages and announcements side by side, most urgent first. The other tabs hold each whole list (All opens them). \"Ask for help\" is gone (cut)." },
+
+  { id: "p-tasks", icon: "task", name: "Tasks", kind: "The Falcon program", when: "Every task, picked on the left", clock: "11:20",
+    tray: { n: 2 }, wins: [work, program(false, "tasks")],
+    what: "Every task given to the person: to start, started, and closed this month. The picked one shows as its window did, with what has changed so far. Start is the only action." },
+
+  { id: "p-messages", icon: "chat", name: "Messages", kind: "The Falcon program", when: "Every conversation", clock: "11:20",
+    tray: { n: 2 }, wins: [work, program(false, "messages")],
+    what: "One conversation per Admin who wrote. The person replies here as in the message window, and never starts one.",
+    decide: "Engine gap: today a Worker cannot write back. To note in ENGINE-GAPS once the Engine session is done with that file." },
+
+  { id: "p-ann", icon: "speaker", name: "Announcements", kind: "The Falcon program", when: "Every announcement", clock: "11:20",
+    tray: { n: 2 }, wins: [work, program(false, "ann")],
+    what: "Every announcement, newest first, emergencies included. Delivered is enough: nobody tracks who read an ordinary one." },
+
+  { id: "p-machine", icon: "window", name: "My machine", kind: "The Falcon program", when: "The details IT asks for", clock: "11:20",
+    tray: { n: 2 }, wins: [work, program(false, "machine")],
+    what: "What the person, or IT on the phone, may need to know about this machine: its name and address, the Windows and Falcon versions, the account signed in and since when, the last restart, storage and the connection. Copy these details puts them on the clipboard in one go." },
+
+  { id: "offline", icon: "off", name: "Not connected", kind: "The Falcon program", when: "Shows what it last knew",
+    tray: { n: 0, off: 1, part: R("Tray icon", "Drawn dim while not connected") },
+    wins: [work, program(true)],
+    what: "Nothing goes blank. The program keeps what it last knew and says how old it is. Anything that needs the organisation waits, with the reason on it." },
+
+  { group: "What can appear over your work", id: "task", icon: "task", name: "A task is given", stays: ["p-tasks", "Tasks"], kind: "A window", when: "Opens once",
+    tray: { n: 1 },
+    wins: [work, { x: 28, y: 9, w: 44, h: 74, title: "A task for you", regions: [
+      R("Who gave it", "The Admin's name, and when", `<div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">A task from R. Mensah</span><span class="c-s">Given today at 09:12</span></div></div>`),
+      R("What it is", "The task, in their words", `<span class="c-h1">Send the October delivery notes</span><span class="c-p">Scan the signed delivery notes for October and put them in the Logistics share, one PDF per shipment, with the list of shipments beside them.</span>`),
+      R("When it is due", "A day and time, or no deadline", `<span class="c-p c-warn" style="font-weight:600">Due Friday 7 Nov at 16:00 · in 3 days</span>`),
+      R("What will show the work", "What will change as you do it, each with whether it has yet", `<span class="c-k">What will show the work is happening</span><div class="c-files">
+        <div class="c-file">${svg("folder")}<span class="mono">\\\\files\\Logistics\\Delivery notes\\2026-10</span><span class="c-s">not yet</span></div>
+        <div class="c-file">${svg("files")}<span>About 40 PDF files in it</span><span class="c-s">not yet</span></div>
+        <div class="c-file">${svg("file")}<span class="mono">October shipments.xlsx</span><span class="c-s">not yet</span></div></div>`),
+      R("Start", "The only action: the Admin closes it, never the person", `<div class="c-row"><span class="c-s grow">R. Mensah closes it when the work is checked.</span>${btns(["Later"], ["Start", "pri"])}</div>`) ] }],
+    what: "Opens over their work once, when the task is given. Closed without Start, it waits in Tasks and comes back as a quiet corner note." },
+
+  { id: "reminder", icon: "note", name: "A quiet reminder", stays: ["p-tasks", "Tasks, or wherever the item it names is"], kind: "A corner note", when: "Never takes the keyboard",
+    tray: { n: 1 },
+    wins: [work, { cls: "note", x: 71, y: 70, w: 27, h: 21, regions: [
+      R("What is waiting", "One line: the task, or who wrote", `<div class="c-note-head"><span class="c-s">A task is waiting · Falcon</span><span class="c-s">now</span></div><span class="c-h2">Send the October delivery notes</span><span class="c-s c-warn">Due Friday at 16:00</span>`, "1 1 0"),
+      R("Open", "The whole note is the click; it goes by itself", `<span class="c-link">Open in Falcon</span>`) ] }],
+    what: "For a task not started (after an hour, then four, then every eight), a new message, or a new announcement. It leaves after a few seconds." },
+
+  { id: "message", icon: "chat", name: "An Admin writes to you", stays: ["p-messages", "Messages"], kind: "A window", when: "You can reply, never start one",
+    tray: { n: 1 },
+    wins: [work, { x: 30, y: 6, w: 40, h: 84, title: "A message", regions: [
+      R("From", "The Admin's name, and when", `<div class="c-row">${av("RM")}<div class="grow"><span class="c-h2">R. Mensah</span><span class="c-s">IT · today at 10:31</span></div></div>`),
+      R("The conversation", "What they wrote, with earlier lines above; newest at the foot", `<div class="c-thread"><span class="c-day">Yesterday</span>
+        <div class="bub">Your new monitor is at reception. Pick it up when you can.<small>16:05</small></div>
+        <div class="bub me">Got it, thank you!<small>16:20</small></div><span class="c-day">Today</span>
+        <div class="bub">Morning Esi. Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.<small>10:31</small></div></div>`, "1 1 0"),
+      R("Your reply", "One box; it goes to this Admin only", `<div class="c-inp">Yes, I'll leave it on.</div><span class="c-s">Your reply goes to R. Mensah only.</span>`),
+      R("Send or Later", "Later keeps it in Messages", btns(["Later"], ["Send", "pri"])) ] }],
+    what: "New in version 1: the person can answer a message an Admin started. There is no compose anywhere on their side. The reply lands in that Admin's Messages.",
+    decide: "Engine gap: today a Worker cannot write back. To note in ENGINE-GAPS once the Engine session is done with that file." },
+
+  { id: "inside", icon: "user", name: "An Admin is using this machine", kind: "Covers the screen", when: "Until they leave",
+    tray: { n: 0 }, clock: "10:54", coverCls: "inuse", cover: [
+      R("Who", "The Admin's name: they are using this machine", `<div class="iu-who"><span class="iu-av">RM</span><span class="iu-eye">This machine is in use</span><span class="iu-title">R. Mensah is using this machine</span></div>`),
+      R("Since when, and until when", "When they came in, how far along it is, and when the session ends at the latest", `<div class="iu-time"><div><span>Came in</span><b>10:42</b></div><div class="iu-track"><i style="width:40%"></i></div><div><span>Leaves by</span><b>11:12</b></div></div>`),
+      R("What you can do", "One plain line; nothing to press, it lifts by itself", `<span class="iu-note">You can use it again when they leave. Your work stays as you left it.</span>`) ],
+    what: "Topmost over everything, and put back if anything covers it. No button: the person waits, and it lifts when the Admin leaves." },
+
+  { id: "viewing", icon: "eye", name: "An Admin is viewing your screen", kind: "A bar at the top", when: "Clicks go through it",
+    tray: { n: 0 },
+    wins: [work], bar: R("Who is viewing", "One line, nothing to press", `<div class="c-bar"><span class="dot"></span>${svg("eye")}<span>R. Mensah is viewing your screen · since 10:40</span></div>`),
+    what: "A small bar at the top, always on top, that never takes a click. It stays until the Admin stops looking." },
+
+  { id: "locked", icon: "lock", name: "Locked by your Admin", kind: "Covers the screen", when: "Until unlocked",
+    tray: { n: 0 }, clock: "13:30", coverCls: "inuse", cover: [
+      R("Locked by", "Who locked it", `<div class="iu-who"><span class="iu-av iu-lock">${svg("lock")}</span><span class="iu-eye">This machine is locked</span><span class="iu-title">R. Mensah locked this machine</span></div>`),
+      R("Why", "Their reason, in their words, if they gave one", `<div class="iu-why">“This machine is moving to the new office. Please don't use it until it is set up there.”</div>`),
+      R("Until", "When it was locked, how far along it is, and when it unlocks by itself", `<div class="iu-time"><div><span>Locked at</span><b>13:05</b></div><div class="iu-track"><i style="width:42%"></i></div><div><span>Unlocks at</span><b>14:00</b></div></div>`),
+      R("What you can do", "One plain line; nothing to press", `<span class="iu-note">It unlocks by itself at 14:00, or sooner if R. Mensah unlocks it.</span>`) ],
+    what: "Like the Admin being inside, with no button: the machine waits for the Admin, or for the time it unlocks by itself." },
+
+  { id: "emergency", icon: "alert", name: "An emergency announcement", stays: ["p-ann", "Announcements"], kind: "Covers the screen", when: "Until read", red: 1,
+    tray: { n: 1 }, coverCls: "inuse", cover: [
+      R("Emergency, from whom", "The kind is said first, then the Admin and the time", `<div class="iu-who"><span class="iu-av iu-lock iu-red">${svg("alert")}</span><span class="iu-eye iu-eye-red">Emergency · from A. Quaye · 10:42</span><span class="iu-title iu-big">Leave the building now</span></div>`),
+      R("The announcement", "What to do, in their words", `<div class="iu-why iu-text">The fire alarm in the warehouse has gone off. Use the stairs, not the lift, and meet at the car park by the main gate. Wait there until you are told it is safe.</div>`),
+      R("I have read this", "The one button; it stays in Announcements", `<div class="iu-act"><span class="btn pri">I have read this</span><span class="iu-note">It stays in your Falcon program, under Announcements.</span></div>`) ],
+    what: "Only emergencies cover the screen; ordinary announcements and warnings arrive as a corner note. An unread emergency comes back after a restart or a reconnect, for a day." },
+
+  { group: "IT setting the machine up", id: "install", icon: "box", name: "Installing Falcon", kind: "The installer", when: "Run once by IT",
+    tray: { hide: 1 },
+    wins: [{ x: 23, y: 8, w: 54, h: 80, title: "Falcon setup", regions: [
+      R("Steps", "Where you are in the install", `<div class="c-steps"><i class="done">✓</i><span>Welcome</span><em></em><i class="now">2</i><span class="now">Who uses it</span><em></em><i>3</i><span>Install</span><em></em><i>4</i><span>Join</span></div>`),
+      R("This step", "One question at a time", `<span class="c-h1">Who will use this machine?</span>
+        <div class="c-opt on"><i></i><div><div class="c-h2">A person at work</div><div class="c-s">They get the Falcon program: their tasks, messages from IT, announcements.</div></div></div>
+        <div class="c-opt"><i></i><div><div class="c-h2">An IT Admin</div><div class="c-s">Also installs the console. Becoming an Admin is finished afterwards with the setup utility, never here.</div></div></div>
+        <span class="c-s">This package already knows where your organisation's Falcon is and carries its certificate.</span>`, "1 1 0"),
+      R("Back and Next", "", btns(["Back"], ["Next", "pri"])) ] }],
+    what: "The package carries the organisation's certificate, so there is nothing to paste. It ends by starting the enrolment." },
+
+  { id: "enroll", icon: "key", name: "Enrolling this machine", kind: "A window", when: "A code, confirmed in the console",
+    tray: { hide: 1 },
+    wins: [{ x: 28, y: 9, w: 44, h: 78, title: "Join your organisation", regions: [
+      R("What happens", "This machine has asked to join; an Admin confirms it", `<span class="c-h1">LOG-01 has asked to join</span><span class="c-p">Give this code to your IT Admin. They type it in Falcon, under Add a machine.</span>`),
+      R("The code", "Short and large, so it can be read out", `<div class="c-code"><b>4</b><b>8</b><b>2</b><em></em><b>7</b><b>1</b><b>9</b></div>`, "1 1 0"),
+      R("Waiting", "Until an Admin confirms; refused or expired ends here", `<div class="c-row"><span class="c-spin"></span><span class="c-s grow">Waiting for an Admin to confirm. The code expires at 11:10.</span>${btns(["Cancel"])}</div>`) ] }],
+    what: "The machine asks to join and shows a code on its own screen. An Admin types that code in the console, so a machine nobody is in front of cannot finish." },
+
+  { id: "tui", icon: "term", name: "The machine's command line", kind: "A terminal", when: "For IT, on the machine itself",
+    tray: { n: 0 },
+    wins: [{ cls: "term", x: 10, y: 6, w: 72, h: 84, title: "Falcon (Worker) · LOG-01", regions: [
+      R("State line", "Connected or not, this machine's name, who is inside", `<div class="tl"><span class="g">● connected</span>  LOG-01 · Logistics · Falcon 1.4.2 · nobody inside</div>`),
+      R("Output", "What the last command printed; news prints as it arrives", `<div class="tl"><b>falcon&gt; status</b>
+  connected since 08:02, to falcon.local:7400
+  watching   C:\\Users\\esi\\Documents   D:\\Shipments
+  waiting    1 task to start · 1 message
+
+<b>falcon&gt; tasks</b>
+  T-118  Send the October delivery notes   <span class="y">due Fri 16:00</span>   not started
+
+<span class="a">[10:31] message from R. Mensah: Can you leave your machine on tonight?</span>
+<b>falcon&gt; messages</b>
+  R. Mensah  10:31  Can you leave your machine on tonight? The update needs ...</div>`, "1 1 0"),
+      R("Command line", "A small set: status, tasks, start, messages, reply, log", `<div class="tl"><b>falcon&gt; </b><span class="cur"></span></div>`) ] }],
+    what: "The narrow Worker command line, for IT checking a machine in place. It never has the console's commands.",
+    decide: "Its help and search commands go (Assistance is cut); messages and reply come in for replies." },
+];
+
+// ---------- drawing
+const $ = (id) => document.getElementById(id);
+let picked = null, parts = [];
+function region(r) {
+  if (!r.b) return `<div class="rg plain" style="--f:${r.f || "0 0 auto"}">${r.h}</div>`;
+  const n = parts.push(r);
+  return `<div class="rg" data-n="${n}" style="--f:${r.f || "0 0 auto"}"><span class="n">${n}</span>${r.h}</div>`;
+}
+function win(w) {
+  const hd = w.cls === "note" ? "" : `<div class="hd"><span>${w.title}</span><span class="dots"><i></i><i></i><i></i></span></div>`;
+  return `<div class="win ${w.cls || ""}" style="left:${w.x}%;top:${w.y}%;width:${w.w}%;height:${w.h}%">${hd}<div class="bd">${w.regions.map((e) => e.cols ? `<div class="c-cols" style="${e.tpl ? `grid-template-columns:${e.tpl}` : ""}">${e.cols.map(region).join("")}</div>` : region(e)).join("")}</div></div>`;
+}
+function show(id) {
+  const m = MOMENTS.find((x) => x.id === id) || MOMENTS[0];
+  parts = []; picked = null;
+  let trayN = 0;
+  if (m.tray.part) trayN = parts.push(m.tray.part);
+  let h = (m.wins || []).map(win).join("");
+  if (m.bar) h += `<div class="topbar">${region(m.bar)}</div>`;
+  if (m.cover) h += `<div class="cover${m.red ? " red" : ""}${m.coverCls ? " " + m.coverCls : ""}"><div class="stack">${m.cover.map(region).join("")}</div></div>`;
+  if (!m.tray.hide) h += `<div class="taskbar"><span class="apps"><i></i><i></i><i></i></span><span class="tray">${trayN ? `<span class="rg" data-n="${trayN}" style="padding:.4cqw"><span class="n">${trayN}</span>` : ""}<span class="ticon${m.tray.off ? " off" : ""}">F${m.tray.n ? `<i>${m.tray.n}</i>` : ""}</span>${trayN ? "</span>" : ""}<span>${m.clock || "10:42"}</span></span></div>`;
+  $("desk").innerHTML = h;
+  $("h1").textContent = m.name;
+  $("sub").textContent = `${m.kind} · ${m.when}`;
+  $("kind").textContent = m.kind;
+  $("when").textContent = m.when;
+  $("what").textContent = m.what;
+  $("stays").innerHTML = m.stays ? `<button class="stays" data-go="${m.stays[0]}"><span class="c-k2">Where it stays</span><span>Falcon program · ${m.stays[1]}</span><span aria-hidden="true">→</span></button>` : "";
+  $("decide").innerHTML = m.decide ? `<div class="decide"><b>To decide</b><span>${m.decide}</span></div>` : "";
+  $("partsK").textContent = `On the screen · ${parts.length} part${parts.length === 1 ? "" : "s"}`;
+  $("parts").innerHTML = parts.map((r, i) => `<button class="iq-card" data-n="${i + 1}"><span class="iq-ic">${i + 1}</span><div class="tx"><b>${r.b}</b>${r.s ? `<span>${r.s}</span>` : ""}</div></button>`).join("");
+  document.querySelectorAll("#nav .nav").forEach((b) => b.classList.toggle("on", b.dataset.id === m.id));
+}
+function pick(n) {
+  picked = picked === n ? null : n;
+  document.querySelectorAll("[data-n]").forEach((el) => el.classList.toggle("on", el.dataset.n === picked));
+}
+$("nav").innerHTML = MOMENTS.map((m) => `${m.group ? `<div class="grp">${m.group}</div>` : ""}<button class="nav" data-id="${m.id}">${svg(m.icon)}<span>${m.name}</span></button>`).join("");
+$("nav").addEventListener("click", (e) => { const b = e.target.closest(".nav"); if (b) location.hash = b.dataset.id; });
+document.querySelector("main").addEventListener("click", (e) => { const g = e.target.closest("[data-go]"); if (g) { location.hash = g.dataset.go; return; } const el = e.target.closest("[data-n]"); if (el) pick(el.dataset.n); });
+const route = () => show(location.hash.slice(1));
+window.addEventListener("hashchange", route);
+route();
+
+// theme: per viewer, remembered when the browser allows it
+function setTheme(t) {
+  if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme");
+  document.querySelectorAll("#theme button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
+  try { localStorage.setItem("falcon-worker-theme", t); } catch (e) {}
+}
+let saved = ""; try { saved = localStorage.getItem("falcon-worker-theme") || ""; } catch (e) {}
+setTheme(saved);
+$("theme").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setTheme(b.dataset.t); });
+</script>
