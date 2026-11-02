@@ -38,7 +38,7 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 ## Smaller Engine gaps already on record
 - **Flows:** *(built 2 Nov 2026)* every step, a flow's name, hourly or run-only flows with Run, several sources, carrying on from
   another flow, files copied, old steps retired. Convert to PDF does text and JPEG only (Office formats need Office or LibreOffice).
-- **Rules:** no threshold on disk or network.
+- **Rules:** *(built 2 Nov 2026)* disk and network thresholds, and a threshold replayed against the last week.
 - **Tasks:** department tasks go with the Super User (parked); an Admin's own to-dos replace them.
 - **Overview:** the figures have no trend history.
 - **Detective:**

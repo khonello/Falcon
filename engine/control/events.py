@@ -19,6 +19,8 @@ Two evaluation mechanisms, chosen per event type by how it is actually detected:
         usb.*             -
         threshold.cpu     percent (>=), duration_s
         threshold.memory  percent (>=)
+        threshold.disk    percent (>=) of the system drive used
+        threshold.network kbps (>=) received, duration_s
         system.idle       seconds (>=)
         time.scheduled    at (ISO datetime)          -- fires once
         time.recurring    at ("HH:MM"), days ([0..6]) or interval_s
@@ -68,7 +70,7 @@ EVENT_TYPES: dict[str, str] = {
     "task.started": "native_pushed", "task.target_appeared": "native_pushed",
     "task.deadline_soft": "native_pushed", "task.deadline_final": "native_pushed",
     "flow.failed": "native_pushed", "resource.violation": "native_pushed",
-    "system.idle": "polled", "threshold.cpu": "polled", "threshold.memory": "polled",
+    "system.idle": "polled", "threshold.cpu": "polled", "threshold.memory": "polled", "threshold.disk": "polled", "threshold.network": "polled",
     "time.scheduled": "polled", "time.recurring": "polled",
 }
 
@@ -76,6 +78,12 @@ EVENT_TYPES: dict[str, str] = {
 # them: nothing the index keeps changes, so it cannot come through index.event.
 OS_SIGNALS = frozenset({"usb.inserted", "usb.removed", "user.login", "user.logout", "program.launched",
                         "program.exited", "network.connected", "network.disconnected", "file.accessed", "log.cleared", "screen.captured", "network.upload", "file.opened"})
+
+# A reading a rule can wait on: the type, the reading the Worker reports (control.metrics), the match field it is compared to, and its default.
+THRESHOLDS: dict[str, tuple[str, str, float]] = {
+    "threshold.cpu": ("cpu", "percent", 80), "threshold.memory": ("memory", "percent", 80),
+    "threshold.disk": ("disk", "percent", 90), "threshold.network": ("net_kbps", "kbps", 10_000),
+}
 
 TIER_TAGS = {"admin": "admin", "restricted": "restricted", "workers": "worker_dept", "common": "common"}
 
@@ -178,6 +186,12 @@ def matches(spec: dict[str, Any], data: dict[str, Any]) -> bool:
 
 
 async def _dept_pcs(engine: Engine, definition: dict[str, Any]) -> set[int] | None:
+    """The machines a rule naming none covers: its maker's department when Admins are kept to theirs; every machine (None) when they are
+    IT (version 1), as for the head of the organisation."""
+    from engine import permissions
+
+    if permissions.ADMIN_SCOPE == "organisation":
+        return None
     creator = await engine.db.accounts.by_id(definition["created_by_account_id"])
     if creator is None or creator["department_id"] is None:
         return None
@@ -269,7 +283,7 @@ async def evaluate_polled(engine: Engine) -> int:
             if _due_recurring(m, now, last):
                 await fire(engine, definition, 0, {"at": now.isoformat()})
                 fired += 1
-        elif etype in ("threshold.cpu", "threshold.memory", "system.idle"):
+        elif etype in THRESHOLDS or etype == "system.idle":
             scope = await _dept_pcs(engine, definition)
             for pc_id, metrics in list(_metrics.items()):
                 if not _pc_in_scope(spec, pc_id, scope):
@@ -277,8 +291,10 @@ async def evaluate_polled(engine: Engine) -> int:
                 if etype == "system.idle":
                     hit = float(metrics.get("idle_s", 0)) >= float(m.get("seconds", 600))
                 else:
-                    key = "cpu" if etype == "threshold.cpu" else "memory"
-                    hit = float(metrics.get(key, 0)) >= float(m.get("percent", 80))
+                    key, field, default = THRESHOLDS[etype]
+                    if key not in metrics:
+                        continue                                  # an older Worker that does not say this reading: nothing is decided on it
+                    hit = float(metrics[key]) >= float(m.get(field, default))
                 since_key = (definition["id"], pc_id)
                 if not hit:
                     _threshold_since.pop(since_key, None)
@@ -529,7 +545,8 @@ def latest_metrics(pc_id: int) -> dict[str, Any] | None:
 
 @handler("control.metrics")
 async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Worker client reports state for polled events: {"cpu": %, "memory": %, "idle_s": n, "foreground"?: {"program", "title"}}."""
+    """Worker client reports state for polled events: {"cpu": %, "memory": %, "idle_s": n, "disk"?: % of the system drive, "net_kbps"?: KB/s
+    received, "foreground"?: {"program", "title"}}."""
     ident = require_account(ctx)
     if ident.pc_id is None:
         raise ProtocolError(ErrorCode.INVALID, "no pc bound to this connection")
@@ -551,6 +568,62 @@ async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await ctx.engine.db.control.add_metric_sample(ident.pc_id, m["cpu"], m["memory"], m["idle_s"], m.get("disk"),
                                                       m.get("net_kbps"))
     return {"accepted": True}
+
+
+BACKTEST_DAYS = 7
+
+
+@handler("control.threshold_backtest")
+async def threshold_backtest(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"type": threshold.cpu|memory|disk|network, "value", "minutes"?: 0, "pc_ids"?} -> how often such a rule would have fired over the last
+    seven days, from the stored readings (one every ten minutes): `per_day` (oldest first, today last), `by_machine` {hostname: n}, `now` (the
+    machines over it at their latest reading), `total`, `samples`. A firing is a run of readings over the value lasting the minutes asked for;
+    it fires once per run. Machines with no readings of that kind (an older Worker for disk or network) are left out and counted in `unread`."""
+    ident = require_role(ctx, "super_user", "admin")
+    etype = str_field(payload, "type", choices=tuple(THRESHOLDS))
+    key = THRESHOLDS[etype][0]
+    try:
+        value = float(payload["value"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ProtocolError(ErrorCode.INVALID, "value is a number (percent, or KB/s for the network)") from exc
+    minutes = int_field(payload, "minutes", required=False) or 0
+    if not 0 <= minutes <= 24 * 60:
+        raise ProtocolError(ErrorCode.INVALID, "minutes is 0 to 1440")
+    need = max(1, -(-minutes // (METRIC_SAMPLE_SECONDS // 60)))
+    wanted = payload.get("pc_ids")
+    if wanted:
+        scope = [int(p) for p in wanted]
+    elif kept(ident) and ident.department_id is not None:
+        scope = sorted(await department_pc_ids(ctx.engine, ident.department_id))
+    else:
+        scope = None
+    samples = await ctx.engine.db.control.metric_readings(key, scope, BACKTEST_DAYS)
+    today = datetime.now().astimezone().date()
+    per_day, by_pc, seen = [0] * BACKTEST_DAYS, {}, set()
+    run: dict[int, int] = {}
+    last: dict[int, float | None] = {}
+    for s in samples:                                           # per machine, oldest first
+        pc, v = s["pc_id"], s["value"]
+        seen.add(pc)
+        last[pc] = v
+        if v is None:
+            run[pc] = 0
+            continue
+        if v >= value:
+            run[pc] = run.get(pc, 0) + 1
+            if run[pc] == need:
+                day = (today - s["sampled_at"].astimezone().date()).days
+                if 0 <= day < BACKTEST_DAYS:
+                    per_day[BACKTEST_DAYS - 1 - day] += 1
+                by_pc[pc] = by_pc.get(pc, 0) + 1
+        else:
+            run[pc] = 0
+    now_over = [pc for pc in seen if last.get(pc) is not None and run.get(pc, 0) >= need]
+    names = await ctx.engine.db.flows.hostnames(sorted(seen))
+    return {"type": etype, "value": value, "minutes": minutes, "per_day": per_day, "total": sum(per_day),
+            "by_machine": {names.get(pc, str(pc)): n for pc, n in sorted(by_pc.items(), key=lambda x: -x[1])},
+            "now": sorted(names.get(pc, str(pc)) for pc in now_over), "samples": len(samples),
+            "unread": len([pc for pc in seen if all(x["value"] is None for x in samples if x["pc_id"] == pc)])}
 
 
 @handler("control.event_history")

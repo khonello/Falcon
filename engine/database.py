@@ -2113,6 +2113,16 @@ class ControlRepo(_Repo):
             "avg(memory)::real AS memory, avg(disk)::real AS disk, avg(net_kbps)::real AS net_kbps FROM metric_samples "
             "WHERE pc_id = $1 AND sampled_at >= $2 AND sampled_at < $3 GROUP BY 1 ORDER BY 1", pc_id, since, until, bucket_minutes)
 
+    READINGS = ("cpu", "memory", "disk", "net_kbps", "idle_s")
+
+    async def metric_readings(self, reading: str, pc_ids: list[int] | None, days: int) -> list[dict[str, Any]]:
+        """One reading of every stored sample over the last `days`, per machine and oldest first: [{pc_id, sampled_at, value}]."""
+        if reading not in self.READINGS:
+            raise ValueError(reading)
+        return await self._fetch(
+            f"SELECT pc_id, sampled_at, {reading}::real AS value FROM metric_samples WHERE sampled_at >= now() - make_interval(days => $1) "
+            "AND ($2::int[] IS NULL OR pc_id = ANY($2::int[])) ORDER BY pc_id, sampled_at", days, pc_ids)
+
     async def typical_levels(self, pc_ids: list[int] | None, days: int = 7) -> dict[str, Any]:
         """The p10-p90 of each metric over the last `days`, across the given machines (None: all)."""
         row = await self._one(

@@ -36,6 +36,7 @@ WHEN_WORDS = {
     "task.started": "a task is started", "task.target_appeared": "a task's file appears", "task.deadline_soft": "a task's soft deadline passes",
     "task.deadline_final": "a task's final deadline passes", "flow.failed": "a flow fails", "resource.violation": "a restricted file turns up where it should not",
     "system.idle": "a machine has been idle", "threshold.cpu": "the processor is busy", "threshold.memory": "memory is nearly full",
+    "threshold.disk": "the disk is nearly full", "threshold.network": "the network is busy",
     "time.scheduled": "a set time comes", "time.recurring": "a repeating time comes",
 }
 
@@ -54,6 +55,10 @@ def when_of(spec: dict[str, Any]) -> str:
         return f"the processor is at {match['percent']}% or more" + (f" for {match['duration_s'] // 60} minutes" if match.get("duration_s", 0) >= 60 else "")
     if etype == "threshold.memory" and match.get("percent"):
         return f"memory is at {match['percent']}% or more"
+    if etype == "threshold.disk" and match.get("percent"):
+        return f"the system drive is {match['percent']}% full or more"
+    if etype == "threshold.network" and match.get("kbps"):
+        return f"it receives {match['kbps']} KB/s or more" + (f" for {match['duration_s'] // 60} minutes" if match.get("duration_s", 0) >= 60 else "")
     if etype == "system.idle" and match.get("seconds"):
         return f"a machine has been idle for {match['seconds'] // 60} minutes"
     if etype == "time.recurring" and match.get("at"):

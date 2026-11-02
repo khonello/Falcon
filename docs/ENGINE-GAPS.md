@@ -469,7 +469,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
 
 - **The console against the concept, page by page: what the Engine cannot back yet** (13 Oct 2026, found auditing every page at both
   levels against the published concept). Each is drawn disabled with the reason, or left out where the concept only decorates; nothing is faked.
-  (1) **Rules:** a threshold on *disk* or *network* (only `threshold.cpu` / `threshold.memory` exist; the reading picker lists them disabled).
+  (1) **Rules:** a threshold on *disk* or *network* -- *built 2 Nov 2026:* `threshold.disk` (percent of the system drive) and `threshold.network` (KB/s received), from the readings the Worker already sends; `control.threshold_backtest` replays a threshold against the last week's stored readings (the rule builder's "would have fired").
   (2) **Actions:** *Test on one machine* for a script not saved yet: `control.action_run` takes a saved action id, so an unsaved draft cannot
   be tried; the button is disabled on New action. (3) **Tasks:** changing a department task after it is sent (Edit is disabled on the
   Super User's given tasks). (4) **Reports:** *Prompt the department* (the Super User nudging a department's Admins about a report they
