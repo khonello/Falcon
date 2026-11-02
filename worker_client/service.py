@@ -89,7 +89,7 @@ class WorkerService:
             self.ossignals.on_program = self.inventory.touch              # a program that just started is hot: it leads the lists, and an unknown one is looked up soon
         self._native_watch = native_watch
         self.signpipe: SignPipeServer | None = None
-        self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command)
+        self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command, config=config)
         state_path = Path(config.path).parent / "index-state.db" if config.index_state else None
         if config.separate_programs:
             self.watcher: Any = IsolatedWatcher(config.watch_roots, self._relay, poll_seconds=config.poll_seconds,
@@ -342,6 +342,7 @@ class WorkerService:
         self._spawn(self._flush_then_reconcile())     # whatever happened while the Engine was not listening is told now (what we saw, then what we missed), in the background
         if self.config.windows:
             self._spawn(self._replay_emergencies())
+        await self.updater.check_pending()                # an update this service started before it was stopped: did it work?
         cur = await self.call("updates.current")
         if cur.get("version") and cur["version"]["version_string"] != VERSION:
             self.updater.on_available({"version": cur["version"]["version_string"]})

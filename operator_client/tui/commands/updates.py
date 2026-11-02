@@ -89,3 +89,11 @@ async def update_prompt(ctx: ShellContext, args: Args) -> str:
     message = " ".join(args.positional[1:]) or None
     res = await ctx.call("updates.prompt_admin", {"department_id": args.get_int(0, "department_id"), "message": message})
     return f"department {res['department_id']} prompted"
+
+
+@command("update", "packages", "", "The packages the Engine holds for machines to update from (data/updates/<version>/<role>.zip)")
+async def update_packages(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("updates.packages")
+    rows_ = [{"version": p["version"], "role": p["role"], "size": f"{p['bytes'] // 1024} KB", "sha256": p["sha256"][:16] + "...",
+              "approved": "yes" if p["approved"] else "no"} for p in res["packages"]]
+    return (table(rows_, ["version", "role", "size", "sha256", "approved"]) if rows_ else "(no packages)") + f"\nfolder: {res['folder']}"

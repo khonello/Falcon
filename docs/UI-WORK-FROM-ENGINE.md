@@ -61,6 +61,11 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   Admin's workstation (the admin installer asks so); the level always follows what the machine asked (`requested_level`). Where Registry's
   "Asking to join" shows such a request, Let it in works now; it should say it will be an IT Admin's machine.
 
+### Updates (built 2 Nov 2026)
+- `updates.packages` -> `{packages: [{version, role, bytes, sha256, approved}], folder}`: what the Engine holds for machines to update from.
+  The Rollout gate can say when an approved version has no package for a role (its machines then cannot update). A machine's failed
+  update now carries the installer's last log line in `updates.report_status`' error, as before.
+
 ### Licences (built 2 Nov 2026)
 - A machine joins with a licence code given at setup (admin or worker code), and nobody confirms it. The console needs a place for the
   licence: `licence.import {name, reference?, codes}` (taking in the file the licence store hands over), `licence.list` -> `{codes: [{id,

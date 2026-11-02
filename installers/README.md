@@ -90,4 +90,4 @@ made per Engine, since it carries that Engine's bundle. Needs Inno Setup 6. The 
 
 - Freezing the helper windows (they run from the bundled Python today).
 - Signing the executables and the packages.
-- The update pipeline (a new payload to a machine that already has the service).
+- *(built 2 Nov 2026)* The update pipeline: see `docs/PACKAGING-PLAN.md`. Not run for real yet: a machine updating itself (the VM).

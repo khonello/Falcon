@@ -74,5 +74,8 @@ Split by **where the code must run and with what rights**, not by feature.
 
 ## Still to decide when packaging starts
 
-- Signing, frozen helper windows, update pipeline (`ENGINE-GAPS.md`, `PHASES.md` Phase 9).
+- Signing and frozen helper windows (`ENGINE-GAPS.md`, `PHASES.md` Phase 9). *The update pipeline is built (2 Nov 2026):* a version's
+  packages sit on the Engine (`data/updates/<version>/<role>.zip`, a payload folder zipped); a machine told an approved version is out
+  fetches its role's package over its own connection (`update.fetch`, SHA-256 checked), checks the payload's manifest, and starts the
+  installer's upgrade detached; the new service reports how it went. `update packages` in the TUI lists what the Engine holds.
 - What the pairing code looks like on a PC with nobody signed in (a service machine at the login screen).

@@ -206,3 +206,95 @@ async def prompt_admin(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await ctx.engine.push_to_role("admin", "update.prompt", {"message": message}, department_id=department_id)
     await ctx.engine.audit.record(ctx, "update.prompt", target_type="departments", target_id=department_id)
     return {"department_id": department_id, "prompted": True}
+
+
+# --- the packages a machine updates itself from (Phase 9: the update pipeline) ---------------------------------------------------------
+#
+# A version's packages sit on the Engine's own disk, one per role: data/updates/<version>/<role>.zip, each a payload folder zipped
+# (`python -m installers.payload <role> <folder>`, then zipped). A machine told `update.available` fetches its role's package in pieces over
+# its own connection (`update.fetch`), checks the hash against what the Engine said, checks the payload's own manifest, and runs the
+# installer's upgrade (worker_client/updater.py). Nothing is fetched from anywhere else: the Engine is the one source a machine trusts.
+
+FETCH_CHUNK = 512 * 1024
+ROLES = ("worker", "admin")
+_hashes: dict[str, tuple[float, int, str]] = {}            # package path -> (mtime, size, sha256): a package is hashed once
+
+
+def packages_dir(engine: Any) -> Any:
+    from pathlib import Path
+
+    return Path(engine.settings.secret_path).parent / "updates"
+
+
+def _package(engine: Any, version: str, role: str) -> tuple[Any, int, str] | None:
+    import hashlib
+    import re
+
+    if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z.\-+]{0,39}", version) or role not in ROLES:
+        return None
+    path = packages_dir(engine) / version / f"{role}.zip"
+    if not path.is_file():
+        return None
+    st = path.stat()
+    cached = _hashes.get(str(path))
+    if cached is None or cached[0] != st.st_mtime:
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                h.update(block)
+        cached = (st.st_mtime, st.st_size, h.hexdigest())
+        _hashes[str(path)] = cached
+    return path, cached[1], cached[2]
+
+
+@handler("update.fetch")
+async def update_fetch(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"version", "role", "index"} -> {"total", "size", "sha256", "index", "content_b64"}: one piece of a version's package, to a machine
+    (only a version that was approved; only the packages that exist)."""
+    import asyncio
+    import base64
+
+    ident = require_account(ctx)
+    if ident.pc_id is None:
+        raise ProtocolError(ErrorCode.INVALID, "a package is fetched by a machine")
+    version, role = str_field(payload, "version"), str_field(payload, "role", choices=ROLES)
+    if await ctx.engine.db.updates.version_by_string(version) is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "that version was never approved")
+    found = await asyncio.to_thread(_package, ctx.engine, version, role)
+    if found is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, f"there is no {role} package for {version} on the Engine")
+    path, size, digest = found
+    total = max(1, (size + FETCH_CHUNK - 1) // FETCH_CHUNK)
+    index = int_field(payload, "index", required=False) or 0
+    if not 0 <= index < total:
+        raise ProtocolError(ErrorCode.INVALID, "no such piece")
+
+    def read() -> bytes:
+        with path.open("rb") as f:
+            f.seek(index * FETCH_CHUNK)
+            return f.read(FETCH_CHUNK)
+    piece = await asyncio.to_thread(read)
+    if index == 0:
+        await ctx.engine.audit.record(ctx, "update.fetched", target_type="pcs", target_id=ident.pc_id, pc_id=ident.pc_id,
+                                      detail={"version": version, "role": role, "bytes": size})
+    return {"version": version, "role": role, "total": total, "size": size, "sha256": digest, "index": index,
+            "content_b64": base64.b64encode(piece).decode("ascii")}
+
+
+@handler("updates.packages")
+async def update_packages(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """What packages the Engine holds: [{version, role, bytes, sha256, approved}] -- an approved version with no package for a role cannot
+    reach that role's machines."""
+    import asyncio
+
+    require_head(ctx)
+    base = packages_dir(ctx.engine)
+    out = []
+    if base.is_dir():
+        for folder in sorted(p for p in base.iterdir() if p.is_dir()):
+            for role in ROLES:
+                found = await asyncio.to_thread(_package, ctx.engine, folder.name, role)
+                if found:
+                    out.append({"version": folder.name, "role": role, "bytes": found[1], "sha256": found[2],
+                                "approved": await ctx.engine.db.updates.version_by_string(folder.name) is not None})
+    return {"packages": out, "folder": str(base)}
