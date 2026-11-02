@@ -38,8 +38,9 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   or `chat.file_save_failed`. `chat.files {conversation_id}` lists files with who saved them where.
 - Asked to allow: `chat.file_consent_request {file_id, name, from, why}` push to the person who restricted it; they answer
   `chat.file_consent {file_id, grant}`. The sender hears `chat.file_refused {file_id, name, why}`.
-- The Worker program: the same ops through its service are not wired yet (the program reaches the Engine only through `localapp`); say
-  if the Worker concept wants Save in the program, and the Engine session adds the ops.
+- The Worker program: `localapp` ops `send_file {id, path}` and `save_file {file_id}` (client.py `send_file()`, `save_file()`); the
+  conversation it gets from `conversation` carries each message's `file`. Pushes reach the program as the view's toasts only, so the
+  program reads a file's state again from `conversation`.
 
 ### Issues (built 2 Nov 2026)
 - **A file deleted at a flow's source.** A flow set to keep its copies (the default) now raises an issue of type `flow` ("A file was deleted

@@ -69,3 +69,11 @@ class LocalClient:
     def reply(self, conversation_id: int, body: str) -> None:
         """The person's answer in it; they never start one."""
         self.call("reply", id=conversation_id, body=body)
+
+    def send_file(self, conversation_id: int, path: str) -> dict[str, Any]:
+        """A file from this machine, in a conversation an Admin started."""
+        return self.call("send_file", id=conversation_id, path=path)["sent"]
+
+    def save_file(self, file_id: int) -> None:
+        """A file sent in a conversation, saved to Downloads, in From Falcon."""
+        self.call("save_file", file_id=file_id)

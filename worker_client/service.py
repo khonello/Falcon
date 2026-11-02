@@ -599,6 +599,14 @@ class WorkerService:
         await self.call("chat.send", {"conversation_id": conversation_id, "body": body})
         self._view_at = 0.0
 
+    async def app_send_file(self, conversation_id: int, path: str) -> dict[str, Any]:
+        """The person sends a file from this machine in a conversation an Admin started (the Engine checks what may be sent)."""
+        return await self.call("chat.send_file", {"conversation_id": conversation_id, "path": path})
+
+    async def app_save_file(self, file_id: int) -> None:
+        """Save a file sent in a conversation: the Engine sends it here, and it lands in Downloads, in "From Falcon" (chat.file_deliver)."""
+        await self.call("chat.file_save", {"file_id": file_id})
+
     def machine_facts(self) -> dict[str, Any]:
         """What the person, or IT on the phone, may need to know about this machine (the program's My machine; Copy these details)."""
         import platform

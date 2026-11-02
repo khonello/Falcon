@@ -9,6 +9,8 @@ connection. So the service listens on this machine's loopback address, and the p
     {"token": "...", "op": "ack", "ids": ["t7"]}        -> {"ok": true}                       the program showed those notes; do not show them again
     {"token": "...", "op": "conversation", "id": 4}     -> {"ok": true, "conversation": {...}} one conversation an Admin started, read up to now
     {"token": "...", "op": "reply", "id": 4, "body": ".."} -> {"ok": true}                     the person answers in it (they never start one)
+    {"token": "...", "op": "send_file", "id": 4, "path": ".."} -> {"ok": true, "sent": {...}}  a file from this machine, in that conversation
+    {"token": "...", "op": "save_file", "file_id": 9}   -> {"ok": true}                       a file sent there, saved to Downloads, in "From Falcon"
 
 Where it is and what it checks:
   * 127.0.0.1 only, on a port the service picks; `app.json` beside the Worker's settings holds the port and a random token, readable by the people who
@@ -46,6 +48,8 @@ class Provider(Protocol):
     async def app_ack(self, ids: list[str]) -> None: ...
     async def app_conversation(self, conversation_id: int) -> dict[str, Any]: ...
     async def app_reply(self, conversation_id: int, body: str) -> None: ...
+    async def app_send_file(self, conversation_id: int, path: str) -> dict[str, Any]: ...
+    async def app_save_file(self, file_id: int) -> None: ...
 
 
 def info_path(settings_path: Path) -> Path:
@@ -141,6 +145,10 @@ class LocalApp:
                 if not isinstance(body, str) or not body.strip():
                     return {"ok": False, "error": "write something to send"}
                 await self.provider.app_reply(int(msg["id"]), body)
+            elif op == "send_file":
+                return {"ok": True, "sent": await self.provider.app_send_file(int(msg["id"]), str(msg.get("path") or ""))}
+            elif op == "save_file":
+                await self.provider.app_save_file(int(msg["file_id"]))
             elif op == "ack":
                 ids = msg.get("ids")
                 if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
