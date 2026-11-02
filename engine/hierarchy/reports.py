@@ -62,6 +62,9 @@ async def emit(engine: Engine, category: str, *, source_table: str, source_id: i
         "report.new", {"id": report_id, "category": category, "summary": summary},
         predicate=lambda c: org_wide(c.ctx.identity)
         or (c.ctx.identity.role == "admin" and c.ctx.identity.department_id in routed))
+    # on the spine too (engine/bus.py), so whatever must react to a report hears it at the "tell" stage, as everything else is heard
+    await engine.announce("report.written", {"report_id": report_id, "category": category, "source_table": source_table,
+                                             "source_id": source_id, "summary": summary, "departments": sorted(routed)}, source="system")
     return report_id
 
 

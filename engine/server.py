@@ -63,6 +63,7 @@ class Engine:
         from common.heat import Heat
 
         self.heat = Heat(ttl=900.0, cap=100000)
+        self.file_index.heat = self.heat
         from engine.marked import MarkedIndex
 
         self.marked = MarkedIndex(self.db)
@@ -162,6 +163,7 @@ class Engine:
             conn.writer.close()
         if self._conn_tasks:
             await asyncio.wait(self._conn_tasks, timeout=5)
+        await self.file_index.catchup_settled(timeout=5)      # what machines missed is taken in before the pool goes away
         await self.scheduler.stop()
         await self.db.close()
 

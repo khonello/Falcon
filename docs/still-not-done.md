@@ -45,7 +45,7 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 - **Overview:** the figures have no trend history.
 - **Detective:**
   - Not watched: clipboard and PrintScreen, and what each program sends over the network.
-  - No bounded queue on the event spine, and no Reports/Notices step on it yet.
+  - *(built 2 Nov 2026)* a bounded, hottest-first queue for what a machine missed, and reports on the spine's tell stage.
 
 ## Tests
 - One test fails whenever the whole Worker test file runs, on the committed code too: `test_the_worker_relays_only_the_signals_an_automation_waits_for`. It passes alone, so an earlier test is probably leaving something behind.

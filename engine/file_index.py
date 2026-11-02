@@ -21,6 +21,7 @@ left (moved away, deleted) is marked `gone_at`, the row kept.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import PurePath
@@ -40,10 +41,19 @@ log = logging.getLogger(__name__)
 
 ACCESS_TAGS = ("admin", "restricted", "worker_dept", "common")  # file_index.resource_tag
 MAX_SWEEP_BATCH = 2000                           # entries taken from one sweep message
+# What a machine missed while the Engine was not listening waits here, per machine, so its live events are never stuck behind it. Past this many
+# waiting, the next catch-up message waits for room: the Worker sends more slowly, and nothing is lost.
+CATCHUP_BOUND = 5000
+CATCHUP_RESORT = 50                              # waiting events are put hottest-first again after this many are taken
 OPS = ("create", "modify", "move", "copy", "delete", "attrib", "security")
 # What Flow, Resource compliance and Task verification care about: the content of a file, or where it is. A change of
 # attributes or permissions, or anything to a folder, is for the history and for automations only.
 CONTENT_OPS = frozenset({"create", "modify", "move", "copy", "delete"})
+
+
+def _key(path: str) -> str:
+    """One file, however its path was written (case and slashes, as Windows sees it)."""
+    return str(path).replace("\\", "/").lower()
 
 
 class FileIndex:
@@ -52,6 +62,11 @@ class FileIndex:
         # Every file event is published on the Engine's bus (engine/bus.py), where each feature hears it at its own stage; `subscribe` below is the old way in.
         self.bus = bus if bus is not None else Bus()
         self._sweeps: dict[int, datetime] = {}      # pc -> when its running idle sweep began (what the sweep sees is newer than this)
+        self.heat: Any = None                         # the Engine's Heat (common/heat.py), set by the Engine: catch-ups are taken hottest first
+        self._catchup: dict[int, dict[str, dict[str, Any]]] = {}     # pc -> path -> the newest missed event for it, waiting
+        self._drainers: dict[int, asyncio.Task[None]] = {}
+        self.catchup_taken = 0                        # for the log and the tests
+        self.catchup_superseded = 0                   # waiting events a live one for the same file made needless
 
     def subscribe(self, callback: Any, *, every_op: bool = False, stage: str = "act", name: str = "") -> None:
         """callback(event: dict) -> Awaitable[None]. Called for every ingested file event that is about a file's
@@ -70,8 +85,50 @@ class FileIndex:
         kinds = ("file.*",) if every_op else tuple(f"file.{op}" for op in sorted(CONTENT_OPS))
         self.bus.on(kinds, hear if every_op else hear_content, stage=stage, name=name or getattr(callback, "__name__", "file handler"))
 
-    async def ingest_event(self, pc_id: int, event: dict[str, Any]) -> int | None:
+    async def queue_catchup(self, pc_id: int, events: list[dict[str, Any]]) -> int:
+        """What a machine missed (index.catchup) waits in its own queue and is taken hottest first, one at a time, by a task of its own; a live
+        event from the same machine goes straight through and takes the place of any waiting one for the same file. Full: wait for room."""
+        waiting = self._catchup.setdefault(pc_id, {})
+        while len(waiting) >= CATCHUP_BOUND:
+            await asyncio.sleep(0.05)
+        for ev in events:
+            path = str((ev or {}).get("path") or "")
+            if path:
+                waiting.pop(_key(path), None)          # a newer one for the same file goes to the back, in its place
+                waiting[_key(path)] = ev
+        task = self._drainers.get(pc_id)
+        if task is None or task.done():
+            self._drainers[pc_id] = asyncio.create_task(self._drain(pc_id))
+        return len(events)
+
+    async def _drain(self, pc_id: int) -> None:
+        waiting = self._catchup.get(pc_id, {})
+        order: list[str] = []
+        while waiting:
+            if not order:
+                keys = list(waiting)
+                order = (self.heat.hottest(keys, key=lambda k: f"file:{pc_id}:{waiting[k].get('path', '')}") if self.heat is not None else keys)[:CATCHUP_RESORT]
+            ev = waiting.pop(order.pop(0), None)
+            if ev is None:
+                continue                                # a live event for the same file came first
+            try:
+                await self.ingest_event(pc_id, ev, live=False)
+                self.catchup_taken += 1
+            except Exception:
+                log.exception("a missed event on pc %s could not be taken in: %s", pc_id, ev.get("path"))
+
+    async def catchup_settled(self, pc_id: int | None = None, timeout: float = 30.0) -> bool:
+        """Wait until what was queued (for one machine, or every one) has been taken in. For the tests and an orderly stop."""
+        tasks = [t for p, t in self._drainers.items() if (pc_id is None or p == pc_id) and not t.done()]
+        if not tasks:
+            return True
+        done, _pending = await asyncio.wait(tasks, timeout=timeout)
+        return len(done) == len(tasks)
+
+    async def ingest_event(self, pc_id: int, event: dict[str, Any], *, live: bool = True) -> int | None:
         entry = _normalize(event)
+        if live and self._catchup.get(pc_id) and self._catchup[pc_id].pop(_key(entry["path"]), None) is not None:
+            self.catchup_superseded += 1                # what the machine missed about this file is old news now
         db = self.db.file_index
         op, path = entry["op"], entry["path"]
         file_index_id: int | None = None          # what subscribers are told (None for a delete, as before)
@@ -214,12 +271,9 @@ async def index_catchup(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     service was restarting), found by the Worker comparing its folders with what the Engine was last told. Each is ingested exactly as if it had
     arrived live, so Flow, Restricted and Task react to it as they would have."""
     pc_id = _pc_id(ctx, payload)
-    events = (payload.get("events") or [])[:500]
-    heat = getattr(ctx.engine, "heat", None)
-    if heat is not None:                                       # the files being worked on first; the rest in the order they came
-        events = heat.hottest(events, key=lambda e: f"file:{pc_id}:{(e or {}).get('path', '')}")
-    for ev in events:
-        await ctx.engine.file_index.ingest_event(pc_id, ev)
+    events = [e for e in (payload.get("events") or [])[:500] if isinstance(e, dict)]
+    # taken in by a task of this machine's own, hottest first, so the machine's live events are never stuck behind what it missed
+    await ctx.engine.file_index.queue_catchup(pc_id, events)
     if events:
         await ctx.engine.audit.record(ctx, "index.caught_up", target_type="pcs", target_id=pc_id, pc_id=pc_id, detail={"events": len(events), "sample": [str(e.get("path")) for e in events[:5]]})
     return {"accepted": len(events)}

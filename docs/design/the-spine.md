@@ -57,5 +57,7 @@ On `case.raised` it can propose "pause flow #n" (an urgent exfiltration case on 
 on `case.reviewed` as escalated, a follow-up task for the department's Admin. Nothing happens until a person accepts; accepting a pause is the person's audited act; marking and tasks are made by the
 person on their own pages. The same suggestion is not made twice while open; there are at most 500 open.
 
-**Still to do on the spine:** a priority queue with a bound so a backlog of cold events never stands in front of a hot one (catch-ups already take hot files first); the "tell" stage for
-reports and notices; more proposals as more cross-feature insights appear.
+**Done 2 Nov 2026:** what a machine missed (`index.catchup`) waits in a bounded queue of that machine's own, taken hottest first by a task, so
+its live events never stand behind it; a live event takes the place of a waiting one for the same file; past 5000 waiting, the next catch-up
+waits for room (`engine/file_index.py`). Every report written is on the spine as `report.written`, heard at the "tell" stage beside Detective's
+proposals. **Still to do:** more proposals as more cross-feature insights appear.
