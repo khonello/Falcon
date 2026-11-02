@@ -59,16 +59,14 @@ class LocalClient:
     def ask(self, to_account_id: int) -> None:
         self.call("ask", to=to_account_id)
 
-    def ack(self, ids: list[str]) -> None:
-        self.call("ack", ids=ids)
-
     def conversation(self, conversation_id: int) -> dict[str, Any]:
-        """One conversation an Admin started with this person, read now (the program's Messages and the message window)."""
-        return self.call("conversation", id=conversation_id)["conversation"]
+        return self.call("conversation", id=conversation_id).get("conversation") or {}
 
     def reply(self, conversation_id: int, body: str) -> None:
-        """The person's answer in it; they never start one."""
         self.call("reply", id=conversation_id, body=body)
+
+    def ack(self, ids: list[str]) -> None:
+        self.call("ack", ids=ids)
 
     def send_file(self, conversation_id: int, path: str) -> dict[str, Any]:
         """A file from this machine, in a conversation an Admin started."""
