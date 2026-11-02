@@ -273,12 +273,11 @@ async def test_chain_flow_failure_is_reported_routed_and_fires_an_action(engine,
     w1 = await _worker(engine, tmp_path, "cid-w1", [str(src)])
     w2 = await _worker(engine, tmp_path, "cid-w2", [str(dst)])
     try:
-        await run_script(_op(engine, tmp_path, "cid-su"), ["connect", f"routing set flow_failure {org['fin']}"])
         out = await run_script(_op(engine, tmp_path, "cid-a1"), [
             "connect", "action add control notify message=flow-broke timeout=10", "event add flow.failed actions=1",
             f"flow create src={org['w1_pc']}:{src} dest={org['w2_pc']}:{dst}@0 stage=transformation:to=pdf"])
         assert "flow 1 active" in out[3]
-        (src / "memo.txt").write_bytes(b"hello")
+        (src / "memo.docx").write_bytes(b"PK not really a Word file")          # Word to PDF needs Office: unsupported here
         async def paused():
             f = await engine.db.flows.get(1)
             return bool(f and f["destinations"][0]["paused_reason"] == "transformation:unsupported_format")
@@ -290,9 +289,9 @@ async def test_chain_flow_failure_is_reported_routed_and_fires_an_action(engine,
         assert await _wait(lambda: 1 in w2.executor.completed, timeout=15)
         # Fix the flow (drop the stage) and resume: the file now syncs.
         fixed = await run_script(_op(engine, tmp_path, "cid-a1"), [
-            "connect", f"flow edit 1 dest={org['w2_pc']}:{dst}", "flow resume 1", "flow trigger 1 memo.txt"])
+            "connect", f"flow edit 1 dest={org['w2_pc']}:{dst}", "flow resume 1", "flow trigger 1 memo.docx"])
         assert "transfer" in fixed[3]
-        assert await _wait(lambda: (dst / "memo.txt").exists())
+        assert await _wait(lambda: (dst / "memo.docx").exists())
     finally:
         await w1.stop()
         await w2.stop()

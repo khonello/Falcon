@@ -117,6 +117,7 @@ async def test_a_report_that_failed_is_found_again_and_told(engine, org, tmp_pat
         assert await _until(lambda: not svc.watcher._reconciling)
         found = await svc.watcher.reconcile()
         assert found.get("changes", 0) >= 1
+        assert await engine.file_index.catchup_settled(org["w1_pc"])                     # what was missed is taken in by a queue of its own
         assert await _present(engine, org["w1_pc"], docs / "lost.txt")
     finally:
         await svc.stop()
