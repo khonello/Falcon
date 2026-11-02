@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import ssl
+import time
 from typing import Any
 
 # Importing the combo packages registers their handlers.
@@ -33,10 +34,14 @@ from engine.scheduler import Scheduler
 
 log = logging.getLogger(__name__)
 
+ENGINE_VERSION = "0.0.1"
+HEALTH_DB_SECONDS = 2.0
+
 
 class Engine:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self.started_monotonic = time.monotonic()        # (start() sets it again: how long it has been serving, for system.health)
         from engine import permissions
 
         if settings.admin_scope not in permissions.ADMIN_SCOPES:
@@ -128,6 +133,7 @@ class Engine:
     # --- lifecycle ------------------------------------------------------------------------------
 
     async def start(self) -> None:
+        self.started_monotonic = time.monotonic()
         self._announce_dev_flags()
         if self.master_secret is None:
             from engine.master_secret import load_or_create
@@ -332,4 +338,25 @@ async def system_ping(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("system.capabilities")
 async def system_capabilities(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    return {"message_types": registered_types(), "version": "0.0.1"}
+    return {"message_types": registered_types(), "version": ENGINE_VERSION}
+
+
+@handler("system.health")
+async def system_health(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Is the Engine well? For a monitor, a systemd timer or an installer, before any sign-in: so it says only what harms nobody --
+    up, its version, whether the database answers (and how fast), how long it has run, how many machines are connected. No names, nothing
+    about the organisation. `ok` is false when the database does not answer."""
+    engine = ctx.engine
+    db_ok, db_ms, db_error = False, None, None
+    if engine.db.connected:
+        began = time.monotonic()
+        try:
+            await asyncio.wait_for(engine.db.pool.fetchval("SELECT 1"), HEALTH_DB_SECONDS)
+            db_ok, db_ms = True, round((time.monotonic() - began) * 1000, 1)
+        except Exception as exc:  # noqa: BLE001  (any failure is the answer: the database is not well)
+            db_error = exc.__class__.__name__
+    else:
+        db_error = "not connected"
+    return {"ok": db_ok, "version": ENGINE_VERSION, "uptime_s": round(time.monotonic() - engine.started_monotonic, 1),
+            "database": {"ok": db_ok, "ms": db_ms, "error": db_error}, "machines_connected": len(engine.online_pc_ids()),
+            "connections": len(engine.connections)}

@@ -79,6 +79,30 @@ async def bootstrap(settings: Settings, hostname: str, department: str = FIRST_D
         await db.close()
 
 
+async def health(settings: Settings, where: str | None) -> int:
+    """`python -m engine health [host:port]`: ask the running Engine how it is (system.health, before any sign-in). Exit 0 when it is well,
+    1 when it answers that something is wrong, 2 when it does not answer at all -- for a monitor or a systemd timer."""
+    from common.connection import EngineConnection
+
+    host, _, port = (where or "").rpartition(":") if where else ("127.0.0.1", "", str(settings.port))
+    tls = not settings.dev_plaintext
+    conn = EngineConnection(host or "127.0.0.1", int(port or settings.port), client_id="", tls=tls,
+                            ca_cert=str(settings.tls_cert) if tls and settings.tls_cert else None)
+    try:
+        await asyncio.wait_for(conn.open(), 5)
+        got = await asyncio.wait_for(conn.call("system.health"), 5)
+    except Exception as exc:  # noqa: BLE001  (no answer at all is the worst answer)
+        print(f"not answering: {exc}")
+        return 2
+    finally:
+        await conn.close()
+    db = got.get("database") or {}
+    print(f"{'well' if got.get('ok') else 'NOT WELL'}: version {got.get('version')}, up {got.get('uptime_s')} s, database "
+          f"{'answers in ' + str(db.get('ms')) + ' ms' if db.get('ok') else 'not answering (' + str(db.get('error')) + ')'}, "
+          f"{got.get('machines_connected')} machine(s) connected")
+    return 0 if got.get("ok") else 1
+
+
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "setup":
         from engine.setup import main as setup_main
@@ -93,6 +117,12 @@ def main() -> None:
         if len(sys.argv) < 3:
             sys.exit("usage: python -m engine bootstrap <hostname> [department]")
         sys.exit(asyncio.run(bootstrap(settings, sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else FIRST_DEPARTMENT)))
+    if len(sys.argv) > 1 and sys.argv[1] in ("backup", "restore"):
+        from engine.backup import main as backup_main
+
+        sys.exit(backup_main(sys.argv[1:], settings.database_url))
+    if len(sys.argv) > 1 and sys.argv[1] == "health":
+        sys.exit(asyncio.run(health(settings, sys.argv[2] if len(sys.argv) > 2 else None)))
     if len(sys.argv) > 1 and sys.argv[1] == "gencert":
         if len(sys.argv) < 3:
             sys.exit("usage: python -m engine gencert <name>[,<name>,<ip>...] [out_dir]")

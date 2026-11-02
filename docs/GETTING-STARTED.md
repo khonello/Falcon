@@ -162,3 +162,14 @@ Open the machine (double-click it) → **Issue a new key**. The old key stops at
 A Worker installed with the installer (`installers/README.md`) needs no key typed by hand: it asks the Engine to be registered, the
 request waits under **Machines → Registry → Asking to join**, and an Admin lets it in by typing the short code shown on that PC's screen.
 The key then goes to the PC by itself. Step 4 above is the by-hand way.
+
+---
+
+## Keeping it running
+
+- **Is it well?** `python -m engine health [host:port]` asks the running Engine (before any sign-in, so a monitor needs no key): whether
+  the database answers, how long it has run, how many machines are connected. Exit code 0 well, 1 something wrong, 2 not answering.
+- **Back up the database:** `python -m engine backup [file]` (PostgreSQL's `pg_dump`; default `data/backups/falcon-<when>.dump`).
+  Put it back with `python -m engine restore <file> --yes`, with the Engine stopped: what is in the database is replaced.
+- **Back up the master secret apart, offline:** `data/master.secret` is not in a database backup. Without it no machine's key can be
+  made again, and every machine would have to be registered anew.
