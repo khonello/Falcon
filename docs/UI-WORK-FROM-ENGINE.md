@@ -30,6 +30,17 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
 - **Would it have fired.** `control.threshold_backtest {type, value, minutes?, pc_ids?}` -> `{per_day[7] oldest first, total, by_machine
   {host: n}, now: [hosts], samples, unread}` from the stored readings: the concept's backtest under the threshold slider.
 
+### Files in conversations (built 2 Nov 2026; ENGINE-GAPS #7, the concept's v296)
+- Send: `chat.send_file {conversation_id, path}` (a file on the sender's own machine) -> `{file_id, state: reading | asked, waits_for?}`.
+  Refused with the reason: programs and scripts, over 100 MB. Restricted: the sender's own restriction is their consent; someone else's waits.
+- The message: `chat.message` pushes and `chat.get` messages carry `file: {file_id, name, size, state, expires_at}` (the card with Save).
+- Save: `chat.file_save {file_id}` -> the caller's machine writes it to Downloads\From Falcon; pushed back as `chat.file_saved {file_id, path}`
+  or `chat.file_save_failed`. `chat.files {conversation_id}` lists files with who saved them where.
+- Asked to allow: `chat.file_consent_request {file_id, name, from, why}` push to the person who restricted it; they answer
+  `chat.file_consent {file_id, grant}`. The sender hears `chat.file_refused {file_id, name, why}`.
+- The Worker program: the same ops through its service are not wired yet (the program reaches the Engine only through `localapp`); say
+  if the Worker concept wants Save in the program, and the Engine session adds the ops.
+
 ### Issues (built 2 Nov 2026)
 - **A file deleted at a flow's source.** A flow set to keep its copies (the default) now raises an issue of type `flow` ("A file was deleted
   at a flow's source", one per flow, gathering the files) with two options from `issues.get`: `remove_copies` and `keep_copies`. The Issues

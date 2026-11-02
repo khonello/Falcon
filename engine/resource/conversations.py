@@ -11,6 +11,7 @@ above the Admins.
     chat.get    {conversation_id, before_id?}        its messages, oldest first (100 at a time), and each member's read time
     chat.send   {conversation_id, body}              a message; pushed to the others as `chat.message`
     chat.read   {conversation_id}                    the caller has read it up to now; pushed to the others as `chat.read`
+    chat.send_file / chat.file_save / ...         a file sent in a conversation: engine/resource/chatfiles.py
 
 Names are the caller's (Display Names never cross namers).
 """
@@ -149,8 +150,13 @@ async def chat_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     found = await db.conversations.messages(convo["id"], before_id=int_field(payload, "before_id", required=False), limit=PAGE)
     names = await db.accounts.display_names_for(ctx.identity.account_id, sorted(set(members) | {m["from_account_id"] for m in found}))
     reads = {r["account_id"]: _iso(r["read_at"]) for r in await db.conversations.reads([convo["id"]]) if r["account_id"] in members}
+    files = await db.chat_files.by_ids([m["chat_file_id"] for m in found if m.get("chat_file_id")])
+
+    def file_of(m: dict[str, Any]) -> dict[str, Any] | None:
+        f = files.get(m.get("chat_file_id"))
+        return {"file_id": f["id"], "name": f["name"], "size": f["size_bytes"], "state": f["state"], "expires_at": _iso(f["expires_at"])} if f else None
     messages = [{"message_id": m["id"], "from_account_id": m["from_account_id"], "from": names.get(m["from_account_id"]), "body": m["body"],
-                 "at": _iso(m["sent_at"]), "mine": m["from_account_id"] == ctx.identity.account_id} for m in reversed(found)]
+                 "at": _iso(m["sent_at"]), "mine": m["from_account_id"] == ctx.identity.account_id, "file": file_of(m)} for m in reversed(found)]
     return {"conversation": (await _views(ctx, [convo]))[0], "messages": messages, "more": len(found) == PAGE,
             "reads": [{"account_id": p, "name": names.get(p), "read_at": reads.get(p)} for p in members]}
 

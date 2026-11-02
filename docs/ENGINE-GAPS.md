@@ -114,7 +114,10 @@ part is recorded for later, not built.
      - adding a person to a Private mark;
      - the delivered copy indexed with its origin (sender, conversation), so Protected and the Detective see a handed-over copy, not a stray one;
      - an audit entry for each transfer.
-   - Still to decide: whether an admin-tier file may go to a Worker at all.
+   - Decided by the user, 2 Nov 2026: an admin-tier file may go to a Worker. **Built 2 Nov 2026** (migration 049, `engine/resource/chatfiles.py`,
+     `worker_client/chatfiles.py`): `chat.send_file`, `chat.file_consent`, `chat.file_save`, `chat.files`; held on the Engine's disk 7 days at
+     most; each saved copy recorded (`chat_file_saves`) and read by Restricted as "handed over in a conversation"; a restricted copy allowed
+     where it lands. Not yet: adding the receiver to a Private file's readers (Private, #3, is next).
 8. **A description is always one task** (the user, 24 Oct 2026; the concept's New task, Admin v70). **Done 1 Nov 2026:** the split step is gone from
    `llm_graph.py`, `proposed_split` from `task.propose`, the TUI and `NewTaskPage.qml`; the cases carry no split field. Benchmark with the 1.7B after it:
    tuned 32/32, held-out 31/31.

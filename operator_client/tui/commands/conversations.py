@@ -74,3 +74,32 @@ async def chat_get(ctx: ShellContext, args: Args) -> str:
     lines.extend(f"{(m['at'] or '')[:16].replace('T', ' ')}  {m['from']}: {m['body']}" for m in res["messages"])
     lines.extend(f"read by {r['name']} up to {r['read_at'][:16].replace('T', ' ')}" for r in res["reads"] if r["read_at"])
     return "\n".join(lines)
+
+
+@command("chat", "file", "<conversation_id> <path...>", "Send one file from your own machine (up to 100 MB; no programs or scripts); something restricted is your consent for that copy, or waits for its owner")
+async def chat_file(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("chat.send_file", {"conversation_id": args.get_int(0, "conversation_id"), "path": " ".join(args.positional[1:])})
+    if res["state"] == "asked":
+        return f"file {res['file_id']} waits for {res['waits_for']} to agree: it is restricted"
+    return f"file {res['file_id']} is on its way; it shows in the conversation when it has arrived"
+
+
+@command("chat", "save", "<file_id>", "Save a file sent in a conversation onto this machine (Downloads, in From Falcon)")
+async def chat_save(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("chat.file_save", {"file_id": args.get_int(0, "file_id")})
+    return f"file {res['file_id']} is being saved on this machine (save {res['save_id']})"
+
+
+@command("chat", "files", "<conversation_id>", "The files sent in a conversation, and who saved them where")
+async def chat_files(ctx: ShellContext, args: Args) -> str:
+    files = (await ctx.call("chat.files", {"conversation_id": args.get_int(0, "conversation_id")}))["files"]
+    rows_ = [{"id": f["id"], "name": f["name"], "state": f["state"], "size": f["size_bytes"] or "", "saved": ", ".join(s["machine"] for s in f["saved"] if s["at"])}
+             for f in files]
+    return table(rows_, ["id", "name", "state", "size", "saved"]) if rows_ else "(no files sent here)"
+
+
+@command("chat", "allow", "<file_id> yes|no", "Answer for a file someone wants to send that you restricted")
+async def chat_allow(ctx: ShellContext, args: Args) -> str:
+    grant = args.get(1, "yes|no").lower() in ("yes", "y", "true", "1")
+    await ctx.call("chat.file_consent", {"file_id": args.get_int(0, "file_id"), "grant": grant})
+    return "allowed: it is sent" if grant else "refused: it is not sent"

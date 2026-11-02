@@ -9,4 +9,4 @@ The resource folder structure IS the access policy, grounded in the Global File 
                   closes)
 """
 
-from engine.resource import assistance, conversations, journey, resource  # noqa: F401
+from engine.resource import assistance, chatfiles, conversations, journey, resource  # noqa: F401

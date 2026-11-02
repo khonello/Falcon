@@ -23,7 +23,7 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 - **#3 Private tag:** use the established mechanisms. Direction: the Worker sets Windows' own permissions on the private file or folder (only
   the people named may open it) and a program's execute right, so a refusal is Windows' own "access denied"; Falcon adds a quiet note saying
   who to ask. Not built yet: the next Engine pass.
-- **#7 Sending a file in a conversation:** yes, an admin-tier file may go to a Worker. Not built yet: the next Engine pass.
+- **#7 Sending a file in a conversation:** *(built 2 Nov 2026)* yes, an admin-tier file may go to a Worker. See ENGINE-GAPS #7.
 - **#10 Finding PCs:** to talk through. Today: a PC with Falcon installed asks to join by itself (`enroll.request`) and one that knocked
   without a key is listed (`registry.knocked`); no network scan.
 - **#13 and #15:** explained to you on 2 Nov; waiting on your answer.

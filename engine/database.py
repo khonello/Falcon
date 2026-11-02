@@ -35,7 +35,7 @@ POLYMORPHIC_TABLES = frozenset({
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages", "conversations",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases", "detective_rules", "flow_restricted_consents", "proposals",
-    "licences", "licence_codes",
+    "licences", "licence_codes", "chat_files",
     # non-table targets used by the audit trail
     "client", "session", "event", "execution",
 })
@@ -89,6 +89,7 @@ class Database:
         self.search = SearchRepo(self)
         self.assistance = AssistanceRepo(self)
         self.conversations = ConversationsRepo(self)
+        self.chat_files = ChatFilesRepo(self)
         self.control = ControlRepo(self)
         self.audit = AuditRepo(self)
         self.updates = UpdatesRepo(self)
@@ -2061,6 +2062,62 @@ _HAS_IMAGE = "EXISTS (SELECT 1 FROM execution_images i WHERE i.execution_id = e.
 
 
 
+class ChatFilesRepo(_Repo):
+    """Files sent in conversations (migration 049): the record of each, and every copy saved."""
+
+    async def create(self, conversation_id: int, from_account_id: int, from_pc_id: int, source_path: str, name: str, size: int | None,
+                     state: str, *, restricted: dict[str, Any] | None = None, consent_account_id: int | None = None) -> int:
+        return await self._val(
+            "INSERT INTO chat_files (conversation_id, from_account_id, from_pc_id, source_path, name, size_bytes, state, restricted, consent_account_id) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+            conversation_id, from_account_id, from_pc_id, source_path, name, size, state, restricted, consent_account_id)
+
+    async def get(self, file_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM chat_files WHERE id = $1", file_id)
+
+    async def set_state(self, file_id: int, state: str, reason: str | None = None) -> None:
+        await self._exec("UPDATE chat_files SET state = $2, reason = COALESCE($3, reason) WHERE id = $1", file_id, state, reason)
+
+    async def held(self, file_id: int, content_hash: str, size: int, expires_at: datetime, message_id: int) -> None:
+        await self._exec("UPDATE chat_files SET state = 'held', content_hash = $2, size_bytes = $3, held_at = now(), expires_at = $4, "
+                         "message_id = $5 WHERE id = $1", file_id, content_hash, size, expires_at, message_id)
+
+    async def by_ids(self, ids: list[int]) -> dict[int, dict[str, Any]]:
+        if not ids:
+            return {}
+        return {r["id"]: r for r in await self._fetch("SELECT * FROM chat_files WHERE id = ANY($1::int[])", ids)}
+
+    async def waiting_for(self, account_id: int) -> list[dict[str, Any]]:
+        """Files waiting for this person's yes, because they restricted what is being sent."""
+        return await self._fetch("SELECT * FROM chat_files WHERE state = 'asked' AND consent_account_id = $1 ORDER BY id", account_id)
+
+    async def expire_due(self) -> list[dict[str, Any]]:
+        """Held files past their 7 days: marked expired (the row stays); the caller drops the bytes."""
+        return await self._fetch("UPDATE chat_files SET state = 'expired', dropped_at = now() WHERE state = 'held' AND expires_at <= now() RETURNING id")
+
+    async def ask_save(self, file_id: int, account_id: int, pc_id: int) -> int:
+        return await self._val("INSERT INTO chat_file_saves (chat_file_id, account_id, pc_id) VALUES ($1, $2, $3) RETURNING id",
+                               file_id, account_id, pc_id)
+
+    async def saved(self, save_id: int, path: str, content_hash: str | None) -> dict[str, Any] | None:
+        return await self._one("UPDATE chat_file_saves SET path = $2, content_hash = $3, saved_at = now() WHERE id = $1 AND saved_at IS NULL "
+                               "RETURNING *", save_id, path, content_hash)
+
+    async def save(self, save_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM chat_file_saves WHERE id = $1", save_id)
+
+    async def saves(self, file_id: int) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT s.*, p.hostname FROM chat_file_saves s JOIN pcs p ON p.id = s.pc_id WHERE s.chat_file_id = $1 ORDER BY s.id",
+                                 file_id)
+
+    async def saved_at(self, pc_id: int, path: str) -> dict[str, Any] | None:
+        """A copy saved here from a conversation: who sent it, when (for "how did this copy get here")."""
+        return await self._one(
+            "SELECT s.*, f.from_account_id, f.name, f.conversation_id FROM chat_file_saves s JOIN chat_files f ON f.id = s.chat_file_id "
+            "WHERE s.pc_id = $1 AND s.saved_at IS NOT NULL AND lower(replace(s.path, chr(92), '/')) = lower(replace($2, chr(92), '/')) "
+            "ORDER BY s.saved_at DESC LIMIT 1", pc_id, path)
+
+
 class ConversationsRepo(_Repo):
     """An Admin's conversations (migration 044): two people, or every active Admin. Read times per person."""
 
@@ -2099,11 +2156,11 @@ class ConversationsRepo(_Repo):
     async def admins_conversation(self) -> dict[str, Any] | None:
         return await self._one("SELECT * FROM conversations WHERE kind = 'admins'")
 
-    async def add(self, conversation_id: int, from_id: int, body: str) -> dict[str, Any]:
+    async def add(self, conversation_id: int, from_id: int, body: str, *, chat_file_id: int | None = None) -> dict[str, Any]:
         async with self.pool.acquire() as conn, conn.transaction():
             msg = await conn.fetchrow(
-                "INSERT INTO conversation_messages (conversation_id, from_account_id, body) VALUES ($1, $2, $3) RETURNING *",
-                conversation_id, from_id, body)
+                "INSERT INTO conversation_messages (conversation_id, from_account_id, body, chat_file_id) VALUES ($1, $2, $3, $4) RETURNING *",
+                conversation_id, from_id, body, chat_file_id)
             await conn.execute("UPDATE conversations SET last_message_at = $2 WHERE id = $1", conversation_id, msg["sent_at"])
             await conn.execute(
                 "INSERT INTO conversation_reads (conversation_id, account_id, read_at) VALUES ($1, $2, $3) "

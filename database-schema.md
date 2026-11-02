@@ -667,3 +667,6 @@ reused by `pair_key`, or the one group of every Admin, whose members are read fr
 source, and its copy moved at a destination).
 `flows.name`, `flows.run_mode` (realtime / hourly / manual), `flows.last_run_at`, `flows.merged_into` (a further source of a flow with several), `flows.source_flow_id` (the flow it carries on from) and `flow_stages.retired_at` (an edit's old steps; migration 047).
 `licences` and `licence_codes` (a bought licence's admin and worker codes, held as a hash with their last four characters, seats and used, an optional department and expiry, withdrawn), and `enrollments.licence_code_id` (the code a machine joined with; migration 048).
+`chat_files` (a file sent in a conversation: from whom and which machine, its state asked/reading/held/refused/expired, what made it
+restricted and whose consent let it go, held until `expires_at`), `chat_file_saves` (each copy saved: machine, path, hash) and
+`conversation_messages.chat_file_id` (migration 049).

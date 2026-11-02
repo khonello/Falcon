@@ -26,6 +26,7 @@ from typing import Any
 from common.connection import ConnectionError_, EngineConnection, EngineError
 from common.signpipe import SignPipeServer
 from worker_client import winsession
+from worker_client.chatfiles import ChatFiles
 from worker_client.config import WorkerConfig
 from worker_client.executor import Executor
 from worker_client.flowsync import FlowSync
@@ -66,6 +67,7 @@ class WorkerService:
         self.identity: Any = None
         self.lockout = Lockout(lock_workstation=config.lock_workstation_on_block)
         self.executor = Executor(self.call, allow_power=allow_power, windows=config.windows)
+        self.chatfiles = ChatFiles(self.call)
         self.flowsync = FlowSync(self.call)
         self.signals = Signals(self.call, metrics_seconds=config.metrics_seconds)
         self.ossignals: Any = IsolatedSignals(self.call, self._component_changed) if config.separate_programs else OsSignals(self.call)
@@ -396,6 +398,10 @@ class WorkerService:
                 await self._on_alert(payload)
             elif type_ == "chat.message":
                 self._on_message(payload)
+            elif type_ == "chat.file_read":
+                await self.chatfiles.on_read(payload)
+            elif type_ == "chat.file_deliver":
+                await self.chatfiles.on_deliver(payload)
             elif type_ in ("task.assigned", "task.completed", "task.incomplete"):
                 await self._refresh_tasks()
                 if type_ == "task.assigned" and self.config.windows:

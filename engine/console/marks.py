@@ -443,6 +443,10 @@ async def came_by(db: Any, pc_id: int, path: str | None, content_hash: str | Non
         return {"how": "unknown", "sure": False, "said": "not known"}
     if await db.marks.written_by_flow(pc_id, path):
         return {"how": "flow", "sure": True, "said": "delivered by a flow"}
+    handed = await db.chat_files.saved_at(pc_id, path)
+    if handed is not None:
+        return {"how": "conversation", "sure": True, "said": f"handed over in a conversation (file {handed['chat_file_id']})",
+                "from_account_id": handed["from_account_id"], "conversation_id": handed["conversation_id"]}
     came = await db.marks.arrival(pc_id, path)
     old = str((came or {}).get("old_path") or "")
     low = norm(path) + "/"
