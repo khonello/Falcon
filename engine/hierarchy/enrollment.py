@@ -30,6 +30,7 @@ from engine.hierarchy.accounts import provision
 from engine.permissions import (
     int_field,
     kept,
+    org_wide,
     own_department,
     require_department_scope,
     require_role,
@@ -176,7 +177,14 @@ async def confirm(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     level = str(payload.get("level") or enr["requested_level"])
     if level not in LEVELS:
         raise ProtocolError(ErrorCode.INVALID, f"level must be one of {LEVELS}")
-    if ident.role == "admin" and level != "worker":
+    if org_wide(ident) and ident.role == "admin":
+        # Version 1 (the user, 2 Nov 2026): what a machine is follows what is installed on it. The admin installer asks as an Admin's
+        # workstation, the worker installer as a person's PC; an IT Admin who types the code shown on that machine lets it in as it asked,
+        # and cannot make it something else here. Making an Admin takes installing the console on their PC, so it is never one click.
+        if level != enr["requested_level"]:
+            raise ProtocolError(ErrorCode.FORBIDDEN, f"this machine asked to be {'an Admin' if enr['requested_level'] == 'admin' else 'a worker PC'}: "
+                                                     "what it is follows what is installed on it")
+    elif ident.role == "admin" and level != "worker":
         raise ProtocolError(ErrorCode.FORBIDDEN, "an Admin workstation is not confirmed this way")
     department_id = int_field(payload, "department_id", required=False) or enr["requested_department_id"]
     if department_id is None:

@@ -19,14 +19,20 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 
 **Settled:** An Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
-## Engine work waiting on your decision
-- **#3 Private tag:** none of it is built. The open question is how a refusal is shown to the person at the machine.
-- **#7 Sending a file in a conversation:** not built. The open question is whether an admin-tier file may go to a Worker.
-- **#10 Seen on the network:** whether a network scan is allowed, from which machine, and how often.
-- **#15 A case told in words:** it breaks the rule that the model only answers narrow questions, so you need to pick one of the two ways written in the doc.
-- **#13, the other three ideas:** try a rule before switching it on, too quiet or too loud, and seeing what a run produced. They aren't in the concept, so I left them alone.
-- **A file deleted at a flow's source:** each flow can already choose to keep or remove the copies. A default for new flows across the console is still open.
-- **`pc_days` retention:** one row per machine per day, kept forever. Clearing them would be a third deletion beside the 90-day jobs.
+## Engine work: your answers of 2 Nov 2026
+- **#3 Private tag:** use the established mechanisms. Direction: the Worker sets Windows' own permissions on the private file or folder (only
+  the people named may open it) and a program's execute right, so a refusal is Windows' own "access denied"; Falcon adds a quiet note saying
+  who to ask. Not built yet: the next Engine pass.
+- **#7 Sending a file in a conversation:** yes, an admin-tier file may go to a Worker. Not built yet: the next Engine pass.
+- **#10 Finding PCs:** to talk through. Today: a PC with Falcon installed asks to join by itself (`enroll.request`) and one that knocked
+  without a key is listed (`registry.knocked`); no network scan.
+- **#13 and #15:** explained to you on 2 Nov; waiting on your answer.
+- **A file deleted at a flow's source:** *(built 2 Nov 2026)* copies are kept by default, and an issue offers Remove the copies / Keep them.
+- **`pc_days`:** explained to you on 2 Nov; waiting on your answer.
+- **Convert to PDF for Office files:** that area of Flow needs a serious look (the user, 2 Nov 2026). Kept on the list: today text and JPEG
+  convert; Word, Excel and others say unsupported.
+- **Making another IT Admin:** *(built 2 Nov 2026)* install the admin console on the PC; it asks as an Admin's workstation and an IT Admin
+  lets it in with the code on its screen. What it is follows what is installed.
 
 ## Super User items
 - **#4** group conversations and **#6** directives and notices: parked with the Super User; not part of version 1.

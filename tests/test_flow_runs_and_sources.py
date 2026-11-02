@@ -99,3 +99,24 @@ async def test_a_flow_carries_on_from_another_and_an_edit_retires_the_old_steps(
     listed = next(f for f in (await a1.ok("flow.list"))["flows"] if f["id"] == first["id"])
     assert [s["config"]["op"] for s in listed["stages"]] == ["Rename by date"]
     assert await engine.db.pool.fetchval("SELECT count(*) FROM flow_stages WHERE flow_id = $1 AND retired_at IS NOT NULL", first["id"]) == 1
+
+
+async def test_a_file_deleted_at_the_source_keeps_its_copies_and_the_issues_page_can_remove_them(engine, org, connect):
+    """The user, 2 Nov 2026: a flow keeps its copies when a file is deleted at its source, and the Issues page offers to remove them."""
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    flow = (await a1.ok("flow.create", _flow(org["a1_pc"], "C:/out", org["w1_pc"], "C:/in")))["flow"]
+    dest = flow["destinations"][0]["id"]
+    for name in ("a.txt", "b.txt"):                                        # two files the flow had copied
+        await engine.db.flows.log_sync(dest, f"h-{name}", "flow_sync", None, source_relative_path=name, written_path=f"C:/in/{name}", source_hash=f"h-{name}")
+    await a1.ok("index.event", {"event": {"op": "delete", "path": "C:/out/a.txt"}})
+    await a1.ok("index.event", {"event": {"op": "delete", "path": "C:/out/b.txt"}})
+    await a1.ok("index.event", {"event": {"op": "delete", "path": "C:/out/never-copied.txt"}})     # nothing to say about a file it never carried
+    assert "flow.remove" not in w1.push_types(await w1.drain_pushes())                         # kept, as the flow is set to
+    found = [i for i in (await a1.ok("issues.list"))["issues"] if i["type"] == "flow"]
+    assert len(found) == 1 and found[0]["title"] == "2 files were deleted at a flow's source"
+    got = await a1.ok("issues.get", {"issue_id": found[0]["id"]})
+    assert {o["key"] for o in got["options"]} == {"remove_copies", "keep_copies"}
+    await a1.ok("issues.act", {"issue_id": found[0]["id"], "key": "remove_copies"})
+    removed = [p for p in await w1.drain_pushes() if p.type == "flow.remove"]
+    assert sorted(p.payload["relative_path"] for p in removed) == ["a.txt", "b.txt"]
+    assert (await a1.ok("issues.get", {"issue_id": found[0]["id"]}))["issue"]["state"] == "resolved"

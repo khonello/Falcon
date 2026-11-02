@@ -221,8 +221,13 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
     if event["op"] == "delete":
         for src in await engine.db.flows.sources_for_pc(pc_id):
             rel = source_relative(src, event["path"])
-            if rel is not None and src.get("on_source_delete") == "mirror" and _live(src):
-                await remove_at_destinations(engine, src["id"], rel)
+            if rel is None:
+                continue
+            if src.get("on_source_delete") == "mirror":
+                if _live(src):
+                    await remove_at_destinations(engine, src["id"], rel)
+            else:
+                await _ask_about_deleted(engine, src, pc_id, rel)
         return
     # A file under an unresolved Resource violation is ignored by the system (Resource ->
     # Compliance): Flow never moves it.
@@ -305,12 +310,12 @@ async def _check_destination_write(engine: Engine, dest: dict[str, Any], event: 
 REMOVED = "removed"             # the content hash a sync-log entry carries when the flow put a destination's copy away
 
 
-async def remove_at_destinations(engine: Engine, flow_id: int, rel: str, *, only: set[int] | None = None) -> int:
+async def remove_at_destinations(engine: Engine, flow_id: int, rel: str, *, only: set[int] | None = None, decided: bool = False) -> int:
     """A mirroring flow: the file is gone from the source, so each destination is asked to put away the copy THE FLOW WROTE (never anything else).
     The destination's machine moves it aside (nothing is destroyed) and says what it did. A destination that is away is dealt with on catch-up."""
     flow = await engine.db.flows.get(flow_id)
-    if flow is None or flow["status"] != "active" or flow.get("on_source_delete") != "mirror":
-        return 0
+    if flow is None or flow["status"] != "active" or (flow.get("on_source_delete") != "mirror" and not decided):
+        return 0                                                           # a flow that keeps its copies removes one only when a person decided so
     asked = 0
     online = engine.online_pc_ids()
     for dest in flow["destinations"]:
@@ -326,6 +331,44 @@ async def remove_at_destinations(engine: Engine, flow_id: int, rel: str, *, only
             "root": dest["destination_path"]})
         asked += 1
     return asked
+
+
+DELETED_LISTED = 50
+
+
+async def _ask_about_deleted(engine: Engine, src: dict[str, Any], pc_id: int, rel: str) -> None:
+    """A flow that keeps its copies when a file is deleted at its source (the default) keeps them, and says so on the Issues page, where an
+    Admin may remove them after all (the user, 2 Nov 2026: "keep, or buttons to decide in the Issues page"). One open issue per flow gathers
+    its deleted files; only the files the flow had actually copied are counted (a deleted file it never carried changes nothing)."""
+    flow = await engine.db.flows.get(src["id"])
+    if flow is None:
+        return
+    carried = False
+    for d in flow["destinations"]:
+        if await engine.db.flows.last_written_for(d["id"], rel):
+            carried = True
+            break
+    if not carried:
+        return
+    group = flow.get("merged_into") or flow["id"]
+    from engine.console import issues
+
+    issue_id, created = await issues.raise_issue(
+        engine, type_="flow", severity="low", title="A file was deleted at a flow's source", subject=rel, pc_id=pc_id,
+        source_table="flow_source_delete", source_id=group,
+        detail={"kind": "source_deleted", "flow_id": group, "files": [{"flow_id": flow["id"], "relative_path": rel}], "more": 0})
+    if not created:
+        issue = await engine.db.issues.get(issue_id)
+        detail = dict((issue or {}).get("detail") or {})
+        files = list(detail.get("files") or [])
+        if not any(f["relative_path"] == rel and f["flow_id"] == flow["id"] for f in files):
+            if len(files) < DELETED_LISTED:
+                files.append({"flow_id": flow["id"], "relative_path": rel})
+            else:
+                detail["more"] = int(detail.get("more") or 0) + 1
+            n = len(files) + int(detail.get("more") or 0)
+            await engine.db.issues.set_detail(issue_id, {"files": files, "more": detail.get("more", 0)})
+            await engine.db.issues.set_severity(issue_id, "low", title=f"{n} files were deleted at a flow's source", subject=rel)
 
 
 @handler("flow.remove_result")

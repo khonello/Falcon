@@ -166,3 +166,27 @@ async def test_an_account_of_the_parked_role_cannot_sign_in(engine, org, connect
     with pytest.raises(AssertionError, match="not part of this version"):
         await connect("cid-su")
     assert (await (await connect("cid-a1")).ok("hierarchy.tree"))["departments"]
+
+
+async def test_a_machine_with_the_console_installed_is_let_in_as_an_admin_and_is_what_it_asked_to_be(engine, org, connect):
+    """The user, 2 Nov 2026: if a PC has the admin console installed, it plays admin. The admin installer asks as an Admin's workstation; an IT
+    Admin lets it in with the code on its screen; nobody turns a worker install into an Admin, or an Admin's into a worker, at that step."""
+    from common.connection import EngineConnection
+
+    a1 = await connect("cid-a1")
+    machines = []
+    try:
+        for host, level in (("IT-02", "admin"), ("OPS-20", "worker")):
+            m = EngineConnection("127.0.0.1", engine.port, client_id="", tls=False)               # no key yet: it only asks
+            await m.open()
+            machines.append(m)
+            asked = await m.call("enroll.request", {"hostname": host, "os": "Windows 11", "mac": "aa:bb:cc:dd:ee:0" + str(len(machines)),
+                                                    "level": level, "department_id": org["fin"]})
+            other = "worker" if level == "admin" else "admin"
+            assert await a1.err("enroll.confirm", {"enrollment_id": asked["enrollment_id"], "code": asked["code"], "level": other}) == "forbidden"
+            made = await a1.ok("enroll.confirm", {"enrollment_id": asked["enrollment_id"], "code": asked["code"]})
+            assert made["role"] == level
+            assert (await engine.db.accounts.by_id(made["account_id"]))["role"] == level
+    finally:
+        for m in machines:
+            await m.close()

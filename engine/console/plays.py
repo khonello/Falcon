@@ -218,6 +218,16 @@ async def _do_deviation(ctx: Context, issue: dict[str, Any], key: str, payload: 
 
 async def _flow(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any]], list[Option], list[str]]:
     d = issue["detail"]
+    if d.get("kind") == "source_deleted":
+        files = d.get("files") or []
+        n = len(files) + int(d.get("more") or 0)
+        lead = (f"{n} file{'s were' if n != 1 else ' was'} deleted where flow {d.get('flow_id')} copies from. The flow kept its copies at its "
+                "destinations, as it is set to. Remove them too, or keep them.")
+        facts = [["Flow", f"#{d.get('flow_id')}"], ["Deleted", ", ".join(f["relative_path"] for f in files[:5]) + (f" and {n - 5} more" if n > 5 else "")]]
+        return lead, facts, [
+            _opt("remove_copies", "Remove the copies too", "Each copy is put aside at its destination (into .falcon-removed), not erased, and only if "
+                 "it is the flow's own, unedited; anything changed there is kept and said so.", "Remove them", "Resolved"),
+            _opt("keep_copies", "Keep the copies", "They stay where the flow put them. Nothing else changes.", "Keep them", "Resolved")], []
     who = d.get("consent_by") or "the destination's owner"
     lead = f"Flow {d.get('flow_id')} starts when {who} agrees to receive it. Agreeing is how they allow it."
     facts = [["Flow", f"#{d.get('flow_id')}"], ["From", d.get("from")], ["To", d.get("to")], ["Asked", d.get("asked_at")]]
@@ -235,6 +245,19 @@ async def _flow(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any
 async def _do_flow(ctx: Context, issue: dict[str, Any], key: str, payload: dict[str, Any]) -> dict[str, Any]:
     db, d = ctx.engine.db, issue["detail"]
     who = (ctx.viewed_by or ctx.identity).account_id
+    if key == "keep_copies":
+        await db.issues.log(issue["id"], "acted", "Kept the copies", who)
+        return await _finish(ctx, issue, "Kept the copies")
+    if key == "remove_copies":
+        from engine.flow import sync
+
+        asked = 0
+        for f in d.get("files") or []:
+            asked += await sync.remove_at_destinations(ctx.engine, int(f["flow_id"]), str(f["relative_path"]), decided=True)
+        await ctx.engine.audit.record(ctx, "flow.copies_removed", target_type="flows", target_id=d.get("flow_id"),
+                                      detail={"files": [f["relative_path"] for f in d.get("files") or []], "asked": asked})
+        await db.issues.log(issue["id"], "acted", f"Asked {asked} destination{'s' if asked != 1 else ''} to put the copies aside", who)
+        return await _finish(ctx, issue, "Removed the copies")
     flow_id = d["flow_id"]
     if key == "remind":
         await ctx.engine.push_to_account(d.get("consent_account_id"), "flow.consent_request",

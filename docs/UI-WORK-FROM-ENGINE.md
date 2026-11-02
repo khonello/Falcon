@@ -1,0 +1,66 @@
+# UI work the Engine is waiting on
+
+Written by the Engine session for the UI session (the user, 2 Nov 2026: separation of powers -- the Engine session never touches QML, pages
+or the concept; it writes here what the UI needs). Each item: what the Engine now offers, the handler, and what a page or window should do
+with it. The concept still decides how it looks. Strike an item when it is drawn.
+
+## Console (operator_client/gui/qml)
+
+### Flows (built 2 Nov 2026)
+- **A flow's name.** `flow.create` / `flow.edit` take `name` (1-80 characters); `flow.list` / `flow.status` return it. A flow without one is
+  still read as `<source folder>-<id>`.
+- **When it copies.** `run_mode`: `realtime` (as before), `hourly`, `manual` ("only when I run it"); in `flow.create` / `flow.edit`, returned
+  in the lists with `last_run_at`. The concept's "Real time / On a schedule / Only when I run it" select maps to these (on a schedule = hourly).
+- **Run.** `flow.run {flow_id}` -> `{sources_started}`; conflict when the flow is paused, waiting for consent, or its source is offline.
+- **Several sources merged into one flow.** `flow.create` takes `sources: [{source_pc_id, source_path, source_kind?}]` (1-10, not overlapping);
+  `flow.list` / `flow.status` return `sources` (every source, the first is the flow's own). The list shows one flow; pause, resume, edit,
+  run and retire act on all its sources.
+- **Carrying on from another flow.** `flow.create` takes `from_flow: {flow_id, destination_id}`: the new flow's source is that destination;
+  `source_flow_id` comes back. The concept's "a folder, or an existing flow" source.
+- **Files copied.** `flow.list` / `flow.status`: `files_copied: {total, today, last_at}` (the concept's Files copied column and figure).
+- **Steps.** Every step now does what it says (Rename by date, Convert to PDF, Compress to ZIP, Sort by file type, Sort by month). Convert to
+  PDF does text and JPEG only; a Word or Excel file still fails with the existing suggestion. An edit retires the old steps (`flow.list`
+  returns only the live ones), so the page's own "only stages a live destination reaches" filter is no longer needed.
+- **Another Admin picks the folder** (`let_them_choose` on a destination; the other Admin names it in `flow.consent {destination_path}`):
+  the console's New flow still says "not in the console yet". The Engine side is there since 1 Nov.
+
+### Rules (built 2 Nov 2026)
+- **Disk and network readings.** Event types `threshold.disk` (`match.percent`, of the system drive) and `threshold.network` (`match.kbps`
+  received, optional `duration_s`), beside cpu and memory. The rule builder's reading picker can enable Disk and Network.
+- **Would it have fired.** `control.threshold_backtest {type, value, minutes?, pc_ids?}` -> `{per_day[7] oldest first, total, by_machine
+  {host: n}, now: [hosts], samples, unread}` from the stored readings: the concept's backtest under the threshold slider.
+
+### Issues (built 2 Nov 2026)
+- **A file deleted at a flow's source.** A flow set to keep its copies (the default) now raises an issue of type `flow` ("A file was deleted
+  at a flow's source", one per flow, gathering the files) with two options from `issues.get`: `remove_copies` and `keep_copies`. The Issues
+  page draws options from the Engine, so it should need nothing new; check that it reads right.
+
+### Registry / Add a machine (built 2 Nov 2026)
+- **A machine with the console installed is let in as an Admin.** `enroll.confirm` by an IT Admin now accepts a request that asked to be an
+  Admin's workstation (the admin installer asks so); the level always follows what the machine asked (`requested_level`). Where Registry's
+  "Asking to join" shows such a request, Let it in works now; it should say it will be an IT Admin's machine.
+
+### Departments (built 1 Nov 2026, drawn)
+- `hierarchy.department_rename`, `hierarchy.pc_move`: on the Departments page. Still to draw: the "Every department" filter on Machines and the
+  department label on each machine (the concept's Machines).
+
+### From the 1 Nov Engine pass, not drawn yet (docs/still-not-done.md)
+- To-dos (`todo.list/add/done`), Messages (`chat.list/people/open/get/send/read`), the machine page's facts (`machines.get`: running_now, about,
+  keyboard, check_ins), Coming up (`automation.board`: next_at, coming_up), action output kinds and Try (`control.action_try`), flow runs as a
+  diff (`flow.runs`), the Restricted page's came_by / allowed / lately / flows_allowed (`marks.get`), At a glance (`detective.glance`), knocked
+  PCs (`registry.knocked`).
+
+## The Worker's own program and windows (worker_client/program/qml, worker_client/windows/qml)
+
+### Conversations (built 2 Nov 2026; the Worker concept's Messages tab and "An Admin writes to you" window)
+- The program's view (`localapp` op `view`) now has `messages: [{id, with, unread, last, from, at}]` and `unread`.
+- `localapp` op `conversation {id}` -> the conversation (messages oldest first, `from`, `at`, `mine`), marked read; op `reply {id, body}`.
+  `worker_client/program/client.py` has `conversation()` and `reply()`.
+- A new message puts a corner note in the view's `toasts`: `{id: "m<conversation id>", kind: "message", conversation_id, title, text}`; it
+  goes when the conversation is opened.
+- The person replies, never starts one: no compose anywhere on their side. "Ask for help" is cut (the `ask` op still exists; the program
+  should not offer it).
+
+### My machine (built 2 Nov 2026)
+- The view's `machine`: `{name, address, windows, falcon, connected, engine, account, signed_in_at, restarted_at, storage: {total_gb, free_gb,
+  used_percent}}` -- what "Copy these details" copies.
