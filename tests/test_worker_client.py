@@ -369,8 +369,17 @@ async def test_the_worker_relays_only_the_signals_an_automation_waits_for(engine
         ev = (await admin.call("control.event_create", {"type": "program.launched", "pc_ids": [org["w1_pc"]],
                                                         "match": {"process": "falcon-test-probe.exe"},
                                                         "action_ids": [note["id"]]}))["event"]
-        assert await _wait(lambda: "program.launched" in svc.ossignals.interest, timeout=5)
+        # its own rule, not just the type: Detective already listens for programs that take screenshots, so the type alone proves nothing
+        assert await _wait(lambda: any(m.get("process") == "falcon-test-probe.exe" for m in svc.ossignals.interest.get("program.launched", [])), timeout=5)
         assert "network.connected" not in svc.ossignals.interest          # nothing waits for the network: not read
+        # This test drives the comparing pass by hand: the service's own pass must not take one of the looks below, and Windows' live
+        # trace of program starts (running when the tests are elevated) is set aside, since with it the pass leaves programs to the trace.
+        if svc.ossignals._task is not None:
+            svc.ossignals._task.cancel()
+            svc.ossignals._task = None
+        if svc.ossignals.etw is not None:
+            await asyncio.to_thread(svc.ossignals.etw.stop)
+            svc.ossignals.etw = None
         await svc.ossignals.tick()                               # the baseline
         assert "network" not in svc.ossignals._base
         looks = iter([{1: "explorer.exe"}, {1: "explorer.exe", 2: "falcon-test-probe.exe"},

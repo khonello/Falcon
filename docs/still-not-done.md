@@ -48,8 +48,11 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
   - *(built 2 Nov 2026)* a bounded, hottest-first queue for what a machine missed, and reports on the spine's tell stage.
 
 ## Tests
-- One test fails whenever the whole Worker test file runs, on the committed code too: `test_the_worker_relays_only_the_signals_an_automation_waits_for`. It passes alone, so an earlier test is probably leaving something behind.
-- The Detective actor test `devops_at_night` takes about 140 s against the 180 s limit.
+- *(fixed 2 Nov 2026)* The Worker test that failed when its whole file ran waited for the rule's type, which Detective already listens for; it
+  now waits for its own rule. `test_signpipe`'s silent client now retries "every instance is busy", as a real client does.
+- *(fixed 2 Nov 2026)* `devops_at_night` took 96 s because Detective compared every pair of events on every event (`common/detective.py`
+  `_coverage`): a machine deleting a few hundred files held the Engine for half a minute. It is O(k log k) now, with the same results (one
+  run: 36 s -> 0.9 s).
 
 ## Not run for real yet
 - The session window end to end, a flow between two real PCs, and the tray, overlays and program on a real desktop (the VM plan).

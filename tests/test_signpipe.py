@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import hashlib
 import hmac
 import json
@@ -58,9 +59,22 @@ def test_a_console_gets_its_challenge_signed_over_a_real_pipe(pipe):
 
 
 @windows_only
+def _open_when_free(name: str, seconds: float = 3.0):
+    """Open the pipe as a client would. Between two of the server's instances Windows says "every instance is busy" (EINVAL from open):
+    a real client waits a moment and asks again (signpipe._ask does), and so does this one -- under a loaded test run that moment is real."""
+    end = time.monotonic() + seconds
+    while True:
+        try:
+            return open(name, "r+b", buffering=0)
+        except OSError as exc:
+            if exc.errno != errno.EINVAL or time.monotonic() >= end:
+                raise
+            time.sleep(0.05)
+
+
 def test_a_client_that_connects_and_says_nothing_does_not_hold_the_pipe(pipe):
     name, key, server = pipe
-    with open(name, "r+b", buffering=0):                                              # says nothing
+    with _open_when_free(name):                                                       # says nothing
         try:
             got = signpipe.sign("still-works", name=name)                                # others are served meanwhile
         except OSError as exc:

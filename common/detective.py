@@ -23,6 +23,7 @@ Stdlib only: it runs on a Worker or in the Engine, and is tested with scripted s
 
 from __future__ import annotations
 
+import itertools
 import re
 import time
 from collections import deque
@@ -798,18 +799,35 @@ class Detective:
                     i = parent[i]
                 return i
 
-            shared: set[int] = set()
-            for i, a in enumerate(mine):
-                for j in range(i):
-                    b = mine[j]
-                    by_thing = bool(a.things & b.things)
-                    if by_thing or abs(a.at - b.at) <= THREAD:
-                        parent[find(i)] = find(j)
-                        if by_thing:
-                            shared.update((i, j))
+            # Two events are one piece of work when they share a file or are within THREAD of each other. Built in O(k log k), not by comparing every
+            # pair (which, run on every event, made a machine deleting a few hundred files hold the Engine for half a minute): by time, joining each
+            # event to the next one in time is enough (any two within THREAD have everything between them within THREAD of its neighbour); by file,
+            # each event joins the first one that touched the same file.
+            def union(i: int, j: int, parent: list[int] = parent) -> None:
+                ri, rj = find(i), find(j)
+                if ri != rj:
+                    parent[ri] = rj
+
+            by_time = sorted(range(len(mine)), key=lambda i: mine[i].at)
+            for a, b in itertools.pairwise(by_time):
+                if mine[b].at - mine[a].at <= THREAD:
+                    union(b, a)
+            first_with: dict[Any, int] = {}
+            holders: dict[Any, int] = {}
+            for i, h in enumerate(mine):
+                for t in h.things:
+                    if t in first_with:
+                        union(i, first_with[t])
+                        holders[t] += 1
+                    else:
+                        first_with[t], holders[t] = i, 1
+            shared = {i for i, h in enumerate(mine) if any(holders[t] > 1 for t in h.things)}
+            groups: dict[int, list[int]] = {}
+            for i in range(len(mine)):
+                groups.setdefault(find(i), []).append(i)
             fresh = {id(h) for h in new}
             for root in {find(i) for i, h in enumerate(mine) if id(h) in fresh}:
-                idx = [i for i in range(len(mine)) if find(i) == root]
+                idx = groups[root]
                 comp = [mine[i] for i in idx]
                 own: dict[str, list[float]] = {}
                 kids: dict[str, list[float]] = {}
