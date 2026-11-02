@@ -225,7 +225,7 @@ async def test_flow_relay_between_two_workers_with_stages_and_conflict(engine, o
             "stages": [{"stage_type": "transformation", "config": {"to": "pdf"}}],
             "destinations": [{"destination_pc_id": org["w2_pc"], "destination_path": str(dst / "pdfs"), "parent_index": 0}]}))["flow"]
         (src / "sub").mkdir()
-        (src / "sub" / "memo.txt").write_text("x", encoding="utf-8")
+        (src / "sub" / "memo.docx").write_bytes(b"PK not really a Word file")              # PDF from Word needs Office: unsupported here
 
         async def paused():
             f = await engine.db.flows.get(bad["id"])

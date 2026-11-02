@@ -63,6 +63,7 @@ class Transfer:
     content_b64: str | None = None
     parts: dict[int, bytes] = field(default_factory=dict)      # chunks arriving from the source
     data: bytes | None = None                                  # the whole file, once it has arrived
+    modified: str | None = None                                # when it was last changed at the source (dates a step uses)
     created: float = field(default_factory=time.monotonic)
 
 
@@ -417,7 +418,7 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
             continue
         base = {"transfer_id": transfer.id, "flow_id": flow["id"], "destination_id": dest["id"],
                 "destination_path": folder, "relative_path": name,
-                "hash": transfer.hash,
+                "hash": transfer.hash, "modified": transfer.modified,
                 "stages": [st for st in flowdefs.stage_chain(flow, dest) if not (followed and st.get("stage_type") == "categorization")],
                 # what the flow itself last wrote there: anything else already at that place is someone's, and is kept, not overwritten
                 "previous": await engine.db.flows.last_written_for(dest["id"], transfer.relative_path)}
@@ -471,6 +472,7 @@ async def content(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         _transfers.pop(transfer.id, None)
         return {"accepted": False}
     transfer.hash = payload.get("hash") or transfer.hash
+    transfer.modified = str(payload["modified"]) if payload.get("modified") else transfer.modified
     if not await guard.gate(ctx.engine, transfer.flow_id, transfer.source_pc_id, transfer.source_path, transfer.hash, step="when its content arrived"):
         _transfers.pop(transfer.id, None)
         return {"accepted": False, "refused": "restricted"}

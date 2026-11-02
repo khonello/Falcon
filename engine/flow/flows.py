@@ -45,6 +45,15 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 STAGE_TYPES = ("branch", "transformation", "categorization")
+# A step as the console names it (its `op`) and what the Worker reads for it (worker_client/flowsync.py). The name is kept in the config, so
+# it comes back as it was picked; the rest is what is done.
+STEP_OPS: dict[str, tuple[str, dict[str, str]]] = {
+    "Rename by date": ("transformation", {"rename": "date"}),
+    "Convert to PDF": ("transformation", {"to": "pdf"}),
+    "Compress to ZIP": ("transformation", {"pack": "zip"}),
+    "Sort by file type": ("categorization", {"by": "extension"}),
+    "Sort by month": ("categorization", {"by": "month"}),
+}
 STATUSES = ("active", "paused", "inactive")
 
 # Predefined, reactive fix suggestions per (stage type, failure kind) -- built-in knowledge,
@@ -154,7 +163,15 @@ def _parse_structure(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], lis
         parent = st.get("parent_index")
         if parent is not None and not (0 <= int(parent) < i):
             raise ProtocolError(ErrorCode.INVALID, f"stage {i}: parent_index must reference an earlier stage")
-        stages.append({"stage_type": stype, "parent_index": parent, "config": st.get("config")})
+        config = st.get("config")
+        op = config.get("op") if isinstance(config, dict) else None
+        if op is not None:
+            if op not in STEP_OPS:
+                raise ProtocolError(ErrorCode.INVALID, f"stage {i}: {op!r} is not a step (one of {', '.join(STEP_OPS)})")
+            if STEP_OPS[op][0] != stype:
+                raise ProtocolError(ErrorCode.INVALID, f"stage {i}: {op} is a {STEP_OPS[op][0]} step")
+            config = {**config, **STEP_OPS[op][1]}
+        stages.append({"stage_type": stype, "parent_index": parent, "config": config})
     dests: list[dict[str, Any]] = []
     for i, d in enumerate(dests_in):
         path = str(d.get("destination_path") or d.get("path") or "").strip()

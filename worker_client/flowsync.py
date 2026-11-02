@@ -11,10 +11,14 @@
                                                      -> the source deleted it and the flow mirrors deletions: move our own, unedited copy aside
                                                         (into `.falcon-removed`), then flow.remove_result {status: removed|kept|missing}
 
-Stages (v1):
-  * transformation {"to": "<ext>"}  -- converts when a converter is registered for the pair;
-    otherwise fails with kind `unsupported_format` (the Engine surfaces the predefined suggestion)
-  * categorization {"by": "extension"} -- places the file in a subfolder named by extension
+Stages (the console's step names, which the Engine turns into these):
+  * transformation {"to": "<ext>"}  -- Convert to <EXT>: PDF from text and JPEG (worker_client/pdf.py), a few text-to-text pairs;
+    anything else fails with kind `unsupported_format` (the Engine surfaces the predefined suggestion)
+  * transformation {"rename": "date"} -- Rename by date: "YYYY-MM-DD name.ext", the date the file was last changed at its source
+  * transformation {"pack": "zip"}   -- Compress to ZIP: "name.ext.zip" holding the file (the same bytes every time for the same file)
+  * categorization {"by": "extension"} -- Sort by file type: a subfolder named by the extension
+  * categorization {"by": "month"}   -- Sort by month: a subfolder "YYYY-MM", the month the file was last changed at its source
+The source's modified time comes with the content (`modified`, ISO 8601); a copy that does not have it uses the day it is written.
 
 Every write records its own hash so the Engine's write attribution can tell our writes from
 external ones when the file event for our own write comes back through the index.
@@ -25,19 +29,24 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import io
 import logging
 import os
+import zipfile
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from worker_client import pdf
 
 log = logging.getLogger(__name__)
 
 Reporter = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 Converter = Callable[[bytes, str, str], bytes]  # (content, from_ext, to_ext) -> content
 
-# Registered converters: (from, to) -> fn. v1 ships text-safe identity conversions only;
-# real format conversion (docx->pdf) is a deployment concern (LibreOffice etc.) plugged in here.
+# Registered converters: (from, to) -> fn, beside PDF from text and JPEG (worker_client/pdf.py). Office formats need Office or LibreOffice on
+# the machine; that is a deployment concern plugged in here, and until then they say `unsupported_format`.
 CONVERTERS: dict[tuple[str, str], Converter] = {
     ("txt", "md"): lambda data, _f, _t: data,
     ("md", "txt"): lambda data, _f, _t: data,
@@ -64,18 +73,20 @@ class FlowSync:
             if path.stat().st_size > self.read_limit:
                 raise OSError("file too large for relay")
             data = await asyncio.to_thread(path.read_bytes)
+            modified = datetime.fromtimestamp(path.stat().st_mtime).astimezone().isoformat(timespec="seconds")
         except OSError as exc:
             log.warning("flow.read %s failed: %s", path, exc)
             await self.report("flow.content", {"transfer_id": transfer_id, "error": "unreadable"})
             return
         digest = hashlib.sha256(data).hexdigest()
         if len(data) <= CHUNK_BYTES:
-            await self.report("flow.content", {"transfer_id": transfer_id, "hash": digest, "content_b64": base64.b64encode(data).decode("ascii")})
+            await self.report("flow.content", {"transfer_id": transfer_id, "hash": digest, "modified": modified,
+                                               "content_b64": base64.b64encode(data).decode("ascii")})
             return
         total = (len(data) + CHUNK_BYTES - 1) // CHUNK_BYTES
         for index in range(total):
             piece = data[index * CHUNK_BYTES:(index + 1) * CHUNK_BYTES]
-            await self.report("flow.content", {"transfer_id": transfer_id, "hash": digest, "chunk": {"index": index, "total": total},
+            await self.report("flow.content", {"transfer_id": transfer_id, "hash": digest, "modified": modified, "chunk": {"index": index, "total": total},
                                                "content_b64": base64.b64encode(piece).decode("ascii")})
 
     async def on_list(self, payload: dict[str, Any]) -> None:
@@ -121,8 +132,9 @@ class FlowSync:
             data = piece
             rel = str(payload["relative_path"]).replace("\\", "/")
             target = Path(str(payload["destination_path"])) / rel
+            when = _when(payload.get("modified"))
             for stage in payload.get("stages") or []:
-                target, data = self._apply_stage(stage, target, data)
+                target, data = self._apply_stage(stage, target, data, when)
             target.parent.mkdir(parents=True, exist_ok=True)
             size_before = target.stat().st_size if target.is_file() else None
             preserved = await asyncio.to_thread(self._preserve_unknown, target, data, payload.get("previous"))
@@ -217,15 +229,20 @@ class FlowSync:
 
     # --- stages ---------------------------------------------------------------------------------
 
-    def _apply_stage(self, stage: dict[str, Any], target: Path, data: bytes) -> tuple[Path, bytes]:
+    def _apply_stage(self, stage: dict[str, Any], target: Path, data: bytes, when: datetime | None = None) -> tuple[Path, bytes]:
         kind = stage.get("stage_type")
         cfg = stage.get("config") or {}
+        when = when or datetime.now().astimezone()
+        if kind == "transformation" and cfg.get("rename") == "date":
+            return target.with_name(f"{when:%Y-%m-%d} {target.name}"), data
+        if kind == "transformation" and cfg.get("pack") == "zip":
+            return target.with_name(target.name + ".zip"), _zip_one(target.name, data, when)
         if kind == "transformation":
             to = str(cfg.get("to", "")).lower().lstrip(".")
             frm = target.suffix.lower().lstrip(".")
             if not to or to == frm:
                 return target, data
-            conv = CONVERTERS.get((frm, to))
+            conv = CONVERTERS.get((frm, to)) or (_pdf if to == "pdf" and pdf.convertible(frm) else None)
             if conv is None:
                 raise StageError("transformation", "unsupported_format")
             try:
@@ -235,11 +252,42 @@ class FlowSync:
                 raise StageError("transformation", "convert_failed") from exc
         if kind == "categorization":
             by = str(cfg.get("by", "extension"))
+            if by == "month":
+                return target.parent / f"{when:%Y-%m}" / target.name, data
             if by != "extension":
                 raise StageError("categorization", "place_failed")
             folder = target.suffix.lower().lstrip(".") or "other"
             return target.parent / folder / target.name, data
         return target, data
+
+
+def _when(raw: Any) -> datetime | None:
+    """The source's modified time from flow.apply, or None (then the step uses the day it writes)."""
+    if not raw:
+        return None
+    try:
+        when = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return when.astimezone() if when.tzinfo else when
+
+
+def _zip_one(name: str, data: bytes, when: datetime) -> bytes:
+    """One file in a ZIP. Its date inside is the file's own, so the same file packs to the same bytes and is not sent again for nothing."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        info = zipfile.ZipInfo(name, date_time=(max(when.year, 1980), when.month, when.day, when.hour, when.minute, when.second - when.second % 2))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = 0o644 << 16
+        z.writestr(info, data)
+    return out.getvalue()
+
+
+def _pdf(data: bytes, frm: str, _to: str) -> bytes:
+    try:
+        return pdf.to_pdf(data, frm)
+    except pdf.NotConvertible as exc:
+        raise StageError("transformation", "unsupported_format") from exc
 
 
 def _same_path(a: str, b: str) -> bool:
