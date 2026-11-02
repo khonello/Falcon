@@ -35,7 +35,12 @@ def _parse_structure(args: Args) -> tuple[list[dict[str, Any]], list[dict[str, A
 
 
 def _flow_text(flow: dict[str, Any]) -> str:
-    out = kv(flow, skip=("stages", "destinations"))
+    out = kv(flow, skip=("stages", "destinations", "sources", "files_copied"))
+    if len(flow.get("sources") or []) > 1:
+        out += "\nsources: " + "; ".join(f"{s.get('source_hostname') or s['source_pc_id']} {s['source_path']}" for s in flow["sources"])
+    if flow.get("files_copied"):
+        c = flow["files_copied"]
+        out += f"\nfiles copied: {c['total']} ({c['today']} today)"
     if flow.get("suggestion"):
         out += f"\nsuggestion: {flow['suggestion']}"
     out += "\n\nstages:\n" + table(flow.get("stages", []), ["id", "stage_type", "parent_stage_id", "config"])
@@ -50,17 +55,22 @@ def _flow_text(flow: dict[str, Any]) -> str:
     return out
 
 
-@command("flow", "create", "src=<pc_id>:<path> [file] dest=<pc|remote>:<path>[@stage#] [dest=..] [stage=<type>[@parent#][:k=v,..]] [confirm]",
-         "Create a flow (`file`: the source is one file, followed wherever it moves); consent / collision / cycle issues come back for you to resolve")
+@command("flow", "create", "src=<pc_id>:<path> [src=..] [file] dest=<pc|remote>:<path>[@stage#] [dest=..] [stage=<type>[@parent#][:k=v,..]] "
+         "[name=..] [when=realtime|hourly|manual] [confirm]",
+         "Create a flow (several src= merge into one; `file`: the source is one file, followed wherever it moves; a step by name: "
+         "stage=transformation:op=Rename by date); consent / collision / cycle issues come back for you to resolve")
 async def flow_create(ctx: ShellContext, args: Args) -> str:
-    src = args.opt("src")
-    if not src or ":" not in src:
+    srcs = args.all("src")
+    if not srcs or any(":" not in s for s in srcs):
         raise UsageError("src=<pc_id>:<path> required")
-    pc, _, path = src.partition(":")
+    kind = "file" if args.flag("file") else "folder"
+    sources = [{"source_pc_id": int(pc), "source_path": path, "source_kind": kind} for pc, _, path in (s.partition(":") for s in srcs)]
     dests, stages = _parse_structure(args)
-    res = await ctx.call("flow.create", {"source_pc_id": int(pc), "source_path": path, "destinations": dests,
-                                         "source_kind": "file" if args.flag("file") else "folder",
-                                         "stages": stages, "confirm_collisions": args.flag("confirm")})
+    payload = {"sources": sources, "destinations": dests, "stages": stages, "confirm_collisions": args.flag("confirm"),
+               "run_mode": args.opt("when") or "realtime"}
+    if args.opt("name"):
+        payload["name"] = args.opt("name")
+    res = await ctx.call("flow.create", payload)
     f = res["flow"]
     out = f"flow {f['id']} {f['status']} (consent: {f['consent_status']})"
     if res["consent_pending"]:
@@ -114,6 +124,12 @@ async def flow_edit(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("flow.edit", {"flow_id": args.get_int(0, "flow_id"), "destinations": dests, "stages": stages,
                                        "confirm_collisions": args.flag("confirm")})
     return _flow_text(res["flow"])
+
+
+@command("flow", "run", "<flow_id>", "Copy now what changed (the only way a flow set to `when=manual` moves anything)")
+async def flow_run(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("flow.run", {"flow_id": args.get_int(0, "flow_id")})
+    return f"flow {res['flow_id']}: running from {res['sources_started']} source(s)"
 
 
 @command("flow", "pause", "<flow_id>", "Pause a flow")

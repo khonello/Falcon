@@ -452,7 +452,12 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
   graph side by side with the QML). The console now keeps each step's name in its stage `config` as `op` (plus `by: "extension"` for
   Sort by file type, which the Worker already reads) and reads a flow's steps from the `parent_stage_id` tree: this is the smallest
   shape that lets a step come back as it was picked. The full `config` shape is still a deferred decision (spec §10), so it is for
-  the user to confirm. Open: (1) **the Worker carries out only Sort by file type.** Rename by date, Convert to PDF, Compress to ZIP and
+  the user to confirm. **Built 2 Nov 2026** (migration 047; `flow.run`; `worker_client/pdf.py`): every step does what it says (Convert to
+  PDF from text and JPEG only; Office formats need Office or LibreOffice and still say unsupported); a flow's name; real time, hourly or
+  only when run; several sources merged into one flow (a further source is a flow of its own pointing at the first; a file of the same name
+  from another source is kept beside, never overwritten); carrying on from another flow's destination; files copied per flow (all time and
+  today); an edit retires the old steps. Still not: (4) below, and asking another Admin to pick the folder from the console (the TUI does it).
+  Was open: (1) **the Worker carries out only Sort by file type.** Rename by date, Convert to PDF, Compress to ZIP and
   Sort by month are kept and drawn, but they leave the files as they are (`worker_client/flowsync.py` converts only txt/md/csv).
   (2) **An edit leaves the old stages on record.** `FlowsRepo.replace_structure` adds new `flow_stages` rows and keeps the old ones,
   and `flow.list` returns them all. The console counts only stages a live destination reaches, but the Engine should mark the old

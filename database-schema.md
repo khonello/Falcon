@@ -665,3 +665,4 @@ reused by `pair_key`, or the one group of every Admin, whose members are read fr
 `outcome` (new / changed / kept_beside / removed), `bytes_before` and `bytes_after` (migration 045: a flow's last sync as a diff).
 `flows.source_kind` (folder / file) and `flow_destinations.followed_path` (migration 046: a single-file flow follows its file at the
 source, and its copy moved at a destination).
+`flows.name`, `flows.run_mode` (realtime / hourly / manual), `flows.last_run_at`, `flows.merged_into` (a further source of a flow with several), `flows.source_flow_id` (the flow it carries on from) and `flow_stages.retired_at` (an edit's old steps; migration 047).

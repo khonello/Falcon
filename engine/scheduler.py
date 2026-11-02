@@ -56,6 +56,7 @@ class Scheduler:
         self.every("enroll.expire", 600.0, self._expire_enrollments)
         self.every("flow.transfers", 30.0, self._expire_flow_transfers)
         self.every("flow.heal", 1200.0, self._heal_flows)
+        self.every("flow.hourly", 3600.0, self._hourly_flows)
         self.every("marks.heal", 1800.0, self._heal_marks)
         self.every("tasks.heal", 600.0, self._heal_tasks)
         self.every("cost.probe", 30.0, self.engine.cost.probe)
@@ -87,6 +88,11 @@ class Scheduler:
         from engine.flow import sync
 
         await sync.heal(self.engine)
+
+    async def _hourly_flows(self) -> None:
+        from engine.flow import sync
+
+        await sync.hourly(self.engine)
 
     async def _heal_marks(self) -> None:
         from engine.console import marks

@@ -269,6 +269,63 @@ async def run_checks(engine: Engine, creator: dict[str, Any], source_pc_id: int,
 
 # --- handlers -----------------------------------------------------------------------------------
 
+RUN_MODES = ("realtime", "hourly", "manual")
+NAME_MAX = 80
+
+
+def _name(payload: dict[str, Any]) -> str | None:
+    """A flow's own name ("month-end"): one line, at most 80 characters. None when not given (it then reads as `<source folder>-<id>`)."""
+    raw = payload.get("name")
+    if raw is None:
+        return None
+    name = " ".join(str(raw).split())
+    if not name or len(name) > NAME_MAX:
+        raise ProtocolError(ErrorCode.INVALID, f"a flow's name is one line of 1 to {NAME_MAX} characters")
+    return name
+
+
+async def _sources(ctx: Context, payload: dict[str, Any]) -> tuple[list[dict[str, Any]], int | None]:
+    """Where a new flow reads from: one source ({source_pc_id, source_path, source_kind?}), several merged into one flow ({"sources": [...]}), or
+    the destination of a flow it carries on from ({"from_flow": {flow_id, destination_id}}). -> ([{source_pc_id, source_path, source_kind}], source_flow_id)."""
+    db = ctx.engine.db
+    if payload.get("from_flow") is not None:
+        ref = payload["from_flow"]
+        if not isinstance(ref, dict):
+            raise ProtocolError(ErrorCode.INVALID, "from_flow is {flow_id, destination_id}")
+        before = await db.flows.get(int_field(ref, "flow_id"))
+        if before is None or before["status"] == "inactive":
+            raise ProtocolError(ErrorCode.NOT_FOUND, "no such flow to carry on from")
+        dest = next((d for d in before["destinations"] if d["id"] == int_field(ref, "destination_id")), None)
+        if dest is None or dest["destination_pc_id"] is None or not dest["destination_path"]:
+            raise ProtocolError(ErrorCode.INVALID, "carry on from one of that flow's destinations, on a machine, with its folder chosen")
+        return [{"source_pc_id": dest["destination_pc_id"], "source_path": dest["destination_path"], "source_kind": "folder"}], before["id"]
+    given = payload.get("sources")
+    if given is None:
+        given = [{"source_pc_id": payload.get("source_pc_id"), "source_path": payload.get("source_path"), "source_kind": payload.get("source_kind")}]
+    if not isinstance(given, list) or not given or len(given) > 10:
+        raise ProtocolError(ErrorCode.INVALID, "sources is a list of 1 to 10 {source_pc_id, source_path, source_kind?}")
+    out: list[dict[str, Any]] = []
+    for s in given:
+        if not isinstance(s, dict):
+            raise ProtocolError(ErrorCode.INVALID, "each source is {source_pc_id, source_path, source_kind?}")
+        src = {"source_pc_id": int_field(s, "source_pc_id"), "source_path": str_field(s, "source_path"),
+               "source_kind": str_field(s, "source_kind", required=False, choices=("folder", "file")) or "folder"}
+        if any(o["source_pc_id"] == src["source_pc_id"] and overlaps(o["source_path"], src["source_path"]) for o in out):
+            raise ProtocolError(ErrorCode.INVALID, "two of the sources overlap: merge folders that are apart")
+        out.append(src)
+    return out, None
+
+
+async def _group(engine: Engine, flow: dict[str, Any]) -> list[dict[str, Any]]:
+    """The flow and the flows merged into it, as full flows (first one first)."""
+    out = [flow]
+    for r in (await engine.db.flows.group(flow["id"]))[1:]:
+        full = await engine.db.flows.get(r["id"])
+        if full is not None:
+            out.append(full)
+    return out
+
+
 def _on_delete(payload: dict[str, Any]) -> str | None:
     """What happens at the destinations when a file is deleted at the source: "keep" (the default) or "mirror". None when not given."""
     if payload.get("on_source_delete") is None:
@@ -283,6 +340,12 @@ async def _flow_view(engine: Engine, flow: dict[str, Any]) -> dict[str, Any]:
     names = await engine.db.flows.hostnames([flow["source_pc_id"]] + [d["destination_pc_id"] for d in flow.get("destinations", [])
                                                                        if d.get("destination_pc_id")])
     view["source_hostname"] = names.get(flow["source_pc_id"])
+    group = await engine.db.flows.group(flow["id"])
+    view["sources"] = [{"source_pc_id": g["source_pc_id"], "source_path": g["source_path"], "source_kind": g.get("source_kind"),
+                        "source_hostname": g.get("source_hostname")} for g in group] or [
+                      {"source_pc_id": flow["source_pc_id"], "source_path": flow["source_path"], "source_kind": flow.get("source_kind"),
+                       "source_hostname": view["source_hostname"]}]
+    view["files_copied"] = row((await engine.db.flows.copied_counts([flow["id"]]))[flow["id"]])
     for d in view.get("destinations", []):
         d["destination_hostname"] = names.get(d.get("destination_pc_id")) if d.get("destination_pc_id") else None
         d["suggestion"] = suggestion_for(d.get("paused_reason"))
@@ -304,35 +367,51 @@ async def _load_owned(ctx: Context, flow_id: int) -> dict[str, Any]:
 @handler("flow.create")
 async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"source_pc_id", "source_path", "destinations": [{destination_pc_id?, destination_path,
-    parent_index?}], "stages": [{stage_type, parent_index?, config?}], "confirm_collisions": bool}
+    parent_index?}], "stages": [{stage_type, parent_index?, config?}], "confirm_collisions": bool,
+    "name"?, "run_mode"?: realtime|hourly|manual, "sources"?: [{source_pc_id, source_path, source_kind?}], "from_flow"?: {flow_id, destination_id}}
+
+    Several sources merge into one flow: the first is the flow, each further one a flow of its own pointing at it (`merged_into`) with the same
+    name, steps and destinations. A file of the same name from two sources is never overwritten: the one already there is kept beside it.
 
     the head of the organisation: any source/destination. Admin: source on own PC or a Worker PC in their
     department. Consent, collision and cycle checks run before anything is stored."""
     ident = require_role(ctx, "super_user", "admin")
     creator = await ctx.engine.db.accounts.by_id(ident.account_id)
     assert creator is not None
-    source_pc_id = int_field(payload, "source_pc_id")
-    source_path = str_field(payload, "source_path")
-    source_kind = str_field(payload, "source_kind", required=False, choices=("folder", "file")) or "folder"
+    srcs, source_flow_id = await _sources(ctx, payload)
+    source_pc_id, source_path = srcs[0]["source_pc_id"], srcs[0]["source_path"]
+    name = _name(payload)
+    run_mode = str_field(payload, "run_mode", required=False, choices=RUN_MODES) or "realtime"
     dests, stages = _parse_structure(payload)
     on_delete = _on_delete(payload)
-    src = await ctx.engine.db.accounts.pc(source_pc_id)
-    if src is None:
-        raise ProtocolError(ErrorCode.NOT_FOUND, "no such source pc")
-    if ident.role == "admin" and not in_scope(ident, src["department_id"]):
-        raise ProtocolError(ErrorCode.FORBIDDEN, "source must be in your department")
+    src = None
+    for s in srcs:
+        pc = await ctx.engine.db.accounts.pc(s["source_pc_id"])
+        if pc is None:
+            raise ProtocolError(ErrorCode.NOT_FOUND, "no such source pc")
+        if ident.role == "admin" and not in_scope(ident, pc["department_id"]):
+            raise ProtocolError(ErrorCode.FORBIDDEN, "source must be in your department")
+        src = src or pc
+    assert src is not None
     await _resolve_owners(ctx.engine, dests, creator)
     checks = await run_checks(ctx.engine, creator, source_pc_id, source_path, dests,
                               confirm_collisions=bool(payload.get("confirm_collisions")))
+    for s in srcs[1:]:                                   # each further source is checked against the same destinations: no cycle, no own folder
+        await run_checks(ctx.engine, creator, s["source_pc_id"], s["source_path"], dests, confirm_collisions=True)
     pending = checks["needs_consent"]
     for d in dests:
         d["pre_flight_check_status"] = "passed"
-    flow_id = await ctx.engine.db.flows.create(
-        {"created_by_account_id": ident.account_id, "source_pc_id": source_pc_id, "source_path": source_path,
-         "consent_status": "pending" if pending else "not_required", "on_source_delete": on_delete or "keep", "source_kind": source_kind},
-        dests, stages)
+    made: list[int] = []
+    for s in srcs:
+        made.append(await ctx.engine.db.flows.create(
+            {"created_by_account_id": ident.account_id, "source_pc_id": s["source_pc_id"], "source_path": s["source_path"],
+             "consent_status": "pending" if pending else "not_required", "on_source_delete": on_delete or "keep", "source_kind": s["source_kind"],
+             "name": name, "run_mode": run_mode, "merged_into": made[0] if made else None, "source_flow_id": source_flow_id},
+            [dict(d) for d in dests], stages))
+    flow_id = made[0]
     if pending:
-        await ctx.engine.db.flows.set_status(flow_id, "paused", "consent:pending")
+        for fid in made:
+            await ctx.engine.db.flows.set_status(fid, "paused", "consent:pending")
         names = await ctx.engine.db.accounts.display_names_for(pending[0]["owner_account_id"], [ident.account_id])
         for d in pending:
             await ctx.engine.push_to_account(d["owner_account_id"], "flow.consent_request",
@@ -355,27 +434,30 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                     "destination_pc_id": first.get("destination_pc_id"), "asked_at": datetime.now(timezone.utc).isoformat()})
     await ctx.engine.audit.record(ctx, "flow.created", target_type="flows", target_id=flow_id,
                                   detail={"source_pc_id": source_pc_id, "destinations": len(dests), "on_source_delete": on_delete or "keep",
+                                          "name": name, "run_mode": run_mode, "merged": made[1:], "source_flow_id": source_flow_id,
                                           "consent_pending": [d["owner_account_id"] for d in pending],
                                           "collisions_confirmed": len(checks["collisions"])})
     # A flow does not carry anything restricted without the owner's consent: if either end already is restricted, the flow starts paused and the owner is asked.
     from engine.flow import guard
 
     held = False
-    ends = [(source_pc_id, source_path)] + [(d["destination_pc_id"], d["destination_path"]) for d in dests]
-    for pc, path in ends:
-        if not path:
-            continue                                     # a folder the destination Admin has not chosen yet: checked when they choose
-        missing = await guard.unconsented(ctx.engine, flow_id, pc, path)
-        if missing:
-            await guard.request(ctx.engine, flow_id, missing, path, step="when the flow was made")
-            held = True
+    for fid, s in zip(made, srcs):
+        ends = [(s["source_pc_id"], s["source_path"])] + [(d["destination_pc_id"], d["destination_path"]) for d in dests]
+        for pc, path in ends:
+            if not path:
+                continue                                 # a folder the destination Admin has not chosen yet: checked when they choose
+            missing = await guard.unconsented(ctx.engine, fid, pc, path)
+            if missing:
+                await guard.request(ctx.engine, fid, missing, path, step="when the flow was made")
+                held = True
     await ctx.engine.announce("flow.created", {"flow_id": flow_id, "source_pc_id": source_pc_id, "held": held, "pending": bool(pending)}, pc=source_pc_id)
     flow = await ctx.engine.db.flows.get(flow_id)
     assert flow is not None
     if not pending and not held:
         from engine.flow import sync
 
-        sync.catch_up_later(ctx.engine, flow_id)               # what is already in the source folder is sent too
+        for fid in made:
+            sync.catch_up_later(ctx.engine, fid)               # what is already in the source folder is sent too (when it runs on its own)
     return {"flow": await _flow_view(ctx.engine, flow), "consent_pending": bool(pending), "restricted_pending": held,
             "collisions_confirmed": checks["collisions"]}
 
@@ -423,10 +505,26 @@ async def consent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await issues.resolve_source(ctx.engine, "flow_consent", flow_id, "Agreed" if granted else "Declined")
     await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.consent_answered",
                                      {"flow_id": flow_id, "granted": granted, "by_account_id": ident.account_id})
-    if granted and not await db.flows.consents(flow_id, states=("asked",)):
-        from engine.flow import sync
+    from engine.flow import sync
 
+    if granted and not await db.flows.consents(flow_id, states=("asked",)):
         sync.catch_up_later(ctx.engine, flow_id)
+    for other in (await _group(ctx.engine, flow))[1:]:      # a merged source shares the destinations, so the same answer is theirs
+        if other["consent_status"] != "pending":
+            continue
+        chosen = [d["destination_path"] for d in (await db.flows.get(flow_id) or {}).get("destinations", [])]
+        for d, path in zip(other["destinations"], chosen):
+            if not d["destination_path"] and path:
+                await db.flows.set_destination_path(d["id"], path)
+        if granted:
+            await db.flows.set_consent(other["id"], "granted")
+            if await db.flows.consents(other["id"], states=("asked",)):
+                await db.flows.set_status(other["id"], "paused", "restricted:consent")
+            else:
+                await db.flows.set_status(other["id"], "active", None)
+                sync.catch_up_later(ctx.engine, other["id"])
+        else:
+            await db.flows.set_status(other["id"], "inactive", "consent:denied")
     return {"flow_id": flow_id, "granted": granted}
 
 
@@ -543,7 +641,8 @@ async def restricted_revoke(ctx: Context, payload: dict[str, Any]) -> dict[str, 
 
 @handler("flow.edit")
 async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Replace destinations/stages; the same pre-flight checks run again. {"flow_id", ...}"""
+    """Replace destinations/stages; the same pre-flight checks run again. {"flow_id", ..., "name"?, "run_mode"?}. A flow with merged sources
+    changes as one: every source gets the new steps and destinations."""
     ident = require_role(ctx, "super_user", "admin")
     flow_id = int_field(payload, "flow_id")
     flow = await _load_owned(ctx, flow_id)
@@ -556,7 +655,15 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if checks["needs_consent"]:
         raise ProtocolError(ErrorCode.FORBIDDEN, "new destinations outside your authority need a new flow "
                                                  "(consent is requested at creation)")
-    await ctx.engine.db.flows.replace_structure(flow_id, dests, stages)
+    group = await _group(ctx.engine, flow)
+    for other in group[1:]:
+        await run_checks(ctx.engine, creator, other["source_pc_id"], other["source_path"], dests, confirm_collisions=True, exclude_flow_id=other["id"])
+    for member in group:
+        await ctx.engine.db.flows.replace_structure(member["id"], [dict(d) for d in dests], stages)
+    if "name" in payload or "run_mode" in payload:
+        name = _name(payload) if "name" in payload else flow.get("name")
+        mode = str_field(payload, "run_mode", required=False, choices=RUN_MODES) or flow.get("run_mode") or "realtime"
+        await ctx.engine.db.flows.set_name_and_mode(flow_id, name=name, run_mode=mode)
     from engine.flow import guard
 
     for d in dests:
@@ -565,7 +672,8 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             await guard.request(ctx.engine, flow_id, missing, d["destination_path"], step="when the flow was edited")
     on_delete = _on_delete(payload)
     if on_delete and on_delete != flow.get("on_source_delete"):
-        await ctx.engine.db.flows.set_on_source_delete(flow_id, on_delete)
+        for member in group:
+            await ctx.engine.db.flows.set_on_source_delete(member["id"], on_delete)
         await ctx.engine.audit.record(ctx, "flow.delete_rule_changed", target_type="flows", target_id=flow_id, detail={"on_source_delete": on_delete})
     await ctx.engine.audit.record(ctx, "flow.edited", target_type="flows", target_id=flow_id)
     updated = await ctx.engine.db.flows.get(flow_id)
@@ -577,8 +685,8 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def pause(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     require_account(ctx)
     flow_id = int_field(payload, "flow_id")
-    await _load_owned(ctx, flow_id)
-    await ctx.engine.db.flows.set_status(flow_id, "paused", "manual")
+    for member in await _group(ctx.engine, await _load_owned(ctx, flow_id)):
+        await ctx.engine.db.flows.set_status(member["id"], "paused", "manual")
     await ctx.engine.audit.record(ctx, "flow.paused", target_type="flows", target_id=flow_id)
     await ctx.engine.announce("flow.paused", {"flow_id": flow_id, "by": "person"})
     return {"flow_id": flow_id, "status": "paused"}
@@ -604,8 +712,12 @@ async def resume(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             raise ProtocolError(ErrorCode.CONFLICT, f"This flow would carry something restricted ({missing[0].reason}); it needs the consent of {guard.deciders_text(missing[0])}")
     if dest_id is not None:
         await ctx.engine.db.flows.set_destination_pause(dest_id, None)
+    others = (await _group(ctx.engine, flow))[1:]
     if flow["status"] == "paused":
         await ctx.engine.db.flows.set_status(flow_id, "active", None)
+        for other in others:
+            if other["status"] == "paused" and other["pause_reason"] == flow["pause_reason"]:
+                await ctx.engine.db.flows.set_status(other["id"], "active", None)
     await ctx.engine.audit.record(ctx, "flow.resumed", target_type="flows", target_id=flow_id,
                                   detail={"destination_id": dest_id})
     updated = await ctx.engine.db.flows.get(flow_id)
@@ -613,8 +725,29 @@ async def resume(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     if updated["status"] == "active":
         from engine.flow import sync
 
-        sync.catch_up_later(ctx.engine, flow_id)               # what was missed while it was paused or failed is sent now
+        for fid in [flow_id] + [o["id"] for o in others]:
+            sync.catch_up_later(ctx.engine, fid)               # what was missed while it was paused or failed is sent now
     return {"flow": await _flow_view(ctx.engine, updated)}
+
+
+@handler("flow.run")
+async def run_now(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"flow_id"} -- Run: copy now what changed, whatever the flow's run mode (the only way a flow set to "only when I run it" moves anything).
+    Every source of a merged flow is run. Any Admin who may see the flow may run it; changing it stays its maker's."""
+    flow = await _load_visible(ctx, int_field(payload, "flow_id"))
+    if flow["status"] != "active" or flow["consent_status"] == "pending":
+        raise ProtocolError(ErrorCode.CONFLICT, f"the flow is {flow['status'] if flow['status'] != 'active' else 'waiting for consent'}: it cannot run")
+    from engine.flow import sync
+
+    started = []
+    for member in await _group(ctx.engine, flow):
+        if await sync.catch_up(ctx.engine, member["id"], why="run"):
+            started.append(member["id"])
+    if not started:
+        raise ProtocolError(ErrorCode.CONFLICT, "the source machine is not connected: run it again when it is")
+    await ctx.engine.db.flows.mark_run(flow["id"])
+    await ctx.engine.audit.record(ctx, "flow.run", target_type="flows", target_id=flow["id"], detail={"sources": started})
+    return {"flow_id": flow["id"], "sources_started": len(started)}
 
 
 @handler("flow.delete")
@@ -622,8 +755,8 @@ async def delete(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Status -> inactive; the row and its sync history are kept."""
     require_account(ctx)
     flow_id = int_field(payload, "flow_id")
-    await _load_owned(ctx, flow_id)
-    await ctx.engine.db.flows.set_status(flow_id, "inactive", "deleted")
+    for member in await _group(ctx.engine, await _load_owned(ctx, flow_id)):
+        await ctx.engine.db.flows.set_status(member["id"], "inactive", "deleted")
     await ctx.engine.audit.record(ctx, "flow.deleted", target_type="flows", target_id=flow_id)
     from engine.console import issues
 
@@ -638,9 +771,14 @@ async def list_flows(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     found = await db.flows.list_all() if org_wide(ident) else await db.flows.list_for(
         ident.account_id, department_id=ident.department_id)
     # each flow's stages and destinations, batched: the Flows page draws every flow at once
-    shapes = await db.flows.shapes([f["id"] for f in found])
+    found = [f for f in found if not f.get("merged_into")]          # a merged source is shown on its flow, not as a flow of its own
+    ids = [f["id"] for f in found]
+    shapes, merged, copied = await db.flows.shapes(ids), await db.flows.merged_sources(ids), await db.flows.copied_counts(ids)
     out = rows(found)
     for f in out:
+        f["sources"] = [{"source_pc_id": f["source_pc_id"], "source_path": f["source_path"], "source_kind": f.get("source_kind"),
+                         "source_hostname": f.get("source_hostname")}] + rows(merged.get(f["id"], []))
+        f["files_copied"] = row(copied[f["id"]])
         f["stages"] = rows(shapes[f["id"]]["stages"])
         f["destinations"] = rows(shapes[f["id"]]["destinations"])
         for d in f["destinations"]:

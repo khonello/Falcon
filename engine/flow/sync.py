@@ -221,7 +221,7 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
     if event["op"] == "delete":
         for src in await engine.db.flows.sources_for_pc(pc_id):
             rel = source_relative(src, event["path"])
-            if rel is not None and src.get("on_source_delete") == "mirror":
+            if rel is not None and src.get("on_source_delete") == "mirror" and _live(src):
                 await remove_at_destinations(engine, src["id"], rel)
         return
     # A file under an unresolved Resource violation is ignored by the system (Resource ->
@@ -231,7 +231,7 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
     # Source side: does this event fall under an active flow's source directory?
     for src in await engine.db.flows.sources_for_pc(pc_id):
         rel = source_relative(src, event["path"])
-        if rel is not None:
+        if rel is not None and _live(src):                                    # an hourly or run-only flow copies what changed when it runs
             if not await guard.gate(engine, src["id"], pc_id, event["path"], event.get("hash"), step="seen at the source"):
                 continue                                                      # paused, and the owner asked
             await _settle_then_propagate(engine, src["id"], event["path"], rel, event.get("hash"))
@@ -243,6 +243,16 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
         if rel is None or dest["flow_status"] != "active" or dest.get("paused_reason"):
             continue
         await _check_destination_write(engine, dest, event, rel)
+
+
+def _live(flow: dict[str, Any]) -> bool:
+    """Does this flow copy the moment a file changes? Hourly and run-only flows leave changes to be found when they run (a listing finds them)."""
+    return (flow.get("run_mode") or "realtime") == "realtime"
+
+
+# Why a flow is caught up, and which run modes that applies to: a flow that runs on its own is healed and caught up whenever; an hourly one
+# on the hour or by Run; a run-only one by Run alone.
+CATCH_UP_FOR = {"realtime": {"heal", "hourly", "run"}, "hourly": {"hourly", "run"}, "manual": {"run"}}
 
 
 def _same_path(a: str, b: str) -> bool:
@@ -599,10 +609,13 @@ async def expire_transfers(engine: Engine) -> None:
 
 # --- catching a destination up -------------------------------------------------------------------
 
-async def catch_up(engine: Engine, flow_id: int, only: set[int] | None = None) -> bool:
-    """Ask the source machine what it holds now, then send the destinations what they are missing. False when it cannot be asked."""
+async def catch_up(engine: Engine, flow_id: int, only: set[int] | None = None, *, why: str = "heal") -> bool:
+    """Ask the source machine what it holds now, then send the destinations what they are missing. False when it cannot be asked, or when the
+    flow does not run for this reason (`why`: heal, hourly, run; see CATCH_UP_FOR)."""
     flow = await engine.db.flows.get(flow_id)
     if flow is None or flow["status"] != "active" or flow["consent_status"] == "pending":
+        return False
+    if why not in CATCH_UP_FOR.get(flow.get("run_mode") or "realtime", {"heal"}):
         return False
     if flow["source_pc_id"] not in engine.online_pc_ids():
         return False
@@ -646,6 +659,15 @@ async def heal(engine: Engine) -> None:
 
 def catch_up_later(engine: Engine, flow_id: int, only: set[int] | None = None) -> None:
     _spawn(catch_up(engine, flow_id, only))
+
+
+async def hourly(engine: Engine) -> None:
+    """Flows set to copy every hour: each is listed and its destinations are sent what changed since. One whose source is away waits for the next hour."""
+    if not engine.db.connected:
+        return
+    for flow in await engine.db.flows.by_run_mode("hourly"):
+        if await catch_up(engine, flow["id"], why="hourly"):
+            await engine.db.flows.mark_run(flow["merged_into"] or flow["id"])
 
 
 @handler("flow.listing")

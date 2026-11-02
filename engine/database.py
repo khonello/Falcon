@@ -1352,10 +1352,11 @@ class FlowsRepo(_Repo):
         a stage the same way. Resolved to ids inside one transaction."""
         async with self.pool.acquire() as conn, conn.transaction():
             flow_id = await conn.fetchval(
-                "INSERT INTO flows (created_by_account_id, source_pc_id, source_path, consent_status, on_source_delete, source_kind) "
-                "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+                "INSERT INTO flows (created_by_account_id, source_pc_id, source_path, consent_status, on_source_delete, source_kind, "
+                "name, run_mode, merged_into, source_flow_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
                 flow["created_by_account_id"], flow["source_pc_id"], flow["source_path"], flow["consent_status"],
-                flow.get("on_source_delete") or "keep", flow.get("source_kind") or "folder")
+                flow.get("on_source_delete") or "keep", flow.get("source_kind") or "folder", flow.get("name"),
+                flow.get("run_mode") or "realtime", flow.get("merged_into"), flow.get("source_flow_id"))
             stage_ids: list[int] = []
             for st in stages:
                 parent = stage_ids[st["parent_index"]] if st.get("parent_index") is not None else None
@@ -1375,7 +1376,7 @@ class FlowsRepo(_Repo):
         flow = await self._one("SELECT * FROM flows WHERE id = $1", flow_id)
         if flow is None:
             return None
-        flow["stages"] = await self._fetch("SELECT * FROM flow_stages WHERE flow_id = $1 ORDER BY id", flow_id)
+        flow["stages"] = await self._fetch("SELECT * FROM flow_stages WHERE flow_id = $1 AND retired_at IS NULL ORDER BY id", flow_id)
         flow["destinations"] = await self._fetch(
             "SELECT * FROM flow_destinations WHERE flow_id = $1 AND removed_at IS NULL ORDER BY id", flow_id)
         return flow
@@ -1391,17 +1392,56 @@ class FlowsRepo(_Repo):
             "LEFT JOIN pcs sp ON sp.id = f.source_pc_id "
             "LEFT JOIN flow_destinations fd ON fd.flow_id = f.id AND fd.removed_at IS NULL "
             "LEFT JOIN pcs dp ON dp.id = fd.destination_pc_id "
-            "WHERE f.status <> 'inactive' AND (f.created_by_account_id = $1 OR fd.owner_account_id = $1 "
+            "WHERE f.status <> 'inactive' AND f.merged_into IS NULL AND (f.created_by_account_id = $1 OR fd.owner_account_id = $1 "
             "   OR ($2::int IS NOT NULL AND (sp.department_id = $2 OR dp.department_id = $2))) "
             "ORDER BY f.id", account_id, department_id)
 
     async def list_all(self) -> list[dict[str, Any]]:
+        """Every flow that is not retired, the merged sources' own rows included (sync and healing work on each)."""
         return await self._fetch("SELECT f.*, sp.hostname AS source_hostname FROM flows f "
                                  "LEFT JOIN pcs sp ON sp.id = f.source_pc_id WHERE f.status <> 'inactive' ORDER BY f.id")
 
+    async def group(self, flow_id: int) -> list[dict[str, Any]]:
+        """A flow and the flows merged into it (its further sources), first one first. One row when it has no others."""
+        return await self._fetch(
+            "SELECT f.*, sp.hostname AS source_hostname FROM flows f LEFT JOIN pcs sp ON sp.id = f.source_pc_id "
+            "WHERE (f.id = $1 OR f.merged_into = $1) AND f.status <> 'inactive' ORDER BY (f.merged_into IS NOT NULL), f.id", flow_id)
+
+    async def merged_sources(self, flow_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+        """For each listed flow, the further sources merged into it: {flow_id: [{id, source_pc_id, source_path, source_kind, source_hostname}]}."""
+        out: dict[int, list[dict[str, Any]]] = {}
+        for r in await self._fetch(
+                "SELECT f.id, f.merged_into, f.source_pc_id, f.source_path, f.source_kind, sp.hostname AS source_hostname FROM flows f "
+                "LEFT JOIN pcs sp ON sp.id = f.source_pc_id WHERE f.merged_into = ANY($1::int[]) AND f.status <> 'inactive' ORDER BY f.id", flow_ids):
+            out.setdefault(r["merged_into"], []).append(r)
+        return out
+
+    async def by_run_mode(self, mode: str) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM flows WHERE run_mode = $1 AND status = 'active' ORDER BY id", mode)
+
+    async def set_name_and_mode(self, flow_id: int, *, name: str | None, run_mode: str) -> None:
+        """The flow and its merged sources share one name and one way of running."""
+        await self._exec("UPDATE flows SET name = $2, run_mode = $3 WHERE id = $1 OR merged_into = $1", flow_id, name, run_mode)
+
+    async def mark_run(self, flow_id: int) -> None:
+        await self._exec("UPDATE flows SET last_run_at = now() WHERE id = $1 OR merged_into = $1", flow_id)
+
+    async def copied_counts(self, flow_ids: list[int]) -> dict[int, dict[str, Any]]:
+        """Files copied per flow (its merged sources counted in): every write a flow made, all time and today. {flow_id: {total, today, last_at}}."""
+        out: dict[int, dict[str, Any]] = {i: {"total": 0, "today": 0, "last_at": None} for i in flow_ids}
+        if not flow_ids:
+            return out
+        for r in await self._fetch(
+                "SELECT COALESCE(f.merged_into, f.id) AS flow_id, count(*) AS total, "
+                "count(*) FILTER (WHERE l.occurred_at >= date_trunc('day', now())) AS today, max(l.occurred_at) AS last_at "
+                "FROM flow_sync_log l JOIN flow_destinations d ON d.id = l.flow_destination_id JOIN flows f ON f.id = d.flow_id "
+                "WHERE l.written_by = 'flow_sync' AND COALESCE(f.merged_into, f.id) = ANY($1::int[]) GROUP BY 1", flow_ids):
+            out[r["flow_id"]] = {"total": r["total"], "today": r["today"], "last_at": r["last_at"]}
+        return out
+
     async def sources_for_pc(self, pc_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT id, source_path, on_source_delete, source_kind FROM flows WHERE source_pc_id = $1 AND status = 'active'", pc_id)
+            "SELECT id, source_path, on_source_delete, source_kind, run_mode FROM flows WHERE source_pc_id = $1 AND status = 'active'", pc_id)
 
     async def file_sources_at(self, pc_id: int, path: str) -> list[dict[str, Any]]:
         """Single-file flows (running or paused) whose source is this file on this machine: what a move there must take along."""
@@ -1496,6 +1536,7 @@ class FlowsRepo(_Repo):
         async with self.pool.acquire() as conn, conn.transaction():
             await conn.execute(
                 "UPDATE flow_destinations SET removed_at = now() WHERE flow_id = $1 AND removed_at IS NULL", flow_id)
+            await conn.execute("UPDATE flow_stages SET retired_at = now() WHERE flow_id = $1 AND retired_at IS NULL", flow_id)
             stage_ids: list[int] = []
             for st in stages:
                 parent = stage_ids[st["parent_index"]] if st.get("parent_index") is not None else None
@@ -1583,7 +1624,7 @@ class FlowsRepo(_Repo):
         if not flow_ids:
             return out
         for st in await self._fetch("SELECT id, flow_id, parent_stage_id, stage_type, config FROM flow_stages "
-                                    "WHERE flow_id = ANY($1::int[]) ORDER BY id", flow_ids):
+                                    "WHERE flow_id = ANY($1::int[]) AND retired_at IS NULL ORDER BY id", flow_ids):
             out[st["flow_id"]]["stages"].append(st)
         for d in await self._fetch(
                 "SELECT d.id, d.flow_id, d.parent_stage_id, d.destination_pc_id, d.destination_path, d.owner_account_id, "

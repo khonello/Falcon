@@ -36,10 +36,8 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 - The Worker's own program doesn't show the new conversations; it still shows the old help channel.
 
 ## Smaller Engine gaps already on record
-- **Flows:**
-  - Only "Sort by file type" actually changes files. Rename by date, Convert to PDF, Compress to ZIP and Sort by month do nothing yet.
-  - An edit leaves the old stages on record.
-  - Missing: a flow's own name, several sources merging into one flow, schedules, and a count of files copied per flow.
+- **Flows:** *(built 2 Nov 2026)* every step, a flow's name, hourly or run-only flows with Run, several sources, carrying on from
+  another flow, files copied, old steps retired. Convert to PDF does text and JPEG only (Office formats need Office or LibreOffice).
 - **Rules:** no threshold on disk or network.
 - **Tasks:** department tasks go with the Super User (parked); an Admin's own to-dos replace them.
 - **Overview:** the figures have no trend history.
