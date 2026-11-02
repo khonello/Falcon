@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -393,6 +394,8 @@ class WorkerService:
                 self.updater.on_available(payload)
             elif type_ == "alert.delivered":
                 await self._on_alert(payload)
+            elif type_ == "chat.message":
+                self._on_message(payload)
             elif type_ in ("task.assigned", "task.completed", "task.incomplete"):
                 await self._refresh_tasks()
                 if type_ == "task.assigned" and self.config.windows:
@@ -537,6 +540,7 @@ class WorkerService:
             tasks = (await self.call("task.list"))["tasks"]
             alerts = (await self.call("alerts.list"))["alerts"]
             admins = (await self.call("assistance.my_admins"))["admins"]
+            chats = await self.call("chat.list")
         except (EngineError, ConnectionError_) as exc:
             log.debug("the program's view could not be refreshed: %s", exc)
             return
@@ -549,7 +553,11 @@ class WorkerService:
         rows.sort(key=lambda r: (r["due"] is None, r["due"] or ""))
         notes = [{"id": a["id"], "kind": a["alert_type"], "title": a.get("title") or "", "body": a.get("body") or "", "from": a.get("from_name") or "",
                   "at": a.get("deliver_at")} for a in alerts]
-        self._view = {"tasks": rows, "announcements": notes, "admins": admins, "as_of": datetime.now(timezone.utc).isoformat(), "version": VERSION}
+        messages = [{"id": c["conversation_id"], "with": c.get("title") or "", "unread": c.get("unread", 0),
+                     "last": (c.get("last") or {}).get("body") or "", "from": (c.get("last") or {}).get("from") or "", "at": (c.get("last") or {}).get("at")}
+                    for c in chats.get("conversations", [])]
+        self._view = {"tasks": rows, "announcements": notes, "messages": messages, "unread": chats.get("unread", 0), "admins": admins,
+                      "machine": await asyncio.to_thread(self.machine_facts), "as_of": datetime.now(timezone.utc).isoformat(), "version": VERSION}
         self._view_at = time.monotonic()
 
     async def app_view(self) -> dict[str, Any]:
@@ -572,6 +580,49 @@ class WorkerService:
         for i in ids:
             self.toasts.pop(i, None)
 
+    async def app_conversation(self, conversation_id: int) -> dict[str, Any]:
+        """One conversation an Admin started with this person: its messages, oldest first, marked read now."""
+        got = await self.call("chat.get", {"conversation_id": conversation_id})
+        await self.call("chat.read", {"conversation_id": conversation_id})
+        self.toasts.pop(f"m{conversation_id}", None)
+        self._view_at = 0.0
+        return got
+
+    async def app_reply(self, conversation_id: int, body: str) -> None:
+        """The person answers. The Engine refuses a conversation they are not in; they never start one (there is no op for it)."""
+        await self.call("chat.send", {"conversation_id": conversation_id, "body": body})
+        self._view_at = 0.0
+
+    def machine_facts(self) -> dict[str, Any]:
+        """What the person, or IT on the phone, may need to know about this machine (the program's My machine; Copy these details)."""
+        import platform
+        import socket
+
+        facts: dict[str, Any] = {"name": socket.gethostname(), "windows": f"{platform.system()} {platform.release()} ({platform.version()})",
+                                 "falcon": VERSION, "connected": bool(self.conn and self.conn.connected),
+                                 "engine": f"{self.config.engine_host}:{self.config.engine_port}"}
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:          # which address this machine uses toward the Engine; nothing is sent
+                s.connect((self.config.engine_host, int(self.config.engine_port)))
+                facts["address"] = s.getsockname()[0]
+        except OSError:
+            facts["address"] = None
+        try:
+            import psutil
+
+            people = [u for u in psutil.users() if u.name]
+            if people:
+                first = min(people, key=lambda u: u.started or 0)
+                facts["account"] = first.name
+                facts["signed_in_at"] = datetime.fromtimestamp(first.started, timezone.utc).isoformat() if first.started else None
+            facts["restarted_at"] = datetime.fromtimestamp(psutil.boot_time(), timezone.utc).isoformat()
+            root = os.environ.get("SystemDrive", "C:") + os.sep if os.name == "nt" else "/"
+            disk = psutil.disk_usage(root)
+            facts["storage"] = {"total_gb": round(disk.total / 1024 ** 3, 1), "free_gb": round(disk.free / 1024 ** 3, 1), "used_percent": disk.percent}
+        except (ImportError, OSError):
+            pass
+        return facts
+
     async def _remind(self, task_id: int) -> None:
         """A quiet nudge for a task nobody started: a small note in the corner (the program shows it), never a window over their work."""
         try:
@@ -585,6 +636,15 @@ class WorkerService:
         text = str(task.get("description_raw") or "").split(".")[0].strip()[:90] or "A task"
         self.toasts[f"t{task_id}"] = {"id": f"t{task_id}", "kind": "task", "title": text, "text": "Still waiting to be started"}
         self.reminders.track(task_id)
+
+    def _on_message(self, payload: dict[str, Any]) -> None:
+        """An Admin wrote: a quiet corner note naming who, which the program shows (and drops once the conversation is opened)."""
+        if self.identity is not None and payload.get("from_account_id") == self.identity.account_id:
+            return
+        cid = payload.get("conversation_id")
+        self._view_at = 0.0
+        self.toasts[f"m{cid}"] = {"id": f"m{cid}", "kind": "message", "conversation_id": cid,
+                                  "title": f"A message from {payload.get('from') or 'your IT Admin'}", "text": str(payload.get("body") or "")[:110]}
 
     async def _on_alert(self, payload: dict[str, Any]) -> None:
         self._view_at = 0.0

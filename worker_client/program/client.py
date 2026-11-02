@@ -61,3 +61,11 @@ class LocalClient:
 
     def ack(self, ids: list[str]) -> None:
         self.call("ack", ids=ids)
+
+    def conversation(self, conversation_id: int) -> dict[str, Any]:
+        """One conversation an Admin started with this person, read now (the program's Messages and the message window)."""
+        return self.call("conversation", id=conversation_id)["conversation"]
+
+    def reply(self, conversation_id: int, body: str) -> None:
+        """The person's answer in it; they never start one."""
+        self.call("reply", id=conversation_id, body=body)

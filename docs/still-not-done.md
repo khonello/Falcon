@@ -33,7 +33,9 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 
 ## Built in the Engine but not in the console
 - Nothing from 1 Nov is drawn in the QML yet: to-dos, Messages, the machine page, Coming up, the action output kinds and test run, flow runs, the Restricted page, At a glance, and knocked PCs.
-- The Worker's own program doesn't show the new conversations; it still shows the old help channel.
+- The Worker's side of conversations is built (2 Nov 2026): the service puts them in the program's view with a corner note when an Admin
+  writes, the program's API reads and replies (`conversation`, `reply`), and the machine's command line has `messages`, `reply` and `log`.
+  The program's QML does not show them yet (the Worker concept's Messages tab and message window).
 
 ## Smaller Engine gaps already on record
 - **Flows:** *(built 2 Nov 2026)* every step, a flow's name, hourly or run-only flows with Run, several sources, carrying on from

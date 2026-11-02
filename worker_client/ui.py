@@ -1,12 +1,13 @@
-"""The narrow Client UI (Hierarchy -> Client): view/start/monitor assigned tasks, Assistance
-search and ping, alerts, and the BLOCKED surface -- deliberately a small command set, not the
-Operator Client's. Built on the same `common.cli` machinery.
+"""The machine's command line (the Worker concept's, for IT checking a machine in place): status, tasks and starting one, the
+conversations an Admin started and replying in them, alerts, the machine's own log, and the BLOCKED surface -- deliberately a small
+command set, never the console's. Built on the same `common.cli` machinery.
 
 `python -m worker_client --ui` runs it in the same process as the service; pushes print live.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from common.cli import Args, Registry, UsageError, make_command_decorator, parse
@@ -72,55 +73,55 @@ async def search(ctx: UIContext, args: Args) -> str:
     return table(res["results"], ["pc_id", "path", "resource_tag", "last_seen_at"], width=60)
 
 
-@command("ping", usage="<admin_account_id>", help_="Ask your Admin to talk (a request; repeatable)")
-async def ping(ctx: UIContext, args: Args) -> str:
-    res = await ctx.call("assistance.ping", {"to_account_id": args.get_int(0, "admin_account_id")})
-    return f"message {res['ping_id']} sent -- your Admin sees a pulsing indicator until they accept"
+@command("messages", usage="[conversation_id]", help_="Conversations an Admin started with you; with an id, that one (read now)")
+async def messages(ctx: UIContext, args: Args) -> str:
+    if not args.positional:
+        res = await ctx.call("chat.list")
+        rows = [{"id": c["conversation_id"], "with": c.get("title") or "", "unread": c.get("unread", 0),
+                 "last": ((c.get("last") or {}).get("body") or "")[:60]} for c in res["conversations"]]
+        return table(rows, ["id", "with", "unread", "last"]) if rows else "(no conversations: an Admin starts one; you reply in it)"
+    cid = args.get_int(0, "conversation_id")
+    res = await ctx.call("chat.get", {"conversation_id": cid})
+    await ctx.call("chat.read", {"conversation_id": cid})
+    ctx.scratch["conversation"] = cid
+    return "\n".join(f"{str(m.get('at') or '')[11:16]}  {m.get('from') or 'you'}: {m['body']}" for m in res["messages"]) or "(no messages)"
 
 
-@command("pings", help_="Requests waiting for YOU to accept (an Admin may ask you for information)")
-async def pings(ctx: UIContext, args: Args) -> str:
-    res = await ctx.call("assistance.ping_status")
-    return f"{res['unaddressed']} unaddressed\n" + table(res["pings"], ["id", "from_name", "sent_at"])
-
-
-@command("respond", usage="<ping_id>", help_="Accept an Admin's request to talk")
-async def respond(ctx: UIContext, args: Args) -> str:
-    res = await ctx.call("assistance.respond", {"ping_id": args.get_int(0, "ping_id")})
-    ctx.scratch["channel"] = res["channel_id"]
-    return f"channel {res['channel_id']} open -- write with: msg <text>"
-
-
-@command("msg", usage="[channel_id] <text...>", help_="Post a message")
-async def msg(ctx: UIContext, args: Args) -> str:
+@command("reply", usage="[conversation_id] <text...>", help_="Answer in a conversation an Admin started (you never start one)")
+async def reply(ctx: UIContext, args: Args) -> str:
     if args.positional and args.positional[0].isdigit():
-        channel_id, text = int(args.positional[0]), args.rest(1, "text")
+        cid, text = int(args.positional[0]), args.rest(1, "text")
     else:
-        channel_id, text = ctx.scratch.get("channel"), args.rest(0, "text")
-    if channel_id is None:
-        raise UsageError("no channel yet -- give the channel id")
-    await ctx.call("assistance.message", {"channel_id": channel_id, "body": text})
-    ctx.scratch["channel"] = channel_id
+        cid, text = ctx.scratch.get("conversation"), args.rest(0, "text")
+    if cid is None:
+        raise UsageError("which conversation? reply <conversation_id> <text> (messages lists them)")
+    await ctx.call("chat.send", {"conversation_id": cid, "body": text})
+    ctx.scratch["conversation"] = cid
     return "sent"
 
 
-@command("channel", usage="[channel_id]", help_="Show the conversation")
-async def channel(ctx: UIContext, args: Args) -> str:
-    channel_id = int(args.positional[0]) if args.positional else ctx.scratch.get("channel")
-    if channel_id is None:
-        raise UsageError("no channel yet")
-    res = await ctx.call("assistance.channel", {"channel_id": channel_id})
-    ctx.scratch["channel"] = channel_id
-    names = res["channel"].get("names", {})
-    state = "closed" if res["channel"].get("closed_at") else ("waiting on you" if res["channel"].get("my_turn") else "waiting on them")
-    return f"channel {channel_id} -- {state}\n" + ("\n".join(
-        f"{m['sent_at'][11:16]}  {names.get(str(m['sender_account_id']), m['sender_account_id'])}: {m['body']}"
-        for m in res["messages"]) or "(no messages)")
+@command("log", usage="[lines]", help_="The last lines of this machine's Falcon log (default 30)")
+async def log_tail(ctx: UIContext, args: Args) -> str:
+    n = args.get_int(0, "lines") if args.positional else 30
+    path = log_path(ctx.service)
+    if path is None:
+        return "no log file here: the Worker is not running as a service (it logs to its window)"
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return f"{path}\n" + "\n".join(lines[-max(1, min(n, 500)):])
 
 
-@command("channels", help_="Your channels")
-async def channels(ctx: UIContext, args: Args) -> str:
-    return table((await ctx.call("assistance.channels"))["channels"], ["id", "superior_account_id", "opened_at", "closed_at"])
+def log_path(service: WorkerService) -> Path | None:
+    """worker.log beside the Worker's settings, else where the service writes it (%PROGRAMDATA%\\Falcon)."""
+    beside = Path(service.config.path).parent / "worker.log"
+    if beside.is_file():
+        return beside
+    try:
+        from worker_client.winservice import data_dir
+
+        there = data_dir() / "worker.log"
+    except (ImportError, OSError):                    # not Windows, or no service here
+        return None
+    return there if there.is_file() else None
 
 
 @command("alerts", help_="Alerts delivered to you")

@@ -255,17 +255,25 @@ async def test_session_blocking_surface_and_worker_ui(engine, org, tmp_path: Pat
         await admin.call("hierarchy.end_session", {"session_id": res["session"]["session_id"]})
         assert await _wait(lambda: not svc.lockout.is_blocked and svc.native_session_id is not None)
         assert "session.blocked" in seen and "session.released" in seen
-        # The narrow UI: tasks, ping the Admin, respond, message.
+        # The machine's command line: tasks, the conversation an Admin started, a reply, the log; no help requests (cut in version 1).
         await admin.call("task.create", {"assignee_account_id": org["w1"], "description": "tidy up",
                                          "verification_mode": "none", "confirm_none": True})
         assert "tidy up" in await run_line(ctx, "tasks")
-        out = await run_line(ctx, f"ping {org['a1']}")
-        assert out.startswith("message ")
         assert "unknown" in (out := await run_line(ctx, "task verify 1 complete")) or "usage" in out  # no verify in the worker UI
-        p = await admin.call("assistance.ping", {"to_account_id": org["w1"]})
-        assert "1 unaddressed" in await run_line(ctx, "pings")
-        assert (await run_line(ctx, f"respond {p['ping_id']}")).startswith("channel ")
-        assert "waiting" in await run_line(ctx, "channel")
+        assert "unknown" in (await run_line(ctx, f"ping {org['a1']}")).lower()
+        convo = (await admin.call("chat.open", {"account_id": org["w1"]}))["conversation"]["conversation_id"]
+        await admin.call("chat.send", {"conversation_id": convo, "body": "Please leave it on tonight"})
+        assert await _wait(lambda: f"m{convo}" in svc.toasts)                                     # a quiet corner note says who wrote
+        assert "Please leave it on" in await run_line(ctx, "messages")
+        assert "Please leave it on" in await run_line(ctx, f"messages {convo}")
+        assert await run_line(ctx, 'reply "Yes, I will leave it on"') == "sent"                  # the conversation just read
+        got = await svc.app_conversation(convo)                                                     # the program's view of it, read now
+        assert [m["body"] for m in got["messages"]][-1] == "Yes, I will leave it on" and f"m{convo}" not in svc.toasts
+        await svc.app_reply(convo, "Done")
+        mine = (await admin.call("chat.get", {"conversation_id": convo}))["messages"]
+        assert [m["body"] for m in mine] == ["Please leave it on tonight", "Yes, I will leave it on", "Done"]
+        facts = svc.machine_facts()
+        assert facts["name"] and facts["falcon"] and "storage" in facts
     finally:
         await admin.close()
         await svc.stop()

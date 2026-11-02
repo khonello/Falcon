@@ -7,6 +7,8 @@ connection. So the service listens on this machine's loopback address, and the p
     {"token": "...", "op": "start_task", "id": 7}       -> {"ok": true}
     {"token": "...", "op": "ask", "to": 12}             -> {"ok": true}                       ping an Admin for help
     {"token": "...", "op": "ack", "ids": ["t7"]}        -> {"ok": true}                       the program showed those notes; do not show them again
+    {"token": "...", "op": "conversation", "id": 4}     -> {"ok": true, "conversation": {...}} one conversation an Admin started, read up to now
+    {"token": "...", "op": "reply", "id": 4, "body": ".."} -> {"ok": true}                     the person answers in it (they never start one)
 
 Where it is and what it checks:
   * 127.0.0.1 only, on a port the service picks; `app.json` beside the Worker's settings holds the port and a random token, readable by the people who
@@ -42,6 +44,8 @@ class Provider(Protocol):
     async def app_start_task(self, task_id: int) -> None: ...
     async def app_ask(self, to_account_id: int) -> None: ...
     async def app_ack(self, ids: list[str]) -> None: ...
+    async def app_conversation(self, conversation_id: int) -> dict[str, Any]: ...
+    async def app_reply(self, conversation_id: int, body: str) -> None: ...
 
 
 def info_path(settings_path: Path) -> Path:
@@ -130,6 +134,13 @@ class LocalApp:
                 await self.provider.app_start_task(int(msg["id"]))
             elif op == "ask":
                 await self.provider.app_ask(int(msg["to"]))
+            elif op == "conversation":
+                return {"ok": True, "conversation": await self.provider.app_conversation(int(msg["id"]))}
+            elif op == "reply":
+                body = msg.get("body")
+                if not isinstance(body, str) or not body.strip():
+                    return {"ok": False, "error": "write something to send"}
+                await self.provider.app_reply(int(msg["id"]), body)
             elif op == "ack":
                 ids = msg.get("ids")
                 if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
