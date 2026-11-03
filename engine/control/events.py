@@ -573,6 +573,82 @@ async def metrics(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 BACKTEST_DAYS = 7
 
 
+TRY_WEEK_DAYS = 7
+
+
+@handler("control.rule_try")
+async def rule_try(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """Try a new or edited rule once, on one machine, before it goes live (ENGINE-GAPS #13; the user, 3 Nov 2026). {"type", "match"?,
+    "action_ids", "pc_id", "event_id"?} -- the rule as it is in the editor, not as it is saved; `event_id` names the rule being edited.
+
+    Two answers, and nothing about the rule is saved:
+      * `condition`: would it start on that machine? A level (CPU, memory, disk, network, idle) is compared with the machine's latest
+        reading (`over_now`); a clock says its next times; a file or folder rule counts what it would have met there in the last week
+        (`week`, with the latest few); a signal from the machine itself (a drive, a program, a sign-in) can only be seen when it happens.
+      * `runs`: its actions are run once on that machine now, whatever the rule's timing would be. The runs are real: recorded with the
+        trier's name (`rule.tried`), and they report back as any run does (`action.status` as each finishes, `control.execution`).
+    """
+    ident = require_role(ctx, "super_user", "admin")
+    _, spec = _parse_spec({**payload, "pc_ids": None})
+    etype, m = spec["type"], spec["match"]
+    db = ctx.engine.db
+    if payload.get("event_id") is not None:
+        await _load_event_in_scope(ctx, int_field(payload, "event_id"), write=True)
+    pc_id = int_field(payload, "pc_id")
+    pc = await db.accounts.pc(pc_id)
+    if pc is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such pc")
+    require_department_scope(ident, pc["department_id"])
+    action_ids = payload.get("action_ids") or []
+    if not isinstance(action_ids, list) or not action_ids:
+        raise ProtocolError(ErrorCode.INVALID, "a rule is tried with the actions it would run (action_ids)")
+    from engine.control.actions import load_action_in_scope
+
+    actions = [await load_action_in_scope(ctx, int(a)) for a in action_ids]
+    if pc_id not in ctx.engine.online_pc_ids():
+        raise ProtocolError(ErrorCode.UNAVAILABLE, f"{pc['hostname']} is offline")
+    condition = await _would_start(ctx.engine, etype, m, pc_id)
+    from engine.control import executions
+
+    runs = []
+    for action in actions:
+        now_ = {**action, "timing": {"mode": "immediate"}}                 # tried now, whatever its delay would be
+        execution_id = await executions.start(ctx.engine, now_, None, pc_id, actor=ctx)     # (a try is not one of the rule's firings)
+        runs.append({"execution_id": execution_id, "action_id": action["id"], "name": action.get("name") or action.get("builtin_type")})
+    await ctx.engine.audit.record(ctx, "rule.tried", target_type="pcs", target_id=pc_id, pc_id=pc_id,
+                                  detail={"type": etype, "match": m, "event_id": payload.get("event_id"), "executions": [r["execution_id"] for r in runs]})
+    from engine.console.automation import when_of
+
+    return {"pc_id": pc_id, "hostname": pc["hostname"], "when": when_of(spec), "condition": condition, "runs": runs}
+
+
+async def _would_start(engine: Engine, etype: str, m: dict[str, Any], pc_id: int) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    if etype in THRESHOLDS or etype == "system.idle":
+        reading = _metrics.get(pc_id)
+        key, field, default = THRESHOLDS.get(etype, ("idle_s", "seconds", 600))
+        limit = float(m.get(field, default))
+        if reading is None or key not in reading:
+            return {"kind": "level", "reading": None, "limit": limit, "over_now": None, "says": "the machine has not reported this reading yet"}
+        value = float(reading[key])
+        return {"kind": "level", "reading": value, "limit": limit, "over_now": value >= limit,
+                "minutes": int(float(m.get("duration_s", 0)) // 60), "at": reading.get("at")}
+    if etype.startswith("time."):
+        from engine.console.automation import next_runs
+
+        return {"kind": "clock", "next": [x.isoformat() for x in next_runs({"type": etype, "match": m}, now, None, 3)]}
+    ops = {v: k for k, v in FILE_OP_TO_EVENT.items()}
+    folder_ops = {v: k for k, v in FOLDER_OP_TO_EVENT.items()}
+    if etype in ops or etype in folder_ops:
+        is_dir = etype in folder_ops
+        op = folder_ops[etype] if is_dir else ops[etype]
+        since = now - timedelta(days=TRY_WEEK_DAYS)
+        met = [e for e in await engine.db.file_index.events_on_pc(pc_id, op, is_dir, since)
+               if matches({"match": m}, {"path": e["path"], "name": str(e["path"]).replace("\\", "/").rsplit("/", 1)[-1], "tag": e["tag"]})]
+        return {"kind": "files", "week": len(met), "latest": [{"path": e["path"], "at": e["occurred_at"].isoformat()} for e in met[:5]]}
+    return {"kind": "signal", "says": "this is seen only when it happens on the machine"}
+
+
 @handler("control.threshold_backtest")
 async def threshold_backtest(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"type": threshold.cpu|memory|disk|network, "value", "minutes"?: 0, "pc_ids"?} -> how often such a rule would have fired over the last

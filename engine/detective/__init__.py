@@ -37,7 +37,7 @@ from common.detective import (
     sig_from_dict,
     sig_to_dict,
 )
-from engine.detective import labels
+from engine.detective import labels, telling
 from engine.dispatch import Context as HandlerContext
 from engine.dispatch import handler
 from engine.permissions import int_field, kept, require_role, str_field
@@ -341,6 +341,7 @@ async def _save(engine: Engine, u: Update) -> None:
     _saved[id(case)] = len(case.findings)
     if u.raised and engine.llm.available:
         _ask(engine, "opinion", (case.id, case.story()))
+        _ask(engine, "telling", case.id)
     if u.raised:
         await engine.audit.record(None, "detective.raised", target_type="detective_cases", target_id=case.id, pc_id=case.pc,
                                   detail={"intent": case.intent, "level": case.level, "weight": round(case.weight, 2), "stage": case.stage[1]})
@@ -374,6 +375,8 @@ async def _model_worker(engine: Engine, queue: asyncio.Queue[tuple[str, Any]]) -
         try:
             if kind == "opinion":
                 await _opinion(engine, *what)
+            elif kind == "telling":
+                await _tell(engine, what)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -390,6 +393,25 @@ async def _opinion(engine: Engine, case_id: int | None, story: list[str]) -> Non
     c = await engine.db.detective.case(case_id)
     if c is not None:
         payload = {"case_id": case_id, "model_says": says}
+        await engine.push_to_role("super_user", "detective.updated", payload)
+        if c["pc_type"] == "client_pc" and c.get("department_id") is not None:
+            await engine.push_to_role("admin", "detective.updated", payload, department_id=c["department_id"])
+
+
+async def _tell(engine: Engine, case_id: int | None) -> None:
+    """Smooth a case's account with the model, paragraph by paragraph; keep only what passes the check (engine/detective/telling.py)."""
+    if case_id is None:
+        return
+    c = await engine.db.detective.case(case_id)
+    if c is None:
+        return
+    t = telling.compose(c, await engine.db.detective.findings(case_id), await engine.db.sessions.signed_in_at(c["pc_id"], c["first_at"]), c.get("hostname"))
+    if (c.get("telling") or {}).get("fingerprint") == t.fingerprint():
+        return                                                        # (asked twice while the first answer was coming)
+    paragraphs = await telling.smooth(engine.llm, t)
+    await engine.db.detective.set_telling(case_id, {"fingerprint": t.fingerprint(), "paragraphs": paragraphs})
+    if any(paragraphs):
+        payload = {"case_id": case_id, "telling": True}
         await engine.push_to_role("super_user", "detective.updated", payload)
         if c["pc_type"] == "client_pc" and c.get("department_id") is not None:
             await engine.push_to_role("admin", "detective.updated", payload, department_id=c["department_id"])
@@ -436,6 +458,7 @@ def _scope(ctx: HandlerContext) -> dict[str, Any]:
 def _view(c: dict[str, Any]) -> dict[str, Any]:
     out = row(c) or {}
     out["host"] = c.get("hostname")
+    out.pop("telling", None)                      # (the account is said in words by detective.case, not as it is kept)
     return out
 
 
@@ -473,7 +496,21 @@ async def case(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
              for f in found]
     held = Case(pc=c["pc_id"], findings=again)
     return {"case": out, "findings": rows(found), "graph": graph_of(sigs), "rule_options": rule_options(again), "board": held.board(),
-            "glance": await _glance(ctx, c, sigs)}
+            "glance": await _glance(ctx, c, sigs), "telling": await _telling(ctx, c, found)}
+
+
+async def _telling(ctx: HandlerContext, c: dict[str, Any], found: list[dict[str, Any]]) -> dict[str, Any]:
+    """The case told in words (ENGINE-GAPS #15): the Engine's own account, every fact filled in from the case, or the model's smoothing of it
+    when that passed the check and was made from the case as it is now. People are named the way this viewer names them."""
+    db = ctx.engine.db
+    t = telling.compose(c, found, await db.sessions.signed_in_at(c["pc_id"], c["first_at"]), c.get("hostname"))
+    people = sorted({p.value for para in t.paragraphs for p in para if isinstance(p, telling.Fact) and p.kind == "person"})
+    names = await db.accounts.display_names_for(ctx.identity.account_id, people) if people else {}
+    kept_ = c.get("telling") or {}
+    fresh = kept_.get("fingerprint") == t.fingerprint()
+    if not fresh and ctx.engine.llm.available:
+        _ask(ctx.engine, "telling", c["id"])
+    return t.view(names, kept_.get("paragraphs") if fresh else None)
 
 
 async def _glance(ctx: HandlerContext, c: dict[str, Any], sigs: list[Sig]) -> dict[str, Any]:

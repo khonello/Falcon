@@ -1,16 +1,22 @@
 # To look at
 
 Open items to go over with the user. Bring this up first in a new session, then tidy it as items close.
-Last updated 2 Nov 2026.
+Last updated 3 Nov 2026.
 
-## Waiting on a decision (2 Nov 2026)
+## Answered 3 Nov 2026
 
-- **#15 A case told in words:** (a) facts filled in from the case, the model writes only the joining words; or (b) the model writes
-  freely and every name, file, time and number is checked against the case. Which?
-- **#13 the Automation page's other three ideas** (what a run produced, try a rule first, too quiet or too loud): build or drop?
-- **`pc_days`** (one row per machine per day, kept forever): purge on the 90-day clock like the audit trail?
-- **To talk through:** finding PCs on the network (#10); Convert to PDF for Office files (needs Office or LibreOffice on the
-  machines); the licence store (where licences are bought, how its files are signed so the Engine can tell a real one).
+- **#15 A case told in words:** *(built)* way (a), then a smoothing pass: the Engine writes the account with every fact from the case; the model
+  may rewrite the words between the facts, and its paragraph is kept only if every fact is still there, in order, with nothing added.
+- **#13:** *(built)* Try a rule first (`control.rule_try`, TUI `event try`). The other two ideas are dropped.
+- **`pc_days`:** *(built)* on the 90-day clock an issue asks the Admins to Delete or Keep; kept, it asks again in 30 days.
+- **#10 Seen on the network:** dropped. What the Engine has (joining with a licence code, knocked PCs) is enough; the drawer change is the UI's.
+- **The licence store:** the user's design, for later: admin and worker codes are downloaded (one file or two); the admin console's setup takes an
+  admin code, the Worker's a worker code; the codes live in a remote store that the Engine asks at setup to validate a code (a little outside
+  access at setup is fine), and a small website sells them. Today's `licence import` stands in until then.
+
+## Waiting on a conversation
+
+- **Flow steps, all of them** (not only Convert to PDF): the user wants the whole area discussed before more is built.
 
 ## Engine pass, 2 Nov 2026 (built; the Engine session does no UI work: `docs/UI-WORK-FROM-ENGINE.md` is the UI's list)
 

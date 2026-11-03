@@ -120,6 +120,27 @@ async def event_add(ctx: ShellContext, args: Args) -> str:
     return f"event {res['event']['id']} ({res['event']['condition_type']}) created"
 
 
+@command("event", "try", "<type> <pc_id> actions=1,2 [event=<id>] [match_<key>=<value> ...]",
+         "Try a rule once on one machine before it goes live: would it start there, and its actions run now (real runs; nothing saved)")
+async def event_try(ctx: ShellContext, args: Args) -> str:
+    match = {k[6:]: _coerce(v) for k, v in args.options.items() if k.startswith("match_")}
+    event_id = args.opt("event")
+    res = await ctx.call("control.rule_try", {"type": args.get(0, "type"), "pc_id": args.get_int(1, "pc_id"), "action_ids": args.opt_ints("actions") or [],
+                                             "match": match, **({"event_id": int(event_id)} if event_id else {})})
+    c = res["condition"]
+    if c["kind"] == "level":
+        said = ("no reading from it yet" if c["reading"] is None else
+                f"{c['reading']:g} against {c['limit']:g}: {'over it now' if c['over_now'] else 'not over it now'}")
+    elif c["kind"] == "clock":
+        said = "next at " + ", ".join(c["next"]) if c["next"] else "no time coming"
+    elif c["kind"] == "files":
+        said = f"it would have started {c['week']} time(s) there in the last week" + "".join(f"\n  {x['at']}  {x['path']}" for x in c["latest"])
+    else:
+        said = c["says"]
+    runs = ", ".join(f"{r['name']} [exec {r['execution_id']}]" for r in res["runs"])
+    return f"{res['when']} on {res['hostname']}: {said}\nrunning now: {runs}"
+
+
 def _coerce(v: str):
     try:
         return int(v)

@@ -194,7 +194,7 @@ building and the rules that govern it (25 of them, each written when it was deci
 `docs/UI-COMPONENTS.md` is the build list and what has been done against it.
 
 **11 Oct 2026: the QML is the published concept** (the "Falcon Concepts" artifact, which the user
-decides from; `docs/design/concepts-snapshot.html` is its copy). The 30 Sep Ant-idiom wave and its kit
+decides from; its copy is now parked, `parked/design/concepts-super-user.html`, and version 1 follows `docs/design/concepts-admin.html`). The 30 Sep Ant-idiom wave and its kit
 are gone; every page below was built from the concept and checked against it by screenshot.
 
 - [x] Tokens (`Theme.qml`: light and dark, system/light/dark switch remembered), IBM Plex bundled
@@ -285,6 +285,12 @@ What the concept shows and the Engine cannot do yet is drawn disabled, with the 
   to EVERY Admin in it). Boards `DP05`–`DP17` had drawn the machines grouped under an Admin's name;
   that grouping is removed, and an Admin is drawn with what is actually theirs — their own
   workstation, their tasks, their flows. No schema change, nothing to decide.
+
+- [x] **The user's answers of 3 Nov 2026, built:** a Detective case told in words (facts from the case, the model only smooths the words
+  between them, checked); try a rule once on one machine (`control.rule_try`); old machine days asked about on the Issues page (Delete or
+  Keep). Dropped: "Seen on the network", and the Automation ideas "what a run produced" and "too quiet or too loud". Still to discuss: flow
+  steps as a whole. Later: the licence store (codes validated by a remote store at setup, a small website to buy them). The UI's part of each
+  is in `docs/UI-WORK-FROM-ENGINE.md`.
 
 ## Deferred (spec §10) — decide when reached, not before
 

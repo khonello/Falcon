@@ -389,6 +389,15 @@ class AccountsRepo(_Repo):
         return await self._fetch("SELECT day, checked_in_at, used_quarters FROM pc_days WHERE pc_id = $1 AND day >= $2 ORDER BY day",
                                  pc_id, since)
 
+    async def days_before(self, before: Any) -> dict[str, Any]:
+        """How many machine days are older than `before`: {rows, machines, oldest}."""
+        return dict(await self._one("SELECT count(*)::int AS rows, count(DISTINCT pc_id)::int AS machines, min(day) AS oldest FROM pc_days WHERE day < $1",
+                                    before) or {"rows": 0, "machines": 0, "oldest": None})
+
+    async def delete_days_before(self, before: Any) -> int:
+        """The one hard delete of machine days, and only when an Admin chose it on the Issues page (the user, 3 Nov 2026)."""
+        return int((await self._exec("DELETE FROM pc_days WHERE day < $1", before)).split()[-1])
+
     async def touch_pc(self, pc_id: int) -> None:
         """The machine's client connected or dropped just now."""
         await self._exec("UPDATE pcs SET last_seen_at = now() WHERE id = $1", pc_id)
@@ -568,6 +577,12 @@ class SessionsRepo(_Repo):
 class FileIndexRepo(_Repo):
     _COLS = ("id, pc_id, path, filename, content_hash, resource_tag, resource_tag_scope_department_id, "
              "indexed_via, last_seen_at, first_seen_at, gone_at")
+
+    async def events_on_pc(self, pc_id: int, op: str, is_dir: bool, since: datetime, limit: int = 5000) -> list[dict[str, Any]]:
+        """One kind of file event on one machine since a moment, newest first, with the file's tier tag: what a rule being tried would have met."""
+        return await self._fetch(
+            "SELECT e.op, e.path, e.old_path, e.occurred_at, fi.resource_tag AS tag FROM file_events e LEFT JOIN file_index fi ON fi.id = e.file_index_id "
+            "WHERE e.pc_id = $1 AND e.op = $2 AND e.is_dir = $3 AND e.occurred_at >= $4 ORDER BY e.occurred_at DESC LIMIT $5", pc_id, op, is_dir, since, limit)
 
     async def upsert(self, pc_id: int, path: str, filename: str, content_hash: str | None,
                      resource_tag: str | None, scope_department_id: int | None,
@@ -1158,7 +1173,7 @@ class IssuesRepo(_Repo):
              "i.target_hours, i.state, i.label, i.detail, i.source_table, i.source_id, i.escalated_at, i.resolved_at, "
              "i.resolved_by_account_id, i.resolution, p.hostname, d.name AS department_name")
     _FROM = "FROM issues i LEFT JOIN pcs p ON p.id = i.pc_id LEFT JOIN departments d ON d.id = i.department_id"
-    _PREFIX: ClassVar[dict[str, str]] = {"file": "INC", "update": "UPD", "deviation": "DEV", "flow": "FLW", "offline": "OFF", "component": "CMP"}
+    _PREFIX: ClassVar[dict[str, str]] = {"file": "INC", "update": "UPD", "deviation": "DEV", "flow": "FLW", "offline": "OFF", "component": "CMP", "retention": "RET"}
 
     async def raise_(self, issue: dict[str, Any]) -> tuple[int, bool]:
         """(id, created). A cause that already has an open issue returns that one, created False."""
@@ -1221,6 +1236,11 @@ class IssuesRepo(_Repo):
     async def set_severity(self, issue_id: int, severity: str, title: str | None = None, subject: str | None = None) -> None:
         await self._exec("UPDATE issues SET severity = $2, title = COALESCE($3, title), subject = COALESCE($4, subject) "
                          "WHERE id = $1 AND state <> 'resolved'", issue_id, severity, title, subject)
+
+    async def last_resolved(self, source_table: str, source_id: int) -> dict[str, Any] | None:
+        """The latest closed issue of a cause: when it closed and how."""
+        return await self._one("SELECT id, resolved_at, resolution FROM issues WHERE source_table = $1 AND source_id = $2 AND state = 'resolved' "
+                               "ORDER BY resolved_at DESC LIMIT 1", source_table, source_id)
 
     async def set_detail(self, issue_id: int, patch: dict[str, Any]) -> None:
         await self._exec("UPDATE issues SET detail = detail || $2::jsonb WHERE id = $1", issue_id, patch)
@@ -2899,6 +2919,10 @@ class DetectiveRepo(_Repo):
 
     async def set_model_says(self, case_id: int, says: str | None) -> None:
         await self._exec("UPDATE detective_cases SET model_says = $2 WHERE id = $1", case_id, says)
+
+    async def set_telling(self, case_id: int, telling: dict[str, Any]) -> None:
+        """The model's smoothing of the case's account ({fingerprint, paragraphs}), with markers in place of facts."""
+        await self._exec("UPDATE detective_cases SET telling = $2::jsonb WHERE id = $1", case_id, telling)
 
     async def device_uses(self, pc_id: int, device: str) -> int:
         return int(await self._val("SELECT uses FROM detective_devices WHERE pc_id = $1 AND device = $2", pc_id, device) or 0)

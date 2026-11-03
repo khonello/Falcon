@@ -48,8 +48,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-TARGET_HOURS = {"file": 1, "update": 24, "deviation": 8, "flow": 72, "offline": 72, "component": 24}
-TYPE_LABEL = {"file": "Restricted file", "update": "Stuck update", "deviation": "Deviation", "flow": "Flow blocked", "offline": "Not checking in", "component": "Part of the Worker"}
+TARGET_HOURS = {"file": 1, "update": 24, "deviation": 8, "flow": 72, "offline": 72, "component": 24, "retention": 168}
+TYPE_LABEL = {"file": "Restricted file", "update": "Stuck update", "deviation": "Deviation", "flow": "Flow blocked", "offline": "Not checking in", "component": "Part of the Worker", "retention": "Old records"}
 SEVERITIES = ("critical", "high", "medium", "low")
 OFFLINE_AFTER = timedelta(minutes=20)           # a machine quiet for this long raises an issue
 OFFLINE_MEDIUM_AFTER = timedelta(hours=24)
@@ -97,7 +97,9 @@ async def raise_issue(engine: Engine, *, type_: str, severity: str, title: str, 
     payload = {"issue_id": issue_id, "code": issue["code"], "type": type_, "severity": severity, "title": title, "subject": subject,
                "pc_id": pc_id, "department_id": department_id}
     await engine.push_to_role("super_user", "issue.raised", payload)
-    if department_id is not None:
+    from engine import permissions
+
+    if department_id is not None or permissions.ADMIN_SCOPE == "organisation":       # (version 1: an issue of no machine is every Admin's)
         await engine.push_to_role("admin", "issue.raised", payload, department_id=department_id)
     return issue_id, True
 
@@ -207,7 +209,7 @@ async def _load(ctx: Context, issue_id: int) -> dict[str, Any]:
 # what the audit trail may add to an issue's story: only the kinds of event that belong to its kind. A machine records a great deal besides (a flow
 # syncing, a routine update check, someone signing in), and none of that is part of why a restricted copy was found.
 RELATED_KINDS = {"file": {"violation", "session"}, "update": {"rollout", "session"}, "deviation": {"deviation", "session"}, "flow": {"flow"},
-                 "offline": {"session", "rollout"}, "component": {"session"}}
+                 "offline": {"session", "rollout"}, "component": {"session"}, "retention": {"retention"}}
 
 
 async def _timeline(ctx: Context, issue: dict[str, Any]) -> list[dict[str, Any]]:

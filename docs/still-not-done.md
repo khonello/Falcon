@@ -1,4 +1,4 @@
-# Still not done (temporary, updated 2 Nov 2026)
+# Still not done (temporary, updated 3 Nov 2026)
 
 Written after commit `560eb6f`; updated the same day when version 1 was settled (`docs/design/v1-it-admin.md`).
 
@@ -23,15 +23,17 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 - **#3 Private tag:** *(built 2 Nov 2026)* Windows' own permissions and its audit of failed opens; see ENGINE-GAPS #3. To try for real: a
   second Windows user on a machine being refused (the VM plan).
 - **#7 Sending a file in a conversation:** *(built 2 Nov 2026)* yes, an admin-tier file may go to a Worker. See ENGINE-GAPS #7.
-- **#10 Finding PCs:** to talk through. Today: a PC with Falcon installed asks to join by itself (`enroll.request`) and one that knocked
-  without a key is listed (`registry.knocked`); no network scan.
-- **#13 and #15:** explained to you on 2 Nov; waiting on your answer.
+- **#10 Finding PCs:** *(settled 3 Nov 2026)* no network scan; "Seen on the network" is dropped. A PC with Falcon installed joins with its
+  licence code, and one that knocked without a key is listed (`registry.knocked`). The drawer change is in UI-WORK-FROM-ENGINE.md.
+- **#13:** *(built 3 Nov 2026)* Try a rule first (`control.rule_try`); the other two dropped.
+- **#15:** *(built 3 Nov 2026)* the account written from the case, smoothed by the model only where every fact survives the check.
 - **A file deleted at a flow's source:** *(built 2 Nov 2026)* copies are kept by default, and an issue offers Remove the copies / Keep them.
-- **`pc_days`:** explained to you on 2 Nov; waiting on your answer.
-- **Convert to PDF for Office files:** that area of Flow needs a serious look (the user, 2 Nov 2026). Kept on the list: today text and JPEG
-  convert; Word, Excel and others say unsupported.
+- **`pc_days`:** *(built 3 Nov 2026)* an issue on the 90-day clock: Delete them, or Keep them and be asked again in 30 days.
+- **Flow steps:** the whole area is to be discussed with the user (3 Nov 2026), not only Convert to PDF. Today text and JPEG convert;
+  Word, Excel and others say unsupported.
 - **Joining with a licence code:** *(built 2 Nov 2026)* admin and worker codes from a bought licence; given at setup, the machine joins at once.
-  Still yours to decide: the licence store itself (where licences are bought, how its files are signed so the Engine can tell a real one).
+  The store, later (the user, 3 Nov 2026): codes downloaded as admin and worker codes, kept in a remote store the Engine asks at setup to
+  validate a code, and a small website to buy them.
 - **Making another IT Admin:** *(built 2 Nov 2026)* install the admin console on the PC; it asks as an Admin's workstation and an IT Admin
   lets it in with the code on its screen. What it is follows what is installed.
 

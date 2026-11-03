@@ -550,3 +550,49 @@ async def test_a_custom_action_reports_back_as_its_author_chose_and_can_be_tried
 
 def tried_ids_absent(lib: dict, action_id: int) -> bool:
     return all(a["id"] != action_id for group in lib["actions"].values() for a in group)
+
+
+async def test_a_rule_is_tried_once_on_one_machine_before_it_goes_live_and_nothing_is_saved(engine, org, connect):
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    shot = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "screenshot", "timeout_s": 10,
+                                                  "timing": {"mode": "delayed", "delay_s": 600}}))["action"]
+    before = len((await a1.ok("control.event_list"))["events"])
+    # a level: compared with the machine's latest reading
+    await w1.ok("control.metrics", {"cpu": 91, "memory": 40, "idle_s": 3})
+    tried = await a1.ok("control.rule_try", {"type": "threshold.cpu", "match": {"percent": 85}, "action_ids": [shot["id"]], "pc_id": org["w1_pc"]})
+    assert tried["hostname"] == "FIN-01" and tried["condition"]["kind"] == "level" and tried["condition"]["over_now"] is True
+    assert tried["condition"]["reading"] == 91 and tried["condition"]["limit"] == 85
+    # its actions ran now (not after the action's delay), on that machine only, as real runs
+    sent = [p.payload for p in await w1.drain_pushes() if p.type == "action.execute"]
+    assert [s["execution_id"] for s in sent] == [tried["runs"][0]["execution_id"]]
+    # a file rule: what it would have met on that machine in the last week
+    fi = engine.file_index
+    for name in ("a.xlsx", "b.xlsx", "c.txt"):
+        await fi.ingest_event(org["w1_pc"], {"op": "create", "path": f"C:\\Reports\\{name}", "name": name})
+    files = await a1.ok("control.rule_try", {"type": "file.created", "match": {"path_prefix": "C:\\Reports", "name_suffix": ".xlsx"},
+                                             "action_ids": [shot["id"]], "pc_id": org["w1_pc"]})
+    assert files["condition"]["kind"] == "files" and files["condition"]["week"] == 2 and len(files["condition"]["latest"]) == 2
+    clock = await a1.ok("control.rule_try", {"type": "time.recurring", "match": {"at": "09:00"}, "action_ids": [shot["id"]], "pc_id": org["w1_pc"]})
+    assert clock["condition"]["kind"] == "clock" and len(clock["condition"]["next"]) == 3
+    sig = await a1.ok("control.rule_try", {"type": "usb.inserted", "action_ids": [shot["id"]], "pc_id": org["w1_pc"]})
+    assert sig["condition"]["kind"] == "signal"
+    # nothing about the rule was saved; the try is on the record with who did it
+    assert len((await a1.ok("control.event_list"))["events"]) == before
+    assert sum(r["action_type"] == "rule.tried" for r in await engine.db.audit.recent(limit=40)) == 4
+    # what it may not do
+    assert await a1.err("control.rule_try", {"type": "threshold.cpu", "action_ids": [], "pc_id": org["w1_pc"]}) == "invalid"
+    assert await a1.err("control.rule_try", {"type": "nope", "action_ids": [shot["id"]], "pc_id": org["w1_pc"]}) == "invalid"
+    assert await a1.err("control.rule_try", {"type": "threshold.cpu", "action_ids": [shot["id"]], "pc_id": org["a2_pc"]}) == "forbidden"
+    assert await a1.err("control.rule_try", {"type": "threshold.cpu", "action_ids": [shot["id"]], "pc_id": org["w2_pc"]}) == "unavailable"
+    assert await w1.err("control.rule_try", {"type": "threshold.cpu", "action_ids": [shot["id"]], "pc_id": org["w1_pc"]}) == "forbidden"
+
+
+async def test_the_shell_tries_a_rule_on_one_machine(engine, org, connect, tmp_path):
+    from operator_client.tui.shell import run_script
+    from tests.test_operator_client import _cfg
+
+    await connect("cid-w1")
+    a1 = await connect("cid-a1")
+    shot = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "screenshot", "timeout_s": 10}))["action"]
+    out = await run_script(_cfg(engine, tmp_path, "cid-a1"), ["connect", f"event try time.recurring {org['w1_pc']} actions={shot['id']} match_at=09:00"])
+    assert "on FIN-01: next at " in out[1] and "[exec " in out[1]

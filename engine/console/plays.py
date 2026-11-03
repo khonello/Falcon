@@ -48,7 +48,7 @@ async def _person(ctx: Context, issue: dict[str, Any]) -> tuple[int | None, str 
 
 
 async def build(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any]], list[Option], list[str]]:
-    builder = {"file": _file, "update": _update, "deviation": _deviation, "flow": _flow, "offline": _offline, "component": _component}[issue["type"]]
+    builder = {"file": _file, "update": _update, "deviation": _deviation, "flow": _flow, "offline": _offline, "component": _component, "retention": _retention}[issue["type"]]
     return await builder(ctx, issue)
 
 
@@ -56,7 +56,7 @@ async def act(ctx: Context, issue: dict[str, Any], key: str, payload: dict[str, 
     _, _, options, _ = await build(ctx, issue)
     if key not in {o["key"] for o in options}:
         raise ProtocolError(ErrorCode.INVALID, f"{key!r} is not something that can be done about this issue now")
-    doer = {"file": _do_file, "update": _do_update, "deviation": _do_deviation, "flow": _do_flow, "offline": _do_offline, "component": _do_component}[issue["type"]]
+    doer = {"file": _do_file, "update": _do_update, "deviation": _do_deviation, "flow": _do_flow, "offline": _do_offline, "component": _do_component, "retention": _do_retention}[issue["type"]]
     return await doer(ctx, issue, key, payload)
 
 
@@ -310,3 +310,17 @@ async def _do_component(ctx: Context, issue: dict[str, Any], key: str, payload: 
 async def _do_offline(ctx: Context, issue: dict[str, Any], key: str, payload: dict[str, Any]) -> dict[str, Any]:
     raise ProtocolError(ErrorCode.INVALID, "there is nothing to do about a machine that is offline but wait")
 
+
+
+# --- old records, kept or deleted by an Admin ------------------------------------------------------
+
+async def _retention(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any]], list[Option], list[str]]:
+    from engine.console import retention
+
+    return retention.view(issue)
+
+
+async def _do_retention(ctx: Context, issue: dict[str, Any], key: str, payload: dict[str, Any]) -> dict[str, Any]:
+    from engine.console import retention
+
+    return await retention.act(ctx, issue, key)

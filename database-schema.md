@@ -672,3 +672,6 @@ restricted and whose consent let it go, held until `expires_at`), `chat_file_sav
 `conversation_messages.chat_file_id` (migration 049).
 `resource_marks.protection` (watch / private / restricted), `allow_system`, `applied` (what the machine said it did), `resource_mark_readers`
 (who may open a private item), `private_refusals` (who Windows refused, where, when) and `pcs.windows_user` (migration 050).
+`detective_cases.telling` (migration 051: the local model's smoothing of a case's account, `{fingerprint, paragraphs}`, with markers in place of the facts;
+used only while the fingerprint matches the case as it is now). `issues.type` also takes `'retention'` (migration 052, code prefix `RET`): old machine days
+past the 90-day window, one open issue at a time (`source_table = 'pc_days'`, `source_id = 0`), deleted only when an Admin picks Delete them.

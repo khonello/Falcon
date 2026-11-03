@@ -50,6 +50,8 @@ N_CTX = 4096
 
 SYSTEM = ("You classify short workplace task descriptions. Answer with exactly what is asked and "
           "nothing else: no explanation, no punctuation, no extra words.")
+SYSTEM_WRITE = ("You rewrite short factual paragraphs in plain words. Keep every marker such as [person1] exactly as it is, "
+                "add nothing and leave nothing out. Reply with only the paragraph.")
 
 
 class LocalLLM:
@@ -139,15 +141,23 @@ class LocalLLM:
             return None
         return value
 
+    async def rewrite(self, instruction: str, text: str, *, max_tokens: int = 320) -> str | None:
+        """The one place the model writes sentences: a paragraph whose facts are markers it cannot see ([person1], [file2]...), smoothed into plainer
+        words. Never shown as it comes: the caller checks it (engine/detective/telling.py `checked`) and keeps its own paragraph otherwise."""
+        answer = await self._ask(f"{instruction}\n\nParagraph: \"\"\"{_quoted(text)}\"\"\"", max_tokens=max_tokens, system=SYSTEM_WRITE)
+        if answer is None:
+            return None
+        return answer.strip().strip("\"'`").strip() or None
+
     # --- transport ------------------------------------------------------------------------------
 
-    async def _ask(self, prompt: str, *, max_tokens: int) -> str | None:
+    async def _ask(self, prompt: str, *, max_tokens: int, system: str = SYSTEM) -> str | None:
         if not self.available:
             return None
         if len(prompt) > MAX_PROMPT_CHARS:
             self.refused += 1                                           # this input is too long to read; the backend is fine
             return None
-        key = f"{max_tokens}|{prompt}"
+        key = f"{max_tokens}|{system[:12]}|{prompt}"
         if (hit := self._cache.get(key)) is not None:
             self._cache.move_to_end(key)
             self.cache_hits += 1
@@ -157,9 +167,9 @@ class LocalLLM:
         try:
             if self.backend == "llamacpp":
                 loop = asyncio.get_running_loop()
-                answer = await asyncio.wait_for(loop.run_in_executor(self._worker(), self._generate_local, prompt, max_tokens), self.timeout)
+                answer = await asyncio.wait_for(loop.run_in_executor(self._worker(), self._generate_local, *_args(prompt, max_tokens, system)), self.timeout)
             else:
-                answer = await asyncio.wait_for(asyncio.to_thread(self._generate_http, prompt, max_tokens), self.timeout + 5)
+                answer = await asyncio.wait_for(asyncio.to_thread(self._generate_http, *_args(prompt, max_tokens, system)), self.timeout + 5)
         except asyncio.TimeoutError:
             self.timeouts += 1
             self._failed(f"did not answer within {self.timeout:.0f}s")
@@ -202,23 +212,23 @@ class LocalLLM:
                                 verbose=False)
         return self._llama
 
-    def _generate_local(self, prompt: str, max_tokens: int) -> str:
+    def _generate_local(self, prompt: str, max_tokens: int, system: str = SYSTEM) -> str:
         llama = self._load_local()
         out = llama.create_chat_completion(
-            messages=[{"role": "system", "content": SYSTEM},
+            messages=[{"role": "system", "content": system},
                       {"role": "user", "content": prompt + " /no_think"}],
             max_tokens=max_tokens + 8, temperature=0.0)
         return _strip_thinking(str(out["choices"][0]["message"]["content"]))
 
-    def _generate_http(self, prompt: str, max_tokens: int) -> str:
+    def _generate_http(self, prompt: str, max_tokens: int, system: str = SYSTEM) -> str:
         if self.backend == "ollama":
             url = f"{self.endpoint}/api/generate"
-            body: dict[str, Any] = {"model": self.model, "prompt": f"{SYSTEM}\n\n{prompt}", "stream": False,
+            body: dict[str, Any] = {"model": self.model, "prompt": f"{system}\n\n{prompt}", "stream": False,
                                     "think": False, "options": {"temperature": 0, "num_predict": max_tokens + 8}}
         else:  # openai-compatible (e.g. python -m llama_cpp.server)
             url = f"{self.endpoint}/v1/chat/completions"
             body = {"model": self.model, "temperature": 0, "max_tokens": max_tokens + 8,
-                    "messages": [{"role": "system", "content": SYSTEM},
+                    "messages": [{"role": "system", "content": system},
                                  {"role": "user", "content": prompt + " /no_think"}]}
         req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
                                      headers={"Content-Type": "application/json"}, method="POST")
@@ -227,6 +237,11 @@ class LocalLLM:
         if self.backend == "ollama":
             return _strip_thinking(str(data["response"]))
         return _strip_thinking(str(data["choices"][0]["message"]["content"]))
+
+
+def _args(prompt: str, max_tokens: int, system: str) -> tuple[Any, ...]:
+    """What the generator is called with: the system prompt only when it is not the usual one (a narrow question is asked as it always was)."""
+    return (prompt, max_tokens) if system is SYSTEM else (prompt, max_tokens, system)
 
 
 def _strip_thinking(text: str) -> str:

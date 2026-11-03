@@ -139,8 +139,8 @@ part is recorded for later, not built.
    memory, disk size and percent, last boot, registered: the Worker says them at connect), `keyboard` (in use / idle / offline now, and today's
    quarter hours of use: a metrics report with input in the last minute marks its quarter), `check_ins` (seven days, yes or no: a connect or a report
    that day). Days and quarters are the Engine host's local time. Entered was already `sessions`. *Not built:* "Never allow it" is a rule the console
-   prepares with the existing `program.launched` condition and `kill_process` + `notify`; nothing new in the Engine. The `pc_days` rows are kept (one
-   per machine per day), not purged.
+   prepares with the existing `program.launched` condition and `kill_process` + `notify`; nothing new in the Engine. The `pc_days` rows (one per machine per day)
+   are asked about on the 90-day clock (3 Nov 2026, `engine/console/retention.py`): an issue offers Delete them or Keep them (asked again in 30 days).
    - **Running now:** the seven busiest programs, with CPU and memory, from a snapshot the Worker sends with its metrics (psutil). Keep only the latest snapshot. System processes and the Worker itself are left out of the snapshot, so they can never be ended from here.
    - **End a program** (the user, 24 Oct 2026). The built-in `kill_process` (by name) already exists. Ending runs it as a manual action, so it is audited. It is followed by a `notify` on that machine telling the person the Admin ended it. The Worker refuses to end anything on its protected list, even when asked directly.
    - **Never allow it:** "never allow it" prepares a rule switched off: when the program starts on any machine, end it and tell the person. This needs a program-started condition; check what OS signals (item 1) already give.
@@ -153,7 +153,7 @@ part is recorded for later, not built.
 10. **PCs found but not registered** (the user, 24 Oct 2026; the Add a machine drawer, Admin v100). The drawer offers PCs the system has noticed but nobody registered, and picking one fills in its name.
    **Knocked: done 1 Nov 2026** (`registry.knocked`, TUI `knocked`): by the name the PC gave, address, tries, first and last; a name registered since
    drops out. Not cut by department: in version 1 the Admins are IT over every department, and departments keep no address range. *Seen on the
-   network* is still waiting on the decision below.
+   network* is **dropped** (the user, 3 Nov 2026): a machine with Falcon installed joins with its licence code; no network scan.
    - **Knocked:** a Worker that tried to connect without a valid key. The handshake already records `auth.failed`, and the Super User's Refused list reads it. The Admin needs the same list, cut to unregistered names and the department's address range, with tries and last try.
    - **Seen on the network:** a PC with no Worker yet. This is new. It needs discovery on the department's subnet, from the Engine or a registered Worker: ARP or NetBIOS/mDNS names, passive where possible. It reports name, address and when first seen. **To decide with the user:** whether discovery is allowed at all (it is a network scan), which machine does it, and how often.
    - Registering a found PC uses the existing `hierarchy.pc_register`. Nothing about keys changes.
@@ -179,7 +179,8 @@ part is recorded for later, not built.
 
 13. **What the Admin's Automation page is still missing** (the user asked for an opinion, 25 Oct 2026; Admin v138). The page says what fired and whether it worked. It does not yet say these four things. They are proposals, not decided:
    **What runs next: done 1 Nov 2026**, because the concept draws Coming up (`automation.board`: each rule's `next_at`, and `coming_up`, the next ten
-   scheduled runs across the rules that are on). The other three are not in the concept and were left.
+   scheduled runs across the rules that are on). **Try it first: done 3 Nov 2026** (the user's pick): `control.rule_try`, TUI `event try`.
+   **What a run produced** and **too quiet or too loud: dropped** (the user, 3 Nov 2026).
    - **What a run produced.** A screenshot, a list of a USB drive's files, a log line: the page says "screenshot taken" but you cannot see it. Each run should link to its output. Keep outputs on the 90-day clock, as run outputs already are.
    - **What runs next.** Each scheduled rule's next time, and the next few runs across all rules, so "Next: Daily maintenance tomorrow at 09:00" is a fact the Engine gives, not a sentence the page guesses.
    - **Try it before switching it on.** Run a new or edited rule once, on one machine you pick, and show the result before it goes live. Nothing about the rule is saved until you confirm.
@@ -198,7 +199,10 @@ part is recorded for later, not built.
      The Engine stores the choice with the action. The console shows a run's output the way the choice says.
    - **A run by hand reports back machine by machine.** As each machine finishes, push its outcome, exit code and time, so the picked machines can fill in while the run is going. Stopping a run by hand ends what is still running; it is recorded as stopped, not failed.
    - **A test run of a custom action before it is saved.** Run the script once, on one machine the author picks, and return what it printed, its exit code and its time. Nothing about the action is saved until the author confirms. This is the same idea as "try it before switching it on" for rules (item 13). The test is a real run, so it is recorded with the author's name.
-15. **A case told in words** (the user, 29 Oct 2026; the concept's Detective, Admin v171).
+15. **A case told in words** (the user, 29 Oct 2026; the concept's Detective, Admin v171). **Done 3 Nov 2026** (the user chose the first way,
+   then a pass to make it natural; `engine/detective/telling.py`, migration 051): `detective.case` returns `telling`, the Engine's account with
+   every fact a marked part; the model may rewrite one paragraph at a time with the facts hidden behind markers, and its paragraph is kept only
+   if every marker survives once each in order, with no new number, name or blame word and the same number of "not"s. TUI `detective case`.
    - **What it is.** "What Detective noticed" is no longer a list of findings. It is a few paragraphs, written by the local model from the case's evidence, telling what went on: who was signed in, on which machine, when it started, how long it took, what was done to which files, what makes it worth a look, and what would make it innocent. People, files, machines, programs and times are marked in the text, the way the task box marks them.
    - **This goes against a rule in CLAUDE.md, so it needs a decision.** The model is only ever asked narrow questions (pick from a list, or extract text that is then checked word for word), never to write freely. A free account from a 1.7B model can say something the evidence does not, about a named person. Two ways to keep it honest:
      - the model writes only the joining words, and every fact (a name, a file, a time, a count) is filled in from the case, never by the model; or
@@ -300,6 +304,23 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - **Start a stopped flow again** (Flows, Resume on a stopped flow). Stop sets it inactive (`flow.delete`), which cannot be undone yet.
    - **Take back an allowance** on a restricted copy (Restricted, Allowed copies).
    - **Delete or ask to delete a restricted copy**, and accept or put back a deviation, where `issues.get` marks the option `cannot`.
+
+21. **No ownership of issues between Admins** (the user, 2 Nov 2026: "the idea of ownership between admins, i hate it"). The console no
+    longer takes, gives back or shows who has an issue; any Admin acts on any issue (`issues.act` never checked the owner). For the Engine
+    session, when it suits: `issues.assign`, the `owner` filter of `issues.list` and `owner` on each issue can go; `issues.get`'s story
+    still writes "Assigned to ..." for an issue someone took before this; the TUI's `issue take / give / free` go with them. Nothing in
+    the console calls them now.
+
+22. **What the concept's pages draw that the Engine cannot do yet, found matching the pages to the concept** (2 Nov 2026). Each
+    is drawn disabled with the reason, or drawn from what the Engine has:
+   - **A case told in words** (Detective, What Detective noticed): the concept shows a short telling by the local model, with the
+     people, files, times and programs marked. `detective.case` has no telling; the page writes the findings out instead and does
+     not claim the model wrote them.
+   - **Run a rule again where it went wrong** (Automation, an opened run): only on the machines where an action failed or timed out.
+   - **Skip one scheduled run** (Automation, Coming up).
+   - **The next scheduled runs** come from `calendar.board`'s rule items; a rule's own next run would be clearer.
+   - **Worker service** (seen in the test run, not a UI matter): `worker_client/winnotify.py:112` (`_window_thread`) takes a Windows
+     access violation during `tests/test_worker_client.py`; the tests still pass.
 
 ## Done inline (for the record)
 

@@ -157,6 +157,7 @@ async def test_the_shell_commands_read_a_case_back_to_a_person(engine, org, tmp_
     await _leak(engine, org["w1_pc"])
     out = await run_script(_cfg(engine, tmp_path, "cid-su"), ["connect", "detective", "detective case 1", "detective review 1 explained a backup we know about", "detective overview"])
     assert "Taking data out" in out[1] and "FIN-01" in out[1] and "urgent" in out[1]
+    assert "Nobody was signed in on FIN-01" in out[2] and "Detective's reading of the evidence, not proof." in out[2]
     assert "Case 1" in out[2] and "stage 4 of 5" in out[2] and "innocent if:" in out[2] and "copied 12 files to" in out[2] and "plugged in a drive" in out[2]
     assert out[3] == "recorded" and "urgent 0" in out[4] and "reviewed 1" in out[4]
 

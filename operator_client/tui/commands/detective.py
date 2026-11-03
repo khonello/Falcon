@@ -27,6 +27,9 @@ async def detective_case(ctx: ShellContext, args: Args) -> str:
            + (f" · next: {c['next_stage']}" if c.get("next_stage") else ""), c["headline"]]
     if c.get("not_yet"):
         out.append(c["not_yet"])
+    told = res.get("telling")
+    if told:
+        out += ["", told["text"], f"({told['note']}" + (" Smoothed by the local model; every fact checked.)" if told["smoothed"] else ")")]
     out.append("")
     out += [f"  {line}" for line in c["story"]]
     out.append("")

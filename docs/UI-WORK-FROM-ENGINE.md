@@ -72,6 +72,35 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   licence, last4, role, seats, used, left, department, expires_at, revoked_at, machines: [{hostname, decided_at}]}]}`, `licence.revoke
   {code_id}`. Probably beside Registry (Machines > Registry). A machine that joins this way is pushed as `enroll.joined` and `machines.changed`.
 
+### Detective: a case told in words (built 3 Nov 2026; ENGINE-GAPS #15, the concept's "What Detective noticed")
+- `detective.case` now returns `telling: {paragraphs, text, smoothed, note}`. `paragraphs` is a list of paragraphs, each a list of parts:
+  `{text}` (plain words) or `{text, kind, value}` (a fact to mark). Kinds: `person` (value: account id, text already in the viewer's own
+  name), `machine`, `time` (value ISO), `duration`, `file`, `folder`, `drive`, `program`, `count`, `amount`, `intent`, `reason` (a rule's
+  own reason or what would make it innocent, word for word), `tag` ("a restricted file"). Mark people, files, machines, programs and times
+  the way the task box does; the rest can stay plain.
+- `smoothed` is true when the local model's smoothing passed the check; the account is the Engine's own otherwise. Either way show `note`
+  ("Detective's reading of the evidence, not proof."). The page's own writing-out of the findings can go: draw this instead.
+- When the smoothing arrives later, `detective.updated {case_id, telling: true}` is pushed: read the case again.
+
+### Automation: try a rule first (built 3 Nov 2026; ENGINE-GAPS #13, the user chose this one of the three)
+- `control.rule_try {type, match?, action_ids, pc_id, event_id?}`: the rule as it stands in the editor, tried once on one machine the
+  person picks (online, in scope); nothing is saved. Returns `{hostname, when, condition, runs: [{execution_id, action_id, name}]}`.
+  `condition.kind`: `level` (`reading`, `limit`, `over_now`, `minutes`), `clock` (`next`: three ISO times), `files` (`week`: how many times
+  it would have started there in the last week, `latest`: up to five {path, at}), `signal` (`says`: seen only when it happens).
+- The runs are real and come back as any run does (`action.status` pushes, `control.execution`); they run now, ignoring the action's delay.
+  New rule and an opened rule's editor: a "Try it on one machine" button with a machine picker, showing the condition and the runs filling in.
+- The other two ideas (what a run produced, too quiet or too loud) are dropped: nothing to draw.
+
+### Issues: old machine records (built 3 Nov 2026; the user's answer on `pc_days`)
+- A new issue type `retention` ("Old records"; code prefix RET), not tied to a machine (`pc_id` and `department_id` are null): "Old machine
+  records are due to be deleted", raised daily when machine days pass the 90-day window. Two options from `issues.get`: `delete_old`
+  (Delete them) and `keep_old` (Keep them; asked again in 30 days). The Issues page draws options from the Engine; it needs the type's
+  label and an icon or tone in its kinds filter, and to read right with no machine.
+
+### Registry / Add a machine: "Seen on the network" is dropped (the user, 3 Nov 2026)
+- The Add a machine drawer offers only the knocked PCs (`registry.knocked`). Take out "Seen on the network" and anything that says it is
+  coming: a machine with Falcon installed joins by itself with its licence code, and the Engine will not scan the network.
+
 ### Departments (built 1 Nov 2026, drawn)
 - `hierarchy.department_rename`, `hierarchy.pc_move`: on the Departments page. Still to draw: the "Every department" filter on Machines and the
   department label on each machine (the concept's Machines).
