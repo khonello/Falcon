@@ -53,6 +53,10 @@ QtObject {
     // minutes -> "42m", "2h 10m"
     function mins(m) { return dur(m / 60) }
     // a long length in hours -> "3d 4h", else as dur
+    // the concept's wording of a wait: under a day "3h 05m", then "1 day", "2 days"
+    function waitLen(h) { h = Math.abs(h); return h < 24 ? dur(h) : h >= 48 ? Math.round(h / 24) + " days" : "1 day" }
+    // how far through its time something is: "2h 10m left", "due now", "1 day over"
+    function waitSay(h, should) { return Math.abs(h - should) < 0.5 ? "due now" : h > should ? waitLen(h - should) + " over" : waitLen(should - h) + " left" }
     function span(h) { h = Math.abs(h); return h > 24 ? Math.floor(h / 24) + "d " + Math.round(h % 24) + "h" : dur(h) }
     // how long ago, compactly: "42m", "3h 05m", "4d"
     function age(x) {

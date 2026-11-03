@@ -269,8 +269,7 @@ GEN = {"OPS-05": 2, "OPS-06": 2, "LOG-02": 3}
 def machines_list(role: str, dept_id: int | None) -> dict[str, Any]:
     out = []
     for pc, host, user, acct, dept, online, seen in MACHINES:
-        if role == "admin" and dept != dept_id:
-            continue
+        # version 1: an Admin reaches every department
         out.append({"pc_id": pc, "hostname": host, "department_id": dept, "key_generation": GEN.get(host, 1),
                     "owner": {"account_id": acct, "name": user}, "ip": f"10.20.{dept + 3}.{10 + pc}", "online": online,
                     "version": "1.4.0" if host == "LOG-02" else "1.4.1" if host == "OPS-06" else "1.4.2",
@@ -450,6 +449,10 @@ def machines_get(pc: int, rng: str) -> dict[str, Any]:
     return {"machine": {"pc_id": pc, "ip": f"10.20.4.{10 + pc}", "os": "Windows 11 Pro 23H2", "agent_started_at": at(-77.5)}, "range": rng,
             "series": {"cpu": ser(1, 28, 22), "memory": ser(2, 61, 8), "disk": ser(3, 47, 1), "net_kbps": ser(4, 40, 35)},
             "processes": {"at": at(-0.05), "items": [{"pid": 1000 + i, "name": n, "cpu": c, "memory_mb": m, "user": u} for i, (n, c, m, u) in enumerate(procs)]},
+            "about": {"os": "Windows 11 Pro 23H2", "memory_total_mb": 16384, "disk_total_gb": 476.0, "disk_percent": round(40 + 7 * (pc % 7), 1),
+                      "boot_at": at(-30 - pc), "registered_at": at(-24 * (60 + pc * 9))},
+            "keyboard": {"state": "in_use", "idle_s": 40, "quarters": []},
+            "check_ins": [{"day": at(-24 * n)[:10], "yes": not (n in (1, 2) and pc % 3 == 0) and not (pc == 9 and n == 0)} for n in range(6, -1, -1)],
             "sessions": [], "files": {}, "events": []}
 
 
@@ -597,8 +600,8 @@ CHANNELS = [
     (20, 27, 7, "sender", 8.9, None, [(9.0, 7, "Is budget-2026.xlsx still open on your PC? It should not be there."),
                                       (9.25, 27, "It was sent to me to read before the meeting. I closed it."),
                                       (10.1, 7, "Thanks. Please delete your copy; it is marked to stay on WS-OPS-A1.")]),
-    (18, 7, 1, "superior", 11.5, None, [(11.7, 1, "What do you need?"),
-                                        (12.1, 7, "Can Update stuck reports for Operations come to us too? Two have waited on you since Wednesday.")]),
+    (18, 9, 7, "superior", 11.5, None, [(11.7, 9, "Before Friday's count, who covers the weekend?"),
+                                        (12.1, 7, "I can take Saturday.")]),
     (16, 31, 8, "superior", 10.4, None, [(10.5, 8, "Go ahead, Afi."),
                                          (10.6, 31, "Someone on my team keeps taking my files off the shared drive and renaming them.")]),
     (15, 23, 7, "sender", -20.5, -19.4, [(-20.4, 7, "What is it, Yaw?"), (-20.1, 23, "The printer on the second floor will not take my jobs."),
@@ -719,7 +722,12 @@ def actions_board() -> dict[str, Any]:
 
 def automation_board(role: str) -> dict[str, Any]:
     """automation.board, only what the console reads from it: who set each rule, by name."""
-    return {"rules": [{"event_id": eid, "owner": "The organisation" if org else "R. Mensah", "org_wide": org} for eid, _t, _p, _m, _a, _o, org, _f in EVENTS],
+    names = {"usb.inserted": "USB device inserted", "time.daily": "Daily maintenance", "file.restricted_copy": "Restricted file copied where it isn't allowed",
+             "metric.cpu": "Sustained high CPU", "user.login_failed": "Several failed sign-ins", "program.exited": "Printer stops responding"}
+    return {"rules": [{"event_id": eid, "owner": "The organisation" if org else "R. Mensah", "org_wide": org, "on": on,
+                       "name": names.get(t, t.replace(".", " ").capitalize()),
+                       "last_run_problem": bool(f) and any(o != "success" for _a2, o, _d in min(f, key=lambda x: x[0])[2])}
+                      for eid, t, _p, _m, _a, on, org, f in EVENTS],
             "days": [], "strip": {}}
 
 
@@ -823,11 +831,67 @@ def board(role: str, dept_id: int | None) -> dict[str, Any]:
     return {"reports": views, "strip": strip, "handling": handling, "categories": sorted({v["category"] for v in views})}
 
 
+def _chat(type_: str, payload: dict[str, Any], account: int) -> dict[str, Any]:
+    """The version 1 conversations (engine/resource/conversations.py), from the sample channels: one per person, and the group of every Admin."""
+    mine = [c for c in CHANNELS if account in (c[1], c[2])]
+
+    def view(c: tuple) -> dict[str, Any]:
+        other = c[1] if c[2] == account else c[2]
+        msgs = c[6]
+        last = msgs[-1] if msgs else None
+        return {"conversation_id": c[0], "kind": "direct", "title": ACCOUNTS.get(other),
+                "members": [{"account_id": a, "name": ACCOUNTS.get(a)} for a in (c[1], c[2])],
+                "last": {"body": last[2], "from_account_id": last[1], "from": ACCOUNTS.get(last[1]), "at": today(last[0])} if last else None,
+                "unread": 1 if last and last[1] != account and c[5] is None else 0, "seen_by": []}
+    if type_ == "chat.list":
+        vs = sorted((view(c) for c in mine), key=lambda v: (v["last"] or {}).get("at") or "", reverse=True)
+        return {"conversations": vs, "unread": sum(v["unread"] for v in vs)}
+    if type_ == "chat.people":
+        people = [{"account_id": a, "name": n, "role": "admin" if a in (7, 8, 9) else "worker", "pc_id": a, "hostname": f"WS-{a}" if a in (7, 8, 9) else
+                   next((m[1] for m in MACHINES if len(m) > 2 and m[2] == n), "OPS-01"), "department": "Operations", "online": True} for a, n in ACCOUNTS.items() if a != account]
+        return {"people": people, "admins_group": True}
+    if type_ == "chat.get":
+        c = next((x for x in mine if x[0] == int(payload.get("conversation_id") or 0)), None)
+        if c is None:
+            return {"conversation": None, "messages": [], "more": False, "reads": []}
+        return {"conversation": view(c), "more": False, "reads": [],
+                "messages": [{"message_id": c[0] * 100 + i, "from_account_id": s, "from": ACCOUNTS.get(s), "body": b, "at": today(h), "mine": s == account, "file": None}
+                             for i, (h, s, b) in enumerate(c[6])]}
+    if type_ == "chat.open":
+        c = next((x for x in mine if payload.get("account_id") in (x[1], x[2])), mine[0] if mine else None)
+        return {"conversation": view(c) if c else {"conversation_id": 99, "title": "them"}}
+    if type_ == "chat.send":
+        return {"message_id": 1, "at": at(0)}
+    return {"conversation_id": payload.get("conversation_id"), "read": True}
+
+
+_TODOS_DONE: set[int] = set()
+
+
+def _todos() -> dict[str, Any]:
+    """todo.list as the Engine answers it (engine/task/todos.py): the Admin's own to-dos; the strip is what is past its date or due
+    within the hour."""
+    rows = [(1, "Confirm who covers the front desk during the training week", -2.4), (2, "Collect the signed leave forms from Logistics", 28.0),
+            (3, "Move last year's tender files to the archive share", 74.0)]
+    todos = []
+    for i, text, h in rows:
+        done = i in _TODOS_DONE
+        todos.append({"id": i, "text": text, "due_at": at(h), "done": done, "overdue": not done and h < 0, "on_strip": not done and h < 1})
+    return {"todos": todos, "open": sum(1 for t in todos if not t["done"]), "strip": [t for t in todos if t["on_strip"]]}
+
+
 def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id: int | None) -> Any:
     """The sample's answer to one call, or None when the sample does not cover it."""
     if type_.startswith(("detective.", "proposals.")):
         import preview_detective
         return preview_detective.answer(type_, payload, role, dept_id)
+    if type_.startswith("chat."):
+        return _chat(type_, payload, account)
+    if type_ == "todo.list":
+        return _todos()
+    if type_ == "todo.done":
+        _TODOS_DONE.add(int(payload.get("todo_id") or 0))
+        return {"todo": next((t for t in _todos()["todos"] if t["id"] == int(payload.get("todo_id") or 0)), None)}
     if type_ == "flow.restricted_waiting":
         return {"waiting": [{"id": 5, "flow_id": 4, "name": "Payroll", "sample_path": "C:/Finance/Payroll/payroll-q3.xlsx", "asked_at": at(-1.5), "source_hostname": "FIN-02"}] if role == "super_user" else []}
     if type_ == "flow.restricted":

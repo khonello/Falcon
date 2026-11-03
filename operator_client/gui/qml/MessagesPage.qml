@@ -1,304 +1,308 @@
 import QtQuick
 import "."
 
-// MESSAGES (Help Ping & Message Channel, at both levels). One row per conversation: Worker <-> Admin,
-// Admin <-> Admin, or Admin <-> worker. It starts as a request (attention only, repeatable) that the
-// other person accepts -- with Accept, or by writing back -- except where the Engine opens it at once,
-// which opens at once. Then either side writes whenever they like (no turn lock, 22 Oct 2026). Who may
-// close it comes from the Engine (`can_close`): the higher party, or either of two Admins.
+// MESSAGES, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminMessagesPage): the people an IT Admin talks to, the
+// other Admins and whoever is signed in on a machine, one at a time or as the group of every Admin. The situation in a sentence; the
+// conversations on the left (requests to talk first, then unread, then the rest); the one picked on the right with its thread and the
+// box to write in; starting a conversation at the foot. On the Engine's version 1 conversations (`chat.*`, engine/resource/conversations.py).
+// A person at a machine answers in a conversation an Admin started; a request to talk from them (the user, 2 Nov 2026) is listed first
+// once the Engine keeps those (ENGINE-GAPS #19).
 Page {
     id: page
     objectName: "messagesView"
 
-    property var chans: []            // channel summaries
-    property var detail: ({})         // channel id -> {channel, messages}
-    property var pings: []            // unanswered pings to me
-    property string f: ""
-    property string sel: Nav.sub ? String(Nav.sub) : ""
+    property var convs: []
+    property var people: []
+    property bool adminsGroup: false
+    property var thread: null             // chat.get for the one picked
+    property var requests: []             // requests to talk, when the Engine has them
+    property string sel: { var a = Nav.takeArrive("messages"); return a !== null ? String(a) : Nav.sub && Nav.sub !== "announcements" ? String(Nav.sub) : "" }
     property var drafts: ({})
-    property var askFor: []           // who I may ping
+    property string q: ""
+    property var who: null
+    property string mtxt: ""
     readonly property int me: falcon.accountId
 
     function load() {
-        falcon.call("assistance.channels", {}, function (ok, r) {
-            page.chans = ok ? (r.channels || []) : []
-            page.chans.forEach(function (c) {
-                falcon.call("assistance.channel", { channel_id: c.id }, function (ok2, r2) {
-                    if (!ok2) return
-                    var d = Object.assign({}, page.detail); d[c.id] = r2; page.detail = d
-                })
-            })
-        })
-        falcon.call("assistance.ping_status", {}, function (ok, r) { page.pings = ok ? (r.pings || []) : [] })
-        // who this person may message, as the Engine decides it: the other Admins and the workers
-        falcon.call("assistance.people", {}, function (ok, r) {
-            page.askFor = ok ? (r.people || []).map(function (a) {
-                return { account: a.account_id, name: a.name, request: a.request !== false,
-                         sub: a.role === "admin" ? "Admin" + (a.department_name ? ", " + a.department_name : "")
-                              : a.hostname ? "on " + a.hostname : "a worker" } }) : []
-        })
+        falcon.call("chat.list", {}, function (ok, r) { page.convs = ok ? (r.conversations || []) : []; page.loadThread() })
+        falcon.call("chat.people", {}, function (ok, r) { page.people = ok ? (r.people || []) : []; page.adminsGroup = ok && !!r.admins_group })
+    }
+    function loadThread() {
+        if (!c) { thread = null; return }
+        var id = c.conversation_id
+        falcon.call("chat.get", { conversation_id: id }, function (ok, r) { if (ok && page.c && page.c.conversation_id === id) page.thread = r })
+        if (c.unread) falcon.call("chat.read", { conversation_id: id }, function () {})
     }
     Component.onCompleted: load()
-    Connections { target: falcon; function onPushReceived(type, payload) { if (/^assistance/.test(type)) again.restart() } }
+    Connections { target: falcon; function onConnected() { page.load() } function onPushReceived(type, payload) { if (/^chat/.test(type)) again.restart() } }
     Timer { id: again; interval: 300; onTriggered: page.load() }
 
-    // every conversation as the person at this console sees it
-    readonly property var rows: {
-        var out = []
-        chans.forEach(function (c) {
-            var d = detail[c.id], ch = d ? d.channel : c, names = ch.names || {}
-            var hi = c.superior_account_id, lo = ch.subordinate_account_id || c.initiator_account_id
-            var party = true      // the Engine lists only the conversations this person is in
-            var other = names[String(hi === me ? lo : hi)] || (hi === me ? c.initiator_name : "")
-            var msgs = d ? (d.messages || []).map(function (m) { return { t: Time.ms(m.sent_at || m.created_at), who: names[String(m.sender_account_id)] || "", mine: m.sender_account_id === me, text: m.body } }) : []
-            var closed = !!c.closed_at
-            // the Engine's `my_turn` now only says the other person wrote last: waiting on you, not a lock
-            var waitsOnMe = party && !closed && (d ? !!ch.my_turn : ((c.turn === "superior") === (hi === me)))
-            var st = closed ? ["Closed", "good", "closed"] : waitsOnMe ? ["Waiting on you", "bad", "you"] : ["Waiting on them", "wait", "them"]
-            out.push({ id: "c" + c.id, cid: c.id, kind: "channel", title: other, canClose: d ? !!ch.can_close : hi === me,
-                       other: other, iHigh: hi === me, party: party, msgs: msgs, closed: closed, st: st,
-                       started: c.opened_at, last: msgs.length ? msgs[msgs.length - 1].t : Time.ms(c.closed_at || c.opened_at),
-                       pings: 1, line: msgs.length ? (msgs[msgs.length - 1].mine ? "You" : msgs[msgs.length - 1].who) + ": " + msgs[msgs.length - 1].text : "no messages yet" })
-        })
-        // the Engine answers one row per unanswered ping (id, sender_account_id, sent_at), oldest first: one sender's
-        // pings are one conversation-to-be, with every time it pinged (answering addresses them all)
-        var bySender = {}, senders = []
-        pings.forEach(function (p) {
-            var k = String(p.sender_account_id)
-            if (!bySender[k]) { bySender[k] = []; senders.push(k) }
-            bySender[k].push(p)
-        })
-        senders.forEach(function (k) {
-            var ps = bySender[k], first = ps[0], n0 = ps.length, name = first.from_name || "Someone"
-            if (out.some(function (x) { return x.party && x.other === name && !x.closed })) return
-            out.push({ id: "p" + first.id, pid: first.id, kind: "ping", title: name, other: name, iHigh: true, party: true, msgs: [], closed: false,
-                       canClose: false, st: ["Asks to talk" + (n0 > 1 ? ", " + n0 + " times" : ""), "bad", "you"], started: first.sent_at,
-                       times: ps.map(function (p) { return p.sent_at }),
-                       last: Time.ms(ps[n0 - 1].sent_at), pings: n0, line: "a request to talk" + (n0 > 1 ? ", sent " + n0 + " times" : "") + "; not accepted yet" })
-        })
-        var order = { you: 0, them: 1, closed: 2 }
-        return out.sort(function (a, b) { return order[a.st[2]] - order[b.st[2]] || b.last - a.last })
-    }
-    function n(k) { return rows.filter(function (x) { return x.st[2] === k }).length }
-    readonly property var shown: rows.filter(function (x) {
-        return (f === "" || (f === "ping" ? x.kind === "ping" : x.st[2] === f)) && (x.title + " " + x.msgs.map(function (m) { return m.text }).join(" ")).toLowerCase().indexOf(list.query.toLowerCase()) >= 0
+    // every conversation, as the Engine lists it, latest first; unread is the Engine's count
+    readonly property var rows: convs.map(function (x) {
+        return { id: String(x.conversation_id), conversation_id: x.conversation_id, kind: x.kind, title: x.title || "Someone", other: x.title || "Someone",
+                 members: x.members || [], unread: x.unread || 0, last: x.last ? Time.ms(x.last.at) : 0,
+                 line: x.last ? (x.last.from_account_id === page.me ? "You: " : x.kind === "admins" ? (x.last.from || "") + ": " : "") + x.last.body : "nothing said yet",
+                 st: [x.unread ? "Waiting on you" : "Read", x.unread ? "bad" : "wait", x.unread ? "you" : "read"] }
     })
-    readonly property var c: { for (var i = 0; i < shown.length; i++) if (shown[i].id === sel) return shown[i]; return shown.length ? shown[0] : null }
+    readonly property var c: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
+    onCChanged: { thread = null; loadThread(); pickedId = c ? c.id : "" }
+    property string pickedId: ""
     readonly property string draft: c ? (drafts[c.id] || "") : ""
     function setDraft(t) { var d = Object.assign({}, drafts); d[c.id] = t; drafts = d }
-
-    // accepting a request opens the conversation; writing back accepts it too
-    function accept(x, then) {
-        falcon.call("assistance.respond", { ping_id: x.pid }, function (ok, r) {
-            if (!ok) { Msg.failed(r && r.message ? r.message : "Not accepted"); return }
-            page.sel = "c" + r.channel_id
-            if (then) then(r.channel_id)
-            else { Msg.ok("Accepted · you and " + x.other + " can write"); page.load() }
-        })
-    }
     function send() {
         var x = c, text = draft.trim()
         if (!text) return
-        if (x.kind === "ping") {
-            accept(x, function (cid) {
-                falcon.call("assistance.message", { channel_id: cid, body: text }, function (ok2, r2) {
-                    if (!ok2) Msg.failed(r2 && r2.message ? r2.message : "Accepted, but not sent")
-                    else Msg.ok("Accepted and answered " + x.other)
-                    page.setDraftFor(x.id, ""); page.load()
-                })
-            })
-            return
-        }
-        falcon.call("assistance.message", { channel_id: x.cid, body: text }, function (ok, r) {
+        falcon.call("chat.send", { conversation_id: x.conversation_id, body: text }, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not sent"); return }
-            Msg.ok("Sent"); page.setDraftFor(x.id, ""); page.load()
+            var d = Object.assign({}, page.drafts); d[x.id] = ""; page.drafts = d
+            Msg.ok("Sent to " + x.title); page.load()
         })
     }
-    function setDraftFor(id, t) { var d = Object.assign({}, drafts); d[id] = t; drafts = d }
+    function personOf(x) {
+        if (!x || x.kind === "admins") return null
+        var o = (x.members || []).filter(function (m) { return m.account_id !== page.me })[0]
+        return o ? page.people.filter(function (p) { return p.account_id === o.account_id })[0] || null : null
+    }
+    function match(x) { return (x.title + " " + x.line).toLowerCase().indexOf(q.toLowerCase()) >= 0 }
+    readonly property var unread: rows.filter(function (x) { return x.unread && page.match(x) })
+    readonly property var read: rows.filter(function (x) { return !x.unread && page.match(x) })
+
+    // starting a conversation: one person goes to your conversation with them; every Admin goes to their group
+    readonly property var whoOptions: (adminsGroup ? [{ value: "admins", label: "Every Admin" }] : [])
+        .concat(people.filter(function (p) { return p.role === "admin" }).map(function (p) { return { value: "a" + p.account_id, label: p.name + " · Admin" } }))
+        .concat(people.filter(function (p) { return p.role !== "admin" }).map(function (p) { return { value: "p" + p.pc_id, label: (p.name || "nobody signed in") + " · " + p.hostname + (p.online ? "" : " · offline") } }))
+    function startOne() {
+        var w = String(who), pl = w === "admins" ? { admins: true } : w.charAt(0) === "a" ? { account_id: Number(w.slice(1)) } : { pc_id: Number(w.slice(1)) }, text = mtxt.trim()
+        falcon.call("chat.open", pl, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not opened"); return }
+            var id = r.conversation.conversation_id
+            page.sel = String(id)
+            if (!text) { Msg.ok("The conversation with " + (r.conversation.title || "them") + " is open"); page.load(); return }
+            falcon.call("chat.send", { conversation_id: id, body: text }, function (ok2, r2) {
+                if (!ok2) Msg.failed(r2 && r2.message ? r2.message : "Opened, but not sent"); else Msg.ok("Sent to " + (r.conversation.title || "them"))
+                page.who = null; page.mtxt = ""; page.load()
+            })
+        })
+    }
+
+    situation: {
+        if (!rows.length && !requests.length) return "No conversations yet. Start one below."
+        var oldest = rows.filter(function (x) { return !x.unread && x.line.indexOf("You: ") === 0 }).sort(function (a, b) { return a.last - b.last })[0]
+        return (requests.length ? (requests.length === 1 ? requests[0].from + " asks" : Theme.fmt(requests.length) + " people ask") + " to talk; every Admin sees " + (requests.length === 1 ? "it" : "them") + " until one accepts. " : "")
+               + (unread.length ? Theme.listNames(unread.map(function (x) { return x.title }), 2) + (unread.length === 1 ? " is" : " are") + " waiting on your answer." : "Nobody is waiting on you.")
+               + (oldest ? " Your message to " + oldest.title + " has waited " + Time.age(oldest.last) + "." : "")
+    }
+    situationAt: Time.now
 
     Confirm { id: confirm; page: page }
 
-    MessageTabs {}
-
-    Strip {
+    function initials(n) { var p = String(n || "?").replace(/[^A-Za-z. ]/g, " ").split(/[\s.]+/).filter(function (x) { return x }); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : (p[0] || "?").slice(0, 2)).toUpperCase() }
+    // a person or a group as a round face (ib-av): their initials on surface-3
+    component Face: Rectangle {
+        property string name: ""
+        property real size: 34
+        width: size; height: size; radius: size / 2
+        color: Theme.surface3
+        Txt { anchors.centerIn: parent; text: page.initials(parent.name); font.pixelSize: parent.size > 40 ? 14 : parent.size < 28 ? 9 : 11; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
+    }
+    component Section: Column {
+        id: sec
+        property string name: ""
+        property string note: ""
+        property var xs: []
+        visible: xs.length > 0
         width: parent.width
-        on: page.f === "" ? null : page.f
-        onPick: function (k) { page.f = k === null ? "" : k }
-        items: [
-            { key: "you", label: "Waiting on you", value: Theme.fmt(page.n("you")), delta: page.n("you") ? "a request, or they wrote last" : "nothing waiting", dc: page.n("you") ? Theme.crit : undefined },
-            { key: "them", label: "Waiting on them", value: Theme.fmt(page.n("them")), delta: "you wrote last" },
-            { key: "ping", label: "Requests", value: Theme.fmt(page.rows.filter(function (x) { return x.kind === "ping" }).length), delta: "not accepted yet" },
-            { key: "closed", label: "Closed", value: Theme.fmt(page.n("closed")), delta: "this week" }
-        ]
+        spacing: 2
+        Item {
+            width: parent.width
+            height: sh.height + 14
+            Txt { id: sh; x: 4; y: 10; text: sec.name; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
+            Txt { x: sh.x + sh.implicitWidth + 8; y: 10; text: Theme.fmt(sec.xs.length) + (sec.note ? " · " + sec.note : ""); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+        }
+        Repeater {
+            model: sec.xs
+            delegate: Rectangle {
+                required property var modelData
+                objectName: "conv_" + modelData.id
+                width: sec.width; height: pt.height + 16; radius: Theme.radiusLg
+                color: page.c && page.c.id === modelData.id ? Theme.accentSoft : ma.containsMouse ? Theme.surface2 : "transparent"
+                Face { x: 8; anchors.verticalCenter: parent.verticalCenter; name: modelData.title }
+                Column {
+                    id: pt
+                    x: 54; y: 8; width: parent.width - 62
+                    Item { width: parent.width; height: nm.height
+                        Txt { id: nm; text: modelData.title + (modelData.kind === "admins" ? "" : ""); font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - tm.implicitWidth - 8) }
+                        Txt { visible: modelData.kind === "admins"; x: nm.width + 6; y: nm.baselineOffset - baselineOffset; text: modelData.members.length; color: Theme.text3; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideNone }
+                        Txt { id: tm; anchors.right: parent.right; y: nm.baselineOffset - baselineOffset; text: modelData.last ? Time.ago(modelData.last) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
+                    Item { width: parent.width; height: ln.height
+                        Txt { id: ln; width: parent.width - (modelData.unread ? 28 : 0); text: modelData.line; font.pixelSize: 13; color: modelData.unread ? Theme.text : Theme.text3; font.weight: modelData.unread ? Font.Medium : Font.Normal }
+                        Rectangle { visible: modelData.unread > 0; anchors.right: parent.right; anchors.verticalCenter: ln.verticalCenter; width: Math.max(20, cn.implicitWidth + 12); height: 20; radius: 10; color: Theme.accent
+                                    Txt { id: cn; anchors.centerIn: parent; text: modelData.unread; color: Theme.inverse; font.pixelSize: 11; font.weight: Font.DemiBold; elide: Text.ElideNone } } }
+                }
+                MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.id }
+            }
+        }
     }
 
     Row {
         width: parent.width
         spacing: 14
-        ListPanel {
-            id: list
-            width: (parent.width - 14) * 8 / 12
-            more: 2
-            title: page.f === "" ? "Conversations" : ({ you: "Waiting on you", them: "Waiting on them", ping: "Requests", closed: "Closed" })[page.f]
-            sub: "waiting on you first · click one to see it on the right"
-            placeholder: "Find a person or a word"
-            actionLabel: "New message"
-            onAction: pingDrawer.open()
-            rows: page.shown
-            pick: page.c ? page.c.id : null
-            onPicked: function (k) { page.sel = k }
-            icon: function (x) { return x.kind === "ping" ? "bell" : "message" }
-            nameTitle: "With"
-            nameText: function (x) { return x.title }
-            nameLine: function (x) { return x.line }
-            cols: [{ title: "Sent", width: 70, text: function (x) { return Theme.fmt(x.pings) } },
-                   { title: "Last", width: 100, text: function (x) { return Time.at(x.last) } }]
-            now: function (x) { return [x.st[0], x.st[1]] }
-            showEmpty: page.rows.length === 0
-            emptyIcon: "message"
-            emptyTitle: "No conversations yet"
-            emptyText: "A message starts as a request; accepting it opens a conversation."
-            emptyAct: "New message"
-            onEmptyAction: pingDrawer.open()
-        }
-
-        SidePanel {
-            id: side
+        readonly property real h: Math.max(listP.implicitHeight, conv.implicitHeight, 520 + 40)
+        // --- conversations ---------------------------------------------------------------------------------------------------------------
+        Box {
+            id: listP
+            objectName: "conversations"
             width: (parent.width - 14) * 4 / 12
-            implicitHeight: Theme.listHeight + 56 * 2 + 64
-            showEmpty: page.c === null
-            emptyIcon: "message"
-            emptyTitle: "No conversations yet"
-            emptyText: "When a worker or another Admin messages you, or you message them, it appears here."
-            title: page.c ? page.c.title : ""
-            sub: page.c ? (page.askFor.filter(function (p) { return p.name === page.c.other })[0] || { sub: "" }).sub : ""
-            facts: page.c ? [["Now", page.c.st[0], page.c.st[1] === "bad" ? Theme.crit : page.c.st[1] === "good" ? Theme.ok : Theme.text4, false, true],
-                             ["Started by", (page.c.kind === "ping" ? page.c.other : page.c.iHigh ? page.c.other : "You") + ", " + Time.at(page.c.started)],
-                             ["Who closes it", page.c.kind === "ping" ? "nobody yet" : page.c.canClose ? (page.c.iHigh ? "You" : "Either of you") : page.c.other]] : []
-            extra: Btn {
-                visible: page.c !== null && page.c.kind === "channel" && page.c.party && !page.c.closed && page.c.canClose
-                small: true; kind: "text"; danger: true; iconName: "closecircle"; tip: "Close the conversation"
-                onClicked: confirm.ask({ title: "Close the conversation with " + page.c.other + "?", ok: "Close it", cancel: "Keep it open",
-                                         text: (page.c.iHigh ? "Only you can close it. " : "") + page.c.other + " cannot write in it again; a new message opens a new one. It stays in the audit log." },
-                                       function () { falcon.call("assistance.close_channel", { channel_id: page.c.cid }, function (ok, r) {
-                                           if (!ok) { Msg.failed(r && r.message ? r.message : "Not closed"); return }
-                                           Msg.ok("Closed · recorded"); page.load() }) })
-            }
-
-            // the thread
+            height: parent.h
+            title: "Conversations"
+            sub: "unread first"
+            Field { width: parent.width; small: true; iconName: "search"; placeholderText: "Find a person or a group"; text: page.q; onTextEdited: page.q = text }
             Column {
                 width: parent.width
-                spacing: 6
-                Txt { text: page.c && page.c.kind === "ping" ? "A REQUEST TO TALK" : "THE CONVERSATION"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                Txt { anchors.horizontalCenter: parent.horizontalCenter; color: Theme.text3; font.pixelSize: 12
-                      text: page.c ? (page.c.kind === "ping" ? page.c.other + " asked " + page.c.times.map(function (t) { return Time.at(t) }).join(", ") : "Opened " + Time.at(page.c.started)) : "" }
-                // a request is accepted here, or by writing back below
-                Row {
-                    visible: page.c !== null && page.c.kind === "ping"
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 10
-                    Btn { objectName: "msgAccept"; small: true; kind: "primary"; text: "Accept"; onClicked: page.accept(page.c) }
-                    Txt { anchors.verticalCenter: parent.verticalCenter; text: "or write back to accept"; color: Theme.text3; font.pixelSize: 12 }
+                spacing: 2
+                Section { name: "Requests to talk"; note: "any Admin may accept"; xs: page.requests }
+                Section { name: "Unread"; xs: page.unread }
+                Section { name: "Read"; xs: page.read }
+                Quiet { visible: page.rows.length === 0; text: "No conversations yet. Start one below." }
+            }
+        }
+        // --- the conversation picked ------------------------------------------------------------------------------------------------------
+        Box {
+            id: conv
+            objectName: "conversation"
+            width: (parent.width - 14) * 8 / 12
+            height: parent.h
+            fill: true
+            readonly property var person: page.personOf(page.c)
+            Quiet { visible: page.c === null; text: "Pick someone on the left." }
+            // the head (ms-head): their face, who and where, under a rule
+            Item {
+                visible: page.c !== null
+                width: parent.width
+                height: Math.max(44, hc.height) + 11
+                Face { size: 44; name: page.c ? page.c.title : "" }
+                Column {
+                    id: hc
+                    x: 56; width: parent.width - 56
+                    spacing: 2
+                    Txt { width: parent.width; text: page.c ? (page.c.kind === "admins" ? "Every Admin" : page.c.title) : ""; font.pixelSize: 15; font.weight: Font.DemiBold }
+                    Txt { width: parent.width; font.pixelSize: 13; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          text: !page.c ? "" : page.c.kind === "admins" ? "A group of " + page.c.members.length + " and you. Each of them sees what everyone writes."
+                                : conv.person ? (conv.person.role === "admin" ? "Admin" : "Signed in on " + conv.person.hostname + (conv.person.online ? "" : " · offline")) : "" }
                 }
-                Repeater {
-                    model: page.c ? page.c.msgs : []
-                    Item {
-                        required property var modelData
-                        width: parent.width
-                        height: bub.height
-                        Rectangle {
-                            id: bub
-                            x: modelData.mine ? parent.width - width : 0
-                            width: Math.min(parent.width * 0.86, bt.implicitWidth + 22)
-                            height: bc.height + 14
-                            radius: 10
-                            color: modelData.mine ? Theme.accent : Theme.surface2
-                            border.width: modelData.mine ? 0 : 1
-                            border.color: Theme.border
-                            Column {
-                                id: bc
-                                x: 11; y: 7
-                                width: parent.width - 22
-                                Txt { visible: !modelData.mine; text: modelData.who + " · " + Time.at(modelData.t); color: Theme.text3; font.pixelSize: 11 }
-                                Txt { id: bt; width: Math.min(implicitWidth, side.width * 0.86 - 54); text: modelData.text; wrapMode: Text.Wrap; elide: Text.ElideNone
-                                      color: modelData.mine ? Theme.inverse : Theme.text }
+                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+            }
+            // the thread (ms-thread), newest at the foot
+            Flickable {
+                id: th
+                visible: page.c !== null
+                width: parent.width
+                height: Math.max(80, conv.height - conv.headerHeight - 16 - 66 - wr.height - 20)
+                contentHeight: msgs.height + 16
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                onContentHeightChanged: contentY = Math.max(0, contentHeight - height)
+                Column {
+                    id: msgs
+                    x: 2; y: 8
+                    width: th.width - 4
+                    spacing: 8
+                    Repeater {
+                        model: page.thread ? page.thread.messages || [] : []
+                        delegate: Column {
+                            required property var modelData
+                            required property int index
+                            readonly property var prev: index > 0 ? page.thread.messages[index - 1] : null
+                            readonly property bool newDay: !prev || !Time.sameDay(Time.ms(prev.at), Time.ms(modelData.at))
+                            width: msgs.width
+                            spacing: 8
+                            Txt { visible: parent.newDay; anchors.horizontalCenter: parent.horizontalCenter; topPadding: 6; text: Time.sameDay(Time.ms(modelData.at), Time.now) ? "Today" : Time.dayName(modelData.at) + " " + Time.day(modelData.at); font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone }
+                            Item {
+                                width: parent.width
+                                height: bub.height
+                                Rectangle {
+                                    id: bub
+                                    readonly property bool mine: !!modelData.mine
+                                    x: mine ? parent.width - width : 0
+                                    width: Math.min(parent.width * 0.72, Math.max(bt.implicitWidth, bf.visible ? bf.implicitWidth : 0, bs.implicitWidth) + 24)
+                                    height: bc.height + 16
+                                    radius: 12
+                                    bottomLeftRadius: mine ? 12 : 4
+                                    bottomRightRadius: mine ? 4 : 12
+                                    color: mine ? Theme.accent : Theme.surface2
+                                    border.width: mine ? 0 : 1
+                                    border.color: Theme.border
+                                    Column {
+                                        id: bc
+                                        x: 12; y: 8
+                                        width: parent.width - 24
+                                        spacing: 4
+                                        Txt { id: bf; visible: !bub.mine && page.c && page.c.kind === "admins"; text: modelData.from || ""; font.weight: Font.DemiBold; font.pixelSize: 12; color: Theme.text2; elide: Text.ElideNone }
+                                        Txt { id: bt; width: parent.width; text: modelData.body + (modelData.file ? "\nFile: " + modelData.file.name : ""); lh: 1.45; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: bub.mine ? Theme.inverse : Theme.text }
+                                        Txt { id: bs; anchors.right: parent.right; text: Time.hhmm(modelData.at); font.pixelSize: 11; color: bub.mine ? Theme.alpha(Theme.inverse, 0.75) : Theme.text3; elide: Text.ElideNone }
+                                    }
+                                }
                             }
                         }
                     }
+                    Quiet { visible: page.c !== null && (!page.thread || !(page.thread.messages || []).length); text: page.thread ? (page.c && page.c.kind === "admins" ? "Nothing has been said in the Admins group yet." : "Nothing has passed between you and " + (page.c ? page.c.title : "them") + " yet.") : "Loading" }
                 }
-                Txt { visible: page.c !== null && page.c.closed; anchors.horizontalCenter: parent.horizontalCenter; text: "Closed"; color: Theme.text3; font.pixelSize: 12; topPadding: 4 }
             }
-
-            footShown: false
-            dockShown: page.c !== null && !page.c.closed
-
-            // the composer, docked under the thread
-            dock: Item {
-                visible: page.c !== null && !page.c.closed
-                width: side.width - 32
-                height: !page.c ? 0 : composer.height
+            // the box to write in (ms-write: a rounded composer under a rule)
+            Column {
+                id: wr
+                visible: page.c !== null
+                width: parent.width
+                spacing: 10
+                Rectangle { width: parent.width; height: 1; color: Theme.border }
                 Rectangle {
-                    id: composer
-                    visible: page.c !== null && page.c.party
                     width: parent.width
-                    height: Math.max(40, ta.height + 8)
+                    height: Math.max(36, ta.height + 8)
                     radius: 20
                     color: Theme.surface2
                     border.width: 1
                     border.color: Theme.borderStrong
                     TextArea2 {
                         id: ta
-                        x: 4; y: 4
-                        width: parent.width - 48
+                        x: 6
+                        width: parent.width - 6 - sendB.width - 8
+                        anchors.verticalCenter: parent.verticalCenter
                         minRows: 1
-                        maxRows: 5
                         borderless: true
-                        enterSends: true
+                        placeholder: page.c ? (page.c.kind === "admins" ? "Write to every Admin; all see it" : "Write to " + page.c.title) : ""
                         text: page.draft
-                        placeholder: page.c && page.c.kind === "ping" ? "Write back to " + page.c.other + " · this accepts the request" : "Write to " + (page.c ? page.c.other : "")
+                        enterSends: true
                         onEdited: function (t) { page.setDraft(t) }
-                        onSubmitted: page.send()
                     }
-                    Btn { objectName: "msgSend"; circle: true; kind: "primary"; iconName: "send"; tip: "Send · Enter"
-                          enabled: page.draft.trim() !== ""; anchors.right: parent.right; anchors.rightMargin: 4; anchors.bottom: parent.bottom; anchors.bottomMargin: 4; onClicked: page.send() }
+                    Btn { id: sendB; objectName: "msgSend"; anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; kind: "primary"; circle: true; iconName: "send"; enabled: page.draft.trim() !== ""; onClicked: page.send() }
                 }
             }
+            Pulse { parent: conv; key: page.pickedId || null }
         }
     }
 
-    // --- a new ping ---------------------------------------------------------------------------------
-    Drawer {
-        id: pingDrawer
-        page: page
-        width: 420
-        title: "Ask someone to talk"
-        property var who: null
-        // writing to someone is a request they accept, unless the Engine says it opens at once
-        readonly property bool direct: who !== null && page.askFor.some(function (p) { return p.account === who && !p.request })
-        note: who === null ? "Pick a person." : ""
-        footer: [
-            Btn { text: "Cancel"; onClicked: pingDrawer.close() },
-            Btn { objectName: "pingSend"; kind: "primary"; text: pingDrawer.direct ? "Open the conversation" : "Send the request"; enabled: pingDrawer.who !== null
-                  onClicked: falcon.call("assistance.ping", { to_account_id: pingDrawer.who }, function (ok, r) {
-                      if (!ok) { Msg.failed(r && r.message ? r.message : "Not sent"); return }
-                      if (r.channel_id) { page.sel = "c" + r.channel_id; Msg.ok("The conversation is open") }
-                      else Msg.ok("Asked · they see it until they accept")
-                      pingDrawer.close(); page.load()
-                  }) }
-        ]
-        Column {
+    // --- start a conversation ------------------------------------------------------------------------------------------------------------
+    Box {
+        objectName: "startConversation"
+        width: parent.width
+        accentFoot: true
+        title: "Start a conversation"
+        sub: "one person goes to your conversation with them; every Admin goes to the group where everyone sees each other's answers"
+        Row {
             width: parent.width
             spacing: 8
-            Txt { text: "WHO"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-            Select { width: parent.width; search: true; placeholder: "Pick a person"; value: pingDrawer.who
-                     options: page.askFor.map(function (p) { return { value: p.account, label: p.name + " · " + p.sub } })
-                     onPicked: function (v) { pingDrawer.who = v } }
+            Select { width: 380; search: true; placeholder: "With whom: a person, or every Admin"; value: page.who; options: page.whoOptions; onPicked: function (v) { page.who = v } }
+            Field { width: parent.width - 380 - goB.width - 16; placeholderText: "The message"; text: page.mtxt; onTextEdited: page.mtxt = text }
+            Btn { id: goB; kind: "primary"; text: "Send"; enabled: page.who !== null; onClicked: page.startOne() }
         }
         Rectangle {
-            width: parent.width; height: pn.height + 20; radius: 6; color: Theme.surface2
-            Txt { id: pn; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                  text: pingDrawer.direct ? "It opens the conversation at once; an Admin does not need to accept a message from you."
-                        : "It is a request to talk and carries no text yet. They see it, bright and pulsing, until they accept it or write back; then you can both write." }
+            visible: page.who !== null
+            width: parent.width
+            height: visible ? sp.height + 20 : 0
+            radius: Theme.radius
+            color: Theme.surface2
+            Txt { id: sp; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                  text: String(page.who) === "admins" ? "Goes to the Admins group; each of them sees it, and each other's answers." : "Goes to your conversation with " + ((page.whoOptions.filter(function (o) { return o.value === page.who })[0] || { label: "them" }).label.split(" · ")[0]) + "; only the two of you see it." }
         }
     }
 }

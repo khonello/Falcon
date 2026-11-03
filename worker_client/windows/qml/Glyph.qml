@@ -16,6 +16,7 @@ Item {
         tasks: ["M4.5 4.5h15v15h-15z", "M8.5 12.2l2.5 2.5 4.5-5"],
         clock: ["M20.5 12a8.5 8.5 0 1 0 -17 0a8.5 8.5 0 1 0 17 0", "M12 7.5V12l3 2"],
         file: ["M6 3h8l4 4v14H6z", "M14 3v4h4"],
+        files: ["M8 3h7l4 4v11H8z", "M15 3v4h4", "M5 6v15h10"],
         window: ["M3 4h18v16H3z", "M3 9h18"],
         x: ["M6 6l12 12", "M18 6L6 18"],
         play: ["M7 4l12 8-12 8z"],
@@ -23,7 +24,11 @@ Item {
         warn: ["M12 4l9 16H3z", "M12 10v4", "M12 17.2v.3"],
         announce: ["M4 10v4h3l6 4V6L7 10z", "M16 9a4 4 0 0 1 0 6"],
         user: ["M15.5 8a3.5 3.5 0 1 0 -7 0a3.5 3.5 0 1 0 7 0", "M5 20a7 7 0 0 1 14 0"],
-        home: ["M4 11l8-7 8 7", "M6 10v10h12V10"]
+        home: ["M4 11l8-7 8 7", "M6 10v10h12V10"],
+        folder: ["M3 6h6l2 2h10v11H3z"],
+        eye: ["M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z", "M15 12a3 3 0 1 0 -6 0a3 3 0 1 0 6 0"],
+        chat: ["M4 5h16v11H9l-4 3v-3H4z"],
+        copy: ["M8 8h12v12H8z", "M16 8V4H4v12h4"]
     })
     readonly property var paths: set[name] || []
     implicitWidth: size

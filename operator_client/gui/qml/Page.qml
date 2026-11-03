@@ -11,6 +11,8 @@ Flickable {
     property string sub: Nav.subtitle(Nav.page)
     property bool bare: false
     property string refused: ""                // "That is not this console's." and why
+    property string situation: ""              // the page's one sentence, at the top (SitBar)
+    property var situationAt: null
     default property alias content: col.data
     readonly property real w: width - 40       // the width a page's own rows lay out in
 
@@ -23,17 +25,25 @@ Flickable {
     Column {
         id: head
         visible: !root.bare
-        x: 20; y: 18
+        x: 20; y: Theme.pageTop
         width: root.w
         spacing: 2
         Txt { text: root.title; font.pixelSize: Theme.fPage; font.weight: Font.DemiBold; width: parent.width }
         Txt { visible: root.sub !== ""; text: root.sub; color: Theme.text3; width: parent.width }
     }
+    SitBar {
+        id: sit
+        x: 20
+        y: head.visible ? head.y + head.height + 14 : Theme.pageTop
+        width: root.w
+        text: root.situation
+        at: root.situationAt
+    }
     Rectangle {
         id: gate
         visible: root.refused !== ""
         x: 20
-        y: head.visible ? head.y + head.height + 14 : 18
+        y: sit.visible ? sit.y + sit.height + 14 : head.visible ? head.y + head.height + 14 : Theme.pageTop
         width: root.w
         height: visible ? 48 : 0
         radius: Theme.radius
@@ -50,7 +60,7 @@ Flickable {
     Column {
         id: col
         x: 20
-        y: gate.visible ? gate.y + gate.height + 14 : head.visible ? head.y + head.height + 14 : 18
+        y: gate.visible ? gate.y + gate.height + 14 : sit.visible ? sit.y + sit.height + 14 : head.visible ? head.y + head.height + 14 : Theme.pageTop
         width: root.w
         spacing: 14
     }

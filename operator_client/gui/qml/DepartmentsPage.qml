@@ -58,12 +58,11 @@ Page {
 
     Confirm { id: confirm }
 
-    Txt {
-        width: parent.width
-        color: Theme.text2
-        wrapMode: Text.WordWrap; elide: Text.ElideNone
-        text: Theme.many(page.depts.length, "department") + " and " + Theme.many(page.all.length, "machine") + ". Every IT Admin reaches every department."
-    }
+    readonly property var loose: all.filter(function (m) { return !depts.some(function (d) { return d.id === m.dept }) })
+    situation: Theme.many(depts.length, "department") + " and " + Theme.many(all.length, "machine") + "; "
+               + (loose.length ? Theme.fmt(loose.length) + " in no department yet" : "every machine is in one") + ". Every IT Admin reaches every department."
+    situationAt: Time.now
+    function deptColor(i) { return [Theme.ser1, Theme.ser2, Theme.ser3, Theme.ser4, Theme.ser5, Theme.ser6][i % 6] }
 
     Row {
         id: two
@@ -72,76 +71,59 @@ Page {
         readonly property real h: Math.max(left.implicitHeight, right.implicitHeight)
 
         // --- the departments ---------------------------------------------------------------------------
-        Panel {
+        Box {
             id: left
             width: (parent.width - 14) * 0.5
             height: two.h
             title: "Departments · " + Theme.fmt(page.depts.length)
-            sub: "a label for grouping machines and the people at them; click one to see its machines, expand it to rename it"
+            sub: "a label for grouping machines and the people at them; click one to see its machines on the right, expand it to rename it"
+            Quiet { visible: page.depts.length === 0; text: "No departments yet. Make one below." }
             Column {
                 width: parent.width
-                spacing: 8
-                Txt { visible: page.depts.length === 0; text: "No departments yet. Make one below."; color: Theme.text3 }
+                spacing: 6
                 Repeater {
                     model: page.depts
-                    delegate: Rectangle {
+                    delegate: Card {
                         id: card
                         required property var modelData
-                        readonly property bool picked: page.cur !== null && page.cur.id === modelData.id
-                        readonly property bool open: page.exp === modelData.id
+                        required property int index
                         readonly property var ms: page.inD(modelData.id)
+                        readonly property int ppl: ms.filter(function (m) { return !!m.user }).length
                         objectName: "deptCard-" + modelData.id
                         width: parent.width
-                        height: inner.height + 20
-                        radius: Theme.radius
-                        color: picked ? Theme.accentSoft : Theme.surface
-                        border.width: 1
-                        border.color: picked ? Theme.accent : Theme.border
-                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = card.modelData.id }
+                        midW: 200
+                        actW: 150
+                        dotColor: page.deptColor(index)
+                        title: modelData.name
+                        line: ms.length ? Theme.listNames(ms.map(function (m) { return m.host }), 4) : "no machines yet"
+                        picked: page.cur !== null && page.cur.id === modelData.id
+                        expandable: true
+                        expanded: page.exp === modelData.id
+                        onOpen: page.sel = modelData.id
+                        onToggle: { page.sel = modelData.id; page.ren = modelData.name; page.exp = expanded ? null : modelData.id }
+                        mid: Row {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 14
+                            Txt { text: Theme.many(card.ms.length, "machine"); font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone }
+                            Txt { text: card.ppl + (card.ppl === 1 ? " person" : " people"); font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone }
+                        }
+                        // opened: its name, to change (pd-open)
                         Column {
-                            id: inner
-                            x: 12; y: 10
-                            width: parent.width - 24
+                            y: 4
+                            width: parent.width
                             spacing: 10
                             Row {
-                                width: parent.width
-                                spacing: 10
-                                Column {
-                                    width: parent.width - facts.width - expand.width - 20
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    Txt { width: parent.width; text: card.modelData.name; font.weight: Font.DemiBold }
-                                    Txt { width: parent.width; color: Theme.text3; font.pixelSize: Theme.fSmall
-                                          text: card.ms.length ? card.ms.slice(0, 4).map(function (m) { return m.host }).join(", ") + (card.ms.length > 4 ? " and " + (card.ms.length - 4) + " more" : "") : "no machines yet" }
-                                }
-                                Column {
-                                    id: facts
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    Txt { text: Theme.many(card.ms.length, "machine"); font.pixelSize: Theme.fSmall; elide: Text.ElideNone }
-                                    Txt { readonly property int n: card.ms.filter(function (m) { return !!m.user }).length
-                                          text: n + (n === 1 ? " person" : " people"); color: Theme.text3; font.pixelSize: Theme.fSmall; elide: Text.ElideNone }
-                                }
-                                Btn {
-                                    id: expand
-                                    objectName: "deptExpand"
-                                    small: true; kind: "text"
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: card.open ? "Collapse" : "Expand"
-                                    iconName: card.open ? "chevu" : "chevd"; iconRight: true
-                                    onClicked: { page.sel = card.modelData.id; page.ren = card.modelData.name; page.exp = card.open ? null : card.modelData.id }
-                                }
-                            }
-                            Column {
-                                visible: card.open
-                                width: parent.width
                                 spacing: 8
-                                Field { objectName: "deptRename"; width: parent.width; text: page.ren; placeholderText: "Name"; onTextEdited: page.ren = text; onAccepted: page.rename(card.modelData) }
-                                Row {
-                                    width: parent.width
-                                    spacing: 10
-                                    Txt { width: parent.width - rn.width - 10; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 12
-                                          wrapMode: Text.WordWrap; elide: Text.ElideNone; text: "The new name shows everywhere the department does; its machines stay in it." }
-                                    Btn { id: rn; small: true; text: "Rename"; enabled: page.ren.trim() !== "" && page.ren.trim() !== card.modelData.name; onClicked: page.rename(card.modelData) }
-                                }
+                                Txt { width: 64; anchors.verticalCenter: parent.verticalCenter; text: "Name"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                Field { objectName: "deptRename"; small: true; width: Math.min(260, card.width - 58 - 14 - 72); text: page.ren; placeholderText: "Name"; onTextEdited: page.ren = text; onAccepted: page.rename(card.modelData) }
+                            }
+                            Item {
+                                width: parent.width
+                                height: rn.height + 2
+                                Txt { width: parent.width - rn.width - 10; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 12
+                                      text: "The new name shows everywhere the department does; its machines stay in it." }
+                                Btn { id: rn; anchors.right: parent.right; small: true; text: "Rename"; enabled: page.ren.trim() !== "" && page.ren.trim() !== card.modelData.name; onClicked: page.rename(card.modelData) }
                             }
                         }
                     }
@@ -150,83 +132,71 @@ Page {
         }
 
         // --- the picked department's machines, and the rest to move in ----------------------------------
-        Panel {
+        Box {
             id: right
             width: (parent.width - 14) * 0.5
             height: two.h
             title: page.cur ? page.cur.name : "No department picked"
             sub: page.cur ? Theme.many(page.inD(page.cur.id).length, "machine") + "; a machine is in one department at a time" : ""
-            Column {
+            Quiet { visible: !page.cur; text: "Pick a department on the left, or make one below." }
+            Item { visible: !!page.cur; width: parent.width; height: ih.height + 6; Txt { id: ih; y: 6; text: page.cur ? "In " + page.cur.name : ""; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2 } }
+            Quiet { visible: !!page.cur && page.inD(page.cur.id).length === 0; text: "No machines yet. Put some in from the list below." }
+            Flow {
+                visible: !!page.cur && page.inD(page.cur.id).length > 0
                 width: parent.width
-                spacing: 8
-                Txt { visible: !page.cur; text: "Pick a department on the left, or make one below."; color: Theme.text3 }
-                Txt { visible: !!page.cur; text: page.cur ? "IN " + page.cur.name.toUpperCase() : ""; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                Txt { visible: !!page.cur && page.inD(page.cur.id).length === 0; text: "No machines yet. Put some in from the list below."; color: Theme.text3 }
-                Flow {
-                    visible: !!page.cur
+                spacing: 10
+                Repeater { model: page.cur ? page.inD(page.cur.id) : []; delegate: Tile { required property var modelData; m: modelData; still: true } }
+            }
+            Item {
+                visible: !!page.cur
+                width: parent.width
+                height: eh.height + 16
+                Txt { id: eh; y: 16; text: "Elsewhere"; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
+                Txt { x: eh.implicitWidth + 8; y: 16; text: page.cur ? "click one to move it into " + page.cur.name : ""; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone }
+            }
+            Field { visible: !!page.cur; small: true; width: Math.min(300, parent.width); iconName: "search"; placeholderText: "Find a machine or a person"; text: page.q; onTextEdited: page.q = text }
+            Repeater {
+                model: page.groups
+                delegate: Column {
+                    required property var modelData
                     width: parent.width
-                    spacing: 5
-                    Repeater { model: page.cur ? page.inD(page.cur.id) : []; delegate: tile }
+                    spacing: 6
+                    Txt { topPadding: 10 + (font.pixelSize * 0.1); text: modelData.name; color: Theme.text3; font.pixelSize: 12 }
+                    Flow { width: parent.width; spacing: 10
+                           Repeater { model: modelData.ms; delegate: Tile { required property var modelData; m: modelData; onClicked: page.moveIn(modelData) } } }
                 }
-                Txt { visible: !!page.cur; topPadding: 6; text: "ELSEWHERE · click one to move it in"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                Field { visible: !!page.cur; width: Math.min(300, parent.width); iconName: "search"; placeholderText: "Find a machine or a person"; text: page.q; onTextEdited: page.q = text }
+            }
+            Quiet { visible: !!page.cur && page.elsewhere.length === 0; text: page.q ? "Nothing matches." : page.cur ? "Every machine is in " + page.cur.name + "." : "" }
+            Txt { visible: page.elsewhere.length > page.cap; text: page.more ? "Show fewer" : "and " + Theme.fmt(page.elsewhere.length - page.cap) + " more"; color: Theme.text3; font.pixelSize: 13
+                  MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.more = !page.more } }
+            Row {
+                visible: !!page.cur
+                spacing: 18
+                topPadding: 4
                 Repeater {
-                    model: page.groups
-                    delegate: Column {
+                    model: [["fine", Theme.surface3, "transparent"], ["needs a look", Theme.mix(Theme.crit, Theme.surface3, 0.16), Theme.alpha(Theme.crit, 0.35)], ["offline", "transparent", Theme.text4]]
+                    delegate: Row {
                         required property var modelData
-                        width: parent.width
-                        spacing: 5
-                        Txt { text: modelData.name; color: Theme.text2; font.pixelSize: Theme.fSmall }
-                        Flow { width: parent.width; spacing: 5; Repeater { model: modelData.ms; delegate: tile } }
+                        spacing: 6
+                        Rectangle { width: 14; height: 11; radius: 3; color: modelData[1]; border.width: 1; border.color: modelData[2]; anchors.verticalCenter: parent.verticalCenter }
+                        Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                     }
                 }
-                Txt { visible: !!page.cur && page.elsewhere.length === 0; color: Theme.text3
-                      text: page.q ? "Nothing matches." : page.cur ? "Every machine is in " + page.cur.name + "." : "" }
-                Link { visible: page.elsewhere.length > page.cap; text: page.more ? "Show fewer" : "and " + Theme.fmt(page.elsewhere.length - page.cap) + " more"; onClicked: page.more = !page.more }
             }
         }
     }
 
     // --- making one ---------------------------------------------------------------------------------------
-    Panel {
+    Box {
         width: parent.width
+        accentFoot: true
         title: "Make a department"
         sub: "name it, then put machines in it on the right"
         Row {
             width: parent.width
-            spacing: 10
-            Field { objectName: "deptName"; width: Math.min(420, parent.width - mk.width - 10); placeholderText: "For example Procurement"; text: page.nm; onTextEdited: page.nm = text; onAccepted: page.make() }
+            spacing: 8
+            Field { objectName: "deptName"; width: Math.min(420, parent.width - mk.width - 8); placeholderText: "For example Procurement"; text: page.nm; onTextEdited: page.nm = text; onAccepted: page.make() }
             Btn { id: mk; objectName: "deptMake"; kind: "primary"; text: "Make it"; enabled: page.nm.trim() !== ""; onClicked: page.make() }
-        }
-    }
-
-    // a machine as the Overview's tile, with its whole name, coloured by how it is; who is at it on hover
-    Component {
-        id: tile
-        Item {
-            required property var modelData
-            readonly property bool inside: page.cur !== null && modelData.dept === page.cur.id
-            // the machine's whole name (the concept, 1 Nov 2026): with every department in one console, "01" alone is several machines
-            readonly property string name: modelData.host.replace(/^WS-/, "")
-            width: Math.max(46, nameW.implicitWidth + 18); height: 34
-            Txt { id: nameW; visible: false; text: parent.name; mono: true; font.pixelSize: 12 }
-            HealthMark {
-                anchors.fill: parent
-                size: 34
-                bordered: false
-                k: Fleet.mark(modelData.status)
-                label: parent.name
-                scale: hit.containsMouse && !parent.inside ? 1.06 : 1
-                Behavior on scale { NumberAnimation { duration: Theme.durFast } }
-            }
-            MouseArea {
-                id: hit
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: parent.inside ? Qt.ArrowCursor : Qt.PointingHandCursor
-                onClicked: if (!parent.inside) page.moveIn(parent.modelData)
-            }
-            Tip { text: modelData.host + (modelData.user ? ", " + modelData.user : ", nobody signed in") + (parent.inside ? "" : " · click to move it in") }
         }
     }
 }

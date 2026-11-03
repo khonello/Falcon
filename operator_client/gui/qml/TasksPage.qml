@@ -1,19 +1,24 @@
 import QtQuick
 import "."
 
-// TASKS (an Admin's console). What a task needs from you decides where it sits: to verify first, then
-// overdue, then quiet, then on track. A click selects; the task shows beside the list with your
-// verdict and its history, and its targets under both.
+// TASKS, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminTasksPage): is the work I gave getting done, and
+// what do I close? The situation in a sentence; the work you gave as one card per task grouped by what you do about it (waiting
+// for your verdict, on track, completed this week, late or gone quiet last); on the right the picked task with its verdict (the
+// buttons live there, never on the cards: the user, 1 Nov 2026), and your to-dos under it; the picked task's targets below
+// (loading in place, then a pulse); giving a task has its own page.
 Page {
     id: page
     objectName: "tasksView"
 
     property var tasks: []
     property var detail: ({})          // task id -> task.get view
-    property string f: ""
-    property var sel: null
+    property var todos: []
+    property var sel: { var a = Nav.takeArrive("tasks"); return a !== null ? a : null }
+    property var openId: null
     property bool asking: false
     property string why: ""
+    property string tdt: ""
+    property bool loading: false
 
     function load() {
         falcon.call("task.list", { include_completed: true }, function (ok, r) {
@@ -25,20 +30,19 @@ Page {
                 })
             })
         })
+        loadTodos()
     }
+    function loadTodos() { falcon.call("todo.list", {}, function (ok, r) { page.todos = ok ? (r.todos || []) : [] }) }
     Component.onCompleted: load()
     Connections {
         target: falcon
-        function onPushReceived(type, payload) { if (/^task/.test(type)) reload.restart() }
+        function onPushReceived(type, payload) { if (/^task/.test(type)) reload.restart(); if (type === "todo.changed") page.loadTodos() }
     }
     Timer { id: reload; interval: 300; onTriggered: page.load() }
 
-    readonly property var cats: ({
-        verify: ["To verify", "only you can close them"], overdue: ["Overdue", "past the final deadline"],
-        quiet: ["Quiet", "nothing seen for two days"], track: ["On track", "with signs of progress"], done: ["Completed", "closed by whoever gave it"]
-    })
-    readonly property var order: ["verify", "overdue", "quiet", "track", "done"]
-    readonly property bool iGaveIt: cur !== null && cur.assigner_account_id === falcon.accountId
+    readonly property var groupsDef: [["verify", "Waiting for your verdict", "handed in; only you close it"], ["track", "On track", "signs of progress"],
+                              ["done", "Completed this week", "closed; kept here for the week"], ["late", "Late, or gone quiet", "past the deadline, or nothing seen for two days"]]
+    readonly property var stateWord: ({ verify: "Handed in", track: "On track", done: "Completed", late: "Late, or gone quiet" })
     function items(t) { var d = detail[t.id]; return d && d.items ? d.items : [] }
     function found(t) { return items(t).filter(function (i) { return i.status === "passed" }).length }
     function lastSign(t) {
@@ -46,31 +50,40 @@ Page {
         ex.forEach(function (e) { var x = Time.ms(e.observed_at); if (m === null || x > m) m = x })
         return m
     }
+    function quiet(t) { var ls = lastSign(t); return Time.now - Time.ms(t.created_at) > 48 * 3600000 && (ls === null || Time.now - ls > 48 * 3600000) }
     function cat(t) {
         if (t.status === "completed") return "done"
         var its = items(t)
         if (its.length && its.every(function (i) { return i.status === "passed" })) return "verify"
-        if (t.final_deadline_at && Time.past(t.final_deadline_at)) return "overdue"
-        var ls = lastSign(t)
-        if (Time.now - Time.ms(t.created_at) > 48 * 3600000 && (ls === null || Time.now - ls > 48 * 3600000)) return "quiet"
+        if ((t.final_deadline_at && Time.past(t.final_deadline_at)) || quiet(t)) return "late"
         return "track"
     }
-    readonly property var all: tasks.map(function (t) { return Object.assign({ k: page.cat(t), key: t.id }, t) })
-        .sort(function (x, y) { return order.indexOf(x.k) - order.indexOf(y.k) || (Time.ms(x.final_deadline_at) || 9e15) - (Time.ms(y.final_deadline_at) || 9e15) })
-    readonly property var rows: all.filter(function (x) {
-        return (f === "" || x.k === f) && (x.id + " " + x.description_raw + " " + x.assignee_name).toLowerCase().indexOf(list.query.toLowerCase()) >= 0
-    })
-    readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
+    readonly property var all: tasks.filter(function (t) { return t.status !== "completed" || !t.completed_at || Time.now - Time.ms(t.completed_at) < 7 * 86400000 })
+        .map(function (t) { return Object.assign({ k: page.cat(t) }, t) })
+        .sort(function (x, y) { return (Time.ms(x.final_deadline_at) || 9e15) - (Time.ms(y.final_deadline_at) || 9e15) })
+    function inGroup(k) { return all.filter(function (x) { return x.k === k }) }
+    // the most pressing is picked at first; nothing is open until you expand it
+    readonly property var cur: {
+        for (var i = 0; i < all.length; i++) if (all[i].id === sel) return all[i]
+        var f = inGroup("verify")[0] || inGroup("late")[0] || inGroup("track")[0]
+        return f || null
+    }
+    property var pickedId: null
+    onCurChanged: { loading = true; ldT.restart(); asking = false; why = ""; pickedId = cur ? cur.id : null }
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
     readonly property var curDetail: cur ? detail[cur.id] || null : null
     readonly property var curHost: cur ? Fleet.byAccount(cur.assignee_account_id) : null
-    function n(k) { return all.filter(function (x) { return x.k === k }).length }
-    function due(t, k) {
-        if (k === "done") return "Closed"
-        if (k === "verify") return "Handed in"
-        if (!t.final_deadline_at) return "No deadline"
-        return Time.left(t.final_deadline_at)
-    }
+    function hostOf(t) { var m = Fleet.byAccount(t.assignee_account_id); return m ? m.host : "" }
+    function by(t) { return t.assigner_account_id === falcon.accountId ? "you" : t.assigner_name }
 
+    situation: {
+        if (!tasks.length) return "You have not given any tasks yet."
+        var v = inGroup("verify").length, l = inGroup("late").length
+        var next = all.filter(function (t) { return t.k !== "done" && t.final_deadline_at && !Time.past(t.final_deadline_at) })[0]
+        return (v ? Theme.fmt(v) + (v === 1 ? " waits" : " wait") + " for your verdict" : "Nothing waits for your verdict") + "; " + (l ? Theme.fmt(l) + " late or gone quiet" : "nothing late") + "."
+               + (next ? " The next deadline: " + next.description_raw + ", " + Time.atDay(next.final_deadline_at) + "." : "")
+    }
+    situationAt: Time.now
 
     function verdict(outcome) {
         falcon.call("task.verify", { task_id: cur.id, outcome: outcome, reason: why.trim() }, function (ok, r) {
@@ -79,150 +92,290 @@ Page {
             page.asking = false; page.why = ""; page.load()
         })
     }
-
-    Strip {
-        width: parent.width
-        on: page.f === "" ? null : page.f
-        onPick: function (k) { page.f = k === null ? "" : k }
-        items: ["verify", "overdue", "quiet", "track"].map(function (k) {
-            return { key: k, label: page.cats[k][0], value: Theme.fmt(page.n(k)), delta: page.cats[k][1], dc: k === "overdue" && page.n(k) ? Theme.crit : undefined }
+    function addTodo() {
+        var d = new Date(Time.now); d.setDate(d.getDate() + 1); d.setHours(17, 0, 0, 0)
+        falcon.call("todo.add", { text: tdt.trim(), due_at: d.toISOString() }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not added"); return }
+            Msg.ok("Added, due " + Time.atDay(d)); page.tdt = ""; page.loadTodos()
         })
+    }
+    function todoDone(t, done) {
+        falcon.call("todo.done", { todo_id: t.id, done: done }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
+            if (done) Msg.ok("Done · " + t.text); page.loadTodos()
+        })
+    }
+
+    // when a task was handed in: the moment its last target was found
+    function handedAt(t) {
+        var its = items(t); if (!its.length || !its.every(function (i) { return i.status === "passed" })) return null
+        var m = null; its.forEach(function (i) { var x = Time.ms(i.passed_at || i.updated_at); if (x !== null && (m === null || x > m)) m = x }); return m !== null ? m : lastSign(t)
+    }
+    // what the card says beside its bar: early or late against the deadline, or how far through its time
+    function barSay(t) {
+        var given = Time.ms(t.created_at), fin = Time.ms(t.final_deadline_at)
+        if (t.k === "done" || t.k === "verify") { var h = handedAt(t); if (h === null || fin === null) return t.k === "done" ? "closed" : "handed in"
+            return h <= fin ? Time.waitLen((fin - h) / 3600000) + " early" : Time.waitLen((h - fin) / 3600000) + " late" }
+        if (fin === null) return "no deadline"
+        return Time.waitSay((Time.now - given) / 3600000, (fin - given) / 3600000)
     }
 
     Row {
         width: parent.width
         spacing: 14
-        ListPanel {
-            id: list
+        // --- the work you gave ----------------------------------------------------------------------------
+        Box {
+            id: workP
+            objectName: "tasksWork"
             width: (parent.width - 14) * 8 / 12
-            title: page.f ? page.cats[page.f][0] : "Tasks"
-            sub: page.f ? Theme.fmt(page.rows.length) : "what needs you first · click one to see it on the right"
-            subLink: page.f ? "every task" : ""
-            onSubLinkClicked: page.f = ""
-            placeholder: "Find a task or person"
-            actionLabel: "New task"
-            onAction: Nav.go("tasks", "new")
-            rows: page.rows
-            pick: page.cur ? page.cur.id : null
-            onPicked: function (k) { page.sel = k; page.asking = false }
-            icon: "checksquare"
-            nameTitle: "Task"
-            nameText: function (r) { return r.description_raw }
-            nameLine: function (r) {
-                var m = Fleet.byAccount(r.assignee_account_id)
-                return "T-" + r.id + " · " + r.assignee_name + (m ? " on " + m.host : "") + (r.assigner_account_id !== falcon.accountId ? " · from " + r.assigner_name : "")
+            title: "The work you gave"
+            sub: "one card per task, grouped by what you do about it; click a task for what to do on the right and its targets below, expand it for its dates"
+            // the axis over the bars (iq-axis): what the bar means, and start / due / over over it
+            Item {
+                width: parent.width
+                height: 18
+                Txt { x: 12; width: parent.width - 12 - 12 - 176 - 12 - 210 - 12; anchors.bottom: parent.bottom; text: "the task's own time: start to deadline, then overdue"; font.pixelSize: 12; color: Theme.text3 }
+                Item {
+                    x: parent.width - 12 - 176 - 12 - 210
+                    width: 104; height: 16
+                    anchors.bottom: parent.bottom
+                    Txt { anchors.bottom: parent.bottom; text: "start"; font.pixelSize: 11; color: Theme.text4; elide: Text.ElideNone }
+                    Txt { anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter; text: "due"; font.pixelSize: 11; color: Theme.text4; elide: Text.ElideNone }
+                    Txt { anchors.bottom: parent.bottom; anchors.right: parent.right; text: "over"; font.pixelSize: 11; color: Theme.text4; elide: Text.ElideNone }
+                }
             }
-            cols: [
-                { title: "Targets", width: 160, bar: function (r) { var n = page.items(r).length; return { v: page.found(r), max: Math.max(1, n), text: n ? page.found(r) + " of " + n + " found" : r.verification_mode === "none" ? "by hand" : "—" } } },
-                { title: "Deadline", width: 150, text: function (r) { return page.due(r, r.k) } }
-            ]
-            now: function (r) { return [page.cats[r.k][0], r.k === "overdue" ? "bad" : r.k === "quiet" || r.k === "done" ? "wait" : "good"] }
-            showEmpty: page.tasks.length === 0
-            emptyIcon: "checksquare"
-            emptyTitle: "No tasks yet"
-            emptyText: "Describe a piece of work in plain words. The system proposes who, what done looks like and when; nothing is created until you confirm it."
-            emptyAct: "New task"
-            onEmptyAction: Nav.go("tasks", "new")
+            Repeater {
+                model: page.groupsDef
+                delegate: Group {
+                    id: grp
+                    required property var modelData
+                    required property int index
+                    readonly property var xs: page.inGroup(modelData[0])
+                    spaced: page.groupsDef.slice(0, index).some(function (g) { return page.inGroup(g[0]).length > 0 })
+                    visible: xs.length > 0
+                    width: workP.innerW
+                    late: modelData[0] === "late"
+                    title: modelData[1] + " · " + xs.length
+                    sub: modelData[2]
+                    Repeater {
+                        model: grp.xs
+                        delegate: Card {
+                            id: tc
+                            required property var modelData
+                            readonly property int n: page.items(modelData).length
+                            objectName: "task_" + modelData.id
+                            width: grp.cardW
+                            actW: 176
+                            icon: "checksquare"
+                            hot: modelData.k === "late"
+                            tint: grp.late
+                            opacity: modelData.k === "done" ? 0.7 : 1
+                            title: modelData.description_raw
+                            line: modelData.assignee_name + (page.hostOf(modelData) ? " on " + page.hostOf(modelData) : "") + " · " + page.found(modelData) + " of " + n + " target" + (n === 1 ? "" : "s") + " found"
+                                  + (modelData.assigner_account_id !== falcon.accountId ? " · from " + modelData.assigner_name : "")
+                            line2: page.quiet(modelData) && modelData.k !== "done" ? "Nothing seen for two days" : ""
+                            picked: page.cur !== null && page.cur.id === modelData.id
+                            expandable: true
+                            expanded: page.openId === modelData.id
+                            onOpen: page.sel = modelData.id
+                            onToggle: { page.sel = modelData.id; page.openId = expanded ? null : modelData.id }
+                            mid: Row {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 10
+                                TaskBar {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    given: Time.ms(tc.modelData.created_at) || 0
+                                    final_: Time.ms(tc.modelData.final_deadline_at) || (Time.ms(tc.modelData.created_at) + 86400000)
+                                    soft: Time.ms(tc.modelData.soft_deadline_at) || 0
+                                    took: tc.modelData.k === "done" || tc.modelData.k === "verify"
+                                    until: took && page.handedAt(tc.modelData) !== null ? page.handedAt(tc.modelData) : Time.now
+                                }
+                                Txt {
+                                    width: 96
+                                    horizontalAlignment: Text.AlignRight
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    readonly property bool over: tc.modelData.k !== "done" && tc.modelData.k !== "verify" && Time.past(tc.modelData.final_deadline_at)
+                                    text: page.barSay(tc.modelData)
+                                    font.pixelSize: 12
+                                    font.weight: over ? Font.DemiBold : Font.Normal
+                                    color: over ? Theme.crit : Theme.text2
+                                }
+                            }
+                            // opened: its dates (tk-facts: 120px labels, at most 420 wide)
+                            Column {
+                                y: 2
+                                width: Math.min(parent.width, 420)
+                                Repeater {
+                                    model: [["Given", Time.atDay(tc.modelData.created_at) + " by " + page.by(tc.modelData)], ["Started", tc.modelData.started_at ? Time.atDay(tc.modelData.started_at) : "not yet"]]
+                                           .concat(tc.modelData.soft_deadline_at ? [["Soft deadline", Time.atDay(tc.modelData.soft_deadline_at)]] : [])
+                                           .concat([["Final deadline", tc.modelData.final_deadline_at ? Time.atDay(tc.modelData.final_deadline_at) : "none"],
+                                                    ["Handed in", tc.modelData.k === "verify" ? "yes" : tc.modelData.k === "done" ? "closed" : "not yet"]])
+                                    delegate: Item {
+                                        required property var modelData
+                                        required property int index
+                                        width: parent.width
+                                        height: fv.height + 10
+                                        Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                        Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13 }
+                                        Rectangle { visible: index < 3; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Quiet { visible: page.tasks.length === 0; text: "No tasks yet. Give one below." }
         }
 
-        // the task beside the list
-        SidePanel {
+        // --- the picked task, and your to-dos (iq-col: the to-dos fill what is left of the column) -----------------
+        Column {
+            id: rightCol
             width: (parent.width - 14) * 4 / 12
-            readonly property var t: page.cur
-            readonly property bool late: t && t.k !== "done" && t.k !== "verify" && t.final_deadline_at && Time.past(t.final_deadline_at)
-            showEmpty: t === null
-            emptyIcon: "checksquare"
-            emptyText: "Pick a task in the list."
-            title: t ? t.description_raw : ""
-            sub: t && page.sel === t.id ? "the one you picked" : "the first in the list · click another"
-            facts: t ? [["Task", "T-" + t.id + " · " + (t.k === "verify" ? (page.iGaveIt ? "Awaiting your verification" : "Awaiting " + t.assigner_name + "'s verification") : page.cats[t.k][0]),
-                         t.k === "verify" ? Theme.ser3 : t.k === "overdue" ? Theme.crit : t.k === "done" ? Theme.text4 : Theme.ok, false, true], ["Who", t.assignee_name + (page.curHost ? " on " + page.curHost.host : "")], ["Given by", t.assigner_name],
-                        ["Given", Time.atDay(t.created_at)], ["Started", t.started_at ? Time.atDay(t.started_at) : "Not yet"]]
-                        .concat(t.soft_deadline_at ? [["Soft deadline", Time.atDay(t.soft_deadline_at), Theme.med]] : [])
-                        .concat([["Final deadline", t.final_deadline_at ? Time.atDay(t.final_deadline_at) : "None", late ? Theme.crit : null],
-                                 [t.k === "done" || t.k === "verify" ? "Handed in" : late ? "Late by" : "Time left",
-                                  t.k === "done" ? "Closed" : t.k === "verify" ? "Yes" : t.final_deadline_at ? Time.span((Time.ms(t.final_deadline_at) - Time.now) / 3600000) : "—", late ? Theme.crit : null]]) : []
-            actions: [
-                Btn { kind: "text"; text: page.curHost ? "Open " + page.curHost.host + "'s page →" : ""; visible: page.curHost !== null; onClicked: Nav.go("machines", page.curHost.host) },
-                // only the person who gave a task closes it (the Engine refuses anyone else): for them the verdict is drawn off, with why
-                Btn { visible: page.cur && page.cur.k !== "done" && !page.asking; text: "Incomplete"; onClicked: page.asking = true
-                      enabled: page.iGaveIt; tip: page.iGaveIt ? "" : "Only " + (page.cur ? page.cur.assigner_name : "whoever gave it") + ", who gave it, can close it" },
-                Btn { visible: page.cur && page.cur.k !== "done" && !page.asking; kind: "primary"; text: "Complete"; onClicked: page.verdict("complete")
-                      enabled: page.iGaveIt; tip: page.iGaveIt ? "" : "Only " + (page.cur ? page.cur.assigner_name : "whoever gave it") + ", who gave it, can close it" }
-            ]
-
-            Column {
+            spacing: 14
+            Box {
+                id: ctl
+                objectName: "taskControls"
                 width: parent.width
-                spacing: 12
-                Txt { text: "YOUR VERDICT"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
+                title: page.cur ? page.cur.description_raw : "No task picked"
+                sub: page.cur ? page.cur.assignee_name + (page.hostOf(page.cur) ? " on " + page.hostOf(page.cur) : "") : ""
+                Quiet { visible: page.cur === null; text: "Pick a task on the left." }
+                Facts {
+                    visible: page.cur !== null
+                    rows: !page.cur ? [] : [
+                        ["State", page.stateWord[page.cur.k], page.cur.k === "late" ? (Time.past(page.cur.final_deadline_at) ? Time.waitLen((Time.now - Time.ms(page.cur.final_deadline_at)) / 3600000) + " past its deadline" : "nothing seen for two days")
+                                                          : page.cur.k === "verify" ? "every target was found" : page.cur.k === "done" ? "closed" : "signs of progress"],
+                        ["Progress", page.found(page.cur) + " of " + page.items(page.cur).length + " targets found", page.lastSign(page.cur) ? "last sign " + Time.atDay(page.lastSign(page.cur)) : "no sign yet"],
+                        ["Deadline", page.cur.final_deadline_at ? Time.atDay(page.cur.final_deadline_at) : "none", page.cur.soft_deadline_at ? "soft deadline " + Time.atDay(page.cur.soft_deadline_at) : "no soft deadline"],
+                        ["Given", page.cur.assigner_account_id === falcon.accountId ? "By you" : "By " + page.cur.assigner_name, Time.atDay(page.cur.created_at)]]
+                }
+                // the verdict (tk-do): what it waits on, then its buttons at the right; only the person who gave it closes it
+                Rectangle {
+                    visible: page.cur !== null
+                    width: parent.width
+                    height: doCol.height + 20
+                    radius: Theme.radius
+                    color: Theme.surface2
+                    readonly property bool mineToClose: page.cur !== null && page.cur.assigner_account_id === falcon.accountId
+                    Column {
+                        id: doCol
+                        x: 12; y: 10
+                        width: parent.width - 24
+                        spacing: 8
+                        Txt {
+                            visible: !page.asking
+                            width: parent.width
+                            color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 13
+                            text: !page.cur ? "" : page.cur.k === "verify" ? (parent.parent.mineToClose ? "Every target was found. Only you close it." : "Every target was found; " + page.cur.assigner_name + " closes it.")
+                                  : page.cur.k === "late" ? (Time.past(page.cur.final_deadline_at) ? "Past its deadline." : "Nothing seen for two days.")
+                                  : page.cur.k === "done" ? "Closed. Nothing more to do." : "Not handed in yet; your verdict comes when it is."
+                        }
+                        Field { visible: page.asking; width: parent.width; placeholderText: page.cur ? "What is missing? " + page.cur.assignee_name + " sees this." : ""; text: page.why; onTextEdited: page.why = text }
+                        Row {
+                            anchors.right: parent.right
+                            spacing: 8
+                            visible: children.length > 0
+                            Btn { visible: !page.asking && page.cur !== null && page.cur.k === "verify" && doCol.parent.mineToClose; small: true; text: "Incomplete"; onClicked: page.asking = true }
+                            Btn { visible: !page.asking && page.cur !== null && page.cur.k === "verify" && doCol.parent.mineToClose; small: true; kind: "primary"; text: "Complete"; onClicked: page.verdict("complete") }
+                            Btn { visible: !page.asking && page.cur !== null && page.cur.k === "late"; small: true; kind: "primary"; text: page.cur ? "Remind " + page.cur.assignee_name : ""
+                                  enabled: false; tip: "The Engine cannot send a reminder about a task yet" }
+                            Btn { visible: page.asking; small: true; text: "Cancel"; onClicked: { page.asking = false; page.why = "" } }
+                            Btn { visible: page.asking; small: true; kind: "primary"; text: "Send back"; enabled: page.why.trim() !== ""; onClicked: page.verdict("incomplete") }
+                        }
+                    }
+                }
+                Pulse { parent: ctl; key: page.loading ? null : page.pickedId }
+            }
+            Box {
+                id: tdBox
+                objectName: "yourTodos"
+                width: parent.width
+                readonly property var open: page.todos.filter(function (t) { return !t.done })
+                readonly property real natural: implicitHeight
+                height: Math.max(implicitHeight, workP.implicitHeight - ctl.implicitHeight - 14)
+                title: "Your to-dos · " + open.length
+                sub: "reminders for yourself, soonest first; only you see them"
+                Repeater {
+                    model: page.todos.slice().sort(function (a, b) { return (a.done - b.done) || ((Time.ms(a.due_at) || 9e15) - (Time.ms(b.due_at) || 9e15)) })
+                    delegate: SuRow {
+                        required property var modelData
+                        icon: modelData.done ? "checksquare" : "square"
+                        title: modelData.text
+                        done: !!modelData.done
+                        line: modelData.done ? "done" + (modelData.done_at ? " " + Time.atDay(modelData.done_at) : "") : modelData.due_at ? "due " + Time.atDay(modelData.due_at) + (modelData.overdue ? ", past its date" : "") : "no date"
+                        lineHot: !modelData.done && !!modelData.overdue
+                        act: modelData.done ? "Undo" : "Done"
+                        actKind: modelData.done ? "text" : "default"
+                        onActed: page.todoDone(modelData, !modelData.done)
+                    }
+                }
+                Quiet { visible: page.todos.length === 0; icon: "check"; text: "Nothing to remember." }
                 Row {
-                    spacing: 6
-                    Txt { text: page.cur ? String(page.found(page.cur)) : ""; font.pixelSize: 22; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                    Txt { text: page.cur ? "of " + page.items(page.cur).length + " targets found" : ""; color: Theme.text3; anchors.baseline: parent.children[0].baseline; elide: Text.ElideNone }
-                }
-                Txt {
-                    width: parent.width
-                    color: Theme.text3; font.pixelSize: 12
-                    text: page.cur ? (page.lastSign(page.cur) !== null ? "Last sign of progress " + Time.atDay(page.lastSign(page.cur)) : "No signs of progress yet") : ""
-                }
-                Txt {
-                    readonly property var waiting: page.cur ? page.items(page.cur).filter(function (i) { return i.status !== "passed" }) : []
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    elide: Text.ElideNone
-                    font.pixelSize: 12
-                    color: waiting.some(function (i) { return i.status === "failed" }) ? Theme.med : Theme.text2
-                    text: !page.cur ? "" : page.items(page.cur).length === 0 ? (page.cur.verification_mode === "none" ? "Nothing is watched. You judge it when the work is in." : "")
-                          : waiting.length ? waiting.map(function (i) { return i.target_type === "program" ? i.program_name : (i.proposed_filename || i.proposed_path) }).join(", ")
-                                             + (waiting.some(function (i) { return i.status === "failed" }) ? " missing at the deadline." : " not seen yet.")
-                          : "Everything the task named has been found. Whether it is good enough is for you to judge."
-                }
-                Column {
-                    visible: page.asking
                     width: parent.width
                     spacing: 8
-                    TextArea2 { width: parent.width; placeholder: "What is missing? " + (page.cur ? page.cur.assignee_name : "They") + " sees this."; text: page.why; onEdited: function (t) { page.why = t } }
-                    Row {
-                        anchors.right: parent.right
-                        spacing: 8
-                        Btn { text: "Cancel"; onClicked: page.asking = false }
-                        Btn { kind: "primary"; text: "Send back"; enabled: page.why.trim() !== ""; onClicked: page.verdict("incomplete") }
-                    }
+                    topPadding: 4
+                    Field { objectName: "todoText"; width: parent.width - addB.width - 8; placeholderText: "Remind yourself of something"; text: page.tdt; onTextEdited: page.tdt = text; onAccepted: if (page.tdt.trim()) page.addTodo() }
+                    Btn { id: addB; text: "Add"; enabled: page.tdt.trim() !== ""; onClicked: page.addTodo() }
                 }
-                Txt { text: "HISTORY"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; topPadding: 4 }
-                Repeater {
-                    model: {
-                        var t = page.cur; if (!t) return []
-                        var out = [[Time.ms(t.created_at), "Assigned by " + (t.assigner_account_id === falcon.accountId ? "you" : t.assigner_name)]]
-                        if (t.started_at) out.push([Time.ms(t.started_at), t.assignee_name + " started the task"])
-                        var d = page.detail[t.id]
-                        ;(d && d.expectations ? d.expectations : []).slice(0, 4).forEach(function (e) { out.push([Time.ms(e.observed_at), String(e.signal_type).replace(/[._]/g, " ")]) })
-                        if (t.completed_at) out.push([Time.ms(t.completed_at), "Closed as complete"])
-                        return out.sort(function (a, b) { return b[0] - a[0] })
-                    }
-                    Item {
-                        required property var modelData
-                        width: parent.width; height: 26
-                        Txt { width: 50; anchors.verticalCenter: parent.verticalCenter; mono: true; color: Theme.text3; font.pixelSize: 12
-                              text: Time.sameDay(modelData[0], Time.now) ? Time.hhmm(modelData[0]) : Time.dayName(modelData[0]) }
-                        Rectangle { x: 56; width: 7; height: 7; radius: 4; color: Theme.ser6; anchors.verticalCenter: parent.verticalCenter }
-                        Txt { x: 70; width: parent.width - 70; anchors.verticalCenter: parent.verticalCenter; text: modelData[1]; color: Theme.text2 }
-                    }
-                }
+                Txt { text: "Due tomorrow at 17:00; to pick another time, add it on the Calendar."; color: Theme.text3; font.pixelSize: 12; width: parent.width }
             }
         }
     }
 
+    // --- the picked task's targets (a hairline panel, as the concept keeps it) ------------------------------------
     Panel {
-        visible: page.cur !== null
+        id: targets
+        objectName: "taskTargets"
         width: parent.width
-        title: page.cur ? "Targets · " + page.cur.description_raw : ""
+        title: page.cur ? "Targets · " + page.cur.description_raw : "Targets"
         sub: "what done looks like, and the signs of progress for each"
         TaskChart {
+            visible: page.cur !== null
             width: parent.width
             task: page.curDetail
             handedIn: page.cur !== null && page.cur.k === "verify"
             host: page.curHost ? page.curHost.host : ""
+        }
+        Quiet { visible: page.cur === null; icon: "arrowu"; text: "Pick a task above to see its targets here." }
+        Loading { parent: targets; on: page.loading && page.cur !== null; under: targets.headerHeight; text: "Loading its targets" }
+        Pulse { parent: targets; key: page.loading ? null : page.pickedId }
+    }
+
+    // --- give a task: a few careful steps, so it has its own page ------------------------------------------------
+    Box {
+        objectName: "giveTask"
+        width: parent.width
+        accentFoot: true
+        title: "Give a task"
+        sub: "it takes a few careful steps, so it has its own page"
+        Item {
+            width: parent.width
+            height: Math.max(steps.height, giveB.height)
+            Row {
+                id: steps
+                width: parent.width - giveB.width - 18
+                spacing: 14
+                Repeater {
+                    model: [["Say what needs doing", "in plain words, as you would tell the person"], ["Check the proposal", "the system proposes who, what done looks like and the deadlines; nothing is guessed silently"], ["Confirm", "nothing is given until you do; the person is told at once"]]
+                    delegate: Item {
+                        required property var modelData
+                        required property int index
+                        width: (steps.width - 28) / 3
+                        height: sc.height
+                        Rectangle { width: 22; height: 22; radius: 11; color: Theme.accentSoft
+                                    Txt { anchors.centerIn: parent; text: index + 1; color: Theme.accent; font.pixelSize: 12; font.weight: Font.DemiBold; elide: Text.ElideNone } }
+                        Column {
+                            id: sc
+                            x: 30
+                            width: parent.width - 30
+                            spacing: 2
+                            Txt { width: parent.width; text: modelData[0]; font.weight: Font.DemiBold }
+                            Txt { width: parent.width; text: modelData[1]; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                        }
+                    }
+                }
+            }
+            Btn { id: giveB; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; kind: "primary"; text: "Give a task"; onClicked: Nav.go("tasks", "new") }
         }
     }
 }

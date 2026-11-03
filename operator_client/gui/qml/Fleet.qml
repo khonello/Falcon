@@ -71,7 +71,7 @@ QtObject {
     function inDept(id) { return machines.filter(function (m) { return m.dept === id }) }
     // every open issue, worst first then oldest first, each with its machine
     readonly property var sevOrder: ({ critical: 0, high: 1, warning: 2, medium: 2, low: 3 })
-    readonly property var typeLabel: ({ file: "Restricted file", update: "Stuck update", help: "Help request", deviation: "Deviation", flow: "Flow blocked" })
+    readonly property var typeLabel: ({ file: "Restricted file", update: "Stuck update", help: "Request to talk", deviation: "Deviation", flow: "Flow blocked" })
     readonly property var issues: {
         var out = []
         for (var i = 0; i < machines.length; i++)
@@ -114,7 +114,7 @@ QtObject {
         var ro = _parts.rollout, behind = ro ? (ro.pcs_behind || []) : []
         var pg = _parts.pings ? (_parts.pings.pings || []) : []
         var dv = _parts.deviations ? (_parts.deviations.deviations || []) : []
-        // issues.list answered: its issues are the issues (raised and resolved by the Engine, with owners and plays);
+        // issues.list answered: its issues are the issues (raised and resolved by the Engine, with plays);
         // otherwise they are read here from the records they come from, as before
         var eng = _parts.issues && _parts.issues.issues ? _parts.issues.issues : null
         engine = eng !== null
@@ -154,9 +154,9 @@ QtObject {
                         note: "A version behind" + (be.failures ? ", " + be.failures + " failed attempt" + (be.failures === 1 ? "" : "s") : ""),
                         at: be.last_attempt_at, ref: be })
                 if (w.name && pingBy[w.name])
-                    issues.push({ id: "P-" + pingBy[w.name].first.id, sev: "warning", type: "help", title: "Help request unanswered",
+                    issues.push({ id: "P-" + pingBy[w.name].first.id, sev: "warning", type: "help", title: "Request to talk not accepted",
                                   subject: w.name + " · " + Theme.many(pingBy[w.name].n, "message"),
-                                  note: "Help request unanswered", at: pingBy[w.name].first.sent_at, ref: pingBy[w.name].first })
+                                  note: "Request to talk not accepted", at: pingBy[w.name].first.sent_at, ref: pingBy[w.name].first })
                 for (var x = 0; x < dv.length; x++)
                     if (dv[x].observed_pc_id === w.pc_id) {
                         var what = String(dv[x].expectation || "deviation").replace(/[._]/g, " ")
@@ -211,7 +211,7 @@ QtObject {
     // an Engine issue as the rest of the console reads one; `ref` keeps the whole of it, `iid` its id
     function fromEngine(x) {
         return { id: "I-" + x.id, iid: x.id, code: x.code, sev: x.severity === "medium" ? "warning" : x.severity, type: x.type, title: x.title,
-                 subject: x.subject || "", note: x.title, at: x.opened_at, ref: x, owner: x.owner, state: x.state, label: x.label, past: !!x.past_target,
+                 subject: x.subject || "", note: x.title, at: x.opened_at, ref: x, state: x.state, label: x.label, past: !!x.past_target,
                  escalated: !!x.escalated }
     }
 

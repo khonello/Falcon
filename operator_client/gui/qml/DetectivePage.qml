@@ -14,7 +14,7 @@ Page {
     property var cases: []
     property var ov: ({ by_level: { noted: 0, "case": 0, urgent: 0 }, by_intent: {}, reviewed: 0 })
     property string show: "open"                 // open | noted | reviewed
-    property int sel: 0
+    property int sel: { var a = Nav.takeArrive("detective"); return a !== null ? Number(a) : 0 }
     property var det: null                       // detective.case for the case on the right
     property string note: ""
     property string evTab: "picture"             // the evidence: the picture first, the story in order as the other tab
@@ -55,196 +55,266 @@ Page {
     readonly property var levelWord: ({ urgent: "Urgent", "case": "Case", noted: "Noted" })
     function levelTint(l) { return l === "urgent" ? Theme.crit : l === "case" ? Theme.med : Theme.text3 }
 
-    Strip {
-        objectName: "detStrip"
-        width: parent.width
-        items: [
-            { label: "Urgent", value: Theme.fmt(page.ov.by_level.urgent), delta: page.ov.by_level.urgent ? "worth looking at now" : "nothing urgent", dc: page.ov.by_level.urgent ? Theme.crit : undefined },
-            { label: "Cases", value: Theme.fmt(page.ov.by_level["case"]), delta: page.ov.by_level["case"] ? "several things add up" : "none open", dc: page.ov.by_level["case"] ? Theme.med : undefined },
-            { label: "Noted quietly", value: Theme.fmt(page.ov.by_level.noted), delta: "kept in view, not raised" },
-            { label: "Reviewed", value: Theme.fmt(page.ov.reviewed), delta: "by a person, with their note" }
-        ]
+    // --- the version 1 concept's layout (docs/design/concepts-admin.html, AdminDetectivePage) ----------------------------------------------------
+    property int exp: 0
+    property int cp: 0                                   // the cases' page, five at a time
+    readonly property int per: 5
+    property bool loading: false
+    property int pickedId: 0
+    onSelChanged: { loading = true; ldT.restart() }
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: { page.loading = false; page.pickedId = page.cur ? page.cur.id : 0 } }
+    readonly property var urgentCases: cases.filter(function (c) { return c.level === "urgent" })
+    situation: {
+        if (!cases.length) return "Nothing to look at. Detective watches by itself; when several small things add up to a pattern, it appears here."
+        var depts = cases.map(function (c) { var m = Fleet.byHost[c.host]; return m ? m.dept : null }).filter(function (d, i, a) { return d !== null && a.indexOf(d) === i })
+        return Theme.many(cases.length, "open case") + (depts.length ? " across " + Theme.many(depts.length, "department") : "") + "."
+               + (urgentCases.length ? " " + Theme.fmt(urgentCases.length) + " urgent: " + Theme.listNames(urgentCases.map(function (c) { return c.intent.toLowerCase() + " on " + c.host }), 3) + "." : "")
+               + " Nobody at a machine is told."
     }
+    situationAt: Time.now
 
-    // --- the cases, and the one picked beside them, at one height ----------------------------------------------------------------------------
+    // the concept's words for how far a case got (DT_STAGE, DT_NEXT, DT_DID)
+    readonly property var stageSaid: ({ Reaching: "Files outside their work were opened", Gathering: "Files were gathered together", "Taking out": "Files left the machine", "Covering up": "The tracks were covered" })
+    readonly property var nextSaid: ({ Gathering: "gathering files", "Taking out": "taking them off the machine", "Covering up": "covering the tracks" })
+    readonly property var didSaid: ({ "Wrecking things": "Files were damaged", "Hiding something": "A file was hidden", "Copying what is on screen": "The screen was copied", "Covering up": "A record was wiped" })
+    function stand(c) { return c.intent === "Copying what is on screen" && c.stage_name === "Taking out" ? "The screen was copied to the clipboard" : stageSaid[c.stage_name] || didSaid[c.intent] || c.intent }
+    function ago(c) { var h = (Time.now - Time.ms(c.last_at || c.first_at)) / 3600000; return h < 1 ? Math.max(1, Math.round(h * 60)) + "m ago" : h < 48 ? Math.round(h) + "h ago" : Math.round(h / 24) + " days ago" }
+    readonly property var gl: det && det.glance ? det.glance : null
+    property var okRules: []
+    function loadRules() { falcon.call("detective.rules", {}, function (ok, r) { page.okRules = ok ? (r.rules || []) : [] }) }
+    Timer { running: true; interval: 10; onTriggered: page.loadRules() }
+    readonly property var okWord: ({ drive_after_staging: "files copied onto it are not counted", mass_removal: "files it removes in bulk are not counted", many_zipped: "files packed together here are not counted" })
+    readonly property var okIcon: ({ drive: "download", program: "appstore", folder: "folder" })
+
     Row {
         width: parent.width
         spacing: 14
-        ListPanel {
-            id: list
+        // --- the open cases ------------------------------------------------------------------------------------------------------------------
+        Box {
+            id: caseP
             objectName: "caseList"
-            width: (parent.width - 14) * 7 / 12
-            title: "Cases"
-            sub: "every machine, strongest first"
-            tools: Segmented { objectName: "detShow"; options: [{ value: "open", label: "Open" }, { value: "noted", label: "+ Noted" }, { value: "reviewed", label: "Reviewed" }]; value: page.show; onPicked: function (v) { page.show = v } }
-            rows: page.cases
-            pick: page.cur ? page.cur.id : null
-            onPicked: function (k) { page.sel = k }
-            icon: function (c) { return c.level === "urgent" ? "alert" : "filesearch" }
-            nameTitle: "What it looks like"
-            nameText: function (c) { return c.intent }
-            nameLine: function (c) { return c.host + " · " + Time.at(c.last_at) }
-            cols: [
-                { title: "Stage", width: 110, text: function (c) { return c.stage_count + " of 5 stages" } },
-                { title: "Last seen", width: 100, text: function (c) { return Time.age(c.last_at) } }
-            ]
-            nowTitle: "Now"
-            nowWidth: 130
-            now: function (c) { return c.status !== "open" ? [c.status.charAt(0).toUpperCase() + c.status.slice(1), "good"] : [page.levelWord[c.level], c.level === "urgent" ? "bad" : c.level === "case" ? Theme.med : "wait"] }
-            showEmpty: page.cases.length === 0
-            emptyIcon: "filesearch"
-            emptyTitle: page.show === "reviewed" ? "Nothing reviewed yet" : "Nothing to look at"
-            emptyText: "Detective watches by itself. When several small things add up to a pattern, it appears here."
-        }
-        SidePanel {
-            id: side
-            objectName: "casePanel"
-            width: (parent.width - 14) * 5 / 12
-            showEmpty: !page.cur
-            emptyIcon: "filesearch"
-            emptyTitle: "Pick a case"
-            emptyText: "It shows what it looks like and the evidence behind it."
-            title: page.cur ? page.cur.intent : ""
-            sub: page.cur ? page.cur.host : ""
-            facts: page.cur ? [
-                ["Level", page.levelWord[page.cur.level], page.levelTint(page.cur.level), false, true],
-                ["Machine", page.cur.host, null, true],
-                ["Began", Time.at(page.cur.first_at)],
-                ["Last seen", Time.at(page.cur.last_at) + " · " + Time.age(page.cur.last_at) + " ago"],
-                ["Status", page.cur.status === "open" ? "Open" : page.cur.status.charAt(0).toUpperCase() + page.cur.status.slice(1) + (page.det && page.det.case.reviewed_by ? " by " + page.det.case.reviewed_by : "")]
-            ] : []
-            actions: [
-                Btn { objectName: "detExplained"; visible: !!page.cur && page.cur.status === "open"; small: true; text: "It is explained"; onClicked: page.review("explained") },
-                Btn { objectName: "detAccepted"; visible: !!page.cur && page.cur.status === "open"; small: true; text: "Accept it"; onClicked: page.review("accepted") },
-                Btn { objectName: "detDismissed"; visible: !!page.cur && page.cur.status === "open"; small: true; text: "Dismiss"; onClicked: page.review("dismissed") }
-            ]
-            foot: Field { objectName: "detNote"; visible: !!page.cur && page.cur.status === "open"; width: parent.width; placeholderText: "A note (optional): what you found out"; maximumLength: 500; text: page.note; onTextEdited: page.note = text }
-
-            Txt { objectName: "caseHeadline"; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: page.cur ? page.cur.headline : "" }
-            Txt { objectName: "modelSays"; visible: !!page.cur && page.cur.model_says !== null && page.cur.model_says !== undefined; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                  color: Theme.text3; font.pixelSize: 12
-                  text: page.cur && page.cur.model_says !== null && page.cur.model_says !== undefined
-                        ? (page.cur.model_says === "" ? "The local model reads it as nothing odd. That is its opinion, not the rules'." : "The local model reads it as: " + page.cur.model_says.toLowerCase() + ". That is its opinion, not the rules'.") : "" }
-            Txt { visible: !!page.cur && page.cur.status !== "open" && !!page.cur.note; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text2
-                  text: page.cur && page.cur.note ? "Their note: " + page.cur.note : "" }
-            Txt { objectName: "coverLine"; visible: !!page.det && !!page.det.board && page.det.board.length > 0; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                  text: page.det && page.det.board ? page.det.board.map(function (b) { return b.label + ": " + b.covered + " of " + b.of + " areas" }).join(" · ") : "" }
-        }
-    }
-
-    // --- the evidence of the one picked: the picture first, the story in order beside it as a tab --------------------------------------------------------
-    Panel {
-        objectName: "evidencePanel"
-        visible: !!page.cur
-        width: parent.width
-        title: "Evidence"
-        sub: "what Detective saw on this machine · the same case as above"
-        pad: 0
-        Column {
-            width: parent.width
-            Tabs {
-                x: 16
-                width: parent.width - 32
-                tabs: [{ key: "picture", label: "Picture" }, { key: "order", label: "In order · " + (page.cur ? page.cur.story.length : 0) }]
-                current: page.evTab
-                onPicked: function (k) { page.evTab = k }
-            }
-            Item {
-                visible: page.evTab === "picture"
+            width: (parent.width - 14) * 8 / 12
+            title: "Open cases · " + page.cases.length
+            sub: "every department, strongest first; click one to see what it covers, expand it to answer"
+            readonly property int pages: Math.max(1, Math.ceil(page.cases.length / page.per))
+            readonly property int pi: Math.min(page.cp, pages - 1)
+            Column {
                 width: parent.width
-                height: Math.min(460, graph.implicitHeight + 24)
-                Flickable {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    contentWidth: width
-                    contentHeight: graph.implicitHeight
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    CaseGraph { id: graph; x: 0; y: 0; width: parent.width; graph: page.det ? page.det.graph : ({ nodes: [], edges: [] }) }
-                }
-            }
-            Item {
-                visible: page.evTab === "order"
-                width: parent.width
-                height: Math.min(460, steps.implicitHeight + 32)
-                Flickable {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    contentWidth: width
-                    contentHeight: steps.implicitHeight
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    Column {
-                        id: steps
-                        width: parent.width; spacing: 8
-                        Repeater {
-                            model: page.cur ? page.cur.story : []
-                            Row {
-                                required property string modelData
-                                spacing: 12
-                                Txt { text: modelData.slice(0, modelData.indexOf("  ")); mono: true; color: Theme.text3; width: 78; font.pixelSize: 12; elide: Text.ElideNone }
-                                Txt { text: modelData.slice(modelData.indexOf("  ") + 2); width: steps.width - 90; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                spacing: 5
+                Repeater {
+                    model: page.cases.slice(caseP.pi * page.per, caseP.pi * page.per + page.per)
+                    delegate: Card {
+                        id: cc
+                        required property var modelData
+                        objectName: "case_" + modelData.id
+                        width: parent.width
+                        midW: 200
+                        actW: 150
+                        padV: 7
+                        icon: "filesearch"
+                        title: modelData.intent
+                        line: page.stand(modelData) + (page.cur && page.cur.id === modelData.id && page.gl && page.gl.restricted ? " · restricted files involved" : "")
+                        picked: page.cur !== null && page.cur.id === modelData.id
+                        expandable: true
+                        expanded: page.exp === modelData.id
+                        onOpen: page.sel = modelData.id
+                        onToggle: { page.sel = modelData.id; page.exp = expanded ? 0 : modelData.id }
+                        mid: Row {
+                            anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
+                            spacing: 14
+                            Txt { textFormat: Text.StyledText; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                                  text: "<font face='" + Theme.mono + "'>" + cc.modelData.host + "</font>" + ((Fleet.byHost[cc.modelData.host] || {}).user ? " · " + Fleet.byHost[cc.modelData.host].user : "") }
+                            Txt { text: page.ago(cc.modelData); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                        }
+                        // opened: what it is, what the model makes of it, a note, and the answer
+                        Column {
+                            width: parent.width
+                            spacing: 10
+                            Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text2; font.pixelSize: 13; text: cc.modelData.headline }
+                            Txt { visible: !!cc.modelData.not_yet; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 13; text: cc.modelData.not_yet || "" }
+                            Txt { visible: !!cc.modelData.model_says; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 13
+                                  text: cc.modelData.model_says ? "The local model reads it as " + cc.modelData.model_says.toLowerCase() + ". That is its opinion, not the rules'." : "" }
+                            Field { objectName: "detNote"; width: parent.width; placeholderText: "What you found out (optional); it stays with the case"; maximumLength: 500; text: page.note; onTextEdited: page.note = text }
+                            Rectangle { width: parent.width; height: 1; color: Theme.border }
+                            Item {
+                                width: parent.width
+                                height: 24
+                                Txt { anchors.verticalCenter: parent.verticalCenter; text: "Your answer"; color: Theme.text3; font.pixelSize: 13 }
+                                Row {
+                                    anchors.right: parent.right
+                                    spacing: 8
+                                    Btn { objectName: "detDismissed"; small: true; text: "Dismiss"; onClicked: page.review("dismissed") }
+                                    Btn { objectName: "detAccepted"; small: true; text: "Accept it"; onClicked: page.review("accepted") }
+                                    Btn { objectName: "detExplained"; small: true; kind: "primary"; text: "It is explained"; onClicked: page.review("explained") }
+                                }
                             }
                         }
                     }
                 }
             }
+            StepPager {
+                visible: caseP.pages > 1
+                width: parent.width
+                from: caseP.pi * page.per + 1
+                to: Math.min(page.cases.length, caseP.pi * page.per + page.per)
+                total: page.cases.length
+                pageNo: caseP.pi
+                pages: caseP.pages
+                onStep: function (d) { page.cp = caseP.pi + d }
+            }
+            Quiet { visible: page.cases.length === 0; text: "Nothing open. Detective watches by itself and raises a case when several small things add up." }
+        }
+        // --- at a glance (dt-gl) --------------------------------------------------------------------------------------------------------
+        Box {
+            id: glance
+            objectName: "casePanel"
+            width: (parent.width - 14) * 4 / 12
+            title: "At a glance"
+            sub: page.cur ? page.cur.intent + " on " + page.cur.host : "pick a case on the left"
+            readonly property var m: page.cur ? Fleet.byHost[page.cur.host] || null : null
+            Quiet { visible: page.cur === null; text: "Pick a case on the left." }
+            Column {
+                visible: page.cur !== null
+                width: parent.width
+                Repeater {
+                    model: !page.cur ? [] : [
+                        ["aim", page.stand(page.cur), page.gl && page.gl.next_stage ? "no further yet; next would be " + (page.nextSaid[page.gl.next_stage] || page.gl.next_stage.toLowerCase()) : page.cur.stage_name ? "it went all the way" : "nothing came of it after that"],
+                        ["lock", page.gl && page.gl.restricted ? "Restricted files are involved" : "No restricted files involved", page.gl && page.gl.restricted ? "they need their owner's consent to leave" : "what was touched is ordinary"],
+                        ["user", page.gl && page.gl.signed_in_then && page.gl.signed_in_then.length ? page.gl.signed_in_then.map(function (s) { return s.name || "someone" }).join(", ") : glance.m && glance.m.user ? glance.m.user : "Nobody signed in",
+                         (glance.m && glance.m.deptName ? glance.m.deptName + " · " : "") + "signed in on " + page.cur.host + " at the time"],
+                        ["desktop", page.cur.host, glance.m ? (glance.m.online ? "on now" + (glance.m.user ? ", " + glance.m.user + " signed in" : "") : "off, last seen " + (glance.m.seen ? Time.age(glance.m.seen) + " ago" : "a while ago")) : ""],
+                        ["history", page.gl && page.gl.earlier && page.gl.earlier.length ? Theme.many(page.gl.earlier.length, "earlier case") + " on this machine" : "The first case on this machine",
+                         page.gl && page.gl.earlier && page.gl.earlier.length ? Theme.listNames(page.gl.earlier.map(function (e) { return e.intent.toLowerCase() + " (" + e.outcome + ")" }), 2) : "nothing before this"],
+                        ["clock", "Open for " + Time.age(page.cur.first_at), "raised at " + Time.hhmm(page.gl && page.gl.raised_at ? page.gl.raised_at : page.cur.first_at) + (page.cur.status === "open" ? "; nobody has answered yet" : "")]]
+                    delegate: Item {
+                        required property var modelData
+                        required property int index
+                        width: parent.width
+                        height: Math.max(28, glc.height) + 16
+                        Rectangle { y: 8 + (Math.max(28, glc.height) - 28) / 2; width: 28; height: 28; radius: 7; color: Theme.surface2
+                                    Icon { anchors.centerIn: parent; name: modelData[0]; size: 13; color: Theme.text3 } }
+                        Column { id: glc; x: 40; y: 8 + (Math.max(28, height) - height) / 2; width: parent.width - 40; spacing: 1
+                            Txt { width: parent.width; text: modelData[1]; font.weight: Font.DemiBold }
+                            Txt { width: parent.width; text: modelData[2]; color: Theme.text3; font.pixelSize: 12 } }
+                        Rectangle { visible: index < 5; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    }
+                }
+            }
+            Pulse { parent: glance; key: page.pickedId || null }
         }
     }
 
-    // what Detective noticed: one row a finding, in four columns across the width (the kind, what it saw, why it counts, what would make it harmless)
-    Panel {
+    Row {
+        width: parent.width
+        spacing: 14
+        visible: !!page.cur
+        // --- what happened, drawn ---------------------------------------------------------------------------------------------------------
+        Box {
+            id: whatP
+            objectName: "evidencePanel"
+            width: (parent.width - 14) * 8 / 12
+            height: Math.max(implicitHeight, stepP.implicitHeight)
+            title: "What happened"
+            sub: page.cur ? page.cur.intent + " on " + page.cur.host + ", " + Time.hhmm(page.cur.first_at) + " to " + Time.hhmm(page.cur.last_at) + "; each connection carries its step's number" : ""
+            Item {
+                width: parent.width
+                height: Math.min(460, Math.max(220, graph.implicitHeight + 8))
+                opacity: page.loading ? 0 : 1
+                Flickable {
+                    anchors.fill: parent
+                    contentWidth: Math.max(width, graph.implicitWidth)
+                    contentHeight: graph.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    CaseGraph { id: graph; x: 0; y: 0; story: page.cur ? page.cur.story : []; graph: page.det ? page.det.graph : ({ nodes: [], edges: [] }) }
+                }
+            }
+            Loading { parent: whatP; on: page.loading && page.cur !== null; under: whatP.headerHeight }
+            Pulse { parent: whatP; key: page.pickedId || null }
+        }
+        // --- step by step (dt-story) -------------------------------------------------------------------------------------------------------
+        Box {
+            id: stepP
+            objectName: "stepByStep"
+            width: (parent.width - 14) * 4 / 12
+            height: Math.max(implicitHeight, whatP.implicitHeight)
+            title: "Step by step"
+            sub: page.cur ? Theme.many(page.cur.story.length, "step") + ", in the order they happened" : ""
+            Column {
+                width: parent.width
+                opacity: page.loading ? 0 : 1
+                Repeater {
+                    model: page.cur ? page.cur.story : []
+                    Item {
+                        required property string modelData
+                        required property int index
+                        readonly property var m: /^(\d\d:\d\d)\s+(.*)$/.exec(modelData)
+                        width: parent.width
+                        height: Math.max(18, st.height) + 10
+                        Rectangle { y: 5 + (Math.max(18, st.height) - 18) / 2; width: 18; height: 18; radius: 9; color: "transparent"; border.width: 1; border.color: Theme.text3
+                                    Txt { anchors.centerIn: parent; text: index + 1; font.pixelSize: 10; font.weight: Font.DemiBold; elide: Text.ElideNone } }
+                        Txt { x: 28; y: 5 + st.baselineOffset - baselineOffset; width: 44; text: parent.m ? parent.m[1] : ""; mono: true; color: Theme.text3; elide: Text.ElideNone }
+                        Txt { id: st; x: 82; y: 5; width: parent.width - 82; text: parent.m ? parent.m[2] : modelData; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                        Rectangle { visible: index < page.cur.story.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    }
+                }
+            }
+            Loading { parent: stepP; on: page.loading && page.cur !== null; under: stepP.headerHeight }
+            Pulse { parent: stepP; key: page.pickedId || null }
+        }
+    }
+
+    // --- what Detective noticed: what went on, told plainly (dt-tell) ---------------------------------------------------------------------
+    Box {
         objectName: "noticedPanel"
         visible: !!page.cur
         width: parent.width
         title: "What Detective noticed"
-        sub: page.det && page.det.findings && page.det.findings.length > 4 ? "each thing on its own, and what would make it harmless · " + Theme.fmt(page.det.findings.length) + ", scroll to see them all"
-                                                                           : "each thing on its own, and what would make it harmless"
-        pad: 16
-        Item {
-            id: nt
+        sub: "what went on, from what Detective found"
+        Column {
             width: parent.width
-            height: Math.min(460, nrows.implicitHeight + head.height)
-            readonly property real kindW: 150
-            readonly property real colW: (width - kindW - 3 * 20) / 3.3
-            Row {
-                id: head
-                width: parent.width; spacing: 20; height: 26
-                Head { width: nt.kindW; text: "Kind" }
-                Head { width: nt.colW * 1.3; text: "What Detective saw" }
-                Head { width: nt.colW; text: "Why it counts" }
-                Head { width: nt.colW; text: "It would be harmless if" }
+            spacing: 10
+            Repeater {
+                model: page.det && page.det.findings && page.det.findings.length ? page.det.findings : (page.cur ? [{ summary: page.cur.headline }] : [])
+                Txt { required property var modelData; width: parent.width; text: modelData.summary + (/[.!?]$/.test(modelData.summary) ? "" : ".") + (modelData.innocent ? " Harmless if " + modelData.innocent.charAt(0).toLowerCase() + modelData.innocent.slice(1) + "." : "")
+                      font.pixelSize: 14; lh: 1.55; wrapMode: Text.WordWrap; elide: Text.ElideNone }
             }
-            Rectangle { y: head.height - 1; width: parent.width; height: 1; color: Theme.border }
-            Flickable {
-                y: head.height
-                width: parent.width; height: parent.height - head.height
-                contentWidth: width; contentHeight: nrows.implicitHeight
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                Column {
-                    id: nrows
-                    width: parent.width
-                    Repeater {
-                        model: page.det ? page.det.findings : []
-                        Item {
-                            required property var modelData
-                            width: nrows.width
-                            height: Math.max(52, Math.max(sm.implicitHeight, why.implicitHeight, ok.implicitHeight) + 20)
-                            Column {
-                                x: 0; y: 10; width: nt.kindW; spacing: 4
-                                Tag { text: modelData.behaviour === "exfiltration" ? "Taking out" : modelData.behaviour.charAt(0).toUpperCase() + modelData.behaviour.slice(1) }
-                                Txt { text: Math.round(modelData.weight * 100) + "% on its own"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                            }
-                            Txt { id: sm; x: nt.kindW + 20; y: 10; width: nt.colW * 1.3; wrapMode: Text.WordWrap; elide: Text.ElideNone; text: modelData.summary; font.weight: Font.Medium }
-                            Txt { id: why; x: nt.kindW + 40 + nt.colW * 1.3; y: 10; width: nt.colW; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12
-                                  text: modelData.why && modelData.why.length ? modelData.why.join("; ") + "." : "—" }
-                            Txt { id: ok; x: nt.kindW + 60 + nt.colW * 2.3; y: 10; width: nt.colW; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 12; text: modelData.innocent + "." }
-                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                        }
-                    }
+        }
+        Column {
+            width: parent.width
+            topPadding: 10
+            spacing: 12
+            Rectangle { width: parent.width; height: 1; color: Theme.grid }
+            Txt { width: parent.width; text: "Each is a reading of the evidence, not proof."; color: Theme.text3; font.pixelSize: 12 }
+        }
+    }
+
+    // --- said to be fine: what Detective lets pass on one machine (dt-oks) --------------------------------------------------------------------
+    Box {
+        width: parent.width
+        title: "Said to be fine · " + page.okRules.length
+        sub: "what Detective lets pass on one machine; restricted files are never let pass"
+        Column {
+            width: parent.width
+            Repeater {
+                model: page.okRules
+                delegate: Item {
+                    required property var modelData
+                    required property int index
+                    readonly property real flex: width - 8 - 18 - 260 - 64 - 82 - tb.width - 70
+                    width: parent.width; height: 37
+                    Icon { x: 4; anchors.verticalCenter: parent.verticalCenter; name: page.okIcon[modelData.kind] || "check"; size: 13; color: Theme.text4 }
+                    Txt { x: 36; width: 260; anchors.verticalCenter: parent.verticalCenter; mono: true; color: Theme.text2; text: modelData.value }
+                    Txt { x: 310; width: parent.flex; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; text: (page.okWord[modelData.graph] || "not counted") + "; restricted files still are" }
+                    Txt { x: 324 + parent.flex; width: 64; anchors.verticalCenter: parent.verticalCenter; mono: true; color: Theme.text3; text: modelData.hostname || modelData.host || "" }
+                    Txt { x: 402 + parent.flex; width: 82; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; text: modelData.made_at ? "since " + Time.day(modelData.made_at) : "" }
+                    Txt { id: tb; anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; text: "Take it back"; color: tba.containsMouse ? Theme.accent : Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                          MouseArea { id: tba; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                      onClicked: falcon.call("detective.rule_revoke", { rule_id: modelData.id }, function (ok, r) { if (!ok) { Msg.failed(r && r.message ? r.message : "Not taken back"); return } Msg.ok("Taken back"); page.loadRules() }) } }
+                    Rectangle { visible: index < page.okRules.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }
+            Quiet { visible: page.okRules.length === 0; text: "Nothing. When you dismiss a case you can say what is fine from now on." }
         }
     }
 }

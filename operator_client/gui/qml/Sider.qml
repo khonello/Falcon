@@ -7,6 +7,7 @@ import "."
 Rectangle {
     id: root
     signal leave()
+    signal askAgain()
     width: Theme.siderW
     color: Theme.surface
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.border }
@@ -30,7 +31,7 @@ Rectangle {
                 width: parent.width
                 color: Theme.text3
                 font.pixelSize: 11
-                text: Nav.deptName || (Nav.departments ? Theme.many(Nav.departments, "department") : falcon.roleLabel)
+                text: "IT console" + (Nav.departments ? " · " + Theme.many(Nav.departments, "department") : "")
             }
         }
     }
@@ -38,7 +39,7 @@ Rectangle {
     Flickable {
         id: list
         anchors.top: org.bottom
-        anchors.topMargin: 8
+        anchors.topMargin: Theme.siderTop
         anchors.bottom: foot.top
         width: parent.width - 1
         contentHeight: groups.height
@@ -179,6 +180,20 @@ Rectangle {
                         Txt { text: Nav.myName || falcon.roleLabel; font.weight: Font.Medium; font.pixelSize: Theme.fSmall }
                         Txt { text: falcon.defaultClientId || ""; mono: true; color: Theme.text3; font.pixelSize: 11 }
                     }
+                }
+                // whether a button that opens another page asks first; turned off from that question, back on here
+                Txt {
+                    objectName: "askFirstLine"
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    elide: Text.ElideNone
+                    color: Theme.text3
+                    font.pixelSize: Theme.fSmall
+                    textFormat: Text.StyledText
+                    linkColor: Theme.accent
+                    text: Nav.askFirst ? "Asks before opening another page · <a href='stop'>Stop asking</a>"
+                                       : "Opens other pages without asking · <a href='ask'>Ask again</a>"
+                    onLinkActivated: function (l) { if (l === "ask") root.askAgain(); else Nav.askFirst = false }
                 }
             }
         }

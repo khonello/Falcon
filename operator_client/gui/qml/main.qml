@@ -35,8 +35,14 @@ ApplicationWindow {
         id: prefs
         category: "console"
         property string themeMode: "system"
+        property bool pulseOn: true             // the bulb beside the theme: a section a click changed pulses once
+        property bool askFirst: true            // a button that opens another page asks first
     }
     Binding { target: Theme; property: "mode"; value: prefs.themeMode }
+    Binding { target: Theme; property: "pulseOn"; value: prefs.pulseOn }
+    Binding { target: Nav; property: "askFirst"; value: prefs.askFirst }
+    Connections { target: Nav; function onAsking(req) { askGo.ask(req) } }
+    Connections { target: sider; function onAskAgain() { prefs.askFirst = true } }
 
     Binding { target: Nav; property: "me"; value: Nav.myName || falcon.roleLabel }
 
@@ -100,6 +106,8 @@ ApplicationWindow {
                 id: tops
                 width: parent.width
 
+                // your to-do, when its time comes: one line across the top
+                TodoStrip { width: parent.width }
 
                 // --- the top bar, which is also the title bar --------------------------------------------
                 Rectangle {
@@ -195,6 +203,15 @@ ApplicationWindow {
                             value: prefs.themeMode
                             onPicked: function (v) { prefs.themeMode = v }
                         }
+                        // the pulse, on or off; not everyone will want it (the user, 1 Nov 2026)
+                        Btn {
+                            objectName: "pulseSwitch"
+                            kind: "text"; small: true; iconName: "bulb"
+                            anchors.verticalCenter: parent.verticalCenter
+                            tip: prefs.pulseOn ? "Changed sections pulse once · click to stop" : "Changed sections do not pulse · click to turn it on"
+                            opacity: prefs.pulseOn ? 1 : 0.45
+                            onClicked: prefs.pulseOn = !prefs.pulseOn
+                        }
                         Row {
                             spacing: 0
                             anchors.verticalCenter: parent.verticalCenter
@@ -231,6 +248,7 @@ ApplicationWindow {
 
     SessionWindow { }
     Palette { id: palette }
+    AskGo { id: askGo; onStopAsking: prefs.askFirst = false }
     Shortcut { sequences: ["Ctrl+K", "Ctrl+P"]; onActivated: palette.visible ? palette.close() : palette.open() }
     Shortcut { sequences: ["Ctrl+Shift+P"]; onActivated: palette.openWith(">") }
 

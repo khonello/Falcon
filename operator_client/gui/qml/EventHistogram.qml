@@ -10,6 +10,11 @@ Item {
     property var kinds: Kinds.keys
     property var brush: null
     property bool brushable: true
+    // calm (the concept's Audit): two shades only, what is worth a look in accent and the routine in grey; `calm` says which is which
+    property var calm: null
+    readonly property var keys: calm ? ["routine", "look"] : Kinds.keys
+    function colorOf(k) { return calm ? (k === "look" ? Theme.accent : Theme.alpha(Theme.text3, 0.55)) : Kinds.color(k) }
+    function wordOf(k) { return calm ? (k === "look" ? "Worth a look" : "Routine") : Kinds.words[k] }
     signal brushed(var b)
     implicitHeight: 150
 
@@ -21,11 +26,11 @@ Item {
     readonly property real bw: spec.h * 3600000 / spec.bins
     readonly property var bins: {
         var b = [], n = spec.bins
-        for (var i = 0; i < n; i++) { var o = {}; for (var k = 0; k < Kinds.keys.length; k++) o[Kinds.keys[k]] = 0; b.push(o) }
+        for (var i = 0; i < n; i++) { var o = {}; for (var k = 0; k < keys.length; k++) o[keys[k]] = 0; b.push(o) }
         for (var j = 0; j < entries.length; j++) {
             var e = entries[j]
             if (e.t === null || e.t < a || kinds.indexOf(e.kind) < 0) continue
-            var x = Math.min(n - 1, Math.floor((e.t - a) / bw)); b[x][e.kind] += 1
+            var x = Math.min(n - 1, Math.floor((e.t - a) / bw)); b[x][calm ? (calm(e) ? "look" : "routine") : e.kind] += 1
         }
         return b
     }
@@ -73,12 +78,12 @@ Item {
             }
             for (var i = 0; i < root.bins.length; i++) {
                 var acc = 0
-                for (var k = 0; k < Kinds.keys.length; k++) {
-                    var kk = Kinds.keys[k], v = root.bins[i][kk]
+                for (var k = 0; k < root.keys.length; k++) {
+                    var kk = root.keys[k], v = root.bins[i][kk]
                     if (!v) continue
                     var y0 = yy(acc), y1 = yy(acc + v); acc += v
                     c.globalAlpha = root.hov < 0 || root.hov === i ? 1 : 0.55
-                    c.fillStyle = Kinds.color(kk)
+                    c.fillStyle = root.colorOf(kk)
                     c.fillRect(root.pl + i * root.cw + 0.5, y1, Math.max(1, root.cw - 1.5), Math.max(0.5, y0 - y1))
                 }
             }
@@ -128,13 +133,13 @@ Item {
                                      + Time.hhmm(root.a + root.hov * root.bw) + " – " + Time.hhmm(root.a + (root.hov + 1) * root.bw) : ""
             }
             Repeater {
-                model: root.hov >= 0 ? Kinds.keys.filter(function (k) { return root.bins[root.hov][k] > 0 }) : []
+                model: root.hov >= 0 ? root.keys.filter(function (k) { return root.bins[root.hov][k] > 0 }) : []
                 Row {
                     required property var modelData
                     width: ttc.width
                     spacing: 8
-                    Rectangle { width: 10; height: 10; radius: 2; color: Kinds.color(modelData); anchors.verticalCenter: parent.verticalCenter }
-                    Txt { text: Kinds.words[modelData]; color: Theme.text2; font.pixelSize: 12; width: parent.width - 60 }
+                    Rectangle { width: 10; height: 10; radius: 2; color: root.colorOf(modelData); anchors.verticalCenter: parent.verticalCenter }
+                    Txt { text: root.wordOf(modelData); color: Theme.text2; font.pixelSize: 12; width: parent.width - 60 }
                     Txt { text: String(root.bins[root.hov][modelData]); mono: true; font.weight: Font.DemiBold; font.pixelSize: 12; elide: Text.ElideNone }
                 }
             }

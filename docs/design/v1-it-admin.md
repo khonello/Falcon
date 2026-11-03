@@ -24,7 +24,7 @@ this and an older doc disagree for version 1, this wins. The combo docs keep the
 | Who picks the destination folder | **The destination chooses.** For an Admin's machine, that Admin picks the folder when consenting. For a Worker's machine, the Admin making the flow picks it (assumed: Workers never use the console). |
 | Restricted material in a flow | **Kept as it is**: a flow pauses and asks the Admin who marked the restricted file or folder, unless that Admin made the flow. So there are two consents, never more: the destination Admin's (Admin to Admin) and the marker's (restricted). |
 | Two Admins on one machine | **Refused**, as peers are today: the second Admin is told who is in and since when, and can message them. Nobody pushes a colleague out. |
-| "Mine" for an issue or report | **An explicit Take.** Every issue and report reaches every Admin and stays unassigned until one takes it; the others see who has it. `issue take / give / free` already exist. |
+| "Mine" for an issue or report | **Nobody owns one** (the user, 2 Nov 2026: "the idea of ownership between admins, i hate it"; this replaced an explicit Take). Every issue and report reaches every Admin and any Admin acts on it; the console has no Take, Give back or "who has it". The Engine's `issues.assign` and owner field are left unused (ENGINE-GAPS #21). |
 | First account at setup | (assumed) `python -m engine setup` makes the first IT Admin, not a Super User. Any Admin can then add departments from the console. |
 | Joining with a licence code (2 Nov 2026) | **The code given at setup decides.** A bought licence carries admin codes and worker codes; the person installing gives one, the Engine checks it and the machine joins at once as what the code is for. No Admin confirms another Admin or a Worker. Without a code, an IT Admin lets the machine in with the code on its screen, and it becomes what was installed. The licence store (where licences are bought, how its files are signed) is still to be decided. |
 | Making another IT Admin | **Never one click in the console** (the user, 1 Nov 2026: "it shouldn't be too simple to make a person admin"). It takes the console installed on that person's PC, so the PC is part of the system, and is then finalised from the TUI or a setup utility. The console has no "Add an IT Admin" button. The exact steps (who runs the command, where, and what proves it) are still to be designed. |
@@ -78,7 +78,7 @@ page has no "From the Super User" tab. The Departments page (the concept's, 1 No
 
 1. **Engine: Admins reach every department.** One setting (`admin_scope`, fixed to organisation for version 1) in `engine/permissions.py`;
    every handler that filters by `ident.department_id` reads it. Department creation becomes an Admin handler; making an Admin does not (it is finished from the TUI or a setup utility on a PC that has the console installed, never from the console). Reports and issues reach
-   every Admin, with Take.
+   every Admin; nobody owns one (no Take, 2 Nov 2026).
 2. **Engine: setup and accounts.** `engine setup` bootstraps the first Admin; `bootstrap`, `make_org.py`, `.env` and `GETTING-STARTED.md` follow.
 3. **Flows.** Consent only Admin to Admin, with the destination Admin choosing the folder; Worker destinations chosen by the maker; restricted
    consent from the marker kept. A single-file source and a followed destination copy (index identity, move events, the sync log's

@@ -14,7 +14,7 @@ Page {
     objectName: "restrictedView"
 
     property var vio: []
-    property string sel: Nav.sub ? String(Nav.sub) : ""
+    property string sel: { var a = Nav.takeArrive("restricted"); return a !== null ? String(a) : Nav.sub ? String(Nav.sub) : "" }
     property string copy: ""
     property bool onlyCopied: false
     property var acted: ({})
@@ -43,7 +43,7 @@ Page {
         var id = curCopy.iid
         falcon.call("issues.get", { issue_id: id }, function (ok, r) { if (ok && page.curCopy && page.curCopy.iid === id) page.cdet = r })
     }
-    onCurChanged: { if (!cur || !mdet || !mdet.mark || mdet.mark.id !== cur.mid) { mdet = null; loadDet() } }
+    onCurChanged: { if (!cur || !mdet || !mdet.mark || mdet.mark.id !== cur.mid) { mdet = null; loadDet() }; pickedKey = cur ? cur.id + ":" + copy : ""; loading = true; ldT.restart() }
     onCurCopyChanged: loadCopy()
     function play(o) {
         var c = curCopy
@@ -91,7 +91,7 @@ Page {
         out.forEach(function (k) { k.copies.sort(function (a, b) { return Fleet.sevOrder[a.sev] - Fleet.sevOrder[b.sev] || Time.ms(b.at) - Time.ms(a.at) }); k.n = k.copies.length })
         return out.sort(function (a, b) { return b.n - a.n })
     }
-    readonly property var rows: marks.filter(function (k) { return (!onlyCopied || k.n) && (k.name + " " + k.path).toLowerCase().indexOf(list.query.toLowerCase()) >= 0 })
+    readonly property var rows: marks
     readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
     readonly property var curCopy: { if (!cur) return null; for (var i = 0; i < cur.copies.length; i++) if (cur.copies[i].id === copy) return cur.copies[i]; return null }
     readonly property var allCopies: marks.reduce(function (a, k) { return a.concat(k.copies) }, [])
@@ -114,176 +114,438 @@ Page {
         })
     }
 
-    Strip {
-        width: parent.width
-        on: page.onlyCopied ? "copied" : null
-        onPick: function (k) { page.onlyCopied = !!k }
-        items: [
-            { label: "Files and folders marked", value: Theme.fmt(page.marks.length), dc: page.leaked ? Theme.crit : undefined,
-              delta: !page.marks.length ? "" : Theme.many(page.marks.length - page.nFolders, "file") + ", " + Theme.many(page.nFolders, "folder")
-                     + " · " + (page.leaked ? page.leaked + " with a copy elsewhere" : "all where they belong") },
-            { label: "Files protected in all", value: page.msum ? Theme.fmt(page.msum.files) : "—", delta: "counting what is inside folders" },
-            { key: page.copiesN ? "copied" : null, label: "Copies found elsewhere", value: Theme.fmt(page.copiesN),
-              delta: page.copiesN ? "click to list only those marks" : "none", dc: page.copiesN ? Theme.crit : undefined },
-            { label: "Machines holding a copy", value: Theme.fmt(page.holders.length), unit: "/ " + Theme.fmt(Fleet.machines.length),
-              delta: page.holders.length ? Theme.listNames(page.holders, 2) : "none", dc: page.holders.length ? Theme.crit : undefined }
-        ]
+    // --- the version 1 concept's layout (docs/design/concepts-admin.html, AdminRestrictedPage) ----------------------------
+    property string exp: ""
+    property var det: ({})                // mark id -> marks.get, for every mark: its copies and the copies allowed
+    property var cdets: ({})              // issue id -> issues.get, for the copies listed
+    property string allowingId: ""
+    function loadAll() {
+        (mk || []).forEach(function (m) {
+            falcon.call("marks.get", { mark_id: m.id }, function (ok, r) {
+                if (!ok) return
+                var d = Object.assign({}, page.det); d[m.id] = r; page.det = d
+                ;(r.copies || []).forEach(function (c) {
+                    falcon.call("issues.get", { issue_id: c.issue_id }, function (ok2, r2) { if (ok2) { var x = Object.assign({}, page.cdets); x[c.issue_id] = r2; page.cdets = x } })
+                })
+            })
+        })
+    }
+    onMkChanged: loadAll()
+    readonly property var allCopyRows: {
+        var out = []
+        marks.forEach(function (k) {
+            var d = k.mid !== undefined ? page.det[k.mid] : null
+            ;((d && d.copies) || []).forEach(function (c) { out.push({ k: k, c: c, id: String(c.issue_id) }) })
+        })
+        return out.sort(function (a, b) { return Fleet.sevOrder[a.c.severity === "medium" ? "warning" : a.c.severity] - Fleet.sevOrder[b.c.severity === "medium" ? "warning" : b.c.severity] || Time.ms(b.c.opened_at) - Time.ms(a.c.opened_at) })
+    }
+    readonly property var allowedRows: {
+        var out = []
+        marks.forEach(function (k) {
+            var d = k.mid !== undefined ? page.det[k.mid] : null
+            ;((d && d.resolved_copies) || []).forEach(function (c) { out.push({ k: k, c: c }) })
+        })
+        return out
+    }
+    readonly property var carrying: { var out = []; marks.forEach(function (k) { (k.carried || []).forEach(function (f) { out.push({ k: k, f: f }) }) }); return out }
+    function hostsHit() { return allCopyRows.map(function (r) { return r.c.host }).filter(function (h, i, a) { return a.indexOf(h) === i }) }
+    function ruleOf(k) { return k.keep === "machine" ? "may be anywhere on " + k.host + ", nowhere else" : "may be only in " + page.where(k) + " on " + k.host }
+    function act(row, key, reason) {
+        var pl = { issue_id: row.c.issue_id, key: key }
+        if (reason) pl.reason = reason
+        falcon.call("issues.act", pl, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not done"); return }
+            var a = Object.assign({}, page.acted); a[row.id] = key === "ask" ? "Asked " + (row.c.signed_in || "them") + "; closes when the copy is gone" : key === "delete" ? "Deleted" : "Allowed there"; page.acted = a
+            page.allowingId = ""; page.why = ""; Msg.ok(a[row.id] + " · recorded"); page.load(); Fleet.refresh()
+        })
+    }
+    function option(row, key) {
+        var d = page.cdets[row.c.issue_id]
+        if (!d || !d.options) return null
+        for (var i = 0; i < d.options.length; i++) if (d.options[i].key === key) return d.options[i]
+        return null
+    }
+    function unmark(k) {
+        confirm.ask({ title: "Stop restricting " + k.name + "?", text: "Copies of it are no longer looked for, and flows may carry it. " + (k.n ? "The copies already caught stay listed until you deal with them. " : "") + "The audit log records that you did it.",
+                      ok: "Stop restricting", danger: true },
+                    function () { falcon.call("marks.unmark", { mark_id: k.mid }, function (ok, r) {
+                        if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
+                        Msg.ok(k.name + " is no longer restricted · recorded"); page.load() }) })
+    }
+    property bool loading: false
+    property string pickedKey: ""
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
+
+    situation: {
+        if (!marks.length) return "You have not restricted anything yet. Restrict a file or folder below; it stays where it is and a copy anywhere else is caught."
+        var hosts = marks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }), hit = hostsHit()
+        return "You restricted " + Theme.many(marks.length, "thing") + " on " + Theme.many(hosts.length, "machine") + ". "
+               + (allCopyRows.length ? Theme.many(allCopyRows.length, "copy", "copies") + " turned up elsewhere, on " + Theme.listNames(hit, 2) + "." : "No copy is anywhere else.")
+               + (allowedRows.length ? " " + Theme.many(allowedRows.length, "copy", "copies") + (allowedRows.length === 1 ? " is" : " are") + " allowed elsewhere." : "")
+               + (carrying.length ? " " + Theme.listNames(carrying.map(function (c) { return c.f.name || ("flow " + c.f.flow_id) }), 2) + " carries something of yours." : "")
+    }
+    situationAt: Time.now
+
+    // a copy's trail (rs-trail): where it was, how it went, where it was found, and who is there
+    component Trail: Item {
+        id: tr
+        property string fromHost: ""
+        property string fromName: ""
+        property string how: ""
+        property string toHost: ""
+        property string toPath: ""
+        property bool hot: false
+        property string who: ""
+        property string whoLine: ""
+        property bool whyStyle: false
+        readonly property real unit: (width - 150 - 120 - 30) / 2.4
+        height: Math.max(a.height, c.height, d.height)
+        Rectangle {
+            id: a
+            width: tr.unit; height: ac.height + 10; radius: Theme.radius; color: Theme.surface2
+            anchors.verticalCenter: parent.verticalCenter
+            Column { id: ac; x: 9; y: 5; width: parent.width - 18; spacing: 1
+                Txt { width: parent.width; text: tr.fromHost; mono: true; font.pixelSize: 13; font.weight: Font.DemiBold }
+                Txt { width: parent.width; text: tr.fromName; mono: true; font.pixelSize: 13; color: Theme.text3 } }
+        }
+        Item {
+            x: tr.unit + 10; width: 150; height: parent.height
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                Dash { width: (150 - hw.implicitWidth - 12) / 2; c: Theme.text4; anchors.verticalCenter: parent.verticalCenter }
+                Txt { id: hw; text: tr.how; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone }
+                Dash { width: (150 - hw.implicitWidth - 12) / 2; c: Theme.text4; anchors.verticalCenter: parent.verticalCenter }
+            }
+        }
+        Rectangle {
+            id: c
+            x: tr.unit + 10 + 150 + 10
+            width: tr.unit * 1.4; height: cc.height + 10; radius: Theme.radius
+            color: tr.hot ? Theme.mix(Theme.crit, Theme.surface2, 0.14) : Theme.surface2
+            anchors.verticalCenter: parent.verticalCenter
+            Column { id: cc; x: 9; y: 5; width: parent.width - 18; spacing: 1
+                Txt { width: parent.width; text: tr.toHost; mono: true; font.pixelSize: 13; font.weight: Font.DemiBold; color: tr.hot ? Theme.crit : Theme.text }
+                Txt { width: parent.width; text: tr.toPath; mono: true; font.pixelSize: 13 } }
+        }
+        Column {
+            id: d
+            x: tr.unit * 2.4 + 10 + 150 + 10 + 10
+            width: 120
+            anchors.verticalCenter: parent.verticalCenter
+            Txt { width: parent.width; text: tr.who; font.pixelSize: 12; color: tr.whyStyle ? Theme.text2 : Theme.text; font.italic: tr.whyStyle }
+            Txt { width: parent.width; text: tr.whoLine; font.pixelSize: 12; color: Theme.text3 }
+        }
     }
 
     Row {
         width: parent.width
         spacing: 14
-        ListPanel {
-            id: list
+        // --- what you restricted, by the machine it lives on --------------------------------------------------
+        Box {
+            id: markP
+            objectName: "markCards"
             width: (parent.width - 14) * 8 / 12
-            title: "Marked files"
-            sub: (page.myHost ? "on " + page.myHost + ", your PC" : "on your PC") + " · click one to see it on the right"
-            placeholder: "Filter by name or path"
-            actionLabel: "Mark files"
-            onAction: Nav.go("restricted", "mark")
-            rows: page.rows
-            pick: page.cur ? page.cur.id : null
-            onPicked: function (k) { page.sel = k; page.copy = "" }
-            icon: function (r) { return r.kind === "folder" ? "folder" : "file" }
-            nameText: function (r) { return r.name }
-            nameLine: function (r) { return r.path || "matched by content" }
-            cols: [{ title: "Allowed", text: function (r) { return r.keep === "path" ? "Only in its place" : "Anywhere on the PC" } },
-                   { title: "Covers", width: 150, bar: function (r) { return { v: r.files, max: Math.max(1, Math.max.apply(null, page.marks.map(function (k) { return k.files }))), text: r.kind === "folder" ? Theme.fmt(r.files) + " files" : "1 file" } } }]
-            now: function (r) { return r.n ? [r.n === 1 ? "A copy elsewhere" : Theme.fmt(r.n) + " copies elsewhere", "bad"] : ["Only where it belongs", "good"] }
-            showEmpty: page.marks.length === 0
-            emptyIcon: "fileprotect"
-            emptyTitle: "No copy of anything you marked has turned up"
-            emptyText: "Mark a file or folder on your PC. It stays where it is and you keep using it; a copy anywhere else is caught."
-            emptyAct: "Mark files"
-            onEmptyAction: Nav.go("restricted", "mark")
-        }
-        SidePanel {
-            width: (parent.width - 14) * 4 / 12
-            readonly property var k: page.cur
-            showEmpty: k === null
-            emptyIcon: "fileprotect"
-            emptyText: "Pick a marked file or folder in the list."
-            title: k ? k.name : ""
-            sub: k && page.sel === k.id ? "the one you picked" : "most copies · click another"
-            facts: k ? [["Kind", k.kind === "folder" ? "Folder · " + Theme.fmt(k.files) + " files" : "File"], ["On", k.host || "—", null, true], ["Path", k.path || "—", null, true],
-                        ["Allowed", k.keep === "path" ? "only in " + page.where(k) : "anywhere on " + (k.host || "its PC"), null, false, false, k.mid !== undefined ? "change" : ""],
-                        ["Marked", page.marked(k)],
-                        ["Copies", k.n ? k.n + " found elsewhere" : "None, only where it belongs", k.n ? Theme.crit : null]]
-                       .concat(k.kind === "folder" && k.generated ? [["Tracked by content", Theme.fmt(k.tracked) + " files · " + Theme.fmt(k.generated) + " generated (node_modules and the like) are covered but not tracked one by one"]] : [])
-                       .concat(k.carried && k.carried.length ? [["Carried by flows", k.carried.map(function (id) { return "flow " + id }).join(", ") + " · allowed by you, until taken back on the Flows page"]] : []) : []
-            onFactLink: function (label) { if (label === "Allowed") page.changeKeep() }
-            actions: Btn { danger: true; text: "Unmark"; enabled: page.cur !== null && page.cur.mid !== undefined; tip: page.cur && page.cur.mid === undefined ? "This Engine cannot unmark" : ""
-                           onClicked: { var k = page.cur
-                                        confirm.ask({ title: "Unmark " + k.name + "?", text: "It stops being restricted. Its open copies close; the mark and its history are kept.", ok: "Unmark", danger: true },
-                                                    function () { falcon.call("marks.unmark", { mark_id: k.mid }, function (ok, r) { if (ok) { Msg.ok(k.name + " unmarked"); page.sel = ""; page.load(); Fleet.refresh() } else Msg.failed(r.message || "Not unmarked") }) }) } }
-            Column {
-                visible: page.cur !== null && page.cur.n > 0
-                width: parent.width
-                spacing: 6
-                Txt { text: "COPIES ELSEWHERE · CLICK ONE TO DEAL WITH IT"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                Repeater {
-                    model: page.cur ? page.cur.copies : []
-                    Rectangle {
-                        id: cc
-                        required property var modelData
-                        readonly property bool on: page.copy === modelData.id
-                        readonly property string done: page.acted[modelData.id] || ""
-                        width: parent.width
-                        height: ch1.height + (on ? acts.height + 10 : 0) + 14
-                        radius: 6
-                        color: on ? Theme.surface2 : "transparent"
-                        border.width: 1
-                        border.color: on ? Theme.borderStrong : Theme.grid
-                        Row {
-                            id: ch1
-                            x: 10; y: 7
-                            width: parent.width - 20
-                            spacing: 10
-                            Rectangle { width: 7; height: 7; radius: 4; color: cc.done ? Theme.ok : Fleet.sevColor(modelData.sev); anchors.verticalCenter: parent.verticalCenter }
-                            Column {
-                                width: parent.width - 100
-                                Txt { text: modelData.host; mono: true; font.weight: Font.Medium; width: parent.width }
-                                Txt { text: modelData.folder || modelData.file; mono: true; color: Theme.text3; font.pixelSize: 11; width: parent.width }
+            height: Math.max(implicitHeight, mapP.implicitHeight)
+            title: "What you restricted"
+            sub: "everything you marked restricted, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it"
+            Repeater {
+                model: page.marks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }).sort(function (a, b) { return (b === page.myHost) - (a === page.myHost) || a.localeCompare(b) })
+                delegate: Group {
+                    id: hg
+                    required property var modelData
+                    required property int index
+                    readonly property var xs: page.marks.filter(function (k) { return k.host === modelData }).sort(function (a, b) { return a.name.localeCompare(b.name) })
+                    width: markP.innerW
+                    spaced: index > 0
+                    cardGap: 5
+                    title: modelData + " · " + xs.length
+                    sub: modelData === page.myHost ? "yours" : (Fleet.byHost[modelData] || {}).user || "nobody signed in"
+                    Repeater {
+                        model: hg.xs
+                        delegate: Card {
+                            id: kc
+                            required property var modelData
+                            objectName: "mark_" + modelData.id
+                            width: hg.cardW
+                            midW: 200
+                            actW: 150
+                            padV: 7
+                            icon: modelData.kind === "folder" ? "folder" : "file"
+                            title: modelData.name
+                            tag: modelData.kind === "folder" ? Theme.many(modelData.files || 0, "file") : "file"
+                            line: modelData.path
+                            picked: page.cur !== null && page.cur.id === modelData.id
+                            expandable: true
+                            expanded: page.exp === modelData.id
+                            onOpen: { page.sel = modelData.id; page.copy = "" }
+                            onToggle: { page.sel = modelData.id; page.exp = expanded ? "" : modelData.id }
+                            mid: Row {
+                                anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
+                                spacing: 14
+                                Txt { text: kc.modelData.keep === "machine" ? "anywhere on " + kc.modelData.host : "only where it is"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                                Txt { text: kc.modelData.at ? "since " + Time.day(kc.modelData.at) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                             }
-                            Txt { text: cc.done ? "dealt with" : Time.age(modelData.at) + " ago"; mono: true; color: Theme.text3; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone }
-                        }
-                        MouseArea { anchors.fill: ch1; cursorShape: Qt.PointingHandCursor; onClicked: { page.copy = cc.on ? "" : modelData.id; page.allowing = false; page.why = "" } }
-                        Column {
-                            id: acts
-                            visible: cc.on
-                            x: 27; y: ch1.height + 12
-                            width: parent.width - 37
-                            spacing: 4
-                            Txt { visible: cc.done !== ""; text: "✓ " + cc.done; color: Theme.ok; font.pixelSize: 12; width: parent.width }
-                            // the Engine's options for this copy (it is an issue)
+                            // opened: its rule, what happened to it lately, and Stop restricting
                             Column {
-                                visible: cc.done === "" && !page.allowing && modelData.iid !== undefined
-                                spacing: 4
-                                Txt { visible: !page.cdet; text: "Loading what can be done…"; color: Theme.text3; font.pixelSize: 12 }
-                                Repeater {
-                                    model: page.cdet && page.curCopy && page.curCopy.id === modelData.id ? (page.cdet.options || []) : []
-                                    Link { required property var modelData; text: modelData.title; font.pixelSize: 12
-                                           onClicked: modelData.need === "reason" ? page.allowing = true : page.play(modelData) }
-                                }
-                            }
-                            Column {
-                                visible: cc.done === "" && !page.allowing && modelData.iid === undefined
-                                spacing: 4
-                                Txt { visible: !!modelData.user; text: "Ask " + modelData.user + " to delete it · not built yet"; color: Theme.text4; font.pixelSize: 12 }
-                                Txt { text: "Delete this copy · not built yet"; color: Theme.text4; font.pixelSize: 12 }
-                                Link { text: "Allow it on " + modelData.host; font.pixelSize: 12; onClicked: page.allowing = true }
-                            }
-                            Column {
-                                visible: cc.done === "" && page.allowing
                                 width: parent.width
-                                spacing: 6
-                                Field { width: parent.width; height: Theme.controlSm; placeholderText: "Why may it be on " + modelData.host + "? Recorded with it."; text: page.why; onTextEdited: page.why = text }
-                                Row {
-                                    anchors.right: parent.right
-                                    spacing: 6
-                                    Btn { small: true; text: "Cancel"; onClicked: { page.allowing = false; page.why = "" } }
-                                    Btn { small: true; kind: "primary"; text: "Allow it"; enabled: page.why.trim() !== ""
-                                          onClicked: { if (modelData.iid === undefined) { page.allow(modelData); return }
-                                                       var o = (page.cdet && page.cdet.options || []).filter(function (x) { return x.need === "reason" })[0]
-                                                       if (o) page.play(o) } }
+                                spacing: 10
+                                Column {
+                                    y: 2
+                                    width: Math.min(parent.width, 420)
+                                    Repeater {
+                                        model: [["Where", kc.modelData.host + " " + kc.modelData.path], ["Rule", "It " + page.ruleOf(kc.modelData)],
+                                                ["Covers", kc.modelData.kind === "folder" ? Theme.many(kc.modelData.files || 0, "file") + ", and any added later" : "1 file"],
+                                                ["Restricted", page.marked(kc.modelData)], ["Recognised by", "content" + (kc.modelData.versions ? ", " + Theme.many(kc.modelData.versions, "version") + " remembered" : "")]]
+                                        delegate: Item {
+                                            required property var modelData
+                                            required property int index
+                                            width: parent.width
+                                            height: fv.height + 10
+                                            Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                            Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13; mono: index === 0; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone }
+                                            Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                        }
+                                    }
                                 }
+                                Column {
+                                    width: parent.width
+                                    readonly property var log: page.det[kc.modelData.mid] && page.det[kc.modelData.mid].events ? page.det[kc.modelData.mid].events : []
+                                    Txt { topPadding: 4; text: "Lately"; color: Theme.text3; font.pixelSize: 12 }
+                                    Repeater {
+                                        model: parent.log
+                                        delegate: Item {
+                                            required property var modelData
+                                            width: parent.width; height: lv.height + 10
+                                            Txt { y: 5; width: 90; text: Time.ago(modelData.at); color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                            Txt { id: lv; x: 100; y: 5; width: parent.width - 100; textFormat: Text.StyledText; font.pixelSize: 13; text: "<b>" + (modelData.who || "") + "</b> " + (modelData.what || "") }
+                                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                        }
+                                    }
+                                    Txt { visible: parent.log.length === 0; text: "Nothing has happened to it since you restricted it."; color: Theme.text3; font.pixelSize: 13 }
+                                }
+                                Rectangle { width: parent.width; height: 1; color: Theme.border }
+                                Btn { anchors.right: parent.right; small: true; danger: true; iconName: "stop"; text: "Stop restricting"; onClicked: page.unmark(kc.modelData) }
                             }
                         }
                     }
                 }
             }
+            Quiet { visible: page.marks.length === 0; text: "Nothing restricted yet. Restrict something below." }
+        }
+        // --- where it is, across every machine -----------------------------------------------------------------
+        Box {
+            id: mapP
+            objectName: "markMap"
+            width: (parent.width - 14) * 4 / 12
+            height: Math.max(implicitHeight, markP.implicitHeight)
+            title: "Where it is, across every machine"
+            readonly property var copies: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].copies || [] : []
+            readonly property var allowedHere: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].resolved_copies || [] : []
+            sub: page.cur ? page.cur.name + " · " + (copies.length ? Theme.many(copies.length, "copy", "copies") + " away from home" : "only at home") : "pick something on the left"
+            Column {
+                width: parent.width
+                spacing: 0
+                opacity: page.loading ? 0 : 1
+                readonly property var others: Fleet.machines.map(function (m) { return m.host }).sort()
+                readonly property var admins: page.marks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i && Fleet.byHost[h] === undefined })
+                Repeater {
+                    model: [["ADMIN PCS", parent.admins], ["OTHER MACHINES", parent.others]]
+                    delegate: Column {
+                        required property var modelData
+                        required property int index
+                        visible: modelData[1].length > 0
+                        width: mapP.innerW
+                        spacing: 8
+                        topPadding: index > 0 ? 14 : 0
+                        bottomPadding: 10
+                        Txt { text: modelData[0]; color: Theme.text4; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
+                        Flow {
+                            width: parent.width
+                            spacing: 10
+                            Repeater {
+                                model: parent.parent.modelData[1]
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    readonly property bool home: page.cur !== null && page.cur.host === modelData
+                                    readonly property var cp: mapP.copies.filter(function (c) { return c.host === modelData })[0] || null
+                                    readonly property bool ok: mapP.allowedHere.some(function (c) { return c.host === modelData })
+                                    width: 42; height: 42; radius: 7
+                                    color: home ? Theme.mix(Theme.accent, Theme.surface3, 0.28) : cp ? Theme.mix(Theme.crit, Theme.surface3, 0.28) : ok ? Theme.mix(Theme.ok, Theme.surface3, 0.26) : Theme.surface3
+                                    border.width: cp && page.copy === String(cp.issue_id) ? 1.5 : 0
+                                    border.color: Theme.crit
+                                    Txt { anchors.centerIn: parent; width: parent.width - 4; horizontalAlignment: Text.AlignHCenter; text: modelData.replace(/^WS-[A-Z]+-/, "").replace(/^[A-Z]+-/, ""); mono: true; font.pixelSize: 11
+                                          font.weight: parent.home || parent.cp || parent.ok ? Font.DemiBold : Font.Normal
+                                          color: parent.home ? Theme.accent : parent.cp ? Theme.crit : parent.ok ? Theme.ok : Theme.text3 }
+                                    MouseArea { anchors.fill: parent; cursorShape: parent.cp ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: if (parent.cp) page.copy = String(parent.cp.issue_id) }
+                                    Tip { text: modelData + (parent.home ? " · its home" : parent.cp ? " · a copy" : parent.ok ? " · a copy you allowed" : "") }
+                                }
+                            }
+                        }
+                    }
+                }
+                Row {
+                    spacing: 16
+                    topPadding: 4
+                    Repeater {
+                        model: [["its home", Theme.mix(Theme.accent, Theme.surface3, 0.28)], ["a copy caught", Theme.mix(Theme.crit, Theme.surface3, 0.28)], ["a copy you allowed", Theme.mix(Theme.ok, Theme.surface3, 0.26)]]
+                        delegate: Row { required property var modelData; spacing: 6
+                            Rectangle { width: 11; height: 11; radius: 3; color: modelData[1]; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
+                    }
+                }
+            }
+            Loading { parent: mapP; on: page.loading && page.cur !== null; under: mapP.headerHeight }
+            Pulse { parent: mapP; key: page.loading ? null : page.pickedKey || null }
         }
     }
 
-    Panel {
-        visible: page.cur !== null
+    // --- copies on other machines --------------------------------------------------------------------------
+    Box {
+        objectName: "copiesElsewhere"
         width: parent.width
-        title: page.cur ? "Where it is · " + page.cur.name : ""
-        sub: page.cur ? (page.cur.n ? page.cur.n + " cop" + (page.cur.n === 1 ? "y" : "ies") + " found elsewhere" : "only where it belongs") + " · the same file as on the right" : ""
+        title: "Copies on other machines"
+        sub: page.allCopyRows.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything you restricted is anywhere else"
         Column {
             width: parent.width
-            spacing: 12
-            CopyMap {
-                width: parent.width
-                mark: page.cur
-                copies: page.cur ? page.cur.copies : []
-                picked: page.copy
-                acted: page.acted
-                onPick: function (id) { page.copy = id; page.allowing = false }
-                onChangeKeep: page.cur && page.cur.mid !== undefined ? page.changeKeep() : Msg.warn("This Engine cannot keep a mark to one place")
+            spacing: 4
+            Repeater {
+                model: page.allCopyRows
+                delegate: Rectangle {
+                    id: cr
+                    required property var modelData
+                    readonly property string done: page.acted[modelData.id] || ""
+                    width: parent.width
+                    height: (page.allowingId === modelData.id ? Math.max(trl.height, 24) : Math.max(trl.height, acts.height)) + 16
+                    radius: Theme.radiusLg
+                    color: page.copy === modelData.id ? Theme.surface3 : "transparent"
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { page.sel = cr.modelData.k.id; page.copy = cr.modelData.id } }
+                    Trail {
+                        id: trl
+                        x: 10; y: 8
+                        width: parent.width - 20 - acts.width - 14
+                        opacity: cr.done !== "" ? 0.55 : 1
+                        fromHost: cr.modelData.k.host; fromName: cr.modelData.k.name
+                        how: cr.modelData.c.how || "copied"
+                        toHost: cr.modelData.c.host; toPath: (cr.modelData.c.folder || cr.modelData.c.path || "") + (cr.modelData.c.file ? "\\" + cr.modelData.c.file : "")
+                        hot: cr.done === ""
+                        who: cr.modelData.c.signed_in || "nobody signed in"; whoLine: Time.ago(cr.modelData.c.opened_at)
+                    }
+                    Row {
+                        id: acts
+                        anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+                        Row {
+                            visible: cr.done !== ""; spacing: 6
+                            Icon { name: "check"; size: 12; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { text: cr.done; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                        }
+                        Field { visible: cr.done === "" && page.allowingId === cr.modelData.id; small: true; width: 240; placeholderText: "Why may it stay on " + cr.modelData.c.host + "?"; text: page.why; onTextEdited: page.why = text }
+                        Btn { visible: cr.done === "" && page.allowingId === cr.modelData.id; small: true; text: "Cancel"; onClicked: { page.allowingId = ""; page.why = "" } }
+                        Btn { visible: cr.done === "" && page.allowingId === cr.modelData.id; small: true; kind: "primary"; text: "Allow it"; enabled: page.why.trim() !== ""; onClicked: page.act(cr.modelData, "allow", page.why.trim()) }
+                        Repeater {
+                            model: cr.done !== "" || page.allowingId === cr.modelData.id ? [] : [["ask", "Ask " + (cr.modelData.c.signed_in || "them") + " to delete it", false], ["delete", "Delete the copy", true], ["allow", "Allow it there", false]]
+                            delegate: Btn {
+                                required property var modelData
+                                readonly property var o: page.option(cr.modelData, modelData[0])
+                                small: true; danger: modelData[2]; text: modelData[1]
+                                enabled: o !== null && !o.cannot
+                                tip: o === null ? (modelData[0] === "ask" ? "Nobody is signed in to ask" : "Not offered for this copy") : o.cannot ? o.cannot : ""
+                                onClicked: modelData[0] === "allow" ? (page.allowingId = cr.modelData.id, page.why = "")
+                                         : modelData[0] === "delete" ? confirm.ask({ title: "Delete the copy on " + cr.modelData.c.host + "?", text: "Only " + cr.modelData.c.file + " on " + cr.modelData.c.host + " is deleted. What you restricted is not touched.", ok: "Delete the copy", danger: true },
+                                                                                   function () { page.act(cr.modelData, "delete", "") })
+                                         : page.act(cr.modelData, "ask", "")
+                            }
+                        }
+                    }
+                }
             }
-            Rectangle { width: parent.width; height: 1; color: Theme.border }
-            // the concept's quiet facts under the drawing: the path, when it was marked, and how copies are recognised
-            Row {
-                spacing: 18
-                Txt { text: page.cur ? page.cur.path || "" : ""; mono: true; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                Txt { text: page.cur && page.cur.at ? "Marked " + Time.day(page.cur.at) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                Row { spacing: 4
-                      Icon { name: "info"; size: 12; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
-                      Txt { id: how; text: "How copies are recognised"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
-                            Tip { text: "Matched by content. " + (page.cur && page.cur.versions ? Theme.many(page.cur.versions, "version") + (page.cur.versions === 1 ? " is" : " are") : "Every version is")
-                                        + " remembered, so editing the original never lets an older copy through." } } }
+            Quiet { visible: page.allCopyRows.length === 0; icon: "check"; text: "Nothing you restricted has been found anywhere else." }
+        }
+    }
+
+    // --- allowed copies --------------------------------------------------------------------------------------
+    Box {
+        objectName: "allowedCopies"
+        width: parent.width
+        title: "Allowed copies"
+        sub: "copies found away from home that you let stay, newest first, each with the reason you gave; they are not caught again unless you take it back"
+        Column {
+            width: parent.width
+            spacing: 4
+            Repeater {
+                model: page.allowedRows
+                delegate: Item {
+                    required property var modelData
+                    width: parent.width
+                    height: Math.max(at.height, 24) + 16
+                    Trail {
+                        id: at
+                        x: 10; y: 8
+                        width: parent.width - 20 - tb.width - 14
+                        fromHost: modelData.k.host; fromName: modelData.k.name
+                        how: "allowed" + (modelData.c.allowed_at ? " " + Time.atDay(modelData.c.allowed_at) : "")
+                        toHost: modelData.c.host; toPath: (modelData.c.folder || modelData.c.path || "") + (modelData.c.file ? "\\" + modelData.c.file : "")
+                        who: modelData.c.reason ? "“" + modelData.c.reason + "”" : ""; whoLine: modelData.c.signed_in || ""
+                        whyStyle: true
+                    }
+                    Btn { id: tb; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; small: true; text: "Take it back"; enabled: false; tip: "The Engine cannot take an allowance back yet" }
+                }
             }
+            Quiet { visible: page.allowedRows.length === 0; text: "You have not allowed a copy anywhere else." }
+        }
+    }
+
+    // --- flows carrying what you restricted (rs-fl) ------------------------------------------------------------
+    Box {
+        objectName: "flowsCarrying"
+        width: parent.width
+        title: "Flows carrying what you restricted"
+        sub: "right now; a flow held at something of yours waits for you to allow it, for that flow only"
+        Column {
+            width: parent.width
+            Repeater {
+                model: page.carrying
+                delegate: Item {
+                    required property var modelData
+                    required property int index
+                    width: parent.width
+                    height: Math.max(34, lt.height) + 18
+                    Rectangle { x: 4; width: 34; height: 34; radius: 17; color: Theme.surface3; anchors.verticalCenter: parent.verticalCenter
+                                Icon { anchors.centerIn: parent; name: "branches"; size: 15; color: Theme.text2 } }
+                    Column {
+                        id: lt
+                        x: 50; anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 50 - 150 - 12 - ob.width - 16
+                        spacing: 2
+                        Txt { width: parent.width; textFormat: Text.StyledText; font.pixelSize: 13; text: "<b>" + (modelData.f.name || "flow " + modelData.f.flow_id) + "</b> carries <b>" + modelData.k.name + "</b>" }
+                        Txt { width: parent.width; mono: true; color: Theme.text3; font.pixelSize: 12; text: modelData.k.host + " " + modelData.k.path }
+                    }
+                    Column {
+                        x: parent.width - 150 - 12 - ob.width - 4; width: 150
+                        anchors.verticalCenter: parent.verticalCenter
+                        Txt { width: parent.width; horizontalAlignment: Text.AlignRight; text: "allowed"; font.pixelSize: 12; font.weight: Font.DemiBold }
+                    }
+                    Btn { id: ob; anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; small: true; text: "Open in Flows"
+                          onClicked: Nav.goAsk("flows", null, "Flows opens with this flow picked.", String(modelData.f.flow_id || modelData.f.id)) }
+                    Rectangle { visible: index < page.carrying.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                }
+            }
+            Quiet { visible: page.carrying.length === 0; text: "No flow carries anything you restricted." }
+        }
+    }
+
+    // --- restrict something: a few careful steps, so it has its own page ---------------------------------------
+    Box {
+        objectName: "restrictSomething"
+        width: parent.width
+        accentFoot: true
+        title: "Restrict something"
+        sub: "it stays where it is and you keep using it; a copy anywhere else is caught"
+        GiveSteps {
+            steps: [["Pick what to restrict", "a file or a folder on this PC, found by a search or picked in Explorer"], ["Say where it may be", "only exactly where it is, or anywhere on this PC"], ["Check and restrict", "copies already elsewhere are found and listed straight away"]]
+            act: "Restrict something"
+            onGo: Nav.go("restricted", "mark")
         }
     }
 }

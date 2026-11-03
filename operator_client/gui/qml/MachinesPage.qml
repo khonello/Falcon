@@ -1,188 +1,427 @@
 import QtQuick
 import "."
 
-// MACHINES (an Admin's console): four figures that also filter, the list worst first, the machine
-// picked beside it, and its last 24 hours under both. A click selects; its own page (charts,
-// processes, sessions, files) is reached only by "Open its page →" (docs/design/click-in-place.md).
+// MACHINES, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminMachinesPage): which of my machines needs me,
+// and what do I do on it? The situation in a sentence; one card per machine, serious first, the department a label on each and a
+// filter on the list; a click picks it and draws it on the right (loading in place, then a pulse), Expand opens its details;
+// check-ins this week for every machine; and Add a machine, which only registers it (its department is set on Departments).
 Page {
     id: page
     objectName: "machinesView"
 
-    property string f: ""                 // "" | online | look | current
-    property bool insideOnly: false
-    property string sel: ""
-    property var cpu: ({})
+    property string sel: { var a = Nav.takeArrive("machines"); return a !== null ? String(a) : "" }
+    property string exp: ""
+    property var dept: null
+    property var more: ({ fine: true })
+    property var info: ({})               // machines.list: readings now, address, health note
+    property var got: null                // machines.get for the picked one
+    property var weeks: ({})              // host -> check_ins
+    property var sparks: ({})             // host -> the last 24 hours of CPU, for its card
+    property bool loading: false
+    readonly property int show: 6
 
-    readonly property var all: Fleet.machines.slice().sort(function (a, b) {
-        return Fleet.order[a.status] - Fleet.order[b.status] || a.host.localeCompare(b.host)
-    })
-    readonly property var held: Fleet.machines.filter(function (m) { return m.held !== "" })
-    readonly property int off: Fleet.machines.filter(function (m) { return !m.online }).length
-    readonly property int behind: Fleet.machines.filter(function (m) { return m.behind }).length
-    readonly property int look: Fleet.machines.filter(function (m) { return m.status !== "healthy" }).length
-    readonly property var rows: all.filter(function (m) {
-        var q = list.query.toLowerCase()
-        return (f === "" || (f === "online" ? m.online : f === "look" ? m.status !== "healthy" : !m.behind))
-            && (!insideOnly || m.held !== "")
-            && (m.host + " " + m.user).toLowerCase().indexOf(q) >= 0
-    })
-    readonly property var cur: {
-        for (var i = 0; i < rows.length; i++) if (rows[i].host === sel) return rows[i]
-        return rows.length ? rows[0] : null
-    }
-    // each machine's readings now, its address and what its health is about (machines.list); the one picked over
-    // the top bar's range (machines.get), drawn under the list
-    property var info: ({})
-    property var series: null
+    readonly property var ms: Fleet.machines.filter(function (m) { return page.dept === null || m.dept === page.dept })
+    function serious(m) { return m.online && (m.status === "high" || m.status === "critical") }
+    readonly property var look: ms.filter(serious).sort(function (a, b) { return a.host.localeCompare(b.host) })
+    readonly property var fine: ms.filter(function (m) { return !serious(m) }).sort(function (a, b) { return a.host.localeCompare(b.host) })
+    readonly property var off: ms.filter(function (m) { return !m.online })
+    readonly property var held: ms.filter(function (m) { return m.held !== "" })
+    readonly property var behind: ms.filter(function (m) { return m.behind })
+    readonly property var cur: { for (var i = 0; i < ms.length; i++) if (ms[i].host === sel) return ms[i]; return null }
+    readonly property var curInfo: cur ? info[cur.host] || null : null
+
     function loadInfo() {
         falcon.call("machines.list", {}, function (ok, r) {
-            var m = {}, c = {}
-            if (ok) (r.machines || []).forEach(function (x) { m[x.hostname] = x; if (x.cpu !== null && x.cpu !== undefined) c[x.hostname] = x.cpu })
-            page.info = m; page.cpu = c
+            var m = {}
+            if (ok) (r.machines || []).forEach(function (x) { m[x.hostname] = x })
+            page.info = m
         })
-    }
-    function loadSeries() {
-        series = null
-        if (!cur) return
-        var host = cur.host
-        falcon.call("machines.get", { pc_id: cur.pc_id, range: Nav.range }, function (ok, r) { if (ok && page.cur && page.cur.host === host) page.series = r.series || null })
-    }
-    onCurChanged: loadSeries()
-    Component.onCompleted: loadInfo()
-    Connections { target: Fleet; function onLoadedChanged() { page.loadInfo() } }
-    Connections { target: Nav; function onRangeChanged() { page.loadSeries() } }
-    readonly property var curInfo: cur ? info[cur.host] || null : null
-    function pct(v) { return v === null || v === undefined ? "—" : Math.round(v) + "%" }
-    readonly property var labels: ({ "": "Machines", online: "Online", look: "Need a look", current: "On the current version" })
-
-    Confirm { id: confirm; page: page }
-    function enter(m) {
-        confirm.ask({
-            title: m.held ? "End " + m.held + "'s session and enter " + m.host + "?" : "Enter " + m.host + "?",
-            text: m.held ? m.held + " is in this machine now and is not warned first. " + (m.user || "Nobody") + " stays locked out while you are in."
-                 : m.user ? m.user + " is signed in and is locked out while you are in. You get 30 minutes, and can extend them."
-                 : "No one is signed in. You get 30 minutes, and can extend them.",
-            ok: m.held ? "End and enter" : "Enter", danger: !!m.held
-        }, function () {
-            falcon.call("hierarchy.traverse", { pc_id: m.pc_id, force: true }, function (ok, r) {
-                if (!ok) { Msg.failed(r && r.message ? r.message : "Could not enter"); return }
-                Msg.ok("You are in " + m.host + (m.user ? " · " + m.user + " is locked out" : ""))
+        // check-ins this week, one machine at a time (machines.get carries them)
+        Fleet.machines.slice(0, 60).forEach(function (x) {
+            falcon.call("machines.get", { pc_id: x.pc_id, range: "24h" }, function (ok, r) {
+                if (!ok) return
+                var w = Object.assign({}, page.weeks); w[x.host] = r.check_ins || []; page.weeks = w
+                var s = Object.assign({}, page.sparks); s[x.host] = (r.series && r.series.cpu ? r.series.cpu : []).map(function (p) { return p.v }); page.sparks = s
             })
         })
     }
+    function loadCur() {
+        got = null
+        if (!cur) return
+        var host = cur.host
+        loading = true; ldT.restart()
+        falcon.call("machines.get", { pc_id: cur.pc_id, range: "24h" }, function (ok, r) { if (ok && page.cur && page.cur.host === host) page.got = r })
+    }
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
+    onCurChanged: loadCur()
+    Component.onCompleted: { if (falcon.isConnected) loadInfo(); loadCur() }
+    Connections { target: Fleet; function onLoadedChanged() { page.loadInfo() } }
 
-    PageTabs { options: [{ value: "machines", label: "Machines" }, { value: "registry", label: "Registry" }]; current: "machines" }
-
-    Strip {
-        width: parent.width
-        on: page.f === "" ? null : page.f
-        onPick: function (k) { page.f = k === null ? "" : k }
-        items: [
-            { label: "Machines", value: Theme.fmt(Fleet.machines.length), delta: "in this department" },
-            { key: "online", label: "Online", value: Theme.fmt(Fleet.machines.length - page.off), unit: "/ " + Theme.fmt(Fleet.machines.length),
-              delta: page.off ? Theme.fmt(page.off) + " not checking in" : "every one", dc: page.off ? Theme.crit : undefined },
-            { key: "look", label: "Need a look", value: Theme.fmt(page.look), delta: page.look ? "not healthy, or offline" : "every one is healthy",
-              dc: Fleet.machines.some(function (m) { return m.status === "critical" }) ? Theme.crit : undefined },
-            { key: "current", label: "On the current version", value: Theme.fmt(Fleet.machines.length - page.behind), unit: "/ " + Theme.fmt(Fleet.machines.length),
-              delta: page.behind ? Theme.fmt(page.behind) + " still on an older one" : "every one on " + (Fleet.version || "the current version") }
-        ]
+    function mine(m) { return m.held === Nav.me || m.held === "You" }
+    function pct(v) { return v === null || v === undefined ? "—" : Math.round(v) + "%" }
+    function whatOf(m) {
+        var x = info[m.host] || {}, out = []
+        out.push(!m.online ? "Off, last seen " + (m.seen ? Time.age(m.seen) + " ago" : "a while ago") : "On, " + (m.user ? m.user + " signed in" : "nobody signed in"))
+        if (serious(m) || m.status === "warning") { if (m.note) out.push(m.note.charAt(0).toLowerCase() + m.note.slice(1)) }
+        if (m.held) out.push(page.mine(m) ? "you are inside" : m.held + " is inside")
+        if (m.online && x.cpu >= 90) out.push("CPU at " + Math.round(x.cpu) + "%")
+        if (m.online && x.disk >= 90) out.push("disk " + Math.round(x.disk) + "% full")
+        if (m.behind && !(m.note && /version/.test(m.note))) out.push("one version behind")
+        return out.join(" · ")
     }
 
+    situation: {
+        if (!ms.length) return page.dept !== null ? "There are no machines in " + Fleet.deptName(page.dept) + " yet." : "There are no machines yet."
+        return (look.length ? Theme.fmt(look.length) + (look.length === 1 ? " needs" : " need") + " a look (" + Theme.listNames(look.map(function (m) { return m.host }), 3) + ")" : "Nothing serious is open")
+               + "; " + (off.length ? Theme.fmt(off.length) + " offline" : "all online") + (held.length ? ", " + Theme.fmt(held.length) + " with someone inside" : "")
+               + (behind.length ? ", " + Theme.fmt(behind.length) + " behind on the version" : "") + "."
+    }
+    situationAt: Time.now
+
+    // entering: two Admins are never on one machine at once, and nobody is pushed out (docs/design/v1-it-admin.md)
+    Confirm { id: confirm; page: page }
+    function enter(m) {
+        if (m.held && !mine(m)) {
+            confirm.ask({ title: m.held + " is in " + m.host, text: m.held + " is inside now. Two Admins are never on one machine at once, and nobody is pushed out. Send them a message on Messages, or enter when they have left.", ok: "OK" }, null)
+            return
+        }
+        confirm.ask({ title: "Enter " + m.host + "?", text: m.user ? m.user + " is signed in and cannot use the machine while you are in. You get 30 minutes, and can extend them." : "No one is signed in. You get 30 minutes, and can extend them.", ok: "Enter" },
+                    function () { falcon.call("hierarchy.traverse", { pc_id: m.pc_id }, function (ok, r) {
+                        if (!ok) { Msg.failed(r && r.message ? r.message : "Could not enter"); return }
+                        Msg.ok("You are in " + m.host + (m.user ? " · " + m.user + " cannot use it while you are in" : "")) }) })
+    }
+    KeyDrawer { id: keys; page: page }
+
+    // --- the machines, and the picked one ----------------------------------------------------------------
     Row {
         width: parent.width
         spacing: 14
-        ListPanel {
-            id: list
+        Box {
+            id: listP
+            objectName: "machineCards"
             width: (parent.width - 14) * 8 / 12
-            title: page.labels[page.f]
-            sub: page.f !== "" ? Theme.fmt(page.rows.length) : "worst first · click one to see it on the right"
-            subLink: page.f !== "" ? "every machine" : ""
-            onSubLinkClicked: page.f = ""
-            placeholder: "Filter by machine or person"
-            tools: Segmented {
-                visible: page.held.length > 0
-                options: [{ value: "all", label: "All" }, { value: "in", label: "Someone inside · " + page.held.length }]
-                value: page.insideOnly ? "in" : "all"
-                onPicked: function (v) { page.insideOnly = v === "in" }
+            height: Math.max(implicitHeight, rightCol.implicitHeight)
+            title: "Machines"
+            sub: (page.dept !== null ? Fleet.deptName(page.dept) : "every department") + "; one card per machine, serious first; click one to draw it on the right, expand it for its details"
+            extra: Select {
+                width: 170; small: true
+                value: page.dept === null ? "" : page.dept
+                options: [{ value: "", label: "Every department" }].concat(Fleet.depts.map(function (d) { return { value: d.id, label: d.name } }))
+                onPicked: function (v) { page.dept = v === "" ? null : v; page.sel = ""; page.exp = "" }
             }
-            rows: page.rows
-            rowKey: "host"
-            pick: page.cur ? page.cur.host : null
-            onPicked: function (k) { page.sel = k }
-            icon: "desktop"
-            nameTitle: "Machine"
-            nameMono: true
-            nameText: function (m) { return m.host }
-            nameLine: function (m) { return (m.user || "No one signed in") + (m.held ? " · " + m.held + " inside" : "") }
-            cols: [
-                { title: "Version", width: 90, text: function (m) { return m.ver || "—" } },
-                { title: "CPU", width: 90, text: function (m) { return page.cpu[m.host] !== undefined ? Math.round(page.cpu[m.host]) + "%" : "—" } },
-                { title: "Last seen", width: 110, text: function (m) { return m.online ? "now" : Time.ago(m.seen) } }
-            ]
-            now: function (m) {
-                var k = Fleet.mark(m.status)
-                return [Fleet.words[m.status], k === "crit" || k === "high" || k === "offline" ? "bad" : k === "watch" ? "wait" : "good"]
+            Repeater {
+                model: [["look", "Serious", "something serious is open on it", page.look], ["fine", "Fine", "nothing serious", page.fine]]
+                delegate: Group {
+                    id: grp
+                    required property var modelData
+                    required property int index
+                    visible: modelData[3].length > 0
+                    spaced: index > 0 && page.look.length > 0
+                    width: listP.innerW
+                    title: modelData[1] + " · " + modelData[3].length
+                    sub: modelData[2]
+                    Repeater {
+                        model: page.more[grp.modelData[0]] ? grp.modelData[3] : grp.modelData[3].slice(0, page.show)
+                        delegate: Card {
+                            id: mc
+                            required property var modelData
+                            readonly property var xi: page.info[modelData.host] || {}
+                            objectName: "machine_" + modelData.host
+                            width: grp.cardW
+                            midW: 200
+                            actW: 150
+                            icon: "desktop"
+                            hot: page.serious(modelData)
+                            title: modelData.host
+                            tag: modelData.deptName || "no department"
+                            line: page.whatOf(modelData)
+                            lineHot: page.serious(modelData)
+                            opacity: modelData.online ? 1 : 0.7
+                            picked: page.sel === modelData.host
+                            expandable: true
+                            expanded: page.exp === modelData.host
+                            onOpen: page.sel = modelData.host
+                            onToggle: { page.exp = expanded ? "" : modelData.host; page.sel = modelData.host }
+                            // am-facts: the day's CPU as a line and its reading now, then the version
+                            mid: Row {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 14
+                                Txt { visible: !mc.modelData.online; text: "no data since " + (mc.modelData.seen ? Time.age(mc.modelData.seen) + " ago" : "a while"); color: Theme.text4; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                                Row {
+                                    visible: mc.modelData.online
+                                    spacing: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    Spark { width: 96; height: 22; max: 100; c: page.serious(mc.modelData) ? Theme.crit : Theme.ser6; values: page.sparks[mc.modelData.host] || []; anchors.verticalCenter: parent.verticalCenter }
+                                    Txt { width: Math.max(30, implicitWidth); horizontalAlignment: Text.AlignRight; text: page.pct(mc.xi.cpu); color: Theme.text2; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                                }
+                                Txt { text: mc.modelData.ver || "—"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                            }
+                            // opened: its facts beside who is at the keyboard and when it was entered, then what to do
+                            Column {
+                                width: parent.width
+                                spacing: 10
+                                Row {
+                                    width: parent.width
+                                    spacing: 24
+                                    Column {
+                                        width: Math.min(420, parent.width - 230 - 24)
+                                        y: 2
+                                        Repeater {
+                                            model: [["Signed in", mc.modelData.user || "nobody"], ["Inside", mc.modelData.held ? (page.mine(mc.modelData) ? "you" : mc.modelData.held) : "nobody"],
+                                                    ["Address", mc.xi.ip || "—"], ["Version", mc.modelData.ver + (mc.modelData.behind ? ", one behind" : "")],
+                                                    ["Last seen", mc.modelData.online ? "now" : mc.modelData.seen ? Time.age(mc.modelData.seen) + " ago" : "—"]]
+                                            delegate: Item {
+                                                required property var modelData
+                                                required property int index
+                                                width: parent.width
+                                                height: fv.height + 10
+                                                Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                                Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13 }
+                                                Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                            }
+                                        }
+                                    }
+                                    Column {
+                                        width: 230
+                                        spacing: 6
+                                        readonly property var use: page.got && page.cur && page.cur.host === mc.modelData.host ? page.got.keyboard || null : null
+                                        Txt { topPadding: 4; text: "At the keyboard"; color: Theme.text3; font.pixelSize: 12 }
+                                        Row {
+                                            spacing: 6
+                                            readonly property bool inUse: !!(parent.use && parent.use.active)
+                                            Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: parent.inUse ? Theme.ok : Theme.text4 }
+                                            Txt { font.pixelSize: 13; elide: Text.ElideNone
+                                                  text: !mc.modelData.online ? "offline" : !mc.modelData.user ? "nobody signed in" : parent.inUse ? "in use now" : parent.parent.use && parent.parent.use.idle_minutes ? "idle for " + Time.mins(parent.parent.use.idle_minutes) : "not known yet" }
+                                        }
+                                        Txt { topPadding: 4; text: "Entered"; color: Theme.text3; font.pixelSize: 12 }
+                                        Repeater {
+                                            model: page.got && page.cur && page.cur.host === mc.modelData.host && page.got.sessions ? page.got.sessions.slice(0, 3) : []
+                                            delegate: Item {
+                                                required property var modelData
+                                                required property int index
+                                                width: 230; height: 26
+                                                Txt { anchors.verticalCenter: parent.verticalCenter; text: Time.atDay(modelData.entered_at); font.pixelSize: 13; elide: Text.ElideNone }
+                                                Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                                                      text: modelData.ended_at ? Time.dur((Time.ms(modelData.ended_at) - Time.ms(modelData.entered_at)) / 3600000) : "inside now" }
+                                                Rectangle { visible: index < 2; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                            }
+                                        }
+                                    }
+                                }
+                                Row {
+                                    anchors.right: parent.right
+                                    spacing: 8
+                                    Btn { visible: mc.modelData.behind && mc.modelData.online; small: true; text: "Update now"; enabled: false; tip: "The Engine retries on its own schedule; it cannot be told to now" }
+                                    Btn { small: true; kind: "primary"; text: page.mine(mc.modelData) ? "You are inside" : "Enter"
+                                          enabled: mc.modelData.online && !page.mine(mc.modelData); onClicked: page.enter(mc.modelData) }
+                                    Btn { small: true; kind: "text"; text: "Run an action"; onClicked: Nav.goAsk("actions", null, "Actions opens with " + mc.modelData.host + " picked.", mc.modelData.host) }
+                                    Btn { small: true; kind: "text"; text: "New key"; tip: "Its old key stops working at once"; onClicked: keys.ask({ mode: "rekey", subject: mc.modelData.host, pc_id: mc.modelData.pc_id }) }
+                                }
+                            }
+                        }
+                    }
+                    Txt {
+                        visible: grp.modelData[3].length > page.show
+                        text: page.more[grp.modelData[0]] ? "Show fewer" : "and " + Theme.fmt(grp.modelData[3].length - page.show) + " more"
+                        color: moreA.containsMouse ? Theme.accent : Theme.text3
+                        font.pixelSize: 13
+                        MouseArea { id: moreA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: { var x = Object.assign({}, page.more); x[grp.modelData[0]] = !x[grp.modelData[0]]; page.more = x } }
+                    }
+                }
             }
-            showEmpty: Fleet.loaded && Fleet.machines.length === 0
-            emptyIcon: "desktop"
-            emptyTitle: "No machines in this department"
-            emptyText: "A machine shows up here once it is registered: install Falcon on it and let it in under Registry."
+            Quiet { visible: page.ms.length === 0; text: "No machines yet. Add a machine below; it gets its department on Departments." }
         }
-        SidePanel {
-            id: side
-            width: (parent.width - 14) * 4 / 12
-            readonly property var m: page.cur
-            showEmpty: m === null
-            emptyIcon: "desktop"
-            emptyTitle: "Nothing to show"
-            emptyText: "Pick a machine in the list."
-            title: m ? m.host : ""
-            sub: m && page.sel === m.host ? "the one you picked" : "needs you most · click another"
-            facts: m ? [
-                ["Health", Fleet.words[m.status], m.status === "critical" || m.status === "high" ? Theme.crit : null, false, false, "",
-                 m.status !== "healthy" ? (page.curInfo && page.curInfo.note ? page.curInfo.note : m.note) : ""],
-                ["Signed in", m.user || "No one"],
-                ["Inside it", m.held ? m.held + (m.heldFrom ? ", " + Time.dur((Time.now - Time.ms(m.heldFrom)) / 3600000) : "") : "Nobody else"],
-                ["Version", m.ver || "—", m.behind ? Theme.med : null, true],
-                ["CPU now", page.cpu[m.host] !== undefined ? Math.round(page.cpu[m.host]) + "%" : "—"],
-                ["Disk", page.pct(page.curInfo ? page.curInfo.disk : null)],
-                ["Last seen", m.online ? "now" : Time.ago(m.seen)],
-                ["IP address", page.curInfo && page.curInfo.ip ? page.curInfo.ip : "—", null, true]
-            ] : []
-            actions: [
-                Btn {
-                    text: "Enter session"
-                    // you cannot enter a machine you are already inside
-                    enabled: side.m !== null && side.m.online && !(page.curInfo && page.curInfo.held_by_you)
-                    tip: page.curInfo && page.curInfo.held_by_you ? "You are inside it now" : !side.m || side.m.online ? "" : "It is offline"
 
-                    onClicked: page.enter(page.cur)
-                },
-                Btn { kind: "primary"; text: "Open its page →"; onClicked: Nav.go("machines", page.cur.host) }
-            ]
+        // the picked machine: its health and the last 24 hours, then storage and what is running
+        Column {
+            id: rightCol
+            width: (parent.width - 14) * 4 / 12
+            spacing: 14
+            Box {
+                id: pickP
+                objectName: "machinePicked"
+                width: parent.width
+                title: page.cur ? page.cur.host : "No machine picked"
+                sub: !page.cur ? "click a machine on the left to draw it here"
+                     : (page.cur.user ? page.cur.user + " is signed in" : "nobody signed in") + (page.cur.held ? " · " + (page.mine(page.cur) ? "you are" : page.cur.held + " is") + " inside" : "")
+                St { visible: page.cur !== null; text: page.cur ? Fleet.words[page.cur.online ? page.cur.status : "offline"] : ""; c: page.cur ? (!page.cur.online ? Theme.text4 : page.serious(page.cur) ? Theme.crit : page.cur.status === "warning" ? Theme.med : Theme.ok) : Theme.text4 }
+                Txt {
+                    visible: page.cur !== null && page.got !== null && !!page.got.about
+                    width: parent.width
+                    height: visible ? implicitHeight - 4 : 0
+                    color: Theme.text3
+                    font.pixelSize: 12
+                    text: !page.got || !page.got.about ? "" : [page.got.about.os, page.got.about.memory_total_mb ? Math.round(page.got.about.memory_total_mb / 1024) + " GB memory" : "",
+                          page.got.about.boot_at ? "up " + Time.age(page.got.about.boot_at) : "", page.got.about.registered_at ? "registered " + Time.day(page.got.about.registered_at) : ""].filter(function (s) { return s }).join(" · ")
+                }
+                Quiet { visible: page.cur !== null && !page.cur.online; text: page.cur ? page.cur.host + " has not checked in" + (page.cur.seen ? " for " + Time.age(page.cur.seen) : "") + "; there is nothing new to draw." : "" }
+                Repeater {
+                    model: [["CPU", "cpu", Theme.ser6], ["Memory", "memory", Theme.ser3]]
+                    delegate: Column {
+                        required property var modelData
+                        visible: page.cur === null || page.cur.online
+                        width: parent.width
+                        spacing: 4
+                        readonly property var pts: page.cur && page.got && page.got.series && page.got.series[modelData[1]] ? page.got.series[modelData[1]] : []
+                        Item {
+                            width: parent.width
+                            height: hv.height
+                            Txt { id: hl; y: hv.baselineOffset - baselineOffset; text: modelData[0]; font.pixelSize: 13; elide: Text.ElideNone }
+                            Txt { id: hv; x: hl.implicitWidth + 8; text: parent.parent.pts.length && !page.loading ? Math.round(parent.parent.pts[parent.parent.pts.length - 1].v) + "%" : "—"; font.pixelSize: 15; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                            Txt { x: hv.x + hv.implicitWidth + 8; y: hv.baselineOffset - baselineOffset; text: "last 24 hours"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                        }
+                        TimeChart {
+                            width: parent.width; height: 164
+                            hours: 24; unit: "%"; yMax: 100
+                            series: [{ name: modelData[0], c: modelData[2], pts: parent.pts.map(function (x) { return [Time.ms(x.at), x.v] }) }]
+                        }
+                    }
+                }
+                Loading { parent: pickP; on: page.loading && page.cur !== null; under: pickP.headerHeight; text: page.cur ? "Loading " + page.cur.host : "Loading" }
+                Pulse { parent: pickP; key: page.loading ? null : page.sel || null }
+            }
+            Box {
+                id: runP
+                objectName: "machineRunning"
+                width: parent.width
+                gap: 0
+                readonly property real disk: page.got && page.got.about && page.got.about.disk_percent !== null && page.got.about.disk_percent !== undefined ? page.got.about.disk_percent : -1
+                readonly property real size: page.got && page.got.about && page.got.about.disk_total_gb ? page.got.about.disk_total_gb : 0
+                // storage
+                Column {
+                    width: parent.width
+                    spacing: 8
+                    Item {
+                        width: parent.width
+                        height: sv.height
+                        Txt { id: sl; y: sv.baselineOffset - baselineOffset; text: "Storage"; font.pixelSize: 13; elide: Text.ElideNone }
+                        Txt { id: sv; x: sl.implicitWidth + 8; text: page.cur && runP.disk >= 0 && !page.loading ? Math.round(runP.disk) + "%" : "—"; font.pixelSize: 15; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                        Txt { visible: page.cur !== null; x: sv.x + sv.implicitWidth + 8; y: sv.baselineOffset - baselineOffset; text: "used, drive C:"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                    }
+                    Rectangle {
+                        width: parent.width; height: 8; radius: 4; color: Theme.grid
+                        Rectangle { width: parent.width * Math.max(0, page.cur ? runP.disk : 0) / 100; height: parent.height; radius: 4
+                                    color: runP.disk >= 90 ? Theme.crit : Theme.mix(Theme.ser1, Theme.surface, 0.8) }
+                    }
+                    Item {
+                        visible: page.cur !== null && runP.size > 0 && runP.disk >= 0
+                        width: parent.width
+                        height: visible ? su.height : 0
+                        Txt { id: su; textFormat: Text.StyledText; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone
+                              text: "<b><font color='" + Theme.text2 + "'>" + Math.round(runP.size * runP.disk / 100) + " GB</font></b> used" }
+                        Txt { anchors.right: parent.right; textFormat: Text.StyledText; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone
+                              text: "<b><font color='" + Theme.text2 + "'>" + Math.round(runP.size * (1 - runP.disk / 100)) + " GB</font></b> free of " + Math.round(runP.size) + " GB" }
+                    }
+                }
+                // running now: a second section under a rule
+                Column {
+                    visible: page.cur === null || page.cur.online
+                    width: parent.width
+                    spacing: 8
+                    topPadding: 14
+                    Rectangle { width: parent.width; height: 1; color: Theme.border }
+                    Item {
+                        width: parent.width
+                        height: rl.height + 6
+                        Txt { id: rl; y: 6; text: "Running now"; font.pixelSize: 13; elide: Text.ElideNone }
+                        Txt { x: rl.implicitWidth + 8; y: rl.y; text: page.cur ? "the busiest programs; point at one to end it" : "the most busy programs"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                    }
+                    Txt { visible: !page.cur; text: "Shown for the machine you pick."; color: Theme.text3; font.pixelSize: 13 }
+                    Column {
+                        visible: page.cur !== null
+                        width: parent.width
+                        readonly property var rows: page.got && page.got.processes && page.got.processes.items ? page.got.processes.items.slice().sort(function (a, b) { return (b.cpu || 0) - (a.cpu || 0) }).slice(0, 7) : []
+                        Item {
+                            width: parent.width; height: 22
+                            Txt { text: "Program"; color: Theme.text4; font.pixelSize: 12 }
+                            Txt { x: parent.width - 44 - 8 - 60 - 8 - 44; width: 44; horizontalAlignment: Text.AlignRight; text: "CPU"; color: Theme.text4; font.pixelSize: 12 }
+                            Txt { x: parent.width - 44 - 8 - 60; width: 60; horizontalAlignment: Text.AlignRight; text: "Memory"; color: Theme.text4; font.pixelSize: 12 }
+                        }
+                        Repeater {
+                            model: parent.rows
+                            delegate: Item {
+                                required property var modelData
+                                required property int index
+                                width: parent.width; height: 29
+                                MouseArea { id: pr; anchors.fill: parent; hoverEnabled: true }
+                                Txt { width: parent.width - 44 - 8 - 60 - 8 - 44 - 8; anchors.verticalCenter: parent.verticalCenter; text: modelData.name; mono: true; font.pixelSize: 13 }
+                                Txt { x: parent.width - 44 - 8 - 60 - 8 - 44; width: 44; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; text: (modelData.cpu || 0).toFixed(0) + "%"; font.pixelSize: 13; elide: Text.ElideNone }
+                                Txt { x: parent.width - 44 - 8 - 60; width: 60; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                                      text: modelData.memory_mb >= 1000 ? (modelData.memory_mb / 1000).toFixed(1) + " GB" : modelData.memory_mb + " MB" }
+                                Btn { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "text"; danger: true; text: "End"; opacity: pr.containsMouse || hovered ? 1 : 0
+                                      enabled: false; tip: "The Engine cannot end one program from here yet" }
+                                Rectangle { visible: index < parent.parent.rows.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                            }
+                        }
+                        Txt { visible: parent.rows.length === 0; text: "Nothing reported yet."; color: Theme.text3; font.pixelSize: 13 }
+                    }
+                }
+                Loading { parent: runP; on: page.loading && page.cur !== null; under: 14; text: page.cur ? "Loading " + page.cur.host : "Loading" }
+                Pulse { parent: runP; key: page.loading ? null : page.sel || null }
+            }
         }
     }
 
-    Panel {
-        id: mchart
-        visible: page.cur !== null
+    // --- check-ins this week (am-wk: the host, a column a day, the count) ------------------------------------------
+    Box {
+        objectName: "checkIns"
         width: parent.width
-        title: page.cur ? page.cur.host + " · the last " + ({ "1h": "hour", "6h": "6 hours", "24h": "24 hours", "7d": "7 days" })[Nav.range] : ""
-        sub: "CPU shaded, memory as the purple line · the same machine as on the right"
-        readonly property var cpuPts: page.series && page.series.cpu ? page.series.cpu.map(function (x) { return [Time.ms(x.at), x.v] }) : []
-        readonly property var memPts: page.series && page.series.memory ? page.series.memory.map(function (x) { return [Time.ms(x.at), x.v] }) : []
-        TimeChart {
-            visible: mchart.cpuPts.length > 1 || mchart.memPts.length > 1
-            width: parent.width; height: 160; unit: "%"; yMax: 100
-            series: [{ name: "CPU", c: Theme.ser6, pts: mchart.cpuPts }, { name: "Memory", c: Theme.ser3, pts: mchart.memPts }]
-        }
-        Empty {
-            visible: mchart.cpuPts.length <= 1 && mchart.memPts.length <= 1
+        title: "Check-ins this week"
+        sub: "a check-in is the machine's worker reaching the Engine: the PC is on and connected, whether or not anyone is signed in to it"
+        Column {
+            id: wk
             width: parent.width
-            h: 170
-            icon: "linechart"
-            title: "Nothing reported over this range yet"
-            text: "A machine reports its readings while its Worker runs. Its readings right now are on the right."
+            readonly property var days: { var w = page.weeks[Object.keys(page.weeks)[0]] || []; return w.map(function (d) { return d.day }) }
+            readonly property real dayW: (width - 12 - 76 - 12 - 96 - 12 - 12 * Math.max(0, days.length - 1)) / Math.max(1, days.length)
+            Item {
+                width: parent.width; height: 20
+                Repeater {
+                    model: wk.days
+                    delegate: Txt { required property var modelData; required property int index; x: 6 + 76 + 12 + index * (wk.dayW + 12); width: wk.dayW; y: 0
+                                    text: index === wk.days.length - 1 ? "Today" : Time.dayName(modelData); color: Theme.text4; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter }
+                }
+            }
+            Repeater {
+                model: page.ms.slice().sort(function (a, b) { return a.host.localeCompare(b.host) })
+                delegate: Rectangle {
+                    required property var modelData
+                    required property int index
+                    readonly property var w: page.weeks[modelData.host] || []
+                    width: parent.width; height: 33
+                    color: page.sel === modelData.host || wa.containsMouse ? Theme.surface2 : "transparent"
+                    MouseArea { id: wa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.host }
+                    Txt { x: 6; width: 76; anchors.verticalCenter: parent.verticalCenter; text: modelData.host; mono: true; font.pixelSize: 13 }
+                    Repeater {
+                        model: parent.w
+                        delegate: Item {
+                            required property var modelData
+                            required property int index
+                            x: 6 + 76 + 12 + index * (wk.dayW + 12)
+                            width: wk.dayW; height: 33
+                            Icon { anchors.centerIn: parent; name: modelData.yes ? "check" : "close"; size: 12; color: modelData.yes ? Theme.text2 : Theme.text4 }
+                        }
+                    }
+                    Txt { anchors.right: parent.right; anchors.rightMargin: 6; width: 96; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                          text: parent.w.length ? Theme.fmt(parent.w.filter(function (d) { return d.yes }).length) + " of " + parent.w.length + " days" : "—" }
+                    Rectangle { visible: index < page.ms.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                }
+            }
+        }
+    }
+
+    // --- add a machine: it only registers; its department is set on Departments ----------------------------------
+    Box {
+        objectName: "addMachine"
+        width: parent.width
+        accentFoot: true
+        title: "Add a machine"
+        sub: "a PC joins in three steps, and gets its department on Departments; nothing connects without the key made here"
+        GiveSteps {
+            steps: [["Pick or name the PC", "PCs already found on the network, or trying to connect, are offered"], ["Copy its key", "it is made for this PC and shown once"], ["Give the key to its worker", "in the Worker Client settings; it checks in from then on"]]
+            act: "Add a machine"
+            onGo: keys.ask({ mode: "pc" })
         }
     }
 }

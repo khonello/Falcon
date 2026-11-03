@@ -1,325 +1,347 @@
 import QtQuick
 import "."
 
-// AN ADMIN'S OVERVIEW (the concept's Overview): four figures, the fleet and the open issues side by
-// side, event volume with the live stream beside it, and the department underneath. An open issue
-// opens in place under its row; only "Open in Issues →" leaves the page.
+// THE ADMIN'S OVERVIEW, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminOverviewPage): the situation
+// in a sentence; Do first, one card per thing with its action on the line, beside your to-dos; the machines as tiles beside
+// what has stopped running; today's hours with Now in the middle beside the live activity; and one sentence to do something.
+// Every card that opens another page asks first and arrives with the thing picked (Nav.goAsk).
 Page {
     id: page
     objectName: "overviewView"
 
-    property string by: "Status"
-    property var cpu: ({})
-    property string openIssue: ""
-    property var audit: []
-    property var kinds: Kinds.keys
-    property var brush: null
+    readonly property int gap: 14
+    property var tasks: []          // every open task, with `verify` true when every target is found
+    property var todos: []
+    property var flows: []
+    property var rules: []
+    property var cal: []
     property var live: []
     property string lastPush: ""
-    property var tasks: []
+    property int dp: 0              // Do first's page
+    property string dv: "run"       // Do something: the verb
+    property var dt: null           // and its target
 
     function load() {
-        Kinds.load({ limit: 500 }, function (es0) {
-            var es = es0.filter(function (e) { return e.t !== null })
-            page.audit = es
-            page.live = es.slice(0, 14)
-        })
-        falcon.call("overview.admin", {}, function (ok, r) {
-            if (ok && r && r.waiting) { page.suggestions = r.waiting.suggestions || 0; page.toAllow = r.waiting.flows_to_allow || 0 }
-        })
+        Kinds.load({ limit: 60 }, function (es) { page.live = es.filter(function (e) { return e.t !== null }).slice(0, 14) })
+        falcon.call("todo.list", {}, function (ok, r) { page.todos = ok ? (r.todos || []).filter(function (t) { return !t.done }) : [] })
+        falcon.call("flow.list", {}, function (ok, r) { page.flows = ok ? (r.flows || []) : [] })
+        falcon.call("automation.board", {}, function (ok, r) { page.rules = ok ? (r.rules || []) : [] })
+        falcon.call("calendar.board", { days: 2 }, function (ok, r) { page.cal = ok ? (r.items || []) : [] })
         falcon.call("task.list", {}, function (ok, r) {
-            page.tasks = ok ? (r.tasks || []) : []
+            var open = ok ? (r.tasks || []).filter(function (t) { return t.status !== "completed" }) : []
+            page.tasks = open
             // a task is handed in when every target is found: it waits on the person who gave it (as on Tasks)
-            page.toVerify = 0
-            page.tasks.filter(function (t) { return t.status !== "completed" }).slice(0, 50).forEach(function (t) {
+            open.slice(0, 50).forEach(function (t) {
                 falcon.call("task.get", { task_id: t.id }, function (ok2, r2) {
                     var its = ok2 && r2.items ? r2.items : []
-                    if (its.length && its.every(function (i) { return i.status === "passed" })) page.toVerify += 1
+                    if (its.length && its.every(function (i) { return i.status === "passed" }))
+                        page.tasks = page.tasks.map(function (x) { return x.id === t.id ? Object.assign({ verify: true }, x) : x })
                 })
             })
         })
     }
-    // CPU right now, for the CPU view: each machine's last report
-    function loadCpu() {
-        var ms = Fleet.machines.filter(function (m) { return m.online }).slice(0, 120)
-        ms.forEach(function (m) {
-            falcon.call("hierarchy.pc_state", { pc_id: m.pc_id }, function (ok, r) {
-                if (!ok || !r.levels) return
-                var c = Object.assign({}, page.cpu); c[m.host] = r.levels.cpu; page.cpu = c
-            })
-        })
-    }
-    onByChanged: if (by === "CPU") loadCpu()
     Component.onCompleted: if (falcon.isConnected) load()
     Connections {
         target: falcon
         function onConnected() { page.load() }
-        function onPushReceived(type, payload) { page.lastPush = type }
+        function onPushReceived(type, payload) {
+            page.lastPush = type
+            if (type === "todo.changed") falcon.call("todo.list", {}, function (ok, r) { page.todos = ok ? (r.todos || []).filter(function (t) { return !t.done }) : [] })
+        }
         function onPushText(line, alert) {
-            page.live = [{ t: Date.now(), kind: Kinds.of(page.lastPush), actor: "", what: line, host: "", fresh: true }].concat(page.live).slice(0, 40)
+            page.live = [{ t: Date.now(), kind: Kinds.of(page.lastPush), actor: "", what: line, host: "", fresh: true }].concat(page.live).slice(0, 30)
         }
     }
-    onBrushChanged: if (brush === null) return
-    Connections { target: Nav; function onRangeChanged() { page.brush = null } }
 
-    readonly property int gap: 14
+    // --- what the page reads ------------------------------------------------------------------------
     readonly property var ms: Fleet.machines
     readonly property var off: ms.filter(function (m) { return !m.online })
-    readonly property var held: ms.filter(function (m) { return m.held !== "" })
-    readonly property var iss: Fleet.issues
-    property int toVerify: 0
-    property int suggestions: 0       // what Detective suggests for this department's machines
-    property int toAllow: 0           // flows waiting for this Admin to say a restricted thing may be carried
-    // what waits in Messages: the menu's count (people who pinged, and conversations where it is your turn)
-    readonly property int pings: Nav.counts.messages ? Nav.counts.messages.n : 0
-    readonly property real since: Time.now - Time.rangeHours(Nav.range) * 3600000
-    readonly property var inRange: audit.filter(function (e) { return e.t >= since })
-    readonly property bool all: kinds.length === Kinds.keys.length
-    readonly property var picked: inRange.filter(function (e) { return kinds.indexOf(e.kind) >= 0 && (!brush || (e.t >= brush[0] && e.t < brush[1])) })
-    function toggleKind(k) {
-        kinds = all ? [k] : kinds.indexOf(k) >= 0 ? (kinds.length === 1 ? Kinds.keys : kinds.filter(function (x) { return x !== k })) : kinds.concat([k])
-    }
+    readonly property var lag: ms.filter(function (m) { return m.online && (m.status === "high" || m.status === "critical") })
+    readonly property var inside: ms.filter(function (m) { return m.held !== "" })
+    readonly property var urgent: Fleet.issues.filter(function (i) { return i.sev === "critical" || i.past })
+    readonly property var rest: Fleet.issues.filter(function (i) { return !(i.sev === "critical" || i.past) })
+    readonly property var verify: tasks.filter(function (t) { return t.verify })
 
-    // --- the four figures --------------------------------------------------------------------------
+    // one card per issue, as on Issues; kinds take turns, so Do first is not one kind five times. A button that names an
+    // action does it here, after a confirm (the user, 2 Nov 2026); one that needs a judgement says Look and opens its page.
+    // Delete copy is offered only where the Engine can reach the machine, as on Issues.
+    function quick(i) {
+        var m = Fleet.byHost[i.host]
+        if (i.type === "file" && i.iid !== undefined && m && m.online)
+            return { act: "Delete copy", ask: { title: "Delete the copy on " + i.host + "?", text: "Deletes " + (i.subject || "the copy") + " from " + i.host + " only. The original is not touched.", ok: "Delete copy", danger: true },
+                     run: function (done) { falcon.call("issues.act", { issue_id: i.iid, key: "delete" }, done) }, said: "Deleting the copy on " + i.host }
+        return null
+    }
+    readonly property var iconOf: ({ file: "fileprotect", update: "cloudupload", deviation: "warn", help: "message", flow: "branches" })
+    function issueItems(xs, hot) {
+        var ks = [], out = []
+        xs.forEach(function (i) { var g = ks.filter(function (k) { return k[0] === i.type })[0]; if (g) g[1].push(i); else ks.push([i.type, [i]]) })
+        for (var r = 0; ks.some(function (k) { return k[1].length > r }); r++)
+            ks.forEach(function (k) {
+                var i = k[1][r]; if (!i) return
+                var q = page.quick(i)
+                out.push({ k: "i" + i.id, ic: page.iconOf[i.type] || "alert", hot: hot, t: i.subject || i.title, s: i.title + " · " + i.host,
+                           n: hot ? (i.past ? Time.age(i.at) + ", past its time" : "critical") : Time.age(i.at) + " old",
+                           act: q ? q.act : "Look", quick: q, go: ["issues", "Issues opens with “" + (i.subject || i.title) + "” on " + i.host + " picked.", i.id] })
+            })
+        return out
+    }
+    readonly property var items: {
+        var srcs = [issueItems(urgent, true),
+                    verify.filter(function (t) { return t.assigner_account_id === falcon.accountId })
+                          .map(function (t) { return { k: "t" + t.id, ic: "checksquare", hot: false, t: t.title, s: "Task · " + (t.assignee_name || "") + (t.hostname ? " on " + t.hostname : ""),
+                                                       n: "every target found; only you can close it", act: "Close it",
+                                                       quick: { ask: { title: "Close “" + t.title + "”?", text: "Every target was found. Closing it marks the task complete and tells " + (t.assignee_name || "the person it was for") + ".", ok: "Close it" },
+                                                                run: function (done) { falcon.call("task.verify", { task_id: t.id, outcome: "complete" }, done) }, said: "Closed “" + t.title + "”" },
+                                                       go: ["tasks", "Tasks opens with “" + t.title + "” picked.", t.id] } }),
+                    issueItems(rest, false)]
+        var out = []
+        for (var r = 0; srcs.some(function (x) { return x.length > r }); r++) srcs.forEach(function (x) { if (x[r]) out.push(x[r]) })
+        return out
+    }
+    readonly property int show: 5
+    readonly property int dpages: Math.max(1, Math.ceil(items.length / show))
+    readonly property int dpi: Math.min(dp, dpages - 1)
+
+    // what stopped running: flows that are not running cleanly, automations whose last run went wrong
+    // a flow is named as Flows names it: its source folder and number, unless it was given a name
+    function flowName(f) { return f.name || (String(f.source_path || "").split(/[\/]/).filter(function (x) { return x }).pop() || "flow") + "-" + f.id }
+    function flowState(f) {
+        if (f.consent_status === "pending") return (f.destinations || []).some(function (d) { return d.let_them_choose }) ? "waits for an Admin to pick a folder" : "waits for an Admin to agree"
+        if (f.pause_reason === "restricted:consent") return "paused · a restricted file needs its owner's consent"
+        if (f.status === "paused") return "paused"
+        if ((f.destinations || []).some(function (d) { return !!d.paused_reason })) return "one destination paused"
+        return ""
+    }
+    readonly property var flowsOff: flows.filter(function (f) { return f.status !== "inactive" && flowState(f) !== "" })
+    readonly property var flowsOn: flows.filter(function (f) { return f.status !== "inactive" && flowState(f) === "" })
+    readonly property var rulesOff: rules.filter(function (r) { return r.on && r.last_run_problem })
+    readonly property var rulesOn: rules.filter(function (r) { return r.on && !r.last_run_problem })
+
+    situation: {
+        var n = Math.min(items.length, show)
+        var s = items.length ? Theme.many(n, "thing") + " to do first" + (urgent.length ? "; " + Theme.many(urgent.length, "issue") + (urgent.length === 1 ? " is past its time or critical" : " are past their time or critical") : "")
+                             : "Nothing needs you right now"
+        s += "."
+        if (off.length) s += " " + Theme.listNames(off.map(function (m) { return m.host }), 2) + (off.length === 1 ? " is" : " are") + " offline."
+        var bad = flowsOff.length + rulesOff.length
+        if (bad) s += " " + Theme.fmt(bad) + " of your flows and automations " + (bad === 1 ? "is" : "are") + " not running cleanly."
+        return s
+    }
+    situationAt: Time.now
+    sub: "Every department · " + Theme.many(ms.length, "machine") + " · as " + Nav.me + " sees it"
+
+    // --- Do first, and your to-dos (c-84: 8 to 4, the two the same height) ------------------------------
     Row {
         width: parent.width
         spacing: page.gap
-        readonly property real cw: (width - 3 * spacing) / 4
-        Kpi {
-            width: parent.cw
-            label: "Waiting on you"
-            none: page.ms.length === 0
-            noneValue: "0"; noneText: "Nothing waiting"
-            readonly property int n: page.toVerify + page.iss.length + page.pings + page.suggestions + page.toAllow
-            value: Theme.fmt(n)
-            delta: n ? page.toVerify + " to verify · " + page.iss.length + " issue" + (page.iss.length === 1 ? "" : "s") + " · " + page.pings + " message" + (page.pings === 1 ? "" : "s")
-                       + (page.suggestions ? " · " + page.suggestions + " suggestion" + (page.suggestions === 1 ? "" : "s") : "") + (page.toAllow ? " · " + page.toAllow + " flow" + (page.toAllow === 1 ? "" : "s") + " to allow" : "") : "Nothing waiting on you"
-            dc: n ? Theme.crit : Theme.text3
-        }
-        Kpi {
-            width: parent.cw
-            label: "Machines online"
-            none: page.ms.length === 0
-            noneValue: "0"; noneText: "No machines yet"
-            value: String(page.ms.length - page.off.length)
-            unit: "/ " + page.ms.length
-            delta: page.off.length ? (page.off.length === 1 ? page.off[0].host + " offline" + (page.off[0].seen ? " since " + Time.at(page.off[0].seen) : "") : page.off.length + " offline") : "All online"
-            dc: page.off.length ? Theme.crit : Theme.text3
-        }
-        Kpi {
-            width: parent.cw
-            label: "Open issues"
-            none: page.ms.length === 0
-            noneValue: "0"; noneText: "Nothing open"
-            value: String(page.iss.length)
-            delta: page.iss.length ? ["critical", "high"].map(function (k) { return page.iss.filter(function (x) { return x.sev === k }).length + " " + k }).join(" · ") : "Nothing open"
-            dc: page.iss.some(function (x) { return x.sev === "critical" }) ? Theme.crit : Theme.text3
-        }
-        Kpi {
-            width: parent.cw
-            label: "Sessions held now"
-            none: page.ms.length === 0
-            noneValue: "0"; noneText: "Nobody is inside a machine"
-            value: String(page.held.length)
-            delta: page.held.length ? "Longest: " + page.held[0].held + " on " + page.held[0].host
-                                      + (page.held[0].heldFrom ? ", " + Time.dur((Time.now - Time.ms(page.held[0].heldFrom)) / 3600000) : "")
-                                    : "Nobody is inside a machine"
-        }
-    }
-
-    // --- the fleet, and the open issues --------------------------------------------------------------
-    Row {
-        width: parent.width
-        spacing: page.gap
-        readonly property real h: Math.max(fleetP.implicitHeight, issuesP.implicitHeight)
-        Panel {
-            id: fleetP
-            width: (parent.width - page.gap) * 7 / 12
-            height: parent.h
-            title: "Fleet"
-            sub: Theme.many(page.ms.length, "machine") + ", " + Theme.many(Fleet.depts.length, "department")
-            extra: Segmented { options: ["Status", "CPU", "Version", "Check-in"]; value: page.by; onPicked: function (v) { page.by = v } }
-            HostMap {
-                width: parent.width
-                by: page.by
-                cpu: page.cpu
-                onOpen: function (h) { Nav.go("machines", h) }
-                onMore: Nav.go("machines")
-            }
-        }
-        Panel {
-            id: issuesP
-            width: (parent.width - page.gap) * 5 / 12
-            height: parent.h
-            flush: true
-            title: "Open issues"
-            sub: "by severity · click one to see it here"
-            extra: Btn { small: true; kind: "link"; text: "All issues →"; onClicked: Nav.go("issues") }
-            Column {
-                width: parent.width
-                Empty {
-                    visible: page.iss.length === 0
-                    width: parent.width
-                    icon: "check"
-                    title: "Nothing open"
-                    text: "Violations, unanswered messages, deviations and stuck updates appear here, worst first."
-                }
-                Repeater {
-                    model: page.iss.slice(0, 8)
-                    delegate: Column {
-                        required property var modelData
-                        readonly property bool on: page.openIssue === modelData.id
-                        width: parent.width
-                        Rectangle {
-                            width: parent.width
-                            height: 50
-                            color: on ? Theme.accentSoft : ia.containsMouse ? Theme.surface2 : "transparent"
-                            Rectangle { x: 14; y: 13; width: 8; height: 8; radius: 2; color: Fleet.sevColor(modelData.sev) }
-                            Column {
-                                x: 32
-                                width: parent.width - 32 - 160
-                                anchors.verticalCenter: parent.verticalCenter
-                                Txt { text: modelData.title; width: parent.width }
-                                Txt { text: modelData.subject || ""; mono: true; color: Theme.text3; font.pixelSize: 11; width: parent.width }
-                            }
-                            Txt { x: parent.width - 150; width: 76; anchors.verticalCenter: parent.verticalCenter; text: modelData.host; mono: true; color: Theme.text3 }
-                            Txt {
-                                x: parent.width - 74; width: 60
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                mono: true
-                                text: modelData.at ? Time.age(modelData.at) : "—"
-                                color: Theme.text3
-                            }
-                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                            MouseArea { id: ia; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                        onClicked: page.openIssue = on ? "" : modelData.id }
-                        }
-                        Rectangle {
-                            visible: on
-                            width: parent.width
-                            height: visible ? exp.height + 20 : 0
-                            color: Theme.surface2
-                            Column {
-                                id: exp
-                                x: 32; y: 8
-                                width: parent.width - 46
-                                spacing: 3
-                                Txt { width: parent.width; color: Theme.text2; font.pixelSize: 12
-                                      text: Fleet.typeLabel[modelData.type] + " · " + Fleet.sevWord(modelData.sev) + " · " + modelData.note }
-                                Link { text: "Open in Issues →"; font.pixelSize: 12; onClicked: Nav.go("issues", modelData.id) }
-                            }
-                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                        }
-                    }
-                }
-                Item {
-                    visible: page.iss.length > 8
-                    width: parent.width; height: 38
-                    More { x: 14; anchors.verticalCenter: parent.verticalCenter; n: page.iss.length - 8; what: "in Issues →"; onClicked: Nav.go("issues") }
-                }
-            }
-        }
-    }
-
-    // --- event volume, and the live stream ------------------------------------------------------------
-    Row {
-        width: parent.width
-        spacing: page.gap
-        readonly property real h: Math.max(evP.implicitHeight, liveP.implicitHeight)
-        Panel {
-            id: evP
+        readonly property real h: Math.max(doP.implicitHeight, todoP.implicitHeight)
+        Box {
+            id: doP
+            objectName: "doFirst"
             width: (parent.width - page.gap) * 8 / 12
             height: parent.h
-            title: "Event volume"
-            sub: Theme.fmt(page.picked.length) + " events · " + (page.brush ? Time.hhmm(page.brush[0]) + " – " + Time.hhmm(page.brush[1]) : Nav.range)
-            extra: [
-                Btn { visible: !page.all || page.brush !== null; small: true; kind: "text"; text: "Clear"; onClicked: { page.kinds = Kinds.keys; page.brush = null } },
-                Btn { small: true; text: "Show in audit log"; iconName: "arrowr"
-                      onClicked: { Nav.preset = { page: "audit", kinds: page.kinds, brush: page.brush }; Nav.go("audit") } }
-            ]
+            title: "Do first"
+            sub: Theme.many(page.items.length, "thing") + ", the most pressing first, from every page; each with its action on the line"
             Column {
                 width: parent.width
-                spacing: 10
-                Flow {
-                    width: parent.width
-                    spacing: 6
-                    Repeater {
-                        model: Kinds.keys.filter(function (k) { return Kinds.keys.indexOf(k) < 7 || page.audit.some(function (e) { return e.kind === k }) })
-                        delegate: Rectangle {
-                            required property var modelData
-                            readonly property bool on: page.kinds.indexOf(modelData) >= 0
-                            width: chip.implicitWidth + 18
-                            height: 24
-                            radius: 12
-                            color: on ? Theme.surface : "transparent"
-                            border.width: 1
-                            border.color: ca.containsMouse ? Theme.borderStrong : Theme.border
-                            Row {
-                                id: chip
-                                anchors.centerIn: parent
-                                spacing: 6
-                                Rectangle { width: 8; height: 8; radius: 2; color: Kinds.color(modelData); opacity: on ? 1 : 0.3; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: Kinds.words[modelData]; font.pixelSize: 12; color: on ? Theme.text2 : Theme.text4; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: Theme.fmt(page.inRange.filter(function (e) { return e.kind === modelData }).length); mono: true; font.pixelSize: 11; color: Theme.text3; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
-                            }
-                            MouseArea { id: ca; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.toggleKind(modelData) }
-                        }
+                spacing: 6
+                Repeater {
+                    model: page.items.slice(page.dpi * page.show, page.dpi * page.show + page.show)
+                    delegate: Card {
+                        required property var modelData
+                        width: parent.width
+                        midW: 220
+                        icon: modelData.ic
+                        hot: modelData.hot
+                        title: modelData.t
+                        line: modelData.s
+                        note: modelData.n
+                        act: modelData.act
+                        actDoes: !!modelData.quick
+                        onOpen: Nav.goAsk(modelData.go[0], null, modelData.go[1], modelData.go[2])
+                        onActed: page.doQuick(modelData.quick)
                     }
-                    Txt { visible: !page.brush; text: "drag across the chart to pick a time"; color: Theme.text4; font.pixelSize: 11; height: 24; elide: Text.ElideNone }
-                }
-                EventHistogram {
-                    visible: page.inRange.length > 0
-                    width: parent.width
-                    height: 170
-                    entries: page.audit
-                    kinds: page.kinds
-                    range: Nav.range
-                    brush: page.brush
-                    onBrushed: function (b) { page.brush = b }
-                }
-                Empty {
-                    visible: page.inRange.length === 0
-                    width: parent.width
-                    h: 170
-                    icon: "barchart"
-                    title: "No events in this period"
-                    text: "Everything the system records lands here: sessions, actions, flows, messages, updates, deviations and violations."
                 }
             }
+            StepPager {
+                visible: page.dpages > 1
+                width: parent.width
+                from: page.dpi * page.show + 1
+                to: Math.min(page.items.length, page.dpi * page.show + page.show)
+                total: page.items.length
+                pageNo: page.dpi
+                pages: page.dpages
+                onStep: function (d) { page.dp = page.dpi + d }
+            }
+            Quiet { visible: page.items.length === 0; icon: "check"; text: "Nothing needs you right now." }
         }
-        Panel {
+        Box {
+            id: todoP
+            objectName: "yourTodos"
+            width: (parent.width - page.gap) * 4 / 12
+            height: parent.h
+            title: "Your to-dos · " + page.todos.length
+            readonly property int late: page.todos.filter(function (t) { return t.overdue }).length
+            sub: (late ? Theme.fmt(late) + " past its date; " : "") + "the soonest first; only you see them"
+            Repeater {
+                model: page.todos.slice().sort(function (a, b) { return (Time.ms(a.due_at) || 9e15) - (Time.ms(b.due_at) || 9e15) }).slice(0, 4)
+                delegate: SuRow {
+                    required property var modelData
+                    icon: "square"
+                    title: modelData.text
+                    line: modelData.due_at ? "due " + Time.atDay(modelData.due_at) + (modelData.overdue ? ", past its date" : "") : "no date"
+                    lineHot: !!modelData.overdue
+                    act: "Done"
+                    onActed: falcon.call("todo.done", { todo_id: modelData.id, done: true }, function (ok, r) {
+                        if (!ok) { Msg.failed(r.message || "Could not tick it off"); return }
+                        Msg.ok("Done: " + modelData.text); page.todos = page.todos.filter(function (t) { return t.id !== modelData.id })
+                    })
+                }
+            }
+            Quiet { visible: page.todos.length === 0; icon: "check"; text: "Nothing to remember." }
+            Txt { visible: page.todos.length > 4; text: "and " + Theme.fmt(page.todos.length - 4) + " more on Tasks"; color: Theme.text3; font.pixelSize: 12 }
+        }
+    }
+
+    // --- the machines, and what stopped running ------------------------------------------------------
+    Row {
+        width: parent.width
+        spacing: page.gap
+        readonly property real h: Math.max(mP.implicitHeight, fP.implicitHeight)
+        Box {
+            id: mP
+            objectName: "machineTiles"
+            width: (parent.width - page.gap) * 8 / 12
+            height: parent.h
+            title: "Machines"
+            sub: Theme.many(page.ms.length, "machine") + ", every department; " + (page.off.length ? Theme.fmt(page.off.length) + " offline" : "all online")
+                 + (page.lag.length ? ", " + Theme.fmt(page.lag.length) + " need a look" : "") + (page.inside.length ? ", " + Theme.fmt(page.inside.length) + " with someone inside" : "")
+                 + "; click one to see it on Machines"
+            readonly property int maxT: 22
+            readonly property var sorted: page.ms.slice().sort(function (a, b) {
+                var w = function (m) { return (m.online && (m.status === "high" || m.status === "critical")) * 2 + (!m.online ? 1 : 0) }
+                return w(b) - w(a) })
+            Item {
+                width: parent.width
+                // the key sits at the foot of the box (margin-top: auto): as tall as the box beside it allows
+                height: Math.max(tiles.height + 10 + key.height, fP.implicitHeight - mP.headerHeight - 16)
+            Flow {
+                id: tiles
+                width: parent.width
+                spacing: 10
+                Repeater {
+                    model: mP.sorted.slice(0, page.ms.length > mP.maxT ? mP.maxT - 1 : mP.maxT)
+                    delegate: Rectangle {
+                        required property var modelData
+                        readonly property bool isOff: !modelData.online
+                        readonly property bool isLag: modelData.online && (modelData.status === "high" || modelData.status === "critical")
+                        width: 66; height: 42; radius: 7
+                        color: isOff ? "transparent" : isLag ? Theme.mix(Theme.crit, Theme.surface3, 0.16) : Theme.surface3
+                        border.width: 1
+                        border.color: isOff ? Theme.text4 : isLag ? Theme.alpha(Theme.crit, 0.35) : ta.containsMouse ? Theme.borderStrong : "transparent"
+                        Txt { anchors.centerIn: parent; width: parent.width - 6; horizontalAlignment: Text.AlignHCenter; text: modelData.host.replace(/^WS-/, ""); font.pixelSize: 12; font.weight: Font.Medium
+                              color: parent.isOff ? Theme.text4 : parent.isLag ? Theme.crit : Theme.text2 }
+                        MouseArea { id: ta; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: Nav.goAsk("machines", null, "Machines opens with " + modelData.host + " picked.", modelData.host) }
+                    }
+                }
+                Rectangle {
+                    visible: page.ms.length > mP.maxT
+                    width: 66; height: 42; radius: 7; color: "transparent"; border.width: 1; border.color: Theme.border
+                    Txt { anchors.centerIn: parent; text: "+" + Theme.fmt(page.ms.length - mP.maxT + 1); color: Theme.text3; font.pixelSize: 12 }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: Nav.goAsk("machines", null, "Machines opens with every machine listed.") }
+                }
+            }
+            Row {
+                id: key
+                anchors.bottom: parent.bottom
+                spacing: 18
+                topPadding: 4
+                Repeater {
+                    model: [["fine", Theme.surface3, "transparent"], ["needs a look", Theme.mix(Theme.crit, Theme.surface3, 0.16), Theme.alpha(Theme.crit, 0.35)], ["offline", "transparent", Theme.text4]]
+                    delegate: Row {
+                        required property var modelData
+                        spacing: 6
+                        Rectangle { width: 14; height: 11; radius: 3; color: modelData[1]; border.width: 1; border.color: modelData[2]; anchors.verticalCenter: parent.verticalCenter }
+                        Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                    }
+                }
+            }
+            }
+        }
+        Box {
+            id: fP
+            objectName: "stuckRuns"
+            width: (parent.width - page.gap) * 4 / 12
+            height: parent.h
+            title: "Flows and automations"
+            sub: (page.flowsOff.length + page.rulesOff.length ? "only what has stopped or is stuck is listed; " : "")
+                 + Theme.many(page.flowsOn.length, "flow") + " and " + Theme.many(page.rulesOn.length, "automation") + (page.rulesOn.length === 1 ? " is" : " are") + " running fine"
+            Repeater {
+                model: page.flowsOff.map(function (f) { var s = page.flowState(f); return { ic: "branches", t: page.flowName(f), s: s, hot: s.indexOf("paused") >= 0, act: "Look",
+                                                                                     go: ["flows", "Flows opens with " + page.flowName(f) + " picked.", f.id] } })
+                       .concat(page.rulesOff.map(function (r) { return { ic: "thunderbolt", t: r.name, s: "its last run went wrong", hot: true, act: "Look",
+                                                                          go: ["automation", "Automation opens with " + r.name + " picked.", r.event_id] } }))
+                delegate: SuRow {
+                    required property var modelData
+                    icon: modelData.ic
+                    title: modelData.t
+                    line: modelData.s
+                    lineHot: modelData.hot
+                    act: modelData.act
+                    onActed: Nav.goAsk(modelData.go[0], null, modelData.go[1], modelData.go[2])
+                    onOpen: Nav.goAsk(modelData.go[0], null, modelData.go[1], modelData.go[2])
+                }
+            }
+            Quiet { visible: page.flowsOff.length + page.rulesOff.length === 0; icon: "check"; text: "Every flow and automation is running fine." }
+        }
+    }
+
+    // --- today, and the live activity ----------------------------------------------------------------
+    Row {
+        width: parent.width
+        spacing: page.gap
+        readonly property real h: Math.max(dayP.implicitHeight, liveP.implicitHeight)
+        Box {
+            id: dayP
+            objectName: "today"
+            width: (parent.width - page.gap) * 8 / 12
+            height: parent.h
+            title: "Today"
+            sub: "the hours around now, with Now in the middle; it moves on as the day does"
+            extra: Txt { text: "The month in Calendar"; color: calA.containsMouse ? Theme.accent : Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                         MouseArea { id: calA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Nav.go("calendar") } }
+            DayStrip {
+                width: parent.width
+                items: page.cal
+            }
+        }
+        Box {
             id: liveP
             width: (parent.width - page.gap) * 4 / 12
             height: parent.h
-            flush: true
             title: "Live activity"
-            sub: page.all ? "" : "same kinds as the chart"
-            extra: Row {
-                spacing: 6
-                Rectangle { width: 7; height: 7; radius: 4; color: Theme.ok; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: "streaming"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-            }
+            sub: "on your machines, as it happens"
+            subDot: Theme.ok
+            Quiet { visible: page.live.length === 0; text: "Each event appears here the moment it is recorded." }
             Column {
                 width: parent.width
-                readonly property var rows: page.live.filter(function (e) { return page.kinds.indexOf(e.kind) >= 0 })
-                Empty { visible: parent.rows.length === 0; width: parent.width; h: 200; icon: "thunderbolt"; title: "Quiet"; text: "Each event appears here the moment it is recorded." }
                 Repeater {
-                    model: parent.rows.slice(0, 12)
-                    delegate: Rectangle {
+                    model: page.live.slice(0, 9)
+                    delegate: Item {
                         required property var modelData
                         width: parent.width
-                        height: 30
-                        color: "transparent"
-                        Txt { x: 14; width: 54; anchors.verticalCenter: parent.verticalCenter; mono: true; color: Theme.text3; font.pixelSize: 12; text: Time.hhmm(modelData.t) }
-                        Rectangle { x: 72; width: 7; height: 7; radius: 2; color: Kinds.color(modelData.kind); anchors.verticalCenter: parent.verticalCenter }
+                        height: ln.height + 13
+                        Txt { y: 6 + ln.baselineOffset - baselineOffset; width: 62; mono: true; color: Theme.text3; font.pixelSize: 13; text: Time.hhmm(modelData.t); elide: Text.ElideNone }
+                        Rectangle { x: 70; y: 6 + ln.baselineOffset - 7; width: 7; height: 7; radius: 2; color: Kinds.color(modelData.kind) }
                         Txt {
-                            x: 88
-                            width: parent.width - 102
-                            anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.RichText
+                            id: ln
+                            x: 88; y: 6
+                            width: parent.width - 88
+                            textFormat: Text.StyledText
                             text: (modelData.actor ? "<span style='font-weight:500'>" + modelData.actor + "</span> " : "") + "<font color='" + Theme.text2 + "'>" + modelData.what + "</font>"
-                                  + (modelData.host ? " <font color='" + Theme.text3 + "'>" + modelData.host + "</font>" : "")
+                                  + (modelData.host ? " <font color='" + Theme.text3 + "' face='" + Theme.mono + "'>" + modelData.host + "</font>" : "")
                         }
                         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                     }
@@ -328,11 +350,68 @@ Page {
         }
     }
 
-    // --- the department ------------------------------------------------------------------------------
-    Panel {
+    // --- do something, in one sentence --------------------------------------------------------------
+    Confirm { id: confirm; page: page }
+    function doQuick(q) {
+        confirm.ask(q.ask, function () { q.run(function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not done"); return }
+            Msg.ok(q.said + " · recorded"); Fleet.refresh(); page.load()
+        }) })
+    }
+    function enter(m) {
+        // two Admins are never on one machine at once, and nobody is pushed out (docs/design/v1-it-admin.md)
+        if (m.held && m.held !== Nav.me) {
+            confirm.ask({ title: m.held + " is in " + m.host, text: m.held + " has been inside" + (m.heldFrom ? " since " + Time.hhmm(m.heldFrom) : "") + ". Two Admins are never on one machine at once, and nobody is pushed out. Send them a message on Messages, or enter when they have left.", ok: "OK" }, null)
+            return
+        }
+        confirm.ask({ title: "Enter " + m.host + "?", text: m.user ? m.user + " is signed in and cannot use the machine while you are in. You get 30 minutes, and can extend them." : "No one is signed in. You get 30 minutes, and can extend them.", ok: "Enter" },
+                    function () { falcon.call("hierarchy.traverse", { pc_id: m.pc_id }, function (ok, r) {
+                        if (!ok) { Msg.failed(r && r.message ? r.message : "Could not enter"); return }
+                        Msg.ok("You are in " + m.host) }) })
+    }
+    readonly property var doVerbs: [{ value: "run", label: "Run an action on" }, { value: "task", label: "Give a task to" }, { value: "enter", label: "Enter" }, { value: "pause", label: "Pause the flow" }]
+    readonly property var doTargets: dv === "pause" ? flowsOn.map(function (f) { return { value: f.id, label: page.flowName(f) } })
+                                   : dv === "task" ? ms.filter(function (m) { return m.user }).map(function (m) { return { value: m.host, label: m.user + " on " + m.host } })
+                                   : ms.map(function (m) { return { value: m.host, label: m.host + (m.user ? " · " + m.user : "") } })
+    readonly property var doMachine: dv !== "pause" && dt !== null ? Fleet.byHost[dt] || null : null
+    readonly property string doPrev: dt === null ? "" : dv === "run" ? "Opens Actions with " + dt + " picked, to choose what to run."
+                                   : dv === "task" ? "Opens a new task for " + (doMachine ? doMachine.user : "them") + " on " + dt + "."
+                                   : dv === "enter" ? "Enters " + dt + ". " + (doMachine && doMachine.user ? doMachine.user + " cannot use it while you are inside." : "Nobody is signed in.")
+                                   : "Pauses " + flowName(flows.filter(function (f) { return f.id === dt })[0] || { id: dt }) + ". Files stop moving until you resume it; nothing is lost."
+    function doIt() {
+        if (dv === "run") Nav.goAsk("actions", null, "Actions opens with " + dt + " picked.", dt)
+        else if (dv === "task") { Nav.preset = { page: "tasks", host: dt }; Nav.goAsk("tasks", "new", "A new task opens for " + (doMachine ? doMachine.user : "them") + " on " + dt + ".") }
+        else if (dv === "enter") { if (doMachine) enter(doMachine) }
+        else falcon.call("flow.pause", { flow_id: dt }, function (ok, r) { if (!ok) { Msg.failed(r.message || "Not paused"); return } Msg.ok("Paused · nothing is lost"); page.load() })
+        dt = null
+    }
+    Box {
+        objectName: "doSomething"
         width: parent.width
-        flush: true
-        title: "Departments"
-        DeptTable { width: parent.width }
+        accentFoot: true
+        title: "Do something"
+        sub: "one sentence; what it does is said before it is done"
+        Row {
+            width: parent.width
+            spacing: 8
+            Select { width: 200; options: page.doVerbs; value: page.dv; onPicked: function (v) { page.dv = v; page.dt = null } }
+            Select {
+                width: parent.width - 200 - goB.width - 16
+                search: true
+                options: page.doTargets
+                value: page.dt
+                placeholder: page.dv === "pause" ? "which flow" : page.dv === "task" ? "whom" : "which machine"
+                onPicked: function (v) { page.dt = v }
+            }
+            Btn { id: goB; kind: "primary"; text: "Do it"; enabled: page.dt !== null; onClicked: page.doIt() }
+        }
+        Rectangle {
+            visible: page.doPrev !== ""
+            width: parent.width
+            height: visible ? pv.height + 20 : 0
+            radius: Theme.radius
+            color: Theme.surface2
+            Txt { id: pv; x: 12; y: 10; width: parent.width - 24; text: page.doPrev; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+        }
     }
 }

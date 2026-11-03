@@ -1,19 +1,24 @@
 import QtQuick
 import "."
 
-// FLOWS. An IT Admin sees every flow; the list starts with the ones that touch
-// the department. The list, the flow beside it, the flow drawn under both, and its sync log. A flow
-// waiting on someone's agreement is answered here by the person asked, in a bar above the page.
+// FLOWS, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminFlowsPage2): are files getting where they should,
+// and where is something held up? The situation in a sentence; your flows as one card per flow by what each is doing (Running,
+// Waiting, Stopped, Paused last); on the right the picked flow's Controls (what waits at its gate, and one line of controls: Edit
+// or whose it is on the left, the gate's action, then apart from it Pause and Stop, or Resume) and its last sync; the flow drawn
+// below; Make a flow has its own page. Only an Admin-to-Admin flow needs consent: the destination Admin's, who picks the folder.
 Page {
     id: page
     objectName: "flowsView"
 
     property var flows: []
-    property string sel: Nav.sub ? String(Nav.sub) : ""
+    property string sel: { var a = Nav.takeArrive("flows"); return a !== null ? String(a) : Nav.sub && String(Nav.sub).indexOf("edit-") !== 0 && Nav.sub !== "new" ? String(Nav.sub) : "" }
+    property string exp: ""
     property var log: []
+    property var rAsks: []                // restricted files a held flow met, that this person may allow
+    property var gsel: ({})               // which of several things at one gate is shown
+    property var gpick: ({})              // which of a gate's choices is picked
+    property bool loading: false
 
-    // a flow that met something restricted waits for the owner of the restriction: the ones this person may answer, asked of the Engine flow by flow
-    property var rAsks: []
     function load() {
         falcon.call("flow.list", {}, function (ok, r) {
             page.flows = ok ? (r.flows || []) : []
@@ -28,309 +33,373 @@ Page {
             })
         })
     }
-    function answerRestricted(c, grant) {
-        falcon.call("flow.restricted_consent", { consent_id: c.id, grant: grant }, function (ok, r) {
-            if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
-            Msg.ok(grant ? "Allowed · the flow goes on" : "Declined · the flow stays paused")
-            page.load()
-            page.loadConsents()
-        })
-    }
     Component.onCompleted: load()
     Connections { target: falcon; function onPushReceived(type) { if (/^flow/.test(type)) again.restart() } }
     Timer { id: again; interval: 300; onTriggered: page.load() }
 
     function folder(p) { var x = String(p || "").replace(/[\\\/]+$/, "").split(/[\\\/]/); return x[x.length - 1] || p }
-    // who made it: you, or an Admin this console knows by name (the Engine sends the account, not the name)
-    function creator(f) {
-        if (f.created_by_account_id === falcon.accountId) return "You"
-        return f.created_by_name || Fleet.adminName(f.created_by_account_id) || "—"
-    }
-    function nameOf(f) { return folder(f.source_path) + "-" + f.id }
-    function stateOf(f) {
-        var paused = (f.destinations || []).filter(function (d) { return d.paused_reason })
-        if (f.consent_status === "pending") return ["Waiting for agreement", "wait", "wait"]
-        if (f.pause_reason === "restricted:consent") return ["Waiting for consent to carry something restricted", "wait", "wait"]
-        if (f.status === "inactive") return ["Retired", "wait", "off"]
-        if (f.status === "paused" || paused.length) return ["A branch is paused", "bad", "deg"]
-        return ["Copying", "good", "act"]
-    }
+    function mine(f) { return f.created_by_account_id === falcon.accountId }
+    function who(f) { return mine(f) ? "you" : f.created_by_name || Fleet.adminName(f.created_by_account_id) || "another Admin" }
+    function nameOf(f) { return f.name || folder(f.source_path) + "-" + f.id }
     function lastCopy(f) {
         var m = null
         ;(f.destinations || []).forEach(function (d) { var t = d.last_sync ? Time.ms(d.last_sync.synced_at) : null; if (t && (!m || t > m)) m = t })
         return m
     }
-    readonly property var rows: flows.map(function (f) {
-        return Object.assign({ key: String(f.id), name: page.nameOf(f), st: page.stateOf(f),
-                               path: f.source_hostname + " → " + (f.destinations || []).map(function (d) { return d.destination_hostname || "storage" }).filter(function (v, i, a) { return a.indexOf(v) === i }).join(", ") }, f)
-    }).filter(function (f) { return (f.name + " " + f.path).toLowerCase().indexOf(list.query.toLowerCase()) >= 0 })
-      .sort(function (a, b) { return (page.lastCopy(b) || 0) - (page.lastCopy(a) || 0) })
-    readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].key === sel) return rows[i]; return rows.length ? rows[0] : null }
-    // the steps along the way, read from the Engine's stage tree (Sync.steps): named, and before or after the split
+    function askedOfMe(f) { return f.consent_status === "pending" && (f.destinations || []).some(function (d) { return d.owner_account_id === falcon.accountId }) }
+    function stateOf(f) {
+        if (f.status === "inactive") return "stopped"
+        if (f.consent_status === "pending") return "waiting"
+        if (f.status === "paused" || f.pause_reason || (f.destinations || []).some(function (d) { return !!d.paused_reason })) return "paused"
+        return "running"
+    }
+    // what waits at a flow's gate: each with its kind, a line, and its choices ([label, fn, enabled, why])
+    function gatesOf(f) {
+        var out = []
+        page.rAsks.filter(function (c) { return c.flow.id === f.id }).forEach(function (c) {
+            out.push({ id: "r" + c.id, hot: true, kind: "Restricted, yours", icon: "stop", title: page.nameOf(f) + " met " + page.folder(c.sample_path), line: "you restricted it; the flow waits for you", at: c.asked_at,
+                       acts: [["Allow it for this flow", function () { page.consentR(c, true) }, true, ""], ["Keep it paused", function () { page.consentR(c, false) }, true, ""]] })
+        })
+        if (f.pause_reason === "restricted:consent" && !out.length)
+            out.push({ id: "rw" + f.id, kind: "Restricted, someone else's", icon: "stop", title: page.nameOf(f) + " met a restricted file", line: "it waits for the Admin who marked it to say yes", acts: [] })
+        if (f.pause_reason && f.pause_reason !== "restricted:consent" && f.consent_status !== "pending")
+            out.push({ id: "p" + f.id, hot: true, kind: f.pause_reason.indexOf("destination") === 0 ? "A destination is gone" : f.pause_reason.indexOf("source") === 0 ? "A source is gone" : "Held by Falcon",
+                       icon: "disconnect", title: page.nameOf(f) + (f.pause_reason.indexOf("destination") === 0 ? " cannot reach where it lands" : f.pause_reason.indexOf("source") === 0 ? " cannot read where it starts" : " stopped by itself"),
+                       line: f.suggestion || "nothing more goes through until it is fixed",
+                       acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id }, "Trying it again") }, page.mine(f), "Only " + page.who(f) + " can do this"],
+                              ["Pick another folder", function () { Nav.go("flows", "edit-" + f.id) }, page.mine(f), "Only " + page.who(f) + " can change it"]] })
+        ;(f.destinations || []).filter(function (d) { return !!d.paused_reason }).forEach(function (d) {
+            out.push({ id: "d" + d.id, hot: true, kind: "A destination stopped", icon: "disconnect", title: (d.destination_hostname || "storage") + " stopped taking files", line: f.suggestion || "files wait in line until it takes them",
+                       acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id, destination_id: d.id }, "Trying it again") }, page.mine(f), "Only " + page.who(f) + " can do this"]] })
+        })
+        if (f.consent_status === "pending") {
+            if (page.askedOfMe(f)) out.push({ id: "a" + f.id, kind: "Wants to send you files", icon: "inbox", title: page.who(f) + ": " + page.nameOf(f), line: f.source_hostname + " " + f.source_path,
+                                              acts: [["Accept", function () { page.call("flow.consent", { flow_id: f.id, granted: true }, "Accepted · it starts copying") }, true, ""],
+                                                     ["Decline", function () { page.call("flow.consent", { flow_id: f.id, granted: false }, "Declined · they are told") }, true, ""]] })
+            else out.push({ id: "w" + f.id, kind: "Waiting on someone else", icon: "clock", title: page.nameOf(f) + " waits for an Admin", line: "to pick a folder and agree; nothing moves until they do",
+                            acts: [["Remind", null, false, "The Engine cannot send a reminder yet"]] })
+        }
+        return out
+    }
+    function call(type, payload, ok) {
+        falcon.call(type, payload, function (good, r) {
+            if (!good) { Msg.failed(r && r.message ? r.message : "Not done"); return }
+            Msg.ok(ok); page.load()
+        })
+    }
+    function consentR(c, grant) { call("flow.restricted_consent", { consent_id: c.id, grant: grant }, grant ? "Allowed for this flow · its destinations become places it may be" : "It stays paused") }
+
+    readonly property var groupsDef: [["running", "Running", "moving files, or set up and ready"], ["waiting", "Waiting", "on someone else: a folder to be picked, or an ask to you"],
+                                      ["stopped", "Stopped", "stopped by you; nothing goes through"], ["paused", "Paused", "held for you, or paused by you; nothing more goes through until you act"]]
+    readonly property var rows: flows.map(function (f) { return Object.assign({ key: String(f.id), name: page.nameOf(f), st: page.stateOf(f) }, f) })
+    function inGroup(k) { return rows.filter(function (r) { return r.st === k }).sort(function (a, b) { return (page.lastCopy(b) || 0) - (page.lastCopy(a) || 0) }) }
+    readonly property var cur: {
+        for (var i = 0; i < rows.length; i++) if (rows[i].key === sel) return rows[i]
+        return inGroup("paused")[0] || inGroup("waiting")[0] || inGroup("running")[0] || null
+    }
+    property string pickedKey: ""
+    onCurChanged: {
+        pickedKey = cur ? cur.key : ""; loading = true; ldT.restart(); log = []
+        if (cur) { var id = cur.id; falcon.call("flow.history", { flow_id: id }, function (ok, r) { if (page.cur && page.cur.id === id) page.log = ok ? (r.history || []) : [] }) }
+    }
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
     readonly property var steps: Sync.steps(cur)
-    // what the flow is waiting to carry that is restricted, what has been allowed, and which of those this person may take back
-    property var consents: []
-    property var canDecide: []
-    function loadConsents() {
-        if (!cur) { consents = []; return }
-        var id = cur.id
-        falcon.call("flow.restricted", { flow_id: id }, function (ok, r) {
-            if (page.cur && page.cur.id === id) { page.consents = ok && r ? (r.consents || []) : []; page.canDecide = ok && r ? (r.can_decide || []) : [] }
-        })
+    readonly property var gates: cur ? gatesOf(cur) : []
+    readonly property int gi: cur ? Math.min(gsel[cur.key] || 0, Math.max(0, gates.length - 1)) : 0
+    readonly property var g0: gates.length ? gates[gi] : null
+    function shape(f) {
+        var n = (f.destinations || []).length, s = Sync.steps(f).length
+        return "1 source → " + (s ? Theme.many(s, "step") + " → " : "") + Theme.many(n, "destination")
     }
-    function takeBack(c) {
-        falcon.call("flow.restricted_revoke", { consent_id: c.id }, function (ok, r) {
-            if (!ok) { Msg.failed(r && r.message ? r.message : "Not taken back"); return }
-            Msg.ok("Taken back · the flow stops, and the places it allowed are not allowed any more")
-            page.load()
-            page.loadConsents()
-        })
-    }
-    onCurChanged: if (cur) {
-        falcon.call("flow.history", { flow_id: cur.id }, function (ok, r) { page.log = ok ? (r.history || []) : [] })
-        loadConsents()
-    }
-    readonly property var asks: flows.filter(function (f) {
-        return f.consent_status === "pending" && (f.destinations || []).some(function (d) { return d.owner_account_id === falcon.accountId })
-    })
-    readonly property int nAct: flows.filter(function (f) { return page.stateOf(f)[2] === "act" }).length
-    readonly property int nDeg: flows.filter(function (f) { return page.stateOf(f)[2] === "deg" }).length
-    readonly property int nWait: flows.filter(function (f) { return page.stateOf(f)[2] === "wait" }).length
-
-    // requests other people sent to the person at this console
-    Repeater {
-        model: page.asks
-        Rectangle {
-            required property var modelData
-            width: page.w
-            height: 44
-            radius: Theme.radius
-            color: Theme.accentSoft
-            border.width: 1
-            border.color: Theme.mix(Theme.accent, Theme.border, 0.3)
-            Row {
-                x: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 10
-                Icon { name: "inbox"; size: 15; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
-                Txt { anchors.verticalCenter: parent.verticalCenter; width: page.w - 260; textFormat: Text.RichText
-                      text: "<b>A flow</b> wants to send you files <span style='color:" + Theme.text3 + "'>from <span style='font-family:" + Theme.mono + "'>" + modelData.source_hostname + " " + modelData.source_path
-                            + "</span> · " + Time.atDay(modelData.created_at) + "</span>" }
-            }
-            Row {
-                anchors.right: parent.right
-                anchors.rightMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
-                Btn { small: true; text: "Decline"; onClicked: falcon.call("flow.consent", { flow_id: modelData.id, granted: false }, function (ok, r) { if (!ok) { Msg.failed(r.message || "Not answered"); return } Msg.ok("Declined · they are told"); page.load() }) }
-                Btn { small: true; kind: "primary"; text: "Accept"; onClicked: falcon.call("flow.consent", { flow_id: modelData.id, granted: true }, function (ok, r) { if (!ok) { Msg.failed(r.message || "Not answered"); return } Msg.ok("Accepted · it starts copying"); page.load() }) }
-            }
-        }
+    function why(f) {
+        var g = gatesOf(f)
+        if (g.length) return g[0].title.indexOf(page.nameOf(f) + " ") === 0 ? g[0].title.slice(page.nameOf(f).length + 1) : g[0].title
+        if (f.status === "inactive") return "stopped"
+        var l = lastCopy(f)
+        return l ? "last copy " + Time.ago(l) : "nothing yet"
     }
 
-    // a flow wants to carry something restricted, and this person made the restriction: their answer lets it go on
-    Repeater {
-        model: page.rAsks
-        Rectangle {
-            required property var modelData
-            objectName: "restrictedAsk_" + modelData.id
-            width: page.w
-            height: 52
-            radius: Theme.radius
-            color: Theme.alpha(Theme.med, 0.10)
-            border.width: 1
-            border.color: Theme.alpha(Theme.med, 0.5)
-            Row {
-                x: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 10
-                Icon { name: "lock"; size: 15; color: Theme.med; anchors.verticalCenter: parent.verticalCenter }
-                Txt { anchors.verticalCenter: parent.verticalCenter; width: page.w - 330; wrapMode: Text.WordWrap; elide: Text.ElideNone; textFormat: Text.RichText
-                      text: "<b>Flow " + modelData.flow_id + "</b> wants to carry <b>" + modelData.name + "</b>, which is restricted <span style='color:" + Theme.text3 + "'>· from <span style='font-family:" + Theme.mono + "'>"
-                            + (modelData.sample_path || "") + "</span>. Nothing moves until you say so.</span>" }
-            }
-            Row {
-                anchors.right: parent.right
-                anchors.rightMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
-                Btn { objectName: "restrictedDecline"; small: true; text: "Keep it paused"; onClicked: page.answerRestricted(modelData, false) }
-                Btn { objectName: "restrictedAllow"; small: true; kind: "primary"; text: "Allow this flow"; onClicked: page.answerRestricted(modelData, true) }
-            }
-        }
+    situation: {
+        if (!flows.length) return "You have no flows yet."
+        var moving = rows.filter(function (r) { return r.st === "running" && page.lastCopy(r) && Time.sameDay(page.lastCopy(r), Time.now) }).length
+        var p = inGroup("paused"), w = inGroup("waiting")
+        return Theme.fmt(moving) + " of " + Theme.fmt(flows.length) + " flows moved files today; " + (p.length ? Theme.listNames(p.map(function (r) { return r.name }), 2) + (p.length === 1 ? " is" : " are") + " paused" : "nothing is paused")
+               + (w.length ? ", " + Theme.fmt(w.length) + " waiting on someone else" : "") + "."
     }
+    situationAt: Time.now
 
-    Strip {
-        width: parent.width
-        items: [
-            { label: "Flows", value: Theme.fmt(page.flows.length), delta: Theme.fmt(page.flows.filter(function (f) { return f.created_by_account_id === falcon.accountId }).length) + " made by you" },
-            { label: "Copying", value: Theme.fmt(page.nAct), unit: "/ " + Theme.fmt(page.flows.length), delta: page.nWait ? Theme.fmt(page.nWait) + " waiting for agreement" : "every flow" },
-            { label: "A branch paused", value: Theme.fmt(page.nDeg), delta: page.nDeg ? "files queue until it is fixed" : "none", dc: page.nDeg ? Theme.crit : undefined },
-            { label: "Last copy", value: page.flows.length && page.flows.some(page.lastCopy) ? Time.at(Math.max.apply(null, page.flows.map(function (f) { return page.lastCopy(f) || 0 }))) : "—", delta: "by any flow here" }
-        ]
-    }
+    Confirm { id: confirm; page: page }
 
     Row {
         width: parent.width
         spacing: 14
-        ListPanel {
-            id: list
+        // --- your flows (stretched to the column beside it) ----------------------------------------------------
+        Box {
+            id: listP
+            objectName: "flowCards"
             width: (parent.width - 14) * 8 / 12
-            title: "All flows in the organisation"
-            sub: "whoever made them · click one to see it on the right"
-            placeholder: "Filter by flow or machine"
-            actionLabel: "New flow"
-            onAction: Nav.go("flows", "new")
-            rows: page.rows
-            rowKey: "key"
-            pick: page.cur ? page.cur.key : null
-            onPicked: function (k) { page.sel = k }
-            icon: "branches"
-            nameTitle: "Flow"
-            nameText: function (r) { return r.name }
-            nameLine: function (r) { return r.path }
-            cols: [{ title: "Created by", width: 130, text: function (r) { return page.creator(r) } },
-                   { title: "Branches", width: 150, text: function (r) { return Theme.many((r.destinations || []).length, "destination") } }]
-            now: function (r) { return [r.st[0], r.st[1]] }
-            showEmpty: page.flows.length === 0
-            emptyIcon: "branches"
-            emptyTitle: "No flows yet"
-            emptyText: "A flow copies files one way, from one machine to others."
-            emptyAct: "New flow"
-            onEmptyAction: Nav.go("flows", "new")
-        }
-        SidePanel {
-            width: (parent.width - 14) * 4 / 12
-            readonly property var f: page.cur
-            readonly property var paused: f ? (f.destinations || []).filter(function (d) { return d.paused_reason }) : []
-            showEmpty: f === null
-            emptyIcon: "branches"
-            emptyText: "Pick a flow in the list."
-            title: f ? f.name : ""
-            sub: f && page.sel === f.key ? "the one you picked" : "the most recent · click another"
-            facts: f ? [["Created by", page.creator(f)],
-                        ["Now", f.st[0], f.st[1] === "bad" ? Theme.crit : f.st[1] === "good" ? Theme.ok : Theme.text4, false, true],
-                        ["Last copy", page.lastCopy(f) ? Time.atDay(page.lastCopy(f)) : "—"],
-                        ["From", f.source_hostname + " " + f.source_path, null, true],
-                        ["To", (f.destinations || []).map(function (d) { return (d.destination_hostname || "storage") + " " + d.destination_path }).join("\n"), null, true],
-                        ["Along the way", page.steps.length ? page.steps.map(function (s) { return s.op }).join(", ") : "Copied as they are"]] : []
-            actions: [
-                Btn { text: page.cur && page.cur.status === "paused" ? "Resume" : "Pause"; visible: page.cur !== null && page.cur.status !== "inactive"
-                      onClicked: falcon.call(page.cur.status === "paused" ? "flow.resume" : "flow.pause", { flow_id: page.cur.id }, function (ok, r) {
-                          if (!ok) { Msg.failed(r.message || "Not changed"); return } Msg.ok(page.cur.status === "paused" ? "Resumed" : "Paused"); page.load() }) },
-                Btn { kind: "primary"; iconName: "edit"; text: "Edit"; enabled: page.cur !== null && page.cur.created_by_account_id === falcon.accountId
-                      tip: page.cur && page.cur.created_by_account_id !== falcon.accountId ? "Only whoever made it can change it" : ""
-                      onClicked: Nav.go("flows", "edit-" + page.cur.id) }
-            ]
-            Rectangle {
-                visible: page.cur !== null && (page.cur.destinations || []).some(function (d) { return d.paused_reason })
-                width: parent.width
-                height: pc.height + 24
-                radius: Theme.radius
-                color: Theme.alpha(Theme.crit, 0.09)
-                border.width: 1
-                border.color: Theme.alpha(Theme.crit, 0.35)
-                Column {
-                    id: pc
-                    x: 12; y: 12
-                    width: parent.width - 24
-                    spacing: 8
-                    Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 12
-                          text: page.cur ? (page.cur.destinations || []).filter(function (d) { return d.paused_reason }).map(function (d) { return d.suggestion || ("The branch to " + d.destination_path + " paused.") }).join(" ") + " Files queue; nothing is lost." : "" }
-                    Row { spacing: 6
-                          Btn { small: true; text: "Resume the flow"; onClicked: falcon.call("flow.resume", { flow_id: page.cur.id }, function (ok, r) { if (!ok) { Msg.failed(r.message || "Not resumed"); return } Msg.ok("Retrying"); page.load() }) } }
-                }
-            }
-        }
-    }
-
-    Panel {
-        visible: page.cur !== null
-        width: parent.width
-        title: page.cur ? page.cur.name : ""
-        sub: "the flow drawn · the same flow as on the right"
-        Column {
-            width: parent.width
-            spacing: 8
-            FlowPreview {
-                width: parent.width
-                srcs: page.cur ? [{ host: page.cur.source_hostname, path: page.cur.source_path }] : []
-                stages: page.steps
-                dests: page.cur ? (page.cur.destinations || []).map(function (d) {
-                    return { host: d.destination_hostname || "storage", path: d.destination_path, ask: page.cur.consent_status === "pending", bad: !!d.paused_reason } }) : []
-            }
-            Row {
-                spacing: 14
-                Row { spacing: 6; Rectangle { width: 10; height: 2; color: Theme.ser2; anchors.verticalCenter: parent.verticalCenter } Txt { text: "copying"; color: Theme.text3; font.pixelSize: 12 } }
-                Txt { text: page.steps.length ? Theme.many(page.steps.length, "step") + " along the way: " + page.steps.map(function (s) { return s.op }).join(", ") : "copied as they are"; color: Theme.text3; font.pixelSize: 12 }
-                Row { visible: page.cur !== null && (page.cur.destinations || []).some(function (d) { return d.paused_reason }); spacing: 6
-                      Rectangle { width: 10; height: 2; color: Theme.crit; anchors.verticalCenter: parent.verticalCenter } Txt { text: "branch paused"; color: Theme.text3; font.pixelSize: 12 } }
-                Row { visible: page.cur !== null && page.cur.consent_status === "pending"; spacing: 6
-                      Rectangle { width: 10; height: 2; color: Theme.med; anchors.verticalCenter: parent.verticalCenter } Txt { text: "waiting for someone to agree"; color: Theme.text3; font.pixelSize: 12 } }
-            }
-        }
-    }
-
-    Panel {
-        objectName: "flowRestricted"
-        visible: page.cur !== null && page.consents.length > 0
-        width: parent.width
-        title: "Restricted material"
-        sub: "a flow carries nothing restricted unless the person who restricted it says so"
-        Column {
-            width: parent.width
-            spacing: 8
+            height: Math.max(implicitHeight, rightCol.implicitHeight)
+            title: "Your flows · " + page.flows.length
+            sub: "by what each is doing, paused last; click one and its controls, last sync and drawing follow; expand it for its facts"
             Repeater {
-                model: page.consents
-                Row {
+                model: page.groupsDef
+                delegate: Group {
+                    id: grp
                     required property var modelData
-                    objectName: "consent_" + modelData.id
-                    width: parent.width
-                    spacing: 10
-                    Txt { width: parent.width - 150; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                          text: modelData.name + " · " + (modelData.state === "asked" ? "waiting for the person who restricted it" : modelData.state === "granted" ? "allowed" + (modelData.expires_at ? " until " + Time.atDay(modelData.expires_at) : "")
-                                                         : modelData.state === "declined" ? "declined" : "taken back" + (modelData.note ? " (" + modelData.note + ")" : "")) }
-                    Btn { objectName: "takeBack_" + modelData.id; visible: modelData.state === "granted" && page.canDecide.indexOf(modelData.id) >= 0; small: true; danger: true; text: "Take back"; onClicked: page.takeBack(modelData) }
-                }
-            }
-        }
-    }
-
-    Panel {
-        visible: page.cur !== null
-        width: parent.width
-        flush: true
-        title: "Sync log"
-        sub: page.cur ? "latest · " + page.cur.name : ""
-        Column {
-            width: parent.width
-            Rectangle {
-                width: parent.width; height: 32; color: "transparent"
-                Row { x: 14; anchors.verticalCenter: parent.verticalCenter
-                      Txt { width: 70; text: "Time"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium }
-                      Txt { width: (page.w - 100) * 0.4; text: "File"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium }
-                      Txt { width: (page.w - 100) * 0.35; text: "Destination"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium }
-                      Txt { width: (page.w - 100) * 0.25; text: "Result"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.Medium } }
-                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
-            }
-            Txt { visible: page.log.length === 0; x: 14; topPadding: 14; bottomPadding: 14; text: "Nothing copied yet."; color: Theme.text3 }
-            Repeater {
-                model: page.log.slice(0, 10)
-                Rectangle {
-                    required property var modelData
-                    width: parent.width; height: 36; color: "transparent"
-                    Row {
-                        x: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        Txt { width: 70; text: Time.hhmm(modelData.occurred_at); mono: true; color: Theme.text3 }
-                        Txt { width: (page.w - 100) * 0.4; text: modelData.filename || modelData.file_path || modelData.path || "—"; mono: true }
-                        Txt { width: (page.w - 100) * 0.35; text: modelData.destination_path || ""; mono: true }
-                        Txt { width: (page.w - 100) * 0.25; text: modelData.result || modelData.outcome || modelData.status || ""
-                              color: /conflict/i.test(modelData.result || "") ? Theme.med : /queued|fail/i.test(modelData.result || "") ? Theme.crit : Theme.text }
+                    required property int index
+                    readonly property var xs: page.inGroup(modelData[0])
+                    visible: xs.length > 0
+                    spaced: page.groupsDef.slice(0, index).some(function (g) { return page.inGroup(g[0]).length > 0 })
+                    width: listP.innerW
+                    late: modelData[0] === "paused"
+                    cardGap: 5
+                    title: modelData[1] + " · " + xs.length
+                    sub: modelData[2]
+                    Repeater {
+                        model: grp.xs
+                        delegate: Card {
+                            id: fc
+                            required property var modelData
+                            readonly property var gs: page.gatesOf(modelData)
+                            readonly property bool urg: gs.length > 0 && !!gs[0].hot
+                            objectName: "flow_" + modelData.id
+                            width: grp.cardW
+                            midW: 110
+                            actW: 104
+                            padV: 7
+                            icon: "branches"
+                            hot: urg
+                            tint: grp.late
+                            title: modelData.name
+                            tag: "by " + page.who(modelData)
+                            line: gs.length ? page.why(modelData) + (gs.length > 1 ? " · and " + (gs.length - 1) + " more" : "") : page.shape(modelData) + " · " + page.why(modelData)
+                            lineHot: urg
+                            picked: page.cur !== null && page.cur.key === modelData.key
+                            expandable: true
+                            expanded: page.exp === modelData.key
+                            onOpen: page.sel = modelData.key
+                            onToggle: { page.sel = modelData.key; page.exp = expanded ? "" : modelData.key }
+                            mid: Txt {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                                text: page.lastCopy(fc.modelData) ? Time.ago(page.lastCopy(fc.modelData)) : "no copy yet"
+                            }
+                            // opened: its facts beside what waits at its gate (am-in)
+                            Row {
+                                width: parent.width
+                                spacing: 24
+                                Column {
+                                    y: 2
+                                    width: Math.min(420, parent.width - 230 - 24)
+                                    Repeater {
+                                        model: [["From", fc.modelData.source_hostname + " " + fc.modelData.source_path],
+                                                ["To", (fc.modelData.destinations || []).map(function (d) { return (d.destination_hostname || "storage") + " " + (d.destination_path || "(they pick the folder)") }).join(", ")],
+                                                ["Along the way", Sync.steps(fc.modelData).map(function (s, i) { return (i + 1) + ". " + s.op }).join("  ") || "copied as it is"],
+                                                ["Made by", page.who(fc.modelData)]]
+                                        delegate: Item {
+                                            required property var modelData
+                                            required property int index
+                                            width: parent.width
+                                            height: fv.height + 10
+                                            Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                            Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13; mono: index < 2; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone }
+                                            Rectangle { visible: index < 3; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                        }
+                                    }
+                                }
+                                Column {
+                                    width: 230
+                                    spacing: 6
+                                    Txt { topPadding: 4; text: "At the gate"; color: Theme.text3; font.pixelSize: 12 }
+                                    Repeater {
+                                        model: fc.gs
+                                        delegate: Column {
+                                            required property var modelData
+                                            width: 230
+                                            spacing: 2
+                                            Row { spacing: 6
+                                                  Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: modelData.hot ? Theme.crit : Theme.text4 }
+                                                  Txt { text: modelData.kind; font.pixelSize: 13; color: modelData.hot ? Theme.crit : Theme.text; elide: Text.ElideNone } }
+                                            Txt { width: 230; text: modelData.line + (modelData.at ? "; waiting " + Time.waitLen((Time.now - Time.ms(modelData.at)) / 3600000) : ""); color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                                        }
+                                    }
+                                    Row { visible: fc.gs.length === 0; spacing: 6
+                                          Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: Theme.ok }
+                                          Txt { text: "nothing waits; it runs by itself"; font.pixelSize: 13; elide: Text.ElideNone } }
+                                    Txt { topPadding: 4; text: "Last copy"; color: Theme.text3; font.pixelSize: 12 }
+                                    Txt { text: page.lastCopy(fc.modelData) ? Time.atDay(page.lastCopy(fc.modelData)) : "none yet"; font.pixelSize: 13; color: Theme.text3 }
+                                }
+                            }
+                        }
                     }
-                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }
+            Quiet { visible: page.flows.length === 0; text: "No flows yet. Make one below." }
+        }
+
+        // --- controls, and the last sync ----------------------------------------------------------------------
+        Column {
+            id: rightCol
+            width: (parent.width - 14) * 4 / 12
+            spacing: 14
+            Box {
+                id: ctlP
+                objectName: "flowControls"
+                width: parent.width
+                title: "Controls"
+                sub: page.cur ? page.cur.name + ": what waits at its gate, and what you can do with it" : "pick a flow on the left"
+                // several at one gate: one at a time, so the line always carries one action
+                Item {
+                    visible: page.gates.length > 1
+                    width: parent.width
+                    height: 22
+                    Txt { anchors.verticalCenter: parent.verticalCenter; text: Theme.many(page.gates.length, "thing") + " wait at its gate"; color: Theme.text3; font.pixelSize: 12 }
+                    StepPager { anchors.right: parent.right; y: -6; width: 120; showCount: false; total: 0; pageNo: page.gi; pages: page.gates.length
+                                onStep: function (d) { var g = Object.assign({}, page.gsel); g[page.cur.key] = page.gi + d; page.gsel = g } }
+                }
+                // the gate (fl-gate): its kind and how long it has waited, what it is, and its choices
+                Column {
+                    visible: page.g0 !== null
+                    width: parent.width
+                    spacing: 6
+                    Item {
+                        width: parent.width
+                        height: gk.height
+                        Row { id: gk; spacing: 5
+                              Icon { name: page.g0 ? page.g0.icon : "clock"; size: 12; color: page.g0 && page.g0.hot ? Theme.crit : Theme.text2; anchors.verticalCenter: parent.verticalCenter }
+                              Txt { text: page.g0 ? page.g0.kind : ""; color: page.g0 && page.g0.hot ? Theme.crit : Theme.text2; font.pixelSize: 12; elide: Text.ElideNone } }
+                        Txt { anchors.right: parent.right; text: page.g0 && page.g0.at ? "waiting " + Time.waitLen((Time.now - Time.ms(page.g0.at)) / 3600000) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                    }
+                    Txt { width: parent.width; text: page.g0 ? page.g0.title : ""; font.pixelSize: 14; font.weight: Font.DemiBold; lh: 1.35; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                    Txt { width: parent.width; text: page.g0 ? page.g0.line : ""; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                    Column {
+                        visible: page.g0 !== null && page.g0.acts.length > 1
+                        width: parent.width
+                        spacing: 6
+                        Item { width: parent.width; height: wt.height + 12; Txt { id: wt; y: 10; text: "What to do"; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone } }
+                        Repeater {
+                            model: page.g0 && page.g0.acts.length > 1 ? page.g0.acts : []
+                            delegate: Opt {
+                                required property var modelData
+                                required property int index
+                                on: (page.gpick[page.g0.id] || 0) === index
+                                title: modelData[0]
+                                onClicked: { var p = Object.assign({}, page.gpick); p[page.g0.id] = index; page.gpick = p }
+                            }
+                        }
+                    }
+                }
+                Quiet { visible: page.cur !== null && page.gates.length === 0 && page.cur.st !== "stopped"; icon: page.cur && page.cur.status === "paused" && !page.cur.pause_reason ? "pausecircle" : "check"
+                        text: page.cur ? (page.cur.status === "paused" && !page.cur.pause_reason ? "You paused " + page.cur.name + ". Nothing goes through until you resume it." : "Nothing waits at a gate; " + page.cur.name + " runs by itself.") : "" }
+                Quiet { visible: page.cur !== null && page.cur.st === "stopped"; icon: "stop"; text: page.cur ? "You stopped " + page.cur.name + ". Nothing goes through." : "" }
+                Quiet { visible: page.cur === null; text: "Pick a flow on the left." }
+                // the controls' line, the same in every case (fl-acts: under a rule)
+                Column {
+                    visible: page.cur !== null
+                    width: parent.width
+                    spacing: 12
+                    Rectangle { width: parent.width; height: 1; color: Theme.border }
+                    Item {
+                        width: parent.width
+                        height: 24
+                        Btn { visible: page.cur !== null && page.mine(page.cur); anchors.verticalCenter: parent.verticalCenter; small: true; iconName: "edit"; text: "Edit"; onClicked: Nav.go("flows", "edit-" + page.cur.id) }
+                        Txt { visible: page.cur !== null && !page.mine(page.cur); anchors.verticalCenter: parent.verticalCenter; width: parent.width - ctlRow.width - 12
+                              text: page.cur ? (page.askedOfMe(page.cur) ? "an ask to you" : "made by " + page.who(page.cur) + "; only they change it") : ""; color: Theme.text3; font.pixelSize: 12 }
+                        Row {
+                            id: ctlRow
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 18
+                            readonly property var act: page.g0 && page.g0.acts.length ? page.g0.acts[page.gpick[page.g0.id] || 0] : null
+                            Btn { visible: ctlRow.act !== null; small: true; kind: "primary"; text: ctlRow.act ? ctlRow.act[0] : ""; enabled: ctlRow.act !== null && ctlRow.act[2]
+                                  tip: ctlRow.act && !ctlRow.act[2] ? ctlRow.act[3] : ""; onClicked: if (ctlRow.act[1]) ctlRow.act[1]() }
+                            Row {
+                                visible: page.cur !== null && page.mine(page.cur)
+                                spacing: 6
+                                readonly property bool held: page.cur !== null && (page.cur.st === "paused" || page.cur.st === "stopped")
+                                Btn { visible: parent.held; small: true; kind: "primary"; iconName: "caretr"; text: page.cur && page.cur.st === "stopped" ? "Start again" : "Resume"
+                                      enabled: page.cur !== null && page.cur.st !== "stopped"; tip: page.cur && page.cur.st === "stopped" ? "The Engine cannot start a stopped flow again yet" : ""
+                                      onClicked: page.call("flow.resume", { flow_id: page.cur.id }, "Resumed · it carries on, and keeps what was held") }
+                                Btn { visible: !parent.held; small: true; iconName: "pausecircle"; text: "Pause"; onClicked: page.call("flow.pause", { flow_id: page.cur.id }, "Paused · nothing is lost") }
+                                Btn { visible: !parent.held; small: true; danger: true; iconName: "stop"; text: "Stop"
+                                      onClicked: confirm.ask({ title: "Stop " + page.cur.name + "?", text: "Nothing goes through it any more. What it copied stays where it is, and its history is kept.", ok: "Stop it", danger: true },
+                                                             function () { page.call("flow.delete", { flow_id: page.cur.id }, "Stopped · its history is kept") }) }
+                            }
+                        }
+                    }
+                }
+                Pulse { parent: ctlP; key: page.loading ? null : page.pickedKey || null }
+            }
+            Box {
+                id: syncP
+                objectName: "flowLastSync"
+                width: parent.width
+                title: "Last sync"
+                sub: page.cur ? page.cur.name : "pick a flow on the left"
+                readonly property var last: page.log.length ? page.log[0] : null
+                Rectangle {
+                    width: parent.width
+                    height: sc.height + 20
+                    radius: Theme.radiusLg
+                    color: Theme.surface2
+                    Column {
+                        id: sc
+                        x: 12; y: 10
+                        width: parent.width - 24
+                        spacing: 6
+                        Txt { visible: syncP.last === null || page.loading; width: parent.width; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                              text: !page.cur ? "Pick a flow on the left." : page.loading ? "Loading " + page.cur.name : page.cur.consent_status === "pending" ? "Not synced yet. It starts once an Admin agrees and picks a folder." : "Not synced yet." }
+                        Txt { visible: syncP.last !== null && !page.loading; width: parent.width; textFormat: Text.StyledText; elide: Text.ElideNone
+                              text: syncP.last ? "<span style='font-size:16px;font-weight:600'>" + Time.atDay(syncP.last.synced_at || syncP.last.at) + "</span>"
+                                    + (page.log.length > 1 ? "<font color='" + Theme.text3 + "'> · the one before was " + Time.atDay(page.log[1].synced_at || page.log[1].at) + "</font>" : "") : "" }
+                        Txt { visible: syncP.last !== null && !page.loading; width: parent.width; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                              text: syncP.last ? [syncP.last.path || syncP.last.file_path || "", syncP.last.outcome || syncP.last.result || ""].filter(function (s) { return s }).join(" · ") : "" }
+                    }
+                }
+                Pulse { parent: syncP; key: page.loading ? null : page.pickedKey || null }
+            }
+        }
+    }
+
+    // --- the picked flow, drawn ---------------------------------------------------------------------------
+    Box {
+        id: drawP
+        objectName: "flowDrawn"
+        width: parent.width
+        title: page.cur ? page.cur.name : "The picked flow"
+        sub: page.cur ? "drawn from its own sources, steps and destinations · " + page.shape(page.cur) : "pick a flow above to draw it here"
+        FlowGraph {
+            visible: page.cur !== null
+            width: parent.width
+            wait: page.cur !== null && page.cur.consent_status === "pending"
+            srcs: page.cur ? [{ host: page.cur.source_hostname, path: page.cur.source_path, gone: !!page.cur.pause_reason && page.cur.pause_reason.indexOf("source") === 0 }] : []
+            stages: page.steps
+            dests: page.cur ? (page.cur.destinations || []).map(function (d) {
+                return { host: d.destination_hostname || "storage", path: d.destination_path, ask: page.cur.consent_status === "pending", bad: !!d.paused_reason } }) : []
+        }
+        Rectangle {
+            visible: page.cur === null
+            width: parent.width; height: 110; radius: Theme.radiusLg
+            color: "transparent"; border.width: 1.5; border.color: Theme.border
+            Row { anchors.centerIn: parent; spacing: 8
+                  Icon { name: "branches"; size: 13; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+                  Txt { text: "Nothing picked"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone } }
+        }
+        Pulse { parent: drawP; key: page.loading ? null : page.pickedKey || null }
+    }
+
+    // --- make a flow: a few careful steps, so it has its own page ---------------------------------------------
+    Box {
+        objectName: "makeFlow"
+        width: parent.width
+        accentFoot: true
+        title: "Make a flow"
+        sub: "files go one way only; nothing restricted rides along without its owner's say"
+        GiveSteps {
+            steps: [["Pick where files start", "a folder or one file on your machines, or one a flow already fills"], ["Say what happens on the way", "convert, compress, rename or sort, in order; or copy them as they are"], ["Pick where they land", "folders you manage; another Admin's is asked first"]]
+            act: "Make a flow"
+            onGo: Nav.go("flows", "new")
         }
     }
 }

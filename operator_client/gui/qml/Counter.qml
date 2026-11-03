@@ -26,23 +26,10 @@ Item {
             Nav.deptName = ds.length === 1 ? ds[0].name : ""
             Nav.count("machines", machines)
         })
-        // a ping is "I need you": the count pulses until every one is answered
-        falcon.call("assistance.channels", {}, function (ok, r) {
-            var n = 0
-            if (ok) {
-                var cs = r.channels || []
-                for (var i = 0; i < cs.length; i++) {
-                    var c = cs[i]
-                    if (c.closed_at) continue
-                    var iAmHigher = c.superior_account_id === me
-                    if ((c.turn === "superior" && iAmHigher) || (c.turn === "sender" && !iAmHigher)) n++
-                }
-            }
-            falcon.call("assistance.ping_status", {}, function (ok2, r2) {
-                // one row per ping: what waits is each person who pinged, not each ping
-                var pings = ok2 ? (r2.pings || []).map(function (p) { return p.sender_account_id }).filter(function (v, i, a) { return a.indexOf(v) === i }).length : 0
-                Nav.count("messages", n + pings, true, n + pings > 0)
-            })
+        // conversations with something unread (version 1, chat.list): the count pulses until they are read
+        falcon.call("chat.list", {}, function (ok, r) {
+            var n = ok ? (r.conversations || []).filter(function (c) { return c.unread > 0 }).length : 0
+            Nav.count("messages", n, true, n > 0)
         })
         falcon.call("resource.violations", {}, function (ok, r) {
             var open = 0
@@ -62,7 +49,7 @@ Item {
         function onConnected() { root.refresh() }
         function onScopeChanged() { root.refresh() }
         function onPushReceived(type, payload) {
-            if (/^(assistance|task|resource|session|hierarchy|reports|pc\.presence|enroll)/.test(type)) refresh.restart()
+            if (/^(chat|assistance|task|resource|session|hierarchy|reports|pc\.presence|enroll)/.test(type)) refresh.restart()
         }
     }
     Timer { id: refresh; interval: 300; onTriggered: root.refresh() }

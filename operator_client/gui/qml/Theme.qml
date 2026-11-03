@@ -89,7 +89,14 @@ QtObject {
     readonly property int controlLg: 36
     readonly property int durFast: 120
     readonly property int durBase: 200
+    // a section a click changed pulses once; the person can turn it off beside the theme (the user, 1 Nov 2026)
+    property bool pulseOn: true
+    readonly property int pulseMs: 900
+    // a section that asks the Engine for something when an item is picked says so for this long
+    readonly property int loadMs: 700
     readonly property int siderW: 216            // the menu's width
+    readonly property int siderTop: 20           // the menu starts this far below the console's name
+    readonly property int pageTop: 30            // and a page's title this far below the top bar
     readonly property int searchW: 540           // the top bar's search, centred over that area
     readonly property int paletteW: 780          // and the palette it opens, on the same centre line
     readonly property int listRows: 6            // a list panel shows six rows a page

@@ -6,9 +6,10 @@ import "."
 TextField {
     id: root
     property string iconName: ""
+    property bool small: false                 // antd's small input: 24 high, 7px in
 
-    implicitHeight: Theme.control
-    leftPadding: (iconName === "" ? 10 : Theme.s5 + Theme.s2)
+    implicitHeight: small ? Theme.controlSm : Theme.control
+    leftPadding: (iconName === "" ? (small ? 7 : 10) : (small ? 26 : Theme.s5 + Theme.s2))
     rightPadding: 10
     topPadding: 0
     bottomPadding: 0
@@ -30,10 +31,10 @@ TextField {
     Icon {
         visible: root.iconName !== ""
         name: root.iconName
-        size: 15
+        size: root.small ? 13 : 15
         color: Theme.quiet
         anchors.left: parent.left
-        anchors.leftMargin: Theme.s3
+        anchors.leftMargin: root.small ? 8 : Theme.s3
         anchors.verticalCenter: parent.verticalCenter
     }
 }

@@ -36,6 +36,9 @@ def main(argv: list[str]) -> int:
             QGuiApplication.quit()
 
     app = QGuiApplication(sys.argv[:1])
+    from worker_client import fonts
+
+    fonts.load()
     engine = QQmlApplicationEngine()
     answer = Answer()
     engine.rootContext().setContextProperty("answer", answer)

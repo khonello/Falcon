@@ -48,6 +48,9 @@ def main(argv: list[str]) -> int:
 
     app = QApplication(sys.argv[:1])
     app.setQuitOnLastWindowClosed(False)
+    from worker_client import fonts
+
+    fonts.load()
 
     # one copy per person: a second start only asks the first to come forward
     name = f"FalconProgram-{getpass.getuser()}"
@@ -68,7 +71,9 @@ def main(argv: list[str]) -> int:
         toastArrived = Signal("QVariant")
         asked = Signal(str)
         showRequested = Signal()
+        conversationChanged = Signal()
         _got = Signal(object)
+        _gotConversation = Signal(object)
 
         def __init__(self) -> None:
             super().__init__()
@@ -80,6 +85,8 @@ def main(argv: list[str]) -> int:
             self._client = LocalClient()
             self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="falcon-program")
             self._got.connect(self._apply)
+            self._conversation: dict[str, Any] = {}
+            self._gotConversation.connect(self._applyConversation)
             try:
                 self._seen = int(json.loads(state_path().read_text(encoding="utf-8")).get("seen_alert", 0))
             except (OSError, ValueError, TypeError):
@@ -104,7 +111,9 @@ def main(argv: list[str]) -> int:
         def preview(self, view: dict[str, Any]) -> None:
             self._view, self._away = view, False
             self._badge = badge_of(view, self._seen)
+            self._conversation = view.get("conversation") or {}     # a sample conversation, for a picture of Messages
             self.viewChanged.emit()
+            self.conversationChanged.emit()
 
         @Slot()
         def refresh(self) -> None:
@@ -163,6 +172,41 @@ def main(argv: list[str]) -> int:
         @Slot("QVariant")
         def ack(self, ids: Any) -> None:
             self._act(self._client.ack, list(ids))
+
+        # a conversation an Admin started, read up to now; the person answers in it and never starts one
+        @Property("QVariant", notify=conversationChanged)
+        def conversation(self) -> Any:
+            return self._conversation
+
+        def _applyConversation(self, c: Any) -> None:
+            self._conversation = c or {}
+            self.conversationChanged.emit()
+
+        @Slot(int)
+        def openConversation(self, conversation_id: int) -> None:
+            def run() -> None:
+                try:
+                    self._gotConversation.emit(self._client.conversation(conversation_id))
+                except ServiceAway:
+                    self._gotConversation.emit(None)
+            self._pool.submit(run)
+
+        @Slot(int, str)
+        def reply(self, conversation_id: int, body: str) -> None:
+            def run() -> None:
+                try:
+                    self._client.reply(conversation_id, body)
+                    self._gotConversation.emit(self._client.conversation(conversation_id))
+                except ServiceAway:
+                    pass
+                self._fetch()
+            self._pool.submit(run)
+
+        @Slot(str)
+        def copyText(self, text: str) -> None:
+            from PySide6.QtGui import QGuiApplication
+
+            QGuiApplication.clipboard().setText(text)
 
         @Slot()
         def show(self) -> None:

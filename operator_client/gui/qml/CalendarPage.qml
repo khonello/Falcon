@@ -18,14 +18,15 @@ Page {
 
     readonly property var kinds: ({
         task:         { label: "Tasks",         c: Theme.accent },
-        rule:         { label: "Automation",    c: Theme.ser2 },
-        announcement: { label: "Announcements", c: Theme.ser3 }
+        todo:         { label: "Your to-dos",   c: Theme.ser3 },
+        rule:         { label: "Automation",    c: Theme.ser2 }
     })
-    readonly property var kindKeys: ["task", "rule", "announcement"]
+    // the version 1 concept: task deadlines, your to-dos and scheduled automation (announcements live on Messages)
+    readonly property var kindKeys: ["task", "todo", "rule"]
     function colour(x) { return x.k === "task" && x.overdue ? Theme.crit : kinds[x.k].c }
 
     // --- the data ------------------------------------------------------------------------------------
-    readonly property var parsed: items.map(function (i) {
+    readonly property var parsed: items.filter(function (i) { return page.kindKeys.indexOf(i.kind) >= 0 }).map(function (i) {
         var t = Time.ms(i.at)
         return { k: i.kind, at: t, day: Time.startOfDay(t), title: i.title, line: i.line, to: i.to, overdue: !!i.overdue }
     })
@@ -354,6 +355,54 @@ Page {
             }
             Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 43; width: parent.width; height: 1; color: Theme.border }
             Txt { x: 18; anchors.bottom: parent.bottom; anchors.bottomMargin: 14; text: "Read-only. An item opens the page that owns it."; color: Theme.text3; font.pixelSize: Theme.fSmall; elide: Text.ElideNone }
+        }
+    }
+
+    situation: {
+        var wk = parsed.filter(function (x) { return x.at >= Time.now && x.at < Time.now + 7 * 86400000 })
+        var n = function (k) { return wk.filter(function (x) { return x.k === k }).length }
+        var late = parsed.filter(function (x) { return x.overdue }).length
+        return "In the next 7 days: " + Theme.many(n("task"), "task deadline") + ", " + Theme.fmt(n("todo")) + " of your to-dos and " + Theme.many(n("rule"), "scheduled run") + "."
+               + (late ? " " + Theme.fmt(late) + (late === 1 ? " is" : " are") + " already past " + (late === 1 ? "its" : "their") + " date." : "")
+    }
+    situationAt: Time.now
+
+    // put something on the calendar: a to-do for yourself, with when it is due (todo.add)
+    property string tdt: ""
+    // tomorrow at 17:00, as the concept starts it
+    property var tdue: { var d = new Date(Time.now); d.setDate(d.getDate() + 1); d.setHours(17, 0, 0, 0); return d.getTime() }
+    function addTodo() {
+        falcon.call("todo.add", { text: tdt.trim(), due_at: Time.d(tdue).toISOString() }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not added"); return }
+            Msg.ok("Added, due " + Time.atDay(page.tdue)); page.tdt = ""; page.tdue = null; page.load()
+        })
+    }
+    Box {
+        objectName: "putOnCalendar"
+        width: parent.width
+        accentFoot: true
+        title: "Put something on the calendar"
+        sub: "a to-do for yourself with when it is due; it is said here before it is added"
+        Column {
+            width: parent.width
+            spacing: 8
+            Row {
+                width: parent.width
+                spacing: 8
+                Field { objectName: "calTodo"; width: parent.width - 190 - addB.width - 16; placeholderText: "What to remember"; text: page.tdt; onTextEdited: page.tdt = text }
+                DateTimeField { width: 190; value: page.tdue; placeholder: "When it is due"; onChanged: function (v) { page.tdue = v } }
+                Btn { id: addB; kind: "primary"; text: "Add it"; enabled: page.tdt.trim() !== "" && page.tdue !== null; onClicked: page.addTodo() }
+            }
+            Rectangle {
+                readonly property bool said: page.tdt.trim() !== "" && page.tdue !== null
+                width: parent.width
+                height: pv.height + (said ? 20 : 0)
+                radius: Theme.radius
+                color: said ? Theme.surface2 : "transparent"
+                Txt { id: pv; x: parent.said ? 12 : 2; y: parent.said ? 10 : 0; width: parent.width - 2 * x; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                      font.pixelSize: parent.said ? 13 : 13; color: parent.said ? Theme.text : Theme.text3
+                      text: parent.said ? (Time.ms(page.tdue) < Time.now ? "That time has passed. Choose a later one." : "A to-do for you, due " + Time.atDay(page.tdue) + ". Only you see it; it shows on Tasks and here.") : "Say what to remember, and by when." }
+            }
         }
     }
 }

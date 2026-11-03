@@ -23,6 +23,23 @@ QtObject {
     }
 
     signal went(string page, var sub)
+    // A button that opens another page asks first, then arrives: the page it opens picks the thing and pulses it (the user,
+    // 1 Nov 2026). The person can stop the asking; the menu, the crumb and search never ask.
+    property bool askFirst: true
+    property var arrive: null                  // {page, target}: what the page being opened should pick
+    signal asking(var req)
+    function goAsk(p, s, what, target) {
+        var req = { page: p, sub: s === undefined ? null : s, what: what || "", target: target === undefined ? null : target }
+        if (askFirst) asking(req); else arriveAt(req)
+    }
+    function arriveAt(req) {
+        arrive = req.target === null ? null : { page: req.page, target: req.target }
+        go(req.page, req.sub)
+    }
+    function takeArrive(p) {
+        if (!arrive || arrive.page !== p) return null
+        var a = arrive.target; arrive = null; return a
+    }
     signal palette()
     // Pages that were pruned (docs/design/pruning.md): whoever still points at one lands on the page that took over its job.
     readonly property var gone: ({ access: 1, accountability: 1, rules: 1, rollout: 1, reports: 1, sessions: 1 })
@@ -62,8 +79,8 @@ QtObject {
 
     // --- titles: what each page is, in a line --------------------------------------------------------
     readonly property var titles: ({
-        calendar: ["Calendar", "What is coming · deadlines, scheduled automation and announcements waiting to go out"],
-        messages: ["Messages", "Conversations with the people you work with; a request opens one once it is accepted"],
+        calendar: ["Calendar", "What is coming · task deadlines, your to-dos and scheduled automation"],
+        messages: ["Messages", "Conversations with the people you look after, one at a time or as a group"],
         detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"],
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
         access: ["Access", "Who is inside which machine, and who was let in"],
