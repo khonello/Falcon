@@ -25,7 +25,7 @@ async def test_the_super_user_has_their_own_level_and_enters_an_admin_s(console)
 
 # --- from tests/test_operator_gui.py
 async def test_the_super_user_never_opens_an_admin_s_page(console):
-    """A machine opens on its department's page; a pruned page lands on Overview (docs/design/su-navigation.md, pruning.md)."""
+    """A machine opens on its department's page; a pruned page lands on Overview (parked/design/su-navigation.md, docs/design/pruning.md)."""
     win, _, _ = console("super_user")
     win.setProperty("view", "machines/OPS-01")
     assert prop(win, "where") == "departments"

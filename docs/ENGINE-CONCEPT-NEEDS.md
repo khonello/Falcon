@@ -1,8 +1,8 @@
 # What the console concept needs from the Engine
 
 Written 11 Oct 2026, after the user asked that the Engine cover **everything the console needs**, not only what
-`ENGINE-GAPS.md` lists. This is the page-by-page check of the concept (`docs/design/concepts-snapshot.html`,
-`docs/design/super-user-menu.md`) against the handlers the Engine has. Each row says what the page shows, whether
+`ENGINE-GAPS.md` lists. This is the page-by-page check of the concept (then `docs/design/concepts-snapshot.html` and
+`docs/design/super-user-menu.md`, both parked now under `parked/design/`) against the handlers the Engine has. Each row says what the page shows, whether
 the Engine could already feed it, and the work package that closes the gap. Work packages (WP) are built in the order
 below; each is committed and pushed on its own and moved to **Done** here when it lands.
 

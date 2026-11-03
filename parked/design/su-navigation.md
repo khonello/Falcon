@@ -120,7 +120,7 @@ machine page opens Restricted.
 | sidebar, *Console Kit ↗* | opens another artifact in a new tab |
 | sidebar, *sample: empty · small · large · absurd* | reloads the page with another sample |
 
-Neither belongs to the product. Found while auditing the Admin's console ([admin-navigation.md](admin-navigation.md)),
+Neither belongs to the product. Found while auditing the Admin's console ([admin-navigation.md](../../docs/design/admin-navigation.md)),
 which also checks the console frame (`App`) that this first pass read only for its Super User parts.
 
 ## Not counted

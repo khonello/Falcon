@@ -2,7 +2,7 @@
 
 Every place in an Admin's console (the concept, `R2NT8v3996VDFYiS3XM4JL`, version 155) that takes the viewer
 from the page they are on to another page, classified by where it lands. The companion to
-[su-navigation.md](su-navigation.md).
+[su-navigation.md](../../parked/design/su-navigation.md).
 
 **The rules the console is held to:**
 

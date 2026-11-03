@@ -19,6 +19,8 @@ lives here. No package includes this folder (`pyproject.toml` finds `engine*`, `
 | `operator_client/core/narrate.py` | `operator_client/core/` (and `FalconBridge.narrate`) | Sentences for the Super User's charts |
 | `operator_client/gui/qml/*.qml` | `operator_client/gui/qml/` (`Desk` back into `qmldir`) | The Super User's pages, the department cards, entering an Admin's console, the task strip |
 | `tests/` | `tests/` | Their tests |
+| `design/concepts-super-user.html` | the "Falcon Concepts" artifact (claude.ai/artifact/R2NT8v3996VDFYiS3XM4JL) | The Super User's concept, as last published (23 Oct 2026); the Admin and Worker concepts in `docs/design/` were cleaned of it on 3 Nov 2026 |
+| `design/*.md` | `docs/design/` | The Super User's design notes: `su-navigation`, `su-pages`, `super-user-menu`, `super-user-reference` (migrations 022 and 024 still cite `super-user-menu.md` by its old path) |
 
 ## What stayed in the shipped code
 

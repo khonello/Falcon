@@ -1,11 +1,11 @@
 # A click stays on its page: sweep (7 Oct 2026)
 
-The rule ([super-user-menu.md](super-user-menu.md), *A click stays on its page*): a click changes the page only when
+The rule ([super-user-menu.md](../../parked/design/super-user-menu.md), *A click stays on its page*): a click changes the page only when
 it is the sidebar, the path, Search, a link whose words name where it goes (ending "→"), or a create/edit button
 that opens an editor. Everything else acts in place.
 
 This sweep lists every click in the concept (version 156) that changes the page, at both levels, built on
-[su-navigation.md](su-navigation.md) and [admin-navigation.md](admin-navigation.md): the same reachability pass
+[su-navigation.md](../../parked/design/su-navigation.md) and [admin-navigation.md](admin-navigation.md): the same reachability pass
 (components drawn from each level's routes) and every `go(...)` and `enter(...)` in them. Each is marked:
 
 - **ok**: frame, a link that names its page, or an editor's create/edit/cancel/save;

@@ -20,9 +20,9 @@ for the Console Kit link; regenerate it from the same source if it is ever lost.
 
 **The console concept (1 Oct 2026) goes further than the kit.** *Falcon Concepts* is a whole working
 console on sample data: eleven pages, live charts, and the create and resolve flows. It was reworked
-with the user over a day until it read as software a company buys. Its source is
-`design/console-concepts.html`; the kit's is `design/console-kit.html`. Both are complete pages that
-can be republished as they are. **Where the concept and an older rule below disagree, the concept
+with the user over a day until it read as software a company buys. Its source was
+`design/console-concepts.html` and the kit's `design/console-kit.html`; both were removed on 3 Nov 2026 (in git history), and
+version 1 follows `docs/design/concepts-admin.html` and `docs/design/concepts-worker.html`. **Where the concept and an older rule below disagree, the concept
 wins.** Those rules are marked *superseded* in place, and the new ones are under *Decided 1 October
 2026* at the end. What the concept shows but nobody has decided yet is listed there too, as still open.
 
@@ -175,7 +175,7 @@ Every page is reachable from the sider. No page is reachable only by clicking a 
 Departments, People, Assistance, Resources and Settings were not drawn in the concept and stand as
 they are.
 
-**What belongs on each page** comes from the role references — `docs/design/super-user-reference.md`, `admin-reference.md` and `client-reference.md` — which list every capability each role has, gathered from the design documents. Build a page from its role's list, not from memory.
+**What belongs on each page** comes from the role references — `docs/design/admin-reference.md` and `client-reference.md` (the Super User's is parked: `parked/design/super-user-reference.md`) — which list every capability each role has, gathered from the design documents. Build a page from its role's list, not from memory.
 
 ---
 

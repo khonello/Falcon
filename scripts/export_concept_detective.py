@@ -1,4 +1,4 @@
-r"""The Detective sample for the console concept (docs/design/concepts-snapshot.html): the same cases `preview.py` shows, played through the real matcher, with the
+r"""The Detective sample for the console concept (docs/design/concepts-admin.html): the same cases `preview.py` shows, played through the real matcher, with the
 clock set to the concept's "now" (13:20 today) so every time on the page agrees with the rest of the concept.
 
     environ-engine\Scripts\python.exe scripts\export_concept_detective.py > detective.json

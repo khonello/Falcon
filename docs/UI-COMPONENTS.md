@@ -186,7 +186,7 @@ selection and the bulk bar that replaces the heading while a set is chosen.
 
 ### Fourth wave — from the console concept (1 Oct 2026)
 
-The concept (`design/console-concepts.html`; UI.md rules 26–38) needs these. None of them is built in
+The concept (then `design/console-concepts.html`, removed 3 Nov 2026; UI.md rules 26–38) needs these. None of them is built in
 QML yet. The priorities are a proposal, ordered by how much of the concept depends on each one.
 
 | Component | What it does | Used by | Built from | Priority |
