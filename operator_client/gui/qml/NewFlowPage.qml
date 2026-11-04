@@ -24,7 +24,7 @@ Editor {
     property string when: "Real time"
     property var stages: []                     // [{ kind, opId, op, settings, scope: "all" | index }]
     property var dests: [{ mode: "mine", pc: 0, path: "", who: 0, note: "" }]
-    property string onDelete: "keep"            // kept as it was set; the concept does not ask
+    property string onDelete: "keep"            // what the destinations do when a file is deleted at the source: keep their copy, or put it aside
     property var tree: []                       // flow.steps: categories of kinds of operations
     readonly property var runModes: ({ "Real time": "realtime", "On a schedule": "hourly", "Only when I run it": "manual" })
 
@@ -222,6 +222,10 @@ Editor {
         NfPick { title: "On a schedule"; desc: "Changed files are copied together, every hour."; on: page.when === "On a schedule"; onPicked: page.when = "On a schedule" }
         NfPick { title: "Only when I run it"; desc: "Nothing moves until someone presses Run on the flow."; on: page.when === "Only when I run it"; onPicked: page.when = "Only when I run it" } }
 
+    NfSec { visible: page.step === 0; title: "When a file is deleted at the source"
+        NfPick { objectName: "nfKeep"; title: "Keep the copies"; desc: "The destinations keep what they were given. Deleting a file here never deletes it there."; on: page.onDelete === "keep"; onPicked: page.onDelete = "keep" }
+        NfPick { objectName: "nfMirror"; title: "Remove the copies"; desc: "The destinations put their copy aside, in a “.falcon-removed” folder; nothing is destroyed. Only a copy this flow wrote and nobody has changed is touched."; on: page.onDelete === "mirror"; onPicked: page.onDelete = "mirror" } }
+
     // --- what happens on the way -----------------------------------------------------------------------------------------------------------
     Head2 { visible: page.step === 1; t: "Should anything happen to the files on the way?"; d: "Optional. Steps run in order, top to bottom. With none, files are copied exactly as they are." }
     Rectangle { visible: page.step === 1 && page.stages.length === 0; width: parent.width; height: 54; radius: 8; color: "transparent"
@@ -303,7 +307,7 @@ Editor {
             d: page.editId ? "The checks run again against every other flow. It keeps running as it was until you save." : "Checked against the one file index and every other flow before anything is copied." }
     FactRows { visible: page.step === 3
         rows: [["Made by", "you"], ["From", page.rsrc.map(function (s) { return page.hostName(s.pc) + " " + s.path }).join(", ")], ["Along the way", page.stages.map(function (s, i) { return (i + 1) + ". " + s.op }).join("  ") || "copied as they are"],
-               ["To", page.dests.map(function (d) { var a = page.adminOf(d.who); return d.mode === "ask" ? (a ? a.name : "") + " picks a folder" : page.hostName(d.pc) + " " + d.path }).join(", ")], ["Copies files", page.when.toLowerCase()]] }
+               ["To", page.dests.map(function (d) { var a = page.adminOf(d.who); return d.mode === "ask" ? (a ? a.name : "") + " picks a folder" : page.hostName(d.pc) + " " + d.path }).join(", ")], ["Copies files", page.when.toLowerCase()], ["If a file is deleted", page.onDelete === "keep" ? "the copies stay" : "the copies are put aside"]] }
     Item { visible: page.step === 3; width: parent.width; height: Theme.control + 6
         Txt { width: 130; y: 12; text: "Name"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
         Field { x: 142; y: 6; width: 320; text: page.name; placeholderText: page.rsrc[0] ? Sync.folder(page.rsrc[0].path) || "my-flow" : "my-flow"; onTextEdited: page.name = text } }

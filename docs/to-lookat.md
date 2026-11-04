@@ -3,16 +3,13 @@
 Open items to go over with the user. Bring this up first in a new session, then tidy it as items close.
 Last updated 4 Nov 2026.
 
-## From the 1:1 pass, 4 Nov 2026
+## Answered 4 Nov 2026
 
-- **The editors are drawers now,** as the concept has them. Two things went with the old pages: the flow's Keep / remove copies choice (the concept does not ask; new flows keep,
-  and the issue on a deleted source still offers Remove) and Keep as one on a split task. Say if either should come back.
-- **Any Admin verifies a task:** the concept shows it, and the QML follows; it changes the invariant "only the assigner closes a task". Confirm, then CLAUDE.md and
-  `task-natural-combo.md` change with it (ENGINE-GAPS #23).
-- **Only a rule's maker changes it** ("only A. Quaye changes it"): the concept has this, and it sits oddly beside "nobody owns an issue". Confirm it is meant.
-- **"In the local model's words":** the concept says this of a case, but `SMOOTHING` is off, so the page says "from what Detective found" until one of them changes.
-- **The concept's own loose ends:** Automation's situation says Next: Daily maintenance tomorrow while its own list starts with tonight's run (the QML says the real next
-  one); Actions counts 4 rules where Automation shows 8; Flows still shows Sort, which `flow.steps` dropped.
+- **Any Admin verifies a task:** yes. CLAUDE.md, `task-natural-combo.md` and the concept say so; `task.verify` must follow (ENGINE-GAPS #23).
+- **Only a rule's maker changes it:** yes; the Engine must refuse anyone else (#23).
+- **The concept's contradictions:** corrected towards what is true. Automation's Next is the real next run, Actions counts all eight rules, Flows has the Engine's steps, and a case's
+  account says who wrote it as it happened: the local model with smoothing on, Falcon with it off.
+- **The flow's Keep / Remove the copies:** back, in the concept and in Make a flow. **Task split is gone** (the user, 4 Nov): a description is one task, in the concept and the console.
 
 ## Answered 3 Nov 2026
 

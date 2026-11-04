@@ -110,7 +110,7 @@ def _told(text: str) -> dict[str, Any]:
             elif x:
                 parts.append({"text": x})
         paras.append(parts)
-    return {"paragraphs": paras, "text": text, "smoothed": True, "note": "Written by the local model from what Detective found. It is a reading of the evidence, not proof."}
+    return {"paragraphs": paras, "text": text, "smoothed": True, "note": "Detective's reading of the evidence, not proof."}
 
 
 def built() -> dict[str, Any]:

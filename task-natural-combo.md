@@ -6,6 +6,8 @@ The Task natural combo is a foundational workflow pattern: **Task → Verificati
 
 Verification is the anchor: it defines what the end outcome of the task must be. Expectations are derived from verification, not defined independently — they exist to show that work toward that outcome is happening, without ever confirming it's finished. A local LLM assists by turning a plain-language task description into a populated task structure — Verification targets, Deadline, and task scope — so the assigner rarely has to configure this by hand.
 
+**Version 1 (the user, 4 Nov 2026):** any Admin may verify a task, whoever gave it. Where this document says the assigner closes a task, read any Admin.
+
 **Governing principle — the LLM surfaces ambiguity, it never silently resolves it:** whenever the LLM encounters something uncertain while populating the task structure — an unclear Verification target, an ambiguous Deadline, or a description that seems to cover more than one task — it surfaces this back to the assigner as a question or a proposal. It never picks silently on the assigner's behalf and presents the guess as settled fact. This single principle governs all LLM-assisted parts of Task creation, not just Verification.
 
 ---
@@ -323,3 +325,5 @@ Task closed (or returned for revision).
 13. **LLM proposes, never silently resolves** = the single governing rule behind all LLM-assisted parts of Task creation — ambiguous verification targets, ambiguous deadlines, name collisions, and descriptions covering multiple tasks are all surfaced to the assigner as a question or proposal, never silently decided
 14. **Deadline is one Task-level property, not per-item** = Soft and Final deadline apply to the whole task; both are implemented as scheduled Events, and their alerts use the same shared status-indicator pattern as the help message
 15. **(Superseded 24 Oct 2026: one description is always one task.) Multi-Task Detection proposes a concrete split** = when a description seems to cover multiple tasks, the LLM drafts the proposed split (sharing common fields, differing only where needed) and asks the assigner to accept the split or keep it as one task — it never restructures silently
+
+**Version 1 (the user, 4 Nov 2026):** wherever this document says the assigner verifies a task, any Admin may. Nobody owns a task between Admins; the record says who verified it. The person a task was given to never verifies it. There are no repeating tasks: a description saying "every day" gets a flag, and repeating work is given again, or made a rule.

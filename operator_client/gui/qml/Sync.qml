@@ -33,7 +33,7 @@ QtObject {
     // THE STEPS ALONG THE WAY. The builder holds them as a list, [{kind, op, scope: "all" | destination index}];
     // the Engine holds a tree (each stage and each destination points at its parent stage). A step's name is kept
     // in its config as `op`, so it comes back as it was picked; `by` is what the Worker already reads.
-    readonly property var stepOps: ({ Transform: ["Rename by date", "Convert to PDF", "Compress to ZIP"], Categorize: ["Sort by file type", "Sort by month"] })
+    readonly property var stepOps: ({ Choosing: ["By file type", "By name", "By size"], Conversion: ["To PDF", "To DOCX", "To another image type", "Zip each file"], Renaming: ["Add a date", "Add text", "Replace text in the name"], Bundling: ["Into one ZIP", "Into one PDF"] })
     function stepKind(st) { return st.stage_type === "categorization" ? "Categorize" : "Transform" }
     function stepName(st) {
         var c = st.config || {}

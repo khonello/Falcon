@@ -24,7 +24,6 @@ Column {
     property bool busy: false
     property var proposal: null
     property var tasks: []                 // [{title, phrase, who, whoSrc, final, finalSrc, soft, softSrc, none, checks: [...]}]
-    property int cur: 0
     readonly property bool read: proposal !== null
     readonly property bool stale: read && text.trim() !== checked.trim()
 
@@ -110,10 +109,10 @@ Column {
     }
     function blocked(t) { return (t.checks.length === 0 && !t.none) || t.checks.some(function (c) { return !c.name }) }
     readonly property int open: tasks.filter(blocked).length
-    readonly property var t: tasks.length ? tasks[Math.min(cur, tasks.length - 1)] : null
+    readonly property var t: tasks.length ? tasks[0] : null
 
-    function create(asOne) {
-        var list = asOne ? [Object.assign({}, tasks[0], { phrase: text.trim(), checks: tasks.reduce(function (a, x) { return a.concat(x.checks) }, []) })] : tasks
+    function create() {
+        var list = tasks.slice(0, 1)                    // a description is one task
         var left = list.length, failed = false
         list.forEach(function (x) {
             var payload = { description: x.phrase, assignee_account_id: x.whoAccount, verification_mode: x.checks.length ? "stack" : "none" }
@@ -126,7 +125,7 @@ Column {
             if (x.soft) payload.soft_deadline_at = x.soft
             falcon.call("task.create", payload, function (ok, r) {
                 if (!ok) { failed = true; Msg.failed(r && r.message ? r.message : "It was not created") }
-                if (--left === 0 && !failed) { Msg.ok(list.length > 1 ? "Gave " + list.length + " tasks" : "Given to " + list[0].who); page.keeps = false; Nav.go("tasks") }
+                if (--left === 0 && !failed) { Msg.ok("Given to " + list[0].who); page.keeps = false; Nav.go("tasks") }
             })
         })
     }
@@ -242,24 +241,17 @@ Column {
                     Item {
                         width: parent.width; height: 26
                         Head { text: "DETAILS"; anchors.verticalCenter: parent.verticalCenter }
-                        Segmented {
-                            visible: page.tasks.length > 1
-                            anchors.right: parent.right
-                            options: page.tasks.map(function (x, j) { return { value: j, label: "Task " + (j + 1) + (page.blocked(x) ? " ●" : "") } })
-                            value: page.cur
-                            onPicked: function (v) { page.cur = v }
-                        }
                     }
                     Txt { text: "Who and when"; color: Theme.text2; font.pixelSize: 12; font.weight: Font.Medium }
                     Row { width: parent.width; Lbl { text: "Title" }
-                          Field { width: parent.width - 104; text: page.t ? page.t.title : ""; onTextEdited: page.patch(page.cur, { title: text, titleSrc: "you" }) } }
+                          Field { width: parent.width - 104; text: page.t ? page.t.title : ""; onTextEdited: page.patch(0, { title: text, titleSrc: "you" }) } }
                     Row { width: parent.width; Lbl { text: "Assignee" }
                           Select { width: parent.width - 104; search: true; value: page.t ? page.t.whoAccount : null
                                    options: page.people.map(function (p) { return { value: p.account, label: p.name + " · " + p.host } })
-                                   onPicked: function (v) { var p = page.people.filter(function (q) { return q.account === v })[0]; page.patch(page.cur, { who: p.name, whoAccount: v, whoSrc: "you" }) } } }
+                                   onPicked: function (v) { var p = page.people.filter(function (q) { return q.account === v })[0]; page.patch(0, { who: p.name, whoAccount: v, whoSrc: "you" }) } } }
                     Row { width: parent.width; spacing: 8; Lbl { text: "Deadlines" }
-                          DateTimeField { width: (parent.width - 120) / 2; placeholder: "Final"; value: page.t ? page.t.final : null; onChanged: function (v) { page.patch(page.cur, { final: v, finalSrc: "you" }) } }
-                          DateTimeField { width: (parent.width - 120) / 2; placeholder: "Soft (optional)"; value: page.t ? page.t.soft : null; onChanged: function (v) { page.patch(page.cur, { soft: v, softSrc: "you" }) } } }
+                          DateTimeField { width: (parent.width - 120) / 2; placeholder: "Final"; value: page.t ? page.t.final : null; onChanged: function (v) { page.patch(0, { final: v, finalSrc: "you" }) } }
+                          DateTimeField { width: (parent.width - 120) / 2; placeholder: "Soft (optional)"; value: page.t ? page.t.soft : null; onChanged: function (v) { page.patch(0, { soft: v, softSrc: "you" }) } } }
                     Txt { text: "What done looks like"; color: Theme.text2; font.pixelSize: 12; font.weight: Font.Medium; topPadding: 6 }
                     Row {
                         width: parent.width
@@ -274,17 +266,17 @@ Column {
                                     required property int index
                                     spacing: 6
                                     Select { width: 92; small: true; value: modelData.target_type; options: [{ value: "file", label: "File" }, { value: "program", label: "Program" }]
-                                             onPicked: function (v) { page.patchCheck(page.cur, index, { target_type: v, intent: v === "file" ? "exists" : "used", name: "" }) } }
+                                             onPicked: function (v) { page.patchCheck(0, index, { target_type: v, intent: v === "file" ? "exists" : "used", name: "" }) } }
                                     Field { width: parent.parent.width - 92 - 130 - 40 - 18; height: Theme.controlSm; text: modelData.name; placeholderText: modelData.target_type === "file" ? "File or folder" : "Program"
-                                            onTextEdited: page.patchCheck(page.cur, index, { name: text }) }
+                                            onTextEdited: page.patchCheck(0, index, { name: text }) }
                                     Select { width: 130; small: true; value: modelData.intent
                                              options: (modelData.target_type === "file" ? page.fileIntents : page.progIntents).map(function (x) { return { value: x[0], label: x[1] } })
-                                             onPicked: function (v) { page.patchCheck(page.cur, index, { intent: v }) } }
-                                    Btn { small: true; kind: "text"; iconName: "close"; onClicked: { var cs = page.t.checks.slice(); cs.splice(index, 1); page.patch(page.cur, { checks: cs }) } }
+                                             onPicked: function (v) { page.patchCheck(0, index, { intent: v }) } }
+                                    Btn { small: true; kind: "text"; iconName: "close"; onClicked: { var cs = page.t.checks.slice(); cs.splice(index, 1); page.patch(0, { checks: cs }) } }
                                 }
                             }
                             Btn { visible: page.t !== null && page.t.checks.length > 0; small: true; iconName: "plus"; text: "Add check"
-                                  onClicked: page.patch(page.cur, { none: false, checks: page.t.checks.concat([{ target_type: "file", intent: "create", name: "", src: "you", why: "Set by you" }]) }) }
+                                  onClicked: page.patch(0, { none: false, checks: page.t.checks.concat([{ target_type: "file", intent: "create", name: "", src: "you", why: "Set by you" }]) }) }
                             // no checks: a decision, asked plainly
                             Rectangle {
                                 visible: page.t !== null && page.t.checks.length === 0
@@ -308,11 +300,11 @@ Column {
                                     Row {
                                         spacing: 8
                                         visible: page.t !== null && !page.t.none
-                                        Btn { iconName: "plus"; text: "Add a check"; onClicked: page.patch(page.cur, { none: false, checks: [{ target_type: "file", intent: "create", name: "", src: "you", why: "Set by you" }] }) }
+                                        Btn { iconName: "plus"; text: "Add a check"; onClicked: page.patch(0, { none: false, checks: [{ target_type: "file", intent: "create", name: "", src: "you", why: "Set by you" }] }) }
                                         Txt { text: "or"; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
-                                        Btn { iconName: "eye"; text: "No checks, I will verify it by hand"; onClicked: page.patch(page.cur, { none: true }) }
+                                        Btn { iconName: "eye"; text: "No checks, I will verify it by hand"; onClicked: page.patch(0, { none: true }) }
                                     }
-                                    Btn { visible: page.t !== null && page.t.none; small: true; kind: "text"; text: "Change"; onClicked: page.patch(page.cur, { none: false }) }
+                                    Btn { visible: page.t !== null && page.t.none; small: true; kind: "text"; text: "Change"; onClicked: page.patch(0, { none: false }) }
                                 }
                             }
                         }
@@ -344,7 +336,7 @@ Column {
         height: Math.max(implicitHeight, page.minHeight)
         fill: true
         flush: true
-        title: page.tasks.length > 1 ? "Task " + (page.cur + 1) + " of " + page.tasks.length : "The task"
+        title: "The task"
         sub: "what will be created"
         extra: Tag { text: page.t && page.blocked(page.t) ? "Needs input" : "Ready"; c: page.t && page.blocked(page.t) ? Theme.med : Theme.ok }
         readonly property var me: page.t ? page.people.filter(function (p) { return p.account === page.t.whoAccount })[0] || null : null
@@ -417,7 +409,7 @@ Column {
                     }
                 }
             }
-            Txt { color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone; text: (page.t ? page.t.who : "") + " is told the moment you give it. Only you close it, once it is handed in." }
+            Txt { color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone; text: (page.t ? page.t.who : "") + " is told the moment you give it. Any Admin can close it, once it is handed in." }
         }
         Rectangle {
             anchors.bottom: parent.bottom
@@ -426,25 +418,12 @@ Column {
             color: "transparent"
             Rectangle { width: parent.width; height: 1; color: Theme.border }
             Row {
-                x: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
-                visible: page.tasks.length > 1
-                Repeater {
-                    model: page.tasks
-                    Link { required property var modelData; required property int index; font.pixelSize: 13
-                           text: "Task " + (index + 1) + (page.blocked(modelData) ? " · needs input" : " · ready")
-                           color: index === page.cur ? Theme.text : page.blocked(modelData) ? Theme.med : Theme.text3
-                           onClicked: page.cur = index }
-                }
-            }
-            Row {
                 anchors.right: parent.right
                 anchors.rightMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
                 Btn { iconName: "left"; text: "Back"; onClicked: page.step = "edit" }
-                Btn { kind: "primary"; enabled: !page.busy && !page.stale && page.open === 0; text: "Give the task"; onClicked: page.create(false) }
+                Btn { kind: "primary"; enabled: !page.busy && !page.stale && page.open === 0; text: "Give the task"; onClicked: page.create() }
             }
         }
     }

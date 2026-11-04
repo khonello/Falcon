@@ -2092,7 +2092,7 @@ function TaskSummary({ t }) {
           : html`<div className="t3">${t.none ? "No targets. Nothing is watched; you judge it when the work is in." : "None found yet."}</div>`}
       </div>
     </div>
-    <div className="t3 ts-cap">${t.who.v} is told the moment you give it. Only you close it, once it is handed in.</div>
+    <div className="t3 ts-cap">${t.who.v} is told the moment you give it. Any Admin can close it, once it is handed in.</div>
   </div>`;
 }
 function NewTask({ go, onDone }) {
@@ -2102,10 +2102,10 @@ function NewTask({ go, onDone }) {
   const [busy, setBusy] = useState(false);
   const [conf, setConf] = useState({});
   const [ignored, setIgnored] = useState({});
-  const [tasks, setTasks] = useState(PROPOSED);
-  const [cur, setCur] = useState(0);
+  const [tasks, setTasks] = useState(PROPOSED.slice(0, 1));
+  const cur = 0;
   const read = checked != null, stale = read && text.trim() !== checked.trim();
-  const check = () => { setBusy(true); setTimeout(() => { setChecked(text); setTasks(applyConfirmed(PROPOSED, conf)); setBusy(false); }, 1400); };
+  const check = () => { setBusy(true); setTimeout(() => { setChecked(text); setTasks(applyConfirmed(PROPOSED.slice(0, 1), conf)); setBusy(false); }, 1400); };
   const mine = { src: "you", why: "Set by you" };
   const patch = (i, f) => setTasks((ts) => ts.map((t, j) => (j === i ? { ...t, ...f(t) } : t)));
   const patchCheck = (i, k, f) => patch(i, (t) => ({ none: false, checks: t.checks.map((c, j) => (j === k ? { ...c, ...f, ...mine } : c)) }));
@@ -2146,7 +2146,7 @@ function NewTask({ go, onDone }) {
         <div className="nt-sec">
         <div className="nt-h" style=${{ justifyContent: "space-between" }}>
           <span>Details</span>
-          ${tasks.length > 1 ? html`<${Segmented} size="small" style=${{ textTransform: "none", letterSpacing: 0, fontWeight: 400 }} value=${cur} onChange=${setCur} options=${tasks.map((x, j) => ({ value: j, label: html`<span>Task ${j + 1}${blocked(x) ? html`<span style=${{ color: "var(--med)", marginLeft: 4 }}>●</span>` : null}</span>` }))} />` : null}
+          
         </div>
         <div className="nt-d" style=${{ opacity: stale ? 0.5 : 1 }}>
           <div className="nt-f nt-title"><span>Title</span>
@@ -2208,7 +2208,7 @@ function NewTask({ go, onDone }) {
     ${onDone && step === "edit" ? null : read ? html`<div className="reveal" style=${{ display: "flex", minWidth: 0 }}>
     <section className="panel" style=${{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", opacity: busy || stale ? 0.55 : 1, transition: "opacity .2s" }}>
       <div className="phd">
-        <div className="pt">${tasks.length > 1 ? `Task ${cur + 1} of ${tasks.length}` : "The task"}<small>what will be created</small></div>
+        <div className="pt">The task<small>what will be created</small></div>
         ${blocked(t) ? html`<${Tag} c="var(--med)">Needs input<//>` : html`<${Tag} c="var(--ok)">Ready<//>`}
       </div>
       ${onDone ? html`<${TaskSummary} t=${t} />` : html`<div className="pbd">
@@ -2240,8 +2240,7 @@ function NewTask({ go, onDone }) {
       </div>`}
       <div className="sp" />
       <div className="row" style=${{ padding: "12px 14px", borderTop: "1px solid var(--border)" }}>
-        ${tasks.length > 1 ? html`<span className="row" style=${{ gap: 6 }}>${tasks.map((x, j) => html`<a key=${j} onClick=${() => setCur(j)} style=${{ color: j === cur ? "var(--text)" : blocked(x) ? "var(--med)" : "var(--text-3)", fontWeight: j === cur ? 500 : 400 }}>Task ${j + 1}${blocked(x) ? " · needs input" : " · ready"}</a>`)}</span>` : null}
-        <span className="sp" />
+                <span className="sp" />
         ${onDone ? html`<${Button} icon=${ic("LeftOutlined")} onClick=${() => setStep("edit")}>Back<//>` : html`<${Button} onClick=${() => leave()}>Cancel<//>`}
         <${Button} type="primary" disabled=${busy || stale || open > 0} onClick=${give}>Give the task<//>
       </div>
@@ -2267,28 +2266,28 @@ function Src({ s, why }) {
 const FLOW_HOSTS = [...MACHINES.map((m) => ({ host: m.host, sub: `${m.user || "no user"} · ${DBY[m.dept].name}`, dept: m.dept, offline: m.status === "offline" }))];
 const FHOST = Object.fromEntries(FLOW_HOSTS.map((h) => [h.host, h]));
 const FOLDER_HINTS = ["/documents/", "/reports/", "/exports/", "/archive/", "/payroll/", "/payroll-pdf/", "/intake/", "/weekly/"];
-const STAGE_OPS = { Transform: ["Rename by date", "Convert to PDF", "Compress to ZIP"], Categorize: ["Sort by file type", "Sort by month"] };
+const STAGE_OPS = { Choosing: ["By file type", "By name", "By size"], Conversion: ["To PDF", "To DOCX", "To another image type", "Zip each file"], Renaming: ["Add a date", "Add text", "Replace text in the name"], Bundling: ["Into one ZIP", "Into one PDF"] };
 // Flows chain: a flow's destination can be another flow's source, so a folder can be both. A flow with
 // several destinations can feed a further flow from any of them. Every change is checked for a loop along
 // the whole chain before it is saved (flow-natural-combo.md, Cycle Prevention).
 const EXISTING_FLOWS = [
-  { name: "payroll", by: "R. Mensah", srcs: [["OPS-01", "/payroll/"]], dests: [["FIN-01", "/payroll/"]], stages: [{ kind: "Transform", op: "Rename by date", scope: "all" }],
+  { name: "payroll", by: "R. Mensah", srcs: [["OPS-01", "/payroll/"]], dests: [["FIN-01", "/payroll/"]], stages: [{ kind: "Renaming", op: "Add a date", scope: "all" }],
     st: "Active", files: 64, last: "13:11", fn: (t) => (working(t) ? 3 + 7 * sm(1, t, 3) : 0) },
-  { name: "payroll-pdf", by: "K. Boateng", srcs: [["FIN-01", "/payroll/"]], dests: [["FIN-02", "/payroll-pdf/"], ["FIN-02", "/archive/"]], stages: [{ kind: "Transform", op: "Convert to PDF", scope: "all" }],
+  { name: "payroll-pdf", by: "K. Boateng", srcs: [["FIN-01", "/payroll/"]], dests: [["FIN-02", "/payroll-pdf/"], ["FIN-02", "/archive/"]], stages: [{ kind: "Conversion", op: "To PDF", scope: "all" }],
     st: "Active", files: 41, last: "13:12", fn: (t) => (working(t) ? 2 + 5 * sm(4, t, 3) : 0) },
-  { name: "weekly", by: "R. Mensah", srcs: [["OPS-07", "/weekly/"]], dests: [["LOG-01", "/weekly/"], ["LOG-01", "/archive/"]], stages: [{ kind: "Categorize", op: "Sort by file type", scope: "all" }],
+  { name: "weekly", by: "R. Mensah", srcs: [["OPS-07", "/weekly/"]], dests: [["LOG-01", "/weekly/"], ["LOG-01", "/archive/"]], stages: [{ kind: "Choosing", op: "By file type", scope: "all" }],
     st: "Degraded", paused: [1], files: 38, last: "13:02", fn: (t) => (working(t) ? 2 + 5 * sm(2, t, 3) : 0) },
-  { name: "weekly-digest", by: "A. Quaye", srcs: [["LOG-01", "/weekly/"]], dests: [["OPS-02", "/reports/"]], stages: [{ kind: "Transform", op: "Compress to ZIP", scope: "all" }],
+  { name: "weekly-digest", by: "A. Quaye", srcs: [["LOG-01", "/weekly/"]], dests: [["OPS-02", "/reports/"]], stages: [{ kind: "Bundling", op: "Into one ZIP", scope: "all" }],
     st: "Active", files: 5, last: "12:05", fn: (t) => (working(t) && hod(t) > 11.9 && hod(t) < 12.2 ? 3 : 0) },
   { name: "intake", by: "R. Mensah", srcs: [["OPS-03", "/intake/"]], dests: [["?K. Boateng", "picks a folder"]], stages: [],
     st: "Waiting for a folder", asked: "Tue 10:40", files: 0, last: "—", fn: () => 0 },
-  { name: "budget-review", by: "R. Mensah", srcs: [["WS-OPS-A1", "/reports/budget/"]], dests: [["?K. Boateng", "picks a folder"]], stages: [{ kind: "Transform", op: "Convert to PDF", scope: "all" }],
+  { name: "budget-review", by: "R. Mensah", srcs: [["WS-OPS-A1", "/reports/budget/"]], dests: [["?K. Boateng", "picks a folder"]], stages: [{ kind: "Conversion", op: "To PDF", scope: "all" }],
     st: "Waiting for a folder", asked: "Today 10:20", files: 0, last: "—", fn: () => 0 },
   // two sources: where weekly-digest delivers, and a plain folder
-  { name: "ops-pack", by: "R. Mensah", srcs: [["OPS-02", "/reports/"], ["OPS-05", "/exports/"]], dests: [["WS-OPS-A1", "/packs/"]], stages: [{ kind: "Transform", op: "Compress to ZIP", scope: "all" }],
+  { name: "ops-pack", by: "R. Mensah", srcs: [["OPS-02", "/reports/"], ["OPS-05", "/exports/"]], dests: [["WS-OPS-A1", "/packs/"]], stages: [{ kind: "Bundling", op: "Into one ZIP", scope: "all" }],
     st: "Active", files: 7, last: "12:30", fn: (t) => (working(t) && hod(t) > 12.2 && hod(t) < 12.6 ? 2 : 0) },
   // board papers from A. Quaye's workstation to two other Admins', as PDFs
-  { name: "board-pack", by: "A. Quaye", srcs: [["WS-OPS-A2", "/board/"]], dests: [["WS-OPS-A1", "/board/"], ["WS-FIN-A1", "/board/"]], stages: [{ kind: "Transform", op: "Convert to PDF", scope: "all" }],
+  { name: "board-pack", by: "A. Quaye", srcs: [["WS-OPS-A2", "/board/"]], dests: [["WS-OPS-A1", "/board/"], ["WS-FIN-A1", "/board/"]], stages: [{ kind: "Conversion", op: "To PDF", scope: "all" }],
     st: "Active", files: 12, last: "11:40", fn: (t) => (working(t) && hod(t) > 11.5 && hod(t) < 11.8 ? 2 : 0) },
 ];
 // Another Admin's workstation is not picked by the creator: they ask that Admin, who picks a folder on it. Asking is
@@ -2297,7 +2296,7 @@ const askOf = (d) => (d[0][0] === "?" ? d[0].slice(1) : null);
 const placeTxt = (d) => (askOf(d) ? `${askOf(d)} picks a folder` : d.join(" "));
 // requests other people sent to the person at this console
 const FLOW_ASKS = [
-  { id: "FR-31", name: "month-end", from: "K. Boateng", to: "R. Mensah", src: ["FIN-01", "/month-end/"], stages: ["Compress to ZIP"], note: "Month-end packs, for your ops review on the 5th.", asked: "Today 11:40" },
+  { id: "FR-31", name: "month-end", from: "K. Boateng", to: "R. Mensah", src: ["FIN-01", "/month-end/"], stages: ["Into one ZIP"], note: "Month-end packs, for your ops review on the 5th.", asked: "Today 11:40" },
 ];
 const FBY = Object.fromEntries(EXISTING_FLOWS.map((x) => [x.name, x]));
 const pkey = (h, p) => `${h} ${p}`;
@@ -2378,7 +2377,7 @@ function EditorShell({ left, right, ratio, problem, note, onCancel, onSave, save
 function NewFlow({ go, me, edit, drawer }) {
   // a source is a folder or one file on a machine, or a folder another flow already delivers to; a flow can have several.
   // One file is followed by its identity in the file index, not its path, at both ends (version 1, 1 Nov 2026)
-  const blank = { name: "", srcs: [{ mode: "dir", host: "", path: "" }], when: "Real time", stages: [], dests: [{ mode: "mine", host: "", path: "" }] };
+  const blank = { name: "", srcs: [{ mode: "dir", host: "", path: "" }], when: "Real time", del: "keep", stages: [], dests: [{ mode: "mine", host: "", path: "" }] };
   // Version 1: onto a Worker's machine (or your own) you pick the folder and nobody has to agree; onto another Admin's
   // workstation, that Admin picks the folder, and picking it is their consent (docs/design/v1-it-admin.md)
   const ws = me && ADMIN_INFO[me] ? ADMIN_INFO[me].ws : null;
@@ -2516,7 +2515,7 @@ function NewFlow({ go, me, edit, drawer }) {
     <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
       ${f.stages.length === 0 ? html`<div className="t3" style=${{ padding: "14px", border: "1px dashed var(--border-strong)", borderRadius: 6, textAlign: "center" }}>No steps. Files are copied exactly as they are.</div>` : null}
       ${f.stages.map(stageCard)}
-      <div className="row"><${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Transform", op: "Rename by date", scope: "all" }] }))}>Add a step<//></div>
+      <div className="row"><${Button} icon=${ic("PlusOutlined")} onClick=${() => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Renaming", op: "Add a date", scope: "all" }] }))}>Add a step<//></div>
     </div>
   </div>`;
   B[2] = html`<div>
@@ -2543,7 +2542,7 @@ function NewFlow({ go, me, edit, drawer }) {
   const nBad = checks.filter((c) => c[0] === "bad").length;
   const checkLine = nBad ? `${nBad} problem${nBad === 1 ? "" : "s"} to fix, listed under the checks` : "No loop, no folder written twice, every folder different";
   const addSrc = () => setF((x) => ({ ...x, srcs: [...x.srcs, { mode: "dir", host: "", path: "" }] }));
-  const addStep = () => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Transform", op: "Rename by date", scope: "all" }] }));
+  const addStep = () => setF((x) => ({ ...x, stages: [...x.stages, { kind: "Renaming", op: "Add a date", scope: "all" }] }));
   const addDest = () => setF((x) => ({ ...x, dests: [...x.dests, { mode: "mine", host: "", path: "" }] }));
   const many = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const bar = html`<div className="edbar"><span style=${{ fontSize: 12.5, color: problem ? "var(--med)" : "var(--text-3)", minWidth: 0 }}>${problem || (asks.length ? `Waiting on ${asks.map((d) => d.who).join(" and ")} once it is created` : "Checked against every other flow and the one file index")}</span><span className="sp" />
@@ -2588,9 +2587,12 @@ function NewFlow({ go, me, edit, drawer }) {
     const WHEN = [["Real time", "A file is copied the moment it changes, from the machine's own file events."], ["On a schedule", "Changed files are copied together, every hour."], ["Only when I run it", "Nothing moves until someone presses Run on the flow."]];
     const whenV = html`<div className="nfv-sec"><div className="nfv-st">Copy files</div>${WHEN.map(([w, d]) => html`<div key=${w} className=${"nfv-pick" + (f.when === w ? " on" : "")} role="radio" aria-checked=${f.when === w} tabIndex="0" onClick=${() => set("when")(w)} onKeyDown=${(e) => e.key === "Enter" && set("when")(w)}>
         <i /><span><b>${w}</b><span className="t3">${d}</span></span></div>`)}</div>`;
+    const DEL = [["keep", "Keep the copies", "The destinations keep what they were given. Deleting a file here never deletes it there."], ["mirror", "Remove the copies", "The destinations put their copy aside, in a “.falcon-removed” folder; nothing is destroyed. Only a copy this flow wrote and nobody has changed is touched."]];
+    const delV = html`<div className="nfv-sec"><div className="nfv-st">When a file is deleted at the source</div>${DEL.map(([v, w, d]) => html`<div key=${v} className=${"nfv-pick" + ((f.del || "keep") === v ? " on" : "")} role="radio" aria-checked=${(f.del || "keep") === v} tabIndex="0" onClick=${() => set("del")(v)} onKeyDown=${(e) => e.key === "Enter" && set("del")(v)}>
+        <i /><span><b>${w}</b><span className="t3">${d}</span></span></div>`)}</div>`;
     const addB = (label, fn) => html`<${Button} icon=${ic("PlusOutlined")} onClick=${fn} style=${{ alignSelf: "flex-start" }}>${label}<//>`;
     B[0] = html`<div className="nfv">${head("Where do the files come from?", "One source or several. Each is a folder or one file on a machine, or an existing flow, so this one carries on with whatever that flow delivers.")}
-      ${f.srcs.map(srcV)}${addB("Add a source", addSrc)}${whenV}</div>`;
+      ${f.srcs.map(srcV)}${addB("Add a source", addSrc)}${whenV}${delV}</div>`;
     B[1] = html`<div className="nfv">${head("Should anything happen to the files on the way?", "Optional. Steps run in order, top to bottom. With none, files are copied exactly as they are.")}
       ${f.stages.length ? f.stages.map(stageV) : html`<div className="nfv-none">No steps. Files are copied exactly as they are.</div>`}${addB("Add a step", addStep)}</div>`;
     B[2] = html`<div className="nfv">${head("Where should the files go?", "Each destination gets its own copy of every file. For anywhere you do not manage, ask the person it belongs to; they pick the folder.")}
@@ -2598,7 +2600,7 @@ function NewFlow({ go, me, edit, drawer }) {
       ${f.dests.length > DEST_SOFT_LIMIT ? html`<div className="decide" style=${{ "--c": "var(--med)" }}>That is a lot of destinations. Every file is copied ${f.dests.length} times.</div>` : null}</div>`;
     const sum = html`<div className="nf-sum">
       <div className="tk-facts" style=${{ maxWidth: "none" }}>${[["Made by", "you"], ["From", rsrc.map((q) => `${q[0]} ${q[1]}`).join(", ")], ["Along the way", f.stages.map((st, i) => `${i + 1}. ${st.op}`).join("  ") || "copied as they are"],
-          ["To", ff.dests.map((d) => (d.host && d.host[0] === "?" ? `${d.host.slice(1)} picks a folder` : `${d.host} ${d.path}`)).join(", ")], ["Copies files", f.when.toLowerCase()]]
+          ["To", ff.dests.map((d) => (d.host && d.host[0] === "?" ? `${d.host.slice(1)} picks a folder` : `${d.host} ${d.path}`)).join(", ")], ["Copies files", f.when.toLowerCase()], ["If a file is deleted", (f.del || "keep") === "keep" ? "the copies stay" : "the copies are put aside"]]
         .map(([k, v]) => html`<span key=${k}><span className="t3">${k}</span> <span className=${k === "From" || k === "To" ? "mono" : ""}>${v}</span></span>`)}</div>
       <div style=${{ marginTop: 18 }}>${nameField}</div>
       ${checkList}
@@ -3069,7 +3071,8 @@ const ALL_RUNS = [
   ...MANUAL_RUNS.map((x) => ({ ...x, rule: null })),
 ].sort((a, b) => b.t - a.t);
 const runsOf = (a) => ALL_RUNS.filter((x) => a.names.includes(x.action));
-const usedBy = (a) => RULES.filter((r) => r.actions.some((x) => a.names.includes(x[0])));
+const allRules = () => [...RULES.filter((r) => !/^rule-/.test(r.id)), ...AU_EXTRA];
+const usedBy = (a) => allRules().filter((r) => r.actions.some((x) => a.names.includes(x[0])));
 // What a run returned. Three kinds, each shown its own way: text (what it printed: most built-ins and every custom
 // script), a list (programs, files on a USB device), or a picture (a screenshot). A one-line summary goes in lists of
 // runs; the whole output opens in place. Kept with the run for 90 days, like the audit log (docs/ENGINE-GAPS.md).
@@ -4336,6 +4339,8 @@ const AU_EXTRA = [
   { id: "night", name: "Lock idle machines at night", kind: "Schedule", when: "it is 20:00 on any day", scope: "Operations", by: "R. Mensah", created: "5 Oct", perDay: [0, 0, 0, 0, 0, 0, 0], off: false,
     actions: [["Lock the screen", 30]], changes: [["19 Oct", "R. Mensah", "Switched it off for the stock count week"], ["5 Oct", "R. Mensah", "Created the rule"]], fir: [] },
 ];
+AU_EXTRA.forEach((r) => { RBY[r.id] = r; r.fir.forEach((f) => f.runs.forEach((x) => ALL_RUNS.push({ t: f.t, action: x.action, host: x.host, sec: x.sec, timeout: x.timeout, outcome: x.outcome, rule: r.id, exit: x.exit }))); });
+ALL_RUNS.sort((a, b) => b.t - a.t);
 const AU_HAND = { usb: { 4: 1 }, backup: { 6: 1 }, daily: { 3: 1 } };
 const auBad = (x) => x.outcome === "Failed" || x.outcome === "Timed out";
 // past tense of each action, so a run reads as what it did
@@ -4363,7 +4368,7 @@ function AdminAutomationPage({ go, open }) {
   const pick = (r, t) => { setSel(r.id); setPickT(t == null ? null : t); };
   const badToday = runs.filter((x) => x.bad && !again[x.r.id + x.f.t]), badHosts = [...new Set(badToday.flatMap((x) => x.f.runs.filter(auBad).map((y) => y.host)))];
   const offN = rules.filter((r) => off[r.id]);
-  const situation = `${fmt(new Set(runs.map((x) => x.r.id)).size)} of your ${fmt(rules.length)} rules ran today, ${fmt(runs.length)} time${runs.length === 1 ? "" : "s"} in all. ${badToday.length ? `${fmt(badToday.length)} run${badToday.length === 1 ? "" : "s"} did not go to plan, on ${listNames(badHosts)}.` : "Everything they did worked."} ${offN.length ? `${listNames(offN.map((r) => r.name))} is switched off. ` : ""}Next: ${(rules.find((r) => r.id === "daily") || rules[0]).name} tomorrow at 09:00.`;
+  const situation = `${fmt(new Set(runs.map((x) => x.r.id)).size)} of your ${fmt(rules.length)} rules ran today, ${fmt(runs.length)} time${runs.length === 1 ? "" : "s"} in all. ${badToday.length ? `${fmt(badToday.length)} run${badToday.length === 1 ? "" : "s"} did not go to plan, on ${listNames(badHosts)}.` : "Everything they did worked."} ${offN.length ? `${listNames(offN.map((r) => r.name))} is switched off. ` : ""}Next: ${(rules.find((r) => r.id === "night") || rules[0]).name} today at 20:00.`;
   // the picked rule
   const rf = fir(R), wk = rf.filter((f) => f.t > NOWH - 168);
   const dayIx = (t) => Math.floor(t / 24) + 6;
@@ -4674,7 +4679,7 @@ function AdminActionsLayout({ host }) {
   const grouped = Object.values(MANUAL_RUNS.reduce((m, x) => { const k = x.action + x.by + Math.round(x.t * 2); (m[k] = m[k] || { action: x.action, by: x.by, t: x.t, xs: [] }).xs.push(x); return m; }, {}));
   const hand = [...mine, ...grouped].map((r) => ({ ...r, bad: r.xs.some(isBadRun), from: `by ${r.by === "You" ? "you" : r.by}` })).sort((x, y) => y.bad - x.bad || y.t - x.t).slice(0, 6);
   const wk = ALL_RUNS.filter((x) => x.t >= -144);
-  const situation = `${fmt(lib.length)} actions, ${fmt(lib.filter((a) => a.cat === "Custom").length)} of them written here. ${fmt(wk.filter((x) => !x.rule).length)} runs by hand this week; Map the shared drive ran out of time on FIN-01. ${fmt(RULES.length)} rules use them.`;
+  const situation = `${fmt(lib.length)} actions, ${fmt(lib.filter((a) => a.cat === "Custom").length)} of them written here. ${fmt(wk.filter((x) => !x.rule).length)} runs by hand this week; Map the shared drive ran out of time on FIN-01. ${fmt(allRules().length)} rules use them.`;
   // a run by hand: each picked machine runs, then reports; when they have all reported it joins Ran by hand lately
   const here = run && run.id === sel ? run : null, busy = here && here.xs.some((y) => y.st === "Running");
   const start = () => { const t = NOWH + Math.random() / 1000, lim = A0.limit, xs = hosts.map((h, i) => ({ host: h, st: "Running", d: 900 + i * 450 + (hs(h) % 5) * 260 }));
@@ -4988,7 +4993,7 @@ function AdminOverviewPage({ go }) {
     return out; };
   const srcs = [issueItems(urgent, true),
     [].map((c) => ({ k: "p" + c.id, ic: "BellOutlined", hot: c.pings.length > 1, t: `${chOther(c, me)} asks to talk`, s: `${c.pings.length > 1 ? `${c.pings.length} times, ` : ""}first at ${atH(c.pings[0])}`, n: "waiting for you to accept", act: "Accept", to: () => go("messages", c.id) })),
-    verify.map((t) => ({ k: "t" + t.id, ic: "CheckSquareOutlined", t: t.title, s: `Task · ${t.who} on ${t.host}`, n: "every target found; only you can close it", act: "Verify", to: () => go("tasks", t.id) })),
+    verify.map((t) => ({ k: "t" + t.id, ic: "CheckSquareOutlined", t: t.title, s: `Task · ${t.who} on ${t.host}`, n: "every target found; any Admin can close it", act: "Verify", to: () => go("tasks", t.id) })),
     issueItems(rest, false)];
   // the most pressing of each source in turn: urgent issues, requests, tasks to verify, then the rest
   const items = []; for (let r = 0; srcs.some((x) => x.length > r); r++) srcs.forEach((x) => { if (x[r]) items.push(x[r]); });
@@ -5284,7 +5289,7 @@ function AdminTasksPage({ go, open }) {
     return [t.id, firsts.some((x) => x == null) ? null : Math.max(...firsts)]; })), [TASKS.length]);
   const groupOf = (t) => t.state === "Completed" ? "done" : t.state === "Awaiting your verification" ? "verify" : t.state === "Overdue" || NOWH > t.final || quiet(t) ? "late" : "track";
   // late or gone quiet comes last, tinted, so it stands apart (the user, 24 Oct 2026)
-  const G = [["verify", "Waiting for your verdict", "handed in; only you close it"], ["track", "On track", "signs of progress"], ["done", "Completed this week", "closed; kept here for the week"], ["late", "Late, or gone quiet", "past the deadline, or nothing seen for two days"]];
+  const G = [["verify", "Waiting for your verdict", "handed in; any Admin can close it"], ["track", "On track", "signs of progress"], ["done", "Completed this week", "closed; kept here for the week"], ["late", "Late, or gone quiet", "past the deadline, or nothing seen for two days"]];
   const by = Object.fromEntries(G.map(([k]) => [k, TASKS.filter((t) => groupOf(t) === k).sort((a, b) => a.final - b.final)]));
   // a click picks a task and its targets show below; Expand opens it in place, one at a time (the accordion standard,
   // 1 Nov 2026); the most pressing is picked at first, and nothing is open until you expand it
@@ -5330,7 +5335,7 @@ function AdminTasksPage({ go, open }) {
   const verdict = (t, k) => vd[t.id] ? html`<span className="t2">${vd[t.id] === "c" ? "Marked complete" : `Sent back: “${why[t.id] || ""}”`}</span><span className="sp" /><${Button} size="small" type="text" onClick=${() => setVd({ ...vd, [t.id]: null })}>Undo<//>`
     : asking === t.id ? html`<${Input} size="small" autoFocus placeholder=${`What is missing? ${t.who} sees this.`} value=${why[t.id] || ""} onChange=${(e) => setWhy({ ...why, [t.id]: e.target.value })} style=${{ flex: 1, minWidth: 160 }} />
         <${Button} size="small" onClick=${() => setAsking(null)}>Cancel<//><${Button} size="small" type="primary" disabled=${!(why[t.id] || "").trim()} onClick=${() => { setVd({ ...vd, [t.id]: "i" }); setAsking(null); }}>Send back<//>`
-    : k === "verify" ? html`<span className="t3">Every target was found. Only you close it.</span><span className="sp" /><${Button} size="small" onClick=${() => setAsking(t.id)}>Incomplete<//><${Button} size="small" type="primary" onClick=${() => setVd({ ...vd, [t.id]: "c" })}>Complete<//>`
+    : k === "verify" ? html`<span className="t3">Every target was found. Any Admin can close it.</span><span className="sp" /><${Button} size="small" onClick=${() => setAsking(t.id)}>Incomplete<//><${Button} size="small" type="primary" onClick=${() => setVd({ ...vd, [t.id]: "c" })}>Complete<//>`
     : k === "late" ? html`<span className="t3">${NOWH > t.final ? "Past its deadline." : "Nothing seen for two days."}</span><span className="sp" /><${Button} size="small" type="primary" onClick=${() => toast(`Reminded ${t.who} (concept)`)}>Remind ${t.who}<//>`
     : k === "done" ? html`<span className="t3">Closed. Nothing more to do.</span>`
     : html`<span className="t3">Not handed in yet; your verdict comes when it is.</span>`;

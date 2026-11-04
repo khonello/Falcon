@@ -334,7 +334,9 @@ Page {
             topPadding: 10
             spacing: 12
             Rectangle { width: parent.width; height: 1; color: Theme.grid }
-            Txt { width: parent.width; text: page.det && page.det.telling && page.det.telling.note ? page.det.telling.note : "It is a reading of the evidence, not proof."; color: Theme.text3; font.pixelSize: 12 }
+            Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12
+                  // who wrote it, as it happened: the model when its smoothing was kept, else the system
+                  text: (page.det && page.det.telling && page.det.telling.smoothed ? "Written by the local model" : "Written by Falcon") + " from what Detective found. It is a reading of the evidence, not proof." }
         }
     }
 

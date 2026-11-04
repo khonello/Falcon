@@ -40,7 +40,7 @@ Page {
     }
     Timer { id: reload; interval: 300; onTriggered: page.load() }
 
-    readonly property var groupsDef: [["verify", "Waiting for your verdict", "handed in; only you close it"], ["track", "On track", "signs of progress"],
+    readonly property var groupsDef: [["verify", "Waiting for your verdict", "handed in; any Admin can close it"], ["track", "On track", "signs of progress"],
                               ["done", "Completed this week", "closed; kept here for the week"], ["late", "Late, or gone quiet", "past the deadline, or nothing seen for two days"]]
     readonly property var stateWord: ({ verify: "Handed in", track: "On track", done: "Completed", late: "Late, or gone quiet" })
     function items(t) { var d = detail[t.id]; return d && d.items ? d.items : [] }
@@ -265,7 +265,7 @@ Page {
                             visible: !page.asking
                             width: parent.width
                             color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 13
-                            text: !page.cur ? "" : page.cur.k === "verify" ? "Every target was found. Only you close it."
+                            text: !page.cur ? "" : page.cur.k === "verify" ? "Every target was found. Any Admin can close it."
                                   : page.cur.k === "late" ? (Time.past(page.cur.final_deadline_at) ? "Past its deadline." : "Nothing seen for two days.")
                                   : page.cur.k === "done" ? "Closed. Nothing more to do." : "Not handed in yet; your verdict comes when it is."
                         }

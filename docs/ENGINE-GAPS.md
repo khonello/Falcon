@@ -323,12 +323,12 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      access violation during `tests/test_worker_client.py`; the tests still pass.
 
 23. **What the console now calls that the Engine must answer (the user, 3-4 Nov 2026: "build exactly as the concept says, no compromises,
-    just put into the engine docs that it needs to cover this so that session handles it").** The QML is built to the concept with these
+    just put into the engine docs that it needs to cover this so that session handles it").** **Done 4 Nov 2026, but for the two below that change a rule** (migration 054; `engine/resource/talk.py`, `tests/test_console_calls.py`; TUI `operator_client/tui/commands/calls.py`): every item is built. **Any Admin verifies a task:** done (the user, 4 Nov 2026). **Only a rule's maker changes it: dropped** (the user, 4 Nov 2026: nobody owns anything between Admins; the audit trail shows who did it). Any Admin already changes any rule, so nothing was needed. `printer.offline` and `threshold.signin` are read by the Worker from Windows (not yet tried on a real printer or a real failed sign-in). The QML is built to the concept with these
     controls live, not disabled: until a handler exists, the button fails with the Engine's "unknown request" message. This replaces
     the "drawn disabled" lines of #20 and #22 for these items. Names are the QML's; change them with the UI session if another name is better.
    - **Any Admin verifies a task.** The concept gives every Admin Verify on Overview and Complete / Incomplete on Tasks, on tasks other
-     Admins gave ("Only you close it"). `task.verify` must accept any Admin in version 1. **This changes an invariant** ("only manual
-     verification by the assigner closes a task"): CLAUDE.md and `task-natural-combo.md` need the same change, confirmed with the user.
+     Admins gave ("Only you close it"). `task.verify` must accept any Admin in version 1. The user confirmed it on 4 Nov 2026; CLAUDE.md and `task-natural-combo.md` are changed.
+   - **Task split is gone (the user, 4 Nov 2026):** `task.propose` need only answer one task; the console reads the first.
    - `task.remind {task_id}`: Remind on a late task.
    - **Requests to talk** (the rest of #19): `chat.requests {}` -> `{requests: [{id, from, account_id, host, at, line}]}`,
      `chat.request_accept {request_id}` -> `{conversation}`, `chat.request_close {request_id, why}`. The Messages section appears once
@@ -359,16 +359,13 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - **Restricted:** `marks.get`'s `lately` needs `who` and `where` beside `what` ("Ama copied it to OPS-07"). `flows_allowed` needs `flow` (its name), `what`, `from`, `to`,
      `today` and `last_at`; `flow.restricted_waiting` needs `what`, `from` and `to`.
    - **Detective:** `detective.cases` rows need `restricted`, so every card can say "restricted files involved" (today only `detective.case`'s glance has it).
-     The concept says "in the local model's words" and "Written by the local model": the page says so only when `telling.smoothed` is true, and with `SMOOTHING` off it
-     says "from what Detective found" with the Engine's own `note`. Either the concept or `SMOOTHING` has to change for the two to agree.
+     The page says who wrote the account from `telling.smoothed`: the local model when true, Falcon when false.
    - **The editors (drawers, built 4 Nov 2026):** `control.event_create` / `event_update` send `action_limits {action_id: seconds}`, each action's limit in this rule
      ("Gets up to"); the Engine keeps only the action's own. Make a rule offers `printer.offline`, `threshold.signin {count, window_s}`, `threshold.disk` and
      `user.login` with `{outside_hours: true}`. `time.scheduled`'s `at` is an ISO date and time. Make a flow sends each asked destination a `note` ("A line for them"),
-     `from_flow`, and `let_them_choose` with the Admin's workstation as `destination_pc_id`. `flow.create` keeps `on_source_delete` at "keep": the concept's drawer does not ask.
+     `from_flow`, and `let_them_choose` with the Admin's workstation as `destination_pc_id`. `on_source_delete` is asked in the drawer again.
    - `hierarchy.pc_register` without `department_id`: the concept registers a machine by name alone ("Put it in a department on Departments"). Until then the console sends the
      first department. The drawer's Found list reads `enroll.list`; the concept also lists PCs "seen on the network", which #10 dropped.
-   - **The concept itself still shows "Sort by file type" and "sort"** in Flows, which `flow.steps` dropped on 3 Nov: the concept needs that change
-     before the QML follows it.
 
 ## Done inline (for the record)
 

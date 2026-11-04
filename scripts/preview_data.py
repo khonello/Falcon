@@ -350,17 +350,17 @@ def enroll_list(role: str) -> dict[str, Any]:
 _WS = {"WS-OPS-A1": 101, "WS-OPS-A2": 102, "WS-FIN-A1": 103}
 FLOWS = [  # id, name, by (account, name), sources [(host, path, paused)], stages [(type, op)], destinations [(host or ?picker, path, paused)],
     # status, pause reason, consent, files copied (all time, today), last sync (hours from now), made (hours from now)
-    (1, "payroll", (7, "R. Mensah"), [("OPS-01", "/payroll/", None)], [("transformation", "Rename by date")], [("FIN-01", "/payroll/", None)], "paused", "restricted:consent", "not_required", (64, 31), -0.15, -400),
-    (2, "payroll-pdf", (8, "K. Boateng"), [("FIN-01", "/payroll/", None)], [("transformation", "Convert to PDF")], [("FIN-02", "/payroll-pdf/", None), ("FIN-02", "/archive/", None)], "active", None, "not_required", (41, 24), -0.13, -400),
-    (3, "weekly", (7, "R. Mensah"), [("OPS-07", "/weekly/", None)], [("categorization", "Sort by file type")], [("LOG-01", "/weekly/", None), ("LOG-01", "/archive/", "destination:path_missing")], "active", None, "not_required", (38, 23), -0.3, -400),
-    (4, "weekly-digest", (9, "A. Quaye"), [("LOG-01", "/weekly/", None)], [("transformation", "Compress to ZIP")], [("OPS-02", "/reports/", None)], "active", None, "not_required", (5, 1), -1.25, -400),
+    (1, "payroll", (7, "R. Mensah"), [("OPS-01", "/payroll/", None)], [("transformation", "Add a date")], [("FIN-01", "/payroll/", None)], "paused", "restricted:consent", "not_required", (64, 31), -0.15, -400),
+    (2, "payroll-pdf", (8, "K. Boateng"), [("FIN-01", "/payroll/", None)], [("transformation", "To PDF")], [("FIN-02", "/payroll-pdf/", None), ("FIN-02", "/archive/", None)], "active", None, "not_required", (41, 24), -0.13, -400),
+    (3, "weekly", (7, "R. Mensah"), [("OPS-07", "/weekly/", None)], [("categorization", "By file type")], [("LOG-01", "/weekly/", None), ("LOG-01", "/archive/", "destination:path_missing")], "active", None, "not_required", (38, 23), -0.3, -400),
+    (4, "weekly-digest", (9, "A. Quaye"), [("LOG-01", "/weekly/", None)], [("transformation", "Into one ZIP")], [("OPS-02", "/reports/", None)], "active", None, "not_required", (5, 1), -1.25, -400),
     (5, "intake", (7, "R. Mensah"), [("OPS-03", "/intake/", None)], [], [("?WS-FIN-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -50.67),
-    (6, "budget-review", (7, "R. Mensah"), [("WS-OPS-A1", "/reports/budget/", None)], [("transformation", "Convert to PDF")], [("?WS-FIN-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -3.0),
-    (7, "ops-pack", (7, "R. Mensah"), [("OPS-02", "/reports/", None), ("OPS-05", "/exports/", "source:path_missing")], [("transformation", "Compress to ZIP")], [("WS-OPS-A1", "/packs/", None)], "active", None, "not_required", (7, 1), -0.83, -400),
-    (8, "board-pack", (9, "A. Quaye"), [("WS-OPS-A2", "/board/", None)], [("transformation", "Convert to PDF")], [("WS-OPS-A1", "/board/", None), ("WS-FIN-A1", "/board/", None)], "active", None, "not_required", (12, 1), -1.67, -400),
+    (6, "budget-review", (7, "R. Mensah"), [("WS-OPS-A1", "/reports/budget/", None)], [("transformation", "To PDF")], [("?WS-FIN-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -3.0),
+    (7, "ops-pack", (7, "R. Mensah"), [("OPS-02", "/reports/", None), ("OPS-05", "/exports/", "source:path_missing")], [("transformation", "Into one ZIP")], [("WS-OPS-A1", "/packs/", None)], "active", None, "not_required", (7, 1), -0.83, -400),
+    (8, "board-pack", (9, "A. Quaye"), [("WS-OPS-A2", "/board/", None)], [("transformation", "To PDF")], [("WS-OPS-A1", "/board/", None), ("WS-FIN-A1", "/board/", None)], "active", None, "not_required", (12, 1), -1.67, -400),
     (9, "scan-archive", (7, "R. Mensah"), [("OPS-04", "/scans/", None)], [], [("WS-OPS-A1", "/scans/", None)], "active", None, "not_required", (212, 0), -384, -900),
     # an ask to this console: K. Boateng wants to send R. Mensah files; R. Mensah picks the folder
-    (10, "month-end", (8, "K. Boateng"), [("FIN-01", "/month-end/", None)], [("transformation", "Compress to ZIP")], [("?WS-OPS-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -1.7),
+    (10, "month-end", (8, "K. Boateng"), [("FIN-01", "/month-end/", None)], [("transformation", "Into one ZIP")], [("?WS-OPS-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -1.7),
 ]
 # the last sync of each flow, as flow.runs answers it: when (hours from now), the one before, each file (name, outcome, KB before, after), what did not go
 FLOW_RUNS = {
@@ -1049,8 +1049,9 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         _TODOS_DONE.add(int(payload.get("todo_id") or 0))
         return {"todo": next((t for t in _todos()["todos"] if t["id"] == int(payload.get("todo_id") or 0)), None)}
     if type_ == "flow.steps":
-        ops = {"Transform": ["Rename by date", "Convert to PDF", "Compress to ZIP"], "Categorize": ["Sort by file type", "Sort by month"]}
-        return {"tree": [{"category": "all", "label": "Steps", "kinds": [{"kind": k, "label": k, "ops": [{"op": o, "label": o} for o in v]} for k, v in ops.items()]}], "order": []}
+        ops = {"Choosing": ["By file type", "By name", "By size"], "Conversion": ["To PDF", "To DOCX", "To another image type", "Zip each file"],
+               "Renaming": ["Add a date", "Add text", "Replace text in the name"], "Bundling": ["Into one ZIP", "Into one PDF"]}
+        return {"tree": [{"category": "all", "label": "Steps", "kinds": [{"kind": k.lower(), "label": k, "ops": [{"op": o, "label": o} for o in v]} for k, v in ops.items()]}], "order": []}
     if type_ == "flow.restricted_waiting":
         return {"waiting": restricted_waiting()}
     if type_ == "flow.restricted":

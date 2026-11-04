@@ -106,7 +106,7 @@ Page {
     readonly property var items: {
         var srcs = [issueItems(urgent, true),
                     verify.map(function (t) { return { k: "t" + t.id, ic: "checksquare", hot: false, t: t.description_raw || t.title, s: "Task · " + (t.assignee_name || "") + (Fleet.byAccount(t.assignee_account_id) ? " on " + Fleet.byAccount(t.assignee_account_id).host : ""),
-                                                       n: "every target found; only you can close it", act: "Verify",
+                                                       n: "every target found; any Admin can close it", act: "Verify",
                                                        go: ["tasks", "Tasks opens with " + (t.description_raw || t.title) + " picked.", t.id] } }),
                     issueItems(rest, false)]
         var out = []
