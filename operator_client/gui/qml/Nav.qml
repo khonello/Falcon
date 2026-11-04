@@ -48,7 +48,7 @@ QtObject {
         return [p === "sessions" || p === "rollout" ? "machines" : p === "reports" ? "issues" : "overview", null]
     }
     // A tab of a page is a page of its own that the menu does not list: it lights up its parent's entry.
-    function parentOf(p) { return p === "registry" ? "machines" : "" }
+    function parentOf(p) { return "" }
     function go(p, s) {
         var r = remap(p, s === undefined ? null : s)
         page = r[0]
@@ -85,7 +85,6 @@ QtObject {
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
         access: ["Access", "Who is inside which machine, and who was let in"],
         departments: ["Departments", "Labels that group machines and the people at them"],
-        registry: ["Registry", "Machines and people · register, re-key, and let a new machine in"],
         rules: ["Rules", "The standard the organisation is measured against"],
         actions: ["Actions", "Everything a rule can do, and what you can run by hand"],
         overview: ["Overview", "All departments · live"],

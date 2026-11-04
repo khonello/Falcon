@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 WORDS = [a for a in sys.argv[1:] if not a.startswith("-")]
 ROLE = "admin"
 AREAS = ("overview", "messages", "calendar", "tasks", "detective", "restricted", "flows", "machines", "sessions", "issues", "automation",
-         "actions", "rollout", "audit", "reports", "departments", "accountability", "access", "registry", "rules")
+         "actions", "rollout", "audit", "reports", "departments", "accountability", "access")
 VIEW = next((w for w in WORDS if w.split("/")[0] in AREAS), "")
 if "--view" in sys.argv:
     VIEW = sys.argv[sys.argv.index("--view") + 1]

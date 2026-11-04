@@ -12,10 +12,7 @@ Row {
     readonly property var parts: {
         var p = Nav.page, s = Nav.sub, t = Nav.title(p)
         if (s === null || s === undefined || s === "") return [[t, ""]]
-        if (p === "machines") return [["Machines", "machines"], [String(s), "", true]]
         if (s === "new" || s === "mark" || String(s).indexOf("edit-") === 0) return [[t, ""]]      // an editor is a drawer over the page
-        if (p === "rules" && (s === "new" || String(s).indexOf("from-") === 0)) return [["Rules", "rules"], ["New rule", ""]]
-        if (p === "rules" && String(s).indexOf("edit-") === 0) { var rr = Rules.all.filter(function (x) { return x.id === String(s).slice(5) })[0]; return [["Rules", "rules"], ["Edit " + (rr ? rr.name : String(s).slice(5)), ""]] }
         return [[t, ""]]
     }
 

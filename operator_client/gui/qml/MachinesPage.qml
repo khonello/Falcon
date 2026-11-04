@@ -9,7 +9,7 @@ Page {
     id: page
     objectName: "machinesView"
 
-    property string sel: { var a = Nav.takeArrive("machines"); return a !== null ? String(a) : "" }
+    property string sel: { var a = Nav.takeArrive("machines"); return a !== null ? String(a) : Nav.sub ? String(Nav.sub) : "" }
     property string exp: ""
     property var dept: null
     property var more: ({ fine: true })

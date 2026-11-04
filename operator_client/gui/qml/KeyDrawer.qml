@@ -1,86 +1,31 @@
 import QtQuick
 import "."
 
-// REGISTER A PC, PROVISION AN ADMIN, OR A NEW KEY: one drawer in two steps. The first asks the name and the
-// department; the second shows the key, once. A new key skips the first step (the confirm came before).
-//   ask({mode: "pc" | "admin" | "rekey" | "promote", subject?, pc_id?, account_id?})
-// "promote" makes a worker an Admin of their department (hierarchy.admin_promote): their machine gets a new key, shown here.
+// A NEW KEY for a machine, shown once (the concept's KeyModal). A machine joins with its licence code, so a key is only ever replaced here.
+//   ask({mode: "rekey", subject, pc_id})
 Drawer {
     id: kd
     width: 480
     property var spec: null
-    property int step: 0
-    property string name: ""
-    property var dept: null
     property var made: null
-    property bool busy: false
-    readonly property bool rk: spec !== null && spec.mode === "rekey"
-    readonly property bool pc: spec !== null && spec.mode === "pc"
-    readonly property bool pr: spec !== null && spec.mode === "promote"
-    title: !spec ? "" : pr ? spec.subject + " becomes an Admin" : rk ? "New key for " + spec.subject : pc ? "Register a PC" : "Add an IT Admin"
-    note: ""
+    title: spec ? "New key for " + spec.subject : ""
     signal done()
 
-    function ask(s) { spec = s; name = ""; dept = s.department_id !== undefined ? s.department_id : null; made = null; busy = false; step = s.mode === "rekey" || s.mode === "promote" ? 1 : 0; open()
-                      if (s.mode === "rekey") rekey(); if (s.mode === "promote") promote() }
-    function promote() {
-        busy = true
-        falcon.call("hierarchy.admin_promote", { account_id: spec.account_id }, function (ok, r) {
-            kd.busy = false
-            if (!ok) { Msg.failed(r && r.message ? r.message : "Not promoted"); kd.close(); return }
-            kd.made = r; Msg.ok(kd.spec.subject + " is an Admin now · recorded"); kd.done()
-        })
-    }
-    function rekey() {
-        busy = true
-        falcon.call("hierarchy.pc_rekey", { pc_id: spec.pc_id }, function (ok, r) {
-            kd.busy = false
+    function ask(s) {
+        spec = s; made = null; open()
+        falcon.call("hierarchy.pc_rekey", { pc_id: s.pc_id }, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "No new key"); kd.close(); return }
             kd.made = r; kd.done()
         })
     }
-    function submit() {
-        busy = true
-        var cb = function (ok, r) {
-            kd.busy = false
-            if (!ok) { Msg.failed(r && r.message ? r.message : "Not done"); return }
-            kd.made = r; kd.step = 1; Msg.ok(kd.name.trim() + " registered · recorded in the audit log"); kd.done()
-        }
-        // its department is set on Departments; until the Engine takes a machine without one (ENGINE-GAPS #23) it starts in the first
-        var d = dept !== null ? dept : Fleet.depts.length ? Fleet.depts[0].id : null
-        if (pc) falcon.call("hierarchy.pc_register", { hostname: name.trim(), department_id: d, pc_type: "client_pc" }, cb)
-        else falcon.call("hierarchy.account_create", { role: "admin", hostname: name.trim(), department_id: d }, cb)
-    }
 
-    footer: [
-        Btn { visible: kd.step === 0; text: "Cancel"; onClicked: kd.close() },
-        Btn { visible: kd.step === 0; kind: "primary"; text: kd.pc ? "Register" : "Add"; enabled: !kd.busy && kd.name.trim() !== ""; onClicked: kd.submit() },
-        Btn { visible: kd.step === 1; kind: "primary"; enabled: kd.made !== null; text: "I have saved it"; onClicked: kd.close() }
-    ]
+    footer: Btn { kind: "primary"; enabled: kd.made !== null; text: "I have saved it"; onClicked: kd.close() }
 
     Column {
-        visible: kd.step === 0
-        width: parent.width
-        spacing: 18
-        Column { width: parent.width; spacing: 6
-                 Txt { text: kd.pc ? "MACHINE NAME" : "NAME"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.DemiBold; font.letterSpacing: 0.69 }
-                 Field { width: parent.width; text: kd.name; placeholderText: kd.pc ? "OPS-08" : "J. Owusu"; onTextEdited: kd.name = text } }
-        Rectangle {
-            width: parent.width; height: hint.height + 20; radius: 6; color: Theme.surface2
-            Txt { id: hint; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 13
-                  text: kd.pc ? "It gets a key, shown once. Put it in a department on Departments."
-                              : "They get the IT console and a key, shown once. Like every Admin, they reach every department, and every issue reaches them." }
-        }
-    }
-    Column {
-        visible: kd.step === 1
         width: parent.width
         spacing: 12
         Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text2
-              text: kd.made === null ? "Making the key…"
-                  : kd.pr ? kd.spec.subject + " is an Admin of their department. Their machine's Worker install stops working: install the Operator Client on it with this key."
-                  : (kd.rk ? "The old key for " + kd.spec.subject + " stops working at once." : kd.name.trim() + " is registered.")
-                    + " Copy this into " + (kd.rk || kd.pc ? "the machine's Worker Client settings." : "their Operator Client settings.") }
+              text: kd.made === null ? "Making the key…" : "The old key for " + kd.spec.subject + " stops working at once. Copy this into the machine's Worker Client settings." }
         Repeater {
             model: kd.made ? [["Client id", kd.made.client_id], ["Key", kd.made.client_key]] : []
             Column { required property var modelData; width: parent.width; spacing: 4
@@ -91,11 +36,6 @@ Drawer {
                                  Btn { anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "ghost"; iconName: "copy"; tip: "Copy"
                                        onClicked: { kt.selectAll(); kt.copy(); kt.deselect(); Msg.ok(modelData[0] + " copied") } } } }
         }
-        Rectangle {
-            width: parent.width; height: once.height + 20; radius: 6
-            color: Theme.alpha(Theme.med, 0.08); border.color: Theme.alpha(Theme.med, 0.35)
-            Txt { id: once; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 12; textFormat: Text.RichText
-                  text: "<b>It is shown once.</b> It cannot be shown again. If it is lost, make a new one." }
-        }
+        Decide { c: Theme.med; text: "It is shown once. It cannot be shown again. If it is lost, make a new one." }
     }
 }

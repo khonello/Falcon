@@ -256,7 +256,6 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
 
 
 ADMIN_MENU = ["overview", "messages", "calendar", "tasks", "flows", "restricted", "detective", "machines", "departments", "actions", "automation", "issues", "audit"]
-TABS = ["registry"]                             # a page the menu does not list: a tab of Machines (docs/design/pruning.md)
 
 
 async def test_the_shell_is_the_console(console):
@@ -269,9 +268,9 @@ async def test_the_shell_is_the_console(console):
     assert prop(win, "menuKeys") == ADMIN_MENU
 
 
-PAGES = [("admin", p) for p in ADMIN_MENU] + [("admin", "registry")] + [
+PAGES = [("admin", p) for p in ADMIN_MENU] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
-    ("admin", "restricted/mark"), ("admin", "messages/announcements"), ("admin", "machines/OPS-01")]
+    ("admin", "restricted/mark"), ("admin", "messages/announcements")]
 
 
 @pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])
@@ -287,24 +286,6 @@ async def test_every_page_loads_clean(console, role, view):
         _pump(0.05)
     assert loader.property("item") is not None
     assert not warnings, "\n".join(warnings)
-
-
-async def test_refused_connections_are_one_row_per_key(console):
-    """registry.refused groups the refused by who tried and from where; an address is blocked at the door from the page."""
-    win, bridge, _ = console("admin")
-    view = await _open(win, bridge, "registry", "registryView")
-    await _wait(lambda: len(prop(view, "doors") or []) == 2)
-    doors = {d["client"]: d for d in prop(view, "doors")}
-    assert doors["abc"]["tries"] == 2 and doors["abc"]["why"] == "wrong key for OPS-01" and doors["abc"]["ip"] == "10.20.9.201"
-    assert doors["zzz"]["why"] == "not registered" and doors["zzz"]["now"] == "Waiting to be registered"
-    QMetaObject.invokeMethod(view, "block", Q_ARG("QVariant", doors["abc"]), Q_ARG("QVariant", False))     # unblocking asks nothing first
-    view.setProperty("tab", "door")
-    await _wait(lambda: any(t == "registry.unblock" for t, _ in bridge.conn.seen))
-    assert next(p for t, p in bridge.conn.seen if t == "registry.unblock") == {"address": "10.20.9.201"}
-    rows = prop(view, "rows")
-    assert next(r for r in rows if r["id"] == "OPS-01")["gen"] == 2
-
-
 
 
 async def test_entering_a_worker_s_machine_opens_its_session_window(console):

@@ -70,13 +70,11 @@ ApplicationWindow {
         automation: "AutomationPage.qml",
         actions: "ActionsPage.qml",
         audit: "AuditPage.qml",
-        registry: "RegistryPage.qml",
         departments: "DepartmentsPage.qml",
     })
 
     // a page and the thing open on it: some open a page of their own (a machine, an editor)
     function pageFile(p, s) {
-        if (p === "machines" && s) return "MachinePage.qml"
         if (p === "messages" && s === "announcements") return "AnnouncementsPage.qml"
         var f = shell.pages[p]
         return f === undefined || f === "" ? "Pending.qml" : f

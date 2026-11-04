@@ -1,7 +1,7 @@
 pragma Singleton
 
 // THE ORGANISATION AS THIS CONSOLE SEES IT: departments, their Admins, their machines, and one word
-// for each machine's health. Read once and shared, so the Overview, Machines, Departments, Registry
+// for each machine's health. Read once and shared, so the Overview, Machines, Departments
 // and Rollout all say the same thing about the same machine. Refreshed on connect, on the pushes that
 // change it, and every 30 seconds.
 //
