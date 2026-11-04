@@ -32,7 +32,7 @@ Editor {
             page.folders = ok && r ? r.folders || [] : []
             page.host = ok && r ? r.hostname || "" : ""
         })
-        falcon.call("marks.list", { scope: "mine" }, function (ok, r) { page.mine = ok ? (r.marks || []).map(function (k) { return page.norm(k.path) }) : [] })
+        falcon.call("marks.list", { scope: "all" }, function (ok, r) { page.mine = ok ? (r.marks || []).map(function (k) { return page.norm(k.path) }) : [] })
     }
     function norm(p) { return String(p).replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase() }
     function leaf(p) { return String(p).replace(/[\\/]+$/, "").split(/[\\/]/).pop() }

@@ -234,7 +234,7 @@ Window {
                 Item {
                     width: parent.width; height: 34
                     Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - 200; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 12
-                           text: (spec.from || "Your Admin") + " checks the work and closes the task." }
+                           text: "An IT Admin checks the work and closes the task." }
                     Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                         Act { text: "Later"; onClicked: answer.give({ later: true }) }
                         Act { visible: !spec.started; text: "Start"; primary: true; onClicked: answer.give({ start: true }) }

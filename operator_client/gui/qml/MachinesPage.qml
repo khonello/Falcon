@@ -4,7 +4,7 @@ import "."
 // MACHINES, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminMachinesPage): which of my machines needs me,
 // and what do I do on it? The situation in a sentence; one card per machine, serious first, the department a label on each and a
 // filter on the list; a click picks it and draws it on the right (loading in place, then a pulse), Expand opens its details;
-// check-ins this week for every machine; and Add a machine, which only registers it (its department is set on Departments).
+// check-ins this week for every machine; and what waits to join: a machine installed without a licence code, let in with the code on its screen.
 Page {
     id: page
     objectName: "machinesView"
@@ -54,7 +54,7 @@ Page {
     }
     Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
     onCurChanged: loadCur()
-    Component.onCompleted: { if (falcon.isConnected) loadInfo(); loadCur() }
+    Component.onCompleted: { if (falcon.isConnected) loadInfo(); loadCur(); loadAsks() }
     Connections { target: Fleet; function onLoadedChanged() { page.loadInfo() } }
 
     function mine(m) { return m.held === Nav.me || m.held === "You" }
@@ -231,7 +231,7 @@ Page {
                     }
                 }
             }
-            Quiet { visible: page.ms.length === 0; text: "No machines yet. Add a machine below; it gets its department on Departments." }
+            Quiet { visible: page.ms.length === 0; text: "No machines yet. A machine joins by itself with its licence code, at setup." }
         }
 
         // the picked machine: its health and the last 24 hours, then storage and what is running
@@ -413,16 +413,44 @@ Page {
     }
 
     // --- add a machine: it only registers; its department is set on Departments ----------------------------------
+    // installed without a licence code: an Admin lets it in with the code on its screen (one with a code has joined by itself)
+    property var asks: []
+    property var codes: ({})
+    function loadAsks() { falcon.call("enroll.list", {}, function (ok, r) { page.asks = ok ? (r.requests || []) : [] }) }
+    Connections { target: falcon; function onPushReceived(type) { if (/^enroll/.test(type)) page.loadAsks() } }
+    function letIn(a) {
+        falcon.call("enroll.confirm", { enrollment_id: a.id, code: String(page.codes[a.id] || "").trim() }, function (ok, r) {
+            if (ok) { Msg.ok(a.hostname + " joined · its key went to the machine"); page.loadAsks(); Fleet.refresh() } else Msg.failed(r && r.message ? r.message : "Wrong code") })
+    }
+    function refuse(a) {
+        falcon.call("enroll.refuse", { enrollment_id: a.id, reason: "refused" }, function (ok, r) { if (ok) { Msg.ok("Refused " + a.hostname); page.loadAsks() } else Msg.failed(r && r.message ? r.message : "Not refused") })
+    }
     Box {
-        objectName: "addMachine"
+        objectName: "waitingToJoin"
+        visible: page.asks.length > 0
         width: parent.width
-        accentFoot: true
-        title: "Add a machine"
-        sub: "a PC joins in three steps, and gets its department on Departments; nothing connects without the key made here"
-        GiveSteps {
-            steps: [["Pick or name the PC", "PCs already found on the network, or trying to connect, are offered"], ["Copy its key", "it is made for this PC and shown once"], ["Give the key to its worker", "in the Worker Client settings; it checks in from then on"]]
-            act: "Add a machine"
-            onGo: keys.ask({ mode: "pc" })
+        title: "Waiting to join · " + page.asks.length
+        sub: "installed without a licence code; type the code on its screen to let it in"
+        Repeater {
+            model: page.asks
+            delegate: Rectangle {
+                id: jr
+                required property var modelData
+                width: parent.width; height: 52; radius: 8; color: Theme.surface2
+                Rectangle { x: 10; anchors.verticalCenter: parent.verticalCenter; width: 30; height: 30; radius: 15; color: Theme.surface3
+                            Icon { anchors.centerIn: parent; name: "desktop"; size: 14; color: Theme.text2 } }
+                Column { x: 50; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 50 - acts.width - 24; spacing: 1
+                    Row { spacing: 8
+                        Txt { text: jr.modelData.hostname; mono: true; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                        Txt { text: jr.modelData.peer || ""; mono: true; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone } }
+                    Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12
+                          text: "asked to join at " + Time.hhmm(jr.modelData.created_at) + ", as " + (jr.modelData.requested_level === "admin" ? "an IT Admin's PC" : "a person's PC") } }
+                Row { id: acts; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                    Field { small: true; width: 170; placeholderText: "The code on its screen"; text: page.codes[jr.modelData.id] || ""
+                            onTextEdited: { var c = Object.assign({}, page.codes); c[jr.modelData.id] = text; page.codes = c } }
+                    Btn { small: true; text: "Refuse"; onClicked: page.refuse(jr.modelData) }
+                    Btn { small: true; kind: "primary"; text: "Let it in"; enabled: String(page.codes[jr.modelData.id] || "").trim() !== ""; onClicked: page.letIn(jr.modelData) } }
+            }
         }
     }
 }

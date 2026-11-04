@@ -77,7 +77,7 @@ Page {
     function gatesOf(f) {
         var out = [], name = page.nameOf(f)
         page.rAsks.filter(function (c) { return c.flow.id === f.id }).forEach(function (c) {
-            out.push({ id: "r" + c.id, hot: true, kind: "Restricted, yours", icon: "stop", title: name + " met " + page.folder(c.sample_path), where: String(c.sample_path).replace(/[^\/\\]+$/, ""), line: "you restricted it; the flow waits for you", wait: page.hours(c.asked_at),
+            out.push({ id: "r" + c.id, hot: true, kind: "Restricted", icon: "stop", title: name + " met " + page.folder(c.sample_path), where: String(c.sample_path).replace(/[^\/\\]+$/, ""), line: "you restricted it; the flow waits for you", wait: page.hours(c.asked_at),
                        acts: [["Allow it for this flow", function () { page.consentR(c, true) }, true, ""], ["Keep it paused", function () { page.consentR(c, false) }, true, ""]] })
         })
         if (f.pause_reason === "restricted:consent" && !out.length)
@@ -86,11 +86,11 @@ Page {
             out.push({ id: "p" + f.id, hot: true, kind: f.pause_reason.indexOf("destination") === 0 ? "A destination is gone" : f.pause_reason.indexOf("source") === 0 ? "A source is gone" : "Held by Falcon",
                        icon: "disconnect", title: name + (f.pause_reason.indexOf("destination") === 0 ? " cannot reach where it lands" : f.pause_reason.indexOf("source") === 0 ? " cannot read where it starts" : " stopped"), where: f.source_hostname + " " + f.source_path, wait: 0,
                        line: f.suggestion || "nothing more goes through until it is fixed",
-                       acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id }, "Trying it again") }, page.mine(f), "Only " + page.who(f) + " can do this"],
-                              ["Pick another folder", function () { Nav.go("flows", "edit-" + f.id) }, page.mine(f), "Only " + page.who(f) + " can change it"]] })
+                       acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id }, "Trying it again") }, true, ""],
+                              ["Pick another folder", function () { Nav.go("flows", "edit-" + f.id) }, true, ""]] })
         ;(f.destinations || []).filter(function (d) { return !!d.paused_reason }).forEach(function (d) {
             out.push({ id: "d" + d.id, hot: true, kind: "A destination stopped", icon: "disconnect", title: name + " cannot reach " + page.place(d), where: "files wait in line until it takes them", line: "the folder stopped taking files", wait: 0.3,
-                       acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id, destination_id: d.id }, "Trying it again") }, page.mine(f), "Only " + page.who(f) + " can do this"]] })
+                       acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id, destination_id: d.id }, "Trying it again") }, true, ""]] })
         })
         var run = page.runs[f.id], beside = run && run.last ? (run.last.items || []).filter(function (i) { return i.outcome === "kept_beside" })[0] : null
         if (beside) {
@@ -114,14 +114,14 @@ Page {
         }
         var g = page.gone(f)
         if (g) out.push({ id: "g" + f.id, hot: true, kind: "A source is gone", icon: "folderopen", title: g.source_hostname + " " + g.source_path + " is not there any more", where: name + " reads from it", line: "it was moved or renamed; the flow's other sources still go", wait: page.hours(g.paused_at),
-                          acts: [["Pick another folder", function () { Nav.go("flows", "edit-" + f.id) }, page.mine(f), "Only " + page.who(f) + " can change it"],
+                          acts: [["Pick another folder", function () { Nav.go("flows", "edit-" + f.id) }, true, ""],
                                  ["Wait for it", function () { Msg.ok("Waiting; you are told when it is back") }, true, ""],
-                                 ["Stop the flow", function () { page.call("flow.delete", { flow_id: f.id }, "Stopped · its history is kept") }, page.mine(f), "Only " + page.who(f) + " can do this"]] })
+                                 ["Stop the flow", function () { page.call("flow.delete", { flow_id: f.id }, "Stopped · its history is kept") }, true, ""]] })
         var q = f.files_copied && f.files_copied.last_at ? page.hours(f.files_copied.last_at) / 24 : 0
         if (q >= 14 && !page.kept[f.id])
             out.push({ id: "q" + f.id, kind: "Quiet for a long time", icon: "pausecircle", title: name + " has moved nothing in " + Math.round(q) + " days", where: (f.sources || []).map(function (s) { return s.source_hostname + " " + s.source_path }).join(", "), line: "a suggestion only; nothing stops by itself", wait: q * 24,
                        acts: [["Keep it", function () { var k = Object.assign({}, page.kept); k[f.id] = true; page.kept = k; Msg.ok(name + " kept") }, true, ""],
-                              ["Stop it", function () { page.call("flow.delete", { flow_id: f.id }, "Stopped · its history is kept") }, page.mine(f), "Only " + page.who(f) + " can do this"]] })
+                              ["Stop it", function () { page.call("flow.delete", { flow_id: f.id }, "Stopped · its history is kept") }, true, ""]] })
         var off = page.offDest(f)
         if (off) { var ad = page.adminAt(off.destination_pc_id)
             out.push({ id: "o" + f.id, kind: "A destination is off", icon: "disconnect", title: off.destination_hostname + " has been off since " + Time.hhmm(ad.last_seen_at), where: name + " · files wait for it", line: "it goes when the machine is back; " + (page.mine(f) ? "you" : page.who(f)) + " made this flow", wait: page.hours(ad.last_seen_at),
@@ -187,7 +187,7 @@ Page {
             objectName: "flowCards"
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, rightCol.implicitHeight)
-            title: "Your flows · " + page.mineList.length
+            title: "The flows · " + page.mineList.length
             sub: "by what each is doing, paused last; click one and its controls, last sync and drawing follow; expand it for its facts"
             Repeater {
                 model: page.groupsDef
@@ -372,9 +372,7 @@ Page {
                     Item {
                         width: parent.width
                         height: 24
-                        Btn { visible: page.cur !== null && page.mine(page.cur); anchors.verticalCenter: parent.verticalCenter; small: true; iconName: "edit"; text: "Edit"; onClicked: Nav.go("flows", "edit-" + page.cur.id) }
-                        Txt { visible: page.cur !== null && !page.mine(page.cur); anchors.verticalCenter: parent.verticalCenter; width: parent.width - ctlRow.width - 12
-                              text: page.cur ? (page.askedOfMe(page.cur) ? "an ask to you" : "made by " + page.who(page.cur) + "; only they change it") : ""; color: Theme.text3; font.pixelSize: 12 }
+                        Btn { visible: page.cur !== null; anchors.verticalCenter: parent.verticalCenter; small: true; iconName: "edit"; text: "Edit"; onClicked: Nav.go("flows", "edit-" + page.cur.id) }
                         Row {
                             id: ctlRow
                             anchors.right: parent.right
@@ -384,7 +382,7 @@ Page {
                             Btn { visible: ctlRow.act !== null; small: true; kind: "primary"; text: ctlRow.act ? ctlRow.act[0] : ""; enabled: ctlRow.act !== null && ctlRow.act[2] && !(page.g0 && page.g0.ask && (page.gpick[page.g0.id] || 0) === 0 && page.askPath.trim() === "")
                                   tip: ctlRow.act && !ctlRow.act[2] ? ctlRow.act[3] : ""; onClicked: if (ctlRow.act[1]) ctlRow.act[1]() }
                             Row {
-                                visible: page.cur !== null && page.mine(page.cur)
+                                visible: page.cur !== null
                                 spacing: 6
                                 readonly property bool held: page.cur !== null && (page.cur.st === "paused" || page.cur.st === "stopped")
                                 Btn { visible: parent.held; small: true; kind: "primary"; iconName: "caretr"; text: page.cur && page.cur.st === "stopped" ? "Start again" : "Resume"
@@ -461,7 +459,7 @@ Page {
         Txt {
             readonly property var notes: !page.cur ? [] : [page.cur.pause_reason === "restricted:consent" ? "red outline: held for your consent at that source" : "",
                                                           (page.cur.destinations || []).some(function (d) { return !!d.paused_reason }) ? "dashed red: a destination that stopped taking files" : "",
-                                                          page.cur.consent_status === "pending" ? "dashed grey: waiting for its owner to pick a folder" : ""].filter(function (x) { return x })
+                                                          page.cur.consent_status === "pending" ? "dashed grey: waiting for an Admin to pick a folder" : ""].filter(function (x) { return x })
             visible: notes.length > 0
             width: parent.width; text: notes.join(" · "); color: Theme.text3; font.pixelSize: 12
         }
@@ -482,7 +480,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Make a flow"
-        sub: "files go one way only; nothing restricted rides along without its owner's say"
+        sub: "files go one way only; nothing restricted rides along without an Admin's say"
         GiveSteps {
             steps: [["Pick where files start", "one or more folders on your machines, or ones a flow already fills"], ["Say what happens on the way", "convert, compress, rename or sort, in order; or copy them as they are"], ["Pick where they land", "folders you manage; anyone else's is asked first"]]
             act: "Make a flow"

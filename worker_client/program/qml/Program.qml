@@ -258,7 +258,7 @@ Window {
                         Rectangle { width: parent.width; height: 1; color: win.line }
                         Item { width: parent.width; height: 34
                             Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - 120; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 12
-                                   text: win.curTask ? (win.curTask.started ? "Started. " : "") + win.curTask.from + " checks the work and closes the task." : "" }
+                                   text: win.curTask ? (win.curTask.started ? "Started. " : "") + "An IT Admin checks the work and closes the task." : "" }
                             Act { anchors.right: parent.right; visible: win.curTask && !win.curTask.started; text: "Start"; primary: true; ok: win.live; objectName: "start_task"
                                   onClicked: program.startTask(win.curTask.id) } }
                         Text { visible: !win.live && win.curTask && !win.curTask.started; text: "Start waits until you are connected again."; color: win.warn; font.family: win.sans; font.pixelSize: 12 }

@@ -218,7 +218,7 @@ Page {
                 Repeater {
                     model: !page.cur ? [] : [
                         ["flag", page.stand(page.cur), page.gl && page.gl.next_stage ? "no further yet; next would be " + (page.nextSaid[page.gl.next_stage] || page.gl.next_stage.toLowerCase()) : page.cur.stage_name ? "it went all the way" : "nothing came of it after that"],
-                        ["lock", page.gl && page.gl.restricted ? "Restricted files are involved" : "No restricted files involved", page.gl && page.gl.restricted ? "they need their owner's consent to leave" : "what was touched is ordinary"],
+                        ["lock", page.gl && page.gl.restricted ? "Restricted files are involved" : "No restricted files involved", page.gl && page.gl.restricted ? "they need an Admin's consent to leave" : "what was touched is ordinary"],
                         ["user", page.gl && page.gl.signed_in_then && page.gl.signed_in_then.length ? page.gl.signed_in_then.map(function (s) { return s.name || "someone" }).join(", ") : glance.m && glance.m.user ? glance.m.user : "Nobody signed in",
                          (glance.m && glance.m.deptName ? glance.m.deptName + " · " : "") + "signed in on " + page.cur.host + " at the time"],
                         ["desktop", page.cur.host, glance.m ? (glance.m.online ? "on now" + (glance.m.user ? ", " + glance.m.user + " signed in" : "") : "off, last seen " + (glance.m.seen ? Time.age(glance.m.seen) + " ago" : "a while ago")) : ""],

@@ -136,7 +136,7 @@ Editor {
             var who = page.asks.map(function (d) { var a = page.adminOf(d.who); return a ? a.name : "" })
             Msg.ok(who.length ? (page.editId ? "Saved; " : "Flow created; ") + Theme.listNames(who) + " asked to pick a folder"
                    : page.editId ? "Saved · checks passed, recorded in the audit log"
-                   : r.restricted_pending ? "Flow created but paused · it would carry something restricted, so its owner is asked first" : "Flow created and running")
+                   : r.restricted_pending ? "Flow created but paused · it would carry something restricted, so an Admin is asked first" : "Flow created and running")
             page.keeps = false
             Nav.go("flows")
         })

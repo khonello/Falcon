@@ -144,7 +144,7 @@ Page {
                         color: Theme.text2
                         elide: Text.ElideNone
                         text: page.m && page.m.heldFrom ? " since " + Time.hhmm(page.m.heldFrom) + " · " + Time.dur((Time.now - Time.ms(page.m.heldFrom)) / 3600000)
-                                                         + ". " + (page.m.user || "Its owner") + " can't use it until " + (page.m.held === "You" ? "you leave." : "they leave.") : ""
+                                                         + ". " + (page.m.user || "Its person") + " can't use it until " + (page.m.held === "You" ? "you leave." : "they leave.") : ""
                     }
                 }
             }
@@ -256,7 +256,7 @@ Page {
                                     width: 160; height: 20
                                     Tag {
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.occupied_via === "native" ? "Owner signed in" : "Admin session"
+                                        text: modelData.occupied_via === "native" ? "Signed in" : "Admin session"
                                         c: modelData.occupied_via === "native" ? Theme.text3 : Theme.ser3
                                     }
                                 }

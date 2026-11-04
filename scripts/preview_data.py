@@ -503,7 +503,7 @@ def issues_get(iid: int, account: int) -> dict[str, Any]:
 
 # --- restricted marks (marks.list / marks.get / marks.tree) ------------------------------------------------------
 _RS = json.loads((Path(__file__).with_name("preview_concept_restricted.json")).read_text(encoding="utf-8"))
-_MARK_PC = {"WS-OPS-A1": 101}
+_MARK_PC = {"WS-OPS-A1": 101, "WS-OPS-A2": 102, "WS-FIN-A1": 103}
 
 
 def _mark_id(code: str) -> int:
@@ -521,7 +521,7 @@ def _mark_host(host: str) -> int:
 
 def marks_list(role: str, account: int) -> dict[str, Any]:
     ms = [{"id": _mark_id(k["id"]), "code": k["id"], "kind": k["kind"], "name": k["name"], "pc_id": _mark_host(k["host"]), "host": k["host"], "path": k["path"], "keep": k["keep"],
-           "keep_label": "Anywhere on the PC" if k["keep"] == "machine" else "Only in its place", "by": {"account_id": account, "name": "You", "you": True}, "files": k["files"], "versions": k["versions"],
+           "keep_label": "Anywhere on the PC" if k["keep"] == "machine" else "Only in its place", "by": {"account_id": _BY.get(k["by"], 0), "name": k["by"], "you": k["by"] == "R. Mensah"}, "files": k["files"], "versions": k["versions"],
            "copies": len(k["copies"]), "worst": k["copies"][0]["sev"] if k["copies"] else None, "created_at": _day_at(k["at"])} for k in _RS["marks"]]
     return {"marks": ms, "summary": {"marks": len(ms), "files": sum(m["files"] for m in ms), "copies": sum(m["copies"] for m in ms), "with_copies": sum(1 for m in ms if m["copies"])}}
 

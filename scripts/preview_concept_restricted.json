@@ -56,6 +56,32 @@
 ]
 },
 {
+"id": "M-3",
+"name": "supplier-contracts-2026.pdf",
+"kind": "file",
+"host": "WS-OPS-A2",
+"path": "C:\\Users\\AQuaye\\Documents\\Contracts\\supplier-contracts-2026.pdf",
+"keep": "machine",
+"files": 1,
+"versions": 2,
+"at": "17 Sep",
+"by": "A. Quaye",
+"copies": []
+},
+{
+"id": "M-4",
+"name": "Board",
+"kind": "folder",
+"host": "WS-OPS-A2",
+"path": "D:\\Board\\",
+"keep": "path",
+"files": 12,
+"versions": 31,
+"at": "9 Sep",
+"by": "A. Quaye",
+"copies": []
+},
+{
 "id": "M-5",
 "name": "headcount-plan-2027.xlsx",
 "kind": "file",
@@ -66,6 +92,226 @@
 "versions": 3,
 "at": "28 Sep",
 "by": "R. Mensah",
+"copies": []
+},
+{
+"id": "M-6",
+"name": "Payroll",
+"kind": "folder",
+"host": "WS-FIN-A1",
+"path": "C:\\Finance\\Payroll\\",
+"keep": "machine",
+"files": 64,
+"versions": 380,
+"at": "1 Sep",
+"by": "K. Boateng",
+"copies": []
+},
+{
+"id": "M-7",
+"name": "bank-mandates.pdf",
+"kind": "file",
+"host": "WS-FIN-A1",
+"path": "C:\\Users\\KBoateng\\Documents\\bank-mandates.pdf",
+"keep": "path",
+"files": 1,
+"versions": 1,
+"at": "22 Sep",
+"by": "K. Boateng",
+"copies": []
+},
+{
+"id": "M-8",
+"name": "Board",
+"kind": "folder",
+"host": "WS-FIN-A1",
+"path": "D:\\Board\\",
+"keep": "machine",
+"files": 3,
+"versions": 18,
+"at": "2 Sep",
+"by": "K. Boateng",
+"copies": []
+},
+{
+"id": "M-9",
+"name": "salaries.csv",
+"kind": "file",
+"host": "WS-FIN-A1",
+"path": "C:\\HR\\Payroll\\salaries.csv",
+"keep": "path",
+"files": 1,
+"versions": 6,
+"at": "15 Sep",
+"by": "K. Boateng",
+"copies": []
+},
+{
+"id": "M-10",
+"name": "board-minutes-2026-09.docx",
+"kind": "file",
+"host": "WS-FIN-A1",
+"path": "D:\\Board\\minutes\\board-minutes-2026-09.docx",
+"keep": "machine",
+"files": 1,
+"versions": 4,
+"at": "29 Sep",
+"by": "K. Boateng",
+"copies": [
+{
+"id": "INC-1050",
+"sev": "high",
+"host": "FIN-01",
+"at": 11.4,
+"file": "board-minutes-2026-09.docx",
+"folder": "C:\\Users\\Afi\\Downloads",
+"how": null
+}
+]
+},
+{
+"id": "M-11",
+"name": "Acquisitions",
+"kind": "folder",
+"host": "WS-FIN-A1",
+"path": "D:\\Acquisitions\\",
+"keep": "path",
+"files": 23,
+"versions": 61,
+"at": "12 Sep",
+"by": "K. Boateng",
+"copies": [
+{
+"id": "INC-1051",
+"sev": "critical",
+"host": "OPS-02",
+"at": 8.75,
+"file": "loi-northline.pdf",
+"folder": "C:\\Users\\Public\\Shared",
+"how": null
+},
+{
+"id": "INC-1052",
+"sev": "high",
+"host": "LOG-01",
+"at": -20.5,
+"file": "valuation-model.xlsx",
+"folder": "C:\\Users\\Esi\\Desktop\\new folder",
+"how": null
+}
+]
+},
+{
+"id": "M-12",
+"name": "strategy-2027.pptx",
+"kind": "file",
+"host": "WS-FIN-A1",
+"path": "C:\\Users\\KBoateng\\Documents\\strategy-2027.pptx",
+"keep": "path",
+"files": 1,
+"versions": 9,
+"at": "24 Sep",
+"by": "K. Boateng",
+"copies": [
+{
+"id": "INC-1053",
+"sev": "medium",
+"host": "OPS-05",
+"at": -50,
+"file": "strategy-2027.pptx",
+"folder": "C:\\Users\\Nana\\Documents",
+"how": null
+}
+]
+},
+{
+"id": "M-13",
+"name": "Payroll archive",
+"kind": "folder",
+"host": "WS-FIN-A1",
+"path": "E:\\Archive\\Payroll\\",
+"keep": "machine",
+"files": 412,
+"versions": 1240,
+"at": "5 Sep",
+"by": "K. Boateng",
+"copies": [
+{
+"id": "INC-1054",
+"sev": "high",
+"host": "OPS-03",
+"at": 7.9,
+"file": "payroll-2025-12.csv",
+"folder": "C:\\Users\\Yaw\\Documents\\old",
+"how": null
+},
+{
+"id": "INC-1055",
+"sev": "high",
+"host": "FIN-02",
+"at": 6.2,
+"file": "payroll-2025-11.csv",
+"folder": "C:\\Users\\Kofi\\Desktop",
+"how": null
+},
+{
+"id": "INC-1056",
+"sev": "medium",
+"host": "OPS-06",
+"at": -30,
+"file": "payroll-2025-10.csv",
+"folder": "D:\\Backup\\Kwame",
+"how": null
+},
+{
+"id": "INC-1057",
+"sev": "medium",
+"host": "OPS-01",
+"at": -40,
+"file": "payroll-2025-09.csv",
+"folder": "C:\\Users\\Kojo\\Documents",
+"how": null
+},
+{
+"id": "INC-1058",
+"sev": "low",
+"host": "FIN-01",
+"at": -60,
+"file": "payroll-2025-08.csv",
+"folder": "C:\\Users\\Afi\\Archive",
+"how": null
+},
+{
+"id": "INC-1059",
+"sev": "low",
+"host": "OPS-04",
+"at": -75,
+"file": "payroll-2025-07.csv",
+"folder": "C:\\Users\\Adjoa\\Desktop",
+"how": null
+},
+{
+"id": "INC-1060",
+"sev": "low",
+"host": "LOG-01",
+"at": -90,
+"file": "payroll-2025-06.csv",
+"folder": "C:\\Users\\Esi\\Downloads",
+"how": null
+}
+]
+},
+{
+"id": "M-14",
+"name": "Legal",
+"kind": "folder",
+"host": "WS-FIN-A1",
+"path": "C:\\Legal\\",
+"keep": "path",
+"files": 58,
+"versions": 97,
+"at": "19 Sep",
+"by": "K. Boateng",
 "copies": []
 },
 {

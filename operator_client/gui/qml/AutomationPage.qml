@@ -59,9 +59,9 @@ Page {
         return { name: k, c: Auto.outColor(k), v: v }
     })
 
-    function ownerOf(e) { var b = board[e.id]; return b && b.owner ? b.owner : "an Admin" }
+    function setBy(e) { var b = board[e.id]; return b && (b.set_by || b.owner) ? b.set_by || b.owner : "an Admin" }
     function mine(e) { return e.created_by_account_id === falcon.accountId }
-    function byWord(e) { return mine(e) ? "you" : ownerOf(e) }
+    function byWord(e) { return mine(e) ? "you" : setBy(e) }
     // Test on one machine: the rule's actions once, on the first machine it applies to that is online (recorded as run by hand)
     function test(e) {
         var ids = (e.condition_spec || {}).pc_ids, ms = Fleet.machines.filter(function (m) { return m.online && (!ids || !ids.length || ids.indexOf(m.pc_id) >= 0) })
@@ -139,7 +139,7 @@ Page {
         var ranToday = events.filter(function (e) { return page.firingsToday(e).length > 0 }).length, times = todayRuns.length
         var bad = todayRuns.filter(function (r) { return r.bad }), hosts = bad.reduce(function (a, r) { return a.concat(page.badOf(r.f).map(page.hostOf)) }, []).filter(function (h, i, a) { return a.indexOf(h) === i })
         var off = events.filter(function (e) { return e.enabled === false }).map(function (e) { return Auto.nameOf(e) }), nx = coming.filter(function (c) { return (page.events.filter(function (e) { return e.id === c.event_id })[0] || {}).enabled !== false })[0]
-        return Theme.fmt(ranToday) + " of your " + Theme.many(events.length, "rule") + " ran today, " + Theme.many(times, "time") + " in all."
+        return Theme.fmt(ranToday) + " of the " + Theme.many(events.length, "rule") + " ran today, " + Theme.many(times, "time") + " in all."
                + (bad.length ? " " + Theme.many(bad.length, "run") + " did not go to plan, on " + Theme.listNames(hosts) + "." : " Everything they did worked.")
                + (off.length ? " " + Theme.listNames(off) + " is switched off." : "")
                + (nx ? " Next: " + nx.name + " " + page.dayWord(nx.at) + " at " + Time.hhmm(nx.at) + "." : "")
@@ -176,7 +176,7 @@ Page {
             objectName: "ruleList"
             width: (parent.width - 16) * 4 / 12
             height: Math.max(parent.h, sheet.implicitHeight)
-            title: "Your rules"
+            title: "The rules"
             sub: String(page.events.length)
             extra: Btn { small: true; headed: true; iconName: "plus"; text: "Make a rule"; onClicked: Nav.go("automation", "new") }
             Repeater {
@@ -191,7 +191,7 @@ Page {
                     Icon { x: 10; y: 9 + 4; name: Auto.kindIcon(modelData.kindW); size: 13; color: Theme.text3 }
                     Column { id: lc; x: 31; y: 9; width: parent.width - 31 - 10 - (parent.n > 0 ? 26 : 0); spacing: 1
                         Txt { width: parent.width; text: modelData.name; font.weight: Font.DemiBold; color: modelData.enabled === false ? Theme.text4 : Theme.text }
-                        Txt { width: parent.width; text: "Made " + Time.day(modelData.created_at) + " by " + page.byWord(modelData); color: Theme.text3; font.pixelSize: 12 } }
+                        Txt { width: parent.width; text: "Set " + Time.day(modelData.created_at) + " by " + page.byWord(modelData); color: Theme.text3; font.pixelSize: 12 } }
                     Rectangle { visible: parent.n > 0; anchors.right: parent.right; anchors.rightMargin: 10; y: 9 + 1; width: Math.max(18, nb.implicitWidth + 8); height: 18; radius: 9; color: Theme.crit
                                 Txt { id: nb; anchors.centerIn: parent; text: parent.parent.n; color: Theme.inverse; font.pixelSize: 11; elide: Text.ElideNone } }
                     MouseArea { id: ra; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.pick(modelData.id) }
@@ -207,13 +207,12 @@ Page {
             height: Math.max(parent.h, implicitHeight)
             gap: 14
             title: page.cur ? page.cur.name : "No rule picked"
-            sub: page.cur ? "made by " + page.byWord(page.cur) + " · " + (page.cur.enabled === false ? "switched off" : "on since " + Time.day(page.cur.created_at)) : "pick a rule on the left"
+            sub: page.cur ? "set by " + page.byWord(page.cur) + " · " + (page.cur.enabled === false ? "switched off" : "on since " + Time.day(page.cur.created_at)) : "pick a rule on the left"
             extra: Row {
                 spacing: 8
                 visible: page.cur !== null
-                Btn { visible: page.cur !== null && page.mine(page.cur); small: true; headed: true; text: "Run now"; enabled: page.cur !== null && page.cur.enabled !== false; onClicked: page.test(page.cur) }
-                Btn { visible: page.cur !== null && page.mine(page.cur); small: true; headed: true; iconName: "edit"; text: "Edit"; onClicked: Nav.go("automation", "edit-" + page.cur.id) }
-                Txt { visible: page.cur !== null && !page.mine(page.cur); text: "only " + (page.cur ? page.ownerOf(page.cur) : "") + " changes it"; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone }
+                Btn { visible: page.cur !== null; small: true; headed: true; text: "Run now"; enabled: page.cur !== null && page.cur.enabled !== false; onClicked: page.test(page.cur) }
+                Btn { visible: page.cur !== null; small: true; headed: true; iconName: "edit"; text: "Edit"; onClicked: Nav.go("automation", "edit-" + page.cur.id) }
             }
             Txt {
                 id: big
@@ -474,10 +473,10 @@ Page {
                         id: sk
                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                         spacing: 6
-                        Txt { visible: nx.isOff || nx.skipped || (nx.ev !== null && !page.mine(nx.ev)); anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
-                              text: nx.isOff ? "switched off; it will not run" : nx.skipped ? "skipped this once" : "runs as set" }
+                        Txt { visible: nx.isOff || nx.skipped; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                              text: nx.isOff ? "switched off; it will not run" : "skipped this once" }
                         Btn { visible: !nx.isOff && nx.skipped; small: true; kind: "text"; text: "Undo"; onClicked: page.skip(nx.modelData, false) }
-                        Btn { visible: !nx.quiet && nx.ev !== null && page.mine(nx.ev); small: true; text: "Skip this once"; onClicked: page.skip(nx.modelData, true) }
+                        Btn { visible: !nx.quiet && nx.ev !== null; small: true; text: "Skip this once"; onClicked: page.skip(nx.modelData, true) }
                     }
                     Rectangle { visible: index < page.coming.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }

@@ -307,7 +307,7 @@ const colHead = (t, n, more) => `<div class="c-colh"><span class="c-h2">${t}${n 
 const tasksCol = (off) => R("Your tasks", "Waiting to start first, then started; Start on the card", colHead("Your tasks", "1 to start", "All 4") +
   card("Send the October delivery notes", "From R. Mensah", { t: "Due Friday 7 Nov at 16:00", warn: 1 }, `<span class="btn pri${off ? " dis" : ""}">Start</span>`) +
   (off ? `<span class="c-s">Start waits until you are connected again.</span>` : "") +
-  card("Update the drivers' phone list", "From A. Quaye · started Monday", "No deadline · A. Quaye closes it when it is checked", "", true), "1 1 0");
+  card("Update the drivers' phone list", "From A. Quaye · started Monday", "No deadline · an IT Admin closes it when it is checked", "", true), "1 1 0");
 const msgCol = (off) => R("Messages", "Conversations; reply on the card, or Ask IT to start one", colHead("Messages", "1 new", "Ask IT · All") +
   card("R. Mensah", "Can you leave your machine on tonight? The update needs about 20 minutes after 19:00.", "Today at 10:31", `<span class="c-link${off ? " dis" : ""}">Reply</span>`) +
   card("R. Mensah", "Your new monitor is at reception.", "Yesterday · you replied", "", true), "1 1 0");
@@ -338,7 +338,7 @@ const VIEWS = {
       <div class="c-file">${svg("folder")}<span class="mono">\\\\files\\Logistics\\Delivery notes\\2026-10</span><span class="c-s">not yet</span></div>
       <div class="c-file">${svg("files")}<span>About 40 PDF files in it</span><span class="c-s">not yet</span></div>
       <div class="c-file">${svg("file")}<span class="mono">October shipments.xlsx</span><span class="c-s">not yet</span></div></div>
-      <div class="c-row" style="margin-top:auto"><span class="c-s grow">R. Mensah closes it when the work is checked.</span>${btns(["Start", "pri"])}</div>`, "1 1 0") ] }],
+      <div class="c-row" style="margin-top:auto"><span class="c-s grow">An IT Admin closes it when the work is checked.</span>${btns(["Start", "pri"])}</div>`, "1 1 0") ] }],
   messages: () => [{ tpl: "minmax(0, 1fr) minmax(0, 1.4fr)", cols: [
     R("Conversations", "Your request while it waits, then one conversation per Admin; Ask IT starts a request", `<div class="c-row"><span class="c-h2 grow">Conversations</span><span class="btn dis">Ask IT</span></div>
       <div class="c-card req"><span class="c-s c-acc" style="font-weight:600">Your request · waiting for IT</span><span class="c-h2">The label printer prints blank labels</span><span class="c-s">Sent today at 09:50 · every IT Admin can see it</span></div>
@@ -420,7 +420,7 @@ const MOMENTS = [
         <div class="c-file">${svg("files")}<span>About 40 PDF files in it</span><span class="tw-pill">not yet</span></div>
         <div class="c-file">${svg("file")}<span class="mono">October shipments.xlsx</span><span class="tw-pill">not yet</span></div></div>
         <span class="c-s">Falcon notices these change by itself. You do not have to report anything.</span></div>`),
-      R("Start, or later", "Start is the only action; Later keeps it in Tasks; the Admin closes it, never the person", `<div class="tw-foot"><span class="c-s grow">R. Mensah checks the work and closes the task.</span>${btns(["Later"], ["Start", "pri"])}</div>`) ] }],
+      R("Start, or later", "Start is the only action; Later keeps it in Tasks; the Admin closes it, never the person", `<div class="tw-foot"><span class="c-s grow">An IT Admin checks the work and closes the task.</span>${btns(["Later"], ["Start", "pri"])}</div>`) ] }],
     what: "Opens over their work once, when the task is given. Closed without Start, it waits in Tasks and comes back as a quiet corner note." },
 
   { id: "reminder", icon: "note", name: "A quiet reminder", stays: ["p-tasks", "Tasks, or wherever the item it names is"], kind: "A corner note", when: "Never takes the keyboard",
@@ -470,21 +470,22 @@ const MOMENTS = [
   { group: "IT setting the machine up", id: "install", icon: "box", name: "Installing Falcon", kind: "The installer", when: "Run once by IT",
     tray: { hide: 1 },
     wins: [{ x: 23, y: 8, w: 54, h: 80, title: "Falcon setup", regions: [
-      R("Steps", "Where you are in the install", `<div class="c-steps"><i class="done">✓</i><span>Welcome</span><em></em><i class="now">2</i><span class="now">Who uses it</span><em></em><i>3</i><span>Install</span><em></em><i>4</i><span>Join</span></div>`),
-      R("This step", "One question at a time", `<span class="c-h1">Who will use this machine?</span>
-        <div class="c-opt on"><i></i><div><div class="c-h2">A person at work</div><div class="c-s">They get the Falcon program: their tasks, messages from IT, announcements.</div></div></div>
-        <div class="c-opt"><i></i><div><div class="c-h2">An IT Admin</div><div class="c-s">Also installs the console. Becoming an Admin is finished afterwards with the setup utility, never here.</div></div></div>
+      R("Steps", "Where you are in the install", `<div class="c-steps"><i class="done">✓</i><span>Welcome</span><em></em><i class="now">2</i><span class="now">Licence code</span><em></em><i>3</i><span>Install</span><em></em><i>4</i><span>Join</span></div>`),
+      R("This step", "One question at a time", `<span class="c-h1">The code from your Falcon licence</span>
+        <span class="c-p">Type the code from the licence your organisation bought. The machine then joins on its own.</span>
+        <span class="c-k" style="margin-top:.6cqw">Licence code</span><div class="c-inp">FLC-W-7K2M-4Q9X</div>
+        <span class="c-s">Leave it empty to have an IT Admin let it in instead.</span>
         <span class="c-s">This package already knows where your organisation's Falcon is and carries its certificate.</span>`, "1 1 0"),
       R("Back and Next", "", btns(["Back"], ["Next", "pri"])) ] }],
-    what: "The package carries the organisation's certificate, so there is nothing to paste. It ends by starting the enrolment." },
+    what: "The package carries the organisation's certificate, so there is nothing to paste. With a licence code the machine joins at once, as what the code is for, and nobody confirms it." },
 
-  { id: "enroll", icon: "key", name: "Enrolling this machine", kind: "A window", when: "A code, confirmed in the console",
+  { id: "enroll", icon: "key", name: "Joining without a code", kind: "A window", when: "A code, confirmed in the console",
     tray: { hide: 1 },
     wins: [{ x: 28, y: 9, w: 44, h: 78, title: "Join your organisation", regions: [
-      R("What happens", "This machine has asked to join; an Admin confirms it", `<span class="c-h1">LOG-01 has asked to join</span><span class="c-p">Give this code to your IT Admin. They type it in Falcon, under Add a machine.</span>`),
+      R("What happens", "Installed without a licence code, this machine has asked to join; an Admin confirms it", `<span class="c-h1">LOG-01 has asked to join</span><span class="c-p">Give this code to your IT Admin. They type it in Falcon, on Machines, under Waiting to join.</span>`),
       R("The code", "Short and large, so it can be read out", `<div class="c-code"><b>4</b><b>8</b><b>2</b><em></em><b>7</b><b>1</b><b>9</b></div>`, "1 1 0"),
       R("Waiting", "Until an Admin confirms; refused or expired ends here", `<div class="c-row"><span class="c-spin"></span><span class="c-s grow">Waiting for an Admin to confirm. The code expires at 11:10.</span>${btns(["Cancel"])}</div>`) ] }],
-    what: "The machine asks to join and shows a code on its own screen. An Admin types that code in the console, so a machine nobody is in front of cannot finish." },
+    what: "Only for a machine installed without a licence code. It asks to join and shows a code on its own screen; an Admin types that code in the console, so a machine nobody is in front of cannot finish." },
 ];
 
 // ---------- drawing

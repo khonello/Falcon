@@ -161,7 +161,7 @@ Page {
             width: (parent.width - 16) * 4 / 12
             height: parent.h
             gap: 0
-            title: "Your actions"
+            title: "The actions"
             sub: String(page.lib.length)
             Repeater {
                 model: [["control", "Control"], ["monitoring", "Monitoring"], ["custom", "Custom"]]
@@ -328,7 +328,7 @@ Page {
     Box {
         width: parent.width
         title: "Ran by hand lately"
-        sub: "yours and the other Admins'; Output shows what each machine returned"
+        sub: "every Admin's; Output shows what each machine returned"
         Repeater {
             model: [["bad", "Failed", "on at least one machine it failed or ran out of time"], ["ok", "Successful", "or you stopped it"]]
             delegate: Group {

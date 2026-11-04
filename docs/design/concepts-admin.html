@@ -1284,9 +1284,9 @@ const copiesOf = (k) => ISSUES.filter((i) => i.type === "file" && i.d.mark === k
 const markOf = (i) => (FULL.MARKS || MARKS).find((k) => k.id === i.d.mark);
 // the person at this console (set by App); Restricted shows only what they marked
 let ME = null;
-const myMarks = () => MARKS.filter((k) => k.by === ME && !k.watch);
+const myMarks = () => MARKS.filter((k) => !k.watch);
 const infoOf = (who) => ADMIN_INFO[who];
-const myCopies = () => ISSUES.filter((i) => i.type === "file" && (markOf(i) || {}).by === ME);
+const myCopies = () => ISSUES.filter((i) => i.type === "file" && markOf(i));
 
 // who held each machine today: [from, to, kind, who]. kinds: own / admin / you
 let LANES = [
@@ -2519,7 +2519,7 @@ function NewFlow({ go, me, edit, drawer }) {
     </div>
   </div>`;
   B[2] = html`<div>
-    ${head("Where should the files go?", "Each destination gets its own copy of every file. Every machine is yours to manage, so none needs anybody to agree. Another Admin's workstation is theirs: ask them, and they pick the folder on it.")}
+    ${head("Where should the files go?", "Each destination gets its own copy of every file. No machine needs anybody to agree. Another Admin's workstation is theirs: ask them, and they pick the folder on it.")}
     <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
       ${f.dests.map(destCard)}
       <div className="row">
@@ -3401,35 +3401,19 @@ const newKey = () => Array.from({ length: 32 }, () => "0123456789abcdef"[Math.fl
 // Found, not registered (sample): "knocked" is a worker that tried to connect without a key (auth.failed);
 // "seen" is a PC on the department's network with no worker yet (needs network discovery, ENGINE-GAPS item 10).
 const AM_FOUND = EMPTY ? [] : [
-  { host: "OPS-08", ip: "10.20.4.18", kind: "knocked", line: "its worker tried to connect 5 times today, last at 09:14" }];
+  { host: "OPS-08", ip: "10.20.4.18", kind: "knocked", line: "asked to join at 09:14, as a person's PC" }];
 function KeyModal({ spec, onClose }) {
-  const [step, setStep] = useState(0), [name, setName] = useState(""), [dept, setDept] = useState(undefined), [key, setKey] = useState(newKey);
-  const sig = spec ? spec.mode + (spec.subject || "") : "";
-  const [found, setFound] = useState(null);
-  useEffect(() => { if (spec) { setStep(spec.mode === "rekey" ? 1 : 0); setName(""); setDept(spec.dept); setFound(null); setKey(newKey()); } }, [sig]);
+  const [key, setKey] = useState(newKey);
+  const sig = spec ? spec.subject || "" : "";
+  useEffect(() => { if (spec) setKey(newKey()); }, [sig]);
   if (!spec) return html`<${Drawer} open=${false} />`;
-  const rk = spec.mode === "rekey", pc = spec.mode === "pc", who = rk ? spec.subject : name.trim();
-  const title = rk ? `New key for ${spec.subject}` : pc ? "Register a PC" : "Add an IT Admin";
-  const fl = pc && spec.found ? spec.found : null, fp = fl && fl.find((f) => f.host === found);
-  return html`<${Drawer} open=${true} onClose=${onClose} title=${title} width=${fl ? 560 : 480} maskClosable=${step === 0}
-    footer=${step === 0 ? html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} onClick=${onClose}>Cancel<//><${Button} type="primary" disabled=${!name.trim()} onClick=${() => { setStep(1); toast(`${name.trim()} registered, recorded in the audit log (concept)`); }}>${pc ? "Register" : "Provision"}<//></div>`
-      : html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${onClose}>I have saved it<//></div>`}>
-    ${step === 0 ? html`<div style=${{ display: "flex", flexDirection: "column", gap: 18 }}>
-        ${fl ? html`<div><div className="nt-h">Found, not registered</div>
-          ${fl.length ? html`<div className="am-found">${fl.map((f) => html`<div key=${f.host} className=${"am-fd" + (found === f.host ? " on" : "")} role="button" tabIndex="0" onClick=${() => { setFound(f.host); setName(f.host); }} onKeyDown=${(e) => e.key === "Enter" && (setFound(f.host), setName(f.host))}>
-              <span className="iq-ic" style=${{ width: 30, height: 30, fontSize: 14 }}>${ic(f.kind === "knocked" ? "DesktopOutlined" : "WifiOutlined")}</span>
-              <span className="iq-main"><span className="iq-t"><b className="mono">${f.host}</b><span className="t3 mono">${f.ip}</span></span><span className="iq-s">${f.line}</span></span>
-              <span className="t3" style=${{ fontSize: 12 }}>${found === f.host ? "picked" : "Use it"}</span></div>`)}</div>
-            <div className="t3" style=${{ fontSize: 12, marginTop: 6 }}>Pick one to fill in its name, or type a new one below.</div>`
-            : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nothing found. A PC shows here once its worker tries to connect.</div>`}</div>` : null}
-        <div><div className="nt-h">${pc ? "Machine name" : "Name"}</div><${Input} id="rg-name" value=${name} onChange=${(e) => setName(e.target.value)} placeholder=${pc ? "OPS-08" : "J. Owusu"} /></div>
-        <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>${pc ? (fp && fp.kind === "seen" ? `${fp.host} has no worker yet. Register it now, then install the worker on it with the key you get next.` : fp ? `${fp.host} is already trying to connect. Once its worker has the key you get next, it checks in.` : "It gets a key, shown once. Put it in a department on Departments.") : "They get the IT console and a key, shown once. Like every Admin, they reach every department, and every issue reaches them."}</div>
-      </div>`
-      : html`<div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div className="t2">${rk ? `The old key for ${spec.subject} stops working at once.` : `${who} is registered.`} Copy this into ${rk || pc ? "the machine's Worker Client settings" : "their Operator Client settings"}.</div>
-        <div className="mono" style=${{ padding: "12px 14px", borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--border-strong)", wordBreak: "break-all", fontSize: 13 }}>${key}</div>
-        <div className="decide" style=${{ "--c": "var(--med)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>It is shown once.</b> It cannot be shown again. If it is lost, make a new one. <span className="t3">(An example key, for the concept.)</span></div>
-      </div>`}
+  return html`<${Drawer} open=${true} onClose=${onClose} title=${`New key for ${spec.subject}`} width=${480} maskClosable=${false}
+    footer=${html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${onClose}>I have saved it<//></div>`}>
+    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="t2">The old key for ${spec.subject} stops working at once. Copy this into the machine's Worker Client settings.</div>
+      <div className="mono" style=${{ padding: "12px 14px", borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--border-strong)", wordBreak: "break-all", fontSize: 13 }}>${key}</div>
+      <div className="decide" style=${{ "--c": "var(--med)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>It is shown once.</b> It cannot be shown again. If it is lost, make a new one. <span className="t3">(An example key, for the concept.)</span></div>
+    </div>
   <//>`;
 }
 // The Overview: what is waiting on you, the fleet, and this week's deviations. Everything opens something.
@@ -3686,7 +3670,7 @@ function AdminDetectivePage({ go }) {
           const got = DT_STAGE[cur.stage_name], next = DT_NEXT[cur.next_stage];
           const rows = [
             ["FlagOutlined", dtStand(cur), got ? (next ? `no further yet; next would be ${next}` : "it went all the way") : "nothing came of it after that"],
-            ["LockOutlined", restr ? "Restricted files are involved" : "No restricted files involved", restr ? "they need their owner's consent to leave" : "what was touched is ordinary"],
+            ["LockOutlined", restr ? "Restricted files are involved" : "No restricted files involved", restr ? "they need an Admin's consent to leave" : "what was touched is ordinary"],
             ["UserOutlined", m.user || "Nobody signed in", `${deptNameOf(cur.dept)} · signed in on ${cur.host} at the time`],
             ["DesktopOutlined", cur.host, m.status === "offline" ? `off, last seen ${dur(m.seen)} ago` : `on now${m.user ? `, ${m.user} signed in` : ""}`],
             ["HistoryOutlined", before.length ? `${fmt(before.length)} earlier case${before.length === 1 ? "" : "s"} on this machine` : "The first case on this machine", before.length ? listNames(before.map((x) => `${x.intent.toLowerCase()} (${(DT_WORD[x.status] || x.status).toLowerCase()})`), 2) : "nothing before this"],
@@ -4166,14 +4150,14 @@ function AdminRestrictedPage({ go }) {
   const kc = K ? cps(K) : [], ka = K ? alw(K) : [];
   const pickCopy = (id) => { setCopy(id); const i = all.find((x) => x.id === id); if (i) setSel0(i.d.mark); };
   const situation = !marks.length ? "You have not restricted anything yet. Restrict a file or folder below; it stays where it is and a copy anywhere else is caught."
-    : `You restricted ${fmt(marks.length)} thing${marks.length === 1 ? "" : "s"} on ${fmt(hostsOf.size)} machine${hostsOf.size === 1 ? "" : "s"}. ${open.length ? `${fmt(open.length)} cop${open.length === 1 ? "y" : "ies"} turned up elsewhere, on ${listNames(hostsHit)}; the worst is ${open[0].d.file} on ${open[0].host}.` : "Everything is where it belongs."}${allowed.length ? ` ${fmt(allowed.length)} cop${allowed.length === 1 ? "y is" : "ies are"} allowed elsewhere.` : ""}${carrying.filter((c) => !c.held).length ? ` ${listNames(carrying.filter((c) => !c.held).map((c) => c.flow))} carr${carrying.filter((c) => !c.held).length === 1 ? "ies" : "y"} something of yours.` : ""}`;
+    : `${fmt(marks.length)} thing${marks.length === 1 ? " is" : "s are"} restricted on ${fmt(hostsOf.size)} machine${hostsOf.size === 1 ? "" : "s"}. ${open.length ? `${fmt(open.length)} cop${open.length === 1 ? "y" : "ies"} turned up elsewhere, on ${listNames(hostsHit)}; the worst is ${open[0].d.file} on ${open[0].host}.` : "Everything is where it belongs."}${allowed.length ? ` ${fmt(allowed.length)} cop${allowed.length === 1 ? "y is" : "ies are"} allowed elsewhere.` : ""}${carrying.filter((c) => !c.held).length ? ` ${listNames(carrying.filter((c) => !c.held).map((c) => c.flow))} carr${carrying.filter((c) => !c.held).length === 1 ? "ies" : "y"} something restricted.` : ""}`;
   const del = (i) => modal.confirm({ title: `Delete the copy on ${i.host}?`, okText: "Delete the copy", okButtonProps: { danger: true }, cancelText: "Keep it",
-    content: `Only ${i.d.file} in ${i.d.folder} on ${i.host} is deleted. What you restricted is not touched.`, onOk: () => { setGone({ ...gone, [i.id]: "deleted" }); toast(`Deleted the copy on ${i.host} · recorded (concept)`); } });
+    content: `Only ${i.d.file} in ${i.d.folder} on ${i.host} is deleted. What is restricted is not touched.`, onOk: () => { setGone({ ...gone, [i.id]: "deleted" }); toast(`Deleted the copy on ${i.host} · recorded (concept)`); } });
   const ruleOf = (k) => (k.keep === "machine" ? `may be anywhere on ${k.host}, nowhere else` : `may be only in ${k.kind === "folder" ? k.path : rsDir(k)} on ${k.host}`);
   const unmark = (k) => modal.confirm({ title: `Stop restricting ${k.name}?`, okText: "Stop restricting", okButtonProps: { danger: true }, cancelText: "Keep it restricted",
     content: `Copies of it are no longer looked for, and flows may carry it. ${cps(k).length ? "The copies already caught stay listed until you deal with them. " : ""}The audit log records that you did it.`,
     onOk: () => { dropMark(k.id); setSel0(null); setExp(null); bump((n) => n + 1); toast(`${k.name} is no longer restricted · recorded (concept)`); } });
-  const owner = (h) => (h === info.ws ? "yours" : (adm.find((x) => x.h === h) || {}).who || (MBY[h] || {}).user || "nobody signed in");
+  const owner = (h) => (h === info.ws ? "you" : (adm.find((x) => x.h === h) || {}).who || (MBY[h] || {}).user || "nobody signed in");
   const G2 = [...hostsOf].sort((a, b) => (b === info.ws) - (a === info.ws) || a.localeCompare(b)).map((h) => [h, h, owner(h), (k) => k.host === h]);
   const card = (k) => { const on = exp === k.id, picked = sel === k.id;
     return html`<div key=${k.id} className=${"tk-item" + (on ? " open" : "") + (picked ? " am-pick" : "")}>
@@ -4185,11 +4169,11 @@ function AdminRestrictedPage({ go }) {
         <span className="iq-a"><${Button} size="small" type="text" aria-expanded=${on} onClick=${(e) => { e.stopPropagation(); setExp(on ? null : k.id); setSel(k.id); }}>${on ? "Collapse" : "Expand"} ${ic(on ? "UpOutlined" : "DownOutlined")}<//></span>
       </article>
       ${on ? html`<div className="tk-open">
-        <div className="tk-facts">${[["Where", `${k.host} ${k.path}`], ["Rule", `It ${ruleOf(k)}`], ["Covers", k.kind === "folder" ? `${fmt(k.files)} files, and any added later` : "1 file"], ["Restricted", k.at], ["Recognised by", `content, ${fmt(k.versions)} version${k.versions === 1 ? "" : "s"} remembered`]]
+        <div className="tk-facts">${[["Where", `${k.host} ${k.path}`], ["Rule", `It ${ruleOf(k)}`], ["Covers", k.kind === "folder" ? `${fmt(k.files)} files, and any added later` : "1 file"], ["Restricted", k.at], ["Recognised by", `content, ${fmt(k.versions)} version${k.versions === 1 ? "" : "s"} remembered`], ["Marked by", k.by === me ? "you" : k.by]]
           .map(([x, y]) => html`<span key=${x}><span className="t3">${x}</span> <span className=${x === "Where" ? "mono" : ""}>${y}</span></span>`)}</div>
         <div className="rs-lately"><div className="am-k">Lately</div>
           ${(RS_LOG[k.id] || []).map((e, i) => html`<div key=${i} className="rs-log"><span className="t3">${ago(e[0])}</span><span><b>${e[1]}</b> ${e[2]} <span className="t3">${e[3]}</span></span></div>`)}
-          ${!(RS_LOG[k.id] || []).length ? html`<span className="t3" style=${{ fontSize: 12.5 }}>Nothing has happened to it since you restricted it.</span>` : null}</div>
+          ${!(RS_LOG[k.id] || []).length ? html`<span className="t3" style=${{ fontSize: 12.5 }}>Nothing has happened to it since it was restricted.</span>` : null}</div>
         <div className="row fl-acts"><span className="sp" />
           <${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => unmark(k)}>Stop restricting<//></div>
       </div>` : null}</div>`; };
@@ -4198,7 +4182,7 @@ function AdminRestrictedPage({ go }) {
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "start" }}>
       <section className="ib-box">
-        <header><b>What you restricted</b><span>everything you marked restricted, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it</span></header>
+        <header><b>What is restricted</b><span>everything marked restricted, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it</span></header>
         ${(() => { const xs0 = G2.flatMap(([g, , , f]) => marks.filter(f).sort((a, b) => a.name.localeCompare(b.name)).map((k) => [g, k])), PER = 5, pages = Math.ceil(xs0.length / PER), p = Math.min(pg, Math.max(0, pages - 1)), page = xs0.slice(p * PER, p * PER + PER);
           return html`${G2.map(([g, t, d, f]) => { const xs = page.filter((e) => e[0] === g).map((e) => e[1]); if (!xs.length) return null;
             return html`<div key=${g} className="iq-grp"><div className="lay-grp iq-gh"><b style=${{ fontWeight: 600 }}><span className="mono" style=${{ marginLeft: 0, color: "var(--text-2)" }}>${t}</span> · ${fmt(marks.filter(f).length)}</b><span>${d}</span></div><div className="iq-cards">${xs.map(card)}</div></div>`; })}
@@ -4215,16 +4199,16 @@ function AdminRestrictedPage({ go }) {
             ${[...adm.map((x) => x.h), ...rest].map((h) => { const [x, y, w, hh] = box(h), m = MBY[h], cp = K ? kc.find((i) => i.host === h) : null, al = K && ka.some((x2) => x2.host === h), home = K && K.host === h, a = adm.find((x2) => x2.h === h);
               const cls = home ? " home" : cp ? " hot" + (copy === cp.id ? " pick" : "") : al ? " ok" : "";
               return html`<g key=${h} className=${"rs-tile" + cls + (a ? " adm" : "")} style=${{ cursor: cp ? "pointer" : "default" }} onClick=${() => cp && pickCopy(cp.id)}>
-                <title>${h}${a ? `, ${a.who === "you" ? "yours" : a.who + "'s"}` : m && m.user ? `, ${m.user}` : ""}${home ? " · its home" : cp ? ` · a copy, ${dur(NOWH - cp.at)} ago` : al ? " · a copy you allowed" : ""}</title>
+                <title>${h}${a ? `, ${a.who}` : m && m.user ? `, ${m.user}` : ""}${home ? " · its home" : cp ? ` · a copy, ${dur(NOWH - cp.at)} ago` : al ? " · a copy allowed" : ""}</title>
                 <rect x=${x} y=${y} width=${w} height=${hh} rx="7" />
                 <text x=${x + w / 2} y=${y + hh / 2 + 4} textAnchor="middle">${h.replace(/^WS-[A-Z]+-/, "").replace(/^[A-Z]+-/, "")}</text></g>`; })}
           </svg>
         </div>
-        <div className="rs-key"><span><i className="home" />its home</span><span><i className="hot" />a copy caught</span><span><i className="ok" />a copy you allowed</span></div>
+        <div className="rs-key"><span><i className="home" />its home</span><span><i className="hot" />a copy caught</span><span><i className="ok" />a copy allowed</span></div>
       </section>
     </div>
     <section className="ib-box">
-      <header><b>Copies on other machines</b><span>${open.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything you restricted is anywhere else"}</span></header>
+      <header><b>Copies on other machines</b><span>${open.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything restricted is anywhere else"}</span></header>
       ${(() => { const gC = paged(all.filter((i) => gone[i.id] !== "allowed"), pgC); return html`${gC.rows.map((i) => { const k = markOf(i), m = MBY[i.host] || {}, done = gone[i.id], on = copy === i.id, can = m.user && m.status !== "offline";
         return html`<div key=${i.id} className=${"rs-c" + (on ? " on" : "") + (done ? " done" : "")}>
           <div className="rs-trail" role="button" tabIndex="0" onClick=${() => pickCopy(i.id)} onKeyDown=${(e) => e.key === "Enter" && pickCopy(i.id)}>
@@ -4233,16 +4217,15 @@ function AdminRestrictedPage({ go }) {
             <span className=${"rs-end" + (done ? "" : " hot")}><b className="mono">${i.host}</b><span className="mono cut" title=${i.d.folder + "\\" + i.d.file}>${i.d.folder}\\${i.d.file}</span></span>
             <span className="rs-who"><span>${m.user || "nobody signed in"}</span><span className="t3">${ago(i.at)}</span></span>
           </div>
-          <span className="rs-acts">${done ? html`<span className="t3">${ic("CheckOutlined")} ${done === "deleted" ? "Deleted" : `Asked ${m.user}; closes when the copy is gone`}</span>`
+          <span className="rs-acts">${done ? html`<span className="t3">${ic("CheckOutlined")} Deleted</span>`
             : allowing === i.id ? html`<${Input} size="small" autoFocus value=${why} onChange=${(e) => setWhy(e.target.value)} placeholder=${`Why may it stay on ${i.host}?`} style=${{ width: 240 }} />
                 <${Button} size="small" onClick=${() => { setAllowing(null); setWhy(""); }}>Cancel<//><${Button} size="small" type="primary" disabled=${!why.trim()} onClick=${() => { setGone({ ...gone, [i.id]: "allowed" }); setAllowed([...allowed, { id: "A" + i.id, mark: i.d.mark, host: i.host, folder: i.d.folder, file: i.d.file, why: why.trim(), since: "today " + hhmm(NOWH), copy: i.id }]); setAllowing(null); setWhy(""); toast(`Allowed on ${i.host} · listed under Allowed copies (concept)`); }}>Allow it<//>`
-            : html`<${Tooltip} title=${can ? "" : "Nobody is signed in to ask"}><span><${Button} size="small" disabled=${!can} onClick=${() => { setGone({ ...gone, [i.id]: "asked" }); toast(`Asked ${m.user} (concept)`); }}>Ask ${m.user || "them"} to delete it<//></span><//>
-                <${Button} size="small" danger onClick=${() => del(i)}>Delete the copy<//><${Button} size="small" onClick=${() => { setAllowing(i.id); setWhy(""); }}>Allow it there<//>`}</span>
+            : html`<${Button} size="small" danger onClick=${() => del(i)}>Delete the copy<//><${Button} size="small" onClick=${() => { setAllowing(i.id); setWhy(""); }}>Allow it there<//>`}</span>
         </div>`; })}${pager(gC, setPgC)}`; })()}
-      ${!all.filter((i) => gone[i.id] !== "allowed").length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing you restricted has been found anywhere else.</div>` : null}
+      ${!all.filter((i) => gone[i.id] !== "allowed").length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing restricted has been found anywhere else.</div>` : null}
     </section>
     <section className="ib-box">
-      <header><b>Allowed copies</b><span>copies found away from home that you let stay, newest first, each with the reason you gave; they are not caught again unless you take it back</span></header>
+      <header><b>Allowed copies</b><span>copies found away from home that were let stay, newest first, each with the reason given; they are not caught again unless an Admin takes it back</span></header>
       ${(() => { const gA = paged(allowed.slice().reverse(), pgA); return html`${gA.rows.map((x) => { const k = marks.find((y) => y.id === x.mark) || MARKS.find((y) => y.id === x.mark) || {}, m = MBY[x.host] || {};
         return html`<div key=${x.id} className="rs-c rs-ok">
           <div className="rs-trail">
@@ -4257,15 +4240,15 @@ function AdminRestrictedPage({ go }) {
       ${!allowed.length ? html`<div className="ib-quiet">You have not allowed a copy anywhere else.</div>` : null}
     </section>
     <section className="ib-box">
-      <header><b>Flows carrying what you restricted</b><span>right now; a flow held at something of yours waits for you to allow it, for that flow only</span></header>
+      <header><b>Flows carrying what is restricted</b><span>right now; a flow held at something restricted waits for an Admin to allow it, for that flow only</span></header>
       ${carrying.map((c) => html`<div key=${c.flow} className="rs-fl">
           <span className="iq-ic">${ic("BranchesOutlined")}</span>
           <span className="rs-lt"><span><b>${c.flow}</b> ${c.held ? "is held at" : "carries"} <b>${c.what}</b></span><span className="t3 mono cut">${c.from} → ${c.to}</span></span>
-          <span className=${"rs-fls" + (c.held ? " hot" : "")}>${c.held ? html`<b>waiting for you</b><span className="t3">since ${hhmm(c.held)}</span>` : html`<b>${c.today ? `${fmt(c.today)} today` : "allowed just now"}</b><span className="t3">${c.last ? `last ${hhmm(c.last)} · ` : ""}allowed ${c.since}</span>`}</span>
+          <span className=${"rs-fls" + (c.held ? " hot" : "")}>${c.held ? html`<b>waiting for an Admin</b><span className="t3">since ${hhmm(c.held)}</span>` : html`<b>${c.today ? `${fmt(c.today)} today` : "allowed just now"}</b><span className="t3">${c.last ? `last ${hhmm(c.last)} · ` : ""}allowed ${c.since}</span>`}</span>
           ${c.held ? html`<${Button} size="small" type="primary" onClick=${() => { setLet({ ...let_, [c.flow]: 1 }); toast(`${c.flow} may carry ${c.what}; it goes on now (concept)`); }}>Allow<//>`
             : html`<${Button} size="small" onClick=${() => go("flows", c.flow)}>Open in Flows<//>`}
         </div>`)}
-      ${!carrying.length ? html`<div className="ib-quiet">No flow carries anything you restricted.</div>` : null}
+      ${!carrying.length ? html`<div className="ib-quiet">No flow carries anything restricted.</div>` : null}
     </section>
     <section className="ib-box og-change">
       <header><b>Restrict something</b><span>it stays where it is and you keep using it; a copy anywhere else is caught</span></header>
@@ -4355,7 +4338,7 @@ function AdminAutomationPage({ go, open }) {
   // today's runs across every rule, newest first
   const runs = rules.flatMap((r) => (off[r.id] ? [] : today(r).map((f) => ({ r, f, bad: f.runs.some(auBad) })))).sort((a, b) => b.f.t - a.f.t);
   const [sel, setSel] = useState(() => (open ? open : runs[0] ? runs[0].r.id : rules[0].id)), [pickT, setPickT] = useState(() => (!open && runs[0] ? runs[0].f.t : null));
-  const R = rules.find((r) => r.id === sel) || rules[0], mine = R.by === me, isOff = off[R.id];
+  const R = rules.find((r) => r.id === sel) || rules[0], isOff = off[R.id];
   const who = (h) => (MBY[h] || {}).user;
   const cause = (r, f) => (r.kind === "Schedule" ? `It was ${hhmm(f.t)}, so it ran on ${f.host}` : `${f.detail || r.when} on ${f.host}${who(f.host) ? `, ${who(f.host)} signed in` : ""}`);
   const effect = (r, f) => { const bad = f.runs.filter(auBad);
@@ -4366,7 +4349,7 @@ function AdminAutomationPage({ go, open }) {
   const pick = (r, t) => { setSel(r.id); setPickT(t == null ? null : t); };
   const badToday = runs.filter((x) => x.bad && !again[x.r.id + x.f.t]), badHosts = [...new Set(badToday.flatMap((x) => x.f.runs.filter(auBad).map((y) => y.host)))];
   const offN = rules.filter((r) => off[r.id]);
-  const situation = `${fmt(new Set(runs.map((x) => x.r.id)).size)} of your ${fmt(rules.length)} rules ran today, ${fmt(runs.length)} time${runs.length === 1 ? "" : "s"} in all. ${badToday.length ? `${fmt(badToday.length)} run${badToday.length === 1 ? "" : "s"} did not go to plan, on ${listNames(badHosts)}.` : "Everything they did worked."} ${offN.length ? `${listNames(offN.map((r) => r.name))} is switched off. ` : ""}Next: ${(rules.find((r) => r.id === "night") || rules[0]).name} today at 20:00.`;
+  const situation = `${fmt(new Set(runs.map((x) => x.r.id)).size)} of the ${fmt(rules.length)} rules ran today, ${fmt(runs.length)} time${runs.length === 1 ? "" : "s"} in all. ${badToday.length ? `${fmt(badToday.length)} run${badToday.length === 1 ? "" : "s"} did not go to plan, on ${listNames(badHosts)}.` : "Everything they did worked."} ${offN.length ? `${listNames(offN.map((r) => r.name))} is switched off. ` : ""}Next: ${(rules.find((r) => r.id === "night") || rules[0]).name} today at 20:00.`;
   // the picked rule
   const rf = fir(R), wk = rf.filter((f) => f.t > NOWH - 168);
   const dayIx = (t) => Math.floor(t / 24) + 6;
@@ -4387,13 +4370,13 @@ function AdminAutomationPage({ go, open }) {
   return html`<div className="og aup">${modalCtx}
     <${SitBar} text=${situation} />
     <div className="auo-sheet aub">
-      <section className="ib-box auo-list"><header><b>Your rules</b><span>${rules.length}</span><span className="sp" /><${Button} size="small" icon=${ic("PlusOutlined")} onClick=${() => setMake("new")}>Make a rule<//></header>
+      <section className="ib-box auo-list"><header><b>The rules</b><span>${rules.length}</span><span className="sp" /><${Button} size="small" icon=${ic("PlusOutlined")} onClick=${() => setMake("new")}>Make a rule<//></header>
         ${ordered.map((r) => { const n = badN(r);
-          return html`<button key=${r.id} className=${"auo-li" + (sel === r.id ? " on" : "")} onClick=${() => pick(r, null)}><span className="t3">${ic(KINDI[r.kind])}</span><span className="auo-lt"><b className="cut">${r.name}</b><span className="cut t3">Made ${r.created} by ${r.by === me ? "you" : r.by}</span></span>${n ? html`<b className="auo-red" title=${`${n} run${n === 1 ? "" : "s"} went wrong today`}>${n}</b>` : null}</button>`; })}
+          return html`<button key=${r.id} className=${"auo-li" + (sel === r.id ? " on" : "")} onClick=${() => pick(r, null)}><span className="t3">${ic(KINDI[r.kind])}</span><span className="auo-lt"><b className="cut">${r.name}</b><span className="cut t3">Set ${r.created} by ${r.by === me ? "you" : r.by}</span></span>${n ? html`<b className="auo-red" title=${`${n} run${n === 1 ? "" : "s"} went wrong today`}>${n}</b>` : null}</button>`; })}
       </section>
       <section className="ib-box auo-page" ref=${pz}>
-        <header><b>${R.name}</b><span>${mine ? "made by you" : `made by ${R.by}`} · ${isOff ? "switched off" : `on since ${R.created}`}</span>
-          <span className="sp" />${mine ? html`<${Button} size="small" disabled=${isOff} onClick=${() => toast(`${R.name} runs now (concept)`)}>Run now<//><${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake(R.id)}>Edit<//>` : html`<span className="t3" style=${{ fontSize: 12 }}>only ${R.by} changes it</span>`}
+        <header><b>${R.name}</b><span>set by ${R.by === me ? "you" : R.by} · ${isOff ? "switched off" : `on since ${R.created}`}</span>
+          <span className="sp" /><${Button} size="small" disabled=${isOff} onClick=${() => toast(`${R.name} runs now (concept)`)}>Run now<//><${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake(R.id)}>Edit<//>
           </header>
         <div className=${"auo-big" + (isOff ? " off" : "")}><span className="t3">When</span> ${R.when} <span className="t3">on</span> ${R.scope === "All machines" ? "any machine" : `an ${R.scope} machine`}<span className="t3">, do</span> ${R.actions.map((x) => x[0]).join(", ")}</div>
         <div className="auo-two">
@@ -4434,12 +4417,12 @@ function AdminAutomationPage({ go, open }) {
     </section>
     <section className="ib-box">
       <header><b>Coming up</b><span>the next scheduled runs, in order; a rule that starts on an event runs whenever it happens, so it is not listed</span></header>
-      <div className="au-next">${next.map((x) => { const isOff = off[x.r.id], sk = skip[x.key], mineX = x.r.by === me, n = x.r.scope === "All machines" ? MACHINES.length : MACHINES.filter((m) => m.dept === "ops").length;
+      <div className="au-next">${next.map((x) => { const isOff = off[x.r.id], sk = skip[x.key], n = x.r.scope === "All machines" ? MACHINES.length : MACHINES.filter((m) => m.dept === "ops").length;
         return html`<div key=${x.key} className=${"au-nx" + (isOff || sk ? " off" : "")}>
           <span className="au-nt"><b>${String(x.h).padStart(2, "0")}:00</b><span className="t3">${x.d}</span></span>
           <a className="au-nn auo-lt" onClick=${() => pick(x.r, null)}><b className="cut">${x.r.name}</b><span className="t3 cut">${x.r.actions.map((y) => y[0]).join(", ")} on ${fmt(n)} machine${n === 1 ? "" : "s"}</span></a>
           <span className="au-na">${isOff ? html`<span className="t3">switched off; it will not run</span>` : sk ? html`<span className="t3">skipped this once</span><${Button} size="small" type="text" onClick=${() => setSkip({ ...skip, [x.key]: 0 })}>Undo<//>`
-            : mineX ? html`<${Button} size="small" onClick=${() => { setSkip({ ...skip, [x.key]: 1 }); toast(`${x.r.name} will skip ${x.d} ${String(x.h).padStart(2, "0")}:00 (concept)`); }}>Skip this once<//>` : html`<span className="t3">runs as set</span>`}</span>
+            : html`<${Button} size="small" onClick=${() => { setSkip({ ...skip, [x.key]: 1 }); toast(`${x.r.name} will skip ${x.d} ${String(x.h).padStart(2, "0")}:00 (concept)`); }}>Skip this once<//>`}</span>
         </div>`; })}</div>
     </section>
     <section className="ib-box og-change">
@@ -4537,7 +4520,7 @@ function RuleNew({ from, taken, onDone }) {
                 ${has ? html`<span className="t3">Added</span>` : html`<${Button} size="small" onClick=${() => setActs([...acts, { name: nm, limit: x.limit }])}>Add<//>`}</div>`; })}
             ${all_.length > xs.length ? html`<span className="t3 rn-more">${all_.length - xs.length} more; search to find them</span>` : null}</div>`; })}</div>` : null}</div>`,
     html`<div className="nfv">
-      <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="tk-facts" style=${{ maxWidth: "none" }}>${[["Called", name.trim()], ["Starts", when], ["On", on], ["Does", acts.map((x, i) => `${i + 1}. ${x.name} (${x.limit}s)`).join("  ")], ["Made by", "you"]]
+      <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="tk-facts" style=${{ maxWidth: "none" }}>${[["Called", name.trim()], ["Starts", when], ["On", on], ["Does", acts.map((x, i) => `${i + 1}. ${x.name} (${x.limit}s)`).join("  ")], ["Set by", "you"]]
       .map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> ${b}</span>`)}</div></div>
       <div className="decide" style=${{ "--c": "var(--accent)" }}>It is switched on when you confirm. Every time it runs shows under Recent runs today.</div></div>`];
   return html`<div className="nf-steps-wrap">
@@ -4696,7 +4679,7 @@ function AdminActionsLayout({ host }) {
   return html`<div className="og aup">
     <${SitBar} text=${situation} />
     <div className="auo-sheet aub">
-      <section className="ib-box auo-list"><header><b>Your actions</b><span>${lib.length}</span></header>
+      <section className="ib-box auo-list"><header><b>The actions</b><span>${lib.length}</span></header>
         ${ACX_G.map(([t, f]) => { const xs = lib.filter(f); return html`<div key=${t}><div className="lay-grp acx-gh">${t}</div>
           ${xs.map((a) => { const n = badOf(a), u = usedBy(a).length;
             return html`<button key=${a.id} className=${"auo-li" + (sel === a.id ? " on" : "")} onClick=${() => setSel(a.id)}><span className="t3">${ic(CATI[a.cat])}</span><span className="auo-lt"><b className="cut">${a.name}</b><span className="cut t3">${a.cat === "Custom" ? `${a.lang} · by ${a.by === "You" ? "you" : a.by}` : u ? `used by ${u} rule${u === 1 ? "" : "s"}` : "run by hand only"}</span></span>${n ? html`<b className="auo-red">${n}</b>` : null}</button>`; })}</div>`; })}
@@ -4726,7 +4709,7 @@ function AdminActionsLayout({ host }) {
       </section>
     </div>
     <section className="ib-box aur">
-      <header><b>Ran by hand lately</b><span>yours and the other Admins'; Output shows what each machine returned</span></header>
+      <header><b>Ran by hand lately</b><span>every Admin's; Output shows what each machine returned</span></header>
       ${G.map(([g, t, d, f]) => { const xs = hand.filter(f); if (!xs.length) return null;
         return html`<div key=${g} className="iq-grp"><div className="lay-grp iq-gh">${t} · ${xs.length}<span>${d}</span></div><div className="iq-cards">${xs.map((r, i) => { const worst = r.xs.find(isBadRun) || r.xs[0], out = runOutput(r.action, worst.host, worst.outcome, worst.t, worst.exit), n = r.xs.length;
           return html`<div key=${g + i} className="tk-item">
@@ -4802,7 +4785,7 @@ function AdminFlowsPage2({ go, open }) {
   const stateOf = (x) => (held[x.name] ? "held" : x.st === "Degraded" ? "branch" : x.st === "Waiting for a folder" ? "wait" : flToday(x) ? "moving" : "quiet");
   const flows = [...EXISTING_FLOWS.filter((x) => names.has(x.name)), ...FL_EXTRA];
   const fby = (n) => flows.find((x) => x.name === n);
-  const G = [["stop", "Held or stopped", "nothing more goes through until you act", (x) => ["held", "branch"].includes(stateOf(x))], ["wait", "Waiting for a folder", "its owner has to pick where files land", (x) => stateOf(x) === "wait"],
+  const G = [["stop", "Held or stopped", "nothing more goes through until you act", (x) => ["held", "branch"].includes(stateOf(x))], ["wait", "Waiting for a folder", "an Admin has to pick where files land", (x) => stateOf(x) === "wait"],
     ["moving", "Moving", "files went through today", (x) => stateOf(x) === "moving"], ["quiet", "Quiet", "set up and running; nothing went through today", (x) => stateOf(x) === "quiet"]];
   const who = (b) => (b === me ? "you" : b);
   const today = flows.reduce((n, x) => n + flToday(x), 0), nMove = flows.filter((x) => stateOf(x) === "moving").length;
@@ -4810,7 +4793,7 @@ function AdminFlowsPage2({ go, open }) {
   const situation = `${fmt(nMove)} of ${fmt(flows.length)} flows moved files today; ${H.length ? `${listNames(H.map((x) => x.name), 2)} is held for you` : "nothing is held for you"}${B.length ? `, ${listNames(B.map((x) => x.name), 2)} has a destination stopped` : ""}${W.length ? `, ${fmt(W.length)} wait${W.length === 1 ? "s" : ""} for a folder` : ""}. ${fmt(today)} files went through today.`;
   const conflict = FLOW_LOG.find((l) => /^Conflict/.test(l[4]));
   const gates = [
-    ...H.map((x) => ({ id: "h:" + x.name, flow: x.name, hot: true, kind: "Restricted, yours", icon: "StopOutlined", wait: NOWH - held[x.name].since, title: `${x.name} met ${held[x.name].file}`, where: held[x.name].at, line: "you restricted it; the flow waits for you",
+    ...H.map((x) => ({ id: "h:" + x.name, flow: x.name, hot: true, kind: "Restricted", icon: "StopOutlined", wait: NOWH - held[x.name].since, title: `${x.name} met ${held[x.name].file}`, where: held[x.name].at, line: "you restricted it; the flow waits for you",
       acts: [["Allow it for this flow", () => { setHeld((h) => { const n = { ...h }; delete n[x.name]; return n; }); toast(`${x.name} may carry ${held[x.name].file}; its destinations become places it may be (concept)`); }], ["Keep it paused", () => toast(`${x.name} stays paused (concept)`)]] })),
     ...B.map((x) => ({ id: "b:" + x.name, flow: x.name, hot: true, kind: "A destination stopped", icon: "DisconnectOutlined", wait: 0.3, title: `${x.name} cannot reach ${x.dests[(x.paused || [0])[0]].join(" ")}`, where: "files wait in line until it takes them", line: "the folder stopped taking files",
       acts: [["Try it again", () => toast(`${x.name} tries ${x.dests[(x.paused || [0])[0]].join(" ")} again (concept)`)]] })),
@@ -4919,10 +4902,10 @@ function AdminFlowsPage2({ go, open }) {
         ${P && !youHeld && !G1.length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing waits at a gate; ${P.name} runs by itself.</div>` : null}
         ${!P && !A ? html`<div className="ib-quiet">Pick a flow on the left.</div>` : null}
         ${P || A ? html`<div className="row fl-acts">
-          ${!P ? html`<span className="t3" style=${{ fontSize: 12 }}>an ask to you</span>` : P.by === me ? html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake("edit-" + P.name)}>Edit<//>` : html`<span className="t3" style=${{ fontSize: 12 }}>made by ${who(P.by)}; only they change it</span>`}
+          ${!P ? html`<span className="t3" style=${{ fontSize: 12 }}>an ask to you</span>` : html`<${Button} size="small" icon=${ic("EditOutlined")} onClick=${() => setMake("edit-" + P.name)}>Edit<//>`}
           <span className="sp" />
-          ${g0 ? html`<span className=${P && P.by === me ? "fl-one" : ""}>${gateBtn(g0, true)}</span>` : null}
-          ${P && P.by === me ? html`<span className="fl-grp">${fstate(P) === "paused" || fstate(P) === "stopped" ? html`<${Button} size="small" type="primary" icon=${ic("CaretRightOutlined")} onClick=${() => { const st = fstate(P); setCtl({ ...ctl, [P.name]: heldBy(P) ? "resumed" : null }); setSel(P.name); setOpn(P.name); toast(`${P.name} ${st === "stopped" ? "started again" : "resumed"}; it catches up on what it missed${heldBy(P) ? ", and what was held stays held until you decide" : ""} (concept)`); }}>${fstate(P) === "stopped" ? "Start again" : "Resume"}<//>`
+          ${g0 ? html`<span className=${P ? "fl-one" : ""}>${gateBtn(g0, true)}</span>` : null}
+          ${P ? html`<span className="fl-grp">${fstate(P) === "paused" || fstate(P) === "stopped" ? html`<${Button} size="small" type="primary" icon=${ic("CaretRightOutlined")} onClick=${() => { const st = fstate(P); setCtl({ ...ctl, [P.name]: heldBy(P) ? "resumed" : null }); setSel(P.name); setOpn(P.name); toast(`${P.name} ${st === "stopped" ? "started again" : "resumed"}; it catches up on what it missed${heldBy(P) ? ", and what was held stays held until you decide" : ""} (concept)`); }}>${fstate(P) === "stopped" ? "Start again" : "Resume"}<//>`
               : html`<${Button} size="small" icon=${ic("PauseOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "paused" }); setSel(P.name); setOpn(P.name); toast(`${P.name} paused (concept)`); }}>Pause<//><${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "stopped" }); setSel(P.name); setOpn(P.name); toast(`${P.name} stopped (concept)`); }}>Stop<//>`}</span>` : null}</div>` : null}
       </section>
       <section className="ib-box fl-sync" ref=${pz}>
@@ -4943,7 +4926,7 @@ function AdminFlowsPage2({ go, open }) {
     <section className="ib-box" ref=${pz}>
       <header><b>${P ? P.name : "The picked flow"}</b><span>${P ? `drawn from its own sources, steps and destinations · ${shape(P)}` : "pick a flow above to draw it here"}</span></header>
       ${P ? html`<${FlowGraph} key=${P.name} x=${P} held=${held[P.name]} gone=${FL_GONE[P.name] ? FL_GONE[P.name].src : null} />
-        ${held[P.name] || P.paused || stateOf(P) === "wait" ? html`<div className="lay-more">${[held[P.name] ? "red outline: held for your consent at that source" : null, P.paused ? "dashed red: a destination that stopped taking files" : null, stateOf(P) === "wait" ? "dashed grey: waiting for its owner to pick a folder" : null].filter(Boolean).join(" · ")}</div>` : null}`
+        ${held[P.name] || P.paused || stateOf(P) === "wait" ? html`<div className="lay-more">${[held[P.name] ? "red outline: held for your consent at that source" : null, P.paused ? "dashed red: a destination that stopped taking files" : null, stateOf(P) === "wait" ? "dashed grey: waiting for an Admin to pick a folder" : null].filter(Boolean).join(" · ")}</div>` : null}`
         : html`<div className="fl-empty">${ic("BranchesOutlined")}<span>Nothing picked</span></div>`}
     </section>
     <section className="ib-box og-change">
@@ -5120,6 +5103,7 @@ function amWeek(m) { const h = hs(m.host), alwaysOn = h % 4 === 0, segs = [], dr
   return { segs, drops, a, end }; }
 const AM_SHOW = 6;
 function AdminMachinesPage({ go, start }) {
+  const [codes, setCodes] = useState({}), [joined, setJoined] = useState({}), joining = AM_FOUND.filter((f) => !joined[f.host]);
   useDT();
   const me = ME;
   const [sel, setSel] = useState(start || null), [exp, setExp] = useState(null), [more, setMore] = useState({ fine: true }), [modal, modalCtx] = Modal.useModal();
@@ -5251,14 +5235,15 @@ function AdminMachinesPage({ go, start }) {
             <span className="am-wn">${fmt(nYes)} of ${fmt(WK_DAYS.length)} days</span></div>`; })}
       </div>
     </section>
-    <section className="ib-box og-change">
-      <header><b>Add a machine</b><span>a PC joins in three steps, and gets its department on Departments; nothing connects without the key made here${AM_FOUND.length ? ` · ${fmt(AM_FOUND.length)} found, not registered` : ""}</span></header>
-      <div className="tk-give">
-        <ol className="tk-steps"><li><b>Pick or name the PC</b><span>PCs already found on the network, or trying to connect, are offered</span></li>
-          <li><b>Copy its key</b><span>it is made for this PC and shown once</span></li>
-          <li><b>Give the key to its worker</b><span>in the Worker Client settings; it checks in from then on</span></li></ol>
-        <${Button} type="primary" onClick=${() => setAdd({ mode: "pc", found: AM_FOUND })}>Add a machine<//></div>
-    </section>
+    ${joining.length ? html`<section className="ib-box">
+      <header><b>Waiting to join · ${fmt(joining.length)}</b><span>installed without a licence code; type the code on its screen to let it in</span></header>
+      <div className="am-found">${joining.map((f) => html`<div key=${f.host} className="am-fd">
+        <span className="iq-ic" style=${{ width: 30, height: 30, fontSize: 14 }}>${ic("DesktopOutlined")}</span>
+        <span className="iq-main"><span className="iq-t"><b className="mono">${f.host}</b><span className="t3 mono">${f.ip}</span></span><span className="iq-s">${f.line}</span></span>
+        <span className="row" style=${{ flexWrap: "nowrap" }}><${Input} size="small" placeholder="The code on its screen" style=${{ width: 170 }} value=${codes[f.host] || ""} onChange=${(e) => setCodes({ ...codes, [f.host]: e.target.value })} />
+          <${Button} size="small" onClick=${() => { setJoined({ ...joined, [f.host]: 1 }); toast(`Refused ${f.host} (concept)`); }}>Refuse<//>
+          <${Button} size="small" type="primary" disabled=${!(codes[f.host] || "").trim()} onClick=${() => { setJoined({ ...joined, [f.host]: 1 }); toast(`${f.host} joined; its key went to the machine (concept)`); }}>Let it in<//></span></div>`)}</div>
+    </section>` : null}
     <${KeyModal} spec=${add} onClose=${() => setAdd(null)} />
   </div>`;
 }
@@ -5534,7 +5519,7 @@ function AdminIssuesPage({ sel: open, go }) {
     <div className="g c-84" style=${{ alignItems: "stretch" }}>
       <div className="iq-col">
         <section className="ib-box">
-          <header><b>To do · ${fmt(todo.length)}</b><span>the next step is yours, by kind; the kind with the most pressing issue first, critical and late first within it</span></header>
+          <header><b>To do · ${fmt(todo.length)}</b><span>the next step, by kind; the kind with the most pressing issue first, critical and late first within it</span></header>
           ${todo.length ? byKind("todo", todo) : html`<div className="ib-quiet">${ic("CheckOutlined")} Nothing for you to do.</div>`}
         </section>
         <section className="ib-box">

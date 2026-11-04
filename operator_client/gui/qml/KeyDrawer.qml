@@ -7,10 +7,8 @@ import "."
 // "promote" makes a worker an Admin of their department (hierarchy.admin_promote): their machine gets a new key, shown here.
 Drawer {
     id: kd
-    width: pc && step === 0 ? 560 : 480
+    width: 480
     property var spec: null
-    property var found: []                      // what knocked and is not registered (enroll.list)
-    property string pick: ""
     property int step: 0
     property string name: ""
     property var dept: null
@@ -23,8 +21,7 @@ Drawer {
     note: ""
     signal done()
 
-    function ask(s) { spec = s; name = ""; pick = ""; found = []; dept = s.department_id !== undefined ? s.department_id : null; made = null; busy = false; step = s.mode === "rekey" || s.mode === "promote" ? 1 : 0; open()
-                      if (s.mode === "pc") falcon.call("enroll.list", {}, function (ok, r) { kd.found = ok ? (r.requests || []) : [] })
+    function ask(s) { spec = s; name = ""; dept = s.department_id !== undefined ? s.department_id : null; made = null; busy = false; step = s.mode === "rekey" || s.mode === "promote" ? 1 : 0; open()
                       if (s.mode === "rekey") rekey(); if (s.mode === "promote") promote() }
     function promote() {
         busy = true
@@ -65,40 +62,13 @@ Drawer {
         visible: kd.step === 0
         width: parent.width
         spacing: 18
-        // what already knocked: pick one to fill in its name (am-found)
-        Column {
-            visible: kd.pc
-            width: parent.width
-            spacing: 6
-            Txt { text: "FOUND, NOT REGISTERED"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.DemiBold; font.letterSpacing: 0.69 }
-            Repeater {
-                model: kd.found
-                delegate: Rectangle {
-                    required property var modelData
-                    readonly property bool on: kd.pick === modelData.hostname
-                    width: parent.width; height: 52; radius: 8
-                    color: on ? Theme.surface3 : fa.containsMouse ? Theme.surface2 : "transparent"
-                    Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 30; height: 30; radius: 15; color: Theme.surface3
-                                Icon { anchors.centerIn: parent; name: "desktop"; size: 14; color: Theme.text2 } }
-                    Column { x: 48; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 48 - 60; spacing: 1
-                        Row { spacing: 8
-                            Txt { text: modelData.hostname; mono: true; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                            Txt { text: modelData.peer || ""; mono: true; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone } }
-                        Txt { width: parent.width; text: "its worker tried to connect, last at " + Time.hhmm(modelData.created_at); color: Theme.text3; font.pixelSize: 12 } }
-                    Txt { anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; text: parent.on ? "picked" : "Use it"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                    MouseArea { id: fa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { kd.pick = modelData.hostname; kd.name = modelData.hostname } }
-                }
-            }
-            Txt { visible: kd.found.length > 0; text: "Pick one to fill in its name, or type a new one below."; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-            Txt { visible: kd.found.length === 0; width: parent.width; text: "Nothing found. A PC shows here once its worker tries to connect."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
-        }
         Column { width: parent.width; spacing: 6
                  Txt { text: kd.pc ? "MACHINE NAME" : "NAME"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.DemiBold; font.letterSpacing: 0.69 }
                  Field { width: parent.width; text: kd.name; placeholderText: kd.pc ? "OPS-08" : "J. Owusu"; onTextEdited: kd.name = text } }
         Rectangle {
             width: parent.width; height: hint.height + 20; radius: 6; color: Theme.surface2
             Txt { id: hint; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 13
-                  text: kd.pc ? (kd.pick ? kd.pick + " is already trying to connect. Once its worker has the key you get next, it checks in." : "It gets a key, shown once. Put it in a department on Departments.")
+                  text: kd.pc ? "It gets a key, shown once. Put it in a department on Departments."
                               : "They get the IT console and a key, shown once. Like every Admin, they reach every department, and every issue reaches them." }
         }
     }

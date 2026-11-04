@@ -323,7 +323,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      access violation during `tests/test_worker_client.py`; the tests still pass.
 
 23. **What the console now calls that the Engine must answer (the user, 3-4 Nov 2026: "build exactly as the concept says, no compromises,
-    just put into the engine docs that it needs to cover this so that session handles it").** **Done 4 Nov 2026, but for the two below that change a rule** (migration 054; `engine/resource/talk.py`, `tests/test_console_calls.py`; TUI `operator_client/tui/commands/calls.py`): every item is built. **Any Admin verifies a task:** done (the user, 4 Nov 2026). **Only a rule's maker changes it: dropped** (the user, 4 Nov 2026: nobody owns anything between Admins; the audit trail shows who did it). Any Admin already changes any rule, so nothing was needed. `printer.offline` and `threshold.signin` are read by the Worker from Windows (not yet tried on a real printer or a real failed sign-in). The QML is built to the concept with these
+    just put into the engine docs that it needs to cover this so that session handles it").** **Done 4 Nov 2026** (migration 054; `engine/resource/talk.py`, `tests/test_console_calls.py`; TUI `operator_client/tui/commands/calls.py`): every item is built. **Any Admin verifies a task:** done (the user, 4 Nov 2026). **Only a rule's maker changes it: dropped** (the user, 4 Nov 2026: nobody owns anything between Admins; the audit trail shows who did it). Any Admin already changes any rule, so nothing was needed. `printer.offline` and `threshold.signin` are read by the Worker from Windows (not yet tried on a real printer or a real failed sign-in). The QML is built to the concept with these
     controls live, not disabled: until a handler exists, the button fails with the Engine's "unknown request" message. This replaces
     the "drawn disabled" lines of #20 and #22 for these items. Names are the QML's; change them with the UI session if another name is better.
    - **Any Admin verifies a task.** The concept gives every Admin Verify on Overview and Complete / Incomplete on Tasks, on tasks other
@@ -352,15 +352,14 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - **Rules:** `automation.skip {event_id, at, undo?}`, and `coming_up[k].skipped`, so a skip shows after a reload. `control.event_history`'s firings need
      `detail` (the sentence "Samsung BAR Plus 128 GB inserted", where `subject` is only a name) and `by_hand: true` for a rule run by hand, which the week's bars count apart.
      The rule sentence needs two more kinds of start, `printer.offline` ("a shared printer stops responding") and `threshold.signin` {count, window_s}
-     ("5 sign-ins fail within 10 minutes"). The concept says only a rule's maker runs, edits or skips it ("only A. Quaye changes it"): `control.event_update`,
-     `control.event_test` and `automation.skip` should refuse anyone else, and `control.event_list` must keep `created_by_account_id`.
+     ("5 sign-ins fail within 10 minutes"). Any Admin runs, edits or skips a rule (the user, 4 Nov 2026: every IT Admin covers everything; the audit trail shows who): "only A. Quaye changes it" goes from the concept.
    - **Actions:** `control.action_list` needs `impact` (the line after the description, "Users are not interrupted..."), `risky` (the red Run button) and
      `created_by_name` on a custom action. `actions.runs` needs `who` for a run by hand ("You" for the asker), which also groups one run across machines.
    - **Restricted:** `marks.get`'s `lately` needs `who` and `where` beside `what` ("Ama copied it to OPS-07"). `flows_allowed` needs `flow` (its name), `what`, `from`, `to`,
      `today` and `last_at`; `flow.restricted_waiting` needs `what`, `from` and `to`.
    - **Detective:** `detective.cases` rows need `restricted`, so every card can say "restricted files involved" (today only `detective.case`'s glance has it).
      The page says who wrote the account from `telling.smoothed`: the local model when true, Falcon when false.
-   - **The editors (drawers, built 4 Nov 2026):** `control.event_create` / `event_update` send `action_limits {action_id: seconds}`, each action's limit in this rule
+   - **The editors (drawers, built 4 Nov 2026; the Engine side done the same day):** `note` comes back on `flow.status` destinations and goes in the consent request. `control.event_create` / `event_update` send `action_limits {action_id: seconds}`, each action's limit in this rule
      ("Gets up to"); the Engine keeps only the action's own. Make a rule offers `printer.offline`, `threshold.signin {count, window_s}`, `threshold.disk` and
      `user.login` with `{outside_hours: true}`. `time.scheduled`'s `at` is an ISO date and time. Make a flow sends each asked destination a `note` ("A line for them"),
      `from_flow`, and `let_them_choose` with the Admin's workstation as `destination_pc_id`. `on_source_delete` is asked in the drawer again.

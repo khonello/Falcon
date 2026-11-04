@@ -26,7 +26,7 @@ Page {
     property var mdet: null               // marks.get for the mark on the right
     property var cdet: null               // issues.get for the copy opened
     function load() {
-        falcon.call("marks.list", {}, function (ok, r) {
+        falcon.call("marks.list", { scope: "all" }, function (ok, r) {
             if (ok && r && r.marks) {
                 page.mk = r.marks; page.msum = r.summary || null; page.loadDet()
                 falcon.call("flow.restricted_waiting", {}, function (ok2, r2) { page.heldFlows = ok2 ? (r2.waiting || []) : [] })
@@ -168,7 +168,7 @@ Page {
     readonly property var myDept: Fleet.depts.filter(function (d) { return (d.admins || []).some(function (a) { return a.account_id === falcon.accountId }) })[0] || null
     readonly property var admTiles: myDept ? (myDept.admins || []).filter(function (a) { return a.hostname }).map(function (a) { return { h: a.hostname, who: a.account_id === falcon.accountId ? "you" : a.name } }) : []
     readonly property var restTiles: (myDept ? myDept.machines : Fleet.machines).map(function (m) { return m.host })
-    function ownerOf(h) { return h === myHost ? "yours" : (admTiles.filter(function (x) { return x.h === h })[0] || {}).who || (Fleet.byHost[h] || {}).user || "nobody signed in" }
+    function ownerOf(h) { return h === myHost ? "you" : (admTiles.filter(function (x) { return x.h === h })[0] || {}).who || (Fleet.byHost[h] || {}).user || "nobody signed in" }
     // what is listed, five marks a page, by the machine they live on (your own first)
     property int pg: 0
     readonly property var hostOrder: marks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }).sort(function (a, b) { return (b === page.myHost) - (a === page.myHost) || a.localeCompare(b) })
@@ -206,7 +206,7 @@ Page {
         if (reason) pl.reason = reason
         falcon.call("issues.act", pl, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not done"); return }
-            var a = Object.assign({}, page.acted); a[row.id] = key === "ask" ? "Asked " + (row.c.signed_in || "them") + "; closes when the copy is gone" : key === "delete" ? "Deleted" : "Allowed there"; page.acted = a
+            var a = Object.assign({}, page.acted); a[row.id] = key === "delete" ? "Deleted" : "Allowed there"; page.acted = a
             page.allowingId = ""; page.why = ""; Msg.ok(a[row.id] + " · recorded"); page.load(); Fleet.refresh()
         })
     }
@@ -228,13 +228,13 @@ Page {
     Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
 
     situation: {
-        if (!marks.length) return "You have not restricted anything yet. Restrict a file or folder below; it stays where it is and a copy anywhere else is caught."
+        if (!marks.length) return "Nothing is restricted yet. Restrict a file or folder below; it stays where it is and a copy anywhere else is caught."
         var hosts = marks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }), hit = hostsHit()
         var carries = carrying.filter(function (c) { return !c.held }).map(function (c) { return c.f.flow || ("flow " + c.f.flow_id) }), first = allCopyRows[0]
-        return "You restricted " + Theme.many(marks.length, "thing") + " on " + Theme.many(hosts.length, "machine") + ". "
+        return Theme.many(marks.length, "thing") + (marks.length === 1 ? " is" : " are") + " restricted on " + Theme.many(hosts.length, "machine") + ". "
                + (first ? Theme.many(allCopyRows.length, "copy", "copies") + " turned up elsewhere, on " + Theme.listNames(hit) + "; the worst is " + first.c.file + " on " + first.c.host + "." : "Everything is where it belongs.")
                + (allowedRows.length ? " " + Theme.many(allowedRows.length, "copy", "copies").replace(/^(\d+) copy$/, "$1 copy") + (allowedRows.length === 1 ? " is" : " are") + " allowed elsewhere." : "")
-               + (carries.length ? " " + Theme.listNames(carries) + (carries.length === 1 ? " carries" : " carry") + " something of yours." : "")
+               + (carries.length ? " " + Theme.listNames(carries) + (carries.length === 1 ? " carries" : " carry") + " something restricted." : "")
     }
     situationAt: Time.now
 
@@ -299,8 +299,8 @@ Page {
             objectName: "markCards"
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, mapP.implicitHeight)
-            title: "What you restricted"
-            sub: "everything you marked restricted, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it"
+            title: "What is restricted"
+            sub: "everything marked restricted, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it"
             Repeater {
                 model: page.hostOrder
                 delegate: Group {
@@ -350,7 +350,7 @@ Page {
                                     Repeater {
                                         model: [["Where", kc.modelData.host + " " + kc.modelData.path], ["Rule", "It " + page.ruleOf(kc.modelData)],
                                                 ["Covers", kc.modelData.kind === "folder" ? Theme.many(kc.modelData.files || 0, "file") + ", and any added later" : "1 file"],
-                                                ["Restricted", Time.day(kc.modelData.at)], ["Recognised by", "content, " + Theme.many(kc.modelData.versions || 0, "version") + " remembered"]]
+                                                ["Restricted", Time.day(kc.modelData.at)], ["Recognised by", "content, " + Theme.many(kc.modelData.versions || 0, "version") + " remembered"], ["Marked by", !kc.modelData.by || kc.modelData.by.you ? "you" : kc.modelData.by.name || "an Admin"]]
                                         delegate: Item {
                                             required property var modelData
                                             required property int index
@@ -358,7 +358,7 @@ Page {
                                             height: fv.height + 10
                                             Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                                             Txt { id: fv; x: 132; y: 5; width: parent.width - 132 + 24; text: modelData[1]; font.pixelSize: 13; mono: index === 0; wrapMode: Text.Wrap; elide: Text.ElideNone }
-                                            Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                            Rectangle { visible: index < 5; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                         }
                                     }
                                 }
@@ -376,7 +376,7 @@ Page {
                                             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                         }
                                     }
-                                    Txt { visible: parent.log.length === 0; text: "Nothing has happened to it since you restricted it."; color: Theme.text3; font.pixelSize: 13 }
+                                    Txt { visible: parent.log.length === 0; text: "Nothing has happened to it since it was restricted."; color: Theme.text3; font.pixelSize: 13 }
                                 }
                                 Rectangle { width: parent.width; height: 1; color: Theme.border }
                                 Btn { anchors.right: parent.right; small: true; danger: true; iconName: "stop"; text: "Stop restricting"; onClicked: page.unmark(kc.modelData) }
@@ -431,7 +431,7 @@ Page {
                                           font.weight: parent.home || parent.cp || parent.ok ? Font.DemiBold : Font.Normal
                                           color: parent.home ? Theme.accent : parent.cp ? Theme.crit : parent.ok ? Theme.ok : Theme.text3 }
                                     MouseArea { anchors.fill: parent; cursorShape: parent.cp ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: if (parent.cp) page.copy = String(parent.cp.issue_id) }
-                                    Tip { text: modelData + (Fleet.byHost[modelData] && Fleet.byHost[modelData].user ? ", " + Fleet.byHost[modelData].user : "") + (parent.home ? " · its home" : parent.cp ? " · a copy, " + Time.dur((Time.now - Time.ms(parent.cp.opened_at)) / 3600000) + " ago" : parent.ok ? " · a copy you allowed" : "") }
+                                    Tip { text: modelData + (Fleet.byHost[modelData] && Fleet.byHost[modelData].user ? ", " + Fleet.byHost[modelData].user : "") + (parent.home ? " · its home" : parent.cp ? " · a copy, " + Time.dur((Time.now - Time.ms(parent.cp.opened_at)) / 3600000) + " ago" : parent.ok ? " · a copy allowed" : "") }
                                 }
                             }
                         }
@@ -441,7 +441,7 @@ Page {
                     spacing: 16
                     topPadding: 9
                     Repeater {
-                        model: [["its home", Theme.mix(Theme.accent, Theme.surface3, 0.28)], ["a copy caught", Theme.mix(Theme.crit, Theme.surface3, 0.28)], ["a copy you allowed", Theme.mix(Theme.ok, Theme.surface3, 0.26)]]
+                        model: [["its home", Theme.mix(Theme.accent, Theme.surface3, 0.28)], ["a copy caught", Theme.mix(Theme.crit, Theme.surface3, 0.28)], ["a copy allowed", Theme.mix(Theme.ok, Theme.surface3, 0.26)]]
                         delegate: Row { required property var modelData; spacing: 6
                             Rectangle { width: 11; height: 11; radius: 3; color: modelData[1]; anchors.verticalCenter: parent.verticalCenter }
                             Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
@@ -458,7 +458,7 @@ Page {
         objectName: "copiesElsewhere"
         width: parent.width
         title: "Copies on other machines"
-        sub: page.allCopyRows.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything you restricted is anywhere else"
+        sub: page.allCopyRows.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything restricted is anywhere else"
         Column {
             width: parent.width
             spacing: 12.5
@@ -497,23 +497,21 @@ Page {
                         Btn { visible: cr.done === "" && page.allowingId === cr.modelData.id; small: true; text: "Cancel"; onClicked: { page.allowingId = ""; page.why = "" } }
                         Btn { visible: cr.done === "" && page.allowingId === cr.modelData.id; small: true; kind: "primary"; text: "Allow it"; enabled: page.why.trim() !== ""; onClicked: page.act(cr.modelData, "allow", page.why.trim()) }
                         Repeater {
-                            model: cr.done !== "" || page.allowingId === cr.modelData.id ? [] : [["ask", "Ask " + (cr.modelData.c.signed_in || "them") + " to delete it", false], ["delete", "Delete the copy", true], ["allow", "Allow it there", false]]
+                            model: cr.done !== "" || page.allowingId === cr.modelData.id ? [] : [["delete", "Delete the copy", true], ["allow", "Allow it there", false]]
                             delegate: Btn {
                                 required property var modelData
                                 small: true; danger: modelData[2]; text: modelData[1]
-                                enabled: modelData[0] !== "ask" || !!cr.modelData.c.signed_in
-                                tip: enabled ? "" : "Nobody is signed in to ask"
                                 onClicked: modelData[0] === "allow" ? (page.allowingId = cr.modelData.id, page.why = "")
-                                         : modelData[0] === "delete" ? confirm.ask({ title: "Delete the copy on " + cr.modelData.c.host + "?", text: "Only " + cr.modelData.c.file + " in " + cr.modelData.c.folder + " on " + cr.modelData.c.host + " is deleted. What you restricted is not touched.", ok: "Delete the copy", cancel: "Keep it", danger: true },
+                                         : modelData[0] === "delete" ? confirm.ask({ title: "Delete the copy on " + cr.modelData.c.host + "?", text: "Only " + cr.modelData.c.file + " in " + cr.modelData.c.folder + " on " + cr.modelData.c.host + " is deleted. What is restricted is not touched.", ok: "Delete the copy", cancel: "Keep it", danger: true },
                                                                                    function () { page.act(cr.modelData, "delete", "") })
-                                         : page.act(cr.modelData, "ask", "")
+                                         : null
                             }
                         }
                     }
                 }
             }
             StepPager { visible: page.pagesC > 1; width: parent.width; from: page.piC * 8 + 1; to: Math.min(page.allCopyRows.length, page.piC * 8 + 8); total: page.allCopyRows.length; pageNo: page.piC; pages: page.pagesC; onStep: function (d) { page.pgC = page.piC + d } }
-            Quiet { visible: page.allCopyRows.length === 0; icon: "check"; text: "Nothing you restricted has been found anywhere else." }
+            Quiet { visible: page.allCopyRows.length === 0; icon: "check"; text: "Nothing restricted has been found anywhere else." }
         }
     }
 
@@ -522,7 +520,7 @@ Page {
         objectName: "allowedCopies"
         width: parent.width
         title: "Allowed copies"
-        sub: "copies found away from home that you let stay, newest first, each with the reason you gave; they are not caught again unless you take it back"
+        sub: "copies found away from home that were let stay, newest first, each with the reason given; they are not caught again unless an Admin takes it back"
         Column {
             width: parent.width
             spacing: 4
@@ -554,8 +552,8 @@ Page {
     Box {
         objectName: "flowsCarrying"
         width: parent.width
-        title: "Flows carrying what you restricted"
-        sub: "right now; a flow held at something of yours waits for you to allow it, for that flow only"
+        title: "Flows carrying what is restricted"
+        sub: "right now; a flow held at something restricted waits for an Admin to allow it, for that flow only"
         Column {
             width: parent.width
             spacing: 10
@@ -581,7 +579,7 @@ Page {
                         x: parent.width - 150 - 12 - ob.width - 4; width: 150
                         anchors.verticalCenter: parent.verticalCenter
                         Txt { width: parent.width; horizontalAlignment: Text.AlignRight; font.pixelSize: 12; font.weight: Font.DemiBold; color: modelData.held ? Theme.crit : Theme.text
-                              text: modelData.held ? "waiting for you" : modelData.f.today ? Theme.fmt(modelData.f.today) + " today" : "allowed just now" }
+                              text: modelData.held ? "waiting for an Admin" : modelData.f.today ? Theme.fmt(modelData.f.today) + " today" : "allowed just now" }
                         Txt { width: parent.width; horizontalAlignment: Text.AlignRight; font.pixelSize: 12; color: Theme.text3
                               text: modelData.held ? "since " + Time.hhmm(modelData.f.asked_at) : (modelData.f.last_at ? "last " + Time.hhmm(modelData.f.last_at) + " · " : "") + "allowed " + page.allowedSince(modelData.f.since) }
                     }
@@ -591,7 +589,7 @@ Page {
                     Rectangle { visible: index < page.carrying.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }
-            Quiet { visible: page.carrying.length === 0; text: "No flow carries anything you restricted." }
+            Quiet { visible: page.carrying.length === 0; text: "No flow carries anything restricted." }
         }
     }
 

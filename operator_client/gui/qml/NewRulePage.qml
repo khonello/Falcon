@@ -264,6 +264,6 @@ Editor {
     // --- check and switch on ------------------------------------------------------------------------------------------------------------
     NfSec { visible: page.step === 3; first: true
         FactRows { rows: [["Called", page.name.trim()], ["Starts", page.whenTxt], ["On", page.onTxt],
-                          ["Does", page.acts.map(function (x, i) { return (i + 1) + ". " + x.name + " (" + x.limit + "s)" }).join("  ")], ["Made by", "you"]] } }
+                          ["Does", page.acts.map(function (x, i) { return (i + 1) + ". " + x.name + " (" + x.limit + "s)" }).join("  ")], ["Set by", "you"]] } }
     Decide { visible: page.step === 3; text: "It is switched on when you confirm. Every time it runs shows under Recent runs today." }
 }

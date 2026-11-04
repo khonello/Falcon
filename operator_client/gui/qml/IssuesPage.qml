@@ -268,7 +268,7 @@ Page {
                 objectName: "issuesTodo"
                 width: parent.width
                 title: "To do · " + page.todo.length
-                sub: "the next step is yours, by kind; the kind with the most pressing issue first, critical and late first within it"
+                sub: "the next step, by kind; the kind with the most pressing issue first, critical and late first within it"
                 KindGroups { visible: page.todo.length > 0; list: "todo"; xs: page.todo }
                 Quiet { visible: page.todo.length === 0; icon: "check"; text: "Nothing for you to do." }
             }

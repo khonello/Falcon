@@ -5,10 +5,12 @@ Last updated 4 Nov 2026.
 
 ## Answered 4 Nov 2026
 
-- **Any Admin verifies a task:** yes. CLAUDE.md, `task-natural-combo.md` and the concept say so; `task.verify` must follow (ENGINE-GAPS #23).
-- **Only a rule's maker changes it:** yes; the Engine must refuse anyone else (#23).
+- **Any Admin verifies a task:** yes, and built.
+- **Only a rule's maker changes it:** no. The user told the Engine session (4 Nov) that every IT Admin covers everything and the log shows who; the concept's "only A. Quaye changes it" goes. To confirm with the user: the UI session had recorded a yes.
 - **The concept's contradictions:** corrected towards what is true. Automation's Next is the real next run, Actions counts all eight rules, Flows has the Engine's steps, and a case's
   account says who wrote it as it happened: the local model with smoothing on, Falcon with it off.
+- **Add a machine is gone** (the user asked, 4 Nov): a machine joins with its licence code at setup. Machines shows Waiting to join only for one installed without a code,
+  let in with the code on its screen. New key stays on a machine's card. The Registry page (not on the menu) still has the old Register a PC.
 - **The flow's Keep / Remove the copies:** back, in the concept and in Make a flow. **Task split is gone** (the user, 4 Nov): a description is one task, in the concept and the console.
 
 ## Answered 3 Nov 2026
@@ -21,6 +23,10 @@ Last updated 4 Nov 2026.
 - **The licence store:** the user's design, for later: admin and worker codes are downloaded (one file or two); the admin console's setup takes an
   admin code, the Worker's a worker code; the codes live in a remote store that the Engine asks at setup to validate a code (a little outside
   access at setup is fine), and a small website sells them. Today's `licence import` stands in until then.
+
+## Coverage (the user, 4 Nov 2026)
+
+- Every IT Admin covers everything, restricted included; the audit trail shows who. Pages say "Set by", never "owner". An Admin-to-Admin flow still waits for the destination Admin to agree and pick the folder: kept on purpose.
 
 ## Flow steps as a tree (the user, 3 Nov 2026; built 4 Nov)
 
