@@ -49,6 +49,8 @@ Window {
         var day = d.toDateString() === now.toDateString() ? "today" : Qt.formatDateTime(d, "dddd d MMM")
         return day + " at " + Qt.formatDateTime(d, "HH:mm")
     }
+    function up(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : "" }
+    function inDays(iso) { var a = new Date(iso), b = new Date(); a.setHours(0, 0, 0, 0); b.setHours(0, 0, 0, 0); var n = Math.round((a - b) / 86400000); return n < 0 ? "" : n === 0 ? "today" : n === 1 ? "tomorrow" : "in " + n + " days" }
     function hhmm(iso) { return iso ? Qt.formatDateTime(new Date(iso), "HH:mm") : "" }
     function initials(n) { var p = String(n || "IT").split(/[ .]+/).filter(function (x) { return x }); return (p.length > 1 ? p[0][0] + p[1][0] : String(n || "IT").slice(0, 2)).toUpperCase() }
     function along(a, b) { if (!a || !b) return 0; var s = new Date(a).getTime(), e = new Date(b).getTime(); return Math.max(0, Math.min(1, (Date.now() - s) / Math.max(1, e - s))) }
@@ -63,36 +65,44 @@ Window {
     }
 
     // --- the three covers: one family ----------------------------------------------------------------------------------------------
-    Rectangle {
+    Item {
         anchors.fill: parent
         visible: win.covers
-        gradient: Gradient {
-            GradientStop { position: 0; color: kind === "emergency" ? "#781810" : "#1e2634" }
-            GradientStop { position: 1; color: kind === "emergency" ? "#240806" : "#0a0d12" }
+        Canvas {
+            anchors.fill: parent
+            onPaint: { var g = getContext("2d"), cx = width / 2, cy = height * 0.42, r = Math.sqrt(Math.pow(width / 2, 2) + Math.pow(height * 0.58, 2)), f = g.createRadialGradient(cx, cy, 0, cx, cy, r)
+                       f.addColorStop(0, kind === "emergency" ? "#781810" : "#1e2634"); f.addColorStop(1, kind === "emergency" ? "#240806" : "#0a0d12")
+                       g.fillStyle = f; g.fillRect(0, 0, width, height) }
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
         }
         Column {
             anchors.centerIn: parent
-            width: Math.min(parent.width * 0.42, 640)
-            spacing: 22
+            width: Math.min(parent.width * 0.46, 720)
+            spacing: 16
             // who, and what it is
             Column {
                 width: parent.width
                 spacing: 8
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 72; height: 72; radius: 36
+                    width: 90; height: 90; radius: 45; color: "transparent"
+                    border.width: 7; border.color: kind === "emergency" ? Qt.rgba(1, 0.47, 0.39, 0.08) : Qt.rgba(91 / 255, 140 / 255, 1, 0.08)
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 77; height: 77; radius: 39
                     color: kind === "emergency" ? Qt.rgba(1, 0.47, 0.39, 0.2) : Qt.rgba(91 / 255, 140 / 255, 1, 0.22)
                     border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.14)
                     Text { visible: kind === "blocked"; anchors.centerIn: parent; text: win.initials(spec.occupant_name); color: win.white; font.family: win.sans; font.pixelSize: 22; font.weight: Font.DemiBold }
-                    Glyph { visible: kind !== "blocked"; anchors.centerIn: parent; name: kind === "locked" ? "lock" : "warn"; size: 30; color: win.white }
+                    Glyph { visible: kind !== "blocked"; anchors.centerIn: parent; name: kind === "locked" ? "lock" : "warn"; size: 33; color: win.white }
                 }
-                Item { width: 1; height: 4 }
-                Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.family: win.sans; font.pixelSize: 12; font.weight: Font.DemiBold; font.letterSpacing: 1
+                }
+                Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; font.family: win.sans; font.pixelSize: 13; font.weight: Font.DemiBold; font.letterSpacing: 1
                        color: kind === "emergency" ? "#ffb4a8" : Qt.rgba(1, 1, 1, 0.5)
                        text: kind === "blocked" ? "THIS MACHINE IS IN USE" : kind === "locked" ? "THIS MACHINE IS LOCKED"
                              : "EMERGENCY" + (spec.from ? " · FROM " + String(spec.from).toUpperCase() : "") + (spec.at ? " · " + win.hhmm(spec.at) : "") }
                 Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; color: win.white; font.family: win.sans; font.weight: Font.DemiBold
-                       font.pixelSize: kind === "emergency" ? 34 : 26
+                       font.pixelSize: kind === "emergency" ? 32 : 24
                        text: kind === "blocked" ? (spec.occupant_name || "Your Admin") + " is using this machine"
                              : kind === "locked" ? (spec.by ? spec.by + " locked this machine" : "Your Admin locked this machine") : (spec.title || "An emergency announcement") }
             }
@@ -104,7 +114,7 @@ Window {
                 radius: 14
                 color: Qt.rgba(1, 1, 1, kind === "emergency" ? 0.06 : 0.04)
                 border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.08)
-                Text { id: why; x: 22; y: 16; width: parent.width - 44; wrapMode: Text.WordWrap; font.family: win.sans; font.pixelSize: kind === "emergency" ? 17 : 16
+                Text { id: why; x: 22; y: 16; width: parent.width - 44; wrapMode: Text.WordWrap; font.family: win.sans; font.pixelSize: kind === "emergency" ? 18 : 16
                        horizontalAlignment: kind === "emergency" ? Text.AlignLeft : Text.AlignHCenter; color: Qt.rgba(1, 1, 1, 0.86); lineHeight: 1.2
                        text: kind === "emergency" ? (spec.text || "") : "“" + (spec.message || "") + "”" }
             }
@@ -140,7 +150,7 @@ Window {
                 }
                 Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; color: Qt.rgba(1, 1, 1, 0.62); font.family: win.sans; font.pixelSize: 14
                        text: kind === "blocked" ? "You can use it again when they leave. Your work stays as you left it."
-                             : kind === "locked" ? (spec.until ? "It unlocks by itself at " + win.hhmm(spec.until) + ", or sooner if your Admin unlocks it." : "It unlocks when your Admin unlocks it.")
+                             : kind === "locked" ? (spec.until ? "It unlocks by itself at " + win.hhmm(spec.until) + ", or sooner if " + (spec.by || "your Admin") + " unlocks it." : "It unlocks when your Admin unlocks it.")
                              : "It stays in your Falcon program, under Announcements." }
             }
         }
@@ -170,8 +180,8 @@ Window {
     Rectangle {
         id: card
         visible: !win.covers && !win.bar
-        width: kind === "task" ? 560 : kind === "message" ? 500 : 380
-        height: body.implicitHeight + 44
+        width: kind === "task" ? 630 : win.joinCode !== "" ? 600 : kind === "message" ? 520 : 380
+        height: body.y + body.implicitHeight + 22
         anchors.centerIn: backdrop ? parent : undefined
         x: 24; y: 24
         radius: 12
@@ -179,10 +189,19 @@ Window {
         border.width: 1
         border.color: win.line
 
+        // the window's title, as the concept draws it; there is no title bar on these
+        Item {
+            id: titleLine
+            visible: kind === "task" || kind === "message"
+            width: parent.width; height: visible ? 40 : 0
+            Text { x: 16; anchors.verticalCenter: parent.verticalCenter; color: win.faint; font.family: win.sans; font.pixelSize: 14
+                   text: kind === "task" ? "Falcon · a task for you" : win.joinCode !== "" ? "Join your organisation" : "Falcon · a message" }
+            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: win.line }
+        }
         Column {
             id: body
-            x: 22; y: 22
-            width: parent.width - 44
+            x: 28; y: titleLine.height + 22
+            width: parent.width - 56
             spacing: 12
 
             // --- a task given to you: who and by when, what it is, what will show the work, Start (never Complete) --------------------------
@@ -191,29 +210,30 @@ Window {
                 width: parent.width
                 spacing: 14
                 Item {
-                    width: parent.width; height: 48
-                    Rectangle { id: tav; width: 40; height: 40; radius: 20; color: win.accentSoft; anchors.verticalCenter: parent.verticalCenter
-                                Text { anchors.centerIn: parent; text: win.initials(spec.from); color: win.accent; font.family: win.sans; font.pixelSize: 13; font.weight: Font.DemiBold } }
-                    Column { anchors.left: tav.right; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                        Text { text: (spec.from || "Your Admin") + " gave you a task"; color: win.ink; font.family: win.sans; font.pixelSize: 15; font.weight: Font.DemiBold }
-                        Text { visible: !!spec.given; text: spec.given ? win.when(spec.given) : ""; color: win.faint; font.family: win.sans; font.pixelSize: 12 } }
-                    Rectangle { visible: !!spec.due; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: dc.implicitWidth + 24; height: 46; radius: 8; color: win.warnSoft
+                    width: parent.width; height: 72
+                    Rectangle { id: tav; width: 41; height: 41; radius: 21; color: Qt.rgba(36 / 255, 89 / 255, 214 / 255, 0.16); anchors.verticalCenter: parent.verticalCenter
+                                Text { anchors.centerIn: parent; text: win.initials(spec.from); color: win.accent; font.family: win.sans; font.pixelSize: 14; font.weight: Font.DemiBold } }
+                    Column { anchors.left: tav.right; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 1
+                        Text { text: (spec.from || "Your Admin") + " gave you a task"; color: win.ink; font.family: win.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
+                        Text { visible: !!spec.given; text: spec.given ? win.up(win.when(spec.given)) : ""; color: win.faint; font.family: win.sans; font.pixelSize: 13 } }
+                    Rectangle { visible: !!spec.due; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: dc.implicitWidth + 28; height: dc.implicitHeight + 14; radius: 10; color: win.warnSoft
                         Column { id: dc; anchors.centerIn: parent
-                            Text { anchors.right: parent.right; text: "Due"; color: win.warn; font.family: win.sans; font.pixelSize: 11 }
-                            Text { anchors.right: parent.right; text: spec.due ? Qt.formatDateTime(new Date(spec.due), "dddd d MMM, HH:mm") : ""; color: win.warn; font.family: win.sans; font.pixelSize: 14; font.weight: Font.DemiBold } } }
+                            Text { anchors.right: parent.right; text: "Due"; color: win.warn; font.family: win.sans; font.pixelSize: 12 }
+                            Text { anchors.right: parent.right; text: spec.due ? Qt.formatDateTime(new Date(spec.due), "dddd d MMM, HH:mm") : ""; color: win.warn; font.family: win.sans; font.pixelSize: 16; font.weight: Font.DemiBold }
+                            Text { anchors.right: parent.right; visible: text !== ""; text: spec.due ? win.inDays(spec.due) : ""; color: win.warn; font.family: win.sans; font.pixelSize: 12 } } }
                 }
                 Rectangle { width: parent.width; height: 1; color: win.line }
-                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.ink; font.family: win.sans; font.pixelSize: 21; font.weight: Font.DemiBold; text: spec.title || "" }
-                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.dim; font.family: win.sans; font.pixelSize: 14; lineHeight: 1.2; visible: !!spec.description && spec.description !== spec.title; text: spec.description || "" }
+                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.ink; font.family: win.sans; font.pixelSize: 24; font.weight: Font.DemiBold; text: spec.title || "" }
+                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.dim; font.family: win.sans; font.pixelSize: 15; lineHeight: 1.15; visible: !!spec.description && spec.description !== spec.title; text: spec.description || "" }
                 Rectangle {
                     visible: (spec.signs || []).length > 0
-                    width: parent.width; height: sg.implicitHeight + 28; radius: 10; color: win.ground
+                    width: parent.width; height: sg.implicitHeight + 28; radius: 11; color: win.ground
                     Column {
                         id: sg
-                        x: 14; y: 14; width: parent.width - 28; spacing: 8
-                        Item { width: parent.width; height: 16
-                            Text { text: "WHAT WILL SHOW THE WORK IS DONE"; color: win.faint; font.family: win.sans; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.6 }
-                            Text { anchors.right: parent.right; color: win.faint; font.family: win.sans; font.pixelSize: 12
+                        x: 16; y: 14; width: parent.width - 32; spacing: 8
+                        Item { width: parent.width; height: 18
+                            Text { text: "WHAT WILL SHOW THE WORK IS DONE"; color: "#a6adb9"; font.family: win.sans; font.pixelSize: 12; font.weight: Font.DemiBold; font.letterSpacing: 0.7 }
+                            Text { anchors.right: parent.right; color: win.faint; font.family: win.sans; font.pixelSize: 13
                                    text: (spec.signs || []).filter(function (s) { return s.seen }).length + " of " + (spec.signs || []).length + " so far" } }
                         Repeater {
                             model: spec.signs || []
@@ -221,21 +241,21 @@ Window {
                                 required property var modelData
                                 // what it is, as the concept marks it: a folder (a path), several files (a count), a file (a name); paths and names in mono
                                 readonly property string what: modelData.program ? "program" : /[\\/]/.test(modelData.name) ? "folder" : /^(about |\d+ )/i.test(modelData.name) ? "files" : "file"
-                                width: sg.width; height: 34; radius: 6; color: win.pane
-                                Glyph { x: 10; anchors.verticalCenter: parent.verticalCenter; name: parent.what === "program" ? "window" : parent.what === "folder" ? "folder" : parent.what === "files" ? "files" : "file"; size: 14; color: win.faint }
-                                Text { x: 34; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 140; elide: Text.ElideRight; text: modelData.name + (modelData.hint ? " · " + modelData.hint : ""); color: win.ink
-                                       font.family: parent.what === "folder" || parent.what === "file" ? "IBM Plex Mono" : win.sans; font.pixelSize: parent.what === "folder" || parent.what === "file" ? 12 : 13 }
+                                width: sg.width; height: 33; radius: 7; color: win.pane
+                                Glyph { x: 10; anchors.verticalCenter: parent.verticalCenter; name: parent.what === "program" ? "window" : parent.what === "folder" ? "folder" : parent.what === "files" ? "files" : "file"; size: 17; color: win.faint }
+                                Text { x: 42; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 130; elide: Text.ElideRight; text: modelData.name + (modelData.hint ? " · " + modelData.hint : ""); color: win.ink
+                                       font.family: parent.what === "folder" || parent.what === "file" ? "IBM Plex Mono" : win.sans; font.pixelSize: parent.what === "folder" || parent.what === "file" ? 13 : 14 }
                                 Rectangle { anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; width: st.implicitWidth + 16; height: 20; radius: 10; color: win.soft2
                                             Text { id: st; anchors.centerIn: parent; text: modelData.seen ? "changed " + win.hhmm(modelData.seen) : "not yet"; color: win.faint; font.family: win.sans; font.pixelSize: 11 } }
                             }
                         }
-                        Text { width: parent.width; wrapMode: Text.WordWrap; text: "Falcon notices these change by itself. You do not have to report anything."; color: win.faint; font.family: win.sans; font.pixelSize: 12 }
+                        Text { width: parent.width; wrapMode: Text.WordWrap; text: "Falcon notices these change by itself. You do not have to report anything."; color: win.faint; font.family: win.sans; font.pixelSize: 13 }
                     }
                 }
                 Rectangle { width: parent.width; height: 1; color: win.line }
                 Item {
                     width: parent.width; height: 34
-                    Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - 200; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 12
+                    Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - 200; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 13
                            text: "An IT Admin checks the work and closes the task." }
                     Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                         Act { text: "Later"; onClicked: answer.give({ later: true }) }
@@ -250,16 +270,31 @@ Window {
                 visible: win.joinCode !== ""
                 width: parent.width
                 spacing: 14
-                Text { text: "This machine has asked to join"; color: win.ink; font.family: win.sans; font.pixelSize: 20; font.weight: Font.DemiBold }
-                Text { width: parent.width; wrapMode: Text.WordWrap; text: "Give this code to your IT Admin. They type it in Falcon, on Machines, under Waiting to join."; color: win.dim; font.family: win.sans; font.pixelSize: 14 }
+                Text { text: (spec.host || "This machine") + " has asked to join"; color: win.ink; font.family: win.sans; font.pixelSize: 24; font.weight: Font.DemiBold }
+                Text { width: parent.width; wrapMode: Text.WordWrap; text: "Give this code to your IT Admin. They type it in Falcon, on Machines, under Waiting to join."; color: win.dim; font.family: win.sans; font.pixelSize: 15; lineHeight: 1.15 }
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 8
+                    topPadding: 8; bottomPadding: 8
+                    spacing: 9
                     Repeater { model: win.joinCode.split("")
-                        Rectangle { required property var modelData; required property int index; width: 44; height: 58; radius: 8; color: win.ground; border.width: 1; border.color: win.edge
-                                    Text { anchors.centerIn: parent; text: parent.modelData; color: win.ink; font.family: "IBM Plex Mono"; font.pixelSize: 28; font.weight: Font.DemiBold } } }
+                        Row { required property var modelData; required property int index; spacing: 9
+                              Rectangle { visible: index === 3; anchors.verticalCenter: parent.verticalCenter; width: 16; height: 2; color: win.edge }
+                              Rectangle { width: 60; height: 76; radius: 8; color: win.ground; border.width: 1; border.color: win.edge
+                                          Text { anchors.centerIn: parent; text: parent.parent.modelData; color: win.ink; font.family: win.sans; font.pixelSize: 44; font.weight: Font.Medium } } } }
                 }
-                Text { width: parent.width; wrapMode: Text.WordWrap; text: "Waiting for an Admin to confirm."; color: win.faint; font.family: win.sans; font.pixelSize: 13 }
+                Item {
+                    width: parent.width; height: 36
+                    Item { id: spin; width: 20; height: 20; anchors.verticalCenter: parent.verticalCenter
+                           Canvas { anchors.fill: parent
+                                    onPaint: { var g = getContext("2d"); g.reset(); g.lineWidth = 2; g.strokeStyle = win.edge; g.beginPath(); g.arc(10, 10, 8, 0, 2 * Math.PI); g.stroke()
+                                               g.strokeStyle = win.accent; g.beginPath(); g.arc(10, 10, 8, -1.2, 0.2); g.stroke() }
+                                    RotationAnimator on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: win.joinCode !== "" } } }
+                    Text { x: 32; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32 - cancelB.width - 12; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 13
+                           text: "Waiting for an Admin to confirm." + (spec.expires_at ? " The code expires at " + win.hhmm(spec.expires_at) + "." : "") }
+                    // the Engine cannot take a request back yet (ENGINE-GAPS 26): drawn, and it says why
+                    Act { id: cancelB; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Cancel"; enabled: false
+                          tip: "It cannot be taken back from here yet. An Admin can refuse it, or the code runs out." }
+                }
             }
 
             // --- a message from IT: the new message first and large; a reply when it came in a conversation ---------------------------------
@@ -268,52 +303,51 @@ Window {
                 width: parent.width
                 spacing: 12
                 Item {
-                    width: parent.width; height: 44
-                    Rectangle { id: mav; width: 38; height: 38; radius: 19; color: win.accentSoft; anchors.verticalCenter: parent.verticalCenter
-                                Text { anchors.centerIn: parent; text: win.initials(spec.from); color: win.accent; font.family: win.sans; font.pixelSize: 13; font.weight: Font.DemiBold } }
-                    Column { anchors.left: mav.right; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                        Text { text: spec.from || "Your IT Admin"; color: win.ink; font.family: win.sans; font.pixelSize: 15; font.weight: Font.DemiBold }
-                        Text { text: "IT" + (spec.at ? " · " + win.when(spec.at) : ""); color: win.faint; font.family: win.sans; font.pixelSize: 12 } }
+                    width: parent.width; height: 46
+                    Rectangle { id: mav; width: 41; height: 41; radius: 21; color: Qt.rgba(36 / 255, 89 / 255, 214 / 255, 0.16); anchors.verticalCenter: parent.verticalCenter
+                                Text { anchors.centerIn: parent; text: win.initials(spec.from); color: win.accent; font.family: win.sans; font.pixelSize: 14; font.weight: Font.DemiBold } }
+                    Column { anchors.left: mav.right; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter
+                        Text { text: spec.from || "Your IT Admin"; color: win.ink; font.family: win.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
+                        Text { text: "IT" + (spec.at ? " · " + win.when(spec.at) : ""); color: win.faint; font.family: win.sans; font.pixelSize: 13 } }
+                    Text { visible: spec.conversation_id !== undefined && spec.conversation_id !== null; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Open in Falcon"; color: win.accent; font.family: win.sans; font.pixelSize: 14
+                           MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: answer.openProgram("messages") } }
                 }
                 Rectangle { width: parent.width; height: 1; color: win.line }
                 Rectangle {
                     visible: !!spec.earlier
-                    width: parent.width; height: 30; radius: 6; color: win.ground
-                    Row { x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                        Glyph { name: "chat"; size: 13; color: win.faint; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: spec.earlier || ""; color: win.faint; font.family: win.sans; font.pixelSize: 12 } }
+                    width: parent.width; height: 32; radius: 8; color: win.ground
+                    Row { x: 11; anchors.verticalCenter: parent.verticalCenter; spacing: 10
+                        Glyph { name: "chat"; size: 17; color: win.faint; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: spec.earlier || ""; color: win.faint; font.family: win.sans; font.pixelSize: 13 } }
                 }
                 Rectangle {
-                    width: Math.min(parent.width, mt.implicitWidth + 36); height: mt.implicitHeight + 28
-                    radius: 14
+                    width: Math.min(parent.width, mt.implicitWidth + 40); height: mt.implicitHeight + 34
+                    radius: 16
                     color: win.soft2
-                    Text { id: mt; x: 18; y: 14; width: Math.min(implicitWidth, body.width - 36); wrapMode: Text.WordWrap; color: win.ink; font.family: win.sans; font.pixelSize: 16; lineHeight: 1.2; text: spec.text || "" }
+                    Rectangle { width: 16; height: 16; radius: 4; color: win.soft2 }       // the corner towards who said it stays sharper
+                    Text { id: mt; x: 20; y: 17; width: Math.min(implicitWidth, body.width - 40); wrapMode: Text.WordWrap; color: win.ink; font.family: win.sans; font.pixelSize: 18; lineHeight: 1.2; text: spec.text || "" }
                 }
                 // a reply, in the conversation the Admin started; a plain notice has OK
                 Column {
                     visible: spec.conversation_id !== undefined && spec.conversation_id !== null
                     width: parent.width
                     spacing: 6
-                    Row {
-                        width: parent.width
-                        spacing: 8
-                        Rectangle {
-                            width: parent.width - sendB.width - 8; height: 40; radius: 20; color: win.ground; border.width: 1; border.color: win.edge
-                            TextInput { id: reply; x: 16; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32; clip: true; font.family: win.sans; font.pixelSize: 14; color: win.ink
-                                        onAccepted: if (text.trim()) answer.give({ reply: text.trim(), conversation_id: spec.conversation_id }) }
-                            Text { visible: reply.text === ""; x: 16; anchors.verticalCenter: parent.verticalCenter; text: "Write a reply"; color: win.faint; font.family: win.sans; font.pixelSize: 14 }
-                        }
-                        Act { id: sendB; text: "Send"; primary: true; enabled: reply.text.trim() !== ""; onClicked: answer.give({ reply: reply.text.trim(), conversation_id: spec.conversation_id }) }
+                    Rectangle {
+                        width: parent.width; height: 50; radius: 25; color: win.ground; border.width: 1; border.color: win.edge
+                        TextInput { id: reply; x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - sendB.width; clip: true; font.family: win.sans; font.pixelSize: 15; color: win.ink
+                                    onAccepted: if (text.trim()) answer.give({ reply: text.trim(), conversation_id: spec.conversation_id }) }
+                        Text { visible: reply.text === ""; x: 18; anchors.verticalCenter: parent.verticalCenter; text: "Write a reply"; color: win.faint; font.family: win.sans; font.pixelSize: 15 }
+                        Act { id: sendB; anchors.right: parent.right; anchors.rightMargin: 7; anchors.verticalCenter: parent.verticalCenter; radius: 18; text: "Send"; primary: true; enabled: reply.text.trim() !== ""; onClicked: answer.give({ reply: reply.text.trim(), conversation_id: spec.conversation_id }) }
                     }
-                    Text { text: "Your reply goes to " + (spec.from || "your IT Admin") + " only."; color: win.faint; font.family: win.sans; font.pixelSize: 12 }
+                    Text { text: "Your reply goes to " + (spec.from || "your IT Admin") + " only."; color: win.faint; font.family: win.sans; font.pixelSize: 13 }
                 }
                 Rectangle { width: parent.width; height: 1; color: win.line }
                 Item {
                     width: parent.width; height: 32
-                    Text { visible: spec.conversation_id !== undefined && spec.conversation_id !== null; anchors.verticalCenter: parent.verticalCenter; color: win.accent; font.family: win.sans; font.pixelSize: 13; text: "Later"
-                           MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: answer.give({ later: true }) } }
-                    Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; visible: spec.conversation_id !== undefined && spec.conversation_id !== null
-                           text: "It stays in Falcon, under Messages."; color: win.faint; font.family: win.sans; font.pixelSize: 12 }
+                    Row { visible: spec.conversation_id !== undefined && spec.conversation_id !== null; anchors.verticalCenter: parent.verticalCenter; spacing: 14
+                        Text { anchors.verticalCenter: parent.verticalCenter; color: win.accent; font.family: win.sans; font.pixelSize: 14; text: "Later"
+                               MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: answer.give({ later: true }) } }
+                        Text { anchors.verticalCenter: parent.verticalCenter; text: "It stays in Falcon, under Messages."; color: win.faint; font.family: win.sans; font.pixelSize: 13 } }
                     Act { anchors.right: parent.right; visible: spec.conversation_id === undefined || spec.conversation_id === null; text: "OK"; primary: true; onClicked: answer.give({ seen: true }) }
                 }
             }
@@ -342,20 +376,19 @@ Window {
         id: act
         property string text: ""
         property bool primary: false
+        property string tip: ""
         signal clicked()
-        width: actLabel.implicitWidth + (act.text === "Start" ? 48 : 36); height: 36; radius: 7
+        width: actLabel.implicitWidth + 36; height: 36; radius: 7
         opacity: enabled ? 1 : 0.45
         color: primary ? (hov.pressed ? Qt.darker(win.accent, 1.15) : hov.containsMouse ? Qt.lighter(win.accent, 1.12) : win.accent)
                        : hov.containsMouse ? win.ground : win.pane
         border.width: primary ? 0 : 1
         border.color: hov.containsMouse ? win.accent : win.edge
-        Row { anchors.centerIn: parent; spacing: 6
-              Glyph { visible: act.text === "Start"; name: "play"; size: 12
-                      color: act.primary ? win.white : win.ink; anchors.verticalCenter: parent.verticalCenter }
-              Text { id: actLabel; text: act.text; color: act.primary ? win.white : win.ink
-                     font.family: win.sans; font.pixelSize: 13; font.weight: act.primary ? Font.DemiBold : Font.Normal
-                     anchors.verticalCenter: parent.verticalCenter } }
-        MouseArea { id: hov; anchors.fill: parent; enabled: act.enabled; hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor; onClicked: act.clicked() }
+        Text { id: actLabel; anchors.centerIn: parent; text: act.text; color: act.primary ? win.white : win.ink; font.family: win.sans; font.pixelSize: 14; font.weight: Font.Medium }
+        // stays enabled for the hover, so a button that cannot act can still say why
+        MouseArea { id: hov; anchors.fill: parent; enabled: true; hoverEnabled: true
+                    cursorShape: act.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: if (act.enabled) act.clicked() }
+        ToolTip.visible: act.tip !== "" && hov.containsMouse
+        ToolTip.text: act.tip
     }
 }

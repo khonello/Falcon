@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import getpass
 import json
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ def main(argv: list[str]) -> int:
 
     from PySide6.QtCore import QObject, QTimer, QUrl, Slot
     from PySide6.QtGui import QGuiApplication
+    from PySide6.QtNetwork import QLocalSocket
     from PySide6.QtQml import QQmlApplicationEngine
     from PySide6.QtQuick import (
         QQuickWindow,  # noqa: F401 -- types the root as a QQuickWindow (grabWindow)
@@ -34,6 +36,16 @@ def main(argv: list[str]) -> int:
             v = value.toVariant() if hasattr(value, "toVariant") else value
             print(json.dumps(v if v is not None else {}), flush=True)
             QGuiApplication.quit()
+
+        @Slot(str)
+        def openProgram(self, tab: str) -> None:
+            """Open in Falcon: bring this person's program forward on `tab`; what was shown here waits there, as Later does."""
+            sock = QLocalSocket()
+            sock.connectToServer(f"FalconProgram-{getpass.getuser()}")
+            if sock.waitForConnected(300):
+                sock.write(f"show {tab}\n".encode())
+                sock.waitForBytesWritten(300)
+            self.give({"later": True})
 
     app = QGuiApplication(sys.argv[:1])
     from worker_client import fonts

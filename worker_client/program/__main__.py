@@ -283,10 +283,17 @@ def main(argv: list[str]) -> int:
         bridge.viewChanged.connect(refresh_icon)
 
     if server is not None:
+        def asked_to_show(line: str) -> None:
+            """`show`, or `show messages` from a window's Open in Falcon: forward, on that tab."""
+            words = line.split()
+            if len(words) > 1 and words[1] in ("today", "tasks", "messages", "announcements", "machine"):
+                win.setProperty("tab", words[1])
+            bring_forward()
+
         def accept() -> None:
             sock = server.nextPendingConnection()
             if sock is not None:
-                sock.readyRead.connect(lambda: (sock.readAll(), bring_forward()))
+                sock.readyRead.connect(lambda: asked_to_show(bytes(sock.readAll()).decode("ascii", "ignore")))
                 sock.disconnected.connect(sock.deleteLater)
 
         server.newConnection.connect(accept)

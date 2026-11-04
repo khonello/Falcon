@@ -373,6 +373,16 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
     `announcement`, `warning` or `emergency`; `routine` is not offered.
     `engine/console/calendar.py:119` should link an announcement to `["announcements", null]`; `Nav.remap` covers the old `["messages", "announcements"]` until it does.
 
+26. **The Worker program and windows, as built to the concept (4 Nov 2026).** The QML draws these when they arrive and leaves them out until then; nothing is faked.
+    - `app_view` (`worker_client/service.py`): on a task `given`, `started_at`, `signs` (`[{name, seen, program?}]`, as the task window gets); `closed` (`[{id, title, closed_by, closed_at}]`, closed this month);
+      on a message `from_request` and `from: "You"` when the last word is the person's; on an announcement `read_at`; `request` (`{line, at}`) for a request still waiting, so it survives a restart;
+      in `machine`: `department`, `up_to_date`, `connected_since`.
+    - The join window: `enroll.py` hands the window plain text. It should pass `{text, host, expires_at}` (`enroll.request` already returns `expires_at`), which gives the title "LOG-01 has asked to join" and the expiry.
+    - **Cancel on the join window needs an `enroll.cancel` handler.** It is drawn disabled with the reason until then; `answer.give({cancel: true})` is what it would send.
+
+27. **`worker_client/winnotify.py:112` raises an access violation at `RegisterClassW`** (seen 4 Nov 2026 in `tests/test_worker_program.py` / `test_worker_client.py`: faulthandler prints it, the tests still pass). Not looked into beyond the stack.
+    `kernel32.GetModuleHandleW` has no `restype` there, so a 64-bit handle may be cut short; that is a guess. Worth checking whether native drive, sign-in and network notifications really start.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine
