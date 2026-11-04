@@ -405,7 +405,7 @@ Page {
                                             delegate: Rectangle {
                                                 required property var modelData
                                                 readonly property string o: Auto.outcome(modelData)
-                                                width: parent.width; height: xn.height + 6; radius: 5
+                                                width: parent.width; height: xn.height + 8; radius: 5
                                                 color: o === "Timed out" ? Theme.mix(Theme.med, Theme.surface2, 0.16) : Auto.problem(o) ? Theme.mix(Theme.crit, Theme.surface2, 0.16) : Theme.surface2
                                                 Txt { id: xn; x: 8; y: 3; width: parent.width - 16 - xo.implicitWidth - 8; text: page.actionName(rc.modelData.e, modelData.action_id); font.pixelSize: 12 }
                                                 Txt { id: xo; anchors.right: parent.right; anchors.rightMargin: 8; y: 3; font.pixelSize: 12; elide: Text.ElideNone
@@ -422,7 +422,6 @@ Page {
                                 width: parent.width
                                 spacing: 12
                                 topPadding: 4
-                                Rectangle { width: parent.width; height: 1; color: Theme.border }
                                 Btn { anchors.right: parent.right; small: true; kind: "primary"; text: "Run again where it went wrong"; onClicked: page.runAgain(rc.modelData) }
                             }
                         }

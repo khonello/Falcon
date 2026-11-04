@@ -326,7 +326,21 @@ Page {
                                         width: parent.width - 24
                                         spacing: 4
                                         Txt { id: bf; visible: !bub.mine && page.c && page.c.kind === "admins"; text: modelData.from || ""; font.weight: Font.DemiBold; font.pixelSize: 12; color: Theme.text2; elide: Text.ElideNone }
-                                        Txt { id: bt; width: parent.width; text: modelData.body + (modelData.file ? "\nFile: " + modelData.file.name : ""); lh: 1.45; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: bub.mine ? Theme.inverse : Theme.text }
+                                        Txt { id: bt; width: parent.width; visible: text !== ""; text: modelData.body || ""; lh: 1.45; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: bub.mine ? Theme.inverse : Theme.text }
+                                        // a file sent in the conversation (ms-file): its name, its size, and Save for the one it came to
+                                        Rectangle {
+                                            visible: !!modelData.file
+                                            width: Math.min(parent.width, 300); height: 46; radius: 8
+                                            color: bub.mine ? Theme.alpha(Theme.inverse, 0.14) : Theme.surface
+                                            border.width: bub.mine ? 0 : 1; border.color: Theme.border
+                                            Icon { x: 10; anchors.verticalCenter: parent.verticalCenter; name: "file"; size: 13; color: bub.mine ? Theme.inverse : Theme.text2 }
+                                            Column { x: 33; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 33 - (bub.mine ? 10 : 62)
+                                                Txt { width: parent.width; text: modelData.file ? modelData.file.name : ""; font.pixelSize: 13; font.weight: Font.DemiBold; color: bub.mine ? Theme.inverse : Theme.text }
+                                                Txt { width: parent.width; font.pixelSize: 12; color: bub.mine ? Theme.alpha(Theme.inverse, 0.8) : Theme.text3
+                                                      text: modelData.file && modelData.file.size_bytes ? (modelData.file.size_bytes >= 1048576 ? (modelData.file.size_bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(modelData.file.size_bytes / 1024)) + " KB") : "" } }
+                                            Btn { visible: !bub.mine && !!modelData.file && modelData.file.state !== "waiting"; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; small: true; text: "Save"
+                                                  onClicked: falcon.call("chat.file_save", { file_id: modelData.file.id }, function (ok, r) { if (ok) Msg.ok("Saved to Downloads\\From Falcon\\" + modelData.file.name); else Msg.failed(r && r.message ? r.message : "Not saved") }) }
+                                        }
                                         Txt { id: bs; anchors.right: parent.right; text: Time.hhmm(modelData.at); font.pixelSize: 11; color: bub.mine ? Theme.alpha(Theme.inverse, 0.75) : Theme.text3; elide: Text.ElideNone }
                                     }
                                 }

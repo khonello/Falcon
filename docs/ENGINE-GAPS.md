@@ -365,6 +365,8 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      ("Gets up to"); the Engine keeps only the action's own. Make a rule offers `printer.offline`, `threshold.signin {count, window_s}`, `threshold.disk` and
      `user.login` with `{outside_hours: true}`. `time.scheduled`'s `at` is an ISO date and time. Make a flow sends each asked destination a `note` ("A line for them"),
      `from_flow`, and `let_them_choose` with the Admin's workstation as `destination_pc_id`. `flow.create` keeps `on_source_delete` at "keep": the concept's drawer does not ask.
+   - `hierarchy.pc_register` without `department_id`: the concept registers a machine by name alone ("Put it in a department on Departments"). Until then the console sends the
+     first department. The drawer's Found list reads `enroll.list`; the concept also lists PCs "seen on the network", which #10 dropped.
    - **The concept itself still shows "Sort by file type" and "sort"** in Flows, which `flow.steps` dropped on 3 Nov: the concept needs that change
      before the QML follows it.
 

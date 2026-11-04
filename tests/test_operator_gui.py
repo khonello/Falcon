@@ -366,13 +366,13 @@ async def test_restricting_finds_it_by_search_and_what_is_restricted_cannot_be_p
     _pump(0.2)
     assert [h["path"] for h in prop(page, "hits")] == [r"C:\Finance\budget-2026.xlsx"]
     assert prop(page, "prob").startswith("Search for the file")                  # nothing picked: the next step is shut
-    QMetaObject.invokeMethod(page, "take", Q_ARG("QVariant", "C:\Finance"), Q_ARG("QVariant", "folder"))
+    QMetaObject.invokeMethod(page, "take", Q_ARG("QVariant", r"C:\Finance"), Q_ARG("QVariant", "folder"))
     page.setProperty("step", 2)
     _pump(0.2)
     page.confirmed.emit()
     await _wait(lambda: any(t == "marks.create" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "marks.create")
-    assert sent == {"paths": ["C:\Finance"], "keep": "path", "confirm_large": False}
+    assert sent == {"paths": [r"C:\Finance"], "keep": "path", "confirm_large": False}
 
 
 QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))
