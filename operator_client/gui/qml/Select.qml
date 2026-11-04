@@ -42,11 +42,11 @@ Item {
         Txt {
             visible: !root.multiple || root.values.length === 0
             anchors.left: parent.left
-            anchors.leftMargin: 10
+            anchors.leftMargin: root.small ? 8 : 12
             anchors.right: chev.left
             anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
-            font.pixelSize: root.small ? Theme.fSmall : Theme.fBody
+            font.pixelSize: Theme.fBody
             text: root.multiple ? root.placeholder : (root.value === null || root.value === undefined ? root.placeholder : root.labelFor(root.value))
             color: root.multiple || root.value === null || root.value === undefined ? Theme.text4 : Theme.text
         }

@@ -14,7 +14,6 @@ Page {
     property var todos: []
     property var flows: []
     property var rules: []
-    property var cal: []
     property var live: []
     property string lastPush: ""
     property int dp: 0              // Do first's page
@@ -26,7 +25,6 @@ Page {
         falcon.call("todo.list", {}, function (ok, r) { page.todos = ok ? (r.todos || []).filter(function (t) { return !t.done }) : [] })
         falcon.call("flow.list", {}, function (ok, r) { page.flows = ok ? (r.flows || []) : [] })
         falcon.call("automation.board", {}, function (ok, r) { page.rules = ok ? (r.rules || []) : [] })
-        falcon.call("calendar.board", { days: 2 }, function (ok, r) { page.cal = ok ? (r.items || []) : [] })
         falcon.call("task.list", {}, function (ok, r) {
             var open = ok ? (r.tasks || []).filter(function (t) { return t.status !== "completed" }) : []
             page.tasks = open
@@ -61,18 +59,37 @@ Page {
     readonly property var urgent: Fleet.issues.filter(function (i) { return i.sev === "critical" || i.past })
     readonly property var rest: Fleet.issues.filter(function (i) { return !(i.sev === "critical" || i.past) })
     readonly property var verify: tasks.filter(function (t) { return t.verify })
+    // Today, as the concept fills it: open tasks by their final deadline, and your to-dos
+    readonly property var today: tasks.filter(function (t) { return t.final_deadline_at })
+        .map(function (t) { return { at: t.final_deadline_at, title: t.description_raw || t.title || "", line: (t.assignee_name || "someone") + "'s task",
+                                     overdue: Time.ms(t.final_deadline_at) < Time.now, to: ["tasks", t.id] } })
+        .concat(todos.map(function (t) { return { at: t.due_at, title: t.text, line: "your to-do", overdue: !!t.overdue, to: ["tasks", null] } }))
+        .sort(function (a, b) { return Time.ms(a.at) - Time.ms(b.at) })
 
     // one card per issue, as on Issues; kinds take turns, so Do first is not one kind five times. A button that names an
     // action does it here, after a confirm (the user, 2 Nov 2026); one that needs a judgement says Look and opens its page.
-    // Delete copy is offered only where the Engine can reach the machine, as on Issues.
+    // The button is the concept's: the issue's Delete copy, else its first decision that needs nothing more (Keep this,
+    // Keep waiting, Accept, Remind). Delete copy is offered only where the Engine can reach the machine, as on Issues.
     function quick(i) {
         var m = Fleet.byHost[i.host]
-        if (i.type === "file" && i.iid !== undefined && m && m.online)
-            return { act: "Delete copy", ask: { title: "Delete the copy on " + i.host + "?", text: "Deletes " + (i.subject || "the copy") + " from " + i.host + " only. The original is not touched.", ok: "Delete copy", danger: true },
-                     run: function (done) { falcon.call("issues.act", { issue_id: i.iid, key: "delete" }, done) }, said: "Deleting the copy on " + i.host }
+        function act(key, verb, title, text, said, danger) {
+            return { act: verb, ask: { title: title, text: text, ok: verb, danger: !!danger },
+                     run: function (done) { falcon.call("issues.act", { issue_id: i.iid, key: key }, done) }, said: said }
+        }
+        if (i.iid === undefined) return null
+        if (i.type === "file" && m && m.online)
+            return act("delete", "Delete copy", "Delete the copy on " + i.host + "?", "Deletes " + (i.subject || "the copy") + " from " + i.host + " only. The original is not touched.", "Deleting the copy on " + i.host, true)
+        if (i.type === "update")
+            return m && m.online ? act("idle", "Keep this", "Let " + i.host + " retry when it is idle?", "The default: the machine retries by itself in its next idle window.", i.host + " retries when it is idle")
+                                 : act("wait", "Keep waiting", "Retry when " + i.host + " is back online?", "The update runs as soon as " + i.host + " checks in again.", i.host + " retries when it is back")
+        if (i.type === "deviation" && m && m.online) return { act: "Enter " + i.host, enter: m }
+        if (i.type === "flow") {
+            var who = String(i.subject || "").split(" → ")[1] || "them"
+            return act("remind", "Remind", "Remind " + who + "?", "Sends the request again.", "Reminded " + who)
+        }
         return null
     }
-    readonly property var iconOf: ({ file: "fileprotect", update: "cloudupload", deviation: "warn", help: "message", flow: "branches" })
+    readonly property var iconOf: ({ file: "fileprotect", update: "cloudsync", deviation: "warning", help: "message", flow: "branches" })
     function issueItems(xs, hot) {
         var ks = [], out = []
         xs.forEach(function (i) { var g = ks.filter(function (k) { return k[0] === i.type })[0]; if (g) g[1].push(i); else ks.push([i.type, [i]]) })
@@ -81,19 +98,16 @@ Page {
                 var i = k[1][r]; if (!i) return
                 var q = page.quick(i)
                 out.push({ k: "i" + i.id, ic: page.iconOf[i.type] || "alert", hot: hot, t: i.subject || i.title, s: i.title + " · " + i.host,
-                           n: hot ? (i.past ? Time.age(i.at) + ", past its time" : "critical") : Time.age(i.at) + " old",
+                           n: hot ? (i.past ? Time.waitLen(i.age - i.target) + " past its time" : "critical") : Time.waitLen(i.target - i.age) + " left",
                            act: q ? q.act : "Look", quick: q, go: ["issues", "Issues opens with “" + (i.subject || i.title) + "” on " + i.host + " picked.", i.id] })
             })
         return out
     }
     readonly property var items: {
         var srcs = [issueItems(urgent, true),
-                    verify.filter(function (t) { return t.assigner_account_id === falcon.accountId })
-                          .map(function (t) { return { k: "t" + t.id, ic: "checksquare", hot: false, t: t.title, s: "Task · " + (t.assignee_name || "") + (t.hostname ? " on " + t.hostname : ""),
-                                                       n: "every target found; only you can close it", act: "Close it",
-                                                       quick: { ask: { title: "Close “" + t.title + "”?", text: "Every target was found. Closing it marks the task complete and tells " + (t.assignee_name || "the person it was for") + ".", ok: "Close it" },
-                                                                run: function (done) { falcon.call("task.verify", { task_id: t.id, outcome: "complete" }, done) }, said: "Closed “" + t.title + "”" },
-                                                       go: ["tasks", "Tasks opens with “" + t.title + "” picked.", t.id] } }),
+                    verify.map(function (t) { return { k: "t" + t.id, ic: "checksquare", hot: false, t: t.description_raw || t.title, s: "Task · " + (t.assignee_name || "") + (Fleet.byAccount(t.assignee_account_id) ? " on " + Fleet.byAccount(t.assignee_account_id).host : ""),
+                                                       n: "every target found; only you can close it", act: "Verify",
+                                                       go: ["tasks", "Tasks opens with " + (t.description_raw || t.title) + " picked.", t.id] } }),
                     issueItems(rest, false)]
         var out = []
         for (var r = 0; srcs.some(function (x) { return x.length > r }); r++) srcs.forEach(function (x) { if (x[r]) out.push(x[r]) })
@@ -106,12 +120,30 @@ Page {
     // what stopped running: flows that are not running cleanly, automations whose last run went wrong
     // a flow is named as Flows names it: its source folder and number, unless it was given a name
     function flowName(f) { return f.name || (String(f.source_path || "").split(/[\/]/).filter(function (x) { return x }).pop() || "flow") + "-" + f.id }
+    // the Admin whose workstation a machine is, by name
+    function adminAt(pc) {
+        for (var i = 0; i < Fleet.depts.length; i++)
+            for (var k = 0; k < (Fleet.depts[i].admins || []).length; k++)
+                if (Fleet.depts[i].admins[k].pc_id === pc) return Fleet.depts[i].admins[k].name
+        return ""
+    }
     function flowState(f) {
-        if (f.consent_status === "pending") return (f.destinations || []).some(function (d) { return d.let_them_choose }) ? "waits for an Admin to pick a folder" : "waits for an Admin to agree"
+        if (f.consent_status === "pending") {
+            var d0 = (f.destinations || []).filter(function (d) { return d.let_them_choose || d.destination_pc_id })[0]
+            var who = d0 ? page.adminAt(d0.destination_pc_id) || "an Admin" : "an Admin"
+            return d0 && d0.let_them_choose ? "waits for " + who + " to pick a folder" : "waits for " + who + " to agree"
+        }
         if (f.pause_reason === "restricted:consent") return "paused · a restricted file needs its owner's consent"
         if (f.status === "paused") return "paused"
         if ((f.destinations || []).some(function (d) { return !!d.paused_reason })) return "one destination paused"
         return ""
+    }
+    // a flow waiting for someone to pick a folder is reminded through its issue, as on Issues
+    function remindOf(f) {
+        if (f.consent_status !== "pending") return null
+        var who = page.flowState(f).replace(/^waits for /, "").replace(/ to .*$/, "")
+        return { act: "Remind", ask: { title: "Remind " + who + "?", text: "Sends the request again, with your name on it.", ok: "Remind" },
+                 run: function (done) { falcon.call("flow.remind", { flow_id: f.id }, done) }, said: "Reminded " + who }
     }
     readonly property var flowsOff: flows.filter(function (f) { return f.status !== "inactive" && flowState(f) !== "" })
     readonly property var flowsOn: flows.filter(function (f) { return f.status !== "inactive" && flowState(f) === "" })
@@ -190,7 +222,7 @@ Page {
                     required property var modelData
                     icon: "square"
                     title: modelData.text
-                    line: modelData.due_at ? "due " + Time.atDay(modelData.due_at) + (modelData.overdue ? ", past its date" : "") : "no date"
+                    line: modelData.due_at ? "due " + Time.at(modelData.due_at) + (modelData.overdue ? ", past its date" : "") : "no date"
                     lineHot: !!modelData.overdue
                     act: "Done"
                     onActed: falcon.call("todo.done", { todo_id: modelData.id, done: true }, function (ok, r) {
@@ -279,9 +311,11 @@ Page {
             sub: (page.flowsOff.length + page.rulesOff.length ? "only what has stopped or is stuck is listed; " : "")
                  + Theme.many(page.flowsOn.length, "flow") + " and " + Theme.many(page.rulesOn.length, "automation") + (page.rulesOn.length === 1 ? " is" : " are") + " running fine"
             Repeater {
-                model: page.flowsOff.map(function (f) { var s = page.flowState(f); return { ic: "branches", t: page.flowName(f), s: s, hot: s.indexOf("paused") >= 0, act: "Look",
-                                                                                     go: ["flows", "Flows opens with " + page.flowName(f) + " picked.", f.id] } })
-                       .concat(page.rulesOff.map(function (r) { return { ic: "thunderbolt", t: r.name, s: "its last run went wrong", hot: true, act: "Look",
+                // a flow waiting for someone is reminded here, through its issue; anything else is looked at on its page
+                model: page.flowsOff.map(function (f) { var s = page.flowState(f), q = page.remindOf(f)
+                                                        return { ic: "branches", t: page.flowName(f), s: s, hot: s.indexOf("paused") >= 0, act: q ? q.act : "Fix", quick: q,
+                                                                 go: ["flows", "Flows opens with " + page.flowName(f) + " picked.", f.id] } })
+                       .concat(page.rulesOff.map(function (r) { return { ic: "thunderbolt", t: r.name, s: String(r.last_run || "its last run went wrong").replace(/ success$/, " succeeded"), hot: true, act: "Look",
                                                                           go: ["automation", "Automation opens with " + r.name + " picked.", r.event_id] } }))
                 delegate: SuRow {
                     required property var modelData
@@ -290,7 +324,7 @@ Page {
                     line: modelData.s
                     lineHot: modelData.hot
                     act: modelData.act
-                    onActed: Nav.goAsk(modelData.go[0], null, modelData.go[1], modelData.go[2])
+                    onActed: modelData.quick ? page.doQuick(modelData.quick) : Nav.goAsk(modelData.go[0], null, modelData.go[1], modelData.go[2])
                     onOpen: Nav.goAsk(modelData.go[0], null, modelData.go[1], modelData.go[2])
                 }
             }
@@ -314,7 +348,7 @@ Page {
                          MouseArea { id: calA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Nav.go("calendar") } }
             DayStrip {
                 width: parent.width
-                items: page.cal
+                items: page.today
             }
         }
         Box {
@@ -353,6 +387,7 @@ Page {
     // --- do something, in one sentence --------------------------------------------------------------
     Confirm { id: confirm; page: page }
     function doQuick(q) {
+        if (q.enter) { page.enter(q.enter); return }
         confirm.ask(q.ask, function () { q.run(function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not done"); return }
             Msg.ok(q.said + " · recorded"); Fleet.refresh(); page.load()

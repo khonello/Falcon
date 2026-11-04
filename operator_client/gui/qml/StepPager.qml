@@ -11,10 +11,11 @@ Item {
     property int pageNo: 0                      // zero-based
     property int pages: 1
     property bool showCount: true
+    property string noun: ""                    // what is counted: "1 to 5 of 9 runs"
     signal step(int d)
     height: 6 + 22
 
-    Txt { visible: root.showCount; y: 6; height: 22; text: Theme.fmt(root.from) + " to " + Theme.fmt(root.to) + " of " + Theme.fmt(root.total); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+    Txt { visible: root.showCount; y: 6; height: 22; text: Theme.fmt(root.from) + " to " + Theme.fmt(root.to) + " of " + Theme.fmt(root.total) + (root.noun ? " " + root.noun : ""); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
     Row {
         anchors.right: parent.right
         y: 6

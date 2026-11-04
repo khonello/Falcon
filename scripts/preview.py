@@ -219,37 +219,7 @@ ANSWERS = {
     "control.action_create": {"action": {"id": 9}},
     "control.event_create": {"event": {"id": 9}},
     "control.event_update": {}, "control.event_delete": {},
-    "flow.list": {"flows": [
-        {"id": 1, "created_by_account_id": 7, "source_pc_id": 1, "source_hostname": "OPS-01", "source_path": "C:/work/payroll",
-         "status": "active", "pause_reason": None, "consent_status": "not_required",
-         "stages": [{"id": 1, "parent_stage_id": None, "stage_type": "transformation", "config": {"op": "Convert to PDF"}}],
-         "destinations": [
-             {"id": 1, "destination_pc_id": 11, "destination_hostname": "FIN-01", "parent_stage_id": 1,
-              "destination_path": "C:/shared/payroll", "suggestion": None,
-              "last_sync": {"synced_at": "2026-09-29T12:40:00+00:00"}}]},
-        {"id": 2, "created_by_account_id": 9, "source_pc_id": 7, "source_hostname": "OPS-07", "source_path": "C:/reports/weekly",
-         "status": "paused", "pause_reason": "destination:path_missing", "consent_status": "granted",
-         "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else.",
-         # a step before the split, and one on the branch to the archive only
-         "stages": [{"id": 2, "parent_stage_id": None, "stage_type": "categorization", "config": {"op": "Sort by file type", "by": "extension"}},
-                    {"id": 3, "parent_stage_id": 2, "stage_type": "transformation", "config": {"op": "Compress to ZIP"}}],
-         "destinations": [
-             {"id": 2, "destination_pc_id": 21, "destination_hostname": "LOG-01", "parent_stage_id": 2,
-              "destination_path": "D:/handover/weekly",
-              "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else.",
-              "last_sync": None},
-             {"id": 3, "destination_pc_id": None, "destination_hostname": None, "parent_stage_id": 3,
-              "destination_path": "//archive/weekly", "suggestion": None, "last_sync": None}]},
-        {"id": 4, "created_by_account_id": 8, "source_pc_id": 12, "source_hostname": "FIN-02", "source_path": "C:/Finance/Payroll",
-         "status": "paused", "pause_reason": "restricted:consent", "consent_status": "not_required",
-         "stages": [], "destinations": [
-             {"id": 5, "destination_pc_id": 1, "destination_hostname": "OPS-01", "destination_path": "D:/handover/payroll", "suggestion": None, "last_sync": None}]},
-        {"id": 3, "created_by_account_id": 7, "source_pc_id": 3, "source_hostname": "OPS-03", "source_path": "C:/intake",
-         "status": "paused", "pause_reason": "consent:pending", "consent_status": "pending",
-         "stages": [], "destinations": [
-             {"id": 4, "destination_pc_id": 12, "destination_hostname": "FIN-02",
-              "destination_path": "C:/intake", "suggestion": None, "last_sync": None}]},
-    ]},
+    "flow.list": {"flows": preview_data.flows()},
     "flow.pause": {}, "flow.resume": {}, "flow.delete": {},
     "flow.create": {"flow": {"id": 9}, "consent_pending": False, "collisions_confirmed": []},
     "task.list": {"tasks": [
@@ -360,10 +330,19 @@ def main() -> int:
                 print("preview: no object named", name)
                 return
             expr = QQmlExpression(engine.contextForObject(target), target, js)
-            expr.evaluate()
+            res = expr.evaluate()
             if expr.hasError():
                 print("preview --do:", expr.error().toString())
+            res = res[0] if isinstance(res, tuple) else res
+            if isinstance(res, str) and res:             # an expression that returns text: printed, for a measuring script
+                print("preview --do result:", res)
         QTimer.singleShot(int(sys.argv[sys.argv.index("--at") + 1]) if "--at" in sys.argv else 900, run_js)
+        if "--do2" in sys.argv:                   # a second script, later: to read what the first one changed once it is laid out
+            def run_js2() -> None:
+                nonlocal js
+                js = sys.argv[sys.argv.index("--do2") + 1]
+                run_js()
+            QTimer.singleShot(int(sys.argv[sys.argv.index("--at2") + 1]), run_js2)
     app.aboutToQuit.connect(loop.stop)       # qasync raises if the Qt loop stops under a pending await
 
     if not SHOT:
@@ -394,7 +373,7 @@ def main() -> int:
         print("saved", out, img.width(), img.height())
         loop.stop()
 
-    QTimer.singleShot(1800, grab)
+    QTimer.singleShot(int(sys.argv[sys.argv.index("--grab") + 1]) if "--grab" in sys.argv else 1800, grab)   # --grab <ms>: later, for a page that loads
     with loop:
         loop.run_forever()
     return 0

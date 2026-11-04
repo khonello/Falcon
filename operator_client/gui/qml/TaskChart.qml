@@ -45,6 +45,18 @@ Column {
                 "Watched through " + (host || "the machine") + "'s own file events, as they happen. Recognised by content, so a rename or a move does not lose it."]
     }
 
+    // what was seen of a target, in the concept's words, from its signs
+    function saw(it, sig) {
+        if (it.status === "failed") return "Not found by the final deadline"
+        if (!sig.length) return ""
+        var ts = sig.map(function (e) { return Time.ms(e.observed_at) }), first = Math.min.apply(null, ts), last = Math.max.apply(null, ts)
+        if (it.intent === "installed_available") return "Found " + Time.atDay(first)
+        if (it.intent === "create") return "Created " + Time.atDay(first)
+        if (it.intent === "exists") return "Present, last changed " + Time.atDay(last)
+        if (it.intent === "update") return "Saved " + Theme.many(sig.length, "time")
+        return "Used " + Time.atDay(last)
+    }
+
     // the marks' words across the top. Marks that fall within a few words of each other (a task given and started minutes ago has Started and
     // Now at the same place on a day-long clock) share one label, "Started · Now", instead of being written on top of each other
     readonly property var labels: {
@@ -62,8 +74,10 @@ Column {
             model: root.labels
             Txt {
                 required property var modelData
-                x: Math.max(0, Math.min(root.width - implicitWidth, modelData.x - (modelData.soft ? implicitWidth + 3 : implicitWidth / 2)))
-                text: modelData.text; color: modelData.color; font.pixelSize: 10; elide: Text.ElideNone
+                // as the concept anchors them: Soft and anything at the right end by its end, anything at the left end by its start
+                x: modelData.soft || modelData.x > root.width - 30 ? Math.min(root.width, modelData.x) - implicitWidth - (modelData.soft ? 3 : 0)
+                   : modelData.x < 30 ? modelData.x : modelData.x - implicitWidth / 2
+                text: modelData.text; color: modelData.color; font.pixelSize: 11; elide: Text.ElideNone
             }
         }
     }
@@ -77,33 +91,39 @@ Column {
             width: root.width
             topPadding: 10
             bottomPadding: 12
-            Row {
+            Item {
                 width: parent.width
-                spacing: 8
-                Icon { name: modelData.target_type === "program" ? "appstore" : /[\/\\]$/.test(root.nameOf(modelData)) ? "folder" : "file"; size: 14; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+                height: 20
+                Icon { name: modelData.target_type === "program" ? "appstore" : /[\/\\]$/.test(root.nameOf(modelData)) ? "folder" : "file"; size: 13; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
                 Txt {
-                    width: parent.width - 300
+                    x: 21
+                    width: parent.width - 21 - ends.width - 8
                     textFormat: Text.RichText
                     anchors.verticalCenter: parent.verticalCenter
                     text: "<span style='font-family:" + Theme.mono + ";font-weight:500'>" + root.nameOf(lane.modelData) + "</span>"
                           + (root.linked(lane.modelData) ? "<span style='color:" + Theme.text3 + "'> with </span><span style='font-family:" + Theme.mono + "'>" + root.linked(lane.modelData) + "</span>" : "")
                           + " <span style='color:" + Theme.text3 + "'>" + (root.want[lane.modelData.intent] || lane.modelData.intent) + "</span>"
                 }
+                Row {
+                    id: ends
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 8
                 Txt {
-                    width: 170
+                    width: Math.min(implicitWidth, 220)
                     visible: lane.st !== "pending"
                     color: Theme.text3; font.pixelSize: 12
-                    horizontalAlignment: Text.AlignRight
                     anchors.verticalCenter: parent.verticalCenter
-                    text: lane.sig.length ? Theme.many(lane.sig.length, "sign") + " of progress" : ""
+                    text: root.saw(lane.modelData, lane.sig)
                 }
                 Row {
                     spacing: 5
                     anchors.verticalCenter: parent.verticalCenter
                     Icon { name: lane.st === "passed" ? "check" : lane.st === "failed" ? "exclaim" : "minus"; size: 13
                            color: lane.st === "passed" ? Theme.text2 : lane.st === "failed" ? Theme.med : Theme.text4; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { text: lane.st === "passed" ? "Found" : lane.st === "failed" ? "Missing at the deadline" : "Not seen yet"; elide: Text.ElideNone; font.pixelSize: 12
+                    Txt { text: lane.st === "passed" ? "Found" : lane.st === "failed" ? "Missing at the deadline" : "Not seen yet"; elide: Text.ElideNone; font.pixelSize: 13
                           color: lane.st === "passed" ? Theme.text2 : lane.st === "failed" ? Theme.med : Theme.text4 }
+                }
                 }
             }
             Item { width: 1; height: 8 }
@@ -123,6 +143,12 @@ Column {
                     for (var k = 0; k < nb; k++) bins.push(0)
                     lane.sig.forEach(function (e) { var t = Time.ms(e.observed_at); if (t < root.a || t > root.end) return
                         bins[Math.min(nb - 1, Math.floor(((t - root.a) / (root.b - root.a)) * nb))] += 1 })
+                    // an installed program is there from when it was found on: the whole of that stretch is shaded
+                    if (lane.modelData.intent === "installed_available" && lane.sig.length) {
+                        var k0 = Math.floor(((Math.min.apply(null, lane.sig.map(function (e) { return Time.ms(e.observed_at) })) - root.a) / (root.b - root.a)) * nb)
+                        var k1 = Math.floor(((root.end - root.a) / (root.b - root.a)) * nb)
+                        for (var kk = Math.max(0, k0); kk < Math.min(nb, k1); kk++) bins[kk] = 1
+                    }
                     var mx = Math.max.apply(null, bins.concat([1]))
                     c.fillStyle = lane.modelData.target_type === "program" ? Theme.ser3 : Theme.ser2
                     for (var j = 0; j < nb; j++) if (bins[j] > 0) { c.globalAlpha = 0.25 + 0.75 * Math.min(1, bins[j] / mx); c.fillRect((j / nb) * w, 5, w / nb + 0.5, 12) }
@@ -155,11 +181,11 @@ Column {
                 return out
             }
             Txt { required property var modelData; x: Math.max(0, Math.min(root.width - implicitWidth, root.xAt(modelData, root.width) - implicitWidth / 2)); y: 4
-                  text: Time.sameDay(modelData, Time.now) ? "Today" : Time.dayName(modelData); mono: true; color: Theme.text3; font.pixelSize: 10; elide: Text.ElideNone }
+                  text: Time.sameDay(modelData, Time.now) ? "Today" : Time.dayName(modelData); mono: true; color: Theme.text3; font.pixelSize: 11; elide: Text.ElideNone }
         }
     }
     Row {
-        topPadding: 8
+        topPadding: 12
         spacing: 14
         Repeater {
             model: [[Theme.ser2, "file activity", false], [Theme.ser3, "program in real use", false], [Theme.text, "found", true]]
@@ -173,8 +199,8 @@ Column {
         topPadding: 14
         width: root.width
         spacing: 6
-        Rectangle { width: parent.width; height: 1; color: Theme.border }
-        Txt { topPadding: 8; text: "HOW THESE ARE MEASURED"; color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
+        Item { width: parent.width; height: 7; Rectangle { width: parent.width; height: 1; color: Theme.border } }
+        Txt { height: implicitHeight + 2; verticalAlignment: Text.AlignTop; text: "HOW THESE ARE MEASURED"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.DemiBold; font.letterSpacing: 0.69 }
         Repeater {
             model: {
                 if (!root.task) return []
@@ -187,7 +213,7 @@ Column {
                 width: root.width
                 spacing: 8
                 Icon { name: modelData.target_type === "program" ? "appstore" : "file"; size: 13; color: Theme.text3 }
-                Txt { width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 12; textFormat: Text.RichText
+                Txt { width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 13; textFormat: Text.RichText
                       text: "<span style='color:" + Theme.text2 + "'>" + (modelData.target_type === "program" ? "Programs" : "Files and folders") + ":</span> <span style='color:" + Theme.text3 + "'>" + root.measure(modelData)[1] + "</span>" }
             }
         }

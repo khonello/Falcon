@@ -26,17 +26,17 @@ Item {
             Nav.deptName = ds.length === 1 ? ds[0].name : ""
             Nav.count("machines", machines)
         })
-        // conversations with something unread (version 1, chat.list): the count pulses until they are read
-        falcon.call("chat.list", {}, function (ok, r) {
-            var n = ok ? (r.conversations || []).filter(function (c) { return c.unread > 0 }).length : 0
-            Nav.count("messages", n, true, n > 0)
-        })
-        falcon.call("resource.violations", {}, function (ok, r) {
-            var open = 0
-            if (ok) { var vs = r.violations || []; for (var i = 0; i < vs.length; i++) if (!vs[i].resolved_at) open++ }
-            Nav.count("restricted", open, true)
-            Nav.count("issues", open, true)
-        })
+        // conversations with something unread, and people asking to talk: the count pulses until they are seen
+        var unread = 0, asking = 0
+        var messages = function () { Nav.count("messages", unread + asking, true, unread + asking > 0) }
+        falcon.call("chat.list", {}, function (ok, r) { unread = ok ? (r.conversations || []).filter(function (c) { return c.unread > 0 }).length : 0; messages() })
+        falcon.call("chat.requests", {}, function (ok, r) { asking = ok ? (r.requests || []).length : 0; messages() })
+        // copies found of what you marked
+        falcon.call("marks.list", {}, function (ok, r) { Nav.count("restricted", ok && r.summary ? r.summary.copies : 0, true) })
+        // cases that are urgent and open
+        falcon.call("detective.overview", {}, function (ok, r) { Nav.count("detective", ok && r.by_level ? r.by_level.urgent : 0, true) })
+        // every issue still open
+        falcon.call("issues.list", {}, function (ok, r) { Nav.count("issues", ok ? (r.issues || []).length : 0, true) })
         falcon.call("task.list", {}, function (ok, r) {
             var n = 0
             if (ok) { var ts = r.tasks || []; for (var i = 0; i < ts.length; i++) if (ts[i].status !== "completed") n++ }
@@ -49,7 +49,7 @@ Item {
         function onConnected() { root.refresh() }
         function onScopeChanged() { root.refresh() }
         function onPushReceived(type, payload) {
-            if (/^(chat|assistance|task|resource|session|hierarchy|reports|pc\.presence|enroll)/.test(type)) refresh.restart()
+            if (/^(chat|assistance|task|resource|session|hierarchy|reports|pc\.presence|enroll|issues|marks|detective)/.test(type)) refresh.restart()
         }
     }
     Timer { id: refresh; interval: 300; onTriggered: root.refresh() }

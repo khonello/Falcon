@@ -51,6 +51,44 @@ Page {
     Connections { target: falcon; function onConnected() { page.load() } function onPushReceived(type, payload) { if (/^detective/.test(type)) again.restart() } }
     Timer { id: again; interval: 400; onTriggered: { page.load(); page.loadCase() } }
 
+    // a paragraph of the case told in words: the words, with each fact marked by its kind (dt-tell, .hl.ok)
+    readonly property var factColor: ({ person: Theme.ser1, file: Theme.ser2, time: Theme.ser5, program: Theme.ser3, machine: Theme.ser6 })
+    component Told: Flow {
+        id: tl
+        property var parts: []
+        // a word at a time, so the marks wrap with the text; what follows a fact without a space stays with it
+        readonly property var words: {
+            var out = []
+            parts.forEach(function (p) {
+                if (p.kind && page.factColor[p.kind]) { out.push({ t: p.text, c: page.factColor[p.kind], mono: p.kind === "file" || p.kind === "machine", tail: "" }); return }
+                var ws = String(p.text).match(/\S+\s*|\s+/g) || []
+                ws.forEach(function (w, i) {
+                    var last = out[out.length - 1]
+                    if (i === 0 && last && last.c !== undefined && !/^\s/.test(w)) last.tail = w
+                    else if (/^\s+$/.test(w) && last) last.tail += w
+                    else out.push({ t: w })
+                })
+            })
+            return out
+        }
+        Repeater {
+            model: tl.words
+            delegate: Row {
+                required property var modelData
+                height: 21.7
+                Rectangle {
+                    visible: modelData.c !== undefined
+                    width: fw.implicitWidth + 4; height: 20; y: 1; radius: 2
+                    color: visible ? Theme.alpha(modelData.c, 0.18) : "transparent"
+                    Rectangle { visible: parent.visible; anchors.bottom: parent.bottom; width: parent.width; height: 2; color: modelData.c !== undefined ? modelData.c : "transparent" }
+                    Txt { id: fw; x: 2; anchors.verticalCenter: parent.verticalCenter; text: modelData.t; mono: !!modelData.mono; font.pixelSize: modelData.mono ? 13 : 14; elide: Text.ElideNone }
+                }
+                Txt { visible: modelData.c === undefined || modelData.tail !== ""; height: 21.7; verticalAlignment: Text.AlignVCenter; text: modelData.c === undefined ? modelData.t : modelData.tail; font.pixelSize: 14; elide: Text.ElideNone; textFormat: Text.PlainText; wrapMode: Text.NoWrap }
+            }
+        }
+    }
+
+    function openFor(c) { var h = (Time.now - Time.ms(c.last_at)) / 3600000; return h < 1 ? Math.max(1, Math.round(h * 60)) + "m" : h < 48 ? Math.round(h) + "h" : Math.round(h / 24) + " days" }
     component Head: Txt { color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66; elide: Text.ElideNone }
     readonly property var levelWord: ({ urgent: "Urgent", "case": "Case", noted: "Noted" })
     function levelTint(l) { return l === "urgent" ? Theme.crit : l === "case" ? Theme.med : Theme.text3 }
@@ -84,7 +122,7 @@ Page {
     function loadRules() { falcon.call("detective.rules", {}, function (ok, r) { page.okRules = ok ? (r.rules || []) : [] }) }
     Timer { running: true; interval: 10; onTriggered: page.loadRules() }
     readonly property var okWord: ({ drive_after_staging: "files copied onto it are not counted", mass_removal: "files it removes in bulk are not counted", many_zipped: "files packed together here are not counted" })
-    readonly property var okIcon: ({ drive: "download", program: "appstore", folder: "folder" })
+    readonly property var okIcon: ({ drive: "usb", program: "appstore", folder: "folder" })
 
     Row {
         width: parent.width
@@ -108,12 +146,12 @@ Page {
                         required property var modelData
                         objectName: "case_" + modelData.id
                         width: parent.width
-                        midW: 200
+                        midW: 237
                         actW: 150
                         padV: 7
                         icon: "filesearch"
                         title: modelData.intent
-                        line: page.stand(modelData) + (page.cur && page.cur.id === modelData.id && page.gl && page.gl.restricted ? " · restricted files involved" : "")
+                        line: page.stand(modelData) + (modelData.restricted || (page.cur && page.cur.id === modelData.id && page.gl && page.gl.restricted) ? " · restricted files involved" : "")
                         picked: page.cur !== null && page.cur.id === modelData.id
                         expandable: true
                         expanded: page.exp === modelData.id
@@ -155,6 +193,7 @@ Page {
             StepPager {
                 visible: caseP.pages > 1
                 width: parent.width
+                noun: "cases"
                 from: caseP.pi * page.per + 1
                 to: Math.min(page.cases.length, caseP.pi * page.per + page.per)
                 total: page.cases.length
@@ -170,7 +209,7 @@ Page {
             objectName: "casePanel"
             width: (parent.width - 14) * 4 / 12
             title: "At a glance"
-            sub: page.cur ? page.cur.intent + " on " + page.cur.host : "pick a case on the left"
+            sub: page.cur ? page.cur.intent + " on <font face='" + Theme.mono + "'>" + page.cur.host + "</font>" : "pick a case on the left"
             readonly property var m: page.cur ? Fleet.byHost[page.cur.host] || null : null
             Quiet { visible: page.cur === null; text: "Pick a case on the left." }
             Column {
@@ -178,14 +217,14 @@ Page {
                 width: parent.width
                 Repeater {
                     model: !page.cur ? [] : [
-                        ["aim", page.stand(page.cur), page.gl && page.gl.next_stage ? "no further yet; next would be " + (page.nextSaid[page.gl.next_stage] || page.gl.next_stage.toLowerCase()) : page.cur.stage_name ? "it went all the way" : "nothing came of it after that"],
+                        ["flag", page.stand(page.cur), page.gl && page.gl.next_stage ? "no further yet; next would be " + (page.nextSaid[page.gl.next_stage] || page.gl.next_stage.toLowerCase()) : page.cur.stage_name ? "it went all the way" : "nothing came of it after that"],
                         ["lock", page.gl && page.gl.restricted ? "Restricted files are involved" : "No restricted files involved", page.gl && page.gl.restricted ? "they need their owner's consent to leave" : "what was touched is ordinary"],
                         ["user", page.gl && page.gl.signed_in_then && page.gl.signed_in_then.length ? page.gl.signed_in_then.map(function (s) { return s.name || "someone" }).join(", ") : glance.m && glance.m.user ? glance.m.user : "Nobody signed in",
                          (glance.m && glance.m.deptName ? glance.m.deptName + " · " : "") + "signed in on " + page.cur.host + " at the time"],
                         ["desktop", page.cur.host, glance.m ? (glance.m.online ? "on now" + (glance.m.user ? ", " + glance.m.user + " signed in" : "") : "off, last seen " + (glance.m.seen ? Time.age(glance.m.seen) + " ago" : "a while ago")) : ""],
                         ["history", page.gl && page.gl.earlier && page.gl.earlier.length ? Theme.many(page.gl.earlier.length, "earlier case") + " on this machine" : "The first case on this machine",
                          page.gl && page.gl.earlier && page.gl.earlier.length ? Theme.listNames(page.gl.earlier.map(function (e) { return e.intent.toLowerCase() + " (" + e.outcome + ")" }), 2) : "nothing before this"],
-                        ["clock", "Open for " + Time.age(page.cur.first_at), "raised at " + Time.hhmm(page.gl && page.gl.raised_at ? page.gl.raised_at : page.cur.first_at) + (page.cur.status === "open" ? "; nobody has answered yet" : "")]]
+                        ["clock", "Open for " + page.openFor(page.cur), "raised at " + Time.hhmm(page.gl && page.gl.raised_at ? page.gl.raised_at : page.cur.last_at) + (page.cur.status === "open" ? "; nobody has answered yet" : "")]]
                     delegate: Item {
                         required property var modelData
                         required property int index
@@ -215,7 +254,7 @@ Page {
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, stepP.implicitHeight)
             title: "What happened"
-            sub: page.cur ? page.cur.intent + " on " + page.cur.host + ", " + Time.hhmm(page.cur.first_at) + " to " + Time.hhmm(page.cur.last_at) + "; each connection carries its step's number" : ""
+            sub: page.cur ? page.cur.intent + " on <font face='" + Theme.mono + "'>" + page.cur.host + "</font>, " + Time.hhmm(page.cur.first_at) + " to " + Time.hhmm(page.cur.last_at) + "; each connection carries its step's number" : ""
             Item {
                 width: parent.width
                 height: Math.min(460, Math.max(220, graph.implicitHeight + 8))
@@ -228,6 +267,15 @@ Page {
                     boundsBehavior: Flickable.StopAtBounds
                     CaseGraph { id: graph; x: 0; y: 0; story: page.cur ? page.cur.story : []; graph: page.det ? page.det.graph : ({ nodes: [], edges: [] }) }
                 }
+            }
+            // wider than its box: it says so (dg-hint)
+            Row {
+                parent: whatP
+                x: 17; y: whatP.height - 37
+                visible: graph.implicitWidth > whatP.innerW
+                spacing: 6
+                Icon { name: "drag"; size: 12; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
+                Txt { text: "drag to move around the picture"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
             }
             Loading { parent: whatP; on: page.loading && page.cur !== null; under: whatP.headerHeight }
             Pulse { parent: whatP; key: page.pickedId || null }
@@ -270,22 +318,23 @@ Page {
         visible: !!page.cur
         width: parent.width
         title: "What Detective noticed"
-        sub: "what went on, from what Detective found"
+        readonly property var told: page.det && page.det.telling ? page.det.telling : null
+        sub: told && told.smoothed ? "what went on, in the local model's words" : "what went on, from what Detective found"
         Column {
             width: parent.width
             spacing: 10
             Repeater {
-                model: page.det && page.det.findings && page.det.findings.length ? page.det.findings : (page.cur ? [{ summary: page.cur.headline }] : [])
-                Txt { required property var modelData; width: parent.width; text: modelData.summary + (/[.!?]$/.test(modelData.summary) ? "" : ".") + (modelData.innocent ? " Harmless if " + modelData.innocent.charAt(0).toLowerCase() + modelData.innocent.slice(1) + "." : "")
-                      font.pixelSize: 14; lh: 1.55; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                model: page.det && page.det.telling ? page.det.telling.paragraphs : []
+                Told { required property var modelData; width: parent.width; parts: modelData }
             }
+            Txt { visible: !page.det || !page.det.telling; width: parent.width; text: page.cur ? page.cur.headline : ""; font.pixelSize: 14; lh: 1.55; wrapMode: Text.WordWrap; elide: Text.ElideNone }
         }
         Column {
             width: parent.width
             topPadding: 10
             spacing: 12
             Rectangle { width: parent.width; height: 1; color: Theme.grid }
-            Txt { width: parent.width; text: "Each is a reading of the evidence, not proof."; color: Theme.text3; font.pixelSize: 12 }
+            Txt { width: parent.width; text: page.det && page.det.telling && page.det.telling.note ? page.det.telling.note : "It is a reading of the evidence, not proof."; color: Theme.text3; font.pixelSize: 12 }
         }
     }
 

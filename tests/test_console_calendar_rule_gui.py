@@ -29,7 +29,7 @@ ITEMS = [
     {"kind": "task", "at": _at(1, 16), "title": "Prepare the stock count", "line": "Finance", "to": ["tasks", "D-13"], "overdue": False},
     {"kind": "announcement", "at": _at(1, 8), "title": "Fire drill on Friday", "line": "Your department", "to": ["messages", "announcements"], "overdue": False},
     {"kind": "rule", "at": _at(2, 9), "title": "Daily maintenance", "line": "2 actions", "to": ["automation", "4"], "overdue": False},
-    {"kind": "announcement", "at": _at(45, 8), "title": "Year-end training week", "line": "Your department", "to": ["messages", "announcements"], "overdue": False},
+    {"kind": "rule", "at": _at(45, 8), "title": "Year-end training week", "line": "Your department", "to": ["automation", "4"], "overdue": False},
 ]
 
 

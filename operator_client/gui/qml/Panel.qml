@@ -11,6 +11,7 @@ Rectangle {
     property string sub: ""
     property bool flush: false
     property int pad: 14
+    property int padTop: pad
     default property alias content: body.data
     property alias extra: extraRow.data
     readonly property alias bodyItem: body
@@ -22,7 +23,7 @@ Rectangle {
     radius: Theme.radius
     border.width: 1
     border.color: Theme.border
-    implicitHeight: headerHeight + (fill ? 0 : body.childrenRect.height + (flush ? 0 : 2 * pad)) + 2
+    implicitHeight: headerHeight + (fill ? 0 : body.childrenRect.height + (flush ? 0 : padTop + pad)) + 2
     clip: true
 
     Item {
@@ -30,7 +31,7 @@ Rectangle {
         visible: root.title !== "" || extraRow.children.length > 0
         x: 1; y: 1
         width: parent.width - 2
-        height: visible ? Math.max(40, extraRow.implicitHeight + 12) : 0
+        height: visible ? Math.max(40, extraRow.implicitHeight + 13) : 0
 
         Row {
             id: titles
@@ -68,7 +69,7 @@ Rectangle {
     Item {
         id: body
         x: root.flush ? 1 : root.pad
-        y: head.height + 1 + (root.flush ? 0 : root.pad)
+        y: head.height + 1 + (root.flush ? 0 : root.padTop)
         width: root.width - 2 * x
         height: root.fill ? root.height - y - (root.flush ? 1 : root.pad) : childrenRect.height
     }

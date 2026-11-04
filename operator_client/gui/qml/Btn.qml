@@ -16,28 +16,29 @@ Button {
     property bool loading: false
     property string tip: ""
     property bool iconRight: false
+    property bool headed: false             // in a box's header the concept's words are the header's own: 12px, text-3
 
     readonly property color accent: danger ? Theme.crit : Theme.accent
     readonly property bool filled: kind === "primary" && !ghost
     readonly property bool bare: kind === "text" || kind === "link"
     readonly property color ink: filled ? Theme.inverse
-                                : kind === "link" || ghost ? accent
-                                : danger ? Theme.crit : Theme.text
+                                : kind === "link" ? (danger ? Theme.crit : Theme.link) : ghost ? accent
+                                : danger ? Theme.crit : headed ? Theme.text3 : Theme.text
 
     implicitHeight: small ? Theme.controlSm : Theme.control
-    implicitWidth: circle ? implicitHeight
-                   : row.implicitWidth + (bare ? (small ? 8 : 12) : 2 * (small ? 7 : 15))   // antd: 7px a side small, 15px
+    implicitWidth: circle || (text === "" && iconName !== "") ? implicitHeight     // antd: an icon alone is a square
+                   : row.implicitWidth + 2 * (small ? 7 : 15)   // antd: 7px a side small, 15px, text buttons too
     hoverEnabled: true
     focusPolicy: Qt.TabFocus
     // disabled, as antd draws it: a faint grey fill and border, the words at a quarter of the ink
-    readonly property color offInk: Theme.alpha(Theme.text, 0.25)
+    readonly property color offInk: Theme.textOff
 
     background: Rectangle {
         radius: root.circle ? height / 2 : Theme.radiusSm
-        color: !root.enabled ? (root.bare ? "transparent" : Theme.alpha(Theme.text, 0.08))
+        color: !root.enabled ? (root.bare ? "transparent" : Theme.fillOff)
                : root.filled ? (root.pressed ? Qt.darker(root.accent, 1.15)
                               : root.hovered ? Qt.lighter(root.accent, 1.1) : root.accent)
-               : root.bare ? (root.hovered && root.kind === "text" ? Theme.surface3 : "transparent")
+               : root.bare ? (root.hovered && root.kind === "text" ? Theme.fillHover : "transparent")
                : root.ghost ? (root.hovered ? Theme.accentSoft : "transparent")
                : (root.pressed ? Theme.surface3 : Theme.surface)
         border.width: root.bare || (root.filled && root.enabled) ? 0 : 1
@@ -54,12 +55,12 @@ Button {
         Row {
             id: row
             anchors.centerIn: parent
-            spacing: 6
+            spacing: 8
             layoutDirection: root.iconRight ? Qt.RightToLeft : Qt.LeftToRight
             Icon {
                 visible: root.iconName !== "" || root.loading
                 name: root.loading ? "loading" : root.iconName
-                size: root.small ? 13 : 14
+                size: 13
                 color: root.enabled ? root.ink : root.offInk
                 anchors.verticalCenter: parent.verticalCenter
                 RotationAnimator on rotation {
@@ -70,10 +71,10 @@ Button {
                 visible: root.text !== "" && !root.circle
                 text: root.text
                 anchors.verticalCenter: parent.verticalCenter
-                font.pixelSize: Theme.fBody
+                font.pixelSize: root.headed ? 12 : Theme.fBody
                 font.weight: Font.Normal
                 color: !root.enabled ? root.offInk
-                       : root.hovered && !root.filled && !root.danger && root.kind !== "link" && !root.ghost
+                       : root.hovered && !root.filled && !root.danger && !root.bare && !root.ghost
                        && root.enabled ? root.accent : root.ink
                 elide: Text.ElideNone
             }

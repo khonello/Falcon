@@ -13,6 +13,7 @@ Column {
     property bool expired: false
     property string image: ""
     property bool loaded: false
+    property bool wide: false                 // the whole of it, at the width it is given (the output window)
     spacing: 8
 
     onExecutionIdChanged: load()
@@ -38,15 +39,15 @@ Column {
     Column {
         visible: root.image !== ""
         spacing: 4
-        Image { source: root.image; width: 240; fillMode: Image.PreserveAspectFit; smooth: true }
-        Txt { text: "Only Admins can see it; every view is recorded."; color: Theme.text3; font.pixelSize: 12; width: 360; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+        Image { source: root.image; width: root.wide ? root.width : 240; fillMode: Image.PreserveAspectFit; smooth: true }
+        Txt { visible: !root.wide; text: "Only Admins can see it; every view is recorded."; color: Theme.text3; font.pixelSize: 12; width: 360; wrapMode: Text.WordWrap; elide: Text.ElideNone }
     }
     // a list
     Rectangle {
         visible: root.rows.length > 0 && root.image === ""
-        width: Math.min(420, root.width)
+        width: root.wide ? root.width : Math.min(420, root.width)
         height: lc.height
-        radius: 5
+        radius: root.wide ? 8 : 5
         color: "transparent"
         border.width: 1
         border.color: Theme.border
@@ -58,7 +59,7 @@ Column {
                         Txt { x: 10; anchors.verticalCenter: parent.verticalCenter; text: root.cols[0] || "Item"; color: Theme.text3; font.pixelSize: 11 }
                         Txt { anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; text: root.cols[1] || ""; color: Theme.text3; font.pixelSize: 11 } }
             Repeater {
-                model: root.rows.slice(0, 8)
+                model: root.wide ? root.rows : root.rows.slice(0, 8)
                 Rectangle {
                     required property var modelData
                     width: lc.width; height: 26; color: "transparent"
@@ -68,23 +69,23 @@ Column {
                     Txt { anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; text: String(parent.a[1] === undefined ? "" : parent.a[1]); mono: true; color: Theme.text3; font.pixelSize: 12 }
                 }
             }
-            Txt { visible: root.rows.length > 8; x: 10; topPadding: 4; bottomPadding: 4; text: "+" + (root.rows.length - 8) + " more"; color: Theme.text3; font.pixelSize: 12 }
+            Txt { visible: !root.wide && root.rows.length > 8; x: 10; topPadding: 4; bottomPadding: 4; text: "+" + (root.rows.length - 8) + " more"; color: Theme.text3; font.pixelSize: 12 }
         }
     }
     // text
     Rectangle {
         visible: root.loaded && root.rows.length === 0 && root.image === ""
         width: root.width
-        height: Math.min(160, pre.implicitHeight + 16)
-        radius: 5
+        height: root.wide ? pre.implicitHeight + 28 : Math.min(160, pre.implicitHeight + 16)
+        radius: root.wide ? 8 : 5
         color: Theme.surface2
         clip: true
         Txt {
             id: pre
-            x: 10; y: 8
-            width: parent.width - 20
+            x: root.wide ? 16 : 10; y: root.wide ? 14 : 8
+            width: parent.width - 2 * x
             mono: true
-            font.pixelSize: 12
+            font.pixelSize: root.wide ? 13 : 12
             wrapMode: Text.WrapAnywhere
             elide: Text.ElideNone
             text: root.lines.length ? root.lines.join("\n") : (root.ex && root.ex.summary ? root.ex.summary : "Finished with no output.")

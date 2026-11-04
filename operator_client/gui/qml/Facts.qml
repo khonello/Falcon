@@ -16,7 +16,7 @@ Column {
             required property var modelData
             required property int index
             width: root.width
-            height: v.implicitHeight + 16
+            height: v.implicitHeight + 16 + (index < root.rows.length - 1 ? 1 : 0)
             Txt { y: 8 + v.children[0].baselineOffset - baselineOffset; width: root.labelW; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone; wrapMode: Text.WordWrap }
             Column {
                 id: v
@@ -24,7 +24,7 @@ Column {
                 width: root.width - x
                 spacing: 1
                 Txt { width: parent.width; text: modelData[1] === undefined || modelData[1] === null ? "" : String(modelData[1]); font.weight: Font.DemiBold; mono: root.mono }
-                Txt { visible: !!modelData[2]; width: parent.width; text: modelData[2] || ""; color: modelData[3] ? Theme.crit : Theme.text3; font.pixelSize: 12 }
+                Txt { visible: !!modelData[2]; width: parent.width; lh: 1.4375; text: modelData[2] || ""; color: modelData[3] ? Theme.crit : Theme.text3; font.pixelSize: 12 }
             }
             Rectangle { visible: index < root.rows.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
         }

@@ -18,10 +18,10 @@ Item {
     width: 104
     height: 8
     Rectangle { anchors.fill: parent; radius: 4; color: Theme.mix(Theme.surface3, Theme.text4, 0.70) }
-    Rectangle { width: Math.min(root.pos, root.at) * root.width; height: parent.height; radius: 4; color: root.took ? Theme.text4 : Theme.text3
-                Rectangle { anchors.right: parent.right; width: Math.min(4, parent.width); height: parent.height; color: parent.color; visible: root.pos > root.at } }
+    Rectangle { width: Math.min(root.pos, root.at) * root.width; height: parent.height; color: root.took ? Theme.text4 : Theme.text3
+                topLeftRadius: 4; bottomLeftRadius: 4 }
     Rectangle { visible: root.pos > root.at; x: root.at * root.width; width: (root.pos - root.at) * root.width; height: parent.height; color: root.took ? Theme.text4 : Theme.crit
-                radius: 4; Rectangle { width: Math.min(4, parent.width); height: parent.height; color: parent.color } }
+                topRightRadius: 4; bottomRightRadius: 4 }
     Rectangle { x: root.width / 2 - 1; y: -3; width: 2; height: parent.height + 6; radius: 1; color: Theme.text2 }
     Rectangle { visible: root.soft > root.given && root.soft < root.final_; x: (root.soft - root.given) / root.span * root.at * root.width; y: -2; width: 1; height: parent.height + 4; color: Theme.med }
     Txt { visible: root.r * root.at > 1; x: root.width - 2; y: -9; text: "›"; font.pixelSize: 13; font.weight: Font.DemiBold; color: Theme.crit; elide: Text.ElideNone }

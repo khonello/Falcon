@@ -322,6 +322,48 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - **Worker service** (seen in the test run, not a UI matter): `worker_client/winnotify.py:112` (`_window_thread`) takes a Windows
      access violation during `tests/test_worker_client.py`; the tests still pass.
 
+23. **What the console now calls that the Engine must answer (the user, 3-4 Nov 2026: "build exactly as the concept says, no compromises,
+    just put into the engine docs that it needs to cover this so that session handles it").** The QML is built to the concept with these
+    controls live, not disabled: until a handler exists, the button fails with the Engine's "unknown request" message. This replaces
+    the "drawn disabled" lines of #20 and #22 for these items. Names are the QML's; change them with the UI session if another name is better.
+   - **Any Admin verifies a task.** The concept gives every Admin Verify on Overview and Complete / Incomplete on Tasks, on tasks other
+     Admins gave ("Only you close it"). `task.verify` must accept any Admin in version 1. **This changes an invariant** ("only manual
+     verification by the assigner closes a task"): CLAUDE.md and `task-natural-combo.md` need the same change, confirmed with the user.
+   - `task.remind {task_id}`: Remind on a late task.
+   - **Requests to talk** (the rest of #19): `chat.requests {}` -> `{requests: [{id, from, account_id, host, at, line}]}`,
+     `chat.request_accept {request_id}` -> `{conversation}`, `chat.request_close {request_id, why}`. The Messages section appears once
+     `chat.requests` answers. (Correction: only a Worker writing back is built; a Worker asking is not.)
+   - **Small groups:** `chat.open` with several people, and a group of them; today only the group of every Admin exists.
+   - `issues.list` carries each issue's `detail` (a file issue's card says "in C:\\Users\\Ama\\Documents"; it is only on `issues.get`).
+   - `issues.act` key `rule`: "Delete this every time from now on": fixes this one and makes the Automation rule.
+   - **The file play in the concept's words:** no `ask` option (the QML hides it), `delete` resolves the issue; the timeline's second line is
+     "Report written; every Admin sees it, and any of them may act on it" and the raised line "<type label> raised on <host>: <subject>".
+   - `flow.remind {flow_id}`: remind whoever must pick a folder, for every waiting flow (today only through a flow issue).
+   - `flow.keep {flow_id, path, keep: "new" | "both"}`: settle a file kept beside.
+   - `flow.start {flow_id}`: start a stopped flow again.
+   - `flow.list`: `sources[k].pause_reason` and `paused_at` (one source of several gone, the rest still go), each flow's `created_at`,
+     each destination's `owner_account_id`; "A destination is off" reads the Admin's workstation from `hierarchy.tree`.
+   - `update.now {pc_id}`: Update now on a machine behind on the version.
+   - `machines.end_program {pc_id, name}`: End on a running program, then a notice on the person's screen.
+   - `machines.get`: eight days of `check_ins` (the concept's week has eight columns; it sends seven).
+   - `automation.run_again {event_id, at}` and `automation.skip {event_id, at}`.
+   - `automation.board`'s `last_run` should say "20 succeeded", not "20 success" (the QML rewrites it for now).
+   - `marks.allow_revoke {mark_id, allowance_id}`: Take it back on an allowed copy (`marks.get`'s `allowed` carries `allowance_id`).
+   - **Rules:** `automation.skip {event_id, at, undo?}`, and `coming_up[k].skipped`, so a skip shows after a reload. `control.event_history`'s firings need
+     `detail` (the sentence "Samsung BAR Plus 128 GB inserted", where `subject` is only a name) and `by_hand: true` for a rule run by hand, which the week's bars count apart.
+     The rule sentence needs two more kinds of start, `printer.offline` ("a shared printer stops responding") and `threshold.signin` {count, window_s}
+     ("5 sign-ins fail within 10 minutes"). The concept says only a rule's maker runs, edits or skips it ("only A. Quaye changes it"): `control.event_update`,
+     `control.event_test` and `automation.skip` should refuse anyone else, and `control.event_list` must keep `created_by_account_id`.
+   - **Actions:** `control.action_list` needs `impact` (the line after the description, "Users are not interrupted..."), `risky` (the red Run button) and
+     `created_by_name` on a custom action. `actions.runs` needs `who` for a run by hand ("You" for the asker), which also groups one run across machines.
+   - **Restricted:** `marks.get`'s `lately` needs `who` and `where` beside `what` ("Ama copied it to OPS-07"). `flows_allowed` needs `flow` (its name), `what`, `from`, `to`,
+     `today` and `last_at`; `flow.restricted_waiting` needs `what`, `from` and `to`.
+   - **Detective:** `detective.cases` rows need `restricted`, so every card can say "restricted files involved" (today only `detective.case`'s glance has it).
+     The concept says "in the local model's words" and "Written by the local model": the page says so only when `telling.smoothed` is true, and with `SMOOTHING` off it
+     says "from what Detective found" with the Engine's own `note`. Either the concept or `SMOOTHING` has to change for the two to agree.
+   - **The concept itself still shows "Sort by file type" and "sort"** in Flows, which `flow.steps` dropped on 3 Nov: the concept needs that change
+     before the QML follows it.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

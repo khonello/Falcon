@@ -47,8 +47,41 @@ Page {
     property string q: ""
     property int ap: 0
     readonly property int per: 8
-    function worth(x) { return ["violation", "deviation", "action", "admin", "report"].indexOf(x.kind) >= 0 || (x.kind === "session" && !/^Signed (in|out)/.test(x.what)) }
-    readonly property var listed: base.filter(function (x) {
+    function worth(x) { return x.kind === "violation" || x.kind === "deviation" || !!x.visit || / notified |^Created flow| failed | left for an Admin/.test(x.what) }
+    readonly property var says: ({ session: "someone went into or out of a machine", action: "an action ran", flow: "a flow moved files", rollout: "an update", update: "an update",
+                                   deviation: "something did not match what it should be", violation: "a restricted file was found where it should not be" })
+    function dayWord(t) { var d = Math.round((Time.startOfDay(Time.now) - Time.startOfDay(t)) / 86400000); return d === 0 ? "Today" : d === 1 ? "Yesterday" : Time.dayName(t) }
+    function whoSay(a) {
+        if (a === "System" || a === "Automation") return "Falcon itself"
+        if (a === "You") return "you"
+        var m = Fleet.machines.filter(function (x) { return x.user === a })[0]
+        return m ? "works on " + m.host : Fleet.depts.some(function (d) { return (d.admins || []).some(function (y) { return y.name === a }) }) ? "IT Admin" : "a person"
+    }
+    function machineSay(h) {
+        var m = Fleet.byHost[h]
+        if (!m) return ""
+        return m.deptName + " · " + (m.online ? "on now" + (m.user ? ", " + m.user + " signed in" : "") : "off, last seen " + Time.dur((Time.now - Time.ms(m.seen)) / 3600000) + " ago")
+    }
+    function working(t) { var d = new Date(t), h = d.getHours() + d.getMinutes() / 60; return d.getDay() !== 0 && d.getDay() !== 6 && h >= 8 && h < 17.5 }
+    // the log as entries, newest first: a visit (entered, then left) is one entry with its length, never an "entered" and a "left"
+    readonly property var entries: {
+        var xs = base.slice().sort(function (a, b) { return a.t - b.t }), out = [], used = {}
+        xs.forEach(function (e, i) {
+            if (used[i]) return
+            var m = /^Entered (\S+)( \(outside working hours\))?$/.exec(e.what)
+            if (m) {
+                var j = -1
+                for (var k = i + 1; k < xs.length; k++) if (xs[k].actor === e.actor && (xs[k].what === "Left " + m[1] || /^Entered /.test(xs[k].what))) { j = k; break }
+                if (j >= 0 && xs[j].what === "Left " + m[1]) used[j] = true
+                out.push(Object.assign({}, e, { visit: true, what: j >= 0 ? "Inside " + m[1] + " for " + Time.dur((xs[j].t - e.t) / 3600000) : "Inside " + m[1] + " now", odd: !!m[2] || !page.working(e.t), end: j >= 0 ? xs[j].t : null }))
+                return
+            }
+            if (/^Left /.test(e.what)) return
+            out.push(Object.assign({}, e, { what: e.what.replace(/ \(outside working hours\)$/, ""), odd: /outside working hours/.test(e.what) }))
+        })
+        return out.reverse()
+    }
+    readonly property var listed: entries.filter(function (x) {
         return (page.everything || page.worth(x)) && (!page.brush || (x.t >= page.brush[0] && x.t < page.brush[1]))
             && (x.what + " " + x.actor + " " + x.host).toLowerCase().indexOf(page.q.toLowerCase()) >= 0
     })
@@ -61,9 +94,10 @@ Page {
     property string pickedId: ""
     onCurChanged: pickedId = cur ? cur.rid : ""
     situation: {
-        var w = base.filter(page.worth), v = base.filter(function (x) { return x.kind === "violation" }).length
-        return Theme.many(base.length, "thing") + " recorded in the last " + Nav.range + "; " + Theme.fmt(w.length) + " worth a look."
-               + (v ? " " + Theme.many(v, "restricted copy", "restricted copies") + " found." : "") + " Kept for 90 days."
+        if (!base.length) return "Nothing was recorded in this period."
+        var w = entries.filter(page.worth), v = entries.filter(function (x) { return x.kind === "violation" }).length, odd = entries.filter(function (x) { return x.visit && x.odd })
+        var says = [v ? Theme.fmt(v) + " restricted cop" + (v === 1 ? "y" : "ies") + " found" : "", odd.length ? Theme.fmt(odd.length) + " visit" + (odd.length === 1 ? "" : "s") + " outside working hours (" + Theme.listNames(odd.slice(0, 2).map(function (x) { return x.actor + ", " + x.host }), 2) + ")" : ""].filter(function (s) { return s }).join(", ")
+        return Theme.fmt(base.length) + " things recorded in the last " + Nav.range + "; " + Theme.fmt(w.length) + " worth a look. " + (says || "Nothing out of the ordinary") + ". Kept for 90 days."
     }
     situationAt: Time.now
 
@@ -80,7 +114,7 @@ Page {
             sub: "newest first; click one to see it on the right"
             Item {
                 width: parent.width
-                height: tools.height + 2
+                height: tools.height + 12
                 Row {
                     id: tools
                     spacing: 10
@@ -99,7 +133,7 @@ Page {
                     width: listP.innerW
                     spaced: index > 0
                     cardGap: 5
-                    title: Time.sameDay(modelData, Time.now) ? "Today" : Time.dayName(modelData) + " " + Time.day(modelData)
+                    title: page.dayWord(modelData)
                     Repeater {
                         model: page.pageRows.filter(function (x) { return Time.startOfDay(x.t) === dg.modelData })
                         delegate: Card {
@@ -110,7 +144,7 @@ Page {
                             padV: 7
                             icon: page.kindIcon[modelData.kind] || "history"
                             title: modelData.what
-                            line: modelData.actor + " · " + (Kinds.words[modelData.kind] || modelData.kind).toLowerCase()
+                            line: modelData.actor + " · " + (Kinds.words[modelData.kind] || modelData.kind).toLowerCase() + (modelData.odd ? " · outside working hours" : "")
                             picked: page.cur !== null && page.cur.rid === modelData.rid
                             onOpen: page.sel = modelData.rid
                             mid: Row {
@@ -148,11 +182,12 @@ Page {
             Facts {
                 visible: page.cur !== null
                 rows: !page.cur ? [] : [
-                    ["What", page.cur.what, (Kinds.words[page.cur.kind] || "").toLowerCase()],
-                    ["When", Time.atDay(page.cur.t), Time.inWorkingHours ? (Time.inWorkingHours(page.cur.t) ? "in working hours" : "outside working hours") : Time.ago(page.cur.t)],
-                    ["How long", "A moment", "it happened once, at that time"],
-                    ["Who", page.cur.actor, page.cur.actor === "System" ? "Falcon itself" : page.cur.actor === "Automation" ? "a rule in Automation" : Fleet.adminName(page.cur.raw && page.cur.raw.actor_account_id) ? "IT Admin" : ""],
-                    ["Machine", page.cur.host || "—", entry.m ? (entry.m.deptName || "") + " · " + (entry.m.online ? "on now" + (entry.m.user ? ", " + entry.m.user + " signed in" : "") : "off now") : ""],
+                    ["What", page.cur.what, page.says[page.cur.kind] || ""],
+                    ["When", page.dayWord(page.cur.t) + " at " + Time.hhmm(page.cur.t), page.cur.odd || !page.working(page.cur.t) ? "outside working hours" : "in working hours"],
+                    ["How long", page.cur.visit ? (page.cur.end !== null ? Time.dur((page.cur.end - page.cur.t) / 3600000) : Time.dur((Time.now - page.cur.t) / 3600000) + " so far") : "A moment",
+                     page.cur.visit ? (page.cur.end !== null ? "until " + Time.hhmm(page.cur.end) : "still inside") : "it happened once, at that time"],
+                    ["Who", page.cur.actor, page.whoSay(page.cur.actor)],
+                    ["Machine", page.cur.host, page.machineSay(page.cur.host)],
                     ["Kind", Kinds.words[page.cur.kind] || page.cur.kind, page.worth(page.cur) ? "worth a look" : "routine"],
                     ["Kept", Math.max(1, Math.ceil(90 - (Time.now - page.cur.t) / 86400000)) + " more days", "every entry is kept for 90 days, then removed"]]
             }

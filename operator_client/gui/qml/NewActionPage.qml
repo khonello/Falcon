@@ -34,6 +34,14 @@ Page {
     }
     readonly property bool ready: !!chk && chk.ok && name.trim() !== ""
     function switchLang(l) { lang = l; src = l === "python" ? "import os\n\n# write what the action does\nprint(os.environ[\"COMPUTERNAME\"])\n" : "$name = $env:COMPUTERNAME\nWrite-Output $name\n" }
+    // a real run on your own PC, before anything is saved (control.action_try)
+    function tryIt() {
+        var mine = Fleet.machines.filter(function (m) { return m.admin && m.online })[0] || Fleet.machines.filter(function (m) { return m.online })[0]
+        if (!mine) { Msg.warn("No machine is online to test it on"); return }
+        falcon.call("control.action_try", { language: lang, script: src, pc_id: mine.pc_id, timeout_s: limit, name: name.trim() || undefined }, function (ok, r) {
+            if (ok) Msg.ok("Testing it on " + mine.host); else Msg.failed(r && r.message ? r.message : "Not run")
+        })
+    }
     function save() {
         var p = page.editId ? { action_id: page.editId, name: name.trim(), description: desc.trim(), script: src, timeout_s: limit }
                             : { kind: "custom", name: name.trim(), description: desc.trim(), language: lang, script: src, timeout_s: limit }
@@ -109,7 +117,7 @@ Page {
                         anchors.right: parent.right
                         spacing: 8
                         Btn { text: "Cancel"; onClicked: Nav.go("actions", page.editId || null) }
-                        Btn { text: "Test on one machine"; enabled: false; tip: "The Engine runs only saved actions: save it, then run it on one machine from Actions" }
+                        Btn { text: "Test on one machine"; onClicked: page.tryIt() }
                         Btn { kind: "primary"; enabled: page.ready; text: page.editId ? "Save changes" : "Save action"; onClicked: page.save() }
                     }
                 }

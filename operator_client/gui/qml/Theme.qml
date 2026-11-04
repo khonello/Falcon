@@ -62,6 +62,16 @@ QtObject {
     readonly property color mid:   text3
     readonly property color quiet: text4
     readonly property color inverse: "#ffffff"
+    // antd's own control inks, as the concept's controls draw them: a label (a Segmented option, a tab), the fill under a hovered one
+    readonly property color textLabel: dark ? Qt.rgba(1, 1, 1, 0.65) : Qt.rgba(0, 0, 0, 0.65)
+    readonly property color fillHover: dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.06)
+    // an antd link button keeps antd's own blue (colorLink), not the accent
+    readonly property color link: dark ? "#1668dc" : "#1677ff"
+    // a disabled control: its words (colorTextDisabled) and its fill (colorBgContainerDisabled)
+    readonly property color textOff: dark ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(0, 0, 0, 0.25)
+    readonly property color fillOff: dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.04)
+    // antd's elevated background (colorBgElevated): a picked Segmented option, a dropdown, a popover
+    readonly property color elevated: dark ? "#161b23" : "#ffffff"
     // the dim behind a dialog, and the dark of a remote screen (the session window)
     readonly property color scrim: Qt.rgba(10 / 255, 14 / 255, 20 / 255, 0.45)
     readonly property color scrimLight: Qt.rgba(10 / 255, 14 / 255, 20 / 255, 0.32)
@@ -88,6 +98,7 @@ QtObject {
     readonly property int controlSm: 24
     readonly property int controlLg: 36
     readonly property int durFast: 120
+    readonly property int durPulse: 1000           // a machine running: its tile breathes
     readonly property int durBase: 200
     // a section a click changed pulses once; the person can turn it off beside the theme (the user, 1 Nov 2026)
     property bool pulseOn: true

@@ -61,12 +61,12 @@ Page {
     function pct(v) { return v === null || v === undefined ? "—" : Math.round(v) + "%" }
     function whatOf(m) {
         var x = info[m.host] || {}, out = []
-        out.push(!m.online ? "Off, last seen " + (m.seen ? Time.age(m.seen) + " ago" : "a while ago") : "On, " + (m.user ? m.user + " signed in" : "nobody signed in"))
+        out.push(!m.online ? "Off, last seen " + (m.seen ? Time.dur((Time.now - Time.ms(m.seen)) / 3600000) + " ago" : "a while ago") : "On, " + (m.user ? m.user + " signed in" : "nobody signed in"))
         if (serious(m) || m.status === "warning") { if (m.note) out.push(m.note.charAt(0).toLowerCase() + m.note.slice(1)) }
         if (m.held) out.push(page.mine(m) ? "you are inside" : m.held + " is inside")
         if (m.online && x.cpu >= 90) out.push("CPU at " + Math.round(x.cpu) + "%")
         if (m.online && x.disk >= 90) out.push("disk " + Math.round(x.disk) + "% full")
-        if (m.behind && !(m.note && /version/.test(m.note))) out.push("one version behind")
+        if (m.behind && !(serious(m) || m.status === "warning")) out.push("one version behind")
         return out.join(" · ")
     }
 
@@ -189,10 +189,10 @@ Page {
                                         Txt { topPadding: 4; text: "At the keyboard"; color: Theme.text3; font.pixelSize: 12 }
                                         Row {
                                             spacing: 6
-                                            readonly property bool inUse: !!(parent.use && parent.use.active)
+                                            readonly property bool inUse: !!(parent.use && parent.use.state === "in_use")
                                             Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: parent.inUse ? Theme.ok : Theme.text4 }
                                             Txt { font.pixelSize: 13; elide: Text.ElideNone
-                                                  text: !mc.modelData.online ? "offline" : !mc.modelData.user ? "nobody signed in" : parent.inUse ? "in use now" : parent.parent.use && parent.parent.use.idle_minutes ? "idle for " + Time.mins(parent.parent.use.idle_minutes) : "not known yet" }
+                                                  text: !mc.modelData.online ? "offline" : !mc.modelData.user ? "nobody signed in" : parent.inUse ? "in use now" : parent.parent.use && parent.parent.use.idle_s !== null && parent.parent.use.idle_s !== undefined ? "idle for " + Time.dur(parent.parent.use.idle_s / 3600) : "idle" }
                                         }
                                         Txt { topPadding: 4; text: "Entered"; color: Theme.text3; font.pixelSize: 12 }
                                         Repeater {
@@ -200,10 +200,10 @@ Page {
                                             delegate: Item {
                                                 required property var modelData
                                                 required property int index
-                                                width: 230; height: 26
-                                                Txt { anchors.verticalCenter: parent.verticalCenter; text: Time.atDay(modelData.entered_at); font.pixelSize: 13; elide: Text.ElideNone }
+                                                width: 230; height: 27.75
+                                                Txt { anchors.verticalCenter: parent.verticalCenter; text: Time.atDay(modelData.started_at); font.pixelSize: 13; elide: Text.ElideNone }
                                                 Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
-                                                      text: modelData.ended_at ? Time.dur((Time.ms(modelData.ended_at) - Time.ms(modelData.entered_at)) / 3600000) : "inside now" }
+                                                      text: modelData.ended_at ? Time.dur((Time.ms(modelData.ended_at) - Time.ms(modelData.started_at)) / 3600000) : "inside now" }
                                                 Rectangle { visible: index < 2; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                             }
                                         }
@@ -212,7 +212,7 @@ Page {
                                 Row {
                                     anchors.right: parent.right
                                     spacing: 8
-                                    Btn { visible: mc.modelData.behind && mc.modelData.online; small: true; text: "Update now"; enabled: false; tip: "The Engine retries on its own schedule; it cannot be told to now" }
+                                    Btn { visible: mc.modelData.behind && mc.modelData.online; small: true; text: "Update now"; onClicked: falcon.call("update.now", { pc_id: mc.modelData.pc_id }, function (ok, r) { if (ok) Msg.ok("Updating now"); else Msg.failed(r && r.message ? r.message : "Not done") }) }
                                     Btn { small: true; kind: "primary"; text: page.mine(mc.modelData) ? "You are inside" : "Enter"
                                           enabled: mc.modelData.online && !page.mine(mc.modelData); onClicked: page.enter(mc.modelData) }
                                     Btn { small: true; kind: "text"; text: "Run an action"; onClicked: Nav.goAsk("actions", null, "Actions opens with " + mc.modelData.host + " picked.", mc.modelData.host) }
@@ -254,7 +254,7 @@ Page {
                     color: Theme.text3
                     font.pixelSize: 12
                     text: !page.got || !page.got.about ? "" : [page.got.about.os, page.got.about.memory_total_mb ? Math.round(page.got.about.memory_total_mb / 1024) + " GB memory" : "",
-                          page.got.about.boot_at ? "up " + Time.age(page.got.about.boot_at) : "", page.got.about.registered_at ? "registered " + Time.day(page.got.about.registered_at) : ""].filter(function (s) { return s }).join(" · ")
+                          page.cur && !page.cur.online ? "off" : page.got.about.boot_at ? "up " + Math.floor((Time.now - Time.ms(page.got.about.boot_at)) / 3600000) + "h" : "", page.got.about.registered_at ? "registered " + Time.day(page.got.about.registered_at) + " " + new Date(Time.ms(page.got.about.registered_at)).getFullYear() : ""].filter(function (s) { return s }).join(" · ")
                 }
                 Quiet { visible: page.cur !== null && !page.cur.online; text: page.cur ? page.cur.host + " has not checked in" + (page.cur.seen ? " for " + Time.age(page.cur.seen) : "") + "; there is nothing new to draw." : "" }
                 Repeater {
@@ -286,13 +286,13 @@ Page {
                 id: runP
                 objectName: "machineRunning"
                 width: parent.width
-                gap: 0
+                gap: 10
                 readonly property real disk: page.got && page.got.about && page.got.about.disk_percent !== null && page.got.about.disk_percent !== undefined ? page.got.about.disk_percent : -1
                 readonly property real size: page.got && page.got.about && page.got.about.disk_total_gb ? page.got.about.disk_total_gb : 0
                 // storage
                 Column {
                     width: parent.width
-                    spacing: 8
+                    spacing: page.cur ? 8 : 4
                     Item {
                         width: parent.width
                         height: sv.height
@@ -319,13 +319,13 @@ Page {
                 Column {
                     visible: page.cur === null || page.cur.online
                     width: parent.width
-                    spacing: 8
-                    topPadding: 14
-                    Rectangle { width: parent.width; height: 1; color: Theme.border }
+                    spacing: page.cur ? 8 : 4
+                    topPadding: page.cur ? 14 : 0
+                    Rectangle { visible: page.cur !== null; width: parent.width; height: 1; color: Theme.border }
                     Item {
                         width: parent.width
-                        height: rl.height + 6
-                        Txt { id: rl; y: 6; text: "Running now"; font.pixelSize: 13; elide: Text.ElideNone }
+                        height: rl.height + (page.cur ? 6 : 0)
+                        Txt { id: rl; y: page.cur ? 6 : 0; text: "Running now"; font.pixelSize: 13; elide: Text.ElideNone }
                         Txt { x: rl.implicitWidth + 8; y: rl.y; text: page.cur ? "the busiest programs; point at one to end it" : "the most busy programs"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                     }
                     Txt { visible: !page.cur; text: "Shown for the machine you pick."; color: Theme.text3; font.pixelSize: 13 }
@@ -351,7 +351,7 @@ Page {
                                 Txt { x: parent.width - 44 - 8 - 60; width: 60; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
                                       text: modelData.memory_mb >= 1000 ? (modelData.memory_mb / 1000).toFixed(1) + " GB" : modelData.memory_mb + " MB" }
                                 Btn { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "text"; danger: true; text: "End"; opacity: pr.containsMouse || hovered ? 1 : 0
-                                      enabled: false; tip: "The Engine cannot end one program from here yet" }
+                                      onClicked: falcon.call("machines.end_program", { pc_id: page.cur.pc_id, name: modelData.name }, function (ok, r) { if (ok) Msg.ok("Ended"); else Msg.failed(r && r.message ? r.message : "Not done") }) }
                                 Rectangle { visible: index < parent.parent.rows.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                             }
                         }
@@ -376,10 +376,11 @@ Page {
             readonly property var days: { var w = page.weeks[Object.keys(page.weeks)[0]] || []; return w.map(function (d) { return d.day }) }
             readonly property real dayW: (width - 12 - 76 - 12 - 96 - 12 - 12 * Math.max(0, days.length - 1)) / Math.max(1, days.length)
             Item {
-                width: parent.width; height: 20
+                width: parent.width; height: 31.5
+                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 Repeater {
                     model: wk.days
-                    delegate: Txt { required property var modelData; required property int index; x: 6 + 76 + 12 + index * (wk.dayW + 12); width: wk.dayW; y: 0
+                    delegate: Txt { required property var modelData; required property int index; x: 6 + 76 + 12 + index * (wk.dayW + 12); width: wk.dayW; y: 7
                                     text: index === wk.days.length - 1 ? "Today" : Time.dayName(modelData); color: Theme.text4; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter }
                 }
             }
@@ -389,7 +390,7 @@ Page {
                     required property var modelData
                     required property int index
                     readonly property var w: page.weeks[modelData.host] || []
-                    width: parent.width; height: 33
+                    width: parent.width; height: 33.75
                     color: page.sel === modelData.host || wa.containsMouse ? Theme.surface2 : "transparent"
                     MouseArea { id: wa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.host }
                     Txt { x: 6; width: 76; anchors.verticalCenter: parent.verticalCenter; text: modelData.host; mono: true; font.pixelSize: 13 }
@@ -399,7 +400,7 @@ Page {
                             required property var modelData
                             required property int index
                             x: 6 + 76 + 12 + index * (wk.dayW + 12)
-                            width: wk.dayW; height: 33
+                            width: wk.dayW; height: 33.75
                             Icon { anchors.centerIn: parent; name: modelData.yes ? "check" : "close"; size: 12; color: modelData.yes ? Theme.text2 : Theme.text4 }
                         }
                     }

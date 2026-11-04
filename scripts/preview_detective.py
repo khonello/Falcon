@@ -7,9 +7,11 @@ Only the machine names, the dates (moved to the last hours) and a few reviewed c
 from __future__ import annotations
 
 import dataclasses
+import json
+import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -93,33 +95,48 @@ def build(now: float | None = None) -> dict[str, Any]:
 
 
 _BUILT: dict[str, Any] | None = None
+_KINDS = {"p": "person", "f": "file", "m": "machine", "t": "time", "g": "program"}
+
+
+def _told(text: str) -> dict[str, Any]:
+    """The concept's account of a case, as detective.case's `telling` carries it: paragraphs of parts."""
+    paras = []
+    for para in text.split("\n\n"):
+        parts: list[dict[str, Any]] = []
+        for x in re.split(r"(\{[pfmtg]:[^}]+\})", para):
+            m = re.fullmatch(r"\{([pfmtg]):([^}]+)\}", x)
+            if m:
+                parts.append({"text": m.group(2), "kind": _KINDS[m.group(1)], "value": m.group(2)})
+            elif x:
+                parts.append({"text": x})
+        paras.append(parts)
+    return {"paragraphs": paras, "text": text, "smoothed": True, "note": "Written by the local model from what Detective found. It is a reading of the evidence, not proof."}
 
 
 def built() -> dict[str, Any]:
+    """The concept's own cases, dated so each ended as long ago as the concept says."""
     global _BUILT
     if _BUILT is None:
-        _BUILT = build()
+        from preview_data import NOW
+        c = json.loads(Path(__file__).with_name("preview_concept_detective.json").read_text(encoding="utf-8"))
+        cases = c["det"]["cases"]
+        detail = {}
+        for x in cases:
+            first, last = datetime.fromisoformat(x["first_at"]), datetime.fromisoformat(x["last_at"])
+            end = NOW - timedelta(hours=x["ago"])
+            x["first_at"], x["last_at"] = (end - (last - first)).isoformat(), end.isoformat()
+            k = str(x["id"])
+            found = c["det"]["detail"].get(k, {}).get("findings", [])
+            x["restricted"] = any("restricted" in w for f in found for w in f.get("why", []))
+            x["glance"] = {"restricted": x["restricted"], "next_stage": x["next_stage"], "earlier": [], "raised_at": x["last_at"]}
+            detail[x["id"]] = dict(c["det"]["detail"].get(k, {"findings": [], "graph": {"nodes": [], "edges": []}, "rule_options": [], "board": []}), case=x,
+                                   glance=x["glance"], telling=_told(c["tell"].get(k, x["headline"])))
+        _BUILT = {"cases": cases, "detail": detail, "rules": c["det"]["rules"], "proposals": c["det"]["proposals"]}
     return _BUILT
 
 
-RULES = [
-    {"id": 1, "pc_id": 2, "host": "OPS-02", "graph": "drive_after_staging", "kind": "drive", "value": "E: (Finance weekly backup)", "made_at": "2026-10-12T09:00:00+00:00"},
-    {"id": 2, "pc_id": 22, "host": "LOG-02", "graph": "mass_removal", "kind": "program", "value": "cleanmgr.exe", "made_at": "2026-10-09T15:20:00+00:00"},
-    {"id": 3, "pc_id": 11, "host": "FIN-01", "graph": "many_zipped", "kind": "folder", "value": "C:\\Finance\\Archive", "made_at": "2026-10-05T11:02:00+00:00"},
-]
-
-
-def proposals() -> list[dict[str, Any]]:
-    now = datetime.now(timezone.utc).isoformat()
-    return [
-        {"id": 1, "kind": "pause_flow", "title": "Pause flow #3 (Finance weekly pack)? Its source machine FIN-02 has an urgent case open.", "pc_id": 12, "department_id": 2, "created_at": now, "state": "open"},
-        {"id": 2, "kind": "mark_folder", "title": "Mark C:\\Finance\\Payroll on FIN-02 as restricted? Files from there were gathered and sent out.", "pc_id": 12, "department_id": 2, "created_at": now, "state": "open"},
-        {"id": 3, "kind": "follow_up_task", "title": "Ask the Operations Admin to follow up on OPS-03 (files renamed to one odd ending)?", "pc_id": 3, "department_id": 1, "created_at": now, "state": "open"},
-    ]
-
-
 def overview(role: str, dept: int | None) -> dict[str, Any]:
-    cs = [c for c in built()["cases"] if role == "super_user" or c["department_id"] == dept]
+    cs = built()["cases"]
     op = [c for c in cs if c["status"] == "open"]
     by_level = {lv: sum(1 for c in op if c["level"] == lv) for lv in ("noted", "case", "urgent")}
     by_intent: dict[str, int] = {}
@@ -135,7 +152,7 @@ def answer(type_: str, payload: dict[str, Any], role: str, dept: int | None) -> 
         return overview(role, dept)
     if type_ == "detective.cases":
         status = payload.get("status")
-        rows = [c for c in b["cases"] if role == "super_user" or c["department_id"] == dept]
+        rows = b["cases"]
         if status == "reviewed":
             rows = [c for c in rows if c["status"] != "open"]
         elif status == "escalated":
@@ -147,11 +164,11 @@ def answer(type_: str, payload: dict[str, Any], role: str, dept: int | None) -> 
     if type_ == "detective.case":
         return b["detail"].get(int(payload.get("case_id") or 0))
     if type_ == "detective.rules":
-        return {"rules": RULES if role == "super_user" else [r for r in RULES if r["pc_id"] in (1, 2, 3, 4, 5, 6, 7)]}
+        return {"rules": b["rules"]}
     if type_ in ("detective.review", "detective.rule_revoke"):
         return {"status": "ok", "rules": []}
     if type_ == "proposals.list":
-        return {"proposals": [p for p in proposals() if role == "super_user" or p["department_id"] == dept]}
+        return {"proposals": b["proposals"]}
     if type_ == "proposals.decide":
         return {"paused": True} if payload.get("accept") else {"dismissed": True}
     return None

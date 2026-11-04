@@ -59,7 +59,7 @@ Page {
         return "track"
     }
     readonly property var all: tasks.filter(function (t) { return t.status !== "completed" || !t.completed_at || Time.now - Time.ms(t.completed_at) < 7 * 86400000 })
-        .map(function (t) { return Object.assign({ k: page.cat(t) }, t) })
+        .map(function (t) { return Object.assign({ k: page.cat(t), factRows: t.soft_deadline_at ? 5 : 4 }, t) })
         .sort(function (x, y) { return (Time.ms(x.final_deadline_at) || 9e15) - (Time.ms(y.final_deadline_at) || 9e15) })
     function inGroup(k) { return all.filter(function (x) { return x.k === k }) }
     // the most pressing is picked at first; nothing is open until you expand it
@@ -136,7 +136,7 @@ Page {
                 height: 18
                 Txt { x: 12; width: parent.width - 12 - 12 - 176 - 12 - 210 - 12; anchors.bottom: parent.bottom; text: "the task's own time: start to deadline, then overdue"; font.pixelSize: 12; color: Theme.text3 }
                 Item {
-                    x: parent.width - 12 - 176 - 12 - 210
+                    x: parent.width - 12 - 128 - 12 - 210
                     width: 104; height: 16
                     anchors.bottom: parent.bottom
                     Txt { anchors.bottom: parent.bottom; text: "start"; font.pixelSize: 11; color: Theme.text4; elide: Text.ElideNone }
@@ -173,7 +173,7 @@ Page {
                             title: modelData.description_raw
                             line: modelData.assignee_name + (page.hostOf(modelData) ? " on " + page.hostOf(modelData) : "") + " · " + page.found(modelData) + " of " + n + " target" + (n === 1 ? "" : "s") + " found"
                                   + (modelData.assigner_account_id !== falcon.accountId ? " · from " + modelData.assigner_name : "")
-                            line2: page.quiet(modelData) && modelData.k !== "done" ? "Nothing seen for two days" : ""
+                            line2: page.quiet(modelData) && modelData.k !== "done" ? "Nothing seen for " + (page.lastSign(modelData) === null ? "as long as it has existed" : Time.waitLen((Time.now - page.lastSign(modelData)) / 3600000)) : ""
                             picked: page.cur !== null && page.cur.id === modelData.id
                             expandable: true
                             expanded: page.openId === modelData.id
@@ -217,7 +217,7 @@ Page {
                                         height: fv.height + 10
                                         Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                                         Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13 }
-                                        Rectangle { visible: index < 3; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                        Rectangle { visible: index < tc.modelData.factRows - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                     }
                                 }
                             }
@@ -256,7 +256,6 @@ Page {
                     height: doCol.height + 20
                     radius: Theme.radius
                     color: Theme.surface2
-                    readonly property bool mineToClose: page.cur !== null && page.cur.assigner_account_id === falcon.accountId
                     Column {
                         id: doCol
                         x: 12; y: 10
@@ -266,7 +265,7 @@ Page {
                             visible: !page.asking
                             width: parent.width
                             color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 13
-                            text: !page.cur ? "" : page.cur.k === "verify" ? (parent.parent.mineToClose ? "Every target was found. Only you close it." : "Every target was found; " + page.cur.assigner_name + " closes it.")
+                            text: !page.cur ? "" : page.cur.k === "verify" ? "Every target was found. Only you close it."
                                   : page.cur.k === "late" ? (Time.past(page.cur.final_deadline_at) ? "Past its deadline." : "Nothing seen for two days.")
                                   : page.cur.k === "done" ? "Closed. Nothing more to do." : "Not handed in yet; your verdict comes when it is."
                         }
@@ -275,10 +274,10 @@ Page {
                             anchors.right: parent.right
                             spacing: 8
                             visible: children.length > 0
-                            Btn { visible: !page.asking && page.cur !== null && page.cur.k === "verify" && doCol.parent.mineToClose; small: true; text: "Incomplete"; onClicked: page.asking = true }
-                            Btn { visible: !page.asking && page.cur !== null && page.cur.k === "verify" && doCol.parent.mineToClose; small: true; kind: "primary"; text: "Complete"; onClicked: page.verdict("complete") }
+                            Btn { visible: !page.asking && page.cur !== null && page.cur.k === "verify"; small: true; text: "Incomplete"; onClicked: page.asking = true }
+                            Btn { visible: !page.asking && page.cur !== null && page.cur.k === "verify"; small: true; kind: "primary"; text: "Complete"; onClicked: page.verdict("complete") }
                             Btn { visible: !page.asking && page.cur !== null && page.cur.k === "late"; small: true; kind: "primary"; text: page.cur ? "Remind " + page.cur.assignee_name : ""
-                                  enabled: false; tip: "The Engine cannot send a reminder about a task yet" }
+                                  onClicked: falcon.call("task.remind", { task_id: page.cur.id }, function (ok, r) { if (ok) Msg.ok("Reminded"); else Msg.failed(r && r.message ? r.message : "Not done") }) }
                             Btn { visible: page.asking; small: true; text: "Cancel"; onClicked: { page.asking = false; page.why = "" } }
                             Btn { visible: page.asking; small: true; kind: "primary"; text: "Send back"; enabled: page.why.trim() !== ""; onClicked: page.verdict("incomplete") }
                         }
@@ -302,7 +301,7 @@ Page {
                         icon: modelData.done ? "checksquare" : "square"
                         title: modelData.text
                         done: !!modelData.done
-                        line: modelData.done ? "done" + (modelData.done_at ? " " + Time.atDay(modelData.done_at) : "") : modelData.due_at ? "due " + Time.atDay(modelData.due_at) + (modelData.overdue ? ", past its date" : "") : "no date"
+                        line: modelData.done ? "done" + (modelData.done_at ? " " + Time.at(modelData.done_at) : "") : modelData.due_at ? "due " + Time.at(modelData.due_at) + (modelData.overdue ? ", past its date" : "") : "no date"
                         lineHot: !modelData.done && !!modelData.overdue
                         act: modelData.done ? "Undo" : "Done"
                         actKind: modelData.done ? "text" : "default"
@@ -317,7 +316,7 @@ Page {
                     Field { objectName: "todoText"; width: parent.width - addB.width - 8; placeholderText: "Remind yourself of something"; text: page.tdt; onTextEdited: page.tdt = text; onAccepted: if (page.tdt.trim()) page.addTodo() }
                     Btn { id: addB; text: "Add"; enabled: page.tdt.trim() !== ""; onClicked: page.addTodo() }
                 }
-                Txt { text: "Due tomorrow at 17:00; to pick another time, add it on the Calendar."; color: Theme.text3; font.pixelSize: 12; width: parent.width }
+                Txt { text: { var d = new Date(Time.now); d.setDate(d.getDate() + 1); d.setHours(17, 0, 0, 0); return "Due " + Time.at(d) + "; to pick another time, add it on the Calendar." } color: Theme.text3; font.pixelSize: 12; width: parent.width }
             }
         }
     }
@@ -329,6 +328,8 @@ Page {
         width: parent.width
         title: page.cur ? "Targets · " + page.cur.description_raw : "Targets"
         sub: "what done looks like, and the signs of progress for each"
+        padTop: 6
+        extra: HowChecking { who: page.cur ? page.cur.assignee_name || "" : "" }
         TaskChart {
             visible: page.cur !== null
             width: parent.width

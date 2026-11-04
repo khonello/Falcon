@@ -15,17 +15,23 @@ Page {
     property var people: []
     property bool adminsGroup: false
     property var thread: null             // chat.get for the one picked
-    property var requests: []             // requests to talk, when the Engine has them
+    property var requests: []             // requests to talk (chat.requests; ENGINE-GAPS #19: the section stays away until the Engine keeps them)
+    property var flows: []                // what is open between you and someone, said above the conversation
+    property var tasks: []
+    property string reqWhy: ""
+    property var many: []                 // who a new conversation is with
     property string sel: { var a = Nav.takeArrive("messages"); return a !== null ? String(a) : Nav.sub && Nav.sub !== "announcements" ? String(Nav.sub) : "" }
     property var drafts: ({})
     property string q: ""
-    property var who: null
     property string mtxt: ""
     readonly property int me: falcon.accountId
 
     function load() {
         falcon.call("chat.list", {}, function (ok, r) { page.convs = ok ? (r.conversations || []) : []; page.loadThread() })
         falcon.call("chat.people", {}, function (ok, r) { page.people = ok ? (r.people || []) : []; page.adminsGroup = ok && !!r.admins_group })
+        falcon.call("chat.requests", {}, function (ok, r) { page.requests = ok ? (r.requests || []) : [] })
+        falcon.call("flow.list", {}, function (ok, r) { page.flows = ok ? (r.flows || []) : [] })
+        falcon.call("task.list", {}, function (ok, r) { page.tasks = ok ? (r.tasks || []) : [] })
     }
     function loadThread() {
         if (!c) { thread = null; return }
@@ -44,7 +50,27 @@ Page {
                  line: x.last ? (x.last.from_account_id === page.me ? "You: " : x.kind === "admins" ? (x.last.from || "") + ": " : "") + x.last.body : "nothing said yet",
                  st: [x.unread ? "Waiting on you" : "Read", x.unread ? "bad" : "wait", x.unread ? "you" : "read"] }
     })
-    readonly property var c: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
+    // a request is picked first, as the concept opens on it; else the conversation picked, else the first
+    readonly property var curReq: { for (var i = 0; i < requests.length; i++) if ("r" + requests[i].id === sel) return requests[i]; return sel === "" && requests.length ? requests[0] : null }
+    readonly property var c: { if (curReq) return null; for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
+    function ago(ms) { var h = (Time.now - ms) / 3600000; return h < 24 ? Time.dur(h) + " ago" : Time.dayName(ms) + " " + Time.hhmm(ms) }
+    function others(x) { return (x.members || []).filter(function (m) { return m.account_id !== page.me }) }
+    // what is open between you and someone: chips under their name (amBetween)
+    function between(x) {
+        if (!x) return []
+        if (x.kind === "admins") return [[page.others(x).length + " Admins and you", "quiet"]]
+        var o = page.personOf(x)
+        if (o && o.role === "admin") {
+            var w = flows.filter(function (f) { return f.consent_status === "pending" && (f.destinations || []).some(function (d) { return d.let_them_choose && d.owner_account_id === o.account_id }) }).length
+            return [w ? [Theme.fmt(w) + " flow" + (w === 1 ? "" : "s") + " waiting for them to pick a folder", ""] : ["No flow waits on them", "quiet"]]
+        }
+        var open = tasks.filter(function (k) { return o && k.assignee_account_id === o.account_id && k.status !== "completed" }), late = open.filter(function (k) { return k.final_deadline_at && Time.ms(k.final_deadline_at) < Time.now })
+        return [open.length ? [Theme.fmt(open.length) + " task" + (open.length === 1 ? "" : "s") + " with them", ""] : ["No task with them", "quiet"]].concat(late.length ? [[Theme.fmt(late.length) + " late", "hot"]] : [])
+    }
+    function acceptReq(r) { falcon.call("chat.request_accept", { request_id: r.id }, function (ok, x) { if (!ok) { Msg.failed(x && x.message ? x.message : "Not accepted"); return }
+                                                                                                        Msg.ok("Accepted · the conversation with " + r.from + " is open"); page.sel = x.conversation ? String(x.conversation.conversation_id) : ""; page.load() }) }
+    function closeReq(r) { falcon.call("chat.request_close", { request_id: r.id, why: reqWhy.trim() }, function (ok, x) { if (!ok) { Msg.failed(x && x.message ? x.message : "Not closed"); return }
+                                                                                                                         Msg.ok("Closed · " + r.from + " is told: " + page.reqWhy.trim()); page.reqWhy = ""; page.sel = ""; page.load() }) }
     onCChanged: { thread = null; loadThread(); pickedId = c ? c.id : "" }
     property string pickedId: ""
     readonly property string draft: c ? (drafts[c.id] || "") : ""
@@ -67,20 +93,20 @@ Page {
     readonly property var unread: rows.filter(function (x) { return x.unread && page.match(x) })
     readonly property var read: rows.filter(function (x) { return !x.unread && page.match(x) })
 
-    // starting a conversation: one person goes to your conversation with them; every Admin goes to their group
+    // starting a conversation: one person goes to your conversation with them; every Admin goes to their group, as several would, once the Engine keeps small groups
     readonly property var whoOptions: (adminsGroup ? [{ value: "admins", label: "Every Admin" }] : [])
-        .concat(people.filter(function (p) { return p.role === "admin" }).map(function (p) { return { value: "a" + p.account_id, label: p.name + " · Admin" } }))
+        .concat(people.filter(function (p) { return p.role === "admin" }).map(function (p) { return { value: "a" + p.account_id, label: p.name } }))
         .concat(people.filter(function (p) { return p.role !== "admin" }).map(function (p) { return { value: "p" + p.pc_id, label: (p.name || "nobody signed in") + " · " + p.hostname + (p.online ? "" : " · offline") } }))
+    readonly property bool several: many.length > 1 && many.indexOf("admins") < 0
     function startOne() {
-        var w = String(who), pl = w === "admins" ? { admins: true } : w.charAt(0) === "a" ? { account_id: Number(w.slice(1)) } : { pc_id: Number(w.slice(1)) }, text = mtxt.trim()
+        var w = String(many[0]), pl = w === "admins" ? { admins: true } : w.charAt(0) === "a" ? { account_id: Number(w.slice(1)) } : { pc_id: Number(w.slice(1)) }, text = mtxt.trim()
         falcon.call("chat.open", pl, function (ok, r) {
             if (!ok) { Msg.failed(r && r.message ? r.message : "Not opened"); return }
             var id = r.conversation.conversation_id
             page.sel = String(id)
-            if (!text) { Msg.ok("The conversation with " + (r.conversation.title || "them") + " is open"); page.load(); return }
             falcon.call("chat.send", { conversation_id: id, body: text }, function (ok2, r2) {
                 if (!ok2) Msg.failed(r2 && r2.message ? r2.message : "Opened, but not sent"); else Msg.ok("Sent to " + (r.conversation.title || "them"))
-                page.who = null; page.mtxt = ""; page.load()
+                page.many = []; page.mtxt = ""; page.load()
             })
         })
     }
@@ -88,22 +114,38 @@ Page {
     situation: {
         if (!rows.length && !requests.length) return "No conversations yet. Start one below."
         var oldest = rows.filter(function (x) { return !x.unread && x.line.indexOf("You: ") === 0 }).sort(function (a, b) { return a.last - b.last })[0]
-        return (requests.length ? (requests.length === 1 ? requests[0].from + " asks" : Theme.fmt(requests.length) + " people ask") + " to talk; every Admin sees " + (requests.length === 1 ? "it" : "them") + " until one accepts. " : "")
-               + (unread.length ? Theme.listNames(unread.map(function (x) { return x.title }), 2) + (unread.length === 1 ? " is" : " are") + " waiting on your answer." : "Nobody is waiting on you.")
-               + (oldest ? " Your message to " + oldest.title + " has waited " + Time.age(oldest.last) + "." : "")
+        return (requests.length ? (requests.length === 1 ? requests[0].from + " on " + requests[0].host + " asks" : Theme.fmt(requests.length) + " people at machines ask") + " to talk; every Admin sees " + (requests.length === 1 ? "it" : "them") + " until one accepts. " : "")
+               + (unread.length ? Theme.listNames(unread.map(function (x) { return x.kind === "admins" ? "the Admins group" : x.title }), 2) + (unread.length === 1 ? " is" : " are") + " waiting on your answer." : "Nobody is waiting on you.")
+               + (oldest ? " Your message to " + oldest.title + " has waited " + Time.span((Time.now - oldest.last) / 3600000) + "." : "")
     }
     situationAt: Time.now
 
     Confirm { id: confirm; page: page }
 
-    function initials(n) { var p = String(n || "?").replace(/[^A-Za-z. ]/g, " ").split(/[\s.]+/).filter(function (x) { return x }); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : (p[0] || "?").slice(0, 2)).toUpperCase() }
-    // a person or a group as a round face (ib-av): their initials on surface-3
-    component Face: Rectangle {
+    function initials(n) { return String(n || "?").split(/[ .]+/).filter(function (x) { return x }).map(function (x) { return x[0] }).join("").slice(0, 2) }
+    // a person as a round face (ib-av): their initials on surface-3; a group as two small ones (ms-stack), the second behind
+    component Face: Item {
         property string name: ""
-        property real size: 34
-        width: size; height: size; radius: size / 2
-        color: Theme.surface3
-        Txt { anchors.centerIn: parent; text: page.initials(parent.name); font.pixelSize: parent.size > 40 ? 14 : parent.size < 28 ? 9 : 11; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
+        property var group: null
+        property real size: 36
+        width: size; height: size
+        Rectangle {
+            visible: parent.group === null
+            anchors.fill: parent; radius: width / 2; color: Theme.surface3
+            Txt { anchors.centerIn: parent; text: page.initials(parent.parent.name); font.pixelSize: parent.width > 40 ? 14 : 12; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
+        }
+        Repeater {
+            model: parent.group === null ? [] : [1, 0]
+            Rectangle {
+                required property int modelData
+                readonly property real d: parent.size > 40 ? 29 : 22
+                x: modelData ? parent.size - d : 0; y: modelData ? parent.size - d : 0
+                width: d; height: d; radius: d / 2
+                color: modelData ? Theme.surface2 : Theme.surface3
+                border.width: 2; border.color: Theme.surface
+                Txt { anchors.centerIn: parent; text: (parent.parent.group[parent.modelData] ? page.initials(parent.parent.group[parent.modelData].name) : ""); font.pixelSize: parent.d > 25 ? 10 : 9; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
+            }
+        }
     }
     component Section: Column {
         id: sec
@@ -112,7 +154,7 @@ Page {
         property var xs: []
         visible: xs.length > 0
         width: parent.width
-        spacing: 2
+        spacing: 0
         Item {
             width: parent.width
             height: sh.height + 14
@@ -123,23 +165,32 @@ Page {
             model: sec.xs
             delegate: Rectangle {
                 required property var modelData
-                objectName: "conv_" + modelData.id
-                width: sec.width; height: pt.height + 16; radius: Theme.radiusLg
-                color: page.c && page.c.id === modelData.id ? Theme.accentSoft : ma.containsMouse ? Theme.surface2 : "transparent"
-                Face { x: 8; anchors.verticalCenter: parent.verticalCenter; name: modelData.title }
+                readonly property bool isReq: modelData.from !== undefined
+                readonly property bool on: isReq ? page.curReq !== null && page.curReq.id === modelData.id : page.c !== null && page.c.id === modelData.id
+                objectName: "conv_" + (isReq ? "r" : "") + modelData.id
+                width: sec.width; height: Math.max(36, pt.height) + 16; radius: Theme.radiusLg
+                color: on ? Theme.accentSoft : ma.containsMouse ? Theme.surface2 : "transparent"
+                Face { x: 8; anchors.verticalCenter: parent.verticalCenter; name: parent.isReq ? modelData.from : modelData.title; group: !parent.isReq && modelData.kind === "admins" ? page.others(modelData) : null }
                 Column {
                     id: pt
                     x: 54; y: 8; width: parent.width - 62
+                    anchors.verticalCenter: parent.verticalCenter
                     Item { width: parent.width; height: nm.height
-                        Txt { id: nm; text: modelData.title + (modelData.kind === "admins" ? "" : ""); font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - tm.implicitWidth - 8) }
-                        Txt { visible: modelData.kind === "admins"; x: nm.width + 6; y: nm.baselineOffset - baselineOffset; text: modelData.members.length; color: Theme.text3; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideNone }
-                        Txt { id: tm; anchors.right: parent.right; y: nm.baselineOffset - baselineOffset; text: modelData.last ? Time.ago(modelData.last) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
-                    Item { width: parent.width; height: ln.height
-                        Txt { id: ln; width: parent.width - (modelData.unread ? 28 : 0); text: modelData.line; font.pixelSize: 13; color: modelData.unread ? Theme.text : Theme.text3; font.weight: modelData.unread ? Font.Medium : Font.Normal }
-                        Rectangle { visible: modelData.unread > 0; anchors.right: parent.right; anchors.verticalCenter: ln.verticalCenter; width: Math.max(20, cn.implicitWidth + 12); height: 20; radius: 10; color: Theme.accent
-                                    Txt { id: cn; anchors.centerIn: parent; text: modelData.unread; color: Theme.inverse; font.pixelSize: 11; font.weight: Font.DemiBold; elide: Text.ElideNone } } }
+                        Txt { id: nm; textFormat: Text.StyledText; font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - tm.implicitWidth - 8)
+                              text: parent.parent.parent.isReq ? modelData.from + " <font color='" + Theme.text3 + "'><span style='font-weight:400'>· " + modelData.host + "</span></font>" : modelData.title }
+                        Txt { visible: !parent.parent.parent.isReq && modelData.kind === "admins"; x: nm.width + 6; y: nm.baselineOffset - baselineOffset; text: page.others(modelData).length; color: Theme.text3; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideNone }
+                        Txt { id: tm; anchors.right: parent.right; y: nm.baselineOffset - baselineOffset; text: parent.parent.parent.isReq ? page.ago(Time.ms(modelData.at)) : modelData.last ? page.ago(modelData.last) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                    }
+                    Item { width: parent.width; height: 18.75
+                        Rectangle { id: rq; visible: parent.parent.parent.isReq; width: visible ? rqt.implicitWidth + 14 : 0; height: 18; radius: 9; color: Theme.accentSoft; anchors.verticalCenter: ln.verticalCenter
+                                    Txt { id: rqt; anchors.centerIn: parent; text: "Request"; color: Theme.accent; font.pixelSize: 11; elide: Text.ElideNone } }
+                        Txt { id: ln; x: rq.visible ? rq.width + 8 : 0; width: parent.width - x - (!parent.parent.parent.isReq && modelData.unread ? 28 : 0); text: modelData.line; font.pixelSize: 13
+                              color: parent.parent.parent.isReq || modelData.unread ? Theme.text : Theme.text3; font.weight: parent.parent.parent.isReq || modelData.unread ? Font.Medium : Font.Normal }
+                        Rectangle { visible: !parent.parent.parent.isReq && modelData.unread > 0; anchors.right: parent.right; anchors.verticalCenter: ln.verticalCenter; width: Math.max(20, cn.implicitWidth + 12); height: 20; radius: 10; color: Theme.accent
+                                    Txt { id: cn; anchors.centerIn: parent; text: modelData.unread || ""; color: Theme.inverse; font.pixelSize: 11; font.weight: Font.DemiBold; elide: Text.ElideNone } }
+                    }
                 }
-                MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.id }
+                MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = (parent.isReq ? "r" : "") + modelData.id }
             }
         }
     }
@@ -174,21 +225,58 @@ Page {
             height: parent.h
             fill: true
             readonly property var person: page.personOf(page.c)
-            Quiet { visible: page.c === null; text: "Pick someone on the left." }
+            Quiet { visible: page.c === null && page.curReq === null; text: "Pick someone on the left." }
+            // a request to talk: who, what they asked, accept it, or close it with a reason
+            Column {
+                visible: page.curReq !== null
+                width: parent.width
+                spacing: 0
+                Item {
+                    width: parent.width
+                    height: 44 + 11
+                    Face { size: 44; name: page.curReq ? page.curReq.from : "" }
+                    Column { x: 54; width: parent.width - 54; spacing: 2
+                             Txt { width: parent.width; text: page.curReq ? page.curReq.from + " asks to talk" : ""; font.pixelSize: 14; font.weight: Font.DemiBold; color: Theme.text3 }
+                             Txt { width: parent.width; text: page.curReq ? "Signed in on " + page.curReq.host + " · sent " + page.ago(Time.ms(page.curReq.at)) + " · every Admin sees this request until one of you accepts it" : ""; font.pixelSize: 13; color: Theme.text3 } }
+                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+                }
+                Column {
+                    x: 20; topPadding: 18; bottomPadding: 18
+                    width: parent.width - 40
+                    spacing: 12
+                    Rectangle { width: parent.width; height: rqq.height + 28; radius: 10; color: Theme.surface2; border.width: 1; border.color: Theme.border
+                                Txt { id: rqq; x: 16; y: 14; width: parent.width - 32; text: page.curReq ? page.curReq.line : ""; font.pixelSize: 16; font.weight: Font.Medium; wrapMode: Text.WordWrap; elide: Text.ElideNone } }
+                    Txt { width: parent.width; text: page.curReq ? "Accepting opens your conversation with " + page.curReq.from + ", with this line in it. The other Admins see that you accepted it." : ""; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                    Btn { kind: "primary"; text: "Accept and open the conversation"; onClicked: page.acceptReq(page.curReq) }
+                    Item { width: 1; height: 0.1 }
+                    Rectangle { width: parent.width; height: 1; color: Theme.border }
+                    Column { width: parent.width; spacing: 6
+                             Txt { text: "Or close it"; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                             Txt { width: parent.width; text: page.curReq ? page.curReq.from + " is told it was closed, with your reason. They can ask again." : ""; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                             Row { width: parent.width; spacing: 8
+                                   Field { width: parent.width - clB.width - 8; placeholderText: "Why, in a line they will read"; text: page.reqWhy; onTextEdited: page.reqWhy = text }
+                                   Btn { id: clB; text: "Close the request"; enabled: page.reqWhy.trim() !== ""; onClicked: page.closeReq(page.curReq) } } }
+                }
+            }
             // the head (ms-head): their face, who and where, under a rule
             Item {
                 visible: page.c !== null
                 width: parent.width
                 height: Math.max(44, hc.height) + 11
-                Face { size: 44; name: page.c ? page.c.title : "" }
+                Face { size: 44; name: page.c ? page.c.title : ""; group: page.c && page.c.kind === "admins" ? page.others(page.c) : null }
                 Column {
                     id: hc
                     x: 56; width: parent.width - 56
                     spacing: 2
                     Txt { width: parent.width; text: page.c ? (page.c.kind === "admins" ? "Every Admin" : page.c.title) : ""; font.pixelSize: 15; font.weight: Font.DemiBold }
                     Txt { width: parent.width; font.pixelSize: 13; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                          text: !page.c ? "" : page.c.kind === "admins" ? "A group of " + page.c.members.length + " and you. Each of them sees what everyone writes."
+                          text: !page.c ? "" : page.c.kind === "admins" ? "A group of " + page.others(page.c).length + " and you. Each of them sees what everyone writes."
                                 : conv.person ? (conv.person.role === "admin" ? "Admin" : "Signed in on " + conv.person.hostname + (conv.person.online ? "" : " · offline")) : "" }
+                    Row { spacing: 6; visible: page.c !== null
+                          Repeater { model: page.between(page.c)
+                                     Rectangle { required property var modelData; width: chT.implicitWidth + 16; height: 19; radius: 10; color: modelData[1] === "quiet" ? "transparent" : modelData[1] === "hot" ? Theme.alpha(Theme.crit, 0.14) : Theme.surface3
+                                                 border.width: modelData[1] === "quiet" ? 1 : 0; border.color: Theme.borderStrong
+                                                 Txt { id: chT; anchors.centerIn: parent; text: modelData[0]; font.pixelSize: 12; color: modelData[1] === "quiet" ? Theme.text3 : modelData[1] === "hot" ? Theme.crit : Theme.text2; elide: Text.ElideNone } } } }
                 }
                 Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
             }
@@ -287,22 +375,23 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Start a conversation"
-        sub: "one person goes to your conversation with them; every Admin goes to the group where everyone sees each other's answers"
+        sub: "one person goes to your conversation with them; several people, or every Admin, make a group where everyone sees each other's answers"
         Row {
             width: parent.width
             spacing: 8
-            Select { width: 380; search: true; placeholder: "With whom: a person, or every Admin"; value: page.who; options: page.whoOptions; onPicked: function (v) { page.who = v } }
+            Select { width: 380; search: true; multiple: true; placeholder: "With whom: people, or every Admin"; values: page.many; options: page.whoOptions; onPicked: function (v) { var x = page.many.slice(), i = x.indexOf(v); if (i >= 0) x.splice(i, 1); else x.push(v); page.many = x } }
             Field { width: parent.width - 380 - goB.width - 16; placeholderText: "The message"; text: page.mtxt; onTextEdited: page.mtxt = text }
-            Btn { id: goB; kind: "primary"; text: "Send"; enabled: page.who !== null; onClicked: page.startOne() }
+            Btn { id: goB; kind: "primary"; text: page.many.length > 1 ? "Start the group" : "Send"; enabled: page.many.length > 0 && !page.several && page.mtxt.trim() !== ""; tip: page.several ? "The Engine keeps the group of every Admin only, for now" : ""; onClicked: page.startOne() }
         }
         Rectangle {
-            visible: page.who !== null
+            visible: page.many.length > 0
             width: parent.width
             height: visible ? sp.height + 20 : 0
             radius: Theme.radius
             color: Theme.surface2
             Txt { id: sp; x: 12; y: 10; width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                  text: String(page.who) === "admins" ? "Goes to the Admins group; each of them sees it, and each other's answers." : "Goes to your conversation with " + ((page.whoOptions.filter(function (o) { return o.value === page.who })[0] || { label: "them" }).label.split(" · ")[0]) + "; only the two of you see it." }
+                  text: page.many.length === 0 ? "" : page.many.indexOf("admins") >= 0 ? "Goes to the Admins group; each of them sees it, and each other's answers." : page.several ? "Starts a group; each of them sees what everyone writes."
+                        : "Goes to your conversation with " + ((page.whoOptions.filter(function (o) { return o.value === page.many[0] })[0] || { label: "them" }).label.split(" · ")[0]) + "." }
         }
     }
 }

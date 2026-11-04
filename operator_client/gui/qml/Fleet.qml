@@ -166,7 +166,8 @@ QtObject {
                     }
                 if (eng) issues = (engBy[w.pc_id] || []).map(fleet.fromEngine)
                 var worst = issues.slice().sort(function (a, c) { return fleet.order[a.sev] - fleet.order[c.sev] })[0]
-                var status = !online ? "offline" : worst ? worst.sev : "healthy"
+                // the Engine's word for the machine, where it sends one (machines.list); else the worst open issue
+                var status = !online ? "offline" : ag && ag.health ? ag.health : worst ? worst.sev : "healthy"
                 var s = w.session
                 var held = s && s.occupied_via && s.occupied_via !== "native" ? (s.occupant_name || "Someone") : ""
                 var m = {
@@ -178,7 +179,7 @@ QtObject {
                     behind: ag && ag.version ? !!ag.behind : !!be, escalated: be ? !!be.escalated : false, failures: be ? be.failures : 0, lastTry: be ? be.last_attempt_at : null,
                     status: status,
                     note: !online ? "Offline" + (w.last_seen_at ? " since " + Time.at(w.last_seen_at) : "") + (worst ? " · " + worst.note.toLowerCase() : "")
-                                  : worst ? worst.note : (held ? "Session held by " + held : (w.name ? "" : "No one signed in")),
+                                  : ag && ag.note ? ag.note : worst ? worst.note : (held ? "Session held by " + held : (w.name ? "" : "No one signed in")),
                     issues: issues
                 }
                 ms.push(m); outM.push(m); bh[m.host] = m; bp[m.pc_id] = m
@@ -212,7 +213,7 @@ QtObject {
     function fromEngine(x) {
         return { id: "I-" + x.id, iid: x.id, code: x.code, sev: x.severity === "medium" ? "warning" : x.severity, type: x.type, title: x.title,
                  subject: x.subject || "", note: x.title, at: x.opened_at, ref: x, state: x.state, label: x.label, past: !!x.past_target,
-                 escalated: !!x.escalated }
+                 escalated: !!x.escalated, age: x.age_hours, target: x.target_hours }
     }
 
     property Timer later: Timer { interval: 400; onTriggered: fleet.refresh() }

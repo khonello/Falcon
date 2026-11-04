@@ -13,7 +13,7 @@ Page {
     property var items: []                         // calendar.board's items
     property int mi: 0                             // the month shown, counted from this one
     property string f: "all"                       // all | task | rule | announcement
-    property real today: Time.startOfDay(Date.now())
+    property real today: Time.startOfDay(Time.now)
     property real sel: today                       // the day picked, as its midnight in ms
 
     readonly property var kinds: ({
@@ -23,7 +23,7 @@ Page {
     })
     // the version 1 concept: task deadlines, your to-dos and scheduled automation (announcements live on Messages)
     readonly property var kindKeys: ["task", "todo", "rule"]
-    function colour(x) { return x.k === "task" && x.overdue ? Theme.crit : kinds[x.k].c }
+    function colour(x) { return (x.k === "task" || x.k === "todo") && x.overdue ? Theme.crit : kinds[x.k].c }
 
     // --- the data ------------------------------------------------------------------------------------
     readonly property var parsed: items.filter(function (i) { return page.kindKeys.indexOf(i.kind) >= 0 }).map(function (i) {
@@ -66,7 +66,7 @@ Page {
     readonly property var kindsHere: kindKeys
     readonly property var agenda: {
         var rows = dayItems.map(function (x) { return { x: x, at: x.at } })
-        if (sel === today) rows.push({ now: true, at: Date.now() })
+        if (sel === today) rows.push({ now: true, at: Time.now })
         rows.sort(function (a, b) { return a.at - b.at })
         return rows
     }
@@ -86,7 +86,7 @@ Page {
     }
     Component.onCompleted: load()
     Connections { target: falcon; function onConnected() { page.load() } }
-    Timer { interval: 60000; running: true; repeat: true; onTriggered: { page.today = Time.startOfDay(Date.now()); page.load() } }
+    Timer { interval: 60000; running: true; repeat: true; onTriggered: { page.today = Time.startOfDay(Time.now); page.load() } }
 
     // --- the page: the month and the day, side by side at one height ------------------------------------
     Item {
@@ -119,13 +119,13 @@ Page {
                         spacing: 8
                         anchors.verticalCenter: parent.verticalCenter
                         Txt { text: Qt.locale("en_GB").monthName(page.first.getMonth(), Locale.LongFormat); font.pixelSize: Theme.fMonth; font.weight: Font.DemiBold; anchors.baseline: yr.baseline; elide: Text.ElideNone }
-                        Txt { id: yr; text: String(page.first.getFullYear()); font.pixelSize: Theme.fLead; color: Theme.text3; elide: Text.ElideNone }
+                        Txt { id: yr; text: String(page.first.getFullYear()); font.pixelSize: 16; color: Theme.text3; elide: Text.ElideNone }
                     }
                     Btn { objectName: "calPrev"; small: true; iconName: "left"; enabled: page.mi > 0; onClicked: page.pickMonth(page.mi - 1); anchors.verticalCenter: parent.verticalCenter }
                     Btn { objectName: "calNext"; small: true; iconName: "right"; enabled: page.mi < page.months - 1; onClicked: page.pickMonth(page.mi + 1); anchors.verticalCenter: parent.verticalCenter }
                     Btn { objectName: "calToday"; small: true; text: "Today"; enabled: !(page.mi === 0 && page.sel === page.today); onClicked: page.pickMonth(0); anchors.verticalCenter: parent.verticalCenter }
                     Segmented {
-                        visible: page.months > 1 && month.width > 760      // the months by name, when there is room for them beside the filter
+                        visible: page.months > 1
                         anchors.verticalCenter: parent.verticalCenter
                         options: { var o = []; for (var i = 0; i < page.months; i++) o.push({ value: i, label: Qt.locale("en_GB").monthName(page.monthStart(i).getMonth(), Locale.ShortFormat) }); return o }
                         value: page.mi
@@ -289,7 +289,7 @@ Page {
                 }
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
-                    Txt { text: Qt.locale("en_GB").dayName(new Date(page.sel).getDay(), Locale.LongFormat); font.pixelSize: Theme.fLead; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                    Txt { text: Qt.locale("en_GB").dayName(new Date(page.sel).getDay(), Locale.LongFormat); font.pixelSize: 16; font.weight: Font.DemiBold; elide: Text.ElideNone }
                     Txt { text: page.rel() + (page.dayItems.length ? " · " + Theme.many(page.dayItems.length, "item") : ""); color: Theme.text3; elide: Text.ElideNone }
                 }
             }
@@ -319,24 +319,24 @@ Page {
                             height: body.height + 14
 
                             Txt { x: 0; y: 1; width: 52; text: Time.hhmm(modelData.at); mono: true; font.pixelSize: Theme.fSmall; color: modelData.now ? Theme.accent : Theme.text3; font.weight: modelData.now ? Font.DemiBold : Font.Normal; elide: Text.ElideNone }
-                            Rectangle { x: 62; y: 4; width: 1; height: parent.height - 2; color: Theme.border; visible: !row.last }
+                            Rectangle { x: 74; y: 4; width: 1; height: parent.height - 2; color: Theme.border; visible: !row.last }
                             Rectangle {
-                                x: 57; y: 4; width: 10; height: 10; radius: 5
+                                x: 69; y: 4; width: 10; height: 10; radius: 5
                                 color: row.c
                                 Rectangle { anchors.centerIn: parent; width: 16; height: 16; radius: 8; color: Theme.alpha(row.c, 0.25); z: -1; visible: !!row.modelData.now }
                             }
                             Column {
                                 id: body
-                                x: 82
-                                width: parent.width - 82
+                                x: 92
+                                width: parent.width - 92
                                 spacing: 1
                                 Txt { visible: !!row.modelData.now; text: "Now"; color: Theme.accent; font.weight: Font.DemiBold; elide: Text.ElideNone }
                                 Txt { visible: !row.modelData.now; text: row.modelData.x ? row.modelData.x.title : ""; font.weight: Font.Medium; width: parent.width; wrapMode: Text.Wrap; elide: Text.ElideNone }
                                 Txt { visible: !row.modelData.now; text: row.modelData.x ? (row.modelData.x.k === "announcement" ? "Goes out · " : "") + row.modelData.x.line : ""; color: Theme.text3; font.pixelSize: Theme.fSmall; width: parent.width }
                                 Row {
                                     visible: !row.modelData.now
-                                    spacing: 10
-                                    topPadding: 5
+                                    spacing: 8
+                                    topPadding: 6
                                     Tag { c: row.c; text: row.modelData.x ? page.kinds[row.modelData.x.k].label + (row.modelData.x.overdue && row.modelData.x.k === "task" ? " · past its date" : "") : "" }
                                     Link { text: "Open →"; anchors.verticalCenter: parent.verticalCenter; onClicked: Nav.go(row.modelData.x.to[0], row.modelData.x.to.length > 1 ? row.modelData.x.to[1] : null) }
                                 }

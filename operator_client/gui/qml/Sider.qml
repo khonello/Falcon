@@ -50,11 +50,13 @@ Rectangle {
             id: groups
             x: 8
             width: parent.width - 16
+            spacing: 1
             Repeater {
                 model: Nav.menu
                 delegate: Column {
                     required property var modelData
                     width: groups.width
+                    spacing: 1
                     Txt {
                         text: modelData[0].toUpperCase()
                         color: Theme.text4
@@ -75,7 +77,7 @@ Rectangle {
                             readonly property var c: Nav.counts[key]
                             objectName: "nav_" + key
                             width: groups.width
-                            height: 32
+                            height: 31.5
                             radius: 5
                             color: on ? Theme.accentSoft : area.containsMouse ? Theme.surface3 : "transparent"
 
@@ -85,7 +87,7 @@ Rectangle {
                                 spacing: 10
                                 Icon {
                                     name: item.modelData[2]
-                                    size: 15
+                                    size: 13
                                     color: item.on ? Theme.accent : area.containsMouse ? Theme.text : Theme.text2
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
@@ -156,8 +158,11 @@ Rectangle {
     // the person at this console
     Column {
         id: foot
+        // the concept's .side-foot: inside the menu's 8px sides and 10px foot, a rule over it, 10px within, 6px between lines
+        x: 8
         anchors.bottom: parent.bottom
-        width: parent.width - 1
+        anchors.bottomMargin: 10
+        width: parent.width - 17
         Rectangle { width: parent.width; height: 1; color: Theme.border }
         Item {
             width: parent.width
@@ -166,7 +171,7 @@ Rectangle {
                 id: inner
                 x: 10; y: 10
                 width: parent.width - 20
-                spacing: 8
+                spacing: 6
                 Row {
                     spacing: 8
                     Rectangle {

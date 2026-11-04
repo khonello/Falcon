@@ -61,12 +61,27 @@ Page {
     readonly property var m: it ? Fleet.byHost[it.host] : null
     readonly property var play: !it ? null : it.iid === undefined ? build(it, m)
         : det && det.issue && det.issue.id === it.iid ? { lead: det.lead, facts: det.facts || [], why: det.why || [],
-              options: (det.options || []).map(function (o) { return Object.assign({ icon: page.keyIcon[o.key] || "right", waits: o.done === "Waiting" }, o) }) } : null
+              options: page.withRule(page.withLook((det.options || []).filter(function (o) { return o.key !== "ask" }))      // the concept offers no Ask
+                  .map(function (o) { return Object.assign({ icon: page.keyIcon[o.key] || "right", waits: o.done === "Waiting" }, o) })) } : null
+    // a deviation can be looked into first, from inside: the concept's first choice
+    function withLook(os) {
+        if (!it || it.type !== "deviation" || !m || !m.online) return os
+        return [{ key: "look", title: "Look into it first", desc: "Enter " + it.host + " and check who changed it." + (m.user ? " " + m.user + " is locked out while you are in." : ""), verb: "Enter " + it.host, done: "Open" }].concat(os)
+    }
+    // the fix on a card: Delete copy, else the first choice that needs nothing more, else the first
+    function primaryOf(os) { return os.filter(function (o) { return o.key === "delete" })[0] || os.filter(function (o) { return !o.need && !o.cannot })[0] || os[0] }
+    // where Falcon can do the fix alone, it can be made a rule (issues.act "rule")
+    function withRule(os) {
+        var p = primaryOf(os)
+        if (!p || p.key !== "delete") return os
+        return os.concat([{ key: "rule", title: "Delete this every time from now on", verb: "Delete copy, every time",
+                            desc: "When a restricted file is copied on any of your machines, Falcon will delete the copy and tell whoever is signed in. This one is fixed now too; you can change or stop it in Automation." }])
+    }
     readonly property var opt: {
         if (!play) return null
         var k = pick[it.id]
         for (var i = 0; i < play.options.length; i++) if (play.options[i].key === k) return play.options[i]
-        return play.options[0]
+        return primaryOf(play.options)
     }
     readonly property string val: it && opt ? (input[it.id + opt.key] || "") : ""
     readonly property string missing: !opt ? "" : opt.cannot ? "" : (opt.need === "reason" || opt.need === "message") && val.trim() === ""
@@ -75,9 +90,10 @@ Page {
 
     situation: {
         if (!todo.length && !later.length) return "Nothing is open on your machines."
-        var now = todo.filter(function (i) { return i.sev === "critical" || page.late(i) }), lateN = todo.filter(page.late).length
+        var open = all.filter(function (i) { return i.state !== "resolved" && !(page.done[i.id] && page.done[i.id].status === "Resolved") })
+        var now = todo.filter(function (i) { return i.sev === "critical" || page.late(i) }), lateN = open.filter(page.late).length
         var worst = now[0] || todo[0]
-        return Theme.fmt(todo.length) + " open on your machines; " + (now.length ? Theme.fmt(now.length) + " to act on now" : "nothing urgent")
+        return Theme.fmt(open.length) + " open on your machines; " + (now.length ? Theme.fmt(now.length) + " to act on now" : "nothing urgent")
                + (lateN ? ", " + Theme.fmt(lateN) + " past " + (lateN === 1 ? "its" : "their") + " time" : "") + "."
                + (worst ? " The worst: " + (worst.subject || worst.title) + " on " + worst.host + (page.late(worst) ? ", " + (worst.at ? Time.waitLen((Time.now - Time.ms(worst.at)) / 3600000 - (worst.type === "file" || worst.type === "help" ? 1 : 24)) + " " : "") + "past its time." : ", " + Fleet.sevWord(worst.sev).toLowerCase() + ".") : "")
     }
@@ -157,12 +173,20 @@ Page {
     function mark(i, status, how) { var d = Object.assign({}, done); d[i.id] = { status: status, how: how, at: Date.now() }; done = d }
 
     // what a card says under its name
+    function whenSay(x) { var t = Time.ms(x), d = Math.round((new Date(Time.now).setHours(0, 0, 0, 0) - new Date(t).setHours(0, 0, 0, 0)) / 86400000)
+                          return (d === 0 ? "Today" : d === 1 ? "Yesterday" : Time.dayName(t)) + " at " + Time.hhmm(t) }
     function cardLine(i) {
         var d = done[i.id]
         if (d) return d.status === "Resolved" ? d.how : "Waits on the step you took: " + d.how.charAt(0).toLowerCase() + d.how.slice(1)
-        if (i.state === "waiting") return i.label || "Waits on the step already taken"
+        if (i.state === "waiting") {
+            var mm = Fleet.byHost[i.host]
+            if (i.type === "update") return mm && !mm.online ? "Waits for " + i.host + " to come online; the update retries then" : "Retries when " + i.host + " is idle"
+            if (i.type === "flow") return "Waits for " + (String(i.subject || "").split(" → ")[1] || "them") + " to pick a folder"
+            return "Waits on the step already taken"
+        }
         if (i.state === "resolved") return "Resolved"
-        return i.title + (i.sev === "critical" ? " · critical" : "")
+        var dt = i.ref && i.ref.detail ? i.ref.detail : null        // the folder comes with issues.list once the Engine sends it there (ENGINE-GAPS #23)
+        return (i.type === "file" && dt && dt.folder ? "in " + dt.folder : i.title) + (i.sev === "critical" ? " · critical" : "")
     }
 
     // one heading per kind, the kind with the most pressing issue first; its worst three, the rest a click away. Groups
@@ -269,9 +293,9 @@ Page {
                                          : page.it ? page.audit.filter(function (e) { return e.host === page.it.host && Math.abs(e.t - Time.ms(page.it.at)) < 2 * 3600000 }).slice(0, 6).reverse() : []
                 Column {
                     width: parent.width
-                    spacing: 4
+                    spacing: 0
                     opacity: page.loading ? 0 : 1
-                    Txt { width: parent.width; bottomPadding: 8 - topPadding; text: "The story of this issue, oldest first. Whatever you choose on the right is added here, with the time."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                    Txt { width: parent.width; bottomPadding: 6.5 - topPadding; text: "The story of this issue, oldest first. Whatever you choose on the right is added here, with the time."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
                     Txt { visible: story.evs.length === 0; text: page.it ? "Nothing recorded on " + page.it.host + " around it yet. What you do here is added as you go." : ""; color: Theme.text3; font.pixelSize: 13 }
                     Column {
                         width: parent.width
@@ -281,10 +305,10 @@ Page {
                                 required property var modelData
                                 width: parent.width
                                 height: el.height + 13
-                                Txt { y: 6 + el.baselineOffset - baselineOffset; width: 84; mono: true; color: Theme.text3; elide: Text.ElideNone
+                                Txt { y: 6 + el.baselineOffset - baselineOffset; width: 44; mono: true; color: Theme.text3; elide: Text.ElideNone
                                       text: Time.sameDay(modelData.t, Time.now) ? Time.hhmm(modelData.t) : Time.dayName(modelData.t) + " " + Time.hhmm(modelData.t) }
-                                Rectangle { x: 92; y: 6 + el.height / 2 - 3.5; width: 7; height: 7; radius: 3.5; color: Kinds.color(modelData.kind) }
-                                Txt { id: el; x: 110; y: 6; width: parent.width - 110; textFormat: Text.StyledText
+                                Rectangle { x: 52; y: 6 + el.height / 2 - 3.5; width: 7; height: 7; radius: 3.5; color: Kinds.color(modelData.kind) }
+                                Txt { id: el; x: 70; y: 6; width: parent.width - 70; textFormat: Text.StyledText
                                       text: "<span style='font-weight:500'>" + modelData.actor + "</span> <font color='" + Theme.text2 + "'>" + modelData.what + "</font>" }
                                 Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                             }
@@ -317,7 +341,7 @@ Page {
                 labelW: 104
                 rows: !page.it ? [] : [["What", page.it.subject || page.it.title, ((page.types[page.it.type] || { label: "" }).label + " · " + Fleet.sevWord(page.it.sev)).toLowerCase()],
                                         ["Where", page.it.host, page.m ? page.m.deptName + " · " + (page.m.user ? page.m.user + " signed in" : "nobody signed in") : ""],
-                                        ["When", Time.atDay(page.it.at), page.isDone(page.it) ? "done, your part" : "open"]]
+                                        ["When", page.whenSay(page.it.at), page.isDone(page.it) ? "done, your part" : "open"]]
                                         .concat(page.play && !page.isDone(page.it) ? page.play.facts.filter(function (f) { return !/^(File|Machine|Found on|Severity|Signed in)$/.test(f[0]) }).map(function (f) { return [f[0], f[1], ""] }) : [])
             }
             // resolved: what was done, and Reopen
@@ -356,7 +380,7 @@ Page {
                             on: page.opt !== null && modelData.key === page.opt.key
                             title: modelData.title
                             desc: modelData.desc || ""
-                            recommended: index === 0
+                            recommended: page.play !== null && modelData.key === page.primaryOf(page.play.options).key
                             onClicked: { var p = Object.assign({}, page.pick); p[page.it.id] = modelData.key; page.pick = p }
                         }
                     }

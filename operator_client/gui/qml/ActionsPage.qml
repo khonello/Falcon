@@ -41,61 +41,114 @@ Page {
     Timer { id: again; interval: 600; onTriggered: page.load() }
 
     function b(a) { return a ? board[a.id] || {} : {} }
-    function usedBy(a) { return events.filter(function (e) { return (e.actions || []).some(function (x) { return x.id === a.id }) }) }
+    function usedBy(a) { return (b(a).used_by || []) }
+    function whoWord(w) { return w === "You" ? "you" : w }
+    function langWord(a) { return (a.custom_script_language || a.language) === "powershell" ? "PowerShell" : "Python" }
     readonly property var catWord: ({ control: "Control", monitoring: "Monitoring", custom: "Custom" })
     readonly property var rows: lib
     readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
     readonly property var curRuns: runs
     readonly property int bad: strip.problems || 0
 
-    RunOnce { id: runOnce; page: page }
-
     // --- the version 1 concept's layout (docs/design/concepts-admin.html, AdminActionsLayout) -------------------------------------------------
     property var picks: []                // machines picked to run it on now
     property bool loading: false
     property var pickedId: null
-    property int busy: 0
-    onSelChanged: picks = []
+    // a run by hand: each picked machine runs, then reports; when they have all reported it joins Ran by hand lately
+    property var run: null                // { id, action, lim, at, xs: [{ pc, host, st, exec, sec, t0 }] }
+    readonly property var here: run && cur && run.id === cur.id ? run : null
+    readonly property bool busy: here !== null && here.xs.some(function (y) { return y.st === "Running" })
+    readonly property int doneN: here ? here.xs.filter(function (y) { return y.st !== "Running" }).length : 0
+    readonly property int failN: here ? here.xs.filter(function (y) { return Auto.problem(y.st) }).length : 0
+    // your own PC: the console is on it, so it is on; an Admin's PC is not among the machines
+    readonly property var mePc: {
+        for (var i = 0; i < Fleet.depts.length; i++) for (var j = 0; j < (Fleet.depts[i].admins || []).length; j++) {
+            var a = Fleet.depts[i].admins[j]
+            if (a.account_id === falcon.accountId && a.pc_id) return { pc_id: a.pc_id, host: a.hostname || a.pc_hostname || "", user: a.name, online: true }
+        }
+        return null
+    }
+    function pcOf(h) { return mePc && mePc.host === h ? mePc : Fleet.byHost[h] }
+    function tileOf(h) { return here ? here.xs.filter(function (y) { return y.host === h })[0] || null : null }
+    onSelChanged: { if (!busy) run = null }
     Component.onCompleted: { load(); var a = Nav.takeArrive("actions"); if (a !== null && Fleet.byHost[a]) picks = [a] }
     onCurChanged: { loadRuns(); loading = true; ldT.restart() }
     Timer { id: ldT; interval: Theme.loadMs; onTriggered: { page.loading = false; page.pickedId = page.cur ? page.cur.id : null } }
     function runNow() {
-        var a = cur, hosts = picks.slice()
-        busy = hosts.length
-        hosts.forEach(function (h) {
-            var m = Fleet.byHost[h]
-            falcon.call("control.action_run", { action_id: a.id, pc_id: m.pc_id }, function (ok, r) {
-                page.busy -= 1
-                if (!ok) Msg.failed(h + ": " + (r && r.message ? r.message : "not started"))
-                if (page.busy === 0) { Msg.ok(a.name + " started on " + Theme.listNames(hosts, 3)); page.picks = []; again.restart() }
+        var a = cur
+        run = { id: a.id, action: a.name, lim: a.timeout_seconds, at: new Date(Time.now).toISOString(),
+                xs: picks.map(function (h) { return { pc: page.pcOf(h).pc_id, host: h, st: "Running", exec: 0, sec: 0, t0: Time.now } }) }
+        run.xs.forEach(function (x) {
+            falcon.call("control.action_run", { action_id: a.id, pc_id: x.pc }, function (ok, r) {
+                if (ok) page.setRun(x.host, { exec: r.execution_id || (r.executions && r.executions[0] ? r.executions[0].execution_id : 0) })
+                else { page.setRun(x.host, { st: "Failed" }); Msg.failed(x.host + ": " + (r && r.message ? r.message : "not started")) }
             })
         })
+        poll.start()
+    }
+    function setRun(h, o) {
+        if (!run) return
+        run = Object.assign({}, run, { xs: run.xs.map(function (y) { return y.host === h ? Object.assign({}, y, o) : y }) })
+    }
+    // each machine reports through control.execution
+    Timer {
+        id: poll
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            var waiting = page.run ? page.run.xs.filter(function (y) { return y.st === "Running" && y.exec }) : []
+            if (page.run && !page.run.xs.some(function (y) { return y.st === "Running" })) { stop(); again.restart(); page.loadHand(); return }
+            waiting.forEach(function (y) {
+                falcon.call("control.execution", { execution_id: y.exec }, function (ok, r) {
+                    if (!ok || !r.execution || r.execution.status === "pending") return
+                    page.setRun(y.host, { st: Auto.outcome(r.execution), sec: Math.max(1, Math.round((Time.now - y.t0) / 1000)) })
+                })
+            })
+        }
+    }
+    function stopRun() {
+        var ids = run.xs.filter(function (y) { return y.st === "Running" && y.exec }).map(function (y) { return y.exec })
+        if (!ids.length) return
+        falcon.call("control.terminate_run", { execution_ids: ids }, function (ok, r) { if (!ok) Msg.failed(r && r.message ? r.message : "Not stopped") })
+    }
+    // the output of the run just made, as Ran by hand lately shows it
+    function showHere() {
+        var r = here
+        showOut({ action: r.action, who: "You", at: r.at, from: "by you", xs: r.xs.map(function (y) { return { host: y.host, pc_id: y.pc, run_id: y.exec, outcome: y.st, took_s: y.sec, limit_s: r.lim, at: r.at } }) })
     }
     situation: {
         if (!lib.length) return "No actions yet."
         var custom = lib.filter(function (a) { return a.cat === "custom" }).length, byHand = strip.by_hand || 0
-        var badRuns = Object.keys(board).map(function (k) { return board[k] }).filter(function (x) { return x.problems })
+        var worst = handRuns.filter(badRun)[0], rules = {}
+        Object.keys(board).forEach(function (k) { (board[k].used_by || []).forEach(function (u) { rules[u.event_id] = 1 }) })
+        var n = Object.keys(rules).length
         return Theme.many(lib.length, "action") + ", " + Theme.fmt(custom) + " of them written here. " + Theme.many(byHand, "run") + " by hand this week"
-               + (badRuns.length ? "; " + Theme.listNames(badRuns.map(function (x) { var a = page.lib.filter(function (y) { return y.id === x.action_id })[0]; return a ? a.name : "an action" }), 2) + " had a run go wrong." : ".")
+               + (worst ? "; " + worst.action + (worst.outcome === "Timed out" ? " ran out of time on " : " failed on ") + worst.host + "." : ".")
+               + (n ? " " + Theme.many(n, "rule") + (n === 1 ? " uses them." : " use them.") : "")
     }
     situationAt: Time.now
 
     // runs by hand across every action, for Ran by hand lately
-    property var hand: []
-    function loadHand() { falcon.call("actions.runs", { limit: 200 }, function (ok, r) { page.hand = ok ? (r.runs || []).filter(function (x) { return !x.event_id }).slice(0, 6) : [] }) }
+    property var handRuns: []
+    function loadHand() { falcon.call("actions.runs", { limit: 200 }, function (ok, r) { page.handRuns = ok ? (r.runs || []).filter(function (x) { return !x.event_id }) : [] }) }
+    // one run on several machines is one card: the same action, by the same person, within the half hour
+    readonly property var hand: {
+        var by = {}, out = []
+        handRuns.forEach(function (x) {
+            var k = x.action + "|" + (x.who || "") + "|" + Math.round(Time.ms(x.at) / 1800000)
+            if (!by[k]) { by[k] = { action: x.action, action_id: x.action_id, who: x.who, at: x.at, xs: [] }; out.push(by[k]) }
+            by[k].xs.push(x)
+        })
+        out.forEach(function (r) { r.bad = r.xs.some(page.badRun); r.from = r.who ? "by " + page.whoWord(r.who) : "by hand" })
+        var late = function (a, b) { return Time.ms(b.at) - Time.ms(a.at) }
+        return out.filter(function (r) { return r.bad }).sort(late).concat(out.filter(function (r) { return !r.bad }).sort(late)).slice(0, 6)
+    }
     Timer { running: true; interval: 10; onTriggered: page.loadHand() }
     function badRun(x) { return x.outcome === "Failed" || x.outcome === "Timed out" }
-    property var outRun: null
-    Modal {
-        id: outM
-        page: page
-        title: page.outRun ? page.outRun.action + " on " + page.outRun.host : ""
-        subtitle: page.outRun ? Time.atDay(page.outRun.at) + " · " + (page.outRun.event_id ? page.outRun.by.replace(/^rule: /, "") : "by hand") : ""
-        width: 640
-        RunOutput { width: 592; executionId: outM.visible && page.outRun ? page.outRun.run_id : 0 }
-        footer: Btn { text: "Close"; onClicked: outM.close() }
-    }
-    function showOut(x) { outRun = x; outM.open() }
+    RunOutputModal { id: outM; page: page }
+    function showOut(r) { outM.show(r) }
+    // one run from Its last runs, as the modal takes it
+    function oneRun(x) { return { action: x.action, at: x.at, from: x.event_id ? String(x.by).replace(/^rule: /, "") : x.who ? "by " + whoWord(x.who) : "by hand", xs: [x] } }
 
     Row {
         width: parent.width
@@ -107,7 +160,7 @@ Page {
             objectName: "actionList"
             width: (parent.width - 16) * 4 / 12
             height: parent.h
-            gap: 2
+            gap: 0
             title: "Your actions"
             sub: String(page.lib.length)
             Repeater {
@@ -115,24 +168,24 @@ Page {
                 delegate: Column {
                     id: cg
                     required property var modelData
+                    required property int index
                     readonly property var xs: page.lib.filter(function (a) { return a.cat === modelData[0] })
                     visible: xs.length > 0
                     width: parent.width
-                    spacing: 2
-                    Txt { topPadding: 10 + 1.2; bottomPadding: 4 - 1.2; text: cg.modelData[1]; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text3 }
+                    Txt { topPadding: cg.index === 0 ? 7.6 : 17; bottomPadding: 4 - 1.2; text: cg.modelData[1]; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text3 }
                     Repeater {
                         model: cg.xs
                         delegate: Rectangle {
                             required property var modelData
                             readonly property var bb: page.b(modelData)
                             readonly property int used: page.usedBy(modelData).length
-                            width: cg.width; height: lc.height + 18; radius: Theme.radius
+                            width: cg.width; height: 55.75; radius: Theme.radius
                             color: page.cur && page.cur.id === modelData.id ? Theme.surface3 : aa.containsMouse ? Theme.surface2 : "transparent"
                             Icon { x: 10; y: 13; name: modelData.cat === "custom" ? "code" : modelData.cat === "monitoring" ? "eye" : "control"; size: 13; color: Theme.text3 }
                             Column { id: lc; x: 31; y: 9; width: parent.width - 31 - 10 - (parent.bb.problems ? 26 : 0); spacing: 1
                                 Txt { width: parent.width; text: modelData.name; font.weight: Font.DemiBold }
                                 Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12
-                                      text: modelData.cat === "custom" ? (modelData.language === "powershell" ? "PowerShell" : "Python") + (modelData.created_by_name ? " · by " + modelData.created_by_name : "")
+                                      text: modelData.cat === "custom" ? page.langWord(modelData) + (modelData.created_by_name ? " · by " + page.whoWord(modelData.created_by_name) : "")
                                             : parent.parent.used ? "used by " + Theme.many(parent.parent.used, "rule") : "run by hand only" } }
                             Rectangle { visible: !!parent.bb.problems; anchors.right: parent.right; anchors.rightMargin: 10; y: 10; width: 18; height: 18; radius: 9; color: Theme.crit
                                         Txt { anchors.centerIn: parent; text: parent.parent.bb.problems || ""; color: Theme.inverse; font.pixelSize: 11; elide: Text.ElideNone } }
@@ -150,58 +203,70 @@ Page {
             height: parent.h
             gap: 14
             title: page.cur ? page.cur.name : "No action picked"
-            sub: page.cur ? (page.cur.cat === "custom" ? (page.cur.language === "powershell" ? "PowerShell" : "Python") + ", written here" : "comes with Falcon") : "pick an action on the left"
-            extra: Btn { visible: page.cur !== null && page.cur.cat === "custom"; small: true; iconName: "edit"; text: "Edit the script"; onClicked: Nav.go("actions", "edit-" + page.cur.id) }
-            Txt { visible: page.cur !== null; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 17; font.weight: Font.Medium; lh: 1.45; text: page.cur ? page.cur.description || page.cur.name : "" }
+            sub: page.cur ? (page.cur.cat === "custom" ? page.langWord(page.cur) + ", written by " + page.whoWord(page.cur.created_by_name || "an Admin") + " on " + Time.day(page.cur.created_at) : "comes with Falcon") : "pick an action on the left"
+            extra: Btn { visible: page.cur !== null && page.cur.cat === "custom"; small: true; headed: true; iconName: "edit"; text: "Edit the script"; onClicked: Nav.go("actions", "edit-" + page.cur.id) }
+            Txt { visible: page.cur !== null; width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 17; font.weight: Font.Medium; lh: 1.45; textFormat: Text.StyledText
+                  text: page.cur ? (page.cur.description || page.cur.name) + (page.cur.impact ? " <font color='" + Theme.text3 + "'>" + page.cur.impact + "</font>" : "") : "" }
             Row {
                 visible: page.cur !== null
                 spacing: 24
-                topPadding: 4
                 Txt { textFormat: Text.StyledText; font.pixelSize: 13; elide: Text.ElideNone; text: "<font color='" + Theme.text3 + "'>Time limit</font>&nbsp; " + (page.cur && page.cur.timeout_seconds ? page.cur.timeout_seconds + "s" : "—") }
                 Txt { textFormat: Text.StyledText; font.pixelSize: 13; width: Math.min(implicitWidth, sheet.innerW - 160)
-                      text: "<font color='" + Theme.text3 + "'>Used by</font>&nbsp; " + (page.cur ? (page.usedBy(page.cur).map(function (e) { return Auto.nameOf(e) }).join(", ") || "no rule yet") : "") }
+                      text: "<font color='" + Theme.text3 + "'>Used by</font>&nbsp; " + (page.cur ? (page.usedBy(page.cur).map(function (u) { return u.name }).join(", ") || "no rule yet") : "") }
             }
             // run it now (acx-run: under a rule)
             Column {
                 visible: page.cur !== null
                 width: parent.width
                 spacing: 8
-                topPadding: 8
+                topPadding: 5
                 Rectangle { width: parent.width; height: 1; color: Theme.border }
                 Item {
                     width: parent.width
                     height: rh.height + 12
                     Txt { id: rh; y: 8; text: "Run it now"; font.weight: Font.DemiBold; elide: Text.ElideNone }
                     Txt { x: rh.implicitWidth + 10; y: rh.y + rh.baselineOffset - baselineOffset; text: "click machines to pick them; offline ones are dashed"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                    Row { anchors.right: parent.right; y: rh.y + rh.baselineOffset - 14; spacing: 10
-                        Link { text: "Every machine"; font.pixelSize: 13; onClicked: page.picks = Fleet.machines.filter(function (m) { return m.online }).map(function (m) { return m.host }) }
-                        Link { text: "Clear"; font.pixelSize: 13; onClicked: page.picks = [] } }
+                    Row { visible: !page.busy; anchors.right: parent.right; y: rh.y + rh.baselineOffset - 14; spacing: 10
+                        Link { text: "Every machine"; font.pixelSize: 13; onClicked: { page.run = null; page.picks = Fleet.machines.filter(function (m) { return m.online }).map(function (m) { return m.host }) } }
+                        Link { text: "Clear"; font.pixelSize: 13; onClicked: { page.run = null; page.picks = [] } } }
                 }
                 Repeater {
-                    model: [["ADMIN PCS", Fleet.machines.filter(function (m) { return m.admin })], ["OTHER MACHINES", Fleet.machines.filter(function (m) { return !m.admin })]]
+                    model: [["ADMIN PCS", page.mePc ? [page.mePc] : []], ["OTHER MACHINES", Fleet.machines]]
                     delegate: Column {
                         required property var modelData
+                        required property int index
                         visible: modelData[1].length > 0
                         width: parent.width
                         spacing: 8
-                        Txt { topPadding: 4; text: modelData[0]; color: Theme.text4; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
+                        Txt { topPadding: parent.index > 0 ? 8 : 4; text: modelData[0]; color: Theme.text4; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
                         Flow {
                             width: parent.width
                             spacing: 8
                             Repeater {
-                                model: parent.parent.modelData[1].slice().sort(function (a, b) { return a.host.localeCompare(b.host) })
+                                model: parent.parent.modelData[1]
                                 delegate: Rectangle {
                                     required property var modelData
                                     readonly property bool on: page.picks.indexOf(modelData.host) >= 0
+                                    readonly property var st: page.tileOf(modelData.host)
+                                    // running, then how it ended; else picked
+                                    readonly property string state2: st ? (st.st === "Running" ? "run" : Auto.problem(st.st) ? "bad" : st.st === "Success" ? "ok" : "on") : on ? "on" : ""
+                                    readonly property color tone: state2 === "bad" ? Theme.crit : state2 === "ok" ? Theme.ok : Theme.accent
                                     width: Math.max(64, mn.implicitWidth + 16); height: 42; radius: 7
-                                    color: !modelData.online ? "transparent" : on ? Theme.mix(Theme.accent, Theme.surface3, 0.28) : Theme.surface3
-                                    border.width: 1
-                                    border.color: !modelData.online ? Theme.borderStrong : ma.containsMouse ? Theme.borderStrong : "transparent"
+                                    color: !modelData.online ? "transparent" : state2 === "" ? Theme.surface3
+                                           : Theme.mix(tone, Theme.surface3, state2 === "run" ? 0.16 : state2 === "ok" ? 0.26 : 0.28)
+                                    SequentialAnimation on opacity {
+                                        running: parent.state2 === "run"; loops: Animation.Infinite; alwaysRunToEnd: true
+                                        NumberAnimation { to: 0.6; duration: Theme.durPulse }
+                                        NumberAnimation { to: 1; duration: Theme.durPulse }
+                                    }
+                                    border.width: modelData.online ? 1 : 0
+                                    border.color: ma.containsMouse ? Theme.borderStrong : "transparent"
+                                    DashBox { visible: !modelData.online }
                                     Txt { id: mn; anchors.centerIn: parent; text: modelData.host.replace(/^WS-/, ""); mono: true; font.pixelSize: 11; font.weight: Font.DemiBold; elide: Text.ElideNone
-                                          color: !modelData.online ? Theme.text4 : parent.on ? Theme.accent : Theme.text3 }
-                                    MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; enabled: modelData.online; cursorShape: Qt.PointingHandCursor
-                                                onClicked: page.picks = parent.on ? page.picks.filter(function (h) { return h !== modelData.host }) : page.picks.concat([modelData.host]) }
-                                    Tip { text: modelData.host + (modelData.user ? ", " + modelData.user : "") + (modelData.online ? "" : " · offline") }
+                                          color: !modelData.online ? Theme.text4 : parent.state2 !== "" ? parent.tone : Theme.text3 }
+                                    MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; enabled: modelData.online && !page.busy; cursorShape: Qt.PointingHandCursor
+                                                onClicked: { if (page.here) page.run = null; page.picks = parent.on ? page.picks.filter(function (h) { return h !== modelData.host }) : page.picks.concat([modelData.host]) } }
+                                    Tip { text: modelData.host + (modelData.user ? ", " + modelData.user : "") + (modelData.online ? "" : " · offline") + (parent.st ? " · " + parent.st.st.toLowerCase() : "") }
                                 }
                             }
                         }
@@ -210,22 +275,30 @@ Page {
                 Item {
                     width: parent.width
                     height: runB.height + 10
-                    Txt { y: 10; width: parent.width - runB.width - 12; anchors.verticalCenter: runB.verticalCenter; color: Theme.text2; font.pixelSize: 13
-                          text: page.picks.length && page.cur ? page.cur.name + " on " + Theme.listNames(page.picks, 4) + (page.cur.timeout_seconds ? ", up to " + page.cur.timeout_seconds + "s each." : ".") : "Pick at least one machine." }
-                    Btn { id: runB; y: 10; anchors.right: parent.right; kind: "primary"; iconName: "caretr"; text: "Run on " + page.picks.length; enabled: page.picks.length > 0 && page.busy === 0; onClicked: page.runNow() }
+                    Txt { y: 10; width: parent.width - runB.width - 12; anchors.verticalCenter: runB.verticalCenter; color: Theme.text2; font.pixelSize: 13; textFormat: Text.StyledText
+                          text: page.busy ? "Running on " + page.here.xs.length + ": " + page.doneN + " of " + page.here.xs.length + " reported back."
+                                : page.here ? (page.failN ? "<font color='" + Theme.crit + "'>" + page.failN + " of " + page.here.xs.length + " went wrong.</font>" : "Done on all " + page.here.xs.length + ".") + " Its output is in Ran by hand lately too."
+                                : page.picks.length && page.cur ? page.cur.name + " on " + Theme.listNames(page.picks, 4) + ", up to " + page.cur.timeout_seconds + "s each." : "Pick at least one machine." }
+                    Btn { id: runB; y: 10; anchors.right: parent.right
+                          kind: page.busy ? "default" : "primary"
+                          danger: !page.busy && !page.here && !!page.cur && !!page.cur.risky
+                          iconName: page.busy ? "" : page.here ? "filesearch" : "caretr"
+                          text: page.busy ? "Stop" : page.here ? "See the output" : "Run on " + page.picks.length
+                          enabled: page.busy || page.here !== null || page.picks.length > 0
+                          onClicked: page.busy ? page.stopRun() : page.here ? page.showHere() : page.runNow() }
                 }
             }
             // its last runs
             Column {
                 visible: page.cur !== null
                 width: parent.width
-                spacing: 0
-                topPadding: 8
+                spacing: 8
+                topPadding: 5
                 Rectangle { width: parent.width; height: 1; color: Theme.border }
                 Item {
                     width: parent.width
-                    height: lh2.height + 20
-                    Txt { id: lh2; y: 16; text: "Its last runs"; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                    height: lh2.height + 16
+                    Txt { id: lh2; y: 13; text: "Its last runs"; font.weight: Font.DemiBold; elide: Text.ElideNone }
                     Txt { x: lh2.implicitWidth + 10; y: lh2.y + lh2.baselineOffset - baselineOffset; text: "from rules and by hand, this week"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                 }
                 Repeater {
@@ -234,14 +307,14 @@ Page {
                         required property var modelData
                         required property int index
                         readonly property real flex: (width - 90 - 80 - 64 - 48) / 2.3
-                        width: parent.width; height: 36
+                        width: parent.width; height: 37
                         Txt { width: 90; anchors.verticalCenter: parent.verticalCenter; mono: true; color: Theme.text3; elide: Text.ElideNone
                               text: Time.sameDay(Time.ms(modelData.at), Time.now) ? Time.hhmm(modelData.at) : Time.dayName(modelData.at) + " " + Time.hhmm(modelData.at) }
                         Txt { x: 102; width: 80; anchors.verticalCenter: parent.verticalCenter; mono: true; text: modelData.host || "" }
-                        Txt { x: 194; width: parent.flex; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; text: modelData.event_id ? String(modelData.by).replace(/^rule: /, "") : "by hand" }
+                        Txt { x: 194; width: parent.flex; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; text: modelData.event_id ? String(modelData.by).replace(/^rule: /, "") : "by hand" + (modelData.who ? ", " + page.whoWord(modelData.who) : "") }
                         Txt { x: 206 + parent.flex; width: parent.flex * 1.3; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 13; color: page.badRun(modelData) ? Theme.crit : Theme.text
                               text: modelData.summary || (modelData.outcome === "Success" ? "done in " + (modelData.took_s || 0) + "s" : modelData.outcome === "Timed out" ? "ran out of time at " + (modelData.took_s || modelData.limit_s) + "s" : String(modelData.outcome || "").toLowerCase()) }
-                        Btn { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "text"; text: "Output"; onClicked: page.showOut(modelData) }
+                        Btn { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "text"; text: "Output"; onClicked: page.showOut(page.oneRun(modelData)) }
                         Rectangle { visible: index < Math.min(6, page.runs.length) - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                     }
                 }
@@ -262,9 +335,9 @@ Page {
                 id: hg
                 required property var modelData
                 required property int index
-                readonly property var xs: page.hand.filter(function (x) { return modelData[0] === "bad" ? page.badRun(x) : !page.badRun(x) })
+                readonly property var xs: page.hand.filter(function (r) { return modelData[0] === "bad" ? r.bad : !r.bad })
                 visible: xs.length > 0
-                spaced: index > 0 && page.hand.some(page.badRun)
+                spaced: index > 0 && page.hand.some(function (r) { return r.bad })
                 cardGap: 5
                 width: parent.width
                 title: modelData[1] + " · " + xs.length
@@ -278,18 +351,17 @@ Page {
                         midW: 260
                         padV: 7
                         icon: a ? (a.cat === "custom" ? "code" : a.cat === "monitoring" ? "eye" : "control") : "playcircle"
-                        hot: page.badRun(modelData)
+                        readonly property var worst: modelData.xs.filter(page.badRun)[0] || modelData.xs[0]
+                        hot: modelData.bad
                         title: modelData.action
-                        line: modelData.summary || (modelData.outcome === "Success" ? "done" : String(modelData.outcome).toLowerCase()) + (page.badRun(modelData) ? " on " + modelData.host : "")
-                        lineHot: page.badRun(modelData)
-                        act: "Output"
-                        actDoes: true
-                        onActed: page.showOut(modelData)
+                        line: modelData.bad ? (worst.summary || String(worst.outcome)) + " on " + worst.host : modelData.xs.length > 1 ? "done on all " + modelData.xs.length : worst.summary || "done"
+                        lineHot: modelData.bad
+                        actions: Btn { small: true; iconName: "filesearch"; text: "Output"; onClicked: page.showOut(modelData) }
                         onOpen: page.sel = modelData.action_id
                         mid: Row {
                             anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
                             spacing: 18
-                            Txt { text: modelData.host + " · by hand"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                            Txt { text: (modelData.xs.length > 1 ? modelData.xs.length + " machines" : modelData.xs[0].host) + " · " + modelData.from; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                             Txt { text: Time.sameDay(Time.ms(modelData.at), Time.now) ? Time.hhmm(modelData.at) : Time.dayName(modelData.at); mono: true; color: Theme.text3; elide: Text.ElideNone }
                         }
                     }

@@ -8,6 +8,7 @@ Popup {
     id: root
     property string title: ""
     property string subtitle: ""
+    property string titleNote: ""               // a quiet line beside the title, on its baseline
     default property alias body: content.data
     property alias footer: foot.data
     property int pad: 24
@@ -55,7 +56,12 @@ Popup {
             anchors.right: shut.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
-            Txt { width: parent.width; text: root.title; font.weight: Font.DemiBold; font.pixelSize: Theme.fLead }
+            Item {
+                width: parent.width
+                height: titleT.height
+                Txt { id: titleT; width: Math.min(implicitWidth, parent.width); text: root.title; font.weight: Font.DemiBold; font.pixelSize: Theme.fLead }
+                Txt { x: titleT.width + 10; y: titleT.baselineOffset - baselineOffset; width: parent.width - x; visible: root.titleNote !== ""; text: root.titleNote; color: Theme.text3; font.pixelSize: 13 }
+            }
             Txt { width: parent.width; text: root.subtitle; color: Theme.text3; font.pixelSize: Theme.fSmall; visible: text !== "" }
         }
         Btn {

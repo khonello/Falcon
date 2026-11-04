@@ -112,5 +112,14 @@ QtObject {
         "cloud":      ["M12 16V8", "M9 11l3-3 3 3", "M6 20h12a4 4 0 0 0 .5-8 6 6 0 0 0-11.7-1.5A3.5 3.5 0 0 0 6 20"],
         "gear":       ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6", "M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 14.6a2 2 0 1 1 0-4 1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.4 3V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z"]
     })
-    function has(name) { return glyph[name] !== undefined }
+    // Names here that are the concept's Ant icon under another name. An Ant icon (AntIcons) is drawn in place of the
+    // stroke above whenever there is one: a name AntIcons has, or one this maps to it.
+    readonly property var ant: ({
+        "arrowr": "arrowright", "arrowu": "arrowup", "chevd": "down", "chevu": "up", "chevl": "left", "chevr": "right",
+        "caretr": "caretright", "info": "infocircle", "question": "questioncircle", "exclaim": "exclamation", "warn": "warning",
+        "clock": "clockcircle", "eyeoff": "eyeinvisible", "safety": "safetycertificate", "square": "border",
+        "tasks": "checksquare", "flows": "branches", "bolt": "thunderbolt", "play": "playcircle", "monitor": "desktop"
+    })
+    function antOf(name) { var a = ant[name] || name; return AntIcons.has(a) ? a : "" }
+    function has(name) { return glyph[name] !== undefined || antOf(name) !== "" }
 }

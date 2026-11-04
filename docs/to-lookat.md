@@ -1,7 +1,18 @@
 # To look at
 
 Open items to go over with the user. Bring this up first in a new session, then tidy it as items close.
-Last updated 3 Nov 2026.
+Last updated 4 Nov 2026.
+
+## From the 1:1 pass, 4 Nov 2026
+
+- **The editors are not ported yet.** The concept makes these in a stepped drawer (1120 wide) over the page: Make a rule, Write an action, Restrict something,
+  Make a flow, Give a task, and Export the log (460). The QML still has the older full pages (`NewRulePage`, `NewActionPage`, `MarkPage`, `NewFlowPage`...), a different design.
+- **Any Admin verifies a task:** the concept shows it, and the QML follows; it changes the invariant "only the assigner closes a task". Confirm, then CLAUDE.md and
+  `task-natural-combo.md` change with it (ENGINE-GAPS #23).
+- **Only a rule's maker changes it** ("only A. Quaye changes it"): the concept has this, and it sits oddly beside "nobody owns an issue". Confirm it is meant.
+- **"In the local model's words":** the concept says this of a case, but `SMOOTHING` is off, so the page says "from what Detective found" until one of them changes.
+- **The concept's own loose ends:** Automation's situation says Next: Daily maintenance tomorrow while its own list starts with tonight's run (the QML says the real next
+  one); Actions counts 4 rules where Automation shows 8; Flows still shows Sort, which `flow.steps` dropped.
 
 ## Answered 3 Nov 2026
 
@@ -14,9 +25,14 @@ Last updated 3 Nov 2026.
   admin code, the Worker's a worker code; the codes live in a remote store that the Engine asks at setup to validate a code (a little outside
   access at setup is fine), and a small website sells them. Today's `licence import` stands in until then.
 
-## Waiting on a conversation
+## Flow steps as a tree (the user, 3 Nov 2026; built 4 Nov)
 
-- **Flow steps, all of them** (not only Convert to PDF): the user wants the whole area discussed before more is built.
+- **Built:** Category > Kind > Operation > settings (`engine/flow/steps.py`, `flow.steps`, TUI `flow steps`): Choosing, Conversion, Renaming, Bundling. Placing and Unbundling dropped.
+- **Not run for real:** Word, Excel and PowerPoint conversion and PDF to DOCX (no Office or LibreOffice on the dev machine; tested with a stand-in).
+- **Add a date:** *(decided 4 Nov 2026)* only the newest stays: an edited file's older copy is put aside in `.falcon-removed`.
+- **LLM (4 Nov 2026):** Detective's smoothing is off (the 1.7B copied or spoiled most paragraphs, even with a worked example); `tests/test_llm_real.py` runs the real model.
+- **Waiting on the user:** a few dozen real task descriptions for `scripts/llm_real_wording.py`; whether to test Qwen3-4B (2.5 GB download); whether smoothing goes to Groq when a key is set.
+- **Groq fallback (built and tried for real, 4 Nov 2026):** `openai/gpt-oss-120b`, paced under the plan's limit: held-out 30/31, about 1 s a call, the 8 Detective paragraphs all rewritten and passing the check. A burst over the plan's 8,000 tokens a minute is refused: those questions come back unclear, and a test run in a burst scored 25/31 for that reason alone. Before a customer ships: their own key, on a paid plan; the key given in the session should be replaced.
 
 ## Engine pass, 2 Nov 2026 (built; the Engine session does no UI work: `docs/UI-WORK-FROM-ENGINE.md` is the UI's list)
 

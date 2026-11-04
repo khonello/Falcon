@@ -15,10 +15,10 @@ QtObject {
         "file.copied": "a file is copied", "file.deleted": "a file is deleted", "file.accessed": "a file is opened",
         "file.attributes_changed": "a file's attributes change", "file.permissions_changed": "a file's permissions change",
         "folder.created": "a folder is created", "folder.moved": "a folder is moved", "folder.deleted": "a folder is deleted",
-        "resource.violation": "a copy of a restricted file appears where it is not allowed", "flow.failed": "a flow stops copying",
+        "resource.violation": "a copy of a restricted file appears anywhere but where it was marked", "flow.failed": "a flow stops copying",
         "task.started": "a task is started", "task.target_appeared": "a task's target appears",
         "task.deadline_soft": "a task reaches its soft deadline", "task.deadline_final": "a task reaches its final deadline",
-        "system.idle": "the machine goes idle", "threshold.cpu": "CPU stays high", "threshold.memory": "memory stays high",
+        "printer.offline": "a shared printer stops responding", "system.idle": "the machine goes idle", "threshold.cpu": "CPU stays high", "threshold.memory": "memory stays high",
         "time.scheduled": "it is a set time", "time.recurring": "it is a set time"
     })
     readonly property var names: ({
@@ -40,6 +40,7 @@ QtObject {
         var s = e.condition_spec || {}, m = s.match || {}
         if (s.type === "threshold.cpu" || s.type === "threshold.memory")
             return (s.type === "threshold.cpu" ? "CPU" : "memory") + " stays above " + (m.percent || 80) + "%" + (m.duration_s ? " for " + Math.round(m.duration_s / 60) + " minutes" : "")
+        if (s.type === "threshold.signin") return (m.count || 5) + " sign-ins fail within " + Math.round((m.window_s || 600) / 60) + " minutes"
         if (s.type === "system.idle") return "the machine is idle for " + Math.round((m.seconds || 600) / 60) + " minutes"
         if (s.type === "time.recurring") {
             if (m.interval_s) return "every " + Math.round(m.interval_s / 60) + " minutes"
@@ -54,10 +55,21 @@ QtObject {
     }
     function whereOf(e) {
         var ids = (e.condition_spec || {}).pc_ids
-        if (!ids || !ids.length) return e.org_wide ? "any machine" : "any machine here"
+        if (!ids || !ids.length) return "any machine"
+        var dd = deptOf(ids)
+        if (dd) return (/^[aeiou]/i.test(dd.name) ? "an " : "a ") + dd.name + " machine"
         var hs = ids.map(function (p) { return Fleet.byPc[p] ? Fleet.byPc[p].host : "PC " + p })
         return hs.length > 3 ? hs.slice(0, 3).join(", ") + " and " + (hs.length - 3) + " more" : hs.join(", ")
     }
+    // the department these machines are all of, when they are all of it (an Admin's own PC need not be among them)
+    function deptOf(ids) {
+        var ds = Fleet.depts.filter(function (d) { return d.machines.some(function (m) { return ids.indexOf(m.pc_id) >= 0 }) })
+        if (ds.length !== 1) return null
+        var ms = ds[0].machines.filter(function (m) { return !m.admin })
+        return ms.length && ms.every(function (m) { return ids.indexOf(m.pc_id) >= 0 }) && ids.every(function (i) { return ds[0].machines.some(function (m) { return m.pc_id === i }) }) ? ds[0] : null
+    }
+    // how many machines it runs on
+    function machinesOf(e) { var ids = (e.condition_spec || {}).pc_ids; return ids && ids.length ? ids.length : Fleet.machines.length }
     // where it runs, as the side panel says it: a whole department as "Operations · 7 here", else the machines
     function whereFact(e) {
         var ids = (e.condition_spec || {}).pc_ids
@@ -69,6 +81,7 @@ QtObject {
 
     // a run's outcome, in the concept's four words
     function outcome(ex) {
+        if (ex.outcome) return ex.outcome                  // the Engine's own word (event_history, actions.runs)
         var st = ex.status
         if (st === "success") return "Success"
         if (st === "terminated") return "Stopped by you"
@@ -78,6 +91,12 @@ QtObject {
     }
     function outColor(o) { return o === "Success" ? Theme.ok : o === "Failed" ? Theme.crit : o === "Timed out" ? Theme.med : o === "Running" ? Theme.ser1 : Theme.ser3 }
     function problem(o) { return o === "Failed" || o === "Timed out" }
+    // how long a run took, in seconds, from when it started and ended
+    function secs(x) { var a = Time.ms(x.started_at), b = Time.ms(x.ended_at); return a !== null && b !== null ? Math.max(1, Math.round((b - a) / 1000)) : 0 }
+    // past tense of each action, so a run reads as what it did
+    readonly property var past: ({ "Take a screenshot": "screenshot taken", "Snapshot USB contents": "contents listed", "Log event": "logged", "Notify the Admin": "the Admin was told",
+                                   "Clear the temp folder": "temp folder cleared", "Check disk health": "disk checked", "Lock the screen": "screen locked", "Back up the Documents folder": "Documents backed up" })
+    function pastOf(name) { var m = /^Notify (.+)$/.exec(name); return past[name] || (m ? m[1] + " was told" : name + " done") }
     function summarize(runs) {
         var c = {}
         runs.forEach(function (x) { var o = outcome(x); c[o] = (c[o] || 0) + 1 })

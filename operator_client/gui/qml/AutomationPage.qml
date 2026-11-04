@@ -17,9 +17,7 @@ Page {
     property int openRun: 0
 
     function load() {
-        falcon.call("calendar.board", { days: 7 }, function (ok, r) {
-            page.coming = ok ? (r.items || []).filter(function (x) { return x.kind === "rule" && Time.ms(x.at) >= Time.now }).sort(function (a, b) { return Time.ms(a.at) - Time.ms(b.at) }).slice(0, 5) : [] })
-        falcon.call("automation.board", {}, function (ok, r) { var b = {}; if (ok) (r.rules || []).forEach(function (x) { b[x.event_id] = x }); page.board = b })
+        falcon.call("automation.board", {}, function (ok, r) { var b = {}; if (ok) (r.rules || []).forEach(function (x) { b[x.event_id] = x }); page.board = b; page.coming = ok ? r.coming_up || [] : [] })
         falcon.call("control.event_list", {}, function (ok, r) {
             page.events = ok ? (r.events || []) : []
             page.events.forEach(function (e) {
@@ -43,7 +41,12 @@ Page {
     readonly property int probs: allRuns.filter(function (x) { return Auto.problem(Auto.outcome(x)) }).length
     readonly property var rows: events.map(function (e) { return Object.assign({ name: Auto.nameOf(e), kindW: Auto.kind((e.condition_spec || {}).type) }, e) })
 
-    readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
+    // opens on the rule that ran last, with that run picked
+    readonly property var curId: sel !== null ? sel : todayRuns.length ? todayRuns[0].e.id : rows.length ? rows[0].id : null
+    readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === curId) return rows[i]; return rows.length ? rows[0] : null }
+    property var pickT: null              // the run picked below, by when it fired; null when a rule was picked from the list
+    readonly property var pickAt: sel === null && todayRuns.length ? todayRuns[0].f.at : pickT
+    function pick(id, at) { sel = id; pickT = at === undefined ? null : at }
     readonly property int maxFired: Math.max(1, Math.max.apply(null, events.map(function (e) { return page.firings(e).length }).concat([0])))
     // runs per day, by outcome, oldest first
     readonly property var perDay: ["Success", "Failed", "Timed out", "Stopped by you"].map(function (k) {
@@ -56,7 +59,9 @@ Page {
         return { name: k, c: Auto.outColor(k), v: v }
     })
 
-    function ownerOf(e) { var b = board[e.id]; return b && b.owner ? b.owner : e.read_only ? "the organisation" : "an Admin" }
+    function ownerOf(e) { var b = board[e.id]; return b && b.owner ? b.owner : "an Admin" }
+    function mine(e) { return e.created_by_account_id === falcon.accountId }
+    function byWord(e) { return mine(e) ? "you" : ownerOf(e) }
     // Test on one machine: the rule's actions once, on the first machine it applies to that is online (recorded as run by hand)
     function test(e) {
         var ids = (e.condition_spec || {}).pc_ids, ms = Fleet.machines.filter(function (m) { return m.online && (!ids || !ids.length || ids.indexOf(m.pc_id) >= 0) })
@@ -80,10 +85,41 @@ Page {
     onCurChanged: { loading = true; ldT.restart() }
     Timer { id: ldT; interval: Theme.loadMs; onTriggered: { page.loading = false; page.pickedId = page.cur ? page.cur.id : null } }
     function actionName(e, id) { var a = (e.actions || []).filter(function (x) { return x.id === id || x.action_id === id })[0]; return a ? a.name : "action " + id }
-    function firingsToday(e) { return firings(e).filter(function (f) { return Time.sameDay(Time.ms(f.at), Time.now) }) }
+    function firingsToday(e) { return firings(e).filter(function (f) { return !f.by_hand && Time.sameDay(Time.ms(f.at), Time.now) }) }
+    function badOf(f) { return (f.runs || []).filter(function (x) { return Auto.problem(Auto.outcome(x)) }) }
+    function hostOf(x) { return x.host || (Fleet.byPc[x.target_pc_id] || { host: "" }).host }
+    // what a run came to, in a line: what it did, or what went wrong
+    function effect(e, f) {
+        var rs = f.runs || [], bad = badOf(f)
+        if (!bad.length) return rs.map(function (x) { return Auto.pastOf(page.actionName(e, x.action_id)) }).filter(function (w, i, a) { return a.indexOf(w) === i }).join(", ")
+        var many = rs.length > (e.actions || []).length
+        return bad.map(function (x) {
+            var n = page.actionName(e, x.action_id), out = Auto.outcome(x) === "Timed out"
+            return many ? n + " on " + page.hostOf(x) + " " + (out ? "ran out of time at " + Auto.secs(x) + "s" : "failed") : n + " " + (out ? "ran out of time at " + Auto.secs(x) + "s" : "failed, exit " + x.exit_code)
+        }).join("; ")
+    }
+    // why it ran
+    function cause(e, f) {
+        var host = f.machines > 1 ? Theme.many(f.machines, "machine") : f.hostname || ""
+        if (Auto.kind((e.condition_spec || {}).type) === "Schedule") return "It was " + Time.hhmm(f.at) + ", so it ran on " + host
+        var m = Fleet.byHost[f.hostname]
+        return (f.detail || f.subject || Auto.whenOf(e)) + " on " + host + (m && m.user ? ", " + m.user + " signed in" : "")
+    }
+    property var again: ({})              // runs sent again where they went wrong, by key
+    function runAgain(r) {
+        var k = r.key
+        falcon.call("automation.run_again", { event_id: r.e.id, at: r.f.at }, function (ok, res) {
+            if (!ok) { Msg.failed(res && res.message ? res.message : "Not done"); return }
+            var a = Object.assign({}, page.again); a[k] = true; page.again = a
+            var bad = page.badOf(r.f)
+            Msg.ok(bad.map(function (x) { return page.actionName(r.e, x.action_id) }).filter(function (w, i, l) { return l.indexOf(w) === i }).join(", ") + " runs again on "
+                   + Theme.listNames(bad.map(page.hostOf).filter(function (w, i, l) { return l.indexOf(w) === i }), 3))
+        })
+    }
+    function badN(e) { return firingsToday(e).filter(function (f) { return page.badOf(f).length > 0 && !page.again[e.id + ":" + f.at] }).length }
     readonly property var todayRuns: {
         var out = []
-        events.forEach(function (e) { page.firingsToday(e).forEach(function (f, i) { out.push({ key: e.id + ":" + i, e: e, f: f, bad: (f.runs || []).some(function (x) { return Auto.problem(Auto.outcome(x)) }) }) }) })
+        events.forEach(function (e) { if (e.enabled !== false) page.firingsToday(e).forEach(function (f) { var k = e.id + ":" + f.at; out.push({ key: k, e: e, f: f, bad: page.badOf(f).length > 0 && !page.again[k], done: !!page.again[k] }) }) })
         return out.sort(function (a, b) { return Time.ms(b.f.at) - Time.ms(a.f.at) })
     }
     // runs a day this week for the picked rule: by the rule, run by hand, went wrong
@@ -94,22 +130,36 @@ Page {
         page.firings(e).forEach(function (f) {
             var d = Math.floor((Time.startOfDay(Time.now) - Time.startOfDay(Time.ms(f.at))) / 86400000)
             if (d < 0 || d > 6) return
-            var bad = (f.runs || []).some(function (x) { return Auto.problem(Auto.outcome(x)) })
-            if (bad) v[6 - d].bad += 1; else if (f.by_hand) v[6 - d].hand += 1; else v[6 - d].rule += 1
+            if (f.by_hand) v[6 - d].hand += 1; else if (page.badOf(f).length) v[6 - d].bad += 1; else v[6 - d].rule += 1
         })
         return v
     }
     situation: {
         if (!events.length) return "You have no rules yet. Make one below; it runs on its own from then on."
         var ranToday = events.filter(function (e) { return page.firingsToday(e).length > 0 }).length, times = todayRuns.length
-        var bad = todayRuns.filter(function (r) { return r.bad }), hosts = bad.map(function (r) { return r.f.hostname || "several machines" }).filter(function (h, i, a) { return a.indexOf(h) === i })
+        var bad = todayRuns.filter(function (r) { return r.bad }), hosts = bad.reduce(function (a, r) { return a.concat(page.badOf(r.f).map(page.hostOf)) }, []).filter(function (h, i, a) { return a.indexOf(h) === i })
+        var off = events.filter(function (e) { return e.enabled === false }).map(function (e) { return Auto.nameOf(e) }), nx = coming.filter(function (c) { return (page.events.filter(function (e) { return e.id === c.event_id })[0] || {}).enabled !== false })[0]
         return Theme.fmt(ranToday) + " of your " + Theme.many(events.length, "rule") + " ran today, " + Theme.many(times, "time") + " in all."
-               + (bad.length ? " " + Theme.many(bad.length, "run") + " did not go to plan, on " + Theme.listNames(hosts, 2) + "." : " Every run went to plan.")
+               + (bad.length ? " " + Theme.many(bad.length, "run") + " did not go to plan, on " + Theme.listNames(hosts) + "." : " Everything they did worked.")
+               + (off.length ? " " + Theme.listNames(off) + " is switched off." : "")
+               + (nx ? " Next: " + nx.name + " " + page.dayWord(nx.at) + " at " + Time.hhmm(nx.at) + "." : "")
     }
     situationAt: Time.now
 
-    // the next scheduled runs (calendar.board's rules), in order
+    // the next scheduled runs (automation.board's coming_up), in order
     property var coming: []
+    property var skipped: ({})            // runs skipped this once, by rule and time
+    function dayWord(x) {
+        var d = Math.round((Time.startOfDay(Time.ms(x)) - Time.startOfDay(Time.now)) / 86400000)
+        return d === 0 ? "today" : d === 1 ? "tomorrow" : Time.dayName(x)
+    }
+    function skip(c, on) {
+        falcon.call("automation.skip", { event_id: c.event_id, at: c.at, undo: !on }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not done"); return }
+            var s = Object.assign({}, page.skipped); s[c.event_id + ":" + c.at] = on; page.skipped = s
+            if (on) Msg.ok(c.name + " will skip " + page.dayWord(c.at) + " " + Time.hhmm(c.at))
+        })
+    }
     property int rpg: 0
     readonly property var runOrder: todayRuns.filter(function (r) { return r.bad }).map(function (r) { return ["bad", r] }).concat(todayRuns.filter(function (r) { return !r.bad }).map(function (r) { return ["ok", r] }))
     readonly property int rpages: Math.max(1, Math.ceil(runOrder.length / 5))
@@ -120,32 +170,31 @@ Page {
     Row {
         width: parent.width
         spacing: 16
-        readonly property real h: Math.max(rulesP.implicitHeight, sheet.implicitHeight)
+        readonly property real h: rulesP.implicitHeight
         Box {
             id: rulesP
             objectName: "ruleList"
             width: (parent.width - 16) * 4 / 12
-            height: parent.h
-            gap: 2
+            height: Math.max(parent.h, sheet.implicitHeight)
             title: "Your rules"
             sub: String(page.events.length)
-            extra: Btn { small: true; iconName: "plus"; text: "Make a rule"; onClicked: Nav.go("automation", "new") }
+            extra: Btn { small: true; headed: true; iconName: "plus"; text: "Make a rule"; onClicked: Nav.go("automation", "new") }
             Repeater {
-                model: page.rows.slice().sort(function (a, b) { return page.hasProb(b) - page.hasProb(a) })
+                model: page.rows.filter(function (r) { return page.badN(r) > 0 }).concat(page.rows.filter(function (r) { return page.badN(r) === 0 }))
                 delegate: Rectangle {
                     required property var modelData
-                    readonly property int n: page.firingsToday(modelData).filter(function (f) { return (f.runs || []).some(function (x) { return Auto.problem(Auto.outcome(x)) }) }).length
+                    readonly property int n: page.badN(modelData)
                     width: parent.width
-                    height: lc.height + 18
+                    height: 55.75
                     radius: Theme.radius
                     color: page.cur && page.cur.id === modelData.id ? Theme.surface3 : ra.containsMouse ? Theme.surface2 : "transparent"
                     Icon { x: 10; y: 9 + 4; name: Auto.kindIcon(modelData.kindW); size: 13; color: Theme.text3 }
                     Column { id: lc; x: 31; y: 9; width: parent.width - 31 - 10 - (parent.n > 0 ? 26 : 0); spacing: 1
                         Txt { width: parent.width; text: modelData.name; font.weight: Font.DemiBold; color: modelData.enabled === false ? Theme.text4 : Theme.text }
-                        Txt { width: parent.width; text: (modelData.enabled === false ? "switched off · " : "") + "Made by " + page.ownerOf(modelData); color: Theme.text3; font.pixelSize: 12 } }
+                        Txt { width: parent.width; text: "Made " + Time.day(modelData.created_at) + " by " + page.byWord(modelData); color: Theme.text3; font.pixelSize: 12 } }
                     Rectangle { visible: parent.n > 0; anchors.right: parent.right; anchors.rightMargin: 10; y: 9 + 1; width: Math.max(18, nb.implicitWidth + 8); height: 18; radius: 9; color: Theme.crit
                                 Txt { id: nb; anchors.centerIn: parent; text: parent.parent.n; color: Theme.inverse; font.pixelSize: 11; elide: Text.ElideNone } }
-                    MouseArea { id: ra; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.id }
+                    MouseArea { id: ra; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.pick(modelData.id) }
                 }
             }
             Quiet { visible: page.events.length === 0; text: "No rules yet. Make one: when something happens, on which machines, do what." }
@@ -155,18 +204,19 @@ Page {
             id: sheet
             objectName: "ruleSheet"
             width: (parent.width - 16) * 8 / 12
-            height: parent.h
+            height: Math.max(parent.h, implicitHeight)
             gap: 14
             title: page.cur ? page.cur.name : "No rule picked"
-            sub: page.cur ? "made by " + page.ownerOf(page.cur) + " · " + (page.cur.enabled === false ? "switched off" : "on") : "pick a rule on the left"
+            sub: page.cur ? "made by " + page.byWord(page.cur) + " · " + (page.cur.enabled === false ? "switched off" : "on since " + Time.day(page.cur.created_at)) : "pick a rule on the left"
             extra: Row {
                 spacing: 8
                 visible: page.cur !== null
-                Btn { small: true; text: "Run now"; enabled: page.cur !== null && !page.cur.read_only && page.cur.enabled !== false; onClicked: page.test(page.cur) }
-                Btn { visible: page.cur !== null && !page.cur.read_only; small: true; iconName: "edit"; text: "Edit"; onClicked: Nav.go("automation", "edit-" + page.cur.id) }
-                Txt { visible: page.cur !== null && !!page.cur.read_only; text: "only " + (page.cur ? page.ownerOf(page.cur) : "") + " changes it"; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                Btn { visible: page.cur !== null && page.mine(page.cur); small: true; headed: true; text: "Run now"; enabled: page.cur !== null && page.cur.enabled !== false; onClicked: page.test(page.cur) }
+                Btn { visible: page.cur !== null && page.mine(page.cur); small: true; headed: true; iconName: "edit"; text: "Edit"; onClicked: Nav.go("automation", "edit-" + page.cur.id) }
+                Txt { visible: page.cur !== null && !page.mine(page.cur); text: "only " + (page.cur ? page.ownerOf(page.cur) : "") + " changes it"; color: Theme.text3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone }
             }
             Txt {
+                id: big
                 visible: page.cur !== null
                 width: parent.width
                 wrapMode: Text.WordWrap; elide: Text.ElideNone
@@ -179,21 +229,25 @@ Page {
                                  + "<font color='" + Theme.text3 + "'>, do</font> " + (page.cur.actions || []).map(function (a) { return a.name }).join(", ") : ""
             }
             Row {
+                id: two
                 visible: page.cur !== null
                 width: parent.width
+                // auo-two fills what the list leaves; the chart never goes under its 220
+                height: Math.max(220 + 36, rulesP.implicitHeight - sheet.headerHeight - big.height - 14 - 17)
                 spacing: 56
                 opacity: page.loading ? 0 : 1
                 // this week, runs a day, on a fixed scale of ten (aub-chart)
                 Column {
                     id: wk
                     width: (parent.width - 56) / 2.3
+                    height: parent.height
                     spacing: 4
                     Txt { topPadding: 4; text: "This week · runs a day"; color: Theme.text3; font.pixelSize: 12 }
                     Item {
                         id: plot
                         width: parent.width
-                        height: 186
-                        readonly property real pt: 18
+                        height: wk.height - 26 - 6 - 34.5
+                        readonly property real pt: 14
                         readonly property real foot: 16
                         readonly property real ph: height - pt - foot
                         Repeater {
@@ -225,9 +279,9 @@ Page {
                                         width: parent.width
                                         spacing: 2
                                         Txt { visible: parent.parent.tot > 0; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: parent.parent.tot; font.pixelSize: parent.parent.tot > 10 ? 12 : 11
-                                              font.weight: parent.parent.tot > 10 ? Font.Bold : Font.Normal; color: parent.parent.tot > 10 ? Theme.text : Theme.text2; elide: Text.ElideNone }
+                                              font.weight: Font.Bold; color: parent.parent.tot > 10 ? Theme.text : Theme.text2; elide: Text.ElideNone }
                                         Rectangle { visible: modelData.hand > 0; width: parent.width; height: parent.parent.hh(modelData.hand); radius: 3; color: Theme.alpha(Theme.ser6, 0.35) }
-                                        Rectangle { visible: modelData.bad > 0; width: parent.width; height: parent.parent.hh(modelData.bad); radius: 3; color: Theme.crit }
+                                        Rectangle { visible: modelData.bad > 0; width: parent.width; height: parent.parent.hh(modelData.bad); radius: 3; color: Theme.alpha(Theme.crit, 0.8) }
                                         Rectangle { visible: modelData.rule > 0; width: parent.width; height: parent.parent.hh(modelData.rule); radius: 3; color: Theme.alpha(Theme.ser6, 0.8) }
                                     }
                                     Txt { anchors.bottom: parent.bottom; width: parent.width; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 11; color: Theme.text3; elide: Text.ElideNone
@@ -236,15 +290,18 @@ Page {
                             }
                         }
                     }
-                    Flow {
+                    Column {
                         width: parent.width - 26
                         x: 26
-                        spacing: 14
                         topPadding: 2
-                        Repeater { model: [["by the rule", Theme.alpha(Theme.ser6, 0.8)], ["run by hand", Theme.alpha(Theme.ser6, 0.35)], ["went wrong", Theme.crit]]
-                            delegate: Row { required property var modelData; spacing: 5
-                                Rectangle { width: 10; height: 10; radius: 2; color: modelData[1]; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } } }
+                        spacing: 4
+                        Row {
+                            spacing: 14
+                            Repeater { model: [["by the rule", Theme.alpha(Theme.ser6, 0.8)], ["run by hand", Theme.alpha(Theme.ser6, 0.35)], ["went wrong", Theme.crit]]
+                                delegate: Row { required property var modelData; spacing: 5
+                                    Rectangle { width: 10; height: 10; radius: 2; color: modelData[1]; anchors.verticalCenter: parent.verticalCenter }
+                                    Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } } }
+                        }
                         Txt { width: parent.width; text: "over 10 stops at the top; the number is the count"; color: Theme.text4; font.pixelSize: 12 }
                     }
                 }
@@ -260,12 +317,12 @@ Page {
                             width: parent.width
                             height: ac.height + 16
                             readonly property var xs: page.cur ? page.runs(page.cur).filter(function (x) { return x.action_id === modelData.id || x.action_id === modelData.action_id }) : []
-                            readonly property var oks: xs.filter(function (x) { return Auto.outcome(x) === "Success" && x.duration_seconds })
+                            readonly property var oks: xs.filter(function (x) { return Auto.outcome(x) === "Success" && Auto.secs(x) })
                             Column { id: ac; y: 8; width: parent.width - 100; spacing: 1
                                 Txt { width: parent.width; text: (index + 1) + ". " + modelData.name; font.weight: Font.DemiBold }
-                                Txt { width: parent.width; text: modelData.description || modelData.builtin_type || "a step of this rule"; color: Theme.text3; font.pixelSize: 12 } }
-                            Txt { anchors.right: parent.right; width: 90; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
-                                  text: parent.oks.length ? Math.round(parent.oks.reduce(function (n, x) { return n + x.duration_seconds }, 0) / parent.oks.length) + "s of " + (modelData.timeout_seconds || "—") + "s"
+                                Txt { width: parent.width; text: modelData.description || "a step of this rule"; color: Theme.text3; font.pixelSize: 12 } }
+                            Txt { anchors.right: parent.right; width: 90; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -4; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                                  text: parent.oks.length ? Math.round(parent.oks.reduce(function (n, x) { return n + Auto.secs(x) }, 0) / parent.oks.length) + "s of " + (modelData.timeout_seconds || "—") + "s"
                                         : "limit " + (modelData.timeout_seconds || "—") + "s" }
                             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                         }
@@ -301,21 +358,19 @@ Page {
                     delegate: Card {
                         id: rc
                         required property var modelData
-                        readonly property var bads: (modelData.f.runs || []).filter(function (x) { return Auto.problem(Auto.outcome(x)) })
                         width: rg.cardW
                         midW: 260
                         padV: 7
                         icon: Auto.kindIcon(Auto.kind((modelData.e.condition_spec || {}).type))
                         hot: modelData.bad
                         title: page.rows.filter(function (r) { return r.id === modelData.e.id }).map(function (r) { return r.name })[0] || Auto.nameOf(modelData.e)
-                        line: bads.length ? bads.map(function (x) { return page.actionName(modelData.e, x.action_id) + (Auto.outcome(x) === "Timed out" ? " ran out of time" + (x.duration_seconds ? " at " + x.duration_seconds + "s" : "") : " failed" + (x.exit_code !== undefined && x.exit_code !== null ? ", exit " + x.exit_code : "")) }).join("; ")
-                              : Auto.lastRunText(modelData.f.runs || [])
+                        line: modelData.done ? "running again now" : page.effect(modelData.e, modelData.f)
                         lineHot: modelData.bad
-                        picked: page.cur !== null && page.cur.id === modelData.e.id
+                        picked: page.cur !== null && page.cur.id === modelData.e.id && page.pickAt === modelData.f.at
                         expandable: true
                         expanded: page.expRun === modelData.key
-                        onOpen: page.sel = modelData.e.id
-                        onToggle: { page.sel = modelData.e.id; page.expRun = expanded ? "" : modelData.key }
+                        onOpen: page.pick(modelData.e.id, modelData.f.at)
+                        onToggle: { page.pick(modelData.e.id, modelData.f.at); page.expRun = expanded ? "" : modelData.key }
                         mid: Row {
                             anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
                             spacing: 18
@@ -329,12 +384,13 @@ Page {
                             Column {
                                 width: parent.width
                                 bottomPadding: 10
-                                Txt { width: parent.width; text: (rc.modelData.f.cause || rc.modelData.f.detail || Auto.whenOf(rc.modelData.e)) + (rc.modelData.f.hostname ? " on " + rc.modelData.f.hostname : ""); color: Theme.text3; font.pixelSize: 13 }
+                                Txt { width: parent.width; text: page.cause(rc.modelData.e, rc.modelData.f); color: Theme.text3; font.pixelSize: 13 }
                                 Rectangle { width: parent.width; height: 1; color: Theme.border; y: parent.height - 1 }
                             }
                             Repeater {
-                                model: { var by = {}, out = []; (rc.modelData.f.runs || []).forEach(function (x) { var h = (Fleet.byPc[x.target_pc_id] || { host: "" }).host; if (!by[h]) { by[h] = []; out.push(h) } by[h].push(x) })
-                                         return out.map(function (h) { return [h, by[h]] }) }
+                                model: { var by = {}, out = []; (rc.modelData.f.runs || []).forEach(function (x) { var h = page.hostOf(x); if (!by[h]) { by[h] = []; out.push(h) } by[h].push(x) })
+                                         var hasBad = function (h) { return by[h].some(function (x) { return Auto.problem(Auto.outcome(x)) }) }
+                                         return out.filter(hasBad).concat(out.filter(function (h) { return !hasBad(h) })).map(function (h) { return [h, by[h]] }) }
                                 delegate: Item {
                                     required property var modelData
                                     width: parent.width
@@ -354,8 +410,8 @@ Page {
                                                 Txt { id: xn; x: 8; y: 3; width: parent.width - 16 - xo.implicitWidth - 8; text: page.actionName(rc.modelData.e, modelData.action_id); font.pixelSize: 12 }
                                                 Txt { id: xo; anchors.right: parent.right; anchors.rightMargin: 8; y: 3; font.pixelSize: 12; elide: Text.ElideNone
                                                       color: parent.o === "Timed out" ? Theme.med : Auto.problem(parent.o) ? Theme.crit : Theme.text3
-                                                      text: parent.o === "Success" ? (modelData.duration_seconds ? modelData.duration_seconds + "s" : "done") : parent.o === "Timed out" ? "ran out of time" + (modelData.duration_seconds ? " at " + modelData.duration_seconds + "s" : "")
-                                                            : parent.o === "Failed" ? "failed" + (modelData.exit_code !== undefined && modelData.exit_code !== null ? ", exit " + modelData.exit_code : "") : parent.o.toLowerCase() }
+                                                      text: parent.o === "Success" ? Auto.secs(modelData) + "s" : parent.o === "Timed out" ? "ran out of time at " + Auto.secs(modelData) + "s"
+                                                            : parent.o === "Failed" ? "failed, exit " + modelData.exit_code : parent.o.toLowerCase() }
                                             }
                                         }
                                     }
@@ -367,7 +423,7 @@ Page {
                                 spacing: 12
                                 topPadding: 4
                                 Rectangle { width: parent.width; height: 1; color: Theme.border }
-                                Btn { anchors.right: parent.right; small: true; kind: "primary"; text: "Run again where it went wrong"; enabled: false; tip: "The Engine cannot run a rule again on the machines where it failed yet" }
+                                Btn { anchors.right: parent.right; small: true; kind: "primary"; text: "Run again where it went wrong"; onClicked: page.runAgain(rc.modelData) }
                             }
                         }
                     }
@@ -377,6 +433,7 @@ Page {
         StepPager {
             visible: page.rpages > 1
             width: parent.width
+            noun: "runs"
             from: page.rpi * 5 + 1
             to: Math.min(page.runOrder.length, page.rpi * 5 + 5)
             total: page.runOrder.length
@@ -397,18 +454,32 @@ Page {
             Repeater {
                 model: page.coming
                 delegate: Item {
+                    id: nx
                     required property var modelData
                     required property int index
+                    readonly property var ev: page.events.filter(function (e) { return e.id === modelData.event_id })[0] || null
+                    readonly property bool isOff: ev !== null && ev.enabled === false
+                    readonly property bool skipped: !!page.skipped[modelData.event_id + ":" + modelData.at]
+                    readonly property bool quiet: isOff || skipped
                     width: parent.width
                     height: Math.max(nt.height, nn.height) + 16
                     Column { id: nt; y: 8; width: 110; spacing: 1
-                        Txt { text: Time.hhmm(modelData.at); mono: true; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                        Txt { text: Time.sameDay(Time.ms(modelData.at), Time.now) ? "today" : Time.dayName(modelData.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
+                        Txt { text: Time.hhmm(modelData.at); mono: true; font.weight: Font.DemiBold; elide: Text.ElideNone; color: nx.quiet ? Theme.text4 : Theme.text }
+                        Txt { text: page.dayWord(modelData.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
                     Column { id: nn; x: 124; y: 8; width: parent.width - 124 - 14 - sk.width; spacing: 1
-                        Txt { width: parent.width; text: modelData.title; font.weight: Font.DemiBold }
-                        Txt { width: parent.width; text: modelData.line || ""; color: Theme.text3; font.pixelSize: 12 } }
-                    MouseArea { x: nn.x; y: nn.y; width: nn.width; height: nn.height; cursorShape: Qt.PointingHandCursor; onClicked: if (modelData.to && modelData.to[1]) page.sel = Number(modelData.to[1]) }
-                    Btn { id: sk; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; small: true; text: "Skip this once"; enabled: false; tip: "The Engine cannot skip one run yet" }
+                        Txt { width: parent.width; text: modelData.name; font.weight: Font.DemiBold; color: nx.quiet ? Theme.text4 : Theme.text }
+                        Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12
+                              text: nx.ev ? (nx.ev.actions || []).map(function (a) { return a.name }).join(", ") + " on " + Theme.many(Auto.machinesOf(nx.ev), "machine") : "" } }
+                    MouseArea { x: nn.x; y: nn.y; width: nn.width; height: nn.height; cursorShape: Qt.PointingHandCursor; onClicked: page.pick(modelData.event_id) }
+                    Row {
+                        id: sk
+                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+                        Txt { visible: nx.isOff || nx.skipped || (nx.ev !== null && !page.mine(nx.ev)); anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                              text: nx.isOff ? "switched off; it will not run" : nx.skipped ? "skipped this once" : "runs as set" }
+                        Btn { visible: !nx.isOff && nx.skipped; small: true; kind: "text"; text: "Undo"; onClicked: page.skip(nx.modelData, false) }
+                        Btn { visible: !nx.quiet && nx.ev !== null && page.mine(nx.ev); small: true; text: "Skip this once"; onClicked: page.skip(nx.modelData, true) }
+                    }
                     Rectangle { visible: index < page.coming.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }

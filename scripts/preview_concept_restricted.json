@@ -1,0 +1,226 @@
+{
+"marks": [
+{
+"id": "M-1",
+"name": "budget-2026.xlsx",
+"kind": "file",
+"host": "WS-OPS-A1",
+"path": "C:\\Finance\\budget-2026.xlsx",
+"keep": "machine",
+"files": 1,
+"versions": 14,
+"at": "3 Sep",
+"by": "R. Mensah",
+"copies": [
+{
+"id": "INC-1042",
+"sev": "critical",
+"host": "OPS-07",
+"at": 10.03,
+"file": "budget-2026.xlsx",
+"folder": "C:\\Users\\Ama\\Documents",
+"how": "copied over the network"
+}
+]
+},
+{
+"id": "M-2",
+"name": "Payroll",
+"kind": "folder",
+"host": "WS-OPS-A1",
+"path": "C:\\HR\\Payroll\\",
+"keep": "path",
+"files": 37,
+"versions": 212,
+"at": "3 Sep",
+"by": "R. Mensah",
+"copies": [
+{
+"id": "INC-1041",
+"sev": "high",
+"host": "OPS-03",
+"at": 9.5,
+"file": "salaries.csv",
+"folder": "C:\\Users\\Yaw\\Desktop",
+"how": "from a USB drive"
+},
+{
+"id": "INC-1070",
+"sev": "high",
+"host": "OPS-05",
+"at": 12.4,
+"file": "payroll-2026-09.xlsx",
+"folder": "C:\\Users\\Nana\\Downloads",
+"how": "saved from an email"
+}
+]
+},
+{
+"id": "M-5",
+"name": "headcount-plan-2027.xlsx",
+"kind": "file",
+"host": "WS-OPS-A1",
+"path": "C:\\Users\\RMensah\\Documents\\headcount-plan-2027.xlsx",
+"keep": "path",
+"files": 1,
+"versions": 3,
+"at": "28 Sep",
+"by": "R. Mensah",
+"copies": []
+},
+{
+"id": "M-40",
+"name": "salaries.csv",
+"kind": "file",
+"host": "OPS-01",
+"path": "C:\\payroll\\salaries.csv",
+"keep": "path",
+"files": 1,
+"versions": 9,
+"at": "20 Sep",
+"by": "R. Mensah",
+"copies": []
+},
+{
+"id": "M-41",
+"name": "Disciplinary",
+"kind": "folder",
+"host": "WS-OPS-A1",
+"path": "C:\\HR\\Disciplinary\\",
+"keep": "path",
+"files": 8,
+"versions": 11,
+"at": "11 Oct",
+"by": "R. Mensah",
+"copies": []
+},
+{
+"id": "M-43",
+"name": "tender-scores-2026.xlsx",
+"kind": "file",
+"host": "OPS-02",
+"path": "D:\\Tenders\\tender-scores-2026.xlsx",
+"keep": "machine",
+"files": 1,
+"versions": 6,
+"at": "6 Oct",
+"by": "R. Mensah",
+"copies": []
+},
+{
+"id": "M-44",
+"name": "Contracts",
+"kind": "folder",
+"host": "OPS-02",
+"path": "D:\\Contracts\\",
+"keep": "path",
+"files": 26,
+"versions": 48,
+"at": "2 Oct",
+"by": "R. Mensah",
+"copies": []
+}
+],
+"allowed": [
+{
+"mark": "M-43",
+"host": "WS-OPS-A2",
+"folder": "D:\\Tenders\\review",
+"why": "A. Quaye scores the tenders with you",
+"at": "14 Oct"
+}
+],
+"carry": [
+{
+"flow": "ops-pack",
+"mark": "M-44",
+"what": "contract-northline.pdf and 2 more from Contracts",
+"from": "OPS-02 /reports/",
+"to": "WS-OPS-A1 /packs/",
+"today": 3,
+"last": 12.5,
+"since": "18 Oct"
+},
+{
+"flow": "payroll",
+"mark": "M-40",
+"what": "salaries.csv",
+"from": "OPS-01 /payroll/",
+"to": "FIN-01 /payroll/",
+"held": 12.9
+}
+],
+"log": {
+"M-1": [
+[
+10.03,
+"Ama",
+"copied it",
+"to OPS-07"
+],
+[
+9.4,
+"R. Mensah",
+"opened it",
+"on WS-OPS-A1"
+],
+[
+-20,
+"R. Mensah",
+"changed it",
+"on WS-OPS-A1"
+]
+],
+"M-2": [
+[
+12.4,
+"Nana",
+"saved a copy of payroll-2026-09.xlsx",
+"on OPS-05"
+],
+[
+9.5,
+"Yaw",
+"copied salaries.csv",
+"to OPS-03"
+],
+[
+8.1,
+"R. Mensah",
+"added 2 files",
+"on WS-OPS-A1"
+]
+],
+"M-40": [
+[
+12.9,
+"The flow payroll",
+"was held at it",
+"OPS-01 /payroll/"
+],
+[
+11.2,
+"Kojo",
+"opened it",
+"on OPS-01"
+]
+],
+"M-43": [
+[
+-30,
+"A. Quaye",
+"opened the allowed copy",
+"on WS-OPS-A2"
+]
+],
+"M-44": [
+[
+10.2,
+"The flow ops-pack",
+"asked to carry contract-northline.pdf",
+"OPS-02"
+]
+]
+},
+"me": "R. Mensah"
+}

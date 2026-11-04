@@ -16,8 +16,9 @@ Rectangle {
     default property alias content: body.data
     property alias extra: extraRow.data
     readonly property alias bodyItem: body
-    readonly property real headerHeight: head.visible ? head.height + 12 + 14 : 14      // where the body starts
-    readonly property real innerW: width - 32
+    // CSS's border-box: the 1px border is inside the box, so the padding starts a pixel in from each edge
+    readonly property real headerHeight: head.visible ? head.height + 12 + 15 : 15      // where the body starts
+    readonly property real innerW: width - 34
 
     color: Theme.surface
     radius: Theme.radiusLg
@@ -29,13 +30,13 @@ Rectangle {
         GradientStop { position: 0; color: Theme.mix(Theme.accent, Theme.surface, 0.045) }
         GradientStop { position: 0.7; color: Theme.surface }
     }
-    implicitHeight: headerHeight + (fill ? 0 : body.implicitHeight) + 16
+    implicitHeight: headerHeight + (fill ? 0 : body.implicitHeight) + 17
 
     // the header: the title, then the line on the same baseline, or under it when it does not fit
     Item {
         id: head
         visible: root.title !== "" || root.sub !== "" || extraRow.children.length > 0
-        x: 16; y: 14
+        x: 17; y: 15
         width: root.innerW
         // CSS's flex-wrap over title, line, spacer, extra: all on one line when they fit; else the extra goes under at the
         // left; and when even the title and the line do not fit, the line goes under the title, wrapping
@@ -92,10 +93,10 @@ Rectangle {
     }
     Column {
         id: body
-        x: 16
+        x: 17
         y: root.headerHeight
         width: root.innerW
-        height: root.fill ? root.height - root.headerHeight - 16 : implicitHeight
+        height: root.fill ? root.height - root.headerHeight - 17 : implicitHeight
         spacing: root.gap
     }
 }

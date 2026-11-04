@@ -15,6 +15,7 @@ Rectangle {
     property string tag: ""                     // a quiet word beside the title (a department)
     property string line: ""
     property bool lineHot: false
+    property bool lineMono: false               // a path: iq-s mono
     property string line2: ""                   // iq-n: a second line, in text-2
     property string note: ""
     property bool noteHot: hot
@@ -44,10 +45,8 @@ Rectangle {
     implicitHeight: head.height + (expanded ? det.childrenRect.height + 14 : 0)
     height: implicitHeight
     radius: Theme.radiusLg
-    color: dim ? "transparent"
-         : picked ? Theme.surface3
-         : area.containsMouse ? Theme.mix(Theme.surface3, tint ? Theme.mix(Theme.crit, Theme.surface2, 0.05) : Theme.surface2, 0.5)
-         : tint ? Theme.mix(Theme.crit, Theme.surface2, 0.05) : Theme.surface2
+    // tk-item is the card's ground; iq-card, its head, carries the pick and the hover, so an opened card's details stay on the ground
+    color: dim ? "transparent" : tint ? Theme.mix(Theme.crit, Theme.surface2, 0.05) : Theme.surface2
     border.width: dim || expanded ? 1 : 0
     border.color: Theme.border
     opacity: dim ? 0.75 : 1
@@ -56,6 +55,12 @@ Rectangle {
         id: head
         width: parent.width
         height: 2 * root.padV + Math.max(34, main.implicitHeight)
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.radiusLg
+            color: root.dim ? "transparent" : root.picked ? Theme.surface3
+                 : area.containsMouse ? Theme.mix(Theme.surface3, root.color, 0.5) : "transparent"
+        }
         MouseArea { id: area; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.open() }
         Rectangle {
             id: ic
@@ -76,10 +81,10 @@ Rectangle {
                 width: parent.width
                 height: tt.height
                 Txt { id: tt; text: root.title; font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - (tg.visible ? tg.implicitWidth + 8 : 0)) }
-                Txt { id: tg; visible: root.tag !== ""; x: tt.width + 8; text: root.tag; color: Theme.text3; font.pixelSize: Theme.fSmall; elide: Text.ElideNone
+                Txt { id: tg; visible: root.tag !== ""; x: tt.width + 8; text: root.tag; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
                       y: tt.baselineOffset - baselineOffset }
             }
-            Txt { visible: root.line !== ""; text: root.line; color: root.lineHot ? Theme.crit : Theme.text3; font.pixelSize: Theme.fSmall; width: parent.width }
+            Txt { visible: root.line !== ""; text: root.line; mono: root.lineMono; color: root.lineHot ? Theme.crit : Theme.text3; font.pixelSize: Theme.fSmall; width: parent.width }
             Txt { visible: root.line2 !== ""; text: root.line2; color: Theme.text2; font.pixelSize: Theme.fSmall; width: parent.width }
         }
         // the middle column: the card's own drawing, or its note

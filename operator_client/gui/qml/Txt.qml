@@ -12,6 +12,8 @@ Text {
     font.family: mono ? Theme.mono : Theme.sans
     font.pixelSize: Theme.fBody
     font.weight: strong ? Font.DemiBold : Font.Normal
+    // the concept's mono is 12.5px; Qt has only whole pixels, so 13 with the 12.5's advance keeps columns of hosts and times in line
+    Component.onCompleted: if (mono && font.pixelSize === 13) font.letterSpacing = -0.3
     renderType: Text.NativeRendering
     elide: Text.ElideRight
     verticalAlignment: Text.AlignVCenter

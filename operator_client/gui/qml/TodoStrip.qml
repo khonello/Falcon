@@ -15,10 +15,14 @@ Rectangle {
         return xs.length ? xs[0] : null
     }
     width: parent ? parent.width : 800
-    height: cur ? 42 : 0
+    // the concept's .newtask: 9px 20px around a small button's 24, a hairline under it at a third of the accent, on the
+    // accent's soft tint over the page
+    height: cur ? 43 : 0
     visible: cur !== null
-    color: Theme.mix(Theme.accent, Theme.surface, 0.10)
-    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.mix(Theme.accent, Theme.border, 0.4) }
+    color: Theme.bg
+    Rectangle { anchors.fill: parent; color: Theme.accentSoft }
+    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.alpha(Theme.accent, 0.35) }
+    readonly property var waiting: strip.filter(function (t) { return !snoozed[t.id] })
 
     function load() {
         if (!falcon.isConnected) return
@@ -36,13 +40,20 @@ Rectangle {
         x: 20
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
-        Check { checked: false; anchors.verticalCenter: parent.verticalCenter; onToggled: root.done() }
-        Txt { text: root.cur && root.cur.overdue ? "Past its date" : "Due soon"; font.weight: Font.DemiBold; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone }
-        Txt { text: root.cur ? root.cur.text : ""; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, root.width - 520) }
+        Icon { name: "checksquarefilled"; size: 15; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
+        Txt { text: !root.cur ? "" : root.cur.overdue ? "Past its date" : Time.sameDay(Time.ms(root.cur.due_at), Time.now) ? "Due today" : "Due tomorrow"; font.weight: Font.DemiBold; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideNone }
+        Txt { text: root.cur ? root.cur.text : ""; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, root.width - 600) }
         Txt {
             text: root.cur ? "due " + Time.hhmm(root.cur.due_at) : ""
             mono: true
-            color: root.cur && root.cur.overdue ? Theme.crit : Theme.med
+            color: root.cur && root.cur.overdue ? Theme.crit : Theme.text
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideNone
+        }
+        Txt {
+            visible: root.waiting.length > 1
+            text: "and " + Theme.fmt(root.waiting.length - 1) + " more"
+            color: Theme.text3
             anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideNone
         }
@@ -51,7 +62,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: 20
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 8
+        spacing: 12
         Btn { objectName: "todoNotNow"; text: "Not now"; small: true; onClicked: { var s = Object.assign({}, root.snoozed); s[root.cur.id] = true; root.snoozed = s } }
         Btn { objectName: "todoDone"; text: "Done"; small: true; kind: "primary"; onClicked: root.done() }
     }

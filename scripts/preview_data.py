@@ -8,14 +8,17 @@ Not product code: nothing imports this but the preview.
 """
 from __future__ import annotations
 
+import base64
+import json
 import math
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 REAL_NOW = datetime.now(timezone.utc).astimezone()
-# the sample is laid out around the concept's 13:20, so the preview's clock reads 13:20 today whatever the real time
-# is (the preview tells the console's Time the same skew): the day's charts then look as they do in the concept
-NOW = REAL_NOW.replace(hour=13, minute=20, second=0, microsecond=0)
+# the sample is the concept's, so the preview's clock reads the concept's now, Thursday 1 October 2026 at 13:20, whatever
+# the real time is (the preview tells the console's Time the same skew): days, dates and charts then read as the concept's
+NOW = REAL_NOW.replace(year=2026, month=10, day=1, hour=13, minute=20, second=0, microsecond=0)
 SKEW_MS = (NOW - REAL_NOW).total_seconds() * 1000
 
 
@@ -51,11 +54,12 @@ MACHINES = [  # pc, host, user, account, dept, online, hours since seen
     (11, "FIN-01", "Afi", 31, 2, True, 0),
     (12, "FIN-02", "Kofi", 32, 2, True, 0),
     (21, "LOG-01", "Esi", 41, 3, True, 0),
-    (22, "LOG-02", "Abena", 42, 3, False, 11.0),
+    (22, "LOG-02", "Abena", 42, 3, False, 10.8133),
 ]
 HOST = {m[1]: m for m in MACHINES}
+_CM = json.loads((Path(__file__).with_name("preview_concept_machines.json")).read_text(encoding="utf-8"))["machines"]
 # who is inside a machine now: host -> (occupant, account, via, entered hours ago)
-HELD = {"OPS-04": ("R. Mensah", 7, "traversal", 0.4), "OPS-07": ("You", 1, "traversal", 2.6)}
+HELD = {"OPS-04": ("A. Quaye", 9, "traversal", 0.4), "OPS-07": ("You", 7, "traversal", 2.6)}
 
 
 def _session(host: str) -> dict[str, Any] | None:
@@ -71,22 +75,22 @@ def _session(host: str) -> dict[str, Any] | None:
 
 
 def calendar_board() -> dict[str, Any]:
-    """What is coming, as `calendar.board` answers it: a few deadlines, a rule that runs every weekday at 09:00, announcements waiting to go out."""
+    """What is coming, as `calendar.board` answers it, from the concept's calEvents: open tasks by their final deadline, your to-dos, and Daily maintenance."""
     items = []
-    def add(kind: str, hours: float, title: str, line: str, to: list[str], overdue: bool = False) -> None:
-        items.append({"kind": kind, "at": at(hours), "title": title, "line": line, "to": to, "overdue": overdue})
-    add("task", -5, "Confirm who covers the front desk during the training week", "Operations", ["tasks", "D-11"], True)
-    add("task", 3, "Prepare the stock count for the auditors", "Finance", ["tasks", "D-13"])
-    add("task", 28, "Collect the signed leave forms from every team", "Operations", ["tasks", "D-14"])
-    add("announcement", 18.7, "Fire drill on Friday morning", "Your department", ["messages", "announcements"])
-    add("announcement", 24 * 6 + 9, "Month-end: timesheets in by 17:00", "Your department", ["messages", "announcements"])
-    add("announcement", 24 * 20 + 8, "Offices closed on the public holiday", "Your department", ["messages", "announcements"])
-    add("announcement", 24 * 45 + 8, "Year-end training week starts on Monday", "Your department", ["messages", "announcements"])
-    for d in range(60):
+    for t in TASKS:
+        tid, title, who, _by, status, _c, _s, _soft, final, _i = t
+        if status != "completed":
+            pc = next((m[1] for m in MACHINES if m[3] == who), "")
+            h = final - CONCEPT_NOW
+            items.append({"kind": "task", "at": at(h), "title": title, "line": f"{NAMES.get(who, '?')} · {pc}", "to": ["tasks", tid], "overdue": h < 0})
+    for td in _todos()["todos"]:
+        if not td["done"]:
+            items.append({"kind": "todo", "at": td["due_at"], "title": td["text"], "line": "your to-do", "to": ["tasks", None], "overdue": td["overdue"]})
+    for d in range(61):
         day = NOW + timedelta(days=d)
         when = day.replace(hour=9, minute=0)
-        if day.weekday() < 5 and when > NOW:
-            items.append({"kind": "rule", "at": when.isoformat(), "title": "Daily maintenance", "line": "2 actions", "to": ["automation", "4"], "overdue": False})
+        if day.weekday() < 5 and when > NOW and day.month <= 11:
+            items.append({"kind": "rule", "at": when.isoformat(), "title": "Daily maintenance", "line": "All machines · 2 actions", "to": ["automation", "4"], "overdue": False})
     items.sort(key=lambda x: x["at"])
     return {"now": NOW.isoformat(), "until": at(124 * 24), "items": items, "cut": False}
 
@@ -95,7 +99,7 @@ def tree(role: str, dept_id: int | None) -> dict[str, Any]:
     out = []
     for did, name in DEPTS:
         admins = [{"account_id": a, "role": "admin", "name": n, "status": "active", "pc_id": pc, "hostname": ws,
-                   "pc_type": "admin_workstation", "online": True, "last_seen_at": at(0),
+                   "pc_type": "admin_workstation", "online": ws != "WS-FIN-A1", "last_seen_at": at(-5 / 3 if ws == "WS-FIN-A1" else 0),
                    "session": ({"occupied_via": "traversal", "occupant_name": n} if busy else None)}
                   for a, n, d, pc, ws, busy in ADMINS if d == did]
         workers = [{"account_id": acct, "role": "worker", "name": user, "status": "active" if online else "inactive",
@@ -269,16 +273,15 @@ GEN = {"OPS-05": 2, "OPS-06": 2, "LOG-02": 3}
 def machines_list(role: str, dept_id: int | None) -> dict[str, Any]:
     out = []
     for pc, host, user, acct, dept, online, seen in MACHINES:
+        c = _CM[host]
         # version 1: an Admin reaches every department
         out.append({"pc_id": pc, "hostname": host, "department_id": dept, "key_generation": GEN.get(host, 1),
-                    "owner": {"account_id": acct, "name": user}, "ip": f"10.20.{dept + 3}.{10 + pc}", "online": online,
-                    "version": "1.4.0" if host == "LOG-02" else "1.4.1" if host == "OPS-06" else "1.4.2",
-                    "behind": host in ("LOG-02", "OPS-06"), "last_seen_at": at(-seen),
+                    "owner": {"account_id": acct, "name": user}, "ip": c["ip"], "online": online, "health": c["status"], "note": c["note"],
+                    "version": c["ver"], "behind": c["ver"] != "1.4.2", "last_seen_at": at(-seen),
                     # the readings now, as machines.list carries them from each machine's last report
-                    "cpu": round(8 + 80 * _nz(7 + pc, 3), 1) if online else None, "memory": round(40 + 40 * _nz(9 + pc, 5), 1) if online else None,
-                    "disk": round(30 + 65 * _nz(11 + pc, 2), 1) if online else None,
+                    "cpu": c["cpu"], "memory": c["mem"], "disk": c["disk"],
                     "held_by_you": host == "OPS-07"})
-    for acct, host, pc in ((1, "ADM-01", 100), (7, "ADM-OPS-01", 101), (8, "ADM-FIN-01", 102), (9, "ADM-OPS-02", 103)):
+    for acct, host, pc in ((7, "WS-OPS-A1", 101), (9, "WS-OPS-A2", 102), (8, "WS-FIN-A1", 103)):
         out.append({"pc_id": pc, "hostname": host, "department_id": None, "key_generation": 1, "pc_type": "admin_workstation",
                     "owner": {"account_id": acct, "name": None}, "ip": f"10.20.1.{pc - 90}", "online": True, "version": "1.4.2", "last_seen_at": at(0)})
     return {"machines": out}
@@ -343,83 +346,207 @@ def enroll_list(role: str) -> dict[str, Any]:
                           "requested_department_id": 1, "requested_level": "worker", "created_at": at(-0.6), "expires_at": at(23.4)}]}
 
 
+# --- flows as flow.list answers them: the concept's eight (docs/design/concepts-admin.html, EXISTING_FLOWS) ----------------
+_WS = {"WS-OPS-A1": 101, "WS-OPS-A2": 102, "WS-FIN-A1": 103}
+FLOWS = [  # id, name, by (account, name), sources [(host, path, paused)], stages [(type, op)], destinations [(host or ?picker, path, paused)],
+    # status, pause reason, consent, files copied (all time, today), last sync (hours from now), made (hours from now)
+    (1, "payroll", (7, "R. Mensah"), [("OPS-01", "/payroll/", None)], [("transformation", "Rename by date")], [("FIN-01", "/payroll/", None)], "paused", "restricted:consent", "not_required", (64, 31), -0.15, -400),
+    (2, "payroll-pdf", (8, "K. Boateng"), [("FIN-01", "/payroll/", None)], [("transformation", "Convert to PDF")], [("FIN-02", "/payroll-pdf/", None), ("FIN-02", "/archive/", None)], "active", None, "not_required", (41, 24), -0.13, -400),
+    (3, "weekly", (7, "R. Mensah"), [("OPS-07", "/weekly/", None)], [("categorization", "Sort by file type")], [("LOG-01", "/weekly/", None), ("LOG-01", "/archive/", "destination:path_missing")], "active", None, "not_required", (38, 23), -0.3, -400),
+    (4, "weekly-digest", (9, "A. Quaye"), [("LOG-01", "/weekly/", None)], [("transformation", "Compress to ZIP")], [("OPS-02", "/reports/", None)], "active", None, "not_required", (5, 1), -1.25, -400),
+    (5, "intake", (7, "R. Mensah"), [("OPS-03", "/intake/", None)], [], [("?WS-FIN-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -50.67),
+    (6, "budget-review", (7, "R. Mensah"), [("WS-OPS-A1", "/reports/budget/", None)], [("transformation", "Convert to PDF")], [("?WS-FIN-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -3.0),
+    (7, "ops-pack", (7, "R. Mensah"), [("OPS-02", "/reports/", None), ("OPS-05", "/exports/", "source:path_missing")], [("transformation", "Compress to ZIP")], [("WS-OPS-A1", "/packs/", None)], "active", None, "not_required", (7, 1), -0.83, -400),
+    (8, "board-pack", (9, "A. Quaye"), [("WS-OPS-A2", "/board/", None)], [("transformation", "Convert to PDF")], [("WS-OPS-A1", "/board/", None), ("WS-FIN-A1", "/board/", None)], "active", None, "not_required", (12, 1), -1.67, -400),
+    (9, "scan-archive", (7, "R. Mensah"), [("OPS-04", "/scans/", None)], [], [("WS-OPS-A1", "/scans/", None)], "active", None, "not_required", (212, 0), -384, -900),
+    # an ask to this console: K. Boateng wants to send R. Mensah files; R. Mensah picks the folder
+    (10, "month-end", (8, "K. Boateng"), [("FIN-01", "/month-end/", None)], [("transformation", "Compress to ZIP")], [("?WS-OPS-A1", "", None)], "paused", "consent:pending", "pending", (0, 0), None, -1.7),
+]
+# the last sync of each flow, as flow.runs answers it: when (hours from now), the one before, each file (name, outcome, KB before, after), what did not go
+FLOW_RUNS = {
+    1: (-0.15, [-0.65, -1.15, -1.65], [("timesheet-0930.xlsx", "changed", 184, 212), ("2026-09-29-timesheet.xlsx", "new", 0, 190)], [("consent", "held for its owner's consent")]),
+    2: (-0.13, [-0.63, -1.13], [("timesheet-0930.pdf", "new", 0, 96), ("timesheet-0929.pdf", "changed", 88, 92)], []),
+    3: (-0.3, [-0.65, -1.3], [("manifest-0930.pdf", "new", 0, 340), ("report.xlsx", "kept_beside", 1100, 1320)], [("destination", "destination:path_missing")]),
+    4: (-1.25, [-25.25], [("weekly-w40.zip", "new", 0, 2400)], []),
+    7: (-0.83, [-24.83], [("pack-0930.zip", "changed", 5100, 5600), ("exports-0930.csv", "new", 0, 210)], []),
+    8: (-1.67, [-45.17], [("minutes-2026-09.pdf", "new", 0, 820), ("agenda-oct.pdf", "changed", 120, 134)], []),
+}
+
+
+def _pc(host: str) -> int | None:
+    return _WS.get(host) or (HOST[host][0] if host in HOST else None)
+
+
+def flows() -> list[dict[str, Any]]:
+    out = []
+    for fid, name, (by, byname), srcs, stages, dests, status, reason, consent, (total, today_n), last, made in FLOWS:
+        st = [{"id": fid * 10 + k, "parent_stage_id": None if k == 0 else fid * 10 + k - 1, "stage_type": t, "config": {"op": op}} for k, (t, op) in enumerate(stages)]
+        tail = st[-1]["id"] if st else None
+        ds = []
+        for k, (host, path, paused) in enumerate(dests):
+            pick = host.startswith("?")
+            h = host.lstrip("?")
+            ds.append({"id": fid * 10 + k, "destination_pc_id": _pc(h), "destination_hostname": h, "parent_stage_id": tail, "owner_account_id": next((a[0] for a in ADMINS if a[4] == h), None),
+                       "destination_path": path or None, "let_them_choose": pick, "paused_reason": paused,
+                       "suggestion": "The destination folder is gone. Make it, or point the flow somewhere else." if paused else None,
+                       "last_sync": {"synced_at": at(last)} if last is not None and not paused else None})
+        out.append({"id": fid, "name": name, "created_by_account_id": by, "created_by_name": byname, "created_at": at(made),
+                    "source_pc_id": _pc(srcs[0][0]), "source_hostname": srcs[0][0], "source_path": srcs[0][1], "source_kind": "folder",
+                    "sources": [{"source_pc_id": _pc(h), "source_hostname": h, "source_path": pth, "source_kind": "folder", "pause_reason": gone, "paused_at": at(-1.5) if gone else None} for h, pth, gone in srcs],
+                    "status": status, "pause_reason": reason, "consent_status": consent,
+                    "suggestion": None, "files_copied": {"total": total, "today": today_n, "last_at": at(last) if last is not None else None},
+                    "stages": st, "destinations": ds})
+    return out
+
+
+def flow_runs(fid: int) -> dict[str, Any]:
+    r = FLOW_RUNS.get(fid)
+    if r is None:
+        return {"flow_id": fid, "last": None, "waiting": [], "earlier": [], "runs": 0}
+    last, earlier, files, waiting = r
+    items = [{"path": n, "relative_path": n, "bundle": False, "outcome": o, "bytes_before": b * 1000, "bytes_after": c * 1000, "destination_id": None, "machine": None, "at": at(last)} for n, o, b, c in files]
+    return {"flow_id": fid, "last": {"started_at": at(last), "ended_at": at(last), "files": len(items), "counts": {}, "bytes": 0, "items": items},
+            "waiting": [{"kind": k, "why": w} for k, w in waiting], "earlier": [{"started_at": at(h), "ended_at": at(h), "files": 1, "counts": {}, "bytes": 0} for h in earlier], "runs": 1 + len(earlier)}
+
+
 # --- issues as the Engine keeps them (issues.list / issues.get / issues.act) ------------------------------------
-ISSUES = [  # id, code, type, severity, title, subject, pc, hours old, owner account, state, label, escalated
-    (41, "I-41", "file", "critical", "Restricted file copied where it isn't allowed", "budget-2026.xlsx", 7, 3.3, 7, "open", None, False),
-    (42, "I-42", "file", "high", "Restricted file copied where it isn't allowed", "salaries.csv", 3, 3.8, 7, "open", None, False),
-    (43, "I-43", "deviation", "medium", "Machine presented another name", "presented WS-OPS-05", 5, 4.1, 7, "open", None, False),
-    (44, "I-44", "update", "high", "Update past the escalation limit", "1.4.0 → 1.4.2", 22, 76.0, None, "open", "Escalated", True),
-    (45, "I-45", "update", "medium", "One version behind", "1.4.1 → 1.4.2, 2 failed attempts", 6, 26.0, 7, "waiting", "Retrying when idle", False),
-    (46, "I-46", "offline", "medium", "Not checking in", "since 02:31", 22, 11.0, None, "open", "Escalated", True),
+ISSUES = [  # the concept's eighteen (docs/design/concepts-admin.html, ISSUES): id, code, type, severity, title, subject, pc, hours old,
+    # target hours, state, label, escalated, detail
+    (41, "INC-1042", "file", "critical", "Restricted file copied where it isn't allowed", "budget-2026.xlsx", 7, 3.303, 1, "open", "Open", False, {"folder": "C:\\Users\\Ama\\Documents", "size": "84 KB", "file": "budget-2026.xlsx", "mark": {"host": "WS-OPS-A1", "path": "C:\\Finance\\budget-2026.xlsx", "keep": "machine", "by": "R. Mensah", "kind": "file"}}),
+    (42, "UPD-0318", "update", "high", "Update past the escalation limit", "1.4.0 → 1.4.2", 22, 75.833, 24, "open", "Escalated", True, {"cur": "1.4.0", "target": "1.4.2", "attempts": "1, Mon 07:45", "err": "Could not reach the update share"}),
+    (43, "INC-1041", "file", "high", "Restricted file copied where it isn't allowed", "salaries.csv", 3, 3.833, 1, "open", "Open", False, {"folder": "C:\\Users\\Yaw\\Desktop", "size": "212 KB", "file": "salaries.csv", "mark": {"host": "WS-OPS-A1", "path": "C:\\HR\\Payroll\\", "keep": "path", "by": "R. Mensah", "kind": "folder"}}),
+    (44, "DEV-0087", "deviation", "medium", "Certificate hostname mismatch", "presented WS-OPS-05", 5, 4.153, 8, "open", "Open", False, {"expected": "OPS-05", "presented": "WS-OPS-05", "fp": "5c:1e:…:a9"}),
+    (45, "FLW-0012", "flow", "low", "Flow waiting for a folder", "intake → K. Boateng", 3, 57.333, 72, "waiting", "Waiting", False, {"flow": "intake", "from": "OPS-03 /intake/", "to": "a folder K. Boateng picks on WS-FIN-A1", "consent": "K. Boateng", "asked": "2 days ago, by R. Mensah"}),
+    (46, "UPD-0322", "update", "low", "One version behind", "1.4.1 → 1.4.2", 6, 26.003, 72, "waiting", "Retrying", False, {"cur": "1.4.1", "target": "1.4.2", "attempts": "2, last Wed 11:20", "err": "Installer exit 1603, a file was in use"}),
+    (47, "INC-1050", "file", "high", "Restricted file copied where it isn't allowed", "board-minutes-2026-09.docx", 11, 1.933, 1, "open", "Open", False, {"folder": "C:\\Users\\Afi\\Downloads", "size": "—", "file": "board-minutes-2026-09.docx", "mark": {"host": "WS-FIN-A1", "path": "D:\\Board\\minutes\\board-minutes-2026-09.docx", "keep": "machine", "by": "K. Boateng", "kind": "file"}}),
+    (48, "INC-1051", "file", "critical", "Restricted file copied where it isn't allowed", "loi-northline.pdf", 2, 4.583, 1, "open", "Open", False, {"folder": "C:\\Users\\Public\\Shared", "size": "—", "file": "loi-northline.pdf", "mark": {"host": "WS-FIN-A1", "path": "D:\\Acquisitions\\", "keep": "path", "by": "K. Boateng", "kind": "folder"}}),
+    (49, "INC-1052", "file", "high", "Restricted file copied where it isn't allowed", "valuation-model.xlsx", 21, 33.833, 1, "open", "Open", False, {"folder": "C:\\Users\\Esi\\Desktop\\new folder", "size": "—", "file": "valuation-model.xlsx", "mark": {"host": "WS-FIN-A1", "path": "D:\\Acquisitions\\", "keep": "path", "by": "K. Boateng", "kind": "folder"}}),
+    (50, "INC-1053", "file", "medium", "Restricted file copied where it isn't allowed", "strategy-2027.pptx", 5, 63.333, 1, "open", "Open", False, {"folder": "C:\\Users\\Nana\\Documents", "size": "—", "file": "strategy-2027.pptx", "mark": {"host": "WS-FIN-A1", "path": "C:\\Users\\KBoateng\\Documents\\strategy-2027.pptx", "keep": "path", "by": "K. Boateng", "kind": "file"}}),
+    (51, "INC-1054", "file", "high", "Restricted file copied where it isn't allowed", "payroll-2025-12.csv", 3, 5.433, 1, "open", "Open", False, {"folder": "C:\\Users\\Yaw\\Documents", "size": "—", "file": "payroll-2025-12.csv", "mark": {"host": "WS-FIN-A1", "path": "E:\\Archive\\Payroll\\", "keep": "machine", "by": "K. Boateng", "kind": "folder"}}),
+    (52, "INC-1055", "file", "high", "Restricted file copied where it isn't allowed", "payroll-2025-11.csv", 12, 7.133, 1, "open", "Open", False, {"folder": "C:\\Users\\Kofi\\Documents", "size": "—", "file": "payroll-2025-11.csv", "mark": {"host": "WS-FIN-A1", "path": "E:\\Archive\\Payroll\\", "keep": "machine", "by": "K. Boateng", "kind": "folder"}}),
+    (53, "INC-1056", "file", "medium", "Restricted file copied where it isn't allowed", "payroll-2025-10.csv", 6, 43.333, 1, "open", "Open", False, {"folder": "C:\\Users\\Kwame\\Documents", "size": "—", "file": "payroll-2025-10.csv", "mark": {"host": "WS-FIN-A1", "path": "E:\\Archive\\Payroll\\", "keep": "machine", "by": "K. Boateng", "kind": "folder"}}),
+    (54, "INC-1057", "file", "medium", "Restricted file copied where it isn't allowed", "payroll-2025-09.csv", 1, 53.333, 1, "open", "Open", False, {"folder": "C:\\Users\\Kojo\\Documents", "size": "—", "file": "payroll-2025-09.csv", "mark": {"host": "WS-FIN-A1", "path": "E:\\Archive\\Payroll\\", "keep": "machine", "by": "K. Boateng", "kind": "folder"}}),
+    (55, "INC-1058", "file", "low", "Restricted file copied where it isn't allowed", "payroll-2025-08.csv", 11, 73.333, 1, "open", "Open", False, {"folder": "C:\\Users\\Afi\\Documents", "size": "—", "file": "payroll-2025-08.csv", "mark": {"host": "WS-FIN-A1", "path": "E:\\Archive\\Payroll\\", "keep": "machine", "by": "K. Boateng", "kind": "folder"}}),
+    (56, "INC-1059", "file", "low", "Restricted file copied where it isn't allowed", "payroll-2025-07.csv", 4, 88.333, 1, "open", "Open", False, {"folder": "C:\\Users\\Adjoa\\Documents", "size": "—", "file": "payroll-2025-07.csv", "mark": {"host": "WS-FIN-A1", "path": "E:\\Archive\\Payroll\\", "keep": "machine", "by": "K. Boateng", "kind": "folder"}}),
+    (57, "INC-1060", "file", "low", "Restricted file copied where it isn't allowed", "payroll-2025-06.csv", 21, 103.333, 1, "open", "Open", False, {"folder": "C:\\Users\\Esi\\Documents", "size": "—", "file": "payroll-2025-06.csv", "mark": {"host": "WS-FIN-A1", "path": "E:\\Archive\\Payroll\\", "keep": "machine", "by": "K. Boateng", "kind": "folder"}}),
+    (58, "INC-1070", "file", "high", "Restricted file copied where it isn't allowed", "payroll-2026-09.xlsx", 5, 0.933, 1, "open", "Open", False, {"folder": "C:\\Users\\Nana\\Downloads", "size": "—", "file": "payroll-2026-09.xlsx", "mark": {"host": "WS-OPS-A1", "path": "C:\\HR\\Payroll\\", "keep": "path", "by": "R. Mensah", "kind": "folder"}}),
 ]
 _TARGET = {"file": 1, "update": 24, "deviation": 8, "flow": 72, "offline": 72}
 _TLABEL = {"file": "Restricted file", "update": "Stuck update", "deviation": "Deviation", "flow": "Flow blocked", "offline": "Not checking in"}
 
 
 def _issue(t: tuple, account: int) -> dict[str, Any]:
-    iid, code, type_, sev, title, subject, pc, age, owner, state, label, esc = t
+    iid, code, type_, sev, title, subject, pc, age, target, state, label, esc, detail = t
     m = next(x for x in MACHINES if x[0] == pc)
     return {"id": iid, "code": code, "type": type_, "type_label": _TLABEL[type_], "severity": sev, "title": title, "subject": subject,
             "pc_id": pc, "host": m[1], "department_id": m[4], "department_name": {1: "Operations", 2: "Finance", 3: "Logistics"}[m[4]],
-            "opened_at": at(-age), "age_hours": age, "target_hours": _TARGET[type_], "past_target": state != "resolved" and age > _TARGET[type_],
-            "owner": {"account_id": owner, "name": NAMES.get(owner, "?"), "you": owner == account} if owner else None,
-            "state": state, "label": label or {"open": "Open", "waiting": "Waiting"}[state], "escalated": esc, "resolved_at": None, "resolution": None}
+            "opened_at": at(-age), "age_hours": age, "target_hours": target, "past_target": state != "resolved" and age > target,
+            "state": state, "label": label, "escalated": esc, "resolved_at": None, "resolution": None, "detail": detail}
 
 
 def issues_list(role: str, dept_id: int | None, account: int) -> dict[str, Any]:
-    out = [_issue(t, account) for t in ISSUES]
-    if role == "admin":
-        out = [i for i in out if i["department_id"] == dept_id]
+    out = [_issue(t, account) for t in ISSUES]      # version 1: an Admin reaches every department
     return {"issues": out, "summary": {"open": sum(i["state"] == "open" for i in out), "waiting": sum(i["state"] == "waiting" for i in out),
                                        "past_target": sum(i["past_target"] for i in out), "done_today": 2, "mine": 0}}
 
 
 def issues_get(iid: int, account: int) -> dict[str, Any]:
+    """issues.get as engine/console/plays.py answers it, in the concept's words for its eighteen issues."""
     t = next(x for x in ISSUES if x[0] == iid)
     i = _issue(t, account)
-    host, who = i["host"], next(x[2] for x in MACHINES if x[0] == i["pc_id"]) or "Nobody"
+    d, host = i["detail"], i["host"]
+    who = next(x[2] for x in MACHINES if x[0] == i["pc_id"])
+    online = next(x[5] for x in MACHINES if x[0] == i["pc_id"])
+    why: list[str] = []
     if i["type"] == "file":
-        lead = f"A copy of {i['subject']}, marked restricted, is on {host}. It may only be where it was marked."
-        facts = [["File", i["subject"]], ["Found on", host], ["Signed in", who], ["Severity", i["severity"].capitalize()]]
-        options = [{"key": "ask", "title": f"Ask {who} to delete it", "desc": f"{who} sees which file and why. The issue closes on its own when the copy is gone.", "verb": "Ask", "done": "Waiting"},
-                   {"key": "delete", "title": "Delete this copy", "desc": f"Deletes it from {host} only. The original is not touched.", "verb": "Delete copy", "done": "Waiting"},
-                   {"key": "allow", "title": f"Allow it on {host} too", "desc": "Adds this one place to what is allowed, with your reason. It is not reported again.", "verb": "Allow it", "done": "Resolved", "need": "reason"}]
+        k = d["mark"]
+        home = k["host"] if k["keep"] == "machine" else f"{k['host']} {k['path']}"
+        lead = f"A copy of a file marked restricted is on {host}. It is kept to {'the machine ' + k['host'] if k['keep'] == 'machine' else 'one place on ' + k['host']}, so nowhere else may have it."
+        facts = [["File", d["file"]], ["Found in", d["folder"]], ["Size", d["size"]], ["Allowed only on", home], ["Marked by", k["by"] + (f", as part of {k['path']}" if k["kind"] == "folder" else "")]]
+        options = []
+        if who and online:
+            options.append({"key": "ask", "title": f"Ask {who} to delete it", "desc": f"{who} sees which file and why. The issue closes on its own when the copy is gone.", "verb": "Ask", "done": "Waiting"})
+        elif not who:
+            why.append("Nobody is signed in, so there is nobody to tell.")
+        if online:
+            options.append({"key": "delete", "title": "Delete this copy", "desc": f"Deletes it from {host} only. The original on {k['host']} is not touched.", "verb": "Delete copy", "done": "Waiting"})
+        options.append({"key": "allow", "title": f"Allow it on {host} too", "desc": "Adds this one place to the mark, with your reason. It is not reported again.", "verb": "Allow it", "done": "Resolved", "need": "reason"})
     elif i["type"] == "deviation":
-        lead = f"{host} presented a name it was not registered with."
-        facts = [["Registered as", host], ["Presented", "WS-OPS-05"], ["Seen", "Today"]]
-        options = [{"key": "accept", "title": "Accept WS-OPS-05", "desc": "Registers the machine as WS-OPS-05.", "verb": "Accept", "done": "Resolved"},
-                   {"key": "reverse", "title": f"Put it back to {host}", "desc": f"Waits for the machine to present {host} again; the issue closes when it does.", "verb": "Put it back", "done": "Waiting"}]
+        lead = f"{host} presented a certificate that does not match what it was registered with."
+        facts = [["Registered as", d["expected"]], ["Presented", d["presented"]], ["First seen", "Today " + at(-i["age_hours"])[11:16]], ["Fingerprint", d["fp"]]]
+        options = [{"key": "accept", "title": f"Accept {d['presented']}", "desc": f"Registers the machine as {d['presented']} and pins its new certificate.", "verb": "Accept", "done": "Resolved"},
+                   {"key": "reverse", "title": f"Put it back to {d['expected']}", "desc": "A new certificate is sent the next time the machine checks in.", "verb": "Put it back", "done": "Waiting"}]
+    elif i["type"] == "flow":
+        lead = f"The {d['flow']} flow starts when {d['consent']} picks a folder on their workstation for it. Picking it is how they agree."
+        facts = [["Flow", d["flow"]], ["From", d["from"]], ["To", d["to"]], ["Asked", d["asked"]]]
+        options = [{"key": "remind", "title": f"Remind {d['consent']}", "desc": "Sends the request again, with your name on it.", "verb": "Remind", "done": "Waiting"},
+                   {"key": "dest", "title": "Send it to a Worker's machine instead", "desc": "You pick the folder there, and nobody has to agree; only another Admin's machine asks first.", "verb": "Change it", "done": "Resolved", "need": "pick",
+                    "pick": ["OPS-01 /intake/", "OPS-04 /intake/", "WS-OPS-A1 /intake/"], "hint": "Pick a destination"},
+                   {"key": "withdraw", "title": "Withdraw the flow", "desc": "Nothing has been copied yet. The request is closed.", "verb": "Withdraw", "done": "Resolved"}]
     else:
-        lead = f"{host} is behind the approved version." if i["type"] == "update" else f"{host} stopped checking in."
-        facts = [["Machine", host], ["Since", i["opened_at"][11:16]]]
-        options = [{"key": "wait", "title": "Wait for it to come back", "desc": f"It retries as soon as {host} checks in again.", "verb": "Keep waiting", "done": "Waiting"},
-                   {"key": "exclude", "title": "Leave it out of the next version's gate", "desc": "The next version can then be approved without it.", "verb": "Leave it out", "done": "Resolved", "need": "reason"}]
-    timeline = [{"at": i["opened_at"], "who": "System", "what": f"Raised: {i['title']}", "kind": "raised", "you": False}]
-    return {"issue": i, "detail": {}, "lead": lead, "facts": facts, "options": options, "why": [], "timeline": timeline}
+        lead = f"{host} is on {d['cur']} and should be on {d['target']}."
+        facts = [["Running", d["cur"]], ["Should run", d["target"]], ["Attempts", d["attempts"]], ["Last error", d["err"]]]
+        if online:
+            options = [{"key": "idle", "title": "Retry when it is idle", "desc": "The default. The next idle window is usually after 17:30.", "verb": "Keep this", "done": "Waiting"},
+                       {"key": "now", "title": "Retry now", "desc": f"{who or 'Whoever is signed in'} may see a restart prompt.", "verb": "Retry now", "done": "Waiting"}]
+        else:
+            why.append(f"{host} is offline, so it can only retry when it is back.")
+            facts.append(["Offline since", "Today 02:20"])
+            options = [{"key": "wait", "title": "Retry when it is back online", "desc": f"The update runs as soon as {host} checks in again.", "verb": "Keep waiting", "done": "Waiting"}]
+        options.append({"key": "exclude", "title": "Leave it out of the 1.4.3 gate", "desc": f"The next version can then be approved without {host}. It stays on {d['cur']} until it updates.", "verb": "Leave it out", "done": "Resolved", "need": "reason"})
+    age, target = i["age_hours"], i["target_hours"]
+    timeline = [{"at": at(-age), "who": "System", "what": f"{i['type_label']} raised on {host}: {i['subject']}", "kind": "raised", "you": False},
+                {"at": at(-age + 0.01), "who": "System", "what": "Report written; every Admin sees it, and any of them may act on it", "kind": "system", "you": False},
+                {"at": at(target - age), "who": "System", "what": f"Passed its target time ({target} h)" if age > target else f"Target time ({target} h)", "kind": "violation" if age > target else "system", "you": False}]
+    return {"issue": i, "detail": d, "lead": lead, "facts": facts, "options": options, "why": why, "timeline": timeline}
 
 
 # --- restricted marks (marks.list / marks.get / marks.tree) ------------------------------------------------------
+_RS = json.loads((Path(__file__).with_name("preview_concept_restricted.json")).read_text(encoding="utf-8"))
+_MARK_PC = {"WS-OPS-A1": 101}
+
+
+def _mark_id(code: str) -> int:
+    return int(code.split("-")[1])
+
+
+def _day_at(word: str) -> str:
+    day, month = word.split()
+    return datetime(2026, {"Sep": 9, "Oct": 10}[month], int(day), 9, 0, tzinfo=NOW.tzinfo).isoformat()
+
+
+def _mark_host(host: str) -> int:
+    return _MARK_PC.get(host) or next((m[0] for m in MACHINES if m[1] == host), 0)
+
+
 def marks_list(role: str, account: int) -> dict[str, Any]:
-    ws, pc = ("WS-OPS-A1", 101) if account == 7 else ("ADM-01", 100)          # the console's own PC, as FakeIdentity says
-    ms = [{"id": 3, "code": "M-3", "kind": "file", "name": "budget-2026.xlsx", "pc_id": pc, "host": ws, "path": "C:/Finance/budget-2026.xlsx",
-           "keep": "machine", "keep_label": "Anywhere on the PC", "by": {"account_id": account, "name": "You", "you": True}, "files": 1, "versions": 13,
-           "copies": 1, "worst": "critical", "created_at": at(-200)},
-          {"id": 4, "code": "M-4", "kind": "folder", "name": "Payroll", "pc_id": pc, "host": ws, "path": "C:/HR/Payroll",
-           "keep": "path", "keep_label": "Only in its place", "by": {"account_id": account, "name": "You", "you": True}, "files": 24, "versions": 31,
-           "copies": 1, "worst": "high", "created_at": at(-400)},
-          {"id": 5, "code": "M-5", "kind": "file", "name": "supplier-contracts-2026.pdf", "pc_id": pc, "host": ws, "path": "C:/Users/R.Mensah/Contracts/supplier-contracts-2026.pdf",
-           "keep": "machine", "keep_label": "Anywhere on the PC", "by": {"account_id": account, "name": "You", "you": True}, "files": 1, "versions": 2,
-           "copies": 0, "worst": None, "created_at": at(-90)}]
-    return {"marks": ms, "summary": {"marks": 3, "files": 26, "copies": 2, "with_copies": 2}}
+    ms = [{"id": _mark_id(k["id"]), "code": k["id"], "kind": k["kind"], "name": k["name"], "pc_id": _mark_host(k["host"]), "host": k["host"], "path": k["path"], "keep": k["keep"],
+           "keep_label": "Anywhere on the PC" if k["keep"] == "machine" else "Only in its place", "by": {"account_id": account, "name": "You", "you": True}, "files": k["files"], "versions": k["versions"],
+           "copies": len(k["copies"]), "worst": k["copies"][0]["sev"] if k["copies"] else None, "created_at": _day_at(k["at"])} for k in _RS["marks"]]
+    return {"marks": ms, "summary": {"marks": len(ms), "files": sum(m["files"] for m in ms), "copies": sum(m["copies"] for m in ms), "with_copies": sum(1 for m in ms if m["copies"])}}
 
 
 def marks_get(mid: int, account: int) -> dict[str, Any]:
     m = next(x for x in marks_list("admin", account)["marks"] if x["id"] == mid)
-    copies = {3: [{"issue_id": 41, "code": "I-41", "severity": "critical", "state": "open", "label": "Open", "host": "OPS-07", "file": "budget-2026.xlsx",
-                   "folder": "C:/Users/Ama/Documents", "path": "C:/Users/Ama/Documents/budget-2026.xlsx", "signed_in": "Ama", "opened_at": at(-3.3), "age_hours": 3.3}],
-              4: [{"issue_id": 42, "code": "I-42", "severity": "high", "state": "open", "label": "Open", "host": "OPS-03", "file": "salaries.csv",
-                   "folder": "C:/Users/Yaw/Desktop", "path": "C:/Users/Yaw/Desktop/salaries.csv", "signed_in": "Yaw", "opened_at": at(-3.8), "age_hours": 3.8}]}.get(mid, [])
-    return {"mark": m, "copies": copies, "resolved_copies": [], "change": {"keep": "path" if m["keep"] == "machine" else "machine", "effect": {"would_flag": 0, "would_clear": 0}}}
+    k = next(x for x in _RS["marks"] if _mark_id(x["id"]) == mid)
+    who = {x[1]: x[2] for x in MACHINES}
+    copies = [{"issue_id": next(i[0] for i in ISSUES if i[1] == c["id"]), "code": c["id"], "severity": c["sev"], "state": "open", "label": "Open", "host": c["host"], "file": c["file"], "folder": c["folder"],
+               "path": c["folder"] + "\\" + c["file"], "signed_in": who.get(c["host"]), "opened_at": _at(c["at"]), "age_hours": CONCEPT_NOW - c["at"], "came_by": {"how": "copied", "sure": True, "said": c["how"]}}
+              for c in k["copies"]]
+    allowed = [{"allowance_id": i + 1, "pc_id": _mark_host(x["host"]), "host": x["host"], "path": x["folder"] + ("\\" + x["file"] if x.get("file") else ""), "reason": x["why"], "by": "You", "at": _day_at(x["at"])}
+               for i, x in enumerate(_RS["allowed"]) if _mark_id(x["mark"]) == mid]
+    flows = [{"consent_id": 9, "flow_id": next((f[0] for f in FLOWS if f[1] == c["flow"]), 0), "flow": c["flow"], "what": c["what"], "from": c["from"], "to": c["to"], "today": c["today"], "last_at": _at(c["last"]),
+              "since": _day_at(c["since"]), "source_path": c["from"], "by": "You", "expires_at": None, "flow_status": "active", "take_back": "flow.restricted_revoke"}
+             for c in _RS["carry"] if _mark_id(c["mark"]) == mid and not c.get("held")]
+    lately = [{"at": _at(e[0]), "who": e[1], "what": e[2], "where": e[3]} for e in _RS["log"].get(k["id"], [])]
+    return {"mark": m, "copies": copies, "allowed": allowed, "lately": lately, "flows_allowed": flows, "resolved_copies": [],
+            "change": {"keep": "path" if m["keep"] == "machine" else "machine", "effect": {"would_flag": 0, "would_clear": 0}}}
+
+
+def restricted_waiting() -> list[dict[str, Any]]:
+    """Flows held at something of yours (flow.restricted_waiting), as the concept has them."""
+    return [{"id": 5, "flow_id": next((f[0] for f in FLOWS if f[1] == c["flow"]), 0), "name": c["flow"], "mark_id": _mark_id(c["mark"]), "what": c["what"], "from": c["from"], "to": c["to"],
+             "sample_path": c["from"] + c["what"], "asked_at": _at(c["held"])} for c in _RS["carry"] if c.get("held")]
 
 
 def marks_tree() -> dict[str, Any]:
@@ -431,8 +558,8 @@ def marks_tree() -> dict[str, Any]:
             "C:/Users/RMensah/Documents/headcount-plan-2027.xlsx", "C:/Users/RMensah/Documents/notes.docx", "C:/Users/RMensah/Documents/ops-review-sep.pptx",
             "C:/Users/RMensah/Desktop/todo.txt", "C:/Users/RMensah/Downloads/vendor-quote.pdf",
             "D:/Board/minutes-2026-09.docx", "D:/Board/minutes-2026-08.docx", "D:/Board/strategy-2027.pptx", "D:/Archive/2024-accounts.zip", "D:/Archive/2025-accounts.zip"]
-    files = [{"path": f, "name": f.rsplit("/", 1)[1], "marked": 3 if f == "C:/Finance/budget-2026.xlsx" else None,
-              "covered_by": 4 if f.startswith("C:/HR/Payroll/") else None} for f in spec]
+    files = [{"path": f, "name": f.rsplit("/", 1)[1], "marked": 1 if f == "C:/Finance/budget-2026.xlsx" else None,
+              "covered_by": 2 if f.startswith("C:/HR/Payroll/") else None} for f in spec]
     folders: dict[str, int] = {}
     for f in spec:
         folders[f.rsplit("/", 1)[0]] = folders.get(f.rsplit("/", 1)[0], 0) + 1
@@ -440,20 +567,22 @@ def marks_tree() -> dict[str, Any]:
 
 
 def machines_get(pc: int, rng: str) -> dict[str, Any]:
-    hours = {"1h": 1, "6h": 6, "24h": 24, "7d": 168}.get(rng, 24)
-    step = hours / 48
-    def ser(seed: float, base: float, amp: float) -> list[dict[str, Any]]:
-        return [{"at": at(-hours + k * step), "v": round(max(0.0, min(100.0, base + amp * (_nz(seed + pc, k) - 0.5) * 2)), 1)} for k in range(49)]
-    procs = [("EXCEL.EXE", 6.2, 412, "Kojo"), ("chrome.exe", 4.1, 880, "Kojo"), ("OUTLOOK.EXE", 1.3, 260, "Kojo"),
-             ("falcon-worker.exe", 0.4, 48, "SYSTEM"), ("MsMpEng.exe", 0.9, 190, "SYSTEM"), ("explorer.exe", 0.2, 96, "Kojo")]
-    return {"machine": {"pc_id": pc, "ip": f"10.20.4.{10 + pc}", "os": "Windows 11 Pro 23H2", "agent_started_at": at(-77.5)}, "range": rng,
-            "series": {"cpu": ser(1, 28, 22), "memory": ser(2, 61, 8), "disk": ser(3, 47, 1), "net_kbps": ser(4, 40, 35)},
-            "processes": {"at": at(-0.05), "items": [{"pid": 1000 + i, "name": n, "cpu": c, "memory_mb": m, "user": u} for i, (n, c, m, u) in enumerate(procs)]},
-            "about": {"os": "Windows 11 Pro 23H2", "memory_total_mb": 16384, "disk_total_gb": 476.0, "disk_percent": round(40 + 7 * (pc % 7), 1),
-                      "boot_at": at(-30 - pc), "registered_at": at(-24 * (60 + pc * 9))},
-            "keyboard": {"state": "in_use", "idle_s": 40, "quarters": []},
-            "check_ins": [{"day": at(-24 * n)[:10], "yes": not (n in (1, 2) and pc % 3 == 0) and not (pc == 9 and n == 0)} for n in range(6, -1, -1)],
-            "sessions": [], "files": {}, "events": []}
+    host = next((m[1] for m in MACHINES if m[0] == pc), None)
+    c = _CM.get(host)
+    if c is None:
+        return {"machine": {"pc_id": pc}, "range": rng, "series": {}, "processes": {"items": []}, "about": {}, "keyboard": {}, "check_ins": [], "sessions": [], "files": {}, "events": []}
+    n = len(c["series"]) - 1
+    def ser(k: int) -> list[dict[str, Any]]:
+        return [{"at": at(-24 + i * 24 / n), "v": p[k]} for i, p in enumerate(c["series"]) if p[k] is not None]
+    ab, use = c["about"], c["use"]
+    who = next(m[2] for m in MACHINES if m[0] == pc) or "SYSTEM"
+    return {"machine": {"pc_id": pc, "ip": c["ip"], "os": ab["os"], "agent_started_at": at(-ab["up"])}, "range": rng,
+            "series": {"cpu": ser(0), "memory": ser(1), "disk": [], "net_kbps": []},
+            "processes": {"at": at(-0.05), "items": [{"pid": 1000 + i, "name": p[0], "cpu": round(p[1], 1), "memory_mb": p[2], "user": who} for i, p in enumerate(c["procs"])]},
+            "about": {"os": ab["os"], "memory_total_mb": ab["ram"] * 1024, "disk_total_gb": ab["size"], "disk_percent": c["disk"], "boot_at": at(-ab["up"]), "registered_at": datetime.strptime(ab["reg"], "%d %b %Y").replace(tzinfo=NOW.tzinfo).isoformat()},
+            "keyboard": {"state": "offline" if c["status"] == "offline" else "in_use" if use["now"] else "idle", "idle_s": int(use["idle"] * 3600), "quarters": []},
+            "check_ins": [{"day": at(-24 * (len(c["days"]) - 1 - i))[:10], "yes": y} for i, y in enumerate(c["days"])],
+            "sessions": [{"started_at": at(t - CONCEPT_NOW), "ended_at": None if dd is None else at(t - CONCEPT_NOW + dd)} for t, dd in c["sessions"]], "files": {}, "events": []}
 
 
 # --- the audit trail, 7 days ---------------------------------------------------------------------------
@@ -462,54 +591,26 @@ def _nz(seed: float, k: float) -> float:
     return x - math.floor(x)
 
 
+def _audit_action(kind: str, what: str) -> str:
+    """The Engine's action name for one of the concept's audit lines."""
+    if kind == "session":
+        return "session.traversed" if what.startswith("Entered") else "session.ended" if what.startswith("Left") else "session.native"
+    if kind == "action":
+        return "control.event_fired" if " notified " in what else "control.action_run"
+    if kind == "flow":
+        return "flow.create" if what.startswith("Created") else "flow.sync"
+    if kind == "rollout":
+        return "update.check" if what.startswith("Checked") else "update.escalated" if "left for an Admin" in what else "update.failed"
+    return {"deviation": "deviation.hostname", "violation": "resource.violation"}.get(kind, kind)
+
+
+_AUDIT = json.loads((Path(__file__).with_name("preview_concept_audit.json")).read_text(encoding="utf-8"))["audit"]
+
+
 def audit(role: str, dept_id: int | None, limit: int) -> dict[str, Any]:
-    hosts = [m for m in MACHINES if m[2]]
-    acts = ["Lock the screen", "Take a screenshot", "Check disk health", "Clear the temp folder", "Log event"]
-    out: list[dict[str, Any]] = []
-    k = 0
-    h = -168.0
-    while h < 0:
-        t = NOW + timedelta(hours=h)
-        working = t.weekday() < 5 and 8 <= t.hour < 17.5
-        n = int((2.6 if working else 0.3) * _nz(41, h) * 1.6 + _nz(5, h * 4))
-        for _ in range(n):
-            r, m = _nz(9, k * 3 + 1), hosts[int(_nz(13, k) * len(hosts))]
-            if r < 0.36:
-                e = ("Automation", f"{acts[int(_nz(19, k) * len(acts))]} ran", m[1], "control.action_run")
-            elif r < 0.58:
-                e = (m[2], "Signed in" if _nz(23, k) > 0.5 else "Signed out", m[1], "session.native")
-            elif r < 0.78:
-                e = ("System", f"payroll synced {1 + int(_nz(29, k) * 12)} files to FIN-01", "OPS-01", "flow.sync")
-            elif r < 0.9:
-                e = (m[2], "Searched shared resources", m[1], "assistance.search")
-            else:
-                e = ("System", "Checked for updates", m[1], "update.check")
-            if not (m[1] == "LOG-02" and h > -11):
-                out.append({"id": 10000 + k, "occupied_at": None, "occurred_at": (t + timedelta(minutes=_nz(17, k) * 15)).isoformat(),
-                            "actor_name": e[0], "summary": e[1], "target_hostname": e[2], "action": e[3]})
-            k += 1
-        h += 0.25
-    notable = [
-        (-3.3, "System", "Copy of restricted budget-2026.xlsx found", "OPS-07", "resource.violation"),
-        (-3.8, "System", "Copy of restricted salaries.csv found", "OPS-03", "resource.violation"),
-        (-4.1, "System", "Certificate presented WS-OPS-05, expected OPS-05", "OPS-05", "deviation.hostname"),
-        (-3.6, "Kojo", "Messaged R. Mensah", "OPS-01", "assistance.ping"),
-        (-3.1, "Kojo", "Messaged R. Mensah again", "OPS-01", "assistance.ping"),
-        (-2.6, "You", "Entered OPS-07", "OPS-07", "session.traversed"),
-        (-0.8, "R. Mensah", "Entered OPS-03", "OPS-03", "session.traversed"),
-        (-0.6, "Automation", "CPU above 90% for 5 min on OPS-03, notified R. Mensah", "OPS-03", "control.event_fired"),
-        (-0.4, "R. Mensah", "Entered OPS-04", "OPS-04", "session.traversed"),
-        (-0.15, "R. Mensah", "Left OPS-03", "OPS-03", "session.ended"),
-        (-11.1, "A. Quaye", "Entered LOG-02 (outside working hours)", "LOG-02", "session.traversed"),
-        (-10.8, "A. Quaye", "Left LOG-02", "LOG-02", "session.ended"),
-        (-76.0, "System", "LOG-02 update escalated to the Admins", "LOG-02", "update.escalated"),
-        (-26.0, "System", "1.4.2 install failed on OPS-06 (attempt 2)", "OPS-06", "update.failed"),
-    ]
-    for j, (hh, who, what, host, action) in enumerate(notable):
-        out.append({"id": 90000 + j, "occurred_at": at(hh), "actor_name": who, "summary": what,
-                    "target_hostname": host, "action": action})
-    if role == "admin":
-        out = [e for e in out if not e["target_hostname"] or HOST.get(e["target_hostname"], (0, 0, 0, 0, dept_id))[4] == dept_id]
+    """The concept's audit trail, as audit.query answers it (version 1: an Admin reads every department's)."""
+    out = [{"id": 10000 + k, "occurred_at": at(t - CONCEPT_NOW), "actor_name": who, "summary": what, "target_hostname": host,
+            "action": _audit_action(kind, what)} for k, (t, who, what, host, kind, _notable) in enumerate(_AUDIT) if t <= CONCEPT_NOW]
     out.sort(key=lambda e: e["occurred_at"], reverse=True)
     return {"entries": out[:limit]}
 
@@ -517,27 +618,45 @@ def audit(role: str, dept_id: int | None, limit: int) -> dict[str, Any]:
 # --- tasks ----------------------------------------------------------------------------------------------
 # id, title, assignee account, assigner (account, name), status, created h, started h, soft h, final h (concept clock),
 # items: (type, intent, name, status, signal hours), linked index for used_with_file
-TASKS = [
+TASKS = [  # the concept's ten (docs/design/concepts-admin.html, TASKS): id, title, assignee, (assigner, name), status, given,
+    # started, soft deadline, final deadline, targets (type, intent, name, status, when each was seen); hours from today's midnight
     (208, "Reconcile the Q3 invoices", 21, (7, "R. Mensah"), "in_progress", -63, -38.75, 36, 41,
-     [("file", "update", "reconciliation.xlsx", "passed", [-38, -30, -28, -7.3, 9.03, 12.97]),
+     [("file", "update", "reconciliation.xlsx", "passed", [-38, -30, -28, -7.27, 9.03, 12.97]),
       ("program", "used_with_file", "EXCEL.EXE", "passed", [-37, -29, -6, 9.03, 10.5, 12.0]),
       ("file", "create", "q3-summary.docx", "pending", [])]),
+    (207, "Update the supplier contact sheet", 22, (9, "A. Quaye"), "active", 9, None, None, 113,
+     [("file", "update", "supplier-contacts.xlsx", "pending", [])]),
+    (205, "Prepare the September payroll export", 31, (8, "K. Boateng"), "in_progress", -135, -134, None, -7,
+     [("file", "create", "payroll-sep.csv", "passed", [-7.5]),
+      ("file", "update", "payroll-sep.xlsx", "passed", [-120, -96, -30]),
+      ("program", "used_with_file", "EXCEL.EXE", "passed", [-120, -30])]),
+    (201, "Archive the August delivery notes", 41, (9, "A. Quaye"), "in_progress", -160, -150, -55, -31,
+     [("file", "exists", "/archive/2026-08/", "passed", [-61.9]),
+      ("file", "create", "delivery-notes-aug.zip", "failed", [])]),
+    (206, "Send the weekly route plan", 41, (9, "A. Quaye"), "in_progress", -40, -39, 30, 41,
+     [("file", "update", "routes-w40.csv", "passed", [-38, -20, -14, 9.5]),
+      ("file", "create", "route-plan-w40.pdf", "pending", [])]),
     (204, "Clear duplicate files from the shared drive", 25, (7, "R. Mensah"), "in_progress", -90, -80, None, 113,
      [("file", "exists", "/common/duplicates/", "passed", [-66, -62, -58]),
       ("file", "create", "duplicates-report.xlsx", "pending", [])]),
     (203, "Install the label printer driver", 26, (9, "A. Quaye"), "in_progress", -100, -98, None, -10,
-     [("program", "installed_available", "LabelPrint.exe", "passed", [-34])]),
-    (209, "Collect the laptop chargers from the meeting room", 27, (7, "R. Mensah"), "active", -70, None, None, -2,
-     [("file", "create", "chargers-list.xlsx", "pending", [])]),
+     [("program", "installed_available", "LabelPrint.exe", "passed", [-33.75])]),
+    (202, "Submit the Q3 expense claims", 31, (8, "K. Boateng"), "completed", -150, -149, None, -60,
+     [("file", "update", "expenses-q3.xlsx", "passed", [-140, -100, -62]),
+      ("program", "used", "OUTLOOK.EXE", "passed", [-61.5])]),
     (200, "Back up the Documents folder", 27, (7, "R. Mensah"), "completed", -160, -158, None, -100,
-     [("file", "create", "documents-backup.zip", "passed", [-108.9])]),
+     [("file", "create", "documents-backup.zip", "passed", [-109])]),
+    (199, "Rename the August scans", 32, (8, "K. Boateng"), "completed", -165, -164, None, -120,
+     [("file", "update", "/scans/2026-08/", "passed", [-144, -130])]),
 ]
-NAMES = {21: "Kojo", 25: "Nana", 26: "Kwame", 27: "Ama", 23: "Yaw"}
+NAMES = {21: "Kojo", 22: "Efua", 25: "Nana", 26: "Kwame", 27: "Ama", 23: "Yaw", 31: "Afi", 32: "Kofi", 41: "Esi"}
 
 
 def _task(t: tuple) -> dict[str, Any]:
-    tid, title, who, (by, byname), status, created, started, soft, final, _items = t
+    tid, title, who, (by, byname), status, created, started, soft, final, items = t
+    pc = next((m[0] for m in MACHINES if m[3] == who), None)
     return {"id": tid, "description_raw": title, "assignee_account_id": who, "assignee_name": NAMES.get(who, "?"),
+            "assignee_pc_id": pc, "checks_total": len(items), "checks_passed": sum(1 for x in items if x[3] == "passed"),
             "assigner_account_id": by, "assigner_name": byname, "status": status,
             "verification_mode": "stack", "created_at": today(created), "started_at": today(started) if started is not None else None,
             "soft_deadline_at": at(soft - CONCEPT_NOW) if soft is not None else None,
@@ -558,7 +677,7 @@ def task_get(tid: int) -> dict[str, Any] | None:
         iid = tid * 10 + k
         items.append({"id": iid, "sequence": k, "target_type": typ, "intent": intent,
                       "proposed_filename": name if typ == "file" else None, "program_name": name if typ == "program" else None,
-                      "status": st, "populated_by": "llm",
+                      "status": st, "populated_by": "llm", "passed_at": today(min(sig)) if st == "passed" and sig else None,
                       "linked_file_verification_item_id": tid * 10 if intent == "used_with_file" else None})
         ex += [{"verification_item_id": iid, "signal_type": "file.modified" if typ == "file" else "program.used",
                 "observed_at": today(h), "value": None} for h in sig]
@@ -594,7 +713,7 @@ def dept_tasks(role: str, account: int) -> dict[str, Any]:
 
 
 # --- messages -------------------------------------------------------------------------------------------
-ACCOUNTS = {7: "R. Mensah", 9: "A. Quaye", 8: "K. Boateng", 21: "Kojo", 23: "Yaw", 27: "Ama", 31: "Afi"}
+ACCOUNTS = {7: "R. Mensah", 9: "A. Quaye", 8: "K. Boateng", 21: "Kojo", 23: "Yaw", 27: "Ama", 31: "Afi", 41: "Esi"}
 # id, initiator (lower), superior (higher), turn, opened (concept clock), closed, messages [(clock, sender, text)]
 CHANNELS = [
     (20, 27, 7, "sender", 8.9, None, [(9.0, 7, "Is budget-2026.xlsx still open on your PC? It should not be there."),
@@ -649,70 +768,99 @@ def channel(cid: int, account: int) -> dict[str, Any] | None:
 
 
 # --- automation ------------------------------------------------------------------------------------------
-LIB = {1: ("Take a screenshot", "monitoring", "screenshot", 30), 2: ("Snapshot USB contents", "monitoring", "usb_contents", 60),
-       3: ("Log event", "monitoring", "log_event", 10), 4: ("Notify the Admin", "control", "notify", 10),
-       5: ("Clear the temp folder", "custom", None, 90), 6: ("Check disk health", "monitoring", "disk_health", 60),
-       7: ("Lock the screen", "control", "lock_session", 30)}
+# The concept's rules, its action library and every run of the week with what it returned (docs/design/concepts-admin.html).
+_AU = json.loads((Path(__file__).with_name("preview_concept_automation.json")).read_text(encoding="utf-8"))
+LIB = {i + 1: a for i, a in enumerate(_AU["lib"])}
+_ACT = {n: i for i, a in LIB.items() for n in a["names"]}
+_ACT["Back up the Documents folder"] = 20                   # a rule's own step, not in the library
 OPS = [1, 2, 3, 4, 5, 6, 7]
-# id, type, pc_ids, match, actions, enabled, org-wide, firings [(hours ago, pc, [(action, outcome, secs)])]
-EVENTS = [
-    (1, "usb.inserted", OPS, {}, [1, 2, 3], True, False,
-     [(0.3, 4, [(1, "success", 3), (2, "success", 38), (3, "success", 1)]), (1.9, 1, [(1, "success", 3), (2, "success", 41), (3, "success", 1)]),
-      (3.3, 7, [(1, "success", 3), (2, "success", 35), (3, "success", 1)]), (26, 3, [(1, "success", 3), (2, "failed", 60), (3, "success", 1)]),
-      (75, 5, [(1, "success", 3), (2, "success", 30), (3, "success", 1)])]),
-    (2, "resource.violation", None, {"tier": "restricted"}, [4, 1], True, True,
-     [(3.3, 7, [(4, "success", 1), (1, "success", 3)]), (3.8, 3, [(4, "success", 1), (1, "success", 3)])]),
-    (3, "threshold.cpu", OPS, {"percent": 90, "duration_s": 300}, [4], True, False,
-     [(0.6, 3, [(4, "success", 1)]), (26, 1, [(4, "success", 1)]), (146, 5, [(4, "success", 1)])]),
-    (4, "time.recurring", None, {"at": "09:00", "days": [0, 1, 2, 3, 4]}, [5, 6], True, True,
-     [(4.3 + 24 * d, 0, [(5, "success" if (d + k) % 9 else "failed", 30 + k) for k in range(5)] + [(6, "success", 10)]) for d in range(6)]),
-]
+_WEEKDAYS = [0, 1, 2, 3, 4]
+# what each concept rule is in the Engine's terms: type, machines, match
+_SPEC = {"usb": ("usb.inserted", OPS, {}), "restricted": ("resource.violation", None, {}), "cpu": ("threshold.cpu", OPS, {"percent": 90, "duration_s": 300}),
+         "daily": ("time.recurring", None, {"at": "09:00", "days": _WEEKDAYS}), "signin": ("threshold.signin", OPS, {"count": 5, "window_s": 600}),
+         "backup": ("time.recurring", OPS, {"at": "12:00", "days": _WEEKDAYS}), "printer": ("printer.offline", OPS, {}), "night": ("time.recurring", OPS, {"at": "20:00", "days": []})}
+_HAND = {"usb": {4: 1}, "backup": {6: 1}, "daily": {3: 1}}   # runs by hand, by day of the week shown (6 is today)
+_WORD = {"Success": "success", "Failed": "failed", "Timed out": "failed", "Stopped by you": "terminated"}
+_MONTHS = {"Sep": 9, "Oct": 10}
+AU_RULES = [dict(r, event_id=i + 1) for i, r in enumerate(_AU["rules"])]
+_RULE_ID = {r["id"]: r["event_id"] for r in AU_RULES}
+_BY = {"R. Mensah": 7, "A. Quaye": 9, "K. Boateng": 8}
+
+
+def _at(t: float) -> str:
+    """A time on the concept's axis, to the minute: the concept rounds where the console's clock would cut."""
+    return at(round(t * 60) / 60 - CONCEPT_NOW)
+
+
+def _pc(host: str) -> int:
+    return next((m[0] for m in MACHINES if m[1] == host), 0)
+
+
+def _made(word: str) -> str:
+    day, month = word.split()
+    return datetime(2026, _MONTHS[month], int(day), 9, 0, tzinfo=NOW.tzinfo).isoformat()
+
+
+def _rule_action(name: str, limit: int) -> dict[str, Any]:
+    aid = _ACT[name]
+    a = LIB.get(aid)
+    kind = a["cat"].lower() if a else "custom"
+    return {"id": aid, "name": name, "action_kind": kind, "builtin_type": None, "timeout_seconds": limit, "description": a["desc"] if a else None}
 
 
 def events(role: str) -> dict[str, Any]:
     out = []
-    for eid, typ, pcs, match, acts, on, org, _f in EVENTS:
-        out.append({"id": eid, "enabled": on, "org_wide": org, "read_only": role == "admin" and org,
-                    "condition_spec": {"type": typ, "pc_ids": pcs, "match": match}, "last_fired_at": None,
-                    "actions": [{"id": a, "name": LIB[a][0], "action_kind": LIB[a][1], "builtin_type": LIB[a][2], "timeout_seconds": LIB[a][3]} for a in acts]})
+    for r in AU_RULES:
+        typ, pcs, match = _SPEC[r["id"]]
+        out.append({"id": r["event_id"], "enabled": not r["off"], "org_wide": False, "read_only": False, "created_at": _made(r["created"]), "created_by_account_id": _BY[r["by"]],
+                    "name": r["name"], "condition_spec": {"type": typ, "pc_ids": pcs, "match": match}, "last_fired_at": None,
+                    "actions": [_rule_action(n, lim) for n, lim in r["actions"]]})
     return {"events": out, "types": {}}
 
 
-OUT = {"success": "Success", "failed": "Failed", "timeout": "Timed out", "terminated": "Stopped by you"}
-# runs by hand: (action, hours ago, pc, outcome, secs, who, summary)
-HAND = [(7, 3.2, 7, "terminated", 44, "You", "Stopped by hand"), (6, 26, 5, "success", 12, "R. Mensah", "Disk healthy · 61% used")]
-
-
 def all_runs() -> list[dict[str, Any]]:
-    """Every run of the week as actions.runs answers it: from rules and by hand."""
+    """Every run of the week as actions.runs answers it, from the rules the Actions page counts and by hand."""
     out = []
-    for eid, typ, _p, _m, _a, _o, _org, firings in EVENTS:
-        rule = automation_name(eid)
-        for h, pc, runs in firings:
-            for k, (a, outcome, secs) in enumerate(runs):
-                if h > 168:
-                    continue
-                host = next((m[1] for m in MACHINES if m[0] == pc), "OPS-01")
-                out.append({"run_id": eid * 1000 + int(h * 10) + k, "action_id": a, "action": LIB[a][0], "pc_id": pc, "host": host, "at": at(-h), "took_s": secs,
-                            "limit_s": LIB[a][3], "outcome": OUT[outcome], "summary": "exit code 1" if outcome == "failed" else None, "exit": 0,
-                            "has_image": False, "event_id": eid, "by": f"rule: {rule}"})
-    for i, (a, h, pc, outcome, secs, who, summ) in enumerate(HAND):
-        host = next((m[1] for m in MACHINES if m[0] == pc), "OPS-01")
-        out.append({"run_id": 90000 + i, "action_id": a, "action": LIB[a][0], "pc_id": pc, "host": host, "at": at(-h), "took_s": secs, "limit_s": LIB[a][3] if a != 7 else 120,
-                    "outcome": OUT[outcome], "summary": summ, "exit": 0, "has_image": False, "event_id": None, "by": "hand"})
-    return sorted(out, key=lambda r: r["at"], reverse=True)
+    for i, x in enumerate(_AU["runs"]):
+        rule = next((r for r in AU_RULES if r["id"] == x["rule"]), None)
+        out.append({"run_id": 50000 + i, "action_id": _ACT.get(x["action"], 0), "action": x["action"], "pc_id": _pc(x["host"]), "host": x["host"], "at": _at(x["t"]),
+                    "took_s": x["sec"], "limit_s": x["timeout"], "outcome": x["outcome"], "summary": x["out"]["summary"], "exit": x["exit"], "has_image": x["out"]["kind"] == "image",
+                    "event_id": rule["event_id"] if rule else None, "by": f"rule: {rule['name']}" if rule else "hand", "who": x["by"]})
+    return out
 
 
-def automation_name(eid: int) -> str:
-    return {1: "USB device inserted", 2: "Restricted file copied where it isn't allowed", 3: "Sustained high CPU", 4: "Scheduled run"}.get(eid, "a rule")
+def run_output(run_id: int) -> dict[str, Any]:
+    """control.execution for a run of the week: what the concept shows it returned."""
+    x = _AU["runs"][run_id - 50000] if 50000 <= run_id < 50000 + len(_AU["runs"]) else None
+    if x is None:
+        return {"execution": {"id": run_id, "status": "success", "has_image": False, "summary": None}, "output": ["Recorded on the machine.", "exit code 0"], "result": None, "expired": False}
+    o = x["out"]
+    return {"execution": {"id": run_id, "status": _WORD[x["outcome"]], "outcome": x["outcome"], "has_image": o["kind"] == "image", "summary": o["summary"], "exit_code": x["exit"]},
+            "output": (o.get("text") or "").splitlines(), "result": {"columns": o["cols"], "rows": o["rows"]} if o["kind"] == "list" else None, "expired": False}
+
+
+def run_image(run_id: int) -> dict[str, Any]:
+    src = _AU["runs"][run_id - 50000]["out"].get("src") or ""
+    return {"data": base64.b64encode(src.encode("utf-8")).decode("ascii"), "mime": "image/svg+xml"}
+
+
+def action_list() -> dict[str, Any]:
+    acts: dict[str, list[dict[str, Any]]] = {"control": [], "monitoring": [], "custom": []}
+    for aid, a in LIB.items():
+        kind = a["cat"].lower()
+        row = {"id": aid, "name": a["name"], "action_kind": kind, "builtin_type": None, "timeout_seconds": a["limit"], "description": a["desc"], "impact": a["impact"], "risky": a["risky"]}
+        if kind == "custom":
+            row.update({"custom_script_language": a["lang"].lower(), "custom_script": a["script"], "created_by_name": a["by"], "created_at": _made(a["created"])})
+        acts[kind].append(row)
+    return {"builtin": {}, "actions": acts}
 
 
 def actions_board() -> dict[str, Any]:
     runs, out = all_runs(), []
-    for aid, (name, kind, builtin, limit) in LIB.items():
+    for aid, a in LIB.items():
         mine = [r for r in runs if r["action_id"] == aid]
-        used = [{"event_id": e[0], "name": automation_name(e[0])} for e in EVENTS if aid in e[4]]
-        out.append({"action_id": aid, "name": name, "kind": kind, "builtin_type": builtin, "timeout_s": limit, "used_by": used, "runs": len(mine),
+        used = [{"event_id": _RULE_ID[i], "name": next(r["name"] for r in AU_RULES if r["id"] == i)} for i in a["used"]]
+        out.append({"action_id": aid, "name": a["name"], "kind": a["cat"].lower(), "builtin_type": None, "timeout_s": a["limit"], "used_by": used, "runs": len(mine),
                     "by_hand": sum(1 for r in mine if r["by"] == "hand"), "problems": sum(1 for r in mine if r["outcome"] in ("Failed", "Timed out")),
                     "last_run": {"outcome": mine[0]["outcome"], "at": mine[0]["at"], "host": mine[0]["host"]} if mine else None, "days": []})
     return {"actions": out, "days": [], "period_days": 7,
@@ -720,49 +868,49 @@ def actions_board() -> dict[str, Any]:
                       "problems": sum(1 for r in runs if r["outcome"] in ("Failed", "Timed out"))}}
 
 
+def _coming() -> list[dict[str, Any]]:
+    """The concept's next scheduled runs: tonight, then tomorrow and Monday (today is a Thursday)."""
+    return [{"at": at(d * 24 + h - CONCEPT_NOW), "event_id": _RULE_ID[i], "name": next(r["name"] for r in AU_RULES if r["id"] == i), "actions": len(next(r for r in AU_RULES if r["id"] == i)["actions"])}
+            for d, h, i in ((0, 20, "night"), (1, 9, "daily"), (1, 12, "backup"), (4, 9, "daily"), (4, 12, "backup"))]
+
+
 def automation_board(role: str) -> dict[str, Any]:
-    """automation.board, only what the console reads from it: who set each rule, by name."""
-    names = {"usb.inserted": "USB device inserted", "time.daily": "Daily maintenance", "file.restricted_copy": "Restricted file copied where it isn't allowed",
-             "metric.cpu": "Sustained high CPU", "user.login_failed": "Several failed sign-ins", "program.exited": "Printer stops responding"}
-    return {"rules": [{"event_id": eid, "owner": "The organisation" if org else "R. Mensah", "org_wide": org, "on": on,
-                       "name": names.get(t, t.replace(".", " ").capitalize()),
-                       "last_run_problem": bool(f) and any(o != "success" for _a2, o, _d in min(f, key=lambda x: x[0])[2])}
-                      for eid, t, _p, _m, _a, on, org, f in EVENTS],
-            "days": [], "strip": {}}
+    """automation.board as the Engine answers it (engine/console/automation.py), for the concept's rules."""
+    rules = []
+    for r in AU_RULES:
+        typ, pcs, _m = _SPEC[r["id"]]
+        latest = r["fir"][0]["runs"] if r["fir"] else []
+        counts: dict[str, int] = {}
+        for x in latest:
+            counts[x[4]] = counts.get(x[4], 0) + 1
+        ok = counts.get("Success", 0)
+        summary = None if not latest else ("Succeeded" if ok == 1 else f"All {ok} succeeded") if len(counts) == 1 and ok else \
+            ", ".join(f"{counts[k]} {k.lower()}" for k in ("Timed out", "Failed", "Stopped by you", "Success") if counts.get(k))
+        rules.append({"event_id": r["event_id"], "name": r["name"], "named": True, "type": typ, "kind": r["kind"].lower(), "when": r["when"], "owner": r["by"], "org_wide": False, "read_only": False,
+                      "on": not r["off"], "scope": "every machine" if not pcs else f"{len(pcs)} machine(s)", "actions": [{"action_id": _ACT[n], "name": n} for n, _l in r["actions"]],
+                      "fired": len(r["fir"]), "last_fired_at": at(r["fir"][0]["t"] - CONCEPT_NOW) if r["fir"] else None, "last_run": summary,
+                      "last_run_problem": any(x[4] in ("Failed", "Timed out") for x in latest), "problems": sum(1 for f in r["fir"] for x in f["runs"] if x[4] in ("Failed", "Timed out"))})
+    return {"rules": rules, "coming_up": _coming(), "days": [], "period_days": 7, "strip": {}}
 
 
 def event_history(eid: int) -> dict[str, Any]:
-    e = next((x for x in EVENTS if x[0] == eid), None)
-    if e is None:
+    r = next((x for x in AU_RULES if x["event_id"] == eid), None)
+    if r is None:
         return {"firings": []}
     firings, k = [], 0
-    for h, pc, runs in e[7]:
-        host = next((m[1] for m in MACHINES if m[0] == pc), None)
+    for f in r["fir"]:
+        many = "machines" in f["host"]
         rr = []
-        for a, outcome, secs in runs:
+        for host, name, _limit, sec, outcome, ex in f["runs"]:
             k += 1
-            rr.append({"id": eid * 1000 + k, "action_id": a, "target_pc_id": pc or 1, "status": outcome, "started_at": at(-h),
-                       "finished_at": at(-h + secs / 3600), "summary": "exit code 1" if outcome == "failed" else None})
-        firings.append({"at": at(-h), "pc_id": pc, "hostname": host, "subject": None, "runs": rr, "machines": 1 if pc else 7})
+            h = round(f["t"] * 60) / 60 - CONCEPT_NOW
+            rr.append({"id": eid * 1000 + k, "action_id": _ACT.get(name, 0), "target_pc_id": _pc(host), "host": host, "status": _WORD[outcome], "outcome": outcome, "started_at": at(h),
+                       "ended_at": at(h + sec / 3600), "exit_code": ex or (1 if outcome == "Failed" else 0), "summary": None})
+        firings.append({"at": _at(f["t"]), "pc_id": 0 if many else _pc(f["host"]), "hostname": None if many else f["host"], "detail": f["detail"], "subject": None, "runs": rr,
+                        "machines": len({x["target_pc_id"] for x in rr}) if many else 1})
+    for day, n in _HAND.get(r["id"], {}).items():           # runs by hand count in the week's bars
+        firings.extend({"at": at((day - 6) * 24 + 8 - CONCEPT_NOW), "pc_id": 1, "hostname": "OPS-01", "detail": None, "subject": None, "runs": [], "machines": 1, "by_hand": True} for _ in range(n))
     return {"event_id": eid, "firings": firings, "fired_today": 0, "running": []}
-
-
-TEMP_PY = """import os
-import time
-from pathlib import Path
-
-LIMIT_DAYS = 7
-temp = Path(os.environ["TEMP"])
-cutoff = time.time() - LIMIT_DAYS * 86400
-removed = 0
-for f in temp.rglob("*"):
-    try:
-        if f.is_file() and f.stat().st_mtime < cutoff:
-            f.unlink()
-            removed += 1
-    except OSError:
-        pass  # in use; try again next time
-print(f"removed {removed} files")"""
 
 
 # --- reports ----------------------------------------------------------------------------------------------
@@ -831,52 +979,60 @@ def board(role: str, dept_id: int | None) -> dict[str, Any]:
     return {"reports": views, "strip": strip, "handling": handling, "categories": sorted({v["category"] for v in views})}
 
 
-def _chat(type_: str, payload: dict[str, Any], account: int) -> dict[str, Any]:
-    """The version 1 conversations (engine/resource/conversations.py), from the sample channels: one per person, and the group of every Admin."""
-    mine = [c for c in CHANNELS if account in (c[1], c[2])]
+# the concept's conversations (amConvs): id, kind, title, other accounts, unread, messages (hours from now, from, body); and its one request to talk
+CONVS = [
+    (31, "direct", "K. Boateng", [8], 1, [(-1.4, 8, "About intake: I will pick its folder on WS-FIN-A1 this afternoon.")]),
+    (32, "admins", "Admins", [9, 8], 2, [(-27, 9, "Before Friday's count, who covers the weekend?"), (-26.2, 7, "I can take Saturday."), (-2.4, 9, "Sunday is mine then. We will both be on call by phone.")]),
+    (20, "direct", "Ama", [27], 0, [(-4.333, 7, "Is budget-2026.xlsx still open on your PC? It should not be there."), (-4.083, 27, "It was sent to me to read before the meeting. I closed it."),
+                                    (-3.233, 7, "Thanks. Please delete your copy; it is marked to stay on WS-OPS-A1.")]),
+    (15, "direct", "Yaw", [23], 0, [(-33.733, 7, "What is it, Yaw?"), (-33.433, 23, "The printer on the second floor will not take my jobs."), (-32.833, 7, "Fixed: it was paused. Try again.")]),
+]
+REQUESTS = [{"id": 1, "from": "Esi", "account_id": 41, "host": "LOG-01", "at": at(-0.85), "line": "The label printer prints blank labels"}]
 
+
+def _chat(type_: str, payload: dict[str, Any], account: int) -> dict[str, Any]:
+    """The version 1 conversations (engine/resource/conversations.py), with the concept's sample."""
     def view(c: tuple) -> dict[str, Any]:
-        other = c[1] if c[2] == account else c[2]
-        msgs = c[6]
-        last = msgs[-1] if msgs else None
-        return {"conversation_id": c[0], "kind": "direct", "title": ACCOUNTS.get(other),
-                "members": [{"account_id": a, "name": ACCOUNTS.get(a)} for a in (c[1], c[2])],
-                "last": {"body": last[2], "from_account_id": last[1], "from": ACCOUNTS.get(last[1]), "at": today(last[0])} if last else None,
-                "unread": 1 if last and last[1] != account and c[5] is None else 0, "seen_by": []}
+        cid, kind, title, others, unread, msgs = c
+        last = msgs[-1]
+        return {"conversation_id": cid, "kind": kind, "title": title, "members": [{"account_id": a, "name": ACCOUNTS.get(a)} for a in [account] + others],
+                "last": {"body": last[2], "from_account_id": last[1], "from": ACCOUNTS.get(last[1]), "at": at(last[0])}, "unread": unread, "seen_by": []}
     if type_ == "chat.list":
-        vs = sorted((view(c) for c in mine), key=lambda v: (v["last"] or {}).get("at") or "", reverse=True)
+        vs = sorted((view(c) for c in CONVS), key=lambda v: v["last"]["at"], reverse=True)
         return {"conversations": vs, "unread": sum(v["unread"] for v in vs)}
+    if type_ == "chat.requests":
+        return {"requests": REQUESTS}
     if type_ == "chat.people":
-        people = [{"account_id": a, "name": n, "role": "admin" if a in (7, 8, 9) else "worker", "pc_id": a, "hostname": f"WS-{a}" if a in (7, 8, 9) else
+        people = [{"account_id": a, "name": n, "role": "admin" if a in (7, 8, 9) else "worker", "pc_id": a, "hostname": next((x[4] for x in ADMINS if x[0] == a), None) or
                    next((m[1] for m in MACHINES if len(m) > 2 and m[2] == n), "OPS-01"), "department": "Operations", "online": True} for a, n in ACCOUNTS.items() if a != account]
         return {"people": people, "admins_group": True}
     if type_ == "chat.get":
-        c = next((x for x in mine if x[0] == int(payload.get("conversation_id") or 0)), None)
+        c = next((x for x in CONVS if x[0] == int(payload.get("conversation_id") or 0)), None)
         if c is None:
             return {"conversation": None, "messages": [], "more": False, "reads": []}
         return {"conversation": view(c), "more": False, "reads": [],
-                "messages": [{"message_id": c[0] * 100 + i, "from_account_id": s, "from": ACCOUNTS.get(s), "body": b, "at": today(h), "mine": s == account, "file": None}
-                             for i, (h, s, b) in enumerate(c[6])]}
+                "messages": [{"message_id": c[0] * 100 + i, "from_account_id": w, "from": ACCOUNTS.get(w), "body": t, "at": at(h), "mine": w == account, "file": None} for i, (h, w, t) in enumerate(c[5])]}
     if type_ == "chat.open":
-        c = next((x for x in mine if payload.get("account_id") in (x[1], x[2])), mine[0] if mine else None)
-        return {"conversation": view(c) if c else {"conversation_id": 99, "title": "them"}}
+        c = next((x for x in CONVS if payload.get("account_id") in x[3]), CONVS[0])
+        return {"conversation": view(c)}
     if type_ == "chat.send":
         return {"message_id": 1, "at": at(0)}
     return {"conversation_id": payload.get("conversation_id"), "read": True}
 
 
-_TODOS_DONE: set[int] = set()
+_TODOS_DONE: set[int] = {4}
 
 
 def _todos() -> dict[str, Any]:
     """todo.list as the Engine answers it (engine/task/todos.py): the Admin's own to-dos; the strip is what is past its date or due
     within the hour."""
-    rows = [(1, "Confirm who covers the front desk during the training week", -2.4), (2, "Collect the signed leave forms from Logistics", 28.0),
-            (3, "Move last year's tender files to the archive share", 74.0)]
+    # the concept's (TODOS), hours from now: due 08:20 today, Fri 17:20, Sun 15:20, and one done
+    rows = [(1, "Confirm who covers the front desk during the training week", -5.0), (2, "Collect the signed leave forms from every team", 28.0),
+            (3, "Move last year's tender files to the archive", 74.0), (4, "Update the fire-drill list for every floor", -18.0)]
     todos = []
     for i, text, h in rows:
         done = i in _TODOS_DONE
-        todos.append({"id": i, "text": text, "due_at": at(h), "done": done, "overdue": not done and h < 0, "on_strip": not done and h < 1})
+        todos.append({"id": i, "text": text, "due_at": at(h), "done": done, "done_at": at(-15.33) if done else None, "overdue": not done and h < 0, "on_strip": not done and h < 1})
     return {"todos": todos, "open": sum(1 for t in todos if not t["done"]), "strip": [t for t in todos if t["on_strip"]]}
 
 
@@ -893,10 +1049,12 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         _TODOS_DONE.add(int(payload.get("todo_id") or 0))
         return {"todo": next((t for t in _todos()["todos"] if t["id"] == int(payload.get("todo_id") or 0)), None)}
     if type_ == "flow.restricted_waiting":
-        return {"waiting": [{"id": 5, "flow_id": 4, "name": "Payroll", "sample_path": "C:/Finance/Payroll/payroll-q3.xlsx", "asked_at": at(-1.5), "source_hostname": "FIN-02"}] if role == "super_user" else []}
+        return {"waiting": restricted_waiting()}
     if type_ == "flow.restricted":
-        return {"consents": [{"id": 5, "flow_id": int(payload.get("flow_id") or 0), "name": "Payroll", "state": "asked", "asked_at": at(-1.5), "sample_path": "C:/Finance/Payroll/payroll-q3.xlsx"}] if int(payload.get("flow_id") or 0) == 4 else [],
-                "can_decide": [5] if role == "super_user" else []}
+        return {"consents": [{"id": 5, "flow_id": 1, "name": "payroll", "state": "asked", "asked_at": at(-0.43), "sample_path": "OPS-01 /payroll/salaries.csv"}] if int(payload.get("flow_id") or 0) == 1 else [],
+                "can_decide": [5]}
+    if type_ == "flow.runs":
+        return flow_runs(int(payload.get("flow_id") or 0))
     if type_ == "calendar.board":
         return calendar_board()
     if type_ == "hierarchy.tree":
@@ -986,18 +1144,7 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return {"addressed": [{"report_id": r[0], "addressed_by_name": r[4][1], "addressed_at": at(-r[3] + r[4][0]), "department_name": dict(DEPTS)[r[5]]}
                               for r in REPORTS if r[4]]}
     if type_ == "control.action_list":
-        acts = {"control": [], "monitoring": [], "custom": []}
-        for aid, (name, kind, builtin, limit) in LIB.items():
-            a = {"id": aid, "name": name, "action_kind": kind, "builtin_type": builtin, "timeout_seconds": limit,
-                 "description": {"Take a screenshot": "Saves what is on screen to the record.", "Snapshot USB contents": "Lists every file on an inserted device, with its hash.",
-                                 "Log event": "Writes one line to the audit log.", "Notify the Admin": "Tells an Admin, or you, inside the console.",
-                                 "Check disk health": "Reads SMART status and free space.", "Lock the screen": "Locks the session. The user signs back in as usual.",
-                                 "Clear the temp folder": "Deletes files older than 7 days in %TEMP%."}.get(name, "")}
-            if kind == "custom":
-                a.update({"custom_script_language": "python", "created_by_name": "R. Mensah",
-                          "custom_script": TEMP_PY})
-            acts[kind].append(a)
-        return {"builtin": {}, "actions": acts}
+        return action_list()
     if type_ == "actions.board":
         return actions_board()
     if type_ == "actions.runs":
@@ -1013,8 +1160,9 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
     if type_ == "control.event_history":
         return event_history(int(payload.get("event_id") or 0))
     if type_ == "control.execution":
-        return {"execution": {"id": payload.get("execution_id"), "status": "success", "has_image": False, "summary": None},
-                "output": ["Recorded on the machine.", "exit code 0"], "result": None, "expired": False}
+        return run_output(int(payload.get("execution_id") or 0))
+    if type_ == "control.execution_image_get":
+        return run_image(int(payload.get("execution_id") or 0))
     if type_ == "hierarchy.pc_state":
         pc = int(payload.get("pc_id") or 0)
         m = next((x for x in MACHINES if x[0] == pc), None)
