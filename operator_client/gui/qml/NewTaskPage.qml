@@ -313,6 +313,11 @@ Column {
             }
         }
 
+        // what a description cannot say, as the Engine words it: shown before anything is given
+        Repeater {
+            model: page.proposal ? (page.proposal.flags || []).filter(function (f) { return !!f.detail }) : []
+            Decide { required property var modelData; width: parent.width; c: Theme.med; text: modelData.detail }
+        }
         // --- the foot (nt-next): read it, then review ----------------------------------------------------
         Item {
             width: parent.width

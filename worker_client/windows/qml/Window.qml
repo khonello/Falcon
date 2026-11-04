@@ -14,6 +14,8 @@ Window {
     id: win
 
     readonly property bool covers: kind === "blocked" || kind === "locked" || kind === "emergency"
+    // the join code rides in the plain message `enroll.py` opens: "Registering this machine. Code 4 8 2 7 1 9"
+    readonly property string joinCode: { var m = kind === "message" ? /^Registering this machine\. Code ([\d ]+)/.exec(String(spec.text || "")) : null; return m ? m[1].replace(/ /g, "").trim() : "" }
     readonly property bool bar: kind === "viewing"      // a small notice at the top of the screen that the click goes through
 
     readonly property color pane: "#ffffff"
@@ -242,9 +244,27 @@ Window {
                 }
             }
 
+            // --- joining without a licence code: the code, large, to read out to an IT Admin ------------------------------------------------
+            Column {
+                objectName: "joinCode"
+                visible: win.joinCode !== ""
+                width: parent.width
+                spacing: 14
+                Text { text: "This machine has asked to join"; color: win.ink; font.family: win.sans; font.pixelSize: 20; font.weight: Font.DemiBold }
+                Text { width: parent.width; wrapMode: Text.WordWrap; text: "Give this code to your IT Admin. They type it in Falcon, on Machines, under Waiting to join."; color: win.dim; font.family: win.sans; font.pixelSize: 14 }
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 8
+                    Repeater { model: win.joinCode.split("")
+                        Rectangle { required property var modelData; required property int index; width: 44; height: 58; radius: 8; color: win.ground; border.width: 1; border.color: win.edge
+                                    Text { anchors.centerIn: parent; text: parent.modelData; color: win.ink; font.family: "IBM Plex Mono"; font.pixelSize: 28; font.weight: Font.DemiBold } } }
+                }
+                Text { width: parent.width; wrapMode: Text.WordWrap; text: "Waiting for an Admin to confirm."; color: win.faint; font.family: win.sans; font.pixelSize: 13 }
+            }
+
             // --- a message from IT: the new message first and large; a reply when it came in a conversation ---------------------------------
             Column {
-                visible: kind === "message"
+                visible: kind === "message" && win.joinCode === ""
                 width: parent.width
                 spacing: 12
                 Item {

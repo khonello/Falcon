@@ -59,6 +59,9 @@ class LocalClient:
     def ask(self, to_account_id: int) -> None:
         self.call("ask", to=to_account_id)
 
+    def talk(self, line: str) -> None:
+        self.call("talk", line=line)
+
     def conversation(self, conversation_id: int) -> dict[str, Any]:
         return self.call("conversation", id=conversation_id).get("conversation") or {}
 

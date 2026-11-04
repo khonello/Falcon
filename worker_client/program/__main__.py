@@ -169,6 +169,10 @@ def main(argv: list[str]) -> int:
             self._act(self._client.ask, account_id)
             self.asked.emit(name)
 
+        @Slot(str)
+        def talk(self, line: str) -> None:
+            self._act(self._client.talk, line)
+
         @Slot("QVariant")
         def ack(self, ids: Any) -> None:
             self._act(self._client.ack, list(ids))

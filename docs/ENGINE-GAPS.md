@@ -366,6 +366,9 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - `hierarchy.pc_register` without `department_id`: the concept registers a machine by name alone ("Put it in a department on Departments"). Until then the console sends the
      first department. The drawer's Found list reads `enroll.list`.
 
+24. **The Worker's program (4 Nov 2026):** Ask IT is built on `talk {line}`. The view needs `request: {line, at}` while one waits, so the waiting card survives a restart (today the program
+    remembers what it sent until the corner note answers it). `enroll.py` could pass the code and the expiry as fields; the window reads the code out of its text for now.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

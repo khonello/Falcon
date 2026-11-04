@@ -48,6 +48,12 @@ Window {
     property var pickNote: null
     property var pickChat: null
     property string draft: ""
+    // Ask IT: one line to every IT Admin, one request at a time; the conversation opens here when one accepts
+    property bool asking: false
+    property string askLine: ""
+    property var sentRequest: null                      // what was sent from here, until it is answered
+    readonly property var myRequest: view.request || sentRequest
+    function dayOf(iso) { var d = new Date(iso), n = new Date(), y = new Date(n.getTime() - 86400000); return d.toDateString() === n.toDateString() ? "Today" : d.toDateString() === y.toDateString() ? "Yesterday" : Qt.formatDateTime(d, "dddd d MMM") }
     readonly property var curTask: { for (var i = 0; i < tasks.length; i++) if (tasks[i].id === pickTask) return tasks[i]; return toStart[0] || tasks[0] || null }
     readonly property var curNote: { for (var i = 0; i < notes.length; i++) if (notes[i].id === pickNote) return notes[i]; return notes[0] || null }
     readonly property var curChat: { for (var i = 0; i < chats.length; i++) if (chats[i].id === pickChat) return chats[i]; return chats[0] || null }
@@ -275,18 +281,51 @@ Window {
                     width: (parent.width - 16) * 0.4; spacing: 8
                     Item { width: parent.width; height: 32
                         Text { anchors.verticalCenter: parent.verticalCenter; text: "Conversations"; color: win.ink; font.family: win.sans; font.pixelSize: 14; font.weight: Font.DemiBold }
-                        Act { objectName: "askIT"; anchors.right: parent.right; text: "Ask IT"; ok: false; tip: "Asking IT comes once Falcon keeps requests to talk" } }
+                        Act { objectName: "askIT"; anchors.right: parent.right; text: "Ask IT"; primary: win.asking; ok: win.live && !win.myRequest; tip: win.myRequest ? "One request at a time" : !win.live ? "Asking waits until you are connected again" : ""
+                              onClicked: win.asking = true } }
+                    Rectangle {
+                        objectName: "myRequest"
+                        visible: !!win.myRequest
+                        width: parent.width; height: rq.height + 24; radius: 10; color: win.accentSoft; border.width: 1; border.color: win.line
+                        Column { id: rq; x: 14; y: 12; width: parent.width - 28; spacing: 3
+                            Text { text: "Your request · waiting for IT"; color: win.accent; font.family: win.sans; font.pixelSize: 12; font.weight: Font.DemiBold }
+                            Text { width: parent.width; wrapMode: Text.WordWrap; text: win.myRequest ? win.myRequest.line : ""; color: win.ink; font.family: win.sans; font.pixelSize: 13; font.weight: Font.DemiBold }
+                            Text { text: win.myRequest ? "Sent at " + Qt.formatDateTime(new Date(win.myRequest.at), "HH:mm") + " · every IT Admin can see it" : ""; color: win.faint; font.family: win.sans; font.pixelSize: 12 } }
+                    }
                     Repeater { model: win.chats
                         delegate: Card { required property var modelData; sel: win.curChat && win.curChat.id === modelData.id
                             title: modelData.with + (modelData.unread ? "  ·  " + modelData.unread + " new" : ""); text1: (modelData.from ? modelData.from + ": " : "") + modelData.last; text2: win.ago(modelData.at)
-                            onPicked: win.pickChat = modelData.id } }
-                    Quiet { visible: win.chats.length === 0; text: "No messages yet. When an IT Admin writes to you, it is here." }
-                    Text { width: parent.width; wrapMode: Text.WordWrap; text: "Only an IT Admin starts a conversation; you can reply to any of them."; color: win.faint; font.family: win.sans; font.pixelSize: 12 }
+                            onPicked: { win.asking = false; win.pickChat = modelData.id } } }
+                    Quiet { visible: win.chats.length === 0 && !win.myRequest; text: "No messages yet. When an IT Admin writes to you, it is here." }
+                    Text { visible: !!win.myRequest; width: parent.width; wrapMode: Text.WordWrap; text: "One request at a time: Ask IT comes back once this one is accepted or closed."; color: win.faint; font.family: win.sans; font.pixelSize: 12 }
+                }
+                Rectangle {
+                    objectName: "askForm"
+                    width: (parent.width - 16) * 0.6; height: parent.height
+                    radius: 10; color: win.pane; border.width: 1; border.color: win.line
+                    visible: win.asking
+                    Column {
+                        x: 18; y: 16; width: parent.width - 36; spacing: 10
+                        Text { text: "Ask IT"; color: win.ink; font.family: win.sans; font.pixelSize: 18; font.weight: Font.DemiBold }
+                        Text { width: parent.width; wrapMode: Text.WordWrap; text: "Say in one line what you need. Every IT Admin sees it, and the conversation opens here when one of them accepts."; color: win.dim; font.family: win.sans; font.pixelSize: 13 }
+                        Text { topPadding: 6; text: "What do you need?"; color: win.faint; font.family: win.sans; font.pixelSize: 12 }
+                        Rectangle { width: parent.width; height: 38; radius: 8; color: win.soft; border.width: 1; border.color: win.edge
+                            TextInput { id: askBox; objectName: "askBox"; x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28; clip: true; font.family: win.sans; font.pixelSize: 13; color: win.ink
+                                        text: win.askLine; onTextEdited: win.askLine = text; onAccepted: askSend.clicked() } }
+                    }
+                    Item {
+                        x: 18; anchors.bottom: parent.bottom; anchors.bottomMargin: 16; width: parent.width - 36; height: 32
+                        Text { anchors.verticalCenter: parent.verticalCenter; text: "You can have one request open at a time."; color: win.faint; font.family: win.sans; font.pixelSize: 12 }
+                        Row { anchors.right: parent.right; spacing: 8
+                            Act { text: "Cancel"; onClicked: win.asking = false }
+                            Act { id: askSend; objectName: "sendRequest"; text: "Send request"; primary: true; ok: win.live && win.askLine.trim() !== ""
+                                  onClicked: { program.talk(win.askLine.trim()); win.sentRequest = { line: win.askLine.trim(), at: new Date().toISOString() }; win.askLine = ""; win.asking = false } } }
+                    }
                 }
                 Rectangle {
                     width: (parent.width - 16) * 0.6; height: parent.height
                     radius: 10; color: win.pane; border.width: 1; border.color: win.line
-                    visible: win.curChat !== null
+                    visible: win.curChat !== null && !win.asking
                     Text { x: 18; y: 14; text: win.curChat ? win.curChat.with : ""; color: win.ink; font.family: win.sans; font.pixelSize: 15; font.weight: Font.DemiBold }
                     Flickable {
                         id: th
@@ -300,9 +339,14 @@ Window {
                                 model: (program.conversation && program.conversation.messages) || []
                                 delegate: Item {
                                     required property var modelData
-                                    width: msgs.width; height: bub.height
+                                    required property int index
+                                    readonly property var all: (program.conversation && program.conversation.messages) || []
+                                    readonly property bool newDay: index === 0 || win.dayOf(all[index - 1].at) !== win.dayOf(modelData.at)
+                                    width: msgs.width; height: bub.y + bub.height
+                                    Text { visible: parent.newDay; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: win.dayOf(modelData.at); color: win.faint; font.family: win.sans; font.pixelSize: 12 }
                                     Rectangle {
                                         id: bub
+                                        y: parent.newDay ? 24 : 0
                                         x: modelData.mine ? parent.width - width : 0
                                         width: Math.min(parent.width * 0.8, bt.implicitWidth + 24); height: bt.implicitHeight + bs.implicitHeight + 18; radius: 12
                                         color: modelData.mine ? win.accentSoft : win.soft2
@@ -403,7 +447,7 @@ Window {
     // a quiet note in the corner for something new; it goes by itself and never takes the keyboard
     Connections {
         target: program
-        function onToastArrived(t) { toasts.push(t); toastWin.next() }
+        function onToastArrived(t) { if (/^q/.test(String(t.id))) win.sentRequest = null; toasts.push(t); toastWin.next() }
     }
     property var toasts: []
     Window {
