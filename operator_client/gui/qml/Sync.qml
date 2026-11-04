@@ -38,11 +38,13 @@ QtObject {
     function stepName(st) {
         var c = st.config || {}
         if (typeof c === "string") { try { c = JSON.parse(c) } catch (e) { c = {} } }
+        if (c.label) return c.label
         if (c.op) return c.op
         if (st.stage_type === "categorization") return c.by === "month" ? "Sort by month" : "Sort by file type"
         return c.to ? "Convert to " + String(c.to).toUpperCase() : "Transform"
     }
     function stageOut(s, parent) {
+        if (s.opId) return { step: { kind: s.kind, op: s.opId, settings: s.settings || {} }, parent_index: parent }      // the Engine's tree (flow.steps)
         var cfg = { op: s.op }
         if (s.op === "Sort by file type") cfg.by = "extension"
         return { stage_type: s.kind === "Categorize" ? "categorization" : "transformation", parent_index: parent, config: cfg }
@@ -65,7 +67,9 @@ QtObject {
             var all = chains.every(function (c) { return c.indexOf(id) >= 0 })
             var first = 0
             while (first < chains.length && chains[first].indexOf(id) < 0) first++
-            return { kind: stepKind(by[id]), op: stepName(by[id]), scope: all ? "all" : first }
+            var c = by[id].config || {}
+            if (typeof c === "string") { try { c = JSON.parse(c) } catch (e) { c = {} } }
+            return { kind: c.kind || stepKind(by[id]), opId: c.kind ? c.op : "", op: stepName(by[id]), settings: c.settings || {}, scope: all ? "all" : first }
         })
     }
     // the builder's list as the Engine's tree: the shared steps one after another, then each destination's own

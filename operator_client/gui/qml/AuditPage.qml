@@ -34,9 +34,9 @@ Page {
         nameFilters: ["CSV (*.csv)"]
         onAccepted: {
             var q = function (s) { return "\"" + String(s === undefined || s === null ? "" : s).replace(/"/g, "\"\"") + "\"" }
-            var lines = ["When,Who,What,Machine,Kind"].concat(page.listed.map(function (x) { return [new Date(x.t).toISOString(), x.actor, x.what, x.host, Kinds.words[x.kind]].map(q).join(",") }))
+            var lines = ["When,Who,What,Machine,Kind"].concat(page.xRows.map(function (x) { return [new Date(x.t).toISOString(), x.actor, x.what, x.host, Kinds.words[x.kind]].map(q).join(",") }))
             var err = falcon.saveText(selectedFile.toString(), lines.join("\r\n") + "\r\n")
-            if (err) Msg.failed("Not saved: " + err); else Msg.ok("Exported " + page.listed.length + " entries as CSV")
+            if (err) Msg.failed("Not saved: " + err); else Msg.ok("Exported " + page.xRows.length + " entries as CSV")
         }
     }
 
@@ -64,8 +64,9 @@ Page {
     }
     function working(t) { var d = new Date(t), h = d.getHours() + d.getMinutes() / 60; return d.getDay() !== 0 && d.getDay() !== 6 && h >= 8 && h < 17.5 }
     // the log as entries, newest first: a visit (entered, then left) is one entry with its length, never an "entered" and a "left"
-    readonly property var entries: {
-        var xs = base.slice().sort(function (a, b) { return a.t - b.t }), out = [], used = {}
+    readonly property var entries: entriesOf(base)
+    function entriesOf(list) {
+        var xs = list.slice().sort(function (a, b) { return a.t - b.t }), out = [], used = {}
         xs.forEach(function (e, i) {
             if (used[i]) return
             var m = /^Entered (\S+)( \(outside working hours\))?$/.exec(e.what)
@@ -212,6 +213,23 @@ Page {
         }
     }
 
+    // how far back an export goes, and what goes in
+    property string xr: "7 days"
+    readonly property var xRows: { var h = ({ "7 days": 168, "30 days": 720, "90 days": 2160 })[xr]
+                                   var from = xr === "Today" ? Time.startOfDay(Time.now) : Time.now - h * 3600000
+                                   return page.entriesOf(all.filter(function (e) { return e.t >= from })) }
+    Drawer {
+        id: xd
+        page: page
+        width: 460
+        title: "Export the log"
+        footer: [ Btn { text: "Cancel"; onClicked: xd.close() },
+                  Btn { kind: "primary"; iconName: "download"; text: "Download " + Theme.fmt(page.xRows.length) + " entries"; onClicked: { xd.close(); save.open() } } ]
+        NfSec { first: true; title: "How far back"
+            Segmented { width: parent.width; block: true; small: false; options: ["Today", "7 days", "30 days", "90 days"]; value: page.xr; onPicked: function (v) { page.xr = v } }
+            Txt { width: parent.width; text: "Everything in that stretch goes in. A visit is one line with when it started and ended; each line has when, who, the machine, the kind and what happened."; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone } }
+    }
+
     // --- export: a copy for someone outside Falcon ------------------------------------------------------------------------------------
     Box {
         width: parent.width
@@ -221,7 +239,7 @@ Page {
         GiveSteps {
             steps: [["Pick how far back", "the range at the top; everything in it goes in"], ["Download it", "a CSV file; the export itself is recorded in the log"]]
             act: "Export the log"
-            onGo: save.open()
+            onGo: { Kinds.load({ limit: 5000 }, function (es) { page.all = es }); xd.open() }
         }
     }
 }

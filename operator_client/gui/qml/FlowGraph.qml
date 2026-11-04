@@ -71,9 +71,9 @@ Column {
                 for (var k = 0; k < ns; k++) line(root.nw, root.ys(k, ns), root.firstX, root.stages.length ? mid : root.ys(0, nd), root.srcs[k].gone ? "stop" : root.wait ? "idle" : "")
                 for (var i = 0; i + 1 < root.stages.length; i++) line(root.stX(i) + root.sw, mid, root.stX(i + 1), mid, root.wait ? "idle" : "")
                 if (root.stages.length) for (k = 0; k < nd; k++) line(root.lastX, mid, root.dx, root.ys(k, nd), root.dests[k].ask || root.wait ? "idle" : root.dests[k].bad ? "stop" : "")
-                for (k = 0; k < ns; k++) box(0, root.ys(k, ns), root.nw, root.nh, root.srcs[k].gone ? "stop" : "", false)
+                for (k = 0; k < ns; k++) box(0, root.ys(k, ns), root.nw, root.nh, root.srcs[k].gone ? "stop" : root.srcs[k].empty ? "wait" : "", false)
                 for (i = 0; i < root.stages.length; i++) box(root.stX(i), mid, root.sw, root.sh, "", true)
-                for (k = 0; k < nd; k++) box(root.dx, root.ys(k, nd), root.nw, root.nh, root.dests[k].ask ? "wait" : root.dests[k].bad ? "stop" : "", false)
+                for (k = 0; k < nd; k++) box(root.dx, root.ys(k, nd), root.nw, root.nh, root.dests[k].ask || root.dests[k].empty ? "wait" : root.dests[k].bad ? "stop" : "", false)
             }
         }
         Connections { target: Theme; function onDarkChanged() { cv.requestPaint() } }

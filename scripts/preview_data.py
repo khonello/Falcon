@@ -792,7 +792,7 @@ def _at(t: float) -> str:
     return at(round(t * 60) / 60 - CONCEPT_NOW)
 
 
-def _pc(host: str) -> int:
+def _mpc(host: str) -> int:
     return next((m[0] for m in MACHINES if m[1] == host), 0)
 
 
@@ -823,7 +823,7 @@ def all_runs() -> list[dict[str, Any]]:
     out = []
     for i, x in enumerate(_AU["runs"]):
         rule = next((r for r in AU_RULES if r["id"] == x["rule"]), None)
-        out.append({"run_id": 50000 + i, "action_id": _ACT.get(x["action"], 0), "action": x["action"], "pc_id": _pc(x["host"]), "host": x["host"], "at": _at(x["t"]),
+        out.append({"run_id": 50000 + i, "action_id": _ACT.get(x["action"], 0), "action": x["action"], "pc_id": _mpc(x["host"]), "host": x["host"], "at": _at(x["t"]),
                     "took_s": x["sec"], "limit_s": x["timeout"], "outcome": x["outcome"], "summary": x["out"]["summary"], "exit": x["exit"], "has_image": x["out"]["kind"] == "image",
                     "event_id": rule["event_id"] if rule else None, "by": f"rule: {rule['name']}" if rule else "hand", "who": x["by"]})
     return out
@@ -904,9 +904,9 @@ def event_history(eid: int) -> dict[str, Any]:
         for host, name, _limit, sec, outcome, ex in f["runs"]:
             k += 1
             h = round(f["t"] * 60) / 60 - CONCEPT_NOW
-            rr.append({"id": eid * 1000 + k, "action_id": _ACT.get(name, 0), "target_pc_id": _pc(host), "host": host, "status": _WORD[outcome], "outcome": outcome, "started_at": at(h),
+            rr.append({"id": eid * 1000 + k, "action_id": _ACT.get(name, 0), "target_pc_id": _mpc(host), "host": host, "status": _WORD[outcome], "outcome": outcome, "started_at": at(h),
                        "ended_at": at(h + sec / 3600), "exit_code": ex or (1 if outcome == "Failed" else 0), "summary": None})
-        firings.append({"at": _at(f["t"]), "pc_id": 0 if many else _pc(f["host"]), "hostname": None if many else f["host"], "detail": f["detail"], "subject": None, "runs": rr,
+        firings.append({"at": _at(f["t"]), "pc_id": 0 if many else _mpc(f["host"]), "hostname": None if many else f["host"], "detail": f["detail"], "subject": None, "runs": rr,
                         "machines": len({x["target_pc_id"] for x in rr}) if many else 1})
     for day, n in _HAND.get(r["id"], {}).items():           # runs by hand count in the week's bars
         firings.extend({"at": at((day - 6) * 24 + 8 - CONCEPT_NOW), "pc_id": 1, "hostname": "OPS-01", "detail": None, "subject": None, "runs": [], "machines": 1, "by_hand": True} for _ in range(n))
@@ -1048,6 +1048,9 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
     if type_ == "todo.done":
         _TODOS_DONE.add(int(payload.get("todo_id") or 0))
         return {"todo": next((t for t in _todos()["todos"] if t["id"] == int(payload.get("todo_id") or 0)), None)}
+    if type_ == "flow.steps":
+        ops = {"Transform": ["Rename by date", "Convert to PDF", "Compress to ZIP"], "Categorize": ["Sort by file type", "Sort by month"]}
+        return {"tree": [{"category": "all", "label": "Steps", "kinds": [{"kind": k, "label": k, "ops": [{"op": o, "label": o} for o in v]} for k, v in ops.items()]}], "order": []}
     if type_ == "flow.restricted_waiting":
         return {"waiting": restricted_waiting()}
     if type_ == "flow.restricted":
@@ -1159,6 +1162,8 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
         return events(role)
     if type_ == "control.event_history":
         return event_history(int(payload.get("event_id") or 0))
+    if type_ == "control.action_try":
+        return {"execution_id": 77, "pc_id": payload.get("pc_id"), "hostname": "OPS-01"}
     if type_ == "control.execution":
         return run_output(int(payload.get("execution_id") or 0))
     if type_ == "control.execution_image_get":

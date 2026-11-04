@@ -78,14 +78,19 @@ ApplicationWindow {
     function pageFile(p, s) {
         if (p === "machines" && s) return "MachinePage.qml"
         if (p === "messages" && s === "announcements") return "AnnouncementsPage.qml"
+        var f = shell.pages[p]
+        return f === undefined || f === "" ? "Pending.qml" : f
+    }
+    // what is made is made in a drawer over its page (EditorHost)
+    function editorFile(p, s) {
         if (p === "tasks" && s === "new") return "NewTaskPage.qml"
         if (p === "restricted" && s === "mark") return "MarkPage.qml"
         if (p === "flows" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewFlowPage.qml"
         if (p === "automation" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewRulePage.qml"
         if (p === "actions" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewActionPage.qml"
-        var f = shell.pages[p]
-        return f === undefined || f === "" ? "Pending.qml" : f
+        return ""
     }
+    EditorHost { src: shell.editorFile(Nav.page, Nav.sub); backTo: Nav.page }
 
     Row {
         anchors.fill: parent

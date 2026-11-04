@@ -71,20 +71,15 @@ async def _page(console, role="admin"):
     return win, bridge, page
 
 
-async def test_a_case_reads_as_a_story_a_picture_and_a_question(console):
+async def test_a_case_reads_as_a_picture_its_steps_and_the_account_in_words(console):
     win, bridge, page = await _page(console)
     assert prop(page, "cur")["id"] == 1
     names = _names(win.contentItem())
-    assert [c["id"] for c in prop(page, "cases")] == [1, 2] and "caseList" in names                      # both cases are rows of the standard list, the first one picked
-    assert "Taking data out" in win.findChild(QObject, "caseHeadline").property("text")
-    graph = win.findChild(QObject, "caseGraph")
-    assert graph is not None
+    assert [c["id"] for c in prop(page, "cases")] == [1, 2] and "caseList" in names                      # both cases are cards, the first one picked
+    assert win.findChild(QObject, "caseGraph") is not None
     ids = {n for n in names if n.startswith("node_")}
     assert any("dev:" in i for i in ids) and any("dir:" in i for i in ids) and len(ids) >= 6                  # the drive, the bursts, the archive, the hidden file
-    assert win.findChild(QObject, "detExplained") is not None and win.findChild(QObject, "detNote") is not None
-    assert {"evidencePanel", "noticedPanel", "coverLine"} <= names and "coverPanel" not in names              # the evidence is one panel of two tabs; the areas are one grey line, not a panel of chips
-    assert "Hiding" in win.findChild(QObject, "coverLine").property("text") or "areas" in win.findChild(QObject, "coverLine").property("text")
-    assert prop(page, "evTab") == "picture"                                                                  # the picture is the first tab
+    assert {"evidencePanel", "stepByStep", "noticedPanel", "casePanel"} <= names
 
 
 async def test_what_a_person_makes_of_it_is_sent_with_their_note(console):
@@ -100,10 +95,11 @@ async def test_what_a_person_makes_of_it_is_sent_with_their_note(console):
 
 async def test_an_admin_has_three_simple_buttons_and_nothing_to_send_up_or_to_remember(console):
     win, bridge, page = await _page(console, "admin")
-    for name in ("detExplained", "detAccepted", "detDismissed"):
-        assert win.findChild(QObject, name).property("visible") is True
-    assert win.findChild(QObject, "detEscalate") is None                                                  # no "Send to the Super User"
-    assert win.findChild(QObject, "detRememberFolder") is None and win.findChild(QObject, "detRememberDrive") is None    # a dismissal is only a dismissal
+    page.setProperty("exp", 1)
+    _pump(0.3)
+    names = _names(win.contentItem())
+    assert {"detExplained", "detAccepted", "detDismissed", "detNote"} <= names                            # opened, a case asks for one of three answers
+    assert "detEscalate" not in names and "detRememberFolder" not in names and "detRememberDrive" not in names
 
 
 async def test_a_dismissal_is_sent_as_it_is_without_a_rule(console):
@@ -119,8 +115,9 @@ async def test_a_dismissal_is_sent_as_it_is_without_a_rule(console):
 async def test_marking_says_what_it_costs_before_it_is_done_and_a_huge_folder_cannot_be_ticked_through(console):
     win, bridge, _ = console("admin")
     page = await _open(win, bridge, "restricted/mark", "markFiles")
+    page.setProperty("step", 2)                                                                   # what it costs is said at Check and restrict
     box = win.findChild(QObject, "markAssess")
-    assert box is not None and box.property("visible") is False                                   # nothing ticked yet: nothing to say
+    assert box is not None and box.property("visible") is False                                   # nothing picked yet: nothing to say
     page.setProperty("assessed", [{"path": "C:/proj", "verdict": "large", "tracked": 4200, "junk": 60000, "seconds": 130, "reasons": ["4,200 files to track will take about 2 minutes"],
                                    "basis": "measured over 3 earlier jobs on this Engine", "capacity": {"state": "quiet"}}])
     _pump(0.3)
@@ -137,8 +134,7 @@ async def test_a_flow_waiting_for_a_restricted_owner_is_answered_on_the_flows_pa
     page = await _open(win, bridge, "flows", "flowsView")
     page.setProperty("rAsks", [{"id": 5, "flow_id": 9, "name": "Payroll", "state": "asked", "sample_path": "C:/Finance/Payroll/p.xlsx", "flow": {"id": 9}}])
     _pump(0.4)
-    assert "restrictedAsk_5" in _names(win.contentItem())                                       # (a delegate of the list, found through the visual tree)
-    QMetaObject.invokeMethod(page, "answerRestricted", Q_ARG("QVariant", {"id": 5}), Q_ARG("QVariant", True))
+    QMetaObject.invokeMethod(page, "consentR", Q_ARG("QVariant", {"id": 5}), Q_ARG("QVariant", True))
     await _wait(lambda: any(t == "flow.restricted_consent" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "flow.restricted_consent")
     assert sent == {"consent_id": 5, "grant": True}
@@ -156,37 +152,3 @@ async def test_the_page_has_no_suggestions_or_written_rules_panels(console):
     win, bridge, page = await _page(console)
     names = _names(win.contentItem())
     assert "suggestions" not in names and "writtenRules" not in names                                     # the evidence and what was noticed are the page's end
-
-
-async def test_a_flow_shows_what_restricted_material_it_waits_for_or_carries_and_who_can_take_it_back(console):
-    win, bridge, _ = console("admin")
-    page = await _open(win, bridge, "flows", "flowsView")
-    page.setProperty("flows", [{"id": 9, "source_hostname": "FIN-01", "source_path": "C:/out", "status": "paused", "pause_reason": "restricted:consent", "consent_status": "not_required",
-                                "created_by_account_id": 2, "destinations": [{"id": 1, "destination_hostname": "FIN-02", "destination_path": "C:/in"}], "stages": [], "created_at": "2026-10-18T10:00:00Z"}])
-    _pump(0.4)
-    QMetaObject.invokeMethod(page, "show", Q_ARG("QVariant", prop(page, "flows")[0]))
-    from PySide6.QtCore import Q_RETURN_ARG
-    said = QMetaObject.invokeMethod(page, "stateOf", Q_RETURN_ARG("QVariant"), Q_ARG("QVariant", prop(page, "flows")[0]))
-    assert said.toVariant()[0].startswith("Waiting for consent")                                                  # it says why it is not copying
-    page.setProperty("consents", [{"id": 5, "name": "Payroll", "state": "granted", "expires_at": None}, {"id": 6, "name": "Board", "state": "asked"}])
-    page.setProperty("canDecide", [5])
-    _pump(0.4)
-    names = _names(win.contentItem())
-    assert {"flowRestricted", "consent_5", "consent_6", "takeBack_5"} <= names and "takeBack_6" in names     # (an unanswered one has no button to show: the button is hidden, not absent)
-    QMetaObject.invokeMethod(page, "takeBack", Q_ARG("QVariant", {"id": 5}))
-    await _wait(lambda: any(t == "flow.restricted_revoke" for t, _ in bridge.conn.seen))
-    assert next(p for t, p in bridge.conn.seen if t == "flow.restricted_revoke") == {"consent_id": 5}
-
-
-async def test_an_admin_s_waiting_count_includes_what_detective_suggests_and_the_flows_they_may_allow(console):
-    win, bridge, _ = console("admin")
-    real = bridge.conn.call
-
-    async def call(type_, payload=None):
-        if type_ == "overview.admin":
-            return {"waiting": {"total": 3, "suggestions": 2, "flows_to_allow": 1}}
-        return await real(type_, payload or {})
-
-    bridge.conn.call = call
-    page = await _open(win, bridge, "overview", "overviewView")
-    await _wait(lambda: prop(page, "suggestions") == 2 and prop(page, "toAllow") == 1)

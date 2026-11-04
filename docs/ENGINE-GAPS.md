@@ -361,6 +361,10 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - **Detective:** `detective.cases` rows need `restricted`, so every card can say "restricted files involved" (today only `detective.case`'s glance has it).
      The concept says "in the local model's words" and "Written by the local model": the page says so only when `telling.smoothed` is true, and with `SMOOTHING` off it
      says "from what Detective found" with the Engine's own `note`. Either the concept or `SMOOTHING` has to change for the two to agree.
+   - **The editors (drawers, built 4 Nov 2026):** `control.event_create` / `event_update` send `action_limits {action_id: seconds}`, each action's limit in this rule
+     ("Gets up to"); the Engine keeps only the action's own. Make a rule offers `printer.offline`, `threshold.signin {count, window_s}`, `threshold.disk` and
+     `user.login` with `{outside_hours: true}`. `time.scheduled`'s `at` is an ISO date and time. Make a flow sends each asked destination a `note` ("A line for them"),
+     `from_flow`, and `let_them_choose` with the Admin's workstation as `destination_pc_id`. `flow.create` keeps `on_source_delete` at "keep": the concept's drawer does not ask.
    - **The concept itself still shows "Sort by file type" and "sort"** in Flows, which `flow.steps` dropped on 3 Nov: the concept needs that change
      before the QML follows it.
 

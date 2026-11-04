@@ -5,8 +5,8 @@ Last updated 4 Nov 2026.
 
 ## From the 1:1 pass, 4 Nov 2026
 
-- **The editors are not ported yet.** The concept makes these in a stepped drawer (1120 wide) over the page: Make a rule, Write an action, Restrict something,
-  Make a flow, Give a task, and Export the log (460). The QML still has the older full pages (`NewRulePage`, `NewActionPage`, `MarkPage`, `NewFlowPage`...), a different design.
+- **The editors are drawers now,** as the concept has them. Two things went with the old pages: the flow's Keep / remove copies choice (the concept does not ask; new flows keep,
+  and the issue on a deleted source still offers Remove) and Keep as one on a split task. Say if either should come back.
 - **Any Admin verifies a task:** the concept shows it, and the QML follows; it changes the invariant "only the assigner closes a task". Confirm, then CLAUDE.md and
   `task-natural-combo.md` change with it (ENGINE-GAPS #23).
 - **Only a rule's maker changes it** ("only A. Quaye changes it"): the concept has this, and it sits oddly beside "nobody owns an issue". Confirm it is meant.

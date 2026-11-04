@@ -259,13 +259,10 @@ async def test_an_announcement_is_sent_from_its_page_and_lists_what_was_sent(con
     assert "Pick at least one person" in prop(page, "problem")
 
 
-async def test_messages_holds_conversations_and_announcements_behind_one_switch(console):
+async def test_announcements_open_under_messages_and_are_not_on_the_menu(console):
     win, bridge, _ = console("admin")
     await _open(win, bridge, "messages", "messagesView")
-    tabs = win.findChild(QObject, "messageTabs")
-    assert tabs is not None
     win.setProperty("view", "messages/announcements")
     await _wait(lambda: win.findChild(QObject, "announcements") is not None)
-    assert win.findChild(QObject, "messageTabs") is not None                         # the same switch on the other side
     assert "announcements" not in prop(win, "menuKeys") and "detective" in prop(win, "menuKeys")
     await _open(win, bridge, "detective", "detectiveView")

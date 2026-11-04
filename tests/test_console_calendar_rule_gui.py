@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from PySide6.QtCore import Q_ARG, QMetaObject, QObject
 
-from tests.test_operator_gui import _open, _pump, console, prop  # noqa: F401
+from tests.test_operator_gui import _open, _pump, _wait, console, prop  # noqa: F401
 
 
 def _at(days: float, hour: int = 9) -> str:
@@ -57,24 +57,34 @@ async def test_the_calendar_lists_what_is_coming_one_month_at_a_time_and_opens_w
     assert win.findChild(QObject, "calendarMonth") is not None and win.findChild(QObject, "calendarDay") is not None
 
 
-async def test_a_new_rule_starts_blank_and_each_step_says_what_is_missing(console):
+async def test_a_rule_is_made_step_by_step_and_each_step_says_what_is_missing(console):
     win, bridge, _ = console("admin")
     page = await _open(win, bridge, "automation/new", "newRule")
     _pump(0.3)
-    assert prop(page, "kind") == "" and prop(page, "scope") == "" and prop(page, "acts") == [] and prop(page, "ok") is False
-    assert prop(page, "problems") == ["Pick what should start it.", "Pick which machines it watches.", "Add at least one action."]
-    # choosing: a kind, every machine, an action
-    page.setProperty("kind", "Threshold")
-    page.setProperty("scope", "all")
-    page.setProperty("lib", [{"id": 5, "name": "Notify the Admin", "cat": "control", "timeout_seconds": 10, "description": "Tells an Admin", "builtin_type": "notify"}])
-    page.setProperty("acts", [5])
-    _pump(0.2)
-    assert prop(page, "problems")[0] == "" and prop(page, "problems")[2] == ""
-    assert prop(page, "ok") is True or prop(page, "targets") == []                               # complete once there is a machine to watch
-    # an event rule needs the event chosen
-    page.setProperty("kind", "Event")
+    assert prop(page, "step") == 0 and prop(page, "prob") == "Give the rule a name."
+    page.setProperty("name", "Midday backup")
     _pump(0.1)
-    assert prop(page, "problems")[0] == "Pick what happens."
-    page.setProperty("ev", "usb.inserted")
+    assert prop(page, "prob") == ""
+    page.setProperty("kind", "Schedule")
+    page.setProperty("days", [])
     _pump(0.1)
-    assert prop(page, "problems")[0] == ""
+    assert prop(page, "prob") == "Pick at least one day."
+    page.setProperty("days", [0, 1, 2, 3, 4])
+    page.setProperty("step", 1)
+    page.setProperty("all", False)
+    _pump(0.1)
+    assert prop(page, "prob") == "Pick at least one machine."
+    page.setProperty("all", True)
+    page.setProperty("step", 2)
+    page.setProperty("acts", [])
+    _pump(0.1)
+    assert prop(page, "prob") == "Add at least one action."
+    page.setProperty("acts", [{"id": 5, "name": "Notify the Admin", "limit": 10}])
+    page.setProperty("step", 3)
+    _pump(0.1)
+    assert prop(page, "whenTxt") == "it is 09:00 on a weekday"
+    page.confirmed.emit()
+    await _wait(lambda: any(t == "control.event_create" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "control.event_create")
+    assert sent["type"] == "time.recurring" and sent["match"] == {"at": "09:00", "days": [0, 1, 2, 3, 4]} and sent["pc_ids"] is None
+    assert sent["action_ids"] == [5] and sent["name"] == "Midday backup"

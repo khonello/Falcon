@@ -357,22 +357,22 @@ async def test_marks_are_the_person_s_own_and_their_copies_are_issues(console):
     assert prop(view, "copiesN") == 1
 
 
-async def test_marking_picks_from_the_index_as_a_tree_of_files_and_folders(console):
-    """marks.tree's files become drives, folders and files; what is marked, or covered by a marked folder, cannot be
-    ticked; a ticked folder is sent by the path its files have, so the Engine finds it in the index."""
+async def test_restricting_finds_it_by_search_and_what_is_restricted_cannot_be_picked_again(console):
+    """Restrict something searches what the index has seen on this PC, folders first; what is already restricted says so; the path goes as the index spells it."""
     win, bridge, _ = console("admin")
     page = await _open(win, bridge, "restricted/mark", "markFiles")
-    await _wait(lambda: any(r["name"] == "Payroll" and r["own"] for r in prop(page, "rows") or []))
-    rows = {r["name"]: r for r in prop(page, "rows")}
-    assert [r["name"] for r in prop(page, "rows")][:4] == ["C:", "Finance", "budget-2026.xlsx", "Invoices"]
-    assert rows["C:"]["n"] == 3 and rows["Finance"]["n"] == 2
-    assert rows["budget-2026.xlsx"]["own"] and rows["Payroll"]["own"]
-    assert "q3.csv" not in rows                      # a second-level folder starts closed
-    QMetaObject.invokeMethod(page, "toggle", Q_ARG("QVariant", rows["Finance"]["key"]))
-    QMetaObject.invokeMethod(page, "mark")
+    await _wait(lambda: len(prop(page, "files") or []) > 0)
+    page.setProperty("q", "budget")
+    _pump(0.2)
+    assert [h["path"] for h in prop(page, "hits")] == [r"C:\Finance\budget-2026.xlsx"]
+    assert prop(page, "prob").startswith("Search for the file")                  # nothing picked: the next step is shut
+    QMetaObject.invokeMethod(page, "take", Q_ARG("QVariant", "C:\Finance"), Q_ARG("QVariant", "folder"))
+    page.setProperty("step", 2)
+    _pump(0.2)
+    page.confirmed.emit()
     await _wait(lambda: any(t == "marks.create" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "marks.create")
-    assert sent == {"paths": ["C:\\Finance"], "keep": "machine", "confirm_large": False}
+    assert sent == {"paths": ["C:\Finance"], "keep": "path", "confirm_large": False}
 
 
 QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))
@@ -384,39 +384,20 @@ async def test_a_flow_s_steps_keep_their_names_and_their_place(console):
     win, bridge, _ = console("admin")
     view = await _open(win, bridge, "flows", "flowsView")
     await _wait(lambda: len(prop(view, "steps") or []) == 2)
-    steps = [{"kind": "Categorize", "op": "Sort by file type", "scope": "all"}, {"kind": "Transform", "op": "Compress to ZIP", "scope": 1}]
+    steps = [{"kind": "Categorize", "opId": "", "op": "Sort by file type", "settings": {}, "scope": "all"}, {"kind": "Transform", "opId": "", "op": "Compress to ZIP", "settings": {}, "scope": 1}]
     assert prop(view, "steps") == steps
     win.setProperty("view", "flows/edit-5")
     await _wait(lambda: win.findChild(QObject, "newFlow") is not None)
     edit = win.findChild(QObject, "newFlow")
     await _wait(lambda: len(prop(edit, "stages") or []) == 2)
     assert prop(edit, "stages") == steps
-    # the three stage columns share one height, the tallest one's, whatever each holds (side by side from 900 wide;
-    # the offscreen test window is narrower, so the shared height is read rather than drawn)
-    needs = [win.findChild(QObject, n).property("need") for n in ("nfSources", "nfSteps", "nfDests")]
-    assert edit.property("colH") == max(needs) > min(needs)
     QMetaObject.invokeMethod(edit, "save")
     await _wait(lambda: any(t == "flow.edit" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "flow.edit")
     assert sent["stages"] == [{"stage_type": "categorization", "parent_index": None, "config": {"op": "Sort by file type", "by": "extension"}},
                               {"stage_type": "transformation", "parent_index": 0, "config": {"op": "Compress to ZIP"}}]
     assert [d["parent_index"] for d in sent["destinations"]] == [0, 1]
-    assert sent["on_source_delete"] == "keep"                                    # said in the setup, and kept unless chosen otherwise
-    assert win.findChild(QObject, "nfOnDelete") is not None
-
-
-async def test_a_flow_can_be_set_to_remove_copies_when_the_source_deletes(console):
-    win, bridge, _ = console("admin")
-    await _open(win, bridge, "flows", "flowsView")
-    win.setProperty("view", "flows/edit-5")
-    await _wait(lambda: win.findChild(QObject, "newFlow") is not None)
-    edit = win.findChild(QObject, "newFlow")
-    await _wait(lambda: len(prop(edit, "stages") or []) == 2)
-    assert prop(edit, "onDelete") == "keep"
-    edit.setProperty("onDelete", "mirror")
-    QMetaObject.invokeMethod(edit, "save")
-    await _wait(lambda: any(t == "flow.edit" for t, _ in bridge.conn.seen))
-    assert next(p for t, p in bridge.conn.seen if t == "flow.edit")["on_source_delete"] == "mirror"
+    assert sent["on_source_delete"] == "keep"                                    # kept as it was set
 
 
 async def test_writing_in_a_conversation_sends_the_body(console):

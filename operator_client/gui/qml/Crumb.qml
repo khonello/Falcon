@@ -13,14 +13,7 @@ Row {
         var p = Nav.page, s = Nav.sub, t = Nav.title(p)
         if (s === null || s === undefined || s === "") return [[t, ""]]
         if (p === "machines") return [["Machines", "machines"], [String(s), "", true]]
-        if (p === "tasks" && s === "new") return [["Tasks", "tasks"], ["New task", ""]]
-        if (p === "flows" && s === "new") return [["Flows", "flows"], ["New flow", ""]]
-        if (p === "flows" && String(s).indexOf("edit-") === 0) return [["Flows", "flows"], ["Edit " + String(s).slice(5), ""]]
-        if (p === "automation" && s === "new") return [["Automation", "automation"], ["New rule", ""]]
-        if (p === "automation" && String(s).indexOf("edit-") === 0) return [["Automation", "automation"], ["Edit", ""]]
-        if (p === "actions" && s === "new") return [["Actions", "actions"], ["New custom action", ""]]
-        if (p === "actions" && String(s).indexOf("edit-") === 0) return [["Actions", "actions"], ["Edit", ""]]
-        if (p === "restricted" && s === "mark") return [["Restricted", "restricted"], ["Mark files", ""]]
+        if (s === "new" || s === "mark" || String(s).indexOf("edit-") === 0) return [[t, ""]]      // an editor is a drawer over the page
         if (p === "rules" && (s === "new" || String(s).indexOf("from-") === 0)) return [["Rules", "rules"], ["New rule", ""]]
         if (p === "rules" && String(s).indexOf("edit-") === 0) { var rr = Rules.all.filter(function (x) { return x.id === String(s).slice(5) })[0]; return [["Rules", "rules"], ["Edit " + (rr ? rr.name : String(s).slice(5)), ""]] }
         return [[t, ""]]

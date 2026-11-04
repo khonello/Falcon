@@ -201,7 +201,6 @@ QML yet. The priorities are a proposal, ordered by how much of the concept depen
 | **IssueResolver** | the typed *What to do* block: lead sentence, facts, Choices built from the issue's type and situation, the input the chosen one needs, one act | Issues | Choice + Form controls | **P0** |
 | **SmartText** | a description box that underlines people, files, dates and programs as they are typed, with a picker on click or pause and `@` for people | New task | Qt's `QSyntaxHighlighter` on a `TextArea`, a `Popup` for the picker | **P1** |
 | **Decision** | a tinted block asking one question with two equal buttons, turning green when answered | *No checks, I will verify it by hand* | Alert-like Rectangle + two `Button`s | **P1** |
-| **FlowPreview** | the flow drawn left to right as it is built; shared steps before the split, branch steps as labels on their edge | New flow | Shapes, laid out, never dragged | **P1** |
 | **RunOnce** | a drawer: choose machines, read what it does to them, run, then each machine Queued → Running → Success / Failed / Skipped | Actions | `Drawer` + `Progress` | **P1** |
 | **Occupancy** | the DayTimeline with an adjustable working frame and a line naming any session outside it | Sessions | extends DayTimeline | **P1** |
 | **Firings** | a rule's firings, newest first, each expanding into the runs it caused (problems only, when there are many) | rule page | `Feed` with expandable rows | **P2** |

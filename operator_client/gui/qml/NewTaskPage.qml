@@ -1,14 +1,21 @@
 import QtQuick
 import "."
 
-// NEW TASK. Describe the work in plain words; people, files, dates and programs are marked as you type
-// and can be confirmed there. "Read it" asks the local model about the rest (task.propose) and nothing
-// is created until you say so: the right shows the task that will be created, every value marked with
-// where it came from -- found by rule, chosen by the model, needs your input, or set by you.
-Page {
+// GIVE A TASK, in the concept's drawer. Describe the work in plain words; people, files, dates and programs are marked as you type and can be
+// confirmed there. "Read it" asks the local model about the rest (task.propose) and nothing is created until you say so; the summary then shows
+// the task as it will sit in your list, every value marked with where it came from: found by rule, chosen by the model, or set by you.
+Column {
     id: page
     objectName: "newTask"
-    bare: true
+    width: parent ? parent.width : 0
+    spacing: 14
+    readonly property string drawerTitle: "Give a task"
+    readonly property string drawerNote: "closing keeps what you wrote; nothing is given until you confirm"
+    property bool keeps: true
+    property real minHeight: 0
+    signal closed()
+    property string step: "edit"           // edit | summary
+    readonly property bool canSum: read && !stale && open === 0 && !busy
 
     property string text: ""
     property var conf: ({})
@@ -119,7 +126,7 @@ Page {
             if (x.soft) payload.soft_deadline_at = x.soft
             falcon.call("task.create", payload, function (ok, r) {
                 if (!ok) { failed = true; Msg.failed(r && r.message ? r.message : "It was not created") }
-                if (--left === 0 && !failed) { Msg.ok(list.length > 1 ? "Created " + list.length + " tasks" : "Task created"); Nav.go("tasks") }
+                if (--left === 0 && !failed) { Msg.ok(list.length > 1 ? "Gave " + list.length + " tasks" : "Given to " + list[0].who); page.keeps = false; Nav.go("tasks") }
             })
         })
     }
@@ -134,14 +141,15 @@ Page {
         Txt { text: page.srcWord[parent.s]; color: parent.s === "input" ? Theme.med : Theme.text3; font.pixelSize: 11; elide: Text.ElideNone }
     }
 
-    Row {
+    Column {
         width: parent.width
         spacing: 14
+        visible: page.step === "edit"
 
         // --- the description, and once read, the details -------------------------------------------
         Panel {
             id: left
-            width: (parent.width - 14) / 2
+            width: parent.width
             title: "New task"
             sub: "describe the work in plain words"
             Column {
@@ -162,18 +170,10 @@ Page {
                 }
                 Row {
                     spacing: 10
-                    Btn {
-                        small: true
-                        kind: !page.read || page.stale ? "primary" : "default"
-                        loading: page.busy
-                        enabled: !page.busy && page.foundPerson !== null && (page.read ? page.stale : page.text.trim() !== "")
-                        text: page.busy ? "Reading" : !page.read ? "Read it" : page.stale ? "Check again" : "Checked"
-                        onClicked: page.readIt()
-                    }
                     // the hint; while the box is empty it runs on into "use an example", as the concept's does
                     Txt {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: left.width - 140
+                        width: left.width - 40
                         color: Theme.text3
                         font.pixelSize: 12
                         readonly property bool empty: !page.busy && !page.read && page.text.trim() === ""
@@ -321,116 +321,130 @@ Page {
             }
         }
 
-        // --- what will be created ----------------------------------------------------------------------
-        Panel {
-            width: (parent.width - 14) / 2
-            height: left.height
-            fill: true
-            flush: true
-            title: page.tasks.length > 1 ? "Task " + (page.cur + 1) + " of " + page.tasks.length : "The task"
-            sub: "what will be created"
-            extra: Tag { visible: page.read; text: page.t && page.blocked(page.t) ? "Needs input" : "Ready"; c: page.t && page.blocked(page.t) ? Theme.med : Theme.ok }
-            opacity: page.busy || page.stale ? 0.55 : 1
-
-            Column {
-                visible: !page.read
-                anchors.centerIn: parent
-                width: 300
+        // --- the foot (nt-next): read it, then review ----------------------------------------------------
+        Item {
+            width: parent.width
+            height: 40
+            Row {
+                anchors.right: parent.right; anchors.rightMargin: 2; anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
-                Icon { anchors.horizontalCenter: parent.horizontalCenter; name: page.busy ? "loading" : "filesearch"; size: 22; color: Theme.text3 }
-                Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3
-                      text: page.busy ? "Reading the description…" : "The proposed task appears here once the description has been read." }
+                Txt { visible: page.read && !page.stale && page.open > 0; anchors.verticalCenter: parent.verticalCenter; text: "Fill in what needs your input first"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                Btn { text: "Cancel"; onClicked: page.closed() }
+                Btn { objectName: "readIt"; visible: !page.read || page.stale || page.busy; kind: "primary"; loading: page.busy; enabled: !page.busy && page.foundPerson !== null && page.text.trim() !== ""
+                      text: page.busy ? "Reading" : page.stale ? "Read it again" : "Read it"; onClicked: page.readIt() }
+                Btn { visible: page.read && !page.stale && !page.busy; kind: "primary"; enabled: page.canSum; iconRight: true; iconName: "right"; text: "Review the summary"; onClicked: page.step = "summary" }
             }
-            Column {
-                visible: page.read && page.t !== null
-                x: 14; y: 6
-                width: parent.width - 28
-                Repeater {
-                    model: page.t ? [["Title", page.t.title, page.t.titleSrc],
-                                     ["Assignee", page.t.who + (page.people.filter(function (p) { return p.account === page.t.whoAccount })[0] ? " · " + page.people.filter(function (p) { return p.account === page.t.whoAccount })[0].host : ""), page.t.whoSrc],
-                                     ["Final deadline", page.t.final ? Time.date(page.t.final) : "Not set", page.t.final ? page.t.finalSrc : "none"],
-                                     ["Soft deadline", page.t.soft ? Time.date(page.t.soft) : "Not set", page.t.soft ? page.t.softSrc : "none"]] : []
-                    Item {
-                        required property var modelData
-                        width: parent.width; height: 34
-                        Txt { width: 112; anchors.verticalCenter: parent.verticalCenter; text: modelData[0]; color: Theme.text3 }
-                        Txt { x: 124; width: parent.width - 124 - 100; anchors.verticalCenter: parent.verticalCenter; text: modelData[1]
-                              color: modelData[2] === "none" ? Theme.text3 : Theme.text; font.weight: modelData[0] === "Title" ? Font.Medium : Font.Normal }
-                        Src { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; s: modelData[2] }
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                    }
-                }
-                Txt { topPadding: 16; bottomPadding: 2; color: Theme.text3; textFormat: Text.RichText
-                      text: "What done looks like" + (page.t && page.t.checks.length ? " · " + page.t.checks.length : "") + " <span style='color:" + Theme.text4 + "'>· verification, you confirm it when the work is in</span>" }
-                Repeater {
-                    model: page.t ? (page.t.checks.length ? page.t.checks : [null]) : []
-                    Item {
-                        required property var modelData
-                        width: parent.width; height: 34
-                        Icon { anchors.verticalCenter: parent.verticalCenter; name: !modelData ? (page.t.none ? "check" : "question") : modelData.target_type === "file" ? "file" : "appstore"; size: 13; color: Theme.text3 }
-                        Txt { x: 22; width: parent.width - 22 - 100; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.RichText
-                              text: !modelData ? "<span style='color:" + (page.t.none ? Theme.text : Theme.med) + "'>" + (page.t.none ? "None. You will verify it by hand." : "None found yet") + "</span>"
-                                    : "<span style='font-family:" + Theme.mono + ";color:" + (modelData.name ? Theme.text : Theme.med) + "'>" + (modelData.name || "No target yet") + "</span><span style='color:" + Theme.text3 + "'> · " + page.intentWord(modelData.intent) + "</span>" }
-                        Src { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; s: !modelData ? (page.t.none ? "you" : "input") : modelData.name ? modelData.src : "input" }
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                    }
-                }
-                Txt { topPadding: 16; bottomPadding: 2; color: Theme.text3; textFormat: Text.RichText
-                      text: "Signs of progress <span style='color:" + Theme.text4 + "'>· expectations, they follow from the targets above</span>" }
-                Repeater {
-                    model: page.t ? page.t.checks.filter(function (c) { return c.name }) : []
-                    Row {
-                        required property var modelData
+        }
+    }
+
+    // --- what will be created: as it will sit in your list ------------------------------------------------
+    Panel {
+        visible: page.step === "summary"
+        width: parent.width
+        height: Math.max(implicitHeight, page.minHeight)
+        fill: true
+        flush: true
+        title: page.tasks.length > 1 ? "Task " + (page.cur + 1) + " of " + page.tasks.length : "The task"
+        sub: "what will be created"
+        extra: Tag { text: page.t && page.blocked(page.t) ? "Needs input" : "Ready"; c: page.t && page.blocked(page.t) ? Theme.med : Theme.ok }
+        readonly property var me: page.t ? page.people.filter(function (p) { return p.account === page.t.whoAccount })[0] || null : null
+        readonly property string host: me ? me.host : "—"
+        readonly property var cs: page.t ? page.t.checks : []
+
+        Column {
+            id: tsum
+            x: 20; y: 18
+            width: parent.width - 40
+            spacing: 12
+            Txt { text: "This is how it will sit in your list, under On track."; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+            Rectangle {
+                width: parent.width
+                height: tcol.height + 16
+                radius: 8
+                color: Theme.surface2
+                Column {
+                    id: tcol
+                    width: parent.width
+                    spacing: 14
+                    Card {
                         width: parent.width
-                        spacing: 8
-                        topPadding: 7; bottomPadding: 7
-                        Icon { name: "eye"; size: 13; color: Theme.text3 }
+                        icon: "checksquare"
+                        title: page.t ? page.t.title : ""
+                        line: (page.t ? page.t.who : "") + " on " + parent.parent.parent.parent.host + " · 0 of " + Theme.many(page.t ? page.t.checks.length : 0, "target") + " found"
+                        actW: 0
+                        midW: 240
+                        mid: Row {
+                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                            spacing: 10
+                            TaskBar { visible: !!page.t && !!page.t.final; anchors.verticalCenter: parent.verticalCenter; given: Time.now; final_: page.t && page.t.final ? Time.ms(page.t.final) : Time.now + 86400000
+                                      soft: page.t && page.t.soft ? Time.ms(page.t.soft) : 0; until: Time.now }
+                            Txt { anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                                  text: page.t && page.t.final ? Time.waitLen((Time.ms(page.t.final) - Time.now) / 3600000) + " left" : "no deadline" }
+                        }
+                    }
+                    Column {
+                        x: 56
+                        width: parent.width - 72
+                        spacing: 14
+                        FactRows {
+                            width: Math.min(560, parent.width)
+                            readonly property var pn: parent.parent.parent.parent.parent
+                            rows: page.t ? [["For", page.t.who + " on " + pn.host], ["Given", "now, by you"], ["Soft deadline", page.t.soft ? Time.date(page.t.soft) : "none"],
+                                            ["Final deadline", page.t.final ? Time.date(page.t.final) : "none; it stays open until you close it"]] : []
+                        }
+                        Txt { textFormat: Text.StyledText; color: Theme.text2; font.pixelSize: 13; font.weight: Font.Medium; elide: Text.ElideNone
+                              text: "What done looks like" + (page.t && page.t.checks.length ? " <font color='" + Theme.text3 + "'>" + page.t.checks.length + " · and the sign of progress watched for each</font>" : "") }
                         Column {
-                            width: parent.width - 22
-                            Txt { width: parent.width; textFormat: Text.RichText
-                                  text: (modelData.target_type === "program" ? (modelData.intent === "installed_available" ? "Shows up among the installed programs" : "Time in real use")
-                                         : modelData.intent === "create" ? "The file appearing, then its saves" : "Saves, renames and moves of the file")
-                                        + " <span style='color:" + Theme.text3 + "'>·</span> <span style='font-family:" + Theme.mono + ";color:" + Theme.text2 + "'>" + modelData.name + "</span>" }
-                            Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                                  text: modelData.target_type === "program" ? "Counted only while it is in use: keyboard, processor and memory moving. Open but idle does not count."
-                                        : "Watched through the machine's own file events, as they happen. Recognised by content, so a rename or a move does not lose it." }
+                            width: parent.width
+                            Repeater {
+                                model: page.t ? page.t.checks : []
+                                delegate: Item {
+                                    required property var modelData
+                                    required property int index
+                                    width: parent.width; height: rc.height + 15
+                                    Icon { y: 9; name: modelData.target_type === "file" ? "file" : "appstore"; size: 13; color: Theme.text3 }
+                                    Column { id: rc; x: 28; y: 7; width: parent.width - 28; spacing: 2
+                                        Txt { width: parent.width; textFormat: Text.StyledText; font.pixelSize: 13
+                                              text: "<font face='" + Theme.mono + "'>" + (modelData.name || "No target yet") + "</font><font color='" + Theme.text3 + "'> · " + page.intentWord(modelData.intent) + "</font>" }
+                                        Txt { visible: !!modelData.name; width: parent.width; color: Theme.text2; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                                              text: modelData.target_type === "program" ? "Time spent in it, counted only while it is in use" : modelData.intent === "create" ? "The file appearing, then its saves" : "Saves, renames and moves of the file" } }
+                                    Rectangle { visible: index < page.t.checks.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                }
+                            }
+                            Txt { visible: !!page.t && page.t.checks.length === 0; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                                  text: page.t && page.t.none ? "No targets. Nothing is watched; you judge it when the work is in." : "None found yet." }
                         }
                     }
                 }
-                Row { visible: page.t !== null && page.t.checks.filter(function (c) { return c.name }).length === 0; spacing: 8; topPadding: 7
-                      Icon { name: "eyeoff"; size: 13; color: Theme.text3 }
-                      Txt { text: page.t && page.t.none ? "Nothing is watched. You judge it when the work is in." : "None until a target is set."; color: Theme.text3 } }
             }
-            Rectangle {
-                visible: page.read
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 52
-                color: "transparent"
-                Rectangle { width: parent.width; height: 1; color: Theme.border }
-                Row {
-                    x: 14
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
-                    visible: page.tasks.length > 1
-                    Repeater {
-                        model: page.tasks
-                        Link { required property var modelData; required property int index; font.pixelSize: 12
-                               text: "Task " + (index + 1) + (page.blocked(modelData) ? " · needs input" : " · ready")
-                               color: index === page.cur ? Theme.text : page.blocked(modelData) ? Theme.med : Theme.text3
-                               onClicked: page.cur = index }
-                    }
+            Txt { color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone; text: (page.t ? page.t.who : "") + " is told the moment you give it. Only you close it, once it is handed in." }
+        }
+        Rectangle {
+            anchors.bottom: parent.bottom
+            width: parent.width
+            height: 52
+            color: "transparent"
+            Rectangle { width: parent.width; height: 1; color: Theme.border }
+            Row {
+                x: 14
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+                visible: page.tasks.length > 1
+                Repeater {
+                    model: page.tasks
+                    Link { required property var modelData; required property int index; font.pixelSize: 13
+                           text: "Task " + (index + 1) + (page.blocked(modelData) ? " · needs input" : " · ready")
+                           color: index === page.cur ? Theme.text : page.blocked(modelData) ? Theme.med : Theme.text3
+                           onClicked: page.cur = index }
                 }
-                Row {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 14
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
-                    Btn { text: "Cancel"; onClicked: Nav.go("tasks") }
-                    Btn { visible: page.tasks.length > 1; enabled: !page.busy && !page.stale; text: "Keep as one"; onClicked: page.create(true) }
-                    Btn { kind: "primary"; enabled: !page.busy && !page.stale && page.open === 0
-                          text: page.tasks.length > 1 ? "Create " + page.tasks.length + " tasks" : "Create task"; onClicked: page.create(false) }
-                }
+            }
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+                Btn { iconName: "left"; text: "Back"; onClicked: page.step = "edit" }
+                Btn { kind: "primary"; enabled: !page.busy && !page.stale && page.open === 0; text: "Give the task"; onClicked: page.create(false) }
             }
         }
     }

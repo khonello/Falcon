@@ -8,6 +8,7 @@ Item {
     property int pcId: 0
     property string text: ""
     property string placeholder: "Folder"
+    property bool mono: true
     signal edited(string text)
     property var folders: []
     implicitWidth: 220
@@ -26,7 +27,7 @@ Item {
         anchors.fill: parent
         text: root.text
         placeholderText: root.placeholder
-        font.family: Theme.mono
+        font.family: root.mono ? Theme.mono : Theme.sans
         onTextEdited: { root.edited(text); pop.open() }
         onActiveFocusChanged: if (activeFocus && root.hits.length) pop.open()
     }
