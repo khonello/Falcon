@@ -58,9 +58,13 @@ Page {
         if ((t.final_deadline_at && Time.past(t.final_deadline_at)) || quiet(t)) return "late"
         return "track"
     }
-    readonly property var all: tasks.filter(function (t) { return t.status !== "completed" || !t.completed_at || Time.now - Time.ms(t.completed_at) < 7 * 86400000 })
+    // the clock ticks every second and this reads it: `all` only changes when what it says changes, or everything hanging off it would be rebuilt each second
+    readonly property var listed: tasks.filter(function (t) { return t.status !== "completed" || !t.completed_at || Time.now - Time.ms(t.completed_at) < 7 * 86400000 })
         .map(function (t) { return Object.assign({ k: page.cat(t), factRows: t.soft_deadline_at ? 5 : 4 }, t) })
         .sort(function (x, y) { return (Time.ms(x.final_deadline_at) || 9e15) - (Time.ms(y.final_deadline_at) || 9e15) })
+    property var all: []
+    property string allSaid: "[]"
+    onListedChanged: { var s = JSON.stringify(listed); if (s !== allSaid) { allSaid = s; all = listed } }
     function inGroup(k) { return all.filter(function (x) { return x.k === k }) }
     // the most pressing is picked at first; nothing is open until you expand it
     readonly property var cur: {
@@ -69,7 +73,7 @@ Page {
         return f || null
     }
     property var pickedId: null
-    onCurChanged: { loading = true; ldT.restart(); asking = false; why = ""; pickedId = cur ? cur.id : null }
+    onCurChanged: { var id = cur ? cur.id : null; if (id === pickedId) return; loading = true; ldT.restart(); asking = false; why = ""; pickedId = id }
     Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
     readonly property var curDetail: cur ? detail[cur.id] || null : null
     readonly property var curHost: cur ? Fleet.byAccount(cur.assignee_account_id) : null

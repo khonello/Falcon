@@ -267,3 +267,20 @@ async def test_announcements_is_a_page_of_the_home_menu(console):
     await _open(win, bridge, "messages/announcements", "announcements")                   # where the calendar still links
     assert "announcements" in prop(win, "menuKeys") and "detective" in prop(win, "menuKeys")
     await _open(win, bridge, "detective", "detectiveView")
+
+
+async def test_the_clock_ticking_does_not_reload_the_picked_task_or_wipe_what_is_being_typed(console):
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "tasks", "tasksView")
+    _pump(0.3)                                                                             # its own load has answered
+    page.setProperty("tasks", [{"id": 1, "description_raw": "Prepare the stock count", "status": "active", "created_at": "2026-01-01T08:00:00+00:00",
+                                "final_deadline_at": "2099-01-01T08:00:00+00:00", "assignee_account_id": 1, "assignee_name": "Esi"}])
+    _pump(1.0)                                                                             # picked, and past the short Loading
+    assert prop(page, "pickedId") is not None
+    page.setProperty("asking", True)
+    page.setProperty("why", "Half a reason")
+    flips = []
+    page.loadingChanged.connect(lambda: flips.append(1))
+    _pump(2.6)                                                                             # more than two ticks of the clock
+    assert not flips                                                                       # the graph stays on the screen
+    assert prop(page, "asking") and prop(page, "why") == "Half a reason"

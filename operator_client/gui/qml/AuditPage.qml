@@ -19,7 +19,8 @@ Page {
         if (p) { if (p.kinds && p.kinds.length === 1) kind = p.kinds[0]; brush = p.brush || null }
         Kinds.load({ limit: 500 }, function (es) { page.all = es })
     }
-    readonly property real since: Time.now - Time.rangeHours(Nav.range) * 3600000
+    // to the minute: the list hangs off this, and a value that moved every second rebuilt every row every second
+    readonly property real since: Math.floor(Time.now / 60000) * 60000 - Time.rangeHours(Nav.range) * 3600000
     readonly property var base: all.filter(function (e) { return e.t >= since })
     readonly property var shown: base.filter(function (e) {
         return (!kind || e.kind === kind) && (!brush || (e.t >= brush[0] && e.t < brush[1]))
