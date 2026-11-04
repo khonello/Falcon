@@ -52,8 +52,9 @@ async def test_a_private_mark_tells_its_machine_who_may_open_it_and_hears_who_wa
     got = (await a1.ok("marks.get", {"mark_id": mark["id"]}))
     assert got["mark"]["refusals"][0]["who"] == "FIN\\kofi"
 
-    # only the owner changes who is named; nobody can ask to be added
-    assert await a2.err("marks.readers", {"mark_id": mark["id"], "readers": [org["a2"]]}) == "forbidden"
+    # any IT Admin changes who is named (the trail says who); a person at a machine cannot ask to be added
+    await a2.ok("marks.readers", {"mark_id": mark["id"], "readers": [org["a2"]]})
+    await a1.drain_pushes()
     changed = await a1.ok("marks.readers", {"mark_id": mark["id"], "readers": [], "allow_system": True})
     assert changed["readers"] == [org["a1"]] and changed["applied_now"] is True
     assert next(p for p in await a1.drain_pushes() if p.type == "private.apply").payload["readers"] == ["FIN\\anna"]

@@ -104,7 +104,8 @@ async def start(engine: Engine, action: dict[str, Any], event_id: int | None, pc
     delay = int(timing.get("delay_s", 0)) if timing.get("mode") == "delayed" else 0
 
     async def dispatch() -> int:
-        execution_id = await engine.db.control.start_execution(action["id"], event_id, pc_id)
+        by = (actor.viewed_by or actor.identity).account_id if actor is not None else None
+        execution_id = await engine.db.control.start_execution(action["id"], event_id, pc_id, by)
         _outputs[execution_id] = deque(maxlen=OUTPUT_CHUNKS_KEPT)
         wire = _wire_action(action)
         if action.get("builtin_type") in FILE_ACTIONS and not (wire["params"].get("path")):

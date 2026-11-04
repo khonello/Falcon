@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine import permissions
-from engine.permissions import in_scope
+from engine.permissions import in_scope, org_wide
 from engine.resource.resource import derive_tag
 
 if TYPE_CHECKING:
@@ -152,7 +152,7 @@ async def gate(engine: Engine, flow_id: int, pc_id: int | None, path: str, diges
 
 def deciders_text(b: Blocker) -> str:
     if permissions.ADMIN_SCOPE == "organisation":                 # version 1: nobody above the Admins
-        return "the person who marked it" if b.kind == "mark" else "an Admin"
+        return "an Admin"
     return "the person who marked it, or the head of the organisation" if b.kind == "mark" else "the head of the organisation" if b.tag == "admin" or not b.scope_department_id else "the department's Admin, or the head of the organisation"
 
 
@@ -174,12 +174,14 @@ async def request(engine: Engine, flow_id: int, missing: list[Blocker], path: st
 
         issue_id, _ = await issues.raise_issue(
             engine, type_="flow", severity="medium", title="A flow wants to carry something restricted", subject=f"{b.name}: flow #{flow_id}", pc_id=flow["source_pc_id"],
-            source_table="flow_restricted", source_id=cid, owner_account_id=b.owner_account_id, state="waiting", label="Waiting for consent",
+            source_table="flow_restricted", source_id=cid, owner_account_id=None if permissions.ADMIN_SCOPE == "organisation" else b.owner_account_id, state="waiting", label="Waiting for consent",
             detail={"flow_id": flow_id, "consent_id": cid, "restricted": b.name, "why": b.reason, "sample": path, "decides": deciders_text(b)})
         await engine.db.flows.set_consent_issue(cid, issue_id)
         if b.owner_account_id is not None:
             await engine.push_to_account(b.owner_account_id, "flow.restricted_request", note)
         await engine.push_to_role("super_user", "flow.restricted_request", note)
+        if permissions.ADMIN_SCOPE == "organisation":             # every Admin hears: any of them may answer
+            await engine.push_to_role("admin", "flow.restricted_request", note)
         if b.kind == "tag" and b.scope_department_id:
             await engine.push_to_role("admin", "flow.restricted_request", note, department_id=b.scope_department_id)
     key = (flow_id, _norm(path))
@@ -211,8 +213,8 @@ def install(engine: Engine) -> None:
 
 
 def can_decide(ident: Any, consent: dict[str, Any]) -> bool:
-    """Who may answer: the head of the organisation always; the person who made the mark; for a department's restricted tier, that department's Admin."""
-    if ident.role == "super_user":
+    """Who may answer: anyone org-wide (every IT Admin in version 1); else the person who made the mark; for a department's restricted tier, that department's Admin."""
+    if org_wide(ident):                                           # (version 1: any IT Admin; the record says who answered)
         return True
     if consent.get("mark_id") is not None:
         return consent.get("mark_owner_account_id") == ident.account_id

@@ -43,7 +43,7 @@ from engine.dispatch import Context, handler
 from engine.flow import flows as flowdefs
 from engine.flow import guard, steps
 from engine.hierarchy import reports
-from engine.permissions import int_field, require_account, str_field
+from engine.permissions import int_field, org_wide, require_account, str_field
 from protocol import ErrorCode, ProtocolError
 
 if TYPE_CHECKING:
@@ -806,7 +806,7 @@ async def trigger(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     flow = await ctx.engine.db.flows.get(flow_id)
     if flow is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such flow")
-    if flow["created_by_account_id"] != ident.account_id and ident.role != "super_user":
+    if flow["created_by_account_id"] != ident.account_id and not org_wide(ident):
         raise ProtocolError(ErrorCode.FORBIDDEN, "not your flow")
     if flow["status"] != "active":
         raise ProtocolError(ErrorCode.CONFLICT, f"flow is {flow['status']}")

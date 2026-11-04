@@ -100,7 +100,7 @@ async def test_a_machines_page_says_whats_running_who_is_at_the_keyboard_and_whe
     assert about["boot_at"].startswith("2026-10-30T07:12") and about["registered_at"]
     kb = page["keyboard"]
     assert kb["state"] == "in_use" and kb["quarters"] == [quarter] and kb["day"] == today.isoformat()
-    assert [c["yes"] for c in page["check_ins"]] == [False, False, False, False, True, False, True]
+    assert [c["yes"] for c in page["check_ins"]] == [False, False, False, False, False, True, False, True]
     assert page["check_ins"][-1]["day"] == today.isoformat()
 
     # idle: the quarter is not marked again, and the state says idle; a report every 15 s writes once

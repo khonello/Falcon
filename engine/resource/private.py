@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, require_account, require_role, str_field
+from engine.permissions import int_field, org_wide, require_account, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 if TYPE_CHECKING:
@@ -119,7 +119,7 @@ async def readers(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such mark")
     if mark.get("protection") != "private":
         raise ProtocolError(ErrorCode.CONFLICT, "only a private mark names who may open it")
-    if mark["by_account_id"] != ident.account_id:
+    if mark["by_account_id"] != ident.account_id and not org_wide(ident):
         raise ProtocolError(ErrorCode.FORBIDDEN, "only the person who made it private changes who may open it")
     from engine.console.marks import _readers
 

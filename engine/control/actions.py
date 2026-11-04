@@ -56,6 +56,23 @@ BUILTIN: dict[str, dict[str, Any]] = {
 }
 
 
+# What each built-in does to the person at the machine (the line after its description), and whether Run is the red button.
+IMPACT: dict[str, tuple[str, bool]] = {
+    "screenshot": ("Users are not interrupted.", False), "notify": ("A message appears on the person's screen.", False),
+    "lock_session": ("The person is locked out until it ends.", True), "rename_file": ("The file's name changes on that machine.", False),
+    "restore_file": ("The file goes back to its kept version.", True), "kill_process": ("The program closes; unsaved work in it is lost.", True),
+    "start_process": ("A program starts on the machine.", False), "shutdown": ("The machine turns off; unsaved work is lost.", True),
+    "reboot": ("The machine restarts; unsaved work is lost.", True), "process_list": ("Users are not interrupted.", False),
+    "system_metrics": ("Users are not interrupted.", False), "file_activity": ("Users are not interrupted.", False), "idle_time": ("Users are not interrupted.", False),
+    "snapshot_file": ("Users are not interrupted.", False), "delete_file": ("The file is deleted from that machine.", True), "usb_contents": ("Users are not interrupted.", False),
+}
+
+
+def impact_of(builtin_type: str | None) -> dict[str, Any]:
+    said, risky = IMPACT.get(builtin_type or "", (None, False))
+    return {"impact": said, "risky": risky}
+
+
 # Settings the design asks for (Actions, AU06). notify: `message`, and `stay_s` (seconds it stays up; absent or 0 =
 # until the person closes it). lock_session: `duration_s` (how long the screen stays locked) and an optional
 # `message`. reboot/shutdown: `delay_s` (the warning before it happens: 60 or 300 as offered; any 0-3600) and a
@@ -150,9 +167,11 @@ async def action_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     stored = await db.control.actions() if org_wide(ident) else await db.control.actions_in_department(
         ident.department_id)
     grouped: dict[str, list[dict[str, Any]]] = {"control": [], "monitoring": [], "custom": []}
+    makers = sorted({a["created_by_account_id"] for a in stored})
+    names = await db.accounts.display_names_for(ident.account_id, makers) if makers else {}
     for a in rows(stored):
-        grouped[a["action_kind"]].append(a)
-    return {"builtin": BUILTIN, "actions": grouped}
+        grouped[a["action_kind"]].append({**a, **impact_of(a.get("builtin_type")), "created_by_name": names.get(a["created_by_account_id"])})
+    return {"builtin": {k: {**v, **impact_of(k)} for k, v in BUILTIN.items()}, "actions": grouped}
 
 
 @handler("control.action_create")

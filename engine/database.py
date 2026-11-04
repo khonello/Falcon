@@ -35,7 +35,7 @@ POLYMORPHIC_TABLES = frozenset({
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages", "conversations",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases", "detective_rules", "flow_restricted_consents", "proposals",
-    "licences", "licence_codes", "chat_files", "private_refusals",
+    "licences", "licence_codes", "chat_files", "private_refusals", "talk_requests",
     # non-table targets used by the audit trail
     "client", "session", "event", "execution",
 })
@@ -1163,8 +1163,9 @@ class MarksRepo(_Repo):
 
     async def consents_for(self, mark_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT c.id, c.flow_id, c.state, c.asked_at, c.decided_at, c.decided_by_account_id, c.expires_at, c.note, f.source_path, f.status AS flow_status "
-            "FROM flow_restricted_consents c JOIN flows f ON f.id = c.flow_id WHERE c.mark_id = $1 ORDER BY c.id DESC", mark_id)
+            "SELECT c.id, c.flow_id, c.state, c.asked_at, c.decided_at, c.decided_by_account_id, c.expires_at, c.note, c.sample_path, f.source_path, f.name AS flow_name, "
+            "f.status AS flow_status, p.hostname AS source_hostname "
+            "FROM flow_restricted_consents c JOIN flows f ON f.id = c.flow_id LEFT JOIN pcs p ON p.id = f.source_pc_id WHERE c.mark_id = $1 ORDER BY c.id DESC", mark_id)
 
     async def resolve_open_copies(self, mark_id: int) -> list[int]:
         rows = await self._fetch(
@@ -1501,9 +1502,9 @@ class FlowsRepo(_Repo):
                 parent = stage_ids[d["parent_index"]] if d.get("parent_index") is not None else None
                 await conn.execute(
                     "INSERT INTO flow_destinations (flow_id, parent_stage_id, destination_pc_id, destination_path, "
-                    "owner_account_id, pre_flight_check_status) VALUES ($1, $2, $3, $4, $5, $6)",
+                    "owner_account_id, pre_flight_check_status, note) VALUES ($1, $2, $3, $4, $5, $6, $7)",
                     flow_id, parent, d.get("destination_pc_id"), d["destination_path"], d["owner_account_id"],
-                    d.get("pre_flight_check_status", "passed"))
+                    d.get("pre_flight_check_status", "passed"), d.get("note"))
             return flow_id
 
     async def get(self, flow_id: int) -> dict[str, Any] | None:
@@ -1545,7 +1546,7 @@ class FlowsRepo(_Repo):
         """For each listed flow, the further sources merged into it: {flow_id: [{id, source_pc_id, source_path, source_kind, source_hostname}]}."""
         out: dict[int, list[dict[str, Any]]] = {}
         for r in await self._fetch(
-                "SELECT f.id, f.merged_into, f.source_pc_id, f.source_path, f.source_kind, sp.hostname AS source_hostname FROM flows f "
+                "SELECT f.id, f.merged_into, f.source_pc_id, f.source_path, f.source_kind, f.pause_reason, f.paused_at, sp.hostname AS source_hostname FROM flows f "
                 "LEFT JOIN pcs sp ON sp.id = f.source_pc_id WHERE f.merged_into = ANY($1::int[]) AND f.status <> 'inactive' ORDER BY f.id", flow_ids):
             out.setdefault(r["merged_into"], []).append(r)
         return out
@@ -1681,13 +1682,25 @@ class FlowsRepo(_Repo):
                 parent = stage_ids[d["parent_index"]] if d.get("parent_index") is not None else None
                 await conn.execute(
                     "INSERT INTO flow_destinations (flow_id, parent_stage_id, destination_pc_id, destination_path, "
-                    "owner_account_id, pre_flight_check_status) VALUES ($1, $2, $3, $4, $5, $6)",
+                    "owner_account_id, pre_flight_check_status, note) VALUES ($1, $2, $3, $4, $5, $6, $7)",
                     flow_id, parent, d.get("destination_pc_id"), d["destination_path"], d["owner_account_id"],
-                    d.get("pre_flight_check_status", "passed"))
+                    d.get("pre_flight_check_status", "passed"), d.get("note"))
 
     async def set_status(self, flow_id: int, status: str, pause_reason: str | None = None) -> None:
         await self._exec(
-            "UPDATE flows SET status = $2, pause_reason = $3 WHERE id = $1", flow_id, status, pause_reason)
+            "UPDATE flows SET status = $2, pause_reason = $3, paused_at = CASE WHEN $2 = 'paused' THEN COALESCE(paused_at, now()) END WHERE id = $1",
+            flow_id, status, pause_reason)
+
+    async def member_ids(self, flow_id: int) -> list[int]:
+        """A flow and the sources merged into it, stopped or not."""
+        return [r["id"] for r in await self._fetch("SELECT id FROM flows WHERE id = $1 OR merged_into = $1 ORDER BY id", flow_id)]
+
+    async def kept_beside(self, flow_id: int, path: str) -> dict[str, Any] | None:
+        """A file the flow kept beside a new version at one of its destinations: where, and which destination."""
+        return await self._one(
+            "SELECT l.written_path, l.source_relative_path, d.id AS destination_id, d.destination_pc_id, d.destination_path FROM flow_sync_log l "
+            "JOIN flow_destinations d ON d.id = l.flow_destination_id WHERE d.flow_id = $1 AND l.outcome = 'kept_beside' "
+            "AND lower(replace(l.written_path, '\\', '/')) = lower(replace($2, '\\', '/')) ORDER BY l.id DESC LIMIT 1", flow_id, path)
 
     async def set_on_source_delete(self, flow_id: int, choice: str) -> None:
         await self._exec("UPDATE flows SET on_source_delete = $2 WHERE id = $1", flow_id, choice)
@@ -2233,7 +2246,29 @@ class ConversationsRepo(_Repo):
     async def pairs_of(self, account_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
             "SELECT c.* FROM conversations c JOIN conversation_members m ON m.conversation_id = c.id AND m.account_id = $1 "
-            "WHERE c.kind = 'pair' ORDER BY c.last_message_at DESC NULLS LAST, c.id DESC", account_id)
+            "WHERE c.kind IN ('pair', 'group') ORDER BY c.last_message_at DESC NULLS LAST, c.id DESC", account_id)
+
+    async def group(self, by: int, members: list[int], title: str | None) -> int:
+        """A small group of named people: a conversation of its own, each time one is made."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            made = await conn.fetchval("INSERT INTO conversations (kind, created_by_account_id, title) VALUES ('group', $1, $2) RETURNING id", by, title)
+            await conn.executemany("INSERT INTO conversation_members (conversation_id, account_id) VALUES ($1, $2)", [(made, m) for m in members])
+            return int(made)
+
+    async def add_talk_request(self, account_id: int, pc_id: int | None, line: str) -> int | None:
+        """A person's request to talk; None when they already have one open."""
+        return await self._val("INSERT INTO talk_requests (from_account_id, pc_id, line) VALUES ($1, $2, $3) "
+                               "ON CONFLICT (from_account_id) WHERE state = 'open' DO NOTHING RETURNING id", account_id, pc_id, line)
+
+    async def talk_request(self, request_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM talk_requests WHERE id = $1", request_id)
+
+    async def talk_requests(self) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT r.*, p.hostname FROM talk_requests r LEFT JOIN pcs p ON p.id = r.pc_id WHERE r.state = 'open' ORDER BY r.sent_at, r.id")
+
+    async def decide_talk_request(self, request_id: int, state: str, by: int, *, why: str | None = None, conversation_id: int | None = None) -> bool:
+        return await self._val("UPDATE talk_requests SET state = $2, decided_by_account_id = $3, decided_at = now(), why = $4, conversation_id = $5 "
+                               "WHERE id = $1 AND state = 'open' RETURNING id", request_id, state, by, why, conversation_id) is not None
 
     async def admins_conversation(self) -> dict[str, Any] | None:
         return await self._one("SELECT * FROM conversations WHERE kind = 'admins'")
@@ -2344,7 +2379,7 @@ class ControlRepo(_Repo):
         """Every run since a time, newest first, named for reading: the action, the machine, and the rule that set it off (none: by hand)."""
         return await self._fetch(
             "SELECT e.id, e.action_id, e.triggered_by_event_definition_id AS event_id, e.target_pc_id AS pc_id, e.status, e.terminated_reason, "
-            "e.started_at, e.ended_at, e.summary, e.exit_code, p.hostname, p.department_id, a.name AS action_name, a.action_kind, a.builtin_type, "
+            "e.started_at, e.ended_at, e.summary, e.exit_code, e.started_by_account_id, p.hostname, p.department_id, a.name AS action_name, a.action_kind, a.builtin_type, "
             "a.timeout_seconds, " + _HAS_IMAGE + " "
             "FROM action_executions e JOIN actions a ON a.id = e.action_id LEFT JOIN pcs p ON p.id = e.target_pc_id "
             "WHERE e.started_at >= $1 AND ($2::int IS NULL OR p.department_id = $2) ORDER BY e.started_at DESC LIMIT 20000",
@@ -2380,11 +2415,11 @@ class ControlRepo(_Repo):
             "AND ($3::int IS NULL OR created_by_account_id = $3) AND (NOT $4 OR enabled) ORDER BY id",
             condition_type, event_type, created_by, enabled_only)
 
-    async def attach_action(self, event_id: int, action_id: int, display_sequence: int) -> None:
+    async def attach_action(self, event_id: int, action_id: int, display_sequence: int, timeout_seconds: int | None = None) -> None:
         await self._exec(
-            "INSERT INTO event_actions (event_definition_id, action_id, display_sequence) VALUES ($1, $2, $3) "
-            "ON CONFLICT (event_definition_id, action_id) DO UPDATE SET display_sequence = EXCLUDED.display_sequence",
-            event_id, action_id, display_sequence)
+            "INSERT INTO event_actions (event_definition_id, action_id, display_sequence, timeout_seconds) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (event_definition_id, action_id) DO UPDATE SET display_sequence = EXCLUDED.display_sequence, timeout_seconds = EXCLUDED.timeout_seconds",
+            event_id, action_id, display_sequence, timeout_seconds)
 
     async def detach_action(self, event_id: int, action_id: int) -> None:
         # A join-table row is configuration, not a system record: removing it is fine.
@@ -2393,7 +2428,8 @@ class ControlRepo(_Repo):
 
     async def actions_for_event(self, event_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT a.*, ea.display_sequence FROM event_actions ea JOIN actions a ON a.id = ea.action_id "
+            "SELECT a.*, ea.display_sequence, ea.timeout_seconds AS rule_limit_s, COALESCE(ea.timeout_seconds, a.timeout_seconds) AS timeout_seconds "
+            "FROM event_actions ea JOIN actions a ON a.id = ea.action_id "
             "WHERE ea.event_definition_id = $1 AND a.archived_at IS NULL ORDER BY ea.display_sequence", event_id)
 
     # -- actions ---------------------------------------------------------------------------------
@@ -2463,10 +2499,33 @@ class ControlRepo(_Repo):
 
     # -- executions ------------------------------------------------------------------------------
 
-    async def start_execution(self, action_id: int, event_id: int | None, pc_id: int) -> int:
+    async def start_execution(self, action_id: int, event_id: int | None, pc_id: int, by_account_id: int | None = None) -> int:
         return await self._val(
-            "INSERT INTO action_executions (action_id, triggered_by_event_definition_id, target_pc_id) "
-            "VALUES ($1, $2, $3) RETURNING id", action_id, event_id, pc_id)
+            "INSERT INTO action_executions (action_id, triggered_by_event_definition_id, target_pc_id, started_by_account_id) "
+            "VALUES ($1, $2, $3, $4) RETURNING id", action_id, event_id, pc_id, by_account_id)
+
+    async def skip(self, event_id: int, at: datetime, by_account_id: int) -> None:
+        await self._exec("INSERT INTO event_skips (event_id, at, by_account_id) VALUES ($1, $2, $3) ON CONFLICT (event_id, at) WHERE undone_at IS NULL DO NOTHING",
+                         event_id, at, by_account_id)
+
+    async def undo_skip(self, event_id: int, at: datetime) -> bool:
+        return await self._val("UPDATE event_skips SET undone_at = now() WHERE event_id = $1 AND at = $2 AND undone_at IS NULL AND used_at IS NULL RETURNING id",
+                               event_id, at) is not None
+
+    async def skips(self) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT event_id, at FROM event_skips WHERE undone_at IS NULL AND used_at IS NULL")
+
+    async def take_skip(self, event_id: int, now: datetime) -> bool:
+        """Is the run due now one somebody skipped? Used up if so. A skip further off waits for its own run; one an hour stale is not this run."""
+        return await self._val("UPDATE event_skips SET used_at = now() WHERE id = (SELECT id FROM event_skips WHERE event_id = $1 AND undone_at IS NULL AND used_at IS NULL "
+                               "AND at BETWEEN $2::timestamptz - interval '1 hour' AND $2::timestamptz + interval '1 minute' ORDER BY at LIMIT 1) RETURNING id",
+                               event_id, now) is not None
+
+    async def event_tests(self, event_id: int, limit: int = 30) -> list[dict[str, Any]]:
+        """Each time a rule was run by hand on one machine."""
+        return await self._fetch(
+            "SELECT l.occurred_at, l.detail FROM audit_log l WHERE l.action_type = 'event.tested' AND l.target_type = 'event_definitions' AND l.target_id = $1 "
+            "ORDER BY l.occurred_at DESC LIMIT $2", str(event_id), limit)
 
     async def finish_execution(self, execution_id: int, status: str, *, terminated_reason: str | None = None,
                                output_log_path: str | None = None, exit_code: int | None = None,
@@ -2927,6 +2986,11 @@ class DetectiveRepo(_Repo):
     async def set_model_says(self, case_id: int, says: str | None) -> None:
         await self._exec("UPDATE detective_cases SET model_says = $2 WHERE id = $1", case_id, says)
 
+    async def restricted_among(self, case_ids: list[int]) -> set[int]:
+        """Which of these cases have restricted files in their evidence."""
+        return {r["case_id"] for r in await self._fetch(
+            "SELECT DISTINCT case_id FROM detective_findings WHERE case_id = ANY($1::int[]) AND evidence::text LIKE '%\"restricted\"%'", case_ids)}
+
     async def set_telling(self, case_id: int, telling: dict[str, Any]) -> None:
         """The model's smoothing of the case's account ({fingerprint, paragraphs}), with markers in place of facts."""
         await self._exec("UPDATE detective_cases SET telling = $2::jsonb WHERE id = $1", case_id, telling)
@@ -3003,6 +3067,11 @@ class ResourceRepo(_Repo):
         return await self._val(
             "INSERT INTO restricted_allowances (pc_id, path, content_hash, mark_id, reason, by_account_id, folder, consent_id) "
             "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id", pc_id, path, content_hash, mark_id, reason, by_account_id, folder, consent_id)
+
+    async def revoke_allowance(self, allowance_id: int, mark_id: int) -> bool:
+        """A copy allowed where it is, taken back: it is caught like any other again."""
+        return await self._val("UPDATE restricted_allowances SET revoked_at = now() WHERE id = $1 AND mark_id = $2 AND revoked_at IS NULL RETURNING id",
+                               allowance_id, mark_id) is not None
 
     async def revoke_allowances(self, consent_id: int) -> int:
         """The consent was taken back: the places it made allowed are not allowed any more (the rows are kept, marked revoked)."""

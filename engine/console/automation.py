@@ -8,6 +8,8 @@
                                                 the strip (actions, custom, runs this week, by hand, problems)
     actions.runs     {action_id?, event_id?, hand?, days?, limit?}   recent runs, each with how it ended, how long it took, what it said and what set it off
     control.event_test {event_id, pc_id}        run a rule's actions once on one machine, as if it had fired (recorded as run by hand; not a firing)
+    automation.run_again {event_id, at}         run a firing's actions again, only where they failed or timed out
+    automation.skip  {event_id, at, undo?}      skip one scheduled run of a rule, or take the skip back
 
 Outcomes are Success, Failed, Timed out (it ran out of its time: not a failure), Stopped by you, Running. An Admin sees their department's machines only; an
 organisation-wide rule counts just those.
@@ -18,9 +20,17 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from engine.control.actions import impact_of
 from engine.control.events import _load_event_in_scope, last_fired, outcome_of
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, own_department, require_department_scope, require_role
+from engine.isotime import parse_iso
+from engine.permissions import (
+    int_field,
+    own_department,
+    require_department_scope,
+    require_role,
+    str_field,
+)
 from protocol import ErrorCode, ProtocolError
 
 OUTCOMES = ("Success", "Failed", "Timed out", "Stopped by you")
@@ -36,7 +46,8 @@ WHEN_WORDS = {
     "task.started": "a task is started", "task.target_appeared": "a task's file appears", "task.deadline_soft": "a task's soft deadline passes",
     "task.deadline_final": "a task's final deadline passes", "flow.failed": "a flow fails", "resource.violation": "a restricted file turns up where it should not",
     "system.idle": "a machine has been idle", "threshold.cpu": "the processor is busy", "threshold.memory": "memory is nearly full",
-    "threshold.disk": "the disk is nearly full", "threshold.network": "the network is busy",
+    "threshold.disk": "the disk is nearly full", "threshold.network": "the network is busy", "printer.offline": "a shared printer stops responding",
+    "chat.asked": "a person at a machine asks to talk",
     "time.scheduled": "a set time comes", "time.recurring": "a repeating time comes",
 }
 
@@ -59,6 +70,10 @@ def when_of(spec: dict[str, Any]) -> str:
         return f"the system drive is {match['percent']}% full or more"
     if etype == "threshold.network" and match.get("kbps"):
         return f"it receives {match['kbps']} KB/s or more" + (f" for {match['duration_s'] // 60} minutes" if match.get("duration_s", 0) >= 60 else "")
+    if etype == "user.login" and match.get("outside_hours"):
+        return "someone signs in outside working hours"
+    if etype == "threshold.signin":
+        return f"{match.get('count', 5)} sign-ins fail within {int(match.get('window_s', 600)) // 60} minutes"
     if etype == "system.idle" and match.get("seconds"):
         return f"a machine has been idle for {match['seconds'] // 60} minutes"
     if etype == "time.recurring" and match.get("at"):
@@ -109,14 +124,14 @@ def _summary(runs: list[dict[str, Any]]) -> str:
     ok = counts.get("Success", 0)
     if len(counts) == 1 and ok:
         return "Succeeded" if ok == 1 else f"All {ok} succeeded"
-    return ", ".join(f"{counts[k]} {k.lower()}" for k in ("Timed out", "Failed", "Stopped by you", "Running", "Success") if counts.get(k))
+    return ", ".join(f"{counts[k]} {'succeeded' if k == 'Success' else k.lower()}" for k in ("Timed out", "Failed", "Stopped by you", "Running", "Success") if counts.get(k))
 
 
-def _run_view(r: dict[str, Any], rules: dict[int, str]) -> dict[str, Any]:
+def _run_view(r: dict[str, Any], rules: dict[int, str], who: str | None = None) -> dict[str, Any]:
     took = int((r["ended_at"] - r["started_at"]).total_seconds()) if r["ended_at"] else None
     return {"run_id": r["id"], "action_id": r["action_id"], "action": r["action_name"] or r["builtin_type"] or "Action", "pc_id": r["pc_id"], "host": r["hostname"],
             "at": _iso(r["started_at"]), "took_s": took, "limit_s": r["timeout_seconds"], "outcome": outcome_of(r), "summary": r["summary"], "exit": r["exit_code"],
-            "has_image": bool(r.get("has_image")), "event_id": r["event_id"], "by": f"rule: {rules.get(r['event_id'], 'a rule')}" if r["event_id"] else "hand"}
+            "has_image": bool(r.get("has_image")), "event_id": r["event_id"], "by": f"rule: {rules.get(r['event_id'], 'a rule')}" if r["event_id"] else "hand", "who": who}
 
 
 async def _scope(ctx: Context, payload: dict[str, Any]) -> tuple[int | None, datetime, int, datetime]:
@@ -140,6 +155,7 @@ async def automation_board(ctx: Context, payload: dict[str, Any]) -> dict[str, A
     names = await db.accounts.display_names_for(ident.account_id, sorted(makers)) if makers else {}
     rules = []
     coming: list[dict[str, Any]] = []
+    skipped = {(s["event_id"], s["at"].timestamp()) for s in await db.control.skips()}
     for d in defs:
         spec = d["condition_spec"] or {}
         fired = [f for f in firings if f["event_id"] == d["id"] and (mine is None or f["pc_id"] in mine or not f["pc_id"])]
@@ -150,11 +166,11 @@ async def automation_board(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         last_any = last or (datetime.fromisoformat(last_fired(d["id"])) if last_fired(d["id"]) else None)
         upcoming = next_runs(spec, now, last_any) if d["enabled"] and str(spec.get("type", "")).startswith("time.") else []
         label = d.get("name") or (when_of(spec)[0].upper() + when_of(spec)[1:])
-        coming.extend({"at": _iso(at), "event_id": d["id"], "name": label, "actions": len(actions)} for at in upcoming)
+        coming.extend({"at": _iso(at), "event_id": d["id"], "name": label, "actions": len(actions), "skipped": (d["id"], at.timestamp()) in skipped} for at in upcoming)
         rules.append({"next_at": _iso(upcoming[0]) if upcoming else None, "event_id": d["id"], "name": d.get("name") or (when_of(spec)[0].upper() + when_of(spec)[1:]), "named": bool(d.get("name")), "type": spec.get("type"),
                       "kind": kind_of(spec.get("type", "")), "when": when_of(spec), "scope": "every machine" if not spec.get("pc_ids") else f"{len(spec['pc_ids'])} machine(s)",
                       "actions": [{"action_id": a["id"], "name": a.get("name") or a.get("builtin_type")} for a in actions], "on": d["enabled"],
-                      "owner": "The organisation" if d["org_wide"] else names.get(d["created_by_account_id"]), "org_wide": bool(d["org_wide"]),
+                      "owner": "The organisation" if d["org_wide"] else names.get(d["created_by_account_id"]), "set_by": names.get(d["created_by_account_id"]), "org_wide": bool(d["org_wide"]),
                       "read_only": ident.role == "admin" and bool(d["org_wide"]),
                       "fired": sum(f["n"] for f in fired), "last_fired_at": _iso(last) or last_fired(d["id"]),
                       "last_run": _summary(latest) if latest else None, "last_run_problem": any(outcome_of(r) in PROBLEMS for r in latest),
@@ -184,7 +200,7 @@ async def actions_board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         used = [{"event_id": l["event_id"], "name": l["event_name"] or when_of({"type": l["event_type"]})} for l in links if l["action_id"] == a["id"]]
         last = mine[0] if mine else None
         out.append({"action_id": a["id"], "name": a.get("name") or a.get("builtin_type"), "kind": a["action_kind"], "builtin_type": a.get("builtin_type"),
-                    "language": a.get("custom_script_language"), "description": a.get("description"), "timeout_s": a["timeout_seconds"], "used_by": used,
+                    "language": a.get("custom_script_language"), "description": a.get("description"), "timeout_s": a["timeout_seconds"], "used_by": used, **impact_of(a.get("builtin_type")),
                     "runs": len(mine), "by_hand": sum(1 for r in mine if not r["event_id"]), "problems": sum(1 for r in mine if outcome_of(r) in PROBLEMS),
                     "last_run": {"outcome": outcome_of(last), "at": _iso(last["started_at"]), "host": last["hostname"]} if last else None,
                     "days": _per_day(mine, _days(now, days))})
@@ -205,7 +221,13 @@ async def actions_runs(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     found = [r for r in runs if (action_id is None or r["action_id"] == action_id) and (event_id is None or r["event_id"] == event_id)
              and (not payload.get("hand") or not r["event_id"])]
     labels = {d["id"]: d.get("name") or when_of(d["condition_spec"] or {}) for d in await db.control.event_definitions(enabled_only=False)}
-    return {"runs": [_run_view(r, labels) for r in found[:limit]], "total": len(found)}
+    me = ctx.identity.account_id
+    hands = sorted({r["started_by_account_id"] for r in found[:limit] if r["started_by_account_id"]})
+    names = await db.accounts.display_names_for(me, hands) if hands else {}
+
+    def who(r: dict[str, Any]) -> str | None:
+        return "You" if r["started_by_account_id"] == me else names.get(r["started_by_account_id"])
+    return {"runs": [_run_view(r, labels, who(r)) for r in found[:limit]], "total": len(found)}
 
 
 @handler("control.event_test")
@@ -236,3 +258,56 @@ async def event_test(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.CONFLICT, "this rule has no actions to run")
     await ctx.engine.audit.record(ctx, "event.tested", target_type="event_definitions", target_id=event_id, pc_id=pc_id, detail={"executions": started})
     return {"event_id": event_id, "pc_id": pc_id, "runs": started}
+
+
+FIRING_WINDOW = timedelta(minutes=10)              # a firing's runs started within this of it
+
+
+def _at(payload: dict[str, Any]) -> datetime:
+    try:
+        at = parse_iso(str_field(payload, "at"))
+    except (TypeError, ValueError) as exc:
+        raise ProtocolError(ErrorCode.INVALID, "at is a date and time") from exc
+    return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+
+
+@handler("automation.run_again")
+async def run_again(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"event_id", "at"} -- run a firing's actions again, only on the machines where one failed or timed out. Recorded as run by hand."""
+    from engine.control import executions
+
+    department_id, _, _, _ = await _scope(ctx, {})
+    event_id = int_field(payload, "event_id")
+    await _load_event_in_scope(ctx, event_id, write=False)
+    at = _at(payload)
+    db = ctx.engine.db
+    runs = await db.control.runs_since(at - timedelta(minutes=1), department_id=department_id)
+    bad = {(r["action_id"], r["pc_id"]) for r in runs if r["event_id"] == event_id and abs(r["started_at"] - at) <= FIRING_WINDOW and outcome_of(r) in PROBLEMS}
+    if not bad:
+        raise ProtocolError(ErrorCode.CONFLICT, "nothing went wrong in that run")
+    online = ctx.engine.online_pc_ids()
+    started, away = [], []
+    for action_id, pc_id in sorted(bad):
+        action = await db.control.action(action_id)
+        if action is None or pc_id not in online:
+            away.append(pc_id)
+            continue
+        started.append({"action_id": action_id, "pc_id": pc_id, "execution_id": await executions.start(ctx.engine, {**action, "timing": {"mode": "immediate"}}, None, pc_id, actor=ctx)})
+    await ctx.engine.audit.record(ctx, "event.run_again", target_type="event_definitions", target_id=event_id, detail={"at": at.isoformat(), "runs": len(started)})
+    return {"event_id": event_id, "runs": started, "offline": sorted(set(away))}
+
+
+@handler("automation.skip")
+async def skip(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"event_id", "at", "undo"?} -- skip one scheduled run of a rule (`coming_up[k].skipped` says so after a reload), or take the skip back."""
+    ident = require_role(ctx, "super_user", "admin")
+    event_id = int_field(payload, "event_id")
+    await _load_event_in_scope(ctx, event_id, write=False)
+    at = _at(payload)
+    db = ctx.engine.db
+    if payload.get("undo"):
+        await db.control.undo_skip(event_id, at)
+    else:
+        await db.control.skip(event_id, at, ident.account_id)
+    await ctx.engine.audit.record(ctx, "event.unskipped" if payload.get("undo") else "event.skipped", target_type="event_definitions", target_id=event_id, detail={"at": at.isoformat()})
+    return {"event_id": event_id, "at": at.isoformat(), "skipped": not payload.get("undo")}

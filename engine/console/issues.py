@@ -89,9 +89,10 @@ async def raise_issue(engine: Engine, *, type_: str, severity: str, title: str, 
         "escalated_at": datetime.now(timezone.utc) if escalated else None})
     if not created:
         return issue_id, False
-    await db.issues.log(issue_id, "raised", f"{title}" + (f": {subject}" if subject else ""))
     issue = await db.issues.get(issue_id)
     assert issue is not None
+    await db.issues.log(issue_id, "raised", f"{TYPE_LABEL[type_]} raised" + (f" on {issue['hostname']}" if issue["hostname"] else "") + (f": {subject}" if subject else ""))
+    await db.issues.log(issue_id, "system", "Report written; every Admin sees it, and any of them may act on it")
     await engine.audit.record(None, "issue.raised", target_type="issues", target_id=issue_id, pc_id=pc_id,
                               detail={"code": issue["code"], "type": type_, "severity": severity, "title": title, "department_id": department_id})
     payload = {"issue_id": issue_id, "code": issue["code"], "type": type_, "severity": severity, "title": title, "subject": subject,
@@ -180,8 +181,11 @@ async def issues_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     owner = payload.get("owner")
     owner_id = ident.account_id if owner == "me" else (int(owner) if isinstance(owner, int) else None)
     midnight = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    found = await _view(ctx, await db.issues.list(department_id=department, pc_id=int_field(payload, "pc_id", required=False),
-                                                  type_=type_, owner_account_id=owner_id, include_resolved_since=midnight))
+    raw = await db.issues.list(department_id=department, pc_id=int_field(payload, "pc_id", required=False),
+                               type_=type_, owner_account_id=owner_id, include_resolved_since=midnight)
+    found = await _view(ctx, raw)
+    for view, issue in zip(found, raw):
+        view["detail"] = issue["detail"]
     if owner == "unassigned":
         found = [i for i in found if i["owner"] is None]
     live = [i for i in found if i["state"] != "resolved"]

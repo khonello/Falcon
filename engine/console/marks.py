@@ -240,7 +240,7 @@ async def _load(ctx: Context, mark_id: int, *, owner_only: bool = False) -> dict
     mark = await ctx.engine.db.marks.get(mark_id)
     if mark is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such mark")
-    mine = mark["by_account_id"] == ident.account_id
+    mine = mark["by_account_id"] == ident.account_id or org_wide(ident)       # version 1: every IT Admin covers every mark; the audit trail shows who did what
     if ident.role == "admin" and not mine and (owner_only or not in_scope(ident, mark["department_id"])):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such mark")
     if owner_only and not mine and ident.role != "super_user":
@@ -540,16 +540,46 @@ async def marks_get(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     consents = await db.marks.consents_for(mark["id"])
     people = sorted({a["by_account_id"] for a in allowed} | {c["decided_by_account_id"] for c in consents if c["decided_by_account_id"]})
     names = await db.accounts.display_names_for(ctx.identity.account_id, people) if people else {}
+    host = (await db.accounts.pc(mark["pc_id"]) or {}).get("hostname")
+    lately = _lately(await db.marks.activity(mark["pc_id"], norm(mark["path"]), now - timedelta(days=LATELY_DAYS)), consents, now)
+    for item in lately:                                     # who was signed in then, and where: "Ama copied it to OPS-07"
+        item["where"] = host
+        item["who"] = None
+        if item.get("path"):
+            then = await db.sessions.signed_in_at(mark["pc_id"], datetime.fromisoformat(item["at"]))
+            if then:
+                account = then[0]["occupant_account_id"]
+                item["who"] = (await db.accounts.display_names_for(ctx.identity.account_id, [account])).get(account)
+    copied = await db.flows.copied_counts(sorted({c["flow_id"] for c in consents}))
+    places = {}
+    for flow_id in copied:
+        full = await db.flows.get(flow_id)
+        hosts = await db.flows.hostnames([d["destination_pc_id"] for d in (full or {}).get("destinations", []) if d.get("destination_pc_id")])
+        places[flow_id] = ", ".join(str(h) for h in hosts.values())
     return {"mark": (await _view(ctx, [mark]))[0], "copies": await rows(await db.marks.copy_issues(mark["id"])),
             "allowed": [{"allowance_id": a["id"], "pc_id": a["pc_id"], "host": a["hostname"], "path": a["path"], "reason": a["reason"],
                          "by": names.get(a["by_account_id"]), "at": _iso(a["at"])} for a in allowed],
-            "lately": _lately(await db.marks.activity(mark["pc_id"], norm(mark["path"]), now - timedelta(days=LATELY_DAYS)), consents, now),
+            "lately": lately,
             "flows_allowed": [{"consent_id": c["id"], "flow_id": c["flow_id"], "source_path": c["source_path"], "since": _iso(c["decided_at"]),
                                "by": names.get(c["decided_by_account_id"]), "expires_at": _iso(c["expires_at"]), "flow_status": c["flow_status"],
-                               "take_back": "flow.revoke"} for c in consents if c["state"] == "granted"],
+                               "take_back": "flow.revoke", "flow": c["flow_name"], "what": str(c.get("sample_path") or mark["path"]).replace("\\", "/").rsplit("/", 1)[-1],
+                               "from": c["source_hostname"], "to": places.get(c["flow_id"]), "today": copied[c["flow_id"]]["today"],
+                               "last_at": _iso(copied[c["flow_id"]]["last_at"])} for c in consents if c["state"] == "granted"],
             "resolved_copies": [c for c in await rows(await db.marks.copy_issues(mark["id"], include_resolved_since=now - timedelta(days=7)))
                                 if c["state"] == "resolved"],
             "change": {"keep": other, "keep_label": KEEP_WORDS[other], "effect": await _effect(ctx, mark, other)}}
+
+
+@handler("marks.allow_revoke")
+async def marks_allow_revoke(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"mark_id", "allowance_id"} -- Take it back on an allowed copy: it is caught like any other from now on. Its owner's to do."""
+    mark = await _load(ctx, int_field(payload, "mark_id"), owner_only=True)
+    allowance_id = int_field(payload, "allowance_id")
+    if not await ctx.engine.db.resource.revoke_allowance(allowance_id, mark["id"]):
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such allowed copy")
+    ctx.engine.marked.invalidate()
+    await ctx.engine.audit.record(ctx, "mark.allowance_revoked", target_type="resource_marks", target_id=mark["id"], detail={"allowance_id": allowance_id})
+    return {"mark_id": mark["id"], "allowance_id": allowance_id}
 
 
 @handler("marks.keep_effect")

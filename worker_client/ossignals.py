@@ -28,7 +28,7 @@ INTERVAL_SECONDS = 3.0           # how often to look when Windows cannot tell us
 SAFETY_SECONDS = 30.0            # with native notifications the look is only a safety net
 SETTLE_SECONDS = 0.5             # a moment after Windows says "changed", for the drive list to catch up
 WATCHED = ("usb.inserted", "usb.removed", "network.connected", "network.disconnected",
-           "program.launched", "program.exited", "user.login", "user.logout", "log.cleared", "screen.captured", "network.upload")
+           "program.launched", "program.exited", "user.login", "user.logout", "log.cleared", "screen.captured", "network.upload", "printer.offline", "threshold.signin")
 
 
 def _psutil() -> Any:
@@ -131,6 +131,82 @@ def event_logs() -> dict[str, str]:
             out[name] = hit.group(1)
     _log_cache = (now, out)
     return out
+
+
+_printer_cache: tuple[float, dict[str, bool]] = (0.0, {})
+_signin_cache: tuple[float, dict[str, str]] = (0.0, {})
+
+
+def parse_printers(text: str) -> dict[str, bool]:
+    """`name<TAB>WorkOffline<TAB>PrinterStatus` lines -> {name: responding}. Status 7 is Windows' "offline"."""
+    out: dict[str, bool] = {}
+    for line in text.splitlines():
+        parts = line.strip().split("\t")
+        if len(parts) == 3 and parts[0]:
+            out[parts[0]] = parts[1].lower() != "true" and parts[2] != "7"
+    return out
+
+
+def printers() -> dict[str, bool]:
+    """This machine's shared printers and whether each answers. Windows only; looked at every LOG_LOOK_SECONDS."""
+    global _printer_cache
+    import subprocess
+    import time
+
+    if os.name != "nt":
+        return {}
+    now = time.monotonic()
+    if now - _printer_cache[0] < LOG_LOOK_SECONDS:
+        return _printer_cache[1]
+    script = "Get-CimInstance Win32_Printer -Filter 'Shared=true' | ForEach-Object { $_.Name + \"`t\" + $_.WorkOffline + \"`t\" + $_.PrinterStatus }"
+    try:
+        done = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True, timeout=20, check=False,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError):
+        return _printer_cache[1]
+    _printer_cache = (now, parse_printers(done.stdout or ""))
+    return _printer_cache[1]
+
+
+def diff_printers(before: dict[str, bool], after: dict[str, bool]) -> list[tuple[str, dict[str, Any]]]:
+    return [("printer.offline", {"name": name}) for name, up in sorted(after.items()) if not up and before.get(name, True)]
+
+
+def parse_signins(xml: str) -> dict[str, str]:
+    """Windows' failed sign-in records (Security 4625) -> {record id: the account named}."""
+    import re
+
+    out: dict[str, str] = {}
+    for event in xml.split("</Event>"):
+        rec = re.search(r"<EventRecordID>(\d+)</EventRecordID>", event)
+        who = re.search(r"Name='TargetUserName'>([^<]*)<", event)
+        if rec:
+            out[rec.group(1)] = who.group(1) if who else ""
+    return out
+
+
+def failed_signins() -> dict[str, str]:
+    """The latest failed sign-ins here, as the Security log has them. Needs the service's rights; without them, nothing."""
+    global _signin_cache
+    import subprocess
+    import time
+
+    if os.name != "nt":
+        return {}
+    now = time.monotonic()
+    if now - _signin_cache[0] < LOG_LOOK_SECONDS:
+        return _signin_cache[1]
+    try:
+        done = subprocess.run(["wevtutil", "qe", "Security", "/q:*[System[(EventID=4625)]]", "/c:50", "/rd:true", "/f:xml"], capture_output=True, text=True,
+                              timeout=10, check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError):
+        return _signin_cache[1]
+    _signin_cache = (now, parse_signins(done.stdout or ""))
+    return _signin_cache[1]
+
+
+def diff_signins(before: dict[str, str], after: dict[str, str]) -> list[tuple[str, dict[str, Any]]]:
+    return [("threshold.signin", {"name": who}) for rec, who in after.items() if rec not in before]
 
 
 def diff_logs(before: dict[str, str], after: dict[str, str]) -> list[tuple[str, dict[str, Any]]]:
@@ -267,7 +343,9 @@ class OsSignals:
                 "network": ("network.connected", "network.disconnected"),
                 "programs": ("program.launched", "program.exited"),
                 "sessions": ("user.login", "user.logout"),
-                "logs": ("log.cleared",)}
+                "logs": ("log.cleared",),
+                "printers": ("printer.offline",),
+                "signins": ("threshold.signin",)}
 
     def wanted(self, etype: str, data: dict[str, Any]) -> bool:
         """Some automation here waits for this signal. A program match is applied here, by the same rule
@@ -281,7 +359,8 @@ class OsSignals:
     async def tick(self) -> int:
         """One comparison pass; returns how many signals were sent."""
         readers = {"drives": (drives, diff_drives), "network": (interfaces, diff_interfaces),
-                   "programs": (programs, diff_programs), "sessions": (sessions, diff_sessions), "logs": (event_logs, diff_logs)}
+                   "programs": (programs, diff_programs), "sessions": (sessions, diff_sessions), "logs": (event_logs, diff_logs),
+                   "printers": (printers, diff_printers), "signins": (failed_signins, diff_signins)}
         sent = 0
         for group, types in self._groups().items():
             if not any(t in self.interest for t in types):

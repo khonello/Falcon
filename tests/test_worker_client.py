@@ -751,7 +751,7 @@ async def test_the_worker_shows_the_ask_to_delete_a_copy_and_retries_an_update_n
         await admin.call("index.event", {"event": {"op": "create", "path": "C:/resources/restricted/s.xlsx", "hash": "S"}})
         await svc.call("index.event", {"event": {"op": "copy", "path": "C:/Users/ama/Desktop/s-copy.xlsx", "hash": "S"}})
         issue = (await admin.call("issues.list"))["issues"][0]
-        await admin.call("issues.act", {"issue_id": issue["id"], "key": "ask"})
+        await svc._on_push("issue.ask_delete", {"issue_id": issue["id"], "file": "s-copy.xlsx", "folder": "C:/Users/ama/Desktop", "why": "It is restricted."})
         assert await _wait(lambda: any(k == "message" and "Please delete s-copy.xlsx" in s["text"] for k, s in shown), timeout=10)
         await svc._on_push("update.available", {"version": "9.9.9", "now": True})
         assert await _wait(lambda: tried == [True], timeout=5)

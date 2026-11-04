@@ -1,13 +1,14 @@
 """An Admin's conversations, with nobody above the Admins (the user, 29 Oct 2026; ENGINE-GAPS #17).
 
 Version 1: an Admin talks to the other Admins and to whoever is signed in on a machine, and there is one group of every Admin once there are two or
-more. There is no request to talk before writing (help requests are out of version 1): a conversation is only what was written in it. A person at a
-machine answers in a conversation an Admin started; they do not start one. The help-ping channels (`assistance.*`) stay as they are for the level
+more. An Admin needs no request to write to anyone; a person at a machine answers in a conversation an Admin started, or asks to talk
+(engine/resource/talk.py). The help-ping channels (`assistance.*`) stay as they are for the level
 above the Admins.
 
     chat.list   {}                                   the caller's conversations, latest first: who is in it, the last message, unread, who has seen it
     chat.people {}                                   Admin: who they may write to (the other Admins, and each machine's person, with the machine)
-    chat.open   {account_id} | {pc_id} | {admins: true}   Admin: the conversation with that person (made the first time), or the group of every Admin
+    chat.open   {account_id} | {pc_id} | {admins: true} | {account_ids: [..], title?}   Admin: the conversation with that person (made the first time), the group of
+                                                     every Admin, or a small group of the people named (a new one each time)
     chat.get    {conversation_id, before_id?}        its messages, oldest first (100 at a time), and each member's read time
     chat.send   {conversation_id, body}              a message; pushed to the others as `chat.message`
     chat.read   {conversation_id}                    the caller has read it up to now; pushed to the others as `chat.read`
@@ -28,6 +29,7 @@ BODY_MAX = 4000
 PAGE = 100
 PEOPLE_MAX = 2000
 EVERY_ADMIN = "Every Admin"
+GROUP_MAX = 20
 
 
 def _iso(value: Any) -> str | None:
@@ -74,7 +76,8 @@ async def _views(ctx: Context, convos: list[dict[str, Any]]) -> list[dict[str, A
         msg = last.get(c["id"])
         seen = [p for p in others if msg and p != msg["from_account_id"] and reads.get(c["id"], {}).get(p) and reads[c["id"]][p] >= msg["sent_at"]]
         out.append({"conversation_id": c["id"], "kind": c["kind"],
-                    "title": EVERY_ADMIN if c["kind"] == "admins" else (names.get(others[0]) if others else None),
+                    "title": EVERY_ADMIN if c["kind"] == "admins" else (c.get("title") or ", ".join(str(names.get(p)) for p in others) if c["kind"] == "group"
+                                                                        else (names.get(others[0]) if others else None)),
                     "members": [{"account_id": p, "name": names.get(p)} for p in members[c["id"]]],
                     "last": {"body": msg["body"][:200], "from_account_id": msg["from_account_id"], "from": names.get(msg["from_account_id"]),
                              "at": _iso(msg["sent_at"])} if msg else None,
@@ -120,6 +123,19 @@ async def chat_open(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         if len(await db.accounts.active_admins()) < 2:
             raise ProtocolError(ErrorCode.CONFLICT, "the group of every Admin starts once there are two Admins")
         convo_id = await db.conversations.admins_group()
+    elif payload.get("account_ids") is not None:
+        given = payload["account_ids"]
+        if not isinstance(given, list):
+            raise ProtocolError(ErrorCode.INVALID, "account_ids is a list")
+        others = sorted({int(a) for a in given} - {ident.account_id})
+        if not 2 <= len(others) <= GROUP_MAX:
+            raise ProtocolError(ErrorCode.INVALID, f"a small group is 2 to {GROUP_MAX} other people")
+        for a in others:
+            person = await db.accounts.by_id(a)
+            if person is None or person["status"] != "active" or person["role"] == "super_user":
+                raise ProtocolError(ErrorCode.NOT_FOUND, "no such person")
+        title = " ".join(str(payload.get("title") or "").split())[:80] or None
+        convo_id = await db.conversations.group(ident.account_id, [ident.account_id, *others], title)
     else:
         account_id = int_field(payload, "account_id", required=False)
         pc_id = int_field(payload, "pc_id", required=False)

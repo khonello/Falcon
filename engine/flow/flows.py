@@ -190,8 +190,9 @@ def _parse_structure(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], lis
         if parent is not None and not (0 <= int(parent) < len(stages)):
             raise ProtocolError(ErrorCode.INVALID, f"destination {i}: parent_index must reference a stage")
         pc = d.get("destination_pc_id")
+        note = " ".join(str(d.get("note") or "").split())[:200] or None              # a line for whoever is asked to pick the folder
         dests.append({"destination_pc_id": int(pc) if pc is not None else None, "destination_path": path,
-                      "parent_index": parent})
+                      "parent_index": parent, "note": note})
     return dests, stages
 
 
@@ -369,7 +370,7 @@ async def _load_owned(ctx: Context, flow_id: int) -> dict[str, Any]:
     flow = await ctx.engine.db.flows.get(flow_id)
     if flow is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such flow")
-    if flow["created_by_account_id"] != ident.account_id and ident.role != "super_user":
+    if flow["created_by_account_id"] != ident.account_id and not org_wide(ident):       # (version 1: every IT Admin's; the audit trail shows who)
         raise ProtocolError(ErrorCode.FORBIDDEN, "not your flow")
     return flow
 
@@ -428,7 +429,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             await ctx.engine.push_to_account(d["owner_account_id"], "flow.consent_request",
                                              {"flow_id": flow_id, "destination_path": d["destination_path"],
                                               "creator_account_id": ident.account_id,
-                                              "creator_name": names.get(ident.account_id)})
+                                              "creator_name": names.get(ident.account_id), "note": d.get("note")})
         from engine.console import issues
 
         first = pending[0]
@@ -573,7 +574,14 @@ async def restricted_waiting(ctx: Context, payload: dict[str, Any]) -> dict[str,
 
     ident = require_role(ctx, "super_user", "admin")
     mine = [c for c in await ctx.engine.db.flows.asked_consents() if guard.can_decide(ident, c)]
-    return {"waiting": rows(mine)}
+    out = rows(mine)
+    for c in out:
+        full = await ctx.engine.db.flows.get(c["flow_id"])
+        places = (await _flow_view(ctx.engine, full))["destinations"] if full else []
+        c["what"] = str(c.get("sample_path") or "").replace("\\", "/").rsplit("/", 1)[-1] or None
+        c["from"] = c.get("source_hostname")
+        c["to"] = ", ".join(str(d.get("destination_hostname") or d.get("destination_path")) for d in places)
+    return {"waiting": out}
 
 
 @handler("flow.restricted_consent")
@@ -694,6 +702,50 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"flow": await _flow_view(ctx.engine, updated)}
 
 
+@handler("flow.remind")
+async def remind(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"flow_id"} -- remind whoever must pick a folder for a waiting flow. Any Admin who may see the flow may."""
+    flow = await _load_visible(ctx, int_field(payload, "flow_id"))
+    if flow["consent_status"] != "pending":
+        raise ProtocolError(ErrorCode.CONFLICT, "this flow is not waiting for anyone")
+    told = sorted({d["owner_account_id"] for d in flow["destinations"] if d.get("owner_account_id") and d["owner_account_id"] != flow["created_by_account_id"]})
+    for account_id in told:
+        await ctx.engine.push_to_account(account_id, "flow.consent_request", {"flow_id": flow["id"], "from_account_id": ctx.identity.account_id, "reminder": True})
+    await ctx.engine.audit.record(ctx, "flow.reminded", target_type="flows", target_id=flow["id"], detail={"told": told})
+    return {"flow_id": flow["id"], "reminded": len(told)}
+
+
+@handler("flow.keep")
+async def keep(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"flow_id", "path", "keep": "new"|"both"} -- settle a file the flow kept beside a new version: put it aside and keep only the new one, or keep both."""
+    flow = await _load_visible(ctx, int_field(payload, "flow_id"))
+    path = str_field(payload, "path")
+    choice = str_field(payload, "keep", choices=("new", "both"))
+    found = await ctx.engine.db.flows.kept_beside(flow["id"], path)
+    if found is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "the flow kept no such file")
+    if choice == "new":
+        if found["destination_pc_id"] not in ctx.engine.online_pc_ids():
+            raise ProtocolError(ErrorCode.UNAVAILABLE, "that machine is not connected")
+        await ctx.engine.push_to_pc(found["destination_pc_id"], "flow.remove", {
+            "flow_id": flow["id"], "destination_id": found["destination_id"], "relative_path": found["source_relative_path"] or path, "path": found["written_path"],
+            "root": found["destination_path"], "settled": True})
+    await ctx.engine.audit.record(ctx, "flow.keep_settled", target_type="flows", target_id=flow["id"], detail={"path": path, "keep": choice})
+    return {"flow_id": flow["id"], "keep": choice}
+
+
+@handler("flow.start")
+async def start(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"flow_id"} -- start a stopped flow again: it resumes, under the same checks, and catches up on what it missed."""
+    flow_id = int_field(payload, "flow_id")
+    flow = await _load_owned(ctx, flow_id)
+    if flow["status"] == "active":
+        raise ProtocolError(ErrorCode.CONFLICT, "this flow is already running")
+    for member in await ctx.engine.db.flows.member_ids(flow_id):
+        await ctx.engine.db.flows.set_status(member, "paused", "manual")
+    return await resume(ctx, {"flow_id": flow_id})
+
+
 @handler("flow.steps")
 async def steps_catalogue(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """The steps a flow can have, as the tree New flow draws: category > kind > operation > settings (engine/flow/steps.py), with each
@@ -798,7 +850,7 @@ async def list_flows(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     out = rows(found)
     for f in out:
         f["sources"] = [{"source_pc_id": f["source_pc_id"], "source_path": f["source_path"], "source_kind": f.get("source_kind"),
-                         "source_hostname": f.get("source_hostname")}] + rows(merged.get(f["id"], []))
+                         "source_hostname": f.get("source_hostname"), "pause_reason": f.get("pause_reason"), "paused_at": f.get("paused_at")}] + rows(merged.get(f["id"], []))
         f["files_copied"] = row(copied[f["id"]])
         f["stages"] = rows(shapes[f["id"]]["stages"])
         f["destinations"] = rows(shapes[f["id"]]["destinations"])

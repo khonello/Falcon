@@ -302,7 +302,8 @@ async def pc_register(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_role(ctx, "super_user", "admin")
     hostname = str_field(payload, "hostname")
     pc_type = str_field(payload, "pc_type", choices=("super_user_workstation", "admin_workstation", "client_pc"))
-    department_id = int_field(payload, "department_id", required=pc_type != "super_user_workstation")
+    # version 1: a machine may be registered by name alone, and put in a department on Departments
+    department_id = int_field(payload, "department_id", required=pc_type != "super_user_workstation" and not org_wide(ident))
     if department_id is not None:
         require_department_scope(ident, department_id)
     client_id = secrets.token_urlsafe(16)

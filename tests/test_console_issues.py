@@ -46,10 +46,10 @@ async def test_a_restricted_copy_is_an_issue_for_its_department_and_resolves_whe
 
     page = await a1.ok("issues.get", {"issue_id": issue["id"]})
     assert "salaries-copy.xlsx" not in page["lead"] and "FIN-01" in page["lead"]
-    assert {o["key"] for o in page["options"]} == {"ask", "delete", "allow"}
+    assert {o["key"] for o in page["options"]} == {"delete", "rule", "allow"}
     assert any(f[0] == "File" and f[1] == "salaries-copy.xlsx" for f in page["facts"])
     raised = next(e for e in page["timeline"] if e["kind"] == "raised")
-    assert raised["what"].startswith("Restricted file copied") and raised["who"] == "System"
+    assert raised["what"].startswith("Restricted file raised on FIN-01") and raised["who"] == "System"
     # the story has the same spine whatever the issue: raised, who it is assigned to, the time it should take; and nothing the machine did that is not about this
     whats = [e["what"] for e in page["timeline"]]
     assert "Assigned to you" in whats and "Target time (1 h)" in whats
@@ -74,11 +74,6 @@ async def test_asking_the_person_deleting_the_copy_and_allowing_it(engine, org, 
     [issue] = (await a1.ok("issues.list"))["issues"]
     await w1.drain_pushes()
 
-    # ask: the person is told which file and why; the issue waits
-    asked = await a1.ok("issues.act", {"issue_id": issue["id"], "key": "ask"})
-    assert asked["issue"]["state"] == "waiting" and asked["issue"]["label"] == "Waiting"
-    note = next(p for p in await w1.drain_pushes() if p.type == "issue.ask_delete").payload
-    assert note["file"] == "salaries-copy.xlsx" and "restricted" in note["why"]
     assert await a1.err("issues.act", {"issue_id": issue["id"], "key": "nonsense"}) == "invalid"
 
     # delete: a real run on that machine, which clears the issue when it succeeds

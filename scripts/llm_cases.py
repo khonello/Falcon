@@ -25,6 +25,18 @@ from __future__ import annotations
 Case = tuple[str, list[tuple[str, str, str]], set[str], str | None]
 
 TUNED: list[Case] = [
+    # the user's own confusing ones (4 Nov 2026): what matters is that each says what it could not work out
+    ("There is a report.xlsx and findings.docx, find a way to combine them into a suitable output and send it to me through the message channel. Finish it today or a day after.",
+     [("file", "exists", "report.xlsx"), ("file", "exists", "findings.docx")], {"cannot_check", "unnamed_result", "made_from", "ambiguous_deadline"}, None),
+    ("The task I gave you, when you finish, use it to create the annual report into a pdf, a flow will pick it up.",
+     [], {"no_target", "cannot_check", "unnamed_result", "waits_on_event"}, None),
+    ("When the reports comes in, use that to create a new summary.docx immediately and put it into the document folder.",
+     [("file", "create", "summary.docx")], {"waits_on_event", "folder_guess"}, None),
+    ("Check if the annual evaluation for last year and this year are available, if not create them into docx.",
+     [], {"no_target", "depends_on_check", "unnamed_result"}, None),
+    ("The summary.docx you did was missing key details, was utterly garbage. Redo it.", [("file", "update", "summary.docx")], {"quality_unseen"}, None),
+    ("Make sure you work on the sales.xlsx.", [("file", "update", "sales.xlsx")], set(), None),
+    ("Check and be sure that salary column is in the report.xlsx.", [("file", "exists", "report.xlsx")], {"inside_file"}, None),
     ("Put together the Q3 sales report as sales-q3.xlsx by Friday",
      [("file", "create", "sales-q3.xlsx")], set(), "Friday"),
     ("Keep inventory.csv current -- update it with this week's counts",

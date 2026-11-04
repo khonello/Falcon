@@ -481,7 +481,9 @@ async def cases(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.INVALID, "status is open, reviewed, explained, accepted, dismissed or escalated")
     if status in ("reviewed", *OUTCOMES):
         levels = None                                                  # anything that was reviewed, whatever its level was
-    return {"cases": [_view(c) for c in await ctx.engine.db.detective.cases(levels=levels, status=status, **scope)]}
+    found = await ctx.engine.db.detective.cases(levels=levels, status=status, **scope)
+    restricted = await ctx.engine.db.detective.restricted_among([c["id"] for c in found])
+    return {"cases": [{**_view(c), "restricted": c["id"] in restricted} for c in found]}
 
 
 @handler("detective.case")

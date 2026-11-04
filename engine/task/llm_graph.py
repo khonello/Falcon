@@ -46,6 +46,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from common.when import resolve
+from engine.task import cues
 from engine.task.hints import Hint
 from engine.task.verification import ProposedStructure, VerificationItem
 
@@ -315,6 +316,7 @@ async def populate(llm: LocalLLM, description: str, hints: list[Hint] | tuple[Hi
     await _deadline_branch(model, text, out, deadlines, now)
     if model.out_of_time:
         out.notes.append("the model ran out of time for this reading; what it did not answer is marked unclear")
+    cues.read(text, out, now)
     # A target whose Intent could not be settled is still a target -- "nothing was found" would
     # be a different and wrong thing to tell the assigner.
     if not out.items and not any(f["kind"] == "no_target" or f.get("target") for f in out.flags):

@@ -160,6 +160,12 @@ async def retry(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return {"pc_id": pc_id, "when": when if online else "when it is back", "version": cur["version_string"]}
 
 
+@handler("update.now")
+async def update_now(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"pc_id"} -- Update now, on a machine behind on the version."""
+    return await retry(ctx, {"pc_id": int_field(payload, "pc_id"), "when": "now"})
+
+
 @handler("updates.leave_out")
 async def leave_out(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ident = require_head(ctx)

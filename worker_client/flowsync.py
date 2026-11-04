@@ -267,7 +267,7 @@ class FlowSync:
         try:
             if not path.is_file():
                 reply["status"] = "missing"
-            elif await asyncio.to_thread(hash_of, path, 1 << 62) != payload.get("hash"):
+            elif not payload.get("settled") and await asyncio.to_thread(hash_of, path, 1 << 62) != payload.get("hash"):      # (settled: an Admin chose)
                 reply["status"] = "kept"                                       # changed since the flow wrote it: not ours to remove
             else:
                 aside = await asyncio.to_thread(self._put_away, path, root)

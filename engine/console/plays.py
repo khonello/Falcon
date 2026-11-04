@@ -77,7 +77,6 @@ async def _finish(ctx: Context, issue: dict[str, Any], resolution: str) -> dict[
 
 async def _file(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any]], list[Option], list[str]]:
     d, host = issue["detail"], issue["hostname"] or "a machine"
-    _, person, online = await _person(ctx, issue)
     mark = d.get("mark") or {}
     if mark:
         home = mark.get("host") if mark.get("keep") == "machine" else f"{mark.get('host')} {mark.get('path', '')}".strip()
@@ -92,13 +91,10 @@ async def _file(ctx: Context, issue: dict[str, Any]) -> tuple[str, list[list[Any
     can_reach = issue["pc_id"] in ctx.engine.online_pc_ids()
     why: list[str] = []
     options: list[Option] = []
-    if person and online:
-        options.append(_opt("ask", f"Ask {person} to delete it", f"{person} sees which file and why. The issue closes on its own when the copy is gone.",
-                            "Ask", "Waiting"))
-    elif not person:
-        why.append("Nobody is signed in, so there is nobody to tell.")
     if can_reach:
-        options.append(_opt("delete", "Delete this copy", f"Deletes it from {host} only. The original is not touched.", "Delete copy", "Waiting"))
+        options.append(_opt("delete", "Delete this copy", f"Deletes it from {host} only. The original is not touched.", "Delete copy", "Resolved"))
+        options.append(_opt("rule", "Delete this every time from now on", f"Deletes this copy, and makes a rule that deletes {d.get('file')} whenever it appears on {host}.",
+                            "Make the rule", "Resolved"))
     else:
         why.append(f"{host} is offline, so the copy cannot be deleted from here.")
     options.append(_opt("allow", f"Allow it on {host} too", "Adds this one place to what is allowed, with your reason. It is not reported again.",
@@ -110,18 +106,15 @@ async def _do_file(ctx: Context, issue: dict[str, Any], key: str, payload: dict[
     db, d = ctx.engine.db, issue["detail"]
     host = issue["hostname"] or "the machine"
     who = (ctx.viewed_by or ctx.identity).account_id
-    if key == "ask":
-        account, person, _ = await _person(ctx, issue)
-        await ctx.engine.push_to_account(account, "issue.ask_delete", {
-            "issue_id": issue["id"], "file": d.get("file"), "folder": d.get("folder"),
-            "why": "It is a restricted file, and it is not allowed on this machine."})
-        return await _wait(ctx, issue, "Waiting", f"Asked {person} to delete the copy of {d.get('file')}")
-    if key == "delete":
+    if key in ("delete", "rule"):
         from engine.console.system_actions import run_on_machine
 
         execution_id = await run_on_machine(ctx, "delete_file", {"path": d["path"]}, issue["pc_id"],
                                             name=f"Delete a restricted copy ({issue['code']})")
         await db.issues.set_detail(issue["id"], {"executions": [*d.get("executions", []), execution_id]})
+        if key == "rule":
+            event_id = await _delete_rule(ctx, issue, who)
+            await db.issues.log(issue["id"], "acted", f"Made a rule that deletes {d.get('file')} on {host} (rule {event_id})", who)
         return await _wait(ctx, issue, "Waiting", f"Deleting the copy of {d.get('file')} on {host}")
     reason = _reason(payload)
     await db.resource.allow(issue["pc_id"], d["path"], d.get("hash"), who, reason, d.get("mark", {}).get("id"))
@@ -129,6 +122,20 @@ async def _do_file(ctx: Context, issue: dict[str, Any], key: str, payload: dict[
         await db.resource.resolve(d["violation_id"])
     await db.issues.log(issue["id"], "acted", f"Allowed {d.get('file')} on {host}: {reason}", who)
     return await _finish(ctx, issue, f"Allowed on {host}: {reason}")
+
+
+async def _delete_rule(ctx: Context, issue: dict[str, Any], who: int) -> int:
+    """"Delete this every time from now on": a rule of the Admin's own, on that machine, for that file's name."""
+    from engine.control.actions import check_params
+
+    db, d = ctx.engine.db, issue["detail"]
+    name = f"Delete {d.get('file')} on {issue['hostname'] or 'this machine'}"
+    action_id = await db.control.create_action(who, "control", 60, builtin_type="delete_file", name=name, params=check_params("delete_file", {"find_name": d.get("file")}))
+    spec = {"type": "file.created", "pc_ids": [issue["pc_id"]], "match": {"name_suffix": str(d.get("file"))}}
+    event_id = await db.control.create_event(who, "native_pushed", spec, name)
+    await db.control.attach_action(event_id, action_id, 1)
+    await ctx.engine.audit.record(ctx, "event.created", target_type="event_definitions", target_id=event_id, detail={"type": spec["type"], "actions": [action_id]})
+    return event_id
 
 
 # --- a stuck or failed update ---------------------------------------------------------------------

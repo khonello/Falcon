@@ -140,7 +140,7 @@ async def cancel(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Withdraw a scheduled announcement before it goes out. {"alert_id"}; its sender, or the head of the organisation."""
     ident = require_role(ctx, "super_user", "admin")
     alert = await ctx.engine.db.alerts.get(int_field(payload, "alert_id"))
-    if alert is None or (ident.role != "super_user" and alert["created_by_account_id"] != ident.account_id):
+    if alert is None or (not org_wide(ident) and alert["created_by_account_id"] != ident.account_id):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such announcement of yours")
     if not await ctx.engine.db.alerts.cancel(alert["id"]):
         raise ProtocolError(ErrorCode.CONFLICT, "it has already been delivered or withdrawn")

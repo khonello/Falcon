@@ -15,7 +15,7 @@ from typing import Any
 from engine.console.feed import describe_many
 from engine.console.health import health_of, open_signals
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, kept, require_department_scope, require_role
+from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
 from protocol import ErrorCode, ProtocolError
 
 RANGES = {"1h": (timedelta(hours=1), 10), "6h": (timedelta(hours=6), 10), "24h": (timedelta(hours=24), 30),
@@ -149,11 +149,27 @@ async def _days(ctx: Context, pc_id: int, machine: dict[str, Any], now: datetime
     from engine.control import events as control_events
 
     today, _ = control_events.quarter_of(now)
-    rows = {r["day"]: r for r in await ctx.engine.db.accounts.days(pc_id, today - timedelta(days=6))}
+    rows = {r["day"]: r for r in await ctx.engine.db.accounts.days(pc_id, today - timedelta(days=7))}
     idle_s = machine["idle_s"]
     in_use = machine["online"] and idle_s is not None and idle_s < control_events.IN_USE_IDLE_S
     return {"keyboard": {"state": "offline" if not machine["online"] else "in_use" if in_use else "idle", "idle_s": idle_s,
                          "day": today.isoformat(), "quarters": sorted((rows.get(today) or {}).get("used_quarters") or [])},
             "check_ins": [{"day": (today - timedelta(days=n)).isoformat(), "yes": (today - timedelta(days=n)) in rows}
-                          for n in range(6, -1, -1)]}
+                          for n in range(7, -1, -1)]}
 
+
+@handler("machines.end_program")
+async def end_program(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"pc_id", "name"} -- End on a running program, then a notice on the person's screen saying IT ended it. The Worker refuses what is on its protected list."""
+    from engine.console.system_actions import run_on_machine
+
+    ident = require_role(ctx, "super_user", "admin")
+    pc_id = int_field(payload, "pc_id")
+    name = str_field(payload, "name")
+    pc = await ctx.engine.db.accounts.pc(pc_id)
+    if pc is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such machine")
+    require_department_scope(ident, pc["department_id"])
+    ended = await run_on_machine(ctx, "kill_process", {"name": name}, pc_id, name=f"End {name}")
+    told = await run_on_machine(ctx, "notify", {"message": f"Your IT Admin ended {name}."}, pc_id, name=f"Say {name} was ended")
+    return {"pc_id": pc_id, "execution_id": ended, "notice_execution_id": told}

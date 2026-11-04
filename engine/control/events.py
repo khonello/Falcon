@@ -21,6 +21,9 @@ Two evaluation mechanisms, chosen per event type by how it is actually detected:
         threshold.memory  percent (>=)
         threshold.disk    percent (>=) of the system drive used
         threshold.network kbps (>=) received, duration_s
+        threshold.signin  count, window_s            -- that many failed sign-ins on one machine within the window
+        user.login        outside_hours (true)       -- only before 08:00, from 18:00, or at a weekend
+        printer.offline   name (a printer's)
         system.idle       seconds (>=)
         time.scheduled    at (ISO datetime)          -- fires once
         time.recurring    at ("HH:MM"), days ([0..6]) or interval_s
@@ -70,6 +73,7 @@ EVENT_TYPES: dict[str, str] = {
     "task.started": "native_pushed", "task.target_appeared": "native_pushed",
     "task.deadline_soft": "native_pushed", "task.deadline_final": "native_pushed",
     "flow.failed": "native_pushed", "resource.violation": "native_pushed",
+    "printer.offline": "native_pushed", "threshold.signin": "native_pushed", "chat.asked": "native_pushed",
     "system.idle": "polled", "threshold.cpu": "polled", "threshold.memory": "polled", "threshold.disk": "polled", "threshold.network": "polled",
     "time.scheduled": "polled", "time.recurring": "polled",
 }
@@ -77,13 +81,17 @@ EVENT_TYPES: dict[str, str] = {
 # The native signals the Worker relays from the OS itself (control.signal). Opening a file is one of
 # them: nothing the index keeps changes, so it cannot come through index.event.
 OS_SIGNALS = frozenset({"usb.inserted", "usb.removed", "user.login", "user.logout", "program.launched",
-                        "program.exited", "network.connected", "network.disconnected", "file.accessed", "log.cleared", "screen.captured", "network.upload", "file.opened"})
+                        "program.exited", "network.connected", "network.disconnected", "file.accessed", "log.cleared", "screen.captured", "network.upload", "file.opened",
+                        "printer.offline", "threshold.signin"})
 
 # A reading a rule can wait on: the type, the reading the Worker reports (control.metrics), the match field it is compared to, and its default.
 THRESHOLDS: dict[str, tuple[str, str, float]] = {
     "threshold.cpu": ("cpu", "percent", 80), "threshold.memory": ("memory", "percent", 80),
     "threshold.disk": ("disk", "percent", 90), "threshold.network": ("net_kbps", "kbps", 10_000),
 }
+
+MAX_RULE_LIMIT_S = 24 * 3600
+WORK_HOURS = (8, 18)                                # outside_hours: before 08:00, from 18:00, or a weekend, on the Engine's clock
 
 TIER_TAGS = {"admin": "admin", "restricted": "restricted", "workers": "worker_dept", "common": "common"}
 
@@ -101,6 +109,8 @@ _last_sampled: dict[int, float] = {}
 _last_fired: dict[int, datetime] = {}
 # (definition id, pc_id) -> when a threshold first became true (for duration_s)
 _threshold_since: dict[tuple[int, int], datetime] = {}
+# (definition id, pc_id) -> failed sign-ins seen lately (a rule on threshold.signin)
+_signins: dict[tuple[int, int], list[float]] = {}
 
 
 def reset_state() -> None:
@@ -108,6 +118,7 @@ def reset_state() -> None:
     _metrics.clear()
     _last_sampled.clear()
     _last_fired.clear()
+    _signins.clear()
     _threshold_since.clear()
     _days_written.clear()
 
@@ -182,6 +193,12 @@ def matches(spec: dict[str, Any], data: dict[str, Any]) -> bool:
         return False
     if "process" in m and str(data.get("process", "")).lower() != str(m["process"]).lower():
         return False
+    if m.get("name") and str(data.get("name", "")).lower() != str(m["name"]).lower():
+        return False
+    if m.get("outside_hours"):
+        now = datetime.now().astimezone()
+        if now.weekday() < 5 and WORK_HOURS[0] <= now.hour < WORK_HOURS[1]:
+            return False
     return not ("task_id" in m and data.get("task_id") != m["task_id"])
 
 
@@ -198,6 +215,16 @@ async def _dept_pcs(engine: Engine, definition: dict[str, Any]) -> set[int] | No
     return {p["id"] for p in await engine.db.accounts.pcs_in_department(creator["department_id"])}
 
 
+def _enough_failures(definition: dict[str, Any], pc_id: int) -> bool:
+    """Another failed sign-in on this machine: has this rule's count been reached within its window? Counting starts again when it fires."""
+    m = definition["condition_spec"].get("match") or {}
+    count, window = int(m.get("count", 5)), float(m.get("window_s", 600))
+    now = time.monotonic()
+    seen = [t for t in _signins.get((definition["id"], pc_id), []) if now - t <= window] + [now]
+    _signins[(definition["id"], pc_id)] = [] if len(seen) >= count else seen
+    return len(seen) >= count
+
+
 async def on_signal(engine: Engine, pc_id: int, event_type: str, data: dict[str, Any]) -> int:
     """Entry point for native/pushed signals. Matches enabled definitions of this type, fires
     their attached Actions independently. Returns how many definitions fired."""
@@ -207,6 +234,8 @@ async def on_signal(engine: Engine, pc_id: int, event_type: str, data: dict[str,
     for definition in await engine.db.control.event_definitions(event_type=event_type):
         spec = definition["condition_spec"]
         if not _pc_in_scope(spec, pc_id, await _dept_pcs(engine, definition)) or not matches(spec, data):
+            continue
+        if event_type == "threshold.signin" and not _enough_failures(definition, pc_id):
             continue
         await fire(engine, definition, pc_id, data)
         fired += 1
@@ -260,6 +289,15 @@ def _due_recurring(m: dict[str, Any], now: datetime, last: datetime | None) -> b
     return now >= target and (last is None or last < target)
 
 
+async def _skipped(engine: Engine, definition: dict[str, Any], now: datetime) -> bool:
+    """Somebody skipped the run due now: it passes as if it had run, and the next one comes as usual."""
+    if not await engine.db.control.take_skip(definition["id"], now):
+        return False
+    _last_fired[definition["id"]] = now
+    await engine.audit.record(None, "event.skip_used", target_type="event_definitions", target_id=definition["id"], detail={"at": now.isoformat()})
+    return True
+
+
 async def evaluate_polled(engine: Engine) -> int:
     """Scheduler job: check every enabled polled definition against current state."""
     if not engine.db.connected:
@@ -277,10 +315,14 @@ async def evaluate_polled(engine: Engine) -> int:
                 continue
             at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
             if now >= at and last is None:
+                if await _skipped(engine, definition, now):
+                    continue
                 await fire(engine, definition, 0, {"at": at.isoformat()})
                 fired += 1
         elif etype == "time.recurring":
             if _due_recurring(m, now, last):
+                if await _skipped(engine, definition, now):
+                    continue
                 await fire(engine, definition, 0, {"at": now.isoformat()})
                 fired += 1
         elif etype in THRESHOLDS or etype == "system.idle":
@@ -364,6 +406,22 @@ async def department_pc_ids(engine: Engine, department_id: int) -> set[int]:
     return {p["id"] for p in await engine.db.accounts.pcs_in_department(department_id)}
 
 
+def _action_limits(payload: dict[str, Any]) -> dict[int, int]:
+    """{"action_limits": {action_id: seconds}}: how long each action gets in this rule ("Gets up to"), over the action's own limit."""
+    given = payload.get("action_limits") or {}
+    if not isinstance(given, dict):
+        raise ProtocolError(ErrorCode.INVALID, "action_limits is {action_id: seconds}")
+    out = {}
+    for action_id, seconds in given.items():
+        try:
+            out[int(action_id)] = int(seconds)
+        except (TypeError, ValueError) as exc:
+            raise ProtocolError(ErrorCode.INVALID, "action_limits is {action_id: seconds}") from exc
+        if not 1 <= out[int(action_id)] <= MAX_RULE_LIMIT_S:
+            raise ProtocolError(ErrorCode.INVALID, f"an action gets 1 to {MAX_RULE_LIMIT_S} seconds")
+    return out
+
+
 @handler("control.event_create")
 async def event_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """{"type", "pc_ids"?, "match"?, "action_ids": [..], "enabled": bool}"""
@@ -385,8 +443,9 @@ async def event_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     db = ctx.engine.db
     name = " ".join(str(payload.get("name") or "").split())[:120] or None
     event_id = await db.control.create_event(ident.account_id, condition_type, spec, name)
+    limits = _action_limits(payload)
     for seq, aid in enumerate(action_ids, start=1):
-        await db.control.attach_action(event_id, int(aid), seq)
+        await db.control.attach_action(event_id, int(aid), seq, limits.get(int(aid)))
     if payload.get("enabled") is False:
         await db.control.update_event(event_id, enabled=False)
     await ctx.engine.audit.record(ctx, "event.created", target_type="event_definitions", target_id=event_id,
@@ -421,8 +480,9 @@ async def event_update(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         current = {a["id"] for a in ev["actions"]}
         for aid in current - set(wanted):
             await db.control.detach_action(event_id, aid)
+        limits = _action_limits(payload)
         for seq, aid in enumerate(wanted, start=1):
-            await db.control.attach_action(event_id, aid, seq)
+            await db.control.attach_action(event_id, aid, seq, limits.get(aid))
     await ctx.engine.audit.record(ctx, "event.updated", target_type="event_definitions", target_id=event_id)
     if ev["condition_spec"].get("type") in OS_SIGNALS:
         await interest_changed(ctx.engine)
@@ -702,6 +762,16 @@ async def threshold_backtest(ctx: Context, payload: dict[str, Any]) -> dict[str,
             "unread": len([pc for pc in seen if all(x["value"] is None for x in samples if x["pc_id"] == pc)])}
 
 
+def said_of(etype: str, data: dict[str, Any]) -> str | None:
+    """What set a firing off, as a sentence ("Samsung BAR Plus 128 GB inserted")."""
+    name = data.get("label") or data.get("name") or data.get("device") or data.get("process")
+    if not name:
+        return None
+    words = {"usb.inserted": "inserted", "usb.removed": "removed", "program.launched": "started", "program.exited": "closed", "printer.offline": "stopped responding",
+             "file.created": "created", "file.modified": "changed", "file.deleted": "deleted", "file.moved": "moved", "file.copied": "copied"}
+    return f"{name} {words[etype]}" if etype in words else str(name)
+
+
 @handler("control.event_history")
 async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """What one automation did: each firing (when, which machine, what set it off) with the runs of its
@@ -718,8 +788,11 @@ async def event_history(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     for f in await db.control.event_firings(event_id):
         detail = f["detail"] or {}
         data = detail.get("data") or {}
-        firings.append({"at": f["occurred_at"].isoformat(), "pc_id": detail.get("pc_id"), "hostname": f["hostname"],
-                        "subject": data.get("name") or data.get("process") or None, "runs": []})
+        firings.append({"at": f["occurred_at"].isoformat(), "pc_id": detail.get("pc_id"), "hostname": f["hostname"], "by_hand": False,
+                        "subject": data.get("name") or data.get("process") or None, "detail": said_of(str(detail.get("type") or ""), data), "runs": []})
+    for t in await db.control.event_tests(event_id):
+        firings.append({"at": t["occurred_at"].isoformat(), "pc_id": None, "hostname": None, "by_hand": True, "subject": None, "detail": None, "runs": []})
+    firings.sort(key=lambda f: f["at"], reverse=True)
     for ex in rows(await db.control.executions_for_event(event_id)):
         if mine is not None and ex["target_pc_id"] not in mine:
             continue

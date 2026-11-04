@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from common.detective import folder_of
 from engine.bus import Event
 from engine.dispatch import Context, handler
-from engine.permissions import in_scope, int_field, require_role
+from engine.permissions import in_scope, int_field, org_wide, require_role
 from engine.serialize import rows
 from protocol import ErrorCode, ProtocolError
 
@@ -141,7 +141,7 @@ async def proposals_decide(ctx: Context, payload: dict[str, Any]) -> dict[str, A
         flow = await db.flows.get(prop["flow_id"]) if prop.get("flow_id") else None
         if flow is None:
             raise ProtocolError(ErrorCode.NOT_FOUND, "that flow is gone")
-        if ident.role != "super_user" and flow["created_by_account_id"] != ident.account_id:
+        if not org_wide(ident) and flow["created_by_account_id"] != ident.account_id:
             raise ProtocolError(ErrorCode.FORBIDDEN, "only the flow's owner can pause it")
         if flow["status"] == "active":
             await db.flows.set_status(flow["id"], "paused", "manual")

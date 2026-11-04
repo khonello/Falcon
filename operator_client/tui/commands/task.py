@@ -77,7 +77,7 @@ def _flag_text(f: dict[str, Any]) -> str:
     if kind == "file_not_indexed":
         cands = ", ".join(f"{c['file_index_id']}={c['path']}" for c in f.get("candidates", [])) or "use `search <name>`"
         return f"item {f['item_index'] + 1}: {f.get('ask')}: {cands} -- then `task item file {f['item_index'] + 1} <file_index_id>`"
-    return str(f)
+    return str(f.get("detail") or f)
 
 
 @command("task", "items", "", "Show the working verification stack")

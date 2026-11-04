@@ -7,6 +7,7 @@ connection. So the service listens on this machine's loopback address, and the p
     {"token": "...", "op": "start_task", "id": 7}       -> {"ok": true}
     {"token": "...", "op": "ask", "to": 12}             -> {"ok": true}                       ping an Admin for help
     {"token": "...", "op": "ack", "ids": ["t7"]}        -> {"ok": true}                       the program showed those notes; do not show them again
+    {"token": "...", "op": "talk", "line": ".."}        -> {"ok": true}                     the person asks to talk ("Ask IT")
     {"token": "...", "op": "conversation", "id": 4}     -> {"ok": true, "conversation": {...}} one conversation an Admin started, read up to now
     {"token": "...", "op": "reply", "id": 4, "body": ".."} -> {"ok": true}                     the person answers in it (they never start one)
     {"token": "...", "op": "send_file", "id": 4, "path": ".."} -> {"ok": true, "sent": {...}}  a file from this machine, in that conversation
@@ -46,6 +47,7 @@ class Provider(Protocol):
     async def app_start_task(self, task_id: int) -> None: ...
     async def app_ask(self, to_account_id: int) -> None: ...
     async def app_ack(self, ids: list[str]) -> None: ...
+    async def app_talk(self, line: str) -> None: ...
     async def app_conversation(self, conversation_id: int) -> dict[str, Any]: ...
     async def app_reply(self, conversation_id: int, body: str) -> None: ...
     async def app_send_file(self, conversation_id: int, path: str) -> dict[str, Any]: ...
@@ -138,6 +140,11 @@ class LocalApp:
                 await self.provider.app_start_task(int(msg["id"]))
             elif op == "ask":
                 await self.provider.app_ask(int(msg["to"]))
+            elif op == "talk":
+                line = msg.get("line")
+                if not isinstance(line, str) or not line.strip():
+                    return {"ok": False, "error": "say what it is about"}
+                await self.provider.app_talk(line)
             elif op == "conversation":
                 return {"ok": True, "conversation": await self.provider.app_conversation(int(msg["id"]))}
             elif op == "reply":

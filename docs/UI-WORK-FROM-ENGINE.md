@@ -101,6 +101,29 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
 - The old fix suggestions about "add a Categorization stage" are gone; a bundle that could not be made pauses that destination as
   `bundling:bundle_failed`, with its own suggestion.
 
+### New task: what a description cannot say (built 4 Nov 2026; `engine/task/cues.py`)
+- `task.propose` `flags` has new kinds, each with `detail`, a sentence to show as it is: `cannot_check` (a message channel, another task, a flow), `unnamed_result`,
+  `made_from`, `waits_on_event`, `depends_on_check`, `folder_guess`, `quality_unseen`, `inside_file`, `recurring`; `ambiguous_deadline` may now carry `detail` too. Show every flag's `detail` on the proposal, before Give.
+
+### From the drawers, built 4 Nov 2026
+- `control.event_create` / `control.event_update` take `action_limits {action_id: seconds}`; a rule's actions come back with `rule_limit_s`. `user.login` takes `match.outside_hours: true` (before 08:00, from 18:00, or a weekend).
+- `flow.create` destinations take `note`, sent in `flow.consent_request`. `hierarchy.pc_register` no longer needs `department_id`: send none instead of the first department.
+- **"Written by the local model":** when `telling.smoothed` is true the wording came from Groq, not a local model. Say "worded by a model; every fact is Falcon's".
+
+### Nobody owns anything between Admins (the user, 4 Nov 2026)
+- Take "only A. Quaye changes it", "Only you close it", "only whoever marked it" and the like out of the pages and the concept: any Admin changes any Automation rule, verifies any task, edits, pauses or deletes any flow, changes any mark or who may open a Private file, and answers any consent. The audit trail shows who did it. Hide no control because someone else made the thing.
+- **The word (the user, 4 Nov 2026): nothing says "owner" or "yours".** Say who did it, as a fact: "Set by A. Quaye" on a rule (`automation.board`'s `set_by`; `owner` goes when the page moves), "Marked by" on a mark, "Made by" on a flow, "Given by" on a task. `flow.restricted_request` now reaches every Admin.
+
+### What ENGINE-GAPS #23 asked for is answered (built 4 Nov 2026; names as the QML calls them)
+- Live now: `task.remind`, `chat.requests` / `chat.request_accept` / `chat.request_close`, small groups (`chat.open {account_ids, title?}`), `issues.list`'s `detail`, `issues.act` key `rule`,
+  `flow.remind`, `flow.keep`, `flow.start`, `flow.list`'s `sources[k].pause_reason` / `paused_at`, `update.now`, `machines.end_program`, eight `check_ins`, `automation.run_again`, `automation.skip`
+  and `coming_up[k].skipped`, "20 succeeded", `marks.allow_revoke`, `marks.get`'s `lately` `who` / `where` and `flows_allowed` `flow` / `what` / `from` / `to` / `today` / `last_at`, `flow.restricted_waiting`'s `what` / `from` / `to`,
+  `control.event_history`'s `detail` and `by_hand`, `threshold.signin` and `printer.offline`, `control.action_list`'s `impact` / `risky` / `created_by_name`, `actions.runs`' `who`, `detective.cases`' `restricted`.
+- A file issue no longer offers `ask`. `delete`'s `done` says Resolved; the issue closes when the machine reports the file gone.
+- The QML's own rewrites of these can go ("20 success" to "succeeded", hiding `ask`).
+- The Worker's program: `talk {line}` is the new op for Ask IT (`chat.ask`); the corner note shows when a request is answered, and on `task.reminder`.
+- Detective: `telling.smoothed` is true when Groq is set up, so the concept's "in the local model's words" should say what is true: the wording is the model's, the facts are not.
+
 ### Detective: a case told in words (built 3 Nov 2026; ENGINE-GAPS #15, the concept's "What Detective noticed")
 - `detective.case` now returns `telling: {paragraphs, text, smoothed, note}`. `paragraphs` is a list of paragraphs, each a list of parts:
   `{text}` (plain words) or `{text, kind, value}` (a fact to mark). Kinds: `person` (value: account id, text already in the viewer's own
@@ -140,10 +163,11 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   diff (`flow.runs`), the Restricted page's came_by / allowed / lately / flows_allowed (`marks.get`), At a glance (`detective.glance`), knocked
   PCs (`registry.knocked`).
 
-### Tests failing on the rebuilt pages (found by the Engine session, 4 Nov 2026; they fail on the UI session's own commit, without any Engine change)
-Each looks for something the rebuilt page no longer has. For each: if the concept dropped it, update or remove the test; if the page lost it by accident, put it back.
-- `test_detective_gui.py`: `caseHeadline` is gone (a case reads as a story); `restrictedAsk_5` is not found on the Flows page; a property read with `.toVariant()` is now a plain string; `suggestions` / `toAllow` never reach 2 and 1 (the waiting count); the buttons test finds no object it looks for by name; the marking test's size box is not visible.
-- `test_task_mentions.py`: the `tabs` switch on Messages (conversations and announcements) is not found.
+### Tests failing on the rebuilt pages (found by the Engine session, 4 Nov 2026, on its own test database)
+All in `test_operator_gui.py`, all in the QML: fix the page, or the test if the concept changed it.
+- `test_nothing_clickable_uses_a_taphandler`: a `TapHandler` is back somewhere (CLAUDE.md says why not).
+- `test_colours_are_named_only_in_the_theme`: a colour named outside `Theme.qml`.
+- `test_restricting_finds_it_by_search_and_what_is_restricted_cannot_be_picked_again`: the Restricted page.
 
 ## The Worker's own program and windows (worker_client/program/qml, worker_client/windows/qml)
 

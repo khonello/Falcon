@@ -4,6 +4,7 @@ from operator_client.tui.commands import (  # noqa: F401
     accountability,
     assistance,
     automation,
+    calls,
     console,
     control,
     conversations,

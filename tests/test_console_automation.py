@@ -35,7 +35,7 @@ async def test_the_automation_board_counts_firings_and_how_the_runs_ended_and_an
     assert set(rules) == {r1["id"], r2["id"]}                                                    # their own, and the Super User's that reaches the department
     mine, org_wide = rules[r1["id"]], rules[r2["id"]]
     assert mine["name"] == "Snapshot a USB drive" and mine["kind"] == "Event" and mine["when"] == "a USB drive is inserted" and mine["read_only"] is False
-    assert mine["fired"] == 1 and mine["last_run"] == "1 failed, 1 success" and mine["last_run_problem"] is True and mine["problems"] == 1
+    assert mine["fired"] == 1 and mine["last_run"] == "1 failed, 1 succeeded" and mine["last_run_problem"] is True and mine["problems"] == 1
     assert [a["name"] for a in mine["actions"]] == ["Snapshot the screen", "Tell the Admin"]
     assert org_wide["name"] == "Excel.exe starts" and org_wide["owner"] == "The organisation" and org_wide["read_only"] is True
     assert org_wide["fired"] == 0 and org_wide["last_run"] is None                              # it fired on an HR machine, which this department does not see

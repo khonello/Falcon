@@ -55,7 +55,7 @@ A unit of work, assigned to a user account. No auto-created workspace directory 
 - **Intent governs the check:** File targets get Create / Update / Exists; Program targets get Used / Used With File / Installed-Available / Closed-Not Running. A Create-intent target is name-first, with collisions against the Global File Index surfaced for resolution.
 - **Expectation:** soft signals derived from each target's Intent (file events for File; activity, memory footprint, open file descriptors for Program) — shows work is happening, never proves completion.
 - **Deadline:** one soft and one final deadline per task, both implemented as scheduled Events, surfaced via the same pulsing status-indicator pattern used elsewhere.
-- **Completion:** only manual verification by the assigner closes a task — never automated, never per-item.
+- **Completion:** only a person's manual verification closes a task — never automated, never per-item. In version 1 any Admin may do it; the record says who.
 - **Governing principle:** the LLM proposes and surfaces ambiguity — an unclear target, an ambiguous deadline, a description covering multiple tasks — it never silently decides.
 
 Client exception: can view, start, and watch progress — cannot verify.

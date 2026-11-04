@@ -403,6 +403,14 @@ class WorkerService:
                 await self.flowsync.on_resolve_conflict(payload)
             elif type_ == "flow.remove":
                 await self.flowsync.on_remove(payload)
+            elif type_ == "task.reminder":
+                self._view_at = 0.0
+                self.toasts[f"r{payload.get('task_id')}"] = {"id": f"r{payload.get('task_id')}", "kind": "task", "title": str(payload.get("description") or "A task")[:90],
+                                                            "text": "Your IT Admin reminded you about this"}
+            elif type_ in ("chat.request_accepted", "chat.request_closed"):
+                self._view_at = 0.0
+                said = "An Admin will talk to you now: see Messages" if type_ == "chat.request_accepted" else str(payload.get("why") or "")
+                self.toasts[f"q{payload.get('request_id')}"] = {"id": f"q{payload.get('request_id')}", "kind": "message", "title": "Your request to talk", "text": said}
             elif type_ == "flow.bundle_close":
                 await self.flowsync.on_bundle_close(payload)
             elif type_ == "flow.bundle_drop":
@@ -626,6 +634,9 @@ class WorkerService:
 
     async def app_ask(self, to_account_id: int) -> None:
         await self.call("assistance.ping", {"to_account_id": to_account_id})
+
+    async def app_talk(self, line: str) -> None:
+        await self.call("chat.ask", {"line": line})
 
     async def app_ack(self, ids: list[str]) -> None:
         for i in ids:

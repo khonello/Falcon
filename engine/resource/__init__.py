@@ -16,4 +16,5 @@ from engine.resource import (  # noqa: F401
     journey,
     private,
     resource,
+    talk,
 )

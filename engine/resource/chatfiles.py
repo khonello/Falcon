@@ -32,6 +32,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
 
+from engine import permissions
 from engine.dispatch import Context, handler
 from engine.permissions import int_field, org_wide, require_account, str_field
 from engine.serialize import rows
@@ -98,18 +99,18 @@ async def send_file(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     needs_yes = False
     if private is not None:
         restricted = {"reasons": [f"{private['name']} is private"], "mark_ids": [], "private_mark_id": private["id"],
-                      "consented_by": ident.account_id if private["by_account_id"] == ident.account_id else None}
-        if private["by_account_id"] != ident.account_id:
-            needs_yes, consent_by = True, private["by_account_id"]
+                      "consented_by": ident.account_id if private["by_account_id"] == ident.account_id or org_wide(ident) else None}
+        if private["by_account_id"] != ident.account_id and not org_wide(ident):
+            needs_yes, consent_by = True, (None if permissions.ADMIN_SCOPE == "organisation" else private["by_account_id"])      # (any IT Admin may answer)
     if found:
-        mine = [b for b in found if (b.kind == "mark" and b.owner_account_id == ident.account_id) or (b.kind == "tag" and org_wide(ident))]
+        mine = [b for b in found if org_wide(ident) or (b.kind == "mark" and b.owner_account_id == ident.account_id)]
         others = [b for b in found if b not in mine]
         restricted = {**(restricted or {}), "reasons": (restricted or {}).get("reasons", []) + [b.reason for b in found],
                       "mark_ids": [b.mark_id for b in found if b.mark_id],
                       "consented_by": ident.account_id if not others and not needs_yes else None}
         if others:
             needs_yes = True
-            owner = next((b.owner_account_id for b in others if b.kind == "mark" and b.owner_account_id), None)
+            owner = None if permissions.ADMIN_SCOPE == "organisation" else next((b.owner_account_id for b in others if b.kind == "mark" and b.owner_account_id), None)
             consent_by = consent_by or owner                        # None: a restricted or admin tier, which any IT Admin may answer
     file_id = await db.chat_files.create(convo["id"], ident.account_id, ident.pc_id, path, name, size, "asked" if needs_yes else "reading",
                                          restricted=restricted, consent_account_id=consent_by)

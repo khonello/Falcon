@@ -321,16 +321,18 @@ async def start(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("task.verify")
 async def verify(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """Assigner only. {"task_id", "outcome": "complete"|"incomplete"} -- the whole task, never
-    per item. The only path to 'completed'."""
+    """{"task_id", "outcome": "complete"|"incomplete"} -- the whole task, never per item. The only path to 'completed'. Any Admin in version 1 (the user,
+    4 Nov 2026): nobody owns a task between Admins, and the record says who verified it; the person it was given to never can."""
     ident = require_account(ctx)
     task_id = int_field(payload, "task_id")
     outcome = str_field(payload, "outcome", choices=("complete", "incomplete"))
     task = await ctx.engine.db.tasks.get(task_id)
     if task is None:
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such task")
-    if task["assigner_account_id"] != ident.account_id:
+    if task["assigner_account_id"] != ident.account_id and not (ident.role == "admin" and org_wide(ident)):
         raise ProtocolError(ErrorCode.FORBIDDEN, "only the assigner verifies")
+    if task["assignee_account_id"] == ident.account_id:
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the person a task was given to does not verify it")
     if task["status"] == "completed":
         raise ProtocolError(ErrorCode.CONFLICT, "task is already completed")
     await ctx.engine.db.tasks.record_manual_verification(task_id, ident.account_id, outcome)
@@ -344,6 +346,21 @@ async def verify(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await ctx.engine.push_to_account(task["assignee_account_id"], "task.incomplete", {"task_id": task_id})
     return {"task_id": task_id, "outcome": outcome,
             "status": "completed" if outcome == "complete" else task["status"]}
+
+
+@handler("task.remind")
+async def remind(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"task_id"} -- Remind on a late task: the person it was given to is told again. Any Admin may."""
+    require_role(ctx, "admin", "super_user")
+    task_id = int_field(payload, "task_id")
+    task = await ctx.engine.db.tasks.get(task_id)
+    if task is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such task")
+    if task["status"] == "completed":
+        raise ProtocolError(ErrorCode.CONFLICT, "task is already completed")
+    await ctx.engine.push_to_account(task["assignee_account_id"], "task.reminder", {"task_id": task_id, "description": task["description_raw"][:200]})
+    await ctx.engine.audit.record(ctx, "task.reminded", target_type="tasks", target_id=task_id)
+    return {"task_id": task_id}
 
 
 @handler("task.stack")

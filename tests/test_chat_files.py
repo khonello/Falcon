@@ -60,8 +60,8 @@ async def test_a_file_is_sent_held_saved_and_its_copy_knows_where_it_came_from(e
 
 @requires_db
 @pytest.mark.organisation
-async def test_someone_elses_restricted_file_waits_for_their_yes_and_the_copy_is_then_allowed(engine, org, connect):
-    a1, a2, w1 = await connect("cid-a1"), await connect("cid-a2"), await connect("cid-w1")
+async def test_every_admin_covers_a_restricted_file_and_a_worker_s_waits_for_any_admin_s_yes(engine, org, connect):
+    a1, _a2, w1 = await connect("cid-a1"), await connect("cid-a2"), await connect("cid-w1")
     path = "C:/Users/a1/Documents/salaries.xlsx"
     digest = hashlib.sha256(CONTENT).hexdigest()
     await engine.db.file_index.upsert(org["a1_pc"], path, "salaries.xlsx", digest, None, None, "event")
@@ -71,16 +71,23 @@ async def test_someone_elses_restricted_file_waits_for_their_yes_and_the_copy_is
     assert mark
     convo = (await a1.ok("chat.open", {"account_id": org["w1"]}))["conversation"]["conversation_id"]
     sent = await a1.ok("chat.send_file", {"conversation_id": convo, "path": path})
-    assert sent["state"] == "asked"                                               # A2 restricted it: A2 says
-    assert "chat.file_read" not in a1.push_types(await a1.drain_pushes())
-    asked = next(p for p in await a2.drain_pushes() if p.type == "chat.file_consent_request")
-    assert asked.payload["file_id"] == sent["file_id"]
-    assert await a1.err("chat.file_consent", {"file_id": sent["file_id"], "grant": True}) == "forbidden"
-    await a2.ok("chat.file_consent", {"file_id": sent["file_id"], "grant": True})
+    assert sent["state"] == "reading"                                             # A2 marked it, and any IT Admin covers it: the record says who sent it
     read = next(p for p in await a1.drain_pushes() if p.type == "chat.file_read")
     await _answer_read(a1, read)
     await w1.ok("chat.file_save", {"file_id": sent["file_id"]})
     assert await engine.db.resource.is_allowed(org["w1_pc"], "C:/Users/w1/Downloads/From Falcon/salaries.xlsx", digest)   # not a stray copy
+
+    # a person at a machine has no such cover: it waits, and any Admin may answer
+    other = "C:/Users/w1/Documents/bonus.xlsx"
+    await engine.db.file_index.upsert(org["w1_pc"], other, "bonus.xlsx", "BONUS", None, None, "event")
+    await engine.db.pool.execute(
+        "INSERT INTO resource_marks (kind, name, pc_id, path, keep, by_account_id, department_id) VALUES ('file', 'bonus.xlsx', $1, $2, 'machine', $3, $4)",
+        org["w1_pc"], other, org["a2"], org["fin"])
+    asked = await w1.ok("chat.send_file", {"conversation_id": convo, "path": other})
+    assert asked["state"] == "asked"
+    assert any(p.type == "chat.file_consent_request" for p in await a1.drain_pushes())
+    await a1.ok("chat.file_consent", {"file_id": asked["file_id"], "grant": True})
+    assert "chat.file_read" in w1.push_types(await w1.drain_pushes())
 
 
 def test_the_worker_saves_into_downloads_from_falcon_and_never_overwrites(tmp_path: Path):

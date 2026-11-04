@@ -248,7 +248,7 @@ Fully self-service — no Super User approval is required to initiate or accept 
   - Start/acknowledge a task (marks task as "started")
   - Monitor work progress (see expectations being tracked in real-time)
   - Work on the task's target file(s)/program(s)
-- **Cannot:** Mark tasks as complete — only the assigner can perform manual verification
+- **Cannot:** Mark tasks as complete — only an Admin can perform manual verification (in version 1 any Admin; the record says who)
 - **Logging:** Task start action and all work activity is logged
 
 **Data Visibility:**
