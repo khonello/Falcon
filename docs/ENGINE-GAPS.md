@@ -365,7 +365,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      `user.login` with `{outside_hours: true}`. `time.scheduled`'s `at` is an ISO date and time. Make a flow sends each asked destination a `note` ("A line for them"),
      `from_flow`, and `let_them_choose` with the Admin's workstation as `destination_pc_id`. `on_source_delete` is asked in the drawer again.
    - `hierarchy.pc_register` without `department_id`: the concept registers a machine by name alone ("Put it in a department on Departments"). Until then the console sends the
-     first department. The drawer's Found list reads `enroll.list`; the concept also lists PCs "seen on the network", which #10 dropped.
+     first department. The drawer's Found list reads `enroll.list`.
 
 ## Done inline (for the record)
 

@@ -3401,9 +3401,7 @@ const newKey = () => Array.from({ length: 32 }, () => "0123456789abcdef"[Math.fl
 // Found, not registered (sample): "knocked" is a worker that tried to connect without a key (auth.failed);
 // "seen" is a PC on the department's network with no worker yet (needs network discovery, ENGINE-GAPS item 10).
 const AM_FOUND = EMPTY ? [] : [
-  { host: "OPS-08", ip: "10.20.4.18", kind: "knocked", line: "its worker tried to connect 5 times today, last at 09:14" },
-  { host: "DESKTOP-7QK2M", ip: "10.20.4.27", kind: "seen", line: "on the network since Tuesday; no worker installed yet" },
-  { host: "LAPTOP-OPS-AMA", ip: "10.20.4.31", kind: "seen", line: "on the network this morning; no worker installed yet" }];
+  { host: "OPS-08", ip: "10.20.4.18", kind: "knocked", line: "its worker tried to connect 5 times today, last at 09:14" }];
 function KeyModal({ spec, onClose }) {
   const [step, setStep] = useState(0), [name, setName] = useState(""), [dept, setDept] = useState(undefined), [key, setKey] = useState(newKey);
   const sig = spec ? spec.mode + (spec.subject || "") : "";
@@ -3423,7 +3421,7 @@ function KeyModal({ spec, onClose }) {
               <span className="iq-main"><span className="iq-t"><b className="mono">${f.host}</b><span className="t3 mono">${f.ip}</span></span><span className="iq-s">${f.line}</span></span>
               <span className="t3" style=${{ fontSize: 12 }}>${found === f.host ? "picked" : "Use it"}</span></div>`)}</div>
             <div className="t3" style=${{ fontSize: 12, marginTop: 6 }}>Pick one to fill in its name, or type a new one below.</div>`
-            : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nothing found. A PC shows here once its worker tries to connect, or once it is seen on the network.</div>`}</div>` : null}
+            : html`<div className="t3" style=${{ fontSize: 12.5 }}>Nothing found. A PC shows here once its worker tries to connect.</div>`}</div>` : null}
         <div><div className="nt-h">${pc ? "Machine name" : "Name"}</div><${Input} id="rg-name" value=${name} onChange=${(e) => setName(e.target.value)} placeholder=${pc ? "OPS-08" : "J. Owusu"} /></div>
         <div className="t3" style=${{ fontSize: 12.5, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 6 }}>${pc ? (fp && fp.kind === "seen" ? `${fp.host} has no worker yet. Register it now, then install the worker on it with the key you get next.` : fp ? `${fp.host} is already trying to connect. Once its worker has the key you get next, it checks in.` : "It gets a key, shown once. Put it in a department on Departments.") : "They get the IT console and a key, shown once. Like every Admin, they reach every department, and every issue reaches them."}</div>
       </div>`

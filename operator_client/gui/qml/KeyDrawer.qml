@@ -90,7 +90,7 @@ Drawer {
                 }
             }
             Txt { visible: kd.found.length > 0; text: "Pick one to fill in its name, or type a new one below."; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-            Txt { visible: kd.found.length === 0; width: parent.width; text: "Nothing found. A PC shows here once its worker tries to connect, or once it is seen on the network."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+            Txt { visible: kd.found.length === 0; width: parent.width; text: "Nothing found. A PC shows here once its worker tries to connect."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
         }
         Column { width: parent.width; spacing: 6
                  Txt { text: kd.pc ? "MACHINE NAME" : "NAME"; color: Theme.text3; font.pixelSize: 12; font.weight: Font.DemiBold; font.letterSpacing: 0.69 }

@@ -49,7 +49,7 @@ Popup {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 56
+        height: 54
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
         Btn {
             id: shut
@@ -57,7 +57,7 @@ Popup {
             small: true
             iconName: "close"
             anchors.left: parent.left
-            anchors.leftMargin: 14
+            anchors.leftMargin: 23
             anchors.verticalCenter: parent.verticalCenter
             onClicked: root.close()
         }
@@ -84,7 +84,7 @@ Popup {
         ScrollBar.vertical: ScrollBar {}
         Column {
             id: content
-            x: 24; y: 20
+            x: 24; y: 31
             width: parent.width - 48
             spacing: 18
         }
@@ -95,7 +95,7 @@ Popup {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        height: foot.children.length ? 56 : 0
+        height: foot.children.length ? 47 : 0
         visible: foot.children.length > 0
         Rectangle { width: parent.width; height: 1; color: Theme.border }
         Txt {
@@ -109,7 +109,7 @@ Popup {
         Row {
             id: foot
             anchors.right: parent.right
-            anchors.rightMargin: 24
+            anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             spacing: 8
         }
