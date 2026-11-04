@@ -4885,7 +4885,7 @@ function AdminFlowsPage2({ go, open }) {
     <${SitBar} text=${situation} />
     <div className="g c-84" style=${{ alignItems: "stretch" }}>
       <section className="ib-box">
-        <header><b>Your flows · ${fmt(flows.length)}</b><span>by what each is doing, paused last; click one and its controls, last sync and drawing follow; expand it for its facts</span></header>
+        <header><b>The flows · ${fmt(flows.length)}</b><span>by what each is doing, paused last; click one and its controls, last sync and drawing follow; expand it for its facts</span></header>
         ${(() => { const PER = 12, pages = Math.ceil(ord.length / PER), p = Math.min(fpg, Math.max(0, pages - 1)), page = ord.slice(p * PER, p * PER + PER);
           return html`${GRP.map(([k, g, d, rs]) => { const xs = page.filter((e) => e[0] === k).map((e) => e[1]); if (!xs.length) return null;
             return html`<div key=${k} className=${"iq-grp" + (k === "paused" ? " tk-late" : "")}><div className="lay-grp iq-gh">${g} · ${fmt(rs.length)}<span>${d}</span></div><div className="iq-cards">${xs.map(row)}</div></div>`; })}
@@ -4930,7 +4930,7 @@ function AdminFlowsPage2({ go, open }) {
         : html`<div className="fl-empty">${ic("BranchesOutlined")}<span>Nothing picked</span></div>`}
     </section>
     <section className="ib-box og-change">
-      <header><b>Make a flow</b><span>files go one way only; nothing restricted rides along without its owner's say</span></header>
+      <header><b>Make a flow</b><span>files go one way only; nothing restricted rides along without an Admin's say</span></header>
       <div className="tk-give">
         <ol className="tk-steps"><li><b>Pick where files start</b><span>one or more folders on your machines, or ones a flow already fills</span></li>
           <li><b>Say what happens on the way</b><span>convert, compress, rename or sort, in order; or copy them as they are</span></li>
@@ -4984,9 +4984,11 @@ function AdminOverviewPage({ go }) {
   // my machines
   const ms = MACHINES, off = ms.filter((m) => m.status === "offline"), lag = ms.filter((m) => m.status === "high" || m.status === "critical"), inside = ms.filter((m) => m.held);
   // what stopped running: flows that are not active on my machines, and automations that did not all succeed
-  const mine = (f) => f.by === me || [...f.srcs, ...f.dests].some(([h]) => MBY[h] && ms.includes(MBY[h]));
-  const flowsOff = EXISTING_FLOWS.filter((f) => mine(f) && f.st !== "Active"), flowsOn = EXISTING_FLOWS.filter((f) => mine(f) && f.st === "Active");
-  const rulesOff = RULES.filter((r) => r.res && r.res[0] !== "var(--ok)"), rulesOn = RULES.filter((r) => !r.res || r.res[0] === "var(--ok)");
+  const held = (f) => RS_CARRY.some((c) => c.flow === f.name && c.held);
+  const allFlows = [...EXISTING_FLOWS, ...FL_EXTRA], flowsOff = allFlows.filter((f) => f.st !== "Active" || held(f)), flowsOn = allFlows.filter((f) => f.st === "Active" && !held(f));
+  const ruleBad = (r) => (r.res ? r.res[0] !== "var(--ok)" : !!(r.fir && r.fir[0] && r.fir[0].runs.some(auBad)));
+  const ruleSay = (r) => { if (r.res) return r.res[1]; const xs = r.fir[0].runs, b = xs.filter(auBad).length; return `${fmt(b)} timed out, ${fmt(xs.length - b)} succeeded`; };
+  const rulesOff = allRules().filter(ruleBad), rulesOn = allRules().filter((r) => !ruleBad(r));
   // today: task deadlines and your to-dos
   const day = Math.floor(NOWH / 24);
   const today = [...TASKS.filter((t) => t.state !== "Completed").map((t) => ({ at: t.final, title: t.title, line: `${t.who}'s task`, late: t.final < NOWH, to: () => go("tasks", t.id) })),
@@ -5040,9 +5042,9 @@ function AdminOverviewPage({ go }) {
       </section>
       <section className="ib-box">
         <header><b>Flows and automations</b><span>${flowsOff.length + rulesOff.length ? "only what has stopped or is stuck is listed; " : ""}${fmt(flowsOn.length)} flow${flowsOn.length === 1 ? "" : "s"} and ${fmt(rulesOn.length)} automation${rulesOn.length === 1 ? " is" : "s are"} running fine</span></header>
-        ${flowsOff.map((f) => html`<div key=${f.name} className="ao-run"><span className="ao-su-i">${ic("BranchesOutlined")}</span><span className="ao-su-t"><b className="cut">${f.name}</b><span className=${f.st === "Failed" || f.st === "Degraded" ? "hot" : "t3"}>${f.st === "Degraded" ? "one destination paused" : f.st === "Waiting for a folder" ? `waits for ${f.dests[0][0].replace("?", "")} to pick a folder` : f.st.toLowerCase()}</span></span>
+        ${flowsOff.map((f) => html`<div key=${f.name} className="ao-run"><span className="ao-su-i">${ic("BranchesOutlined")}</span><span className="ao-su-t"><b className="cut">${f.name}</b><span className=${f.st === "Failed" || f.st === "Degraded" || held(f) ? "hot" : "t3"}>${held(f) ? "paused · a restricted file needs an Admin's consent" : f.st === "Degraded" ? "one destination paused" : f.st === "Waiting for a folder" ? `waits for ${f.dests[0][0].replace("?", "")} to pick a folder` : f.st.toLowerCase()}</span></span>
           <${Button} size="small" onClick=${() => go("flows", f.name)}>${f.st === "Waiting for a folder" ? "Remind" : "Fix"}<//></div>`)}
-        ${rulesOff.map((r) => html`<div key=${r.id} className="ao-run"><span className="ao-su-i">${ic("ThunderboltOutlined")}</span><span className="ao-su-t"><b className="cut">${r.name}</b><span className="hot">${r.res[1]}</span></span>
+        ${rulesOff.map((r) => html`<div key=${r.id} className="ao-run"><span className="ao-su-i">${ic("ThunderboltOutlined")}</span><span className="ao-su-t"><b className="cut">${r.name}</b><span className="hot">${ruleSay(r)}</span></span>
           <${Button} size="small" onClick=${() => go("automation", r.id)}>Look<//></div>`)}
         ${!flowsOff.length && !rulesOff.length ? html`<div className="ib-quiet">${ic("CheckOutlined")} Every flow and automation is running fine.</div>` : null}
       </section>

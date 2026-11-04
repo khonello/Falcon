@@ -253,7 +253,7 @@ Editor {
                 } }
         }
         Row {
-            topPadding: 2
+            topPadding: 10
             spacing: 10
             Btn { iconName: "caretr"; loading: !!page.test && page.test.st === "run"; text: "Run a test on " + page.hostNow; onClicked: page.runTest() }
             Txt { visible: !!page.test && page.test.st === "done" && page.test.src !== page.src; anchors.verticalCenter: parent.verticalCenter; text: "the script changed since this test"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }

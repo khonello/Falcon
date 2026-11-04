@@ -46,7 +46,7 @@ Page {
     function langWord(a) { return (a.custom_script_language || a.language) === "powershell" ? "PowerShell" : "Python" }
     readonly property var catWord: ({ control: "Control", monitoring: "Monitoring", custom: "Custom" })
     readonly property var rows: lib
-    readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
+    readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; var first = rows.filter(function (a) { return a.name === "Take a screenshot" })[0]; return first || rows[0] || null }
     readonly property var curRuns: runs
     readonly property int bad: strip.problems || 0
 

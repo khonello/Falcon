@@ -482,7 +482,7 @@ Page {
                         how: page.howOf(cr.modelData.c)
                         toHost: cr.modelData.c.host; toPath: (cr.modelData.c.folder || cr.modelData.c.path || "") + (cr.modelData.c.file ? "\\" + cr.modelData.c.file : "")
                         hot: cr.done === ""
-                        who: cr.modelData.c.signed_in || "nobody signed in"; whoLine: Time.ago(cr.modelData.c.opened_at)
+                        who: cr.modelData.c.signed_in || "nobody signed in"; whoLine: page.agoWord(cr.modelData.c.opened_at)
                     }
                     Row {
                         id: acts

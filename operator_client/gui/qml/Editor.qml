@@ -31,7 +31,7 @@ Column {
         id: topBox
         visible: root.showTop
         width: parent.width
-        gap: 7
+        gap: 10
         Txt { text: root.names[root.step] + " · step " + (root.step + 1) + " of " + root.names.length; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
         Txt { visible: root.showName; width: parent.width; text: root.nameNow.trim() || "Not named yet"; font.pixelSize: 15; lh: 1.5
               font.weight: root.nameNow.trim() ? Font.DemiBold : Font.Normal; color: root.nameNow.trim() ? Theme.text : Theme.text4 }

@@ -24,7 +24,7 @@ SKEW_MS = (NOW - REAL_NOW).total_seconds() * 1000
 
 def at(hours: float) -> str:
     """An ISO time `hours` from now (negative: earlier)."""
-    return (NOW + timedelta(hours=hours)).isoformat()
+    return (NOW + timedelta(minutes=round(hours * 60))).isoformat()    # the concept rounds to the minute where a clock would cut
 
 
 CONCEPT_NOW = 13 + 20 / 60       # the concept's "now", 13:20; the sample is laid out around it

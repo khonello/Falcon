@@ -130,6 +130,20 @@ Column {
         })
     }
 
+    // the sign of progress watched for a target, and how (the concept's `measure`)
+    function signOf(c, file, host) {
+        var name = c.name || ""
+        if (c.target_type === "program") {
+            if (c.intent === "installed_available") return ["Shows up among the installed programs", "Read from " + host + "'s list of programs."]
+            return [file ? "Time in real use with " + file : "Time in real use", "Counted only while " + name + " is in use" + (file ? " with " + file + " open" : "") + ": keyboard, processor and memory moving. Open but idle does not count."]
+        }
+        return [c.intent === "create" ? "The file appearing, then its saves" : "Saves, renames and moves of the file", "Watched through " + host + "'s own file events, as they happen. Recognised by content, so a rename or a move does not lose it."]
+    }
+    // how long there is to do it, in words: "1 day and 4 hours"
+    function spanWords(h) {
+        var d = Math.floor(h / 24), r = Math.round(h - d * 24)
+        return (d ? Theme.many(d, "day") : "") + (d && r ? " and " : "") + (r || !d ? Theme.many(r, "hour") : "")
+    }
     component Lbl: Txt { width: 104; topPadding: 5; color: Theme.text3; elide: Text.ElideNone }
     component Head: Txt { color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
     component Src: Row {
@@ -336,6 +350,7 @@ Column {
 
     // --- what will be created: as it will sit in your list ------------------------------------------------
     Panel {
+        id: sumP
         visible: page.step === "summary"
         width: parent.width
         height: Math.max(implicitHeight, page.minHeight)
@@ -359,6 +374,8 @@ Column {
                 height: tcol.height + 16
                 radius: 8
                 color: Theme.surface2
+                border.width: 1
+                border.color: Theme.border
                 Column {
                     id: tcol
                     width: parent.width
@@ -367,8 +384,8 @@ Column {
                         width: parent.width
                         icon: "checksquare"
                         title: page.t ? page.t.title : ""
-                        line: (page.t ? page.t.who : "") + " on " + parent.parent.parent.parent.host + " · 0 of " + Theme.many(page.t ? page.t.checks.length : 0, "target") + " found"
-                        actW: 0
+                        line: (page.t ? page.t.who : "") + " on " + sumP.host + " · 0 of " + Theme.many(page.t ? page.t.checks.length : 0, "target") + " found"
+                        actW: 128
                         midW: 240
                         mid: Row {
                             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -385,9 +402,8 @@ Column {
                         spacing: 14
                         FactRows {
                             width: Math.min(560, parent.width)
-                            readonly property var pn: parent.parent.parent.parent.parent
-                            rows: page.t ? [["For", page.t.who + " on " + pn.host], ["Given", "now, by you"], ["Soft deadline", page.t.soft ? Time.date(page.t.soft) : "none"],
-                                            ["Final deadline", page.t.final ? Time.date(page.t.final) : "none; it stays open until you close it"]] : []
+                            rows: page.t ? [["For", page.t.who + " on " + sumP.host], ["Given", "now, by you"], ["Soft deadline", page.t.soft ? Time.date(page.t.soft) : "none"],
+                                            ["Final deadline", page.t.final ? Time.date(page.t.final) + "  · " + page.spanWords((Time.ms(page.t.final) - Time.now) / 3600000) + " to do it" : "none; it stays open until you close it"]] : []
                         }
                         Txt { textFormat: Text.StyledText; color: Theme.text2; font.pixelSize: 13; font.weight: Font.Medium; elide: Text.ElideNone
                               text: "What done looks like" + (page.t && page.t.checks.length ? " <font color='" + Theme.text3 + "'>" + page.t.checks.length + " · and the sign of progress watched for each</font>" : "") }
@@ -398,13 +414,19 @@ Column {
                                 delegate: Item {
                                     required property var modelData
                                     required property int index
+                                    readonly property var linked: modelData.linked_item_index !== undefined && modelData.linked_item_index !== null ? page.t.checks[modelData.linked_item_index] : null
+                                    readonly property string file: linked ? linked.name || "" : ""
+                                    readonly property string host: sumP.host
                                     width: parent.width; height: rc.height + 15
                                     Icon { y: 9; name: modelData.target_type === "file" ? "file" : "appstore"; size: 13; color: Theme.text3 }
-                                    Column { id: rc; x: 28; y: 7; width: parent.width - 28; spacing: 2
-                                        Txt { width: parent.width; textFormat: Text.StyledText; font.pixelSize: 13
-                                              text: "<font face='" + Theme.mono + "'>" + (modelData.name || "No target yet") + "</font><font color='" + Theme.text3 + "'> · " + page.intentWord(modelData.intent) + "</font>" }
-                                        Txt { visible: !!modelData.name; width: parent.width; color: Theme.text2; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                                              text: modelData.target_type === "program" ? "Time spent in it, counted only while it is in use" : modelData.intent === "create" ? "The file appearing, then its saves" : "Saves, renames and moves of the file" } }
+                                    Column { id: rc; x: 28; y: 7; width: parent.width - 28 - 18; spacing: 2
+                                        Txt { width: parent.width; textFormat: Text.RichText; font.pixelSize: 13
+                                              text: "<font face='" + Theme.mono + "'>" + (modelData.name || "No target yet") + "</font>" + (parent.parent.file ? "<font color='" + Theme.text3 + "'> with </font><font face='" + Theme.mono + "'>" + parent.parent.file + "</font>" : "")
+                                                    + "<font color='" + Theme.text3 + "'> · " + page.intentWord(modelData.intent) + "</font>" }
+                                        Txt { visible: !!modelData.name; width: parent.width; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone; textFormat: Text.StyledText; color: Theme.text2
+                                              readonly property var sign: page.signOf(modelData, parent.parent.file, parent.parent.host)
+                                              text: sign[0] + "<font color='" + Theme.text4 + "'> · " + sign[1] + "</font>" } }
+                                    Rectangle { anchors.right: parent.right; y: 12; width: 7; height: 7; radius: 3.5; color: page.srcColor[modelData.src || "rule"] || Theme.text4 }
                                     Rectangle { visible: index < page.t.checks.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                 }
                             }

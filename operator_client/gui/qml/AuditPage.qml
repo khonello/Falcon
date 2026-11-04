@@ -237,7 +237,7 @@ Page {
         title: "Export the log"
         sub: "a copy for someone outside Falcon; the log itself is never changed"
         GiveSteps {
-            steps: [["Pick how far back", "the range at the top; everything in it goes in"], ["Download it", "a CSV file; the export itself is recorded in the log"]]
+            steps: [["Pick how far back", "today, a week, a month, or all 90 days; everything in it goes in"], ["Download it", "a CSV file; the export itself is recorded in the log"]]
             act: "Export the log"
             onGo: { Kinds.load({ limit: 5000 }, function (es) { page.all = es }); xd.open() }
         }

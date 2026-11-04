@@ -16,8 +16,8 @@ Item {
     Rectangle { x: 5; y: 9; width: parent.width - 10; height: 4; radius: 2; color: Theme.fillHover }
     Rectangle { x: 5; y: 9; width: (parent.width - 10) * root.at; height: 4; radius: 2; color: Theme.alpha(Theme.accent, ma.containsMouse ? 1 : 0.75) }
     Rectangle { x: (parent.width - 10) * root.at - 1; y: 5; width: 12; height: 12; radius: 6; color: Theme.surface; border.width: 2; border.color: Theme.accent }
-    Txt { visible: root.marks.length > 0; y: 22; text: root.marks[0] || ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-    Txt { visible: root.marks.length > 1; anchors.right: parent.right; y: 22; text: root.marks[1] || ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+    Txt { visible: root.marks.length > 0; y: 22; text: root.marks[0] || ""; color: Theme.text2; font.pixelSize: 13; elide: Text.ElideNone }
+    Txt { visible: root.marks.length > 1; anchors.right: parent.right; y: 22; text: root.marks[1] || ""; color: Theme.text2; font.pixelSize: 13; elide: Text.ElideNone }
     MouseArea {
         id: ma
         width: parent.width; height: 22

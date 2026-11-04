@@ -31,7 +31,7 @@ Page {
             // a task is handed in when every target is found: it waits on the person who gave it (as on Tasks)
             open.slice(0, 50).forEach(function (t) {
                 falcon.call("task.get", { task_id: t.id }, function (ok2, r2) {
-                    var its = ok2 && r2.items ? r2.items : []
+                    var its = ok2 ? (r2.task && r2.task.items) || r2.items || [] : []
                     if (its.length && its.every(function (i) { return i.status === "passed" }))
                         page.tasks = page.tasks.map(function (x) { return x.id === t.id ? Object.assign({ verify: true }, x) : x })
                 })
@@ -57,7 +57,7 @@ Page {
     readonly property var lag: ms.filter(function (m) { return m.online && (m.status === "high" || m.status === "critical") })
     readonly property var inside: ms.filter(function (m) { return m.held !== "" })
     readonly property var urgent: Fleet.issues.filter(function (i) { return i.sev === "critical" || i.past })
-    readonly property var rest: Fleet.issues.filter(function (i) { return !(i.sev === "critical" || i.past) })
+    readonly property var rest: Fleet.issues.filter(function (i) { return !(i.sev === "critical" || i.past) && (i.state === undefined || i.state === "open") })
     readonly property var verify: tasks.filter(function (t) { return t.verify })
     // Today, as the concept fills it: open tasks by their final deadline, and your to-dos
     readonly property var today: tasks.filter(function (t) { return t.final_deadline_at })
@@ -133,7 +133,7 @@ Page {
             var who = d0 ? page.adminAt(d0.destination_pc_id) || "an Admin" : "an Admin"
             return d0 && d0.let_them_choose ? "waits for " + who + " to pick a folder" : "waits for " + who + " to agree"
         }
-        if (f.pause_reason === "restricted:consent") return "paused · a restricted file needs its owner's consent"
+        if (f.pause_reason === "restricted:consent") return "paused · a restricted file needs an Admin's consent"
         if (f.status === "paused") return "paused"
         if ((f.destinations || []).some(function (d) { return !!d.paused_reason })) return "one destination paused"
         return ""
@@ -145,7 +145,9 @@ Page {
         return { act: "Remind", ask: { title: "Remind " + who + "?", text: "Sends the request again, with your name on it.", ok: "Remind" },
                  run: function (done) { falcon.call("flow.remind", { flow_id: f.id }, done) }, said: "Reminded " + who }
     }
-    readonly property var flowsOff: flows.filter(function (f) { return f.status !== "inactive" && flowState(f) !== "" })
+    // a flow someone asks to send to you is an ask on Flows, not something stopped
+    function askedOfMe(f) { return f.consent_status === "pending" && (f.destinations || []).some(function (d) { return page.adminAt(d.destination_pc_id) === Nav.me || d.owner_account_id === falcon.accountId }) }
+    readonly property var flowsOff: flows.filter(function (f) { return f.status !== "inactive" && flowState(f) !== "" && !askedOfMe(f) })
     readonly property var flowsOn: flows.filter(function (f) { return f.status !== "inactive" && flowState(f) === "" })
     readonly property var rulesOff: rules.filter(function (r) { return r.on && r.last_run_problem })
     readonly property var rulesOn: rules.filter(function (r) { return r.on && !r.last_run_problem })
@@ -157,7 +159,7 @@ Page {
         s += "."
         if (off.length) s += " " + Theme.listNames(off.map(function (m) { return m.host }), 2) + (off.length === 1 ? " is" : " are") + " offline."
         var bad = flowsOff.length + rulesOff.length
-        if (bad) s += " " + Theme.fmt(bad) + " of your flows and automations " + (bad === 1 ? "is" : "are") + " not running cleanly."
+        if (bad) s += " " + Theme.fmt(bad) + " of the flows and automations " + (bad === 1 ? "is" : "are") + " not running cleanly."
         return s
     }
     situationAt: Time.now
