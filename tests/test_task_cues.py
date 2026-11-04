@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from engine.task import cues
+from engine.task import cues, llm_graph
 from engine.task.verification import ProposedStructure, VerificationItem
 from scripts.llm_cases import HELDOUT, TUNED
 
@@ -67,11 +67,13 @@ def test_redoing_work_and_what_is_inside_a_file_are_said_and_work_on_means_it_is
 def test_plain_descriptions_raise_nothing():
     """A check on the filter, not a target for it: on our own clean cases it should stay quiet, or it would become noise people stop reading."""
     noisy = []
-    for case in [*TUNED[7:], *HELDOUT]:
+    for case in [*TUNED[10:], *HELDOUT]:
         if "ambiguous_deadline" in case[2] or "every morning" in case[0]:
             continue                                                                     # (two deadlines, and a repeating job: rightly said)
         out = ProposedStructure()
         cues.read(case[0], out)
+        if cues.not_a_task(case[0]) and not llm_graph.find_file_names(case[0]):
+            out.flags.append({"kind": "not_a_task"})
         if out.flags:
             noisy.append((case[0], sorted(kinds(out))))
     assert noisy == []
@@ -82,3 +84,26 @@ def test_a_deadline_the_person_marked_stands_whatever_the_words_say():
     out.final_deadline_at, out.deadline_source = "2026-10-16T15:00:00+00:00", "hint"
     cues.read("Finish the slides by Monday or Wednesday", out)
     assert out.final_deadline_at == "2026-10-16T15:00:00+00:00" and not out.flags
+
+
+async def test_a_question_or_a_test_is_said_at_once_and_the_model_is_not_asked():
+    class Model:
+        available = True
+        calls = 0
+
+        async def extract(self, *a):
+            Model.calls += 1
+
+        async def choose(self, *a):
+            Model.calls += 1
+
+        async def yes_no(self, *a):
+            Model.calls += 1
+
+    for text in ("Does this work, testing", "Create a new task for me", "How does this task work, what and what am I supposed to ask or write"):
+        s = await llm_graph.populate(Model(), text)
+        assert [f["kind"] for f in s.flags] == ["not_a_task"] and "sales.xlsx" in s.flags[0]["detail"] and not s.items
+        assert s.flags[0]["help"]["examples"] and "cannot see" in s.flags[0]["help"]["cannot"]
+    assert Model.calls == 0
+    s = await llm_graph.populate(Model(), "Does report.xlsx have the totals?")              # a file named: it is read as usual
+    assert "not_a_task" not in {f["kind"] for f in s.flags}

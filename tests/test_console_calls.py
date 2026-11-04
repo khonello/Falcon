@@ -231,3 +231,15 @@ def test_a_sign_in_outside_working_hours(monkeypatch):
     assert events.matches(spec, {"user": "ama"}) is False
     Clock.at = real(2026, 11, 7, 10, 0, tzinfo=timezone.utc)                            # a Saturday
     assert events.matches(spec, {"user": "ama"}) is True
+
+
+async def test_how_to_write_a_task_is_there_to_ask_for(engine, org, connect, tmp_path):
+    from operator_client.tui.shell import run_script
+    from tests.test_operator_client import _cfg
+
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    got = await a1.ok("task.help")
+    assert got["title"] == "How to write a task" and len(got["parts"]) == 3
+    assert await w1.err("task.help") == "forbidden"
+    out = await run_script(_cfg(engine, tmp_path, "cid-a1"), ["connect", "task help"])
+    assert "Update sales.xlsx by Friday" in out[1]

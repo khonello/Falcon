@@ -14,6 +14,7 @@ proposal, in words the assigner can act on. Nothing is guessed, and the model is
     quality_unseen      "redo it", "missing key details": Falcon sees that a file changed, never whether it is better
     inside_file         "the salary column is in report.xlsx": Falcon sees the file, not what is in it; the file is checked to exist, the rest is the assigner's
     recurring           "every day": a task is done once; a repeating job is not one task
+    not_a_task          a question, a test, or a request for a task: nothing to give anyone. Said at once, with an example, and the model is not asked (`not_a_task`)
 
 Two readings are settled here too, where a pattern is surer than the model: "work on a file" means it is there already (update), and a check of what is inside a
 file changes nothing (exists).
@@ -43,6 +44,21 @@ QUALITY = re.compile(r"\b(redo|re-do|rewrite|missing (?:\w+ )?(?:details?|inform
 INSIDE = re.compile(r"\b(?:check|verify|confirm|be sure|make sure|ensure)\b.*?\b(\w+ (?:column|sheet|tab|row|section|field|paragraph|page|chapter|table))\b", re.IGNORECASE)
 WORK_ON = re.compile(r"\bwork(?:ing)? on\b", re.IGNORECASE)
 RECURRING = re.compile(r"\b(every\s?day|every (?:morning|evening|night|week|month|monday|tuesday|wednesday|thursday|friday)|each (?:day|morning|week)|(?:daily|weekly)(?=[.,]|$))\b", re.IGNORECASE)
+QUESTION = re.compile(r"^\s*(?:how|why|what|does|is this|is it|are you|can you|could you)\b|\?\s*$", re.IGNORECASE)
+TESTING = re.compile(r"^\s*(?:this is a\s+)?test(?:ing)?\b|,\s*test(?:ing)?\s*$", re.IGNORECASE)
+ASKS_FOR_A_TASK = re.compile(r"\b(?:create|make|give|add|write)\b(?:\s+\w+){0,3}?\s+task\b", re.IGNORECASE)
+EXAMPLE = "A task names a file or a program and what should happen to it, like “Update sales.xlsx by Friday”."
+HELP: dict[str, Any] = {
+    "title": "How to write a task",
+    "says": "Write what should be true when the work is done. Falcon reads it, shows you what it understood, and you confirm before anyone gets it.",
+    "parts": [
+        {"name": "What", "says": "A file by its name (sales.xlsx) or a program by its name (Excel)."},
+        {"name": "What happens to it", "says": "A file is made, changed, or checked to be there. A program is used, installed, closed or kept running."},
+        {"name": "When", "says": "Optional: a day or a time, like by Friday or 5pm tomorrow."},
+    ],
+    "examples": ["Update sales.xlsx by Friday", "Create summary.docx in C:/Reports by 5pm tomorrow", "Make sure report.pdf is there before Monday", "Install Zoom on the new laptop"],
+    "cannot": "Falcon sees files and programs. It cannot see what is inside a file, whether the work is any good, or whether something was sent to someone: you confirm those yourself when you verify the task.",
+}
 CHECK_THEN = re.compile(r"\bcheck (?:if|whether)\b.*?\bif not\b", re.IGNORECASE | re.DOTALL)
 
 
@@ -55,6 +71,15 @@ def _weekend_note(first: str, second: str, now: datetime | None) -> str:
         return ""
     base = now + timedelta(days=1) if first.lower() in ("today", "tonight") else now + timedelta(days=2)
     return f" The later one is a {base:%A}." if base.weekday() >= 5 else ""
+
+
+def not_a_task(text: str) -> dict[str, Any] | None:
+    """Nothing here is work to give anyone (the caller has found no file named): a question, a test, or a request for a task. None when it may be a task."""
+    if ASKS_FOR_A_TASK.search(text):
+        return _flag("not_a_task", f"This asks for a task but does not say what it is. {EXAMPLE}", help=HELP)
+    if QUESTION.search(text) or TESTING.search(text):
+        return _flag("not_a_task", f"This reads like a question or a test, not work for someone to do. {EXAMPLE}", help=HELP)
+    return None
 
 
 def read(text: str, out: Any, now: datetime | None = None) -> None:

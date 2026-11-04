@@ -30,7 +30,7 @@ from engine.permissions import (
     str_field,
 )
 from engine.serialize import row, rows
-from engine.task import llm_graph, verification
+from engine.task import cues, llm_graph, verification
 from engine.task.hints import parse_hints
 from engine.task.verification import VerificationItem
 from protocol import ErrorCode, ProtocolError
@@ -346,6 +346,13 @@ async def verify(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await ctx.engine.push_to_account(task["assignee_account_id"], "task.incomplete", {"task_id": task_id})
     return {"task_id": task_id, "outcome": outcome,
             "status": "completed" if outcome == "complete" else task["status"]}
+
+
+@handler("task.help")
+async def task_help(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """How to write a task: what it needs, examples, and what Falcon cannot check. Also on a `not_a_task` flag, as `help`."""
+    require_role(ctx, "super_user", "admin")
+    return cues.HELP
 
 
 @handler("task.remind")

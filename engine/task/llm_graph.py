@@ -304,6 +304,10 @@ async def populate(llm: LocalLLM, description: str, hints: list[Hint] | tuple[Hi
     if shortened:
         out.flags.append({"kind": "too_long", "limit": MAX_DESCRIPTION, "detail": f"Only the first {MAX_DESCRIPTION} characters were read."})
         out.notes.append("the description was longer than could be read; the rest was left out")
+    said = cues.not_a_task(text) if not hints and not find_file_names(text) else None
+    if said is not None:
+        out.flags.append(said)                                     # nothing to read: the person hears why now, and the model is not asked
+        return out
     model = _Budgeted(llm, MODEL_BUDGET_SECONDS)
     if not llm.available:
         out.notes.append("the local model is not available: only what patterns and your marks settle was read")

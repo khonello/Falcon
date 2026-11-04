@@ -11,6 +11,13 @@ async def task_remind(ctx: ShellContext, args: Args) -> str:
     return "reminded"
 
 
+@command("task", "help", "", "How to write a task")
+async def task_help(ctx: ShellContext, args: Args) -> str:
+    h = await ctx.call("task.help")
+    parts = [f"  {x['name']}: {x['says']}" for x in h["parts"]]
+    return "\n".join([h["title"], h["says"], *parts, "For example:", *[f"  {e}" for e in h["examples"]], h["cannot"]])
+
+
 @command("chat", "requests", "", "Who at a machine is asking to talk")
 async def chat_requests(ctx: ShellContext, args: Args) -> str:
     got = (await ctx.call("chat.requests"))["requests"]

@@ -103,7 +103,7 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
 
 ### New task: what a description cannot say (built 4 Nov 2026; `engine/task/cues.py`)
 - `task.propose` `flags` has new kinds, each with `detail`, a sentence to show as it is: `cannot_check` (a message channel, another task, a flow), `unnamed_result`,
-  `made_from`, `waits_on_event`, `depends_on_check`, `folder_guess`, `quality_unseen`, `inside_file`, `recurring`; `ambiguous_deadline` may now carry `detail` too. Show every flag's `detail` on the proposal, before Give.
+  `made_from`, `waits_on_event`, `depends_on_check`, `folder_guess`, `quality_unseen`, `inside_file`, `recurring`, `not_a_task` (a question or a test: nothing to give; it carries `help`: show it as guidance on New task: `{title, says, parts: [{name, says}], examples, cannot}`, also from `task.help {}` for a Help link there); `ambiguous_deadline` may now carry `detail` too. Show every flag's `detail` on the proposal, before Give.
 
 ### From the drawers, built 4 Nov 2026
 - `control.event_create` / `control.event_update` take `action_limits {action_id: seconds}`; a rule's actions come back with `rule_limit_s`. `user.login` takes `match.outside_hours: true` (before 08:00, from 18:00, or a weekend).
