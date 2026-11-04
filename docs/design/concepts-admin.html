@@ -492,16 +492,12 @@ a { color: var(--accent); text-decoration: none; }
 }
 .rs-i { flex: none; display: inline-flex; width: 16px; justify-content: center; color: var(--text-3); }
 .rs-kn { font-weight: 600; color: var(--text); }
-.rs-map { display: block; }
-.rs-tile rect { fill: var(--surface-3); }
-.rs-tile text { fill: var(--text-3); font-size: 11px; font-family: var(--mono); }
-.rs-tile.home rect { fill: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); }
-.rs-tile.home text { fill: var(--accent); font-weight: 600; }
-.rs-tile.hot rect { fill: color-mix(in srgb, var(--crit) 28%, var(--surface-3)); }
-.rs-tile.hot text { fill: var(--crit); font-weight: 600; }
-.rs-tile.hot.pick rect { stroke: var(--crit); stroke-width: 1.5; }
-.rs-tile.ok rect { fill: color-mix(in srgb, var(--ok) 26%, var(--surface-3)); }
-.rs-tile.ok text { fill: var(--ok); font-weight: 600; }
+.rs-depts { max-height: 420px; overflow-y: auto; padding-bottom: 10px; }
+.rs-depts > div:first-child .pd-from { margin-top: 2px; }
+.ao-ovh .ovh-m.home { background: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); color: var(--accent); font-weight: 600; }
+.ao-ovh .ovh-m.hot { background: color-mix(in srgb, var(--crit) 28%, var(--surface-3)); color: var(--crit); font-weight: 600; }
+.ao-ovh .ovh-m.hot.pick { border: 1.5px solid var(--crit); }
+.ao-ovh .ovh-m.ok { background: color-mix(in srgb, var(--ok) 26%, var(--surface-3)); color: var(--ok); font-weight: 600; }
 .rs-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11.5px; color: var(--text-3); }
 .rs-key i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--surface-3); }
 .rs-key i.home { background: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); }
@@ -531,7 +527,6 @@ a { color: var(--accent); text-decoration: none; }
 .rsp2 .iq-cards { gap: 5px; }
 .rs-facts { align-items: baseline; }
 .rs-lately { display: flex; flex-direction: column; }
-.rs-band { fill: var(--text-4); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; }
 .rs-ok .rs-end { background: var(--surface-2); }
 .rs-why { font-size: 12px; color: var(--text-2); font-style: italic; }
 .rs-ok .rs-who { min-width: 0; }
@@ -4220,14 +4215,10 @@ function AdminRestrictedPage({ go }) {
   const [let_, setLet] = useState({});
   const carrying = RS_CARRY.filter((c) => marks.some((k) => k.id === c.mark)).map((c) => (c.held && let_[c.flow] ? { ...c, held: null, today: 0, last: null, since: "today" } : c));
   const hostsOf = new Set(marks.map((k) => k.host));
-  // the department's machines: the Admins' own workstations apart, then every other machine
-  const adm = Object.entries(ADMIN_INFO).filter(([, v]) => v.dept === dept).map(([n, v]) => ({ h: v.ws, who: n === me ? "you" : n }));
-  const rest = MACHINES.filter((m) => m.dept === dept).map((m) => m.host);
-  const ref = useRef(null), W = useWidth(ref, 380), G = 10;
-  const T = 42, C = Math.max(3, Math.floor((W + G) / (T + G))), aRows = Math.ceil(adm.length / C), LBL = 22;
-  const yA = LBL + 4, yR = yA + aRows * (T + G) + LBL + 6, H = yR + Math.ceil(rest.length / C) * (T + G);
-  const box = (h) => { const ai = adm.findIndex((x) => x.h === h); if (ai >= 0) return [(ai % C) * (T + G) + 1, yA + Math.floor(ai / C) * (T + G), T, T];
-    const i = rest.indexOf(h); return i < 0 ? null : [(i % C) * (T + G) + 1, yR + Math.floor(i / C) * (T + G), T, T]; };
+  // every machine, by department (the user, 4 Nov 2026): the Admins' own workstations first in theirs, as the Departments page draws a machine
+  const adm = Object.entries(ADMIN_INFO).map(([n, v]) => ({ h: v.ws, who: n === me ? "you" : n, d: v.dept }));
+  const mapDepts = [...DEPTS.map((d) => ({ name: d.name, hs: [...adm.filter((x) => x.d === d.id).map((x) => x.h), ...MACHINES.filter((m) => m.dept === d.id).map((m) => m.host)] })),
+    { name: "In no department", hs: MACHINES.filter((m) => !DBY[m.dept]).map((m) => m.host) }].filter((g) => g.hs.length);
   const mid = (h) => { const r = box(h); return [r[0] + r[2] / 2, r[1] + r[3] / 2]; };
   const kc = K ? cps(K) : [], ka = K ? alw(K) : [];
   const pickCopy = (id) => { setCopy(id); const i = all.find((x) => x.id === id); if (i) setSel0(i.d.mark); };
@@ -4274,17 +4265,11 @@ function AdminRestrictedPage({ go }) {
       </section>
       <section className=${"ib-box" + (ld ? " ld-on" : "")} ref=${pz}>
         <header><b>Where it is, across every machine</b><span>${K ? html`<b className="rs-kn">${K.name}</b> · ${kc.length ? `${fmt(kc.length)} cop${kc.length === 1 ? "y" : "ies"} away from home` : "only at home"}` : "pick something on the left"}</span></header>
-        ${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}<div ref=${ref}>
-          <svg width=${W} height=${H} className="rs-map" role="img" aria-label="The department's machines">
-            <text x="0" y="14" className="rs-band">ADMIN PCS</text>
-            <text x="0" y=${yR - 12} className="rs-band">OTHER MACHINES</text>
-            ${[...adm.map((x) => x.h), ...rest].map((h) => { const [x, y, w, hh] = box(h), m = MBY[h], cp = K ? kc.find((i) => i.host === h) : null, al = K && ka.some((x2) => x2.host === h), home = K && K.host === h, a = adm.find((x2) => x2.h === h);
-              const cls = home ? " home" : cp ? " hot" + (copy === cp.id ? " pick" : "") : al ? " ok" : "";
-              return html`<g key=${h} className=${"rs-tile" + cls + (a ? " adm" : "")} style=${{ cursor: cp ? "pointer" : "default" }} onClick=${() => cp && pickCopy(cp.id)}>
-                <title>${h}${a ? `, ${a.who}` : m && m.user ? `, ${m.user}` : ""}${home ? " · its home" : cp ? ` · a copy, ${dur(NOWH - cp.at)} ago` : al ? " · a copy allowed" : ""}</title>
-                <rect x=${x} y=${y} width=${w} height=${hh} rx="7" />
-                <text x=${x + w / 2} y=${y + hh / 2 + 4} textAnchor="middle">${h.replace(/^WS-[A-Z]+-/, "").replace(/^[A-Z]+-/, "")}</text></g>`; })}
-          </svg>
+        ${ld ? html`<div className="ld-over">${ic("LoadingOutlined")}<span>Loading</span></div>` : null}<div className="rs-depts">
+          ${mapDepts.map((g) => html`<div key=${g.name}><div className="pd-from">${g.name}</div><div className="ovh-tiles ao-ovh">${g.hs.map((h) => { const m = MBY[h], cp = K ? kc.find((i) => i.host === h) : null, al = K && ka.some((x2) => x2.host === h), home = K && K.host === h, a = adm.find((x2) => x2.h === h);
+            const cls = home ? " home" : cp ? " hot" + (copy === cp.id ? " pick" : "") : al ? " ok" : m && m.status === "offline" ? " off" : "";
+            return html`<button key=${h} className=${"ovh-m" + cls + (cp ? "" : " pd-in")} onClick=${() => cp && pickCopy(cp.id)}
+              title=${`${h}${a ? `, ${a.who}` : m && m.user ? `, ${m.user}` : ""}${home ? " · its home" : cp ? ` · a copy, ${dur(NOWH - cp.at)} ago` : al ? " · a copy allowed" : ""}`}>${tileName(h)}</button>`; })}</div></div>`)}
         </div>
         <div className="rs-key"><span><i className="home" />its home</span><span><i className="hot" />a copy caught</span><span><i className="ok" />a copy allowed</span></div>
       </section>

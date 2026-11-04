@@ -164,10 +164,17 @@ Page {
         })
         return out.concat(heldFlows.map(function (f) { return { k: null, f: f, held: true } }))
     }
-    // the machines of your department, Admins' own apart
-    readonly property var myDept: Fleet.depts.filter(function (d) { return (d.admins || []).some(function (a) { return a.account_id === falcon.accountId }) })[0] || null
-    readonly property var admTiles: myDept ? (myDept.admins || []).filter(function (a) { return a.hostname }).map(function (a) { return { h: a.hostname, who: a.account_id === falcon.accountId ? "you" : a.name } }) : []
-    readonly property var restTiles: (myDept ? myDept.machines : Fleet.machines).map(function (m) { return m.host })
+    // every machine, by department: the Admins' own workstations first in theirs, as the Departments page draws a machine
+    readonly property var admTiles: Fleet.depts.reduce(function (o, d) { return o.concat((d.admins || []).filter(function (a) { return a.hostname }).map(function (a) { return { h: a.hostname, who: a.account_id === falcon.accountId ? "you" : a.name } })) }, [])
+    readonly property var mapDepts: {
+        var seen = {}, out = Fleet.depts.map(function (d) {
+            var hs = (d.admins || []).filter(function (a) { return a.hostname }).map(function (a) { return a.hostname }).concat((d.machines || []).map(function (m) { return m.host }))
+            hs.forEach(function (h) { seen[h] = true })
+            return { name: d.name, hs: hs }
+        })
+        out.push({ name: "In no department", hs: Fleet.machines.map(function (m) { return m.host }).filter(function (h) { return !seen[h] }) })
+        return out.filter(function (g) { return g.hs.length > 0 })
+    }
     function ownerOf(h) { return h === myHost ? "you" : (admTiles.filter(function (x) { return x.h === h })[0] || {}).who || (Fleet.byHost[h] || {}).user || "nobody signed in" }
     // what is listed, five marks a page, by the machine they live on (your own first)
     property int pg: 0
@@ -402,36 +409,47 @@ Page {
                 width: parent.width
                 spacing: 0
                 opacity: page.loading ? 0 : 1
-                Repeater {
-                    model: [["ADMIN PCS", page.admTiles.map(function (x) { return x.h })], ["OTHER MACHINES", page.restTiles]]
-                    delegate: Column {
-                        required property var modelData
-                        required property int index
-                        visible: modelData[1].length > 0
-                        width: mapP.innerW
-                        spacing: 8
-                        topPadding: index > 0 ? 0 : 4
+                Flickable {
+                    width: parent.width
+                    height: Math.min(contentHeight, 420)
+                    contentHeight: depts.height
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    Column {
+                        id: depts
+                        objectName: "mapDepts"
+                        width: parent.width
+                        spacing: 0
                         bottomPadding: 10
-                        Txt { text: modelData[0]; color: Theme.text4; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                        Flow {
-                            width: parent.width
-                            spacing: 10
-                            Repeater {
-                                model: parent.parent.modelData[1]
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    readonly property bool home: page.cur !== null && page.cur.host === modelData
-                                    readonly property var cp: mapP.copies.filter(function (c) { return c.host === modelData })[0] || null
-                                    readonly property bool ok: mapP.allowedHere.some(function (c) { return c.host === modelData })
-                                    width: 42; height: 42; radius: 7
-                                    color: home ? Theme.mix(Theme.accent, Theme.surface3, 0.28) : cp ? Theme.mix(Theme.crit, Theme.surface3, 0.28) : ok ? Theme.mix(Theme.ok, Theme.surface3, 0.26) : Theme.surface3
-                                    border.width: cp && page.copy === String(cp.issue_id) ? 1.5 : 0
-                                    border.color: Theme.crit
-                                    Txt { anchors.centerIn: parent; width: parent.width - 4; horizontalAlignment: Text.AlignHCenter; text: modelData.replace(/^WS-[A-Z]+-/, "").replace(/^[A-Z]+-/, ""); mono: true; font.pixelSize: 11
-                                          font.weight: parent.home || parent.cp || parent.ok ? Font.DemiBold : Font.Normal
-                                          color: parent.home ? Theme.accent : parent.cp ? Theme.crit : parent.ok ? Theme.ok : Theme.text3 }
-                                    MouseArea { anchors.fill: parent; cursorShape: parent.cp ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: if (parent.cp) page.copy = String(parent.cp.issue_id) }
-                                    Tip { text: modelData + (Fleet.byHost[modelData] && Fleet.byHost[modelData].user ? ", " + Fleet.byHost[modelData].user : "") + (parent.home ? " · its home" : parent.cp ? " · a copy, " + Time.dur((Time.now - Time.ms(parent.cp.opened_at)) / 3600000) + " ago" : parent.ok ? " · a copy allowed" : "") }
+                        Repeater {
+                            model: page.mapDepts
+                            delegate: Column {
+                                id: dg
+                                required property var modelData
+                                required property int index
+                                width: depts.width
+                                spacing: 6
+                                topPadding: dg.index ? 10 : 2
+                                Txt { text: dg.modelData.name; color: Theme.text3; font.pixelSize: 12 }
+                                Flow {
+                                    width: parent.width
+                                    spacing: 10
+                                    Repeater {
+                                        model: dg.modelData.hs
+                                        delegate: Tile {
+                                            required property var modelData
+                                            readonly property bool home: page.cur !== null && page.cur.host === modelData
+                                            readonly property var cp: mapP.copies.filter(function (c) { return c.host === modelData })[0] || null
+                                            readonly property bool allowedOn: mapP.allowedHere.some(function (c) { return c.host === modelData })
+                                            m: Fleet.byHost[modelData] || { host: modelData, online: true }
+                                            mark: home ? "home" : cp ? "hot" : allowedOn ? "ok" : ""
+                                            picked: !!cp && page.copy === String(cp.issue_id)
+                                            still: !cp
+                                            marksOnly: true
+                                            tip: modelData + (page.ownerOf(modelData) ? ", " + page.ownerOf(modelData) : "") + (home ? " · its home" : cp ? " · a copy, " + Time.dur((Time.now - Time.ms(cp.opened_at)) / 3600000) + " ago" : allowedOn ? " · a copy allowed" : "")
+                                            onClicked: page.copy = String(cp.issue_id)
+                                        }
+                                    }
                                 }
                             }
                         }
