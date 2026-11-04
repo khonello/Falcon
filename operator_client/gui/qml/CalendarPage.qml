@@ -21,7 +21,7 @@ Page {
         todo:         { label: "Your to-dos",   c: Theme.ser3 },
         rule:         { label: "Automation",    c: Theme.ser2 }
     })
-    // the version 1 concept: task deadlines, your to-dos and scheduled automation (announcements live on Messages)
+    // the version 1 concept: task deadlines, your to-dos and scheduled automation (announcements have their own page)
     readonly property var kindKeys: ["task", "todo", "rule"]
     function colour(x) { return (x.k === "task" || x.k === "todo") && x.overdue ? Theme.crit : kinds[x.k].c }
 

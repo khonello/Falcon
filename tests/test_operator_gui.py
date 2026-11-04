@@ -255,7 +255,7 @@ async def _open(win, bridge, view: str, name: str) -> QObject:
     return win.findChild(QObject, name)
 
 
-ADMIN_MENU = ["overview", "messages", "calendar", "tasks", "flows", "restricted", "detective", "machines", "departments", "actions", "automation", "issues", "audit"]
+ADMIN_MENU = ["overview", "messages", "announcements", "calendar", "tasks", "flows", "restricted", "detective", "machines", "departments", "actions", "automation", "issues", "audit"]
 
 
 async def test_the_shell_is_the_console(console):
@@ -270,7 +270,7 @@ async def test_the_shell_is_the_console(console):
 
 PAGES = [("admin", p) for p in ADMIN_MENU] + [
     ("admin", "tasks/new"), ("admin", "flows/new"), ("admin", "automation/new"), ("admin", "actions/new"),
-    ("admin", "restricted/mark"), ("admin", "messages/announcements")]
+    ("admin", "restricted/mark")]
 
 
 @pytest.mark.parametrize(("role", "view"), PAGES, ids=[f"{r}-{v}" for r, v in PAGES])

@@ -240,29 +240,30 @@ async def test_the_palette_says_how_old_its_names_are_when_they_are_not_live(con
     assert foot.property("visible") and "Not connected" in foot.property("text")
 
 
-async def test_an_announcement_is_sent_from_its_page_and_lists_what_was_sent(console):
+async def test_an_announcement_is_sent_from_its_drawer(console):
     win, bridge, _ = console("admin")
-    page = await _open(win, bridge, "messages/announcements", "announcements")
-    assert "Write the announcement" in prop(page, "problem")
-    page.setProperty("body", "Fire drill at 10.")
+    page = await _open(win, bridge, "announcements/new", "newAnnouncement")
+    page.setProperty("audience", "specific_users")
+    await _wait(lambda: "Pick at least one person" in prop(page, "prob"))
+    page.setProperty("audience", "department")
+    await _wait(lambda: "Pick a department" in prop(page, "prob"))
+    page.setProperty("audience", "all_users")
+    page.setProperty("step", 1)
+    await _wait(lambda: "Write the announcement" in prop(page, "prob"))
+    page.setProperty("message", "Fire drill at 10.")
     page.setProperty("title", "Fire drill")
     page.setProperty("kind", "emergency")
-    await _wait(lambda: prop(page, "problem") == "")
-    QMetaObject.invokeMethod(page, "send")
+    page.setProperty("step", 2)
+    await _wait(lambda: prop(page, "prob") == "")
+    page.confirmed.emit()
     await _wait(lambda: any(t == "alerts.create" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "alerts.create")
     assert sent["type"] == "emergency" and sent["audience"] == "all_users" and sent["title"] == "Fire drill" and sent["body"] == "Fire drill at 10."
     assert "deliver_at" not in sent                                                       # now, not later
-    assert prop(page, "body") == ""                                                       # sent: the box is empty again
-    page.setProperty("body", "Again.")
-    page.setProperty("audience", "specific_users")
-    assert "Pick at least one person" in prop(page, "problem")
 
 
-async def test_announcements_open_under_messages_and_are_not_on_the_menu(console):
+async def test_announcements_is_a_page_of_the_home_menu(console):
     win, bridge, _ = console("admin")
-    await _open(win, bridge, "messages", "messagesView")
-    win.setProperty("view", "messages/announcements")
-    await _wait(lambda: win.findChild(QObject, "announcements") is not None)
-    assert "announcements" not in prop(win, "menuKeys") and "detective" in prop(win, "menuKeys")
+    await _open(win, bridge, "messages/announcements", "announcements")                   # where the calendar still links
+    assert "announcements" in prop(win, "menuKeys") and "detective" in prop(win, "menuKeys")
     await _open(win, bridge, "detective", "detectiveView")

@@ -14,6 +14,8 @@ Column {
     property string prob: ""                    // what stops the next step
     property string confirmText: ""
     property bool confirmDisabled: false
+    property bool confirmDanger: false
+    property string noName: "Not named yet"
     property bool showName: true
     property bool showTop: true                 // Restrict something has no rn-top
     property real minHeight: 0
@@ -33,7 +35,7 @@ Column {
         width: parent.width
         gap: 10
         Txt { text: root.names[root.step] + " · step " + (root.step + 1) + " of " + root.names.length; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-        Txt { visible: root.showName; width: parent.width; text: root.nameNow.trim() || "Not named yet"; font.pixelSize: 15; lh: 1.5
+        Txt { visible: root.showName; width: parent.width; text: root.nameNow.trim() || root.noName; font.pixelSize: 15; lh: 1.5
               font.weight: root.nameNow.trim() ? Font.DemiBold : Font.Normal; color: root.nameNow.trim() ? Theme.text : Theme.text4 }
         Column { id: topCol; width: parent.width; spacing: 6 }
     }
@@ -54,7 +56,7 @@ Column {
             spacing: 8
             Btn { text: "Cancel"; onClicked: root.closed() }
             Btn { visible: root.step > 0; iconName: "left"; text: "Back"; onClicked: root.step -= 1 }
-            Btn { kind: "primary"; objectName: "editorNext"; iconRight: !root.last; iconName: root.last ? "" : "right"
+            Btn { kind: "primary"; danger: root.last && root.confirmDanger; objectName: "editorNext"; iconRight: !root.last; iconName: root.last ? "" : "right"
                   enabled: root.prob === "" && !(root.last && root.confirmDisabled)
                   text: root.last ? root.confirmText : root.names[root.step + 1] || ""
                   onClicked: root.last ? root.confirmed() : root.step += 1 }

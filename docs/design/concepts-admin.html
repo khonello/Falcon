@@ -3807,11 +3807,11 @@ function CalendarPage({ go, level }) {
 }
 // Three groups at both levels (19 Oct 2026): Home, Core (the four features), Manage.
 const NAV_ADMIN = [
-  ["Home", [["overview", "Overview", "DashboardOutlined"], ["messages", "Messages", "MessageOutlined", () => amWaiting(), true, true], ["calendar", "Calendar", "CalendarOutlined"]]],
+  ["Home", [["overview", "Overview", "DashboardOutlined"], ["messages", "Messages", "MessageOutlined", () => amWaiting(), true, true], ["announcements", "Announcements", "NotificationOutlined"], ["calendar", "Calendar", "CalendarOutlined"]]],
   ["Core", [["tasks", "Tasks", "CheckSquareOutlined", () => TASKS.filter((t) => t.state !== "Completed").length], ["flows", "Flows", "BranchesOutlined"], ["restricted", "Restricted", "FileProtectOutlined", () => myCopies().length, true], ["detective", "Detective", "FileSearchOutlined", () => DET.cases.filter((c) => c.status === "open" && c.level === "urgent").length, true]]],
   ["Manage", [["machines", "Machines", "DesktopOutlined", () => MACHINES.length], ["departments", "Departments", "ApartmentOutlined"], ["actions", "Actions", "PlayCircleOutlined"], ["automation", "Automation", "ThunderboltOutlined"], ["issues", "Issues", "AlertOutlined", () => ISSUES.length, true], ["audit", "Audit log", "HistoryOutlined"]]],
 ];
-const TITLES = { overview: ["Overview", "All departments · live"], messages: ["Messages", "Conversations with the people you look after, one at a time or as a group"], calendar: ["Calendar", "What is coming · task deadlines, your to-dos and scheduled automation"], tasks: ["Tasks", "Assigned work and the evidence for it"], flows: ["Flows", "One-way file pipelines between machines"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"], machines: ["Machines", "Every registered client PC"], departments: ["Departments", "Labels that group machines and the people at them"], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], automation: ["Automation", "Rules, conditions and every run"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], audit: ["Audit log", "Everything that happened, and who did it"] };
+const TITLES = { overview: ["Overview", "All departments · live"], announcements: ["Announcements", "What is said to many people at once"], messages: ["Messages", "Conversations with the people you look after, one at a time or as a group"], calendar: ["Calendar", "What is coming · task deadlines, your to-dos and scheduled automation"], tasks: ["Tasks", "Assigned work and the evidence for it"], flows: ["Flows", "One-way file pipelines between machines"], restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"], detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"], machines: ["Machines", "Every registered client PC"], departments: ["Departments", "Labels that group machines and the people at them"], actions: ["Actions", "Everything a rule can do, and what you can run by hand"], automation: ["Automation", "Rules, conditions and every run"], issues: ["Issues", "Violations, deviations and anything waiting on someone"], audit: ["Audit log", "Everything that happened, and who did it"] };
 function Palette({ go, close, nav }) {
   const [q, setQ] = useState(""); const [i, setI] = useState(0); const r = useRef(null);
   useEffect(() => { r.current && r.current.focus(); }, []);
@@ -3890,6 +3890,88 @@ const msAnswered = (th) => { let i = th.length - 1; const by = new Set(); for (;
 const MsFace = ({ c, big }) => (c.group ? html`<span className=${"ms-stack" + (big ? " big" : "")}><span className="ib-av">${initials(c.members[0])}</span><span className="ib-av">${c.members.length > 2 ? `+${c.members.length - 1}` : initials(c.members[1])}</span></span>`
   : html`<span className=${"ib-av" + (big ? " ms-big" : "")}>${initials(c.name)}</span>`);
 
+
+// Announcements (4 Nov 2026): what is said to many people at once, on its own page. What went out and what is waiting, a click reads it on the right;
+// sending one is the drawer. A Worker reads it in the Falcon program; an emergency covers their screen until it is read.
+const AN_KINDS = { announcement: ["Announcement", "NotificationOutlined", "It waits in their Falcon program, with a quiet note in the corner. It does not interrupt anyone."],
+  warning: ["Warning", "WarningOutlined", "The same, marked as a warning, for something they should watch out for."],
+  emergency: ["Emergency", "AlertOutlined", "It covers the screen on every machine it reaches until the person has read it. Use it only when it cannot wait."] };
+const AN_TO = [["all", "Everyone", "Every person and every Admin."], ["dept", "A department", "Everyone in the one you pick."], ["admins", "All Admins", "Only the IT Admins, in their consoles."], ["some", "Chosen people", "Only the people you name."]];
+const ANNS = EMPTY ? [] : [
+  { id: 5, kind: "announcement", title: "New printer on the first floor", body: "The new printer by the stairs is ready. Pick FLOOR-1 when you print; the old one goes on Monday.", to: "Everyone", by: "R. Mensah", at: 33, state: "scheduled" },
+  { id: 4, kind: "announcement", title: "Office closed on Monday 5 Oct", body: "The building is closed on Monday 5 October for the electrical inspection. Nobody can come in that day, including the warehouse. Work from home if you can.", to: "Everyone", by: "A. Quaye", at: 8.67, state: "sent" },
+  { id: 3, kind: "emergency", title: "Leave the building now", body: "The fire alarm in the warehouse has gone off. Use the stairs, not the lift, and meet at the car park by the main gate.", to: "Everyone", by: "A. Quaye", at: -8.67, state: "sent" },
+  { id: 2, kind: "warning", title: "Emails asking for parcel fees", body: "Emails asking you to pay a parcel fee are fake. Do not click them; delete them.", to: "Logistics", by: "R. Mensah", at: -77, state: "sent" },
+  { id: 1, kind: "announcement", title: "New parking rules from 1 Oct", body: "Staff parking moves to the back lot from 1 October.", to: "Everyone", by: "R. Mensah", at: -170, state: "withdrawn" }];
+const anWhen = (a) => (a >= 0 && a < 24 ? `today ${hhmm(a)}` : a >= 24 && a < 48 ? `tomorrow ${hhmm(a - 24)}` : `${dayOf(a)} ${hhmm(a)}`);
+function AdminAnnouncementsPage() {
+  const [modal, modalCtx] = Modal.useModal();
+  const [gone, setGone] = useState({}), [sel, setSel] = useState(null), [make, setMake] = useState(false);
+  const all = ANNS.map((a) => (gone[a.id] ? { ...a, state: "withdrawn" } : a)), wait = all.filter((a) => a.state === "scheduled"), sent = all.filter((a) => a.state === "sent"), out = all.filter((a) => a.state === "withdrawn");
+  const A0 = all.find((a) => a.id === sel) || sent[0] || all[0], week = sent.filter((a) => a.at > NOWH - 168);
+  const situation = !all.length ? "Nothing has been announced yet." : `${fmt(week.length)} sent this week${week.some((a) => a.kind === "emergency") ? ", one of them an emergency" : ""}. ${wait.length ? `${fmt(wait.length)} waiting to go out, ${anWhen(wait[0].at)}.` : "Nothing is waiting to go out."}`;
+  const withdraw = (a) => modal.confirm({ title: `Withdraw ${a.title}?`, content: "It does not go out. It stays listed as withdrawn.", okText: "Withdraw it", okButtonProps: { danger: true }, cancelText: "Keep it", onOk: () => { setGone({ ...gone, [a.id]: 1 }); toast("Withdrawn (concept)"); } });
+  const card = (a) => { const hot = a.kind === "emergency", picked = A0 && A0.id === a.id;
+    return html`<div key=${a.id} className=${"tk-item" + (picked ? " am-pick" : "")}><article className=${"iq-card am-card" + (hot ? " urg" : "")} role="button" tabIndex="0" onClick=${() => setSel(a.id)} onKeyDown=${(e) => e.key === "Enter" && setSel(a.id)}>
+      <span className="iq-ic">${ic(AN_KINDS[a.kind][1])}</span>
+      <span className="iq-main"><span className="iq-t"><b className="cut">${a.title}</b></span><span className="iq-s cut">To ${a.to.toLowerCase() === "everyone" ? "everyone" : a.to} · by ${a.by === ME ? "you" : a.by}</span></span>
+      <span className="am-facts"><span>${AN_KINDS[a.kind][0]}</span><span className="mono">${anWhen(a.at)}</span></span><span className="iq-a" /></article></div>`; };
+  const G = [["Waiting to go out", "they go at their time; withdraw one to stop it", wait], ["Sent", "newest first", sent], ["Withdrawn", "they did not go out", out]];
+  return html`<div className="og aup">${modalCtx}
+    <${SitBar} text=${situation} />
+    <div className="g c-84" style=${{ alignItems: "stretch" }}>
+      <section className="ib-box aur">
+        <header><b>What was announced · ${fmt(all.length)}</b><span>every Admin's; click one to read it on the right</span></header>
+        ${G.map(([t, d, xs]) => (xs.length ? html`<div key=${t} className="iq-grp"><div className="lay-grp iq-gh">${t} · ${fmt(xs.length)}<span>${d}</span></div><div className="iq-cards">${xs.map(card)}</div></div>` : null))}
+        ${!all.length ? html`<div className="ib-quiet">Nothing has been announced yet.</div>` : null}
+      </section>
+      <section className="ib-box">
+        ${A0 ? html`<header><b>${AN_KINDS[A0.kind][0]}</b><span>${A0.state === "scheduled" ? "waiting to go out" : A0.state === "withdrawn" ? "withdrawn" : "sent"}</span></header>
+          <div className="auo-big">${A0.title}</div><div className="t2">${A0.body}</div>
+          <div className="tk-facts">${[["To", A0.to], ["From", A0.by === ME ? "you" : A0.by], [A0.state === "scheduled" ? "Goes out" : "Went out", anWhen(A0.at)]].map(([k, v]) => html`<span key=${k}><span className="t3">${k}</span> ${v}</span>`)}</div>
+          ${A0.state === "scheduled" ? html`<div className="row"><span className="sp" /><${Button} size="small" danger onClick=${() => withdraw(A0)}>Withdraw it<//></div>` : null}`
+          : html`<header><b>Nothing picked</b></header>`}
+      </section>
+    </div>
+    <section className="ib-box og-change">
+      <header><b>Send an announcement</b><span>nothing goes out until you confirm</span></header>
+      <div className="tk-give">
+        <ol className="tk-steps"><li><b>Say who it is for</b><span>everyone, a department, the Admins, or people you name</span></li>
+          <li><b>Write it</b><span>an announcement, a warning, or an emergency that covers the screen</span></li>
+          <li><b>Say when</b><span>now, or at a time you pick</span></li></ol>
+        <${Button} type="primary" onClick=${() => setMake(true)}>Send an announcement<//></div>
+    </section>
+    <${Drawer} open=${make} onClose=${() => setMake(false)} width="min(1120px, 80vw)" title="Send an announcement" className="tk-drawer"
+      extra=${html`<span className="t3" style=${{ fontSize: 12 }}>nothing goes out until you confirm</span>`}>
+      ${make ? html`<${AnnNew} onDone=${() => setMake(false)} />` : null}
+    <//>
+  </div>`;
+}
+function AnnNew({ onDone }) {
+  const [step, setStep] = useState(0), [to, setTo] = useState("all"), [dept, setDept] = useState(undefined), [some, setSome] = useState([]), [kind, setKind] = useState("announcement"), [title, setTitle] = useState(""), [body, setBody] = useState(""), [later, setLater] = useState(false), [at, setAt] = useState(null);
+  const NAMES = ["Who it is for", "What it says", "When it goes"];
+  const toW = to === "all" ? "everyone" : to === "admins" ? "all Admins" : to === "dept" ? ((DEPTS.find((d) => d.id === dept) || {}).name || "the department you pick") : some.length ? listNames(some, 3) : "the people you name";
+  const prob = step === 0 && to === "dept" && !dept ? "Pick a department." : step === 0 && to === "some" && !some.length ? "Pick at least one person." : step === 1 && !body.trim() ? "Write the announcement." : step === 2 && later && !at ? "Pick when it goes." : null;
+  const pick = (on, t, d, fn) => html`<div key=${t} className=${"nfv-pick" + (on ? " on" : "")} role="radio" aria-checked=${on} tabIndex="0" onClick=${fn} onKeyDown=${(e) => e.key === "Enter" && fn()}><i /><span><b>${t}</b><span className="t3">${d}</span></span></div>`;
+  const body0 = [html`<div className="nfv"><div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">Who is it for?</div>${AN_TO.map(([v, t, d]) => pick(to === v, t, d, () => setTo(v)))}</div>
+      ${to === "dept" ? html`<div className="nfv-sec"><div className="nfv-st">Which department?</div><${Select} value=${dept} placeholder="Pick a department" options=${DEPTS.map((d) => ({ value: d.id, label: d.name }))} onChange=${setDept} /></div>` : null}
+      ${to === "some" ? html`<div className="nfv-sec"><div className="nfv-st">Who?</div><${Select} mode="multiple" value=${some} placeholder="Pick people" options=${MACHINES.filter((m) => m.user).map((m) => ({ value: m.user, label: `${m.user} · ${m.host}` }))} onChange=${setSome} /></div>` : null}</div>`,
+    html`<div className="nfv"><div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">What kind is it?</div>${Object.entries(AN_KINDS).map(([v, [t, , d]]) => pick(kind === v, t, d, () => setKind(v)))}</div>
+      <div className="nfv-sec"><div className="nfv-st">A title <span className="t4" style=${{ fontWeight: 400 }}>optional</span></div><${Input} value=${title} maxLength=${120} onChange=${(e) => setTitle(e.target.value)} placeholder="For example Office closed on Monday" /></div>
+      <div className="nfv-sec"><div className="nfv-st">What do they need to know?</div><${Input.TextArea} rows=${5} value=${body} maxLength=${1500} onChange=${(e) => setBody(e.target.value)} /></div></div>`,
+    html`<div className="nfv"><div className="nfv-sec" style=${{ marginTop: 0 }}><div className="nfv-st">When does it go?</div>${pick(!later, "Now", "It goes the moment you confirm.", () => setLater(false))}${pick(later, "At a time", "It waits, and you can withdraw it until then.", () => setLater(true))}</div>
+      ${later ? html`<div className="nfv-sec"><${DatePicker} showTime=${{ format: "HH:mm" }} format="ddd D MMM, HH:mm" value=${at} onChange=${setAt} placeholder="Pick when" style=${{ width: 240 }} /></div>` : null}
+      <div className="nfv-sec"><div className="tk-facts" style=${{ maxWidth: "none" }}>${[["To", toW], ["Kind", AN_KINDS[kind][0]], ["Title", title.trim() || "none"], ["Goes", later && at ? at.format("ddd D MMM, HH:mm") : "now"]].map(([k, v]) => html`<span key=${k}><span className="t3">${k}</span> ${v}</span>`)}</div></div>
+      ${kind === "emergency" ? html`<div className="decide" style=${{ "--c": "var(--crit)" }}>It covers the screen on every machine it reaches until the person has read it.</div>` : null}</div>`];
+  return html`<div className="nf-steps-wrap">
+    <section className="ib-box rn-top"><span className="t3">${NAMES[step]} · step ${step + 1} of 3</span><div className=${"rn-name" + (title.trim() ? "" : " none")}>${title.trim() || "No title yet"}</div>
+      <div className="rn-sent"><span className="t3">To</span> <b className=${step === 0 ? "now" : ""}>${toW}</b><span className="t3">, as</span> <b className=${step === 1 ? "now" : ""}>${AN_KINDS[kind][0].toLowerCase()}</b><span className="t3">,</span> <b className=${step === 2 ? "now" : ""}>${later ? (at ? at.format("ddd D MMM, HH:mm") : "at a time") : "now"}</b></div></section>
+    <section className="ib-box nf-body">${body0[step]}</section>
+    <div className="row nt-next"><span className="t3" style=${{ fontSize: 12.5, color: prob ? "var(--med)" : undefined }}>${prob || ""}</span><span className="sp" />
+      <${Button} onClick=${onDone}>Cancel<//>${step > 0 ? html`<${Button} icon=${ic("LeftOutlined")} onClick=${() => setStep(step - 1)}>Back<//>` : null}
+      ${step < 2 ? html`<${Button} type="primary" disabled=${!!prob} onClick=${() => setStep(step + 1)}>${NAMES[step + 1]} ${ic("RightOutlined")}<//>`
+        : html`<${Button} type="primary" danger=${kind === "emergency"} disabled=${!!prob} onClick=${() => { toast(later ? "Waiting to go out (concept)" : "Sent (concept)"); onDone(); }}>${later ? "Schedule it" : "Send it"}<//>`}</div></div>`;
+}
 
 // The Admin's Calendar (29 Oct 2026). The week ahead in one sentence, the month with the
 // day picked, and putting something on it: here, a to-do for yourself with when it is due.
@@ -5625,6 +5707,7 @@ function App() {
   let body;
   if (page === "departments") body = html`<${AdminDepartmentsPage} go=${goAsk} />`;
   else if (page === "messages") body = html`<${AdminMessagesPage} key=${ME + (sub || "")} go=${goAsk} open=${sub} />`;
+  else if (page === "announcements") body = html`<${AdminAnnouncementsPage} />`;
   else if (page === "calendar") body = html`<${AdminCalendarPage} key=${level.dept} go=${goAsk} level=${level} />`;
   else if (page === "overview") body = html`<${AdminOverviewPage} go=${goAsk} />`;
   // the Admin has no page for one machine: a machine named anywhere opens Machines with it picked

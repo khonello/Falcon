@@ -20,7 +20,7 @@ Page {
     property var tasks: []
     property string reqWhy: ""
     property var many: []                 // who a new conversation is with
-    property string sel: { var a = Nav.takeArrive("messages"); return a !== null ? String(a) : Nav.sub && Nav.sub !== "announcements" ? String(Nav.sub) : "" }
+    property string sel: { var a = Nav.takeArrive("messages"); return a !== null ? String(a) : Nav.sub ? String(Nav.sub) : "" }
     property var drafts: ({})
     property string q: ""
     property string mtxt: ""

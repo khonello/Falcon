@@ -60,6 +60,7 @@ ApplicationWindow {
     readonly property var pages: ({
         overview: "OverviewPage.qml",
         messages: "MessagesPage.qml",
+        announcements: "AnnouncementsPage.qml",
         calendar: "CalendarPage.qml",
         detective: "DetectivePage.qml",
         tasks: "TasksPage.qml",
@@ -75,13 +76,13 @@ ApplicationWindow {
 
     // a page and the thing open on it: some open a page of their own (a machine, an editor)
     function pageFile(p, s) {
-        if (p === "messages" && s === "announcements") return "AnnouncementsPage.qml"
         var f = shell.pages[p]
         return f === undefined || f === "" ? "Pending.qml" : f
     }
     // what is made is made in a drawer over its page (EditorHost)
     function editorFile(p, s) {
         if (p === "tasks" && s === "new") return "NewTaskPage.qml"
+        if (p === "announcements" && s === "new") return "NewAnnouncementPage.qml"
         if (p === "restricted" && s === "mark") return "MarkPage.qml"
         if (p === "flows" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewFlowPage.qml"
         if (p === "automation" && s && (s === "new" || String(s).indexOf("edit-") === 0)) return "NewRulePage.qml"

@@ -44,6 +44,7 @@ QtObject {
     // Pages that were pruned (docs/design/pruning.md): whoever still points at one lands on the page that took over its job.
     readonly property var gone: ({ access: 1, accountability: 1, rules: 1, rollout: 1, reports: 1, sessions: 1 })
     function remap(p, s) {
+        if (p === "messages" && s === "announcements") return ["announcements", null]      // the calendar still links here (ENGINE-GAPS 25)
         if (!(p in gone)) return [p, s]
         return [p === "sessions" || p === "rollout" ? "machines" : p === "reports" ? "issues" : "overview", null]
     }
@@ -64,7 +65,7 @@ QtObject {
     // --- the menus ----------------------------------------------------------------------------------
     // Three groups (19 Oct 2026): Home, Core (the four features), Manage.
     readonly property var menu: [
-        ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["calendar", "Calendar", "calendar"]]],
+        ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["announcements", "Announcements", "notification"], ["calendar", "Calendar", "calendar"]]],
         ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
         ["Manage", [["machines", "Machines", "desktop"], ["departments", "Departments", "apartment"], ["actions", "Actions", "playcircle"], ["automation", "Automation", "thunderbolt"],
                     ["issues", "Issues", "alert"], ["audit", "Audit log", "history"]]]
@@ -79,6 +80,7 @@ QtObject {
 
     // --- titles: what each page is, in a line --------------------------------------------------------
     readonly property var titles: ({
+        announcements: ["Announcements", "What is said to many people at once"],
         calendar: ["Calendar", "What is coming · task deadlines, your to-dos and scheduled automation"],
         messages: ["Messages", "Conversations with the people you look after, one at a time or as a group"],
         detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"],

@@ -38,7 +38,7 @@ async def test_the_calendar_lists_what_is_coming_one_month_at_a_time_and_opens_w
     page = await _open(win, bridge, "calendar", "calendarPage")
     page.setProperty("items", ITEMS)
     _pump(0.3)
-    assert prop(win, "menuKeys")[:3] == ["overview", "messages", "calendar"]                      # Home: Overview, Messages, Calendar
+    assert prop(win, "menuKeys")[:4] == ["overview", "messages", "announcements", "calendar"]     # Home
     assert prop(page, "months") >= 2 and prop(page, "mi") == 0                                    # this month, and on to the last one that has anything
     assert len(prop(page, "cells")) % 7 == 0                                                     # whole weeks
     today = prop(page, "today")

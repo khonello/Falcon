@@ -913,6 +913,16 @@ def event_history(eid: int) -> dict[str, Any]:
     return {"event_id": eid, "firings": firings, "fired_today": 0, "running": []}
 
 
+# --- announcements (alerts.sent) ------------------------------------------------------------------------
+def alerts_sent() -> list[dict[str, Any]]:
+    rows = [(5, "announcement", "New printer on the first floor", "The new printer by the stairs is ready. Pick FLOOR-1 when you print; the old one goes on Monday.", "Everyone", "R. Mensah", 33, "scheduled"),
+            (4, "announcement", "Office closed on Monday 5 Oct", "The building is closed on Monday 5 October for the electrical inspection. Nobody can come in that day, including the warehouse. Work from home if you can.", "Everyone", "A. Quaye", 8.67, "delivered"),
+            (3, "emergency", "Leave the building now", "The fire alarm in the warehouse has gone off. Use the stairs, not the lift, and meet at the car park by the main gate.", "Everyone", "A. Quaye", -8.67, "delivered"),
+            (2, "warning", "Emails asking for parcel fees", "Emails asking you to pay a parcel fee are fake. Do not click them; delete them.", "Logistics", "R. Mensah", -77, "delivered"),
+            (1, "announcement", "New parking rules from 1 Oct", "Staff parking moves to the back lot from 1 October.", "Everyone", "R. Mensah", -170, "withdrawn")]
+    return [{"id": i, "alert_type": k, "title": t, "body": b, "audience_label": a, "from_name": by, "from_you": by == "R. Mensah", "deliver_at": at(h - CONCEPT_NOW), "status": st} for i, k, t, b, a, by, h, st in rows]
+
+
 # --- reports ----------------------------------------------------------------------------------------------
 # id, category, summary, hours ago, addressed (hours after, by), department it came from
 REPORTS = [
@@ -1048,6 +1058,8 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
     if type_ == "todo.done":
         _TODOS_DONE.add(int(payload.get("todo_id") or 0))
         return {"todo": next((t for t in _todos()["todos"] if t["id"] == int(payload.get("todo_id") or 0)), None)}
+    if type_ == "alerts.sent":
+        return {"alerts": alerts_sent()}
     if type_ == "flow.steps":
         ops = {"Choosing": ["By file type", "By name", "By size"], "Conversion": ["To PDF", "To DOCX", "To another image type", "Zip each file"],
                "Renaming": ["Add a date", "Add text", "Replace text in the name"], "Bundling": ["Into one ZIP", "Into one PDF"]}
