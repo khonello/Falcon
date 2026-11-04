@@ -34,6 +34,8 @@ Last updated 4 Nov 2026.
 - **REMIND THE USER (they asked, 4 Nov 2026):** a few dozen real task descriptions, one per line in `data/real-task-descriptions.txt`, then run `scripts/llm_real_wording.py`.
 - **Smoothing (4 Nov 2026):** Groq smooths the events paragraph when a key is set; 8 of 8 real paragraphs rewritten and checked. No key: the Engine's own account.
 - **Flow steps:** Into one PDF dropped too, with `pypdf`.
+- **Qwen3-4B test, on hold (the user, 4 Nov 2026: do not resume until they say):** the 2.5 GB download stopped part way; what came down is kept as `models/Qwen3-4B-Q4_K_M.gguf.part` and it continues from there, it does not start again:
+  `curl -L --fail -C - -o models/Qwen3-4B-Q4_K_M.gguf.part "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"`, then rename it to `.gguf` (2,497,280,256 bytes whole). Then: `scripts/llm_probe.py --model-path`, `scripts/llm_benchmark.py --model-path` for it and for the 1.7B on the same held-out cases, and compare with Groq's 30/31.
 - **Groq fallback (built and tried for real, 4 Nov 2026):** `openai/gpt-oss-120b`, paced under the plan's limit: held-out 30/31, about 1 s a call, the 8 Detective paragraphs all rewritten and passing the check. A burst over the plan's 8,000 tokens a minute is refused: those questions come back unclear, and a test run in a burst scored 25/31 for that reason alone. Before a customer ships: their own key, on a paid plan; the key given in the session should be replaced.
 
 ## Engine pass, 2 Nov 2026 (built; the Engine session does no UI work: `docs/UI-WORK-FROM-ENGINE.md` is the UI's list)
