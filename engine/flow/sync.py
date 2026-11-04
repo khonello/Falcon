@@ -593,7 +593,7 @@ async def _bundle_close(engine: Engine, b: Bundle) -> None:
     _closing[b.id] = b
     await engine.push_to_pc(dest["destination_pc_id"], "flow.bundle_close", {
         "bundle_id": b.id, "flow_id": flow["id"], "destination_id": dest["id"], "destination_path": dest["destination_path"], "name": name,
-        "op": step["config"]["op"], "folders": step["config"]["settings"].get("folders", "keep"),
+        "folders": step["config"]["settings"].get("folders", "keep"),
         "previous": await engine.db.flows.last_written_for(dest["id"], BUNDLE_KEY)})
 
 
@@ -626,7 +626,7 @@ _closing: dict[str, Bundle] = {}            # bundles the destination was told t
 @handler("flow.bundle_result")
 async def bundle_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """The destination made a bundle (or could not): {"bundle_id", "status": "success"|"failed", "written_path"?, "written_hash"?, "files"?,
-    "size_before"?, "size_after"?, "preserved"?, "left_out"?: [names not put in (a bundle of PDFs takes only PDFs)]}."""
+    "size_before"?, "size_after"?, "preserved"?}."""
     ident = require_account(ctx)
     b = _closing.pop(str_field(payload, "bundle_id"), None)
     dest = await ctx.engine.db.flows.destination(b.destination_id) if b else None
@@ -645,8 +645,7 @@ async def bundle_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
         await ctx.engine.db.flows.log_sync(dest["id"], "", "external", None, conflict_resolved=True, source_relative_path=BUNDLE_KEY,
                                            written_path=str(payload["preserved"]), outcome="kept_beside", bytes_before=before)
     await ctx.engine.audit.record(ctx, "flow.bundled", target_type="flow_destinations", target_id=dest["id"],
-                                  detail={"flow_id": flow["id"], "files": b.files, "path": payload.get("written_path"),
-                                          "left_out": list(payload.get("left_out") or [])[:50]})
+                                  detail={"flow_id": flow["id"], "files": b.files, "path": payload.get("written_path")})
     await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.synced",
                                      {"flow_id": flow["id"], "destination_id": dest["id"], "relative_path": str(payload.get("written_path") or ""), "bundle": True})
     return {"recorded": True}

@@ -61,9 +61,9 @@ async def test_detective_s_second_opinion_reads_a_plain_leak_as_something_not_no
 
 @pytest.mark.timeout(300)
 async def test_smoothing_is_only_switched_on_when_the_model_really_rewrites(llm):
-    """Off today: the 1.7B rewrote too little, too badly. Whoever switches it on must pass this with the model they chose."""
-    if not telling.SMOOTHING:
-        pytest.skip("Detective's smoothing is off")
+    """Off today: the 1.7B rewrote too little, too badly. Whoever switches LOCAL_SMOOTHING on must pass this with the model they chose."""
+    if not telling.LOCAL_SMOOTHING:
+        pytest.skip("the local model does not smooth")
     paragraphs = ["At [time1], [count2] files were copied to [folder3]. At [time4], a drive was plugged in ([drive5]).",
                   "At [time1], [program2] was started. At [time3], [program4] sent [amount5] out over the network.",
                   "At [time1], [file2] was renamed to [file3]. At [time4], who may open [file5] was changed."]

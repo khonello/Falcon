@@ -164,17 +164,18 @@ class LocalLLM:
             return None
         return value
 
-    async def rewrite(self, instruction: str, text: str, *, max_tokens: int = 320) -> str | None:
+    async def rewrite(self, instruction: str, text: str, *, max_tokens: int = 320, cloud: bool = False) -> str | None:
         """The one place the model writes sentences: a paragraph whose facts are markers it cannot see ([person1], [file2]...), smoothed into plainer
-        words. Never shown as it comes: the caller checks it (engine/detective/telling.py `checked`) and keeps its own paragraph otherwise."""
-        answer = await self._ask(f"{instruction}\n\nParagraph: \"\"\"{_quoted(text)}\"\"\"", max_tokens=max_tokens, system=SYSTEM_WRITE)
+        words. Never shown as it comes: the caller checks it (engine/detective/telling.py `checked`) and keeps its own paragraph otherwise. `cloud`: straight
+        to Groq, the one question that may skip the local model, because it holds no fact (only markers), and nothing at all without a key."""
+        answer = await self._ask(f"{instruction}\n\nParagraph: \"\"\"{_quoted(text)}\"\"\"", max_tokens=max_tokens, system=SYSTEM_WRITE, cloud=cloud)
         if answer is None:
             return None
         return answer.strip().strip("\"'`").strip() or None
 
     # --- transport ------------------------------------------------------------------------------
 
-    async def _ask(self, prompt: str, *, max_tokens: int, system: str = SYSTEM) -> str | None:
+    async def _ask(self, prompt: str, *, max_tokens: int, system: str = SYSTEM, cloud: bool = False) -> str | None:
         if not self.available:
             return None
         if len(prompt) > MAX_PROMPT_CHARS:
@@ -185,7 +186,7 @@ class LocalLLM:
             self._cache.move_to_end(key)
             self.cache_hits += 1
             return hit
-        answer = await self._ask_local(prompt, max_tokens, system) if self.local_available else None
+        answer = await self._ask_local(prompt, max_tokens, system) if self.local_available and not cloud else None
         if answer is None and self.fallback_available:
             answer = await self._ask_fallback(prompt, max_tokens, system)
         if answer is None:
@@ -247,7 +248,7 @@ class LocalLLM:
         if self._fallback_said is not None and now - self._fallback_said < FALLBACK_SAY_SECONDS:
             return
         self._fallback_said = now
-        log.warning("the local model could not answer: questions are going to Groq (%s)", self.fallback_model)
+        log.warning("questions are going to Groq (%s)", self.fallback_model)
         if self.on_fallback is not None:
             try:
                 await self.on_fallback()

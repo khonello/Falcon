@@ -80,7 +80,7 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   Operation, then its settings.
   - Per file: Choosing (by file type, by name, by size), Conversion (To PDF, To DOCX, To another image type, Zip each file), Renaming
     (Add a date, Add text, Replace text in the name).
-  - All files: Bundling (Into one ZIP, Into one PDF).
+  - All files: Bundling (Into one ZIP).
 - **Sending a step:** in `flow.create` / `flow.edit`, each stage is `{"step": {kind, op, settings}, "parent_index"?}` (a branch is still
   `{"stage_type": "branch"}`). `flow.list` / `flow.status` return each stage with `stage_type` = its kind and `config: {kind, op, label,
   settings}`. The old five names (`{"config": {"op": "Rename by date"}}`) are still accepted, for the console as it is.
@@ -107,7 +107,7 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   name), `machine`, `time` (value ISO), `duration`, `file`, `folder`, `drive`, `program`, `count`, `amount`, `intent`, `reason` (a rule's
   own reason or what would make it innocent, word for word), `tag` ("a restricted file"). Mark people, files, machines, programs and times
   the way the task box does; the rest can stay plain.
-- `smoothed` is false for now: the model's smoothing is switched off (4 Nov 2026), so the account is always the Engine's own. Either way show `note`
+- `smoothed` is true when Groq smoothed the paragraph that tells what happened and it passed the check; that needs a Groq key. Otherwise the account is the Engine's own, word for word. Either way show `note`
   ("Detective's reading of the evidence, not proof."). The page's own writing-out of the findings can go: draw this instead.
 - When the smoothing arrives later, `detective.updated {case_id, telling: true}` is pushed: read the case again.
 
@@ -139,6 +139,11 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   keyboard, check_ins), Coming up (`automation.board`: next_at, coming_up), action output kinds and Try (`control.action_try`), flow runs as a
   diff (`flow.runs`), the Restricted page's came_by / allowed / lately / flows_allowed (`marks.get`), At a glance (`detective.glance`), knocked
   PCs (`registry.knocked`).
+
+### Tests failing on the rebuilt pages (found by the Engine session, 4 Nov 2026; they fail on the UI session's own commit, without any Engine change)
+Each looks for something the rebuilt page no longer has. For each: if the concept dropped it, update or remove the test; if the page lost it by accident, put it back.
+- `test_detective_gui.py`: `caseHeadline` is gone (a case reads as a story); `restrictedAsk_5` is not found on the Flows page; a property read with `.toVariant()` is now a plain string; `suggestions` / `toAllow` never reach 2 and 1 (the waiting count); the buttons test finds no object it looks for by name; the marking test's size box is not visible.
+- `test_task_mentions.py`: the `tabs` switch on Messages (conversations and announcements) is not found.
 
 ## The Worker's own program and windows (worker_client/program/qml, worker_client/windows/qml)
 

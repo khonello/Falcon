@@ -101,13 +101,13 @@ A step is picked from a tree: a category, a kind, an operation, then a few setti
 - **Renaming**, the name changes and the content does not: Add a date, Add text, Replace text in the name. One file in stays one file out: when an edit gives a file a new name (Add a date), the copy under the old name is put aside and only the newest stays. A copy someone changed at the destination is theirs, and stays beside it.
 
 **All files** (many in, one out)
-- **Bundling**, the files become one: Into one ZIP, Into one PDF. It needs a moment when "all the files" are known, so it is only in a flow that runs every hour or when Run is pressed, from one folder. Each run bundles the whole folder as it is then, and makes nothing when nothing changed since the last bundle.
+- **Bundling**, the files become one ZIP. It needs a moment when "all the files" are known, so it is only in a flow that runs every hour or when Run is pressed, from one folder. Each run bundles the whole folder as it is then, and makes nothing when nothing changed since the last bundle.
 
 The kinds always run in one order along a destination's path: **Choosing, Conversion, Renaming, Bundling**. A path has at most one Bundling. The original is always preserved at the source.
 
 A Conversion a file cannot have never stops the flow: the step's setting says whether the file is copied as it is (the default) or left out, and it is on the record either way. Word, Excel and PowerPoint files need Microsoft Office or LibreOffice on the destination machine; neither ships with Falcon, and the flow says which destinations have one.
 
-Placing (sorting into folders by type or by month) was dropped on 3 Nov 2026: it was not obvious what it does. Unbundling (unzipping, splitting a PDF) was dropped on 4 Nov 2026: nothing needs it.
+Placing (sorting into folders by type or by month) was dropped on 3 Nov 2026: it was not obvious what it does. Unbundling (unzipping, splitting a PDF) and merging PDFs into one were dropped on 4 Nov 2026: nothing needs them.
 
 **Manual Checkpoint:** Each stage is manually configured and managed, not automatic.
 

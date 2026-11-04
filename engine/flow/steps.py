@@ -5,7 +5,7 @@
       Conversion   what is inside changes:    to_pdf, to_docx, to_image, zip_each
       Renaming     the name changes:          add_date, add_text, replace_text
     All files (many in, one out)
-      Bundling     the files become one:      zip, pdf
+      Bundling     the files become one:      zip
 
 Placing (sorting into folders by type or month) was dropped: it was not obvious what it does. A flow made with it before keeps running; its
 placing steps do nothing now.
@@ -93,11 +93,7 @@ CATALOGUE: list[dict[str, Any]] = [
             {"op": "zip", "label": "Into one ZIP", "settings": {
                 "name": {"text": 80, "label": "Its name", "name": True},
                 "dated": {"flag": True, "default": True, "label": "Add the date to its name"},
-                "folders": {"choices": ["keep", "flatten"], "default": "keep", "label": "Folders inside it"}}},
-            {"op": "pdf", "label": "Into one PDF", "settings": {
-                "name": {"text": 80, "label": "Its name", "name": True},
-                "dated": {"flag": True, "default": True, "label": "Add the date to its name"}},
-             "needs": "Only PDF files go in, in name order; put a To PDF step before it for the rest"}],
+                "folders": {"choices": ["keep", "flatten"], "default": "keep", "label": "Folders inside it"}}}],
          "needs": "Only in a flow that runs every hour or when you press Run, from one folder"}]}
 ]
 
@@ -261,10 +257,10 @@ def chosen(chain: list[dict[str, Any]], relative_path: str, size: int | None = N
 
 
 def bundle_name(config: dict[str, Any], flow_name: str | None, today: str) -> str:
-    """The bundle's file name: its name (the flow's, when none was given), the date when asked, and .zip or .pdf."""
+    """The bundle's file name: its name (the flow's, when none was given), the date when asked, and .zip."""
     s = config["settings"]
     base = (s.get("name") or flow_name or "bundle").strip() or "bundle"
     base = NAME_BAD.sub("-", base)
     if s.get("dated", True):
         base = f"{base} {today}"
-    return f"{base}.{'pdf' if config['op'] == 'pdf' else 'zip'}"
+    return f"{base}.zip"

@@ -74,7 +74,7 @@ async def test_a_run_sends_the_whole_folder_into_one_bundle_and_nothing_when_not
             seen += 1
         reads = [p for p in await a1.drain_pushes() if p.type == "flow.read"]
     close = next(p for p in await w1.drain_pushes() if p.type == "flow.bundle_close")
-    assert close.payload["name"] == "pack.zip" and close.payload["op"] == "zip"
+    assert close.payload["name"] == "pack.zip"
     await w1.ok("flow.bundle_result", {"bundle_id": close.payload["bundle_id"], "status": "success", "written_path": "C:/in/pack.zip", "written_hash": "hz",
                                        "files": 2, "size_after": 10})
     assert (await a1.ok("flow.status", {"flow_id": flow["id"]}))["flow"]["files_copied"]["total"] == 1      # one file: the bundle

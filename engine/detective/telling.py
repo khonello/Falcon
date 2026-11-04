@@ -4,7 +4,8 @@ The account is written by the Engine, not by the model. Every fact in it (who wa
 program, count and how long it lasted, and the rules' own reasons) is filled in from the case. Each one is a part the console marks, the
 way the task box marks people and files. Around the facts are plain joining words.
 
-Then, when `SMOOTHING` is on (it is off: see below) and the model is here, it may smooth one paragraph at a time so it reads less like a form. It never sees the facts. It sees each one
+Then, when a model is fit for it (`smoothing`: see below), the paragraph that tells what happened may be smoothed so it reads less like a form. The
+others stay as written: they are mostly the rules' own words, and rewriting them only made them worse. It never sees the facts. It sees each one
 as a marker that says what kind of fact it is ([person1], [file2], [time3]...) and is told to keep every marker once and to add nothing.
 Its paragraph is used only when a check finds every marker still there once, each still with the facts of its own sentence and the
 sentences in their order (inside a sentence, facts of different kinds may change places: `_same_facts`), and finds no new number, no new name (a capitalised word), no change in
@@ -39,17 +40,18 @@ SMOOTH_TOKENS = 320
 
 NOTE = "Detective's reading of the evidence, not proof."
 
-# Off (4 Nov 2026): measured on 8 paragraphs, the 1.7B handed all 8 back unchanged, and with a worked example (below) improved 2, spoiled 2 and
-# still copied the events paragraph, at about 13 s each, with Task proposals queued behind it. The Engine's own account is what is shown.
-# tests/test_llm_real.py has the bar a model must clear before this is switched on.
-SMOOTHING = False
+# Who smooths (the user, 4 Nov 2026). Groq, when a key is set: it sees only markers, never a fact, so no name or file leaves the machine. The local
+# model does not (LOCAL_SMOOTHING): on 8 paragraphs the 1.7B handed all 8 back unchanged, and with a worked example improved 2, spoiled 2 and still
+# copied the events paragraph, at about 13 s each, with Task proposals queued behind it. tests/test_llm_real.py has the bar it must clear.
+# With neither, the Engine's own account is shown, which says exactly the same.
+LOCAL_SMOOTHING = False
 
 INSTRUCTION = (
-    "Turn the stiff notes below into natural English, the way a colleague would tell it. Join sentences with words like then, after that, and, a little later. "
+    "Turn the stiff notes below into natural English, the way a colleague would tell it. Join sentences with words like then, after that, and. "
     "Words in square brackets such as [time1] or [file2] are placeholders: copy each one exactly, each one once, and keep them with the same event. "
-    "Tell the events in the same order. Add no facts and no reasons.\n\n"
+    "Tell the events in the same order. Add no facts and no reasons, and do not say how long anything took or how soon it came.\n\n"
     "Example notes: At [time1], [file2] was opened. At [time3], [file4] was deleted.\n"
-    "Example answer: [file2] was opened at [time1], and then [file4] was deleted a little later, at [time3].\n\n"
+    "Example answer: [file2] was opened at [time1], and then [file4] was deleted at [time3].\n\n"
     "Now do the same for these notes. Reply with only the new text.")
 
 # Words that judge or guess at a reason: the account says what happened, never why or who is to blame. Refused in a rewrite unless the
@@ -58,7 +60,10 @@ BLAME = ("deliberately", "deliberate", "intentionally", "intentional", "on purpo
          "stole", "steal", "stealing", "theft", "thief", "guilty", "malicious", "criminal", "suspicious", "suspect", "suspected", "illegal",
          "probably", "likely", "presumably", "apparently", "must have", "seems", "seemed", "in order to", "so that", "because", "trying to",
          "tried to", "wanted to", "attempt", "attempted", "to hide", "to cover", "cover up", "covered up", "secretly", "sneak", "sneaked",
-         "snuck", "wrongdoing", "breach", "leak", "leaked")
+         "snuck", "wrongdoing", "breach", "leak", "leaked",
+         # and words of timing: the times in the account say how soon things came; "a little later" would be the model's guess
+         "a little later", "later on", "shortly", "soon", "immediately", "right after", "right away", "moments later", "minutes later", "seconds later",
+         "quickly", "suddenly", "eventually", "straight away")
 NEGATIONS = re.compile(r"\b(not|no|never|nothing|nobody|none|without|neither|nor)\b|n't\b", re.IGNORECASE)
 MARKER = re.compile(r"\[([a-z]+)(\d+)\]")          # [person1], [file2]: what kind of fact, and which one
 SHAPE = "2"                                        # how the markers look; part of the fingerprint, so a smoothing in an older shape is made again
@@ -77,6 +82,7 @@ class Fact:
 @dataclass
 class Telling:
     paragraphs: list[list[str | Fact]] = field(default_factory=list)
+    events: int | None = None                 # which paragraph tells what happened: the one that may be smoothed
 
     def skeletons(self) -> list[str]:
         """Each paragraph with its facts as markers [person1], [file2]... (its kind, and a number from 1 within the paragraph): what the model sees."""
@@ -302,6 +308,7 @@ def compose(case: dict[str, Any], findings: list[dict[str, Any]], sessions: list
         more = sum(len(r) for r in runs[MAX_STEPS:])
         p2 += [" After that came ", Fact("count", str(more), more), f" more step{'s' if more != 1 else ''}."]
     if p2:
+        t.events = len(t.paragraphs)
         t.paragraphs.append(p2)
 
     # why it is worth a look: the rules' own reasons, word for word
@@ -376,13 +383,17 @@ def checked(skeleton: str, rewrite: str) -> bool:
     return 0.5 * plain - 20 <= len(MARKER.sub("", rewrite)) <= 1.6 * plain + 60
 
 
+def smoothing(llm: Any) -> bool:
+    return LOCAL_SMOOTHING or bool(getattr(llm, "fallback_key", None))
+
+
 async def smooth(llm: Any, telling: Telling) -> list[str | None]:
-    """Each paragraph the model rewrote and the check passed; None where it did not (or the model is away)."""
+    """The events paragraph if the model rewrote it and the check passed; None for every paragraph kept as the Engine wrote it."""
     out: list[str | None] = []
-    for skeleton in telling.skeletons():
+    for i, skeleton in enumerate(telling.skeletons()):
         said = None
-        if getattr(llm, "available", False) and hasattr(llm, "rewrite"):
-            said = await llm.rewrite(INSTRUCTION, skeleton, max_tokens=SMOOTH_TOKENS)
+        if i == telling.events and getattr(llm, "available", False) and hasattr(llm, "rewrite"):
+            said = await llm.rewrite(INSTRUCTION, skeleton, max_tokens=SMOOTH_TOKENS, cloud=not LOCAL_SMOOTHING)
         said = " ".join(said.split()) if said else None
         out.append(said if said and said != skeleton and checked(skeleton, said) else None)
     return out

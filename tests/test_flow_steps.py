@@ -41,7 +41,7 @@ def test_the_tree_lists_every_kind_and_each_step_is_checked_against_it():
     tree = steps.catalogue()
     kinds = {k["kind"]: [o["op"] for o in k["ops"]] for c in tree for k in c["kinds"]}
     assert kinds == {"choosing": ["by_type", "by_name", "by_size"], "conversion": ["to_pdf", "to_docx", "to_image", "zip_each"],
-                     "renaming": ["add_date", "add_text", "replace_text"], "bundling": ["zip", "pdf"]}
+                     "renaming": ["add_date", "add_text", "replace_text"], "bundling": ["zip"]}
     assert [c["category"] for c in tree] == ["per_file", "all_files"]
     st = _stage("conversion", "to_pdf")
     assert st["stage_type"] == "conversion" and st["config"]["settings"] == {"from": ["text", "images", "word", "excel", "powerpoint"], "if_not": "copy"}
@@ -80,7 +80,7 @@ def test_the_kinds_run_in_one_order_and_bundling_only_where_a_run_has_a_folder()
     dests, stages = path(("renaming", "add_date", {}), ("conversion", "to_pdf", {}))
     with pytest.raises(ProtocolError):
         check_steps(stages, dests, run_mode="realtime", sources=1, source_kind="folder")      # Conversion comes before Renaming
-    dests, stages = path(("bundling", "zip", {}), ("bundling", "pdf", {}))
+    dests, stages = path(("bundling", "zip", {}), ("bundling", "zip", {}))
     with pytest.raises(ProtocolError):
         check_steps(stages, dests, run_mode="hourly", sources=1, source_kind="folder")        # one bundle
     with pytest.raises(ProtocolError):
@@ -177,19 +177,17 @@ def test_an_image_changes_type_with_windows_own_image_library(tmp_path):
 
 
 def test_a_bundle_is_made_from_what_was_kept_aside(tmp_path):
-    # a bundle's run: files kept aside, then one ZIP (folders kept or flattened) or one PDF
+    # a bundle's run: files kept aside, then one ZIP (folders kept or flattened)
     (tmp_path / "sub").mkdir()
     (tmp_path / "a.pdf").write_bytes(pdf.to_pdf(b"a", "txt"))
     (tmp_path / "sub" / "a.pdf").write_bytes(pdf.to_pdf(b"b", "txt"))
     (tmp_path / "note.txt").write_text("n")
-    data, files, left = _make_bundle(tmp_path, "zip", "keep")
+    data, files = _make_bundle(tmp_path, "keep")
     with zipfile.ZipFile(io.BytesIO(data)) as z:
-        assert sorted(z.namelist()) == ["a.pdf", "note.txt", "sub/a.pdf"] and files == 3 and left == []
-    data, _, _ = _make_bundle(tmp_path, "zip", "flatten")
+        assert sorted(z.namelist()) == ["a.pdf", "note.txt", "sub/a.pdf"] and files == 3
+    data, _ = _make_bundle(tmp_path, "flatten")
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         assert sorted(z.namelist()) == ["a (2).pdf", "a.pdf", "note.txt"]
-    data, files, left = _make_bundle(tmp_path, "pdf", "keep")
-    assert data.startswith(b"%PDF") and files == 2 and left == ["note.txt"]
     assert steps.bundle_name({"op": "zip", "settings": {"dated": True}}, "Month end", "2026-11-03") == "Month end 2026-11-03.zip"
 
 

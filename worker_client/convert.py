@@ -1,11 +1,10 @@
-"""What a flow's Conversion and Bundling steps are done with on this machine (engine/flow/steps.py has the tree).
+"""What a flow's Conversion steps are done with on this machine (engine/flow/steps.py has the tree).
 
   * Word, Excel, PowerPoint (and the OpenDocument kinds) to PDF, and a PDF to DOCX: Microsoft Office when it is installed (driven through
     PowerShell, as Windows itself allows), else LibreOffice run with no window (`soffice --headless --convert-to`). Neither is shipped with
     Falcon; `office_tool()` says which this machine has, and the Worker says so when it connects.
   * Images (PNG, JPG, BMP, GIF, TIFF) to JPG or PNG: Windows' own image library (System.Drawing), through PowerShell.
   * Text to PDF and JPEG to PDF: worker_client/pdf.py, nothing outside the standard library. Text to DOCX: written here.
-  * PDFs merged into one: pypdf.
 
 Each takes and returns bytes; anything it cannot do raises Unconvertible, which the step turns into "copied as it is" or "left out".
 """
@@ -220,22 +219,4 @@ def text_docx(data: bytes) -> bytes:
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             z.writestr(info, body.encode("utf-8"))
-    return out.getvalue()
-
-
-# --- PDFs as one (pypdf) --------------------------------------------------------------------------------------------
-
-def merge_pdfs(parts: list[bytes]) -> bytes:
-    try:
-        from pypdf import PdfReader, PdfWriter
-    except ImportError as exc:
-        raise Unconvertible("PDFs cannot be merged on this machine (pypdf is not installed)") from exc
-    writer = PdfWriter()
-    for data in parts:
-        try:
-            writer.append(PdfReader(io.BytesIO(data)))
-        except Exception as exc:
-            raise Unconvertible(f"a PDF could not be read ({exc.__class__.__name__})") from exc
-    out = io.BytesIO()
-    writer.write(out)
     return out.getvalue()

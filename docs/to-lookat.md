@@ -31,7 +31,9 @@ Last updated 4 Nov 2026.
 - **Not run for real:** Word, Excel and PowerPoint conversion and PDF to DOCX (no Office or LibreOffice on the dev machine; tested with a stand-in).
 - **Add a date:** *(decided 4 Nov 2026)* only the newest stays: an edited file's older copy is put aside in `.falcon-removed`.
 - **LLM (4 Nov 2026):** Detective's smoothing is off (the 1.7B copied or spoiled most paragraphs, even with a worked example); `tests/test_llm_real.py` runs the real model.
-- **Waiting on the user:** a few dozen real task descriptions for `scripts/llm_real_wording.py`; whether to test Qwen3-4B (2.5 GB download); whether smoothing goes to Groq when a key is set.
+- **REMIND THE USER (they asked, 4 Nov 2026):** a few dozen real task descriptions, one per line in `data/real-task-descriptions.txt`, then run `scripts/llm_real_wording.py`.
+- **Smoothing (4 Nov 2026):** Groq smooths the events paragraph when a key is set; 8 of 8 real paragraphs rewritten and checked. No key: the Engine's own account.
+- **Flow steps:** Into one PDF dropped too, with `pypdf`.
 - **Groq fallback (built and tried for real, 4 Nov 2026):** `openai/gpt-oss-120b`, paced under the plan's limit: held-out 30/31, about 1 s a call, the 8 Detective paragraphs all rewritten and passing the check. A burst over the plan's 8,000 tokens a minute is refused: those questions come back unclear, and a test run in a burst scored 25/31 for that reason alone. Before a customer ships: their own key, on a paid plan; the key given in the session should be replaced.
 
 ## Engine pass, 2 Nov 2026 (built; the Engine session does no UI work: `docs/UI-WORK-FROM-ENGINE.md` is the UI's list)

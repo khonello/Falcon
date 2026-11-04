@@ -15,7 +15,7 @@ Steps (engine/flow/steps.py has the tree; the Engine sends each destination's pa
   * conversion  to_pdf, to_docx, to_image, zip_each   -- worker_client/convert.py; a file a step cannot have is copied as it is or left
                                                          out (its `if_not`), never a reason to stop the flow
   * renaming    add_date, add_text, replace_text
-  * bundling    a file of a bundle's run (`bundle` in flow.apply) is kept aside, not written: flow.bundle_close makes the one ZIP or PDF
+  * bundling    a file of a bundle's run (`bundle` in flow.apply) is kept aside, not written: flow.bundle_close makes the one ZIP
                 from what was kept, flow.bundle_drop throws it away
 The source's modified time comes with the content (`modified`, ISO 8601); a copy that does not have it uses the day it is written.
 
@@ -190,7 +190,7 @@ class FlowSync:
         try:
             if base is None:
                 raise OSError("nothing was kept aside for this bundle")
-            data, files, left = await asyncio.to_thread(_make_bundle, base, str(payload.get("op") or "zip"), str(payload.get("folders") or "keep"))
+            data, files = await asyncio.to_thread(_make_bundle, base, str(payload.get("folders") or "keep"))
             target = Path(str(payload["destination_path"])) / str(payload["name"])
             target.parent.mkdir(parents=True, exist_ok=True)
             before = target.stat().st_size if target.is_file() else None
@@ -198,11 +198,11 @@ class FlowSync:
             await asyncio.to_thread(target.write_bytes, data)
             digest = hashlib.sha256(data).hexdigest()
             self.written_hashes[str(target)] = digest
-            reply.update({"status": "success", "written_path": str(target), "written_hash": digest, "files": files, "left_out": left,
+            reply.update({"status": "success", "written_path": str(target), "written_hash": digest, "files": files,
                           "size_before": before, "size_after": len(data)})
             if kept:
                 reply["preserved"] = str(kept)
-        except (OSError, convert.Unconvertible, zipfile.BadZipFile) as exc:
+        except (OSError, zipfile.BadZipFile) as exc:
             log.warning("flow bundle %s failed: %s", bundle_id, exc)
             reply.update({"status": "failed", "why": str(exc)[:200]})
         finally:
@@ -373,14 +373,9 @@ def _renamed(op: str | None, s: dict[str, Any], target: Path, when: datetime) ->
     return target
 
 
-def _make_bundle(base: Path, op: str, folders: str) -> tuple[bytes, int, list[str]]:
-    """(the bundle, how many files are in it, the names left out of it) from what a run kept aside."""
+def _make_bundle(base: Path, folders: str) -> tuple[bytes, int]:
+    """(the ZIP, how many files are in it) from what a run kept aside."""
     found = sorted((p for p in base.rglob("*") if p.is_file()), key=lambda p: p.relative_to(base).as_posix().lower())
-    if op == "pdf":
-        pdfs = [p for p in found if p.suffix.lower() == ".pdf"]
-        if not pdfs:
-            raise convert.Unconvertible("there was no PDF to put in it")
-        return convert.merge_pdfs([p.read_bytes() for p in pdfs]), len(pdfs), [p.name for p in found if p not in pdfs][:50]
     out = io.BytesIO()
     used: set[str] = set()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
@@ -393,7 +388,7 @@ def _make_bundle(base: Path, op: str, folders: str) -> tuple[bytes, int, list[st
                 n += 1
             used.add(name.lower())
             z.write(p, name)
-    return out.getvalue(), len(found), []
+    return out.getvalue(), len(found)
 
 
 def _when(raw: Any) -> datetime | None:

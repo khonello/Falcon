@@ -35,6 +35,7 @@ def test_a_rewrite_is_used_only_when_every_fact_is_kept_with_its_own_and_nothing
     assert not checked(SKELETON, "At [time1], [count2] files were copied to [folder3] in order to take them. At [time4], a drive was plugged in ([drive5]). It has not left yet.")
     assert not checked(SKELETON, "At [time1], [count2] files were copied to [folder3]. At [time4], a drive was plugged in ([drive5]). It has not left the machine yet. " * 3)  # too long
     assert not checked(SKELETON, "At [file1], [count2] files were copied to [folder3]. At [time4], a drive was plugged in ([drive5]). It has not left the machine yet.")  # a fact's kind changed
+    assert not checked(SKELETON, "At [time1], [count2] files were copied to [folder3]. A little later, at [time4], a drive was plugged in ([drive5]). It has not left the machine yet.")  # a guess at timing
     assert not checked(SKELETON, "At [time1] **[count2]** files were copied to [folder3]. At [time4], a drive was plugged in ([drive5]). It has not left the machine yet.")    # markup
 
 
@@ -70,6 +71,7 @@ class Smoother:
     """A model that smooths the account: well on what happened, and adds a guess at a reason to the paragraph that says why it matters."""
 
     available = True
+    fallback_key = "a key"
 
     def __init__(self) -> None:
         self.asked: list[str] = []
@@ -77,7 +79,8 @@ class Smoother:
     async def choose(self, question, text, options):
         return None
 
-    async def rewrite(self, instruction, text, *, max_tokens=320):
+    async def rewrite(self, instruction, text, *, max_tokens=320, cloud=False):
+        assert cloud                                                            # only Groq smooths: the local model is not asked
         self.asked.append(text)
         if text.startswith("Detective reads"):
             return text + " It was clearly done on purpose."
@@ -85,8 +88,7 @@ class Smoother:
 
 
 @requires_db
-async def test_the_case_is_told_in_words_and_the_model_may_change_only_the_words_between_the_facts(engine, org, connect, monkeypatch):
-    monkeypatch.setattr(telling, "SMOOTHING", True)                             # (off in the product: this tests the check, for when a model earns it)
+async def test_the_case_is_told_in_words_and_the_model_may_change_only_the_words_between_the_facts(engine, org, connect):
     su = await connect("cid-su")
 
     class Away:
@@ -108,7 +110,7 @@ async def test_the_case_is_told_in_words_and_the_model_may_change_only_the_words
             break
         await asyncio.sleep(0.1)
     assert told["smoothed"] is True and "Then at " in told["text"]
-    assert "on purpose" not in told["text"] and "Detective reads this as Taking data out" in told["text"]     # that paragraph failed the check: the Engine's own
+    assert "Detective reads this as Taking data out" in told["text"] and len(engine.llm.asked) == 1 and engine.llm.asked[0].startswith("At [time1]")   # only what happened
     assert any(p.get("kind") == "machine" and p["text"] == "FIN-01" for para in told["paragraphs"] for p in para)
     asked = len(engine.llm.asked)
     await su.ok("detective.case", {"case_id": c["id"]})
@@ -117,9 +119,10 @@ async def test_the_case_is_told_in_words_and_the_model_may_change_only_the_words
 
 
 @requires_db
-async def test_with_smoothing_off_the_model_is_never_asked_and_the_engine_s_own_account_is_shown(engine, org, connect):
+async def test_with_no_groq_key_the_model_is_never_asked_and_the_engine_s_own_account_is_shown(engine, org, connect):
     su = await connect("cid-su")
     engine.llm = Smoother()
+    engine.llm.fallback_key = None
     await _leak(engine, org["w1_pc"])
     (c,) = (await su.ok("detective.cases", {}))["cases"]
     told = (await su.ok("detective.case", {"case_id": c["id"]}))["telling"]

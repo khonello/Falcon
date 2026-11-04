@@ -86,6 +86,17 @@ async def test_what_the_local_model_answers_never_goes_to_groq(groq, tmp_path, m
     assert await llm.yes_no("Is it?", "text") is False and groq.asked == []
 
 
+async def test_only_a_rewrite_of_markers_goes_to_groq_first_and_with_no_key_nowhere(groq, tmp_path, monkeypatch):
+    model = tmp_path / "m.gguf"
+    model.write_bytes(b"x")
+    llm = _llm(groq, model_path=str(model))
+    monkeypatch.setattr(llm, "_generate_local", lambda *a: "from the local model")
+    assert await llm.rewrite("Rewrite", "At [time1], [file2] was opened.", cloud=True) == "YES" and len(groq.asked) == 1
+    plain = _llm(groq, key=None, model_path=str(model))
+    monkeypatch.setattr(plain, "_generate_local", lambda *a: "from the local model")
+    assert await plain.rewrite("Rewrite", "At [time1], [file2] was opened.", cloud=True) is None and len(groq.asked) == 1
+
+
 async def test_a_local_model_that_fails_or_cannot_load_is_covered_by_the_fallback(groq, tmp_path, monkeypatch):
     model = tmp_path / "m.gguf"
     model.write_bytes(b"x")
