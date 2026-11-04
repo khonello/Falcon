@@ -4215,9 +4215,9 @@ function AdminRestrictedPage({ go }) {
   const [let_, setLet] = useState({});
   const carrying = RS_CARRY.filter((c) => marks.some((k) => k.id === c.mark)).map((c) => (c.held && let_[c.flow] ? { ...c, held: null, today: 0, last: null, since: "today" } : c));
   const hostsOf = new Set(marks.map((k) => k.host));
-  // every machine, by department (the user, 4 Nov 2026): the Admins' own workstations first in theirs, as the Departments page draws a machine
+  // every machine (the user, 4 Nov 2026): the Admins' own apart at the top, then everyone else's by department, as the Departments page draws a machine
   const adm = Object.entries(ADMIN_INFO).map(([n, v]) => ({ h: v.ws, who: n === me ? "you" : n, d: v.dept }));
-  const mapDepts = [...DEPTS.map((d) => ({ name: d.name, hs: [...adm.filter((x) => x.d === d.id).map((x) => x.h), ...MACHINES.filter((m) => m.dept === d.id).map((m) => m.host)] })),
+  const mapDepts = [{ name: "Admins", hs: adm.map((x) => x.h) }, ...DEPTS.map((d) => ({ name: d.name, hs: MACHINES.filter((m) => m.dept === d.id).map((m) => m.host) })),
     { name: "In no department", hs: MACHINES.filter((m) => !DBY[m.dept]).map((m) => m.host) }].filter((g) => g.hs.length);
   const mid = (h) => { const r = box(h); return [r[0] + r[2] / 2, r[1] + r[3] / 2]; };
   const kc = K ? cps(K) : [], ka = K ? alw(K) : [];

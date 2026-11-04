@@ -164,14 +164,16 @@ Page {
         })
         return out.concat(heldFlows.map(function (f) { return { k: null, f: f, held: true } }))
     }
-    // every machine, by department: the Admins' own workstations first in theirs, as the Departments page draws a machine
+    // every machine: the Admins' own apart at the top, then everyone else's by department, as the Departments page draws a machine
     readonly property var admTiles: Fleet.depts.reduce(function (o, d) { return o.concat((d.admins || []).filter(function (a) { return a.hostname }).map(function (a) { return { h: a.hostname, who: a.account_id === falcon.accountId ? "you" : a.name } })) }, [])
     readonly property var mapDepts: {
-        var seen = {}, out = Fleet.depts.map(function (d) {
-            var hs = (d.admins || []).filter(function (a) { return a.hostname }).map(function (a) { return a.hostname }).concat((d.machines || []).map(function (m) { return m.host }))
+        var seen = {}, adm = admTiles.map(function (x) { return x.h })
+        adm.forEach(function (h) { seen[h] = true })
+        var out = [{ name: "Admins", hs: adm }].concat(Fleet.depts.map(function (d) {
+            var hs = (d.machines || []).map(function (m) { return m.host }).filter(function (h) { return !seen[h] })
             hs.forEach(function (h) { seen[h] = true })
             return { name: d.name, hs: hs }
-        })
+        }))
         out.push({ name: "In no department", hs: Fleet.machines.map(function (m) { return m.host }).filter(function (h) { return !seen[h] }) })
         return out.filter(function (g) { return g.hs.length > 0 })
     }
