@@ -78,31 +78,36 @@ A flow specifies:
 - Allows resource distribution to multiple endpoints
 - Example: Source syncs to Client PC A, Client PC B, and Remote Storage simultaneously
 
-**Placement determines scope:** A Transformation or Categorization stage placed **before** a Branch applies to everything downstream of it (shared across all resulting destinations). The same stage type placed **after** a Branch, on one specific path, applies only to that one destination. This lets a flow share common processing across all destinations while still allowing individual destinations to have their own additional treatment.
+**Placement determines scope:** A step placed **before** a Branch applies to everything downstream of it (shared across all resulting destinations). The same step placed **after** a Branch, on one specific path, applies only to that one destination. This lets a flow share common processing across all destinations while still allowing individual destinations to have their own additional treatment.
 
 ```
 Source
-  → Transformation Stage (convert to PDF)     ← applies to everything downstream
+  → Conversion (to PDF)                       ← applies to everything downstream
       → Branch
-          ├─→ Destination A: Categorization (by type)   ← only affects A
+          ├─→ Destination A: Renaming (add a date)      ← only affects A
           ├─→ Destination B (no further processing)
           └─→ Branch (splits again)
                 ├─→ Destination C
-                └─→ Destination D: Categorization (different rule)  ← only affects D
+                └─→ Destination D: Renaming (add text)  ← only affects D
 ```
 
-#### 2. Transformation Stage
-- Modifies file format during transit
-- Only makes sense between source and destination (mid-flow)
-- Common transformations: convert to PDF, convert to Word, compress, decompress
-- Transformed version flows to destination; original preserved at source
-- Example: Word documents → converted to PDF → synced to PDF archive
+#### 2. Steps: what happens to the files on the way (the user, 3 Nov 2026)
 
-#### 3. Categorization Stage
-- Organizes files at destination by type
-- Creates subdirectories based on file extension/category
-- Executed when files reach destination
-- Example: PDFs go to `/pdf/`, ZIPs go to `/zip/`, images to `/images/`
+A step is picked from a tree: a category, a kind, an operation, then a few settings (`engine/flow/steps.py`).
+
+**Per file** (each file in, one file or none out)
+- **Choosing**, which files the flow takes: by file type, by name, by size. A file not taken does not go down that path.
+- **Conversion**, what is inside the file changes: To PDF (text, images, Word, Excel, PowerPoint), To DOCX (text; a PDF, roughly), To another image type (JPG, PNG), Zip each file.
+- **Renaming**, the name changes and the content does not: Add a date, Add text, Replace text in the name. One file in stays one file out: when an edit gives a file a new name (Add a date), the copy under the old name is put aside and only the newest stays. A copy someone changed at the destination is theirs, and stays beside it.
+
+**All files** (many in, one out)
+- **Bundling**, the files become one: Into one ZIP, Into one PDF. It needs a moment when "all the files" are known, so it is only in a flow that runs every hour or when Run is pressed, from one folder. Each run bundles the whole folder as it is then, and makes nothing when nothing changed since the last bundle.
+
+The kinds always run in one order along a destination's path: **Choosing, Conversion, Renaming, Bundling**. A path has at most one Bundling. The original is always preserved at the source.
+
+A Conversion a file cannot have never stops the flow: the step's setting says whether the file is copied as it is (the default) or left out, and it is on the record either way. Word, Excel and PowerPoint files need Microsoft Office or LibreOffice on the destination machine; neither ships with Falcon, and the flow says which destinations have one.
+
+Placing (sorting into folders by type or by month) was dropped on 3 Nov 2026: it was not obvious what it does. Unbundling (unzipping, splitting a PDF) was dropped on 4 Nov 2026: nothing needs it.
 
 **Manual Checkpoint:** Each stage is manually configured and managed, not automatic.
 
@@ -163,13 +168,13 @@ When a destination file is modified by an external entity (not from source sync)
 
 ## Failure Handling
 
-**Scope of Failure:** Flow failures come from a finite set of possibilities tied to the flow's structure and stage types — a Transformation stage failing to convert a file, a Categorization stage failing to place a file, a broken destination connection, and similar. Because this set is finite, the system can predefine how to respond to each one.
+**Scope of Failure:** Flow failures come from a finite set of possibilities tied to the flow's structure and stage types — a bundle that could not be made, a destination that cannot be written to, a broken destination connection, and similar (a file a Conversion cannot convert is not a failure: it is copied as it is or left out). Because this set is finite, the system can predefine how to respond to each one.
 
 **On Failure:**
 1. **Pause, scoped precisely:** Only the specific flow or branch the failure occurred on is paused — not the entire flow tree. Unaffected branches continue operating normally.
 2. **Persistent status at the source/creator side:** The flow creator sees a failure status that does not clear on its own — it remains until the underlying issue is actually resolved.
 3. **Status at the destination side:** The affected destination also shows a status indicating new changes won't reflect until the issue is resolved, rather than silently going stale with no indication anything is wrong.
-4. **Reactive fix suggestion, not upfront configuration:** Clicking the failure status surfaces a quick, safe suggested solution appropriate to that failure type (e.g., "remove transformation stage"). These suggestions are predefined per stage type/failure type as built-in system knowledge — the flow creator is never asked to anticipate or configure failure handling when first setting up the flow. Suggestions only appear reactively, once a failure has actually occurred.
+4. **Reactive fix suggestion, not upfront configuration:** Clicking the failure status surfaces a quick, safe suggested solution appropriate to that failure type (e.g., "grant write access at the destination path"). These suggestions are predefined per stage type/failure type as built-in system knowledge — the flow creator is never asked to anticipate or configure failure handling when first setting up the flow. Suggestions only appear reactively, once a failure has actually occurred.
 5. **Resume:** Once the issue is resolved (by applying the suggestion or otherwise), the paused flow or branch resumes automatically.
 
 **Why this approach:** Asking a flow creator to configure failure handling for every possible failure mode upfront is excessive before they've even seen the flow in action. Predefining solutions per (finite) failure type and surfacing them only when relevant keeps setup simple while still giving a clear, actionable path to resolution when something breaks.
@@ -203,40 +208,38 @@ Classwork syncs to both admin review and archive simultaneously
 ```
 Source: Admin PC - /reports/ (Word documents)
     ↓
-Transformation Stage: Convert to PDF
+Conversion: To PDF
     ↓
 Destination: Remote Storage - /pdf-archive/
 
 Word documents automatically converted to PDF during sync
 ```
 
-### Example 4: Flow with Categorization
+### Example 4: Flow with Choosing and Bundling
 
 ```
-Source: Client PC - /downloads/ (mixed file types)
+Source: Client PC - /month-end/ (mixed file types), run every hour
     ↓
-Categorization Stage: Organize by file type
+Choosing: by file type (PDF only)
     ↓
-Destination: Admin PC - /organized-downloads/
-    ├─ /pdf/
-    ├─ /images/
-    ├─ /documents/
-    └─ /archives/
+Bundling: Into one ZIP, named month-end, with the date
+    ↓
+Destination: Admin PC - /archive/month-end 2026-11-03.zip
 
-Files arrive at destination organized into type-specific folders
+One file per run, holding the folder's PDFs as they were at that run
 ```
 
-### Example 5: Complex Multi-Stage Flow (Branching + Transformation + Categorization)
+### Example 5: Complex Multi-Stage Flow (Branching + Conversion + Renaming)
 
 ```
 Source: Admin PC - /raw-submissions/
-    ├─→ Branch A: Transformation Stage (convert to PDF)
+    ├─→ Branch A: Conversion (to PDF)
     │       ↓
-    │   Categorization Stage (organize by type)
+    │   Renaming (add a date)
     │       ↓
     │   Destination 1: Remote Storage - /submissions-archive/
     │
-    └─→ Branch B: No transformation
+    └─→ Branch B: No steps
             ↓
         Destination 2: Backup Storage - /raw-backup/
 ```
@@ -253,7 +256,7 @@ Source: Admin PC - /raw-submissions/
 **Flow Properties:**
 - Source: Directory path on Admin PC or Client PC
 - Destination(s): Directory path on Admin PC, Client PC, or remote storage
-- Stages: Ordered list of processing stages (Branch, Transformation, Categorization)
+- Stages: Branches and steps (Choosing, Conversion, Renaming, Bundling)
 - Status: Active, Paused, Inactive
 - Sync Frequency: Real-time, scheduled, or manual trigger
 - Conflict Resolution: Automatic (rename + sync), based on write attribution
@@ -277,7 +280,7 @@ Source: Admin PC - /raw-submissions/
 3. **Chaining, with Cycle Prevention** — Destination can become source for another flow, but any flow/branch change is validated for cycles before it's saved
 4. **Destination Consent** — a flow is created without approval only when the creator already has authority over the destination; lateral flows and flows into a superior's space require the destination owner's explicit consent
 5. **Pre-Flight Collision Check** — a flow's destination path is checked against the Global File Index before creation; existing unrelated content there is surfaced to the creator, never silently overwritten
-6. **Staged Processing** — Transformation and categorization happen mid-flow, not at source; placement before/after a Branch determines shared vs. per-destination scope
+6. **Staged Processing** — Steps happen mid-flow, not at source; placement before/after a Branch determines shared vs. per-destination scope
 7. **Manual Checkpoints** — Stages are manually configured, not automatic
 8. **Conflict Preservation via Attribution** — Every write carries hash + who + hierarchy level, letting the flow distinguish its own sync writes from genuinely external ones; external modifications preserved (renamed) while source syncs alongside
 9. **Native-First Change Detection** — OS-emitted file events, filtered against registered flow sources, drive sync checks; polling is the fallback where native detection isn't practical

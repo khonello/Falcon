@@ -162,6 +162,8 @@ async def _remember_agent(ctx: Context, payload: dict[str, Any]) -> None:
                                            version=(str(payload["version"])[:40] if payload.get("version") else None),
                                            started_at=started, memory_total_mb=int(memory) if memory else None,
                                            disk_total_gb=number("disk_total_gb", 1024 * 1024), boot_at=boot)
+    if "converter" in payload:                                  # what it converts Office files with: a flow's To PDF says which destinations can
+        await ctx.engine.db.accounts.set_converter(pc_id, payload["converter"] if payload["converter"] in ("word", "libreoffice") else None)
     if payload.get("windows_user"):                             # how a person named on a private mark is found on another machine
         await ctx.engine.db.accounts.set_windows_user(pc_id, str(payload["windows_user"])[:120])
     from engine.control import events as control_events

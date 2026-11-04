@@ -137,12 +137,12 @@ async def run(d, check, say, wait_for) -> None:
     await d.online("WS-D1")
     await admin.call("flow.create", {"source_pc_id": p1, "source_path": str(cat_src), "destinations": [
         {"destination_pc_id": p2, "destination_path": str(cat_dst), "parent_index": 0}],
-        "stages": [{"stage_type": "categorization", "config": {"by": "extension"}}]})
+        "stages": [{"step": {"kind": "choosing", "op": "by_type", "settings": {"types": ["txt"]}}}]})
     await _settle()
     (cat_src / "a.txt").write_text("a\n", encoding="utf-8")
     (cat_src / "b.csv").write_text("x,y\n", encoding="utf-8")
-    ok = await wait_for(lambda: (cat_dst / "txt" / "a.txt").exists() and (cat_dst / "csv" / "b.csv").exists(), 30)
-    check("S9  a categorization stage files each by extension", ok, str([str(p.relative_to(cat_dst)) for p in cat_dst.rglob("*") if p.is_file()]))
+    ok = await wait_for(lambda: (cat_dst / "a.txt").exists(), 30) and not (cat_dst / "b.csv").exists()
+    check("S9  a Choosing step takes only the file types it names", ok, str([str(p.relative_to(cat_dst)) for p in cat_dst.rglob("*") if p.is_file()]))
     tr_src, tr_dst = d.folder("WS-D1", "convert"), d.folder("WS-D3", "converted")
     d.stop_worker("WS-D1")
     d.start_worker("WS-D1", [src, cat_src, tr_src])

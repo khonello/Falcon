@@ -341,7 +341,8 @@ async def _save(engine: Engine, u: Update) -> None:
     _saved[id(case)] = len(case.findings)
     if u.raised and engine.llm.available:
         _ask(engine, "opinion", (case.id, case.story()))
-        _ask(engine, "telling", case.id)
+        if telling.SMOOTHING:
+            _ask(engine, "telling", case.id)
     if u.raised:
         await engine.audit.record(None, "detective.raised", target_type="detective_cases", target_id=case.id, pc_id=case.pc,
                                   detail={"intent": case.intent, "level": case.level, "weight": round(case.weight, 2), "stage": case.stage[1]})
@@ -508,7 +509,7 @@ async def _telling(ctx: HandlerContext, c: dict[str, Any], found: list[dict[str,
     names = await db.accounts.display_names_for(ctx.identity.account_id, people) if people else {}
     kept_ = c.get("telling") or {}
     fresh = kept_.get("fingerprint") == t.fingerprint()
-    if not fresh and ctx.engine.llm.available:
+    if not fresh and telling.SMOOTHING and ctx.engine.llm.available:
         _ask(ctx.engine, "telling", c["id"])
     return t.view(names, kept_.get("paragraphs") if fresh else None)
 

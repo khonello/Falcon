@@ -288,8 +288,8 @@ What the concept shows and the Engine cannot do yet is drawn disabled, with the 
 
 - [x] **The user's answers of 3 Nov 2026, built:** a Detective case told in words (facts from the case, the model only smooths the words
   between them, checked); try a rule once on one machine (`control.rule_try`); old machine days asked about on the Issues page (Delete or
-  Keep). Dropped: "Seen on the network", and the Automation ideas "what a run produced" and "too quiet or too loud". Still to discuss: flow
-  steps as a whole. Later: the licence store (codes validated by a remote store at setup, a small website to buy them). The UI's part of each
+  Keep). Dropped: "Seen on the network", and the Automation ideas "what a run produced" and "too quiet or too loud". Flow steps became a tree
+  (4 Nov 2026: Choosing, Conversion, Renaming, Bundling; Placing and Unbundling dropped). Later: the licence store (codes validated by a remote store at setup, a small website to buy them). The UI's part of each
   is in `docs/UI-WORK-FROM-ENGINE.md`.
 
 ## Deferred (spec §10) — decide when reached, not before

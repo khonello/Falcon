@@ -85,7 +85,8 @@ class Smoother:
 
 
 @requires_db
-async def test_the_case_is_told_in_words_and_the_model_may_change_only_the_words_between_the_facts(engine, org, connect):
+async def test_the_case_is_told_in_words_and_the_model_may_change_only_the_words_between_the_facts(engine, org, connect, monkeypatch):
+    monkeypatch.setattr(telling, "SMOOTHING", True)                             # (off in the product: this tests the check, for when a model earns it)
     su = await connect("cid-su")
 
     class Away:
@@ -113,3 +114,14 @@ async def test_the_case_is_told_in_words_and_the_model_may_change_only_the_words
     await su.ok("detective.case", {"case_id": c["id"]})
     await asyncio.sleep(0.2)
     assert len(engine.llm.asked) == asked                                       # kept: not asked again while the case is the same
+
+
+@requires_db
+async def test_with_smoothing_off_the_model_is_never_asked_and_the_engine_s_own_account_is_shown(engine, org, connect):
+    su = await connect("cid-su")
+    engine.llm = Smoother()
+    await _leak(engine, org["w1_pc"])
+    (c,) = (await su.ok("detective.cases", {}))["cases"]
+    told = (await su.ok("detective.case", {"case_id": c["id"]}))["telling"]
+    await asyncio.sleep(0.2)
+    assert told["smoothed"] is False and told["text"].startswith("Nobody was signed in") and engine.llm.asked == []

@@ -4,7 +4,7 @@ common/dotenv.py), so a fresh setup needs no shell variables at all; a variable 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _TRUTHY = {"1", "true", "yes", "on"}
@@ -44,12 +44,15 @@ class Settings:
     flow_settle_seconds: float = 1.0
     # Detective (what a person seems to be trying to do) listens by itself; this turns it off (FALCON_DETECTIVE=0).
     detective: bool = True
-    # Local LLM (spec 7.2.1). Never an external API. In-process llama.cpp by default (open
-    # item 10.3); 'openai' / 'ollama' select a local sidecar process instead.
+    # Local LLM (spec 7.2.1). In-process llama.cpp by default (open item 10.3); 'openai' / 'ollama' select a local sidecar process instead.
+    # Nothing leaves the machine unless groq_api_key is set: then Groq answers what the local model could not (engine/llm.py).
     llm_backend: str = "llamacpp"
     llm_model_path: str | None = "models/Qwen3-1.7B-Q8_0.gguf"
     llm_endpoint: str = "http://127.0.0.1:11434"
     llm_model: str = "qwen3:1.7b"
+    groq_api_key: str | None = field(default=None, repr=False)
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_endpoint: str = "https://api.groq.com/openai/v1"
     debug: bool = False
 
     # Development-only. Both are hard, visible skips — never a quietly-always-true check (spec §8.1).
@@ -91,6 +94,9 @@ class Settings:
             llm_model_path=os.environ.get("FALCON_LLM_MODEL_PATH", cls.llm_model_path) or None,
             llm_endpoint=os.environ.get("FALCON_LLM_ENDPOINT", cls.llm_endpoint),
             llm_model=os.environ.get("FALCON_LLM_MODEL", cls.llm_model),
+            groq_api_key=os.environ.get("FALCON_GROQ_API_KEY") or None,
+            groq_model=os.environ.get("FALCON_GROQ_MODEL", cls.groq_model),
+            groq_endpoint=os.environ.get("FALCON_GROQ_ENDPOINT", cls.groq_endpoint),
             debug=_flag("FALCON_DEBUG"),
             dev_bypass_auth=_flag("FALCON_DEV_BYPASS_AUTH"),
             dev_plaintext=_flag("FALCON_DEV_PLAINTEXT"),

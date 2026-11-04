@@ -183,7 +183,7 @@ async def test_executor_runs_custom_and_builtin_actions_with_timeout_and_termina
         await svc.stop()
 
 
-async def test_flow_relay_between_two_workers_with_stages_and_conflict(engine, org, tmp_path: Path):
+async def test_flow_relay_between_two_workers_with_stages_and_conflict(engine, org, tmp_path: Path, monkeypatch):
     src = tmp_path / "out"
     dst = tmp_path / "in"
     src.mkdir()
@@ -194,11 +194,11 @@ async def test_flow_relay_between_two_workers_with_stages_and_conflict(engine, o
     try:
         flow = (await admin.call("flow.create", {
             "source_pc_id": org["w1_pc"], "source_path": str(src),
-            "stages": [{"stage_type": "categorization", "config": {"by": "extension"}}],
+            "stages": [{"step": {"kind": "renaming", "op": "add_text", "settings": {"text": "Q3-"}}}],
             "destinations": [{"destination_pc_id": org["w2_pc"], "destination_path": str(dst), "parent_index": 0}]}))["flow"]
         (src / "report.txt").write_text("quarterly numbers", encoding="utf-8")
         # w1's watcher reports -> Engine flow.read -> w1 flow.content -> Engine flow.apply -> w2 writes.
-        landed = dst / "txt" / "report.txt"
+        landed = dst / "Q3-report.txt"
         assert await _wait(lambda: landed.exists(), timeout=10)
         assert landed.read_text(encoding="utf-8") == "quarterly numbers"
 
@@ -213,24 +213,27 @@ async def test_flow_relay_between_two_workers_with_stages_and_conflict(engine, o
         assert all(h["written_by"] == "flow_sync" for h in rows)
         # An external edit at the destination is preserved as -modified and re-synced.
         landed.write_text("edited locally", encoding="utf-8")
-        modified = dst / "txt" / "report-modified.txt"
+        modified = dst / "Q3-report-modified.txt"
         assert await _wait(lambda: modified.exists() and landed.exists()
                            and landed.read_text(encoding="utf-8") == "quarterly numbers", timeout=10)
         assert modified.read_text(encoding="utf-8") == "edited locally"
         rows = await engine.db.flows.history(flow["id"])
         assert any(h["written_by"] == "external" and h["conflict_resolved"] for h in rows)
-        # An unsupported transformation fails only that destination with the predefined suggestion.
+        # A file a step cannot convert, set to be left out: on the record, not written, and the flow carries on.
+        from worker_client import convert
+
+        monkeypatch.setattr(convert, "office_tool", lambda: None)
         bad = (await admin.call("flow.create", {
             "source_pc_id": org["w1_pc"], "source_path": str(src / "sub"),
-            "stages": [{"stage_type": "transformation", "config": {"to": "pdf"}}],
+            "stages": [{"step": {"kind": "conversion", "op": "to_pdf", "settings": {"if_not": "leave_out"}}}],
             "destinations": [{"destination_pc_id": org["w2_pc"], "destination_path": str(dst / "pdfs"), "parent_index": 0}]}))["flow"]
         (src / "sub").mkdir()
-        (src / "sub" / "memo.docx").write_bytes(b"PK not really a Word file")              # PDF from Word needs Office: unsupported here
+        (src / "sub" / "memo.docx").write_bytes(b"PK not really a Word file")              # PDF from Word needs Office: not here
 
-        async def paused():
-            f = await engine.db.flows.get(bad["id"])
-            return bool(f and f["destinations"][0]["paused_reason"] == "transformation:unsupported_format")
-        assert await _wait(paused, timeout=10)
+        async def left_out():
+            return bool(await engine.db.pool.fetchval("SELECT count(*) FROM flow_sync_log WHERE outcome = 'left_out' AND source_relative_path = 'memo.docx'"))
+        assert await _wait(left_out, timeout=10)
+        assert (await engine.db.flows.get(bad["id"]))["destinations"][0]["paused_reason"] is None and not (dst / "pdfs" / "memo.docx").exists()
     finally:
         await admin.close()
         await w1.stop()

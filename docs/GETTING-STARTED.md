@@ -173,3 +173,17 @@ The key then goes to the PC by itself. Step 4 above is the by-hand way.
   Put it back with `python -m engine restore <file> --yes`, with the Engine stopped: what is in the database is replaced.
 - **Back up the master secret apart, offline:** `data/master.secret` is not in a database backup. Without it no machine's key can be
   made again, and every machine would have to be registered anew.
+
+## A server that cannot run the local model
+
+Falcon's model runs on the Engine's own machine, and nothing leaves it. If that machine cannot run the model (too little memory, too slow), a Groq key
+makes Groq answer what the local model could not. Add it to `.env` and restart the Engine:
+
+```
+FALCON_GROQ_API_KEY=<a key from console.groq.com>
+```
+
+Task descriptions then leave your network, so set it only where that is acceptable. Each use is on the audit trail (`llm.fallback`). Groq's free plan
+refuses bursts: a refused question reaches the person as unclear, and nothing is lost. Groq retires models: when it does, the log says the fallback failed,
+and `FALCON_GROQ_MODEL` is what to change.
+

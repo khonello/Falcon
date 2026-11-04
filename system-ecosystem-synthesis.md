@@ -68,7 +68,7 @@ Client exception: can view, start, and watch progress — cannot verify.
 
 A one-directional sync pipeline, so changes never conflict.
 
-- **Source → Destination(s):** one-directional, branches like a river. Placement of Transformation/Categorization before or after a Branch determines whether it's shared across destinations or specific to one.
+- **Source → Destination(s):** one-directional, branches like a river. Placement of a step (Choosing, Conversion, Renaming, Bundling) before or after a Branch determines whether it's shared across destinations or specific to one.
 - **Destination Consent:** created without approval only when the creator already outranks the destination owner; lateral flows and flows into a superior's space need explicit consent.
 - **Pre-Flight Collision Check & Cycle Prevention:** both validated against the Global File Index / flow graph before a flow is accepted, never silently overwritten or allowed to loop.
 - **Change detection:** native OS file events filtered against registered flow sources, polling as fallback; conflict detection uses write attribution (hash + who + hierarchy level) so a flow never mistakes its own write for an external one.

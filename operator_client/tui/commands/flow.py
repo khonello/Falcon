@@ -1,9 +1,10 @@
 """Flow: create (with consent / collision / cycle feedback), consent, edit, pause/resume/delete,
 status with failure suggestions, history, manual trigger.
 
-    flow create src=<pc_id>:<path> dest=<pc_id|remote>:<path>[@<stage#>] ... [stage=<type>[@<parent#>][:k=v,..]] [confirm]
-      e.g. flow create src=2:C:/out dest=3:C:/in@1 dest=4:C:/in@2 stage=transformation:to=pdf stage=branch@0 stage=categorization@1:by=extension
-    stages are numbered from 0 in the order given; `@n` attaches to stage n.
+    flow create src=<pc_id>:<path> dest=<pc_id|remote>:<path>[@<stage#>] ... [stage=<kind>.<op>[@<parent#>][:k=v,..]] [stage=branch[@<parent#>]] [confirm]
+      e.g. flow create src=2:C:/out dest=3:C:/in@1 dest=4:C:/in@2 stage=conversion.to_pdf stage=branch@0 stage=renaming.add_date@1:where=after
+    stages are numbered from 0 in the order given; `@n` attaches to stage n. `flow steps` lists every step and its settings; several values
+    are joined with + (types=pdf+docx).
 """
 
 from __future__ import annotations
@@ -14,6 +15,12 @@ from operator_client.tui.render import kv, table
 from operator_client.tui.shell import Args, ShellContext, UsageError, command
 
 
+def _setting(key: str, value: str) -> Any:
+    if key in ("types", "from"):
+        return [v for v in value.split("+") if v]
+    return {"true": True, "false": False}.get(value.lower(), value)
+
+
 def _parse_structure(args: Args) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     stages: list[dict[str, Any]] = []
     dests: list[dict[str, Any]] = []
@@ -21,7 +28,12 @@ def _parse_structure(args: Args) -> tuple[list[dict[str, Any]], list[dict[str, A
         head, _, cfg = spec.partition(":")
         stype, _, parent = head.partition("@")
         config = dict(item.split("=", 1) for item in cfg.split(",") if "=" in item) if cfg else None
-        stages.append({"stage_type": stype, "parent_index": int(parent) if parent else None, "config": config})
+        where = int(parent) if parent else None
+        if "." in stype:
+            kind, _, op = stype.partition(".")
+            stages.append({"step": {"kind": kind, "op": op, "settings": {k: _setting(k, v) for k, v in (config or {}).items()}}, "parent_index": where})
+        else:
+            stages.append({"stage_type": stype, "parent_index": where, "config": config})
     for spec in args.all("dest"):
         target, _, parent = spec.partition("@")
         pc, colon, path = target.partition(":")
@@ -55,10 +67,24 @@ def _flow_text(flow: dict[str, Any]) -> str:
     return out
 
 
-@command("flow", "create", "src=<pc_id>:<path> [src=..] [file] dest=<pc|remote>:<path>[@stage#] [dest=..] [stage=<type>[@parent#][:k=v,..]] "
+@command("flow", "steps", "", "Every step a flow can have: category, kind, operation, and its settings")
+async def flow_steps(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("flow.steps")
+    lines = []
+    for c in res["tree"]:
+        lines.append(f"{c['label']}: {c['says']}")
+        for k in c["kinds"]:
+            lines.append(f"  {k['kind']}: {k['says']}" + (f" ({k['needs']})" if k.get("needs") else ""))
+            for o in k["ops"]:
+                said = ", ".join(f"{key}={'|'.join(s.get('choices') or s.get('many') or []) or '...'}" for key, s in o["settings"].items())
+                lines.append(f"    {k['kind']}.{o['op']}  {o['label']}" + (f"  [{said}]" if said else ""))
+    return "\n".join(lines + ["", "They run in this order: " + " > ".join(res["order"])])
+
+
+@command("flow", "create", "src=<pc_id>:<path> [src=..] [file] dest=<pc|remote>:<path>[@stage#] [dest=..] [stage=<kind>.<op>[@parent#][:k=v,..]] "
          "[name=..] [when=realtime|hourly|manual] [confirm]",
          "Create a flow (several src= merge into one; `file`: the source is one file, followed wherever it moves; a step by name: "
-         "stage=transformation:op=Rename by date); consent / collision / cycle issues come back for you to resolve")
+         "stage=renaming.add_date); consent / collision / cycle issues come back for you to resolve")
 async def flow_create(ctx: ShellContext, args: Args) -> str:
     srcs = args.all("src")
     if not srcs or any(":" not in s for s in srcs):

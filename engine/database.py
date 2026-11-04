@@ -356,6 +356,12 @@ class AccountsRepo(_Repo):
         if version:
             await self.db.updates.log_version(pc_id, version)
 
+    async def set_converter(self, pc_id: int, tool: str | None) -> None:
+        await self._exec("UPDATE pcs SET converter = $2 WHERE id = $1", pc_id, tool)
+
+    async def converters(self, pc_ids: list[int]) -> dict[int, str | None]:
+        return {r["id"]: r["converter"] for r in await self._fetch("SELECT id, converter FROM pcs WHERE id = ANY($1::int[])", pc_ids)}
+
     async def fleet(self, *, department_id: int | None = None, pc_id: int | None = None) -> list[dict[str, Any]]:
         """Every machine with what a console shows first: its department, its person, its agent, and who is in it now."""
         return await self._fetch(
@@ -1563,7 +1569,7 @@ class FlowsRepo(_Repo):
                 "SELECT COALESCE(f.merged_into, f.id) AS flow_id, count(*) AS total, "
                 "count(*) FILTER (WHERE l.occurred_at >= date_trunc('day', now())) AS today, max(l.occurred_at) AS last_at "
                 "FROM flow_sync_log l JOIN flow_destinations d ON d.id = l.flow_destination_id JOIN flows f ON f.id = d.flow_id "
-                "WHERE l.written_by = 'flow_sync' AND COALESCE(f.merged_into, f.id) = ANY($1::int[]) GROUP BY 1", flow_ids):
+                "WHERE l.written_by = 'flow_sync' AND COALESCE(l.outcome, '') NOT IN ('left_out', 'removed') AND COALESCE(f.merged_into, f.id) = ANY($1::int[]) GROUP BY 1", flow_ids):
             out[r["flow_id"]] = {"total": r["total"], "today": r["today"], "last_at": r["last_at"]}
         return out
 
@@ -1709,6 +1715,7 @@ class FlowsRepo(_Repo):
         """What the flow last wrote at a destination for one source file: where, and the hash of what it wrote."""
         return await self._one(
             "SELECT written_path AS path, content_hash AS hash FROM flow_sync_log WHERE flow_destination_id = $1 AND written_by = 'flow_sync' "
+            "AND outcome IS DISTINCT FROM 'left_out' "
             "AND lower(replace(source_relative_path, '\\', '/')) = lower(replace($2, '\\', '/')) ORDER BY occurred_at DESC, id DESC LIMIT 1",
             destination_id, source_relative_path)
 

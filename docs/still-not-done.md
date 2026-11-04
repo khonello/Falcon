@@ -29,8 +29,8 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 - **#15:** *(built 3 Nov 2026)* the account written from the case, smoothed by the model only where every fact survives the check.
 - **A file deleted at a flow's source:** *(built 2 Nov 2026)* copies are kept by default, and an issue offers Remove the copies / Keep them.
 - **`pc_days`:** *(built 3 Nov 2026)* an issue on the 90-day clock: Delete them, or Keep them and be asked again in 30 days.
-- **Flow steps:** the whole area is to be discussed with the user (3 Nov 2026), not only Convert to PDF. Today text and JPEG convert;
-  Word, Excel and others say unsupported.
+- **Flow steps:** *(built 4 Nov 2026)* the tree of steps; Placing dropped. Office conversion is not yet run for real. Add a date keeps only the newest
+  copy (decided 4 Nov 2026).
 - **Joining with a licence code:** *(built 2 Nov 2026)* admin and worker codes from a bought licence; given at setup, the machine joins at once.
   The store, later (the user, 3 Nov 2026): codes downloaded as admin and worker codes, kept in a remote store the Engine asks at setup to
   validate a code, and a small website to buy them.

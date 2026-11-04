@@ -1,4 +1,4 @@
-"""Local LLM client (spec 7.2.1). Local only -- never an external API.
+"""Local LLM client (spec 7.2.1). Local by default: nothing leaves the machine unless a Groq key was set (see the fallback, below).
 
 The graph in `task.llm_graph` asks narrow questions -- yes/no, pick-from-a-finite-list, short
 span extraction -- and every method returns None when the model is unreachable or its answer
@@ -16,6 +16,11 @@ Backends (open item 10.3 -- in-process is the default, a sidecar remains availab
 Settings: FALCON_LLM_BACKEND (llamacpp|openai|ollama), FALCON_LLM_MODEL_PATH,
 FALCON_LLM_ENDPOINT, FALCON_LLM_MODEL. A missing model file / unreachable sidecar makes the
 client unavailable (logged once, retried after a backoff) -- the Engine still runs.
+
+Fallback (the user, 4 Nov 2026): a server that cannot run the model. With FALCON_GROQ_API_KEY set, a question the local model could not answer (its
+file is not there, it cannot be loaded, it timed out, it is treated as away) goes to Groq instead; a question it did answer never does. With no
+key, which is the default, no question ever leaves the machine. Each use is logged and put on the audit trail (`llm.fallback`). FALCON_GROQ_MODEL,
+FALCON_GROQ_ENDPOINT. Groq retires models often: when it does, the fallback fails loudly in the log and the setting is what changes.
 
 Hardening (the model is the part of Task a person waits on, so it must never be the part that breaks):
   * answers are cached (temperature 0 makes the same question the same answer), so reading the same description twice costs nothing;
@@ -35,6 +40,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import OrderedDict
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -46,6 +52,9 @@ _BACKOFF_SECONDS = 60.0  # once the backend is declared away, don't hammer it on
 FAILURES_BEFORE_BACKOFF = 3
 MAX_PROMPT_CHARS = 9000        # about 3,000 tokens: well inside the context window below
 CACHE_SIZE = 1024
+FALLBACK_SECONDS = 20.0
+FALLBACK_THINKING_TOKENS = 1024
+FALLBACK_SAY_SECONDS = 3600.0
 N_CTX = 4096
 
 SYSTEM = ("You classify short workplace task descriptions. Answer with exactly what is asked and "
@@ -57,7 +66,8 @@ SYSTEM_WRITE = ("You rewrite short factual paragraphs in plain words. Keep every
 class LocalLLM:
     def __init__(self, backend: str = "llamacpp", *, model_path: str | None = None,
                  endpoint: str = "http://127.0.0.1:11434", model: str = "qwen3:1.7b",
-                 timeout: float = 30.0, n_threads: int | None = None) -> None:
+                 timeout: float = 30.0, n_threads: int | None = None, fallback_key: str | None = None,
+                 fallback_model: str = "openai/gpt-oss-120b", fallback_endpoint: str = "https://api.groq.com/openai/v1") -> None:
         if backend not in BACKENDS:
             raise ValueError(f"unknown LLM backend {backend!r}")
         self.backend = backend
@@ -66,6 +76,15 @@ class LocalLLM:
         self.model = model
         self.timeout = timeout
         self.n_threads = n_threads
+        self.fallback_key = fallback_key or None
+        self.fallback_model = fallback_model
+        self.fallback_endpoint = fallback_endpoint.rstrip("/")
+        self.fallback_calls = 0                           # questions sent to Groq
+        self.fallback_failures = 0
+        self._fallback_until = 0.0
+        self._fallback_in_a_row = 0
+        self._fallback_said: float | None = None
+        self.on_fallback: Callable[[], Awaitable[None]] | None = None
         self._unavailable_until = 0.0
         self._llama: Any = None
         self._executor: ThreadPoolExecutor | None = None
@@ -80,18 +99,22 @@ class LocalLLM:
 
     def stats(self) -> dict[str, Any]:
         return {"calls": self.calls, "cache_hits": self.cache_hits, "timeouts": self.timeouts, "failures": self.failures, "refused": self.refused,
-                "seconds": round(self.seconds, 3), "available": self.available, "backend": self.backend}
+                "seconds": round(self.seconds, 3), "available": self.available, "backend": self.backend, "fallback_calls": self.fallback_calls,
+                "fallback_failures": self.fallback_failures}
 
     @property
     def available(self) -> bool:
+        return self.local_available or self.fallback_available
+
+    @property
+    def local_available(self) -> bool:
         if self.backend == "llamacpp" and (not self.model_path or not Path(self.model_path).is_file()):
             return False
         return time.monotonic() >= self._unavailable_until
 
     def describe(self) -> str:
-        if self.backend == "llamacpp":
-            return f"llamacpp in-process ({self.model_path})"
-        return f"{self.backend} sidecar at {self.endpoint} ({self.model})"
+        said = f"llamacpp in-process ({self.model_path})" if self.backend == "llamacpp" else f"{self.backend} sidecar at {self.endpoint} ({self.model})"
+        return said + (f", falling back to Groq ({self.fallback_model})" if self.fallback_key else "")
 
     # --- narrow question types ------------------------------------------------------------------
 
@@ -162,6 +185,17 @@ class LocalLLM:
             self._cache.move_to_end(key)
             self.cache_hits += 1
             return hit
+        answer = await self._ask_local(prompt, max_tokens, system) if self.local_available else None
+        if answer is None and self.fallback_available:
+            answer = await self._ask_fallback(prompt, max_tokens, system)
+        if answer is None:
+            return None
+        self._cache[key] = answer
+        while len(self._cache) > CACHE_SIZE:
+            self._cache.popitem(last=False)
+        return answer
+
+    async def _ask_local(self, prompt: str, max_tokens: int, system: str) -> str | None:
         self.calls += 1
         started = time.monotonic()
         try:
@@ -177,16 +211,60 @@ class LocalLLM:
         except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
             self._failed(f"unreachable: {exc}")
             return None
-        except (ValueError, KeyError, RuntimeError) as exc:
-            self._failed(f"failed: {exc}")
+        except (ValueError, KeyError, RuntimeError, ImportError, MemoryError) as exc:      # (a server that cannot load the model at all)
+            self._failed(f"failed: {exc!r}")
             return None
         finally:
             self.seconds += time.monotonic() - started
         self._consecutive_failures = 0
-        self._cache[key] = answer
-        while len(self._cache) > CACHE_SIZE:
-            self._cache.popitem(last=False)
         return answer
+
+    # --- the fallback: only when a key was set, and only for what the local model could not answer -----------------------------
+
+    @property
+    def fallback_available(self) -> bool:
+        return bool(self.fallback_key) and time.monotonic() >= self._fallback_until
+
+    async def _ask_fallback(self, prompt: str, max_tokens: int, system: str) -> str | None:
+        self.fallback_calls += 1
+        await self._say_fallback_used()
+        try:
+            answer = await asyncio.wait_for(asyncio.to_thread(self._generate_groq, prompt, max_tokens, system), FALLBACK_SECONDS + 2)
+        except (asyncio.TimeoutError, urllib.error.URLError, TimeoutError, ConnectionError, OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+            self.fallback_failures += 1
+            self._fallback_in_a_row += 1
+            log.warning("Groq fallback failed (%s, %d in a row)", exc.__class__.__name__, self._fallback_in_a_row)
+            if self._fallback_in_a_row >= FAILURES_BEFORE_BACKOFF:
+                self._fallback_until = time.monotonic() + _BACKOFF_SECONDS
+                self._fallback_in_a_row = 0
+            return None
+        self._fallback_in_a_row = 0
+        return answer or None
+
+    async def _say_fallback_used(self) -> None:
+        """Text is leaving the machine: logged and put on the audit trail (`on_fallback`), at most once an hour, not once per question."""
+        now = time.monotonic()
+        if self._fallback_said is not None and now - self._fallback_said < FALLBACK_SAY_SECONDS:
+            return
+        self._fallback_said = now
+        log.warning("the local model could not answer: questions are going to Groq (%s)", self.fallback_model)
+        if self.on_fallback is not None:
+            try:
+                await self.on_fallback()
+            except Exception:                                # (the question is answered either way)
+                log.exception("could not record the fallback")
+
+    def _generate_groq(self, prompt: str, max_tokens: int, system: str) -> str:
+        # A reasoning model spends tokens thinking before it answers: the room is for that, so a one-word question is not cut off before its answer
+        body: dict[str, Any] = {"model": self.fallback_model, "temperature": 0, "max_completion_tokens": max_tokens + FALLBACK_THINKING_TOKENS,
+                                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}]}
+        if "gpt-oss" in self.fallback_model:
+            body.update({"reasoning_effort": "low", "include_reasoning": False})
+        req = urllib.request.Request(f"{self.fallback_endpoint}/chat/completions", data=json.dumps(body).encode("utf-8"), method="POST",
+                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.fallback_key}", "User-Agent": "falcon-engine"})
+        with urllib.request.urlopen(req, timeout=FALLBACK_SECONDS) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return _strip_thinking(str(data["choices"][0]["message"]["content"] or ""))
 
     def _failed(self, why: str) -> None:
         """One failure is a missing answer; only several in a row mean the backend is away."""

@@ -36,11 +36,12 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
 from engine.flow import flows as flowdefs
-from engine.flow import guard
+from engine.flow import guard, steps
 from engine.hierarchy import reports
 from engine.permissions import int_field, require_account, str_field
 from protocol import ErrorCode, ProtocolError
@@ -64,7 +65,26 @@ class Transfer:
     parts: dict[int, bytes] = field(default_factory=dict)      # chunks arriving from the source
     data: bytes | None = None                                  # the whole file, once it has arrived
     modified: str | None = None                                # when it was last changed at the source (dates a step uses)
+    bundles: dict[int, str] = field(default_factory=dict)      # destination -> the bundle this file goes into there (a Bundling step's run)
     created: float = field(default_factory=time.monotonic)
+
+
+@dataclass
+class Bundle:
+    """One run of a Bundling step at one destination: the files go to the destination machine one by one (through the steps before it),
+    which keeps them aside; when the last has arrived, it is told to make the one file (`flow.bundle_close`)."""
+    id: str
+    flow_id: int
+    destination_id: int
+    snapshot: str                                              # what went in (each file and its version): the same again is not bundled again
+    pending: set[str] = field(default_factory=set)             # transfers still to arrive there
+    files: int = 0
+    sent: bool = False                                         # every file has been sent
+    failed: str | None = None
+    created: float = field(default_factory=time.monotonic)
+
+
+BUNDLE_KEY = "<bundle>"                 # the sync log's source path for a destination's bundle (its source hash is the run's snapshot)
 
 
 @dataclass
@@ -84,6 +104,7 @@ MAX_LISTING_BATCH = 2000            # entries taken from one listing message
 IN_FLIGHT = 4                       # a catch-up sends this many files at a time, so thousands of files do not flood the Engine
 
 _transfers: dict[str, Transfer] = {}
+_bundles: dict[str, Bundle] = {}
 _listings: dict[str, Listing] = {}
 _background: set[asyncio.Task[Any]] = set()
 _settling: dict[tuple[int, str], asyncio.Task[Any]] = {}
@@ -93,6 +114,8 @@ def reset_state() -> None:
     guard.reset_state()
     _routes.clear()
     _transfers.clear()
+    _bundles.clear()
+    _closing.clear()
     _listings.clear()
     for waiting in list(_settling.values()):
         waiting.cancel()
@@ -424,20 +447,32 @@ async def _settle_then_propagate(engine: Engine, flow_id: int, path: str, rel: s
     task.add_done_callback(_background.discard)
 
 
+def bundling(flow: dict[str, Any], dest: dict[str, Any]) -> dict[str, Any] | None:
+    """The Bundling step on this destination's path, if it has one."""
+    return next((st for st in flowdefs.stage_chain(flow, dest) if st["stage_type"] == "bundling"), None)
+
+
 async def propagate(engine: Engine, flow_id: int, source_file: str, relative_path: str, file_hash: str | None,
-                    *, only_destination: int | None = None, only: set[int] | None = None) -> str | None:
+                    *, only_destination: int | None = None, only: set[int] | None = None, bundle_for: dict[int, str] | None = None) -> str | None:
     flow = await engine.db.flows.get(flow_id)
     if flow is None or flow["status"] != "active":
         return None
     if not await guard.gate(engine, flow_id, flow["source_pc_id"], source_file, file_hash, step="before reading"):
         return None
     wanted = only if only is not None else ({only_destination} if only_destination is not None else None)
-    targets = [d for d in flow["destinations"] if not d.get("paused_reason") and (wanted is None or d["id"] in wanted)]
+    # A destination that bundles takes files only in its run (bundle_for); a Choosing step that does not take this file: never read for it
+    targets = [d for d in flow["destinations"] if not d.get("paused_reason") and (wanted is None or d["id"] in wanted)
+               and (bundling(flow, d) is None or (bundle_for or {}).get(d["id"]))
+               and steps.chosen(flowdefs.stage_chain(flow, d), relative_path)]
     if not targets:
         return None
     transfer = Transfer(id=uuid.uuid4().hex, flow_id=flow_id, source_pc_id=flow["source_pc_id"],
                         source_path=source_file, relative_path=relative_path, hash=file_hash,
-                        pending_destinations={d["id"] for d in targets})
+                        pending_destinations={d["id"] for d in targets},
+                        bundles={d["id"]: (bundle_for or {})[d["id"]] for d in targets if (bundle_for or {}).get(d["id"])})
+    for bundle_id in transfer.bundles.values():
+        if bundle_id in _bundles:
+            _bundles[bundle_id].pending.add(transfer.id)
     _transfers[transfer.id] = transfer
     await engine.push_to_pc(flow["source_pc_id"], "flow.read",
                             {"transfer_id": transfer.id, "flow_id": flow_id, "path": source_file})
@@ -455,11 +490,13 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
         if dest["destination_pc_id"] is None:
             await _fail_destination(engine, flow, dest, "destination:unsupported")
             transfer.pending_destinations.discard(dest["id"])
+            await _bundle_skip(engine, transfer, dest["id"])
             continue
         if dest["destination_pc_id"] not in online:
             # not forgotten: paused as unreachable, and resumed and caught up when the machine returns
             await _fail_destination(engine, flow, dest, "destination:unreachable")
             transfer.pending_destinations.discard(dest["id"])
+            await _bundle_skip(engine, transfer, dest["id"])
             continue
         followed = dest.get("followed_path") if flow.get("source_kind") == "file" else None
         # a single-file flow writes where its copy now is when someone moved it; the destination folder otherwise
@@ -468,13 +505,24 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
         if not (await guard.gate(engine, flow["id"], dest["destination_pc_id"], dest["destination_path"], step="before writing")
                 and await guard.gate(engine, flow["id"], dest["destination_pc_id"], target, step="before writing")):
             transfer.pending_destinations.discard(dest["id"])               # the flow is paused; what is left of this transfer is caught up after consent
+            await _bundle_skip(engine, transfer, dest["id"])
+            continue
+        chain = flowdefs.stage_chain(flow, dest)
+        data = transfer.data
+        size = len(data) if data is not None else (len(base64.b64decode(transfer.content_b64)) if transfer.content_b64 else None)
+        if not steps.chosen(chain, transfer.relative_path, size):           # a Choosing step by size: decided now its size is known
+            transfer.pending_destinations.discard(dest["id"])
+            await _left_out(engine, flow, dest, transfer, "not taken by a Choosing step")
             continue
         base = {"transfer_id": transfer.id, "flow_id": flow["id"], "destination_id": dest["id"],
                 "destination_path": folder, "relative_path": name,
                 "hash": transfer.hash, "modified": transfer.modified,
-                "stages": [st for st in flowdefs.stage_chain(flow, dest) if not (followed and st.get("stage_type") == "categorization")],
+                # (a single-file copy someone moved keeps the name it has now: Renaming is for the copy the flow places)
+                "stages": [st for st in chain if st["stage_type"] not in ("choosing", "bundling") and not (followed and st["stage_type"] == "renaming")],
                 # what the flow itself last wrote there: anything else already at that place is someone's, and is kept, not overwritten
                 "previous": await engine.db.flows.last_written_for(dest["id"], transfer.relative_path)}
+        if transfer.bundles.get(dest["id"]):
+            base["bundle"] = transfer.bundles[dest["id"]]                  # kept aside at the destination until its run's bundle is made
         data = transfer.data
         if data is None or len(data) <= CHUNK_BYTES:
             content = transfer.content_b64 if data is None else base64.b64encode(data).decode("ascii")
@@ -487,6 +535,121 @@ async def _apply_to_destinations(engine: Engine, transfer: Transfer) -> None:
                                     {**base, "chunk": {"index": index, "total": total}, "content_b64": base64.b64encode(piece).decode("ascii")})
     if not transfer.pending_destinations:
         _transfers.pop(transfer.id, None)
+
+
+async def _left_out(engine: Engine, flow: dict[str, Any], dest: dict[str, Any], transfer: Transfer, why: str) -> None:
+    """A file a step did not take or could not convert, set to be left out: kept on the record with its source version (so it is not sent
+    again for nothing), and said. In a bundle's run it is simply not in the bundle."""
+    if transfer.bundles.get(dest["id"]):
+        await _bundle_step(engine, transfer, dest["id"])
+        return
+    await engine.db.flows.log_sync(dest["id"], "", "flow_sync", None, source_relative_path=transfer.relative_path, source_hash=transfer.hash,
+                                   outcome="left_out")
+    await engine.audit.record(None, "flow.left_out", target_type="flow_destinations", target_id=dest["id"],
+                              detail={"flow_id": flow["id"], "relative_path": transfer.relative_path, "why": why})
+
+
+# --- a Bundling step's run -----------------------------------------------------------------------------------------------------------
+
+async def _bundle_skip(engine: Engine, transfer: Transfer, dest_id: int) -> None:
+    """A file of a bundle's run that did not reach the destination (held for consent, the destination away): the run is given up quietly."""
+    bundle_id = transfer.bundles.get(dest_id)
+    b = _bundles.get(bundle_id) if bundle_id else None
+    if b is not None:
+        b.failed = b.failed or ""
+        await _bundle_step(engine, transfer, dest_id)
+
+
+async def _bundle_step(engine: Engine, transfer: Transfer, dest_id: int, *, arrived: bool = False, failed: str | None = None) -> None:
+    bundle_id = transfer.bundles.get(dest_id)
+    b = _bundles.get(bundle_id) if bundle_id else None
+    if b is None:
+        return
+    b.pending.discard(transfer.id)
+    if arrived:
+        b.files += 1
+    if failed and not b.failed:
+        b.failed = failed
+    await _bundle_close(engine, b)
+
+
+async def _bundle_close(engine: Engine, b: Bundle) -> None:
+    """Every file of the run has arrived (or not): the destination makes the bundle, or drops what it kept aside."""
+    if not b.sent or b.pending:
+        return
+    _bundles.pop(b.id, None)
+    flow = await engine.db.flows.get(b.flow_id)
+    dest = next((d for d in (flow or {}).get("destinations", []) if d["id"] == b.destination_id), None)
+    if flow is None or dest is None or dest["destination_pc_id"] is None:
+        return
+    step = bundling(flow, dest)
+    if b.failed is not None or not b.files or step is None:
+        await engine.push_to_pc(dest["destination_pc_id"], "flow.bundle_drop", {"bundle_id": b.id})
+        if b.failed:
+            await _fail_destination(engine, flow, dest, b.failed if ":" in b.failed else "bundling:bundle_failed")
+        return
+    today = datetime.now().astimezone().strftime("%Y-%m-%d")
+    name = steps.bundle_name(step["config"], flow.get("name"), today)
+    _closing[b.id] = b
+    await engine.push_to_pc(dest["destination_pc_id"], "flow.bundle_close", {
+        "bundle_id": b.id, "flow_id": flow["id"], "destination_id": dest["id"], "destination_path": dest["destination_path"], "name": name,
+        "op": step["config"]["op"], "folders": step["config"]["settings"].get("folders", "keep"),
+        "previous": await engine.db.flows.last_written_for(dest["id"], BUNDLE_KEY)})
+
+
+async def start_bundles(engine: Engine, flow: dict[str, Any], entries: list[dict[str, Any]], targets: list[dict[str, Any]],
+                        given: dict[int, dict[str, Any]]) -> None:
+    """A run of a flow with Bundling: each bundling destination gets every file of the folder its Choosing steps take, as the folder is now,
+    unless that is exactly what its last bundle was made from."""
+    for dest in targets:
+        if bundling(flow, dest) is None:
+            continue
+        chain = flowdefs.stage_chain(flow, dest)
+        taken = sorted((e for e in entries if steps.chosen(chain, e["relative_path"])), key=lambda e: e["relative_path"].lower())
+        snapshot = hashlib.sha256("\n".join(f"{e['relative_path']}\0{e['hash']}" for e in taken).encode("utf-8")).hexdigest()
+        if not taken or given[dest["id"]].get(BUNDLE_KEY.lower()) == snapshot:
+            continue                                                   # nothing to bundle, or nothing changed since the last bundle
+        b = Bundle(uuid.uuid4().hex, flow["id"], dest["id"], snapshot)
+        _bundles[b.id] = b
+        for entry in taken:
+            while sum(1 for t in _transfers.values() if t.flow_id == flow["id"]) >= IN_FLIGHT:
+                await asyncio.sleep(0.05)
+            rel = entry["relative_path"]
+            await propagate(engine, flow["id"], source_file(flow, rel), rel, entry["hash"], only={dest["id"]}, bundle_for={dest["id"]: b.id})
+        b.sent = True
+        await _bundle_close(engine, b)
+
+
+_closing: dict[str, Bundle] = {}            # bundles the destination was told to make: waiting for flow.bundle_result
+
+
+@handler("flow.bundle_result")
+async def bundle_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """The destination made a bundle (or could not): {"bundle_id", "status": "success"|"failed", "written_path"?, "written_hash"?, "files"?,
+    "size_before"?, "size_after"?, "preserved"?, "left_out"?: [names not put in (a bundle of PDFs takes only PDFs)]}."""
+    ident = require_account(ctx)
+    b = _closing.pop(str_field(payload, "bundle_id"), None)
+    dest = await ctx.engine.db.flows.destination(b.destination_id) if b else None
+    if b is None or dest is None or dest["destination_pc_id"] != ident.pc_id:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such bundle for this pc")
+    flow = await ctx.engine.db.flows.get(b.flow_id)
+    assert flow is not None
+    if str_field(payload, "status", choices=("success", "failed")) == "failed":
+        await _fail_destination(ctx.engine, flow, dest, "bundling:bundle_failed")
+        return {"recorded": True}
+    before = payload.get("size_before") if isinstance(payload.get("size_before"), int) else None
+    await ctx.engine.db.flows.log_sync(dest["id"], str(payload.get("written_hash") or ""), "flow_sync", None, source_relative_path=BUNDLE_KEY,
+                                       written_path=payload.get("written_path"), source_hash=b.snapshot, outcome="new" if before is None else "changed",
+                                       bytes_before=before, bytes_after=payload.get("size_after") if isinstance(payload.get("size_after"), int) else None)
+    if payload.get("preserved"):
+        await ctx.engine.db.flows.log_sync(dest["id"], "", "external", None, conflict_resolved=True, source_relative_path=BUNDLE_KEY,
+                                           written_path=str(payload["preserved"]), outcome="kept_beside", bytes_before=before)
+    await ctx.engine.audit.record(ctx, "flow.bundled", target_type="flow_destinations", target_id=dest["id"],
+                                  detail={"flow_id": flow["id"], "files": b.files, "path": payload.get("written_path"),
+                                          "left_out": list(payload.get("left_out") or [])[:50]})
+    await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.synced",
+                                     {"flow_id": flow["id"], "destination_id": dest["id"], "relative_path": str(payload.get("written_path") or ""), "bundle": True})
+    return {"recorded": True}
 
 
 async def _fail_destination(engine: Engine, flow: dict[str, Any], dest: dict[str, Any], reason: str) -> None:
@@ -558,8 +721,8 @@ async def content(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("flow.sync_result")
 async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Destination PC reports the outcome of flow.apply:
-    {"transfer_id", "destination_id", "status": "success"|"failed", "written_hash"?,
-     "failure": {"stage_type": "transformation"|"categorization"|"destination", "kind": str}?}"""
+    {"transfer_id", "destination_id", "status": "success"|"failed"|"left_out"|"kept_aside", "written_hash"?, "replaced"?: {path, moved_to?, kept?},
+     "as_is"?: [what a Conversion could not do], "failure": {"stage_type": "destination"|..., "kind": str}?}"""
     ident = require_account(ctx)
     transfer = _transfers.get(str_field(payload, "transfer_id"))
     dest_id = int_field(payload, "destination_id")
@@ -570,7 +733,17 @@ async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         raise ProtocolError(ErrorCode.FORBIDDEN, "not the destination pc")
     flow = await ctx.engine.db.flows.get(transfer.flow_id)
     assert flow is not None
-    status = str_field(payload, "status", choices=("success", "failed"))
+    status = str_field(payload, "status", choices=("success", "failed", "left_out", "kept_aside"))
+    if payload.get("as_is"):                    # a Conversion that could not be done here: the file went as it is, and that is said
+        await ctx.engine.audit.record(ctx, "flow.not_converted", target_type="flow_destinations", target_id=dest_id,
+                                      detail={"flow_id": flow["id"], "relative_path": transfer.relative_path, "steps": list(payload["as_is"])[:5]})
+    if transfer.bundles.get(dest_id):           # a file of a bundle's run: kept aside at the destination, not a copy of its own
+        failure = payload.get("failure") or {}
+        await _bundle_step(ctx.engine, transfer, dest_id, arrived=status == "kept_aside",
+                           failed=f"{failure.get('stage_type', 'destination')}:{failure.get('kind', 'unknown')}" if status == "failed" else None)
+        status = "bundled"
+    elif status == "left_out":
+        await _left_out(ctx.engine, flow, dest, transfer, str(payload.get("why") or "a step could not convert it"))
     if status == "success":
         written = payload.get("written_hash") or transfer.hash or ""
 
@@ -581,6 +754,19 @@ async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         before, after = size("size_before"), size("size_after")
         # A Worker that says no size before was writing where nothing was: the file is new there. One that says nothing (older) leaves it unknown.
         outcome = None if "size_before" not in payload else "new" if before is None else "changed"
+        older = payload.get("replaced") if isinstance(payload.get("replaced"), dict) else None
+        if older and not older.get("kept"):      # this version has a new name (Add a date): the copy under the old one was put aside. Logged first: the new write is the latest
+            await ctx.engine.db.flows.log_sync(dest_id, REMOVED, "flow_sync", None, source_relative_path=transfer.relative_path,
+                                               written_path=str(older.get("path") or "") or None, outcome="removed")
+            await ctx.engine.audit.record(ctx, "flow.replaced", target_type="flow_destinations", target_id=dest_id,
+                                          detail={"flow_id": flow["id"], "relative_path": transfer.relative_path, "moved_to": older.get("moved_to")})
+        elif older:
+            await ctx.engine.audit.record(ctx, "flow.kept", target_type="flow_destinations", target_id=dest_id,
+                                          detail={"flow_id": flow["id"], "relative_path": transfer.relative_path, "path": older.get("path"),
+                                                  "why": "changed after the flow wrote it, so it stays beside the new version"})
+            await ctx.engine.push_to_account(flow["created_by_account_id"], "flow.conflict",
+                                             {"flow_id": flow["id"], "destination_id": dest_id, "kept": str(older.get("path") or ""), "relative_path": transfer.relative_path,
+                                              "why": "a newer version has a new name, but this copy was changed here: kept"})
         await ctx.engine.db.flows.log_sync(dest_id, written, "flow_sync", None,
                                            source_relative_path=transfer.relative_path,
                                            written_path=payload.get("written_path"), source_hash=transfer.hash,
@@ -601,7 +787,7 @@ async def sync_result(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                                          {"flow_id": flow["id"], "destination_id": dest_id,
                                           "relative_path": transfer.relative_path})
         await ctx.engine.announce("flow.synced", {"flow_id": flow["id"], "destination_id": dest_id, "relative_path": transfer.relative_path, "pc_id": ident.pc_id}, source="system", pc=ident.pc_id)
-    else:
+    elif status == "failed":
         failure = payload.get("failure") or {}
         reason = f"{failure.get('stage_type', 'destination')}:{failure.get('kind', 'unknown')}"
         await _fail_destination(ctx.engine, flow, dest, reason)
@@ -644,7 +830,13 @@ async def expire_transfers(engine: Engine) -> None:
         reason = "source:unreadable" if transfer.data is None and transfer.content_b64 is None else "destination:unreachable"
         for dest in flow["destinations"]:
             if dest["id"] in transfer.pending_destinations:
-                await _fail_destination(engine, flow, dest, reason)
+                if transfer.bundles.get(dest["id"]):
+                    await _bundle_step(engine, transfer, dest["id"], failed=reason)
+                else:
+                    await _fail_destination(engine, flow, dest, reason)
+    for bid, b in list(_closing.items()):                   # told to make the bundle, and never said it did
+        if now - b.created >= 2 * TRANSFER_SECONDS:
+            _closing.pop(bid, None)
     for lid, found in list(_listings.items()):
         if now - found.created >= TRANSFER_SECONDS:
             _listings.pop(lid, None)
@@ -742,6 +934,12 @@ async def _reconcile(engine: Engine, found: Listing) -> None:
     if not targets:
         return
     given = {d["id"]: await engine.db.flows.synced_source_hashes(d["id"]) for d in targets}
+    bundled = [d for d in targets if bundling(flow, d) is not None]
+    if bundled:
+        await start_bundles(engine, flow, found.entries, bundled, given)
+        targets = [d for d in targets if d not in bundled]              # a bundle is the whole folder at each run, not files one by one
+        if not targets:
+            return
     await _mirror_deletes(engine, flow, found, targets, given)
     sent = 0
     ordered = engine.heat.hottest(found.entries, key=lambda e: f"file:{flow['source_pc_id']}:{join_client_path(flow['source_path'], e['relative_path'])}")

@@ -4,7 +4,7 @@ The account is written by the Engine, not by the model. Every fact in it (who wa
 program, count and how long it lasted, and the rules' own reasons) is filled in from the case. Each one is a part the console marks, the
 way the task box marks people and files. Around the facts are plain joining words.
 
-Then, when the model is here, it may smooth one paragraph at a time so it reads less like a form. It never sees the facts. It sees each one
+Then, when `SMOOTHING` is on (it is off: see below) and the model is here, it may smooth one paragraph at a time so it reads less like a form. It never sees the facts. It sees each one
 as a marker that says what kind of fact it is ([person1], [file2], [time3]...) and is told to keep every marker once and to add nothing.
 Its paragraph is used only when a check finds every marker still there once, each still with the facts of its own sentence and the
 sentences in their order (inside a sentence, facts of different kinds may change places: `_same_facts`), and finds no new number, no new name (a capitalised word), no change in
@@ -39,12 +39,18 @@ SMOOTH_TOKENS = 320
 
 NOTE = "Detective's reading of the evidence, not proof."
 
-INSTRUCTION = ("Rewrite the paragraph below so it reads like a person telling a colleague what happened, in plain short sentences. "
-               "Each marker such as [person1], [file2] or [time3] stands for a fact you cannot see; its word says what kind of fact it is "
-               "(a person, a file, a time, a count of files). Keep every marker exactly as written, each one once, in the sentence it belongs to; "
-               "you may reorder the words of a sentence, but keep the sentences in the same order. "
-               "Do not add any fact, name, number, time, reason or guess about why it was done, and do not leave anything out. "
-               "Reply with only the rewritten paragraph.")
+# Off (4 Nov 2026): measured on 8 paragraphs, the 1.7B handed all 8 back unchanged, and with a worked example (below) improved 2, spoiled 2 and
+# still copied the events paragraph, at about 13 s each, with Task proposals queued behind it. The Engine's own account is what is shown.
+# tests/test_llm_real.py has the bar a model must clear before this is switched on.
+SMOOTHING = False
+
+INSTRUCTION = (
+    "Turn the stiff notes below into natural English, the way a colleague would tell it. Join sentences with words like then, after that, and, a little later. "
+    "Words in square brackets such as [time1] or [file2] are placeholders: copy each one exactly, each one once, and keep them with the same event. "
+    "Tell the events in the same order. Add no facts and no reasons.\n\n"
+    "Example notes: At [time1], [file2] was opened. At [time3], [file4] was deleted.\n"
+    "Example answer: [file2] was opened at [time1], and then [file4] was deleted a little later, at [time3].\n\n"
+    "Now do the same for these notes. Reply with only the new text.")
 
 # Words that judge or guess at a reason: the account says what happened, never why or who is to blame. Refused in a rewrite unless the
 # Engine's own paragraph already had them.

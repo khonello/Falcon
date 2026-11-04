@@ -193,6 +193,9 @@ class WorkerService:
         who = signed_in_user()
         if who:
             out["windows_user"] = who                       # how this machine's person is named on another machine's private item
+        from worker_client import convert
+
+        out["converter"] = convert.office_tool()            # what Word, Excel and PowerPoint files are converted with here, if anything
         try:
             import psutil
 
@@ -400,6 +403,10 @@ class WorkerService:
                 await self.flowsync.on_resolve_conflict(payload)
             elif type_ == "flow.remove":
                 await self.flowsync.on_remove(payload)
+            elif type_ == "flow.bundle_close":
+                await self.flowsync.on_bundle_close(payload)
+            elif type_ == "flow.bundle_drop":
+                await self.flowsync.on_bundle_drop(payload)
             elif type_ == "issue.ask_delete":
                 if self.config.windows:
                     self._spawn(self._ask_to_delete(payload))

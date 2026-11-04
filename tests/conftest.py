@@ -37,6 +37,7 @@ def answer(client_id: str, nonce: str, key_generation: int = 1) -> str:
 from common import dotenv
 from protocol import Envelope, Kind, decode, encode, request
 
+os.environ["FALCON_GROQ_API_KEY"] = ""                 # the tests never reach Groq, whatever this machine's .env says (a variable already set wins over .env)
 dotenv.load()
 TEST_DB_URL = os.environ.get("FALCON_TEST_DATABASE_URL")
 # The suite drops and recreates the test database's schema: it must never be the working database.

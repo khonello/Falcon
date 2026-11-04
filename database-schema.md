@@ -309,8 +309,8 @@ Branching — one flow, many destinations.
 | `id` | INTEGER PK | |
 | `flow_id` | INTEGER FK → flows.id NOT NULL | |
 | `parent_stage_id` | INTEGER FK → flow_stages.id, NULLABLE | Self-reference — a stage can sit before or after a Branch, so this models the actual path structure, not a flat list |
-| `stage_type` | TEXT NOT NULL CHECK (`stage_type` IN ('branch','transformation','categorization')) | |
-| `config` | TEXT NULLABLE | Serialized (JSON) — e.g., target format for Transformation, rule set for Categorization |
+| `stage_type` | TEXT NOT NULL CHECK (`stage_type` IN ('branch','transformation','choosing','conversion','renaming','bundling')) | The step's kind (migration 053; `transformation` rows are from before the tree, read in their new names) |
+| `config` | TEXT NULLABLE | Serialized (JSON): `{kind, op, label, settings}` (`engine/flow/steps.py`) |
 
 ### `flow_sync_log`
 | Column | Type | Notes |
@@ -675,3 +675,4 @@ restricted and whose consent let it go, held until `expires_at`), `chat_file_sav
 `detective_cases.telling` (migration 051: the local model's smoothing of a case's account, `{fingerprint, paragraphs}`, with markers in place of the facts;
 used only while the fingerprint matches the case as it is now). `issues.type` also takes `'retention'` (migration 052, code prefix `RET`): old machine days
 past the 90-day window, one open issue at a time (`source_table = 'pc_days'`, `source_id = 0`), deleted only when an Admin picks Delete them.
+`flow_stages.stage_type` names a step's kind, and placing rows became branches (migration 053). `flow_sync_log.outcome` also takes `left_out` (a file a step did not take or could not convert, on the record so it is not sent again), a bundle's row has `source_relative_path = '<bundle>'` with the run's snapshot as `source_hash`, and `pcs.converter` says what a machine converts Office files with (`word`, `libreoffice`, NULL).

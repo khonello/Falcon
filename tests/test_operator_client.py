@@ -125,7 +125,7 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
     out = await run_script(a1, [
         "connect",
         (f"flow create src={org['a1_pc']}:C:/out dest={org['w1_pc']}:C:/in@1 dest={org['w2_pc']}:C:/in@2 "
-         "stage=transformation:to=pdf stage=branch@0 stage=categorization@1:by=extension"),
+         "stage=conversion.to_pdf stage=branch@0 stage=renaming.add_text@1:text=FIN-"),
         "flows",
         f"flow create src={org['a1_pc']}:C:/out2 dest={org['a2_pc']}:C:/from-fin",
         "action add control notify message=hello timeout=5",
@@ -140,7 +140,7 @@ async def test_scripted_flow_assistance_control_updates(engine, org, tmp_path: P
         "event history 1",
         "levels",
     ])
-    assert out[1].startswith("flow 1 active") and "transformation" in out[1] and "categorization" in out[1]
+    assert out[1].startswith("flow 1 active") and "conversion" in out[1] and "renaming" in out[1]
     assert "1" in out[2]
     assert "waiting for the destination owner's consent" in out[3]
     assert out[4].startswith("action 1 'notify' created")

@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from engine.dispatch import Context, handler
+from engine.flow import steps
 from engine.permissions import (
     in_scope,
     int_field,
@@ -44,25 +45,13 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-STAGE_TYPES = ("branch", "transformation", "categorization")
-# A step as the console names it (its `op`) and what the Worker reads for it (worker_client/flowsync.py). The name is kept in the config, so
-# it comes back as it was picked; the rest is what is done.
-STEP_OPS: dict[str, tuple[str, dict[str, str]]] = {
-    "Rename by date": ("transformation", {"rename": "date"}),
-    "Convert to PDF": ("transformation", {"to": "pdf"}),
-    "Compress to ZIP": ("transformation", {"pack": "zip"}),
-    "Sort by file type": ("categorization", {"by": "extension"}),
-    "Sort by month": ("categorization", {"by": "month"}),
-}
+STAGE_TYPES = steps.STAGE_TYPES
 STATUSES = ("active", "paused", "inactive")
 
 # Predefined, reactive fix suggestions per (stage type, failure kind) -- built-in knowledge,
 # never configured upfront. Keys match what worker clients report in flow.sync_result.
 FAILURE_SUGGESTIONS: dict[tuple[str, str], str] = {
-    ("transformation", "convert_failed"): "Remove or reconfigure the Transformation stage for this destination.",
-    ("transformation", "unsupported_format"): "This file type cannot be converted; add a Categorization stage to "
-                                              "route it around the Transformation, or remove the stage.",
-    ("categorization", "place_failed"): "Add a fallback category or relax the categorization rule.",
+    ("bundling", "bundle_failed"): "The bundle could not be made at the destination (no room, or a file in it could not be read); run the flow again.",
     ("destination", "unreachable"): "Check the destination PC's connection, then resume the flow.",
     ("destination", "permission_denied"): "Grant write access at the destination path, then resume.",
     ("destination", "unsupported"): "Remote-storage destinations are not supported in v1; change the destination.",
@@ -134,18 +123,45 @@ def has_cycle(edges: list[tuple[str, str]], new_edges: list[tuple[str, str]]) ->
 
 
 def stage_chain(flow: dict[str, Any], destination: dict[str, Any]) -> list[dict[str, Any]]:
-    """Ordered processing stages that apply to one destination: walk parent links from the
-    destination back to the source, drop Branch stages (structural only)."""
+    """The steps that apply to one destination, in the order they run (engine/flow/steps.py): walk parent links from the destination back
+    to the source; a branch, and a placing step made before placing was dropped, mean nothing to a file and are left out."""
     by_id = {s["id"]: s for s in flow["stages"]}
     chain: list[dict[str, Any]] = []
     cur = destination.get("parent_stage_id")
     while cur is not None and cur in by_id:
         st = by_id[cur]
-        if st["stage_type"] != "branch":
-            chain.append({"stage_type": st["stage_type"], "config": st.get("config") or {}})
+        meant = steps.normal(st)
+        if meant is not None:
+            chain.append(meant)
         cur = st.get("parent_stage_id")
     chain.reverse()
-    return chain
+    return sorted(chain, key=lambda x: steps.RANK[x["stage_type"]])             # (stable: steps of one kind keep the order they were put in)
+
+
+def _chains(stages: list[dict[str, Any]], dests: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Each destination's path through steps not stored yet (parent_index links), in the order they were given."""
+    out = []
+    for d in dests:
+        chain, cur = [], d.get("parent_index")
+        while cur is not None:
+            st = stages[int(cur)]
+            if st["stage_type"] != "branch":
+                chain.append({"stage_type": st["stage_type"], "config": st["config"]})
+            cur = st.get("parent_index")
+        out.append(list(reversed(chain)))
+    return out
+
+
+def check_steps(stages: list[dict[str, Any]], dests: list[dict[str, Any]], *, run_mode: str, sources: int, source_kind: str) -> None:
+    """Each destination's steps in the kinds' order; Bundling only where a run has a whole folder to bundle."""
+    chains = _chains(stages, dests)
+    for chain in chains:
+        steps.check_path(chain)
+    if steps.bundles(chains):
+        if run_mode == "realtime":
+            raise ProtocolError(ErrorCode.INVALID, "a Bundling step makes one file at each run: set the flow to run every hour, or only when you run it")
+        if sources > 1 or source_kind != "folder":
+            raise ProtocolError(ErrorCode.INVALID, "a Bundling step bundles one folder: not a single file, and not several sources")
 
 
 # --- creation checks ----------------------------------------------------------------------------
@@ -157,20 +173,12 @@ def _parse_structure(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], lis
         raise ProtocolError(ErrorCode.INVALID, "destinations (non-empty list) and stages (list) required")
     stages: list[dict[str, Any]] = []
     for i, st in enumerate(stages_in):
-        stype = st.get("stage_type")
-        if stype not in STAGE_TYPES:
-            raise ProtocolError(ErrorCode.INVALID, f"stage {i}: stage_type must be one of {', '.join(STAGE_TYPES)}")
+        if not isinstance(st, dict):
+            raise ProtocolError(ErrorCode.INVALID, f"stage {i}: a step is an object")
         parent = st.get("parent_index")
         if parent is not None and not (0 <= int(parent) < i):
             raise ProtocolError(ErrorCode.INVALID, f"stage {i}: parent_index must reference an earlier stage")
-        config = st.get("config")
-        op = config.get("op") if isinstance(config, dict) else None
-        if op is not None:
-            if op not in STEP_OPS:
-                raise ProtocolError(ErrorCode.INVALID, f"stage {i}: {op!r} is not a step (one of {', '.join(STEP_OPS)})")
-            if STEP_OPS[op][0] != stype:
-                raise ProtocolError(ErrorCode.INVALID, f"stage {i}: {op} is a {STEP_OPS[op][0]} step")
-            config = {**config, **STEP_OPS[op][1]}
+        stype, config = steps.parse(st, i)
         stages.append({"stage_type": stype, "parent_index": parent, "config": config})
     dests: list[dict[str, Any]] = []
     for i, d in enumerate(dests_in):
@@ -346,7 +354,9 @@ async def _flow_view(engine: Engine, flow: dict[str, Any]) -> dict[str, Any]:
                       {"source_pc_id": flow["source_pc_id"], "source_path": flow["source_path"], "source_kind": flow.get("source_kind"),
                        "source_hostname": view["source_hostname"]}]
     view["files_copied"] = row((await engine.db.flows.copied_counts([flow["id"]]))[flow["id"]])
+    tools = await engine.db.accounts.converters([d["destination_pc_id"] for d in view.get("destinations", []) if d.get("destination_pc_id")])
     for d in view.get("destinations", []):
+        d["converter"] = tools.get(d.get("destination_pc_id"))           # what converts Office files there (word, libreoffice), or None
         d["destination_hostname"] = names.get(d.get("destination_pc_id")) if d.get("destination_pc_id") else None
         d["suggestion"] = suggestion_for(d.get("paused_reason"))
         last = await engine.db.flows.last_sync(d["id"])
@@ -383,6 +393,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     name = _name(payload)
     run_mode = str_field(payload, "run_mode", required=False, choices=RUN_MODES) or "realtime"
     dests, stages = _parse_structure(payload)
+    check_steps(stages, dests, run_mode=run_mode, sources=len(srcs), source_kind=srcs[0]["source_kind"])
     on_delete = _on_delete(payload)
     src = None
     for s in srcs:
@@ -649,13 +660,15 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     creator = await ctx.engine.db.accounts.by_id(ident.account_id)
     assert creator is not None
     dests, stages = _parse_structure(payload)
+    mode_after = str_field(payload, "run_mode", required=False, choices=RUN_MODES) or flow.get("run_mode") or "realtime"
+    group = await _group(ctx.engine, flow)
+    check_steps(stages, dests, run_mode=mode_after, sources=len(group), source_kind=flow.get("source_kind") or "folder")
     await _resolve_owners(ctx.engine, dests, creator)
     checks = await run_checks(ctx.engine, creator, flow["source_pc_id"], flow["source_path"], dests,
                               confirm_collisions=bool(payload.get("confirm_collisions")), exclude_flow_id=flow_id)
     if checks["needs_consent"]:
         raise ProtocolError(ErrorCode.FORBIDDEN, "new destinations outside your authority need a new flow "
                                                  "(consent is requested at creation)")
-    group = await _group(ctx.engine, flow)
     for other in group[1:]:
         await run_checks(ctx.engine, creator, other["source_pc_id"], other["source_path"], dests, confirm_collisions=True, exclude_flow_id=other["id"])
     for member in group:
@@ -679,6 +692,14 @@ async def edit(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     updated = await ctx.engine.db.flows.get(flow_id)
     assert updated is not None
     return {"flow": await _flow_view(ctx.engine, updated)}
+
+
+@handler("flow.steps")
+async def steps_catalogue(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """The steps a flow can have, as the tree New flow draws: category > kind > operation > settings (engine/flow/steps.py), with each
+    setting's choices and default, the order the kinds run in, and what an operation needs."""
+    require_role(ctx, "super_user", "admin")
+    return {"tree": steps.catalogue(), "order": list(steps.KINDS)}
 
 
 @handler("flow.pause")
@@ -832,7 +853,8 @@ async def flow_runs(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             runs.append([w])
 
     def file_of(w: dict[str, Any]) -> dict[str, Any]:
-        return {"path": w["written_path"], "relative_path": w["source_relative_path"], "outcome": w["outcome"] or "unknown",
+        bundle = w["source_relative_path"] == "<bundle>"
+        return {"path": w["written_path"], "relative_path": None if bundle else w["source_relative_path"], "bundle": bundle, "outcome": w["outcome"] or "unknown",
                 "bytes_before": w["bytes_before"], "bytes_after": w["bytes_after"], "destination_id": w["destination_id"],
                 "machine": w["hostname"], "at": w["occurred_at"].isoformat()}
 

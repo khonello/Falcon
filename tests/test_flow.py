@@ -72,7 +72,7 @@ async def test_propagation_attribution_conflict_and_failure(engine, org, connect
         "source_pc_id": org["a1_pc"], "source_path": "C:/out",
         "stages": [{"stage_type": "transformation", "config": {"to": "pdf"}},
                    {"stage_type": "branch", "parent_index": 0},
-                   {"stage_type": "categorization", "parent_index": 1, "config": {"by": "extension"}}],
+                   {"step": {"kind": "renaming", "op": "add_date"}, "parent_index": 1}],
         "destinations": [{"destination_pc_id": org["w1_pc"], "destination_path": "C:/in", "parent_index": 1},
                          {"destination_pc_id": org["w2_pc"], "destination_path": "C:/in", "parent_index": 2}]})
     flow = res["flow"]
@@ -88,20 +88,20 @@ async def test_propagation_attribution_conflict_and_failure(engine, org, connect
     apply1 = next(p for p in await w1.drain_pushes() if p.type == "flow.apply")
     apply2 = next(p for p in await w2.drain_pushes() if p.type == "flow.apply")
     assert apply1.payload["relative_path"] == "docs/report.docx" and apply1.payload["content_b64"] == "QUJD"
-    assert [s["stage_type"] for s in apply1.payload["stages"]] == ["transformation"]
-    assert [s["stage_type"] for s in apply2.payload["stages"]] == ["transformation", "categorization"]
-    # 3. W1 succeeds; W2 fails in its Categorization stage -> only W2's branch pauses.
+    assert [s["stage_type"] for s in apply1.payload["stages"]] == ["conversion"]
+    assert [s["stage_type"] for s in apply2.payload["stages"]] == ["conversion", "renaming"]
+    # 3. W1 succeeds; W2 cannot write there -> only W2's branch pauses.
     await w1.ok("flow.sync_result", {"transfer_id": read.payload["transfer_id"], "destination_id": d1["id"],
                                      "status": "success", "written_hash": "h1-pdf", "written_path": "C:/in/docs/report.pdf"})
     await w2.ok("flow.sync_result", {"transfer_id": read.payload["transfer_id"], "destination_id": d2["id"],
-                                     "status": "failed", "failure": {"stage_type": "categorization", "kind": "place_failed"}})
+                                     "status": "failed", "failure": {"stage_type": "destination", "kind": "permission_denied"}})
     failed = next(p for p in await a1.drain_pushes() if p.type == "flow.failed")
-    assert failed.payload["destination_id"] == d2["id"] and "fallback category" in failed.payload["suggestion"]
+    assert failed.payload["destination_id"] == d2["id"] and "write access" in failed.payload["suggestion"]
     assert "flow.failed" in w2.push_types(await w2.drain_pushes())
     st = (await a1.ok("flow.status", {"flow_id": flow["id"]}))["flow"]
     assert st["status"] == "active"
     assert st["destinations"][0]["paused_reason"] is None and st["destinations"][0]["last_sync"]["written_by"] == "flow_sync"
-    assert st["destinations"][1]["paused_reason"] == "categorization:place_failed"
+    assert st["destinations"][1]["paused_reason"] == "destination:permission_denied"
     assert (await engine.db.reports.all())[0]["category"] == "flow_failure"
 
     # 4. Attribution: the flow's own write landing at W1 (same hash) is NOT a conflict.

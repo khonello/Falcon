@@ -33,6 +33,7 @@ worker = [
     "psutil>=5.9",
     "prompt_toolkit>=3.0",
     "watchdog>=4.0",          # native OS file events; the worker polls as a fallback without it
+    "pypdf>=4.0",             # a flow's Bundling into one PDF (pure Python, about 0.3 MB)
 ]
 # The Worker's windows (worker_client.windows): optional, the service runs headless without them
 worker-ui = [
@@ -42,6 +43,7 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
     "pytest-timeout>=2.3",
+    "pypdf>=4.0",             # the Worker's PDF steps are tested from this environment
     "ruff>=0.4",
     "watchdog>=4.0",
 ]

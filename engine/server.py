@@ -56,7 +56,9 @@ class Engine:
         self.file_index = FileIndex(self.db, self.bus)
         self.scheduler = Scheduler(self)
         self.llm = LocalLLM(settings.llm_backend, model_path=settings.llm_model_path,
-                            endpoint=settings.llm_endpoint, model=settings.llm_model)
+                            endpoint=settings.llm_endpoint, model=settings.llm_model, fallback_key=settings.groq_api_key,
+                            fallback_model=settings.groq_model, fallback_endpoint=settings.groq_endpoint)
+        self.llm.on_fallback = self._fallback_used
         self.connections: set[Connection] = set()
         # Generated once on the Engine host, never transmitted (spec 8.2). Loaded in start().
         self.master_secret: bytes | None = settings.master_secret
@@ -131,6 +133,10 @@ class Engine:
             self.heat.touch(f"pc:{pc}", folder=False)
 
     # --- lifecycle ------------------------------------------------------------------------------
+
+    async def _fallback_used(self) -> None:
+        """Text left the machine for Groq: on the record (at most once an hour; engine/llm.py)."""
+        await self.audit.record(None, "llm.fallback", detail={"to": "groq", "model": self.llm.fallback_model})
 
     async def start(self) -> None:
         self.started_monotonic = time.monotonic()

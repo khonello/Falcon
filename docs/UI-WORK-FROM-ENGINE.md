@@ -72,13 +72,42 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   licence, last4, role, seats, used, left, department, expires_at, revoked_at, machines: [{hostname, decided_at}]}]}`, `licence.revoke
   {code_id}`. Probably beside Registry (Machines > Registry). A machine that joins this way is pushed as `enroll.joined` and `machines.changed`.
 
+### Flows: steps as a tree (the user, 3 Nov 2026; `engine/flow/steps.py`) -- New flow's step picker changes
+- **The tree:** `flow.steps {}` -> `{tree, order}`. `tree` is a list of categories, each `{category, label, says, kinds: [{kind, label,
+  says, needs?, ops: [{op, label, needs?, settings: {key: spec}}]}]}`. A setting's spec says how to draw it: `choices` (+ `default`,
+  `words` for nicer labels), `many` (pick several), `list: "extension"` (file types typed in), `text: <max length>`, `number: [lo, hi]`,
+  `flag`. `required` marks the ones that must be filled. Draw the picker from this, not from a list in the QML: Category > Kind >
+  Operation, then its settings.
+  - Per file: Choosing (by file type, by name, by size), Conversion (To PDF, To DOCX, To another image type, Zip each file), Renaming
+    (Add a date, Add text, Replace text in the name).
+  - All files: Bundling (Into one ZIP, Into one PDF).
+- **Sending a step:** in `flow.create` / `flow.edit`, each stage is `{"step": {kind, op, settings}, "parent_index"?}` (a branch is still
+  `{"stage_type": "branch"}`). `flow.list` / `flow.status` return each stage with `stage_type` = its kind and `config: {kind, op, label,
+  settings}`. The old five names (`{"config": {"op": "Rename by date"}}`) are still accepted, for the console as it is.
+- **Placing is dropped.** "Sort by file type" and "Sort by month" are refused now ("placing steps were dropped"): take them out of
+  New flow and the flow drawings. A flow made with one keeps running; its placing step shows as nothing.
+- **The order is fixed:** Choosing, Conversion, Renaming, Bundling, on each destination's path (`order`). The Engine refuses
+  any other order, so New flow can simply list a path's steps in that order (or sort them as they are added). At most one Bundling per path.
+- **Add a date keeps only the newest copy.** An edited file gets a new dated name and the older copy is put aside in `.falcon-removed`; in
+  `flow.runs` it shows with outcome `removed`. A copy changed at the destination stays, and a `flow.conflict` push says so.
+- **Bundling** only in a flow that runs every hour or only when Run is pressed, from one folder (not a single file, not several
+  sources): the Engine refuses it otherwise. Say so beside the step, and grey "Real time" when a bundling step is on (or the step when
+  Real time is picked). Each run makes one file from the whole folder as it is (not only what changed), and makes none when nothing changed.
+- **A Conversion that cannot be done** never stops the flow any more: the `if_not` setting ("Copy it as it is" / "Leave it out",
+  default copy). Files a step left out are kept on the record: `flow.runs` gives them as `left_out`, with no `path`. A bundle's row in
+  `flow.runs` has `bundle: true` and its file in `path`.
+- **Which destinations convert Office files:** `flow.status` destinations carry `converter` (`word`, `libreoffice` or null). Beside a
+  To PDF (Word, Excel, PowerPoint) or To DOCX (from PDF) step, say which destinations have neither, so those files will be copied as they are.
+- The old fix suggestions about "add a Categorization stage" are gone; a bundle that could not be made pauses that destination as
+  `bundling:bundle_failed`, with its own suggestion.
+
 ### Detective: a case told in words (built 3 Nov 2026; ENGINE-GAPS #15, the concept's "What Detective noticed")
 - `detective.case` now returns `telling: {paragraphs, text, smoothed, note}`. `paragraphs` is a list of paragraphs, each a list of parts:
   `{text}` (plain words) or `{text, kind, value}` (a fact to mark). Kinds: `person` (value: account id, text already in the viewer's own
   name), `machine`, `time` (value ISO), `duration`, `file`, `folder`, `drive`, `program`, `count`, `amount`, `intent`, `reason` (a rule's
   own reason or what would make it innocent, word for word), `tag` ("a restricted file"). Mark people, files, machines, programs and times
   the way the task box does; the rest can stay plain.
-- `smoothed` is true when the local model's smoothing passed the check; the account is the Engine's own otherwise. Either way show `note`
+- `smoothed` is false for now: the model's smoothing is switched off (4 Nov 2026), so the account is always the Engine's own. Either way show `note`
   ("Detective's reading of the evidence, not proof."). The page's own writing-out of the findings can go: draw this instead.
 - When the smoothing arrives later, `detective.updated {case_id, telling: true}` is pushed: read the case again.
 

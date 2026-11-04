@@ -19,10 +19,10 @@ async def test_a_flow_set_to_run_only_when_asked_moves_nothing_until_run_and_an_
     a1 = await connect("cid-a1")
     await connect("cid-w1")
     made = (await a1.ok("flow.create", {**_flow(org["a1_pc"], "C:/out", org["w1_pc"], "C:/in"), "name": "  month-end ", "run_mode": "manual",
-                                        "stages": [{"stage_type": "categorization", "config": {"op": "Sort by month"}}],
+                                        "stages": [{"step": {"kind": "renaming", "op": "add_date"}}],
                                         "destinations": [{"destination_pc_id": org["w1_pc"], "destination_path": "C:/in", "parent_index": 0}]}))["flow"]
     assert made["name"] == "month-end" and made["run_mode"] == "manual" and made["files_copied"]["total"] == 0
-    assert made["stages"][0]["config"]["by"] == "month"
+    assert made["stages"][0]["config"]["op"] == "add_date"
     await a1.drain_pushes()
     await a1.ok("index.event", {"event": {"op": "modify", "path": "C:/out/report.txt", "hash": "h1"}})
     assert "flow.read" not in a1.push_types(await a1.drain_pushes())                       # a run-only flow does not copy on a change
@@ -95,9 +95,9 @@ async def test_a_flow_carries_on_from_another_and_an_edit_retires_the_old_steps(
                               "stages": [{"stage_type": "transformation", "config": {"op": "Rename by date"}}],
                               "destinations": [{"destination_pc_id": org["w1_pc"], "destination_path": "C:/in", "parent_index": 0}]})
     now = (await a1.ok("flow.status", {"flow_id": first["id"]}))["flow"]
-    assert [s["config"]["op"] for s in now["stages"]] == ["Rename by date"] and now["name"] == "zipped" and now["run_mode"] == "hourly"
+    assert [s["config"]["op"] for s in now["stages"]] == ["add_date"] and now["name"] == "zipped" and now["run_mode"] == "hourly"
     listed = next(f for f in (await a1.ok("flow.list"))["flows"] if f["id"] == first["id"])
-    assert [s["config"]["op"] for s in listed["stages"]] == ["Rename by date"]
+    assert [s["config"]["op"] for s in listed["stages"]] == ["add_date"]
     assert await engine.db.pool.fetchval("SELECT count(*) FROM flow_stages WHERE flow_id = $1 AND retired_at IS NOT NULL", first["id"]) == 1
 
 
