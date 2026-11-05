@@ -26,16 +26,12 @@ Drawer {
         spacing: 12
         Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text2
               text: kd.made === null ? "Making the key…" : "The old key for " + kd.spec.subject + " stops working at once. Copy this into the machine's Worker Client settings." }
-        Repeater {
-            model: kd.made ? [["Client id", kd.made.client_id], ["Key", kd.made.client_key]] : []
-            Column { required property var modelData; width: parent.width; spacing: 4
-                     Txt { text: modelData[0].toUpperCase(); color: Theme.text3; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.66 }
-                     Rectangle { width: parent.width; height: kt.height + 24; radius: 6; color: Theme.surface2; border.color: Theme.borderStrong
-                                 TextEdit { id: kt; x: 14; y: 12; width: parent.width - 60; text: modelData[1]; readOnly: true; selectByMouse: true; wrapMode: TextEdit.WrapAnywhere
-                                            font.family: Theme.mono; font.pixelSize: 13; color: Theme.text; selectionColor: Theme.accentSoft; selectedTextColor: Theme.text }
-                                 Btn { anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "ghost"; iconName: "copy"; tip: "Copy"
-                                       onClicked: { kt.selectAll(); kt.copy(); kt.deselect(); Msg.ok(modelData[0] + " copied") } } } }
-        }
+        // the key alone: the machine keeps its id, and only the key changes
+        Rectangle { visible: !!kd.made; width: parent.width; height: kt.height + 24; radius: 6; color: Theme.surface2; border.color: Theme.borderStrong
+                    TextEdit { id: kt; x: 14; y: 12; width: parent.width - 60; text: kd.made ? kd.made.client_key : ""; readOnly: true; selectByMouse: true; wrapMode: TextEdit.WrapAnywhere
+                               font.family: Theme.mono; font.pixelSize: 13; color: Theme.text; selectionColor: Theme.accentSoft; selectedTextColor: Theme.text }
+                    Btn { anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "ghost"; iconName: "copy"; tip: "Copy"
+                          onClicked: { kt.selectAll(); kt.copy(); kt.deselect(); Msg.ok("Key copied") } } }
         Decide { c: Theme.med; text: "It is shown once. It cannot be shown again. If it is lost, make a new one." }
     }
 }

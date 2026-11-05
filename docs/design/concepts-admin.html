@@ -4719,7 +4719,7 @@ function ActionNew({ from, onDone }) {
         : html`<${Button} type="primary" onClick=${() => { toast(from ? `${name.trim()} saved (concept)` : `${name.trim()} added to Custom (concept)`); onDone(); }}>${from ? "Save changes" : "Add the action"}<//>`}</div></div>`;
 }
 function AdminActionsLayout({ host }) {
-  const [sel, setSel] = useState("shot"), [hosts, setHosts] = useState(host ? [host] : ["OPS-03", "OPS-04"]), [make, setMake] = useState(false);
+  const [sel, setSel] = useState("shot"), [hosts, setHosts] = useState(host ? [host] : []), [make, setMake] = useState(false);
   const [run, setRun] = useState(null), [mine, setMine] = useState([]), [show, setShow] = useState(null);
   const A0 = ABY[sel], lib = ACTION_LIB.filter((a) => !/^cust-/.test(a.id));
   const badOf = (a) => runsOf(a).filter((x) => x.t >= -144 && isBadRun(x)).length;

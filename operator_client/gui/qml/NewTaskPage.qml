@@ -384,6 +384,8 @@ Column {
                         width: parent.width
                         icon: "checksquare"
                         title: page.t ? page.t.title : ""
+                        titleDot: page.t ? page.srcColor[page.t.titleSrc || "rule"] : "transparent"
+                        titleDotTip: page.t && page.t.titleSrc === "you" ? "Set by you" : "The request, shortened"
                         line: (page.t ? page.t.who : "") + " on " + sumP.host + " · 0 of " + Theme.many(page.t ? page.t.checks.length : 0, "target") + " found"
                         actW: 128
                         midW: 240
@@ -402,8 +404,9 @@ Column {
                         spacing: 14
                         FactRows {
                             width: Math.min(560, parent.width)
-                            rows: page.t ? [["For", page.t.who + " on " + sumP.host], ["Given", "now, by you"], ["Soft deadline", page.t.soft ? Time.date(page.t.soft) : "none"],
-                                            ["Final deadline", page.t.final ? Time.date(page.t.final) + "  · " + page.spanWords((Time.ms(page.t.final) - Time.now) / 3600000) + " to do it" : "none; it stays open until you close it"]] : []
+                            rows: page.t ? [["For", page.t.who + " on " + sumP.host, false, page.srcColor[page.t.whoSrc], page.srcWord[page.t.whoSrc]], ["Given", "now, by you"],
+                                            ["Soft deadline", page.t.soft ? Time.date(page.t.soft) : "none", false, page.t.soft ? page.srcColor[page.t.softSrc] : "", page.t.soft ? page.srcWord[page.t.softSrc] : ""],
+                                            ["Final deadline", page.t.final ? Time.date(page.t.final) + " <font color='" + Theme.text3 + "'>· " + page.spanWords((Time.ms(page.t.final) - Time.now) / 3600000) + " to do it</font>" : "none; it stays open until you close it", false, page.t.final ? page.srcColor[page.t.finalSrc] : "", page.t.final ? page.srcWord[page.t.finalSrc] : ""]] : []
                         }
                         Txt { textFormat: Text.StyledText; color: Theme.text2; font.pixelSize: 13; font.weight: Font.Medium; elide: Text.ElideNone
                               text: "What done looks like" + (page.t && page.t.checks.length ? " <font color='" + Theme.text3 + "'>" + page.t.checks.length + " · and the sign of progress watched for each</font>" : "") }

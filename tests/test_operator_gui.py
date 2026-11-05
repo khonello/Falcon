@@ -446,3 +446,10 @@ async def test_editing_a_flow_keeps_its_steps_and_a_destination_still_waiting_on
     stage, dest = prop(page, "stages")[0], prop(page, "dests")[0]
     assert (stage["kind"], stage["opId"], stage["op"]) == ("bundling", "zip_one", "Into one ZIP")   # as the Engine stores a step
     assert dest["mode"] == "ask" and dest["who"] == 7                                               # they still pick the folder
+
+
+async def test_a_new_key_shows_the_key_alone(console):
+    win, bridge, _ = console("admin")
+    await _open(win, bridge, "machines", "machinesView")
+    text = (Path(__file__).parents[1] / "operator_client/gui/qml/KeyDrawer.qml").read_text(encoding="utf8")
+    assert "client_key" in text and "client_id" not in text                                # the machine keeps its id; only the key changes

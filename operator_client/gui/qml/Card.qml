@@ -13,6 +13,8 @@ Rectangle {
     property bool hot: false                    // urg: the icon goes red
     property string title: ""
     property string tag: ""                     // a quiet word beside the title (a department)
+    property color titleDot: "transparent"      // where the title came from (nt-dot), just after it
+    property string titleDotTip: ""
     property string line: ""
     property bool lineHot: false
     property bool lineMono: false               // a path: iq-s mono
@@ -80,7 +82,9 @@ Rectangle {
             Item {
                 width: parent.width
                 height: tt.height
-                Txt { id: tt; text: root.title; font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - (tg.visible ? tg.implicitWidth + 8 : 0)) }
+                Txt { id: tt; text: root.title; font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - (tg.visible ? tg.implicitWidth + 8 : 0) - (root.titleDot.a > 0 ? 15 : 0)) }
+                Rectangle { visible: root.titleDot.a > 0; x: tt.width + 8; anchors.verticalCenter: tt.verticalCenter; width: 7; height: 7; radius: 3.5; color: root.titleDot
+                            Tip { text: root.titleDotTip } }
                 Txt { id: tg; visible: root.tag !== ""; x: tt.width + 8; text: root.tag; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
                       y: tt.baselineOffset - baselineOffset }
             }
