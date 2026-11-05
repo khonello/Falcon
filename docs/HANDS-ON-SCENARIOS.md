@@ -1,6 +1,6 @@
 # Hands-on scenarios
 
-*All four were run end to end on 5 Nov 2026 with real Notepad and File Explorer, driven by keystroke, and passed. Only the USB step has not been tried.*
+*All four were run end to end on 5 Nov 2026 with real Notepad and File Explorer, driven by keystroke, and passed. Copying out was tried on a real USB stick and a real USB hard disk.*
 
 You will use Falcon the way real people would, and check it notices. There are four scenarios, about 50 minutes in all. Do them in order. Each one stands alone, so you can stop between them.
 
@@ -372,7 +372,7 @@ detective status=open
 
 Deleting with plain Delete, to the Recycle Bin, behaves the same as Shift+Delete.
 
-**Optional, with a USB stick (not rehearsed):** in `WS-D1\Documents`, make a new folder, copy `sales.txt` and `notes.txt` into it, right-click the folder, pick **Compress to ZIP file**, plug in the stick, copy the zip to it, then delete the zip. Type `detective noted status=open` and tell me what it shows.
+**Optional, with a USB stick or USB hard disk:** copy `payroll.txt` from `ADM-01\Restricted` to the drive under another name, while it is still marked (Scenario 2, before step 11). Type `issues type=file`: **you should see** an Open row, `high`, on `WS-D1`. Type `detective noted status=open`, then `detective case <id>`: **you should see** *Taking data out* and *was copied to a removable drive*. Delete the copy afterwards. A plug-in or a removal is recorded, but it is not a line in the case's story.
 
 ---
 

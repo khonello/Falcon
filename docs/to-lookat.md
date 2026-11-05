@@ -18,7 +18,7 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 
 **Flaky, timing only:** `test_the_screen_streamer...` (the streamer hears stop only on its next send, and an unchanged screen sends nothing) and `test_chain_resource_violation...` (waits 15 s for a process). Each failed once under load and passes alone (6 of 6, 5 of 5).
 
-**Hands-on:** all four scenarios in `docs/HANDS-ON-SCENARIOS.md` were run end to end on 5 Nov 2026 by Claude, with real Notepad and File Explorer by keystroke, and passed, through the TUI. Not covered: the USB step, and the same journeys through the console's pages.
+**Hands-on:** all four scenarios in `docs/HANDS-ON-SCENARIOS.md` were run end to end on 5 Nov 2026 by Claude, with real Notepad and File Explorer by keystroke, and passed, through the TUI. A real USB stick and USB hard disk were tried too (`worker_client/drivewatch.py`): both had been invisible until then. Not covered: the same journeys through the console's pages.
 
 **Settled 5 Nov 2026:** an Admin's PC that dies frees the person after two minutes (built). "Work on a spreadsheet" with no file named keeps asking. Detective flagging a restricted file opened by an unusual program: dropped, as Windows reports tens of thousands of file opens in seconds, mostly backup, antivirus and indexing, so it would be false alarms. Detective's blind spots are not a question for the user: `detective-assumptions.md` was answered on 17 Oct with the anchors, and what is left there is known limits.
 
