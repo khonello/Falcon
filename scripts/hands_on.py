@@ -1,6 +1,8 @@
 """The hands-on scenarios' machines: real Workers on this PC, each with its own folders, running until you press Ctrl+C. The steps are `docs/HANDS-ON-SCENARIOS.md`.
 
     environ-operator\\Scripts\\python.exe scripts\\hands_on.py          (from an elevated prompt, with the Engine running)
+    environ-operator\\Scripts\\python.exe scripts\\hands_on.py wipe     a program deletes the old contracts (a person's own deleting counts for less)
+    environ-operator\\Scripts\\python.exe scripts\\hands_on.py refill   puts them back, to go again
 
 Three "machines" run here at once, as they would on three PCs: a person's (WS-D1), a second person's (WS-D2) and the Admin's workstation (ADM-01). It uses the Admin in
 `data/admin.json` and the Workers `scripts/live_drill.py` made. Everything is under `data/hands-on/`, which is git-ignored and made fresh each time: nothing else is touched.
@@ -24,6 +26,18 @@ FILES = {"WS-D1/Documents/sales.txt": "Region,Sales\nNorth,1200\nSouth,900\n",
          "WS-D1/Documents/notes.txt": "Notes for the week\n",
          "ADM-01/Restricted/payroll.txt": "Name,Salary\nAma,4000\nKofi,3800\n"}
 OLD_DOCUMENTS = 60
+OLD = HOME / "WS-D1" / "Documents" / "Old"
+
+
+def refill() -> None:
+    OLD.mkdir(exist_ok=True)
+    for i in range(OLD_DOCUMENTS):
+        (OLD / f"contract-{i:02d}.docx").write_text(f"contract {i}\n", encoding="utf-8")
+
+
+def wipe() -> None:
+    for p in OLD.glob("*.docx"):
+        p.unlink()
 
 
 async def main() -> int:
@@ -44,10 +58,7 @@ async def main() -> int:
             (HOME / machine / name).mkdir(parents=True)
     for rel, text in FILES.items():
         (HOME / rel).write_text(text, encoding="utf-8")
-    old = HOME / "WS-D1" / "Documents" / "Old"
-    old.mkdir()
-    for i in range(OLD_DOCUMENTS):
-        (old / f"contract-{i:02d}.docx").write_text(f"contract {i}\n", encoding="utf-8")
+    refill()
     for name in ("WS-D1", "WS-D2"):
         await d.worker_account(name)
     for machine, names in FOLDERS.items():
@@ -68,6 +79,10 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] in (["wipe"], ["refill"]):
+        {"wipe": wipe, "refill": refill}[sys.argv[1]]()
+        print(f"{sys.argv[1]}: done, {len(list(OLD.glob('*.docx')))} contracts in {OLD}")
+        sys.exit(0)
     try:
         sys.exit(asyncio.run(main()))
     except KeyboardInterrupt:
