@@ -39,10 +39,19 @@ Editor {
         if (!f) return
         name = copy ? "Copy of " + (f.name || "") : f.name || ""
         var ss = f.sources && f.sources.length ? f.sources : [{ source_pc_id: f.source_pc_id, source_path: f.source_path }]
-        srcs = ss.map(function (s) { return { mode: s.source_kind === "file" ? "file" : "dir", pc: s.source_pc_id, path: s.source_path, flow: 0, branch: 0 } })
+        // a folder another flow delivers to is that flow's branch, as it was picked
+        srcs = ss.map(function (s) {
+            var up = page.flows.filter(function (x) { return x.id !== f.id && page.branches(x.id).some(function (d) { return page.key(d.destination_pc_id, d.destination_path) === page.key(s.source_pc_id, s.source_path) }) })[0]
+            if (up) return { mode: "flow", pc: 0, path: "", flow: up.id, branch: page.branches(up.id).findIndex(function (d) { return page.key(d.destination_pc_id, d.destination_path) === page.key(s.source_pc_id, s.source_path) }) }
+            return { mode: s.source_kind === "file" ? "file" : "dir", pc: s.source_pc_id, path: s.source_path, flow: 0, branch: 0 }
+        })
         when = f.run_mode === "hourly" ? "On a schedule" : f.run_mode === "manual" ? "Only when I run it" : "Real time"
         onDelete = f.on_source_delete === "mirror" ? "mirror" : "keep"
-        dests = (f.destinations || []).map(function (d) { return { mode: "mine", pc: d.destination_pc_id || 0, path: d.destination_path, who: 0, note: "" } })
+        // one still waiting on its Admin stays an ask: they pick the folder, nobody picks it for them here
+        dests = (f.destinations || []).map(function (d) {
+            if (d.let_them_choose && !d.destination_path) return { mode: "ask", pc: 0, path: "", who: d.owner_account_id || 0, note: d.note || "" }
+            return { mode: "mine", pc: d.destination_pc_id || 0, path: d.destination_path, who: 0, note: "" }
+        })
         stages = Sync.steps(f)
     }
     function startFrom(id) {
@@ -269,7 +278,7 @@ Editor {
                 }
             }
             Fld { label: "Applies to"; note: tc.modelData.scope === "all" ? "before the flow splits, so every destination gets the result" : ""
-                Segmented { small: false; options: [{ value: "all", label: "Every destination" }, { value: "one", label: "One destination" }]; value: tc.modelData.scope === "all" ? "all" : "one"; onPicked: function (v) { page.setStage(tc.index, { scope: v === "all" ? "all" : 0 }) } } }
+                Segmented { width: parent.width; small: false; options: [{ value: "all", label: "Every destination" }, { value: "one", label: "One destination" }]; value: tc.modelData.scope === "all" ? "all" : "one"; onPicked: function (v) { page.setStage(tc.index, { scope: v === "all" ? "all" : 0 }) } } }
             Fld { visible: tc.modelData.scope !== "all"; label: "Which destination"
                 Select { width: parent.width; value: tc.modelData.scope === "all" ? 0 : tc.modelData.scope; onPicked: function (v) { page.setStage(tc.index, { scope: v }) }
                          options: page.dests.map(function (d, j) { var a = page.adminOf(d.who); return { value: j, label: d.mode === "ask" ? (a ? a.name + " picks a folder" : "Destination " + (j + 1)) : (page.hostName(d.pc) || "Destination " + (j + 1)) + " " + (d.path || "") } }) } }
@@ -306,11 +315,11 @@ Editor {
     Head2 { visible: page.step === 3; t: page.editId ? "Check it and save" : "Name it and check it"
             d: page.editId ? "The checks run again against every other flow. It keeps running as it was until you save." : "Checked against the one file index and every other flow before anything is copied." }
     FactRows { visible: page.step === 3
-        rows: [["Made by", "you"], ["From", page.rsrc.map(function (s) { return page.hostName(s.pc) + " " + s.path }).join(", ")], ["Along the way", page.stages.map(function (s, i) { return (i + 1) + ". " + s.op }).join("  ") || "copied as they are"],
-               ["To", page.dests.map(function (d) { var a = page.adminOf(d.who); return d.mode === "ask" ? (a ? a.name : "") + " picks a folder" : page.hostName(d.pc) + " " + d.path }).join(", ")], ["Copies files", page.when.toLowerCase()], ["If a file is deleted", page.onDelete === "keep" ? "the copies stay" : "the copies are put aside"]] }
-    Item { visible: page.step === 3; width: parent.width; height: Theme.control + 6
-        Txt { width: 130; y: 12; text: "Name"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-        Field { x: 142; y: 6; width: 320; text: page.name; placeholderText: page.rsrc[0] ? Sync.folder(page.rsrc[0].path) || "my-flow" : "my-flow"; onTextEdited: page.name = text } }
+        rows: [["Made by", "you"], ["From", page.rsrc.map(function (s) { return page.hostName(s.pc) + " " + s.path }).join(", "), true], ["Along the way", page.stages.map(function (s, i) { return (i + 1) + ". " + s.op }).join("  ") || "copied as they are"],
+               ["To", page.dests.map(function (d) { var a = page.adminOf(d.who); return d.mode === "ask" ? (a ? a.name : "") + " picks a folder" : page.hostName(d.pc) + " " + d.path }).join(", "), !page.dests.some(function (d) { return d.mode === "ask" })], ["Copies files", page.when.toLowerCase()], ["If a file is deleted", page.onDelete === "keep" ? "the copies stay" : "the copies are put aside"]] }
+    Item { visible: page.step === 3; width: parent.width; height: Theme.control + 20
+        Txt { width: 130; y: 18; text: "Name"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+        Field { x: 142; y: 12; width: 320; text: page.name; placeholderText: page.rsrc[0] ? Sync.folder(page.rsrc[0].path) || "my-flow" : "my-flow"; onTextEdited: page.name = text } }
     Column {
         visible: page.step === 3
         width: parent.width

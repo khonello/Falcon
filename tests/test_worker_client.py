@@ -507,6 +507,9 @@ async def test_a_windows_notification_makes_the_watcher_look_at_once(monkeypatch
     from worker_client import ossignals
 
     sent = []
+    again = w.WindowsNotifier(got.append)                                                  # a restart gets its own window, not a dead class
+    assert again.start() is True and again._hwnd
+    again.stop()
 
     async def report(type_, payload):
         sent.append((type_, payload))

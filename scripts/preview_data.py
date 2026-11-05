@@ -377,10 +377,15 @@ def _pc(host: str) -> int | None:
     return _WS.get(host) or (HOST[host][0] if host in HOST else None)
 
 
+def _step_kind(op: str) -> str:
+    """A step as the Engine stores it, {kind, op, label, settings}: which of the tree's kinds this sample's step is in."""
+    return "bundling" if op.startswith("Into one") else "renaming" if op.startswith(("Add ", "Replace ")) else "choosing" if op.startswith("By ") else "conversion"
+
+
 def flows() -> list[dict[str, Any]]:
     out = []
     for fid, name, (by, byname), srcs, stages, dests, status, reason, consent, (total, today_n), last, made in FLOWS:
-        st = [{"id": fid * 10 + k, "parent_stage_id": None if k == 0 else fid * 10 + k - 1, "stage_type": t, "config": {"op": op}} for k, (t, op) in enumerate(stages)]
+        st = [{"id": fid * 10 + k, "parent_stage_id": None if k == 0 else fid * 10 + k - 1, "stage_type": _step_kind(op), "config": {"kind": _step_kind(op), "op": op, "label": op, "settings": {}}} for k, (t, op) in enumerate(stages)]
         tail = st[-1]["id"] if st else None
         ds = []
         for k, (host, path, paused) in enumerate(dests):

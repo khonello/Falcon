@@ -174,6 +174,13 @@ def test_the_program_draws_each_tab_and_says_when_it_is_not_live(tmp_path: Path)
     view = {"connected": False, "as_of": "2026-10-16T10:00:00+00:00",
             "tasks": [{"id": 1, "title": "Collect the signed leave forms", "description": "x", "from": "R. Mensah", "due": "2030-01-02T15:00:00+00:00", "started": False}],
             "announcements": [{"id": 5, "kind": "emergency", "title": "Server room closed", "body": "Saturday.", "from": "Super User", "at": "2026-10-16T09:00:00+00:00"}],
+
+
+def test_open_in_falcon_names_a_tab_and_nothing_else_does():
+    from worker_client.program.__main__ import tab_asked
+
+    assert tab_asked("show messages\n") == "messages"
+    assert tab_asked("show\n") == "" and tab_asked("show nonsense\n") == "" and tab_asked("hide messages\n") == ""
             "admins": [{"account_id": 7, "name": "R. Mensah"}], "toasts": []}
     for tab in ("today", "tasks", "announcements", "machine"):
         out = tmp_path / f"{tab}.png"

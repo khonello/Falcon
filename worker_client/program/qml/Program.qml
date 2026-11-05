@@ -172,22 +172,9 @@ Window {
                         objectName: "todayTasks"
                         width: cols.cw; spacing: 10
                         ColHead { title: "Your tasks"; n: win.toStart.length ? win.toStart.length + " to start" : ""; more: win.tasks.length ? "All " + win.tasks.length : "All"; onAll: win.tab = "tasks" }
-                        Repeater {
-                            model: win.toStart.slice(0, 2).concat(win.started.slice(0, 1))
-                            delegate: Card {
-                                required property var modelData
-                                dim: modelData.started
-                                title: modelData.title
-                                text1: "From " + modelData.from + (modelData.started ? " · " + win.startedWord(modelData) : "")
-                                text2: modelData.due ? "Due " + win.when(modelData.due) : "No deadline · an IT Admin closes it when it is checked"
-                                text2Color: modelData.due && !modelData.started ? win.warn : win.faint
-                                act: modelData.started ? "" : "Start"
-                                actOk: win.live
-                                onActed: program.startTask(modelData.id)
-                                onPicked: { win.pickTask = modelData.id; win.tab = "tasks" }
-                            }
-                        }
+                        Repeater { model: win.toStart.slice(0, 2); delegate: TodayTask { } }
                         Text { visible: !win.live && win.toStart.length > 0; width: parent.width; wrapMode: Text.WordWrap; text: "Start waits until you are connected again."; color: win.faint; font.family: win.sans; font.pixelSize: 13 }
+                        Repeater { model: win.started.slice(0, 1); delegate: TodayTask { } }
                         Quiet { visible: win.tasks.length === 0; text: "Nothing is assigned to you right now." }
                     }
                     Column {
@@ -525,6 +512,18 @@ Window {
     }
 
     // --- the pieces ------------------------------------------------------------------------------------------------------------------------
+    component TodayTask: Card {
+        required property var modelData
+        dim: modelData.started
+        title: modelData.title
+        text1: "From " + modelData.from + (modelData.started ? " · " + win.startedWord(modelData) : "")
+        text2: modelData.due ? "Due " + win.when(modelData.due) : "No deadline · an IT Admin closes it when it is checked"
+        text2Color: modelData.due && !modelData.started ? win.warn : win.faint
+        act: modelData.started ? "" : "Start"
+        actOk: win.live
+        onActed: program.startTask(modelData.id)
+        onPicked: { win.pickTask = modelData.id; win.tab = "tasks" }
+    }
     component ColHead: Item {
         id: ch
         property string title: ""

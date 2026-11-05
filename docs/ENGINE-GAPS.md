@@ -319,8 +319,6 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - **Run a rule again where it went wrong** (Automation, an opened run): only on the machines where an action failed or timed out.
    - **Skip one scheduled run** (Automation, Coming up).
    - **The next scheduled runs** come from `calendar.board`'s rule items; a rule's own next run would be clearer.
-   - **Worker service** (seen in the test run, not a UI matter): `worker_client/winnotify.py:112` (`_window_thread`) takes a Windows
-     access violation during `tests/test_worker_client.py`; the tests still pass.
 
 23. **What the console now calls that the Engine must answer (the user, 3-4 Nov 2026: "build exactly as the concept says, no compromises,
     just put into the engine docs that it needs to cover this so that session handles it").** **Done 4 Nov 2026** (migration 054; `engine/resource/talk.py`, `tests/test_console_calls.py`; TUI `operator_client/tui/commands/calls.py`): every item is built. **Any Admin verifies a task:** done (the user, 4 Nov 2026). **Only a rule's maker changes it: dropped** (the user, 4 Nov 2026: nobody owns anything between Admins; the audit trail shows who did it). Any Admin already changes any rule, so nothing was needed. `printer.offline` and `threshold.signin` are read by the Worker from Windows (not yet tried on a real printer or a real failed sign-in). The QML is built to the concept with these
@@ -380,8 +378,8 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
     - The join window: `enroll.py` hands the window plain text. It should pass `{text, host, expires_at}` (`enroll.request` already returns `expires_at`), which gives the title "LOG-01 has asked to join" and the expiry.
     - **Cancel on the join window needs an `enroll.cancel` handler.** It is drawn disabled with the reason until then; `answer.give({cancel: true})` is what it would send.
 
-27. **`worker_client/winnotify.py:112` raises an access violation at `RegisterClassW`** (seen 4 Nov 2026 in `tests/test_worker_program.py` / `test_worker_client.py`: faulthandler prints it, the tests still pass). Not looked into beyond the stack.
-    `kernel32.GetModuleHandleW` has no `restype` there, so a 64-bit handle may be cut short; that is a guess. Worth checking whether native drive, sign-in and network notifications really start.
+27. **`worker_client/winnotify.py` access violation: done 5 Nov 2026.** `GetModuleHandleW` had no `restype`, so the 64-bit handle was cut short and Windows faulted at `RegisterClassW`. The class was also never
+    unregistered, so a second start could not register its own and native notifications silently stayed off after a restart. Both fixed; `test_the_windows_notifier_hears_windows_messages` starts it twice.
 
 ## Done inline (for the record)
 

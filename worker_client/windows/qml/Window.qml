@@ -291,9 +291,10 @@ Window {
                                     RotationAnimator on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: win.joinCode !== "" } } }
                     Text { x: 32; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32 - cancelB.width - 12; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 13
                            text: "Waiting for an Admin to confirm." + (spec.expires_at ? " The code expires at " + win.hhmm(spec.expires_at) + "." : "") }
-                    // the Engine cannot take a request back yet (ENGINE-GAPS 26): drawn, and it says why
-                    Act { id: cancelB; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Cancel"; enabled: false
-                          tip: "It cannot be taken back from here yet. An Admin can refuse it, or the code runs out." }
+                    // only a service that passes the host listens for the answer: from an older one it stays drawn, and says why
+                    Act { id: cancelB; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Cancel"; enabled: !!spec.host
+                          tip: spec.host ? "" : "It cannot be taken back from here yet. An Admin can refuse it, or the code runs out."
+                          onClicked: answer.give({ cancel: true }) }
                 }
             }
 

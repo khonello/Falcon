@@ -106,6 +106,9 @@ class WindowsNotifier:
         name = "FalconNotify"
         cls = WNDCLASS()
         cls.lpfnWndProc = callback
+        # the handle is 64 bits: left to ctypes' default of a C int it is cut short, and Windows faults reading it
+        kernel32.GetModuleHandleW.restype = wintypes.HMODULE
+        kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
         cls.hInstance = kernel32.GetModuleHandleW(None)
         cls.lpszClassName = name
         user32.RegisterClassW.argtypes = [ctypes.POINTER(WNDCLASS)]
@@ -132,6 +135,9 @@ class WindowsNotifier:
             user32.DispatchMessageW(ctypes.byref(msg))
         wtsapi.WTSUnRegisterSessionNotification(hwnd)
         self._hwnd = 0
+        # the class points at this thread's callback: left registered, the next start could not register its own
+        user32.UnregisterClassW.argtypes = [wintypes.LPCWSTR, wintypes.HINSTANCE]
+        user32.UnregisterClassW(name, cls.hInstance)
 
     # --- the network callback ----------------------------------------------------------------------
 

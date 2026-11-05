@@ -27,6 +27,12 @@ def badge_of(view: dict[str, Any], seen_alert: int) -> int:
     return tasks + notes
 
 
+def tab_asked(line: str) -> str:
+    """Which tab a `show` line names: `show messages` from a window's Open in Falcon; a bare `show`, or a word that is no tab, names none."""
+    words = line.split()
+    return words[1] if len(words) > 1 and words[0] == "show" and words[1] in ("today", "tasks", "messages", "announcements", "machine") else ""
+
+
 def main(argv: list[str]) -> int:
     shot = argv[argv.index("--shot") + 1] if "--shot" in argv else None
     view_arg = argv[argv.index("--view") + 1] if "--view" in argv else None
@@ -285,9 +291,9 @@ def main(argv: list[str]) -> int:
     if server is not None:
         def asked_to_show(line: str) -> None:
             """`show`, or `show messages` from a window's Open in Falcon: forward, on that tab."""
-            words = line.split()
-            if len(words) > 1 and words[1] in ("today", "tasks", "messages", "announcements", "machine"):
-                win.setProperty("tab", words[1])
+            tab = tab_asked(line)
+            if tab:
+                win.setProperty("tab", tab)
             bring_forward()
 
         def accept() -> None:

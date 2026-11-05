@@ -30,7 +30,7 @@ def _ago(hours: float) -> str:
 
 
 TREE = [
-    {"department_id": 1, "name": "Operations", "admins": [{"account_id": 7, "name": "R. Mensah", "online": True}],
+    {"department_id": 1, "name": "Operations", "admins": [{"account_id": 7, "name": "R. Mensah", "online": True, "hostname": "WS-OPS-A1"}],
      "workers": [{"pc_id": 1, "account_id": 21, "hostname": "OPS-01", "name": "Kojo", "session": {"occupied_via": "native"}},
                  {"pc_id": 2, "account_id": 22, "hostname": "OPS-02", "name": "Efua", "session": None}]},
     {"department_id": 2, "name": "Logistics", "admins": [],
@@ -425,3 +425,24 @@ async def test_departments_are_made_renamed_and_a_machine_moved_in_from_their_pa
     await _wait(lambda: any(t == "hierarchy.department_rename" for t, _ in bridge.conn.seen))
     assert next(p for t, p in bridge.conn.seen if t == "hierarchy.department_rename") == {"department_id": 1, "name": "Ops"}
 
+
+async def test_restricted_draws_every_machine_the_admins_apart_at_the_top_then_each_department(console):
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "restricted", "restrictedView")
+    await _wait(lambda: len(prop(page, "mapDepts")) == 3)
+    assert [(g["name"], g["hs"]) for g in prop(page, "mapDepts")] == [("Admins", ["WS-OPS-A1"]), ("Operations", ["OPS-01", "OPS-02"]), ("Logistics", ["LOG-01"])]
+
+
+async def test_editing_a_flow_keeps_its_steps_and_a_destination_still_waiting_on_its_admin(console):
+    from PySide6.QtCore import Q_ARG, QMetaObject
+
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "flows/new", "newFlow")
+    _pump(0.3)
+    flow = {"id": 40, "name": "ops-pack", "source_pc_id": 1, "source_path": "/reports/",
+            "stages": [{"id": 1, "parent_stage_id": None, "stage_type": "bundling", "config": {"kind": "bundling", "op": "zip_one", "label": "Into one ZIP", "settings": {}}}],
+            "destinations": [{"id": 2, "destination_pc_id": 3, "destination_path": None, "let_them_choose": True, "owner_account_id": 7, "parent_stage_id": 1}]}
+    QMetaObject.invokeMethod(page, "fill", Q_ARG("QVariant", flow), Q_ARG("QVariant", False))
+    stage, dest = prop(page, "stages")[0], prop(page, "dests")[0]
+    assert (stage["kind"], stage["opId"], stage["op"]) == ("bundling", "zip_one", "Into one ZIP")   # as the Engine stores a step
+    assert dest["mode"] == "ask" and dest["who"] == 7                                               # they still pick the folder
