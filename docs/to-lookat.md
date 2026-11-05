@@ -10,7 +10,6 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 **For the user to decide:** nothing is waiting (5 Nov 2026).
 
 **Waiting on the user to say go**
-- More task descriptions: the next unseen batch is the honest test (see below).
 - Replace the Groq key given in the session, before anything ships.
 
 **Needs real machines, not code** (`docs/VM-TEST-PLAN.md`): Office conversion, a second Windows user refused a Private file, a machine updating itself, the installers on a clean machine, a real printer going offline, real failed sign-ins, a flow between two PCs, the session window end to end, the console as a non-administrator, the tray, overlays and program on a real desktop.
@@ -56,7 +55,7 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 - **Not run for real:** Word, Excel and PowerPoint conversion and PDF to DOCX (no Office or LibreOffice on the dev machine; tested with a stand-in).
 - **Add a date:** *(decided 4 Nov 2026)* only the newest stays: an edited file's older copy is put aside in `.falcon-removed`.
 - **LLM (4 Nov 2026):** Detective's smoothing is off (the 1.7B copied or spoiled most paragraphs, even with a worked example); `tests/test_llm_real.py` runs the real model.
-- **REMIND THE USER (they asked, 4 Nov 2026):** a few dozen real task descriptions, one per line in `data/real-task-descriptions.txt`, then run `scripts/llm_real_wording.py`.
+- **Task descriptions:** the user has no more for now (5 Nov 2026), so do not remind them. `data/real-task-descriptions.txt` and `scripts/llm_real_wording.py` are there if more come.
 - **Smoothing (4 Nov 2026):** Groq smooths the events paragraph when a key is set; 8 of 8 real paragraphs rewritten and checked. No key: the Engine's own account.
 - **Flow steps:** Into one PDF dropped too, with `pypdf`.
 - **Qwen3-4B test (5 Nov 2026):** held-out, same 31 cases: 1.7B 31/31 at 3.7 s a call; 4B 30/31 at 6.9 s; Groq 30/31 at about 1 s. Not better and twice as slow, so the 1.7B stays and the file was deleted (the user).
