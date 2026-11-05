@@ -1274,6 +1274,10 @@ class Detective:
         have = max((order.get(b, -1) for b in c.behaviours), default=-1)
         return order.get(f.behaviour, -2) >= have >= 0
 
+    def close(self, case_id: int) -> None:
+        """A person has decided this case. What the machine does next is not part of it: left here it would be folded into a case nobody is looking at, and nobody told."""
+        self.cases = [c for c in self.cases if c.id != case_id]
+
     def note(self, f: Finding) -> Update:
         """Take a finding made elsewhere (the model's label on a rename) into the same cases, weighed as it comes."""
         return self._attach(f)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from engine import detective
 from tests.conftest import requires_db
 
@@ -373,3 +375,27 @@ async def test_a_dismissal_can_be_written_down_as_a_rule_that_lowers_the_same_th
     await a1.ok("detective.rule_revoke", {"rule_id": rid})
     assert rid not in [r["id"] for r in (await a1.ok("detective.rules", {}))["rules"]]
     assert "detective.rule_revoked" in [r["action_type"] for r in await engine.db.pool.fetch("SELECT action_type FROM audit_log WHERE action_type LIKE 'detective.rule%'")]
+
+
+@pytest.mark.parametrize("outcome", ["dismissed", "explained", "accepted"])
+async def test_what_a_machine_does_after_a_case_is_closed_is_a_new_case_and_people_are_told(engine, org, connect, outcome):
+    """Found by hand, 5 Nov 2026: the detector was never told, so sixty real deletions folded into a dismissed case and nobody heard. One false alarm must not blind it."""
+    su, a1 = await connect("cid-su"), await connect("cid-a1")
+    await _leak(engine, org["w1_pc"])
+    [closed] = (await su.ok("detective.cases", {}))["cases"]
+    await a1.ok("detective.review", {"case_id": closed["id"], "outcome": outcome})
+    await a1.drain_pushes()
+    await _leak(engine, org["w1_pc"])
+    found = {c["id"]: c for c in (await su.ok("detective.cases", {}))["cases"]}
+    assert len(found) == 2 and found[closed["id"]]["status"] == outcome and found[closed["id"]]["last_at"] == closed["last_at"]
+    [fresh] = [c for i, c in found.items() if i != closed["id"]]
+    assert fresh["status"] == "open" and "detective.raised" in a1.push_types(await a1.drain_pushes())
+
+
+async def test_an_escalated_case_is_still_being_worked_and_keeps_growing(engine, org, connect):
+    su, a1 = await connect("cid-su"), await connect("cid-a1")
+    await _leak(engine, org["w1_pc"])
+    [case] = (await su.ok("detective.cases", {}))["cases"]
+    await a1.ok("detective.review", {"case_id": case["id"], "outcome": "escalated"})
+    await _leak(engine, org["w1_pc"])
+    assert [c["id"] for c in (await su.ok("detective.cases", {}))["cases"]] == [case["id"]]

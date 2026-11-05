@@ -545,6 +545,8 @@ async def review(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]
         raise ProtocolError(ErrorCode.INVALID, "a rule is written down only with a dismissal or an explanation, for a program, a folder or a drive")
     if not await ctx.engine.db.detective.review(c["id"], outcome, ident.account_id, note):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such case")
+    if outcome != "escalated":                                       # (escalated: still being worked, and still growing)
+        _detector().close(c["id"])
     made: list[dict[str, Any]] = []
     if kind:
         made = await _write_rules(ctx, c, kind, ident.account_id)
