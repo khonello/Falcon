@@ -36,6 +36,7 @@ from typing import Any
 
 from common.heat import Heat
 from worker_client import fsmeta, idle
+from worker_client.sharedread import open_shared
 from worker_client.snapshot import Snapshot
 from worker_client.stopping import stop_tasks
 
@@ -53,7 +54,7 @@ def hash_file(path: Path, limit: int) -> str | None:
         if path.stat().st_size > limit:
             return None
         h = hashlib.sha256()
-        with path.open("rb") as f:
+        with open_shared(path) as f:
             for chunk in iter(lambda: f.read(1 << 20), b""):
                 h.update(chunk)
         return h.hexdigest()

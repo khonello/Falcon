@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any
 
 from worker_client import convert
+from worker_client.sharedread import open_shared
 
 log = logging.getLogger(__name__)
 
@@ -422,7 +423,7 @@ def hash_of(path: Path, limit: int) -> str | None:
     if path.stat().st_size > limit:
         return None
     h = hashlib.sha256()
-    with path.open("rb") as f:
+    with open_shared(path) as f:
         for block in iter(lambda: f.read(1 << 20), b""):
             h.update(block)
     return h.hexdigest()
