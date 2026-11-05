@@ -107,3 +107,21 @@ async def test_a_question_or_a_test_is_said_at_once_and_the_model_is_not_asked()
     assert Model.calls == 0
     s = await llm_graph.populate(Model(), "Does report.xlsx have the totals?")              # a file named: it is read as usual
     assert "not_a_task" not in {f["kind"] for f in s.flags}
+
+
+async def test_work_with_no_file_named_is_asked_about_and_nothing_is_guessed():
+    class Unsure:
+        available = True
+
+        async def extract(self, *a):
+            return None
+
+        async def choose(self, *a):
+            return None
+
+        async def yes_no(self, *a):
+            return None
+
+    for text in ("Work on a spreadsheet", "Work on the report"):
+        s = await llm_graph.populate(Unsure(), text)
+        assert not s.items and "no_target" in {f["kind"] for f in s.flags}

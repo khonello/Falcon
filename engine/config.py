@@ -29,6 +29,8 @@ class Settings:
     # Traversal Time Limit (Hierarchy -> Session Blocking): fixed, extendable on request.
     traversal_limit_minutes: int = 30
     traversal_extension_minutes: int = 15
+    # An Admin whose connection has gone for this long has left the machine: the person is not held until the deadline.
+    traversal_drop_grace_seconds: int = 120
     # Working hours, local time on the Engine host: an Admin entering a machine outside them is reported to the
     # The head of the organisation only (report category about_admin).
     working_hours: str = "06:00-18:00"
@@ -77,6 +79,7 @@ class Settings:
                 os.environ.get("FALCON_AUDIT_RETENTION_DAYS", cls.audit_retention_days)
             ),
             traversal_limit_minutes=int(os.environ.get("FALCON_TRAVERSAL_LIMIT_MINUTES", cls.traversal_limit_minutes)),
+            traversal_drop_grace_seconds=int(os.environ.get("FALCON_TRAVERSAL_DROP_GRACE_SECONDS", cls.traversal_drop_grace_seconds)),
             traversal_extension_minutes=int(
                 os.environ.get("FALCON_TRAVERSAL_EXTENSION_MINUTES", cls.traversal_extension_minutes)
             ),

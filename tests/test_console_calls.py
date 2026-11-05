@@ -255,3 +255,12 @@ async def test_opening_a_task_s_file_in_any_program_is_a_sign_of_work(engine, or
     await w1.ok("control.signal", {"type": "file.opened", "data": {"files": [{"path": "C:/new/REPORT.docx", "process": "wps.exe"}]}})
     seen = await engine.db.tasks.expectations(task)
     assert [(s["signal_type"], s["value"]["program"]) for s in seen if s["signal_type"] == "file_opened"] == [("file_opened", "wps.exe")]     # any program counts; it is only noted
+
+
+async def test_a_lock_run_by_hand_names_who_locked_it_as_the_person_knows_them(engine, org, connect):
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    action = (await a1.ok("control.action_create", {"kind": "control", "builtin_type": "lock_session", "timeout_s": 30, "params": {"duration_s": 60}}))["action"]
+    await w1.drain_pushes()
+    await a1.ok("control.action_run", {"action_id": action["id"], "pc_id": org["w1_pc"]})
+    sent = next(p for p in await w1.drain_pushes() if p.type == "action.execute")
+    assert sent.payload["action"]["params"]["by"]

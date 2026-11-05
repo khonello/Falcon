@@ -7,16 +7,10 @@ Last updated 5 Nov 2026.
 
 Every call the console, the TUI and the Worker make has a handler. These are what remains; the rest of this file is the record.
 
-**For the user to decide**
-- **An Admin's PC dies while inside a machine** (ENGINE-GAPS #19): the person stays covered until the deadline, 30 minutes by default. End it after a short grace (about 2 minutes), or keep the deadline and have the cover say what happened?
-- **Detective:** note the narrow check (a restricted file opened by something that is not a document program) for later, or drop it.
-- **"Work on a spreadsheet" with no file named:** keep asking (recommended).
-- **Detective's blind spots** (`docs/design/detective-assumptions.md`): how the user would get around the scenarios.
-- **Tell the design session** the rule-maker decision is all Admins (the concept's "only A. Quaye changes it" goes).
+**For the user to decide:** nothing is waiting (5 Nov 2026).
 
 **Waiting on the user to say go**
 - More task descriptions: the next unseen batch is the honest test (see below).
-- **Keep or delete the Qwen3-4B file** (2.3 GB, downloaded 5 Nov 2026). Held-out, same 31 cases: 1.7B 31/31 at 3.7 s a call; 4B 30/31 at 6.9 s; Groq 30/31 at about 1 s. The 4B is not better, and is about twice as slow. A re-run after the unclosed `<think>` fix was stopped by low memory, so that fix's effect on the 4B's extraction questions is unmeasured.
 - Replace the Groq key given in the session, before anything ships.
 
 **Needs real machines, not code** (`docs/VM-TEST-PLAN.md`): Office conversion, a second Windows user refused a Private file, a machine updating itself, the installers on a clean machine, a real printer going offline, real failed sign-ins, a flow between two PCs, the session window end to end, the console as a non-administrator, the tray, overlays and program on a real desktop.
@@ -26,6 +20,8 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 **Flaky, timing only:** `test_the_screen_streamer...` (the streamer hears stop only on its next send, and an unchanged screen sends nothing) and `test_chain_resource_violation...` (waits 15 s for a process). Each failed once under load and passes alone (6 of 6, 5 of 5).
 
 **Hands-on:** `docs/HANDS-ON-SCENARIOS.md` is ready for the user.
+
+**Settled 5 Nov 2026:** an Admin's PC that dies frees the person after two minutes (built). "Work on a spreadsheet" with no file named keeps asking. Detective flagging a restricted file opened by an unusual program: dropped, as Windows reports tens of thousands of file opens in seconds, mostly backup, antivirus and indexing, so it would be false alarms. Detective's blind spots are not a question for the user: `detective-assumptions.md` was answered on 17 Oct with the anchors, and what is left there is known limits.
 
 **Later, by decision:** the licence store; packaging (Phase 9).
 
@@ -63,7 +59,7 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 - **REMIND THE USER (they asked, 4 Nov 2026):** a few dozen real task descriptions, one per line in `data/real-task-descriptions.txt`, then run `scripts/llm_real_wording.py`.
 - **Smoothing (4 Nov 2026):** Groq smooths the events paragraph when a key is set; 8 of 8 real paragraphs rewritten and checked. No key: the Engine's own account.
 - **Flow steps:** Into one PDF dropped too, with `pypdf`.
-- **Qwen3-4B test:** downloaded and measured 5 Nov 2026; the result is at the top of this file.
+- **Qwen3-4B test (5 Nov 2026):** held-out, same 31 cases: 1.7B 31/31 at 3.7 s a call; 4B 30/31 at 6.9 s; Groq 30/31 at about 1 s. Not better and twice as slow, so the 1.7B stays and the file was deleted (the user).
 - **Groq fallback (built and tried for real, 4 Nov 2026):** `openai/gpt-oss-120b`, paced under the plan's limit: held-out 30/31, about 1 s a call, the 8 Detective paragraphs all rewritten and passing the check. A burst over the plan's 8,000 tokens a minute is refused: those questions come back unclear, and a test run in a burst scored 25/31 for that reason alone. Before a customer ships: their own key, on a paid plan; the key given in the session should be replaced.
 
 ## Engine pass, 2 Nov 2026 (built; the Engine session does no UI work: `docs/UI-WORK-FROM-ENGINE.md` is the UI's list)

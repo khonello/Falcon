@@ -333,3 +333,30 @@ async def test_a_changed_machine_name_is_said_back_to_the_client(engine, org):
 
     assert (await respond("FIN-01-NEW"))["hostname_mismatch"] == {"expected": "FIN-01", "announced": "FIN-01-NEW"}
     assert "hostname_mismatch" not in await respond("FIN-01")
+
+
+async def _inside_then_gone(engine, org, connect):
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    sid = (await a1.ok("hierarchy.traverse", {"pc_id": org["w1_pc"], "force": True}))["session"]["session_id"]
+    await a1.close()
+    await asyncio.sleep(0.1)
+    await traversal.expire_due_sessions(engine)
+    assert (await engine.db.sessions.by_id(sid))["ended_at"] is None and sid in engine.sessions_gone      # the grace has started; nobody is thrown out yet
+    return sid, w1
+
+
+async def test_an_admin_s_dead_pc_frees_the_person_after_the_grace_not_the_deadline(engine, org, connect):
+    sid, w1 = await _inside_then_gone(engine, org, connect)
+    engine.sessions_gone[sid] -= engine.settings.traversal_drop_grace_seconds + 1
+    await w1.drain_pushes()
+    await traversal.expire_due_sessions(engine)
+    assert (await engine.db.sessions.by_id(sid))["ended_reason"] == "network_drop_deadline_expired"
+    assert "session.released" in w1.push_types(await w1.drain_pushes()) and engine.sessions_gone == {}
+
+
+async def test_an_admin_back_within_the_grace_is_still_inside(engine, org, connect):
+    sid, _ = await _inside_then_gone(engine, org, connect)
+    engine.sessions_gone[sid] -= engine.settings.traversal_drop_grace_seconds - 30           # most of it gone: then they are back
+    await connect("cid-a1")
+    await traversal.expire_due_sessions(engine)
+    assert (await engine.db.sessions.by_id(sid))["ended_at"] is None and engine.sessions_gone == {}

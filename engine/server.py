@@ -60,6 +60,7 @@ class Engine:
                             fallback_model=settings.groq_model, fallback_endpoint=settings.groq_endpoint)
         self.llm.on_fallback = self._fallback_used
         self.connections: set[Connection] = set()
+        self.sessions_gone: dict[int, float] = {}                # traversal session id -> when its Admin was first seen gone
         # Generated once on the Engine host, never transmitted (spec 8.2). Loaded in start().
         self.master_secret: bytes | None = settings.master_secret
         self._server: asyncio.base_events.Server | None = None

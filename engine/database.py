@@ -570,6 +570,10 @@ class SessionsRepo(_Repo):
             "UPDATE sessions SET deadline_at = $2, extended_count = extended_count + 1 "
             "WHERE id = $1 AND ended_at IS NULL", session_id, new_deadline)
 
+    async def list_traversals(self) -> list[dict[str, Any]]:
+        """Every Admin inside a machine now."""
+        return await self._fetch(f"SELECT {self._COLS} {self._FROM} WHERE s.ended_at IS NULL AND s.occupied_via = 'traversal'")
+
     async def list_expired(self) -> list[dict[str, Any]]:
         return await self._fetch(
             f"SELECT {self._COLS} {self._FROM} WHERE s.ended_at IS NULL AND s.deadline_at IS NOT NULL "

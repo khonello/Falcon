@@ -93,7 +93,7 @@ def notify(argv: list[str]) -> int:
 
 
 def lock(argv: list[str]) -> int:
-    duration, message = _num(argv, 0), _text(argv, 1)
+    duration, message, by = _num(argv, 0), _text(argv, 1), _text(argv, 2)
     until = datetime.now(timezone.utc).astimezone() + timedelta(seconds=duration)
     if not available():
         if sys.platform == "win32":
@@ -102,7 +102,7 @@ def lock(argv: list[str]) -> int:
             ctypes.windll.user32.LockWorkStation()
         _mark("locked once (no windows installed, so no timer)")
         return 0
-    proc = _window("locked", {"message": message, "at": datetime.now(timezone.utc).isoformat(), "until": until.isoformat()})
+    proc = _window("locked", {"message": message, "at": datetime.now(timezone.utc).isoformat(), "until": until.isoformat(), "by": by})
     blocked = _block_input(True)
     try:
         time.sleep(max(duration, 0))

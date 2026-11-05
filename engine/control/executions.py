@@ -119,6 +119,10 @@ async def start(engine: Engine, action: dict[str, Any], event_id: int | None, pc
                                                          "summary": why})
                 return execution_id
             wire["params"] = {**{k: v for k, v in wire["params"].items() if k not in LOCATORS}, "path": paths[0]}
+        if action.get("builtin_type") == "lock_session" and by is not None:     # the cover names who locked it, as the person there knows them; a rule's lock has no one to name
+            person = next((m["account_id"] for m in await engine.db.accounts.fleet(pc_id=pc_id)), None)
+            names = await engine.db.accounts.display_names_for(person, [by]) if person is not None else {}
+            wire["params"] = {**wire["params"], "by": names.get(by) or ""}
         await engine.push_to_pc(pc_id, "action.execute", {
             "execution_id": execution_id, "action": wire, "timeout_s": action["timeout_seconds"]})
         await engine.audit.record(actor, "action.started", target_type="execution", target_id=execution_id,

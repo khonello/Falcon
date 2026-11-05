@@ -105,7 +105,7 @@ The single table implementing **Session Blocking During Traversal** — session,
 
 **Enforcement of "one active session per PC":** a partial unique index — `CREATE UNIQUE INDEX one_active_session_per_pc ON sessions(pc_id) WHERE ended_at IS NULL`. This is the actual mechanism behind "traversal can only begin when the destination is idle": inserting a new active session row for an already-occupied `pc_id` fails at the database level, which the Engine translates into the correct response — block-or-end-first for vertical relationships, hard refusal for horizontal.
 
-**Network drop resolution (Implementation Spec §7.1):** deliberately *no* separate "connection_lost_at" column or disconnect-handling state. A dropped connection has no special row or status — the existing `deadline_at` continues to govern the row exactly as it would with a live connection; `ended_reason = 'network_drop_deadline_expired'` exists only so the audit trail can distinguish *why* a deadline expiry occurred, not to add new behavior.
+**Network drop resolution (Implementation Spec §7.1):** an Admin gone for two minutes ends the session (5 Nov 2026), watched in memory by the Engine's sweep, so there is still *no* "connection_lost_at" column or disconnect-handling state. A dropped connection has no special row or status — the existing `deadline_at` continues to govern the row exactly as it would with a live connection; `ended_reason = 'network_drop_deadline_expired'` exists only so the audit trail can distinguish *why* a deadline expiry occurred, not to add new behavior.
 
 ### `assisted_access_requests`
 Cross-Department Assisted Access — deliberately its own table, not folded into `sessions`, since entry here is consent-based, not block-or-end-first.

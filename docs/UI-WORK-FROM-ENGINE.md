@@ -184,7 +184,7 @@ All in `test_operator_gui.py`, all in the QML: fix the page, or the test if the 
 - **Join window:** `enroll.cancel` exists: enable Cancel in `Window.qml` (it sends `answer.give({cancel: true})`, which the Worker now acts on) and drop the "cannot take it back yet" reason. `spec.host` and `spec.expires_at` now arrive, so the code can stop being read out of the text.
 - **Ask for help is gone from the service:** the `kind === "ask"` block in `Window.qml` can go, with any `ask` left in the program's QML.
 - **The program's view** now has everything #26 lists: nothing to change unless a field was left out while waiting.
-- **The covers:** a blocked cover gets `since`, a locked one `at`, so Came in and Locked at now show. `by` on a locked cover is still not sent: it falls back to "your Admin".
+- **The covers:** a blocked cover gets `since`, a locked one `at` and `by` (empty for a rule's lock: keep the "your Admin" fallback).
 
 ### Conversations (built 2 Nov 2026; the Worker concept's Messages tab and "An Admin writes to you" window)
 - The program's view (`localapp` op `view`) now has `messages: [{id, with, unread, last, from, at}]` and `unread`.

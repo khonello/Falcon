@@ -262,7 +262,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      reference is stripped from what ships.
    - Settled and built: an Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
-19. **Done 5 Nov 2026, except the one open question at its end.** Ask for help is gone (`ask` window kind, the `ask` op, `ask_for_help`; Window.qml's block is the UI's), the Worker's command line lost `search`, the covers get `since` and `at`.
+19. **Done 5 Nov 2026.** Ask for help is gone (`ask` window kind, the `ask` op, `ask_for_help`; Window.qml's block is the UI's), the Worker's command line lost `search`, the covers get `since` and `at`.
     **The Worker's side, as the Worker concept draws it** (the user, 1-2 Nov 2026; `docs/design/concepts-worker.html`, the
     "Falcon Concepts · Worker" artifact, v13; the Admin concept's Messages, Admin v237). The concept is the source of truth for what the
     person at a machine sees; this is what the Engine and the Worker Client need for it.
@@ -288,11 +288,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      and the Admin's reason.
    - **The Worker's command line** is not part of the product the person sees. It stays as IT's and the tests' tool; its Assistance commands
      (search, ping) go, and a messages / reply pair comes in.
-   - **Open, not decided:** when the Admin's PC dies mid-session the Worker stays covered until the deadline (30 min by default, longer if
-     extended), because a dropped connection is not special-cased (`engine/hierarchy/traversal.py`). Options raised: end the session after a
-     short grace (~2 min) once the Admin's console is gone, or keep the deadline and have the cover say the Admin's connection dropped and
-     when the machine frees itself. Also: the cover only returns after the Worker reconnects, so a restarted machine is usable for those
-     seconds.
+   - **Decided and built (the user, 5 Nov 2026):** when the Admin's PC dies mid-session, the session ends after a two-minute grace, not at the deadline (`traversal.end_abandoned_sessions`, `FALCON_TRAVERSAL_DROP_GRACE_SECONDS`). A blip inside the grace changes nothing.
 
 20. **Closed: everything here was answered by #23 (checked against the handlers, 5 Nov 2026).** **What the console's pages draw that the Engine cannot do yet** (2 Nov 2026, the QML rebuilt from the version 1 Admin concept). Each
     control is drawn disabled with this reason on it, never faked:
@@ -384,7 +380,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
     unregistered, so a second start could not register its own and native notifications silently stayed off after a restart. Both fixed; `test_the_windows_notifier_hears_windows_messages` starts it twice.
 
 28. **From finishing the UI (5 Nov 2026).** Neither blocks version 1.
-    - `by` on a locked cover is not sent, so the cover says "your Admin" where the concept names who locked it.
+    - *(built 5 Nov 2026)* `by` on a locked cover: a lock run by hand names who, as the person there knows them. A rule's lock has nobody to name and says "your Admin".
     - A reinstalled machine that rejoins with a licence code becomes a new machine and takes another seat (`enrollment._join_with_licence` always provisions). Its old record stays.
 
 ## Done inline (for the record)

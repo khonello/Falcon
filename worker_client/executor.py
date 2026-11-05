@@ -122,7 +122,7 @@ DESKTOP_BUILTINS = frozenset({"screenshot", "notify", "lock_session", "start_pro
 BUILTIN_ARGS: dict[str, list[str]] = {
     "file_activity": ["path"], "snapshot_file": ["path"], "rename_file": ["path", "new_name"], "restore_file": ["path"],
     "kill_process": ["name", "pid"], "delete_file": ["path"], "start_process": ["command"], "notify": ["message", "stay_s"],
-    "lock_session": ["duration_s", "message"], "shutdown": ["delay_s", "message"], "reboot": ["delay_s", "message"],
+    "lock_session": ["duration_s", "message", "by"], "shutdown": ["delay_s", "message"], "reboot": ["delay_s", "message"],
 }
 
 

@@ -11,7 +11,8 @@ the partial unique index `one_active_session_per_pc`. On an occupied target:
   * the head of the organisation's occupancy is un-evictable
 
 Traversal Time Limit: an Engine-side countdown per traversal session, extendable on request.
-The same deadline governs a network drop mid-traversal -- no separate disconnect logic.
+A network drop mid-traversal ends the session after a short grace, or at the deadline if that comes first: an Admin's PC that
+dies must not hold the person out for the rest of the deadline, and a blip must not throw the Admin out (`end_abandoned_sessions`).
 
 Native sessions: a Worker or Admin occupies its own PC ('native', no deadline) from handshake
 to disconnect. Ending it (superior_ended) is what "blocked" means to that user; their client
@@ -21,6 +22,7 @@ shows the overlay until `session.released` arrives and it re-claims.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -131,15 +133,33 @@ async def end_session(engine: Engine, session: dict[str, Any], reason: str, *,
 
 
 async def expire_due_sessions(engine: Engine) -> None:
-    """Scheduler hook: end every session whose deadline has passed and release its block.
-    Whether the traverser is still connected is irrelevant (spec 7.1)."""
+    """Scheduler hook: end every session whose deadline has passed and release its block, then any whose Admin has gone (spec 7.1)."""
     if not engine.db.connected:
         return
     for session in await engine.db.sessions.list_expired():
-        connected = any(c.ctx.identity.account_id == session["occupant_account_id"]
-                        for c in engine.connections if c.authenticated)
-        reason = "deadline_expired" if connected else "network_drop_deadline_expired"
+        reason = "deadline_expired" if _is_connected(engine, session["occupant_account_id"]) else "network_drop_deadline_expired"
         await end_session(engine, session, reason, actor=None)
+    await end_abandoned_sessions(engine)
+
+
+def _is_connected(engine: Engine, account_id: int) -> bool:
+    return any(c.ctx.identity.account_id == account_id for c in engine.connections if c.authenticated)
+
+
+async def end_abandoned_sessions(engine: Engine) -> None:
+    """An Admin gone from the Engine for the whole grace has left the machine, and the person gets it back. Looked at on the sweep rather than when a connection drops, so an
+    Engine restart forgets nothing it needs: everyone reconnects, and the grace simply starts again for whoever does not."""
+    gone = engine.sessions_gone
+    now = time.monotonic()
+    live = await engine.db.sessions.list_traversals()
+    for sid in set(gone) - {s["id"] for s in live}:
+        del gone[sid]
+    for session in live:
+        if _is_connected(engine, session["occupant_account_id"]):
+            gone.pop(session["id"], None)
+        elif now - gone.setdefault(session["id"], now) >= engine.settings.traversal_drop_grace_seconds:
+            del gone[session["id"]]
+            await end_session(engine, session, "network_drop_deadline_expired", actor=None)
 
 
 # --- handlers -----------------------------------------------------------------------------------
