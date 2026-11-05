@@ -122,3 +122,12 @@ async def test_groq_failing_is_an_unclear_answer_and_several_in_a_row_stop_askin
 
 def test_the_key_is_not_in_what_gets_printed():
     assert "gsk-secret" not in repr(Settings(groq_api_key="gsk-secret"))
+
+
+def test_a_think_tag_never_closed_does_not_hide_the_answer():
+    """The 4B answers "<think>\\n\\nchange an existing file": read as wrong, it scored 0 of 8 on the probe with every answer right but one."""
+    from engine.llm import _strip_thinking
+
+    assert _strip_thinking("<think>\n\nchange an existing file").strip() == "change an existing file"
+    assert _strip_thinking("<think>\n</think>\n\ncreate a new file").strip() == "create a new file"
+    assert _strip_thinking("create a new file").strip() == "create a new file"

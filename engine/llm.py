@@ -324,9 +324,11 @@ def _args(prompt: str, max_tokens: int, system: str) -> tuple[Any, ...]:
 
 
 def _strip_thinking(text: str) -> str:
-    """Qwen3 may emit an empty <think></think> block even with thinking disabled."""
+    """Qwen3 may emit an empty <think></think> block even with thinking disabled, and the 4B opens one and never closes it: its answer follows the bare tag."""
     if "</think>" in text:
         text = text.rsplit("</think>", 1)[1]
+    elif text.lstrip().startswith("<think>"):
+        text = text.lstrip()[len("<think>"):]
     return text.strip()
 
 
