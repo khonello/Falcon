@@ -246,6 +246,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     visible: !falcon.isConnected
                 }
+                SetupModal { }
             }
         }
     }

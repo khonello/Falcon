@@ -9,6 +9,17 @@ from operator_client.tui.render import bullet, kv, pretty, table
 from operator_client.tui.shell import Args, Command, ShellContext, UsageError, command, registry
 
 
+@command("setup", usage="<engine address> <licence code> [ca=<cert.pem>]",
+         help_="First run: join your Engine with an admin licence code, then connect")
+async def setup(ctx: ShellContext, args: Args) -> str:
+    from operator_client.core import firstrun
+
+    if not firstrun.needs_setup(ctx.config):
+        return "This console is already set up."
+    why = await firstrun.set_up(ctx.config, args.get(0, "engine address"), args.get(1, "licence code"), str(args.opt("ca") or ""))
+    return why or await connect(ctx, Args([], {}))
+
+
 @command("connect", usage="[host:port] [client=<client_id>] [plaintext] [ca=<cert.pem>]",
          help_="Connect to the Engine and authenticate as this client")
 async def connect(ctx: ShellContext, args: Args) -> str:

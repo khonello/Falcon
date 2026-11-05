@@ -53,6 +53,9 @@ class LocalClient:
     def view(self) -> dict[str, Any]:
         return self.call("view")["view"]
 
+    def setup(self, address: str, code: str, cert: str) -> None:
+        self.call("setup", address=address, code=code, cert=cert)
+
     def start_task(self, task_id: int) -> None:
         self.call("start_task", id=task_id)
 

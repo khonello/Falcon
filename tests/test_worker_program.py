@@ -185,21 +185,24 @@ def test_open_in_falcon_names_a_tab_and_nothing_else_does():
 
 def test_open_in_falcon_asks_the_running_program_for_the_tab():
     pytest.importorskip("PySide6")
-    import getpass
-
     from PySide6.QtCore import QCoreApplication
     from PySide6.QtNetwork import QLocalServer
 
     from worker_client.program.__main__ import tab_asked
+
     QCoreApplication.instance() or QCoreApplication([])
-    name = f"FalconProgram-{getpass.getuser()}"
-    QLocalServer.removeServer(name)
+    who = f"test{os.getpid()}"                                 # its own name: a real program on this machine is not to be touched
     server = QLocalServer()
-    assert server.listen(name)
-    window = subprocess.Popen([sys.executable, "-c", "from worker_client.windows.__main__ import open_program; open_program('messages')"])
+    assert server.listen(f"FalconProgram-{who}")
+    window = subprocess.Popen([sys.executable, "-c", "from worker_client.windows.__main__ import open_program; open_program('messages')"],
+                              env={**os.environ, "LOGNAME": who})
     try:
-        assert server.waitForNewConnection(15000)
+        for _ in range(60):
+            server.waitForNewConnection(500)
+            if server.hasPendingConnections():
+                break
         sock = server.nextPendingConnection()
+        assert sock is not None
         got = b""
         while not got.endswith(bytes([10])) and sock.waitForReadyRead(5000):
             got += bytes(sock.readAll())

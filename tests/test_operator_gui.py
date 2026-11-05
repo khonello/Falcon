@@ -464,3 +464,20 @@ async def test_a_rule_is_tried_on_one_machine_and_nothing_is_saved(console):
     sent = next(p for t, p in bridge.conn.seen if t == "control.rule_try")
     assert sent["pc_id"] == 2 and sent["action_ids"] == [4] and sent["type"]
     assert not any(t in ("control.event_create", "control.event_update") for t, _ in bridge.conn.seen)
+
+
+async def test_a_console_that_is_not_set_up_asks_in_the_middle_and_nothing_else(console):
+    win, bridge, _ = console("admin")
+    modal = win.findChild(QObject, "setupModal")
+    bridge.state.connected = True
+    bridge.stateChanged.emit()
+    await _wait(lambda: prop(modal, "visible") is False)                                  # connected: there is nothing to ask
+    bridge.state.connected = False
+    bridge.stateChanged.emit()
+    await _wait(lambda: prop(modal, "visible") is True)
+    assert prop(bridge, "needsSetup") is True
+    assert prop(modal, "problem") == ""                                                   # Connect waits for the address and the code
+    modal.setProperty("address", "192.168.1.20")
+    modal.setProperty("code", "ADMN-1111")
+    modal.setProperty("cert", "C:/engine.crt")
+    assert prop(modal, "problem") == "ready"

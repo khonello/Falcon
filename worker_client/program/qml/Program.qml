@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Window
 import "../../windows/qml" as W
 
@@ -474,6 +475,52 @@ Window {
         }
     }
 
+    // FIRST RUN: this machine is not set up, so the Engine's address and a licence code are asked for here, over everything else, until it
+    // has joined. The certificate is only asked for when the install did not bring one. With no code an IT Admin lets it in, as ever.
+    readonly property var setup: view.setup || null
+    property string setupAddress: ""
+    property string setupCode: ""
+    property string setupCert: ""
+    onSetupChanged: {
+        if (!setup) return
+        if (setup.address && !setupAddress) setupAddress = setup.address
+        if (!previewOnly) { win.show(); win.raise(); win.requestActivate() }
+    }
+    readonly property bool setupReady: !!setup && !setup.busy && setupAddress.trim() !== "" && (!setup.needs_cert || setupCert !== "")
+    function setUp() { if (setupReady) { program.setUp(setupAddress, setupCode, setupCert); program.refresh() } }
+    Timer { running: !!win.setup && !previewOnly; interval: 1000; repeat: true; onTriggered: program.refresh() }
+    FileDialog { id: certFile; nameFilters: ["Certificates (*.crt *.pem)"]; onAccepted: win.setupCert = String(selectedFile) }
+    Rectangle {
+        objectName: "setupModal"
+        visible: win.setup !== null
+        anchors.fill: parent
+        color: Qt.rgba(25 / 255, 29 / 255, 37 / 255, 0.45)
+        MouseArea { anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.AllButtons }       // nothing behind it can be pressed
+        Rectangle {
+            anchors.centerIn: parent
+            width: 460; height: sc.height + 48; radius: 12; color: win.pane; border.width: 1; border.color: win.line
+            Column {
+                id: sc
+                x: 24; y: 24; width: parent.width - 48; spacing: 12
+                Text { text: "Set up Falcon"; color: win.ink; font.family: win.sans; font.pixelSize: 24; font.weight: Font.DemiBold }
+                Text { width: parent.width; wrapMode: Text.WordWrap; text: "Give this machine your Engine's address and the code from your Falcon licence."; color: win.dim; font.family: win.sans; font.pixelSize: 15; lineHeight: 1.15 }
+                Sec { topPadding: 6; text: "ENGINE IP ADDRESS" }
+                SetupField { objectName: "setupAddress"; hint: "For example 192.168.1.20"; value: win.setupAddress; onEdited: function (t) { win.setupAddress = t } }
+                Sec { topPadding: 6; text: "LICENCE CODE" }
+                SetupField { objectName: "setupCode"; hint: "FLC-W-…"; value: win.setupCode; onEdited: function (t) { win.setupCode = t } }
+                Text { width: parent.width; wrapMode: Text.WordWrap; text: "Leave it empty to have an IT Admin let it in instead."; color: win.faint; font.family: win.sans; font.pixelSize: 13 }
+                Sec { visible: !!win.setup && win.setup.needs_cert; topPadding: 6; text: "ENGINE CERTIFICATE" }
+                Item { visible: !!win.setup && win.setup.needs_cert; width: parent.width; height: 34
+                    Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - pickCert.width - 12; elide: Text.ElideMiddle; text: win.setupCert ? decodeURIComponent(win.setupCert.replace(/^file:\/+/, "")) : "engine.crt, from your Engine"; color: win.setupCert ? win.ink : win.faint; font.family: win.sans; font.pixelSize: 13 }
+                    Act { id: pickCert; anchors.right: parent.right; text: "Choose"; onClicked: certFile.open() } }
+                Text { visible: text !== ""; width: parent.width; wrapMode: Text.WordWrap; text: win.setup ? win.setup.error : ""; color: win.bad; font.family: win.sans; font.pixelSize: 13 }
+                Item { width: parent.width; height: 34
+                    Text { visible: !!win.setup && win.setup.busy; anchors.verticalCenter: parent.verticalCenter; text: "Connecting to your Engine…"; color: win.faint; font.family: win.sans; font.pixelSize: 13 }
+                    Act { objectName: "setupGo"; anchors.right: parent.right; text: "Connect"; primary: true; ok: win.setupReady; onClicked: win.setUp() } }
+            }
+        }
+    }
+
     // a quiet note in the corner for something new; it goes by itself and never takes the keyboard
     Connections {
         target: program
@@ -512,6 +559,16 @@ Window {
     }
 
     // --- the pieces ------------------------------------------------------------------------------------------------------------------------
+    component SetupField: Rectangle {
+        id: sf
+        property string hint: ""
+        property string value: ""
+        signal edited(string text)
+        width: parent ? parent.width : 300; height: 41; radius: 10; color: win.pane; border.width: 1; border.color: win.edge
+        TextInput { id: si; x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28; clip: true; font.family: win.sans; font.pixelSize: 14; color: win.ink
+                    text: sf.value; onTextEdited: sf.edited(text); onAccepted: win.setUp() }
+        Text { visible: si.text === ""; x: 14; anchors.verticalCenter: parent.verticalCenter; text: sf.hint; color: win.faint; font.family: win.sans; font.pixelSize: 14 }
+    }
     component TodayTask: Card {
         required property var modelData
         dim: modelData.started

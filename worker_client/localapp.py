@@ -10,6 +10,7 @@ connection. So the service listens on this machine's loopback address, and the p
     {"token": "...", "op": "conversation", "id": 4}     -> {"ok": true, "conversation": {...}} one conversation an Admin started, read up to now
     {"token": "...", "op": "reply", "id": 4, "body": ".."} -> {"ok": true}                     the person answers in it (they never start one)
     {"token": "...", "op": "send_file", "id": 4, "path": ".."} -> {"ok": true, "sent": {...}}  a file from this machine, in that conversation
+    {"token": "...", "op": "setup", "address": "..", "code": "..", "cert": ".."} -> {"ok": true}   first run only (`firstrun.py`): the view then says how it went
     {"token": "...", "op": "save_file", "file_id": 9}   -> {"ok": true}                       a file sent there, saved to Downloads, in "From Falcon"
 
 Where it is and what it checks:
@@ -50,6 +51,7 @@ class Provider(Protocol):
     async def app_reply(self, conversation_id: int, body: str) -> None: ...
     async def app_send_file(self, conversation_id: int, path: str) -> dict[str, Any]: ...
     async def app_save_file(self, file_id: int) -> None: ...
+    async def app_setup(self, address: str, code: str, cert: str) -> None: ...
 
 
 def info_path(settings_path: Path) -> Path:
@@ -152,6 +154,8 @@ class LocalApp:
                 return {"ok": True, "sent": await self.provider.app_send_file(int(msg["id"]), str(msg.get("path") or ""))}
             elif op == "save_file":
                 await self.provider.app_save_file(int(msg["file_id"]))
+            elif op == "setup":
+                await self.provider.app_setup(str(msg.get("address") or ""), str(msg.get("code") or ""), str(msg.get("cert") or ""))
             elif op == "ack":
                 ids = msg.get("ids")
                 if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):

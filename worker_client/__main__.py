@@ -56,6 +56,16 @@ async def _enroll(cfg: WorkerConfig, department_id: int | None, level: str) -> N
         sys.exit(f"not registered: {exc}")
 
 
+async def _first_run(cfg: WorkerConfig, ui: bool) -> None:
+    """Not set up: the person is asked, in the terminal with --ui, else in the Falcon program's window."""
+    from worker_client import firstrun, windows
+
+    if ui:
+        await firstrun.ask_in_tui(cfg)
+    elif cfg.windows and windows.available():
+        await firstrun.FirstRun(cfg).run(asyncio.Event())
+
+
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "service":
         from worker_client import winservice
@@ -104,6 +114,8 @@ def main() -> None:
         if args.code:
             cfg.enroll_code = args.code
         asyncio.run(_enroll(cfg, args.department, args.level))
+    if not cfg.client_id:
+        asyncio.run(_first_run(cfg, args.ui))
     if not cfg.client_id:
         sys.exit("no client id: pass --client-id once (it is remembered), or register with --enroll")
     cfg.save()

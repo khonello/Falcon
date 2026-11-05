@@ -19,11 +19,12 @@ import ssl
 from datetime import datetime, timezone
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 from PySide6.QtQml import QJSValue
 
 from common.connection import ConnectionError_, EngineConnection, EngineError
 from common.when import resolve as resolve_when
+from operator_client.core import firstrun
 from operator_client.core.config import LocalConfig
 from operator_client.core.deadlines import resolve_phrase
 from operator_client.core.lookup_cache import LookupCache
@@ -69,6 +70,8 @@ class FalconBridge(QObject):
         self._extension_minutes = 0
         self._retry_now: asyncio.Event | None = None      # made on the running loop when a retry starts
         self._deliberate = False
+        self._setup_busy = False
+        self._setup_error = ""
 
     # --- properties (read by QML bindings) -----------------------------------------------------
 
@@ -117,6 +120,42 @@ class FalconBridge(QObject):
     @Property(bool, notify=stateChanged)
     def isConnected(self) -> bool:
         return self.state.connected
+
+    # --- first run: not set up, so the modal asks for the Engine's address and a licence code -------------
+
+    @Property(bool, notify=stateChanged)
+    def needsSetup(self) -> bool:
+        return firstrun.needs_setup(self.config) and not self.state.connected
+
+    @Property(bool, notify=stateChanged)
+    def setupNeedsCert(self) -> bool:
+        return firstrun.needs_certificate(self.config)
+
+    @Property(str, notify=stateChanged)
+    def setupAddress(self) -> str:
+        return firstrun.known_address(self.config)
+
+    @Property(bool, notify=stateChanged)
+    def setupBusy(self) -> bool:
+        return self._setup_busy
+
+    @Property(str, notify=stateChanged)
+    def setupError(self) -> str:
+        return self._setup_error
+
+    @Slot(str, str, str)
+    def setUp(self, address: str, code: str, cert: str) -> None:
+        asyncio.ensure_future(self._set_up(address, code, cert))
+
+    async def _set_up(self, address: str, code: str, cert: str) -> None:
+        self._setup_busy, self._setup_error = True, ""
+        self.stateChanged.emit()
+        self._setup_error = await firstrun.set_up(self.config, address, code, QUrl(cert).toLocalFile() if cert.startswith("file:") else cert)
+        self._setup_busy = False
+        self.stateChanged.emit()
+        if not self._setup_error:
+            cfg = self.config
+            await self._connect(cfg.engine_host, cfg.engine_port, cfg.client_id, cfg.client_key, not cfg.tls, cfg.ca_cert or "")
 
     @Property(str, notify=stateChanged)
     def role(self) -> str:

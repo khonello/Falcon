@@ -12,6 +12,7 @@ Popup {
     default property alias body: content.data
     property alias footer: foot.data
     property int pad: 24
+    property bool closable: true                // false: there is no way round it, so there is no X
 
     // A popup lives in the Overlay, not in the page that declared it, so leaving that page does not
     // take it with it. `page` ties it back: when the page goes, so does this.
@@ -68,7 +69,7 @@ Popup {
             id: shut
             kind: "text"
             small: true
-            iconName: "close"
+            iconName: "close"; visible: root.closable
             anchors.right: parent.right
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter

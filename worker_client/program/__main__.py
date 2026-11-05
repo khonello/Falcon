@@ -206,6 +206,10 @@ def main(argv: list[str]) -> int:
                 self._fetch()
             self._pool.submit(run)
 
+        @Slot(str, str, str)
+        def setUp(self, address: str, code: str, cert: str) -> None:
+            self._act(self._client.setup, address, code, QUrl(cert).toLocalFile() if cert.startswith("file:") else cert)
+
         @Slot(str)
         def copyText(self, text: str) -> None:
             from PySide6.QtGui import QGuiApplication

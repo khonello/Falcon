@@ -237,6 +237,10 @@ async def _wait_to_be_registered(cfg: Any, stop_event: asyncio.Event) -> None:
     async def show(spec: dict[str, Any]) -> Any:
         return await open_window("message", {**spec, "from": ""})
 
+    from worker_client.firstrun import FirstRun, needs_setup
+
+    if needs_setup(cfg) and cfg.windows:
+        await FirstRun(cfg).run(stop_event)         # nobody has said where the Engine is: the Falcon program asks
     while not cfg.client_id and not stop_event.is_set():
         task = asyncio.create_task(enroll(cfg, department_id=cfg.enroll_department, level=cfg.enroll_level,
                                           show=lambda m: log.info("%s", m), window=show if cfg.windows else None))

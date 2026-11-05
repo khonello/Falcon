@@ -596,6 +596,9 @@ class WorkerService:
 
         self._program = await open_program()
 
+    async def app_setup(self, address: str, code: str, cert: str) -> None:
+        raise RuntimeError("this machine is already set up")
+
     async def _build_view(self) -> None:
         from worker_client.windows.spawn import first_sentence, signs_of
 

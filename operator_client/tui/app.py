@@ -15,9 +15,11 @@ from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.shortcuts import input_dialog, message_dialog
 from prompt_toolkit.styles import Style
 
 import operator_client.tui.commands  # noqa: F401  -- registers commands
+from operator_client.core import firstrun
 from operator_client.core.config import LocalConfig
 from operator_client.core.state import ClientState
 from operator_client.tui.push_format import describe_push
@@ -65,6 +67,28 @@ def _toolbar(state: ClientState, tick: list[int]) -> FormattedText:
     return FormattedText(parts)
 
 
+async def _ask_setup(config: LocalConfig) -> bool:
+    """First run: the same questions as the console's modal, as dialogs in the middle of the terminal. Cancel leaves it not set up."""
+    error = ""
+    while True:
+        if error:
+            await message_dialog(title="Set up Falcon", text=error).run_async()
+        address = await input_dialog(title="Set up Falcon", text="The Engine's IP address").run_async()
+        if address is None:
+            return False
+        code = await input_dialog(title="Set up Falcon", text="The licence code").run_async()
+        if code is None:
+            return False
+        cert = ""
+        if firstrun.needs_certificate(config):
+            cert = await input_dialog(title="Set up Falcon", text="Where the Engine's certificate is on this machine (engine.crt)").run_async()
+            if cert is None:
+                return False
+        error = await firstrun.set_up(config, address, code, cert)
+        if not error:
+            return True
+
+
 async def run_app(config: LocalConfig, *, initial: list[str] | None = None) -> None:
     state = ClientState()
     ctx = ShellContext(config=config, state=state)
@@ -82,6 +106,8 @@ async def run_app(config: LocalConfig, *, initial: list[str] | None = None) -> N
         bottom_toolbar=lambda: _toolbar(state, tick), style=STYLE, refresh_interval=0.7,
         complete_while_typing=False)
 
+    if firstrun.needs_setup(config) and not initial and await _ask_setup(config):
+        initial = ["connect"]
     print_formatted_text(FormattedText([("bold", "Falcon Operator Client"), ("", "  --  type `help`; `connect` to begin")]))
     for line in initial or []:
         out = await run_line(ctx, line)
