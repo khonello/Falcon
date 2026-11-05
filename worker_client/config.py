@@ -46,6 +46,7 @@ class WorkerConfig:
     metrics_seconds: float = 15.0        # control.metrics cadence
     idle_sweep_after_seconds: float = 300.0   # start the full sweep after this much idle
     hash_limit_bytes: int = 64 * 1024 * 1024   # bigger files are indexed without a hash
+    watch_drives: bool = True                  # follow what is written to external drives (worker_client/drivewatch.py)
     lock_workstation_on_block: bool = False    # Windows: LockWorkStation() when a superior enters
     enroll_level: str = "worker"               # with no client id yet: what this machine asks to be registered as (worker | admin)
     enroll_department: int | None = None       # ... and the department it asks to join (None: the Engine's confirmer decides)
@@ -68,7 +69,7 @@ class WorkerConfig:
         except (OSError, ValueError):
             return cfg
         for key in ("engine_host", "engine_port", "client_id", "client_key", "tls", "ca_cert", "watch_roots", "poll_seconds",
-                    "metrics_seconds", "idle_sweep_after_seconds", "hash_limit_bytes", "lock_workstation_on_block",
+                    "metrics_seconds", "idle_sweep_after_seconds", "hash_limit_bytes", "watch_drives", "lock_workstation_on_block",
                     "windows", "index_state", "reconcile_seconds", "separate_programs", "serve_console", "enroll_level", "enroll_department", "enroll_code", "update_command", "cache"):
             if key in data:
                 setattr(cfg, key, data[key])

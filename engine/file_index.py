@@ -239,6 +239,7 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
         "path": path,
         "name": str(event.get("name") or PurePath(path).name),
         "hash": event.get("hash"),
+        "drive": event.get("drive"),
         "old_path": event.get("old_path"),
         "is_dir": bool(event.get("is_dir")),
         "resource_tag": tag,

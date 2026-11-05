@@ -182,6 +182,8 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     wrote = facts["flow_wrote"] if "flow_wrote" in facts else (op in ("create", "modify", "move", "copy") and await _flow_wrote(engine, pc_id, path, digest))
     by = "falcon" if wrote else seen.get("by", "unknown")
     det = _detector()
+    if event.get("drive"):
+        det.know_drive(pc_id, str(event["drive"]), time.time())
     mem = det.mem.get(pc_id)
     if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
         tags.add("allowed")

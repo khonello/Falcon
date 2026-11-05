@@ -28,6 +28,7 @@ from common.signpipe import SignPipeServer
 from worker_client import winsession
 from worker_client.chatfiles import ChatFiles
 from worker_client.config import WorkerConfig
+from worker_client.drivewatch import DriveWatch
 from worker_client.executor import Executor
 from worker_client.flowsync import FlowSync
 from worker_client.inventory import Inventory
@@ -100,6 +101,7 @@ class WorkerService:
             self.watcher = Watcher(config.watch_roots, self._relay, poll_seconds=config.poll_seconds,
                                    hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
                                    native=native_watch, state_path=state_path, reconcile_seconds=config.reconcile_seconds)
+        self.drivewatch = DriveWatch(self._relay, hash_limit=config.hash_limit_bytes) if config.watch_drives else None
         self.notifiers: list[Notifier] = []   # the narrow UI / dialogs subscribe here
         self.native_session_id: int | None = None
         self._stopping = False
@@ -135,6 +137,8 @@ class WorkerService:
             if not self.signpipe.start():
                 log.warning("the console on this machine cannot be signed in: the signing pipe did not start")
         await self.watcher.start()
+        if self.drivewatch is not None:
+            await self.drivewatch.start()
         await self.signals.start()
         await self.ossignals.start(native=self._native_watch)
         self._clipboard_watch().start()
@@ -171,6 +175,8 @@ class WorkerService:
         if self.signpipe is not None:
             self.signpipe.stop()
         await self.watcher.stop()
+        if self.drivewatch is not None:
+            await self.drivewatch.stop()
         await self.signals.stop()
         if self._clipboard is not None:
             await self._clipboard.stop()

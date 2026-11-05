@@ -104,11 +104,11 @@ class Drill:
         p.mkdir(parents=True, exist_ok=True)
         return p
 
-    def start_worker(self, name: str, watch: list[Path]) -> None:
+    def start_worker(self, name: str, watch: list[Path], *, drives: bool = False) -> None:
         w = self.state["workers"][name]
         cfg = {"engine_host": self.engine_cfg["engine_host"], "engine_port": self.engine_cfg["engine_port"], "client_id": w["client_id"],
                "client_key": w["client_key"], "tls": self.engine_cfg["tls"], "ca_cert": self.engine_cfg["ca_cert"], "windows": False,
-               "watch_roots": [str(p) for p in watch], "poll_seconds": 1.0, "metrics_seconds": 5, "idle_sweep_after_seconds": 999999}
+               "watch_roots": [str(p) for p in watch], "poll_seconds": 1.0, "metrics_seconds": 5, "idle_sweep_after_seconds": 999999, "watch_drives": drives}
         path = DRILL / name / "worker.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")

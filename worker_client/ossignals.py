@@ -39,14 +39,48 @@ def _psutil() -> Any:
     return psutil
 
 
+EXTERNAL_BUSES = frozenset({4, 7, 12, 13})                # FireWire, USB, SD, MMC
+
+
+def bus_type(mount: str) -> int | None:
+    """How a volume's disk is connected, as Windows says (STORAGE_BUS_TYPE); None when it will not say. Needs no special rights."""
+    if os.name != "nt":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    kernel32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel32.DeviceIoControl.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD,
+                                         ctypes.POINTER(wintypes.DWORD), wintypes.LPVOID]
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel32.CreateFileW("\\\\.\\" + mount.rstrip("\\"), 0, 3, None, 3, 0, None)
+    if handle in (None, wintypes.HANDLE(-1).value):
+        return None
+    try:
+        query = (ctypes.c_uint32 * 3)(0, 0, 0)                 # StorageDeviceProperty, PropertyStandardQuery
+        out = ctypes.create_string_buffer(1024)
+        got = wintypes.DWORD(0)
+        if not kernel32.DeviceIoControl(handle, 0x2D1400, query, ctypes.sizeof(query), out, 1024, ctypes.byref(got), None) or got.value < 32:
+            return None
+        return int.from_bytes(out.raw[28:32], "little")        # STORAGE_DEVICE_DESCRIPTOR.BusType
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def drives() -> dict[str, str]:
-    """Removable drives now: mount point -> device."""
+    """External drives now: mount point -> device. Windows calls a USB hard disk "fixed", so how it is connected decides, not that word. The drive Windows runs from never counts."""
     ps = _psutil()
     if ps is None:
         return {}
+    system = os.environ.get("SystemDrive", "").rstrip("\\").lower()
     out = {}
     for part in ps.disk_partitions(all=False):
-        if "removable" in part.opts.lower():
+        opts = part.opts.lower()
+        if system and part.mountpoint.rstrip("\\").lower() == system:
+            continue
+        if "removable" in opts or ("fixed" in opts and bus_type(part.mountpoint) in EXTERNAL_BUSES):
             out[part.mountpoint] = part.device
     return out
 

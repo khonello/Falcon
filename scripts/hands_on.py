@@ -59,7 +59,7 @@ async def main() -> int:
     for name in ("WS-D1", "WS-D2"):
         await d.worker_account(name)
     for machine, names in FOLDERS.items():
-        d.start_worker(machine, [HOME / machine / n for n in names])
+        d.start_worker(machine, [HOME / machine / n for n in names], drives=machine == "WS-D1")      # three machines on one PC: one of them answers for the real drives
     ready = await d.online("WS-D1", "WS-D2")
     await asyncio.sleep(10)                                                       # the machines tell what this rebuild looked like: to Detective, a mass deletion
     for c in (await d.admin.call("detective.cases", {"include_noted": True}))["cases"]:

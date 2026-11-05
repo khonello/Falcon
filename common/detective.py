@@ -1274,6 +1274,10 @@ class Detective:
         have = max((order.get(b, -1) for b in c.behaviours), default=-1)
         return order.get(f.behaviour, -2) >= have >= 0
 
+    def know_drive(self, pc: int, device: str, at: float) -> None:
+        """A drive heard of from a file on it, not from being plugged in: it was there before the Worker started, so no signal ever came."""
+        self.mem.setdefault(pc, Memory()).devices.setdefault(device, at)
+
     def close(self, case_id: int) -> None:
         """A person has decided this case. What the machine does next is not part of it: left here it would be folded into a case nobody is looking at, and nobody told."""
         self.cases = [c for c in self.cases if c.id != case_id]
