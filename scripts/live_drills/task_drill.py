@@ -28,7 +28,7 @@ async def run(d, check, say, wait_for) -> None:
     d.start_worker("WS-D1", [work])
     d.start_worker("WS-D2", [d.folder("WS-D2", "tasks")])
     check("the person's PC is online", await d.online("WS-D1", "WS-D2"))
-    admin, su = d.admin, d.su
+    admin = d.admin
     me = d.state["workers"]["WS-D1"]
     person = await connect({**d.engine_cfg, "client_id": me["client_id"], "client_key": me["client_key"]})
     pushes: list[tuple[str, dict]] = []
@@ -68,12 +68,6 @@ async def run(d, check, say, wait_for) -> None:
           and tid in [t["id"] for t in (await person.call("task.list"))["tasks"]])
     other = await admin.call("task.list")
     check("T2  the assigner lists it too", tid in [t["id"] for t in other["tasks"]])
-    try:
-        await su.call("task.get", {"task_id": tid})
-        saw = True
-    except Exception:                                              # noqa: BLE001
-        saw = False
-    check("T2  the Super User can read it (always visible upward)", saw)
 
     # --- T3: doing it -----------------------------------------------------------------------------------------------------------
     await person.call("task.start", {"task_id": tid})
@@ -150,20 +144,6 @@ async def run(d, check, say, wait_for) -> None:
         blocked = True
     check("T8  a person cannot give tasks", blocked)
 
-    # --- T9: the Super User gives a department a task -----------------------------------------------------------------------------------------
-    tree = await su.call("hierarchy.tree")
-    dept = next(x for x in tree["departments"] if any(a["hostname"] == "ADM-01" for a in x["admins"]))
-    dt = await su.call("task.dept_create", {"department_id": dept["department_id"], "title": f"Hand in the Q3 figures {TAG}", "deadline_at": when(hours=2)})
-    dtid = dt["task"]["id"]
-    check("T9  a department task is announced to the department's Admin", await wait_for(lambda: any(t == "task.dept_assigned" for t, _ in admin_pushes), 10))
-    await admin.call("task.dept_mark", {"task_id": dtid, "state": "seen"})
-    await admin.call("task.dept_mark", {"task_id": dtid, "state": "ongoing"})
-    await admin.call("task.dept_mark", {"task_id": dtid, "state": "done"})
-    got = await su.call("task.dept_get", {"task_id": dtid})
-    check("T9  the Admin marks seen, ongoing, done (a mark is not completion)", got["task"]["standing"] != "complete", str(got["task"].get("standing")))
-    await su.call("task.dept_complete", {"task_id": dtid})
-    got = await su.call("task.dept_get", {"task_id": dtid})
-    check("T9  only the Super User completes it", got["task"]["standing"] == "complete", str(got["task"].get("standing")))
     with contextlib.suppress(Exception):
         await person.close()
 

@@ -7,7 +7,7 @@ PASS or FAIL with what it saw; a FAIL is a finding to fix.
     environ-operator\\Scripts\\python.exe scripts\\live_drill.py restricted
     environ-operator\\Scripts\\python.exe scripts\\live_drill.py task
 
-It uses the Engine in `.env` (start it first: `python -m engine`), the Super User saved on this machine (`python -m engine setup`) and the
+It uses the Engine in `.env` (start it first: `python -m engine`), an IT Admin and the
 Admin written by `scripts/make_org.py` (`data/admin.json`). It makes its own Workers (WS-D1, WS-D2, WS-D3) in that Admin's department the first
 time, remembers them in `data/drill/state.json`, and keeps their folders under `data/drill/`.
 """
@@ -24,7 +24,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from operator_client.core import EngineConnection, LocalConfig
+from operator_client.core import EngineConnection
 
 DRILL = ROOT / "data" / "drill"
 STATE = DRILL / "state.json"
@@ -61,35 +61,26 @@ async def connect(cfg: dict[str, Any]) -> EngineConnection:
     return c
 
 
-def su_config() -> dict[str, Any]:
-    c = LocalConfig.load()
-    return {"engine_host": c.engine_host, "engine_port": c.engine_port, "client_id": c.client_id, "client_key": c.client_key, "tls": c.tls,
-            "ca_cert": c.ca_cert}
-
-
 def admin_config() -> dict[str, Any]:
     return json.loads((ROOT / "data" / "admin.json").read_text(encoding="utf-8"))
 
 
 class Drill:
     def __init__(self) -> None:
-        self.su: EngineConnection | None = None
         self.admin: EngineConnection | None = None
         self.state: dict[str, Any] = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {"workers": {}}
         self.procs: dict[str, subprocess.Popen] = {}
-        self.engine_cfg = su_config()
+        self.engine_cfg = admin_config()
 
     async def start(self) -> None:
         DRILL.mkdir(parents=True, exist_ok=True)
-        self.su = await connect(self.engine_cfg)
         self.admin = await connect(admin_config())
 
     async def stop(self) -> None:
         for name in list(self.procs):
             self.stop_worker(name)
-        for c in (self.su, self.admin):
-            if c is not None:
-                await c.close()
+        if self.admin is not None:
+            await self.admin.close()
         STATE.write_text(json.dumps(self.state, indent=2), encoding="utf-8")
 
     # --- workers -----------------------------------------------------------------------------------------------
@@ -98,10 +89,10 @@ class Drill:
         """A Worker account in the Admin's department (made once, remembered)."""
         if name not in self.state["workers"]:
             dept = (await self.admin.call("hierarchy.tree"))["viewer"]            # type: ignore[union-attr]
-            tree = await self.su.call("hierarchy.tree")                            # type: ignore[union-attr]
+            tree = await self.admin.call("hierarchy.tree")                            # type: ignore[union-attr]
             admin_id = admin_config()["client_id"]
             dept_id = next(d["department_id"] for d in tree["departments"] if any(a.get("hostname") == "ADM-01" for a in d["admins"]))
-            made = await self.su.call("hierarchy.account_create", {"role": "worker", "hostname": name, "department_id": dept_id})   # type: ignore[union-attr]
+            made = await self.admin.call("hierarchy.account_create", {"role": "worker", "hostname": name, "department_id": dept_id})   # type: ignore[union-attr]
             self.state["workers"][name] = {"client_id": made["client_id"], "client_key": made["client_key"], "account_id": made["account_id"],
                                            "department_id": dept_id}
             STATE.write_text(json.dumps(self.state, indent=2), encoding="utf-8")
@@ -135,13 +126,13 @@ class Drill:
 
     async def online(self, *names: str) -> bool:
         async def ready() -> bool:
-            tree = await self.su.call("hierarchy.tree")                                          # type: ignore[union-attr]
+            tree = await self.admin.call("hierarchy.tree")                                          # type: ignore[union-attr]
             up = {w["hostname"] for d in tree["departments"] for w in d["workers"] if w["online"]}
             return all(n in up for n in names)
         return await wait_for(ready, 30)
 
     async def pc_id(self, hostname: str) -> int:
-        tree = await self.su.call("hierarchy.tree")                                              # type: ignore[union-attr]
+        tree = await self.admin.call("hierarchy.tree")                                              # type: ignore[union-attr]
         for d in tree["departments"]:
             for w in d["workers"] + d["admins"]:
                 if w["hostname"] == hostname:

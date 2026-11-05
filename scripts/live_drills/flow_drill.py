@@ -25,6 +25,13 @@ async def run(d, check, say, wait_for) -> None:
     check("the three Workers come online", await d.online("WS-D1", "WS-D2", "WS-D3"))
     p1, p2, p3 = await d.pc_id("WS-D1"), await d.pc_id("WS-D2"), await d.pc_id("WS-D3")
     admin = d.admin
+    for f in (await admin.call("flow.list"))["flows"]:                   # a run cut short leaves its flows running, and a second flow into the same folders is another test
+        if "drill" in str(f.get("source_path") or "").lower():
+            await admin.call("flow.delete", {"flow_id": f["id"]})
+    for folder in (src, a, b):
+        for child in folder.iterdir():
+            shutil.rmtree(child) if child.is_dir() else child.unlink()
+    await _settle(3)
     (src / "already-there.txt").write_text("this was in the folder before the flow existed\n", encoding="utf-8")
     (src / "old-folder").mkdir()
     (src / "old-folder" / "inside.txt").write_text("and so was this\n", encoding="utf-8")
@@ -149,19 +156,15 @@ async def run(d, check, say, wait_for) -> None:
     await d.online("WS-D1")
     await admin.call("flow.create", {"source_pc_id": p1, "source_path": str(tr_src), "destinations": [
         {"destination_pc_id": p3, "destination_path": str(tr_dst), "parent_index": 0}],
-        "stages": [{"stage_type": "transformation", "config": {"to": "md"}}]})
+        "stages": [{"step": {"kind": "conversion", "op": "to_pdf", "settings": {"if_not": "copy"}}}]})
     await _settle()
     (tr_src / "note.txt").write_text("# a note\n", encoding="utf-8")
-    ok = await wait_for(lambda: (tr_dst / "note.md").exists(), 30)
-    check("S9  a transformation stage renames and converts txt to md", ok, str([p.name for p in tr_dst.iterdir()]))
+    ok = await wait_for(lambda: (tr_dst / "note.pdf").exists(), 30)
+    check("S9  a Conversion step turns a text file into a PDF", ok, str([p.name for p in tr_dst.iterdir()]))
+    check("S9  and it is a real PDF", ok and (tr_dst / "note.pdf").read_bytes()[:5] == b"%PDF-")
     (tr_src / "sheet.xlsx").write_bytes(b"not really a spreadsheet")
-    await _settle(8)
-    f2 = (await admin.call("flow.list"))["flows"]
-    mine = [f for f in f2 if f["source_path"] == str(tr_src)]
-    paused = mine and any(x.get("paused_reason") for x in mine[0]["destinations"])
-    check("S9  a file the stage cannot convert pauses only that destination, with a suggestion", bool(paused) and bool(mine[0]["destinations"][0].get("suggestion")),
-          str(mine[0]["destinations"][0] if mine else "no flow"))
-    check("S9  and the other flows keep running", True)
+    ok = await wait_for(lambda: (tr_dst / "sheet.xlsx").exists(), 30)
+    check("S9  a file it cannot convert is copied as it is, and the flow does not stop", ok, str([p.name for p in tr_dst.iterdir()]))
 
     # --- S10: an unreachable destination path ---------------------------------------------------------------------------------------
     bad = await admin.call("flow.create", {"source_pc_id": p1, "source_path": str(d.folder("WS-D1", "bad-src")), "destinations": [
@@ -190,5 +193,5 @@ async def _settle(seconds: float = 3.0) -> None:
 
 
 async def _offline(d, name: str) -> bool:
-    tree = await d.su.call("hierarchy.tree")
+    tree = await d.admin.call("hierarchy.tree")
     return not any(w["online"] for dep in tree["departments"] for w in dep["workers"] if w["hostname"] == name)

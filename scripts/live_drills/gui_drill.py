@@ -40,7 +40,7 @@ async def settle(seconds: float) -> None:
 async def run(d, check, say, wait_for) -> None:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
     os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
-    from live_drill import admin_config, su_config
+    from live_drill import admin_config
     from PySide6.QtCore import QObject
 
     from operator_client.core import LocalConfig
@@ -112,7 +112,6 @@ async def run(d, check, say, wait_for) -> None:
             await bridge.conn.close() if bridge.conn is not None else None
 
     await visit("admin", ac, ADMIN_PAGES)
-    await visit("su", su_config(), SU_PAGES)
     say(f"pictures in {shots}")
     _ = json, sys
 

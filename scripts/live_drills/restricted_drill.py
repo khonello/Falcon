@@ -28,6 +28,8 @@ async def run(d, check, say, wait_for) -> None:
     d.start_worker("WS-D2", [p2])
     check("the Admin's workstation and two people's PCs come online", await _online(d, "WS-D1", "WS-D2") and await wait_for(lambda: _admin_online(d), 30))
     admin = d.admin
+    for m in (await admin.call("marks.list", {"scope": "mine"}))["marks"]:    # a run cut short leaves its marks behind
+        await admin.call("marks.unmark", {"mark_id": m["id"]})
     for f in (home, elsewhere, p1, p2):                       # cleared with the Workers watching, so the index learns the files are gone
         for child in f.iterdir():
             shutil.rmtree(child) if child.is_dir() else child.unlink()
@@ -69,10 +71,9 @@ async def run(d, check, say, wait_for) -> None:
     got = await wait_issue("payroll-copy.txt", "WS-D1")
     check("R2  a copy on a person's PC becomes an issue, under another name too (matched by content)", got is not None)
     if got:
-        check("R2  it is owned by whoever marked it, and high (another PC of the same department)",
-              got["issue"]["owner"] is not None and got["issue"]["severity"] == "high", f"{got['issue'].get('owner')} {got['issue']['severity']}")
+        check("R2  it is high (another PC of the same department), and nobody owns it", "owner" not in got["issue"] and got["issue"]["severity"] == "high", got["issue"]["severity"])
         keys = [o["key"] for o in got["options"]]
-        check("R2  the Admin may ask the person, delete the copy, or allow it", {"ask", "delete", "allow"} <= set(keys), str(keys))
+        check("R2  the Admin may delete the copy, delete it every time, or allow it", {"rule", "delete", "allow"} <= set(keys), str(keys))
     violations = await admin.call("resource.violations", {})
     check("R2  and the violation is on record", bool(violations.get("violations") or violations.get("items") or violations), str(list(violations)))
 
@@ -188,7 +189,7 @@ async def _online(d, *names: str) -> bool:
 
 
 async def _admin_online(d) -> bool:
-    tree = await d.su.call("hierarchy.tree")
+    tree = await d.admin.call("hierarchy.tree")
     return any(a["online"] for dep in tree["departments"] for a in dep["admins"] if a["hostname"] == "ADM-01")
 
 
