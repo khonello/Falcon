@@ -383,6 +383,10 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
 27. **`worker_client/winnotify.py` access violation: done 5 Nov 2026.** `GetModuleHandleW` had no `restype`, so the 64-bit handle was cut short and Windows faulted at `RegisterClassW`. The class was also never
     unregistered, so a second start could not register its own and native notifications silently stayed off after a restart. Both fixed; `test_the_windows_notifier_hears_windows_messages` starts it twice.
 
+28. **From finishing the UI (5 Nov 2026).** Neither blocks version 1.
+    - `by` on a locked cover is not sent, so the cover says "your Admin" where the concept names who locked it.
+    - A reinstalled machine that rejoins with a licence code becomes a new machine and takes another seat (`enrollment._join_with_licence` always provisions). Its old record stays.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

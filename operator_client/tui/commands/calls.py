@@ -57,6 +57,17 @@ async def update_now(ctx: ShellContext, args: Args) -> str:
     return f"asked: version {(await ctx.call('update.now', {'pc_id': args.get_int(0, 'pc_id')}))['version']}"
 
 
+@command("machine", "newkey", "<pc_id> yes", "Replace a stolen key: the old one stops at once, the machine drops off; shown once")
+async def machine_newkey(ctx: ShellContext, args: Args) -> str:
+    pc_id = args.get_int(0, "pc_id")
+    if args.get(1, "yes") != "yes":
+        return "Nothing changed. Say yes to replace the key: the old one stops at once and the machine drops off."
+    r = await ctx.call("hierarchy.pc_rekey", {"pc_id": pc_id})
+    return (f"Machine {pc_id}: the old key has stopped working, and it is off until it has this one. It is shown once.\n"
+            f"client id  {r['client_id']}\nkey        {r['client_key']}\n"
+            f"On the machine: python -m worker_client --client-id {r['client_id']} --client-key {r['client_key']}")
+
+
 @command("machine", "end", "<pc_id> <program>", "End a running program; the person is told")
 async def machine_end(ctx: ShellContext, args: Args) -> str:
     return f"execution {(await ctx.call('machines.end_program', {'pc_id': args.get_int(0, 'pc_id'), 'name': args.rest(1, 'program')}))['execution_id']}"

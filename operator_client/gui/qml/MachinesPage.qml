@@ -90,7 +90,6 @@ Page {
                         if (!ok) { Msg.failed(r && r.message ? r.message : "Could not enter"); return }
                         Msg.ok("You are in " + m.host + (m.user ? " · " + m.user + " cannot use it while you are in" : "")) }) })
     }
-    KeyDrawer { id: keys; page: page }
 
     // --- the machines, and the picked one ----------------------------------------------------------------
     Row {
@@ -216,7 +215,6 @@ Page {
                                     Btn { small: true; kind: "primary"; text: page.mine(mc.modelData) ? "You are inside" : "Enter"
                                           enabled: mc.modelData.online && !page.mine(mc.modelData); onClicked: page.enter(mc.modelData) }
                                     Btn { small: true; kind: "text"; text: "Run an action"; onClicked: Nav.goAsk("actions", null, "Actions opens with " + mc.modelData.host + " picked.", mc.modelData.host) }
-                                    Btn { small: true; kind: "text"; text: "New key"; tip: "Its old key stops working at once"; onClicked: keys.ask({ mode: "rekey", subject: mc.modelData.host, pc_id: mc.modelData.pc_id }) }
                                 }
                             }
                         }

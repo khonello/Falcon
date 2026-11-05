@@ -264,7 +264,7 @@ async def test_an_announcement_is_sent_from_its_drawer(console):
 
 async def test_announcements_is_a_page_of_the_home_menu(console):
     win, bridge, _ = console("admin")
-    await _open(win, bridge, "messages/announcements", "announcements")                   # where the calendar still links
+    await _open(win, bridge, "announcements", "announcements")
     assert "announcements" in prop(win, "menuKeys") and "detective" in prop(win, "menuKeys")
     await _open(win, bridge, "detective", "detectiveView")
 

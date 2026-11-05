@@ -319,7 +319,7 @@ Page {
         width: parent.width
         title: "What Detective noticed"
         readonly property var told: page.det && page.det.telling ? page.det.telling : null
-        sub: told && told.smoothed ? "what went on, in the local model's words" : "what went on, from what Detective found"
+        sub: told && told.smoothed ? "what went on, worded by a model; every fact is Falcon's" : "what went on, from what Detective found"
         Column {
             width: parent.width
             spacing: 10
@@ -336,7 +336,7 @@ Page {
             Rectangle { width: parent.width; height: 1; color: Theme.grid }
             Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12
                   // who wrote it, as it happened: the model when its smoothing was kept, else the system
-                  text: (page.det && page.det.telling && page.det.telling.smoothed ? "Written by the local model" : "Written by Falcon") + " from what Detective found. It is a reading of the evidence, not proof." }
+                  text: (page.det && page.det.telling && page.det.telling.smoothed ? "Worded by a model from what Detective found; every fact is Falcon's." : "Written by Falcon from what Detective found.") + " It is a reading of the evidence, not proof." }
         }
     }
 

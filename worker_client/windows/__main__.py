@@ -12,6 +12,17 @@ from worker_client.windows import KINDS
 QML_DIR = Path(__file__).with_name("qml")
 
 
+def open_program(tab: str) -> None:
+    """Bring this person's program forward on `tab`."""
+    from PySide6.QtNetwork import QLocalSocket
+
+    sock = QLocalSocket()
+    sock.connectToServer(f"FalconProgram-{getpass.getuser()}")
+    if sock.waitForConnected(300):
+        sock.write(f"show {tab}\n".encode())
+        sock.waitForBytesWritten(300)
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 1 or argv[0] not in KINDS:
         print(f"usage: python -m worker_client.windows {{{'|'.join(KINDS)}}} '<json>' [--shot out.png]", file=sys.stderr)
@@ -22,7 +33,6 @@ def main(argv: list[str]) -> int:
 
     from PySide6.QtCore import QObject, QTimer, QUrl, Slot
     from PySide6.QtGui import QGuiApplication
-    from PySide6.QtNetwork import QLocalSocket
     from PySide6.QtQml import QQmlApplicationEngine
     from PySide6.QtQuick import (
         QQuickWindow,  # noqa: F401 -- types the root as a QQuickWindow (grabWindow)
@@ -39,12 +49,8 @@ def main(argv: list[str]) -> int:
 
         @Slot(str)
         def openProgram(self, tab: str) -> None:
-            """Open in Falcon: bring this person's program forward on `tab`; what was shown here waits there, as Later does."""
-            sock = QLocalSocket()
-            sock.connectToServer(f"FalconProgram-{getpass.getuser()}")
-            if sock.waitForConnected(300):
-                sock.write(f"show {tab}\n".encode())
-                sock.waitForBytesWritten(300)
+            """Open in Falcon: what was shown here waits there, as Later does."""
+            open_program(tab)
             self.give({"later": True})
 
     app = QGuiApplication(sys.argv[:1])

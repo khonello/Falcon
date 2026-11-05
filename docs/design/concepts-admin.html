@@ -492,6 +492,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .rs-i { flex: none; display: inline-flex; width: 16px; justify-content: center; color: var(--text-3); }
 .rs-kn { font-weight: 600; color: var(--text); }
+.tk-help { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding: 12px 14px; border-radius: 6px; background: var(--surface-2); }
 .rs-depts { max-height: 420px; overflow-y: auto; padding-bottom: 10px; }
 .rs-depts > div:first-child .pd-from { margin-top: 2px; }
 .ao-ovh .ovh-m.home { background: color-mix(in srgb, var(--accent) 28%, var(--surface-3)); color: var(--accent); font-weight: 600; }
@@ -1580,6 +1581,11 @@ const ISSUE_TYPES = {
           { key: "reverse", icon: "UndoOutlined", title: `Put it back to ${i.d.expected}`, desc: "A new certificate is sent the next time the machine checks in.", verb: "Put it back", done: "Waiting", log: `Queued a new certificate for ${i.d.expected}` },
         ] };
     } },
+  // not tied to a machine: the 90-day clock asks the Admins before old machine days go (3 Nov 2026)
+  retention: { label: "Old records", icon: "ClockCircleOutlined", from: "Retention",
+    build: (i) => ({ lead: "Machine days older than 90 days are due to be deleted.", facts: [["Older than", "90 days"]], why: [],
+      options: [{ key: "delete_old", icon: "DeleteOutlined", title: "Delete them", desc: "They are gone for good. The audit log is not touched.", verb: "Delete them", done: "Resolved", log: "Deleted the old machine records" },
+        { key: "keep_old", icon: "ClockCircleOutlined", title: "Keep them", desc: "Nothing is deleted. You are asked again in 30 days.", verb: "Keep them", done: "Waiting", log: "Kept the old machine records" }] }) },
   update: { label: "Stuck update", icon: "CloudSyncOutlined", from: "Rollout",
     build: (i, m, dp) => {
       const offline = m.status === "offline", noAdmin = false;   // version 1: departments are labels, with no Admins of their own
@@ -2095,6 +2101,7 @@ function NewTask({ go, onDone }) {
   const [text, setText] = useState("");
   const [checked, setChecked] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [help, setHelp] = useState(false);
   const [conf, setConf] = useState({});
   const [ignored, setIgnored] = useState({});
   const [tasks, setTasks] = useState(PROPOSED.slice(0, 1));
@@ -2131,7 +2138,9 @@ function NewTask({ go, onDone }) {
         <div className="row" style=${{ marginTop: 8 }}>
           ${onDone ? null : html`<${Button} size="small" type=${!read || stale ? "primary" : "default"} loading=${busy} disabled=${busy || (read ? !stale : !text.trim())} onClick=${check}>${busy ? "Reading" : !read ? "Read it" : stale ? "Check again" : "Checked"}<//>`}
           <span className="t3" style=${{ fontSize: 12 }}>${busy ? "The local model is reading it…" : !read ? (text.trim() ? "It proposes who, what to check, and when. Nothing is created yet." : html`<span>Write what needs doing, or <a onClick=${() => setText(SAMPLE)}>use an example</a>.</span>`) : stale ? "The details below are for the previous text." : "Read by the local model in 14 s."}</span>
+          <span className="sp" /><a style=${{ fontSize: 12 }} onClick=${() => setHelp(!help)}>How to write a task</a>
         </div>
+        ${help ? html`<${TaskHelp} />` : null}
         ${read ? html`<div className="reveal">
         <div className="nt-sec"><div className="nt-h">What the model read</div>
         <div style=${{ padding: "8px 10px", borderRadius: 5, background: "var(--surface-2)", lineHeight: 1.9, opacity: stale ? 0.5 : 1 }}><${Annotated} text=${checked} /></div>
@@ -2368,6 +2377,17 @@ function EditorShell({ left, right, ratio, problem, note, onCancel, onSave, save
     <div className="edbar"><span style=${{ fontSize: 12.5, color: problem ? "var(--med)" : "var(--text-3)", minWidth: 0 }}>${problem || note || ""}</span><span className="sp" />
       <${Button} onClick=${onCancel}>Cancel<//><${Button} type="primary" disabled=${!!problem} title=${problem || ""} onClick=${onSave}>${saveLabel}<//></div>
   </div>`;
+}
+// How to write a task (4 Nov 2026): the Engine's own words (task.help). It also opens by itself under a description that is a question or a test.
+const TASK_HELP = { says: "Write what should be true when the work is done. Falcon reads it, shows you what it understood, and you confirm before anyone gets it.",
+  parts: [["What", "A file by its name (sales.xlsx) or a program by its name (Excel)."], ["What happens to it", "A file is made, changed, or checked to be there. A program is used, installed, closed or kept running."], ["When", "Optional: a day or a time, like by Friday or 5pm tomorrow."]],
+  examples: ["Update sales.xlsx by Friday", "Create summary.docx in C:/Reports by 5pm tomorrow", "Make sure report.pdf is there before Monday", "Install Zoom on the new laptop"],
+  cannot: "Falcon sees files and programs. It cannot see what is inside a file, whether the work is any good, or whether something was sent to someone: you confirm those yourself when you verify the task." };
+function TaskHelp() {
+  return html`<div className="tk-help"><div className="t2">${TASK_HELP.says}</div>
+    <div className="tk-facts" style=${{ maxWidth: "none" }}>${TASK_HELP.parts.map(([k, v]) => html`<span key=${k}><span className="t3">${k}</span> ${v}</span>`)}</div>
+    <div className="t3">For example</div>${TASK_HELP.examples.map((x) => html`<div key=${x} className="mono" style=${{ fontSize: 12.5 }}>${x}</div>`)}
+    <div className="t3">${TASK_HELP.cannot}</div></div>`;
 }
 function NewFlow({ go, me, edit, drawer }) {
   // a source is a folder or one file on a machine, or a folder another flow already delivers to; a flow can have several.
@@ -3397,20 +3417,6 @@ const newKey = () => Array.from({ length: 32 }, () => "0123456789abcdef"[Math.fl
 // "seen" is a PC on the department's network with no worker yet (needs network discovery, ENGINE-GAPS item 10).
 const AM_FOUND = EMPTY ? [] : [
   { host: "OPS-08", ip: "10.20.4.18", kind: "knocked", line: "asked to join at 09:14, as a person's PC" }];
-function KeyModal({ spec, onClose }) {
-  const [key, setKey] = useState(newKey);
-  const sig = spec ? spec.subject || "" : "";
-  useEffect(() => { if (spec) setKey(newKey()); }, [sig]);
-  if (!spec) return html`<${Drawer} open=${false} />`;
-  return html`<${Drawer} open=${true} onClose=${onClose} title=${`New key for ${spec.subject}`} width=${480} maskClosable=${false}
-    footer=${html`<div className="row" style=${{ justifyContent: "flex-end" }}><${Button} type="primary" onClick=${onClose}>I have saved it<//></div>`}>
-    <div style=${{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div className="t2">The old key for ${spec.subject} stops working at once. Copy this into the machine's Worker Client settings.</div>
-      <div className="mono" style=${{ padding: "12px 14px", borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--border-strong)", wordBreak: "break-all", fontSize: 13 }}>${key}</div>
-      <div className="decide" style=${{ "--c": "var(--med)", fontSize: 12.5 }}><b style=${{ fontWeight: 600 }}>It is shown once.</b> It cannot be shown again. If it is lost, make a new one. <span className="t3">(An example key, for the concept.)</span></div>
-    </div>
-  <//>`;
-}
 // The Overview: what is waiting on you, the fleet, and this week's deviations. Everything opens something.
 // ---------------------------------------------------------------- Messages (Help Ping & Message Channel)
 // One row per conversation between a person at a machine and an Admin. It starts as a
@@ -3684,9 +3690,9 @@ function AdminDetectivePage({ go }) {
     </section>
     </div>
     <section className="ib-box" ref=${pz}>
-      <header><b>What Detective noticed</b><span>what went on, in the local model's words</span></header>
+      <header><b>What Detective noticed</b><span>what went on, worded by a model; every fact is Falcon's</span></header>
       <${DtTell} text=${DT_TELL[cur.id] || cur.headline} />
-      <div className="dt-by t3">Written by the local model from what Detective found. It is a reading of the evidence, not proof.</div>
+      <div className="dt-by t3">Worded by a model from what Detective found; every fact is Falcon's. It is a reading of the evidence, not proof.</div>
     </section>
     <section className="ib-box">
       <header><b>Said to be fine · ${fmt(rules.length)}</b><span>what Detective lets pass on one machine; restricted files are never let pass</span></header>
@@ -4533,6 +4539,9 @@ function RuleNew({ from, taken, onDone }) {
     : rep_ === "date" ? `it is ${at} on ${date ? date.format("D MMM YYYY") : "a date you pick"}` : `it is ${at} on ${dayText}`;
   const on = all ? `every one of your ${ms.length} machines` : hosts.length ? listNames(hosts, 4) : "the machines you pick";
   const [nm, setNm] = useState(from ? from.name : "");
+  const [tryOn, setTryOn] = useState(undefined), [tried, setTried] = useState(false);
+  const wouldStart = kind === "Threshold" ? `Not now: ${tryOn} is at ${Math.max(0, level - 18)}${R0[2]} against ${level}${R0[2]}, and it must stay there ${mins} minutes.`
+    : kind === "Schedule" ? "Next at 09:00 on Mon, Tue and Wed." : "This is seen only when it happens on the machine.";
   const sug = kind === "Event" ? (ev === "prog" ? `${prog.trim() || "A program"} starts` : { usb: "USB device inserted", printer: "Printer stops responding", night: "Sign-in outside working hours", restricted: "Restricted file turns up" }[ev])
     : kind === "Threshold" ? (rd === "signin" ? "Several failed sign-ins" : rd === "disk" ? "Disk nearly full" : `High ${R0[1]} for ${mins} min`)
     : rep_ === "date" ? `One-off at ${at}${date ? ` on ${date.format("D MMM")}` : ""}` : `${days.length === 7 ? "Daily" : days.join(",") === "Mon,Tue,Wed,Thu,Fri" ? "Weekdays" : days.join(", ") || "Days"} at ${at}`;
@@ -4589,6 +4598,11 @@ function RuleNew({ from, taken, onDone }) {
     html`<div className="nfv">
       <div className="nfv-sec" style=${{ marginTop: 0 }}><div className="tk-facts" style=${{ maxWidth: "none" }}>${[["Called", name.trim()], ["Starts", when], ["On", on], ["Does", acts.map((x, i) => `${i + 1}. ${x.name} (${x.limit}s)`).join("  ")], ["Set by", "you"]]
       .map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> ${b}</span>`)}</div></div>
+      <div className="nfv-sec"><div className="nfv-st">Try it on one machine <span className="t4" style=${{ fontWeight: 400 }}>optional</span></div>
+        <div className="t3" style=${{ fontSize: 12 }}>Its actions really run there, once, now. Nothing is saved.</div>
+        <div className="row"><${Select} showSearch style=${{ width: 240 }} placeholder="Pick a machine" value=${tryOn} options=${MACHINES.filter((m) => m.status !== "offline").map((m) => ({ value: m.host, label: m.host }))} onChange=${(v) => { setTryOn(v); setTried(false); }} />
+          <${Button} disabled=${!tryOn || !acts.length} onClick=${() => setTried(true)}>Try it<//></div>
+        ${tried ? html`<div className="tk-facts" style=${{ maxWidth: "none", marginTop: 8 }}>${[["Would it start?", wouldStart], ...acts.map((x) => [x.name, "started on " + tryOn])].map(([a, b]) => html`<span key=${a}><span className="t3">${a}</span> ${b}</span>`)}</div>` : null}</div>
       <div className="decide" style=${{ "--c": "var(--accent)" }}>It is switched on when you confirm. Every time it runs shows under Recent runs today.</div></div>`];
   return html`<div className="nf-steps-wrap">
     <section className="ib-box rn-top"><span className="t3">${NAMES[step]} · step ${step + 1} of 4</span>
@@ -5188,7 +5202,7 @@ function AdminMachinesPage({ go, start }) {
   const pick = ms.find((m) => m.host === sel) || null, cur = pick || ms[0];
   const [loading, setLoading] = useState(false);
   useEffect(() => { if (!sel) return; setLoading(true); const t = setTimeout(() => setLoading(false), 700); return () => clearTimeout(t); }, [sel]);
-  const [ended, setEnded] = useState({}), [add, setAdd] = useState(null);
+  const [ended, setEnded] = useState({});
   // ending a program: the built-in kill_process action, then a notice on the person's screen; "never allow it" prepares a rule
   const endProc = (m, n) => { let never = false;
     modal.confirm({ title: `End ${n} on ${m.host}?`, okText: "End it", okButtonProps: { danger: true }, cancelText: "Cancel",
@@ -5233,7 +5247,7 @@ function AdminMachinesPage({ go, start }) {
         </div>
       </div>
       <div className="row" style=${{ justifyContent: "flex-end" }}>${verb !== "Fix it" && verb !== "Enter" ? html`<${Button} size="small" onClick=${fn}>${verb}<//>` : null}<${Button} size="small" type="primary" disabled=${!enterOk} onClick=${() => modal.confirm(enterSessionConfirm(m, () => toast(`You are in ${m.host} (concept)`)))}>${m.held === "You" ? "You are inside" : "Enter"}<//><${Button} size="small" type="text" onClick=${() => go("actions", m.host)}>Run an action<//>
-          <${Button} size="small" type="text" onClick=${() => setAdd({ mode: "rekey", subject: m.host })} title="Its old key stops working at once">New key<//></div>
+</div>
     </div>` : null}</div>`; };
   // act on several
   const AV = { update: "Update", restart: "Restart", action: "Run an action on" };
@@ -5313,7 +5327,6 @@ function AdminMachinesPage({ go, start }) {
           <${Button} size="small" onClick=${() => { setJoined({ ...joined, [f.host]: 1 }); toast(`Refused ${f.host} (concept)`); }}>Refuse<//>
           <${Button} size="small" type="primary" disabled=${!(codes[f.host] || "").trim()} onClick=${() => { setJoined({ ...joined, [f.host]: 1 }); toast(`${f.host} joined; its key went to the machine (concept)`); }}>Let it in<//></span></div>`)}</div>
     </section>` : null}
-    <${KeyModal} spec=${add} onClose=${() => setAdd(null)} />
   </div>`;
 }
 

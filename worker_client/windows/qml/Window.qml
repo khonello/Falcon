@@ -161,17 +161,17 @@ Window {
         visible: win.bar
         anchors.horizontalCenter: parent.horizontalCenter
         y: 0
-        width: vr.implicitWidth + 32; height: 34
+        width: vr.implicitWidth + 36; height: 40
         radius: 12
         color: "#1f2937"
         Rectangle { width: parent.width; height: 12; color: parent.color }
         Row {
             id: vr
             anchors.centerIn: parent
-            spacing: 9
-            Rectangle { width: 8; height: 8; radius: 4; color: "#f2604c"; anchors.verticalCenter: parent.verticalCenter }
-            Glyph { name: "eye"; size: 15; color: "#f3f5f8"; anchors.verticalCenter: parent.verticalCenter }
-            Text { anchors.verticalCenter: parent.verticalCenter; color: "#f3f5f8"; font.family: win.sans; font.pixelSize: 13
+            spacing: 10
+            Rectangle { width: 10; height: 10; radius: 5; color: "#f2604c"; anchors.verticalCenter: parent.verticalCenter }
+            Glyph { name: "eye"; size: 17; color: "#f3f5f8"; anchors.verticalCenter: parent.verticalCenter }
+            Text { anchors.verticalCenter: parent.verticalCenter; color: "#f3f5f8"; font.family: win.sans; font.pixelSize: 15
                    text: (spec.occupant_name || "Your Admin") + " is viewing your screen" + (spec.since ? " · since " + win.hhmm(spec.since) : "") }
         }
     }
@@ -291,9 +291,7 @@ Window {
                                     RotationAnimator on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: win.joinCode !== "" } } }
                     Text { x: 32; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32 - cancelB.width - 12; wrapMode: Text.WordWrap; color: win.faint; font.family: win.sans; font.pixelSize: 13
                            text: "Waiting for an Admin to confirm." + (spec.expires_at ? " The code expires at " + win.hhmm(spec.expires_at) + "." : "") }
-                    // only a service that passes the host listens for the answer: from an older one it stays drawn, and says why
-                    Act { id: cancelB; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Cancel"; enabled: !!spec.host
-                          tip: spec.host ? "" : "It cannot be taken back from here yet. An Admin can refuse it, or the code runs out."
+                    Act { id: cancelB; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "Cancel"
                           onClicked: answer.give({ cancel: true }) }
                 }
             }
@@ -350,23 +348,6 @@ Window {
                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: answer.give({ later: true }) } }
                         Text { anchors.verticalCenter: parent.verticalCenter; text: "It stays in Falcon, under Messages."; color: win.faint; font.family: win.sans; font.pixelSize: 13 } }
                     Act { anchors.right: parent.right; visible: spec.conversation_id === undefined || spec.conversation_id === null; text: "OK"; primary: true; onClicked: answer.give({ seen: true }) }
-                }
-            }
-
-            // --- asking for help: out of version 1 (Assistance is cut); kept until the service stops opening it (ENGINE-GAPS #19) ----------------
-            Column {
-                visible: kind === "ask"
-                width: parent.width
-                spacing: 10
-                Text { text: spec.admins && spec.admins.length > 1 ? "Ask for help" : "Ask " + (spec.to || "your Admin") + " for help"; color: win.ink; font.family: win.sans; font.pixelSize: 15; font.weight: Font.DemiBold }
-                Text { width: parent.width; wrapMode: Text.WordWrap; color: win.dim; font.family: win.sans; font.pixelSize: 13
-                       text: "They will see that you need them, and write to you when they can. You do not have to say anything now." }
-                Flow {
-                    width: parent.width; spacing: 8
-                    Repeater {
-                        model: spec.admins || []
-                        Act { required property var modelData; text: "Ask " + modelData.name; primary: spec.admins.length === 1; onClicked: answer.give({ to: modelData.account_id }) }
-                    }
                 }
             }
         }

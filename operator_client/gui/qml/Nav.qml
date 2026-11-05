@@ -44,7 +44,6 @@ QtObject {
     // Pages that were pruned (docs/design/pruning.md): whoever still points at one lands on the page that took over its job.
     readonly property var gone: ({ access: 1, accountability: 1, rules: 1, rollout: 1, reports: 1, sessions: 1 })
     function remap(p, s) {
-        if (p === "messages" && s === "announcements") return ["announcements", null]      // the calendar still links here (ENGINE-GAPS 25)
         if (!(p in gone)) return [p, s]
         return [p === "sessions" || p === "rollout" ? "machines" : p === "reports" ? "issues" : "overview", null]
     }

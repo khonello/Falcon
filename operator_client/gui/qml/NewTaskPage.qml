@@ -23,6 +23,12 @@ Column {
     property string checked: ""            // the text the proposal was read from
     property bool busy: false
     property var proposal: null
+    property var help: null                // task.help: how to write a task
+    property bool helpOpen: false
+    function toggleHelp() {
+        helpOpen = !helpOpen
+        if (helpOpen && !help) falcon.call("task.help", {}, function (ok, r) { if (ok) page.help = r })
+    }
     property var tasks: []                 // [{title, phrase, who, whoSrc, final, finalSrc, soft, softSrc, none, checks: [...]}]
     readonly property bool read: proposal !== null
     readonly property bool stale: read && text.trim() !== checked.trim()
@@ -186,7 +192,7 @@ Column {
                     // the hint; while the box is empty it runs on into "use an example", as the concept's does
                     Txt {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: left.width - 40
+                        width: left.width - 40 - helpLink.width - 12
                         color: Theme.text3
                         font.pixelSize: 12
                         readonly property bool empty: !page.busy && !page.read && page.text.trim() === ""
@@ -199,6 +205,7 @@ Column {
                         onLinkActivated: page.text = "Have " + (page.people.length ? page.people[0].name : "Kojo") + " reconcile the Q3 invoices in Excel into reconciliation.xlsx by Friday 17:00, and write up q3-summary.docx for Finance."
                         HoverHandler { enabled: parent.empty; cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
                     }
+                    Link { id: helpLink; objectName: "howToWrite"; anchors.verticalCenter: parent.verticalCenter; text: "How to write a task"; font.pixelSize: 12; onClicked: page.toggleHelp() }
                 }
 
                 // what the model read, marked by where each part came from
@@ -327,6 +334,23 @@ Column {
             }
         }
 
+        // how to write a task, in the Engine's words: asked for, or by itself under a question or a test
+        Rectangle {
+            objectName: "taskHelp"
+            readonly property var told: { var f = page.proposal ? (page.proposal.flags || []).filter(function (x) { return !!x.help })[0] : null; return f ? f.help : page.helpOpen ? page.help : null }
+            visible: told !== null
+            width: parent.width; height: hc.height + 24; radius: 6; color: Theme.surface2
+            Column {
+                id: hc
+                x: 14; y: 12; width: parent.width - 28; spacing: 8
+                Txt { width: parent.width; text: parent.parent.told ? parent.parent.told.says : ""; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                FactRows { rows: parent.parent.told ? parent.parent.told.parts.map(function (p) { return [p.name, p.says] }) : [] }
+                Txt { text: "For example"; color: Theme.text3; font.pixelSize: 12 }
+                Repeater { model: parent.parent.told ? parent.parent.told.examples : []
+                    Txt { required property var modelData; width: hc.width; text: modelData; mono: true; elide: Text.ElideNone } }
+                Txt { width: parent.width; text: parent.parent.told ? parent.parent.told.cannot : ""; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+            }
+        }
         // what a description cannot say, as the Engine words it: shown before anything is given
         Repeater {
             model: page.proposal ? (page.proposal.flags || []).filter(function (f) { return !!f.detail }) : []

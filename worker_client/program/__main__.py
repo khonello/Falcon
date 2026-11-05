@@ -75,7 +75,6 @@ def main(argv: list[str]) -> int:
     class Bridge(QObject):
         viewChanged = Signal()
         toastArrived = Signal("QVariant")
-        asked = Signal(str)
         showRequested = Signal()
         conversationChanged = Signal()
         _got = Signal(object)
@@ -169,11 +168,6 @@ def main(argv: list[str]) -> int:
         @Slot(int)
         def startTask(self, task_id: int) -> None:
             self._act(self._client.start_task, task_id)
-
-        @Slot(int, str)
-        def ask(self, account_id: int, name: str) -> None:
-            self._act(self._client.ask, account_id)
-            self.asked.emit(name)
 
         @Slot(str)
         def talk(self, line: str) -> None:

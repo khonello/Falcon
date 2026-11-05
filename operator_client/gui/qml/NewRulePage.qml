@@ -93,6 +93,27 @@ Editor {
         hosts = s.pc_ids || []
         acts = (e.actions || []).map(function (a) { return { id: a.id, name: a.name, limit: a.timeout_seconds || 30 } })
     }
+    // the rule as it stands, once, on one machine: nothing is saved (control.rule_try)
+    property var tryOn: null
+    property var tried: null
+    property bool trying: false
+    function tryIt() {
+        trying = true
+        var p = { type: type, match: match, action_ids: acts.map(function (a) { return a.id }), pc_id: tryOn }
+        if (editId) p.event_id = editId
+        falcon.call("control.rule_try", p, function (ok, r) {
+            page.trying = false
+            if (!ok) { Msg.failed(r && r.message ? r.message : "It could not be tried"); return }
+            page.tried = r
+        })
+    }
+    function wouldStart(c) {
+        if (!c) return ""
+        if (c.kind === "level") return c.reading === null || c.reading === undefined ? c.says || "" : (c.over_now ? "Yes: it is at " : "Not now: it is at ") + Math.round(c.reading) + " against " + Math.round(c.limit) + (c.minutes ? ", and it must stay there " + Theme.many(c.minutes, "minute") : "") + "."
+        if (c.kind === "clock") return (c.next || []).length ? "Next at " + Theme.listNames(c.next.map(function (x) { return Time.atDay(x) }), 3) + "." : "It has no next time."
+        if (c.kind === "files") return "It would have started " + Theme.many(c.week, "time") + " there in the last week."
+        return (c.says || "").charAt(0).toUpperCase() + (c.says || "").slice(1) + "."
+    }
     function move(i, d) { var xs = acts.slice(), j = i + d; if (j < 0 || j >= xs.length) return; var t = xs[i]; xs[i] = xs[j]; xs[j] = t; acts = xs }
     onConfirmed: {
         var pcs = all ? null : hosts, limits = {}, n = name.trim()
@@ -265,5 +286,12 @@ Editor {
     NfSec { visible: page.step === 3; first: true
         FactRows { rows: [["Called", page.name.trim()], ["Starts", page.whenTxt], ["On", page.onTxt],
                           ["Does", page.acts.map(function (x, i) { return (i + 1) + ". " + x.name + " (" + x.limit + "s)" }).join("  ")], ["Set by", "you"]] } }
+    NfSec { visible: page.step === 3; title: "Try it on one machine"; optional: "optional"; note: "Its actions really run there, once, now. Nothing is saved."
+        Row { spacing: 8
+            Select { objectName: "tryOn"; width: 240; search: true; placeholder: "Pick a machine"; value: page.tryOn
+                     options: Fleet.machines.filter(function (m) { return m.online }).map(function (m) { return { value: m.pc_id, label: m.host } })
+                     onPicked: function (v) { page.tryOn = v; page.tried = null } }
+            Btn { objectName: "tryIt"; text: "Try it"; loading: page.trying; enabled: page.tryOn !== null && page.acts.length > 0 && !page.trying; onClicked: page.tryIt() } }
+        FactRows { visible: page.tried !== null; rows: page.tried ? [["Would it start?", page.wouldStart(page.tried.condition)]].concat(page.tried.runs.map(function (x) { return [x.name, "started on " + page.tried.hostname] })) : [] } }
     Decide { visible: page.step === 3; text: "It is switched on when you confirm. Every time it runs shows under Recent runs today." }
 }

@@ -181,3 +181,29 @@ def test_open_in_falcon_names_a_tab_and_nothing_else_does():
 
     assert tab_asked("show messages\n") == "messages"
     assert tab_asked("show\n") == "" and tab_asked("show nonsense\n") == "" and tab_asked("hide messages\n") == ""
+
+
+def test_open_in_falcon_asks_the_running_program_for_the_tab():
+    pytest.importorskip("PySide6")
+    import getpass
+
+    from PySide6.QtCore import QCoreApplication
+    from PySide6.QtNetwork import QLocalServer
+
+    from worker_client.program.__main__ import tab_asked
+    QCoreApplication.instance() or QCoreApplication([])
+    name = f"FalconProgram-{getpass.getuser()}"
+    QLocalServer.removeServer(name)
+    server = QLocalServer()
+    assert server.listen(name)
+    window = subprocess.Popen([sys.executable, "-c", "from worker_client.windows.__main__ import open_program; open_program('messages')"])
+    try:
+        assert server.waitForNewConnection(15000)
+        sock = server.nextPendingConnection()
+        got = b""
+        while not got.endswith(bytes([10])) and sock.waitForReadyRead(5000):
+            got += bytes(sock.readAll())
+        assert tab_asked(got.decode("ascii")) == "messages"
+    finally:
+        window.wait(15)
+        server.close()

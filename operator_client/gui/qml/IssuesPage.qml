@@ -31,7 +31,7 @@ Page {
     // a pick asks the Engine for the issue's story: the story says so for a moment, then pulses once it is there
     onItChanged: { pv = ""; loading = true; ldT.restart(); if (!it || !det || !det.issue || det.issue.id !== it.iid) { det = null; loadDet() } }
     Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
-    readonly property var keyIcon: ({ ask: "message", "delete": "delete", allow: "safety", idle: "clock", now: "reload", wait: "clock", exclude: "stop",
+    readonly property var keyIcon: ({ ask: "message", "delete": "delete", delete_old: "delete", keep_old: "clock", allow: "safety", idle: "clock", now: "reload", wait: "clock", exclude: "stop",
                                       accept: "checkcircle", reverse: "undo", remind: "bell", dest: "branches", withdraw: "close", enter: "login", look: "login", answer: "message" })
 
     Component.onCompleted: Kinds.load({ limit: 500 }, function (es) { page.audit = es })
@@ -43,7 +43,8 @@ Page {
         deviation: { label: "Deviation", plural: "Certificate mismatches", icon: "warn" },
         update: { label: "Stuck update", plural: "Machines behind on the version", icon: "cloudsync" },
         flow: { label: "Flow blocked", plural: "Flows waiting", icon: "branches" },
-        component: { label: "Part of the Worker", plural: "Parts of the Worker", icon: "warn" }
+        component: { label: "Part of the Worker", plural: "Parts of the Worker", icon: "warn" },
+        retention: { label: "Old records", plural: "Old records", icon: "clock" }
     })
     readonly property var all: Fleet.issues
     function late(i) { if (i.past !== undefined) return i.past; return i.at && (Time.now - Time.ms(i.at)) / 3600000 > (i.type === "file" ? 1 : i.type === "help" ? 1 : 24) }
@@ -61,7 +62,7 @@ Page {
     readonly property var m: it ? Fleet.byHost[it.host] : null
     readonly property var play: !it ? null : it.iid === undefined ? build(it, m)
         : det && det.issue && det.issue.id === it.iid ? { lead: det.lead, facts: det.facts || [], why: det.why || [],
-              options: page.withRule(page.withLook((det.options || []).filter(function (o) { return o.key !== "ask" }))      // the concept offers no Ask
+              options: page.withRule(page.withLook(det.options || [])
                   .map(function (o) { return Object.assign({ icon: page.keyIcon[o.key] || "right", waits: o.done === "Waiting" }, o) })) } : null
     // a deviation can be looked into first, from inside: the concept's first choice
     function withLook(os) {

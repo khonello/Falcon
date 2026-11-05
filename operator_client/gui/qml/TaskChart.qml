@@ -49,6 +49,8 @@ Column {
     function saw(it, sig) {
         if (it.status === "failed") return "Not found by the final deadline"
         if (!sig.length) return ""
+        var opened = sig.filter(function (e) { return e.signal_type === "file_opened" })
+        if (opened.length === sig.length) { var v = opened[opened.length - 1].value || {}; return v.program ? "Opened in " + v.program : "Opened" }
         var ts = sig.map(function (e) { return Time.ms(e.observed_at) }), first = Math.min.apply(null, ts), last = Math.max.apply(null, ts)
         if (it.intent === "installed_available") return "Found " + Time.atDay(first)
         if (it.intent === "create") return "Created " + Time.atDay(first)

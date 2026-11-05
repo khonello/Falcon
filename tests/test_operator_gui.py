@@ -448,8 +448,19 @@ async def test_editing_a_flow_keeps_its_steps_and_a_destination_still_waiting_on
     assert dest["mode"] == "ask" and dest["who"] == 7                                               # they still pick the folder
 
 
-async def test_a_new_key_shows_the_key_alone(console):
+async def test_making_a_new_key_is_not_in_the_console(console):
+    root = Path(__file__).parents[1] / "operator_client/gui/qml"
+    assert not (root / "KeyDrawer.qml").exists()
+    assert not any("pc_rekey" in p.read_text(encoding="utf8") for p in root.glob("*.qml"))   # a power setting: the TUI's `machine newkey`
+
+
+async def test_a_rule_is_tried_on_one_machine_and_nothing_is_saved(console):
     win, bridge, _ = console("admin")
-    await _open(win, bridge, "machines", "machinesView")
-    text = (Path(__file__).parents[1] / "operator_client/gui/qml/KeyDrawer.qml").read_text(encoding="utf8")
-    assert "client_key" in text and "client_id" not in text                                # the machine keeps its id; only the key changes
+    page = await _open(win, bridge, "automation/new", "newRule")
+    page.setProperty("acts", [{"id": 4, "name": "Take a screenshot", "limit": 30}])
+    page.setProperty("tryOn", 2)
+    QMetaObject.invokeMethod(page, "tryIt")
+    await _wait(lambda: any(t == "control.rule_try" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "control.rule_try")
+    assert sent["pc_id"] == 2 and sent["action_ids"] == [4] and sent["type"]
+    assert not any(t in ("control.event_create", "control.event_update") for t, _ in bridge.conn.seen)

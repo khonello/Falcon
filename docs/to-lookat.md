@@ -30,7 +30,7 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 - **The concept's contradictions:** corrected towards what is true. Automation's Next is the real next run, Actions counts all eight rules, Flows has the Engine's steps, and a case's
   account says who wrote it as it happened (its wording is on the UI's list: only Groq smooths now, not the local model).
 - **Add a machine is gone** (the user asked, 4 Nov): a machine joins with its licence code at setup. Machines shows Waiting to join only for one installed without a code,
-  let in with the code on its screen. New key stays on a machine's card. The Registry page (not on the menu) still has the old Register a PC.
+  let in with the code on its screen. New key moved to the TUI (`machine newkey`, the user, 5 Nov 2026). The Registry page (not on the menu) still has the old Register a PC.
 - **The flow's Keep / Remove the copies:** back, in the concept and in Make a flow. **Task split is gone** (the user, 4 Nov): a description is one task, in the concept and the console.
 
 ## Answered 3 Nov 2026

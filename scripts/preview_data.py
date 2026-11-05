@@ -1063,6 +1063,15 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
     if type_ == "todo.done":
         _TODOS_DONE.add(int(payload.get("todo_id") or 0))
         return {"todo": next((t for t in _todos()["todos"] if t["id"] == int(payload.get("todo_id") or 0)), None)}
+    if type_ == "control.rule_try":
+        return {"pc_id": payload.get("pc_id"), "hostname": "OPS-03", "when": "", "condition": {"kind": "signal", "says": "this is seen only when it happens on the machine"},
+                "runs": [{"execution_id": 1, "action_id": a, "name": "Take a screenshot"} for a in (payload.get("action_ids") or [])[:1]]}
+    if type_ == "task.help":
+        return {"title": "How to write a task", "says": "Write what should be true when the work is done. Falcon reads it, shows you what it understood, and you confirm before anyone gets it.",
+                "parts": [{"name": "What", "says": "A file by its name (sales.xlsx) or a program by its name (Excel)."}, {"name": "What happens to it", "says": "A file is made, changed, or checked to be there. A program is used, installed, closed or kept running."},
+                          {"name": "When", "says": "Optional: a day or a time, like by Friday or 5pm tomorrow."}],
+                "examples": ["Update sales.xlsx by Friday", "Create summary.docx in C:/Reports by 5pm tomorrow", "Make sure report.pdf is there before Monday", "Install Zoom on the new laptop"],
+                "cannot": "Falcon sees files and programs. It cannot see what is inside a file, whether the work is any good, or whether something was sent to someone: you confirm those yourself when you verify the task."}
     if type_ == "alerts.sent":
         return {"alerts": alerts_sent()}
     if type_ == "flow.steps":

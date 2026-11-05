@@ -372,3 +372,10 @@ async def test_scripted_session_window(engine, org, tmp_path: Path):
 async def test_scripted_find(engine, org, tmp_path: Path):
     out = await run_script(_cfg(engine, tmp_path, "cid-su"), ["connect", "find fin-0", "find zzzz"])
     assert "FIN-01" in out[1] and "machine" in out[1] and "nothing found" in out[2]
+
+
+async def test_a_new_key_is_made_from_the_tui_only_when_asked_twice(engine, org, tmp_path: Path):
+    pc = org["w1_pc"]
+    out = await run_script(_cfg(engine, tmp_path, "cid-a1"), ["connect", f"machine newkey {pc} no", f"machine newkey {pc} yes"])
+    assert out[1].startswith("Nothing changed")
+    assert "client id" in out[2] and "key  " in out[2] and "--client-key" in out[2]
