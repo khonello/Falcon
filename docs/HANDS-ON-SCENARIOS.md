@@ -1,13 +1,15 @@
 # Hands-on scenarios
 
-You will use Falcon the way real people would, and check it notices. There are four scenarios, about 45 minutes in all. Do them in order. Each one stands alone, so you can stop between them.
+*All four were run end to end on 5 Nov 2026 with real Notepad and File Explorer, driven by keystroke, and passed. Only the USB step has not been tried.*
+
+You will use Falcon the way real people would, and check it notices. There are four scenarios, about 50 minutes in all. Do them in order. Each one stands alone, so you can stop between them.
 
 | | Scenario | What it proves | Time |
 |---|---|---|---|
 | 1 | Task | Falcon sees a file being opened and changed, and only a person closes a task | 10 min |
 | 2 | Restricted | A file marked to stay in one place is caught anywhere else, under any name | 10 min |
 | 3 | Flow | A file arrives at the other machine, converted, and nobody's work is overwritten | 10 min |
-| 4 | Detective | It notices mass deleting, tells a person from a program, and a false alarm does not blind it | 10 min |
+| 4 | Detective | It notices mass deleting, tells a person from a program, and a false alarm does not blind it | 15 min |
 
 **You need:** only Notepad and File Explorer. Nothing is installed and nothing outside the Falcon folder is touched.
 
@@ -318,19 +320,21 @@ Wait 10 seconds. **You should see** `paused.pdf` arrive in `Inbox`. Nothing was 
 
 **2. Type:**
 ```
+detective status=open
+```
+**You should see** `(no cases)`. That is right: someone deleting 60 files from one folder may just be tidying up, so it is not put in front of an Admin.
+
+**3. Now look at what it kept quietly. Type:**
+```
 detective noted status=open
 ```
-**You should see** a case on `WS-D1`. **Note its `level`.** If Falcon judged the deleting was by hand, the level is `noted`: it is kept quietly, because a person deleting 60 files may just be tidying up. If it says `urgent`, Falcon read it as not by hand.
+**You should see** a case on `WS-D1`, level `noted`. `detective case <id>` says the documents were deleted **by hand**: Falcon saw real keyboard use in File Explorer just before.
 
-If it says `(no cases)`, wait 15 seconds and try once more. If it is still empty, note that and carry on with step 3: it does not stop the scenario.
-
-Any of these is a useful result, so tell me which you get. **This is the one step I could not rehearse:** a script stood in for File Explorer, and it was read both ways.
-
-**3. Put the contracts back. Window 4:**
+**3b. Put the contracts back, and wait. Window 4:**
 ```powershell
 environ-operator\Scripts\python.exe scripts\hands_on.py refill
 ```
-**You should see** `refill: done, 60 contracts`. Wait 10 seconds.
+**You should see** `refill: done, 60 contracts`. **Wait 2 minutes 30 seconds.** Detective looks at two-minute bursts, so if you go sooner, this round counts as part of the last one and reads as by hand.
 
 **4. Now a program deletes them. Window 4:**
 ```powershell
@@ -342,13 +346,13 @@ environ-operator\Scripts\python.exe scripts\hands_on.py wipe
 ```
 detective status=open
 ```
-**You should see** a case on `WS-D1`: `urgent`, `Wrecking things`. **Write down its `id`.**
+**You should see** a case on `WS-D1`: `urgent`, `Wrecking things`. It may be the same case as step 3, now raised because a program did this. **Write down its `id`.**
 
 **6. Read it. Type:**
 ```
 detective case <id>
 ```
-**You should see** what happened in order, "not by hand" in the summary, what could make it harmless, and *Detective's reading of the evidence, not proof*.
+**You should see** what happened in order, "not by hand" in the summary (beside your earlier "by hand"), what could make it harmless, and *Detective's reading of the evidence, not proof*.
 
 **7. Call it a false alarm. Type:**
 ```
@@ -356,7 +360,7 @@ detective review <id> dismissed it was a test
 ```
 **You should see** `recorded`.
 
-**8. Do it again. Window 4:** run the `refill` command from step 3, wait 10 seconds, then the `wipe` command from step 4. Wait 15 seconds.
+**8. Do it again. Window 4:** run the `refill` command from step 3b, wait 10 seconds, then the `wipe` command from step 4. Wait 15 seconds.
 
 **9. Type:**
 ```
@@ -364,7 +368,9 @@ detective status=open
 ```
 **You should see** a case with a **new id**, `urgent`, on `WS-D1`. This is the most important check here: one dismissed alarm must not blind Detective. Until 5 Nov 2026 it did.
 
-**Passed if:** steps 5, 6 and 9 all matched, and you noted the level from step 2.
+**Passed if:** steps 2, 3, 5, 6 and 9 all matched.
+
+Deleting with plain Delete, to the Recycle Bin, behaves the same as Shift+Delete.
 
 **Optional, with a USB stick (not rehearsed):** in `WS-D1\Documents`, make a new folder, copy `sales.txt` and `notes.txt` into it, right-click the folder, pick **Compress to ZIP file**, plug in the stick, copy the zip to it, then delete the zip. Type `detective noted status=open` and tell me what it shows.
 
@@ -398,7 +404,7 @@ To go again from scratch, start from Setup step B.
 
 ## Telling me how it went
 
-Just send the scenario and step number, and what you saw instead. If everything matched, "all passed" is enough, plus the level from Scenario 4 step 2.
+Just send the scenario and step number, and what you saw instead. If everything matched, "all passed" is enough.
 
 ## What this cannot show
 

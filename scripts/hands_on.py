@@ -50,9 +50,6 @@ async def main() -> int:
     for f in (await d.admin.call("flow.list"))["flows"]:
         if "hands-on" in str(f.get("source_path") or ""):
             await d.admin.call("flow.delete", {"flow_id": f["id"]})
-    for c in (await d.admin.call("detective.cases", {}))["cases"]:                # what the drills raised is not what you are about to do
-        if c["status"] == "open":
-            await d.admin.call("detective.review", {"case_id": c["id"], "outcome": "dismissed", "note": "Cleared before a hands-on test"})
     for machine, names in FOLDERS.items():
         for name in names:
             (HOME / machine / name).mkdir(parents=True)
@@ -64,6 +61,10 @@ async def main() -> int:
     for machine, names in FOLDERS.items():
         d.start_worker(machine, [HOME / machine / n for n in names])
     ready = await d.online("WS-D1", "WS-D2")
+    await asyncio.sleep(10)                                                       # the machines tell what this rebuild looked like: to Detective, a mass deletion
+    for c in (await d.admin.call("detective.cases", {"include_noted": True}))["cases"]:
+        if c["status"] == "open":
+            await d.admin.call("detective.review", {"case_id": c["id"], "outcome": "dismissed", "note": "Cleared before a hands-on test"})
     print("\nThe machines are running." if ready else "\nA machine did not come online: see data/drill/<name>/worker.log.")
     for name in ("WS-D1", "WS-D2"):
         print(f"  {name}  account {d.state['workers'][name]['account_id']}  machine {await d.pc_id(name)}  {HOME / name}")
