@@ -16,10 +16,16 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 
 **Waiting on the user to say go**
 - More task descriptions: the next unseen batch is the honest test (see below).
-- Resume the Qwen3-4B download (below).
+- **Keep or delete the Qwen3-4B file** (2.3 GB, downloaded 5 Nov 2026). Held-out, same 31 cases: 1.7B 31/31 at 3.7 s a call; 4B 30/31 at 6.9 s; Groq 30/31 at about 1 s. The 4B is not better, and is about twice as slow. A re-run after the unclosed `<think>` fix was stopped by low memory, so that fix's effect on the 4B's extraction questions is unmeasured.
 - Replace the Groq key given in the session, before anything ships.
 
 **Needs real machines, not code** (`docs/VM-TEST-PLAN.md`): Office conversion, a second Windows user refused a Private file, a machine updating itself, the installers on a clean machine, a real printer going offline, real failed sign-ins, a flow between two PCs, the session window end to end, the console as a non-administrator, the tray, overlays and program on a real desktop.
+
+**Unexplained:** a full test run froze on 4 Nov 2026 at 18:32:31 (no CPU, 74 threads waiting, the 180 s limit never fired). Not the Wi-Fi drop: that was 19:07:28. The likeliest cause is the `winnotify` memory fault, fixed at 23:52 after that run. Not seen since in 2 full runs and 4 repeats of the Worker tests, which is not proof.
+
+**Flaky, timing only:** `test_the_screen_streamer...` (the streamer hears stop only on its next send, and an unchanged screen sends nothing) and `test_chain_resource_violation...` (waits 15 s for a process). Each failed once under load and passes alone (6 of 6, 5 of 5).
+
+**Hands-on:** `docs/HANDS-ON-SCENARIOS.md` is ready for the user.
 
 **Later, by decision:** the licence store; packaging (Phase 9).
 
@@ -57,8 +63,7 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 - **REMIND THE USER (they asked, 4 Nov 2026):** a few dozen real task descriptions, one per line in `data/real-task-descriptions.txt`, then run `scripts/llm_real_wording.py`.
 - **Smoothing (4 Nov 2026):** Groq smooths the events paragraph when a key is set; 8 of 8 real paragraphs rewritten and checked. No key: the Engine's own account.
 - **Flow steps:** Into one PDF dropped too, with `pypdf`.
-- **Qwen3-4B test, on hold (the user, 4 Nov 2026: do not resume until they say):** the 2.5 GB download stopped part way; what came down is kept as `models/Qwen3-4B-Q4_K_M.gguf.part` and it continues from there, it does not start again:
-  `curl -L --fail -C - -o models/Qwen3-4B-Q4_K_M.gguf.part "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"`, then rename it to `.gguf` (2,497,280,256 bytes whole). Then: `scripts/llm_probe.py --model-path`, `scripts/llm_benchmark.py --model-path` for it and for the 1.7B on the same held-out cases, and compare with Groq's 30/31.
+- **Qwen3-4B test:** downloaded and measured 5 Nov 2026; the result is at the top of this file.
 - **Groq fallback (built and tried for real, 4 Nov 2026):** `openai/gpt-oss-120b`, paced under the plan's limit: held-out 30/31, about 1 s a call, the 8 Detective paragraphs all rewritten and passing the check. A burst over the plan's 8,000 tokens a minute is refused: those questions come back unclear, and a test run in a burst scored 25/31 for that reason alone. Before a customer ships: their own key, on a paid plan; the key given in the session should be replaced.
 
 ## Engine pass, 2 Nov 2026 (built; the Engine session does no UI work: `docs/UI-WORK-FROM-ENGINE.md` is the UI's list)

@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from engine.llm import SYSTEM
+from engine.llm import SYSTEM, _strip_thinking
 from engine.task.llm_graph import FILE_INTENT_OPTIONS, PROGRAM_INTENT_OPTIONS
 
 FILE_Q = "For the file {name}, does the task ask to:"
@@ -77,7 +77,7 @@ def main() -> int:
             messages=[{"role": "system", "content": SYSTEM},
                       {"role": "user", "content": prompt + " /no_think"}],
             max_tokens=16, temperature=0.0)
-        raw = str(out["choices"][0]["message"]["content"]).rsplit("</think>", 1)[-1].strip()
+        raw = _strip_thinking(str(out["choices"][0]["message"]["content"])).strip()
         got = options.get(raw, raw)
         ok = got == want
         correct += ok
