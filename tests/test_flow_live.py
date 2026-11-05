@@ -143,8 +143,10 @@ async def test_a_flow_never_overwrites_a_file_it_did_not_write(engine, org, tmp_
         assert await _wait(lambda: (dst / "report.txt").exists() and (dst / "report.txt").read_text(encoding="utf-8") == "from the source", timeout=15)
         kept = dst / "report-modified.txt"
         assert kept.exists() and kept.read_text(encoding="utf-8") == "a person's own report"           # nothing of theirs was lost
-        audit = await engine.db.audit.recent(action_prefix="flow.conflict")
-        assert audit and "did not write" in str(audit[0]["detail"])                                  # and it was said
+
+        async def said():                                                                       # the file lands first; the Worker's report of it follows
+            return any("did not write" in str(a["detail"]) for a in await engine.db.audit.recent(action_prefix="flow.conflict"))
+        assert await _wait(said, timeout=10)                                                    # and it was said
         # the flow's own earlier write, untouched, is replaced without fuss
         (src / "report.txt").write_text("the source moves on", encoding="utf-8")
         assert await _wait(lambda: (dst / "report.txt").read_text(encoding="utf-8") == "the source moves on", timeout=15)
