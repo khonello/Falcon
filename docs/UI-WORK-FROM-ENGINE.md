@@ -101,6 +101,9 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
 - The old fix suggestions about "add a Categorization stage" are gone; a bundle that could not be made pauses that destination as
   `bundling:bundle_failed`, with its own suggestion.
 
+### Tasks: a file being opened (built 4 Nov 2026)
+- A task's expectations have a new signal `file_opened {path, program}`: its file was opened, in any program. Show it with the other signs of work (for example "Opened in wps.exe"). A task that names no program gets none inferred.
+
 ### New task: what a description cannot say (built 4 Nov 2026; `engine/task/cues.py`)
 - `task.propose` `flags` has new kinds, each with `detail`, a sentence to show as it is: `cannot_check` (a message channel, another task, a flow), `unnamed_result`,
   `made_from`, `waits_on_event`, `depends_on_check`, `folder_guess`, `quality_unseen`, `inside_file`, `recurring`, `not_a_task` (a question or a test: nothing to give; it carries `help`: show it as guidance on New task: `{title, says, parts: [{name, says}], examples, cannot}`, also from `task.help {}` for a Help link there); `ambiguous_deadline` may now carry `detail` too. Show every flag's `detail` on the proposal, before Give.
@@ -163,6 +166,12 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   diff (`flow.runs`), the Restricted page's came_by / allowed / lately / flows_allowed (`marks.get`), At a glance (`detective.glance`), knocked
   PCs (`registry.knocked`).
 
+### From the check of 5 Nov 2026
+- **Detective, a false line:** `DetectivePage.qml` says "in the local model's words" when `telling.smoothed` is true. Only Groq smooths now (`telling.LOCAL_SMOOTHING` is off), so say something true of the model that did it, or simply "reworded, every fact checked". The concept says the same and needs the same change.
+- **Not drawn yet, though the list above has them:** Try a rule first (`control.rule_try`, section "Automation: try a rule first") and the guidance on New task (`task.help`, and `help` on a `not_a_task` flag). Nothing in the QML calls either.
+- **Issues:** `owner` is gone from an issue and `issues.assign` from the Engine; the console used neither. Nothing to do; test sample data may still carry it. `Nav.remap`'s old announcements entry can go.
+- **Restricted, Register a PC:** `enroll.cancelled {enrollment_id}` is pushed to Admins when a machine takes its request back: refresh the waiting list on it.
+
 ### Tests failing on the rebuilt pages (found by the Engine session, 4 Nov 2026, on its own test database)
 All in `test_operator_gui.py`, all in the QML: fix the page, or the test if the concept changed it.
 - `test_nothing_clickable_uses_a_taphandler`: a `TapHandler` is back somewhere (CLAUDE.md says why not).
@@ -170,6 +179,12 @@ All in `test_operator_gui.py`, all in the QML: fix the page, or the test if the 
 - `test_restricting_finds_it_by_search_and_what_is_restricted_cannot_be_picked_again`: the Restricted page.
 
 ## The Worker's own program and windows (worker_client/program/qml, worker_client/windows/qml)
+
+### From the check of 5 Nov 2026 (ENGINE-GAPS 19, 21, 24, 25, 26 are done)
+- **Join window:** `enroll.cancel` exists: enable Cancel in `Window.qml` (it sends `answer.give({cancel: true})`, which the Worker now acts on) and drop the "cannot take it back yet" reason. `spec.host` and `spec.expires_at` now arrive, so the code can stop being read out of the text.
+- **Ask for help is gone from the service:** the `kind === "ask"` block in `Window.qml` can go, with any `ask` left in the program's QML.
+- **The program's view** now has everything #26 lists: nothing to change unless a field was left out while waiting.
+- **The covers:** a blocked cover gets `since`, a locked one `at`, so Came in and Locked at now show. `by` on a locked cover is still not sent: it falls back to "your Admin".
 
 ### Conversations (built 2 Nov 2026; the Worker concept's Messages tab and "An Admin writes to you" window)
 - The program's view (`localapp` op `view`) now has `messages: [{id, with, unread, last, from, at}]` and `unread`.

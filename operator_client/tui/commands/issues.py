@@ -1,9 +1,8 @@
 """Issues: the tickets an Admin works.
 
-    issues [type=..] [mine|unassigned]       open and waiting issues, worst first, and what is waiting on you
+    issues [type=..]                         open and waiting issues, worst first
     issue <id>                               what it means, its facts, what you can do, its timeline
     issue act <id> <key> [reason=..] [message=..] [pick=<n>]    do one of the things offered
-    issue take <id> | give <id> <account> | free <id>           take it, give it to an Admin, hand it back
     issue note <id> <text...>                a line in its timeline
 """
 
@@ -13,22 +12,20 @@ from operator_client.tui.render import kv, table
 from operator_client.tui.shell import Args, ShellContext, command
 
 
-@command("issues", usage="[type=file|update|deviation|flow|offline] [mine|unassigned]",
+@command("issues", usage="[type=file|update|deviation|flow|offline]",
          help_="Open and waiting issues, worst first")
 async def issues_list(ctx: ShellContext, args: Args) -> str:
     payload: dict = {}
     if args.opt("type"):
         payload["type"] = args.opt("type")
-    if args.positional and args.positional[0] in ("mine", "unassigned"):
-        payload["owner"] = "me" if args.positional[0] == "mine" else "unassigned"
     res = await ctx.call("issues.list", payload)
     s = res["summary"]
     rows = [{"id": i["id"], "code": i["code"], "severity": i["severity"], "what": f"{i['title']}: {i['subject']}".strip(": "),
-             "machine": i["host"] or "", "owner": (i["owner"] or {}).get("name") or "unassigned", "state": i["label"],
+             "machine": i["host"] or "", "state": i["label"],
              "age": f"{i['age_hours']:.1f}h" + (" PAST TARGET" if i["past_target"] else "")} for i in res["issues"]]
     head = (f"{s['open']} open, {s['waiting']} waiting, {s['past_target']} past target, {s['done_today']} done today; "
             f"{s['mine']} waiting on you")
-    return head + "\n\n" + (table(rows, ["id", "code", "severity", "what", "machine", "owner", "state", "age"], width=48) if rows else "(nothing)")
+    return head + "\n\n" + (table(rows, ["id", "code", "severity", "what", "machine", "state", "age"], width=48) if rows else "(nothing)")
 
 
 @command("issue", None, "<id>", "One issue: what it means, its facts, what you can do, its timeline")
@@ -55,24 +52,6 @@ async def issue_act(ctx: ShellContext, args: Args) -> str:
         payload["pick"] = args.opt_int("pick")
     res = await ctx.call("issues.act", payload)
     return f"{res['issue']['code']}: {res['issue']['label']}"
-
-
-@command("issue", "take", "<id>", "Take an issue yourself")
-async def issue_take(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("issues.assign", {"issue_id": args.get_int(0, "id")})
-    return f"{res['issue']['code']} is yours"
-
-
-@command("issue", "give", "<id> <account_id>", "Give an issue to an Admin")
-async def issue_give(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("issues.assign", {"issue_id": args.get_int(0, "id"), "account_id": args.get_int(1, "account_id")})
-    return f"{res['issue']['code']} is now {res['issue']['owner']['name']}'s"
-
-
-@command("issue", "free", "<id>", "Hand an issue back (unassigned)")
-async def issue_free(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("issues.assign", {"issue_id": args.get_int(0, "id"), "account_id": None})
-    return f"{res['issue']['code']} is unassigned"
 
 
 @command("issue", "escalate", "<id> [note...]", "Send an issue up (refused when nobody is above the Admins)")

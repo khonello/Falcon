@@ -805,6 +805,7 @@ class TasksRepo(_Repo):
                   "(SELECT count(*) FROM verification_items v WHERE v.task_id = t.id) AS checks_total, "
                   "(SELECT count(*) FROM verification_items v WHERE v.task_id = t.id AND v.status = 'passed') AS checks_passed")
     _TASK_FROM = "FROM tasks t JOIN accounts a ON a.id = t.assignee_account_id"
+    _SEEN_AT = "(SELECT max(e.observed_at) FROM expectations e WHERE e.verification_item_id = v.id) AS seen_at"
 
     async def get(self, task_id: int) -> dict[str, Any] | None:
         task = await self._one(f"SELECT {self._TASK_COLS} {self._TASK_FROM} WHERE t.id = $1", task_id)
@@ -817,7 +818,7 @@ class TasksRepo(_Repo):
 
     async def items(self, task_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT v.*, f.path AS file_path, f.content_hash AS file_hash, f.last_seen_at AS file_last_seen_at "
+            f"SELECT v.*, f.path AS file_path, f.content_hash AS file_hash, f.last_seen_at AS file_last_seen_at, {self._SEEN_AT} "
             "FROM verification_items v LEFT JOIN file_index f ON f.id = v.file_index_id "
             "WHERE v.task_id = $1 ORDER BY v.sequence", task_id)
 
@@ -830,6 +831,17 @@ class TasksRepo(_Repo):
             f"SELECT {self._TASK_COLS} {self._TASK_FROM} "
             "WHERE (t.assigner_account_id = $1 OR t.assignee_account_id = $1) "
             "AND ($2 OR t.status <> 'completed') ORDER BY t.created_at DESC", account_id, include_completed)
+
+    async def items_of(self, task_ids: list[int]) -> list[dict[str, Any]]:
+        """`items`, for several tasks at once."""
+        return await self._fetch(
+            f"SELECT v.*, f.path AS file_path, {self._SEEN_AT} FROM verification_items v LEFT JOIN file_index f ON f.id = v.file_index_id "
+            "WHERE v.task_id = ANY($1::int[]) ORDER BY v.task_id, v.sequence", task_ids)
+
+    async def closers(self, task_ids: list[int]) -> dict[int, int]:
+        """Who closed each of these tasks: {task_id: account_id}."""
+        found = await self._fetch("SELECT task_id, verified_by_account_id FROM manual_verifications WHERE task_id = ANY($1::int[])", task_ids)
+        return {r["task_id"]: r["verified_by_account_id"] for r in found}
 
     async def list_department(self, department_id: int, *, include_completed: bool = False) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -889,7 +901,7 @@ class TasksRepo(_Repo):
             "WHERE v.task_id = $1 ORDER BY e.observed_at DESC LIMIT $2", task_id, limit_per_item * 10)
 
     async def record_manual_verification(self, task_id: int, verifier_account_id: int, outcome: str) -> None:
-        """The only path to 'completed'. Caller has already checked verifier == assigner."""
+        """The only path to 'completed'. The caller has checked who may verify."""
         async with self.pool.acquire() as conn, conn.transaction():
             await conn.execute(
                 "INSERT INTO manual_verifications (task_id, verified_by_account_id, outcome) VALUES ($1, $2, $3) "
@@ -2259,6 +2271,15 @@ class ConversationsRepo(_Repo):
         """A person's request to talk; None when they already have one open."""
         return await self._val("INSERT INTO talk_requests (from_account_id, pc_id, line) VALUES ($1, $2, $3) "
                                "ON CONFLICT (from_account_id) WHERE state = 'open' DO NOTHING RETURNING id", account_id, pc_id, line)
+
+    async def open_talk_request(self, account_id: int) -> dict[str, Any] | None:
+        """The request this person is still waiting on, if any."""
+        return await self._one("SELECT line, sent_at FROM talk_requests WHERE from_account_id = $1 AND state = 'open'", account_id)
+
+    async def opened_by_request(self, conversation_ids: list[int]) -> set[int]:
+        """Which of these conversations began with a person's request to talk."""
+        found = await self._fetch("SELECT DISTINCT conversation_id FROM talk_requests WHERE state = 'accepted' AND conversation_id = ANY($1::int[])", conversation_ids)
+        return {r["conversation_id"] for r in found}
 
     async def talk_request(self, request_id: int) -> dict[str, Any] | None:
         return await self._one("SELECT * FROM talk_requests WHERE id = $1", request_id)

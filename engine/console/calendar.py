@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, kept, require_role
+from engine.permissions import int_field, kept, org_wide, require_role
 
 DEFAULT_DAYS = 62
 MAX_DAYS = 124
@@ -112,11 +112,11 @@ async def board(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                               "line": f"{len(actions)} action{'' if len(actions) == 1 else 's'}", "to": ["automation", str(d["id"])], "overdue": False})
 
     # --- announcements waiting to go out
-    for a in await db.alerts.sent(None if ident.role == "super_user" else ident.account_id):
+    for a in await db.alerts.sent(None if org_wide(ident) else ident.account_id):
         when = a.get("deliver_at")
         if when is None or a.get("delivered_at") or a.get("cancelled_at") or when < now or when >= until:
             continue
-        items.append({"kind": "announcement", "at": _iso(when), "title": a.get("title") or str(a.get("body") or "")[:80], "line": "Goes out", "to": ["messages", "announcements"], "overdue": False})
+        items.append({"kind": "announcement", "at": _iso(when), "title": a.get("title") or str(a.get("body") or "")[:80], "line": "Goes out", "to": ["announcements", None], "overdue": False})
 
     items.sort(key=lambda x: x["at"])
     return {"now": _iso(now), "until": _iso(until), "items": items[:MAX_ITEMS], "cut": len(items) > MAX_ITEMS}

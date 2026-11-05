@@ -1,12 +1,14 @@
 """Expectation (Task -> Expectation): soft signals that work is happening. Never completion.
 
-File targets ride on the Global File Index's event stream (created / modified / activity).
+File targets ride on the Global File Index's event stream (created / modified / activity), and on the machine saying a file was opened: opening it is a sign of work
+whatever program did it, since many programs open the same kind of file, so when a task names no program none is inferred (the user, 4 Nov 2026); the program is only noted.
 Program targets use worker-client-reported usage evidence (active vs idle, memory footprint,
 open file descriptors, running state). Skipped entirely when a task's verification is an
 explicit None.
 
 Signals recorded in `expectations`:
     file_created, file_modified, file_activity          (from index events)
+    file_opened {path, program}                         (from the machine: `file.opened`)
     process_state {running, active, rss_bytes}, process_active, open_file_descriptor
     {open_files}, program_present {present}             (from task.program_signal)
 """
@@ -32,6 +34,12 @@ def install(engine: Engine) -> None:
     event stream Flow and Resource use."""
     engine.file_index.subscribe(lambda event: _on_file_event(engine, event), stage="act", name="task")
     engine.file_index.subscribe(lambda event: _task_fact(engine, event), every_op=True, stage="act", name="task.fact")
+
+    async def hear_signal(event: Any) -> None:
+        if event.data["type"] == "file.opened":
+            await _on_opened(engine, event.data["pc_id"], event.data["data"])
+
+    engine.bus.on("os.signal", hear_signal, stage="act", name="task.opened")
 
     async def on_task(event: Any) -> None:
         from engine.task import expected
@@ -84,6 +92,26 @@ async def _on_file_event(engine: Engine, event: dict[str, Any]) -> None:
                 signal = "file_modified" if event["op"] in ("modify", "create", "copy", "move") else "file_activity"
                 await engine.db.tasks.add_expectation(item["id"], signal, {"op": event["op"], "path": event["path"],
                                                                            "hash": event.get("hash")})
+                touched = True
+        if touched:
+            await push_stack(engine, task["id"])
+
+
+async def _on_opened(engine: Engine, pc_id: int, data: dict[str, Any]) -> None:
+    """Files a machine says were opened: a soft sign of work on any task there with that file as a target, by whatever program."""
+    if not engine.db.connected:
+        return
+    opened = {str(f.get("path") or "").replace("\\", "/").rsplit("/", 1)[-1].lower(): f for f in data.get("files") or [] if isinstance(f, dict)}
+    if not opened:
+        return
+    for task in await engine.db.tasks.active_for_pc(pc_id):
+        if task["verification_mode"] == "none":
+            continue
+        touched = False
+        for item in task["items"]:
+            f = opened.get((item.get("proposed_filename") or "").lower()) if item["target_type"] == "file" else None
+            if f is not None:
+                await engine.db.tasks.add_expectation(item["id"], "file_opened", {"path": f.get("path"), "program": f.get("process")})
                 touched = True
         if touched:
             await push_stack(engine, task["id"])

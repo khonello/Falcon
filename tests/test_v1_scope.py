@@ -39,15 +39,13 @@ async def test_two_admins_on_one_machine_are_refused_and_issues_reach_every_admi
     await connect("cid-w1")
     await a1.ok("hierarchy.traverse", {"pc_id": org["w1_pc"], "force": True})
     assert await a2.err("hierarchy.traverse", {"pc_id": org["w1_pc"], "force": True}) in ("forbidden", "conflict")
-    # an issue on a Finance machine is in HR's Admin's list too, unassigned until someone takes it
+    # an issue on a Finance machine is in HR's Admin's list too: nobody's, and any Admin's to act on
     from engine.console import issues
 
     await issues.raise_issue(engine, type_="offline", severity="medium", title="Disk nearly full", pc_id=org["w1_pc"], department_id=org["fin"])
     listed = (await a2.ok("issues.list"))["issues"]
-    assert [i["title"] for i in listed] == ["Disk nearly full"] and listed[0]["owner"] is None
-    took = await a2.ok("issues.assign", {"issue_id": listed[0]["id"]})
-    assert took["issue"]["owner"]["you"] is True
-    assert (await a1.ok("issues.list"))["issues"][0]["owner"]["account_id"] == org["a2"]
+    assert [i["title"] for i in listed] == ["Disk nearly full"] and "owner" not in listed[0]
+    assert (await a1.ok("issues.list"))["summary"]["mine"] == (await a2.ok("issues.list"))["summary"]["mine"] == 1
 
 
 async def test_setup_makes_the_first_it_admin_not_a_super_user(engine):

@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import sys
 from typing import Any
 
@@ -64,18 +65,27 @@ async def open_program() -> WindowHandle | None:
     return WindowHandle(proc) if proc is not None else None
 
 
+def first_sentence(text: str) -> str:
+    """A task's first sentence, for its title: a dot only ends one before a space or the end, or "Update sales.xlsx" would read "Update sales"."""
+    return re.split(r"\.(?:\s|$)", text, maxsplit=1)[0].strip()
+
+
+def signs_of(task: dict[str, Any]) -> list[dict[str, Any]]:
+    """The signs that will show the work, and whether each has been seen."""
+    signs = []
+    for item in task.get("items") or []:
+        path = item.get("file_path") or item.get("proposed_path") or ""
+        name = item.get("program_name") or item.get("proposed_filename") or path.replace("\\", "/").rsplit("/", 1)[-1] or "a file"
+        seen = item.get("seen_at")                                   # when the Engine last saw a sign of it (its expectations)
+        signs.append({"name": name, "program": item.get("target_type") == "program", "seen": seen,
+                      "hint": "save it anywhere; it is found by name" if item.get("intent") == "create" else ""})
+    return signs
+
+
 def task_spec(task: dict[str, Any]) -> dict[str, Any]:
     """A task as the assignee reads it (TK07): what, when it is due, and the signs that will show the work."""
     text = str(task.get("description_raw") or "")
-    first = text.split(".")[0].strip()
-    signs = []
-    for item in task.get("items") or []:
-        if item.get("removed"):
-            continue
-        name = item.get("name") or item.get("program_name") or item.get("path") or "a file"
-        seen = next((item.get(k) for k in ("satisfied_at", "changed_at", "last_seen_at") if item.get(k)), None)
-        signs.append({"name": name, "program": item.get("target_type") == "program", "seen": seen,
-                      "hint": "save it anywhere; it is found by name" if item.get("intent") == "create" else ""})
+    first = first_sentence(text)
     return {"from": task.get("assigner_name") or "your Admin", "title": first[:60] or "A task",
-            "description": text, "due": task.get("final_deadline_at"), "signs": signs,
+            "description": text, "due": task.get("final_deadline_at"), "signs": signs_of(task),
             "started": bool(task.get("started_at"))}

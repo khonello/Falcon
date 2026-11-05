@@ -52,11 +52,19 @@ async def enroll(cfg: WorkerConfig, *, department_id: int | None = None, level: 
                  hostname: str | None = None) -> dict[str, Any]:
     """Ask, show the code, wait for the answer, store the key. Returns what the Engine handed over.
 
-    `window` is an optional async function `(text) -> handle` that puts the code on this person's screen (a Worker window);
-    its handle's `close()` is called when the request is decided. Raises EnrollmentEnded when it was not confirmed."""
+    `window` is an optional async function `({text, host, expires_at}) -> handle` that puts the code on this person's screen (a Worker window);
+    its handle's `close()` is called when the request is decided, and its answer `{cancel: true}` takes the request back. Raises EnrollmentEnded when it was not confirmed."""
     conn = EngineConnection(cfg.engine_host, cfg.engine_port, client_id="", tls=cfg.tls, ca_cert=cfg.ca_cert)
     await conn.open()
     decided = asyncio.Event()
+    cancelled = asyncio.Event()
+    watching: list[asyncio.Future[None]] = []
+
+    async def hear(shown: Any) -> None:
+        answer = await shown.answer()
+        if answer and answer.get("cancel"):
+            cancelled.set()
+            decided.set()
 
     async def on_push(type_: str, payload: dict[str, Any]) -> None:
         if type_ == "enroll.decided":
@@ -75,21 +83,28 @@ async def enroll(cfg: WorkerConfig, *, department_id: int | None = None, level: 
         show(message)
         if not licensed:
             show("Ask your Admin to confirm it, and give them this code. Waiting...")
-        text = message + "\n\nGive this code to whoever is registering you, and wait."
+        spec = {"text": message + "\n\nGive this code to whoever is registering you, and wait.", "host": request["hostname"], "expires_at": asked.get("expires_at")}
         if window is not None and not licensed:
-            handle = await window(text)
+            handle = await window(spec)
+            if handle is not None:
+                watching.append(asyncio.ensure_future(hear(handle)))
         if licensed:
             decided.set()                                        # already in: collect the key at once
         shown_at = loop_time()
         while True:
             if window is not None and not licensed and handle is None and loop_time() - shown_at >= RESHOW_SECONDS:
-                handle = await window(text)                    # nobody was signed in to see it the first time
+                handle = await window(spec)                    # nobody was signed in to see it the first time
                 shown_at = loop_time()
+                if handle is not None:
+                    watching.append(asyncio.ensure_future(hear(handle)))
             try:
                 await asyncio.wait_for(decided.wait(), poll)       # the Engine nudges; polling covers a missed nudge
             except asyncio.TimeoutError:
                 pass
             decided.clear()
+            if cancelled.is_set():
+                await conn.call("enroll.cancel", {"token": asked["token"]})
+                raise EnrollmentEnded("the request was cancelled on this machine")
             got = await conn.call("enroll.wait", {"token": asked["token"]})
             status = got["status"]
             if status == "pending":
@@ -108,6 +123,8 @@ async def enroll(cfg: WorkerConfig, *, department_id: int | None = None, level: 
     except (EngineError, ConnectionError_) as exc:
         raise EnrollmentEnded(f"could not ask the Engine: {exc}") from exc
     finally:
+        for w in watching:
+            w.cancel()
         if handle is not None:
             handle.close()
         await conn.close()

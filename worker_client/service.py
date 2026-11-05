@@ -114,6 +114,7 @@ class WorkerService:
         self._view_at = 0.0
         self.toasts: dict[str, dict[str, Any]] = {}              # quiet notes for the program to show; they stay until it says it showed them
         self._dismissed: set[int] = {int(i) for i in config.cache.get("dismissed_alerts", [])}
+        self._connected_since: str | None = None
         self._window_tasks: set[asyncio.Task[None]] = set()
         self.reminders = TaskReminders()                      # tasks waiting to be started, shown again until they are
         self._reminder_task: asyncio.Task[None] | None = None
@@ -345,6 +346,7 @@ class WorkerService:
         self._spawn(self._flush_then_reconcile())     # whatever happened while the Engine was not listening is told now (what we saw, then what we missed), in the background
         if self.config.windows:
             self._spawn(self._replay_emergencies())
+        self._connected_since = datetime.now(timezone.utc).isoformat()
         await self.updater.check_pending()                # an update this service started before it was stopped: did it work?
         cur = await self.call("updates.current")
         if cur.get("version") and cur["version"]["version_string"] != VERSION:
@@ -505,7 +507,7 @@ class WorkerService:
     async def _open_overlay(self, blocked_by: dict[str, Any]) -> None:
         from worker_client.windows.spawn import open_window
 
-        handle = await open_window("blocked", {"occupant_name": blocked_by.get("occupant_name"),
+        handle = await open_window("blocked", {"occupant_name": blocked_by.get("occupant_name"), "since": blocked_by.get("entered_at"),
                                                "deadline_at": blocked_by.get("deadline_at")})
         if handle is not None and self.lockout.is_blocked:
             self._overlay = handle
@@ -595,28 +597,40 @@ class WorkerService:
         self._program = await open_program()
 
     async def _build_view(self) -> None:
+        from worker_client.windows.spawn import first_sentence, signs_of
+
         try:
-            tasks = (await self.call("task.list"))["tasks"]
+            tasks = (await self.call("task.list", {"include_completed": True, "with_items": True}))["tasks"]
             alerts = (await self.call("alerts.list"))["alerts"]
             admins = (await self.call("assistance.my_admins"))["admins"]
             chats = await self.call("chat.list")
+            place = await self.call("machines.mine")
         except (EngineError, ConnectionError_) as exc:
             log.debug("the program's view could not be refreshed: %s", exc)
             return
-        mine = [t for t in tasks if t.get("assignee_account_id") == self.identity.account_id and t.get("status") in (None, "active")]
+        mine = [t for t in tasks if t.get("assignee_account_id") == self.identity.account_id and t.get("status") in (None, "active", "in_progress")]
         rows = []
         for t in mine:
             text = str(t.get("description_raw") or "")
-            rows.append({"id": t["id"], "title": text.split(".")[0].strip()[:90] or "A task", "description": text, "from": t.get("assigner_name") or "your Admin",
-                         "due": t.get("final_deadline_at"), "started": bool(t.get("started_at"))})
+            rows.append({"id": t["id"], "title": first_sentence(text)[:90] or "A task", "description": text, "from": t.get("assigner_name") or "your Admin",
+                         "due": t.get("final_deadline_at"), "started": bool(t.get("started_at")), "started_at": t.get("started_at"),
+                         "given": t.get("created_at"), "signs": signs_of(t)})
         rows.sort(key=lambda r: (r["due"] is None, r["due"] or ""))
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+        closed = [{"id": t["id"], "title": first_sentence(str(t.get("description_raw") or ""))[:90] or "A task", "closed_by": t.get("closed_by") or "your Admin",
+                   "closed_at": t["completed_at"]} for t in tasks
+                  if t.get("assignee_account_id") == self.identity.account_id and t.get("status") == "completed" and str(t.get("completed_at") or "").startswith(month)]
+        read = self.config.cache.get("read_alerts", {})
         notes = [{"id": a["id"], "kind": a["alert_type"], "title": a.get("title") or "", "body": a.get("body") or "", "from": a.get("from_name") or "",
-                  "at": a.get("deliver_at")} for a in alerts]
-        messages = [{"id": c["conversation_id"], "with": c.get("title") or "", "unread": c.get("unread", 0),
-                     "last": (c.get("last") or {}).get("body") or "", "from": (c.get("last") or {}).get("from") or "", "at": (c.get("last") or {}).get("at")}
+                  "at": a.get("deliver_at"), "read_at": read.get(str(a["id"]))} for a in alerts]
+        me = self.identity.account_id
+        messages = [{"id": c["conversation_id"], "with": c.get("title") or "", "unread": c.get("unread", 0), "from_request": bool(c.get("from_request")),
+                     "last": (c.get("last") or {}).get("body") or "", "at": (c.get("last") or {}).get("at"),
+                     "from": "You" if (c.get("last") or {}).get("from_account_id") == me else (c.get("last") or {}).get("from") or ""}
                     for c in chats.get("conversations", [])]
-        self._view = {"tasks": rows, "announcements": notes, "messages": messages, "unread": chats.get("unread", 0), "admins": admins,
-                      "machine": await asyncio.to_thread(self.machine_facts), "as_of": datetime.now(timezone.utc).isoformat(), "version": VERSION}
+        self._view = {"tasks": rows, "closed": closed, "announcements": notes, "messages": messages, "unread": chats.get("unread", 0), "admins": admins,
+                      "request": chats.get("request"),
+                      "machine": {**await asyncio.to_thread(self.machine_facts), **place, "connected_since": self._connected_since}, "as_of": datetime.now(timezone.utc).isoformat(), "version": VERSION}
         self._view_at = time.monotonic()
 
     async def app_view(self) -> dict[str, Any]:
@@ -631,9 +645,6 @@ class WorkerService:
     async def app_start_task(self, task_id: int) -> None:
         await self._start_task(task_id)
         self._view_at = 0.0
-
-    async def app_ask(self, to_account_id: int) -> None:
-        await self.call("assistance.ping", {"to_account_id": to_account_id})
 
     async def app_talk(self, line: str) -> None:
         await self.call("chat.ask", {"line": line})
@@ -695,6 +706,8 @@ class WorkerService:
 
     async def _remind(self, task_id: int) -> None:
         """A quiet nudge for a task nobody started: a small note in the corner (the program shows it), never a window over their work."""
+        from worker_client.windows.spawn import first_sentence
+
         try:
             task = (await self.call("task.get", {"task_id": task_id}))["task"]
         except (EngineError, ConnectionError_):
@@ -703,7 +716,7 @@ class WorkerService:
         if task.get("status") != "active" or task.get("started_at") or task.get("assignee_account_id") != self.identity.account_id:
             self.reminders.clear(task_id)
             return
-        text = str(task.get("description_raw") or "").split(".")[0].strip()[:90] or "A task"
+        text = first_sentence(str(task.get("description_raw") or ""))[:90] or "A task"
         self.toasts[f"t{task_id}"] = {"id": f"t{task_id}", "kind": "task", "title": text, "text": "Still waiting to be started"}
         self.reminders.track(task_id)
 
@@ -743,6 +756,9 @@ class WorkerService:
         if answer and answer.get("seen"):
             self._dismissed.add(alert_id)
             self.config.cache["dismissed_alerts"] = sorted(self._dismissed)[-200:]
+            read = self.config.cache.setdefault("read_alerts", {})      # only an emergency is confirmed as read; delivered is enough for the rest
+            read[str(alert_id)] = datetime.now(timezone.utc).isoformat()
+            self.config.cache["read_alerts"] = dict(sorted(read.items(), key=lambda kv: int(kv[0]))[-200:])
             with contextlib.suppress(OSError):
                 self.config.save()
 
@@ -756,30 +772,6 @@ class WorkerService:
         for a in alerts:
             if a["alert_type"] == "emergency" and a["id"] not in self._dismissed and a.get("deliver_at") and _iso(str(a["deliver_at"])) >= cutoff:
                 await self._show_emergency(a)
-
-    async def ask_for_help(self) -> None:
-        """The person chose to ask for help: say who they can ask, let them pick, send the ping. A ping carries
-        no message -- whoever they ask sees it, answers, and writes first."""
-        from worker_client.windows.spawn import open_window
-
-        try:
-            admins = (await self.call("assistance.my_admins"))["admins"]
-            if not admins:
-                handle = await open_window("message", {"text": "There is no Admin to ask yet.", "from": ""})
-                if handle is not None:
-                    await handle.answer()
-                return
-            handle = await open_window("ask", {"admins": admins})
-            answer = await handle.answer() if handle is not None else None
-            if not answer or answer.get("to") is None:
-                return
-            await self.call("assistance.ping", {"to_account_id": int(answer["to"])})
-            name = next((a["name"] for a in admins if a["account_id"] == int(answer["to"])), "your Admin")
-            done = await open_window("message", {"text": f"Asked {name}. They will write to you when they can.", "from": ""})
-            if done is not None:
-                await done.answer()
-        except (EngineError, ConnectionError_) as exc:
-            log.warning("asking for help failed: %s", exc)
 
     async def _refresh_tasks(self) -> None:
         try:

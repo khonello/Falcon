@@ -329,9 +329,8 @@ def test_a_task_reads_to_its_assignee_in_plain_words():
 
     spec = task_spec({"assigner_name": "R. Mensah", "description_raw": "Q3 reconciliation. Reconcile the invoices.",
                       "final_deadline_at": "2026-09-30T17:00:00+00:00", "started_at": None,
-                      "items": [{"name": "suppliers-q3.xlsx", "intent": "update", "target_type": "file"},
-                                {"name": "reconciliation-q3.docx", "intent": "create", "target_type": "file"},
-                                {"name": "gone.docx", "removed": True}]})
+                      "items": [{"file_path": "C:/Finance/suppliers-q3.xlsx", "intent": "update", "target_type": "file"},
+                                {"proposed_filename": "reconciliation-q3.docx", "intent": "create", "target_type": "file"}]})
     assert spec["from"] == "R. Mensah" and spec["title"] == "Q3 reconciliation" and spec["started"] is False
     assert [s["name"] for s in spec["signs"]] == ["suppliers-q3.xlsx", "reconciliation-q3.docx"]
     assert spec["signs"][1]["hint"] == "save it anywhere; it is found by name"
@@ -456,60 +455,11 @@ def test_the_screen_builtins_use_their_settings(monkeypatch, capsys):
     assert "locked for 15 min" in capsys.readouterr().out
 
 
-async def test_asking_for_help_from_the_tray_pings_the_admin_with_no_message(engine, org, tmp_path: Path, monkeypatch):
-    from worker_client.windows import spawn
-
-    shown = []
-
-    class Handle:
-        def __init__(self, answer):
-            self._answer = answer
-
-        async def answer(self):
-            return self._answer
-
-        def close(self):
-            pass
-
-    async def fake_open(kind, spec):
-        shown.append((kind, spec))
-        return Handle({"to": spec["admins"][0]["account_id"]} if kind == "ask" else {"seen": True})
-
-    monkeypatch.setattr(spawn, "open_window", fake_open)
-    svc = await _start(engine, tmp_path, "cid-w1", [])
-    admin = await _admin(engine)
-    try:
-        await svc.ask_for_help()
-        kinds = [k for k, _ in shown]
-        assert kinds == ["ask", "message"]                                   # who to ask, then "Asked ..."
-        assert shown[0][1]["admins"][0]["account_id"] == org["a1"]
-        assert "Asked" in shown[1][1]["text"]
-        status = await admin.call("assistance.ping_status")
-        assert status["unaddressed"] == 1 and status["pings"][0]["sender_account_id"] == org["w1"]
-        # closing the window without choosing sends nothing
-        shown.clear()
-
-        async def closed(kind, spec):
-            shown.append((kind, spec))
-            return Handle(None)
-
-        monkeypatch.setattr(spawn, "open_window", closed)
-        await svc.ask_for_help()
-        assert [k for k, _ in shown] == ["ask"]
-        assert (await admin.call("assistance.ping_status"))["unaddressed"] == 1
-    finally:
-        await admin.close()
-        await svc.stop()
-
-
 async def test_a_windows_notification_makes_the_watcher_look_at_once(monkeypatch):
     """A drive arriving is reported the moment Windows says so, not at the next interval (here a minute away)."""
     from worker_client import ossignals
 
     sent = []
-    again = w.WindowsNotifier(got.append)                                                  # a restart gets its own window, not a dead class
-    assert again.start() is True and again._hwnd
-    again.stop()
 
     async def report(type_, payload):
         sent.append((type_, payload))
@@ -557,6 +507,9 @@ def test_the_windows_notifier_hears_windows_messages():
     finally:
         n.stop()
     assert not n._thread.is_alive()
+    again = w.WindowsNotifier(got.append)                                                  # a restart gets its own window, not a dead class
+    assert again.start() is True and again._hwnd
+    again.stop()
 
 
 async def test_the_worker_reports_what_runs_and_what_is_installed(engine, org, tmp_path: Path):

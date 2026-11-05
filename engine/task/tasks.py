@@ -251,6 +251,9 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     task = await ctx.engine.db.tasks.get(task_id)
     assert task is not None
     schedule_deadlines(ctx.engine, task)
+    from engine.control import events
+
+    await events.interest_changed(ctx.engine)         # its machine now wants to hear when a target file is opened
     await ctx.engine.audit.record(ctx, "task.created", target_type="tasks", target_id=task_id,
                                   detail={"assignee_account_id": assignee["id"], "verification_mode": mode,
                                           "items": len(items)})
@@ -262,7 +265,7 @@ async def create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 @handler("task.list")
 async def list_tasks(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     """Tasks the caller assigned or is assigned; an Admin also sees their department's;
-    The head of the organisation sees all. {"include_completed": bool}"""
+    The head of the organisation sees all. {"include_completed": bool, "with_items": bool}: `with_items` adds each task's checks, as stored, in one read."""
     ident = require_account(ctx)
     include = bool(payload.get("include_completed", False))
     db = ctx.engine.db
@@ -275,12 +278,22 @@ async def list_tasks(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         found = [t for t in mine + dept if not (t["id"] in seen or seen.add(t["id"]))]
     else:
         found = await db.tasks.list_for(ident.account_id, include_completed=include)
+    ids = [t["id"] for t in found]
+    closers = await db.tasks.closers(ids) if include and ids else {}
     names = await db.accounts.display_names_for(
-        ident.account_id, sorted({t["assigner_account_id"] for t in found} | {t["assignee_account_id"] for t in found}))
+        ident.account_id, sorted({t["assigner_account_id"] for t in found} | {t["assignee_account_id"] for t in found} | set(closers.values())))
+    items: dict[int, list[dict[str, Any]]] = {}
+    if payload.get("with_items") and ids:
+        for item in rows(await db.tasks.items_of(ids)):
+            items.setdefault(item["task_id"], []).append(item)
     out = []
     for t in rows(found):
         t["assigner_name"] = names.get(t["assigner_account_id"])
         t["assignee_name"] = names.get(t["assignee_account_id"])
+        if t["id"] in closers:
+            t["closed_by"] = names.get(closers[t["id"]])
+        if payload.get("with_items"):
+            t["items"] = items.get(t["id"], [])
         out.append(t)
     return {"tasks": out}
 

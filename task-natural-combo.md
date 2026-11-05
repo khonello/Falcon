@@ -327,3 +327,5 @@ Task closed (or returned for revision).
 15. **(Superseded 24 Oct 2026: one description is always one task.) Multi-Task Detection proposes a concrete split** = when a description seems to cover multiple tasks, the LLM drafts the proposed split (sharing common fields, differing only where needed) and asks the assigner to accept the split or keep it as one task — it never restructures silently
 
 **Version 1 (the user, 4 Nov 2026):** wherever this document says the assigner verifies a task, any Admin may. Nobody owns a task between Admins; the record says who verified it. The person a task was given to never verifies it. There are no repeating tasks: a description saying "every day" gets a flag, and repeating work is given again, or made a rule.
+
+**Opening a file (the user, 4 Nov 2026):** a target file being opened is a soft sign of work, in whatever program, since many programs open the same kind of file. When a task names no program, none is inferred. A program named in the task is its own target, checked as before.

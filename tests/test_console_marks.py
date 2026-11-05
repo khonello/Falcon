@@ -76,7 +76,6 @@ async def test_a_copy_where_the_mark_does_not_allow_it_is_an_issue_and_every_ver
     assert copy["host"] == "FIN-01" and copy["file"] == "budget.xlsx" and copy["severity"] == "high" and copy["signed_in"]
     assert "issue.raised" in su.push_types(await su.drain_pushes())
     page = await a1.ok("issues.get", {"issue_id": copy["issue_id"]})
-    assert page["issue"]["owner"]["you"] is True                                                         # the one who marked it
     assert "the machine FIN-ADM" in page["lead"] and any(f[0] == "Allowed only on" and f[1] == "FIN-ADM" for f in page["facts"])
     assert any(f[0] == "Marked by" for f in page["facts"]) and {o["key"] for o in page["options"]} >= {"delete", "allow"}
 

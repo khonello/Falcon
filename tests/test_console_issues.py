@@ -31,11 +31,10 @@ async def test_a_restricted_copy_is_an_issue_for_its_department_and_resolves_whe
     [issue] = res["issues"]
     assert issue["type"] == "file" and issue["code"].startswith("INC-") and issue["host"] == "FIN-01"
     assert issue["severity"] == "high" and issue["subject"] == "salaries-copy.xlsx"            # another machine, same department
-    assert issue["owner"]["account_id"] == org["a1"] and issue["owner"]["you"] is True         # Finance has one Admin: theirs
+    assert "owner" not in issue                                                                 # nobody owns an issue
     assert issue["state"] == "open" and issue["past_target"] is False and issue["target_hours"] == 1
     assert res["summary"] == {"open": 1, "waiting": 0, "past_target": 0, "done_today": 0, "mine": 1,
                               "by_type": {"file": 1}, "by_severity": {"high": 1}}
-    assert (await su.ok("issues.list"))["issues"][0]["owner"]["you"] is False
     assert (await a2.ok("issues.list"))["issues"] == []                                         # HR does not see Finance's
     assert await a2.err("issues.get", {"issue_id": issue["id"]}) == "not_found"
     assert await w1.err("issues.list") == "forbidden"
@@ -50,9 +49,9 @@ async def test_a_restricted_copy_is_an_issue_for_its_department_and_resolves_whe
     assert any(f[0] == "File" and f[1] == "salaries-copy.xlsx" for f in page["facts"])
     raised = next(e for e in page["timeline"] if e["kind"] == "raised")
     assert raised["what"].startswith("Restricted file raised on FIN-01") and raised["who"] == "System"
-    # the story has the same spine whatever the issue: raised, who it is assigned to, the time it should take; and nothing the machine did that is not about this
+    # the story has the same spine whatever the issue: raised, the time it should take; and nothing the machine did that is not about this
     whats = [e["what"] for e in page["timeline"]]
-    assert "Assigned to you" in whats and "Target time (1 h)" in whats
+    assert not any(w.startswith("Assigned to") for w in whats) and "Target time (1 h)" in whats
     await engine.audit.record(None, "flow.synced", target_type="flows", target_id=1, pc_id=org["w1_pc"], detail={"files": 3})
     again = [e["what"] for e in (await a1.ok("issues.get", {"issue_id": issue["id"]}))["timeline"]]
     assert not any("synced" in w for w in again)
@@ -114,30 +113,18 @@ async def test_asking_the_person_deleting_the_copy_and_allowing_it(engine, org, 
 async def test_who_owns_an_issue_and_how_it_moves(engine, org, connect):
     su = await connect("cid-su")
     a1 = await connect("cid-a1")
-    a2 = await connect("cid-a2")
     w1 = await connect("cid-w1")
     pc2 = await engine.db.accounts.create_pc("FIN-ADM2", org["fin"], "admin_workstation", "cid-a1b")
-    a1b = await engine.db.accounts.create("admin", org["fin"], pc2)
+    await engine.db.accounts.create("admin", org["fin"], pc2)
     a1_2 = await connect("cid-a1b")
     await _copy_of_restricted(a1, w1)
     [issue] = (await a1.ok("issues.list"))["issues"]
-    assert issue["owner"] is None and (await a1.ok("issues.list"))["summary"]["mine"] == 1          # two Admins: nobody's, any may take it
-    assert (await a1.ok("issues.list", {"owner": "unassigned"}))["issues"] != []
-
-    took = (await a1_2.ok("issues.assign", {"issue_id": issue["id"]}))["issue"]
-    assert took["owner"]["account_id"] == a1b and took["owner"]["you"] is True
-    assert (await a1.ok("issues.list"))["summary"]["mine"] == 0
-    assert await a2.err("issues.assign", {"issue_id": issue["id"]}) == "not_found"
-    assert await a1.err("issues.assign", {"issue_id": issue["id"], "account_id": org["a2"]}) == "forbidden"       # another department's Admin
-    assert await a1.err("issues.assign", {"issue_id": issue["id"], "account_id": org["w1"]}) == "invalid"
-    given = (await a1_2.ok("issues.assign", {"issue_id": issue["id"], "account_id": org["a1"]}))["issue"]
-    assert given["owner"]["account_id"] == org["a1"]
-    back = (await a1.ok("issues.assign", {"issue_id": issue["id"], "account_id": None}))["issue"]
-    assert back["owner"] is None
+    assert (await a1.ok("issues.list"))["summary"]["mine"] == 1 and (await a1_2.ok("issues.list"))["summary"]["mine"] == 1   # nobody's: on every Admin's list
+    assert await a1.err("issues.assign", {"issue_id": issue["id"]}) == "unknown_type"
 
     await a1.ok("issues.note", {"issue_id": issue["id"], "text": "  Spoke to Ama; she is deleting it after lunch. "})
     kinds = [e["kind"] for e in (await a1.ok("issues.get", {"issue_id": issue["id"]}))["timeline"]]
-    assert "note" in kinds and kinds.count("assigned") == 3
+    assert "note" in kinds
     assert await a1.err("issues.note", {"issue_id": issue["id"], "text": "  "}) == "invalid"
 
     # an Admin sends it up: the Super User hears of it and it is theirs now
@@ -147,9 +134,7 @@ async def test_who_owns_an_issue_and_how_it_moves(engine, org, connect):
     assert "issue.escalated" in su.push_types(await su.drain_pushes())
     assert (await su.ok("issues.list"))["summary"]["mine"] == 1
     assert await su.err("issues.escalate", {"issue_id": issue["id"]}) == "forbidden"
-    await su.ok("issues.assign", {"issue_id": issue["id"]})
-    assert (await su.ok("issues.get", {"issue_id": issue["id"]}))["issue"]["owner"]["you"] is True
-    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["admin"]}))["events"]} >= {"issue.raised", "issue.assigned", "issue.escalated"}
+    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["admin"]}))["events"]} >= {"issue.raised", "issue.escalated"}
 
 
 async def test_an_update_that_fails_is_an_issue_that_grows_and_clears_when_it_lands(engine, org, connect):
@@ -222,7 +207,7 @@ async def test_a_flow_waiting_for_consent_is_an_issue_that_can_be_reminded_moved
                                        "destinations": [{"destination_pc_id": org["a2_pc"], "destination_path": "D:/from-finance"}]})
     assert made["consent_pending"] is True
     [issue] = (await a1.ok("issues.list", {"type": "flow"}))["issues"]
-    assert issue["state"] == "waiting" and issue["owner"]["account_id"] == org["a2"] and issue["host"] == "FIN-01" and issue["severity"] == "low"
+    assert issue["state"] == "waiting" and issue["host"] == "FIN-01" and issue["severity"] == "low"
     page = await a1.ok("issues.get", {"issue_id": issue["id"]})
     assert {o["key"] for o in page["options"]} == {"remind", "dest", "withdraw"}
     assert [p["label"] for p in next(o for o in page["options"] if o["key"] == "dest")["pick"]] == ["FIN-02", "FIN-ADM"]

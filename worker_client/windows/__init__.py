@@ -18,7 +18,7 @@ PySide6 is the optional `worker-ui` extra: without it the service runs headless 
 
 from __future__ import annotations
 
-KINDS = ("blocked", "message", "locked", "ask", "task", "emergency", "viewing")
+KINDS = ("blocked", "message", "locked", "task", "emergency", "viewing")
 
 
 def available() -> bool:

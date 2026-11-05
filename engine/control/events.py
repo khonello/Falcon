@@ -546,6 +546,8 @@ async def interest_for_pc(engine: Engine, pc_id: int) -> dict[str, list[dict[str
             spec = definition["condition_spec"]
             if _pc_in_scope(spec, pc_id, await _dept_pcs(engine, definition)):
                 out.setdefault(etype, []).append(spec.get("match") or {})
+    if await engine.db.tasks.active_for_pc(pc_id):
+        out.setdefault("file.opened", []).append({})                 # a task here wants to know when its file is opened
     if engine.settings.detective:
         from common.detective import CAPTURE_TOOLS
 

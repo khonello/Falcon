@@ -162,6 +162,23 @@ async def wait(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+@handler("enroll.cancel")
+async def cancel(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """The machine takes its own request back while it waits: only the one holding the token can, and the row stays, as a refusal it gave itself."""
+    db = ctx.engine.db
+    enr = await db.enrollments.by_token(_hash(str_field(payload, "token")))
+    if enr is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such request")
+    if enr["status"] != "pending":
+        raise ProtocolError(ErrorCode.CONFLICT, "this request has already been answered")
+    await db.enrollments.refuse(enr["id"], None, "the machine took its request back")
+    await ctx.engine.audit.record(None, "enroll.cancelled", target_type="enrollments", target_id=enr["id"], detail={"hostname": enr["hostname"]})
+    gone = {"enrollment_id": enr["id"]}
+    await ctx.engine.push_to_role("super_user", "enroll.cancelled", gone)
+    await ctx.engine.push_to_role("admin", "enroll.cancelled", gone)
+    return {"enrollment_id": enr["id"], "status": "cancelled"}
+
+
 def _visible_department(ctx: Context) -> int | None:
     """None for the head of the organisation (every request); an Admin's own department for an Admin."""
     ident = require_role(ctx, "super_user", "admin")

@@ -15,7 +15,14 @@ from typing import Any
 from engine.console.feed import describe_many
 from engine.console.health import health_of, open_signals
 from engine.dispatch import Context, handler
-from engine.permissions import int_field, kept, require_department_scope, require_role, str_field
+from engine.permissions import (
+    int_field,
+    kept,
+    require_account,
+    require_department_scope,
+    require_role,
+    str_field,
+)
 from protocol import ErrorCode, ProtocolError
 
 RANGES = {"1h": (timedelta(hours=1), 10), "6h": (timedelta(hours=6), 10), "24h": (timedelta(hours=24), 30),
@@ -173,3 +180,15 @@ async def end_program(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     ended = await run_on_machine(ctx, "kill_process", {"name": name}, pc_id, name=f"End {name}")
     told = await run_on_machine(ctx, "notify", {"message": f"Your IT Admin ended {name}."}, pc_id, name=f"Say {name} was ended")
     return {"pc_id": pc_id, "execution_id": ended, "notice_execution_id": told}
+
+
+@handler("machines.mine")
+async def machines_mine(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """What a machine cannot see for itself, for the person's My machine: its department and whether it runs the approved version (None when none is approved)."""
+    ident = require_account(ctx)
+    found = await ctx.engine.db.accounts.fleet(pc_id=ident.pc_id) if ident.pc_id is not None else []
+    if not found:
+        return {"department": None, "up_to_date": None}
+    current = await ctx.engine.db.updates.current_version()
+    version = found[0]["agent_version"]
+    return {"department": found[0]["department_name"], "up_to_date": version == current["version_string"] if current and version else None}

@@ -1,14 +1,34 @@
 # To look at
 
 Open items to go over with the user. Bring this up first in a new session, then tidy it as items close.
-Last updated 4 Nov 2026.
+Last updated 5 Nov 2026.
+
+## What is really open (checked against the code, 5 Nov 2026)
+
+Every call the console, the TUI and the Worker make has a handler. These are what remains; the rest of this file is the record.
+
+**For the user to decide**
+- **An Admin's PC dies while inside a machine** (ENGINE-GAPS #19): the person stays covered until the deadline, 30 minutes by default. End it after a short grace (about 2 minutes), or keep the deadline and have the cover say what happened?
+- **Detective:** note the narrow check (a restricted file opened by something that is not a document program) for later, or drop it.
+- **"Work on a spreadsheet" with no file named:** keep asking (recommended).
+- **Detective's blind spots** (`docs/design/detective-assumptions.md`): how the user would get around the scenarios.
+- **Tell the design session** the rule-maker decision is all Admins (the concept's "only A. Quaye changes it" goes).
+
+**Waiting on the user to say go**
+- More task descriptions: the next unseen batch is the honest test (see below).
+- Resume the Qwen3-4B download (below).
+- Replace the Groq key given in the session, before anything ships.
+
+**Needs real machines, not code** (`docs/VM-TEST-PLAN.md`): Office conversion, a second Windows user refused a Private file, a machine updating itself, the installers on a clean machine, a real printer going offline, real failed sign-ins, a flow between two PCs, the session window end to end, the console as a non-administrator, the tray, overlays and program on a real desktop.
+
+**Later, by decision:** the licence store; packaging (Phase 9).
 
 ## Answered 4 Nov 2026
 
 - **Any Admin verifies a task:** yes, and built.
-- **Only a rule's maker changes it:** no. The user told the Engine session (4 Nov) that every IT Admin covers everything and the log shows who; the concept's "only A. Quaye changes it" goes. To confirm with the user: the UI session had recorded a yes.
+- **Only a rule's maker changes it:** no. The user told the Engine session (4 Nov) that every IT Admin covers everything and the log shows who; the concept's "only A. Quaye changes it" goes.
 - **The concept's contradictions:** corrected towards what is true. Automation's Next is the real next run, Actions counts all eight rules, Flows has the Engine's steps, and a case's
-  account says who wrote it as it happened: the local model with smoothing on, Falcon with it off.
+  account says who wrote it as it happened (its wording is on the UI's list: only Groq smooths now, not the local model).
 - **Add a machine is gone** (the user asked, 4 Nov): a machine joins with its licence code at setup. Machines shows Waiting to join only for one installed without a code,
   let in with the code on its screen. New key stays on a machine's card. The Registry page (not on the menu) still has the old Register a PC.
 - **The flow's Keep / Remove the copies:** back, in the concept and in Make a flow. **Task split is gone** (the user, 4 Nov): a description is one task, in the concept and the console.
@@ -49,14 +69,9 @@ Last updated 4 Nov 2026.
   Private (#3) with Windows' own permissions; the update pipeline; a deleted source file's copies kept with an issue to remove them.
 - **Not run for real yet:** a second Windows user refused a Private file, a machine updating itself, the two installers (the VM plan).
 
-## Waiting on a decision (older)
+## Older decisions (all settled since)
 
-- **Version 1 is Admin (IT) → Workers; the Super User is set aside** (decided 25 Oct 2026):
-  `docs/design/who-runs-the-console.md`. The Admins are IT with every department's reach, and departments are IT's
-  groups. The Super User is kept, not deleted, and reconnected later. **Still to settle:** what stands in for the Super
-  User where the design names one, and questions 3 to 5 in that file.
-- **Discovering PCs on the network** for Add a machine (`docs/ENGINE-GAPS.md` item 10): is a network scan acceptable,
-  which machine does it, and how often.
+- Version 1 is IT Admins; what stood in for the Super User is `require_head` and any Admin. `who-runs-the-console.md` questions 3 to 5 are settled by `docs/design/v1-it-admin.md`: two Admins on one machine are refused, nobody owns an issue, departments are labels. Network discovery is dropped.
 
 ## Version 1 settled, 1 Nov 2026 (`docs/design/v1-it-admin.md`)
 
@@ -72,18 +87,8 @@ Last updated 4 Nov 2026.
   PCs that knocked; a flow's last sync as a diff; the Restricted page (how a copy got there, allowed, lately, flows allowed); Coming up; custom action
   output kinds, per-machine results, stopping a run, a test run before saving; Detective weighing what was carried, and At a glance; an Admin's
   to-dos; an Admin's conversations. Migrations 041-045. Each has a TUI command; none of it is drawn in the QML yet.
-- **Not built, waiting on you:**
-  - **The v1 Admin scope (mode B) is not in the Engine.** `require_department_scope` still keeps an Admin to their own department, while the
-    concept draws IT over every department. It is one switch in `engine/permissions.py` plus the handlers that filter by `ident.department_id`.
-    Questions 3 to 5 in `who-runs-the-console.md` are still open. Conversations (`chat.people`) and knocked PCs already span every department.
-  - **#3 Private:** how a refusal is shown to the person at the machine.
-  - **#7 Sending a file:** whether an admin-tier file may go to a Worker.
-  - **#10 Seen on the network:** whether a network scan is allowed, from which machine, and how often.
-  - **#15 A case told in words:** it goes against the narrow-questions rule in CLAUDE.md; pick one of the two ways in ENGINE-GAPS #15.
-  - **#13, the other three** (try a rule before switching it on, too quiet or too loud, what a run produced): not in the concept, so left alone.
-  - **`pc_days` is kept forever** (one row per machine per day). Purging it would be a third hard delete beside the 90-day jobs.
-- **Noticed:** the Detective actor test `devops_at_night` takes about 140 s on its own, against the suite's 180 s limit, and timed out when the
-  machine was busy. The Worker's own program does not show the new conversations yet.
+- **What was waiting on the user here is all answered** (see Answered, above).
+- **Noticed:** fixed since: `devops_at_night` (`_coverage`) and the Worker's conversations.
 
 ## Not exercised yet
 
@@ -101,9 +106,6 @@ Last updated 4 Nov 2026.
 
 ## Housekeeping
 
-- **GUI session message** (handler names, session window caveat, empty `pc_id`, hostname wording) was queued while
-  that session was offline. No confirmation it was read.
-- **`CLAUDE.md` was committed whole in 3000d67**, so it may include the GUI session's console-line edits. Check the diff.
 - **Decided, for the record:** Admin from another department stays disabled; retention is 90 days on the audit clock
   (`audit_log`, `file_events`, run outputs), logged per part.
 
@@ -119,20 +121,18 @@ Last updated 4 Nov 2026.
 
 - **Written and tested; the Engine's installer was also run for real on Linux (WSL), twice, and removed.** Not yet on a clean machine. The Hyper-V pass should do, in order: the Engine's installer (Linux VM, with the `.deb`), then the Super User's,
   an Admin's and a person's PC (Windows VMs), confirm each registration, and try the console as a non-administrator user on the Admin workstation (the pipe's access rules).
-- **Decide:** is the Super User's PC also a managed machine (the Worker service on it)? Today the Super User's installer is the console only.
 - **Not mine, and removed from the list:** the Admin console needs no blocked bar; the overlay on the Admin's PC does it (the Admin installer puts the Worker pieces there).
 
 ## Flow, Restricted, Task tried live (14 Oct 2026)
 
 - Fixed along the way (see `ENGINE-GAPS.md`): big files, a destination that was away, files already in a source folder, a file mid-write, a marked file being moved, an allowance by path, `index.search`, ghosts in the index.
-- **Decide:** should a file deleted at a flow's source also be deleted at its destinations? Today it is not (the design says "destination updated to match source"; deleting is the risky half).
 - **Done since:** the console's own forms are scripted live (`live_drill.py forms`, 18 checks) and the default Qwen3-1.7B model is downloaded and probed 8/8. **Still only on separate machines:** a flow between two real PCs (`docs/VM-TEST-PLAN.md`).
 
 ## Proactive and reactive (16 Oct 2026)
 
 - Built: the index reconciles on start, reconnect and a timer; the Engine heals flows, marks and tasks on timers; a flow never overwrites what it did not write. See `ENGINE-GAPS.md`.
 - The two-PC Flow test, the away-and-back tests and the non-administrator console test are in `docs/VM-TEST-PLAN.md` (needs a machine with ~14 GB free for the guests).
-- Still open: should a deleted source file be deleted at destinations? (Today: no; the destination keeps its copy. The user said that is what they first thought.)
+- A deleted source file is now a choice per flow (see below).
 
 ## Task creation, hardened (16 Oct 2026)
 
@@ -167,7 +167,6 @@ Last updated 4 Nov 2026.
 
 - Built (Engine + TUI + installer option): `handover open | status | confirm <id> <code> | cancel`, migration 033, `python -m operator_client --handover-join`, and `installers.windows.install --role superuser --handover`. See `docs/GETTING-STARTED.md`. Tested end to end (`tests/test_handover.py`): same account, one Super User at all times, old key stops at once, wrong codes and expired windows change nothing.
 - Not built: a page for it in the console (Access / Registry) — today it is TUI commands. Nothing for the old machine afterwards except registering it like any other.
-- Still your decision: should the old machine be kept as an ordinary managed machine? (Default: it is just unbound; register it as a Worker if you want it.)
 
 ## The Falcon program on a Worker's machine, announcements, quiet reminders (16 Oct 2026)
 
@@ -204,7 +203,4 @@ Last updated 4 Nov 2026.
 - **Console, 18 Oct 2026:** the proposals are on the Detective page and in the Super User's queue; flows waiting for a restricted owner and a machine asking to become the Super User's are in the queue too; the Admin's Overview counts suggestions and flows to allow (`overview.admin`); the Restricted page shows what is tracked by content, what is generated, and which flows carry a mark. The spine's health stays a debugging tool, not a page.
 - **Console, later the same day:** Detective page rebuilt on the standard list-and-item layout (equal heights, evidence in paired panels, suggestions and written rules always shown side by side); the Super User's Overview is now the four core features as a 2 x 2 with what waits on them above and a slim organisation line below; Home and Core are one Core group of six; `scripts/preview.py` has real Detective cases (played through the matcher), suggestions, rules and a flow waiting for consent; the concept (claude.ai/artifact/R2NT8v3996VDFYiS3XM4JL, version 186) has the Detective page, the new Overview and the restricted-flow consent. Not yet in the concept: the machine-asks-to-take-over card, the mark assessment card.
 - **Pruned (docs/design/pruning.md):** the console lost the Accountability, Rules, Reports, Access, Sessions and Rollout pages, listeners and the cross-department hand-off; Registry is a tab of Departments and Actions a tab of Automation (Admin 10 pages, Super User 8). Their Engine handlers and tests are untouched until the core / full split decides them (rules, deviations, reports routing, updates gate). **Assisted access, listeners and the report kinds Listener report / Help across departments / Folder conflict are gone from the Engine too (19 Oct); every report kind but "About an Admin" now routes to each department by default (migration 040).**
-- **Still not done:** a bounded priority queue on the bus; Reports/Notices as the spine's "tell" stage; the dormant sources (the Engine produces `opened`
-  events and the outside-role tag only from the new file-open batches, which need the Worker's file trace, i.e. an elevated service on a real machine).
-- **Waiting on the owner:** how they would get around the Detective scenarios (`docs/design/detective-assumptions.md`); whether the Super User's old machine is re-enrolled as a managed machine (default: unbound);
-  the VM runs (two-PC Flow, keyboard control, away-and-back, the tray / overlay / program at sign-in / Detective page on a real desktop).
+- The bounded queue and the tell stage are built (2 Nov 2026); file opens need the elevated service, and were confirmed delivered here on 4 Nov 2026.

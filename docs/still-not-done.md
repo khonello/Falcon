@@ -1,4 +1,6 @@
-# Still not done (temporary, updated 3 Nov 2026)
+# Still not done (temporary, updated 5 Nov 2026)
+
+**What is really open is at the top of `docs/to-lookat.md`.** This file is the record of how it got there.
 
 Written after commit `560eb6f`; updated the same day when version 1 was settled (`docs/design/v1-it-admin.md`).
 
@@ -41,10 +43,10 @@ Version 1 is IT Admins only. The Super User does not exist in anything that ship
 - **#4** group conversations and **#6** directives and notices: parked with the Super User; not part of version 1.
 
 ## Built in the Engine but not in the console
-- Nothing from 1 Nov is drawn in the QML yet: to-dos, Messages, the machine page, Coming up, the action output kinds and test run, flow runs, the Restricted page, At a glance, and knocked PCs.
+- Drawn since (the console was rebuilt to the concept, 2-4 Nov 2026). Still not drawn: Try a rule first and the guidance on New task (`docs/UI-WORK-FROM-ENGINE.md`).
 - The Worker's side of conversations is built (2 Nov 2026): the service puts them in the program's view with a corner note when an Admin
   writes, the program's API reads and replies (`conversation`, `reply`), and the machine's command line has `messages`, `reply` and `log`.
-  The program's QML does not show them yet (the Worker concept's Messages tab and message window).
+  The program's QML shows them (4 Nov 2026).
 
 ## Smaller Engine gaps already on record
 - **Flows:** *(built 2 Nov 2026)* every step, a flow's name, hourly or run-only flows with Run, several sources, carrying on from

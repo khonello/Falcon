@@ -123,12 +123,14 @@ async def list_alerts(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 
 @handler("alerts.sent")
 async def sent(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """What this person has sent, scheduled or withdrawn (the head of the organisation: everything), with who it reached."""
+    """What went out, is scheduled or was withdrawn, with who sent it and who it reached: every Admin's in version 1, where nobody owns anything; one's own with the department scope."""
     ident = require_role(ctx, "super_user", "admin")
-    found = await ctx.engine.db.alerts.sent(None if ident.role == "super_user" else ident.account_id)
+    found = await ctx.engine.db.alerts.sent(None if org_wide(ident) else ident.account_id)
     depts = {d["id"]: d["name"] for d in await ctx.engine.db.accounts.list_departments()}
+    names = await ctx.engine.db.accounts.display_names_for(ident.account_id, sorted({a["created_by_account_id"] for a in found if a["created_by_account_id"]}))
     out = rows(found)
     for a in out:
+        a["from_name"] = names.get(a["created_by_account_id"])          # as the reader names them
         a["status"] = "withdrawn" if a["cancelled_at"] else "delivered" if a["delivered_at"] else "scheduled"
         a["audience_label"] = {"all_users": "Everyone", "admin_only": "All Admins", "department": depts.get(a["department_id"], "A department"),
                                "specific_users": f"{len(a['recipient_account_ids'] or [])} chosen people"}[a["audience"]]

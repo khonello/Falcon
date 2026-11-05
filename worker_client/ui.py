@@ -67,12 +67,6 @@ async def task_start(ctx: UIContext, args: Args) -> str:
     return f"task {res['task_id']} {res['status']}"
 
 
-@command("search", usage="<query...>", help_="Search files you are permitted to see")
-async def search(ctx: UIContext, args: Args) -> str:
-    res = await ctx.call("assistance.search", {"query": args.rest(0, "query")})
-    return table(res["results"], ["pc_id", "path", "resource_tag", "last_seen_at"], width=60)
-
-
 @command("messages", usage="[conversation_id]", help_="Conversations an Admin started with you; with an id, that one (read now)")
 async def messages(ctx: UIContext, args: Args) -> str:
     if not args.positional:

@@ -56,9 +56,6 @@ class LocalClient:
     def start_task(self, task_id: int) -> None:
         self.call("start_task", id=task_id)
 
-    def ask(self, to_account_id: int) -> None:
-        self.call("ask", to=to_account_id)
-
     def talk(self, line: str) -> None:
         self.call("talk", line=line)
 

@@ -40,11 +40,11 @@ async def _main(cfg: WorkerConfig, *, ui: bool, native: bool, allow_power: bool)
         await service.stop()
 
 
-async def _show_code(text: str) -> object:
+async def _show_code(spec: dict[str, object]) -> object:
     """The code on this person's screen, in a Worker window, when this machine has windows."""
     from worker_client.windows.spawn import open_window
 
-    return await open_window("message", {"text": text, "from": ""})
+    return await open_window("message", {**spec, "from": ""})
 
 
 async def _enroll(cfg: WorkerConfig, department_id: int | None, level: str) -> None:

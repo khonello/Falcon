@@ -102,7 +102,7 @@ def lock(argv: list[str]) -> int:
             ctypes.windll.user32.LockWorkStation()
         _mark("locked once (no windows installed, so no timer)")
         return 0
-    proc = _window("locked", {"message": message, "until": until.isoformat()})
+    proc = _window("locked", {"message": message, "at": datetime.now(timezone.utc).isoformat(), "until": until.isoformat()})
     blocked = _block_input(True)
     try:
         time.sleep(max(duration, 0))

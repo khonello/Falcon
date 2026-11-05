@@ -190,6 +190,9 @@ async def test_a_service_installed_with_no_key_asks_shows_the_code_and_carries_o
         def close(self) -> None:
             shown.append("closed")
 
+        async def answer(self):
+            await asyncio.Event().wait()                                           # nobody answers: the window just stays up
+
     async def fake_open(kind, spec):
         shown.append(spec["text"])
         return Handle()
@@ -231,3 +234,56 @@ async def test_stopping_a_service_that_is_waiting_on_probation_ends_it_cleanly(e
     stop.set()
     await asyncio.wait_for(task, 10)
     assert not cfg.client_id
+
+
+async def test_the_join_window_is_told_who_and_until_when_and_cancel_takes_the_request_back(engine, org, connect, tmp_path):
+    from worker_client.config import WorkerConfig
+    from worker_client.enroll import EnrollmentEnded, enroll
+
+    specs: list[dict] = []
+    press = asyncio.Event()
+
+    class Window:
+        def close(self) -> None:
+            pass
+
+        async def answer(self):
+            await press.wait()
+            return {"cancel": True}
+
+    async def window(spec):
+        specs.append(spec)
+        return Window()
+
+    su = await connect("cid-su")
+    cfg = WorkerConfig(windows=False, engine_host="127.0.0.1", engine_port=engine.port, tls=False, path=tmp_path / "worker.json")
+    asked = asyncio.create_task(enroll(cfg, department_id=org["fin"], window=window, hostname="LOG-01", show=lambda m: None))
+    for _ in range(100):
+        if specs:
+            break
+        await asyncio.sleep(0.05)
+    assert specs[0]["host"] == "LOG-01" and specs[0]["expires_at"] and "Code" in specs[0]["text"]
+    assert [r["hostname"] for r in (await su.ok("enroll.list"))["requests"]] == ["LOG-01"]
+    await su.drain_pushes()
+    press.set()
+    with pytest.raises(EnrollmentEnded, match="cancelled"):
+        await asyncio.wait_for(asked, 10)
+    assert (await su.ok("enroll.list"))["requests"] == [] and not cfg.client_id
+    assert "enroll.cancelled" in su.push_types(await su.drain_pushes())
+
+
+async def test_only_a_waiting_request_can_be_taken_back_and_only_with_its_token(engine, org, connect):
+    from common.connection import EngineConnection
+
+    su = await connect("cid-su")
+    machine = EngineConnection("127.0.0.1", engine.port, client_id="", tls=False)
+    await machine.open()
+    try:
+        got = await machine.call("enroll.request", {"hostname": "PC-C", "department_id": org["fin"]})
+        with pytest.raises(Exception, match="no such request"):
+            await machine.call("enroll.cancel", {"token": "not-it"})
+        await su.ok("enroll.refuse", {"enrollment_id": got["enrollment_id"], "reason": "no"})
+        with pytest.raises(Exception, match="already been answered"):
+            await machine.call("enroll.cancel", {"token": got["token"]})
+    finally:
+        await machine.close()

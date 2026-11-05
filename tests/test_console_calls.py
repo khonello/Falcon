@@ -243,3 +243,15 @@ async def test_how_to_write_a_task_is_there_to_ask_for(engine, org, connect, tmp
     assert await w1.err("task.help") == "forbidden"
     out = await run_script(_cfg(engine, tmp_path, "cid-a1"), ["connect", "task help"])
     assert "Update sales.xlsx by Friday" in out[1]
+
+
+async def test_opening_a_task_s_file_in_any_program_is_a_sign_of_work(engine, org, connect):
+    a1, w1 = await connect("cid-a1"), await connect("cid-w1")
+    made = await a1.ok("task.create", {"assignee_account_id": org["w1"], "description": "write report.docx", "verification_mode": "stack",
+                                       "items": [{"target_type": "file", "intent": "create", "name": "report.docx", "path": "C:/new"}]})
+    task = made["task_id"] if "task_id" in made else made["task"]["id"]
+    assert "file.opened" in (await w1.ok("control.signal_interest"))["interest"]        # the machine is asked to say
+    await w1.ok("control.signal", {"type": "file.opened", "data": {"files": [{"path": "C:/new/other.docx", "process": "wps.exe"}]}})
+    await w1.ok("control.signal", {"type": "file.opened", "data": {"files": [{"path": "C:/new/REPORT.docx", "process": "wps.exe"}]}})
+    seen = await engine.db.tasks.expectations(task)
+    assert [(s["signal_type"], s["value"]["program"]) for s in seen if s["signal_type"] == "file_opened"] == [("file_opened", "wps.exe")]     # any program counts; it is only noted

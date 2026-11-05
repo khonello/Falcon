@@ -68,6 +68,7 @@ async def _views(ctx: Context, convos: list[dict[str, Any]]) -> list[dict[str, A
     for r in await db.conversations.reads(ids):
         reads.setdefault(r["conversation_id"], {})[r["account_id"]] = r["read_at"]
     unread = await db.conversations.unread(ids, me)
+    asked = await db.conversations.opened_by_request(ids)
     people = sorted({p for ps in members.values() for p in ps} | {m["from_account_id"] for m in last.values()})
     names = await db.accounts.display_names_for(me, people) if people else {}
     out = []
@@ -75,7 +76,7 @@ async def _views(ctx: Context, convos: list[dict[str, Any]]) -> list[dict[str, A
         others = [p for p in members[c["id"]] if p != me]
         msg = last.get(c["id"])
         seen = [p for p in others if msg and p != msg["from_account_id"] and reads.get(c["id"], {}).get(p) and reads[c["id"]][p] >= msg["sent_at"]]
-        out.append({"conversation_id": c["id"], "kind": c["kind"],
+        out.append({"conversation_id": c["id"], "kind": c["kind"], "from_request": c["id"] in asked,
                     "title": EVERY_ADMIN if c["kind"] == "admins" else (c.get("title") or ", ".join(str(names.get(p)) for p in others) if c["kind"] == "group"
                                                                         else (names.get(others[0]) if others else None)),
                     "members": [{"account_id": p, "name": names.get(p)} for p in members[c["id"]]],
@@ -95,7 +96,9 @@ async def chat_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         convos.insert(0, group)
     views = await _views(ctx, convos)
     views.sort(key=lambda v: (v["last"] or {}).get("at") or "", reverse=True)
-    return {"conversations": views, "unread": sum(v["unread"] for v in views)}
+    waiting = await db.conversations.open_talk_request(ident.account_id)          # told here so a waiting request survives a restart of the person's program
+    return {"conversations": views, "unread": sum(v["unread"] for v in views),
+            "request": {"line": waiting["line"], "at": _iso(waiting["sent_at"])} if waiting else None}
 
 
 @handler("chat.people")

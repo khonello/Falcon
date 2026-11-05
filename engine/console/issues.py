@@ -10,10 +10,9 @@ An issue is raised from something the system already records and resolved when i
 
 A help request is not an issue: it is a ping, and lives in Messages.
 
-    issues.list    {department_id?, pc_id?, type?, owner?: "me"|"unassigned"|<account_id>}   -> issues + the strip's figures
+    issues.list    {department_id?, pc_id?, type?}   -> issues + the strip's figures
     issues.get     {issue_id}                                  -> the issue, what it means, its facts, what can be done, its timeline
     issues.act     {issue_id, key, reason?, message?, pick?}   -> do one of the things `issues.get` offered
-    issues.assign  {issue_id, account_id?}                     -> take it (no account: yourself), give it, or hand it back (null)
     issues.escalate{issue_id, note?}                           -> an Admin sends it up to the head of the organisation
     issues.note    {issue_id, text}                            -> add a line to its timeline
 
@@ -37,7 +36,6 @@ from engine.permissions import (
     int_field,
     kept,
     org_wide,
-    require_department_scope,
     require_role,
     str_field,
 )
@@ -140,9 +138,6 @@ def _iso(value: Any) -> str | None:
 
 
 async def _view(ctx: Context, found: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    ident = ctx.identity
-    names = await ctx.engine.db.accounts.display_names_for(
-        ident.account_id, sorted({i["owner_account_id"] for i in found if i["owner_account_id"]})) if found else {}
     now = datetime.now(timezone.utc)
     out = []
     for i in found:
@@ -153,41 +148,33 @@ async def _view(ctx: Context, found: list[dict[str, Any]]) -> list[dict[str, Any
             "department_id": i["department_id"], "department_name": i["department_name"], "opened_at": _iso(i["opened_at"]),
             "age_hours": round(age, 2), "target_hours": i["target_hours"],
             "past_target": i["state"] != "resolved" and age > i["target_hours"],
-            "owner": {"account_id": i["owner_account_id"], "name": names.get(i["owner_account_id"]),
-                      "you": i["owner_account_id"] == ident.account_id} if i["owner_account_id"] else None,
             "state": i["state"], "label": i["label"] or {"open": "Open", "waiting": "Waiting", "resolved": "Resolved"}[i["state"]],
             "escalated": i["escalated_at"] is not None, "resolved_at": _iso(i["resolved_at"]), "resolution": i["resolution"]})
     return out
 
 
 def _is_mine(i: dict[str, Any], ident: Any) -> bool:
-    """Waiting on this person: theirs, or nobody's in their department (an Admin); the head of the organisation's: escalated to them."""
+    """Waiting on this person: nobody owns an issue, so every open one is any Admin's; the head of the organisation's: what was sent up to them."""
     if i["state"] == "resolved":
         return False
-    if ident.role == "super_user":
-        return i["owner"] is None and i["escalated"] or bool(i["owner"] and i["owner"]["you"])
-    return bool(i["owner"] and i["owner"]["you"]) or (i["owner"] is None and not i["escalated"])
+    return i["escalated"] if ident.role == "super_user" else not i["escalated"]
 
 
 @handler("issues.list")
 async def issues_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"department_id"? (the head of the organisation), "pc_id"?, "type"?, "owner"?: "me"|"unassigned"|<account_id>} -> {"issues": [...], "summary": {...}}.
+    """{"department_id"? (the head of the organisation), "pc_id"?, "type"?} -> {"issues": [...], "summary": {...}}.
     Open and waiting issues, worst first, and those resolved today (so *Done today* can be shown). summary: open, waiting,
     past_target, done_today, mine (waiting on this person), by_type, by_severity."""
     ident = require_role(ctx, "super_user", "admin")
     db = ctx.engine.db
     department = ident.department_id if kept(ident) else int_field(payload, "department_id", required=False)
     type_ = str_field(payload, "type", required=False, choices=tuple(TYPE_LABEL))
-    owner = payload.get("owner")
-    owner_id = ident.account_id if owner == "me" else (int(owner) if isinstance(owner, int) else None)
     midnight = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     raw = await db.issues.list(department_id=department, pc_id=int_field(payload, "pc_id", required=False),
-                               type_=type_, owner_account_id=owner_id, include_resolved_since=midnight)
+                               type_=type_, include_resolved_since=midnight)
     found = await _view(ctx, raw)
     for view, issue in zip(found, raw):
         view["detail"] = issue["detail"]
-    if owner == "unassigned":
-        found = [i for i in found if i["owner"] is None]
     live = [i for i in found if i["state"] != "resolved"]
     by_type: dict[str, int] = {}
     by_sev: dict[str, int] = {}
@@ -222,14 +209,11 @@ async def _timeline(ctx: Context, issue: dict[str, Any]) -> list[dict[str, Any]]
     db = ctx.engine.db
     ident = ctx.identity
     entries = await db.issues.entries(issue["id"])
-    people = {e["actor_account_id"] for e in entries if e["actor_account_id"]} | ({issue["owner_account_id"]} if issue["owner_account_id"] else set())
+    people = {e["actor_account_id"] for e in entries if e["actor_account_id"]}
     names = await db.accounts.display_names_for(ident.account_id, sorted(people)) if people else {}
     out = [{"at": _iso(e["at"]), "who": (names.get(e["actor_account_id"]) if e["actor_account_id"] else "System"),
             "what": e["text"], "kind": e["kind"], "you": e["actor_account_id"] == ident.account_id} for e in entries]
     opened = issue["opened_at"]
-    if issue["owner_account_id"]:
-        owner = "you" if issue["owner_account_id"] == ident.account_id else names.get(issue["owner_account_id"], "someone")
-        out.append({"at": _iso(opened + timedelta(seconds=1)), "who": "System", "what": f"Assigned to {owner}", "kind": "system", "you": False})
     target = opened + timedelta(hours=issue["target_hours"])
     late = datetime.now(timezone.utc) > target and issue["resolved_at"] is None
     out.append({"at": _iso(target), "who": "System", "what": (f"Passed its target time ({issue['target_hours']} h)" if late else f"Target time ({issue['target_hours']} h)"),
@@ -277,33 +261,6 @@ async def issues_act(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     await ctx.engine.audit.record(ctx, "issue.acted", target_type="issues", target_id=issue["id"], pc_id=issue["pc_id"],
                                   detail={"code": issue["code"], "key": payload["key"], "department_id": issue["department_id"]})
     return {"issue": (await _view(ctx, [fresh]))[0], "done": result}
-
-
-@handler("issues.assign")
-async def issues_assign(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    """{"issue_id", "account_id"?}: no account takes it yourself; an Admin of the department (the head of the organisation: any Admin) may be
-    given it; `null` hands it back (unassigned)."""
-    ident = ctx.identity
-    issue = await _load(ctx, int_field(payload, "issue_id"))
-    db = ctx.engine.db
-    target = payload.get("account_id", ident.account_id)
-    if target is not None:
-        who = await db.accounts.by_id(int(target))
-        if who is None or who["status"] != "active" or who["role"] not in ("admin", "super_user"):
-            raise ProtocolError(ErrorCode.INVALID, "an issue is given to an Admin")
-        if who["role"] == "admin":
-            require_department_scope(ident, who["department_id"])
-            if kept(ident) and who["department_id"] != issue["department_id"]:
-                raise ProtocolError(ErrorCode.INVALID, "that Admin is not in this issue's department")
-        elif ident.role != "super_user":
-            raise ProtocolError(ErrorCode.INVALID, "an issue is given to an Admin")
-    await db.issues.assign(issue["id"], None if target is None else int(target))
-    names = await db.accounts.display_names_for(ident.account_id, [int(target)]) if target is not None else {}
-    text = "Handed back, unassigned" if target is None else ("Took it" if target == ident.account_id else f"Given to {names.get(int(target))}")
-    await db.issues.log(issue["id"], "assigned", text, ident.account_id)
-    await ctx.engine.audit.record(ctx, "issue.assigned", target_type="issues", target_id=issue["id"], pc_id=issue["pc_id"],
-                                  detail={"code": issue["code"], "owner": target, "department_id": issue["department_id"]})
-    return {"issue": (await _view(ctx, [await db.issues.get(issue["id"])]))[0]}
 
 
 @handler("issues.escalate")

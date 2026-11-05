@@ -2,7 +2,7 @@
 
 The first thing the Engine does on a new connection is issue the auth challenge (unless
 FALCON_DEV_BYPASS_AUTH). Until `auth.respond` succeeds, only `auth.*` and `system.*` requests
-are accepted, plus the two a machine asking to be registered needs (`enroll.request`, `enroll.wait`).
+are accepted, plus the two a machine asking to be registered needs (`enroll.request`, `enroll.wait`, `enroll.cancel`).
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ log = logging.getLogger(__name__)
 MAX_LINE_BYTES = 4 * 1024 * 1024  # generous: Custom Action scripts and file-sweep batches
 PRE_AUTH_PREFIXES = ("auth.", "system.")
 # The two requests a machine with no key yet may make: asking to be registered, and collecting the answer.
-PRE_AUTH_TYPES = frozenset({"enroll.request", "enroll.wait"})
+PRE_AUTH_TYPES = frozenset({"enroll.request", "enroll.wait", "enroll.cancel"})
 
 
 class Connection:

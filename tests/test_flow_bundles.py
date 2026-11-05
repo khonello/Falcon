@@ -158,7 +158,10 @@ async def test_an_edited_file_under_add_a_date_leaves_only_the_newest_copy(engin
         report.write_text("second", encoding="utf-8")                                   # edited today: a new dated name
         assert await _wait(lambda: len(copies()) == 1 and copies()[0].read_text(encoding="utf-8") == "second", timeout=15)
         assert [p.read_text(encoding="utf-8") for p in (dst / ".falcon-removed").iterdir()] == ["first"]
-        assert (await admin.call("flow.status", {"flow_id": flow["id"]}))["flow"]["files_copied"]["total"] == 2
+
+        async def counted():                                                            # the file lands first; the Worker's report of it follows
+            return (await admin.call("flow.status", {"flow_id": flow["id"]}))["flow"]["files_copied"]["total"] == 2
+        assert await _wait(counted, timeout=10)
     finally:
         await admin.close()
         await w1.stop()

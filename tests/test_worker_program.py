@@ -26,16 +26,13 @@ class Fake:
     """A service that answers like the real one, from memory."""
 
     def __init__(self) -> None:
-        self.started, self.asked, self.acked = [], [], []
+        self.started, self.acked = [], []
 
     async def app_view(self):
         return {"tasks": [{"id": 1, "title": "t", "started": False}], "announcements": [], "admins": [], "connected": True}
 
     async def app_start_task(self, task_id):
         self.started.append(task_id)
-
-    async def app_ask(self, to):
-        self.asked.append(to)
 
     async def app_ack(self, ids):
         self.acked.extend(ids)
@@ -55,9 +52,8 @@ async def test_the_program_asks_the_service_and_the_service_answers_only_with_th
         assert read_info(tmp_path / "worker.json")["port"] == app.port
         assert (await asyncio.to_thread(client.view))["tasks"][0]["id"] == 1
         await asyncio.to_thread(client.start_task, 1)
-        await asyncio.to_thread(client.ask, 7)
         await asyncio.to_thread(client.ack, ["t1"])
-        assert fake.started == [1] and fake.asked == [7] and fake.acked == ["t1"]
+        assert fake.started == [1] and fake.acked == ["t1"]
         # the wrong token, a missing token, nonsense: all refused, and the service carries on
         for line in (b'{"token": "nope", "op": "view"}\n', b'{"op": "view"}\n', b"not json\n", b"[]\n"):
             r, w = await asyncio.open_connection("127.0.0.1", app.port)
@@ -110,9 +106,6 @@ async def test_what_the_program_sees_is_what_concerns_this_person_and_says_when_
         assert any(t["kind"] == "announcement" and t["title"] == "Month end" for t in svc.toasts.values())
         await svc.app_ack(list(svc.toasts))
         assert svc.toasts == {}
-        # asking an Admin for help goes through the service, as a ping
-        await svc.app_ask(org["a1"])
-        assert (await admin.call("assistance.ping_status"))["unaddressed"] == 1
         # the Engine goes away: the program is shown what was last known, and told it is not live
         await svc.conn.close()
         away = await svc.app_view()
@@ -174,13 +167,6 @@ def test_the_program_draws_each_tab_and_says_when_it_is_not_live(tmp_path: Path)
     view = {"connected": False, "as_of": "2026-10-16T10:00:00+00:00",
             "tasks": [{"id": 1, "title": "Collect the signed leave forms", "description": "x", "from": "R. Mensah", "due": "2030-01-02T15:00:00+00:00", "started": False}],
             "announcements": [{"id": 5, "kind": "emergency", "title": "Server room closed", "body": "Saturday.", "from": "Super User", "at": "2026-10-16T09:00:00+00:00"}],
-
-
-def test_open_in_falcon_names_a_tab_and_nothing_else_does():
-    from worker_client.program.__main__ import tab_asked
-
-    assert tab_asked("show messages\n") == "messages"
-    assert tab_asked("show\n") == "" and tab_asked("show nonsense\n") == "" and tab_asked("hide messages\n") == ""
             "admins": [{"account_id": 7, "name": "R. Mensah"}], "toasts": []}
     for tab in ("today", "tasks", "announcements", "machine"):
         out = tmp_path / f"{tab}.png"
@@ -188,3 +174,10 @@ def test_open_in_falcon_names_a_tab_and_nothing_else_does():
                               capture_output=True, text=True, timeout=60, env={**os.environ, "QT_QPA_PLATFORM": "offscreen"}, check=False)
         assert done.returncode == 0 and out.exists() and out.stat().st_size > 2000, done.stderr
         assert "QML:" not in done.stderr, done.stderr                                      # no QML error on any tab
+
+
+def test_open_in_falcon_names_a_tab_and_nothing_else_does():
+    from worker_client.program.__main__ import tab_asked
+
+    assert tab_asked("show messages\n") == "messages"
+    assert tab_asked("show\n") == "" and tab_asked("show nonsense\n") == "" and tab_asked("hide messages\n") == ""

@@ -109,5 +109,4 @@ async def test_a_stuck_update_in_a_department_with_no_admin_can_be_answered_by_p
     res = await su.ok("issues.act", {"issue_id": issue_id, "key": "admin", "account_id": worker["account_id"]})
     done = res["done"]
     assert done["label"] == "Assigned" and done["promoted"]["role"] == "admin" and done["promoted"]["client_key"]
-    assert res["issue"]["owner"]["account_id"] == worker["account_id"]
     assert "admin" not in {o["key"] for o in (await su.ok("issues.get", {"issue_id": issue_id}))["options"]}                    # the department has an Admin now

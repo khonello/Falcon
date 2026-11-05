@@ -262,7 +262,8 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      reference is stripped from what ships.
    - Settled and built: an Admin leaving is known by another Admin offboarding the account (the machine stays and says nothing); what the account still owns (restrictions, flows, rules, actions, tasks to verify, issues) is handed to another Admin with a tool, not a page: TUI `account owns <id>` and `account handover <from> <to>` (`hierarchy.ownership`, `hierarchy.hand_over`; decided 1 Nov 2026).
 
-19. **The Worker's side, as the Worker concept draws it** (the user, 1-2 Nov 2026; `docs/design/concepts-worker.html`, the
+19. **Done 5 Nov 2026, except the one open question at its end.** Ask for help is gone (`ask` window kind, the `ask` op, `ask_for_help`; Window.qml's block is the UI's), the Worker's command line lost `search`, the covers get `since` and `at`.
+    **The Worker's side, as the Worker concept draws it** (the user, 1-2 Nov 2026; `docs/design/concepts-worker.html`, the
     "Falcon Concepts · Worker" artifact, v13; the Admin concept's Messages, Admin v237). The concept is the source of truth for what the
     person at a machine sees; this is what the Engine and the Worker Client need for it.
    - **A Worker replies to an Admin's message.** Today the message window (`worker_client/windows`, kind `message`) only has OK. The reply
@@ -293,7 +294,7 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
      when the machine frees itself. Also: the cover only returns after the Worker reconnects, so a restarted machine is usable for those
      seconds.
 
-20. **What the console's pages draw that the Engine cannot do yet** (2 Nov 2026, the QML rebuilt from the version 1 Admin concept). Each
+20. **Closed: everything here was answered by #23 (checked against the handlers, 5 Nov 2026).** **What the console's pages draw that the Engine cannot do yet** (2 Nov 2026, the QML rebuilt from the version 1 Admin concept). Each
     control is drawn disabled with this reason on it, never faked:
    - **End one program on a machine** (Machines, "Running now", End). There is a `kill_process` built-in action, but no call ends one
      program on one machine from the console; the concept also offers "never allow it", a rule prepared in Automation.
@@ -305,13 +306,13 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - **Take back an allowance** on a restricted copy (Restricted, Allowed copies).
    - **Delete or ask to delete a restricted copy**, and accept or put back a deviation, where `issues.get` marks the option `cannot`.
 
-21. **No ownership of issues between Admins** (the user, 2 Nov 2026: "the idea of ownership between admins, i hate it"). The console no
+21. **Done 5 Nov 2026:** `issues.assign`, the `owner` filter, `owner` on an issue, "Assigned to ..." and the TUI's `issue take / give / free` are gone; `summary.mine` is every open issue. `owner_account_id` stays in the table for the parked department scope. **No ownership of issues between Admins** (the user, 2 Nov 2026: "the idea of ownership between admins, i hate it"). The console no
     longer takes, gives back or shows who has an issue; any Admin acts on any issue (`issues.act` never checked the owner). For the Engine
     session, when it suits: `issues.assign`, the `owner` filter of `issues.list` and `owner` on each issue can go; `issues.get`'s story
     still writes "Assigned to ..." for an issue someone took before this; the TUI's `issue take / give / free` go with them. Nothing in
     the console calls them now.
 
-22. **What the concept's pages draw that the Engine cannot do yet, found matching the pages to the concept** (2 Nov 2026). Each
+22. **Closed: built under #15 and #23; the `winnotify` line is #27 (checked 5 Nov 2026).** **What the concept's pages draw that the Engine cannot do yet, found matching the pages to the concept** (2 Nov 2026). Each
     is drawn disabled with the reason, or drawn from what the Engine has:
    - **A case told in words** (Detective, What Detective noticed): the concept shows a short telling by the local model, with the
      people, files, times and programs marked. `detective.case` has no telling; the page writes the findings out instead and does
@@ -364,14 +365,15 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
    - `hierarchy.pc_register` without `department_id`: the concept registers a machine by name alone ("Put it in a department on Departments"). Until then the console sends the
      first department. The drawer's Found list reads `enroll.list`.
 
-24. **The Worker's program (4 Nov 2026):** Ask IT is built on `talk {line}`. The view needs `request: {line, at}` while one waits, so the waiting card survives a restart (today the program
+24. **Done 5 Nov 2026, with #26.** **The Worker's program (4 Nov 2026):** Ask IT is built on `talk {line}`. The view needs `request: {line, at}` while one waits, so the waiting card survives a restart (today the program
     remembers what it sent until the corner note answers it). `enroll.py` could pass the code and the expiry as fields; the window reads the code out of its text for now.
 
-25. **Announcements is a page (the user, 4 Nov 2026):** `alerts.sent` should answer every Admin's, not only the asker's (nobody owns anything), with `from_name` on each. The drawer sends
+25. **Done 5 Nov 2026:** every Admin's, with `from_name`; any Admin may withdraw one; the calendar links to `["announcements", null]`, so `Nav.remap` can lose its old entry. **Announcements is a page (the user, 4 Nov 2026):** `alerts.sent` should answer every Admin's, not only the asker's (nobody owns anything), with `from_name` on each. The drawer sends
     `announcement`, `warning` or `emergency`; `routine` is not offered.
     `engine/console/calendar.py:119` should link an announcement to `["announcements", null]`; `Nav.remap` covers the old `["messages", "announcements"]` until it does.
 
-26. **The Worker program and windows, as built to the concept (4 Nov 2026).** The QML draws these when they arrive and leaves them out until then; nothing is faked.
+26. **Done 5 Nov 2026** (`tests/test_worker_view.py`, `tests/test_enrollment.py`): all of it, through `task.list {with_items}`, `chat.list`'s `request` and `from_request`, `machines.mine`, and `enroll.cancel` (allowed before sign-in; pushes `enroll.cancelled`). `read_at` is an emergency's only: other announcements have no read tracking, as decided. Found on the way: a started task vanished from the person's program (the view kept only `active`, and starting makes it `in_progress`); every task sign read "a file" and never showed as seen, in the task window too (it read fields the table does not have; its test used a hand-made dict); a title was cut at a file's dot ("Update sales"). All fixed.
+    **The Worker program and windows, as built to the concept (4 Nov 2026).** The QML draws these when they arrive and leaves them out until then; nothing is faked.
     - `app_view` (`worker_client/service.py`): on a task `given`, `started_at`, `signs` (`[{name, seen, program?}]`, as the task window gets); `closed` (`[{id, title, closed_by, closed_at}]`, closed this month);
       on a message `from_request` and `from: "You"` when the last word is the person's; on an announcement `read_at`; `request` (`{line, at}`) for a request still waiting, so it survives a restart;
       in `machine`: `department`, `up_to_date`, `connected_since`.

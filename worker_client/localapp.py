@@ -5,7 +5,6 @@ connection. So the service listens on this machine's loopback address, and the p
 
     {"token": "...", "op": "view"}                      -> {"ok": true, "view": {...}}        what is relevant to this person, right now
     {"token": "...", "op": "start_task", "id": 7}       -> {"ok": true}
-    {"token": "...", "op": "ask", "to": 12}             -> {"ok": true}                       ping an Admin for help
     {"token": "...", "op": "ack", "ids": ["t7"]}        -> {"ok": true}                       the program showed those notes; do not show them again
     {"token": "...", "op": "talk", "line": ".."}        -> {"ok": true}                     the person asks to talk ("Ask IT")
     {"token": "...", "op": "conversation", "id": 4}     -> {"ok": true, "conversation": {...}} one conversation an Admin started, read up to now
@@ -45,7 +44,6 @@ IDLE_SECONDS = 15.0
 class Provider(Protocol):
     async def app_view(self) -> dict[str, Any]: ...
     async def app_start_task(self, task_id: int) -> None: ...
-    async def app_ask(self, to_account_id: int) -> None: ...
     async def app_ack(self, ids: list[str]) -> None: ...
     async def app_talk(self, line: str) -> None: ...
     async def app_conversation(self, conversation_id: int) -> dict[str, Any]: ...
@@ -138,8 +136,6 @@ class LocalApp:
                 return {"ok": True, "view": await self.provider.app_view()}
             if op == "start_task":
                 await self.provider.app_start_task(int(msg["id"]))
-            elif op == "ask":
-                await self.provider.app_ask(int(msg["to"]))
             elif op == "talk":
                 line = msg.get("line")
                 if not isinstance(line, str) or not line.strip():

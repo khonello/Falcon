@@ -234,8 +234,8 @@ async def _wait_to_be_registered(cfg: Any, stop_event: asyncio.Event) -> None:
     from worker_client.enroll import EnrollmentEnded, enroll
     from worker_client.windows.spawn import open_window
 
-    async def show(text: str) -> Any:
-        return await open_window("message", {"text": text, "from": ""})
+    async def show(spec: dict[str, Any]) -> Any:
+        return await open_window("message", {**spec, "from": ""})
 
     while not cfg.client_id and not stop_event.is_set():
         task = asyncio.create_task(enroll(cfg, department_id=cfg.enroll_department, level=cfg.enroll_level,

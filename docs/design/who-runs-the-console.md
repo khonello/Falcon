@@ -81,6 +81,8 @@ User, with a clear confirmation. Behaviour is the same no matter how many Admins
 
 ## Open, for the user to decide
 
+*All settled by `docs/design/v1-it-admin.md` (1-4 Nov 2026): two Admins on one machine are refused; nobody owns an issue and any Admin acts; departments are labels, with no department-level Admins. Kept for the record.*
+
 1. Can the mode change after setup, or is it fixed at install? If it can change, what happens to reports and tasks
    routed under the old mode?
 2. A third shape, a mix where some Admins are IT-wide and some are per department: rule it out, or keep it in view?
