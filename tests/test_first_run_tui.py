@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("prompt_toolkit")
-from prompt_toolkit.application import create_app_session  # noqa: E402
-from prompt_toolkit.input import create_pipe_input  # noqa: E402
-from prompt_toolkit.output.plain_text import PlainTextOutput  # noqa: E402
+from prompt_toolkit.application import create_app_session
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output.plain_text import PlainTextOutput
 
-from operator_client.core.config import LocalConfig  # noqa: E402
-from tests.conftest import requires_db  # noqa: E402
-from worker_client.config import WorkerConfig  # noqa: E402
+from operator_client.core.config import LocalConfig
+from tests.conftest import requires_db
+from worker_client.config import WorkerConfig
 
 pytestmark = [requires_db, pytest.mark.organisation]
 
