@@ -28,19 +28,34 @@ LICENCE = {"name": "Falcon", "reference": "ORD-T",
 ENTER = "\r"
 
 
-async def _type(inp, answers: list[str]) -> None:
-    """Each answer typed into its own dialog: the text, Enter to leave the box, Enter on OK."""
+async def _next_dialog(seen: object) -> object:
+    """Wait, as a person does, until the next dialog is on the screen (asking the Engine can take a moment)."""
+    from prompt_toolkit.application.current import get_app_or_none
+
+    for _ in range(600):
+        app = get_app_or_none()
+        if app is not None and app is not seen and app.is_running:
+            await asyncio.sleep(0.1)                               # drawn and listening
+            return app
+        await asyncio.sleep(0.05)
+    raise AssertionError("no dialog came up")
+
+
+async def _type(inp, answers: list[str | None]) -> None:
+    """Each answer into its own dialog: the text, Enter to leave the box, Enter on OK. None is a message: one Enter."""
+    seen = None
     for answer in answers:
-        await asyncio.sleep(0.6)                                   # the next dialog is up and waiting
-        for ch in answer:
-            inp.send_text(ch)
-            await asyncio.sleep(0.005)
-        inp.send_text(ENTER)
-        await asyncio.sleep(0.15)
+        seen = await _next_dialog(seen)
+        if answer is not None:
+            for ch in answer:
+                inp.send_text(ch)
+                await asyncio.sleep(0.005)
+            inp.send_text(ENTER)
+            await asyncio.sleep(0.15)
         inp.send_text(ENTER)
 
 
-async def _run(ask, cfg, answers: list[str]) -> tuple[object, str]:
+async def _run(ask, cfg, answers: list[str | None]) -> tuple[object, str]:
     screen = io.StringIO()
     with create_pipe_input() as inp, create_app_session(input=inp, output=PlainTextOutput(screen)):
         typing = asyncio.create_task(_type(inp, answers))
@@ -61,7 +76,7 @@ async def test_the_console_tui_asks_says_what_was_wrong_and_joins(engine, org, c
     cfg = LocalConfig(client_id="", tls=False, path=tmp_path / "operator.json")
     address = f"127.0.0.1:{engine.port}"
     # a wrong code first: told so, asked again; then the right one
-    joined, screen = await _run(_ask_setup, cfg, [address, "NOPE-NOPE", "", address, "ADMN-TUIT-ESTS-1111"])
+    joined, screen = await _run(_ask_setup, cfg, [address, "NOPE-NOPE", None, address, "ADMN-TUIT-ESTS-1111"])
     assert joined is True and cfg.client_id and cfg.client_key
     assert "Set up Falcon" in screen and "The Engine's IP address" in screen and "The licence code" in screen
     assert "That is not a licence code this organisation has." in screen
