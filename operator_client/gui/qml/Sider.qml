@@ -183,7 +183,7 @@ Rectangle {
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
                         Txt { text: Nav.myName || falcon.roleLabel; font.weight: Font.Medium; font.pixelSize: Theme.fSmall }
-                        Txt { text: falcon.defaultClientId || ""; mono: true; color: Theme.text3; font.pixelSize: 11 }
+                        Txt { text: Nav.myHost; mono: true; color: Theme.text3; font.pixelSize: 11 }
                     }
                 }
                 // whether a button that opens another page asks first; turned off from that question, back on here

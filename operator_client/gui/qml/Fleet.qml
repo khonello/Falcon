@@ -186,7 +186,7 @@ QtObject {
             }
             outD.push({ id: d.department_id, name: d.name, admins: d.admins || [], machines: ms })
             for (var a = 0; a < (d.admins || []).length; a++)
-                if (d.admins[a].account_id === falcon.accountId) Nav.myName = d.admins[a].name
+                if (d.admins[a].account_id === falcon.accountId) { Nav.myName = d.admins[a].name; Nav.myHost = d.admins[a].hostname || "" }
         }
         if (tree && typeof falcon.cachePut === "function")      // only what a picker needs, not sessions or health
             falcon.cachePut("tree", ds.map(function (d) {

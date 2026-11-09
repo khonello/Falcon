@@ -11,6 +11,7 @@ QtObject {
     property var sub: null
     property string range: "24h"              // 1h | 6h | 24h | 7d, the top bar's, for the pages that read time
     property string me: ""                      // the person at this console, by name
+    property string myHost: ""                  // the signed-in Admin's own workstation: what the sider says under the name, never an id
     property string myName: ""                  // the signed-in Admin's own name, from the tree
     property var counts: ({})                  // page -> {n, hot, pulse}, drawn on the menu
     property int ver: 0                        // bumped when something every page shows changed

@@ -481,3 +481,10 @@ async def test_a_console_that_is_not_set_up_asks_in_the_middle_and_nothing_else(
     modal.setProperty("code", "ADMN-1111")
     modal.setProperty("cert", "C:/engine.crt")
     assert prop(modal, "problem") == "ready"
+
+
+async def test_the_sider_names_the_admins_workstation_never_an_id(console):
+    win, bridge, _ = console("admin")
+    await _open(win, bridge, "overview", "overviewView")
+    text = (Path(__file__).parents[1] / "operator_client/gui/qml/Sider.qml").read_text(encoding="utf8")
+    assert "defaultClientId" not in text and "clientId" not in text                     # a client id is internal: no page shows it
