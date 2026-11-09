@@ -45,6 +45,7 @@ class DriveWatch:
         self.observers: dict[str, Any] = {}
         self.waiting: dict[str, float] = {}
         self.told: dict[str, tuple[int, int]] = {}
+        self.removed: list[str] = []                 # files gone from a drive, to be told: otherwise the index keeps them, and a mark finds a copy that is not there
         self._loop: asyncio.AbstractEventLoop | None = None
         self._task: asyncio.Task[None] | None = None
         self._said_full = False
@@ -95,6 +96,8 @@ class DriveWatch:
                 if getattr(event, "is_directory", False) or watch._loop is None:
                     return
                 kind = event.event_type
+                if kind in ("deleted", "moved"):
+                    watch._loop.call_soon_threadsafe(watch.gone, str(event.src_path))
                 path = str(getattr(event, "dest_path", "") or "") if kind == "moved" else str(event.src_path)
                 if kind in ("created", "modified", "moved") and path:
                     watch._loop.call_soon_threadsafe(watch.touched, kind, path)
@@ -123,6 +126,12 @@ class DriveWatch:
         for path in [p for p in self.told if p.lower().startswith(drive.lower())]:
             del self.told[path]
 
+    def gone(self, path: str) -> None:
+        """A file left a drive. One made and gone before it was ever told (a temporary file) is nobody's news; any other is, even one told before a restart."""
+        self.told.pop(path, None)
+        if self.waiting.pop(path, None) is None and len(self.removed) < MAX_WAITING:
+            self.removed.append(path)
+
     def touched(self, kind: str, path: str) -> None:
         if any(part.lower() in NOT_THE_PERSONS for part in Path(path).parts):
             return
@@ -140,6 +149,15 @@ class DriveWatch:
         self.waiting[path] = time.monotonic()
 
     async def _tell_what_settled(self) -> None:
+        while self.removed:
+            path = self.removed.pop(0)
+            if os.path.exists(path):
+                continue                                # put back before it was told: nothing went
+            event = {"op": "delete", "path": path, "name": os.path.basename(path), "drive": _drive_of(path, self.observers)}
+            try:
+                await self.report("index.event", {"event": event})
+            except Exception as exc:  # noqa: BLE001 -- never let a report failure end the watch
+                log.warning("could not tell that %s went: %s", path, exc)
         now = time.monotonic()
         for path in [p for p, at in self.waiting.items() if now - at >= self.settled]:
             del self.waiting[path]

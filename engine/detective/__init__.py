@@ -184,6 +184,8 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     det = _detector()
     if event.get("drive"):
         det.know_drive(pc_id, str(event["drive"]), time.time())
+        if op == "delete":
+            return                                      # a file taken off a drive is not erasing anything on this machine
     mem = det.mem.get(pc_id)
     if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
         tags.add("allowed")

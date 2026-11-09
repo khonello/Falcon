@@ -164,3 +164,29 @@ async def test_a_file_put_on_a_drive_that_was_plugged_in_before_the_worker_start
     assert cases
     found = [await a1.ok("detective.case", {"case_id": c["id"]}) for c in cases]
     assert "to_drive" in str(found)
+
+
+async def test_a_file_taken_off_a_drive_is_told_as_gone_so_the_index_does_not_keep_it(tmp_path: Path):
+    """Found 9 Nov 2026: files deleted from a stick stayed in the index, and marking the original again raised issues for copies that no longer existed."""
+    sent: list[dict] = []
+    w = await _watching(tmp_path, sent)
+    try:
+        p = tmp_path / "pay.txt"
+        p.write_bytes(b"figures")
+        assert await _until(lambda: any(e["op"] == "create" for e in sent))
+        p.unlink()
+        assert await _until(lambda: any(e["op"] == "delete" for e in sent))
+        gone = next(e for e in sent if e["op"] == "delete")
+        assert gone["path"] == str(p) and gone["drive"] == str(tmp_path) + os.sep
+    finally:
+        await w.stop()
+
+
+@requires_db
+async def test_taking_a_file_off_a_drive_updates_the_index_and_is_not_read_as_covering_up(engine, org, connect):
+    fi = engine.file_index
+    await fi.ingest_event(org["w1_pc"], {"op": "create", "path": "K:\\out\\pay.txt", "hash": "h-pay", "drive": "K:\\"})
+    await fi.ingest_event(org["w1_pc"], {"op": "delete", "path": "K:\\out\\pay.txt", "drive": "K:\\"})
+    await asyncio.sleep(0.2)
+    assert (await engine.db.file_index.by_path(org["w1_pc"], "K:\\out\\pay.txt", present_only=True)) is None
+    assert not any(s.verb == "deleted" for s in detective._detector().mem[org["w1_pc"]].since(0, "deleted"))
