@@ -44,10 +44,11 @@ Page {
         function onConnected() { page.load() }
         function onPushReceived(type, payload) {
             page.lastPush = type
+            // a new row from the audit push itself, as the first rows come from audit.events: its person, machine and kind with it
+            if (type === "audit.event" && payload)
+                page.live = [{ t: Time.ms(payload.at) || Date.now(), kind: payload.kind || Kinds.of(payload.action_type), actor: payload.actor || "System",
+                               what: payload.what || "", host: payload.host || "", id: payload.id, fresh: true }].concat(page.live).slice(0, 30)
             if (type === "todo.changed") falcon.call("todo.list", {}, function (ok, r) { page.todos = ok ? (r.todos || []).filter(function (t) { return !t.done }) : [] })
-        }
-        function onPushText(line, alert) {
-            page.live = [{ t: Date.now(), kind: Kinds.of(page.lastPush), actor: "", what: line, host: "", fresh: true }].concat(page.live).slice(0, 30)
         }
     }
 

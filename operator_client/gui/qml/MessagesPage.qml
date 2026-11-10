@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import "."
 
 // MESSAGES, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminMessagesPage): the people an IT Admin talks to, the
@@ -75,6 +76,44 @@ Page {
     property string pickedId: ""
     readonly property string draft: c ? (drafts[c.id] || "") : ""
     function setDraft(t) { var d = Object.assign({}, drafts); d[c.id] = t; drafts = d }
+    // one file from this machine, sent once (chat.send_file): it arrives as a card they can save
+    property string filePath: ""
+    property string fileWhy: ""
+    property bool fileBusy: false
+    function sendTheFile() {
+        if (!page.c || !filePath || fileBusy) return
+        fileBusy = true
+        var to = page.c.kind === "admins" ? "every Admin" : page.c.title
+        falcon.call("chat.send_file", { conversation_id: page.c.conversation_id, path: filePath }, function (ok, r) {
+            page.fileBusy = false
+            if (!ok) { page.fileWhy = r && r.message ? r.message.charAt(0).toUpperCase() + r.message.slice(1) + "." : "It was not sent."; return }
+            sendFile.close()
+            if (r.state === "asked") Msg.ok("Waiting for " + (r.waits_for || "an IT Admin") + " to agree; " + to + " gets it then")
+            else Msg.ok("Sent to " + to)
+            page.load()
+        })
+    }
+    FileDialog { id: pickFile; title: "A file on this machine"; onAccepted: { page.filePath = decodeURIComponent(String(selectedFile).replace(/^file:\/{3}/, "")); page.fileWhy = "" } }
+    Modal {
+        id: sendFile
+        objectName: "sendFileModal"
+        page: page
+        title: page.c ? "Send a file to " + (page.c.kind === "admins" ? "every Admin" : page.c.title) : "Send a file"
+        Column {
+            width: sendFile.width - 2 * sendFile.pad
+            spacing: 10
+            bottomPadding: 6
+            Row { width: parent.width; spacing: 8
+                Field { width: parent.width - chooseB.width - 8; readOnly: true; text: page.filePath; placeholderText: "A file on your machine" }
+                Btn { id: chooseB; text: "Choose…"; onClicked: pickFile.open() } }
+            Txt { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideNone; color: Theme.text3; font.pixelSize: 13
+                  text: "One file, sent once, up to 100 MB. It arrives as a card they can save. A restricted file waits for whoever restricted it to agree." }
+            Decide { visible: page.fileWhy !== ""; c: Theme.crit; text: page.fileWhy }
+        }
+        footer: Row { spacing: 8
+            Btn { text: "Cancel"; onClicked: sendFile.close() }
+            Btn { objectName: "sendFileGo"; kind: "primary"; text: "Send it"; loading: page.fileBusy; enabled: page.filePath !== "" && !page.fileBusy; onClicked: page.sendTheFile() } }
+    }
     function send() {
         var x = c, text = draft.trim()
         if (!text) return
@@ -364,10 +403,12 @@ Page {
                     color: Theme.surface2
                     border.width: 1
                     border.color: Theme.borderStrong
+                    Btn { id: clipB; objectName: "msgFile"; x: 4; anchors.verticalCenter: parent.verticalCenter; kind: "text"; circle: true; iconName: "paperclip"
+                          tip: "Send a file"; onClicked: { page.fileWhy = ""; page.filePath = ""; sendFile.open() } }
                     TextArea2 {
                         id: ta
-                        x: 6
-                        width: parent.width - 6 - sendB.width - 8
+                        x: clipB.x + clipB.width + 2
+                        width: parent.width - x - sendB.width - 8
                         anchors.verticalCenter: parent.verticalCenter
                         minRows: 1
                         borderless: true

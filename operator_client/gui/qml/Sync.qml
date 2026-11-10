@@ -40,14 +40,11 @@ QtObject {
         if (typeof c === "string") { try { c = JSON.parse(c) } catch (e) { c = {} } }
         if (c.label) return c.label
         if (c.op) return c.op
-        if (st.stage_type === "categorization") return c.by === "month" ? "Sort by month" : "Sort by file type"
         return c.to ? "Convert to " + String(c.to).toUpperCase() : "Transform"
     }
     function stageOut(s, parent) {
         if (s.opId) return { step: { kind: s.kind, op: s.opId, settings: s.settings || {} }, parent_index: parent }      // the Engine's tree (flow.steps)
-        var cfg = { op: s.op }
-        if (s.op === "Sort by file type") cfg.by = "extension"
-        return { stage_type: s.kind === "Categorize" ? "categorization" : "transformation", parent_index: parent, config: cfg }
+        return { stage_type: "transformation", parent_index: parent, config: { op: s.op } }          // a step of the old five, as a stored flow may still have
     }
     // the Engine's tree as the builder's list. Only stages a live destination reaches count: an edit re-creates
     // the stages and the old ones stay on record, unreached. A stage every destination passes is before the split.
@@ -57,7 +54,8 @@ QtObject {
         ;(f.stages || []).forEach(function (s) { by[s.id] = s })
         var chains = (f.destinations || []).map(function (d) {
             var out = [], cur = d.parent_stage_id, guard = 0
-            while (cur !== null && cur !== undefined && by[cur] && guard++ < 64) { if (by[cur].stage_type !== "branch") out.unshift(cur); cur = by[cur].parent_stage_id }
+            // a branch is no step, and a placing step (Sort by file type or by month) was dropped: it means nothing to a file now, and sent back it is refused
+            while (cur !== null && cur !== undefined && by[cur] && guard++ < 64) { if (by[cur].stage_type !== "branch" && by[cur].stage_type !== "categorization") out.unshift(cur); cur = by[cur].parent_stage_id }
             return out
         })
         var ids = []

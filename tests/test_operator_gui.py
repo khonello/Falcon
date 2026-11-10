@@ -361,23 +361,23 @@ QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))
 
 async def test_a_flow_s_steps_keep_their_names_and_their_place(console):
     """The Engine holds the steps as a tree; the page draws them as the concept does, named, before the split or on
-    one branch, and leaves out what an earlier edit left unreached. Saving an edit sends the same tree back."""
+    one branch, and leaves out what an earlier edit left unreached. A placing step (Sort by file type) was dropped on 3 Nov
+    2026: it is left out when the flow is read in, and saving sends back only what the Engine still takes."""
     win, bridge, _ = console("admin")
     view = await _open(win, bridge, "flows", "flowsView")
-    await _wait(lambda: len(prop(view, "steps") or []) == 2)
-    steps = [{"kind": "Categorize", "opId": "", "op": "Sort by file type", "settings": {}, "scope": "all"}, {"kind": "Transform", "opId": "", "op": "Compress to ZIP", "settings": {}, "scope": 1}]
+    await _wait(lambda: len(prop(view, "steps") or []) == 1)
+    steps = [{"kind": "Transform", "opId": "", "op": "Compress to ZIP", "settings": {}, "scope": 1}]   # only the second destination reaches it
     assert prop(view, "steps") == steps
     win.setProperty("view", "flows/edit-5")
     await _wait(lambda: win.findChild(QObject, "newFlow") is not None)
     edit = win.findChild(QObject, "newFlow")
-    await _wait(lambda: len(prop(edit, "stages") or []) == 2)
+    await _wait(lambda: len(prop(edit, "stages") or []) == 1)
     assert prop(edit, "stages") == steps
     QMetaObject.invokeMethod(edit, "save")
     await _wait(lambda: any(t == "flow.edit" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "flow.edit")
-    assert sent["stages"] == [{"stage_type": "categorization", "parent_index": None, "config": {"op": "Sort by file type", "by": "extension"}},
-                              {"stage_type": "transformation", "parent_index": 0, "config": {"op": "Compress to ZIP"}}]
-    assert [d["parent_index"] for d in sent["destinations"]] == [0, 1]
+    assert sent["stages"] == [{"stage_type": "transformation", "parent_index": None, "config": {"op": "Compress to ZIP"}}]
+    assert [d["parent_index"] for d in sent["destinations"]] == [None, 0]
     assert sent["on_source_delete"] == "keep"                                    # kept as it was set
 
 
@@ -488,3 +488,38 @@ async def test_the_sider_names_the_admins_workstation_never_an_id(console):
     await _open(win, bridge, "overview", "overviewView")
     text = (Path(__file__).parents[1] / "operator_client/gui/qml/Sider.qml").read_text(encoding="utf8")
     assert "defaultClientId" not in text and "clientId" not in text                     # a client id is internal: no page shows it
+
+
+async def test_a_live_row_is_built_from_the_audit_push_with_its_person_and_machine(console):
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "overview", "overviewView")
+    bridge.pushReceived.emit("audit.event", {"id": 99, "at": "2026-11-10T00:30:00+00:00", "kind": "session", "actor": "A. Quaye",
+                                             "what": "Entered OPS-04", "host": "OPS-04", "action_type": "session.traverse"})
+    await _wait(lambda: (prop(page, "live") or [{}])[0].get("id") == 99)
+    row = prop(page, "live")[0]
+    assert (row["actor"], row["what"], row["host"], row["kind"]) == ("A. Quaye", "Entered OPS-04", "OPS-04", "session")
+
+
+async def test_a_file_is_sent_from_this_machine_in_a_conversation(console):
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "messages", "messagesView")
+    await _wait(lambda: prop(view, "c") is not None)
+    view.setProperty("filePath", "C:/Users/Admin/Documents/report.pdf")
+    QMetaObject.invokeMethod(view, "sendTheFile")
+    await _wait(lambda: any(t == "chat.send_file" for t, _ in bridge.conn.seen))
+    sent = next(p for t, p in bridge.conn.seen if t == "chat.send_file")
+    assert sent == {"conversation_id": 12, "path": "C:/Users/Admin/Documents/report.pdf"}
+
+
+async def test_a_dropped_placing_step_is_left_out_when_a_flow_is_read_in(console):
+    from PySide6.QtCore import Q_ARG
+
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "flows/new", "newFlow")
+    _pump(0.3)
+    flow = {"id": 41, "name": "old", "source_pc_id": 1, "source_path": "/in/",
+            "stages": [{"id": 1, "parent_stage_id": None, "stage_type": "categorization", "config": {"op": "Sort by file type", "by": "extension"}},
+                       {"id": 2, "parent_stage_id": 1, "stage_type": "renaming", "config": {"kind": "renaming", "op": "add_date", "label": "Add a date", "settings": {}}}],
+            "destinations": [{"id": 3, "destination_pc_id": 2, "destination_path": "/out/", "parent_stage_id": 2}]}
+    QMetaObject.invokeMethod(page, "fill", Q_ARG("QVariant", flow), Q_ARG("QVariant", False))
+    assert [s["op"] for s in prop(page, "stages")] == ["Add a date"]                     # sent back, the Engine would refuse the placing step
