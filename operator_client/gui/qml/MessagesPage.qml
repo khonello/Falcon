@@ -182,6 +182,29 @@ Page {
 
     function initials(n) { return String(n || "?").split(/[ .]+/).filter(function (x) { return x }).map(function (x) { return x[0] }).join("").slice(0, 2) }
     // a person as a round face (ib-av): their initials on surface-3; a group as two small ones (ms-stack), the second behind
+    // one thing someone asks of an Admin, in the middle of the panel: their face, who and from where, their words in a box, then the
+    // answers (the card's children), centred under it
+    component AskCard: Column {
+        id: ac
+        property string who: ""
+        property string head: ""
+        property string where: ""
+        property string quote: ""
+        property bool quoteMono: false
+        property string why: ""
+        default property alias answers: ans.data
+        width: Math.min(520, parent ? parent.width - 48 : 520)
+        spacing: 14
+        Face { size: 56; name: ac.who; anchors.horizontalCenter: parent.horizontalCenter }
+        Column { width: parent.width; spacing: 3
+            Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: ac.head; font.pixelSize: 16; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+            Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: ac.where; font.pixelSize: 13; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone } }
+        Rectangle { width: parent.width; height: qt.height + 32; radius: 10; color: Theme.surface2; border.width: 1; border.color: Theme.border
+            Txt { id: qt; x: 18; y: 16; width: parent.width - 36; horizontalAlignment: Text.AlignHCenter; text: ac.quote; mono: ac.quoteMono; font.pixelSize: 16; font.weight: Font.Medium
+                  wrapMode: ac.quoteMono ? Text.WrapAnywhere : Text.WordWrap; elide: Text.ElideNone } }
+        Txt { visible: ac.why !== ""; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: ac.why; font.pixelSize: 13; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+        Column { id: ans; width: parent.width; spacing: 10; topPadding: 4 }
+    }
     component Face: Item {
         property string name: ""
         property var group: null
@@ -286,64 +309,52 @@ Page {
             fill: true
             readonly property var person: page.personOf(page.c)
             Quiet { visible: page.c === null && page.curReq === null && page.curAsk === null; text: "Pick someone on the left." }
-            // a restricted file waiting for a yes: what it is, why it is held, let it go or keep it
-            Column {
+            // a restricted file waiting for a yes, or a request to talk: one card in the middle of the panel (the user, 10 Nov 2026), not
+            // a conversation: who asks and from where, what they ask in their own words, the yes, and the other answer under a rule
+            Item {
                 objectName: "fileAsk"
                 visible: page.curAsk !== null
                 width: parent.width
-                spacing: 0
-                Item {
-                    width: parent.width
-                    height: 44 + 11
-                    Face { size: 44; name: page.curAsk ? page.curAsk.from : "" }
-                    Column { x: 54; width: parent.width - 54; spacing: 2
-                             Txt { width: parent.width; text: page.curAsk ? page.curAsk.from + " wants to send a restricted file" : ""; font.pixelSize: 14; font.weight: Font.DemiBold; color: Theme.text3 }
-                             Txt { width: parent.width; text: page.curAsk ? (page.curAsk.host ? "From " + page.curAsk.host + (page.curAsk.to ? " to " + page.curAsk.to : "") + " · " : page.curAsk.to ? "To " + page.curAsk.to + " · " : "") + "asked " + page.ago(Time.ms(page.curAsk.at)) + " · every Admin sees this until one of you answers" : ""; font.pixelSize: 13; color: Theme.text3 } }
-                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
-                }
-                Column {
-                    x: 20; topPadding: 18; bottomPadding: 18
-                    width: parent.width - 40
-                    spacing: 12
-                    Rectangle { width: parent.width; height: faq.height + 28; radius: 10; color: Theme.surface2; border.width: 1; border.color: Theme.border
-                                Txt { id: faq; x: 16; y: 14; width: parent.width - 32; text: page.curAsk ? page.curAsk.name : ""; mono: true; font.pixelSize: 16; font.weight: Font.Medium; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone } }
-                    Txt { width: parent.width; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone
-                          text: page.curAsk ? (page.curAsk.why ? "It is restricted: " + page.curAsk.why + ". " : "It is restricted. ") + "Letting it go sends it, once; keeping it means it is not sent, and " + page.curAsk.from + " is told." : "" }
-                    Row { spacing: 8
+                height: parent.height
+                AskCard {
+                    anchors.centerIn: parent
+                    who: page.curAsk ? page.curAsk.from : ""
+                    head: page.curAsk ? page.curAsk.from + " wants to send a restricted file" : ""
+                    where: page.curAsk ? (page.curAsk.host ? "From " + page.curAsk.host : "") + (page.curAsk.to ? (page.curAsk.host ? " to " : "To ") + page.curAsk.to : "")
+                                          + ((page.curAsk.host || page.curAsk.to) ? " · " : "") + "asked " + page.ago(Time.ms(page.curAsk.at)) : ""
+                    quote: page.curAsk ? page.curAsk.name : ""
+                    quoteMono: true
+                    why: page.curAsk ? (page.curAsk.why ? "It is restricted: " + page.curAsk.why + "." : "It is restricted.") + " Every Admin sees this until one of you answers." : ""
+                    Row { spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
                         Btn { objectName: "letItGo"; kind: "primary"; text: "Let it go"; onClicked: page.answer(page.curAsk, true) }
                         Btn { objectName: "keepIt"; text: "Keep it"; onClicked: page.answer(page.curAsk, false) } }
+                    Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          text: page.curAsk ? "Letting it go sends it, once. Keeping it means it is not sent, and " + page.curAsk.from + " is told." : "" }
                 }
             }
-            // a request to talk: who, what they asked, accept it, or close it with a reason
-            Column {
+            Item {
+                objectName: "talkAsk"
                 visible: page.curReq !== null
                 width: parent.width
-                spacing: 0
-                Item {
-                    width: parent.width
-                    height: 44 + 11
-                    Face { size: 44; name: page.curReq ? page.curReq.from : "" }
-                    Column { x: 54; width: parent.width - 54; spacing: 2
-                             Txt { width: parent.width; text: page.curReq ? page.curReq.from + " asks to talk" : ""; font.pixelSize: 14; font.weight: Font.DemiBold; color: Theme.text3 }
-                             Txt { width: parent.width; text: page.curReq ? "Signed in on " + page.curReq.host + " · sent " + page.ago(Time.ms(page.curReq.at)) + " · every Admin sees this request until one of you accepts it" : ""; font.pixelSize: 13; color: Theme.text3 } }
-                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
-                }
-                Column {
-                    x: 20; topPadding: 18; bottomPadding: 18
-                    width: parent.width - 40
-                    spacing: 12
-                    Rectangle { width: parent.width; height: rqq.height + 28; radius: 10; color: Theme.surface2; border.width: 1; border.color: Theme.border
-                                Txt { id: rqq; x: 16; y: 14; width: parent.width - 32; text: page.curReq ? page.curReq.line : ""; font.pixelSize: 16; font.weight: Font.Medium; wrapMode: Text.WordWrap; elide: Text.ElideNone } }
-                    Txt { width: parent.width; text: page.curReq ? "Accepting opens your conversation with " + page.curReq.from + ", with this line in it. The other Admins see that you accepted it." : ""; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone }
-                    Btn { kind: "primary"; text: "Accept and open the conversation"; onClicked: page.acceptReq(page.curReq) }
-                    Item { width: 1; height: 0.1 }
+                height: parent.height
+                AskCard {
+                    anchors.centerIn: parent
+                    who: page.curReq ? page.curReq.from : ""
+                    head: page.curReq ? page.curReq.from + " asks to talk" : ""
+                    where: page.curReq ? "Signed in on " + page.curReq.host + " · sent " + page.ago(Time.ms(page.curReq.at)) : ""
+                    quote: page.curReq ? page.curReq.line : ""
+                    why: "Every Admin sees this request until one of you accepts it."
+                    Btn { anchors.horizontalCenter: parent.horizontalCenter; kind: "primary"; text: "Accept and open the conversation"; onClicked: page.acceptReq(page.curReq) }
+                    Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          text: page.curReq ? "It opens your conversation with " + page.curReq.from + ", this line in it; the other Admins see you took it." : "" }
+                    Item { width: 1; height: 4 }
                     Rectangle { width: parent.width; height: 1; color: Theme.border }
-                    Column { width: parent.width; spacing: 6
-                             Txt { text: "Or close it"; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                             Txt { width: parent.width; text: page.curReq ? page.curReq.from + " is told it was closed, with your reason. They can ask again." : ""; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone }
-                             Row { width: parent.width; spacing: 8
-                                   Field { width: parent.width - clB.width - 8; placeholderText: "Why, in a line they will read"; text: page.reqWhy; onTextEdited: page.reqWhy = text }
-                                   Btn { id: clB; text: "Close the request"; enabled: page.reqWhy.trim() !== ""; onClicked: page.closeReq(page.curReq) } } }
+                    Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; topPadding: 4; text: "Or close it"; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                    Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          text: page.curReq ? page.curReq.from + " is told it was closed, with your reason. They can ask again." : "" }
+                    Row { width: parent.width; spacing: 8
+                          Field { width: parent.width - clB.width - 8; placeholderText: "Why, in a line they will read"; text: page.reqWhy; onTextEdited: page.reqWhy = text }
+                          Btn { id: clB; text: "Close the request"; enabled: page.reqWhy.trim() !== ""; onClicked: page.closeReq(page.curReq) } }
                 }
             }
             // the head (ms-head): their face, who and where, under a rule
