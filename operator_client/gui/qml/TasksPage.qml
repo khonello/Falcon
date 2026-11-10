@@ -115,7 +115,7 @@ Page {
         var its = items(t); if (!its.length || !its.every(function (i) { return i.status === "passed" })) return null
         var m = null; its.forEach(function (i) { var x = Time.ms(i.passed_at || i.updated_at); if (x !== null && (m === null || x > m)) m = x }); return m !== null ? m : lastSign(t)
     }
-    // what the card says beside its bar: early or late against the deadline, or how far through its time
+    // what the card says on the right: early or late against the deadline, or how far through its time
     function barSay(t) {
         var given = Time.ms(t.created_at), fin = Time.ms(t.final_deadline_at)
         if (t.k === "done" || t.k === "verify") { var h = handedAt(t); if (h === null || fin === null) return t.k === "done" ? "closed" : "handed in"
@@ -134,20 +134,6 @@ Page {
             width: (parent.width - 14) * 8 / 12
             title: "The work you gave"
             sub: "one card per task, grouped by what you do about it; click a task for what to do on the right and its targets below, expand it for its dates"
-            // the axis over the bars (iq-axis): what the bar means, and start / due / over over it
-            Item {
-                width: parent.width
-                height: 18
-                Txt { x: 12; width: parent.width - 12 - 12 - 176 - 12 - 210 - 12; anchors.bottom: parent.bottom; text: "the task's own time: start to deadline, then overdue"; font.pixelSize: 12; color: Theme.text3 }
-                Item {
-                    x: parent.width - 12 - 128 - 12 - 210
-                    width: 104; height: 16
-                    anchors.bottom: parent.bottom
-                    Txt { anchors.bottom: parent.bottom; text: "start"; font.pixelSize: 11; color: Theme.text4; elide: Text.ElideNone }
-                    Txt { anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter; text: "due"; font.pixelSize: 11; color: Theme.text4; elide: Text.ElideNone }
-                    Txt { anchors.bottom: parent.bottom; anchors.right: parent.right; text: "over"; font.pixelSize: 11; color: Theme.text4; elide: Text.ElideNone }
-                }
-            }
             Repeater {
                 model: page.groupsDef
                 delegate: Group {
@@ -170,6 +156,7 @@ Page {
                             objectName: "task_" + modelData.id
                             width: grp.cardW
                             actW: 176
+                            midW: 130
                             icon: "checksquare"
                             hot: modelData.k === "late"
                             tint: grp.late
@@ -186,14 +173,6 @@ Page {
                             mid: Row {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 10
-                                TaskBar {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    given: Time.ms(tc.modelData.created_at) || 0
-                                    final_: Time.ms(tc.modelData.final_deadline_at) || (Time.ms(tc.modelData.created_at) + 86400000)
-                                    soft: Time.ms(tc.modelData.soft_deadline_at) || 0
-                                    took: tc.modelData.k === "done" || tc.modelData.k === "verify"
-                                    until: took && page.handedAt(tc.modelData) !== null ? page.handedAt(tc.modelData) : Time.now
-                                }
                                 Txt {
                                     width: 96
                                     horizontalAlignment: Text.AlignRight

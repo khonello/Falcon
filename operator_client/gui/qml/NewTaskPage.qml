@@ -416,8 +416,6 @@ Column {
                         mid: Row {
                             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                             spacing: 10
-                            TaskBar { visible: !!page.t && !!page.t.final; anchors.verticalCenter: parent.verticalCenter; given: Time.now; final_: page.t && page.t.final ? Time.ms(page.t.final) : Time.now + 86400000
-                                      soft: page.t && page.t.soft ? Time.ms(page.t.soft) : 0; until: Time.now }
                             Txt { anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
                                   text: page.t && page.t.final ? Time.waitLen((Time.ms(page.t.final) - Time.now) / 3600000) + " left" : "no deadline" }
                         }
