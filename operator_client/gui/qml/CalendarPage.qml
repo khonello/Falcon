@@ -263,6 +263,7 @@ Page {
         Rectangle {
             id: dayPanel
             objectName: "calendarDay"
+            Pulse { parent: dayPanel; key: page.sel; radius: dayPanel.radius }     // a day picked pulses at once (drawn from what is loaded: no spinner)
             x: month.width + 14
             width: both.width - x
             height: parent.height

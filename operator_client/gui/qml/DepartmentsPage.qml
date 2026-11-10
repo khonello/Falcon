@@ -137,6 +137,7 @@ Page {
             width: (parent.width - 14) * 0.5
             height: two.h
             title: page.cur ? page.cur.name : "No department picked"
+            Pulse { parent: right; key: page.cur ? page.cur.id : null }          // a click on the left pulses it at once (drawn from the list: no spinner)
             sub: page.cur ? Theme.many(page.inD(page.cur.id).length, "machine") + "; a machine is in one department at a time" : ""
             Quiet { visible: !page.cur; text: "Pick a department on the left, or make one below." }
             Item { visible: !!page.cur; width: parent.width; height: ih.height + 6; Txt { id: ih; y: 6; text: page.cur ? "In " + page.cur.name : ""; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2 } }

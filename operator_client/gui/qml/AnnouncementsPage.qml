@@ -99,6 +99,7 @@ Page {
             title: page.cur ? page.words[page.cur.alert_type] || "" : "Nothing picked"
             sub: page.cur ? (page.cur.status === "scheduled" ? "waiting to go out" : page.cur.status === "withdrawn" ? "withdrawn" : "sent") : ""
             gap: 10
+            Pulse { parent: readP; key: page.cur ? page.cur.id : null }          // a click on the left pulses it at once (drawn from the list: no spinner)
             Txt { visible: page.cur !== null; width: parent.width; text: page.cur ? page.cur.title || "" : ""; font.pixelSize: 17; font.weight: Font.Medium; lh: 1.45; wrapMode: Text.WordWrap; elide: Text.ElideNone }
             Txt { visible: page.cur !== null; width: parent.width; text: page.cur ? page.cur.body : ""; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone }
             FactRows { visible: page.cur !== null
