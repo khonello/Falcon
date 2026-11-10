@@ -345,10 +345,10 @@ Page {
             width: (parent.width - page.gap) * 8 / 12
             height: parent.h
             title: "Today"
-            sub: "the hours around now, with Now in the middle; it moves on as the day does"
+            sub: "what has passed today above Now, what comes next below it; it moves on as the day does"
             extra: Txt { text: "The month in Calendar"; color: calA.containsMouse ? Theme.accent : Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
                          MouseArea { id: calA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Nav.go("calendar") } }
-            DayStrip {
+            DayAgenda {
                 width: parent.width
                 items: page.today
             }

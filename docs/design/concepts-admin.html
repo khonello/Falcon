@@ -905,34 +905,21 @@ a { color: var(--accent); text-decoration: none; }
 .ovh-m.rest { background: transparent; border: 1px solid var(--border); color: var(--text-3); font-size: 11.5px; }
 .ovh-m.sm { width: 14px; height: 11px; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 6px; }
 .ovh-key { display: flex; gap: 18px; font-size: 11.5px; color: var(--text-3); margin-top: auto; padding-top: 4px; }
-.ovh-day { position: relative; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); margin-top: 4px; border-top: 1px solid var(--border); }
-.ovh-col { display: flex; flex-direction: column; gap: 6px; min-height: 120px; padding: 8px 8px 4px; border-left: 1px solid var(--grid); min-width: 0; }
-.ovh-col:first-child { border-left: 0; padding-left: 0; }
-.ovh-col.past { opacity: .5; }
 .ds { display: flex; flex-direction: column; gap: 8px; }
 .ao-today > .ds { flex: 1; }
-.ao-today .ovh-day { flex: 1; }
+.ag { display: flex; flex-direction: column; flex: 1; border-top: 1px solid var(--border); margin-top: 4px; }
+.ag-row { display: grid; grid-template-columns: 78px minmax(0, 1fr) minmax(0, 38%); gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--grid); color: var(--text); font-size: 13px; cursor: pointer; }
+.ag-row b { font-weight: 500; }
+.ag-row:hover b { color: var(--accent); }
+.ag-row.past { opacity: .5; }
+.ag-row.late b { color: var(--crit); }
+.ag-now { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 11px; color: var(--accent); }
+.ag-now b { font-weight: 600; white-space: nowrap; }
+.ag-now::after { content: ""; flex: 1; height: 1.5px; background: var(--accent); }
+.ag-empty { padding: 8px 0; font-size: 12.5px; }
 .ds-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
-.ovh-col.now { background: color-mix(in srgb, var(--accent) 4%, transparent); }
-.ovh-col-h { font-size: 11px; color: var(--text-4); }
-.ovh-col.now .ovh-col-h { color: var(--accent); }
-.ovh-ev { display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-size: 11.5px; min-width: 0; position: relative; z-index: 1; }
-.ovh-col-more { font-size: 11.5px; color: var(--text-3); padding-left: 2px; }
-.ovh-col-more:hover { color: var(--accent); }
-.ovh-now { position: absolute; top: 0; bottom: 0; width: 1.5px; background: var(--accent); z-index: 0; }
-.ovh-ev b { font-weight: 600; font-size: 12.5px; }
-.ovh-ev span { color: var(--text-3); }
-.ovh-ev.ann { background: transparent; border-style: dashed; }
-.ovh-ev.late { border-color: color-mix(in srgb, var(--crit) 45%, transparent); }
-.ovh-ev.late b { color: var(--crit); }
-.ovh-ev:hover b { color: var(--accent); }
-.ovh-now b { position: absolute; bottom: 2px; left: 6px; font-size: 11px; font-weight: 600; color: var(--accent); white-space: nowrap; }
 @media (max-width: 760px) {
   .ovh-m { width: 40px; height: 32px; }
-  .ovh-day { grid-template-columns: minmax(0, 1fr); }
-  .ovh-col { border-left: 0; min-height: 0; padding-left: 0; }
-  .ovh-col:not(:has(.ovh-ev)) { display: none; }
-  .ovh-now { display: none; }
   .ib-sit-t { display: none; }
 }
 /* ---- Messages and Calendar, grown into the agreed layouts (22 Oct 2026) ---- */
@@ -4146,22 +4133,26 @@ function AdminMessagesPage({ go, open }) {
 // A day as seven two-hour columns with Now kept in the middle (the user, 23 Oct 2026). The strip moves with the clock, so
 // what is coming shows as it becomes relevant and what is past fades; what is earlier and still open, and what is later,
 // are counted at the foot. Items: { at, title, line, late, ann, to }.
-function DayStrip({ items, go, empty }) {
+// Today as an agenda around Now (the user, 10 Nov 2026, in place of the seven two-hour columns): one line per thing, in time
+// order, with Now between what has passed today and what comes next, so a title is read whole and Now is always where the eye
+// looks. Above Now the last three of the past seven hours, faded; below it the next six, however far off, with their day; what is
+// late is red. At the foot what is earlier and still open, and what comes after those six.
+function DayAgenda({ items, go, empty }) {
   useNow(60000);
-  const now = NOWH + (Date.now() - T0) / 3.6e6, c0 = 2 * Math.floor(now / 2) - 6, end = c0 + 14, cols = Array.from({ length: 7 }, (_, k) => c0 + k * 2);
-  const inW = items.filter((e) => e.at >= c0 && e.at < end), before = items.filter((e) => e.at < c0 && e.late), after = items.filter((e) => e.at >= end);
-  const dayOfH = (h) => Math.floor(h / 24), label = (h, k) => `${(k === 0 || dayOfH(h) !== dayOfH(cols[k - 1])) && dayOfH(h) !== dayOfH(now) ? CAL_DAY0.add(dayOfH(h), "day").format("ddd") + " " : ""}${hhmm(h)}`;
+  const now = NOWH + (Date.now() - T0) / 3.6e6;
+  const past = items.filter((e) => e.at >= now - 7 && e.at < now).slice(-3), next = items.filter((e) => e.at >= now).slice(0, 6);
+  const before = items.filter((e) => e.at < now && e.late && !past.includes(e)), after = items.filter((e) => e.at >= now && !next.includes(e));
+  const when = (h) => `${Math.floor(h / 24) !== Math.floor(now / 24) ? CAL_DAY0.add(Math.floor(h / 24), "day").format("ddd") + " " : ""}${hhmm(h)}`;
+  const row = (e, i, gone) => html`<a key=${i} className=${"ag-row" + (gone ? " past" : "") + (e.late ? " late" : "")} onClick=${e.to} title=${e.title}>
+    <span className="mono t3">${when(e.at)}</span><b className="cut">${e.title}</b><span className="t3 cut">${e.line}${e.late ? " · past its time" : ""}</span></a>`;
   return html`<div className="ds">
-    <div className="ovh-day" style=${{ "--cols": 7 }}>
-      ${cols.map((h, k) => { const es = inW.filter((e) => e.at >= h && e.at < h + 2);
-        return html`<div key=${h} className=${"ovh-col" + (now >= h && now < h + 2 ? " now" : "") + (h + 2 <= now ? " past" : "")}>
-          <span className="ovh-col-h">${label(h, k)}</span>
-          ${es.slice(0, 2).map((e, i) => html`<a key=${i} className=${"ovh-ev" + (e.late ? " late" : "") + (e.ann ? " ann" : "")} onClick=${e.to} title=${e.title}><b className="cut">${e.title}</b><span className="cut">${hhmm(e.at)}, ${e.line}${e.late ? ", past its time" : ""}</span></a>`)}
-          ${es.length > 2 ? html`<a className="ovh-col-more" onClick=${() => go("calendar")}>+${fmt(es.length - 2)} more</a>` : null}</div>`; })}
-      <span className="ovh-now" style=${{ left: `${((now - c0) / 14) * 100}%` }}><b>Now ${hhmm(now)}</b></span>
+    <div className="ag">
+      ${past.map((e, i) => row(e, "p" + i, true))}
+      <div className="ag-now"><b>Now ${hhmm(now)}</b></div>
+      ${next.map((e, i) => row(e, "n" + i, false))}
+      ${!past.length && !next.length ? html`<div className="t3 ag-empty">${empty}</div>` : null}
     </div>
     <div className="ds-foot">${before.length ? html`<a onClick=${() => go("calendar")}>‹ ${fmt(before.length)} earlier, still open</a>` : html`<span />`}
-      <span className="t3">${inW.length ? `${fmt(inW.length)} in these 14 hours; it moves on as the day does` : empty}</span>
       ${after.length ? html`<a onClick=${() => go("calendar")}>${fmt(after.length)} later ›</a>` : html`<span />`}</div>
   </div>`;
 }
@@ -5132,8 +5123,8 @@ function AdminOverviewPage({ go }) {
     </div>
     <div className="g c-84" style=${{ alignItems: "stretch" }}>
       <section className="ib-box ao-today">
-        <header><b>Today</b><span>the hours around now, with Now in the middle; it moves on as the day does</span><span className="sp" /><a className="ib-more" onClick=${() => go("calendar")}>The month in Calendar</a></header>
-        <${DayStrip} go=${go} items=${today} empty="nothing due in these hours" />
+        <header><b>Today</b><span>what has passed today above Now, what comes next below it; it moves on as the day does</span><span className="sp" /><a className="ib-more" onClick=${() => go("calendar")}>The month in Calendar</a></header>
+        <${DayAgenda} go=${go} items=${today} empty="nothing due in these hours" />
       </section>
       <section className="ib-box">
         <header><b>Live activity</b><span className="live"><i />on your machines, as it happens</span></header>
