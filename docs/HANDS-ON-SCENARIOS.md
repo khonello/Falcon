@@ -2,6 +2,8 @@
 
 *All four were run end to end on 5 Nov 2026 with real Notepad and File Explorer, driven by keystroke, and passed. Copying out was tried on a real USB stick and a real USB hard disk.*
 
+*On 10 Nov 2026 the user copied a restricted file by hand three times in File Explorer (to another folder, to the USB hard disk, to a pendrive), copying other text in between. Each copy raised its own issue, and each issue's Delete this copy removed it. The pendrive copy read as "done by a program the person started": who was at the keyboard was asked only once the copy had settled, by when the hands were off. Fixed the same day (fb81ca8): it is asked when the file first appears.*
+
 You will use Falcon the way real people would, and check it notices. There are four scenarios, about 50 minutes in all. Do them in order. Each one stands alone, so you can stop between them.
 
 | | Scenario | What it proves | Time |
