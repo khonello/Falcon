@@ -227,7 +227,14 @@ def _step(e: Sig) -> list[str | Fact]:
     else:
         out = [_file(e.path) if e.path else Fact("reason", e.name or v, None), f" ({v})"]
     if "restricted" in e.tags and e.path:
-        out += [", ", Fact("tag", "a restricted file", "restricted")]
+        # said next to the file it is about ("payroll.txt, a restricted file, was created"), never left trailing at the end, where a rewording read it
+        # as a second thing that happened ("was created at 13:56 and a restricted file", hands-on test, 10 Nov 2026)
+        tag = Fact("tag", "a restricted file", "restricted")
+        at = next((i for i, x in enumerate(out) if isinstance(x, Fact) and x.kind == "file" and x.value == e.path), None)
+        if at is None or at == len(out) - 1:
+            out += [", ", tag]
+        else:
+            out[at + 1:at + 1] = [", ", tag, ","]
     return out
 
 

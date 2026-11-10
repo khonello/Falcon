@@ -128,3 +128,16 @@ async def test_with_no_groq_key_the_model_is_never_asked_and_the_engine_s_own_ac
     told = (await su.ok("detective.case", {"case_id": c["id"]}))["telling"]
     await asyncio.sleep(0.2)
     assert told["smoothed"] is False and told["text"].startswith("Nobody was signed in") and engine.llm.asked == []
+
+
+def test_a_restricted_file_is_called_so_next_to_its_name_not_at_the_end_of_the_sentence():
+    """Hands-on, 10 Nov 2026: "payroll.txt was created, a restricted file" was reworded to "was created at 13:56 and a restricted file"."""
+    from common.detective import Sig
+    from engine.detective.telling import _step
+
+    def said(verb: str, path: str, old: str = "") -> str:
+        return "".join(x if isinstance(x, str) else x.text for x in _step(Sig(0.0, 1, verb, path, old, "", "", "hand", "", tags=frozenset({"restricted"}))))
+
+    assert said("created", r"D:\payroll.txt") == "payroll.txt, a restricted file, was created"
+    assert said("deleted", r"C:\x\payroll.txt") == "payroll.txt, a restricted file, was deleted"
+    assert said("renamed", r"C:\x\pay.txt", r"C:\x\payroll.txt") == "payroll.txt was renamed to pay.txt, a restricted file"
