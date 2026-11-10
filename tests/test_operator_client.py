@@ -300,6 +300,27 @@ async def test_scripted_marks(engine, org, tmp_path: Path):
     assert "now kept to anywhere on the pc" in out[4] and "unmarked" in out[5] and "0 marks" in out[6]
 
 
+async def test_scripted_marks_private_and_watch(engine, org, tmp_path: Path):
+    """mark as=private names who may open it (and the Admin making it is always one); as=watch notes and refuses nothing; mark readers changes who."""
+    from common.connection import EngineConnection as Raw
+
+    a1 = Raw("127.0.0.1", engine.port, client_id="cid-a1", tls=False, derived_key=key_for("cid-a1"), hostname="FIN-ADM")
+    await a1.connect()
+    try:
+        await a1.call("index.event", {"event": {"op": "create", "path": "C:/HR/reviews.docx", "hash": "R1"}})
+        await a1.call("index.event", {"event": {"op": "create", "path": "D:/Board/minutes.docx", "hash": "M1"}})
+        out = await run_script(_cfg(engine, tmp_path, "cid-a1"), [
+            "connect", f"mark C:/HR/reviews.docx as=private readers={org['w1']}", "mark D:/Board/minutes.docx as=watch", "marks",
+            "mark show 1", f"mark readers 1 {org['w1']},{org['w2']} system=0"])
+    finally:
+        await a1.close()
+    assert "M-1 file reviews.docx on FIN-ADM: 1 file(s), private," in out[1] and "may open it" in out[1]
+    assert "M-2 file minutes.docx on FIN-ADM: 1 file(s), watched" in out[2]
+    assert "2 marks" in out[3] and "private" in out[3] and "watch" in out[3] and "2 may open it" in out[3]
+    assert "may open it:" in out[4] and "refused:" in out[4] and "nobody" in out[4]
+    assert f"accounts {', '.join(str(a) for a in sorted([org['a1'], org['w1'], org['w2']]))} may open it" in out[5] and "the system account may not" in out[5]
+
+
 async def test_scripted_rules_and_deviations(engine, org, tmp_path: Path):
     from common.connection import EngineConnection as Raw
 

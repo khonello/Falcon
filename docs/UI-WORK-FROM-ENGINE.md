@@ -12,8 +12,12 @@ once the Engine has it: ENGINE-GAPS 29); Run now on a flow that copies only when
 when a flow is read in (sent back it was refused); editing a rule keeps its own time limits (`rule_limit_s`).
 
 **Not drawn, and why** (for the user to decide, not passed over):
-- **Watch and Private marks** (`protection`, `readers`, `allow_system`, `marks.readers`, `refusals`, `private.*` pushes): the concept's
-  Restrict drawer makes only Restricted marks. The concept shows Watch and Private only as the tag of a file sent in a conversation.
+- ~~**Watch and Private marks**~~ **drawn 10 Nov 2026** (the user: one page, renamed): the Restricted page is now **Protected files** (its key
+  is still `restricted`, so every link lands where it did). Protect something asks Restricted, Private or Watch first (`marks.create`'s
+  `protection`, and for Private `readers` + `allow_system`); each mark carries its tag, the list filters by it; a Private mark shows who may
+  open it, what its machine did (`applied`) and who was refused (`refusals`), with Change who may open it (`marks.readers`); copies, allowed
+  copies and flows stay Restricted's alone. The TUI: `mark <path> as=private readers=<ids> [system=0]`, `as=watch`, `mark readers`. The
+  concept is not drawn yet (the user: the QML first). Watch notes what the file events say (changed, copied, moved); opens are not seen.
 - **Network readings and "would it have fired" (`threshold.network`, `control.threshold_backtest`):** only in the concept's old rule editor;
   the rule drawer the console opens offers CPU, memory, disk and failed sign-ins.
 - **Bundling greys Real time, and which destinations convert Office files (`converter`):** not in the concept. Saving a flow the Engine

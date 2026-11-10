@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from operator_client.tui.render import table
-from operator_client.tui.shell import Args, ShellContext, command
+from operator_client.tui.shell import Args, ShellContext, UsageError, command
 
 
 @command("violations", usage="[all]", help_="Resource violations you can see (`all` includes resolved)")
@@ -44,15 +44,17 @@ async def journey(ctx: ShellContext, args: Args) -> str:
     return "\n".join([head, ""] + lines)
 
 
-@command("marks", usage="[all|department]", help_="Restricted marks: files and folders marked where they are")
+@command("marks", usage="[all|department]", help_="Protected files: marked where they are, restricted, private or watched")
 async def marks_list(ctx: ShellContext, args: Args) -> str:
     scope = args.positional[0] if args.positional and args.positional[0] in ("all", "department") else "mine"
     res = await ctx.call("marks.list", {"scope": scope})
-    rows = [{"id": m["id"], "code": m["code"], "kind": m["kind"], "name": m["name"], "on": m["host"], "allowed": m["keep_label"],
+    rows = [{"id": m["id"], "code": m["code"], "kind": m["kind"], "as": m.get("protection") or "restricted", "name": m["name"], "on": m["host"],
+             "allowed": m["keep_label"] if (m.get("protection") or "restricted") == "restricted" else
+             f"{len(m.get('readers') or [])} may open it" if m.get("protection") == "private" else "anyone (noted)",
              "files": m["files"], "versions": m["versions"], "copies": m["copies"], "worst": m["worst"] or ""} for m in res["marks"]]
     s = res["summary"]
     return (f"{s['marks']} marks, {s['files']} files, {s['copies']} copies found elsewhere\n\n"
-            + (table(rows, ["id", "code", "kind", "name", "on", "allowed", "files", "versions", "copies", "worst"]) if rows else "(none)"))
+            + (table(rows, ["id", "code", "kind", "as", "name", "on", "allowed", "files", "versions", "copies", "worst"]) if rows else "(none)"))
 
 
 @command("mark", "assess", "<path> [<path>...]", "What marking these would cost, before doing it: files, how long, and whether it is too large")
@@ -65,17 +67,58 @@ async def mark_assess(ctx: ShellContext, args: Args) -> str:
     return "\n".join(lines)
 
 
-@command("mark", usage="<path> [<path>...] [keep=machine|path] [confirm_large=1]", help_="Mark files or folders restricted, where they are (nothing is moved)")
+def _ids(raw: str | None) -> list[int]:
+    try:
+        return [int(x) for x in (raw or "").split(",") if x.strip()]
+    except ValueError as exc:
+        raise UsageError("readers are account ids separated by commas, e.g. readers=21,27") from exc
+
+
+@command("mark", usage="<path> [<path>...] [as=restricted|private|watch] [keep=machine|path] [readers=<id>,<id>] [system=0] [confirm_large=1]",
+         help_="Protect files or folders where they are (nothing is moved): restricted (the default), private to the people named, or watched")
 async def mark_create(ctx: ShellContext, args: Args) -> str:
-    res = await ctx.call("marks.create", {"paths": list(args.positional), "keep": args.opt("keep") or "machine", "confirm_large": bool(args.opt("confirm_large"))})
-    return "\n".join(f"{m['code']} {m['kind']} {m['name']} on {m['host']}: {m['files']} file(s), kept to {m['keep_label'].lower()}" for m in res["marks"]) \
+    prot = args.opt("as") or "restricted"
+    payload: dict = {"paths": list(args.positional), "protection": prot, "keep": args.opt("keep") or "machine", "confirm_large": bool(args.opt("confirm_large"))}
+    if prot == "private":
+        payload["readers"] = _ids(args.opt("readers"))
+        payload["allow_system"] = args.opt("system") not in ("0", "no", "false")
+    res = await ctx.call("marks.create", payload)
+
+    def said(m: dict) -> str:
+        if m.get("protection") == "private":
+            return "private, " + (", ".join(r["name"] or f"account {r['account_id']}" for r in m.get("readers") or []) or "only you") + " may open it"
+        if m.get("protection") == "watch":
+            return "watched, every change, copy and move noted"
+        return f"kept to {m['keep_label'].lower()}"
+    return "\n".join(f"{m['code']} {m['kind']} {m['name']} on {m['host']}: {m['files']} file(s), {said(m)}" for m in res["marks"]) \
         + (f"\n{res['copies_found']} copy(ies) already elsewhere" if res["copies_found"] else "")
+
+
+@command("mark", "readers", "<mark_id> <id>,<id>... [system=0]", "Change who may open a private file or folder (account ids; you are always one)")
+async def mark_readers(ctx: ShellContext, args: Args) -> str:
+    payload: dict = {"mark_id": args.get_int(0, "mark_id"), "readers": _ids(args.positional[1] if len(args.positional) > 1 else "")}
+    if args.opt("system") is not None:
+        payload["allow_system"] = args.opt("system") not in ("0", "no", "false")
+    res = await ctx.call("marks.readers", payload)
+    return (f"M-{res['mark_id']}: accounts {', '.join(str(a) for a in res['readers'])} may open it"
+            + ("" if res["allow_system"] else "; the system account may not") + ("" if res["applied_now"] else " (its machine is told when it connects)"))
 
 
 @command("mark", "show", "<mark_id>", "One mark: where it is allowed, its copies, and what changing it would do")
 async def mark_show(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("marks.get", {"mark_id": args.get_int(0, "mark_id")})
     m, ch = res["mark"], res["change"]
+    prot = m.get("protection") or "restricted"
+    if prot != "restricted":
+        out = [f"{m['code']} {m['name']} on {m['host']}: {prot}, {m['files']} file(s)"]
+        if prot == "private":
+            a = m.get("applied") or {}
+            out.append("may open it: " + (", ".join(r["name"] or f"account {r['account_id']}" for r in m.get("readers") or []) or "only whoever made it private")
+                       + ("" if m.get("allow_system", True) else "; the system account may not"))
+            out.append("on the machine: " + ("set" if a.get("ok") else a.get("waiting") or a.get("error") or "not yet"))
+            out.append("refused:\n" + ("\n".join(f"  {r['at'][:16].replace('T', ' ')}  {r['who'] or 'someone'}  {r['process'] or ''}" for r in m.get("refusals") or []) or "  nobody"))
+        out.append("lately:\n" + ("\n".join(f"  {e['at'][:16].replace('T', ' ')}  {e.get('who') or ''} {e['what']}" for e in res.get("lately") or []) or "  nothing"))
+        return "\n".join(out)
     out = [f"{m['code']} {m['name']} on {m['host']}: {m['keep_label']}, {m['files']} file(s), {m['versions']} version(s)"]
     out.append("copies elsewhere:\n" + (table([{"issue": c["code"], "severity": c["severity"], "on": c["host"], "file": c["file"],
                                                "signed in": c["signed_in"] or "", "state": c["label"]} for c in res["copies"]],

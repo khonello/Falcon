@@ -66,7 +66,7 @@ QtObject {
     // Three groups (19 Oct 2026): Home, Core (the four features), Manage.
     readonly property var menu: [
         ["Home", [["overview", "Overview", "dashboard"], ["messages", "Messages", "message"], ["announcements", "Announcements", "notification"], ["calendar", "Calendar", "calendar"]]],
-        ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Restricted", "fileprotect"], ["detective", "Detective", "filesearch"]]],
+        ["Core", [["tasks", "Tasks", "checksquare"], ["flows", "Flows", "branches"], ["restricted", "Protected", "fileprotect"], ["detective", "Detective", "filesearch"]]],
         ["Manage", [["machines", "Machines", "desktop"], ["departments", "Departments", "apartment"], ["actions", "Actions", "playcircle"], ["automation", "Automation", "thunderbolt"],
                     ["issues", "Issues", "alert"], ["audit", "Audit log", "history"]]]
     ]
@@ -94,7 +94,7 @@ QtObject {
         sessions: ["Sessions", "Who is on which machine, and who entered whose"],
         issues: ["Issues", "Violations, deviations and anything waiting on someone"],
         tasks: ["Tasks", "Assigned work and the evidence for it"],
-        restricted: ["Restricted", "Files marked to stay where they are · a copy anywhere else is caught"],
+        restricted: ["Protected files", "Files kept to their place, kept private or watched · nothing is moved"],
         flows: ["Flows", "One-way file pipelines between machines"],
         automation: ["Automation", "Rules, conditions and every run"],
         rollout: ["Rollout", "Versions and the gate to the next one"],

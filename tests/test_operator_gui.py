@@ -160,8 +160,21 @@ class _Connection:
             return {"issue": {**ISSUE, "state": "resolved"}, "done": "ok"}
         if type_ == "marks.list":
             return {"marks": [{"id": 3, "kind": "folder", "name": "Payroll", "pc_id": 101, "host": "WS-OPS-A1", "path": "C:/HR/Payroll", "keep": "path",
-                               "files": 24, "versions": 30, "copies": 1, "by": {"account_id": 7, "you": True}}],
-                    "summary": {"marks": 1, "files": 24, "copies": 1, "with_copies": 1}}
+                               "files": 24, "versions": 30, "copies": 1, "by": {"account_id": 7, "you": True}},
+                              {"id": 5, "kind": "file", "name": "reviews.docx", "pc_id": 101, "host": "WS-OPS-A1", "path": "C:/HR/reviews.docx", "keep": "machine",
+                               "files": 1, "versions": 1, "copies": 0, "by": {"account_id": 7, "you": True}, "protection": "private", "allow_system": True,
+                               "readers": [{"account_id": 7, "name": "R. Mensah"}, {"account_id": 9, "name": "A. Quaye"}],
+                               "applied": {"ok": True, "at": _ago(5), "granted": [], "missing": []},
+                               "refusals": [{"who": "Kojo", "account_id": 21, "process": "WINWORD.EXE", "path": "C:/HR/reviews.docx", "at": _ago(1), "machine": "WS-OPS-A1"}]},
+                              {"id": 6, "kind": "folder", "name": "Board", "pc_id": 101, "host": "WS-OPS-A1", "path": "D:/Board", "keep": "machine",
+                               "files": 3, "versions": 1, "copies": 0, "by": {"account_id": 7, "you": True}, "protection": "watch", "readers": [], "refusals": []}],
+                    "summary": {"marks": 3, "files": 28, "copies": 1, "with_copies": 1}}
+        if type_ == "marks.readers":
+            return {"mark_id": payload["mark_id"], "readers": sorted(set(payload["readers"]) | {7}), "allow_system": payload.get("allow_system", True), "applied_now": True}
+        if type_ == "chat.people":
+            return {"people": [{"account_id": 9, "name": "A. Quaye", "role": "admin", "pc_id": 102, "hostname": "WS-OPS-A2", "department": None, "online": True},
+                               {"account_id": 27, "name": "Ama", "role": "worker", "pc_id": 7, "hostname": "OPS-07", "department": "Operations", "online": True}],
+                    "admins_group": True}
         if type_ == "marks.tree":
             files = ["C:\\Finance\\budget-2026.xlsx", "C:\\Finance\\Invoices\\q3.csv", "C:\\HR\\Payroll\\salaries.csv", "D:\\Board\\minutes.docx"]
             return {"pc_id": 101, "hostname": "WS-OPS-A1", "truncated": False,
@@ -353,7 +366,58 @@ async def test_restricting_finds_it_by_search_and_what_is_restricted_cannot_be_p
     page.confirmed.emit()
     await _wait(lambda: any(t == "marks.create" for t, _ in bridge.conn.seen))
     sent = next(p for t, p in bridge.conn.seen if t == "marks.create")
-    assert sent == {"paths": [r"C:\Finance"], "keep": "path", "confirm_large": False}
+    assert sent == {"paths": [r"C:\Finance"], "protection": "restricted", "keep": "path", "confirm_large": False}
+
+
+async def test_protected_files_shows_each_mark_with_its_tag_and_only_a_restricted_one_looks_for_copies(console):
+    """Protected files (the page's key is still "restricted"): every mark carries its tag, the list filters by it, and copies,
+    allowed copies and flows are the Restricted marks' alone; the page opens where it did, on what has copies."""
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "restricted", "restrictedView")
+    await _wait(lambda: len(prop(page, "marks")) == 3)
+    assert {k["name"]: k["prot"] for k in prop(page, "marks")} == {"Payroll": "restricted", "reviews.docx": "private", "Board": "watch"}
+    assert [k["name"] for k in prop(page, "rmarks")] == ["Payroll"]
+    assert prop(page, "cur")["name"] == "Payroll"
+    sit = prop(page, "situation")
+    assert "3 things are protected on 1 machine: 1 restricted, 1 private and 1 watched." in sit and "Someone was refused a private file this week." in sit
+    page.setProperty("show", "private")
+    _pump(0.2)
+    assert [k["name"] for k in prop(page, "shownMarks")] == ["reviews.docx"]
+    private = next(k for k in prop(page, "marks") if k["prot"] == "private")
+    assert private["readers"][1]["name"] == "A. Quaye" and private["refusals"][0]["who"] == "Kojo"
+
+
+async def test_who_may_open_a_private_file_is_changed_in_place(console):
+    """Change who may open it: ticked from chat.people, without the Admin at this console (the Engine always adds them), sent as marks.readers."""
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "restricted", "restrictedView")
+    await _wait(lambda: len(prop(page, "marks")) == 3)
+    private = next(k for k in prop(page, "marks") if k["prot"] == "private")
+    QMetaObject.invokeMethod(page, "changeReaders", Q_ARG("QVariant", private))
+    await _wait(lambda: len(prop(page, "people")) == 2)
+    assert prop(page, "readersPick") == [9]
+    page.setProperty("readersPick", [9, 27])
+    page.setProperty("readersSystem", False)
+    QMetaObject.invokeMethod(page, "saveReaders")
+    await _wait(lambda: any(t == "marks.readers" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "marks.readers") == {"mark_id": 5, "readers": [9, 27], "allow_system": False}
+
+
+async def test_protecting_something_asks_how_and_a_private_one_names_who_may_open_it(console):
+    """Protect something: Restricted, Private or Watch. Private sends the people named and whether backup may open it; Watch sends no place rule of its own."""
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "restricted/mark", "markFiles")
+    await _wait(lambda: len(prop(page, "files") or []) > 0)
+    QMetaObject.invokeMethod(page, "take", Q_ARG("QVariant", r"C:\HR\reviews.docx"), Q_ARG("QVariant", "file"))
+    page.setProperty("prot", "private")
+    page.setProperty("readers", [27])
+    page.setProperty("step", 2)
+    _pump(0.2)
+    assert prop(page, "confirmText") == "Make it private"
+    page.confirmed.emit()
+    await _wait(lambda: any(t == "marks.create" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "marks.create") == {"paths": [r"C:\HR\reviews.docx"], "protection": "private", "keep": "machine",
+                                                                           "confirm_large": False, "readers": [27], "allow_system": True}
 
 
 QML_FILES = sorted(Path(QML_DIR).glob("*.qml"))

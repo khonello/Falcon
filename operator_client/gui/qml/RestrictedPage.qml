@@ -1,10 +1,12 @@
 import QtQuick
 import "."
 
-// RESTRICTED, at both levels: only what the person at this console marked. A file or folder is marked
-// where it already is; nothing is copied into a special place. The mark keeps it to its machine or to
-// its exact place, and a copy found anywhere else is an issue. The list, the mark beside it with its
-// copies, and where it is drawn under both.
+// PROTECTED FILES (the page's key stays "restricted", so every link to it still lands here; the user, 10 Nov 2026). A file or folder is
+// marked where it already is; nothing is copied into a special place. A mark is one of the Engine's three tags (marks.*'s protection):
+//   Restricted  kept to its machine or its exact place; a copy found anywhere else is an issue, and no flow carries it unallowed
+//   Private     only the people named may open it; Windows refuses anyone else, and each refusal is noted (marks.readers changes who)
+//   Watch       nothing is refused; every change, copy and move is noted under it
+// The list, the mark beside it with its copies, and where it is drawn under both. Copies, allowed copies and flows are Restricted's alone.
 //
 // With the Engine's marks (marks.list / marks.get) a mark is the person's own, its copies are issues,
 // and a copy is dealt with through that issue's options (issues.get / issues.act). Without them, the
@@ -73,7 +75,7 @@ Page {
         })
     }
     Component.onCompleted: load()
-    Connections { target: falcon; function onPushReceived(type) { if (/^resource/.test(type)) page.load() } }
+    Connections { target: falcon; function onPushReceived(type) { if (/^resource|^private\.|^mark\./.test(type)) page.load() } }
 
     // a mark per file name copies were found of, worst copy first
     readonly property var marks: mk !== null ? mk.map(function (m) {
@@ -82,7 +84,8 @@ Page {
                      sev: c.severity === "medium" ? "warning" : c.severity }
         }) : []
         return { id: String(m.id), mid: m.id, name: m.name, kind: m.kind, host: m.host, pc: m.pc_id, path: m.path, keep: m.keep, files: m.files, n: m.copies, copies: cs,
-                 tracked: m.tracked, generated: m.generated || 0, carried: m.carried_by || [], versions: m.versions, by: m.by, at: m.created_at }
+                 tracked: m.tracked, generated: m.generated || 0, carried: m.carried_by || [], versions: m.versions, by: m.by, at: m.created_at,
+                 prot: m.protection || "restricted", readers: m.readers || [], refusals: m.refusals || [], applied: m.applied || null, allowSystem: m.allow_system !== false }
     }) : readVio()
     function readVio() {
         var by = {}, out = []
@@ -97,6 +100,25 @@ Page {
         return out.sort(function (a, b) { return b.n - a.n })
     }
     readonly property var rows: marks
+    // what only a Restricted mark has: copies looked for, copies allowed, flows held
+    readonly property var rmarks: marks.filter(function (k) { return !k.prot || k.prot === "restricted" })
+    function countOf(p) { return marks.filter(function (k) { return (k.prot || "restricted") === p }).length }
+    // the list's filter: every tag, or one
+    property string show: "all"
+    readonly property var shownMarks: show === "all" ? marks : marks.filter(function (k) { return (k.prot || "restricted") === show })
+    readonly property var protWords: ({ restricted: ["Restricted", "stop"], "private": ["Private", "lock"], watch: ["Watch", "eye"] })
+    function protWord(k) { return (protWords[k.prot || "restricted"] || protWords.restricted)[0] }
+    function protIcon(k) { return (protWords[k.prot || "restricted"] || protWords.restricted)[1] }
+    function readerNames(k) { return (k.readers || []).map(function (r) { return r.account_id === falcon.accountId ? "you" : r.name || "account " + r.account_id }) }
+    // what the mark's machine did with a Private mark (marks.list's applied)
+    function appliedWord(k) {
+        var a = k.applied
+        if (!a) return "being set on " + k.host
+        if (a.waiting) return "waiting: " + a.waiting
+        if (!a.ok) return "not set on " + k.host + (a.error ? ": " + a.error : "")
+        return "set on " + k.host + (a.at ? " " + page.agoWord(a.at) : "") + (a.missing && a.missing.length ? "; " + Theme.many(a.missing.length, "person", "people") + " left out until their Windows name is known" : "")
+    }
+    function recentRefusals() { var wk = Time.now - 7 * 86400000; return marks.reduce(function (n, k) { return n + (k.refusals || []).filter(function (r) { return Time.ms(r.at) >= wk }).length }, 0) }
     // opens on what has the most copies away from home
     readonly property var byCopies: marks.slice().sort(function (a, b) { return b.n - a.n || a.name.localeCompare(b.name) })
     readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return byCopies.length ? byCopies[0] : null }
@@ -110,7 +132,7 @@ Page {
     readonly property string myHost: { for (var i = 0; i < marks.length; i++) if (marks[i].pc === falcon.pcId) return marks[i].host
                                        var m = Fleet.byPc[falcon.pcId]; return m ? m.host : "" }
     readonly property int nFolders: marks.filter(function (k) { return k.kind === "folder" }).length
-    readonly property int leaked: marks.filter(function (k) { return k.n > 0 }).length
+    readonly property int leaked: rmarks.filter(function (k) { return k.n > 0 }).length
     function where(k) { return k.kind === "folder" ? k.path : String(k.path || "").replace(/[^\\/]+$/, "") }
     function marked(k) { return (k.at ? Time.day(k.at) : "—") + " by " + (!k.by || k.by.you ? "you" : k.by.name || "someone") }
     function allow(c) {
@@ -140,7 +162,7 @@ Page {
     onMkChanged: loadAll()
     readonly property var allCopyRows: {
         var out = []
-        marks.forEach(function (k) {
+        rmarks.forEach(function (k) {
             var d = k.mid !== undefined ? page.det[k.mid] : null
             ;((d && d.copies) || []).forEach(function (c) { out.push({ k: k, c: c, id: String(c.issue_id) }) })
         })
@@ -148,7 +170,7 @@ Page {
     }
     readonly property var allowedRows: {
         var out = []
-        marks.forEach(function (k) {
+        rmarks.forEach(function (k) {
             var d = k.mid !== undefined ? page.det[k.mid] : null
             ;((d && d.allowed) || []).forEach(function (c) { out.push({ k: k, c: c }) })
         })
@@ -158,7 +180,7 @@ Page {
     property var heldFlows: []
     readonly property var carrying: {
         var out = []
-        marks.forEach(function (k) {
+        rmarks.forEach(function (k) {
             var d = k.mid !== undefined ? page.det[k.mid] : null
             ;((d && d.flows_allowed) || []).forEach(function (f) { out.push({ k: k, f: f, held: false }) })
         })
@@ -180,8 +202,8 @@ Page {
     function ownerOf(h) { return h === myHost ? "you" : (admTiles.filter(function (x) { return x.h === h })[0] || {}).who || (Fleet.byHost[h] || {}).user || "nobody signed in" }
     // what is listed, five marks a page, by the machine they live on (your own first)
     property int pg: 0
-    readonly property var hostOrder: marks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }).sort(function (a, b) { return (b === page.myHost) - (a === page.myHost) || a.localeCompare(b) })
-    readonly property var ordered: hostOrder.reduce(function (o, h) { return o.concat(marks.filter(function (k) { return k.host === h }).sort(function (a, b) { return a.name.localeCompare(b.name) })) }, [])
+    readonly property var hostOrder: shownMarks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }).sort(function (a, b) { return (b === page.myHost) - (a === page.myHost) || a.localeCompare(b) })
+    readonly property var ordered: hostOrder.reduce(function (o, h) { return o.concat(shownMarks.filter(function (k) { return k.host === h }).sort(function (a, b) { return a.name.localeCompare(b.name) })) }, [])
     readonly property int pages: Math.max(1, Math.ceil(ordered.length / 5))
     readonly property int pi: Math.min(pg, pages - 1)
     readonly property var markPage: ordered.slice(pi * 5, pi * 5 + 5)
@@ -225,23 +247,72 @@ Page {
         for (var i = 0; i < d.options.length; i++) if (d.options[i].key === key) return d.options[i]
         return null
     }
+    function stopWord(k) { return k.prot === "private" ? "Stop keeping it private" : k.prot === "watch" ? "Stop watching" : "Stop restricting" }
     function unmark(k) {
-        confirm.ask({ title: "Stop restricting " + k.name + "?", text: "Copies of it are no longer looked for, and flows may carry it. " + (k.n ? "The copies already caught stay listed until you deal with them. " : "") + "The audit log records that you did it.",
-                      ok: "Stop restricting", danger: true },
+        var say = k.prot === "private" ? ["Stop keeping " + k.name + " private?", "Its machine puts back the permissions it had before, so whoever could open it then can open it again. "]
+                : k.prot === "watch" ? ["Stop watching " + k.name + "?", "What happens to it is no longer noted. What was noted stays in the audit log. "]
+                : ["Stop restricting " + k.name + "?", "Copies of it are no longer looked for, and flows may carry it. " + (k.n ? "The copies already caught stay listed until you deal with them. " : "")]
+        confirm.ask({ title: say[0], text: say[1] + "The audit log records that you did it.", ok: page.stopWord(k), danger: true },
                     function () { falcon.call("marks.unmark", { mark_id: k.mid }, function (ok, r) {
                         if (!ok) { Msg.failed(r && r.message ? r.message : "Not changed"); return }
-                        Msg.ok(k.name + " is no longer restricted · recorded"); page.load() }) })
+                        Msg.ok(k.name + (k.prot === "private" ? " is no longer private" : k.prot === "watch" ? " is no longer watched" : " is no longer restricted") + " · recorded"); page.load() }) })
+    }
+    // Private: who may open it, changed in place (marks.readers); the Engine adds whoever changes it
+    property var people: []
+    property var readersOf: null
+    property var readersPick: []
+    property bool readersSystem: true
+    property bool readersBusy: false
+    function changeReaders(k) {
+        readersOf = k
+        readersPick = (k.readers || []).map(function (r) { return r.account_id }).filter(function (a) { return a !== falcon.accountId })
+        readersSystem = k.allowSystem
+        if (!people.length) falcon.call("chat.people", {}, function (ok, r) { page.people = ok && r ? r.people || [] : [] })
+        readersM.open()
+    }
+    function saveReaders() {
+        var k = readersOf
+        if (!k || readersBusy) return
+        readersBusy = true
+        falcon.call("marks.readers", { mark_id: k.mid, readers: readersPick, allow_system: readersSystem }, function (ok, r) {
+            page.readersBusy = false
+            if (!ok) { Msg.failed(r && r.message ? r.message.charAt(0).toUpperCase() + r.message.slice(1) : "Not changed"); return }
+            readersM.close()
+            Msg.ok("Who may open " + k.name + " is changed" + (r.applied_now ? "" : "; " + k.host + " is told when it connects") + " · recorded")
+            page.load()
+        })
+    }
+    Modal {
+        id: readersM
+        objectName: "readersModal"
+        page: page
+        title: page.readersOf ? "Who may open " + page.readersOf.name : "Who may open it"
+        subtitle: page.readersOf ? page.readersOf.host + " " + page.readersOf.path : ""
+        Column {
+            width: readersM.width - 2 * readersM.pad
+            spacing: 12
+            bottomPadding: 6
+            ReadersPick { people: page.people; picked: page.readersPick; onChanged: function (ids) { page.readersPick = ids } }
+            Check { controlled: true; checked: page.readersSystem; text: "Let backup and antivirus open it too (the machine's system account)"; onToggled: function (v) { page.readersSystem = v } }
+        }
+        footer: Row { spacing: 8
+            Btn { text: "Cancel"; onClicked: readersM.close() }
+            Btn { objectName: "readersSave"; kind: "primary"; text: "Save who may open it"; loading: page.readersBusy; enabled: !page.readersBusy; onClicked: page.saveReaders() } }
     }
     property bool loading: false
     property string pickedKey: ""
     Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
 
     situation: {
-        if (!marks.length) return "Nothing is restricted yet. Restrict a file or folder below; it stays where it is and a copy anywhere else is caught."
+        if (!marks.length) return "Nothing is protected yet. Protect a file or folder below; it stays where it is."
         var hosts = marks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }), hit = hostsHit()
         var carries = carrying.filter(function (c) { return !c.held }).map(function (c) { return c.f.flow || ("flow " + c.f.flow_id) }), first = allCopyRows[0]
-        return Theme.many(marks.length, "thing") + (marks.length === 1 ? " is" : " are") + " restricted on " + Theme.many(hosts.length, "machine") + ". "
-               + (first ? Theme.many(allCopyRows.length, "copy", "copies") + " turned up elsewhere, on " + Theme.listNames(hit) + "; the worst is " + first.c.file + " on " + first.c.host + "." : "Everything is where it belongs.")
+        var kinds = [[countOf("restricted"), "restricted"], [countOf("private"), "private"], [countOf("watch"), "watched"]].filter(function (x) { return x[0] > 0 })
+        var refused = recentRefusals()
+        return Theme.many(marks.length, "thing") + (marks.length === 1 ? " is" : " are") + " protected on " + Theme.many(hosts.length, "machine")
+               + (kinds.length > 1 ? ": " + kinds.map(function (x) { return x[0] + " " + x[1] }).join(", ").replace(/, ([^,]*)$/, " and $1") : kinds.length ? ", all " + kinds[0][1] : "") + ". "
+               + (refused ? Theme.many(refused, "person was", "people were").replace(/^1 person was$/, "Someone was") + " refused a private file this week. " : "")
+               + (!rmarks.length ? "" : first ? Theme.many(allCopyRows.length, "copy", "copies") + " turned up elsewhere, on " + Theme.listNames(hit) + "; the worst is " + first.c.file + " on " + first.c.host + "." : "Everything is where it belongs.")
                + (allowedRows.length ? " " + Theme.many(allowedRows.length, "copy", "copies").replace(/^(\d+) copy$/, "$1 copy") + (allowedRows.length === 1 ? " is" : " are") + " allowed elsewhere." : "")
                + (carries.length ? " " + Theme.listNames(carries) + (carries.length === 1 ? " carries" : " carry") + " something restricted." : "")
     }
@@ -308,8 +379,17 @@ Page {
             objectName: "markCards"
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, mapP.implicitHeight)
-            title: "What is restricted"
-            sub: "everything marked restricted, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it"
+            title: "What is protected"
+            sub: "everything marked, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it"
+            extra: Segmented {
+                objectName: "protShow"
+                visible: page.marks.length > 0
+                small: true
+                options: [{ value: "all", label: "All · " + page.marks.length }, { value: "restricted", label: "Restricted · " + page.countOf("restricted") },
+                          { value: "private", label: "Private · " + page.countOf("private") }, { value: "watch", label: "Watch · " + page.countOf("watch") }]
+                value: page.show
+                onPicked: function (v) { page.show = v; page.pg = 0 }
+            }
             Repeater {
                 model: page.hostOrder
                 delegate: Group {
@@ -321,7 +401,7 @@ Page {
                     width: markP.innerW
                     spaced: index > 0
                     cardGap: 5
-                    title: modelData + " · " + page.marks.filter(function (k) { return k.host === hg.modelData }).length
+                    title: modelData + " · " + page.shownMarks.filter(function (k) { return k.host === hg.modelData }).length
                     sub: page.ownerOf(modelData)
                     Repeater {
                         model: hg.xs
@@ -330,7 +410,7 @@ Page {
                             required property var modelData
                             objectName: "mark_" + modelData.id
                             width: hg.cardW
-                            midW: 200
+                            midW: 290
                             actW: 150
                             padV: 7
                             icon: modelData.kind === "folder" ? "folder" : "file"
@@ -346,30 +426,65 @@ Page {
                             mid: Row {
                                 anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
                                 spacing: 14
-                                Txt { text: kc.modelData.keep === "machine" ? "anywhere on " + kc.modelData.host : "only where it is"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                                Txt { text: kc.modelData.at ? "since " + Time.day(kc.modelData.at) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                                Tag { objectName: "prot_" + kc.modelData.id; text: page.protWord(kc.modelData); iconName: page.protIcon(kc.modelData); anchors.verticalCenter: parent.verticalCenter }
+                                Txt { anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                                      text: kc.modelData.prot === "private" ? Theme.many(page.readerNames(kc.modelData).length, "person", "people") + " may open it"
+                                            : kc.modelData.prot === "watch" ? "every change noted"
+                                            : kc.modelData.keep === "machine" ? "anywhere on " + kc.modelData.host : "only where it is" }
+                                Txt { anchors.verticalCenter: parent.verticalCenter; text: kc.modelData.at ? "since " + Time.day(kc.modelData.at) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                             }
-                            // opened: its rule, what happened to it lately, and Stop restricting
+                            // opened: its rule, what happened to it lately (and, when private, who was refused), and Stop
                             Column {
                                 width: parent.width
                                 spacing: 10
                                 Column {
+                                    id: facts
                                     y: 2
-                                    width: Math.min(parent.width, 420)
+                                    width: Math.min(parent.width, 460)
+                                    readonly property var k: kc.modelData
+                                    readonly property var rowsOf: {
+                                        var covers = ["Covers", k.kind === "folder" ? Theme.many(k.files || 0, "file") + ", and any added later" : "1 file"]
+                                        var tail = [["Since", Time.day(k.at)], ["Marked by", !k.by || k.by.you ? "you" : k.by.name || "an Admin"]]
+                                        if (k.prot === "private")
+                                            return [["Where", k.host + " " + k.path], ["Rule", "Only the people named may open it; Windows refuses anyone else"], ["May open it", page.readerNames(k).join(", ") || "only whoever made it private"],
+                                                    ["Backup, antivirus", k.allowSystem ? "may open it" : "refused like anyone else"], ["On the machine", page.appliedWord(k)], covers].concat(tail)
+                                        if (k.prot === "watch")
+                                            return [["Where", k.host + " " + k.path], ["Rule", "Anyone may open, copy or move it; every change, copy and move is noted"], covers].concat(tail)
+                                        return [["Where", k.host + " " + k.path], ["Rule", "It " + page.ruleOf(k)], covers, ["Recognised by", "content, " + Theme.many(k.versions || 0, "version") + " remembered"]].concat(tail)
+                                    }
                                     Repeater {
-                                        model: [["Where", kc.modelData.host + " " + kc.modelData.path], ["Rule", "It " + page.ruleOf(kc.modelData)],
-                                                ["Covers", kc.modelData.kind === "folder" ? Theme.many(kc.modelData.files || 0, "file") + ", and any added later" : "1 file"],
-                                                ["Restricted", Time.day(kc.modelData.at)], ["Recognised by", "content, " + Theme.many(kc.modelData.versions || 0, "version") + " remembered"], ["Marked by", !kc.modelData.by || kc.modelData.by.you ? "you" : kc.modelData.by.name || "an Admin"]]
+                                        model: facts.rowsOf
                                         delegate: Item {
                                             required property var modelData
                                             required property int index
                                             width: parent.width
                                             height: fv.height + 10
                                             Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                            Txt { id: fv; x: 132; y: 5; width: parent.width - 132 + 24; text: modelData[1]; font.pixelSize: 13; mono: index === 0; wrapMode: Text.Wrap; elide: Text.ElideNone }
-                                            Rectangle { visible: index < 5; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                            Txt { id: fv; x: 132; y: 5; width: parent.width - 132 + 24; text: modelData[1]; font.pixelSize: 13; mono: index === 0; wrapMode: Text.Wrap; elide: Text.ElideNone
+                                                  color: modelData[0] === "On the machine" && facts.k.applied && facts.k.applied.ok === false && !facts.k.applied.waiting ? Theme.crit : Theme.text }
+                                            Rectangle { visible: index < facts.rowsOf.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                         }
                                     }
+                                }
+                                // Private: who was refused, in grey (marks.list's refusals, the last ten)
+                                Column {
+                                    visible: kc.modelData.prot === "private"
+                                    width: parent.width
+                                    readonly property var said: kc.modelData.refusals || []
+                                    Txt { topPadding: 4; bottomPadding: 3; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
+                                    Repeater {
+                                        model: parent.said
+                                        delegate: Item {
+                                            required property var modelData
+                                            width: parent.width; height: rv.height + 11
+                                            Txt { y: 5; width: 90; text: page.agoWord(modelData.at); color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                            Txt { id: rv; x: 100; y: 5; width: parent.width - 100; textFormat: Text.RichText; font.pixelSize: 13; color: Theme.text2
+                                                  text: "<span style='font-weight:600'>" + (modelData.who || "someone") + "</span> was refused" + (modelData.process ? " in " + modelData.process : "")
+                                                        + " <font color='" + Theme.text3 + "'>" + (modelData.machine || "") + (modelData.path && modelData.path !== kc.modelData.path ? " " + modelData.path : "") + "</font>" }
+                                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                                        }
+                                    }
+                                    Txt { visible: parent.said.length === 0; text: "Nobody has been refused it."; color: Theme.text3; font.pixelSize: 13 }
                                 }
                                 Column {
                                     width: parent.width
@@ -385,17 +500,20 @@ Page {
                                             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                         }
                                     }
-                                    Txt { visible: parent.log.length === 0; text: "Nothing has happened to it since it was restricted."; color: Theme.text3; font.pixelSize: 13 }
+                                    Txt { visible: parent.log.length === 0; text: "Nothing has happened to it since it was " + (kc.modelData.prot === "private" ? "made private." : kc.modelData.prot === "watch" ? "watched." : "restricted."); color: Theme.text3; font.pixelSize: 13 }
                                 }
                                 Rectangle { width: parent.width; height: 1; color: Theme.border }
-                                Btn { anchors.right: parent.right; small: true; danger: true; iconName: "stop"; text: "Stop restricting"; onClicked: page.unmark(kc.modelData) }
+                                Row { anchors.right: parent.right; spacing: 8
+                                    Btn { visible: kc.modelData.prot === "private"; objectName: "readers_" + kc.modelData.id; small: true; iconName: "team"; text: "Change who may open it"; onClicked: page.changeReaders(kc.modelData) }
+                                    Btn { small: true; danger: true; iconName: "stop"; text: page.stopWord(kc.modelData); onClicked: page.unmark(kc.modelData) } }
                             }
                         }
                     }
                 }
             }
             StepPager { visible: page.pages > 1; width: parent.width; from: page.pi * 5 + 1; to: Math.min(page.ordered.length, page.pi * 5 + 5); total: page.ordered.length; pageNo: page.pi; pages: page.pages; onStep: function (d) { page.pg = page.pi + d } }
-            Quiet { visible: page.marks.length === 0; text: "Nothing restricted yet. Restrict something below." }
+            Quiet { visible: page.marks.length === 0; text: "Nothing protected yet. Protect something below." }
+            Quiet { visible: page.marks.length > 0 && page.shownMarks.length === 0; text: "Nothing is " + (page.show === "watch" ? "watched" : page.show) + " yet." }
         }
         // --- where it is, across every machine -----------------------------------------------------------------
         Box {
@@ -406,7 +524,9 @@ Page {
             title: "Where it is, across every machine"
             readonly property var copies: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].copies || [] : []
             readonly property var allowedHere: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].allowed || [] : []
-            sub: page.cur ? "<b><font color='" + Theme.text + "'>" + page.cur.name + "</font></b> · " + (copies.length ? Theme.many(copies.length, "copy", "copies") + " away from home" : "only at home") : "pick something on the left"
+            sub: page.cur ? "<b><font color='" + Theme.text + "'>" + page.cur.name + "</font></b> · " + (page.cur.prot === "private" ? "private where it is; copies are not looked for"
+                                : page.cur.prot === "watch" ? "watched where it is; copies are not looked for"
+                                : copies.length ? Theme.many(copies.length, "copy", "copies") + " away from home" : "only at home") : "pick something on the left"
             Column {
                 width: parent.width
                 spacing: 0
@@ -613,16 +733,16 @@ Page {
         }
     }
 
-    // --- restrict something: a few careful steps, so it has its own page ---------------------------------------
+    // --- protect something: a few careful steps, so it has its own page ---------------------------------------
     Box {
         objectName: "restrictSomething"
         width: parent.width
         accentFoot: true
-        title: "Restrict something"
-        sub: "it stays where it is and you keep using it; a copy anywhere else is caught"
+        title: "Protect something"
+        sub: "it stays where it is and you keep using it"
         GiveSteps {
-            steps: [["Pick what to restrict", "a file or a folder on this PC, found by a search or picked in Explorer"], ["Say where it may be", "only exactly where it is, or anywhere on this PC"], ["Check and restrict", "copies already elsewhere are found and listed straight away"]]
-            act: "Restrict something"
+            steps: [["Pick what to protect", "a file or a folder on this PC, found by a search or picked in Explorer"], ["Say how", "restricted to its place, private to the people you name, or watched"], ["Check and protect", "a restricted one's copies elsewhere are found and listed straight away"]]
+            act: "Protect something"
             onGo: Nav.go("restricted", "mark")
         }
     }

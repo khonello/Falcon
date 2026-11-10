@@ -527,12 +527,29 @@ def _mark_host(host: str) -> int:
 def marks_list(role: str, account: int) -> dict[str, Any]:
     ms = [{"id": _mark_id(k["id"]), "code": k["id"], "kind": k["kind"], "name": k["name"], "pc_id": _mark_host(k["host"]), "host": k["host"], "path": k["path"], "keep": k["keep"],
            "keep_label": "Anywhere on the PC" if k["keep"] == "machine" else "Only in its place", "by": {"account_id": _BY.get(k["by"], 0), "name": k["by"], "you": k["by"] == "R. Mensah"}, "files": k["files"], "versions": k["versions"],
-           "copies": len(k["copies"]), "worst": k["copies"][0]["sev"] if k["copies"] else None, "created_at": _day_at(k["at"])} for k in _RS["marks"]]
+           "copies": len(k["copies"]), "worst": k["copies"][0]["sev"] if k["copies"] else None, "created_at": _day_at(k["at"]), "protection": "restricted"} for k in _RS["marks"]]
+    ms += _other_marks()
     return {"marks": ms, "summary": {"marks": len(ms), "files": sum(m["files"] for m in ms), "copies": sum(m["copies"] for m in ms), "with_copies": sum(1 for m in ms if m["copies"])}}
+
+
+def _other_marks() -> list[dict[str, Any]]:
+    """A Private and a Watch mark on the Admin's own PC (marks.create's protection), beside the concept's Restricted ones."""
+    base = {"pc_id": 101, "host": "WS-OPS-A1", "keep": "machine", "keep_label": "Anywhere on the PC", "versions": 1, "copies": 0, "worst": None, "by": {"account_id": 7, "name": "R. Mensah", "you": True}}
+    return [{**base, "id": 90, "code": "M-90", "kind": "file", "name": "reviews-2026.docx", "path": "C:\\HR\\Reviews\\reviews-2026.docx", "files": 1, "created_at": _day_at("2 Oct"),
+             "protection": "private", "allow_system": True, "readers": [{"account_id": 7, "name": "R. Mensah"}, {"account_id": 9, "name": "A. Quaye"}, {"account_id": 27, "name": "Ama"}],
+             "applied": {"ok": True, "at": at(-30), "granted": ["WS-OPS-A1\\rmensah", "OPS\\aquaye", "OPS\\ama"], "missing": [], "error": None},
+             "refusals": [{"who": "Kojo", "account_id": 21, "process": "WINWORD.EXE", "path": "C:\\HR\\Reviews\\reviews-2026.docx", "at": at(-3.2), "machine": "WS-OPS-A1"}]},
+            {**base, "id": 91, "code": "M-91", "kind": "folder", "name": "Board", "path": "D:\\Board", "files": 3, "created_at": _day_at("6 Oct"),
+             "protection": "watch", "allow_system": True, "readers": [], "applied": None, "refusals": []}]
 
 
 def marks_get(mid: int, account: int) -> dict[str, Any]:
     m = next(x for x in marks_list("admin", account)["marks"] if x["id"] == mid)
+    if m["protection"] != "restricted":
+        lately = [{"at": at(-1.5), "who": "R. Mensah", "what": "changed", "path": m["path"], "where": m["host"]},
+                  {"at": at(-26), "who": "A. Quaye", "what": "copied", "path": m["path"], "where": m["host"]}] if m["protection"] == "watch" else []
+        return {"mark": m, "copies": [], "allowed": [], "lately": lately, "flows_allowed": [], "resolved_copies": [],
+                "change": {"keep": "path", "effect": {"would_flag": 0, "would_clear": 0}}}
     k = next(x for x in _RS["marks"] if _mark_id(x["id"]) == mid)
     who = {x[1]: x[2] for x in MACHINES}
     copies = [{"issue_id": next(i[0] for i in ISSUES if i[1] == c["id"]), "code": c["id"], "severity": c["sev"], "state": "open", "label": "Open", "host": c["host"], "file": c["file"], "folder": c["folder"],
