@@ -523,3 +523,21 @@ async def test_a_dropped_placing_step_is_left_out_when_a_flow_is_read_in(console
             "destinations": [{"id": 3, "destination_pc_id": 2, "destination_path": "/out/", "parent_stage_id": 2}]}
     QMetaObject.invokeMethod(page, "fill", Q_ARG("QVariant", flow), Q_ARG("QVariant", False))
     assert [s["op"] for s in prop(page, "stages")] == ["Add a date"]                     # sent back, the Engine would refuse the placing step
+
+
+async def test_a_restricted_file_waiting_for_a_yes_is_answered_from_messages(console):
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "messages", "messagesView")
+    bridge.pushReceived.emit("chat.file_consent_request", {"file_id": 77, "name": "budget.xlsx", "from_account_id": 21, "from": "Kojo", "why": ["restricted on OPS-01"]})
+    await _wait(lambda: len(prop(view, "asks") or []) == 1)
+    bridge.pushReceived.emit("chat.file_consent_request", {"file_id": 77, "name": "budget.xlsx", "from": "Kojo"})
+    _pump(0.2)
+    assert len(prop(view, "asks")) == 1                                                   # the same file asked twice is one request
+    view.setProperty("sel", "f77")
+    await _wait(lambda: prop(view, "curAsk") is not None)
+    assert prop(view, "c") is None                                                        # the request is what is open, not a conversation
+    QMetaObject.invokeMethod(view, "answer", Q_ARG("QVariant", prop(view, "curAsk")), Q_ARG("QVariant", True))
+    await _wait(lambda: any(t == "chat.file_consent" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "chat.file_consent") == {"file_id": 77, "grant": True}
+    await _wait(lambda: prop(view, "asks") == [])
+

@@ -383,6 +383,14 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
     - *(built 5 Nov 2026)* `by` on a locked cover: a lock run by hand names who, as the person there knows them. A rule's lock has nobody to name and says "your Admin".
     - A reinstalled machine that rejoins with a licence code becomes a new machine and takes another seat (`enrollment._join_with_licence` always provisions). Its old record stays.
 
+29. **A restricted file sent in a conversation is only asked for by a push (found 10 Nov 2026, checking UI-WORK-FROM-ENGINE).** `chat.file_consent_request`
+    reaches whoever is connected at that moment; a console that is closed never hears it, and nothing lists what still waits, so the sender waits forever
+    (`chat_files.waiting_for` exists, but no handler calls it, and in version 1 `consent_account_id` is null, so it would find nothing). The console now
+    draws "Files waiting for a yes" in Messages from the push and calls **`chat.files_waiting {}`** on load, which the Engine should answer with
+    `{files: [{file_id, name, from, host, to, at, why: [..]}]}`: every file in state `asked` that this caller may answer (theirs, or any when nobody is named
+    and the caller is an org-wide Admin), named as the caller names people. Also: `chat.file_consent` runs SQL in the handler
+    (`db.pool.execute("UPDATE chat_files ...")`); it belongs in the repo.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

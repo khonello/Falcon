@@ -1056,6 +1056,9 @@ def answer(type_: str, payload: dict[str, Any], role: str, account: int, dept_id
     if type_.startswith(("detective.", "proposals.")):
         import preview_detective
         return preview_detective.answer(type_, payload, role, dept_id)
+    if type_ == "chat.files_waiting":
+        return {"files": [{"file_id": 501, "name": "budget-2026.xlsx", "from": "Ama", "host": "OPS-07", "to": "Kojo", "at": at(-0.4),
+                           "why": ["it is a copy of a file restricted on WS-OPS-A1"]}]}
     if type_.startswith("chat."):
         return _chat(type_, payload, account)
     if type_ == "todo.list":

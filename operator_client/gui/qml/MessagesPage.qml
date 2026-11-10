@@ -16,6 +16,9 @@ Page {
     property var people: []
     property bool adminsGroup: false
     property var thread: null             // chat.get for the one picked
+    // a restricted file someone wants to send waits for a yes: from the push chat.file_consent_request, and from chat.files_waiting once the
+    // Engine lists them (ENGINE-GAPS 29; a push alone is lost while this console is closed)
+    property var asks: []
     property var requests: []             // requests to talk (chat.requests; ENGINE-GAPS #19: the section stays away until the Engine keeps them)
     property var flows: []                // what is open between you and someone, said above the conversation
     property var tasks: []
@@ -31,6 +34,7 @@ Page {
         falcon.call("chat.list", {}, function (ok, r) { page.convs = ok ? (r.conversations || []) : []; page.loadThread() })
         falcon.call("chat.people", {}, function (ok, r) { page.people = ok ? (r.people || []) : []; page.adminsGroup = ok && !!r.admins_group })
         falcon.call("chat.requests", {}, function (ok, r) { page.requests = ok ? (r.requests || []) : [] })
+        falcon.call("chat.files_waiting", {}, function (ok, r) { if (ok) page.asks = (r.files || []).map(page.askOf) })
         falcon.call("flow.list", {}, function (ok, r) { page.flows = ok ? (r.flows || []) : [] })
         falcon.call("task.list", {}, function (ok, r) { page.tasks = ok ? (r.tasks || []) : [] })
     }
@@ -41,7 +45,22 @@ Page {
         if (c.unread) falcon.call("chat.read", { conversation_id: id }, function () {})
     }
     Component.onCompleted: load()
-    Connections { target: falcon; function onConnected() { page.load() } function onPushReceived(type, payload) { if (/^chat/.test(type)) again.restart() } }
+    Connections { target: falcon; function onConnected() { page.load() }
+        function onPushReceived(type, payload) {
+            if (type === "chat.file_consent_request" && payload && !page.asks.some(function (a) { return a.file_id === payload.file_id })) page.asks = page.asks.concat([page.askOf(payload)])
+            if (/^chat/.test(type)) again.restart()
+        } }
+    function askOf(x) { return { id: x.file_id, file_id: x.file_id, from: x.from || "Someone", host: x.host || "", at: x.at || new Date().toISOString(), name: x.name || "a file",
+                                 why: (x.why || []).join("; "), to: x.to || "", line: x.name || "a file", ask: true } }
+    readonly property var curAsk: { for (var i = 0; i < asks.length; i++) if ("f" + asks[i].id === sel) return asks[i]; return null }
+    function answer(a, yes) {
+        falcon.call("chat.file_consent", { file_id: a.file_id, grant: yes }, function (ok, r) {
+            if (!ok) { Msg.failed(r && r.message ? r.message : "Not answered"); return }
+            page.asks = page.asks.filter(function (x) { return x.file_id !== a.file_id }); page.sel = ""
+            Msg.ok(yes ? a.name + " goes on its way" : a.name + " is kept; " + a.from + " is told")
+            page.load()
+        })
+    }
     Timer { id: again; interval: 300; onTriggered: page.load() }
 
     // every conversation, as the Engine lists it, latest first; unread is the Engine's count
@@ -53,7 +72,7 @@ Page {
     })
     // a request is picked first, as the concept opens on it; else the conversation picked, else the first
     readonly property var curReq: { for (var i = 0; i < requests.length; i++) if ("r" + requests[i].id === sel) return requests[i]; return sel === "" && requests.length ? requests[0] : null }
-    readonly property var c: { if (curReq) return null; for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
+    readonly property var c: { if (curReq || curAsk) return null; for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return rows.length ? rows[0] : null }
     function ago(ms) { var h = (Time.now - ms) / 3600000; return h < 24 ? Time.dur(h) + " ago" : Time.dayName(ms) + " " + Time.hhmm(ms) }
     function others(x) { return (x.members || []).filter(function (m) { return m.account_id !== page.me }) }
     // what is open between you and someone: chips under their name (amBetween)
@@ -205,8 +224,9 @@ Page {
             delegate: Rectangle {
                 required property var modelData
                 readonly property bool isReq: modelData.from !== undefined
-                readonly property bool on: isReq ? page.curReq !== null && page.curReq.id === modelData.id : page.c !== null && page.c.id === modelData.id
-                objectName: "conv_" + (isReq ? "r" : "") + modelData.id
+                readonly property string pre: modelData.ask ? "f" : isReq ? "r" : ""
+                readonly property bool on: modelData.ask ? page.sel === "f" + modelData.id : isReq ? page.curReq !== null && page.curReq.id === modelData.id : page.c !== null && page.c.id === modelData.id
+                objectName: "conv_" + pre + modelData.id
                 width: sec.width; height: Math.max(36, pt.height) + 16; radius: Theme.radiusLg
                 color: on ? Theme.accentSoft : ma.containsMouse ? Theme.surface2 : "transparent"
                 Face { x: 8; anchors.verticalCenter: parent.verticalCenter; name: parent.isReq ? modelData.from : modelData.title; group: !parent.isReq && modelData.kind === "admins" ? page.others(modelData) : null }
@@ -216,20 +236,20 @@ Page {
                     anchors.verticalCenter: parent.verticalCenter
                     Item { width: parent.width; height: nm.height
                         Txt { id: nm; textFormat: Text.StyledText; font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - tm.implicitWidth - 8)
-                              text: parent.parent.parent.isReq ? modelData.from + " <font color='" + Theme.text3 + "'><span style='font-weight:400'>· " + modelData.host + "</span></font>" : modelData.title }
+                              text: parent.parent.parent.isReq ? modelData.from + (modelData.host ? " <font color='" + Theme.text3 + "'><span style='font-weight:400'>· " + modelData.host + "</span></font>" : "") : modelData.title }
                         Txt { visible: !parent.parent.parent.isReq && modelData.kind === "admins"; x: nm.width + 6; y: nm.baselineOffset - baselineOffset; text: page.others(modelData).length; color: Theme.text3; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideNone }
                         Txt { id: tm; anchors.right: parent.right; y: nm.baselineOffset - baselineOffset; text: parent.parent.parent.isReq ? page.ago(Time.ms(modelData.at)) : modelData.last ? page.ago(modelData.last) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                     }
                     Item { width: parent.width; height: 18.75
                         Rectangle { id: rq; visible: parent.parent.parent.isReq; width: visible ? rqt.implicitWidth + 14 : 0; height: 18; radius: 9; color: Theme.accentSoft; anchors.verticalCenter: ln.verticalCenter
-                                    Txt { id: rqt; anchors.centerIn: parent; text: "Request"; color: Theme.accent; font.pixelSize: 11; elide: Text.ElideNone } }
+                                    Txt { id: rqt; anchors.centerIn: parent; text: modelData.ask ? "A file" : "Request"; color: Theme.accent; font.pixelSize: 11; elide: Text.ElideNone } }
                         Txt { id: ln; x: rq.visible ? rq.width + 8 : 0; width: parent.width - x - (!parent.parent.parent.isReq && modelData.unread ? 28 : 0); text: modelData.line; font.pixelSize: 13
                               color: parent.parent.parent.isReq || modelData.unread ? Theme.text : Theme.text3; font.weight: parent.parent.parent.isReq || modelData.unread ? Font.Medium : Font.Normal }
                         Rectangle { visible: !parent.parent.parent.isReq && modelData.unread > 0; anchors.right: parent.right; anchors.verticalCenter: ln.verticalCenter; width: Math.max(20, cn.implicitWidth + 12); height: 20; radius: 10; color: Theme.accent
                                     Txt { id: cn; anchors.centerIn: parent; text: modelData.unread || ""; color: Theme.inverse; font.pixelSize: 11; font.weight: Font.DemiBold; elide: Text.ElideNone } }
                     }
                 }
-                MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = (parent.isReq ? "r" : "") + modelData.id }
+                MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = parent.pre + modelData.id }
             }
         }
     }
@@ -250,6 +270,7 @@ Page {
             Column {
                 width: parent.width
                 spacing: 2
+                Section { name: "Files waiting for a yes"; note: "any Admin may answer"; xs: page.asks }
                 Section { name: "Requests to talk"; note: "any Admin may accept"; xs: page.requests }
                 Section { name: "Unread"; xs: page.unread }
                 Section { name: "Read"; xs: page.read }
@@ -264,7 +285,35 @@ Page {
             height: parent.h
             fill: true
             readonly property var person: page.personOf(page.c)
-            Quiet { visible: page.c === null && page.curReq === null; text: "Pick someone on the left." }
+            Quiet { visible: page.c === null && page.curReq === null && page.curAsk === null; text: "Pick someone on the left." }
+            // a restricted file waiting for a yes: what it is, why it is held, let it go or keep it
+            Column {
+                objectName: "fileAsk"
+                visible: page.curAsk !== null
+                width: parent.width
+                spacing: 0
+                Item {
+                    width: parent.width
+                    height: 44 + 11
+                    Face { size: 44; name: page.curAsk ? page.curAsk.from : "" }
+                    Column { x: 54; width: parent.width - 54; spacing: 2
+                             Txt { width: parent.width; text: page.curAsk ? page.curAsk.from + " wants to send a restricted file" : ""; font.pixelSize: 14; font.weight: Font.DemiBold; color: Theme.text3 }
+                             Txt { width: parent.width; text: page.curAsk ? (page.curAsk.host ? "From " + page.curAsk.host + (page.curAsk.to ? " to " + page.curAsk.to : "") + " · " : page.curAsk.to ? "To " + page.curAsk.to + " · " : "") + "asked " + page.ago(Time.ms(page.curAsk.at)) + " · every Admin sees this until one of you answers" : ""; font.pixelSize: 13; color: Theme.text3 } }
+                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+                }
+                Column {
+                    x: 20; topPadding: 18; bottomPadding: 18
+                    width: parent.width - 40
+                    spacing: 12
+                    Rectangle { width: parent.width; height: faq.height + 28; radius: 10; color: Theme.surface2; border.width: 1; border.color: Theme.border
+                                Txt { id: faq; x: 16; y: 14; width: parent.width - 32; text: page.curAsk ? page.curAsk.name : ""; mono: true; font.pixelSize: 16; font.weight: Font.Medium; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone } }
+                    Txt { width: parent.width; color: Theme.text3; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                          text: page.curAsk ? (page.curAsk.why ? "It is restricted: " + page.curAsk.why + ". " : "It is restricted. ") + "Letting it go sends it, once; keeping it means it is not sent, and " + page.curAsk.from + " is told." : "" }
+                    Row { spacing: 8
+                        Btn { objectName: "letItGo"; kind: "primary"; text: "Let it go"; onClicked: page.answer(page.curAsk, true) }
+                        Btn { objectName: "keepIt"; text: "Keep it"; onClicked: page.answer(page.curAsk, false) } }
+                }
+            }
             // a request to talk: who, what they asked, accept it, or close it with a reason
             Column {
                 visible: page.curReq !== null

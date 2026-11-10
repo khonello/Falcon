@@ -91,7 +91,7 @@ Editor {
         if (s.type === "time.scheduled") { rep = "date"; date = m.at; at = Time.hhmm(m.at) }
         all = !(s.pc_ids && s.pc_ids.length)
         hosts = s.pc_ids || []
-        acts = (e.actions || []).map(function (a) { return { id: a.id, name: a.name, limit: a.timeout_seconds || 30 } })
+        acts = (e.actions || []).map(function (a) { return { id: a.id, name: a.name, limit: a.rule_limit_s || a.timeout_seconds || 30 } })      // this rule's own limit first
     }
     // the rule as it stands, once, on one machine: nothing is saved (control.rule_try)
     property var tryOn: null

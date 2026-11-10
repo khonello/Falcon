@@ -3445,6 +3445,7 @@ function filePolicy(f, me, to) {
   if (f.tag === "watch") return { say: `${who} get a copy in Downloads\\From Falcon. The file is watched, so the copy is noted.` };
   return { say: `${who} get a copy in Downloads\\From Falcon. It is recorded.` };
 }
+const AM_FILE_ASKS = [{ id: "FA-1", from: "Ama", host: "OPS-07", to: "Kojo", t: NOWH - 0.4, name: "budget-2026.xlsx", why: "it is a copy of a file restricted on WS-OPS-A1" }];
 function SendFile({ me, to, onSend }) {
   const [open, setOpen] = useState(false), [pick, setPick] = useState(undefined);
   const files = FILES_OF(me), f = files.find((x) => x.path === pick), pol = f ? filePolicy(f, me, to) : null;
@@ -4044,6 +4045,10 @@ function AdminMessagesPage({ go, open }) {
   const reqLine = reqs.length ? `${reqs.length === 1 ? `${reqs[0].from} on ${reqs[0].host} asks` : `${fmt(reqs.length)} people at machines ask`} to talk; every Admin sees ${reqs.length === 1 ? "it" : "them"} until one accepts. ` : "";
   const situation = reqLine + (!convs.length ? "There is nobody to talk to yet." : you.length ? `${listNames(you.map((x) => x.say))} ${you.length === 1 ? "is" : "are"} waiting on your answer.${oldestThem ? ` Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : ""}` : oldestThem ? `Nobody is waiting on you. Your message to ${oldestThem.say} has waited ${span(NOWH - oldestThem.last.t)}.` : "Nobody is waiting on you, and nothing you sent is unanswered.");
   const [q, setQ] = useState(""), [sel, setSel] = useState(open || null);
+  // a restricted file someone wants to send in a conversation waits for a yes (10 Nov 2026): any IT Admin answers it here
+  const [said, setSaid] = useState({});
+  const asks = (EMPTY ? [] : AM_FILE_ASKS).filter((a) => !said[a.id]), curAsk = asks.find((a) => a.id === sel) || null;
+  const answer = (a, yes) => { setSaid({ ...said, [a.id]: yes ? "sent" : "kept" }); setSel(null); toast(yes ? `${a.name} goes to ${a.to}` : `${a.name} is kept; ${a.from} is told`); };
   const shown = convs.filter((x) => x.find.toLowerCase().includes(q.trim().toLowerCase()));
   const curReq = reqs.find((r) => r.id === sel) || (!sel ? reqs[0] : null) || null;
   const cur = curReq ? null : convs.find((x) => x.id === sel) || convs.find((x) => x.th.length) || convs[0];
@@ -4082,6 +4087,9 @@ function AdminMessagesPage({ go, open }) {
     : html`<header className="ms-head"><${MsFace} c=${cur} big /><span className="ms-head-t"><b>${cur.name}</b><span className="t3">${cur.admin ? `Admin, ${ADMIN_INFO[cur.name].now.charAt(0).toLowerCase()}${ADMIN_INFO[cur.name].now.slice(1)}` : `Signed in on ${cur.host}`}</span>
         <span className="ms-chips">${amBetween(cur).map(([t, c], i) => html`<span key=${i} className=${"ms-chip " + c}>${t}</span>`)}</span></span></header>`;
   const pz = usePulse(curReq ? curReq.id : cur ? cur.id : null);
+  const askRow = (a) => html`<button key=${a.id} className=${"ms-p" + (curAsk && curAsk.id === a.id ? " on" : "")} onClick=${() => setSel(a.id)}>
+      <span className="ib-av">${initials(a.from)}</span><span className="ms-p-t"><span className="ms-p-h"><b className="cut">${a.from}<span className="t3" style=${{ fontWeight: 400 }}> · ${a.host}</span></b><span className="t3 nowrap">${ago(a.t)}</span></span>
+      <span className="ms-p-l"><span className="ms-why req">A file</span><span className="cut ms-you">${a.name}</span></span></span></button>`;
   const reqRow = (r) => html`<button key=${r.id} className=${"ms-p" + (curReq && curReq.id === r.id ? " on" : "")} onClick=${() => { setSel(r.id); setWhy(""); }}>
       <span className="ib-av">${initials(r.from)}</span><span className="ms-p-t"><span className="ms-p-h"><b className="cut">${r.from}<span className="t3" style=${{ fontWeight: 400 }}> · ${r.host}</span></b><span className="t3 nowrap">${ago(r.t)}</span></span>
       <span className="ms-p-l"><span className="ms-why req">Request</span><span className="cut ms-you">${r.text}</span></span></span></button>`;
@@ -4091,12 +4099,18 @@ function AdminMessagesPage({ go, open }) {
       <section className="ib-box">
         <header><b>Conversations</b><span>unread first</span></header>
         <${Input} allowClear prefix=${ic("SearchOutlined")} placeholder="Find a person or a group" value=${q} onChange=${(e) => setQ(e.target.value)} />
-        <div className="ms-list">${reqs.length ? html`<div key="reqs"><div className="ms-grp">Requests to talk<span>${fmt(reqs.length)} · any Admin may accept</span></div>${reqs.map(reqRow)}</div>` : null}${section("unread", "Unread", unread)}${section("read", "Read", read)}${q.trim() ? section("others", "No conversation yet", shown.filter((x) => !x.th.length)) : null}
+        <div className="ms-list">${asks.length ? html`<div key="asks"><div className="ms-grp">Files waiting for a yes<span>${fmt(asks.length)} · any Admin may answer</span></div>${asks.map(askRow)}</div>` : null}${reqs.length ? html`<div key="reqs"><div className="ms-grp">Requests to talk<span>${fmt(reqs.length)} · any Admin may accept</span></div>${reqs.map(reqRow)}</div>` : null}${section("unread", "Unread", unread)}${section("read", "Read", read)}${q.trim() ? section("others", "No conversation yet", shown.filter((x) => !x.th.length)) : null}
           ${!talked.length && !q.trim() && convs.length ? html`<div className="ib-quiet">No conversations yet. Start one below.</div>` : null}
           ${!shown.length ? html`<div className="ib-quiet">${convs.length ? "Nothing matches." : "Nobody to talk to yet."}</div>` : null}</div>
       </section>
       <section className="ib-box ms-conv" ref=${pz}>
-        ${curReq ? html`<header className="ms-head"><span className="ib-av ms-big">${initials(curReq.from)}</span><span className="ms-head-t"><b>${curReq.from} asks to talk</b><span className="t3">Signed in on ${curReq.host} · sent ${ago(curReq.t)} · every Admin sees this request until one of you accepts it</span></span></header>
+        ${curAsk ? html`<header className="ms-head"><span className="ib-av ms-big">${initials(curAsk.from)}</span><span className="ms-head-t"><b>${curAsk.from} wants to send a restricted file</b><span className="t3">From ${curAsk.host} to ${curAsk.to} · asked ${ago(curAsk.t)} · every Admin sees this until one of you answers</span></span></header>
+          <div className="ms-req">
+            <div className="ms-req-q mono">${curAsk.name}</div>
+            <div className="t3">It is restricted: ${curAsk.why}. Letting it go sends it to ${curAsk.to}, once; keeping it means it is not sent, and ${curAsk.from} is told.</div>
+            <div className="row" style=${{ gap: 8 }}><${Button} type="primary" onClick=${() => answer(curAsk, true)}>Let it go<//><${Button} onClick=${() => answer(curAsk, false)}>Keep it<//></div>
+          </div>`
+        : curReq ? html`<header className="ms-head"><span className="ib-av ms-big">${initials(curReq.from)}</span><span className="ms-head-t"><b>${curReq.from} asks to talk</b><span className="t3">Signed in on ${curReq.host} · sent ${ago(curReq.t)} · every Admin sees this request until one of you accepts it</span></span></header>
           <div className="ms-req">
             <div className="ms-req-q">${curReq.text}</div>
             <div className="t3">Accepting opens your conversation with ${curReq.from}, with this line in it. The other Admins see that you accepted it.</div>
