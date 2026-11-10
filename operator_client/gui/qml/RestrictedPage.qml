@@ -118,6 +118,14 @@ Page {
         if (!a.ok) return "not set on " + k.host + (a.error ? ": " + a.error : "")
         return "set on " + k.host + (a.at ? " " + page.agoWord(a.at) : "") + (a.missing && a.missing.length ? "; " + Theme.many(a.missing.length, "person", "people") + " left out until their Windows name is known" : "")
     }
+    // across the marks of a kind: what was refused (Private) and what happened (Watch), newest first, each with its mark
+    readonly property var allRefusals: marks.filter(function (k) { return k.prot === "private" }).reduce(function (o, k) {
+        return o.concat((k.refusals || []).map(function (r) { return { k: k, r: r } })) }, []).sort(function (a, b) { return Time.ms(b.r.at) - Time.ms(a.r.at) })
+    readonly property var watchLately: marks.filter(function (k) { return k.prot === "watch" }).reduce(function (o, k) {
+        var d = k.mid !== undefined ? page.det[k.mid] : null
+        return o.concat(((d && d.lately) || []).map(function (e) { return { k: k, e: e } })) }, []).sort(function (a, b) { return Time.ms(b.e.at) - Time.ms(a.e.at) })
+    function latelyOf(k) { var d = k && k.mid !== undefined ? page.det[k.mid] : null; return (d && d.lately) || [] }
+    function showing(kind) { return page.show === "all" || page.show === kind }
     function recentRefusals() { var wk = Time.now - 7 * 86400000; return marks.reduce(function (n, k) { return n + (k.refusals || []).filter(function (r) { return Time.ms(r.at) >= wk }).length }, 0) }
     // opens on what has the most copies away from home
     readonly property var byCopies: marks.slice().sort(function (a, b) { return b.n - a.n || a.name.localeCompare(b.name) })
@@ -370,6 +378,53 @@ Page {
         }
     }
 
+    // --- the three kinds of protection, each as it stands; a tile is the list's filter (click it again for all) --------------
+    Row {
+        objectName: "protKinds"
+        visible: page.marks.length > 0
+        width: parent.width
+        spacing: 14
+        Repeater {
+            model: [
+                ["restricted", "Restricted", "stop", "kept to its place; a copy anywhere else is caught",
+                 page.allCopyRows.length ? Theme.many(page.allCopyRows.length, "copy", "copies") + " caught elsewhere" : "every copy is where it belongs", page.allCopyRows.length > 0],
+                ["private", "Private", "lock", "only the people named may open it",
+                 page.recentRefusals() ? Theme.many(page.recentRefusals(), "refusal") + " this week" : "nobody refused this week", page.recentRefusals() > 0],
+                ["watch", "Watch", "eye", "anyone may use it; every change is noted",
+                 page.watchLately.length ? Theme.many(page.watchLately.length, "change") + " in the last two weeks" : "nothing has changed lately", false]]
+            delegate: Rectangle {
+                id: kt
+                required property var modelData
+                readonly property bool on: page.show === modelData[0]
+                readonly property int n: page.countOf(modelData[0])
+                objectName: "kind_" + modelData[0]
+                width: (parent.width - 28) / 3
+                height: kc2.height + 28
+                radius: Theme.radiusLg
+                color: on ? Theme.mix(Theme.accent, Theme.surface, 0.07) : Theme.surface
+                border.width: 1
+                border.color: on ? Theme.accent : ka.containsMouse ? Theme.borderStrong : Theme.border
+                opacity: n === 0 && !on ? 0.6 : 1
+                Rectangle { x: 16; y: 16; width: 36; height: 36; radius: 18; color: Theme.surface3
+                            Icon { anchors.centerIn: parent; name: kt.modelData[2]; size: 16; color: kt.modelData[5] ? Theme.crit : Theme.text2 } }
+                Column {
+                    id: kc2
+                    x: 64; y: 14
+                    width: parent.width - 64 - 16
+                    spacing: 2
+                    Row { spacing: 8
+                        Txt { text: kt.modelData[1]; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                        Txt { text: kt.n; font.pixelSize: 14; color: Theme.text3; elide: Text.ElideNone } }
+                    Txt { width: parent.width; text: kt.modelData[3]; font.pixelSize: 12; color: Theme.text3 }
+                    Txt { width: parent.width; text: kt.n ? kt.modelData[4] : "none yet"; font.pixelSize: 12; font.weight: kt.modelData[5] ? Font.DemiBold : Font.Normal
+                          color: kt.modelData[5] ? Theme.crit : Theme.text2 }
+                }
+                MouseArea { id: ka; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { page.show = kt.on ? "all" : kt.modelData[0]; page.pg = 0 } }
+            }
+        }
+    }
+
     Row {
         width: parent.width
         spacing: 14
@@ -379,17 +434,9 @@ Page {
             objectName: "markCards"
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, mapP.implicitHeight)
-            title: "What is protected"
-            sub: "everything marked, by the machine it lives on; click one to see it on the right, expand it for its rule and what happened to it"
-            extra: Segmented {
-                objectName: "protShow"
-                visible: page.marks.length > 0
-                small: true
-                options: [{ value: "all", label: "All · " + page.marks.length }, { value: "restricted", label: "Restricted · " + page.countOf("restricted") },
-                          { value: "private", label: "Private · " + page.countOf("private") }, { value: "watch", label: "Watch · " + page.countOf("watch") }]
-                value: page.show
-                onPicked: function (v) { page.show = v; page.pg = 0 }
-            }
+            title: page.show === "all" ? "What is protected" : page.show === "private" ? "What is private" : page.show === "watch" ? "What is watched" : "What is restricted"
+            sub: "by the machine it lives on; click one to see it on the right, expand it for its rule"
+            extra: Link { objectName: "protAll"; visible: page.show !== "all"; text: "Show all " + page.marks.length; font.pixelSize: 12; onClicked: { page.show = "all"; page.pg = 0 } }
             Repeater {
                 model: page.hostOrder
                 delegate: Group {
@@ -466,9 +513,9 @@ Page {
                                         }
                                     }
                                 }
-                                // Private: who was refused, in grey (marks.list's refusals, the last ten)
+                                // (who was refused is on the right, with who may open it)
                                 Column {
-                                    visible: kc.modelData.prot === "private"
+                                    visible: false
                                     width: parent.width
                                     readonly property var said: kc.modelData.refusals || []
                                     Txt { topPadding: 4; bottomPadding: 3; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
@@ -487,6 +534,7 @@ Page {
                                     Txt { visible: parent.said.length === 0; text: "Nobody has been refused it."; color: Theme.text3; font.pixelSize: 13 }
                                 }
                                 Column {
+                                    visible: kc.modelData.prot !== "watch"           // a watched one's story is on the right
                                     width: parent.width
                                     readonly property var log: page.det[kc.modelData.mid] ? page.det[kc.modelData.mid].lately || [] : []
                                     Txt { topPadding: 4; bottomPadding: 3; text: "Lately"; color: Theme.text3; font.pixelSize: 12 }
@@ -521,13 +569,79 @@ Page {
             objectName: "markMap"
             width: (parent.width - 14) * 4 / 12
             height: Math.max(implicitHeight, markP.implicitHeight)
-            title: "Where it is, across every machine"
+            title: !page.cur || page.cur.prot === "restricted" || !page.cur.prot ? "Where it is, across every machine" : page.cur.prot === "private" ? "Who may open it" : "What happened to it"
             readonly property var copies: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].copies || [] : []
             readonly property var allowedHere: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].allowed || [] : []
-            sub: page.cur ? "<b><font color='" + Theme.text + "'>" + page.cur.name + "</font></b> · " + (page.cur.prot === "private" ? "private where it is; copies are not looked for"
-                                : page.cur.prot === "watch" ? "watched where it is; copies are not looked for"
+            sub: page.cur ? "<b><font color='" + Theme.text + "'>" + page.cur.name + "</font></b> · " + (page.cur.prot === "private" ? "on " + page.cur.host + "; Windows refuses anyone else"
+                                : page.cur.prot === "watch" ? "on " + page.cur.host + "; nothing is refused, everything is noted"
                                 : copies.length ? Theme.many(copies.length, "copy", "copies") + " away from home" : "only at home") : "pick something on the left"
+            // Private: the people named, then what the machine did and who was refused
             Column {
+                objectName: "privatePanel"
+                visible: page.cur !== null && page.cur.prot === "private"
+                width: parent.width
+                spacing: 0
+                opacity: page.loading ? 0 : 1
+                Repeater {
+                    model: page.cur && page.cur.prot === "private" ? page.cur.readers : []
+                    delegate: Item {
+                        required property var modelData
+                        required property int index
+                        readonly property string nm: modelData.account_id === falcon.accountId ? "You" : modelData.name || "Account " + modelData.account_id
+                        width: parent.width; height: 44
+                        Rectangle { y: 6; width: 32; height: 32; radius: 16; color: Theme.surface3
+                                    Txt { anchors.centerIn: parent; text: Theme.initials(parent.parent.nm); font.pixelSize: 12; font.weight: Font.DemiBold; elide: Text.ElideNone } }
+                        Txt { x: 44; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 44 - 110; text: parent.nm; font.pixelSize: 13; font.weight: Font.Medium }
+                        Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone
+                              text: page.cur && page.cur.by && page.cur.by.account_id === modelData.account_id ? "made it private" : "may open it" }
+                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    }
+                }
+                Item { width: 1; height: 10 }
+                FactRows { width: parent.width
+                           rows: page.cur && page.cur.prot === "private" ? [["Backup, antivirus", page.cur.allowSystem ? "may open it" : "refused like anyone else"], ["On " + page.cur.host, page.appliedWord(page.cur).replace(/^(set|being set|not set) on \S+/, "$1")]] : [] }
+                Btn { anchors.right: parent.right; small: true; iconName: "team"; text: "Change who may open it"; onClicked: page.changeReaders(page.cur) }
+                Txt { topPadding: 16; bottomPadding: 4; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
+                Repeater {
+                    model: page.cur && page.cur.prot === "private" ? page.cur.refusals : []
+                    delegate: Item {
+                        required property var modelData
+                        width: parent.width; height: rw.height + 12
+                        Txt { y: 6; width: 76; text: page.agoWord(modelData.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                        Txt { id: rw; x: 84; y: 6; width: parent.width - 84; textFormat: Text.RichText; font.pixelSize: 13; wrapMode: Text.WordWrap
+                              text: "<span style='font-weight:600'>" + (modelData.who || "Someone") + "</span> was refused" + (modelData.process ? " in " + modelData.process : "") }
+                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    }
+                }
+                Txt { visible: !page.cur || !(page.cur.refusals || []).length; text: "Nobody has been refused it."; color: Theme.text3; font.pixelSize: 13 }
+            }
+            // Watch: what happened to it, newest first
+            Column {
+                objectName: "watchPanel"
+                visible: page.cur !== null && page.cur.prot === "watch"
+                width: parent.width
+                spacing: 0
+                opacity: page.loading ? 0 : 1
+                Txt { bottomPadding: 6; text: page.cur && page.cur.prot === "watch" ? (page.latelyOf(page.cur).length ? Theme.many(page.latelyOf(page.cur).length, "thing") + " in the last two weeks" : "") : ""
+                      visible: text !== ""; color: Theme.text3; font.pixelSize: 12 }
+                Repeater {
+                    model: page.cur && page.cur.prot === "watch" ? page.latelyOf(page.cur) : []
+                    delegate: Item {
+                        required property var modelData
+                        width: parent.width; height: wl.height + 14
+                        Rectangle { x: 3; y: 11; width: 7; height: 7; radius: 4; color: Theme.accent }
+                        Column { id: wl; x: 20; y: 7; width: parent.width - 20; spacing: 1
+                            Txt { width: parent.width; textFormat: Text.RichText; font.pixelSize: 13; wrapMode: Text.WordWrap
+                                  text: "<span style='font-weight:600'>" + (modelData.who || "Someone") + "</span> " + (modelData.what || "") }
+                            Txt { width: parent.width; text: page.agoWord(modelData.at) + (modelData.path ? " · " + String(modelData.path).replace(/^.*[\\/]/, "") : "") + (modelData.where ? " · " + modelData.where : "")
+                                  color: Theme.text3; font.pixelSize: 12 } }
+                    }
+                }
+                Txt { visible: !page.cur || !page.latelyOf(page.cur).length; text: "Nothing has happened to it in the last two weeks."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; width: parent.width }
+            }
+            // Restricted: where it is, across every machine
+            Column {
+                visible: !page.cur || page.cur.prot === "restricted" || !page.cur.prot
                 width: parent.width
                 spacing: 0
                 opacity: page.loading ? 0 : 1
@@ -596,6 +710,7 @@ Page {
     // --- copies on other machines --------------------------------------------------------------------------
     Box {
         objectName: "copiesElsewhere"
+        visible: page.rmarks.length > 0 && page.showing("restricted")
         width: parent.width
         title: "Copies on other machines"
         sub: page.allCopyRows.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything restricted is anywhere else"
@@ -658,6 +773,7 @@ Page {
     // --- allowed copies --------------------------------------------------------------------------------------
     Box {
         objectName: "allowedCopies"
+        visible: page.rmarks.length > 0 && page.showing("restricted")
         width: parent.width
         title: "Allowed copies"
         sub: "copies found away from home that were let stay, newest first, each with the reason given; they are not caught again unless an Admin takes it back"
@@ -691,6 +807,7 @@ Page {
     // --- flows carrying what you restricted (rs-fl) ------------------------------------------------------------
     Box {
         objectName: "flowsCarrying"
+        visible: page.rmarks.length > 0 && page.showing("restricted")
         width: parent.width
         title: "Flows carrying what is restricted"
         sub: "right now; a flow held at something restricted waits for an Admin to allow it, for that flow only"
@@ -730,6 +847,65 @@ Page {
                 }
             }
             Quiet { visible: page.carrying.length === 0; text: "No flow carries anything restricted." }
+        }
+    }
+
+    // --- Private: everyone refused, across every private file -----------------------------------------------------------
+    Box {
+        objectName: "refusedLately"
+        visible: page.countOf("private") > 0 && page.showing("private")
+        width: parent.width
+        title: "Refused lately"
+        sub: page.allRefusals.length ? "who tried to open something private, newest first; Windows said no" : "nobody has been refused a private file"
+        Column {
+            width: parent.width
+            Repeater {
+                model: page.allRefusals.slice(0, 8)
+                delegate: Item {
+                    required property var modelData
+                    required property int index
+                    width: parent.width; height: 40
+                    Rectangle { x: 4; anchors.verticalCenter: parent.verticalCenter; width: 28; height: 28; radius: 14; color: Theme.surface3
+                                Icon { anchors.centerIn: parent; name: "lock"; size: 13; color: Theme.text2 } }
+                    Txt { x: 44; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 44 - 150; textFormat: Text.RichText; font.pixelSize: 13
+                          text: "<span style='font-weight:600'>" + (modelData.r.who || "Someone") + "</span> was refused <span style='font-weight:600'>" + modelData.k.name + "</span>"
+                                + (modelData.r.process ? " in " + modelData.r.process : "") + " <font color='" + Theme.text3 + "'>on " + (modelData.r.machine || modelData.k.host) + "</font>" }
+                    Txt { anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; text: page.agoWord(modelData.r.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                    Rectangle { visible: index < Math.min(8, page.allRefusals.length) - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.k.id }
+                }
+            }
+            Quiet { visible: page.allRefusals.length === 0; icon: "check"; text: "Nobody has been refused a private file." }
+        }
+    }
+
+    // --- Watch: what happened, across every watched file ---------------------------------------------------------------
+    Box {
+        objectName: "watchedLately"
+        visible: page.countOf("watch") > 0 && page.showing("watch")
+        width: parent.width
+        title: "Lately on watched files"
+        sub: page.watchLately.length ? "every change, copy and move, newest first, with who was signed in" : "nothing has happened to a watched file in the last two weeks"
+        Column {
+            width: parent.width
+            Repeater {
+                model: page.watchLately.slice(0, 8)
+                delegate: Item {
+                    required property var modelData
+                    required property int index
+                    width: parent.width; height: 40
+                    Rectangle { x: 4; anchors.verticalCenter: parent.verticalCenter; width: 28; height: 28; radius: 14; color: Theme.surface3
+                                Icon { anchors.centerIn: parent; name: "eye"; size: 13; color: Theme.text2 } }
+                    Txt { x: 44; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 44 - 150; textFormat: Text.RichText; font.pixelSize: 13
+                          readonly property string f: modelData.e.path ? String(modelData.e.path).replace(/[\\/]+$/, "").replace(/^.*[\\/]/, "") : modelData.k.name
+                          text: "<span style='font-weight:600'>" + (modelData.e.who || "Someone") + "</span> " + (modelData.e.what || "") + " <span style='font-weight:600'>" + f + "</span> <font color='"
+                                + Theme.text3 + "'>" + (f === modelData.k.name ? "" : "in " + modelData.k.name + " ") + "on " + (modelData.e.where || modelData.k.host) + "</font>" }
+                    Txt { anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; text: page.agoWord(modelData.e.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                    Rectangle { visible: index < Math.min(8, page.watchLately.length) - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.k.id }
+                }
+            }
+            Quiet { visible: page.watchLately.length === 0; icon: "check"; text: "Nothing has happened to a watched file lately." }
         }
     }
 
