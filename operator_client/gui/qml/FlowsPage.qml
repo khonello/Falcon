@@ -398,7 +398,7 @@ Page {
                         }
                     }
                 }
-                Pulse { parent: ctlP; key: page.loading ? null : page.pickedKey || null }
+                Pulse { parent: ctlP; key: page.pickedKey || null }
             }
             Box {
                 id: syncP
@@ -438,7 +438,8 @@ Page {
                                     + (syncP.added ? "<font color='" + Theme.text3 + "'>" + (syncP.added > 0 ? "+" : "−") + syncP.kb(syncP.added) + " in all</font>" : "") }
                     }
                 }
-                Pulse { parent: syncP; key: page.loading ? null : page.pickedKey || null }
+                Loading { parent: syncP; on: page.loading && page.cur !== null; under: syncP.headerHeight; text: page.cur ? "Loading " + page.cur.name : "Loading" }
+                Pulse { parent: syncP; key: page.pickedKey || null }
             }
         }
     }
@@ -474,7 +475,7 @@ Page {
                   Icon { name: "branches"; size: 13; color: Theme.text3; anchors.verticalCenter: parent.verticalCenter }
                   Txt { text: "Nothing picked"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone } }
         }
-        Pulse { parent: drawP; key: page.loading ? null : page.pickedKey || null }
+        Pulse { parent: drawP; key: page.pickedKey || null }
     }
 
     // --- make a flow: a few careful steps, so it has its own page ---------------------------------------------

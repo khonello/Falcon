@@ -266,7 +266,7 @@ Page {
                         }
                     }
                 }
-                Pulse { parent: ctl; key: page.loading ? null : page.pickedId }
+                Pulse { parent: ctl; key: page.pickedId }
             }
             Box {
                 id: tdBox
@@ -322,7 +322,7 @@ Page {
         }
         Quiet { visible: page.cur === null; icon: "arrowu"; text: "Pick a task above to see its targets here." }
         Loading { parent: targets; on: page.loading && page.cur !== null; under: targets.headerHeight; text: "Loading its targets" }
-        Pulse { parent: targets; key: page.loading ? null : page.pickedId }
+        Pulse { parent: targets; key: page.pickedId }
     }
 
     // --- give a task: a few careful steps, so it has its own page ------------------------------------------------

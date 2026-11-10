@@ -82,8 +82,8 @@ Page {
     property string expRun: ""
     property bool loading: false
     property var pickedId: null
-    onCurChanged: { loading = true; ldT.restart() }
-    Timer { id: ldT; interval: Theme.loadMs; onTriggered: { page.loading = false; page.pickedId = page.cur ? page.cur.id : null } }
+    onCurChanged: { pickedId = cur ? cur.id : null; loading = true; ldT.restart() }
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
     function actionName(e, id) { var a = (e.actions || []).filter(function (x) { return x.id === id || x.action_id === id })[0]; return a ? a.name : "action " + id }
     function firingsToday(e) { return firings(e).filter(function (f) { return !f.by_hand && Time.sameDay(Time.ms(f.at), Time.now) }) }
     function badOf(f) { return (f.runs || []).filter(function (x) { return Auto.problem(Auto.outcome(x)) }) }

@@ -72,8 +72,8 @@ Page {
     function tileOf(h) { return here ? here.xs.filter(function (y) { return y.host === h })[0] || null : null }
     onSelChanged: { if (!busy) run = null }
     Component.onCompleted: { load(); var a = Nav.takeArrive("actions"); if (a !== null && Fleet.byHost[a]) picks = [a] }
-    onCurChanged: { loadRuns(); loading = true; ldT.restart() }
-    Timer { id: ldT; interval: Theme.loadMs; onTriggered: { page.loading = false; page.pickedId = page.cur ? page.cur.id : null } }
+    onCurChanged: { loadRuns(); pickedId = cur ? cur.id : null; loading = true; ldT.restart() }
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
     function runNow() {
         var a = cur
         run = { id: a.id, action: a.name, lim: a.timeout_seconds, at: new Date(Time.now).toISOString(),
@@ -320,6 +320,7 @@ Page {
                 }
                 Quiet { visible: page.runs.length === 0; text: "It has not run this week." }
             }
+            Loading { parent: sheet; on: page.loading && page.cur !== null; under: sheet.headerHeight }
             Pulse { parent: sheet; key: page.pickedId }
         }
     }

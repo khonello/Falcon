@@ -589,7 +589,7 @@ Page {
                 }
             }
             Loading { parent: mapP; on: page.loading && page.cur !== null; under: mapP.headerHeight }
-            Pulse { parent: mapP; key: page.loading ? null : page.pickedKey || null }
+            Pulse { parent: mapP; key: page.pickedKey || null }
         }
     }
 

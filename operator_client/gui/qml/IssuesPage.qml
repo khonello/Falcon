@@ -324,7 +324,7 @@ Page {
                     }
                 }
                 Loading { parent: story; on: page.loading; under: 44; text: "Loading" }
-                Pulse { parent: story; key: page.loading ? null : (page.it ? page.it.id : null) }
+                Pulse { parent: story; key: (page.it ? page.it.id : null) }
             }
         }
 

@@ -41,7 +41,7 @@ Page {
     function loadThread() {
         if (!c) { thread = null; return }
         var id = c.conversation_id
-        falcon.call("chat.get", { conversation_id: id }, function (ok, r) { if (ok && page.c && page.c.conversation_id === id) page.thread = r })
+        falcon.call("chat.get", { conversation_id: id }, function (ok, r) { if (page.c && page.c.conversation_id === id) page.thread = ok ? r : { messages: [], reads: [], more: false } })   // a failed read ends the spinner too
         if (c.unread) falcon.call("chat.read", { conversation_id: id }, function () {})
     }
     Component.onCompleted: load()
@@ -469,6 +469,7 @@ Page {
                     Btn { id: sendB; objectName: "msgSend"; anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; kind: "primary"; circle: true; iconName: "send"; enabled: page.draft.trim() !== ""; onClicked: page.send() }
                 }
             }
+            Loading { parent: conv; on: page.c !== null && page.thread === null; under: conv.headerHeight; text: page.c ? "Loading the conversation with " + page.c.title : "Loading" }
             Pulse { parent: conv; key: page.pickedId || null }
         }
     }

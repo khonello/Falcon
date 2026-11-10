@@ -99,8 +99,8 @@ Page {
     readonly property int per: 5
     property bool loading: false
     property int pickedId: 0
-    onSelChanged: { loading = true; ldT.restart() }
-    Timer { id: ldT; interval: Theme.loadMs; onTriggered: { page.loading = false; page.pickedId = page.cur ? page.cur.id : 0 } }
+    onSelChanged: { pickedId = cur ? cur.id : 0; loading = true; ldT.restart() }
+    Timer { id: ldT; interval: Theme.loadMs; onTriggered: page.loading = false }
     readonly property var urgentCases: cases.filter(function (c) { return c.level === "urgent" })
     situation: {
         if (!cases.length) return "Nothing to look at. Detective watches by itself; when several small things add up to a pattern, it appears here."

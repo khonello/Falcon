@@ -278,7 +278,7 @@ Page {
                     }
                 }
                 Loading { parent: pickP; on: page.loading && page.cur !== null; under: pickP.headerHeight; text: page.cur ? "Loading " + page.cur.host : "Loading" }
-                Pulse { parent: pickP; key: page.loading ? null : page.sel || null }
+                Pulse { parent: pickP; key: page.sel || null }
             }
             Box {
                 id: runP
@@ -357,7 +357,7 @@ Page {
                     }
                 }
                 Loading { parent: runP; on: page.loading && page.cur !== null; under: 14; text: page.cur ? "Loading " + page.cur.host : "Loading" }
-                Pulse { parent: runP; key: page.loading ? null : page.sel || null }
+                Pulse { parent: runP; key: page.sel || null }
             }
         }
     }
