@@ -166,6 +166,10 @@ with it. The concept still decides how it looks. Strike an item when it is drawn
   diff (`flow.runs`), the Restricted page's came_by / allowed / lately / flows_allowed (`marks.get`), At a glance (`detective.glance`), knocked
   PCs (`registry.knocked`).
 
+### Overview's Live activity (the user, 10 Nov 2026: "it seems to show an object dump")
+- Fixed on the Engine session's side: the line comes from `describe_push` (`operator_client/tui/push_format.py`), which printed any push it did not know as a raw payload. `audit.event` now reads as its sentence (*who: what, on host*), "look again" pushes (`pc.presence`, `*.changed`, ...) give no line, and nothing is ever shown as a payload.
+- **For the page:** build each new row from the `audit.event` push itself, as `Kinds.load` does for the first rows (`{t: at, kind, actor, what, host}`), instead of the one-line text: the row then gets its real kind, its person and its machine, where it now has `Kinds.of("audit.event")`, an empty actor and no machine. Other pushes need not reach this list at all.
+
 ### From the check of 5 Nov 2026
 - **Detective, a false line:** `DetectivePage.qml` says "in the local model's words" when `telling.smoothed` is true. Only Groq smooths now (`telling.LOCAL_SMOOTHING` is off), so say something true of the model that did it, or simply "reworded, every fact checked". The concept says the same and needs the same change.
 - **Not drawn yet, though the list above has them:** Try a rule first (`control.rule_try`, section "Automation: try a rule first") and the guidance on New task (`task.help`, and `help` on a `not_a_task` flag). Nothing in the QML calls either.

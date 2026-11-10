@@ -4,8 +4,25 @@ from __future__ import annotations
 
 from typing import Any
 
+# Pushes that only say "look again": a page refreshes on them, and there is nothing in them for a person to read.
+QUIET = frozenset({"pc.presence", "control.interest_changed", "chat.read", "chat.request_gone", "machines.changed", "enroll.cancelled"})
+
+
+def _audit_line(p: dict[str, Any]) -> str:
+    """An event the Engine recorded, in the sentence the log itself uses: who, then what, and where when the sentence does not say."""
+    what = str(p.get("what") or "").strip()
+    if not what:
+        return ""
+    who = str(p.get("actor") or "System")
+    host = str(p.get("host") or "")
+    return f"{who}: {what}" + (f" (on {host})" if host and host not in what else "")
+
 
 def describe_push(type_: str, p: dict[str, Any]) -> tuple[str, bool]:
+    if type_ == "audit.event":
+        return _audit_line(p), False
+    if type_ in QUIET or type_.endswith(".changed"):
+        return "", False
     if type_ == "session.blocked":
         return f"your PC is now occupied by {p.get('occupant_name')} ({p.get('occupant_role')}) until {str(p.get('deadline_at', ''))[11:16]}", True
     if type_ == "session.ended":
@@ -67,4 +84,4 @@ def describe_push(type_: str, p: dict[str, Any]) -> tuple[str, bool]:
         return f"UPDATE FAILING on pc {p.get('pc_id')} ({p.get('failures')}x) -- needs attention", True
     if type_ == "update.prompt":
         return f"Asked: {p.get('message')}", True
-    return f"{type_} {p}", False
+    return type_.replace(".", " ").replace("_", " "), False          # never the raw payload: it is not for a person to read
