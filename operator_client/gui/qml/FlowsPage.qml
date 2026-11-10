@@ -387,6 +387,9 @@ Page {
                                 readonly property bool held: page.cur !== null && (page.cur.st === "paused" || page.cur.st === "stopped")
                                 Btn { visible: parent.held; small: true; kind: "primary"; iconName: "caretr"; text: page.cur && page.cur.st === "stopped" ? "Start again" : "Resume"
                                       onClicked: page.cur.st === "stopped" ? page.call("flow.start", { flow_id: page.cur.id }, "Started again; it catches up on what it missed") : page.call("flow.resume", { flow_id: page.cur.id }, "Resumed · it carries on, and keeps what was held") }
+                                // a flow that copies only when it is run (or every hour) can be run now; a real-time one needs no button (flow.run)
+                                Btn { objectName: "flowRunNow"; visible: !parent.held && page.cur !== null && !!page.cur.run_mode && page.cur.run_mode !== "realtime"; small: true; iconName: "caretr"; text: "Run now"
+                                      onClicked: page.call("flow.run", { flow_id: page.cur.id }, "Copying now · what changed goes through") }
                                 Btn { visible: !parent.held; small: true; iconName: "pausecircle"; text: "Pause"; onClicked: page.call("flow.pause", { flow_id: page.cur.id }, "Paused · nothing is lost") }
                                 Btn { visible: !parent.held; small: true; danger: true; iconName: "stop"; text: "Stop"
                                       onClicked: confirm.ask({ title: "Stop " + page.cur.name + "?", text: "Nothing goes through it any more. What it copied stays where it is, and its history is kept.", ok: "Stop it", danger: true },

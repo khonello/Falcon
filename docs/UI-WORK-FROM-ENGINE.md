@@ -4,6 +4,23 @@ Written by the Engine session for the UI session (the user, 2 Nov 2026: separati
 or the concept; it writes here what the UI needs). Each item: what the Engine now offers, the handler, and what a page or window should do
 with it. The concept still decides how it looks. Strike an item when it is drawn.
 
+## Checked by the UI session, 10 Nov 2026 (every item below, against the QML)
+
+**Drawn now** (on top of what was already drawn): Live activity rows from the `audit.event` push itself; Send a file in a conversation
+(`chat.send_file`); a restricted file waiting for a yes, answered in Messages (`chat.file_consent`, from the push and from `chat.files_waiting`
+once the Engine has it: ENGINE-GAPS 29); Run now on a flow that copies only when run or hourly (`flow.run`); a dropped placing step left out
+when a flow is read in (sent back it was refused); editing a rule keeps its own time limits (`rule_limit_s`).
+
+**Not drawn, and why** (for the user to decide, not passed over):
+- **Watch and Private marks** (`protection`, `readers`, `allow_system`, `marks.readers`, `refusals`, `private.*` pushes): the concept's
+  Restrict drawer makes only Restricted marks. The concept shows Watch and Private only as the tag of a file sent in a conversation.
+- **Network readings and "would it have fired" (`threshold.network`, `control.threshold_backtest`):** only in the concept's old rule editor;
+  the rule drawer the console opens offers CPU, memory, disk and failed sign-ins.
+- **Bundling greys Real time, and which destinations convert Office files (`converter`):** not in the concept. Saving a flow the Engine
+  refuses shows the Engine's reason.
+- **`updates.packages`:** version 1 has no Rollout page. **Licences:** a power setting, so the TUI's (`licence import / list / revoke`).
+- **`chat.files {conversation_id}`** (every file sent in a conversation, who saved it where): not in the concept.
+
 ## Console (operator_client/gui/qml)
 
 ### Flows (built 2 Nov 2026)

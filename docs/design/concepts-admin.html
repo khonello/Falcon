@@ -2275,7 +2275,7 @@ const EXISTING_FLOWS = [
   { name: "budget-review", by: "R. Mensah", srcs: [["WS-OPS-A1", "/reports/budget/"]], dests: [["?K. Boateng", "picks a folder"]], stages: [{ kind: "Conversion", op: "To PDF", scope: "all" }],
     st: "Waiting for a folder", asked: "Today 10:20", files: 0, last: "—", fn: () => 0 },
   // two sources: where weekly-digest delivers, and a plain folder
-  { name: "ops-pack", by: "R. Mensah", srcs: [["OPS-02", "/reports/"], ["OPS-05", "/exports/"]], dests: [["WS-OPS-A1", "/packs/"]], stages: [{ kind: "Bundling", op: "Into one ZIP", scope: "all" }],
+  { name: "ops-pack", by: "R. Mensah", when: "Only when I run it", srcs: [["OPS-02", "/reports/"], ["OPS-05", "/exports/"]], dests: [["WS-OPS-A1", "/packs/"]], stages: [{ kind: "Bundling", op: "Into one ZIP", scope: "all" }],
     st: "Active", files: 7, last: "12:30", fn: (t) => (working(t) && hod(t) > 12.2 && hod(t) < 12.6 ? 2 : 0) },
   // board papers from A. Quaye's workstation to two other Admins', as PDFs
   { name: "board-pack", by: "A. Quaye", srcs: [["WS-OPS-A2", "/board/"]], dests: [["WS-OPS-A1", "/board/"], ["WS-FIN-A1", "/board/"]], stages: [{ kind: "Conversion", op: "To PDF", scope: "all" }],
@@ -2392,7 +2392,7 @@ function NewFlow({ go, me, edit, drawer }) {
   const flowOpts = EXISTING_FLOWS.filter((x) => x.dests.some((d) => !askOf(d))).map((x) => ({ value: x.name, label: `${x.name} · by ${x.by}` }));
   const branchesOf = (n) => (FBY[n] ? FBY[n].dests.filter((d) => !askOf(d)) : []);
   // the wizard's state for an existing flow: as itself when editing it, or as a copy to start from
-  const fromFlow = (x, copy) => ({ name: copy ? "Copy of " + x.name : x.name, when: "Real time", stages: x.stages.map((st) => ({ ...st })),
+  const fromFlow = (x, copy) => ({ name: copy ? "Copy of " + x.name : x.name, when: x.when || "Real time", stages: x.stages.map((st) => ({ ...st })),
     srcs: x.srcs.map((s) => { const up = deliveredBy(pkey(...s))[0]; return up ? { mode: "flow", flow: up.name, branch: branchesOf(up.name).findIndex((d) => pkey(...d) === pkey(...s)) } : { mode: "dir", host: s[0], path: s[1] }; }),
     dests: x.dests.map((d) => (askOf(d) ? { mode: "ask", who: askOf(d), note: "" } : { mode: "mine", host: d[0], path: d[1] })) });
   const [f, setF] = useState(() => (edit && FBY[edit] ? fromFlow(FBY[edit], false) : blank));
@@ -4992,7 +4992,7 @@ function AdminFlowsPage2({ go, open }) {
           <span className="sp" />
           ${g0 ? html`<span className=${P ? "fl-one" : ""}>${gateBtn(g0, true)}</span>` : null}
           ${P ? html`<span className="fl-grp">${fstate(P) === "paused" || fstate(P) === "stopped" ? html`<${Button} size="small" type="primary" icon=${ic("CaretRightOutlined")} onClick=${() => { const st = fstate(P); setCtl({ ...ctl, [P.name]: heldBy(P) ? "resumed" : null }); setSel(P.name); setOpn(P.name); toast(`${P.name} ${st === "stopped" ? "started again" : "resumed"}; it catches up on what it missed${heldBy(P) ? ", and what was held stays held until you decide" : ""} (concept)`); }}>${fstate(P) === "stopped" ? "Start again" : "Resume"}<//>`
-              : html`<${Button} size="small" icon=${ic("PauseOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "paused" }); setSel(P.name); setOpn(P.name); toast(`${P.name} paused (concept)`); }}>Pause<//><${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "stopped" }); setSel(P.name); setOpn(P.name); toast(`${P.name} stopped (concept)`); }}>Stop<//>`}</span>` : null}</div>` : null}
+              : html`${P.when && P.when !== "Real time" ? html`<${Button} size="small" icon=${ic("CaretRightOutlined")} onClick=${() => toast(`${P.name}: copying now (concept)`)}>Run now<//>` : null}<${Button} size="small" icon=${ic("PauseOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "paused" }); setSel(P.name); setOpn(P.name); toast(`${P.name} paused (concept)`); }}>Pause<//><${Button} size="small" danger icon=${ic("StopOutlined")} onClick=${() => { setCtl({ ...ctl, [P.name]: "stopped" }); setSel(P.name); setOpn(P.name); toast(`${P.name} stopped (concept)`); }}>Stop<//>`}</span>` : null}</div>` : null}
       </section>
       <section className="ib-box fl-sync" ref=${pz}>
         <header><b>Last sync</b><span>${P ? P.name : A ? "an ask has not synced anything" : "pick a flow on the left"}</span></header>

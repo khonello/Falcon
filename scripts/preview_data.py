@@ -398,7 +398,7 @@ def flows() -> list[dict[str, Any]]:
         out.append({"id": fid, "name": name, "created_by_account_id": by, "created_by_name": byname, "created_at": at(made),
                     "source_pc_id": _pc(srcs[0][0]), "source_hostname": srcs[0][0], "source_path": srcs[0][1], "source_kind": "folder",
                     "sources": [{"source_pc_id": _pc(h), "source_hostname": h, "source_path": pth, "source_kind": "folder", "pause_reason": gone, "paused_at": at(-1.5) if gone else None} for h, pth, gone in srcs],
-                    "status": status, "pause_reason": reason, "consent_status": consent,
+                    "status": status, "run_mode": "manual" if name == "ops-pack" else "realtime", "pause_reason": reason, "consent_status": consent,
                     "suggestion": None, "files_copied": {"total": total, "today": today_n, "last_at": at(last) if last is not None else None},
                     "stages": st, "destinations": ds})
     return out

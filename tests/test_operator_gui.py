@@ -541,3 +541,16 @@ async def test_a_restricted_file_waiting_for_a_yes_is_answered_from_messages(con
     assert next(p for t, p in bridge.conn.seen if t == "chat.file_consent") == {"file_id": 77, "grant": True}
     await _wait(lambda: prop(view, "asks") == [])
 
+
+async def test_a_flow_that_copies_only_when_run_can_be_run_now(console):
+    win, bridge, _ = console("admin")
+    view = await _open(win, bridge, "flows", "flowsView")
+    await _wait(lambda: prop(view, "cur") is not None)
+    run = win.findChild(QObject, "flowRunNow")
+    assert prop(run, "visible") is False                                                  # a real-time flow needs no button
+    view.setProperty("flows", [{**FLOW, "run_mode": "manual"}])
+    await _wait(lambda: prop(run, "visible") is True)
+    run.clicked.emit()
+    await _wait(lambda: any(t == "flow.run" for t, _ in bridge.conn.seen))
+    assert next(p for t, p in bridge.conn.seen if t == "flow.run") == {"flow_id": 5}
+
