@@ -391,6 +391,19 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
     and the caller is an org-wide Admin), named as the caller names people. Also: `chat.file_consent` runs SQL in the handler
     (`db.pool.execute("UPDATE chat_files ...")`); it belongs in the repo.
 
+30. **Deviations are postponed to version 2, as the Super User was (the user, 10 Nov 2026).** In the dev database there are 573, every one
+    `account_bound_to_one_pc` ("ADM-01 connected under another name"): `auth._announce_hostname` writes one to `deviation_log` and one
+    `deviation.logged` audit line at *every* connection whose announced name differs from the registered one, so the Audit log is one message
+    repeated, and it is hard to explain to a customer (a renamed PC, a reinstall). The key already proves which machine it is. Wanted:
+    - `_announce_hostname` records nothing in version 1: no `deviation_log` row, no `deviation.logged` audit line, no `hostname_mismatch` issue,
+      no `accountability.never("cert", ...)`. A plain `log.info` is enough. Park the code (like `parked/`), do not delete it; the name the
+      machine presents may still be kept for the Registry.
+    - The open `hostname_mismatch` issues close (status change, no delete) with a reason such as "Not checked in this version".
+    - `audit.deviations` is not called by the console any more once this lands (the UI session takes it out of `Fleet.qml` then, and the
+      Issues page's "Certificate mismatches" kind). Automation rules' own `deviation.raised` (accountability) is a different thing and stays.
+    - Also seen (small): the audit feed says "Marked <path> restricted" for every `mark.created`; a mark now carries `protection` (watch,
+      private), so `engine/console/feed.py` should say "made private" / "watched" from `detail.protection`.
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine
