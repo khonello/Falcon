@@ -5,6 +5,9 @@ new files only. What was already on a drive is never read or listed: an 880 GB d
 
 It finds the drives itself (`ossignals.drives`), so it also covers one that was plugged in before the Worker started and never gave a signal. Each file is told once it has
 stopped changing, as a file event carrying `drive`, through the same path as every other: the Engine indexes it, and Detective and Restricted hear of it as usual.
+
+Who was at the keyboard is asked the moment a file first appears on the drive, not when it is told: a file is told only after it has been quiet for SETTLED seconds,
+and by then the person who pasted it has usually taken their hands off, so a copy by hand read as "a program the person started" (hands-on test, 10 Nov 2026).
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from worker_client.watcher import hash_file
 log = logging.getLogger(__name__)
 
 Reporter = Callable[..., Awaitable[Any]]
+Stamp = Callable[[str], Awaitable[dict[str, Any]]]
 LOOK_EVERY = 5.0                # how often the drives are looked at
 SETTLED = 2.0                   # a file quiet for this long has finished being written
 MAX_WAITING = 20000             # a copy of more than this at once: the rest are not told, and the log says so
@@ -36,8 +40,12 @@ def _drive_of(path: str, drives: Any) -> str:
 
 
 class DriveWatch:
-    def __init__(self, report: Reporter, *, hash_limit: int, find: Callable[[], Any] | None = None, look_every: float = LOOK_EVERY, settled: float = SETTLED) -> None:
+    def __init__(self, report: Reporter, *, hash_limit: int, find: Callable[[], Any] | None = None, look_every: float = LOOK_EVERY, settled: float = SETTLED,
+                 stamp: Stamp | None = None) -> None:
         self.report = report
+        self.stamp = stamp
+        self.seen: dict[str, tuple[float, dict[str, Any]]] = {}   # when a file first appeared, and who was at the keyboard then
+        self._stamping: set[asyncio.Task[None]] = set()
         self.hash_limit = hash_limit
         self.find = find or (lambda: list(ossignals.drives()))
         self.look_every = look_every
@@ -125,10 +133,13 @@ class DriveWatch:
             del self.waiting[path]
         for path in [p for p in self.told if p.lower().startswith(drive.lower())]:
             del self.told[path]
+        for path in [p for p in self.seen if p.lower().startswith(drive.lower())]:
+            del self.seen[path]
 
     def gone(self, path: str) -> None:
         """A file left a drive. One made and gone before it was ever told (a temporary file) is nobody's news; any other is, even one told before a restart."""
         self.told.pop(path, None)
+        self.seen.pop(path, None)
         if self.waiting.pop(path, None) is None and len(self.removed) < MAX_WAITING:
             self.removed.append(path)
 
@@ -146,7 +157,19 @@ class DriveWatch:
                 self._said_full = True
                 log.warning("over %d files are being written to a drive at once: the rest are not told", MAX_WAITING)
             return
+        if path not in self.waiting and self.stamp is not None:
+            task = asyncio.ensure_future(self._take_stamp(path, time.time()))
+            self._stamping.add(task)
+            task.add_done_callback(self._stamping.discard)
         self.waiting[path] = time.monotonic()
+
+    async def _take_stamp(self, path: str, at: float) -> None:
+        try:
+            got = await self.stamp(path)                # type: ignore[misc]
+        except Exception as exc:  # noqa: BLE001 -- no stamp is "asked when told", never a lost file
+            log.debug("could not take a witness stamp for %s: %s", path, exc)
+            return
+        self.seen.setdefault(path, (at, got))
 
     async def _tell_what_settled(self) -> None:
         while self.removed:
@@ -173,7 +196,9 @@ class DriveWatch:
         if self.told.get(path) == (st.st_size, st.st_mtime_ns):
             return
         digest = await asyncio.to_thread(hash_file, Path(path), self.hash_limit)
-        event = {"op": "create", "path": path, "name": os.path.basename(path), "hash": digest, "drive": _drive_of(path, self.observers)}
+        event: dict[str, Any] = {"op": "create", "path": path, "name": os.path.basename(path), "hash": digest, "drive": _drive_of(path, self.observers)}
+        if (first := self.seen.pop(path, None)) is not None:
+            event["at"], event["witness"] = first        # when it was put there, and by whom: not two seconds later, when the hands are off
         try:
             await self.report("index.event", {"event": event})
             self.told[path] = (st.st_size, st.st_mtime_ns)

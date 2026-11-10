@@ -101,7 +101,7 @@ class WorkerService:
             self.watcher = Watcher(config.watch_roots, self._relay, poll_seconds=config.poll_seconds,
                                    hash_limit=config.hash_limit_bytes, idle_after=config.idle_sweep_after_seconds,
                                    native=native_watch, state_path=state_path, reconcile_seconds=config.reconcile_seconds)
-        self.drivewatch = DriveWatch(self._relay, hash_limit=config.hash_limit_bytes) if config.watch_drives else None
+        self.drivewatch = DriveWatch(self._relay, hash_limit=config.hash_limit_bytes, stamp=self.witness.stamp) if config.watch_drives else None
         self.notifiers: list[Notifier] = []   # the narrow UI / dialogs subscribe here
         self.native_session_id: int | None = None
         self._stopping = False

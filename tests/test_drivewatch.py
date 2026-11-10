@@ -190,3 +190,22 @@ async def test_taking_a_file_off_a_drive_updates_the_index_and_is_not_read_as_co
     await asyncio.sleep(0.2)
     assert (await engine.db.file_index.by_path(org["w1_pc"], "K:\\out\\pay.txt", present_only=True)) is None
     assert not any(s.verb == "deleted" for s in detective._detector().mem[org["w1_pc"]].since(0, "deleted"))
+
+
+async def test_who_was_at_the_keyboard_is_asked_when_the_file_appears_not_when_it_is_told(tmp_path: Path):
+    """Hands-on, 10 Nov 2026: a paste to a pendrive read as "a program the person started", because the stamp was taken after the file had been quiet."""
+    sent: list[dict] = []
+    hands = {"by": "hand", "front": "explorer.exe"}
+
+    async def stamp(path: str) -> dict:
+        return dict(hands)
+
+    w = await _watching(tmp_path, sent, stamp=stamp)
+    try:
+        (tmp_path / "payroll.txt").write_bytes(b"salaries")
+        await asyncio.sleep(0.1)
+        hands.update(by="started", front="")           # the person lets go of the mouse while the copy settles
+        assert await _until(lambda: sent)
+        assert sent[0]["witness"] == {"by": "hand", "front": "explorer.exe"} and sent[0]["at"] <= time.time()
+    finally:
+        await w.stop()
