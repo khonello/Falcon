@@ -391,7 +391,17 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
     and the caller is an org-wide Admin), named as the caller names people. Also: `chat.file_consent` runs SQL in the handler
     (`db.pool.execute("UPDATE chat_files ...")`); it belongs in the repo.
 
-30. **Deviations are postponed to version 2, as the Super User was (the user, 10 Nov 2026).** In the dev database there are 573, every one
+30. **Done 10 Nov 2026 by the UI session, with the user's go-ahead** (it touched Engine files: `engine/console/feed.py` rewritten,
+    `engine/auth.py` `NAME_CHECK = False`, `engine/audit.py` no push for routine entries, `engine/database.py` `AuditRepo.labels` /
+    `recorded_since` / `feed(types=)`, `engine/task/tasks.py` a deadline said once, `engine/console/issues.py` one kind added; tests in
+    `tests/test_audit_words.py`). **The audit log rethought:** every action the Engine records has one entry in `feed.ENTRIES` (kind,
+    level, sentence) and `test_audit_words.py` fails when something is recorded without one, so **a new `audit.record(...)` action needs
+    an entry there**. Sentences name things (a task's words, a flow's name, a rule's name) looked up when read; the levels are worth /
+    done / routine, and `audit.events` leaves routine out unless `routine: true` (connections, each file a flow carried, catch-ups,
+    and lines that only repeat another: a copy's issue and the built-in rules B-1 and B-4). New kinds: protected, issue, message,
+    detective (`mark.*` is no longer "violation"; `issue.*` and `rule.*` no longer "admin"). Found on the way: every Engine start
+    re-recorded each old task's deadline (187 lines in dev); now once per deadline. What was asked:
+    **Deviations are postponed to version 2, as the Super User was (the user, 10 Nov 2026).** In the dev database there are 573, every one
     `account_bound_to_one_pc` ("ADM-01 connected under another name"): `auth._announce_hostname` writes one to `deviation_log` and one
     `deviation.logged` audit line at *every* connection whose announced name differs from the registered one, so the Audit log is one message
     repeated, and it is hard to explain to a customer (a renamed PC, a reinstall). The key already proves which machine it is. Wanted:

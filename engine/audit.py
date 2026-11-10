@@ -95,8 +95,10 @@ class AuditTrail:
         eng = self.engine
         if eng is None or not eng.connections:
             return
-        from engine.console.feed import describe_many
+        from engine.console.feed import ENTRIES, describe_many
 
+        if ENTRIES.get(entry["action"], ("", "routine", None))[1] == "routine":
+            return                                         # the machinery is kept, never pushed, and costs no lookup
         dept = entry.get("department_id")
         row = {**entry, "action_type": entry["action"]}
         for conn in list(eng.connections):
@@ -107,6 +109,8 @@ class AuditTrail:
                 continue
             # named the way this viewer names people (Display Names never propagate between namers)
             event = (await describe_many(eng.db, [row], ident.account_id))[0]
+            if event["level"] == "routine":
+                return                                     # the machinery is kept, never pushed (engine/console/feed.py's levels)
             await conn.push("audit.event", event)
 
     async def deviation(self, kind: str, *, surfaced_to_account_id: int,

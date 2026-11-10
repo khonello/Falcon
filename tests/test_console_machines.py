@@ -134,9 +134,9 @@ async def test_the_audit_trail_is_events_with_a_kind_a_sentence_a_machine_and_a_
     assert any("Entered FIN-01" in e["what"] for e in fin)
     assert all(e["host"] in (None, "FIN-ADM", "FIN-01", "FIN-02") for e in fin)
     assert not any(e["action_type"].startswith("report_routing") for e in await _only(a2, "report"))   # routed to Finance, not HR
-    page = await su.ok("audit.events", {"limit": 2})
+    page = await su.ok("audit.events", {"limit": 2, "routine": True})          # connections included, so there is more than a page
     assert len(page["events"]) == 2 and page["more"] is True
-    older = await su.ok("audit.events", {"limit": 2, "before_id": page["events"][-1]["id"]})
+    older = await su.ok("audit.events", {"limit": 2, "routine": True, "before_id": page["events"][-1]["id"]})
     assert older["events"][0]["id"] < page["events"][-1]["id"]
 
     # counts, per kind and over time

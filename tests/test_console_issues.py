@@ -134,7 +134,9 @@ async def test_who_owns_an_issue_and_how_it_moves(engine, org, connect):
     assert "issue.escalated" in su.push_types(await su.drain_pushes())
     assert (await su.ok("issues.list"))["summary"]["mine"] == 1
     assert await su.err("issues.escalate", {"issue_id": issue["id"]}) == "forbidden"
-    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["admin"]}))["events"]} >= {"issue.raised", "issue.escalated"}
+    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["issue"]}))["events"]} >= {"issue.escalated"}
+    # a copy caught is the line; its issue being raised only says it again, so it is with the machinery (feed.py's levels)
+    assert "issue.raised" in {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["issue"], "routine": True}))["events"]}
 
 
 async def test_an_update_that_fails_is_an_issue_that_grows_and_clears_when_it_lands(engine, org, connect):
@@ -175,7 +177,8 @@ async def test_an_update_that_fails_is_an_issue_that_grows_and_clears_when_it_la
     assert states["FIN-02"] == "resolved" and states["FIN-01"] == "resolved"
 
 
-async def test_a_machine_that_presents_another_name_is_an_issue_until_it_does_not(engine, org, connect):
+async def test_a_machine_that_presents_another_name_is_an_issue_until_it_does_not(engine, org, connect, monkeypatch):
+    monkeypatch.setattr("engine.auth.NAME_CHECK", True)          # postponed to version 2; its code stays tested
     a1 = await connect("cid-a1")
     await connect("cid-w1", hostname="LOBBY-PC")
     [issue] = (await a1.ok("issues.list", {"type": "deviation"}))["issues"]

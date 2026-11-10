@@ -106,7 +106,7 @@ async def test_a_copy_where_the_mark_does_not_allow_it_is_an_issue_and_every_ver
     assert everything["summary"]["marks"] == 3 and everything["summary"]["with_copies"] == 3 and everything["summary"]["copies"] == 5
     assert (await su.ok("marks.list"))["marks"] == []                          # "mine" is the Super User's own: none yet
     assert (await a1.ok("marks.list", {"scope": "department"}))["summary"]["marks"] == 2
-    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["violation"]}))["events"]} >= {"mark.created"}
+    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["protected"]}))["events"]} >= {"mark.created"}
 
 
 async def test_an_existing_copy_is_found_at_marking_and_changing_where_it_is_allowed_says_what_it_does(engine, org, connect):

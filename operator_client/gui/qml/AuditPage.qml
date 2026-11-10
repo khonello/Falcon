@@ -17,8 +17,10 @@ Page {
     Component.onCompleted: {
         var p = Nav.take("audit")
         if (p) { if (p.kinds && p.kinds.length === 1) kind = p.kinds[0]; brush = p.brush || null }
-        Kinds.load({ limit: 500 }, function (es) { page.all = es })
+        page.reload()
     }
+    // Worth a look and All that was done come from one read; Everything reads again with the machinery (the Engine's levels, feed.py)
+    function reload() { Kinds.load({ limit: 500, routine: page.show === "all" }, function (es) { page.all = es }) }
     // to the minute: the list hangs off this, and a value that moved every second rebuilt every row every second
     readonly property real since: Math.floor(Time.now / 60000) * 60000 - Time.rangeHours(Nav.range) * 3600000
     readonly property var base: all.filter(function (e) { return e.t >= since })
@@ -42,15 +44,21 @@ Page {
     }
 
     // --- the version 1 concept's layout (docs/design/concepts-admin.html, AdminAuditPage) -------------------------------------------------
-    // Worth a look by default: someone going into a machine, a restricted copy, a deviation, an action or a rule; the routine (files synced,
-    // people signing in and out) is under Everything.
-    property bool everything: false
+    // Worth a look by default: what someone should look at, as the Engine says (a copy caught, a deadline passed, a refusal, a failure) and
+    // a visit outside working hours; All that was done adds what people and Falcon did; Everything adds the machinery (connections, each
+    // file a flow carried, catch-ups), which the Engine leaves out unless asked.
+    property string show: "worth"
+    readonly property bool everything: show !== "worth"
+    onShowChanged: page.reload()
     property string q: ""
     property int ap: 0
     readonly property int per: 8
-    function worth(x) { return x.kind === "violation" || x.kind === "deviation" || !!x.visit || / notified |^Created flow| failed | left for an Admin/.test(x.what) }
+    function worth(x) { return x.level === "worth" || (!!x.visit && !!x.odd) }
     readonly property var says: ({ session: "someone went into or out of a machine", action: "an action ran", flow: "a flow moved files", rollout: "an update", update: "an update",
-                                   deviation: "something did not match what it should be", violation: "a restricted file was found where it should not be" })
+                                   deviation: "an Automation rule saw something it did not expect", violation: "a protected file turned up where it may not be, or someone was refused it",
+                                   protected: "a file was kept to its place, made private or watched", task: "a task moved on", issue: "an issue opened, moved or closed",
+                                   message: "someone talked or sent a file", detective: "Detective opened a case or suggested a step", admin: "people, machines and settings",
+                                   system: "Falcon itself" })
     function dayWord(t) { var d = Math.round((Time.startOfDay(Time.now) - Time.startOfDay(t)) / 86400000); return d === 0 ? "Today" : d === 1 ? "Yesterday" : Time.dayName(t) }
     function whoSay(a) {
         if (a === "System" || a === "Automation") return "Falcon itself"
@@ -92,7 +100,8 @@ Page {
     readonly property var pageRows: listed.slice(pi * per, pi * per + per)
     readonly property var days: pageRows.map(function (x) { return Time.startOfDay(x.t) }).filter(function (d, i, a) { return a.indexOf(d) === i })
     readonly property var cur: { for (var i = 0; i < listed.length; i++) if (listed[i].rid === sel) return listed[i]; return listed.length ? listed[0] : null }
-    readonly property var kindIcon: ({ session: "login", action: "thunderbolt", flow: "branches", violation: "fileprotect", deviation: "warn", task: "checksquare", report: "filetext", admin: "user", system: "gear", rollout: "cloudupload" })
+    readonly property var kindIcon: ({ session: "login", action: "thunderbolt", flow: "branches", violation: "fileprotect", protected: "lock", deviation: "warn", task: "checksquare",
+                                       issue: "alert", message: "message", detective: "filesearch", report: "filetext", admin: "user", system: "gear", rollout: "cloudupload" })
     property string pickedId: ""
     onCurChanged: pickedId = cur ? cur.rid : ""
     situation: {
@@ -120,8 +129,8 @@ Page {
                 Row {
                     id: tools
                     spacing: 10
-                    Segmented { objectName: "auditWorth"; small: true; options: [{ value: "worth", label: "Worth a look" }, { value: "all", label: "Everything" }]; value: page.everything ? "all" : "worth"
-                                onPicked: function (v) { page.everything = v === "all"; page.ap = 0 } }
+                    Segmented { objectName: "auditWorth"; small: true; options: [{ value: "worth", label: "Worth a look" }, { value: "done", label: "All that was done" }, { value: "all", label: "Everything" }]
+                                value: page.show; onPicked: function (v) { page.show = v; page.ap = 0 } }
                     Field { width: 280; small: true; iconName: "search"; placeholderText: "Who, what or which machine"; text: page.q; onTextEdited: { page.q = text; page.ap = 0 } }
                     Btn { visible: page.brush !== null; small: true; kind: "text"; iconRight: true; iconName: "close"; text: page.brush ? Time.hhmm(page.brush[0]) + " to " + Time.hhmm(page.brush[1]) : ""; onClicked: page.brush = null }
                 }
@@ -190,7 +199,7 @@ Page {
                      page.cur.visit ? (page.cur.end !== null ? "until " + Time.hhmm(page.cur.end) : "still inside") : "it happened once, at that time"],
                     ["Who", page.cur.actor, page.whoSay(page.cur.actor)],
                     ["Machine", page.cur.host, page.machineSay(page.cur.host)],
-                    ["Kind", Kinds.words[page.cur.kind] || page.cur.kind, page.worth(page.cur) ? "worth a look" : "routine"],
+                    ["Kind", Kinds.words[page.cur.kind] || page.cur.kind, page.worth(page.cur) ? "worth a look" : page.cur.level === "routine" ? "Falcon's own working" : "something that was done"],
                     ["Kept", Math.max(1, Math.ceil(90 - (Time.now - page.cur.t) / 86400000)) + " more days", "every entry is kept for 90 days, then removed"]]
             }
             Pulse { parent: entry; key: page.pickedId || null }
@@ -240,7 +249,7 @@ Page {
         GiveSteps {
             steps: [["Pick how far back", "today, a week, a month, or all 90 days; everything in it goes in"], ["Download it", "a CSV file; the export itself is recorded in the log"]]
             act: "Export the log"
-            onGo: { Kinds.load({ limit: 5000 }, function (es) { page.all = es }); xd.open() }
+            onGo: { Kinds.load({ limit: 5000, routine: true }, function (es) { page.all = es }); xd.open() }
         }
     }
 }

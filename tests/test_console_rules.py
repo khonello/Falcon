@@ -52,7 +52,7 @@ async def test_the_standard_has_locked_built_in_rules_and_the_super_users_patter
     off = (await su.ok("rules.switch", {"rule_id": made["id"], "on": False}))["rule"]
     assert off["on"] is False and (await su.ok("rules.list"))["summary"] == {"rules": 5, "on": 4, "broken_this_week": 0, "kept": 4}
     assert await su.err("rules.switch", {"rule_id": made["id"], "on": "yes"}) == "invalid"
-    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["admin"]}))["events"]} >= {"rule.created", "rule.updated", "rule.switched"}
+    assert {e["action_type"] for e in (await su.ok("audit.events", {"kinds": ["deviation"]}))["events"]} >= {"rule.created", "rule.updated", "rule.switched"}
 
 
 async def test_a_never_rule_records_a_deviation_with_its_context_and_evidence_and_a_person_gives_it_an_outcome(engine, org, connect):
@@ -171,7 +171,7 @@ async def test_every_machine_must_run_the_approved_version_in_time_and_a_departm
     assert await engine.db.pool.fetchval("SELECT count(*) FROM rule_watches WHERE state = 'open' AND target_table = $1", f"seat:{org['hr']}") == 1
 
 
-async def test_a_limit_rule_counts_what_the_audit_trail_shows_and_a_never_rule_catches_a_second_session(engine, org, connect):
+async def test_a_limit_rule_counts_what_the_audit_trail_shows_and_a_never_rule_catches_a_second_session(engine, org, connect, monkeypatch):
     su = await connect("cid-su")
     a1 = await connect("cid-a1")
     await connect("cid-w1")
@@ -207,7 +207,8 @@ async def test_a_limit_rule_counts_what_the_audit_trail_shows_and_a_never_rule_c
     second = [d for d in (await su.ok("deviations.list"))["deviations"] if d["rule"]["code"] == "B-2"]
     assert len(second) == 1 and second[0]["kind"] == "admin" and "tried to enter FIN-02" in second[0]["short"]
 
-    # a machine presenting another name breaks B-4
+    # a machine presenting another name breaks B-4 (the name check is postponed to version 2; its code stays tested)
+    monkeypatch.setattr("engine.auth.NAME_CHECK", True)
     await connect("cid-w1", hostname="LOBBY-PC")
     [cert] = [d for d in (await su.ok("deviations.list", {"kind": "pc"}))["deviations"] if d["rule"]["code"] == "B-4"]
     assert cert["expected"] == "The name FIN-01" and cert["happened"] == "The name LOBBY-PC" and cert["who"] == "FIN-01"

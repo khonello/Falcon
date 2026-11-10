@@ -199,7 +199,7 @@ async def _load(ctx: Context, issue_id: int) -> dict[str, Any]:
 
 # what the audit trail may add to an issue's story: only the kinds of event that belong to its kind. A machine records a great deal besides (a flow
 # syncing, a routine update check, someone signing in), and none of that is part of why a restricted copy was found.
-RELATED_KINDS = {"file": {"violation", "session"}, "update": {"rollout", "session"}, "deviation": {"deviation", "session"}, "flow": {"flow"},
+RELATED_KINDS = {"file": {"violation", "protected", "session"}, "update": {"rollout", "session"}, "deviation": {"deviation", "session"}, "flow": {"flow"},
                  "offline": {"session", "rollout"}, "component": {"session"}, "retention": {"retention"}}
 
 

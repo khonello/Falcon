@@ -2640,6 +2640,12 @@ class AuditRepo(_Repo):
             entry.get("actor_account_id"), entry["action"], target_type, entry.get("target_id"),
             entry.get("detail") or {}, entry.get("at") or _now(), entry.get("pc_id"), entry.get("department_id"))
 
+    async def recorded_since(self, action_type: str, target_type: str, target_id: int, since: datetime) -> bool:
+        """Whether this was already recorded about this thing at or after `since` (a task's deadline is said once)."""
+        return bool(await self._val(
+            "SELECT EXISTS (SELECT 1 FROM audit_log WHERE action_type = $1 AND target_type = $2 AND target_id = $3 AND occurred_at >= $4)",
+            action_type, target_type, str(target_id), since))
+
     async def recent(self, *, limit: int = 200, actor_account_id: int | None = None,
                      action_prefix: str | None = None) -> list[dict[str, Any]]:
         return await self._fetch(
@@ -2677,12 +2683,52 @@ class AuditRepo(_Repo):
 
     async def feed(self, *, since: datetime, until: datetime, kinds: list[str] | None, pc_id: int | None,
                    department_id: int | None, actor_account_id: int | None, before_id: int | None,
-                   limit: int) -> list[dict[str, Any]]:
+                   limit: int, types: list[str] | None = None) -> list[dict[str, Any]]:
+        """`types`: only these action types (the Audit log's default leaves the routine ones out)."""
         extra, args = self._scope_sql(4, kinds, pc_id, department_id, actor_account_id, before_id)
+        if types is not None:
+            extra += f" AND action_type = ANY(${4 + len(args)}::text[])"
+            args = [*args, types]
         return await self._fetch(
             "SELECT id, actor_account_id, action_type, target_type, target_id, detail, occurred_at, pc_id, department_id "
             f"FROM audit_log WHERE occurred_at >= $1 AND occurred_at < $2{extra} ORDER BY id DESC LIMIT $3",
             since, until, limit, *args)
+
+    # what an audit row is about, named (engine/console/feed.py): target type -> SQL giving id, label and what a sentence needs
+    _LABELS: ClassVar[dict[str, str]] = {
+        "tasks": "SELECT id, description_raw AS label, assignee_account_id AS assignee FROM tasks WHERE id = ANY($1::int[])",
+        "flows": "SELECT id, name, source_path FROM flows WHERE id = ANY($1::int[])",
+        "flow_destinations": "SELECT d.id, f.name, f.source_path, f.id AS flow_id FROM flow_destinations d JOIN flows f ON f.id = d.flow_id "
+                             "WHERE d.id = ANY($1::int[])",
+        "rules": "SELECT id, coalesce(name, code) AS label FROM rules WHERE id = ANY($1::int[])",
+        "deviations": "SELECT d.id, d.short, d.expected, d.happened, d.subject_account_id, p.hostname AS subject_host, r.name AS rule, "
+                      "r.code AS rule_code FROM deviations d LEFT JOIN rules r ON r.id = d.rule_id LEFT JOIN pcs p ON p.id = d.subject_pc_id "
+                      "WHERE d.id = ANY($1::int[])",
+        "issues": "SELECT id, title AS label, subject FROM issues WHERE id = ANY($1::int[])",
+        "resource_marks": "SELECT id, name AS label, protection FROM resource_marks WHERE id = ANY($1::int[])",
+        "actions": "SELECT id, name AS label FROM actions WHERE id = ANY($1::int[])",
+        "execution": "SELECT e.id, a.name AS label FROM action_executions e JOIN actions a ON a.id = e.action_id WHERE e.id = ANY($1::int[])",
+        "event_definitions": "SELECT id, name AS label FROM event_definitions WHERE id = ANY($1::int[])",
+        "system_alerts": "SELECT id, title AS label FROM system_alerts WHERE id = ANY($1::int[])",
+        "proposals": "SELECT id, title AS label FROM proposals WHERE id = ANY($1::int[])",
+        "detective_cases": "SELECT id, headline AS label FROM detective_cases WHERE id = ANY($1::int[])",
+        "talk_requests": "SELECT id, line AS label FROM talk_requests WHERE id = ANY($1::int[])",
+    }
+
+    async def labels(self, target_type: str, ids: list[int]) -> dict[int, dict[str, Any]]:
+        """The things audit rows are about, by id, with a `label` to name them by. A flow without a name is "<source folder>-<id>",
+        as the console names it. Kinds of target that are not named return nothing."""
+        sql = self._LABELS.get(target_type)
+        if sql is None or not ids:
+            return {}
+        out = {}
+        for r in await self._fetch(sql, ids):
+            row = dict(r)
+            if target_type in ("flows", "flow_destinations"):
+                folder = str(row.get("source_path") or "").replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or "flow"
+                row["label"] = row.get("name") or f"{folder}-{row.get('flow_id') or row['id']}"
+            out[row["id"]] = row
+        return out
 
     async def counts(self, *, since: datetime, until: datetime, bucket_minutes: int, pc_id: int | None,
                      department_id: int | None) -> list[dict[str, Any]]:

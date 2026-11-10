@@ -6,7 +6,7 @@
 Nothing is written to a table by hand: everything goes through the Engine as the Admin in `data/admin.json` (ADM-01) and as real Worker
 processes (WS-D1, WS-D2, WS-D3 from `data/drill/state.json`, and ADM-01's own machine), the way the console and the machines do it. Their
 files live under `data/seed/` (git-ignored). It needs the Engine running on the dev database (`python -m engine`), never the test one.
-Run it again and it starts over: its own marks are lifted and its own flows deleted first; a task it already gave that is still open is
+Its people are named (Kojo Asante, Ama Owusu, Esi Boateng). Run it again and it starts over: its own marks are lifted and its own flows deleted first; a task it already gave that is still open is
 not given twice.
 
 What it leaves:
@@ -50,6 +50,8 @@ FILES = {
     "ADM-01/Board/minutes-october.docx": "Board minutes, October\n",
     "ADM-01/Board/strategy-2027.pptx": "Strategy 2027\n",
 }
+# the people, named the way an Admin names them in the console (a Display Name is the namer's own: hierarchy.set_display_name)
+PEOPLE = {"WS-D1": "Kojo Asante", "WS-D2": "Ama Owusu", "WS-D3": "Esi Boateng"}
 TASKS = [  # who, what, file, folder, deadline in hours, what the seed does with it
     ("WS-D1", "Write the weekly sales summary", "summary-week-45.txt", "WS-D1/Documents", 20, "hand_in"),
     ("WS-D1", "Update the price list for December", "price-list-december.csv", "WS-D1/Documents", 30, "complete"),
@@ -105,10 +107,12 @@ async def main(stop_after: bool) -> int:
     for rel, text in FILES.items():
         (HOME / rel).write_text(text, encoding="utf-8")
 
-    # --- the people talk first, each on a short connection of their own, before their machines start ------------------------------------------
-    print("Messages", flush=True)
+    # --- the people: named, then they talk, each on a short connection of their own, before their machines start ---------------------------
+    print("People and messages", flush=True)
     w1, w2 = await d.worker_account("WS-D1"), await d.worker_account("WS-D2")
     await d.worker_account("WS-D3")
+    for host, name in PEOPLE.items():
+        await step(f"named the person at {host} {name}", a.call("hierarchy.set_display_name", {"account_id": (await d.worker_account(host))["account_id"], "label": name}))
     convo = await step("a conversation with WS-D1's person", a.call("chat.open", {"account_id": w1["account_id"]}))
     if convo:
         cid = convo["conversation"]["conversation_id"] if "conversation" in convo else convo["conversation_id"]

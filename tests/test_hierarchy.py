@@ -19,7 +19,8 @@ pytestmark = requires_db
 
 # --- auth binds identity ------------------------------------------------------------------------
 
-async def test_handshake_resolves_identity_and_claims_native_session(engine, org, connect):
+async def test_handshake_resolves_identity_and_claims_native_session(engine, org, connect, monkeypatch):
+    monkeypatch.setattr("engine.auth.NAME_CHECK", True)          # postponed to version 2; its code stays tested
     w1 = await connect("cid-w1", hostname="FIN-01")
     state = await w1.ok("hierarchy.session_state")
     assert state["pc_session"]["occupied_via"] == "native"
@@ -315,9 +316,10 @@ async def test_an_admin_cannot_use_the_flag_to_see_anything_new(engine, org, con
     assert tree["viewer"] == {"account_id": org["a1"], "role": "admin"}
 
 
-async def test_a_changed_machine_name_is_said_back_to_the_client(engine, org):
+async def test_a_changed_machine_name_is_said_back_to_the_client(engine, org, monkeypatch):
     """ST01: a hostname mismatch is a deviation, logged AND told to the person connecting ("this machine's name
-    has changed"), never a refusal. A matching name says nothing."""
+    has changed"), never a refusal. A matching name says nothing. Postponed to version 2; its code stays tested."""
+    monkeypatch.setattr("engine.auth.NAME_CHECK", True)
     import asyncio
 
     from tests.conftest import Client, answer

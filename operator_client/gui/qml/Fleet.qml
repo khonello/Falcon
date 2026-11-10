@@ -90,7 +90,7 @@ QtObject {
     function refresh() {
         if (!falcon.isConnected) return
         _parts = {}
-        _pending = 8
+        _pending = 7                       // one per read below
         var take = function (key) {
             return function (ok, r) {
                 var p = Object.assign({}, fleet._parts); p[key] = ok ? r : null; fleet._parts = p
@@ -101,7 +101,7 @@ QtObject {
         falcon.call("resource.violations", {}, take("violations"))
         falcon.call("updates.rollout_health", {}, take("rollout"))
         falcon.call("assistance.ping_status", {}, take("pings"))
-        falcon.call("audit.deviations", {}, take("deviations"))
+        // deviations (a machine's other name) are postponed to version 2 (the user, 10 Nov 2026; ENGINE-GAPS 30): not read
         falcon.call("hierarchy.sessions_today", {}, take("sessions"))
         // the Engine's own records, when it has them: the machines with their agents, and the issues it raises and resolves
         falcon.call("machines.list", {}, take("machines"))

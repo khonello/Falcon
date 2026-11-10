@@ -58,7 +58,7 @@ async def test_entering_to_look_leaves_the_person_working_and_the_picture_goes_t
     assert (await a1.ok("session.screen", {"session_id": sid, "action": "stop"}))["streaming"] is False
     assert "screen.stop" in w1.push_types(await w1.drain_pushes())
     assert await w1.ok("session.frame", {"session_id": sid, "png_b64": PNG_B64}) == {"keep": False}
-    kinds = {e["action_type"] for e in (await a1.ok("audit.events", {"kinds": ["session"]}))["events"]}
+    kinds = {e["action_type"] for e in (await a1.ok("audit.events", {"kinds": ["session"], "routine": True}))["events"]}       # seeing the screen is with the machinery
     assert {"session.screen_started", "session.screen_stopped", "session.mode_changed"} <= kinds
 
 

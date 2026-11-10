@@ -33,6 +33,12 @@ from protocol import ErrorCode, ProtocolError
 
 log = logging.getLogger(__name__)
 
+# The name check (a machine presenting another name than it was registered with) is postponed to version 2, as the Super User was (the user,
+# 10 Nov 2026; ENGINE-GAPS 30): it wrote a deviation, an audit line and an issue at every connection from a renamed or reinstalled machine,
+# and the key already proves which machine it is. Off, nothing is recorded and an open name issue closes when the machine connects; the code
+# stays, and its tests turn it on.
+NAME_CHECK = False
+
 
 def new_nonce() -> str:
     return secrets.token_hex(32)
@@ -85,7 +91,15 @@ def _identity_of(account: dict[str, Any], client_id: str) -> Identity:
 async def _announce_hostname(ctx: Context, account: dict[str, Any], announced_hostname: str | None) -> dict[str, str] | None:
     """Hostname mismatch is a *deviation* (hierarchy-system-design → System Expectations): logged
     and surfaced, the connection proceeds as the provisioned identity. The key proves the install
-    package; the hostname says where it is being used from."""
+    package; the hostname says where it is being used from. Postponed to version 2 (`NAME_CHECK`)."""
+    if not NAME_CHECK:
+        if announced_hostname and account["hostname"] and announced_hostname != account["hostname"]:
+            log.info("%s connected under the name %s (not checked in this version)", account["hostname"], announced_hostname)
+        if account["bound_pc_id"]:
+            from engine.console import issues
+
+            await issues.resolve_source(ctx.engine, "hostname_mismatch", account["bound_pc_id"], "Not checked in this version")
+        return None
     if announced_hostname and account["hostname"] and announced_hostname == account["hostname"] and account["bound_pc_id"]:
         from engine.console import issues
 

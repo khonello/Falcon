@@ -114,9 +114,14 @@ def _deadline_job(engine: Engine, task_id: int, kind: str) -> Any:
         task = await engine.db.tasks.get(task_id)
         if task is None or task["status"] == "completed":
             return
+        # once per deadline: an Engine that starts again re-arms every open task, and a deadline long past must not be said again
+        # each time (the dev log held 187 of them, 10 Nov 2026). A deadline moved later is a new one, and is said when it comes.
+        due = task.get("soft_deadline_at" if kind == "soft" else "final_deadline_at")
+        if due is not None and await engine.db.audit.recorded_since(f"task.deadline_{kind}", "tasks", task_id, due):
+            return
         from engine.control import events
 
-        await engine.audit.record(None, f"task.deadline_{kind}", target_type="tasks", target_id=task_id)
+        await engine.audit.record(None, f"task.deadline_{kind}", target_type="tasks", target_id=task_id, pc_id=task.get("assignee_pc_id"))
         payload = {"task_id": task_id, "kind": kind, "indicator": "deadline_reached"}
         await engine.push_to_account(task["assigner_account_id"], "task.deadline", payload)
         await engine.push_to_account(task["assignee_account_id"], "task.deadline", payload)
