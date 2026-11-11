@@ -2,7 +2,7 @@ import QtQuick
 import "."
 
 // TODAY AS AN AGENDA AROUND NOW (the concept's DayAgenda, ag; the user, 10 Nov 2026, in place of the seven two-hour columns): one line
-// per thing in time order, the last three of the past seven hours above Now, faded, and the next six below it however far off; each line its time, its whole title
+// per thing in time order, the last three of the past seven hours above Now, faded, and the next three below it however far off; each line its time, its whole title
 // and where it is, red when it is past its time. At the foot what is earlier and still open, and what is later. Items are
 // calendar.board's: {at, title, line, overdue, to}.
 Column {
@@ -11,7 +11,7 @@ Column {
     property string empty: "nothing due in these hours"
     readonly property real now: Math.floor(Time.now / 60000) * 60000          // to the minute: the rows are rebuilt only when that moves
     readonly property var past: items.filter(function (e) { var t = Time.ms(e.at); return t >= root.now - 7 * 3600000 && t < root.now }).slice(-3)
-    readonly property var next: items.filter(function (e) { return Time.ms(e.at) >= root.now }).slice(0, 6)
+    readonly property var next: items.filter(function (e) { return Time.ms(e.at) >= root.now }).slice(0, 3)            // three after Now, three before it: the rest is in Calendar (the user, 11 Nov 2026)
     readonly property int before: items.filter(function (e) { return Time.ms(e.at) < root.now && e.overdue }).length - past.filter(function (e) { return e.overdue }).length
     readonly property int after: items.filter(function (e) { return Time.ms(e.at) >= root.now }).length - next.length
     function when(x) {
