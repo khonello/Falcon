@@ -9,6 +9,8 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 
 **For the user to decide:** nothing is waiting (5 Nov 2026).
 
+**The user's next UI changes (said 11 Nov 2026):** changes to the **Issues**, **Departments** and **Audit log** pages. Ask what they are.
+
 **Waiting on the user to say go**
 - Replace the Groq key given in the session, before anything ships.
 
