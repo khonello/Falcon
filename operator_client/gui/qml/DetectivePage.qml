@@ -347,8 +347,8 @@ Page {
         sub: "what Detective lets pass on one machine; restricted files are never let pass"
         Column {
             width: parent.width
-            Repeater {
-                model: page.okRules
+            PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                id: op; items: page.okRules; per: 8
                 delegate: Item {
                     required property var modelData
                     required property int index
@@ -362,7 +362,7 @@ Page {
                     Txt { id: tb; anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; text: "Take it back"; color: tba.containsMouse ? Theme.accent : Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
                           MouseArea { id: tba; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                       onClicked: falcon.call("detective.rule_revoke", { rule_id: modelData.id }, function (ok, r) { if (!ok) { Msg.failed(r && r.message ? r.message : "Not taken back"); return } Msg.ok("Taken back"); page.loadRules() }) } }
-                    Rectangle { visible: index < page.okRules.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    Rectangle { visible: index < op.shown.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }
             Quiet { visible: page.okRules.length === 0; text: "Nothing. When you dismiss a case you can say what is fine from now on." }

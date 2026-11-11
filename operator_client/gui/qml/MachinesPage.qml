@@ -429,8 +429,8 @@ Page {
         width: parent.width
         title: "Waiting to join · " + page.asks.length
         sub: "installed without a licence code; type the code on its screen to let it in"
-        Repeater {
-            model: page.asks
+        PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+            id: ap; items: page.asks; per: 5
             delegate: Rectangle {
                 id: jr
                 required property var modelData

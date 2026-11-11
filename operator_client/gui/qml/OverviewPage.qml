@@ -313,9 +313,8 @@ Page {
             title: "Flows and automations"
             sub: (page.flowsOff.length + page.rulesOff.length ? "only what has stopped or is stuck is listed; " : "")
                  + Theme.many(page.flowsOn.length, "flow") + " and " + Theme.many(page.rulesOn.length, "automation") + (page.rulesOn.length === 1 ? " is" : " are") + " running fine"
-            Repeater {
-                // a flow waiting for someone is reminded here, through its issue; anything else is looked at on its page
-                model: page.flowsOff.map(function (f) { var s = page.flowState(f), q = page.remindOf(f)
+            PagedList {   // a flow waiting for someone is reminded here, through its issue; anything else is looked at on its page; five a page
+                id: ovp; per: 5; items: page.flowsOff.map(function (f) { var s = page.flowState(f), q = page.remindOf(f)
                                                         return { ic: "branches", t: page.flowName(f), s: s, hot: s.indexOf("paused") >= 0, act: q ? q.act : "Fix", quick: q,
                                                                  go: ["flows", "Flows opens with " + page.flowName(f) + " picked.", f.id] } })
                        .concat(page.rulesOff.map(function (r) { return { ic: "thunderbolt", t: r.name, s: String(r.last_run || "its last run went wrong").replace(/ success$/, " succeeded"), hot: true, act: "Look",

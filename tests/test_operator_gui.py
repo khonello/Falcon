@@ -618,3 +618,29 @@ async def test_a_flow_that_copies_only_when_run_can_be_run_now(console):
     await _wait(lambda: any(t == "flow.run" for t, _ in bridge.conn.seen))
     assert next(p for t, p in bridge.conn.seen if t == "flow.run") == {"flow_id": 5}
 
+
+
+async def test_a_long_list_pages_in_place_and_keeps_the_picked_one_on_screen(console):
+    """Paging is native to anything list-like (the user, 11 Nov 2026): a PagedList, and a Group given its items, draw `per` at a
+    time with the pager under them, step through the pages, and show the page that holds the item picked."""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtQml import QQmlComponent, QQmlEngine
+
+    win, _bridge, _ = console("admin")
+    qml = QQmlEngine.contextForObject(win).engine()
+    for kind in ("PagedList", "Group"):
+        comp = QQmlComponent(qml)
+        comp.setData(("import QtQuick\nimport \".\"\n" + kind + " { width: 400; items: [0,1,2,3,4,5,6,7,8,9,10,11]; per: 5\n"
+                      "  delegate: Item { required property var modelData; width: 10; height: 10 } }").encode(), QUrl.fromLocalFile(str(Path(QML_DIR) / "_paged_test.qml")))
+        obj = comp.create()
+        assert obj is not None, [e.toString() for e in comp.errors()]
+        assert prop(obj, "shown") == [0, 1, 2, 3, 4]
+        pager = next(c for c in obj.findChildren(QObject) if c.metaObject().className().startswith("StepPager"))
+        assert pager.property("visible") and pager.property("total") == 12 and pager.property("pages") == 3
+        pager.step.emit(1)
+        assert prop(obj, "shown") == [5, 6, 7, 8, 9]
+        obj.setProperty("keep", 11)                                    # the item picked is on the last page: that page is shown
+        assert prop(obj, "shown") == [10, 11]
+        obj.setProperty("items", [0, 1, 2])
+        assert prop(obj, "shown") == [0, 1, 2] and not pager.property("visible")   # one page: no pager
+        obj.deleteLater()

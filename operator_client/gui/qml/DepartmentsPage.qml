@@ -81,8 +81,8 @@ Page {
             Column {
                 width: parent.width
                 spacing: 6
-                Repeater {
-                    model: page.depts
+                PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                    id: dp; items: page.depts; per: 6; keep: page.cur ? page.depts.findIndex(function (d) { return d.id === page.cur.id }) : -1
                     delegate: Card {
                         id: card
                         required property var modelData

@@ -242,8 +242,8 @@ Page {
             Txt { id: sh; x: 4; y: 10; text: sec.name; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
             Txt { x: sh.x + sh.implicitWidth + 8; y: 10; text: Theme.fmt(sec.xs.length) + (sec.note ? " · " + sec.note : ""); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
         }
-        Repeater {
-            model: sec.xs
+        PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+            id: sp; items: sec.xs; per: 6; keep: sec.xs.findIndex(function (x) { return (x.ask ? "f" : x.from !== undefined ? "r" : "") + x.id === page.sel })
             delegate: Rectangle {
                 required property var modelData
                 readonly property bool isReq: modelData.from !== undefined

@@ -5,11 +5,14 @@ import "."
 // (dr-step: 12px in text-3, the steps 22px and borderless), 6px above.
 Item {
     id: root
-    property int from: 0
-    property int to: 0
-    property int total: 0
-    property int pageNo: 0                      // zero-based
-    property int pages: 1
+    property var of: null                       // a Paged: everything below is read from it, and a step moves it
+    property int from: of ? of.from : 0
+    property int to: of ? of.to : 0
+    property int total: of ? of.total : 0
+    property int pageNo: of ? of.pi : 0         // zero-based
+    property int pages: of ? of.pages : 1
+    visible: of ? of.more : true
+    Connections { target: root; function onStep(d) { if (root.of) root.of.pg = root.of.pi + d } }
     property bool showCount: true
     property string noun: ""                    // what is counted: "1 to 5 of 9 runs"
     signal step(int d)

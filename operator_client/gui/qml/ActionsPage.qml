@@ -173,8 +173,8 @@ Page {
                     visible: xs.length > 0
                     width: parent.width
                     Txt { topPadding: cg.index === 0 ? 7.6 : 17; bottomPadding: 4 - 1.2; text: cg.modelData[1]; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text3 }
-                    Repeater {
-                        model: cg.xs
+                    PagedList {   // six a page per kind of action (the user, 11 Nov 2026); the one picked stays on the page shown
+                        id: cp; items: cg.xs; per: 6; keep: page.cur ? cg.xs.findIndex(function (a) { return a.id === page.cur.id }) : -1
                         delegate: Rectangle {
                             required property var modelData
                             readonly property var bb: page.b(modelData)
@@ -343,28 +343,26 @@ Page {
                 width: parent.width
                 title: modelData[1] + " · " + xs.length
                 sub: modelData[2]
-                Repeater {
-                    model: hg.xs
-                    delegate: Card {
-                        required property var modelData
-                        readonly property var a: page.lib.filter(function (y) { return y.id === modelData.action_id })[0] || null
-                        width: hg.cardW
-                        midW: 260
-                        padV: 7
-                        icon: a ? (a.cat === "custom" ? "code" : a.cat === "monitoring" ? "eye" : "control") : "playcircle"
-                        readonly property var worst: modelData.xs.filter(page.badRun)[0] || modelData.xs[0]
-                        hot: modelData.bad
-                        title: modelData.action
-                        line: modelData.bad ? (worst.summary || String(worst.outcome)) + " on " + worst.host : modelData.xs.length > 1 ? "done on all " + modelData.xs.length : worst.summary || "done"
-                        lineHot: modelData.bad
-                        actions: Btn { small: true; iconName: "filesearch"; text: "Output"; onClicked: page.showOut(modelData) }
-                        onOpen: page.sel = modelData.action_id
-                        mid: Row {
-                            anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
-                            spacing: 18
-                            Txt { text: (modelData.xs.length > 1 ? modelData.xs.length + " machines" : modelData.xs[0].host) + " · " + modelData.from; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                            Txt { text: Time.sameDay(Time.ms(modelData.at), Time.now) ? Time.hhmm(modelData.at) : Time.dayName(modelData.at); mono: true; color: Theme.text3; elide: Text.ElideNone }
-                        }
+                items: hg.xs; per: 5
+                delegate: Card {
+                    required property var modelData
+                    readonly property var a: page.lib.filter(function (y) { return y.id === modelData.action_id })[0] || null
+                    width: hg.cardW
+                    midW: 260
+                    padV: 7
+                    icon: a ? (a.cat === "custom" ? "code" : a.cat === "monitoring" ? "eye" : "control") : "playcircle"
+                    readonly property var worst: modelData.xs.filter(page.badRun)[0] || modelData.xs[0]
+                    hot: modelData.bad
+                    title: modelData.action
+                    line: modelData.bad ? (worst.summary || String(worst.outcome)) + " on " + worst.host : modelData.xs.length > 1 ? "done on all " + modelData.xs.length : worst.summary || "done"
+                    lineHot: modelData.bad
+                    actions: Btn { small: true; iconName: "filesearch"; text: "Output"; onClicked: page.showOut(modelData) }
+                    onOpen: page.sel = modelData.action_id
+                    mid: Row {
+                        anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
+                        spacing: 18
+                        Txt { text: (modelData.xs.length > 1 ? modelData.xs.length + " machines" : modelData.xs[0].host) + " · " + modelData.from; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                        Txt { text: Time.sameDay(Time.ms(modelData.at), Time.now) ? Time.hhmm(modelData.at) : Time.dayName(modelData.at); mono: true; color: Theme.text3; elide: Text.ElideNone }
                     }
                 }
             }

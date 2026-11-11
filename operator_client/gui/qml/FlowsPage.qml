@@ -203,91 +203,90 @@ Page {
                     cardGap: 5
                     title: modelData[1] + " · " + xs.length
                     sub: modelData[2]
-                    Repeater {
-                        model: grp.xs
-                        delegate: Card {
-                            id: fc
-                            required property var modelData
-                            readonly property var gs: page.gatesOf(modelData)
-                            readonly property bool urg: gs.length > 0 && !!gs[0].hot
-                            objectName: "flow_" + modelData.id
-                            width: grp.cardW
-                            midW: 110
-                            actW: 104
-                            padV: 7
-                            readonly property bool ask: page.askedOfMe(modelData)
-                            icon: ask ? "inbox" : "branches"
-                            hot: urg
-                            tint: grp.late
-                            title: ask ? gs[0].title : modelData.name
-                            tag: ask ? "" : "by " + page.who(modelData)
-                            line: ask ? gs[0].kind.toLowerCase() : gs.length ? page.strip(gs[0], modelData) + (gs.length > 1 ? " · and " + (gs.length - 1) + " more" : "") : page.shape(modelData) + " · " + page.why(modelData)
-                            lineHot: urg
-                            picked: page.cur !== null && page.cur.key === modelData.key
-                            expandable: true
-                            expanded: page.exp === modelData.key
-                            onOpen: page.sel = modelData.key
-                            onToggle: { page.sel = modelData.key; page.exp = expanded ? "" : modelData.key }
-                            mid: Txt {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
-                                text: fc.ask ? Time.waitLen(fc.gs[0].wait) + " ago" : Theme.fmt(page.today(fc.modelData)) + " today"
-                            }
-                            // opened: its facts beside what waits at its gate (am-in)
-                            Row {
-                                width: parent.width
-                                spacing: 24
-                                Column {
-                                    y: 2
-                                    width: Math.min(420, parent.width - 230 - 24)
-                                    Repeater {
-                                        model: [["From", (fc.modelData.sources || []).map(function (s) { return s.source_hostname + " " + s.source_path }).join(", ")],
-                                                ["To", (fc.modelData.destinations || []).map(function (d) { return (d.destination_hostname || "storage") + " " + (d.destination_path || "(they pick the folder)") }).join(", ")],
-                                                ["Along the way", Sync.steps(fc.modelData).map(function (s, i) { return (i + 1) + ". " + s.op }).join("  ") || "copied as it is"],
-                                                ["Made by", page.who(fc.modelData)], ["Since it began", Theme.fmt(fc.modelData.files_copied ? fc.modelData.files_copied.total : 0) + " files"]]
-                                        delegate: Item {
-                                            required property var modelData
-                                            required property int index
-                                            width: parent.width
-                                            height: fv.height + 10
-                                            Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                            Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13; mono: index < 2; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone }
-                                            Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                                        }
+                    // five a page, each category its own pages (the user, 11 Nov 2026); the flow picked is always on the page shown
+                    items: grp.xs; per: 5; keep: page.cur ? grp.xs.findIndex(function (f) { return f.key === page.cur.key }) : -1
+                    delegate: Card {
+                        id: fc
+                        required property var modelData
+                        readonly property var gs: page.gatesOf(modelData)
+                        readonly property bool urg: gs.length > 0 && !!gs[0].hot
+                        objectName: "flow_" + modelData.id
+                        width: grp.cardW
+                        midW: 110
+                        actW: 104
+                        padV: 7
+                        readonly property bool ask: page.askedOfMe(modelData)
+                        icon: ask ? "inbox" : "branches"
+                        hot: urg
+                        tint: grp.late
+                        title: ask ? gs[0].title : modelData.name
+                        tag: ask ? "" : "by " + page.who(modelData)
+                        line: ask ? gs[0].kind.toLowerCase() : gs.length ? page.strip(gs[0], modelData) + (gs.length > 1 ? " · and " + (gs.length - 1) + " more" : "") : page.shape(modelData) + " · " + page.why(modelData)
+                        lineHot: urg
+                        picked: page.cur !== null && page.cur.key === modelData.key
+                        expandable: true
+                        expanded: page.exp === modelData.key
+                        onOpen: page.sel = modelData.key
+                        onToggle: { page.sel = modelData.key; page.exp = expanded ? "" : modelData.key }
+                        mid: Txt {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
+                            text: fc.ask ? Time.waitLen(fc.gs[0].wait) + " ago" : Theme.fmt(page.today(fc.modelData)) + " today"
+                        }
+                        // opened: its facts beside what waits at its gate (am-in)
+                        Row {
+                            width: parent.width
+                            spacing: 24
+                            Column {
+                                y: 2
+                                width: Math.min(420, parent.width - 230 - 24)
+                                Repeater {
+                                    model: [["From", (fc.modelData.sources || []).map(function (s) { return s.source_hostname + " " + s.source_path }).join(", ")],
+                                            ["To", (fc.modelData.destinations || []).map(function (d) { return (d.destination_hostname || "storage") + " " + (d.destination_path || "(they pick the folder)") }).join(", ")],
+                                            ["Along the way", Sync.steps(fc.modelData).map(function (s, i) { return (i + 1) + ". " + s.op }).join("  ") || "copied as it is"],
+                                            ["Made by", page.who(fc.modelData)], ["Since it began", Theme.fmt(fc.modelData.files_copied ? fc.modelData.files_copied.total : 0) + " files"]]
+                                    delegate: Item {
+                                        required property var modelData
+                                        required property int index
+                                        width: parent.width
+                                        height: fv.height + 10
+                                        Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                        Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13; mono: index < 2; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone }
+                                        Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                     }
                                 }
-                                Column {
-                                    width: 230
-                                    spacing: 6
-                                    Txt { topPadding: 4; text: "At the gate"; color: Theme.text3; font.pixelSize: 12 }
-                                    Repeater {
-                                        model: fc.gs
-                                        delegate: Column {
-                                            required property var modelData
-                                            width: 230
-                                            spacing: 2
-                                            Row { spacing: 6
-                                                  Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: modelData.hot ? Theme.crit : Theme.text4 }
-                                                  Txt { text: modelData.kind; font.pixelSize: 13; color: modelData.hot ? Theme.crit : Theme.text; elide: Text.ElideNone } }
-                                            Txt { width: 230; text: modelData.where + "; waiting " + Time.waitLen(modelData.wait); color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
-                                        }
+                            }
+                            Column {
+                                width: 230
+                                spacing: 6
+                                Txt { topPadding: 4; text: "At the gate"; color: Theme.text3; font.pixelSize: 12 }
+                                Repeater {
+                                    model: fc.gs
+                                    delegate: Column {
+                                        required property var modelData
+                                        width: 230
+                                        spacing: 2
+                                        Row { spacing: 6
+                                              Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: modelData.hot ? Theme.crit : Theme.text4 }
+                                              Txt { text: modelData.kind; font.pixelSize: 13; color: modelData.hot ? Theme.crit : Theme.text; elide: Text.ElideNone } }
+                                        Txt { width: 230; text: modelData.where + "; waiting " + Time.waitLen(modelData.wait); color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
                                     }
-                                    Row { visible: fc.gs.length === 0; spacing: 6
-                                          Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: Theme.ok }
-                                          Txt { text: "nothing waits; it runs by itself"; font.pixelSize: 13; elide: Text.ElideNone } }
-                                    Item { width: 1; height: 4 }
-                                    Txt { text: "Today"; color: Theme.text3; font.pixelSize: 12 }
-                                    Repeater {
-                                        model: [["Files through it", Theme.fmt(page.today(fc.modelData))], ["Last copy", page.lastCopy(fc.modelData) ? Time.at(page.lastCopy(fc.modelData)) : "none yet"]]
-                                        delegate: Item {
-                                            required property var modelData
-                                            required property int index
-                                            width: 230; height: 27.75
-                                            Txt { y: 4; text: modelData[0]; font.pixelSize: 13; elide: Text.ElideNone }
-                                            Txt { y: 4; anchors.right: parent.right; text: modelData[1]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                            Rectangle { visible: index === 0; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                                        }
+                                }
+                                Row { visible: fc.gs.length === 0; spacing: 6
+                                      Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: Theme.ok }
+                                      Txt { text: "nothing waits; it runs by itself"; font.pixelSize: 13; elide: Text.ElideNone } }
+                                Item { width: 1; height: 4 }
+                                Txt { text: "Today"; color: Theme.text3; font.pixelSize: 12 }
+                                Repeater {
+                                    model: [["Files through it", Theme.fmt(page.today(fc.modelData))], ["Last copy", page.lastCopy(fc.modelData) ? Time.at(page.lastCopy(fc.modelData)) : "none yet"]]
+                                    delegate: Item {
+                                        required property var modelData
+                                        required property int index
+                                        width: 230; height: 27.75
+                                        Txt { y: 4; text: modelData[0]; font.pixelSize: 13; elide: Text.ElideNone }
+                                        Txt { y: 4; anchors.right: parent.right; text: modelData[1]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                        Rectangle { visible: index === 0; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                     }
                                 }
                             }

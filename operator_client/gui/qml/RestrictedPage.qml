@@ -582,8 +582,8 @@ Page {
                 width: parent.width
                 spacing: 0
                 opacity: page.loading ? 0 : 1
-                Repeater {
-                    model: page.cur && page.cur.prot === "private" ? page.cur.readers : []
+                PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                    id: rdp; items: page.cur && page.cur.prot === "private" ? page.cur.readers : []; per: 6
                     delegate: Item {
                         required property var modelData
                         required property int index
@@ -602,8 +602,8 @@ Page {
                            rows: page.cur && page.cur.prot === "private" ? [["Backup, antivirus", page.cur.allowSystem ? "may open it" : "refused like anyone else"], ["On " + page.cur.host, page.appliedWord(page.cur).replace(/^(set|being set|not set) on \S+/, "$1")]] : [] }
                 Btn { anchors.right: parent.right; small: true; iconName: "team"; text: "Change who may open it"; onClicked: page.changeReaders(page.cur) }
                 Txt { topPadding: 16; bottomPadding: 4; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
-                Repeater {
-                    model: page.cur && page.cur.prot === "private" ? page.cur.refusals : []
+                PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                    id: rfp; items: page.cur && page.cur.prot === "private" ? page.cur.refusals : []; per: 5
                     delegate: Item {
                         required property var modelData
                         width: parent.width; height: rw.height + 12
@@ -624,8 +624,8 @@ Page {
                 opacity: page.loading ? 0 : 1
                 Txt { bottomPadding: 6; text: page.cur && page.cur.prot === "watch" ? (page.latelyOf(page.cur).length ? Theme.many(page.latelyOf(page.cur).length, "thing") + " in the last two weeks" : "") : ""
                       visible: text !== ""; color: Theme.text3; font.pixelSize: 12 }
-                Repeater {
-                    model: page.cur && page.cur.prot === "watch" ? page.latelyOf(page.cur) : []
+                PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                    id: wp; items: page.cur && page.cur.prot === "watch" ? page.latelyOf(page.cur) : []; per: 8
                     delegate: Item {
                         required property var modelData
                         width: parent.width; height: wl.height + 14
@@ -814,8 +814,8 @@ Page {
         Column {
             width: parent.width
             spacing: 10
-            Repeater {
-                model: page.carrying
+            PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                id: fp; items: page.carrying; per: 6
                 delegate: Item {
                     required property var modelData
                     required property int index
@@ -843,7 +843,7 @@ Page {
                     Btn { id: ob; anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; small: true
                           kind: modelData.held ? "primary" : "default"; text: modelData.held ? "Allow" : "Open in Flows"
                           onClicked: modelData.held ? page.letFlow(modelData) : Nav.goAsk("flows", null, "Flows opens with this flow picked.", String(modelData.f.flow_id)) }
-                    Rectangle { visible: index < page.carrying.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    Rectangle { visible: index < fp.shown.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }
             Quiet { visible: page.carrying.length === 0; text: "No flow carries anything restricted." }

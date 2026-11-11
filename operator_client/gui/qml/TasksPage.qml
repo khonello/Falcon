@@ -147,61 +147,60 @@ Page {
                     late: modelData[0] === "late"
                     title: modelData[1] + " · " + xs.length
                     sub: modelData[2]
-                    Repeater {
-                        model: grp.xs
-                        delegate: Card {
-                            id: tc
-                            required property var modelData
-                            readonly property int n: page.items(modelData).length
-                            objectName: "task_" + modelData.id
-                            width: grp.cardW
-                            actW: 176
-                            midW: 130
-                            icon: "checksquare"
-                            hot: modelData.k === "late"
-                            tint: grp.late
-                            opacity: modelData.k === "done" ? 0.7 : 1
-                            title: modelData.description_raw
-                            line: modelData.assignee_name + (page.hostOf(modelData) ? " on " + page.hostOf(modelData) : "") + " · " + page.found(modelData) + " of " + n + " target" + (n === 1 ? "" : "s") + " found"
-                                  + (modelData.assigner_account_id !== falcon.accountId ? " · from " + modelData.assigner_name : "")
-                            line2: page.quiet(modelData) && modelData.k !== "done" ? "Nothing seen for " + (page.lastSign(modelData) === null ? "as long as it has existed" : Time.waitLen((Time.now - page.lastSign(modelData)) / 3600000)) : ""
-                            picked: page.cur !== null && page.cur.id === modelData.id
-                            expandable: true
-                            expanded: page.openId === modelData.id
-                            onOpen: page.sel = modelData.id
-                            onToggle: { page.sel = modelData.id; page.openId = expanded ? null : modelData.id }
-                            mid: Row {
+                    // five a page, each category its own pages (the user, 11 Nov 2026); the task picked is always on the page shown
+                    items: grp.xs; per: 5; keep: page.cur ? grp.xs.findIndex(function (t) { return t.id === page.cur.id }) : -1
+                    delegate: Card {
+                        id: tc
+                        required property var modelData
+                        readonly property int n: page.items(modelData).length
+                        objectName: "task_" + modelData.id
+                        width: grp.cardW
+                        actW: 176
+                        midW: 130
+                        icon: "checksquare"
+                        hot: modelData.k === "late"
+                        tint: grp.late
+                        opacity: modelData.k === "done" ? 0.7 : 1
+                        title: modelData.description_raw
+                        line: modelData.assignee_name + (page.hostOf(modelData) ? " on " + page.hostOf(modelData) : "") + " · " + page.found(modelData) + " of " + n + " target" + (n === 1 ? "" : "s") + " found"
+                              + (modelData.assigner_account_id !== falcon.accountId ? " · from " + modelData.assigner_name : "")
+                        line2: page.quiet(modelData) && modelData.k !== "done" ? "Nothing seen for " + (page.lastSign(modelData) === null ? "as long as it has existed" : Time.waitLen((Time.now - page.lastSign(modelData)) / 3600000)) : ""
+                        picked: page.cur !== null && page.cur.id === modelData.id
+                        expandable: true
+                        expanded: page.openId === modelData.id
+                        onOpen: page.sel = modelData.id
+                        onToggle: { page.sel = modelData.id; page.openId = expanded ? null : modelData.id }
+                        mid: Row {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 10
+                            Txt {
+                                width: 96
+                                horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 10
-                                Txt {
-                                    width: 96
-                                    horizontalAlignment: Text.AlignRight
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    readonly property bool over: tc.modelData.k !== "done" && tc.modelData.k !== "verify" && Time.past(tc.modelData.final_deadline_at)
-                                    text: page.barSay(tc.modelData)
-                                    font.pixelSize: 12
-                                    font.weight: over ? Font.DemiBold : Font.Normal
-                                    color: over ? Theme.crit : Theme.text2
-                                }
+                                readonly property bool over: tc.modelData.k !== "done" && tc.modelData.k !== "verify" && Time.past(tc.modelData.final_deadline_at)
+                                text: page.barSay(tc.modelData)
+                                font.pixelSize: 12
+                                font.weight: over ? Font.DemiBold : Font.Normal
+                                color: over ? Theme.crit : Theme.text2
                             }
-                            // opened: its dates (tk-facts: 120px labels, at most 420 wide)
-                            Column {
-                                y: 2
-                                width: Math.min(parent.width, 420)
-                                Repeater {
-                                    model: [["Given", Time.atDay(tc.modelData.created_at) + " by " + page.by(tc.modelData)], ["Started", tc.modelData.started_at ? Time.atDay(tc.modelData.started_at) : "not yet"]]
-                                           .concat(tc.modelData.soft_deadline_at ? [["Soft deadline", Time.atDay(tc.modelData.soft_deadline_at)]] : [])
-                                           .concat([["Final deadline", tc.modelData.final_deadline_at ? Time.atDay(tc.modelData.final_deadline_at) : "none"],
-                                                    ["Handed in", tc.modelData.k === "verify" ? "yes" : tc.modelData.k === "done" ? "closed" : "not yet"]])
-                                    delegate: Item {
-                                        required property var modelData
-                                        required property int index
-                                        width: parent.width
-                                        height: fv.height + 10
-                                        Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                        Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13 }
-                                        Rectangle { visible: index < tc.modelData.factRows - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                                    }
+                        }
+                        // opened: its dates (tk-facts: 120px labels, at most 420 wide)
+                        Column {
+                            y: 2
+                            width: Math.min(parent.width, 420)
+                            Repeater {
+                                model: [["Given", Time.atDay(tc.modelData.created_at) + " by " + page.by(tc.modelData)], ["Started", tc.modelData.started_at ? Time.atDay(tc.modelData.started_at) : "not yet"]]
+                                       .concat(tc.modelData.soft_deadline_at ? [["Soft deadline", Time.atDay(tc.modelData.soft_deadline_at)]] : [])
+                                       .concat([["Final deadline", tc.modelData.final_deadline_at ? Time.atDay(tc.modelData.final_deadline_at) : "none"],
+                                                ["Handed in", tc.modelData.k === "verify" ? "yes" : tc.modelData.k === "done" ? "closed" : "not yet"]])
+                                delegate: Item {
+                                    required property var modelData
+                                    required property int index
+                                    width: parent.width
+                                    height: fv.height + 10
+                                    Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                    Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13 }
+                                    Rectangle { visible: index < tc.modelData.factRows - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                 }
                             }
                         }

@@ -179,8 +179,8 @@ Page {
             title: "The rules"
             sub: String(page.events.length)
             extra: Btn { small: true; headed: true; iconName: "plus"; text: "Make a rule"; onClicked: Nav.go("automation", "new") }
-            Repeater {
-                model: page.rows.filter(function (r) { return page.badN(r) > 0 }).concat(page.rows.filter(function (r) { return page.badN(r) === 0 }))
+            PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                id: rp; items: page.rows.filter(function (r) { return page.badN(r) > 0 }).concat(page.rows.filter(function (r) { return page.badN(r) === 0 })); per: 8
                 delegate: Rectangle {
                     required property var modelData
                     readonly property int n: page.badN(modelData)
@@ -449,8 +449,8 @@ Page {
         sub: "the next scheduled runs, in order; a rule that starts on an event runs whenever it happens, so it is not listed"
         Column {
             width: parent.width
-            Repeater {
-                model: page.coming
+            PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                id: cop; items: page.coming; per: 6
                 delegate: Item {
                     id: nx
                     required property var modelData
@@ -478,7 +478,7 @@ Page {
                         Btn { visible: !nx.isOff && nx.skipped; small: true; kind: "text"; text: "Undo"; onClicked: page.skip(nx.modelData, false) }
                         Btn { visible: !nx.quiet && nx.ev !== null; small: true; text: "Skip this once"; onClicked: page.skip(nx.modelData, true) }
                     }
-                    Rectangle { visible: index < page.coming.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    Rectangle { visible: index < cop.shown.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                 }
             }
             Quiet { visible: page.coming.length === 0; text: "No rule is set to run at a time." }
