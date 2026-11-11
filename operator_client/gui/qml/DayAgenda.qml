@@ -14,10 +14,12 @@ Column {
     readonly property var next: items.filter(function (e) { return Time.ms(e.at) >= root.now }).slice(0, 3)            // three after Now, three before it: the rest is in Calendar (the user, 11 Nov 2026)
     readonly property int before: items.filter(function (e) { return Time.ms(e.at) < root.now && e.overdue }).length - past.filter(function (e) { return e.overdue }).length
     readonly property int after: items.filter(function (e) { return Time.ms(e.at) >= root.now }).length - next.length
+    // each line its date with its time, as the days differ (the user, 11 Nov 2026): "Today 08:20", "Fri 14 Nov 17:00"
     function when(x) {
         var d = new Date(Time.ms(x)), n = new Date(now)
-        return (d.toDateString() !== n.toDateString() ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] + " " : "") + Time.hhmm(x)
+        return (d.toDateString() === n.toDateString() ? "Today" : Time.dayName(x) + " " + Time.day(x)) + " " + Time.hhmm(x)
     }
+    readonly property int timeW: 132
     width: parent ? parent.width : 600
     spacing: 8
 
@@ -49,10 +51,10 @@ Column {
         width: root.width
         height: 36
         opacity: gone ? 0.5 : 1
-        Txt { anchors.verticalCenter: parent.verticalCenter; width: 78; text: root.when(ln.modelData.at); mono: true; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-        Txt { x: 90; anchors.verticalCenter: parent.verticalCenter; width: (parent.width - 90) * 0.62 - 12; text: ln.modelData.title; font.pixelSize: 13; font.weight: Font.Medium
+        Txt { anchors.verticalCenter: parent.verticalCenter; width: root.timeW; text: root.when(ln.modelData.at); mono: true; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+        Txt { x: root.timeW + 12; anchors.verticalCenter: parent.verticalCenter; width: (parent.width - root.timeW - 12) * 0.62 - 12; text: ln.modelData.title; font.pixelSize: 13; font.weight: Font.Medium
               color: ln.modelData.overdue ? Theme.crit : lnA.containsMouse ? Theme.accent : Theme.text }
-        Txt { x: 90 + (parent.width - 90) * 0.62; anchors.verticalCenter: parent.verticalCenter; width: (parent.width - 90) * 0.38; font.pixelSize: 13; color: Theme.text3
+        Txt { x: root.timeW + 12 + (parent.width - root.timeW - 12) * 0.62; anchors.verticalCenter: parent.verticalCenter; width: (parent.width - root.timeW - 12) * 0.38; font.pixelSize: 13; color: Theme.text3
               text: ln.modelData.line + (ln.modelData.overdue ? " · past its time" : "") }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
         MouseArea { id: lnA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
