@@ -106,6 +106,10 @@ QtObject {
     // a section that asks the Engine for something when an item is picked says so for this long
     readonly property int loadMs: 700
     readonly property int siderW: 216            // the menu's width
+    // the window's height, set by main.qml: a list's page size follows it (Paged), so a tall monitor shows more of a list and a small
+    // one pages sooner (the user, 11 Nov 2026: sizing relative to the screen, so it works on every monitor). 900 is the design's height.
+    property real viewH: 900
+    readonly property real viewScale: Math.max(0.5, viewH / 900)
     readonly property int siderTop: 20           // the menu starts this far below the console's name
     readonly property int pageTop: 30            // and a page's title this far below the top bar
     readonly property int searchW: 540           // the top bar's search, centred over that area

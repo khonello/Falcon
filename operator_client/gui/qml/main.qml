@@ -22,6 +22,8 @@ ApplicationWindow {
     flags: Qt.Window | Qt.FramelessWindowHint
 
     readonly property bool maximised: shell.visibility === Window.Maximized
+    onHeightChanged: Theme.viewH = height
+    Component.onCompleted: Theme.viewH = height
     function toggleMaximised() { shell.maximised ? shell.showNormal() : shell.showMaximized() }
 
     // the preview and the tests open a page by name

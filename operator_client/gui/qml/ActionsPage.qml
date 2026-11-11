@@ -174,7 +174,7 @@ Page {
                     width: parent.width
                     Txt { topPadding: cg.index === 0 ? 7.6 : 17; bottomPadding: 4 - 1.2; text: cg.modelData[1]; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text3 }
                     PagedList {   // six a page per kind of action (the user, 11 Nov 2026); the one picked stays on the page shown
-                        id: cp; items: cg.xs; per: 6; keep: page.cur ? cg.xs.findIndex(function (a) { return a.id === page.cur.id }) : -1
+                        id: cp; reserve: false; items: cg.xs; per: 6; keep: page.cur ? cg.xs.findIndex(function (a) { return a.id === page.cur.id }) : -1
                         delegate: Rectangle {
                             required property var modelData
                             readonly property var bb: page.b(modelData)

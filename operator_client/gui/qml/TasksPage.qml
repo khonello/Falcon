@@ -210,7 +210,7 @@ Page {
             Quiet { visible: page.tasks.length === 0; text: "No tasks yet. Give one below." }
         }
 
-        // --- the picked task, and your to-dos (iq-col: the to-dos fill what is left of the column) -----------------
+        // --- the picked task, and your to-dos: a set size, four a page, never stretched to fill the column (the user, 11 Nov 2026) -----
         Column {
             id: rightCol
             width: (parent.width - 14) * 4 / 12
@@ -272,12 +272,13 @@ Page {
                 objectName: "yourTodos"
                 width: parent.width
                 readonly property var open: page.todos.filter(function (t) { return !t.done })
-                readonly property real natural: implicitHeight
-                height: Math.max(implicitHeight, workP.implicitHeight - ctl.implicitHeight - 14)
                 title: "Your to-dos · " + open.length
                 sub: "reminders for yourself, soonest first; only you see them"
-                Repeater {
-                    model: page.todos.slice().sort(function (a, b) { return (a.done - b.done) || ((Time.ms(a.due_at) || 9e15) - (Time.ms(b.due_at) || 9e15)) })
+                PagedList {
+                    objectName: "todoList"
+                    spacing: 10                          // as the rows stood in the box before
+                    per: 4
+                    items: page.todos.slice().sort(function (a, b) { return (a.done - b.done) || ((Time.ms(a.due_at) || 9e15) - (Time.ms(b.due_at) || 9e15)) })
                     delegate: SuRow {
                         required property var modelData
                         icon: modelData.done ? "checksquare" : "square"

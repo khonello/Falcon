@@ -220,13 +220,16 @@ Page {
     property int pg: 0
     readonly property var hostOrder: shownMarks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }).sort(function (a, b) { return (b === page.myHost) - (a === page.myHost) || a.localeCompare(b) })
     readonly property var ordered: hostOrder.reduce(function (o, h) { return o.concat(shownMarks.filter(function (k) { return k.host === h }).sort(function (a, b) { return a.name.localeCompare(b.name) })) }, [])
-    readonly property int pages: Math.max(1, Math.ceil(ordered.length / 5))
+    // page sizes follow the screen (Theme.viewScale; the user, 11 Nov 2026): five marks and eight copies on the design's 900-high window
+    readonly property int perM: Math.max(2, Math.round(5 * Theme.viewScale))
+    readonly property int perC: Math.max(2, Math.round(8 * Theme.viewScale))
+    readonly property int pages: Math.max(1, Math.ceil(ordered.length / perM))
     readonly property int pi: Math.min(pg, pages - 1)
-    readonly property var markPage: ordered.slice(pi * 5, pi * 5 + 5)
+    readonly property var markPage: ordered.slice(pi * perM, pi * perM + perM)
     property int pgC: 0
     property int pgA: 0
-    readonly property int pagesC: Math.max(1, Math.ceil(allCopyRows.length / 8))
-    readonly property int pagesA: Math.max(1, Math.ceil(allowedRows.length / 8))
+    readonly property int pagesC: Math.max(1, Math.ceil(allCopyRows.length / perC))
+    readonly property int pagesA: Math.max(1, Math.ceil(allowedRows.length / perC))
     readonly property int piC: Math.min(pgC, pagesC - 1)
     readonly property int piA: Math.min(pgA, pagesA - 1)
     function hostsHit() { return allCopyRows.map(function (r) { return r.c.host }).filter(function (h, i, a) { return a.indexOf(h) === i }) }
@@ -565,7 +568,7 @@ Page {
                     }
                 }
             }
-            StepPager { visible: page.pages > 1; width: parent.width; from: page.pi * 5 + 1; to: Math.min(page.ordered.length, page.pi * 5 + 5); total: page.ordered.length; pageNo: page.pi; pages: page.pages; onStep: function (d) { page.pg = page.pi + d } }
+            StepPager { visible: page.pages > 1; width: parent.width; from: page.pi * page.perM + 1; to: Math.min(page.ordered.length, page.pi * page.perM + page.perM); total: page.ordered.length; pageNo: page.pi; pages: page.pages; onStep: function (d) { page.pg = page.pi + d } }
             Quiet { visible: page.marks.length === 0; text: "Nothing protected yet. Protect something below." }
             Quiet { visible: page.marks.length > 0 && page.shownMarks.length === 0; text: "Nothing is " + (page.show === "watch" ? "watched" : page.show) + " yet. Protect something below, and pick " + (page.show === "watch" ? "Watch" : page.show === "private" ? "Private" : "Restricted") + "." }
         }
@@ -589,7 +592,7 @@ Page {
                 spacing: 0
                 opacity: page.loading ? 0 : 1
                 PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                    id: rdp; items: page.cur && page.cur.prot === "private" ? page.cur.readers : []; per: 6
+                    id: rdp; reserve: false; items: page.cur && page.cur.prot === "private" ? page.cur.readers : []; per: 6
                     delegate: Item {
                         required property var modelData
                         required property int index
@@ -609,7 +612,7 @@ Page {
                 Btn { anchors.right: parent.right; small: true; iconName: "team"; text: "Change who may open it"; onClicked: page.changeReaders(page.cur) }
                 Txt { topPadding: 16; bottomPadding: 4; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
                 PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                    id: rfp; items: page.cur && page.cur.prot === "private" ? page.cur.refusals : []; per: 5
+                    id: rfp; reserve: false; items: page.cur && page.cur.prot === "private" ? page.cur.refusals : []; per: 5
                     delegate: Item {
                         required property var modelData
                         width: parent.width; height: rw.height + 12
@@ -724,7 +727,7 @@ Page {
             width: parent.width
             spacing: 12.5
             Repeater {
-                model: page.allCopyRows.slice(page.piC * 8, page.piC * 8 + 8)
+                model: page.allCopyRows.slice(page.piC * page.perC, page.piC * page.perC + page.perC)
                 delegate: Rectangle {
                     id: cr
                     required property var modelData
@@ -771,7 +774,7 @@ Page {
                     }
                 }
             }
-            StepPager { visible: page.pagesC > 1; width: parent.width; from: page.piC * 8 + 1; to: Math.min(page.allCopyRows.length, page.piC * 8 + 8); total: page.allCopyRows.length; pageNo: page.piC; pages: page.pagesC; onStep: function (d) { page.pgC = page.piC + d } }
+            StepPager { visible: page.pagesC > 1; width: parent.width; from: page.piC * page.perC + 1; to: Math.min(page.allCopyRows.length, page.piC * page.perC + page.perC); total: page.allCopyRows.length; pageNo: page.piC; pages: page.pagesC; onStep: function (d) { page.pgC = page.piC + d } }
             Quiet { visible: page.allCopyRows.length === 0; icon: "check"; text: "Nothing restricted has been found anywhere else." }
         }
     }
@@ -787,7 +790,7 @@ Page {
             width: parent.width
             spacing: 4
             Repeater {
-                model: page.allowedRows.slice(page.piA * 8, page.piA * 8 + 8)
+                model: page.allowedRows.slice(page.piA * page.perC, page.piA * page.perC + page.perC)
                 delegate: Item {
                     required property var modelData
                     width: parent.width
@@ -805,7 +808,7 @@ Page {
                     Btn { id: tb; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; small: true; text: "Take it back"; onClicked: page.takeBack(parent.modelData) }
                 }
             }
-            StepPager { visible: page.pagesA > 1; width: parent.width; from: page.piA * 8 + 1; to: Math.min(page.allowedRows.length, page.piA * 8 + 8); total: page.allowedRows.length; pageNo: page.piA; pages: page.pagesA; onStep: function (d) { page.pgA = page.piA + d } }
+            StepPager { visible: page.pagesA > 1; width: parent.width; from: page.piA * page.perC + 1; to: Math.min(page.allowedRows.length, page.piA * page.perC + page.perC); total: page.allowedRows.length; pageNo: page.piA; pages: page.pagesA; onStep: function (d) { page.pgA = page.piA + d } }
             Quiet { visible: page.allowedRows.length === 0; text: "You have not allowed a copy anywhere else." }
         }
     }
@@ -865,8 +868,8 @@ Page {
         sub: page.allRefusals.length ? "who tried to open something private, newest first; Windows said no" : "nobody has been refused a private file"
         Column {
             width: parent.width
-            Repeater {
-                model: page.allRefusals.slice(0, 8)
+            PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                id: rlp; items: page.allRefusals; per: 8
                 delegate: Item {
                     required property var modelData
                     required property int index
@@ -877,7 +880,7 @@ Page {
                           text: "<span style='font-weight:600'>" + (modelData.r.who || "Someone") + "</span> was refused <span style='font-weight:600'>" + modelData.k.name + "</span>"
                                 + (modelData.r.process ? " in " + modelData.r.process : "") + " <font color='" + Theme.text3 + "'>on " + (modelData.r.machine || modelData.k.host) + "</font>" }
                     Txt { anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; text: page.agoWord(modelData.r.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                    Rectangle { visible: index < Math.min(8, page.allRefusals.length) - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    Rectangle { visible: index < rlp.shown.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.k.id }
                 }
             }
@@ -894,8 +897,8 @@ Page {
         sub: page.watchLately.length ? "every change, copy and move, newest first, with who was signed in" : "nothing has happened to a watched file in the last two weeks"
         Column {
             width: parent.width
-            Repeater {
-                model: page.watchLately.slice(0, 8)
+            PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                id: wlp; items: page.watchLately; per: 8
                 delegate: Item {
                     required property var modelData
                     required property int index
@@ -907,7 +910,7 @@ Page {
                           text: "<span style='font-weight:600'>" + (modelData.e.who || "Someone") + "</span> " + (modelData.e.what || "") + " <span style='font-weight:600'>" + f + "</span> <font color='"
                                 + Theme.text3 + "'>" + (f === modelData.k.name ? "" : "in " + modelData.k.name + " ") + "on " + (modelData.e.where || modelData.k.host) + "</font>" }
                     Txt { anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; text: page.agoWord(modelData.e.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                    Rectangle { visible: index < Math.min(8, page.watchLately.length) - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                    Rectangle { visible: index < wlp.shown.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.k.id }
                 }
             }

@@ -162,9 +162,10 @@ Page {
     }
     property int rpg: 0
     readonly property var runOrder: todayRuns.filter(function (r) { return r.bad }).map(function (r) { return ["bad", r] }).concat(todayRuns.filter(function (r) { return !r.bad }).map(function (r) { return ["ok", r] }))
-    readonly property int rpages: Math.max(1, Math.ceil(runOrder.length / 5))
+    readonly property int rper: Math.max(2, Math.round(5 * Theme.viewScale))        // five runs on the design's 900-high window; follows the screen
+    readonly property int rpages: Math.max(1, Math.ceil(runOrder.length / rper))
     readonly property int rpi: Math.min(rpg, rpages - 1)
-    readonly property var runPage: runOrder.slice(rpi * 5, rpi * 5 + 5)
+    readonly property var runPage: runOrder.slice(rpi * rper, rpi * rper + rper)
 
     // --- your rules, and the picked one (auo-sheet: 4 to 8, the two as tall as each other) ---------------------------------------
     Row {
@@ -432,8 +433,8 @@ Page {
             visible: page.rpages > 1
             width: parent.width
             noun: "runs"
-            from: page.rpi * 5 + 1
-            to: Math.min(page.runOrder.length, page.rpi * 5 + 5)
+            from: page.rpi * page.rper + 1
+            to: Math.min(page.runOrder.length, page.rpi * page.rper + page.rper)
             total: page.runOrder.length
             pageNo: page.rpi
             pages: page.rpages

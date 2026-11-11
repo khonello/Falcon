@@ -114,7 +114,7 @@ Page {
         for (var r = 0; srcs.some(function (x) { return x.length > r }); r++) srcs.forEach(function (x) { if (x[r]) out.push(x[r]) })
         return out
     }
-    readonly property int show: 5
+    readonly property int show: Math.max(2, Math.round(5 * Theme.viewScale))   // five on the design's 900-high window; follows the screen
     readonly property int dpages: Math.max(1, Math.ceil(items.length / show))
     readonly property int dpi: Math.min(dp, dpages - 1)
 

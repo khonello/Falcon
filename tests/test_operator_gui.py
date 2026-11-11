@@ -650,3 +650,29 @@ async def test_a_long_list_pages_in_place_and_keeps_the_picked_one_on_screen(con
         obj.setProperty("items", [0, 1, 2])
         assert prop(obj, "shown") == [0, 1, 2] and not pager.property("visible")   # one page: no pager
         obj.deleteLater()
+
+
+async def test_a_page_holds_more_on_a_taller_screen(console):
+    """Sizing follows the screen (the user, 11 Nov 2026): `per` is for the design's 900-high window; on one twice as tall a page holds twice as many."""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtQml import QQmlComponent, QQmlEngine
+
+    win, _bridge, _ = console("admin")
+    qml = QQmlEngine.contextForObject(win).engine()
+    comp = QQmlComponent(qml)
+    comp.setData(b'import QtQuick\nimport "."\nItem { function tall(h) { Theme.viewH = h }\n'
+                 b'  PagedList { objectName: "pl"; width: 400; per: 5; items: [0,1,2,3,4,5,6,7,8,9,10,11]\n'
+                 b'    delegate: Item { required property var modelData; width: 10; height: 10 } } }', QUrl.fromLocalFile(str(Path(QML_DIR) / "_tall_test.qml")))
+    obj = comp.create()
+    assert obj is not None, [e.toString() for e in comp.errors()]
+    pl = obj.findChild(QObject, "pl")
+    try:
+        QMetaObject.invokeMethod(obj, "tall", Q_ARG("QVariant", 900))
+        assert len(prop(pl, "shown")) == 5
+        QMetaObject.invokeMethod(obj, "tall", Q_ARG("QVariant", 1800))
+        assert len(prop(pl, "shown")) == 10
+        QMetaObject.invokeMethod(obj, "tall", Q_ARG("QVariant", 450))
+        assert len(prop(pl, "shown")) == 3                                     # half as tall: half as many, rounded (2.5 -> 3)
+    finally:
+        QMetaObject.invokeMethod(obj, "tall", Q_ARG("QVariant", win.property("height")))
+        obj.deleteLater()

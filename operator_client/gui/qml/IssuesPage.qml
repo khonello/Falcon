@@ -216,32 +216,31 @@ Page {
                 width: kg.width
                 title: (page.plural[modelData.ty] || (page.types[modelData.ty] || { plural: modelData.ty }).plural) + " · " + modelData.xs.length
                 sub: "on " + Theme.listNames(grp.hosts, 3) + (grp.crit ? ", " + Theme.fmt(grp.crit) + " critical" : "")
-                Repeater {
-                    model: grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 3)
-                    delegate: Card {
-                        required property var modelData
-                        readonly property bool fin: page.isDone(modelData)
-                        readonly property bool crit: !fin && modelData.sev === "critical"
-                        objectName: "issue_" + modelData.id
-                        width: grp.cardW
-                        actW: 0
-                        midW: 150
-                        padV: 8
-                        icon: (page.types[modelData.type] || { icon: "alert" }).icon
-                        hot: crit
-                        dim: !!(fin && (modelData.state === "resolved" || (page.done[modelData.id] && page.done[modelData.id].status === "Resolved")))
-                        title: modelData.subject || modelData.title
-                        line: page.cardLine(modelData)
-                        lineHot: crit
-                        picked: page.it !== null && page.it.id === modelData.id
-                        onOpen: page.sel = modelData.id
-                        mid: Row {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 14
-                            Txt { text: modelData.host; mono: true; color: Theme.text3; elide: Text.ElideNone }
-                            Txt { text: modelData.at ? (Time.sameDay(Time.ms(modelData.at), Time.now) ? Time.hhmm(modelData.at) : Time.dayName(Time.ms(modelData.at))) : ""; mono: true; color: Theme.text3; elide: Text.ElideNone }
-                        }
+                // closed, its first three; opened, every one, six a page (the user, 11 Nov 2026: a list pages, it does not grow)
+                items: grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 3); per: 6; keep: page.it ? (grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 3)).findIndex(function (x) { return x.id === page.it.id }) : -1
+                delegate: Card {
+                    required property var modelData
+                    readonly property bool fin: page.isDone(modelData)
+                    readonly property bool crit: !fin && modelData.sev === "critical"
+                    objectName: "issue_" + modelData.id
+                    width: grp.cardW
+                    actW: 0
+                    midW: 150
+                    padV: 8
+                    icon: (page.types[modelData.type] || { icon: "alert" }).icon
+                    hot: crit
+                    dim: !!(fin && (modelData.state === "resolved" || (page.done[modelData.id] && page.done[modelData.id].status === "Resolved")))
+                    title: modelData.subject || modelData.title
+                    line: page.cardLine(modelData)
+                    lineHot: crit
+                    picked: page.it !== null && page.it.id === modelData.id
+                    onOpen: page.sel = modelData.id
+                    mid: Row {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 14
+                        Txt { text: modelData.host; mono: true; color: Theme.text3; elide: Text.ElideNone }
+                        Txt { text: modelData.at ? (Time.sameDay(Time.ms(modelData.at), Time.now) ? Time.hhmm(modelData.at) : Time.dayName(Time.ms(modelData.at))) : ""; mono: true; color: Theme.text3; elide: Text.ElideNone }
                     }
                 }
                 Txt {
