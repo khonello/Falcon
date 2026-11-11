@@ -378,6 +378,12 @@ async def test_protected_files_shows_each_mark_with_its_tag_and_only_a_restricte
     assert {k["name"]: k["prot"] for k in prop(page, "marks")} == {"Payroll": "restricted", "reviews.docx": "private", "Board": "watch"}
     assert [k["name"] for k in prop(page, "rmarks")] == ["Payroll"]
     assert prop(page, "cur")["name"] == "Payroll"
+    # always one kind on screen, never a mix (the user, 11 Nov 2026): Restricted first; a file of another kind brings its own kind
+    assert prop(page, "show") == "restricted" and [k["name"] for k in prop(page, "shownMarks")] == ["Payroll"]
+    page.setProperty("sel", "6")
+    _pump(0.2)
+    assert prop(page, "show") == "watch" and prop(page, "cur")["name"] == "Board"
+    page.setProperty("sel", "")
     sit = prop(page, "situation")
     assert "3 things are protected on 1 machine: 1 restricted, 1 private and 1 watched." in sit and "Someone was refused a private file this week." in sit
     page.setProperty("show", "private")

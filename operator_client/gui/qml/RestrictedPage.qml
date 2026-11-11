@@ -104,8 +104,15 @@ Page {
     readonly property var rmarks: marks.filter(function (k) { return !k.prot || k.prot === "restricted" })
     function countOf(p) { return marks.filter(function (k) { return (k.prot || "restricted") === p }).length }
     // the list's filter: every tag, or one
-    property string show: "all"
-    readonly property var shownMarks: show === "all" ? marks : marks.filter(function (k) { return (k.prot || "restricted") === show })
+    // always one kind on screen, never a mix (the user, 11 Nov 2026): its list, its panel on the right and its sections under them. It opens
+    // on Restricted, or on the first kind that has anything; a mark arrived at from elsewhere brings its own kind.
+    property string show: "restricted"
+    readonly property var shownMarks: marks.filter(function (k) { return (k.prot || "restricted") === show })
+    function syncShow() {
+        for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) { show = rows[i].prot || "restricted"; return }
+        if (countOf(show) === 0) { var k = ["restricted", "private", "watch"].filter(function (x) { return page.countOf(x) > 0 })[0]; if (k) show = k }
+    }
+    onSelChanged: syncShow()
     readonly property var protWords: ({ restricted: ["Restricted", "stop"], "private": ["Private", "lock"], watch: ["Watch", "eye"] })
     function protWord(k) { return (protWords[k.prot || "restricted"] || protWords.restricted)[0] }
     function protIcon(k) { return (protWords[k.prot || "restricted"] || protWords.restricted)[1] }
@@ -125,11 +132,12 @@ Page {
         var d = k.mid !== undefined ? page.det[k.mid] : null
         return o.concat(((d && d.lately) || []).map(function (e) { return { k: k, e: e } })) }, []).sort(function (a, b) { return Time.ms(b.e.at) - Time.ms(a.e.at) })
     function latelyOf(k) { var d = k && k.mid !== undefined ? page.det[k.mid] : null; return (d && d.lately) || [] }
-    function showing(kind) { return page.show === "all" || page.show === kind }
+    function showing(kind) { return page.show === kind }
     function recentRefusals() { var wk = Time.now - 7 * 86400000; return marks.reduce(function (n, k) { return n + (k.refusals || []).filter(function (r) { return Time.ms(r.at) >= wk }).length }, 0) }
     // opens on what has the most copies away from home
     readonly property var byCopies: marks.slice().sort(function (a, b) { return b.n - a.n || a.name.localeCompare(b.name) })
-    readonly property var cur: { for (var i = 0; i < rows.length; i++) if (rows[i].id === sel) return rows[i]; return byCopies.length ? byCopies[0] : null }
+    readonly property var cur: { var xs = byCopies.filter(function (k) { return (k.prot || "restricted") === page.show })
+                                 for (var i = 0; i < xs.length; i++) if (xs[i].id === sel) return xs[i]; return xs.length ? xs[0] : null }
     readonly property var curCopy: { if (!cur) return null; for (var i = 0; i < cur.copies.length; i++) if (cur.copies[i].id === copy) return cur.copies[i]; return null }
     readonly property var allCopies: marks.reduce(function (a, k) { return a.concat(k.copies) }, [])
     readonly property var holders: (mk !== null ? Fleet.issues.filter(function (i) { return i.type === "file" }) : allCopies).map(function (c) { return c.host }).filter(function (h, i, a) { return a.indexOf(h) === i })
@@ -167,7 +175,7 @@ Page {
             })
         })
     }
-    onMkChanged: loadAll()
+    onMkChanged: { loadAll(); syncShow() }
     readonly property var allCopyRows: {
         var out = []
         rmarks.forEach(function (k) {
@@ -420,7 +428,7 @@ Page {
                           color: kt.modelData[5] ? Theme.crit : Theme.text2 }
                 }
                 MouseArea { id: ka; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: { page.show = kt.on ? "all" : kt.modelData[0]; page.pg = 0 } }
+                            onClicked: { if (kt.on) return; page.show = kt.modelData[0]; page.sel = ""; page.copy = ""; page.pg = 0 } }
             }
         }
     }
@@ -434,9 +442,8 @@ Page {
             objectName: "markCards"
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, mapP.implicitHeight)
-            title: page.show === "all" ? "What is protected" : page.show === "private" ? "What is private" : page.show === "watch" ? "What is watched" : "What is restricted"
+            title: page.show === "private" ? "What is private" : page.show === "watch" ? "What is watched" : "What is restricted"
             sub: "by the machine it lives on; click one to see it on the right, expand it for its rule"
-            extra: Link { objectName: "protAll"; visible: page.show !== "all"; text: "Show all " + page.marks.length; font.pixelSize: 12; onClicked: { page.show = "all"; page.pg = 0 } }
             Repeater {
                 model: page.hostOrder
                 delegate: Group {
@@ -473,7 +480,6 @@ Page {
                             mid: Row {
                                 anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
                                 spacing: 14
-                                Tag { objectName: "prot_" + kc.modelData.id; text: page.protWord(kc.modelData); iconName: page.protIcon(kc.modelData); anchors.verticalCenter: parent.verticalCenter }
                                 Txt { anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone
                                       text: kc.modelData.prot === "private" ? Theme.many(page.readerNames(kc.modelData).length, "person", "people") + " may open it"
                                             : kc.modelData.prot === "watch" ? "every change noted"
@@ -561,7 +567,7 @@ Page {
             }
             StepPager { visible: page.pages > 1; width: parent.width; from: page.pi * 5 + 1; to: Math.min(page.ordered.length, page.pi * 5 + 5); total: page.ordered.length; pageNo: page.pi; pages: page.pages; onStep: function (d) { page.pg = page.pi + d } }
             Quiet { visible: page.marks.length === 0; text: "Nothing protected yet. Protect something below." }
-            Quiet { visible: page.marks.length > 0 && page.shownMarks.length === 0; text: "Nothing is " + (page.show === "watch" ? "watched" : page.show) + " yet." }
+            Quiet { visible: page.marks.length > 0 && page.shownMarks.length === 0; text: "Nothing is " + (page.show === "watch" ? "watched" : page.show) + " yet. Protect something below, and pick " + (page.show === "watch" ? "Watch" : page.show === "private" ? "Private" : "Restricted") + "." }
         }
         // --- where it is, across every machine -----------------------------------------------------------------
         Box {
