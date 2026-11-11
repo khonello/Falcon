@@ -38,8 +38,8 @@ Column {
     }
     Item {
         width: parent.width; height: 18
-        Link { visible: root.before > 0; text: "‹ " + root.before + " earlier, still open"; font.pixelSize: 12; onClicked: Nav.go("calendar") }
-        Link { visible: root.after > 0; anchors.right: parent.right; text: root.after + " later ›"; font.pixelSize: 12; onClicked: Nav.go("calendar") }
+        Link { visible: root.before > 0; text: "‹ " + root.before + " more from earlier, still late"; font.pixelSize: 12; onClicked: Nav.go("calendar") }
+        Link { visible: root.after > 0; anchors.right: parent.right; text: root.after + " more after these ›"; font.pixelSize: 12; onClicked: Nav.go("calendar") }
     }
 
     component Line: Item {

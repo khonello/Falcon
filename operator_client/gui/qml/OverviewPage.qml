@@ -344,10 +344,10 @@ Page {
             objectName: "today"
             width: (parent.width - page.gap) * 8 / 12
             height: parent.h
-            title: "Today"
-            sub: "what has passed today above Now, what comes next below it; it moves on as the day does"
-            extra: Txt { text: "The month in Calendar"; color: calA.containsMouse ? Theme.accent : Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
-                         MouseArea { id: calA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Nav.go("calendar") } }
+            // what is due, around now (the user, 11 Nov 2026: "Today" with Friday and Monday under it, and a link that read as a label, confused)
+            title: "What is due"
+            sub: "your tasks' deadlines and your to-dos, in time order; the blue line is now, anything red is late"
+            extra: Link { objectName: "openCalendar"; text: "Open the calendar ›"; font.pixelSize: 13; onClicked: Nav.go("calendar") }
             DayAgenda {
                 width: parent.width
                 items: page.today
