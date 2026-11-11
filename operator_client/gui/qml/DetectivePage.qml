@@ -56,16 +56,21 @@ Page {
     component Told: Flow {
         id: tl
         property var parts: []
-        // a word at a time, so the marks wrap with the text; what follows a fact without a space stays with it
+        // a word at a time, so the marks wrap with the text. Punctuation right after a fact stays with it; at the seam between two
+        // pieces, a piece that starts with a letter or a digit after one that does not end in a space gets one ("a restricted file" +
+        // "was created" read "filewas"; a sentence's "." + "What" read ".What": the user, 11 Nov 2026)
         readonly property var words: {
             var out = []
+            function ends(x) { return x.c !== undefined ? x.tail || x.t : x.t }
             parts.forEach(function (p) {
-                if (p.kind && page.factColor[p.kind]) { out.push({ t: p.text, c: page.factColor[p.kind], mono: p.kind === "file" || p.kind === "machine", tail: "" }); return }
-                var ws = String(p.text).match(/\S+\s*|\s+/g) || []
+                var txt = String(p.text), last = out[out.length - 1]
+                if (last && /^[A-Za-z0-9\u00C0-\u024F]/.test(txt) && !/[\s(\[\u201C\u2018"']$/.test(ends(last))) { if (last.c !== undefined) last.tail += " "; else last.t += " " }
+                if (p.kind && page.factColor[p.kind]) { out.push({ t: txt, c: page.factColor[p.kind], mono: p.kind === "file" || p.kind === "machine", tail: "" }); return }
+                var ws = txt.match(/\S+\s*|\s+/g) || []
                 ws.forEach(function (w, i) {
-                    var last = out[out.length - 1]
-                    if (i === 0 && last && last.c !== undefined && !/^\s/.test(w)) last.tail = w
-                    else if (/^\s+$/.test(w) && last) last.tail += w
+                    var l = out[out.length - 1]
+                    if (i === 0 && l && l.c !== undefined && /^[^\sA-Za-z0-9]/.test(w)) l.tail += w
+                    else if (/^\s+$/.test(w) && l) { if (l.c !== undefined) l.tail += w; else l.t += w }
                     else out.push({ t: w })
                 })
             })
