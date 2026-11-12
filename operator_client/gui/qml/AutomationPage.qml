@@ -179,7 +179,7 @@ Page {
             sub: String(page.events.length)
             extra: Btn { small: true; headed: true; iconName: "plus"; text: "Make a rule"; onClicked: Nav.go("automation", "new") }
             PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                id: rp; items: page.rows.filter(function (r) { return page.badN(r) > 0 }).concat(page.rows.filter(function (r) { return page.badN(r) === 0 })); per: 8
+                id: rp; items: page.rows.filter(function (r) { return page.badN(r) > 0 }).concat(page.rows.filter(function (r) { return page.badN(r) === 0 })); per: 4
                 delegate: Rectangle {
                     required property var modelData
                     readonly property int n: page.badN(modelData)
@@ -417,7 +417,7 @@ Page {
             // (the user, 12 Nov 2026: an opened card holds fixed details; a list that can grow is on the right, paged)
             PagedList {
                 objectName: "runMachineList"
-                per: 5
+                per: 4
                 spacing: 8
                 items: page.curRun ? (function () { var by = {}, out = []; (page.curRun.f.runs || []).forEach(function (x) { var h = page.hostOf(x); if (!by[h]) { by[h] = []; out.push(h) } by[h].push(x) }); var hasBad = function (h) { return by[h].some(function (x) { return Auto.problem(Auto.outcome(x)) }) }; return out.filter(hasBad).concat(out.filter(function (h) { return !hasBad(h) })).map(function (h) { return [h, by[h]] }) })() : []
                 delegate: Item {
@@ -458,7 +458,7 @@ Page {
         Column {
             width: parent.width
             PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                id: cop; items: page.coming; per: 6
+                id: cop; items: page.coming; per: 4
                 delegate: Item {
                     id: nx
                     required property var modelData

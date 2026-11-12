@@ -101,7 +101,7 @@ Page {
     // --- the version 1 concept's layout (docs/design/concepts-admin.html, AdminDetectivePage) ----------------------------------------------------
     property int exp: 0
     property int cp: 0                                   // the cases' page, five at a time
-    readonly property int per: Math.max(2, Math.round(5 * Theme.viewScale))   // five on the design's 900-high window; follows the screen
+    readonly property int per: Math.max(2, Math.round(4 * Theme.viewScale))   // four on the design's 900-high window; follows the screen
     property bool loading: false
     property int pickedId: 0
     onSelChanged: { pickedId = cur ? cur.id : 0; loading = true; ldT.restart() }
@@ -353,7 +353,7 @@ Page {
         Column {
             width: parent.width
             PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                id: op; items: page.okRules; per: 8
+                id: op; items: page.okRules; per: 4
                 delegate: Item {
                     required property var modelData
                     required property int index

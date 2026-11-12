@@ -430,7 +430,7 @@ Page {
         title: "Waiting to join · " + page.asks.length
         sub: "installed without a licence code; type the code on its screen to let it in"
         PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-            id: ap; items: page.asks; per: 5
+            id: ap; items: page.asks; per: 4
             delegate: Rectangle {
                 id: jr
                 required property var modelData

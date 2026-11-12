@@ -6,7 +6,7 @@ import "."
 // elsewhere is never on a page you cannot see. A StepPager given it as `of` draws "1 to 5 of 18 ‹ 1 of 4 ›" and steps it.
 QtObject {
     property var items: []
-    property int per: 5                         // for the design's 900-high window; `size` is what a page holds on this screen
+    property int per: 4                         // four a page (the user, 12 Nov 2026), for the design's 900-high window; `size` is what a page holds on this screen
     readonly property int size: Math.max(2, Math.round(per * Theme.viewScale))
     property int pg: 0
     property int keep: -1
