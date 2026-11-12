@@ -88,7 +88,12 @@ Rectangle {
                 Txt { id: tg; visible: root.tag !== ""; x: tt.width + 8; text: root.tag; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
                       y: tt.baselineOffset - baselineOffset }
             }
-            Txt { visible: root.line !== ""; text: root.line; mono: root.lineMono; color: root.lineHot ? Theme.crit : Theme.text3; font.pixelSize: Theme.fSmall; width: parent.width }
+            // a path is cut in its middle to fit, its start and its file kept, the whole of it on hover (the user, 12 Nov 2026)
+            Txt { id: ln; visible: root.line !== ""; mono: root.lineMono; color: root.lineHot ? Theme.crit : Theme.text3; font.pixelSize: Theme.fSmall; width: parent.width
+                  readonly property bool isPath: root.lineMono && /^([A-Za-z]:[\\\/]|\\\\|\/)/.test(root.line)
+                  text: isPath ? Theme.fitPath(root.line, lnm, width) : root.line
+                  FontMetrics { id: lnm; font: ln.font }
+                  Tip { over: ln; text: ln.isPath && ln.text !== root.line ? root.line : "" } }
             Txt { visible: root.line2 !== ""; text: root.line2; color: Theme.text2; font.pixelSize: Theme.fSmall; width: parent.width }
         }
         // the middle column: the card's own drawing, or its note

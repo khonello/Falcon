@@ -252,7 +252,12 @@ Page {
     function hostsHit() { return allCopyRows.map(function (r) { return r.c.host }).filter(function (h, i, a) { return a.indexOf(h) === i }) }
     // when something happened: how long ago today, else the day and the time
     function agoWord(x) { var h = (Time.now - Time.ms(x)) / 3600000; return h < 24 ? Time.dur(h) + " ago" : Time.dayName(x) + " " + Time.hhmm(x) }
-    function howOf(c) { return c.came_by && (c.came_by.said || c.came_by.how) || "copied" }
+    // how a copy got there, in a few words between the boxes (the user, 12 Nov 2026: the sentence ran over them); the Engine's whole
+    // sentence (came_by.said: "copied over the network from \FS-01\share") is on hover
+    readonly property var howWords: ({ flow: "by a flow", usb: "from a USB drive", network: "over the network", conversation: "in a conversation",
+                                       email_or_download: "email or download", on_machine: "on the machine" })
+    function howOf(c) { return c.came_by && howWords[c.came_by.how] || "copied" }
+    function howSaid(c) { return c.came_by && c.came_by.said && c.came_by.said !== "not known" ? c.came_by.said : "" }
     function allowedSince(x) { return Time.sameDay(Time.ms(x), Time.now) ? "today " + Time.hhmm(x) : Time.day(x) }
     function pickCopy(r) { page.sel = r.k.id; page.copy = r.id }
     function letFlow(c) {
@@ -360,6 +365,7 @@ Page {
         property string fromHost: ""
         property string fromName: ""
         property string how: ""
+        property string howFull: ""             // the whole of it, on hover
         property string toHost: ""
         property string toPath: ""
         property bool hot: false
@@ -378,12 +384,14 @@ Page {
         }
         Item {
             x: tr.unit + 10; width: 150; height: parent.height
+            // a few words between the boxes, never over them (the user, 12 Nov 2026): what does not fit is on hover
             Row {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
-                Dash { width: (150 - hw.implicitWidth - 12) / 2; c: Theme.text4; anchors.verticalCenter: parent.verticalCenter }
-                Txt { id: hw; text: tr.how; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone }
-                Dash { width: (150 - hw.implicitWidth - 12) / 2; c: Theme.text4; anchors.verticalCenter: parent.verticalCenter }
+                Dash { width: Math.max(6, (150 - hw.width - 12) / 2); c: Theme.text4; anchors.verticalCenter: parent.verticalCenter }
+                Txt { id: hw; width: Math.min(implicitWidth, 150 - 24); text: tr.how; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideRight
+                      Tip { over: hw; text: tr.howFull !== "" && tr.howFull !== tr.how ? tr.howFull : hw.truncated ? tr.how : "" } }
+                Dash { width: Math.max(6, (150 - hw.width - 12) / 2); c: Theme.text4; anchors.verticalCenter: parent.verticalCenter }
             }
         }
         Rectangle {
@@ -394,7 +402,9 @@ Page {
             anchors.verticalCenter: parent.verticalCenter
             Column { id: cc; x: 9; y: 5; width: parent.width - 18; spacing: 1
                 Txt { width: parent.width; text: tr.toHost; mono: true; font.pixelSize: 13; font.weight: Font.DemiBold; color: tr.hot ? Theme.crit : Theme.text }
-                Txt { width: parent.width; text: tr.toPath; mono: true; font.pixelSize: 13; color: tr.hot ? Theme.crit : Theme.text } }
+                Txt { id: tp; width: parent.width; text: Theme.fitPath(tr.toPath, tpm, width); mono: true; font.pixelSize: 13; color: tr.hot ? Theme.crit : Theme.text
+                      FontMetrics { id: tpm; font: tp.font }
+                      Tip { over: tp; text: tp.truncated || tp.text !== tr.toPath ? tr.toPath : "" } } }
         }
         Column {
             id: d
@@ -762,6 +772,7 @@ Page {
                         opacity: cr.done !== "" ? 0.55 : 1
                         fromHost: cr.modelData.k.host; fromName: cr.modelData.k.name
                         how: page.howOf(cr.modelData.c)
+                        howFull: page.howSaid(cr.modelData.c)
                         toHost: cr.modelData.c.host; toPath: (cr.modelData.c.folder || cr.modelData.c.path || "") + (cr.modelData.c.file ? "\\" + cr.modelData.c.file : "")
                         hot: cr.done === ""
                         who: cr.modelData.c.signed_in || "nobody signed in"; whoLine: page.agoWord(cr.modelData.c.opened_at)

@@ -172,6 +172,24 @@ QtObject {
         if (typeof n !== "number") return n
         return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
     }
+    // a long path cut in its middle (the user, 12 Nov 2026): its start, "…", then its last `tail` parts, so where it begins and what it ends
+    // in both stay readable; C:\Users\Khonello\Documents\...\WS-D2\Inbox\payroll.xlsx -> C:\Users\…\WS-D2\Inbox\payroll.xlsx.
+    // The whole path goes in a Tip beside it.
+    function shortPath(p, tail) {
+        var s = String(p || ""), sep = s.indexOf("\\") >= 0 ? "\\" : "/", parts = s.split(/[\\\/]/).filter(function (x, i) { return x !== "" || i === 0 })
+        var keep = tail || 3
+        if (parts.length <= keep + 2) return s
+        return parts.slice(0, 2).join(sep) + sep + "\u2026" + sep + parts.slice(parts.length - keep).join(sep)
+    }
+    // the path as it fits in `w` pixels, measured with `fm` (a FontMetrics of the text's font): whole when it fits, else cut in its middle
+    // keeping fewer and fewer of its last parts; the file's own name is always kept
+    function fitPath(p, fm, w) {
+        var s = String(p || "")
+        if (!fm || w <= 0 || fm.advanceWidth(s) <= w) return s
+        for (var keep = 4; keep >= 1; keep--) { var c = shortPath(s, keep); if (fm.advanceWidth(c) <= w) return c }
+        var sep = s.indexOf("\\") >= 0 ? "\\" : "/"
+        return "\u2026" + sep + s.replace(/[\\\/]+$/, "").split(/[\\\/]/).pop()      // narrower still: the file's name alone
+    }
     function initials(name) {
         if (!name) return "?"
         var parts = String(name).split(/[ .]+/).filter(function (p) { return p.length > 0 })
