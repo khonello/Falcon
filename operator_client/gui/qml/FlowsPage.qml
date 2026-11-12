@@ -203,8 +203,8 @@ Page {
                     cardGap: 5
                     title: modelData[1] + " · " + xs.length
                     sub: modelData[2]
-                    // five a page, each category its own pages (the user, 11 Nov 2026); the flow picked is always on the page shown
-                    items: grp.xs; per: 5; keep: page.cur ? grp.xs.findIndex(function (f) { return f.key === page.cur.key }) : -1
+                    // four a page, each category its own pages (the user, 11 Nov 2026); the flow picked is always on the page shown
+                    items: grp.xs; per: 4; keep: page.cur ? grp.xs.findIndex(function (f) { return f.key === page.cur.key }) : -1
                     delegate: Card {
                         id: fc
                         required property var modelData

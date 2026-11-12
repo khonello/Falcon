@@ -19,7 +19,7 @@ Item {
     property Component delegate: null
     readonly property alias shown: own.shown
     property var paging: delegate ? own : null  // the Paged the pager under the cards reads (one of its own when it draws the cards)
-    Paged { id: own; per: 5 }
+    Paged { id: own; per: 4 }                  // four a page in a category (the user, 12 Nov 2026)
     readonly property real cardW: late ? width + 26 - 24 : width
 
     readonly property real lead: spaced ? 16 : 0

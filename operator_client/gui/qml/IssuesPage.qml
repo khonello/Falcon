@@ -216,8 +216,8 @@ Page {
                 width: kg.width
                 title: (page.plural[modelData.ty] || (page.types[modelData.ty] || { plural: modelData.ty }).plural) + " · " + modelData.xs.length
                 sub: "on " + Theme.listNames(grp.hosts, 3) + (grp.crit ? ", " + Theme.fmt(grp.crit) + " critical" : "")
-                // closed, its first three; opened, every one, six a page (the user, 11 Nov 2026: a list pages, it does not grow)
-                items: grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 3); per: 6; keep: page.it ? (grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 3)).findIndex(function (x) { return x.id === page.it.id }) : -1
+                // closed, its first four; opened, every one, four a page (the user, 11 Nov 2026: a list pages, it does not grow)
+                items: grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 4); per: 4; keep: page.it ? (grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 4)).findIndex(function (x) { return x.id === page.it.id }) : -1
                 delegate: Card {
                     required property var modelData
                     readonly property bool fin: page.isDone(modelData)
@@ -244,8 +244,8 @@ Page {
                     }
                 }
                 Txt {
-                    visible: grp.modelData.xs.length > 3
-                    text: grp.open ? "Show fewer" : "and " + Theme.fmt(grp.modelData.xs.length - 3) + " more"
+                    visible: grp.modelData.xs.length > 4
+                    text: grp.open ? "Show fewer" : "and " + Theme.fmt(grp.modelData.xs.length - 4) + " more"
                     color: mA.containsMouse ? Theme.accent : Theme.text3
                     font.pixelSize: 13
                     MouseArea { id: mA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor

@@ -243,7 +243,7 @@ Page {
             Txt { x: sh.x + sh.implicitWidth + 8; y: 10; text: Theme.fmt(sec.xs.length) + (sec.note ? " · " + sec.note : ""); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
         }
         PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-            id: sp; reserve: false; items: sec.xs; per: 6; keep: sec.xs.findIndex(function (x) { return (x.ask ? "f" : x.from !== undefined ? "r" : "") + x.id === page.sel })
+            id: sp; reserve: false; items: sec.xs; per: 4; keep: sec.xs.findIndex(function (x) { return (x.ask ? "f" : x.from !== undefined ? "r" : "") + x.id === page.sel })
             delegate: Rectangle {
                 required property var modelData
                 readonly property bool isReq: modelData.from !== undefined

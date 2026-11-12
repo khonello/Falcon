@@ -163,12 +163,7 @@ Page {
             if (on) Msg.ok(c.name + " will skip " + page.dayWord(c.at) + " " + Time.hhmm(c.at))
         })
     }
-    property int rpg: 0
     readonly property var runOrder: todayRuns.filter(function (r) { return r.bad }).map(function (r) { return ["bad", r] }).concat(todayRuns.filter(function (r) { return !r.bad }).map(function (r) { return ["ok", r] }))
-    readonly property int rper: Math.max(2, Math.round(5 * Theme.viewScale))        // five runs on the design's 900-high window; follows the screen
-    readonly property int rpages: Math.max(1, Math.ceil(runOrder.length / rper))
-    readonly property int rpi: Math.min(rpg, rpages - 1)
-    readonly property var runPage: runOrder.slice(rpi * rper, rpi * rper + rper)
 
     // --- your rules, and the picked one (auo-sheet: 4 to 8, the two as tall as each other) ---------------------------------------
     Row {
@@ -354,15 +349,18 @@ Page {
                     id: rg
                     required property var modelData
                     required property int index
-                    readonly property var xs: page.runPage.filter(function (e) { return e[0] === modelData[0] }).map(function (e) { return e[1] })
+                    readonly property var xs: page.runOrder.filter(function (e) { return e[0] === modelData[0] }).map(function (e) { return e[1] })
                     visible: xs.length > 0
-                    spaced: index > 0 && page.runPage.some(function (e) { return e[0] === "bad" })
+                    spaced: index > 0 && page.runOrder.some(function (e) { return e[0] === "bad" })
+                    // four a page, each category its own pages (the user, 12 Nov 2026); the run picked stays on the page shown
+                    Paged { id: rgp; items: rg.xs; per: 4; keep: rg.xs.findIndex(function (r) { return page.cur !== null && r.e.id === page.cur.id && r.f.at === page.pickAt }) }
+                    paging: rgp
                     cardGap: 5
                     width: parent.width
                     title: modelData[1] + " · " + page.todayRuns.filter(function (r) { return rg.modelData[0] === "bad" ? r.bad : !r.bad }).length
                     sub: modelData[2]
                     Repeater {
-                        model: rg.xs
+                        model: rgp.shown
                         delegate: Card {
                             id: rc
                             required property var modelData
@@ -406,17 +404,6 @@ Page {
                         }
                     }
                 }
-            }
-            StepPager {
-                visible: page.rpages > 1
-                width: parent.width
-                noun: "runs"
-                from: page.rpi * page.rper + 1
-                to: Math.min(page.runOrder.length, page.rpi * page.rper + page.rper)
-                total: page.runOrder.length
-                pageNo: page.rpi
-                pages: page.rpages
-                onStep: function (d) { page.rpg = page.rpi + d }
             }
             Quiet { visible: page.todayRuns.length === 0; text: "No rule has run yet today." }
         }
