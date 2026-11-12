@@ -12,13 +12,11 @@ Page {
     property string sel: { var a = Nav.takeArrive("machines"); return a !== null ? String(a) : Nav.sub ? String(Nav.sub) : "" }
     property string exp: ""
     property var dept: null
-    property var more: ({ fine: true })
     property var info: ({})               // machines.list: readings now, address, health note
     property var got: null                // machines.get for the picked one
     property var weeks: ({})              // host -> check_ins
     property var sparks: ({})             // host -> the last 24 hours of CPU, for its card
     property bool loading: false
-    readonly property int show: 6
 
     readonly property var ms: Fleet.machines.filter(function (m) { return page.dept === null || m.dept === page.dept })
     function serious(m) { return m.online && (m.status === "high" || m.status === "critical") }
@@ -119,8 +117,11 @@ Page {
                     width: listP.innerW
                     title: modelData[1] + " · " + modelData[3].length
                     sub: modelData[2]
+                    // four a page, as every list pages (the user, 12 Nov 2026: in place of "and N more"); the machine picked stays on the page shown
+                    Paged { id: mgp; items: grp.modelData[3]; per: 4; keep: grp.modelData[3].findIndex(function (m) { return m.host === page.sel }) }
+                    paging: mgp
                     Repeater {
-                        model: page.more[grp.modelData[0]] ? grp.modelData[3] : grp.modelData[3].slice(0, page.show)
+                        model: mgp.shown
                         delegate: Card {
                             id: mc
                             required property var modelData
@@ -218,14 +219,6 @@ Page {
                                 }
                             }
                         }
-                    }
-                    Txt {
-                        visible: grp.modelData[3].length > page.show
-                        text: page.more[grp.modelData[0]] ? "Show fewer" : "and " + Theme.fmt(grp.modelData[3].length - page.show) + " more"
-                        color: moreA.containsMouse ? Theme.accent : Theme.text3
-                        font.pixelSize: 13
-                        MouseArea { id: moreA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: { var x = Object.assign({}, page.more); x[grp.modelData[0]] = !x[grp.modelData[0]]; page.more = x } }
                     }
                 }
             }

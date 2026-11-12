@@ -17,7 +17,6 @@ Page {
     property var pick: ({})
     property var input: ({})
     property var done: ({})
-    property var more: ({})
     property var audit: []
     property var det: null                 // issues.get for the issue on the right
     property string pv: ""                 // the pick, for an option that needs one
@@ -210,14 +209,13 @@ Page {
                 id: grp
                 required property var modelData
                 readonly property string key: kg.list + modelData.ty
-                readonly property bool open: !!page.more[key]
                 readonly property var hosts: modelData.xs.map(function (x) { return x.host }).filter(function (h, k, a) { return a.indexOf(h) === k })
                 readonly property int crit: modelData.xs.filter(function (x) { return x.sev === "critical" }).length
                 width: kg.width
                 title: (page.plural[modelData.ty] || (page.types[modelData.ty] || { plural: modelData.ty }).plural) + " · " + modelData.xs.length
                 sub: "on " + Theme.listNames(grp.hosts, 3) + (grp.crit ? ", " + Theme.fmt(grp.crit) + " critical" : "")
-                // closed, its first four; opened, every one, four a page (the user, 11 Nov 2026: a list pages, it does not grow)
-                items: grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 4); per: 4; keep: page.it ? (grp.open ? grp.modelData.xs : grp.modelData.xs.slice(0, 4)).findIndex(function (x) { return x.id === page.it.id }) : -1
+                // four a page, as every list pages (the user, 12 Nov 2026: in place of "and N more")
+                items: grp.modelData.xs; per: 4; keep: page.it ? grp.modelData.xs.findIndex(function (x) { return x.id === page.it.id }) : -1
                 delegate: Card {
                     required property var modelData
                     readonly property bool fin: page.isDone(modelData)
@@ -242,14 +240,6 @@ Page {
                         Txt { text: modelData.host; mono: true; color: Theme.text3; elide: Text.ElideNone }
                         Txt { text: modelData.at ? (Time.sameDay(Time.ms(modelData.at), Time.now) ? Time.hhmm(modelData.at) : Time.dayName(Time.ms(modelData.at))) : ""; mono: true; color: Theme.text3; elide: Text.ElideNone }
                     }
-                }
-                Txt {
-                    visible: grp.modelData.xs.length > 4
-                    text: grp.open ? "Show fewer" : "and " + Theme.fmt(grp.modelData.xs.length - 4) + " more"
-                    color: mA.containsMouse ? Theme.accent : Theme.text3
-                    font.pixelSize: 13
-                    MouseArea { id: mA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: { var x = Object.assign({}, page.more); x[grp.key] = !grp.open; page.more = x } }
                 }
             }
         }
