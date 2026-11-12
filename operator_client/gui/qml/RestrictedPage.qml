@@ -131,6 +131,23 @@ Page {
     readonly property var watchLately: marks.filter(function (k) { return k.prot === "watch" }).reduce(function (o, k) {
         var d = k.mid !== undefined ? page.det[k.mid] : null
         return o.concat(((d && d.lately) || []).map(function (e) { return { k: k, e: e } })) }, []).sort(function (a, b) { return Time.ms(b.e.at) - Time.ms(a.e.at) })
+    // what happened to a protected file, in words (the user, 12 Nov 2026: "I can't deduce what each entry means"): the file and what
+    // happened to it, then who was signed in on the machine at the time -- Falcon knows who was signed in, not whose hand it was, so it
+    // says so -- when, and where. `e` is one of marks.get's lately: {what, path, at, who, where}; `k` the mark it belongs to.
+    function happened(e, k) {
+        var f = e.path ? String(e.path).replace(/[\\/]+$/, "").replace(/^.*[\\/]/, "") : (k ? k.name : "it")
+        var w = String(e.what || "")
+        var head = w === "changed" ? f + " was changed"
+                 : w === "copied" ? "A copy of " + f + " was made"
+                 : w === "moved or renamed" ? f + " was moved or renamed"
+                 : w === "deleted" ? f + " was deleted"
+                 : w === "a file added" ? f + " was added" + (k && k.kind === "folder" && f !== k.name ? " to " + k.name : "")
+                 : w === "a flow held at it" ? "A flow stopped at it, to wait for an Admin to allow it"
+                 : f + " " + w
+        var who = e.who ? (e.who === Nav.myName ? "while you were signed in" : "while " + e.who + " was signed in") : e.path ? "nobody was signed in" : ""
+        var place = (k && k.kind === "folder" && f !== k.name ? "in " + k.name + " " : "") + "on " + (e.where || (k ? k.host : "its machine"))
+        return { head: head, who: who, place: place, when: page.agoWord(e.at) }       // a file's name is said as it is spelled, never capitalised
+    }
     function latelyOf(k) { var d = k && k.mid !== undefined ? page.det[k.mid] : null; return (d && d.lately) || [] }
     function showing(kind) { return page.show === kind }
     function recentRefusals() { var wk = Time.now - 7 * 86400000; return marks.reduce(function (n, k) { return n + (k.refusals || []).filter(function (r) { return Time.ms(r.at) >= wk }).length }, 0) }
@@ -553,7 +570,8 @@ Page {
                                             required property var modelData
                                             width: parent.width; height: lv.height + 11
                                             Txt { y: 5; width: 90; text: page.agoWord(modelData.at); color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                            Txt { id: lv; x: 100; y: 5; width: parent.width - 100; textFormat: Text.RichText; font.pixelSize: 13; text: "<span style='font-weight:600'>" + (modelData.who || "") + "</span> " + (modelData.what || "") + " <font color='" + Theme.text3 + "'>" + (modelData.where || modelData.path || "") + "</font>" }
+                                            Txt { id: lv; x: 100; y: 5; width: parent.width - 100; textFormat: Text.RichText; font.pixelSize: 13; readonly property var h: page.happened(modelData, kc.modelData)
+                                                  text: "<span style='font-weight:600'>" + h.head + "</span> <font color='" + Theme.text3 + "'>" + [h.who, h.place].filter(function (x) { return x }).join(" · ") + "</font>" }
                                             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                         }
                                     }
@@ -639,11 +657,11 @@ Page {
                         required property var modelData
                         width: parent.width; height: wl.height + 14
                         Rectangle { x: 3; y: 11; width: 7; height: 7; radius: 4; color: Theme.accent }
+                        readonly property var h: page.happened(modelData, page.cur)
                         Column { id: wl; x: 20; y: 7; width: parent.width - 20; spacing: 1
-                            Txt { width: parent.width; textFormat: Text.RichText; font.pixelSize: 13; wrapMode: Text.WordWrap
-                                  text: "<span style='font-weight:600'>" + (modelData.who || "Someone") + "</span> " + (modelData.what || "") }
-                            Txt { width: parent.width; text: page.agoWord(modelData.at) + (modelData.path ? " · " + String(modelData.path).replace(/^.*[\\/]/, "") : "") + (modelData.where ? " · " + modelData.where : "")
-                                  color: Theme.text3; font.pixelSize: 12 } }
+                            Txt { width: parent.width; font.pixelSize: 13; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; text: parent.parent.h.head }
+                            Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap
+                                  text: [parent.parent.h.when, parent.parent.h.who, parent.parent.h.place].filter(function (x) { return x }).join(" · ") } }
                     }
                 }
                 Txt { visible: !page.cur || !page.latelyOf(page.cur).length; text: "Nothing has happened to it in the last two weeks."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; width: parent.width }
@@ -906,9 +924,8 @@ Page {
                     Rectangle { x: 4; anchors.verticalCenter: parent.verticalCenter; width: 28; height: 28; radius: 14; color: Theme.surface3
                                 Icon { anchors.centerIn: parent; name: "eye"; size: 13; color: Theme.text2 } }
                     Txt { x: 44; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 44 - 150; textFormat: Text.RichText; font.pixelSize: 13
-                          readonly property string f: modelData.e.path ? String(modelData.e.path).replace(/[\\/]+$/, "").replace(/^.*[\\/]/, "") : modelData.k.name
-                          text: "<span style='font-weight:600'>" + (modelData.e.who || "Someone") + "</span> " + (modelData.e.what || "") + " <span style='font-weight:600'>" + f + "</span> <font color='"
-                                + Theme.text3 + "'>" + (f === modelData.k.name ? "" : "in " + modelData.k.name + " ") + "on " + (modelData.e.where || modelData.k.host) + "</font>" }
+                          readonly property var h: page.happened(modelData.e, modelData.k)
+                          text: "<span style='font-weight:600'>" + h.head + "</span> <font color='" + Theme.text3 + "'>" + [h.who, h.place].filter(function (x) { return x }).join(" · ") + "</font>" }
                     Txt { anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; text: page.agoWord(modelData.e.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                     Rectangle { visible: index < wlp.shown.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.sel = modelData.k.id }
