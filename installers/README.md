@@ -74,7 +74,7 @@ cover the pipe and the first-start registration. **Run for real on Linux (WSL Ub
 runtime from the payload's requirements, a PostgreSQL role and database with a made password, the certificate, schema, master secret and first account, the bundle and
 its fingerprint, and a systemd service answering as the `falcon` user; the secret and key are `600` and the settings `640 root:falcon`; a Windows client then connected to
 it over TLS pinned to the bundle's certificate with the first account's key, and a wrong certificate was refused; the second run kept the password, the secret and the
-first account and issued nothing new. **Not run for real yet:** the Windows installer's own runtime venv with real wheels (the VM) and the `.deb` build (`dpkg-deb`).
+first account and issued nothing new. **The `.deb`, run for real (WSL Ubuntu, 12 Nov 2026, throwaway names, then removed):** built (337 KB, no secret in it), `dpkg -i`, `falcon-engine-install` in 57 s with the service answering; installed again, it upgraded in place and kept the secret, the key and the settings; `dpkg -r` stopped the service and kept `/var/lib/falcon`, `/etc/falcon` and the database, as it says. **Not run for real yet:** the Windows installer's own runtime venv with real wheels (the VM).
 
 ## setup.exe (built 1 Nov 2026)
 
