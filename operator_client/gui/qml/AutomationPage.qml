@@ -47,6 +47,9 @@ Page {
     property var pickT: null              // the run picked below, by when it fired; null when a rule was picked from the list
     readonly property var pickAt: sel === null && todayRuns.length ? todayRuns[0].f.at : pickT
     function pick(id, at) { sel = id; pickT = at === undefined ? null : at }
+    // the run picked among today's, for the panel beside them: what each action did on each machine
+    readonly property var curRun: { for (var i = 0; i < todayRuns.length; i++) if (cur && todayRuns[i].e.id === cur.id && todayRuns[i].f.at === pickAt) return todayRuns[i]
+                                    return null }
     readonly property int maxFired: Math.max(1, Math.max.apply(null, events.map(function (e) { return page.firings(e).length }).concat([0])))
     // runs per day, by outcome, oldest first
     readonly property var perDay: ["Success", "Failed", "Timed out", "Stopped by you"].map(function (k) {
@@ -335,112 +338,129 @@ Page {
     }
 
     // --- recent runs today -----------------------------------------------------------------------------------------------------------
-    Box {
-        objectName: "runsToday"
+    Row {
         width: parent.width
-        title: "Recent runs today"
-        sub: page.todayRuns.length ? "newest first; click one to see its rule above, expand it for each machine" : "nothing has run yet today"
-        Repeater {
-            model: [["bad", "Failed", "an action failed or ran out of time"], ["ok", "Successful", "everything it did worked"]]
-            delegate: Group {
-                id: rg
-                required property var modelData
-                required property int index
-                readonly property var xs: page.runPage.filter(function (e) { return e[0] === modelData[0] }).map(function (e) { return e[1] })
-                visible: xs.length > 0
-                spaced: index > 0 && page.runPage.some(function (e) { return e[0] === "bad" })
-                cardGap: 5
-                width: parent.width
-                title: modelData[1] + " · " + page.todayRuns.filter(function (r) { return rg.modelData[0] === "bad" ? r.bad : !r.bad }).length
-                sub: modelData[2]
-                Repeater {
-                    model: rg.xs
-                    delegate: Card {
-                        id: rc
-                        required property var modelData
-                        width: rg.cardW
-                        midW: 260
-                        padV: 7
-                        icon: Auto.kindIcon(Auto.kind((modelData.e.condition_spec || {}).type))
-                        hot: modelData.bad
-                        title: page.rows.filter(function (r) { return r.id === modelData.e.id }).map(function (r) { return r.name })[0] || Auto.nameOf(modelData.e)
-                        line: modelData.done ? "running again now" : page.effect(modelData.e, modelData.f)
-                        lineHot: modelData.bad
-                        picked: page.cur !== null && page.cur.id === modelData.e.id && page.pickAt === modelData.f.at
-                        expandable: true
-                        expanded: page.expRun === modelData.key
-                        onOpen: page.pick(modelData.e.id, modelData.f.at)
-                        onToggle: { page.pick(modelData.e.id, modelData.f.at); page.expRun = expanded ? "" : modelData.key }
-                        mid: Row {
-                            anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
-                            spacing: 18
-                            Txt { text: rc.modelData.f.machines > 1 ? Theme.many(rc.modelData.f.machines, "machine") : rc.modelData.f.hostname || ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                            Txt { text: Time.hhmm(rc.modelData.f.at); mono: true; color: Theme.text3; elide: Text.ElideNone }
-                        }
-                        // opened: why it ran, then what each action did on each machine
-                        Column {
-                            width: parent.width
-                            spacing: 8
+        spacing: 16
+        Box {
+            id: runsBox
+            objectName: "runsToday"
+            width: (parent.width - 16) * 8 / 12
+            height: Math.max(implicitHeight, runP.implicitHeight)
+            title: "Recent runs today"
+            sub: page.todayRuns.length ? "newest first; click one to see its rule above, its machines are on the right" : "nothing has run yet today"
+            Repeater {
+                model: [["bad", "Failed", "an action failed or ran out of time"], ["ok", "Successful", "everything it did worked"]]
+                delegate: Group {
+                    id: rg
+                    required property var modelData
+                    required property int index
+                    readonly property var xs: page.runPage.filter(function (e) { return e[0] === modelData[0] }).map(function (e) { return e[1] })
+                    visible: xs.length > 0
+                    spaced: index > 0 && page.runPage.some(function (e) { return e[0] === "bad" })
+                    cardGap: 5
+                    width: parent.width
+                    title: modelData[1] + " · " + page.todayRuns.filter(function (r) { return rg.modelData[0] === "bad" ? r.bad : !r.bad }).length
+                    sub: modelData[2]
+                    Repeater {
+                        model: rg.xs
+                        delegate: Card {
+                            id: rc
+                            required property var modelData
+                            width: rg.cardW
+                            midW: 260
+                            padV: 7
+                            icon: Auto.kindIcon(Auto.kind((modelData.e.condition_spec || {}).type))
+                            hot: modelData.bad
+                            title: page.rows.filter(function (r) { return r.id === modelData.e.id }).map(function (r) { return r.name })[0] || Auto.nameOf(modelData.e)
+                            line: modelData.done ? "running again now" : page.effect(modelData.e, modelData.f)
+                            lineHot: modelData.bad
+                            picked: page.cur !== null && page.cur.id === modelData.e.id && page.pickAt === modelData.f.at
+                            expandable: true
+                            expanded: page.expRun === modelData.key
+                            onOpen: page.pick(modelData.e.id, modelData.f.at)
+                            onToggle: { page.pick(modelData.e.id, modelData.f.at); page.expRun = expanded ? "" : modelData.key }
+                            mid: Row {
+                                anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
+                                spacing: 18
+                                Txt { text: rc.modelData.f.machines > 1 ? Theme.many(rc.modelData.f.machines, "machine") : rc.modelData.f.hostname || ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                                Txt { text: Time.hhmm(rc.modelData.f.at); mono: true; color: Theme.text3; elide: Text.ElideNone }
+                            }
+                            // opened: why it ran, then what each action did on each machine
                             Column {
                                 width: parent.width
-                                bottomPadding: 10
-                                Txt { width: parent.width; text: page.cause(rc.modelData.e, rc.modelData.f); color: Theme.text3; font.pixelSize: 13 }
-                                Rectangle { width: parent.width; height: 1; color: Theme.border; y: parent.height - 1 }
-                            }
-                            Repeater {
-                                model: { var by = {}, out = []; (rc.modelData.f.runs || []).forEach(function (x) { var h = page.hostOf(x); if (!by[h]) { by[h] = []; out.push(h) } by[h].push(x) })
-                                         var hasBad = function (h) { return by[h].some(function (x) { return Auto.problem(Auto.outcome(x)) }) }
-                                         return out.filter(hasBad).concat(out.filter(function (h) { return !hasBad(h) })).map(function (h) { return [h, by[h]] }) }
-                                delegate: Item {
-                                    required property var modelData
+                                spacing: 8
+                                Column {
                                     width: parent.width
-                                    height: fx.height
-                                    Txt { y: 3; width: 70; text: modelData[0]; mono: true; font.pixelSize: 12; color: Theme.text2; elide: Text.ElideRight }
-                                    Column {
-                                        id: fx
-                                        x: 80; width: parent.width - 80
-                                        spacing: 3
-                                        Repeater {
-                                            model: modelData[1]
-                                            delegate: Rectangle {
-                                                required property var modelData
-                                                readonly property string o: Auto.outcome(modelData)
-                                                width: parent.width; height: xn.height + 8; radius: 5
-                                                color: o === "Timed out" ? Theme.mix(Theme.med, Theme.surface2, 0.16) : Auto.problem(o) ? Theme.mix(Theme.crit, Theme.surface2, 0.16) : Theme.surface2
-                                                Txt { id: xn; x: 8; y: 3; width: parent.width - 16 - xo.implicitWidth - 8; text: page.actionName(rc.modelData.e, modelData.action_id); font.pixelSize: 12 }
-                                                Txt { id: xo; anchors.right: parent.right; anchors.rightMargin: 8; y: 3; font.pixelSize: 12; elide: Text.ElideNone
-                                                      color: parent.o === "Timed out" ? Theme.med : Auto.problem(parent.o) ? Theme.crit : Theme.text3
-                                                      text: parent.o === "Success" ? Auto.secs(modelData) + "s" : parent.o === "Timed out" ? "ran out of time at " + Auto.secs(modelData) + "s"
-                                                            : parent.o === "Failed" ? "failed, exit " + modelData.exit_code : parent.o.toLowerCase() }
-                                            }
-                                        }
-                                    }
+                                    bottomPadding: 10
+                                    Txt { width: parent.width; text: page.cause(rc.modelData.e, rc.modelData.f); color: Theme.text3; font.pixelSize: 13 }
+                                    Rectangle { width: parent.width; height: 1; color: Theme.border; y: parent.height - 1 }
                                 }
-                            }
-                            Column {
-                                visible: rc.modelData.bad
-                                width: parent.width
-                                spacing: 12
-                                topPadding: 4
-                                Btn { anchors.right: parent.right; small: true; kind: "primary"; text: "Run again where it went wrong"; onClicked: page.runAgain(rc.modelData) }
+                                Column {
+                                    visible: rc.modelData.bad
+                                    width: parent.width
+                                    spacing: 12
+                                    topPadding: 4
+                                    Btn { anchors.right: parent.right; small: true; kind: "primary"; text: "Run again where it went wrong"; onClicked: page.runAgain(rc.modelData) }
+                                }
                             }
                         }
                     }
                 }
             }
+            StepPager {
+                visible: page.rpages > 1
+                width: parent.width
+                noun: "runs"
+                from: page.rpi * page.rper + 1
+                to: Math.min(page.runOrder.length, page.rpi * page.rper + page.rper)
+                total: page.runOrder.length
+                pageNo: page.rpi
+                pages: page.rpages
+                onStep: function (d) { page.rpg = page.rpi + d }
+            }
+            Quiet { visible: page.todayRuns.length === 0; text: "No rule has run yet today." }
         }
-        StepPager {
-            visible: page.rpages > 1
-            width: parent.width
-            noun: "runs"
-            from: page.rpi * page.rper + 1
-            to: Math.min(page.runOrder.length, page.rpi * page.rper + page.rper)
-            total: page.runOrder.length
-            pageNo: page.rpi
-            pages: page.rpages
-            onStep: function (d) { page.rpg = page.rpi + d }
+        Box {
+            id: runP
+            objectName: "runMachines"
+            width: (parent.width - 16) * 4 / 12
+            height: Math.max(implicitHeight, runsBox.implicitHeight)
+            title: page.curRun ? "The run at " + Time.hhmm(page.curRun.f.at) : "No run picked"
+            sub: page.curRun ? (page.curRun.f.machines > 1 ? Theme.many(page.curRun.f.machines, "machine") : page.curRun.f.hostname || "") + "; what each action did" : "pick a run on the left"
+            // (the user, 12 Nov 2026: an opened card holds fixed details; a list that can grow is on the right, paged)
+            PagedList {
+                objectName: "runMachineList"
+                per: 5
+                spacing: 8
+                items: page.curRun ? (function () { var by = {}, out = []; (page.curRun.f.runs || []).forEach(function (x) { var h = page.hostOf(x); if (!by[h]) { by[h] = []; out.push(h) } by[h].push(x) }); var hasBad = function (h) { return by[h].some(function (x) { return Auto.problem(Auto.outcome(x)) }) }; return out.filter(hasBad).concat(out.filter(function (h) { return !hasBad(h) })).map(function (h) { return [h, by[h]] }) })() : []
+                delegate: Item {
+                    required property var modelData
+                    width: parent.width
+                    height: fx.height
+                    Txt { y: 3; width: 70; text: modelData[0]; mono: true; font.pixelSize: 12; color: Theme.text2; elide: Text.ElideRight }
+                    Column {
+                        id: fx
+                        x: 80; width: parent.width - 80
+                        spacing: 3
+                        Repeater {
+                            model: modelData[1]
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property string o: Auto.outcome(modelData)
+                                width: parent.width; height: xn.height + 8; radius: 5
+                                color: o === "Timed out" ? Theme.mix(Theme.med, Theme.surface2, 0.16) : Auto.problem(o) ? Theme.mix(Theme.crit, Theme.surface2, 0.16) : Theme.surface2
+                                Txt { id: xn; x: 8; y: 3; width: parent.width - 16 - xo.implicitWidth - 8; text: page.actionName(page.curRun.e, modelData.action_id); font.pixelSize: 12 }
+                                Txt { id: xo; anchors.right: parent.right; anchors.rightMargin: 8; y: 3; font.pixelSize: 12; elide: Text.ElideNone
+                                      color: parent.o === "Timed out" ? Theme.med : Auto.problem(parent.o) ? Theme.crit : Theme.text3
+                                      text: parent.o === "Success" ? Auto.secs(modelData) + "s" : parent.o === "Timed out" ? "ran out of time at " + Auto.secs(modelData) + "s"
+                                            : parent.o === "Failed" ? "failed, exit " + modelData.exit_code : parent.o.toLowerCase() }
+                            }
+                        }
+                    }
+                }
+            }
+            Quiet { visible: page.curRun === null; text: "Pick a run on the left to see each machine." }
         }
-        Quiet { visible: page.todayRuns.length === 0; text: "No rule has run yet today." }
     }
 
     // --- coming up --------------------------------------------------------------------------------------------------------------------

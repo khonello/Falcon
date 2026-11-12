@@ -549,44 +549,6 @@ Page {
                                         }
                                     }
                                 }
-                                // (who was refused is on the right, with who may open it)
-                                Column {
-                                    visible: false
-                                    width: parent.width
-                                    readonly property var said: kc.modelData.refusals || []
-                                    Txt { topPadding: 4; bottomPadding: 3; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
-                                    Repeater {
-                                        model: parent.said
-                                        delegate: Item {
-                                            required property var modelData
-                                            width: parent.width; height: rv.height + 11
-                                            Txt { y: 5; width: 90; text: page.agoWord(modelData.at); color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                            Txt { id: rv; x: 100; y: 5; width: parent.width - 100; textFormat: Text.RichText; font.pixelSize: 13; color: Theme.text2
-                                                  text: "<span style='font-weight:600'>" + (modelData.who || "someone") + "</span> was refused" + (modelData.process ? " in " + modelData.process : "")
-                                                        + " <font color='" + Theme.text3 + "'>" + (modelData.machine || "") + (modelData.path && modelData.path !== kc.modelData.path ? " " + modelData.path : "") + "</font>" }
-                                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                                        }
-                                    }
-                                    Txt { visible: parent.said.length === 0; text: "Nobody has been refused it."; color: Theme.text3; font.pixelSize: 13 }
-                                }
-                                Column {
-                                    visible: kc.modelData.prot !== "watch"           // a watched one's story is on the right
-                                    width: parent.width
-                                    readonly property var log: page.det[kc.modelData.mid] ? page.det[kc.modelData.mid].lately || [] : []
-                                    Txt { topPadding: 4; bottomPadding: 3; text: "Lately"; color: Theme.text3; font.pixelSize: 12 }
-                                    Repeater {
-                                        model: parent.log
-                                        delegate: Item {
-                                            required property var modelData
-                                            width: parent.width; height: lv.height + 11
-                                            Txt { y: 5; width: 90; text: page.agoWord(modelData.at); color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                            Txt { id: lv; x: 100; y: 5; width: parent.width - 100; textFormat: Text.RichText; font.pixelSize: 13; readonly property var h: page.happened(modelData, kc.modelData)
-                                                  text: "<span style='font-weight:600'>" + h.head + "</span> <font color='" + Theme.text3 + "'>" + [h.who, h.place].filter(function (x) { return x }).join(" · ") + "</font>" }
-                                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                                        }
-                                    }
-                                    Txt { visible: parent.log.length === 0; text: "Nothing has happened to it since it was " + (kc.modelData.prot === "private" ? "made private." : kc.modelData.prot === "watch" ? "watched." : "restricted."); color: Theme.text3; font.pixelSize: 13 }
-                                }
                                 Rectangle { width: parent.width; height: 1; color: Theme.border }
                                 Row { anchors.right: parent.right; spacing: 8
                                     Btn { visible: kc.modelData.prot === "private"; objectName: "readers_" + kc.modelData.id; small: true; iconName: "team"; text: "Change who may open it"; onClicked: page.changeReaders(kc.modelData) }
@@ -738,6 +700,30 @@ Page {
                             Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
                     }
                 }
+            }
+            // what happened to it lately, here and not in its opened card (the user, 12 Nov 2026: an opened card holds fixed details; a list that can grow is on the right, paged)
+            Column {
+                objectName: "restrictedLately"
+                visible: page.cur !== null && (page.cur.prot === "restricted" || !page.cur.prot)
+                width: parent.width
+                topPadding: 14
+                opacity: page.loading ? 0 : 1
+                Rectangle { width: parent.width; height: 1; color: Theme.border }
+                Txt { topPadding: 10; bottomPadding: 4; text: "What happened to it, the last two weeks"; color: Theme.text3; font.pixelSize: 12 }
+                PagedList {
+                    items: page.cur ? page.latelyOf(page.cur) : []
+                    per: 4
+                    delegate: Item {
+                        required property var modelData
+                        readonly property var h: page.happened(modelData, page.cur)
+                        width: parent.width; height: rl.height + 12
+                        Column { id: rl; y: 6; width: parent.width; spacing: 1
+                            Txt { width: parent.width; font.pixelSize: 13; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; text: parent.parent.h.head }
+                            Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap
+                                  text: [parent.parent.h.when, parent.parent.h.who, parent.parent.h.place].filter(function (x) { return x }).join(" · ") } }
+                    }
+                }
+                Txt { visible: !page.cur || page.latelyOf(page.cur).length === 0; text: "Nothing has happened to it in the last two weeks."; color: Theme.text3; font.pixelSize: 13 }
             }
             Loading { parent: mapP; on: page.loading && page.cur !== null; under: mapP.headerHeight }
             Pulse { parent: mapP; key: page.pickedKey || null }

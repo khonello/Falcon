@@ -261,18 +261,11 @@ Page {
                                 width: 230
                                 spacing: 6
                                 Txt { topPadding: 4; text: "At the gate"; color: Theme.text3; font.pixelSize: 12 }
-                                Repeater {
-                                    model: fc.gs
-                                    delegate: Column {
-                                        required property var modelData
-                                        width: 230
-                                        spacing: 2
-                                        Row { spacing: 6
-                                              Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: modelData.hot ? Theme.crit : Theme.text4 }
-                                              Txt { text: modelData.kind; font.pixelSize: 13; color: modelData.hot ? Theme.crit : Theme.text; elide: Text.ElideNone } }
-                                        Txt { width: 230; text: modelData.where + "; waiting " + Time.waitLen(modelData.wait); color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; elide: Text.ElideNone }
-                                    }
-                                }
+                                // (the user, 12 Nov 2026: an opened card holds fixed details; a list that can grow is on the right, paged)
+                                Txt { visible: fc.gs.length > 0; width: 230; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 13
+                                      color: fc.gs.some(function (g) { return g.hot }) ? Theme.crit : Theme.text
+                                      text: fc.gs.length === 1 ? fc.gs[0].kind + ", waiting " + Time.waitLen(fc.gs[0].wait) + "; it is under Controls"
+                                            : Theme.many(fc.gs.length, "thing") + " wait, the oldest " + Time.waitLen(Math.max.apply(null, fc.gs.map(function (g) { return g.wait || 0 }))) + "; each is under Controls" }
                                 Row { visible: fc.gs.length === 0; spacing: 6
                                       Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: Theme.ok }
                                       Txt { text: "nothing waits; it runs by itself"; font.pixelSize: 13; elide: Text.ElideNone } }
