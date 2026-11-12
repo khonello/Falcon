@@ -3,8 +3,9 @@ import "."
 
 // DEPARTMENTS (version 1, the user, 1 Nov 2026; docs/design/v1-it-admin.md). A department is a label an Admin makes and puts
 // machines in, for grouping and filtering; it is never a wall, and every IT Admin reaches every one. On the left the
-// departments as cards: a click picks one, Expand opens its name to change. On the right the picked one's machines as the
-// Overview's tiles, and every other machine under where it is now: a click moves it in. Making an Admin is never here.
+// departments as cards: a click picks one, Expand opens its name to change. On the right the picked one alone: its machines as
+// the Overview's tiles, a page at a time; "Move machines here" opens a window to find and tick machines from elsewhere (the user,
+// 12 Nov 2026: seeing a department and moving machines into it are two things). Making an Admin is never here.
 Page {
     id: page
     objectName: "departmentsView"
@@ -14,18 +15,16 @@ Page {
     property string ren: ""
     property string nm: ""
     property string q: ""
-    property bool more: false
-    readonly property int cap: 40
+    property var ticked: []                // the machines ticked in the window, by pc_id
+    property bool moving: false
 
     readonly property var depts: Fleet.depts
     readonly property var all: Fleet.machines
     readonly property var cur: { for (var i = 0; i < depts.length; i++) if (depts[i].id === sel) return depts[i]; return depts.length ? depts[0] : null }
     function inD(id) { return all.filter(function (m) { return m.dept === id }) }
-    readonly property var elsewhere: cur ? all.filter(function (m) { return m.dept !== cur.id && (m.host + " " + (m.user || "")).toLowerCase().indexOf(q.trim().toLowerCase()) >= 0 }) : []
-    readonly property var shown: more ? elsewhere : elsewhere.slice(0, cap)
-    readonly property var groups: !cur ? [] : depts.filter(function (d) { return d.id !== cur.id })
-        .map(function (d) { return { name: d.name, ms: page.shown.filter(function (m) { return m.dept === d.id }) } })
-        .filter(function (g) { return g.ms.length > 0 })
+    readonly property var elsewhere: cur ? all.filter(function (m) { return m.dept !== cur.id && (m.host + " " + (m.user || "") + " " + (m.deptName || "")).toLowerCase().indexOf(q.trim().toLowerCase()) >= 0 }) : []
+    function tick(m, on) { ticked = on ? ticked.concat([m.pc_id]) : ticked.filter(function (x) { return x !== m.pc_id }) }
+    function openMove() { ticked = []; q = ""; moveM.open() }
 
     function make() {
         var name = nm.trim()
@@ -44,19 +43,67 @@ Page {
             Msg.ok(r.was + " is now " + r.name); page.exp = null; Fleet.refresh()
         })
     }
-    function moveIn(m) {
-        var d = cur
-        var doIt = function () {
-            falcon.call("hierarchy.pc_move", { pc_id: m.pc_id, department_id: d.id }, function (ok, r) {
-                if (!ok) { Msg.failed(r && r.message ? r.message : "Not moved"); return }
-                Msg.ok(m.host + " is in " + d.name + " now"); Fleet.refresh()
+    function moveTicked() {
+        var d = cur, ids = ticked.slice(), left = ids.length, failed = []
+        if (!d || !left || moving) return
+        moving = true
+        ids.forEach(function (id) {
+            var m = all.filter(function (x) { return x.pc_id === id })[0]
+            falcon.call("hierarchy.pc_move", { pc_id: id, department_id: d.id }, function (ok, r) {
+                if (!ok) failed.push((m ? m.host : "a machine") + ": " + (r && r.message ? r.message : "not moved"))
+                if (--left === 0) {
+                    page.moving = false
+                    if (failed.length) Msg.failed(failed.join("; "))
+                    var n = ids.length - failed.length
+                    if (n) Msg.ok(Theme.many(n, "machine") + (n === 1 ? " is" : " are") + " in " + d.name + " now")
+                    moveM.close(); page.ticked = []; Fleet.refresh()
+                }
             })
-        }
-        confirm.ask({ title: "Move " + m.host + " to " + d.name + "?", ok: "Move it",
-                      text: "It leaves " + m.deptName + ". A department is only a label: nothing on the machine changes, and every Admin still reaches it." }, doIt)
+        })
     }
 
     Confirm { id: confirm }
+    Modal {
+        id: moveM
+        objectName: "deptMoveModal"
+        page: page
+        width: 560
+        title: page.cur ? "Move machines into " + page.cur.name : "Move machines"
+        subtitle: "A department is only a label: nothing on a machine changes, and every Admin still reaches it."
+        Column {
+            width: moveM.width - 2 * moveM.pad
+            spacing: 10
+            bottomPadding: 6
+            Field { objectName: "deptMoveSearch"; width: parent.width; iconName: "search"; placeholderText: "Find a machine, a person or a department"; text: page.q; onTextEdited: page.q = text }
+            PagedList {
+                objectName: "deptMoveList"
+                items: page.elsewhere
+                per: 6
+                delegate: Rectangle {
+                    id: mr
+                    required property var modelData
+                    readonly property bool on: page.ticked.indexOf(modelData.pc_id) >= 0
+                    width: parent.width; height: 44; radius: Theme.radius
+                    color: on ? Theme.mix(Theme.accent, Theme.surface, 0.07) : ma.containsMouse ? Theme.surface2 : "transparent"
+                    Check { x: 10; anchors.verticalCenter: parent.verticalCenter; controlled: true; checked: mr.on; onToggled: function (v) { page.tick(mr.modelData, v) } }
+                    Rectangle { x: 36; anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8; radius: 4
+                                color: !mr.modelData.online ? Theme.text4 : mr.modelData.status === "high" || mr.modelData.status === "critical" ? Theme.crit : Theme.ok }
+                    Column { x: 54; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 54 - 150 - 12
+                        Txt { width: parent.width; text: mr.modelData.host; mono: true; font.pixelSize: 13; font.weight: Font.DemiBold }
+                        Txt { width: parent.width; text: mr.modelData.online ? (mr.modelData.user ? mr.modelData.user + " signed in" : "nobody signed in") : "offline"; color: Theme.text3; font.pixelSize: 12 } }
+                    Txt { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; width: 150; horizontalAlignment: Text.AlignRight
+                          text: mr.modelData.deptName ? "now in " + mr.modelData.deptName : "in no department"; color: Theme.text3; font.pixelSize: 12 }
+                    MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: page.tick(mr.modelData, !mr.on) }
+                }
+            }
+            Quiet { visible: page.elsewhere.length === 0; text: page.q ? "Nothing matches." : page.cur ? "Every machine is in " + page.cur.name + " already." : "" }
+        }
+        footer: Row { spacing: 8
+            Btn { text: "Cancel"; onClicked: moveM.close() }
+            Btn { objectName: "deptMoveGo"; kind: "primary"; loading: page.moving; enabled: page.ticked.length > 0 && !page.moving
+                  text: page.ticked.length > 1 ? "Move " + page.ticked.length + " machines into " + (page.cur ? page.cur.name : "it") : page.ticked.length === 1 ? "Move it into " + (page.cur ? page.cur.name : "it") : "Tick a machine"
+                  onClicked: page.moveTicked() } }
+    }
 
     readonly property var loose: all.filter(function (m) { return !depts.some(function (d) { return d.id === m.dept }) })
     situation: Theme.many(depts.length, "department") + " and " + Theme.many(all.length, "machine") + "; "
@@ -131,47 +178,29 @@ Page {
             }
         }
 
-        // --- the picked department's machines, and the rest to move in ----------------------------------
+        // --- the picked department: its machines, a page at a time, and the way to move more in -----------------
         Box {
             id: right
             width: (parent.width - 14) * 0.5
             height: two.h
             title: page.cur ? page.cur.name : "No department picked"
-            Pulse { parent: right; key: page.cur ? page.cur.id : null }          // a click on the left pulses it at once (drawn from the list: no spinner)
             sub: page.cur ? Theme.many(page.inD(page.cur.id).length, "machine") + "; a machine is in one department at a time" : ""
+            extra: Btn { objectName: "deptMoveHere"; visible: !!page.cur; small: true; headed: true; iconName: "plus"; text: "Move machines here"; onClicked: page.openMove() }
+            Pulse { parent: right; key: page.cur ? page.cur.id : null }          // a click on the left pulses it at once (drawn from the list: no spinner)
             Quiet { visible: !page.cur; text: "Pick a department on the left, or make one below." }
-            Item { visible: !!page.cur; width: parent.width; height: ih.height + 6; Txt { id: ih; y: 6; text: page.cur ? "In " + page.cur.name : ""; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2 } }
-            Quiet { visible: !!page.cur && page.inD(page.cur.id).length === 0; text: "No machines yet. Put some in from the list below." }
+            Quiet { visible: !!page.cur && page.inD(page.cur.id).length === 0; text: "No machines in it yet. Move some here with the button above." }
+            // its machines as tiles, twelve a page on the design's window (a grid of small tiles, so more than a list's four)
+            Paged { id: tp; items: page.cur ? page.inD(page.cur.id) : []; per: 12 }
             Flow {
-                visible: !!page.cur && page.inD(page.cur.id).length > 0
+                objectName: "deptMachines"
+                visible: tp.total > 0
                 width: parent.width
                 spacing: 10
-                Repeater { model: page.cur ? page.inD(page.cur.id) : []; delegate: Tile { required property var modelData; m: modelData; still: true } }
+                Repeater { model: tp.shown; delegate: Tile { required property var modelData; m: modelData; still: true; tip: modelData.host + (modelData.user ? ", " + modelData.user : "") } }
             }
-            Item {
-                visible: !!page.cur
-                width: parent.width
-                height: eh.height + 16
-                Txt { id: eh; y: 16; text: "Elsewhere"; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
-                Txt { x: eh.implicitWidth + 8; y: 16; text: page.cur ? "click one to move it into " + page.cur.name : ""; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone }
-            }
-            Field { visible: !!page.cur; small: true; width: Math.min(300, parent.width); iconName: "search"; placeholderText: "Find a machine or a person"; text: page.q; onTextEdited: page.q = text }
-            Repeater {
-                model: page.groups
-                delegate: Column {
-                    required property var modelData
-                    width: parent.width
-                    spacing: 6
-                    Txt { topPadding: 10 + (font.pixelSize * 0.1); text: modelData.name; color: Theme.text3; font.pixelSize: 12 }
-                    Flow { width: parent.width; spacing: 10
-                           Repeater { model: modelData.ms; delegate: Tile { required property var modelData; m: modelData; onClicked: page.moveIn(modelData) } } }
-                }
-            }
-            Quiet { visible: !!page.cur && page.elsewhere.length === 0; text: page.q ? "Nothing matches." : page.cur ? "Every machine is in " + page.cur.name + "." : "" }
-            Txt { visible: page.elsewhere.length > page.cap; text: page.more ? "Show fewer" : "and " + Theme.fmt(page.elsewhere.length - page.cap) + " more"; color: Theme.text3; font.pixelSize: 13
-                  MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.more = !page.more } }
+            StepPager { width: parent.width; of: tp; noun: "machines" }
             Row {
-                visible: !!page.cur
+                visible: tp.total > 0
                 spacing: 18
                 topPadding: 4
                 Repeater {

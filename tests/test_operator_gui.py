@@ -676,3 +676,21 @@ async def test_a_page_holds_more_on_a_taller_screen(console):
     finally:
         QMetaObject.invokeMethod(obj, "tall", Q_ARG("QVariant", win.property("height")))
         obj.deleteLater()
+
+
+async def test_machines_are_moved_into_a_department_from_a_window_of_their_own(console):
+    """Departments (the user, 12 Nov 2026): the department on the right is only itself; Move machines here opens a window where machines from
+    elsewhere are found and ticked, and each one ticked is moved in (hierarchy.pc_move)."""
+    win, bridge, _ = console("admin")
+    page = await _open(win, bridge, "departments", "departmentsView")
+    await _wait(lambda: prop(page, "cur") is not None and len(prop(page, "elsewhere") or []) > 0)
+    dept = prop(page, "cur")["id"]
+    QMetaObject.invokeMethod(page, "openMove")
+    _pump(0.2)
+    assert win.findChild(QObject, "deptMoveModal").property("visible")
+    pcs = [m["pc_id"] for m in prop(page, "elsewhere")][:2]
+    page.setProperty("ticked", pcs)
+    QMetaObject.invokeMethod(page, "moveTicked")
+    await _wait(lambda: len([p for t, p in bridge.conn.seen if t == "hierarchy.pc_move"]) == len(pcs))
+    assert sorted(p["pc_id"] for t, p in bridge.conn.seen if t == "hierarchy.pc_move") == sorted(pcs)
+    assert all(p["department_id"] == dept for t, p in bridge.conn.seen if t == "hierarchy.pc_move")
