@@ -99,7 +99,7 @@ Page {
             id: listP
             objectName: "machineCards"
             width: (parent.width - 14) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: Math.max(implicitHeight, rightCol.implicitHeight)
             title: "Machines"
             sub: (page.dept !== null ? Fleet.deptName(page.dept) : "every department") + "; one card per machine, serious first; click one to draw it on the right, expand it for its details"
             extra: Select {

@@ -175,7 +175,7 @@ Page {
             id: doP
             objectName: "doFirst"
             width: (parent.width - page.gap) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             title: "Do first"
             sub: Theme.many(page.items.length, "thing") + ", the most pressing first, from every page; each with its action on the line"
             Column {
@@ -215,7 +215,7 @@ Page {
             id: todoP
             objectName: "yourTodos"
             width: (parent.width - page.gap) * 4 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             title: "Your to-dos · " + page.todos.length
             readonly property int late: page.todos.filter(function (t) { return t.overdue }).length
             sub: (late ? Theme.fmt(late) + " past its date; " : "") + "the soonest first; only you see them"
@@ -248,7 +248,7 @@ Page {
             id: mP
             objectName: "machineTiles"
             width: (parent.width - page.gap) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             title: "Machines"
             sub: Theme.many(page.ms.length, "machine") + ", every department; " + (page.off.length ? Theme.fmt(page.off.length) + " offline" : "all online")
                  + (page.lag.length ? ", " + Theme.fmt(page.lag.length) + " need a look" : "") + (page.inside.length ? ", " + Theme.fmt(page.inside.length) + " with someone inside" : "")
@@ -309,7 +309,7 @@ Page {
             id: fP
             objectName: "stuckRuns"
             width: (parent.width - page.gap) * 4 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             title: "Flows and automations"
             sub: (page.flowsOff.length + page.rulesOff.length ? "only what has stopped or is stuck is listed; " : "")
                  + Theme.many(page.flowsOn.length, "flow") + " and " + Theme.many(page.rulesOn.length, "automation") + (page.rulesOn.length === 1 ? " is" : " are") + " running fine"
@@ -343,7 +343,7 @@ Page {
             id: dayP
             objectName: "today"
             width: (parent.width - page.gap) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             // what is due, around now (the user, 11 Nov 2026: "Today" with Friday and Monday under it, and a link that read as a label, confused)
             title: "What is due"
             sub: "your tasks' deadlines and your to-dos, in time order; the blue line is now, anything red is late"
@@ -356,7 +356,7 @@ Page {
         Box {
             id: liveP
             width: (parent.width - page.gap) * 4 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             title: "Live activity"
             sub: "on your machines, as it happens"
             subDot: Theme.ok

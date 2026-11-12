@@ -159,7 +159,7 @@ Page {
             id: libP
             objectName: "actionList"
             width: (parent.width - 16) * 4 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             gap: 0
             title: "The actions"
             sub: String(page.lib.length)
@@ -200,7 +200,7 @@ Page {
             id: sheet
             objectName: "actionSheet"
             width: (parent.width - 16) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: parent.h
             gap: 14
             title: page.cur ? page.cur.name : "No action picked"
             sub: page.cur ? (page.cur.cat === "custom" ? page.langWord(page.cur) + ", written by " + page.whoWord(page.cur.created_by_name || "an Admin") + " on " + Time.day(page.cur.created_at) : "comes with Falcon") : "pick an action on the left"

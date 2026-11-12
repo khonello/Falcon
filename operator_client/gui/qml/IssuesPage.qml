@@ -286,7 +286,7 @@ Page {
                 objectName: "issueStory"
                 visible: page.it !== null
                 width: parent.width
-                height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+                height: Math.max(implicitHeight, fix.implicitHeight - todoB.implicitHeight - doneB.implicitHeight - 28)
                 title: "Its story"
                 sub: page.it ? (page.it.subject || page.it.title) + " on " + page.it.host : ""
                 readonly property var evs: page.det && page.det.timeline ? page.det.timeline.map(function (e) { return { t: Time.ms(e.at), actor: e.who, what: e.what, kind: e.kind } })

@@ -49,7 +49,7 @@ Page {
             id: listP
             objectName: "announcementList"
             width: (parent.width - 14) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: Math.max(implicitHeight, readP.implicitHeight)
             title: "What was announced · " + page.sent.length
             sub: "every Admin's; click one to read it on the right"
             Repeater {
@@ -95,7 +95,7 @@ Page {
             id: readP
             objectName: "announcementRead"
             width: (parent.width - 14) * 4 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: Math.max(implicitHeight, listP.implicitHeight)
             title: page.cur ? page.words[page.cur.alert_type] || "" : "Nothing picked"
             sub: page.cur ? (page.cur.status === "scheduled" ? "waiting to go out" : page.cur.status === "withdrawn" ? "withdrawn" : "sent") : ""
             gap: 10

@@ -471,7 +471,7 @@ Page {
             id: markP
             objectName: "markCards"
             width: (parent.width - 14) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: Math.max(implicitHeight, rightP.implicitHeight)
             title: page.show === "private" ? "What is private" : page.show === "watch" ? "What is watched" : "What is restricted"
             sub: "by the machine it lives on; click one to see it on the right, expand it for its rule"
             Repeater {
@@ -572,7 +572,7 @@ Page {
                 objectName: "markMap"
                 width: parent.width
                 // alone (Private, Watch) it is as tall as the list beside it; with What happened under it, as tall as it needs
-                height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+                height: histP.visible ? implicitHeight : Math.max(implicitHeight, markP.implicitHeight)
                 title: !page.cur || page.cur.prot === "restricted" || !page.cur.prot ? "Where it is, across every machine" : page.cur.prot === "private" ? "Who may open it" : "What happened to it"
                 readonly property var copies: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].copies || [] : []
                 readonly property var allowedHere: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].allowed || [] : []

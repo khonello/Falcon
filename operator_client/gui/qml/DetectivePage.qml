@@ -257,7 +257,7 @@ Page {
             id: whatP
             objectName: "evidencePanel"
             width: (parent.width - 14) * 8 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: Math.max(implicitHeight, stepP.implicitHeight)
             title: "What happened"
             sub: page.cur ? page.cur.intent + " on <font face='" + Theme.mono + "'>" + page.cur.host + "</font>, " + Time.hhmm(page.cur.first_at) + " to " + Time.hhmm(page.cur.last_at) + "; each connection carries its step's number" : ""
             Item {
@@ -290,7 +290,7 @@ Page {
             id: stepP
             objectName: "stepByStep"
             width: (parent.width - 14) * 4 / 12
-            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
+            height: Math.max(implicitHeight, whatP.implicitHeight)
             title: "Step by step"
             sub: page.cur ? Theme.many(page.cur.story.length, "step") + ", in the order they happened" : ""
             Column {
