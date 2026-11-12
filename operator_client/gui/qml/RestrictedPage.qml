@@ -471,7 +471,7 @@ Page {
             id: markP
             objectName: "markCards"
             width: (parent.width - 14) * 8 / 12
-            height: Math.max(implicitHeight, mapP.implicitHeight)
+            height: Math.max(implicitHeight, rightP.implicitHeight)
             title: page.show === "private" ? "What is private" : page.show === "watch" ? "What is watched" : "What is restricted"
             sub: "by the machine it lives on; click one to see it on the right, expand it for its rule"
             Repeater {
@@ -563,170 +563,181 @@ Page {
             Quiet { visible: page.marks.length > 0 && page.shownMarks.length === 0; text: "Nothing is " + (page.show === "watch" ? "watched" : page.show) + " yet. Protect something below, and pick " + (page.show === "watch" ? "Watch" : page.show === "private" ? "Private" : "Restricted") + "." }
         }
         // --- where it is, across every machine -----------------------------------------------------------------
-        Box {
-            id: mapP
-            objectName: "markMap"
+        Column {
+            id: rightP
             width: (parent.width - 14) * 4 / 12
-            height: Math.max(implicitHeight, markP.implicitHeight)
-            title: !page.cur || page.cur.prot === "restricted" || !page.cur.prot ? "Where it is, across every machine" : page.cur.prot === "private" ? "Who may open it" : "What happened to it"
-            readonly property var copies: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].copies || [] : []
-            readonly property var allowedHere: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].allowed || [] : []
-            sub: page.cur ? "<b><font color='" + Theme.text + "'>" + page.cur.name + "</font></b> · " + (page.cur.prot === "private" ? "on " + page.cur.host + "; Windows refuses anyone else"
-                                : page.cur.prot === "watch" ? "on " + page.cur.host + "; nothing is refused, everything is noted"
-                                : copies.length ? Theme.many(copies.length, "copy", "copies") + " away from home" : "only at home") : "pick something on the left"
-            // Private: the people named, then what the machine did and who was refused
-            Column {
-                objectName: "privatePanel"
-                visible: page.cur !== null && page.cur.prot === "private"
+            spacing: 14
+            Box {
+                id: mapP
+                objectName: "markMap"
                 width: parent.width
-                spacing: 0
-                opacity: page.loading ? 0 : 1
-                PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                    id: rdp; reserve: false; items: page.cur && page.cur.prot === "private" ? page.cur.readers : []; per: 6
-                    delegate: Item {
-                        required property var modelData
-                        required property int index
-                        readonly property string nm: modelData.account_id === falcon.accountId ? "You" : modelData.name || "Account " + modelData.account_id
-                        width: parent.width; height: 44
-                        Rectangle { y: 6; width: 32; height: 32; radius: 16; color: Theme.surface3
-                                    Txt { anchors.centerIn: parent; text: Theme.initials(parent.parent.nm); font.pixelSize: 12; font.weight: Font.DemiBold; elide: Text.ElideNone } }
-                        Txt { x: 44; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 44 - 110; text: parent.nm; font.pixelSize: 13; font.weight: Font.Medium }
-                        Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone
-                              text: page.cur && page.cur.by && page.cur.by.account_id === modelData.account_id ? "made it private" : "may open it" }
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                    }
-                }
-                Item { width: 1; height: 10 }
-                FactRows { width: parent.width
-                           rows: page.cur && page.cur.prot === "private" ? [["Backup, antivirus", page.cur.allowSystem ? "may open it" : "refused like anyone else"], ["On " + page.cur.host, page.appliedWord(page.cur).replace(/^(set|being set|not set) on \S+/, "$1")]] : [] }
-                Btn { anchors.right: parent.right; small: true; iconName: "team"; text: "Change who may open it"; onClicked: page.changeReaders(page.cur) }
-                Txt { topPadding: 16; bottomPadding: 4; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
-                PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                    id: rfp; reserve: false; items: page.cur && page.cur.prot === "private" ? page.cur.refusals : []; per: 5
-                    delegate: Item {
-                        required property var modelData
-                        width: parent.width; height: rw.height + 12
-                        Txt { y: 6; width: 76; text: page.agoWord(modelData.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                        Txt { id: rw; x: 84; y: 6; width: parent.width - 84; textFormat: Text.RichText; font.pixelSize: 13; wrapMode: Text.WordWrap
-                              text: "<span style='font-weight:600'>" + (modelData.who || "Someone") + "</span> was refused" + (modelData.process ? " in " + modelData.process : "") }
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                    }
-                }
-                Txt { visible: !page.cur || !(page.cur.refusals || []).length; text: "Nobody has been refused it."; color: Theme.text3; font.pixelSize: 13 }
-            }
-            // Watch: what happened to it, newest first
-            Column {
-                objectName: "watchPanel"
-                visible: page.cur !== null && page.cur.prot === "watch"
-                width: parent.width
-                spacing: 0
-                opacity: page.loading ? 0 : 1
-                Txt { bottomPadding: 6; text: page.cur && page.cur.prot === "watch" ? (page.latelyOf(page.cur).length ? Theme.many(page.latelyOf(page.cur).length, "thing") + " in the last two weeks" : "") : ""
-                      visible: text !== ""; color: Theme.text3; font.pixelSize: 12 }
-                PagedList {   // a long list pages in place (the user, 11 Nov 2026)
-                    id: wp; items: page.cur && page.cur.prot === "watch" ? page.latelyOf(page.cur) : []; per: 8
-                    delegate: Item {
-                        required property var modelData
-                        width: parent.width; height: wl.height + 14
-                        Rectangle { x: 3; y: 11; width: 7; height: 7; radius: 4; color: Theme.accent }
-                        readonly property var h: page.happened(modelData, page.cur)
-                        Column { id: wl; x: 20; y: 7; width: parent.width - 20; spacing: 1
-                            Txt { width: parent.width; font.pixelSize: 13; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; text: parent.parent.h.head }
-                            Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap
-                                  text: [parent.parent.h.when, parent.parent.h.who, parent.parent.h.place].filter(function (x) { return x }).join(" · ") } }
-                    }
-                }
-                Txt { visible: !page.cur || !page.latelyOf(page.cur).length; text: "Nothing has happened to it in the last two weeks."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; width: parent.width }
-            }
-            // Restricted: where it is, across every machine
-            Column {
-                visible: !page.cur || page.cur.prot === "restricted" || !page.cur.prot
-                width: parent.width
-                spacing: 0
-                opacity: page.loading ? 0 : 1
-                Flickable {
+                // alone (Private, Watch) it is as tall as the list beside it; with What happened under it, as tall as it needs
+                height: histP.visible ? implicitHeight : Math.max(implicitHeight, markP.implicitHeight)
+                title: !page.cur || page.cur.prot === "restricted" || !page.cur.prot ? "Where it is, across every machine" : page.cur.prot === "private" ? "Who may open it" : "What happened to it"
+                readonly property var copies: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].copies || [] : []
+                readonly property var allowedHere: page.cur && page.cur.mid !== undefined && page.det[page.cur.mid] ? page.det[page.cur.mid].allowed || [] : []
+                sub: page.cur ? "<b><font color='" + Theme.text + "'>" + page.cur.name + "</font></b> · " + (page.cur.prot === "private" ? "on " + page.cur.host + "; Windows refuses anyone else"
+                                    : page.cur.prot === "watch" ? "on " + page.cur.host + "; nothing is refused, everything is noted"
+                                    : copies.length ? Theme.many(copies.length, "copy", "copies") + " away from home" : "only at home") : "pick something on the left"
+                // Private: the people named, then what the machine did and who was refused
+                Column {
+                    objectName: "privatePanel"
+                    visible: page.cur !== null && page.cur.prot === "private"
                     width: parent.width
-                    height: Math.min(contentHeight, 420)
-                    contentHeight: depts.height
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    Column {
-                        id: depts
-                        objectName: "mapDepts"
+                    spacing: 0
+                    opacity: page.loading ? 0 : 1
+                    PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                        id: rdp; reserve: false; items: page.cur && page.cur.prot === "private" ? page.cur.readers : []; per: 6
+                        delegate: Item {
+                            required property var modelData
+                            required property int index
+                            readonly property string nm: modelData.account_id === falcon.accountId ? "You" : modelData.name || "Account " + modelData.account_id
+                            width: parent.width; height: 44
+                            Rectangle { y: 6; width: 32; height: 32; radius: 16; color: Theme.surface3
+                                        Txt { anchors.centerIn: parent; text: Theme.initials(parent.parent.nm); font.pixelSize: 12; font.weight: Font.DemiBold; elide: Text.ElideNone } }
+                            Txt { x: 44; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 44 - 110; text: parent.nm; font.pixelSize: 13; font.weight: Font.Medium }
+                            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: Theme.text3; elide: Text.ElideNone
+                                  text: page.cur && page.cur.by && page.cur.by.account_id === modelData.account_id ? "made it private" : "may open it" }
+                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                        }
+                    }
+                    Item { width: 1; height: 10 }
+                    FactRows { width: parent.width
+                               rows: page.cur && page.cur.prot === "private" ? [["Backup, antivirus", page.cur.allowSystem ? "may open it" : "refused like anyone else"], ["On " + page.cur.host, page.appliedWord(page.cur).replace(/^(set|being set|not set) on \S+/, "$1")]] : [] }
+                    Btn { anchors.right: parent.right; small: true; iconName: "team"; text: "Change who may open it"; onClicked: page.changeReaders(page.cur) }
+                    Txt { topPadding: 16; bottomPadding: 4; text: "Refused"; color: Theme.text3; font.pixelSize: 12 }
+                    PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                        id: rfp; reserve: false; items: page.cur && page.cur.prot === "private" ? page.cur.refusals : []; per: 5
+                        delegate: Item {
+                            required property var modelData
+                            width: parent.width; height: rw.height + 12
+                            Txt { y: 6; width: 76; text: page.agoWord(modelData.at); color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                            Txt { id: rw; x: 84; y: 6; width: parent.width - 84; textFormat: Text.RichText; font.pixelSize: 13; wrapMode: Text.WordWrap
+                                  text: "<span style='font-weight:600'>" + (modelData.who || "Someone") + "</span> was refused" + (modelData.process ? " in " + modelData.process : "") }
+                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                        }
+                    }
+                    Txt { visible: !page.cur || !(page.cur.refusals || []).length; text: "Nobody has been refused it."; color: Theme.text3; font.pixelSize: 13 }
+                }
+                // Watch: what happened to it, newest first
+                Column {
+                    objectName: "watchPanel"
+                    visible: page.cur !== null && page.cur.prot === "watch"
+                    width: parent.width
+                    spacing: 0
+                    opacity: page.loading ? 0 : 1
+                    Txt { bottomPadding: 6; text: page.cur && page.cur.prot === "watch" ? (page.latelyOf(page.cur).length ? Theme.many(page.latelyOf(page.cur).length, "thing") + " in the last two weeks" : "") : ""
+                          visible: text !== ""; color: Theme.text3; font.pixelSize: 12 }
+                    PagedList {   // a long list pages in place (the user, 11 Nov 2026)
+                        id: wp; items: page.cur && page.cur.prot === "watch" ? page.latelyOf(page.cur) : []; per: 8
+                        delegate: Item {
+                            required property var modelData
+                            width: parent.width; height: wl.height + 14
+                            Rectangle { x: 3; y: 11; width: 7; height: 7; radius: 4; color: Theme.accent }
+                            readonly property var h: page.happened(modelData, page.cur)
+                            Column { id: wl; x: 20; y: 7; width: parent.width - 20; spacing: 1
+                                Txt { width: parent.width; font.pixelSize: 13; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; text: parent.parent.h.head }
+                                Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap
+                                      text: [parent.parent.h.when, parent.parent.h.who, parent.parent.h.place].filter(function (x) { return x }).join(" · ") } }
+                        }
+                    }
+                    Txt { visible: !page.cur || !page.latelyOf(page.cur).length; text: "Nothing has happened to it in the last two weeks."; color: Theme.text3; font.pixelSize: 13; wrapMode: Text.WordWrap; width: parent.width }
+                }
+                // Restricted: where it is, across every machine
+                Column {
+                    visible: !page.cur || page.cur.prot === "restricted" || !page.cur.prot
+                    width: parent.width
+                    spacing: 0
+                    opacity: page.loading ? 0 : 1
+                    Flickable {
                         width: parent.width
-                        spacing: 0
-                        bottomPadding: 10
-                        Repeater {
-                            model: page.mapDepts
-                            delegate: Column {
-                                id: dg
-                                required property var modelData
-                                required property int index
-                                width: depts.width
-                                spacing: 6
-                                topPadding: dg.index ? 10 : 2
-                                Txt { text: dg.modelData.name; color: Theme.text3; font.pixelSize: 12 }
-                                Flow {
-                                    width: parent.width
-                                    spacing: 10
-                                    Repeater {
-                                        model: dg.modelData.hs
-                                        delegate: Tile {
-                                            required property var modelData
-                                            readonly property bool home: page.cur !== null && page.cur.host === modelData
-                                            readonly property var cp: mapP.copies.filter(function (c) { return c.host === modelData })[0] || null
-                                            readonly property bool allowedOn: mapP.allowedHere.some(function (c) { return c.host === modelData })
-                                            m: Fleet.byHost[modelData] || { host: modelData, online: true }
-                                            mark: home ? "home" : cp ? "hot" : allowedOn ? "ok" : ""
-                                            picked: !!cp && page.copy === String(cp.issue_id)
-                                            still: !cp
-                                            marksOnly: true
-                                            tip: modelData + (page.ownerOf(modelData) ? ", " + page.ownerOf(modelData) : "") + (home ? " · its home" : cp ? " · a copy, " + Time.dur((Time.now - Time.ms(cp.opened_at)) / 3600000) + " ago" : allowedOn ? " · a copy allowed" : "")
-                                            onClicked: page.copy = String(cp.issue_id)
+                        height: Math.min(contentHeight, 420)
+                        contentHeight: depts.height
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        Column {
+                            id: depts
+                            objectName: "mapDepts"
+                            width: parent.width
+                            spacing: 0
+                            bottomPadding: 10
+                            Repeater {
+                                model: page.mapDepts
+                                delegate: Column {
+                                    id: dg
+                                    required property var modelData
+                                    required property int index
+                                    width: depts.width
+                                    spacing: 6
+                                    topPadding: dg.index ? 10 : 2
+                                    Txt { text: dg.modelData.name; color: Theme.text3; font.pixelSize: 12 }
+                                    Flow {
+                                        width: parent.width
+                                        spacing: 10
+                                        Repeater {
+                                            model: dg.modelData.hs
+                                            delegate: Tile {
+                                                required property var modelData
+                                                readonly property bool home: page.cur !== null && page.cur.host === modelData
+                                                readonly property var cp: mapP.copies.filter(function (c) { return c.host === modelData })[0] || null
+                                                readonly property bool allowedOn: mapP.allowedHere.some(function (c) { return c.host === modelData })
+                                                m: Fleet.byHost[modelData] || { host: modelData, online: true }
+                                                mark: home ? "home" : cp ? "hot" : allowedOn ? "ok" : ""
+                                                picked: !!cp && page.copy === String(cp.issue_id)
+                                                still: !cp
+                                                marksOnly: true
+                                                tip: modelData + (page.ownerOf(modelData) ? ", " + page.ownerOf(modelData) : "") + (home ? " · its home" : cp ? " · a copy, " + Time.dur((Time.now - Time.ms(cp.opened_at)) / 3600000) + " ago" : allowedOn ? " · a copy allowed" : "")
+                                                onClicked: page.copy = String(cp.issue_id)
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                Row {
-                    spacing: 16
-                    topPadding: 9
-                    Repeater {
-                        model: [["its home", Theme.mix(Theme.accent, Theme.surface3, 0.28)], ["a copy caught", Theme.mix(Theme.crit, Theme.surface3, 0.28)], ["a copy allowed", Theme.mix(Theme.ok, Theme.surface3, 0.26)]]
-                        delegate: Row { required property var modelData; spacing: 6
-                            Rectangle { width: 11; height: 11; radius: 3; color: modelData[1]; anchors.verticalCenter: parent.verticalCenter }
-                            Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
+                    Row {
+                        spacing: 16
+                        topPadding: 9
+                        Repeater {
+                            model: [["its home", Theme.mix(Theme.accent, Theme.surface3, 0.28)], ["a copy caught", Theme.mix(Theme.crit, Theme.surface3, 0.28)], ["a copy allowed", Theme.mix(Theme.ok, Theme.surface3, 0.26)]]
+                            delegate: Row { required property var modelData; spacing: 6
+                                Rectangle { width: 11; height: 11; radius: 3; color: modelData[1]; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { text: modelData[0]; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone } }
+                        }
                     }
                 }
+                Loading { parent: mapP; on: page.loading && page.cur !== null; under: mapP.headerHeight }
+                Pulse { parent: mapP; key: page.pickedKey || null }
             }
-            // what happened to it lately, here and not in its opened card (the user, 12 Nov 2026: an opened card holds fixed details; a list that can grow is on the right, paged)
-            Column {
+            // --- what happened to it: its own box under the map (the user, 12 Nov 2026) -----------------------------------------------
+            Box {
+                id: histP
                 objectName: "restrictedLately"
                 visible: page.cur !== null && (page.cur.prot === "restricted" || !page.cur.prot)
                 width: parent.width
-                topPadding: 14
-                opacity: page.loading ? 0 : 1
-                Rectangle { width: parent.width; height: 1; color: Theme.border }
-                Txt { topPadding: 10; bottomPadding: 4; text: "What happened to it, the last two weeks"; color: Theme.text3; font.pixelSize: 12 }
-                PagedList {
-                    items: page.cur ? page.latelyOf(page.cur) : []
-                    per: 4
-                    delegate: Item {
-                        required property var modelData
-                        readonly property var h: page.happened(modelData, page.cur)
-                        width: parent.width; height: rl.height + 12
-                        Column { id: rl; y: 6; width: parent.width; spacing: 1
-                            Txt { width: parent.width; font.pixelSize: 13; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; text: parent.parent.h.head }
-                            Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap
-                                  text: [parent.parent.h.when, parent.parent.h.who, parent.parent.h.place].filter(function (x) { return x }).join(" · ") } }
+                title: "What happened to it"
+                sub: page.cur ? "<b><font color='" + Theme.text + "'>" + page.cur.name + "</font></b> · the last two weeks, newest first" : ""
+                Column {
+                    width: parent.width
+                    opacity: page.loading ? 0 : 1
+                    PagedList {
+                        items: page.cur ? page.latelyOf(page.cur) : []
+                        per: 4
+                        delegate: Item {
+                            required property var modelData
+                            readonly property var h: page.happened(modelData, page.cur)
+                            width: parent.width; height: rl.height + 12
+                            Column { id: rl; y: 6; width: parent.width; spacing: 1
+                                Txt { width: parent.width; font.pixelSize: 13; font.weight: Font.DemiBold; wrapMode: Text.WordWrap; text: parent.parent.h.head }
+                                Txt { width: parent.width; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap
+                                      text: [parent.parent.h.when, parent.parent.h.who, parent.parent.h.place].filter(function (x) { return x }).join(" · ") } }
+                        }
                     }
+                    Txt { visible: !page.cur || page.latelyOf(page.cur).length === 0; text: "Nothing has happened to it in the last two weeks."; color: Theme.text3; font.pixelSize: 13 }
                 }
-                Txt { visible: !page.cur || page.latelyOf(page.cur).length === 0; text: "Nothing has happened to it in the last two weeks."; color: Theme.text3; font.pixelSize: 13 }
+                Loading { parent: histP; on: page.loading && page.cur !== null; under: histP.headerHeight }
+                Pulse { parent: histP; key: page.pickedKey || null }
             }
-            Loading { parent: mapP; on: page.loading && page.cur !== null; under: mapP.headerHeight }
-            Pulse { parent: mapP; key: page.pickedKey || null }
         }
     }
 
