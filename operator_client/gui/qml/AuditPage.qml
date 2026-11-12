@@ -120,7 +120,7 @@ Page {
             id: listP
             objectName: "auditList"
             width: (parent.width - 14) * 8 / 12
-            height: Math.max(implicitHeight, entry.implicitHeight)
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             title: "What happened · " + page.listed.length
             sub: "newest first; click one to see it on the right"
             Item {
@@ -185,7 +185,7 @@ Page {
             id: entry
             objectName: "auditEntry"
             width: (parent.width - 14) * 4 / 12
-            height: Math.max(implicitHeight, listP.implicitHeight)
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             title: page.cur ? "The entry" : "Nothing picked"
             sub: page.cur ? "the same seven things for every entry in the log" : ""
             readonly property var m: page.cur && page.cur.host ? Fleet.byHost[page.cur.host] || null : null

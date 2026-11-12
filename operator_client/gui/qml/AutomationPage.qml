@@ -179,7 +179,7 @@ Page {
             id: rulesP
             objectName: "ruleList"
             width: (parent.width - 16) * 4 / 12
-            height: Math.max(parent.h, sheet.implicitHeight)
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             title: "The rules"
             sub: String(page.events.length)
             extra: Btn { small: true; headed: true; iconName: "plus"; text: "Make a rule"; onClicked: Nav.go("automation", "new") }
@@ -208,7 +208,7 @@ Page {
             id: sheet
             objectName: "ruleSheet"
             width: (parent.width - 16) * 8 / 12
-            height: Math.max(parent.h, implicitHeight)
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             gap: 14
             title: page.cur ? page.cur.name : "No rule picked"
             sub: page.cur ? "set by " + page.byWord(page.cur) + " · " + (page.cur.enabled === false ? "switched off" : "on since " + Time.day(page.cur.created_at)) : "pick a rule on the left"
@@ -236,7 +236,7 @@ Page {
                 visible: page.cur !== null
                 width: parent.width
                 // auo-two fills what the list leaves; the chart never goes under its 220
-                height: Math.max(220 + 36, rulesP.implicitHeight - sheet.headerHeight - big.height - 14 - 17)
+                height: 220 + 36
                 spacing: 56
                 opacity: page.loading ? 0 : 1
                 // this week, runs a day, on a fixed scale of ten (aub-chart)
@@ -345,7 +345,7 @@ Page {
             id: runsBox
             objectName: "runsToday"
             width: (parent.width - 16) * 8 / 12
-            height: Math.max(implicitHeight, runP.implicitHeight)
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             title: "Recent runs today"
             sub: page.todayRuns.length ? "newest first; click one to see its rule above, its machines are on the right" : "nothing has run yet today"
             Repeater {
@@ -424,7 +424,7 @@ Page {
             id: runP
             objectName: "runMachines"
             width: (parent.width - 16) * 4 / 12
-            height: Math.max(implicitHeight, runsBox.implicitHeight)
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             title: page.curRun ? "The run at " + Time.hhmm(page.curRun.f.at) : "No run picked"
             sub: page.curRun ? (page.curRun.f.machines > 1 ? Theme.many(page.curRun.f.machines, "machine") : page.curRun.f.hostname || "") + "; what each action did" : "pick a run on the left"
             // (the user, 12 Nov 2026: an opened card holds fixed details; a list that can grow is on the right, paged)

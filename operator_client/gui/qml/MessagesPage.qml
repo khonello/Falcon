@@ -286,7 +286,7 @@ Page {
             id: listP
             objectName: "conversations"
             width: (parent.width - 14) * 4 / 12
-            height: parent.h
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             title: "Conversations"
             sub: "unread first"
             Field { width: parent.width; small: true; iconName: "search"; placeholderText: "Find a person or a group"; text: page.q; onTextEdited: page.q = text }
@@ -305,7 +305,7 @@ Page {
             id: conv
             objectName: "conversation"
             width: (parent.width - 14) * 8 / 12
-            height: parent.h
+            height: Math.round(560 * Theme.viewScale)   // the conversation scrolls inside itself: a set height, following the screen
             fill: true
             readonly property var person: page.personOf(page.c)
             Quiet { visible: page.c === null && page.curReq === null && page.curAsk === null; text: "Pick someone on the left." }

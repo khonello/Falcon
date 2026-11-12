@@ -186,7 +186,7 @@ Page {
             id: listP
             objectName: "flowCards"
             width: (parent.width - 14) * 8 / 12
-            height: Math.max(implicitHeight, rightCol.implicitHeight)
+            height: implicitHeight  // its own height: a neighbour's growth never drags it (the user, 12 Nov 2026)
             title: "The flows · " + page.mineList.length
             sub: "by what each is doing, paused last; click one and its controls, last sync and drawing follow; expand it for its facts"
             Repeater {
