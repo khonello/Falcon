@@ -123,7 +123,7 @@ Page {
             width: (parent.width - 14) * 0.5
             height: two.h
             title: "Departments · " + Theme.fmt(page.depts.length)
-            sub: "a label for grouping machines and the people at them; click one to see its machines on the right, expand it to rename it"
+            sub: "labels for machines"
             Quiet { visible: page.depts.length === 0; text: "No departments yet. Make one below." }
             Column {
                 width: parent.width
@@ -184,7 +184,7 @@ Page {
             width: (parent.width - 14) * 0.5
             height: two.h
             title: page.cur ? page.cur.name : "No department picked"
-            sub: page.cur ? Theme.many(page.inD(page.cur.id).length, "machine") + "; a machine is in one department at a time" : ""
+            sub: page.cur ? Theme.many(page.inD(page.cur.id).length, "machine") + "" : ""
             extra: Btn { objectName: "deptMoveHere"; visible: !!page.cur; small: true; headed: true; iconName: "plus"; text: "Move machines here"; onClicked: page.openMove() }
             Pulse { parent: right; key: page.cur ? page.cur.id : null }          // a click on the left pulses it at once (drawn from the list: no spinner)
             Quiet { visible: !page.cur; text: "Pick a department on the left, or make one below." }
@@ -221,7 +221,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Make a department"
-        sub: "name it, then put machines in it on the right"
+        sub: "a new label"
         Row {
             width: parent.width
             spacing: 8

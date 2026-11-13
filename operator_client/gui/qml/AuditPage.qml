@@ -122,7 +122,7 @@ Page {
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, entry.implicitHeight)
             title: "What happened · " + page.listed.length
-            sub: "newest first; click one to see it on the right"
+            sub: "newest first"
             Item {
                 width: parent.width
                 height: tools.height + 12
@@ -187,7 +187,7 @@ Page {
             width: (parent.width - 14) * 4 / 12
             height: Math.max(implicitHeight, listP.implicitHeight)
             title: page.cur ? "The entry" : "Nothing picked"
-            sub: page.cur ? "the same seven things for every entry in the log" : ""
+            sub: page.cur ? "the one picked" : ""
             readonly property var m: page.cur && page.cur.host ? Fleet.byHost[page.cur.host] || null : null
             Quiet { visible: page.cur === null; text: "Pick an entry in the list." }
             Facts {
@@ -206,11 +206,11 @@ Page {
         }
     }
 
-    // --- over the range: drag across it to show only that stretch in the list --------------------------------------------------------
+    // --- over the range: drag to narrow the list --------------------------------------------------------
     Box {
         width: parent.width
         title: Nav.range === "7d" ? "Over the week" : "Over the last " + Nav.range
-        sub: page.brush ? Time.hhmm(page.brush[0]) + " to " + Time.hhmm(page.brush[1]) + " picked; the list shows only that" : "drag across it to show only that stretch in the list"
+        sub: page.brush ? Time.hhmm(page.brush[0]) + " to " + Time.hhmm(page.brush[1]) + " picked; the list shows only that" : "drag to narrow the list"
         EventHistogram {
             width: parent.width
             height: 150
@@ -245,7 +245,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Export the log"
-        sub: "a copy for someone outside Falcon; the log itself is never changed"
+        sub: "as a CSV file"
         GiveSteps {
             steps: [["Pick how far back", "today, a week, a month, or all 90 days; everything in it goes in"], ["Download it", "a CSV file; the export itself is recorded in the log"]]
             act: "Export the log"

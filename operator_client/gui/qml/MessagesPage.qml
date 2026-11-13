@@ -491,7 +491,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Start a conversation"
-        sub: "one person goes to your conversation with them; several people, or every Admin, make a group where everyone sees each other's answers"
+        sub: "one person or a group"
         Row {
             width: parent.width
             spacing: 8

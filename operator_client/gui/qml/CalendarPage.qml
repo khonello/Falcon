@@ -383,7 +383,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Put something on the calendar"
-        sub: "a to-do for yourself with when it is due; it is said here before it is added"
+        sub: "a to-do with a due time"
         Column {
             width: parent.width
             spacing: 8

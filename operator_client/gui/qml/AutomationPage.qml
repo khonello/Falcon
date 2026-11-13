@@ -342,9 +342,9 @@ Page {
             width: (parent.width - 16) * 8 / 12
             height: Math.max(implicitHeight, runP.implicitHeight)
             title: "Recent runs today"
-            sub: page.todayRuns.length ? "newest first; click one to see its rule above, its machines are on the right" : "nothing has run yet today"
+            sub: page.todayRuns.length ? "newest first" : "nothing has run yet today"
             Repeater {
-                model: [["bad", "Failed", "an action failed or ran out of time"], ["ok", "Successful", "everything it did worked"]]
+                model: [["bad", "Failed", "failed or timed out"], ["ok", "Successful", "everything it did worked"]]
                 delegate: Group {
                     id: rg
                     required property var modelData
@@ -454,7 +454,7 @@ Page {
     Box {
         width: parent.width
         title: "Coming up"
-        sub: "the next scheduled runs, in order; a rule that starts on an event runs whenever it happens, so it is not listed"
+        sub: "the next scheduled runs"
         Column {
             width: parent.width
             PagedList {   // a long list pages in place (the user, 11 Nov 2026)
@@ -498,7 +498,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Make a rule"
-        sub: "nothing runs until you switch it on at the end"
+        sub: "off until you switch it on"
         GiveSteps {
             steps: [["Say when it starts", "when something happens, when a reading crosses a line, or at a time"], ["Pick the machines", "every machine, or the ones you name"], ["Say what it does", "one or more actions, in order, each with a time limit"]]
             act: "Make a rule"

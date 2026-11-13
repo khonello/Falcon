@@ -80,25 +80,25 @@ QtObject {
 
     // --- titles: what each page is, in a line --------------------------------------------------------
     readonly property var titles: ({
-        announcements: ["Announcements", "What is said to many people at once"],
-        calendar: ["Calendar", "What is coming · task deadlines, your to-dos and scheduled automation"],
-        messages: ["Messages", "Conversations with the people you look after, one at a time or as a group"],
-        detective: ["Detective", "What people seem to be trying to do · several small things read together, with the evidence"],
+        announcements: ["Announcements", "Said to many at once"],
+        calendar: ["Calendar", "Deadlines, to-dos and runs"],
+        messages: ["Messages", "Conversations with your people"],
+        detective: ["Detective", "What people seem to be doing"],
         accountability: ["Accountability", "Where a rule was broken, who it was, and what came of it"],
         access: ["Access", "Who is inside which machine, and who was let in"],
-        departments: ["Departments", "Labels that group machines and the people at them"],
+        departments: ["Departments", "Labels for machines"],
         rules: ["Rules", "The standard the organisation is measured against"],
-        actions: ["Actions", "Everything a rule can do, and what you can run by hand"],
+        actions: ["Actions", "What rules run, and you can"],
         overview: ["Overview", "All departments · live"],
         machines: ["Machines", "Every registered client PC"],
         sessions: ["Sessions", "Who is on which machine, and who entered whose"],
-        issues: ["Issues", "Violations, deviations and anything waiting on someone"],
-        tasks: ["Tasks", "Assigned work and the evidence for it"],
-        restricted: ["Protected files", "Files kept to their place, kept private or watched · nothing is moved"],
-        flows: ["Flows", "One-way file pipelines between machines"],
-        automation: ["Automation", "Rules, conditions and every run"],
+        issues: ["Issues", "What needs dealing with"],
+        tasks: ["Tasks", "Work given, and its evidence"],
+        restricted: ["Protected files", "Restricted, private or watched"],
+        flows: ["Flows", "Files copied between machines"],
+        automation: ["Automation", "Rules and their runs"],
         rollout: ["Rollout", "Versions and the gate to the next one"],
-        audit: ["Audit log", "Everything that happened, and who did it"],
+        audit: ["Audit log", "What happened, and who did it"],
         reports: ["Reports", "What the system wrote down, and where it went"]
     })
     property string deptName: ""                // the only department there is, when there is one, for the subtitle

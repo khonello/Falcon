@@ -329,9 +329,9 @@ Page {
     Box {
         width: parent.width
         title: "Ran by hand lately"
-        sub: "every Admin's; Output shows what each machine returned"
+        sub: "every Admin's"
         Repeater {
-            model: [["bad", "Failed", "on at least one machine it failed or ran out of time"], ["ok", "Successful", "or you stopped it"]]
+            model: [["bad", "Failed", "failed or ran out of time"], ["ok", "Successful", "or you stopped it"]]
             delegate: Group {
                 id: hg
                 required property var modelData
@@ -375,7 +375,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Write an action"
-        sub: "a Python or PowerShell script of your own; nothing is saved until you confirm"
+        sub: "your own script"
         GiveSteps {
             steps: [["Say what it is", "its name, one line, and whether it changes the machine"], ["Write or upload the script", "checked as you type, and again on each machine"], ["Try it and save", "a test on one machine, and its time limit"]]
             act: "Write an action"

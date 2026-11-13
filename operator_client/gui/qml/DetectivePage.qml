@@ -138,7 +138,7 @@ Page {
             objectName: "caseList"
             width: (parent.width - 14) * 8 / 12
             title: "Open cases · " + page.cases.length
-            sub: "every department, strongest first; click one to see what it covers, expand it to answer"
+            sub: "strongest first"
             readonly property int pages: Math.max(1, Math.ceil(page.cases.length / page.per))
             readonly property int pi: Math.min(page.cp, pages - 1)
             Column {
@@ -292,7 +292,7 @@ Page {
             width: (parent.width - 14) * 4 / 12
             height: Math.max(implicitHeight, whatP.implicitHeight)
             title: "Step by step"
-            sub: page.cur ? Theme.many(page.cur.story.length, "step") + ", in the order they happened" : ""
+            sub: page.cur ? Theme.many(page.cur.story.length, "step") + " in order" : ""
             Column {
                 width: parent.width
                 opacity: page.loading ? 0 : 1
@@ -324,7 +324,7 @@ Page {
         width: parent.width
         title: "What Detective noticed"
         readonly property var told: page.det && page.det.telling ? page.det.telling : null
-        sub: told && told.smoothed ? "what went on, worded by a model; every fact is Falcon's" : "what went on, from what Detective found"
+        sub: told && told.smoothed ? "worded by a model" : "from what Detective found"
         Column {
             width: parent.width
             spacing: 10
@@ -349,7 +349,7 @@ Page {
     Box {
         width: parent.width
         title: "Said to be fine · " + page.okRules.length
-        sub: "what Detective lets pass on one machine; restricted files are never let pass"
+        sub: "let pass on one machine"
         Column {
             width: parent.width
             PagedList {   // a long list pages in place (the user, 11 Nov 2026)

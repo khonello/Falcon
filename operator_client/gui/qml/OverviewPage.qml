@@ -177,7 +177,7 @@ Page {
             width: (parent.width - page.gap) * 8 / 12
             height: parent.h
             title: "Do first"
-            sub: Theme.many(page.items.length, "thing") + ", the most pressing first, from every page; each with its action on the line"
+            sub: Theme.many(page.items.length, "thing") + ", most pressing first"
             Column {
                 width: parent.width
                 spacing: 6
@@ -218,7 +218,7 @@ Page {
             height: parent.h
             title: "Your to-dos · " + page.todos.length
             readonly property int late: page.todos.filter(function (t) { return t.overdue }).length
-            sub: (late ? Theme.fmt(late) + " past its date; " : "") + "the soonest first; only you see them"
+            sub: (late ? Theme.fmt(late) + " past its date; " : "") + "soonest first"
             PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
                 id: tdp; items: page.todos.slice().sort(function (a, b) { return (Time.ms(a.due_at) || 9e15) - (Time.ms(b.due_at) || 9e15) }); per: 4
                 delegate: SuRow {
@@ -311,7 +311,7 @@ Page {
             width: (parent.width - page.gap) * 4 / 12
             height: parent.h
             title: "Flows and automations"
-            sub: (page.flowsOff.length + page.rulesOff.length ? "only what has stopped or is stuck is listed; " : "")
+            sub: (page.flowsOff.length + page.rulesOff.length ? "stuck or stopped; " : "")
                  + Theme.many(page.flowsOn.length, "flow") + " and " + Theme.many(page.rulesOn.length, "automation") + (page.rulesOn.length === 1 ? " is" : " are") + " running fine"
             PagedList {   // a flow waiting for someone is reminded here, through its issue; anything else is looked at on its page; five a page
                 id: ovp; per: 4; items: page.flowsOff.map(function (f) { var s = page.flowState(f), q = page.remindOf(f)
@@ -346,7 +346,7 @@ Page {
             height: parent.h
             // what is due, around now (the user, 11 Nov 2026: "Today" with Friday and Monday under it, and a link that read as a label, confused)
             title: "What is due"
-            sub: "your tasks' deadlines and your to-dos, in time order; the blue line is now, anything red is late"
+            sub: "deadlines and to-dos; red is late"
             extra: Link { objectName: "openCalendar"; text: "Open the calendar ›"; font.pixelSize: 13; onClicked: Nav.go("calendar") }
             DayAgenda {
                 width: parent.width
@@ -358,7 +358,7 @@ Page {
             width: (parent.width - page.gap) * 4 / 12
             height: parent.h
             title: "Live activity"
-            sub: "on your machines, as it happens"
+            sub: "as it happens"
             subDot: Theme.ok
             Quiet { visible: page.live.length === 0; text: "Each event appears here the moment it is recorded." }
             Column {
@@ -427,7 +427,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Do something"
-        sub: "one sentence; what it does is said before it is done"
+        sub: "said before it is done"
         Row {
             width: parent.width
             spacing: 8

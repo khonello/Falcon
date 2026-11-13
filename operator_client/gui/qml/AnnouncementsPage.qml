@@ -51,7 +51,7 @@ Page {
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, readP.implicitHeight)
             title: "What was announced · " + page.sent.length
-            sub: "every Admin's; click one to read it on the right"
+            sub: "every Admin's"
             Repeater {
                 model: [["Waiting to go out", "they go at their time; withdraw one to stop it", page.waiting], ["Sent", "newest first", page.out], ["Withdrawn", "they did not go out", page.gone]]
                 delegate: Group {

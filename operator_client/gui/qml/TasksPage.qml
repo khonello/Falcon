@@ -40,8 +40,8 @@ Page {
     }
     Timer { id: reload; interval: 300; onTriggered: page.load() }
 
-    readonly property var groupsDef: [["verify", "Waiting for your verdict", "handed in; any Admin can close it"], ["track", "On track", "signs of progress"],
-                              ["done", "Completed this week", "closed; kept here for the week"], ["late", "Late, or gone quiet", "past the deadline, or nothing seen for two days"]]
+    readonly property var groupsDef: [["verify", "Waiting for your verdict", "handed in"], ["track", "On track", "signs of progress"],
+                              ["done", "Completed this week", "closed"], ["late", "Late, or gone quiet", "late, or quiet for two days"]]
     readonly property var stateWord: ({ verify: "Handed in", track: "On track", done: "Completed", late: "Late, or gone quiet" })
     function items(t) { var d = detail[t.id]; return d && d.items ? d.items : [] }
     function found(t) { return items(t).filter(function (i) { return i.status === "passed" }).length }
@@ -133,7 +133,7 @@ Page {
             objectName: "tasksWork"
             width: (parent.width - 14) * 8 / 12
             title: "The work you gave"
-            sub: "one card per task, grouped by what you do about it; click a task for what to do on the right and its targets below, expand it for its dates"
+            sub: "by what you do next"
             Repeater {
                 model: page.groupsDef
                 delegate: Group {
@@ -273,7 +273,7 @@ Page {
                 width: parent.width
                 readonly property var open: page.todos.filter(function (t) { return !t.done })
                 title: "Your to-dos · " + open.length
-                sub: "reminders for yourself, soonest first; only you see them"
+                sub: "only you see them"
                 PagedList {
                     objectName: "todoList"
                     spacing: 10                          // as the rows stood in the box before
@@ -310,7 +310,7 @@ Page {
         objectName: "taskTargets"
         width: parent.width
         title: page.cur ? "Targets · " + page.cur.description_raw : "Targets"
-        sub: "what done looks like, and the signs of progress for each"
+        sub: "what done looks like"
         padTop: 6
         extra: HowChecking { who: page.cur ? page.cur.assignee_name || "" : "" }
         TaskChart {
@@ -331,7 +331,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Give a task"
-        sub: "it takes a few careful steps, so it has its own page"
+        sub: "a few steps"
         Item {
             width: parent.width
             height: Math.max(steps.height, giveB.height)

@@ -473,7 +473,7 @@ Page {
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, rightP.implicitHeight)
             title: page.show === "private" ? "What is private" : page.show === "watch" ? "What is watched" : "What is restricted"
-            sub: "by the machine it lives on; click one to see it on the right, expand it for its rule"
+            sub: "by machine"
             Repeater {
                 model: page.hostOrder
                 delegate: Group {
@@ -747,7 +747,7 @@ Page {
         visible: page.rmarks.length > 0 && page.showing("restricted")
         width: parent.width
         title: "Copies on other machines"
-        sub: page.allCopyRows.length ? "worst first; where it was, how it went, where it was found; click one to see it on the machines" : "no copy of anything restricted is anywhere else"
+        sub: page.allCopyRows.length ? "worst first" : "none found"
         Column {
             width: parent.width
             spacing: 12.5
@@ -811,7 +811,7 @@ Page {
         visible: page.rmarks.length > 0 && page.showing("restricted")
         width: parent.width
         title: "Allowed copies"
-        sub: "copies found away from home that were let stay, newest first, each with the reason given; they are not caught again unless an Admin takes it back"
+        sub: "let stay, with the reason"
         Column {
             width: parent.width
             spacing: 4
@@ -845,7 +845,7 @@ Page {
         visible: page.rmarks.length > 0 && page.showing("restricted")
         width: parent.width
         title: "Flows carrying what is restricted"
-        sub: "right now; a flow held at something restricted waits for an Admin to allow it, for that flow only"
+        sub: "right now"
         Column {
             width: parent.width
             spacing: 10
@@ -895,7 +895,7 @@ Page {
         visible: page.countOf("private") > 0 && page.showing("private")
         width: parent.width
         title: "Refused lately"
-        sub: page.allRefusals.length ? "who tried to open something private, newest first; Windows said no" : "nobody has been refused a private file"
+        sub: page.allRefusals.length ? "newest first" : "nobody has been refused a private file"
         Column {
             width: parent.width
             PagedList {   // a long list pages in place (the user, 11 Nov 2026)
@@ -924,7 +924,7 @@ Page {
         visible: page.countOf("watch") > 0 && page.showing("watch")
         width: parent.width
         title: "Lately on watched files"
-        sub: page.watchLately.length ? "every change, copy and move, newest first, with who was signed in" : "nothing has happened to a watched file in the last two weeks"
+        sub: page.watchLately.length ? "newest first" : "quiet for two weeks"
         Column {
             width: parent.width
             PagedList {   // a long list pages in place (the user, 11 Nov 2026)
@@ -953,7 +953,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Protect something"
-        sub: "it stays where it is and you keep using it"
+        sub: "nothing is moved"
         GiveSteps {
             steps: [["Pick what to protect", "a file or a folder on this PC, found by a search or picked in Explorer"], ["Say how", "restricted to its place, private to the people you name, or watched"], ["Check and protect", "a restricted one's copies elsewhere are found and listed straight away"]]
             act: "Protect something"

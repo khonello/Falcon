@@ -99,7 +99,7 @@ Page {
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, rightCol.implicitHeight)
             title: "Machines"
-            sub: (page.dept !== null ? Fleet.deptName(page.dept) : "every department") + "; one card per machine, serious first; click one to draw it on the right, expand it for its details"
+            sub: (page.dept !== null ? Fleet.deptName(page.dept) : "every department") + "; serious first"
             extra: Select {
                 width: 170; small: true
                 value: page.dept === null ? "" : page.dept
@@ -107,7 +107,7 @@ Page {
                 onPicked: function (v) { page.dept = v === "" ? null : v; page.sel = ""; page.exp = "" }
             }
             Repeater {
-                model: [["look", "Serious", "something serious is open on it", page.look], ["fine", "Fine", "nothing serious", page.fine]]
+                model: [["look", "Serious", "something serious open", page.look], ["fine", "Fine", "nothing serious", page.fine]]
                 delegate: Group {
                     id: grp
                     required property var modelData
@@ -231,7 +231,7 @@ Page {
                 objectName: "machinePicked"
                 width: parent.width
                 title: page.cur ? page.cur.host : "No machine picked"
-                sub: !page.cur ? "click a machine on the left to draw it here"
+                sub: !page.cur ? "pick one on the left"
                      : (page.cur.user ? page.cur.user + (page.cur.online ? " is signed in" : " was the last signed in") : "nobody signed in") + (page.cur.held ? " · " + (page.mine(page.cur) ? "you are" : page.cur.held + " is") + " inside" : "")
                 St { visible: page.cur !== null; text: page.cur ? Fleet.words[page.cur.online ? page.cur.status : "offline"] : ""; c: page.cur ? (!page.cur.online ? Theme.text4 : page.serious(page.cur) ? Theme.crit : page.cur.status === "warning" ? Theme.med : Theme.ok) : Theme.text4 }
                 Txt {
@@ -379,7 +379,7 @@ Page {
         objectName: "checkIns"
         width: parent.width
         title: "Check-ins this week"
-        sub: "a check-in is the machine's worker reaching the Engine: the PC is on and connected, whether or not anyone is signed in to it"
+        sub: "on and connected, day by day"
         Column {
             id: wk
             width: parent.width
@@ -441,7 +441,7 @@ Page {
         visible: page.asks.length > 0
         width: parent.width
         title: "Waiting to join · " + page.asks.length
-        sub: "installed without a licence code; type the code on its screen to let it in"
+        sub: "type its code to let it in"
         PagedList {   // a long list pages in place (the user, 11 Nov 2026)
             id: ap; items: page.asks; per: 4
             delegate: Rectangle {

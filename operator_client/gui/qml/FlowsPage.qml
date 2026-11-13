@@ -136,8 +136,8 @@ Page {
     }
     function consentR(c, grant) { call("flow.restricted_consent", { consent_id: c.id, grant: grant }, grant ? "Allowed for this flow · its destinations become places it may be" : "It stays paused") }
 
-    readonly property var groupsDef: [["running", "Running", "moving files, or set up and ready"], ["waiting", "Waiting", "on someone else: a folder to be picked, a machine to come back, or an ask to you"],
-                                      ["stopped", "Stopped", "stopped by you; nothing goes through until you start it again"], ["paused", "Paused", "held for you, or paused by you; nothing more goes through until you act"]]
+    readonly property var groupsDef: [["running", "Running", "moving files, or set up and ready"], ["waiting", "Waiting", "on someone else"],
+                                      ["stopped", "Stopped", "until started again"], ["paused", "Paused", "nothing goes through"]]
     readonly property var rows: flows.map(function (f) { return Object.assign({ key: String(f.id), name: page.nameOf(f), st: page.stateOf(f) }, f) })
     // the hot first, then what has waited longest
     function inGroup(k) { return rows.filter(function (r) { return r.st === k }).sort(function (a, b) {
@@ -188,7 +188,7 @@ Page {
             width: (parent.width - 14) * 8 / 12
             height: Math.max(implicitHeight, rightCol.implicitHeight)
             title: "The flows · " + page.mineList.length
-            sub: "by what each is doing, paused last; click one and its controls, last sync and drawing follow; expand it for its facts"
+            sub: "by what each is doing"
             Repeater {
                 model: page.groupsDef
                 delegate: Group {
@@ -300,7 +300,7 @@ Page {
                 objectName: "flowControls"
                 width: parent.width
                 title: "Controls"
-                sub: page.cur && page.askedOfMe(page.cur) ? "an ask to send you files" : page.cur ? page.cur.name + (page.gates.length ? ": what waits at its gate, and what you can do with it" : page.cur.st === "running" ? ": how it is going, and what you can do with it" : ": what you can do with it") : "pick a flow on the left"
+                sub: page.cur && page.askedOfMe(page.cur) ? "an ask to send you files" : page.cur ? page.cur.name + (page.gates.length ? ": waiting at its gate" : page.cur.st === "running" ? ": running" : "") : "pick a flow on the left"
                 // several at one gate: one at a time, so the line always carries one action
                 Item {
                     visible: page.gates.length > 1
@@ -519,7 +519,7 @@ Page {
         objectName: "flowDrawn"
         width: parent.width
         title: page.cur ? page.cur.name : "The picked flow"
-        sub: page.cur ? "drawn from its own sources, steps and destinations · " + page.shape(page.cur) : "pick a flow above to draw it here"
+        sub: page.cur ? page.shape(page.cur) : "pick a flow above"
         FlowGraph {
             visible: page.cur !== null
             width: parent.width
@@ -553,7 +553,7 @@ Page {
         width: parent.width
         accentFoot: true
         title: "Make a flow"
-        sub: "files go one way only; nothing restricted rides along without an Admin's say"
+        sub: "one way only"
         GiveSteps {
             steps: [["Pick where files start", "one or more folders on your machines, or ones a flow already fills"], ["Say what happens on the way", "convert, compress, rename or sort, in order; or copy them as they are"], ["Pick where they land", "folders you manage; anyone else's is asked first"]]
             act: "Make a flow"

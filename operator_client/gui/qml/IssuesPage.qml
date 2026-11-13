@@ -4,7 +4,7 @@ import "."
 // ISSUES, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminIssuesPage). The situation in a sentence;
 // on the left To do (the next step is yours) and Done (addressed), one card
 // per issue, several of one kind under a heading, never inside another card; under them the picked issue's story. On the
-// right the picked issue: the same fields for every issue, then what to do.
+// right the picked issue: and what to do.
 // Every issue reaches every Admin and is any Admin's to act on: nobody owns one (the user, 2 Nov 2026).
 //
 // When the Engine keeps issues (issues.list), an issue's meaning, facts, options and timeline are its answer to issues.get,
@@ -258,7 +258,7 @@ Page {
                 objectName: "issuesTodo"
                 width: parent.width
                 title: "To do · " + page.todo.length
-                sub: "the next step, by kind; the kind with the most pressing issue first, critical and late first within it"
+                sub: "most pressing first"
                 KindGroups { visible: page.todo.length > 0; list: "todo"; xs: page.todo }
                 Quiet { visible: page.todo.length === 0; icon: "check"; text: "Nothing for you to do." }
             }
@@ -324,7 +324,7 @@ Page {
             visible: page.it !== null
             width: (parent.width - 14) * 4 / 12
             title: "The issue"
-            sub: "the same fields for every issue, then what to do"
+            sub: "and what to do"
             gap: 12
             Pulse { parent: fix; key: page.it ? page.it.id : null }
             Facts {
