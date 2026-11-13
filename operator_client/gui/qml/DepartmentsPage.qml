@@ -109,7 +109,7 @@ Page {
     situation: Theme.many(depts.length, "department") + " and " + Theme.many(all.length, "machine") + "; "
                + (loose.length ? Theme.fmt(loose.length) + " in no department yet" : "every machine is in one") + ". Every IT Admin reaches every department."
     situationAt: Time.now
-    function deptColor(i) { return [Theme.ser1, Theme.ser2, Theme.ser3, Theme.ser4, Theme.ser5, Theme.ser6][i % 6] }
+    function deptColor(i) { return Theme.accent }       // one colour for every department (the user, 13 Nov 2026): a department is a label, not a kind
 
     Row {
         id: two
