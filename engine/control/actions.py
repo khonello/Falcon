@@ -154,6 +154,8 @@ async def load_action_in_scope(ctx: Context, action_id: int) -> dict[str, Any]:
     action = await ctx.engine.db.control.action(action_id)
     if action is None or action.get("archived_at"):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such action")
+    if action.get("falcon_key"):                     # Falcon's own (migration 055): every department's
+        return action
     creator = await ctx.engine.db.accounts.by_id(action["created_by_account_id"])
     require_department_scope(ctx.identity, creator["department_id"] if creator else None)
     return action
@@ -167,10 +169,11 @@ async def action_list(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
     stored = await db.control.actions() if org_wide(ident) else await db.control.actions_in_department(
         ident.department_id)
     grouped: dict[str, list[dict[str, Any]]] = {"control": [], "monitoring": [], "custom": []}
-    makers = sorted({a["created_by_account_id"] for a in stored})
+    makers = sorted({a["created_by_account_id"] for a in stored if a["created_by_account_id"] is not None})
     names = await db.accounts.display_names_for(ident.account_id, makers) if makers else {}
     for a in rows(stored):
-        grouped[a["action_kind"]].append({**a, **impact_of(a.get("builtin_type")), "created_by_name": names.get(a["created_by_account_id"])})
+        grouped[a["action_kind"]].append({**a, **impact_of(a.get("builtin_type")),
+                                          "created_by_name": "Falcon" if a.get("falcon_key") else names.get(a["created_by_account_id"])})
     return {"builtin": {k: {**v, **impact_of(k)} for k, v in BUILTIN.items()}, "actions": grouped}
 
 

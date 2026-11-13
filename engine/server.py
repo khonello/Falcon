@@ -150,6 +150,12 @@ class Engine:
         await self.db.migrate()
         if self.db.connected:
             self.blocked_addresses = await self.db.registry.blocked_set()
+        if self.db.connected and self.settings.starter_actions:
+            from engine.control import starter
+
+            added = await starter.ensure(self.db)                # the actions that come with Falcon (migration 055)
+            if added:
+                log.info("added %d of Falcon's own actions to the library", added)
         await self.scheduler.start()
         from engine.task import tasks
 

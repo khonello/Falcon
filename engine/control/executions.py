@@ -157,8 +157,8 @@ async def _guard(engine: Engine, execution_id: int) -> None:
 
 
 async def _notify_dashboard(engine: Engine, action: dict[str, Any], payload: dict[str, Any]) -> None:
-    creator = await engine.db.accounts.by_id(action["created_by_account_id"])
-    dept = creator["department_id"] if creator else None
+    creator = await engine.db.accounts.by_id(action["created_by_account_id"]) if action.get("created_by_account_id") is not None else None
+    dept = creator["department_id"] if creator else None          # (Falcon's own action, migration 055: every Admin is told)
     await engine.push_to_role("admin", "action.status", {"action_id": action["id"], **payload}, department_id=dept)
     await engine.push_to_role("super_user", "action.status", {"action_id": action["id"], **payload})
 

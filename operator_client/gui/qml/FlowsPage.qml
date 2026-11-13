@@ -87,8 +87,13 @@ Page {
     }
     function picker(f) { var d = (f.destinations || [])[0], a = d ? page.adminAt(d.destination_pc_id) : null; return a ? a.name : "an Admin" }
     function place(d) { return (d.destination_hostname || "storage") + " " + (d.destination_path || "") }
-    function gone(f) { return (f.sources || []).filter(function (s) { return !!s.pause_reason })[0] || null }
-    function offDest(f) { return (f.destinations || []).filter(function (d) { var a = page.adminAt(d.destination_pc_id); return !d.let_them_choose && a !== null && a.online === false })[0] || null }
+    // a source whose folder went away. Only a reason that says so: every source carries its flow's own pause (manual, consent, restricted),
+    // which is not a source gone (the dev data, 13 Nov 2026: four paused flows read "is not there any more"). The Engine does not say it yet
+    // (docs/ENGINE-GAPS.md #31), so this stays quiet until it does.
+    function gone(f) { return (f.sources || []).filter(function (s) { return /gone|missing|not_found/.test(String(s.pause_reason || "")) })[0] || null }
+    // the machine a destination lands on, an Admin's or anyone's (the dev data, 13 Nov 2026: a flow to a person's machine that was off read "running")
+    function destAt(d) { return page.adminAt(d.destination_pc_id) || Fleet.byHost[d.destination_hostname] || null }
+    function offDest(f) { return (f.destinations || []).filter(function (d) { var a = page.destAt(d); return !d.let_them_choose && a !== null && a.online === false })[0] || null }
     function today(f) { return f.files_copied ? f.files_copied.today || 0 : 0 }
     function stateOf(f) {
         if (f.status === "inactive") return "stopped"
@@ -148,8 +153,8 @@ Page {
                        acts: [["Keep it", function () { var k = Object.assign({}, page.kept); k[f.id] = true; page.kept = k; Msg.ok(name + " kept") }, true, ""],
                               ["Stop it", function () { page.call("flow.delete", { flow_id: f.id }, "Stopped · its history is kept") }, true, ""]] })
         var off = page.offDest(f)
-        if (off) { var ad = page.adminAt(off.destination_pc_id)
-            out.push({ id: "o" + f.id, kind: "A destination is off", icon: "disconnect", title: off.destination_hostname + " has been off since " + Time.hhmm(ad.last_seen_at), where: name + " · files wait for it", line: "it goes when the machine is back; " + (page.mine(f) ? "you" : page.who(f)) + " made this flow", wait: page.hours(ad.last_seen_at),
+        if (off) { var ad = page.destAt(off)
+            out.push({ id: "o" + f.id, kind: "A destination is off", icon: "disconnect", title: off.destination_hostname + " has been off since " + Time.hhmm(ad.last_seen_at || ad.seen), host: off.destination_hostname || "", path: off.destination_path || "", where: name + " · files wait for it", line: "it goes when the machine is back; " + (page.mine(f) ? "you" : page.who(f)) + " made this flow", wait: page.hours(ad.last_seen_at || ad.seen),
                        acts: [["Keep waiting", function () { Msg.ok("Keeps waiting") }, true, ""]] }) }
         return out.sort(function (x, y) { return (y.hot ? 1 : 0) - (x.hot ? 1 : 0) || y.wait - x.wait })
     }

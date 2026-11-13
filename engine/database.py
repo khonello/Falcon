@@ -2459,18 +2459,24 @@ class ControlRepo(_Repo):
 
     # -- actions ---------------------------------------------------------------------------------
 
-    async def create_action(self, created_by: int, action_kind: str, timeout_seconds: int, *,
+    async def create_action(self, created_by: int | None, action_kind: str, timeout_seconds: int, *,
                             builtin_type: str | None = None, custom_script: str | None = None,
                             custom_script_language: str | None = None, name: str | None = None,
                             description: str | None = None, params: dict[str, Any] | None = None,
-                            timing: dict[str, Any] | None = None, output_kind: str = "text", trial: bool = False) -> int:
-        """A `trial` action (a script tried before it is saved, migration 043) is archived as it is made: never in the library."""
+                            timing: dict[str, Any] | None = None, output_kind: str = "text", trial: bool = False,
+                            falcon_key: str | None = None) -> int:
+        """A `trial` action (a script tried before it is saved, migration 043) is archived as it is made: never in the library.
+        One of Falcon's own (migration 055, engine/control/starter.py) has a `falcon_key` and no maker."""
         return await self._val(
             "INSERT INTO actions (created_by_account_id, action_kind, builtin_type, custom_script, "
-            "custom_script_language, timeout_seconds, name, description, params, timing, output_kind, trial, archived_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CASE WHEN $12 THEN now() END) RETURNING id",
+            "custom_script_language, timeout_seconds, name, description, params, timing, output_kind, trial, archived_at, falcon_key) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CASE WHEN $12 THEN now() END, $13) RETURNING id",
             created_by, action_kind, builtin_type, custom_script, custom_script_language, timeout_seconds,
-            name, description, params, timing, output_kind, trial)
+            name, description, params, timing, output_kind, trial, falcon_key)
+
+    async def falcon_keys(self) -> set[str]:
+        """The keys of Falcon's own actions already made, archived ones included."""
+        return {r["falcon_key"] for r in await self._fetch("SELECT falcon_key FROM actions WHERE falcon_key IS NOT NULL")}
 
     async def update_action(self, action_id: int, *, timeout_seconds: int | None = None,
                             custom_script: str | None = None, name: str | None = None,
@@ -2485,8 +2491,8 @@ class ControlRepo(_Repo):
 
     async def actions_in_department(self, department_id: int) -> list[dict[str, Any]]:
         return await self._fetch(
-            "SELECT a.* FROM actions a JOIN accounts c ON c.id = a.created_by_account_id "
-            "WHERE a.archived_at IS NULL AND c.department_id = $1 ORDER BY a.action_kind, a.id", department_id)
+            "SELECT a.* FROM actions a LEFT JOIN accounts c ON c.id = a.created_by_account_id "
+            "WHERE a.archived_at IS NULL AND (c.department_id = $1 OR a.falcon_key IS NOT NULL) ORDER BY a.action_kind, a.id", department_id)
 
     async def events_in_department(self, department_id: int, *, enabled_only: bool = False) -> list[dict[str, Any]]:
         """The department's own automations, and the organisation-wide ones that reach

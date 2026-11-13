@@ -9,7 +9,7 @@ QtObject {
 
     property string page: "overview"
     property var sub: null
-    property string range: "24h"              // 1h | 6h | 24h | 7d, the top bar's, for the pages that read time
+    property string range: "24h"              // 1h | 6h | 24h | 7d, the Audit log's chart's
     property string me: ""                      // the person at this console, by name
     property string myHost: ""                  // the signed-in Admin's own workstation: what the sider says under the name, never an id
     property string myName: ""                  // the signed-in Admin's own name, from the tree

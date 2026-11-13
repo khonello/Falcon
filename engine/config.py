@@ -44,6 +44,8 @@ class Settings:
     control_poll_seconds: int = 15
     # A file being written raises many events; a flow reads it once, this long after the last one (0: at once).
     flow_settle_seconds: float = 1.0
+    # Falcon's own actions (engine/control/starter.py) are added at start; the test Engine leaves them out, so a test's library holds what it made
+    starter_actions: bool = True
     # Detective (what a person seems to be trying to do) listens by itself; this turns it off (FALCON_DETECTIVE=0).
     detective: bool = True
     # ... in its own process (the user, 12 Nov 2026), so its thinking never holds the Engine's loop; FALCON_DETECTIVE_PROCESS=0 runs it inside the Engine.

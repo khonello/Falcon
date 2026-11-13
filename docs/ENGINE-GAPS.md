@@ -414,6 +414,18 @@ choose, `flow consent <id> yes folder=..`. Steps 4-6 are next. The plan, in orde
     - Also seen (small): the audit feed says "Marked <path> restricted" for every `mark.created`; a mark now carries `protection` (watch,
       private), so `engine/console/feed.py` should say "made private" / "watched" from `detail.protection`.
 
+31. **A flow's source folder that goes away is not noticed (found 13 Nov 2026 by the UI session, on the fresh dev data).** `scripts/seed_dev.py` makes
+    `old-forms` from WS-D3's `Old` folder and then deletes the folder: the flow stays `active` with no reason, and nothing tells an Admin. The
+    Flows page has the gate for it (the concept's "A source is gone": Pick another folder / Wait for it / Stop the flow) and shows it when a
+    source's `pause_reason` says `source:gone` (any reason matching `gone|missing|not_found`). What it needs: when the index sees a flow's
+    source root deleted or moved (the Worker reports the folder's `folder.deleted` / `folder.moved`, or a reconcile finds the root missing),
+    that source is paused with `pause_reason = "source:gone"` and `paused_at`, a merged source alone if there are others ("the flow's other
+    sources still go"), and resumed by itself when the folder is back (proactive first: the heal job looks again). Until then the gate stays
+    hidden; it was showing for every paused flow because the first source carries the flow's own pause (`manual`, `consent:pending`,
+    `restricted:consent`), which the page now leaves alone.
+    Also seen on the same data, for whoever looks at Detective: `printscreens` played on a machine of its own raised no case (seven
+    scenarios, four cases; the others that raised none are the benign ones and are right to).
+
 ## Done inline (for the record)
 
 - **Registering machines by asking** (was #15, done 10 Oct 2026). A new Worker runs `python -m worker_client --engine

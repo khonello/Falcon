@@ -211,6 +211,8 @@ Page {
         width: parent.width
         title: Nav.range === "7d" ? "Over the week" : "Over the last " + Nav.range
         sub: page.brush ? Time.hhmm(page.brush[0]) + " to " + Time.hhmm(page.brush[1]) + " picked; the list shows only that" : "drag to narrow the list"
+        // the range is this chart's own: the top bar's switch changed nothing on most pages (the user, 13 Nov 2026)
+        extra: Segmented { objectName: "range"; small: true; options: ["1h", "6h", "24h", "7d"]; value: Nav.range; onPicked: function (v) { Nav.range = v; page.brush = null } }
         EventHistogram {
             width: parent.width
             height: 150

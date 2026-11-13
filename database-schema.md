@@ -483,7 +483,7 @@ Covers Control, Monitoring, and Custom Actions in one table — they share the s
 | Column | Type | Notes |
 |---|---|---|
 | `id` | INTEGER PK | |
-| `created_by_account_id` | INTEGER FK → accounts.id NOT NULL | Must be role = 'admin'; Custom Actions additionally require this to be the *authoring* Admin for audit attribution |
+| `created_by_account_id` | INTEGER FK → accounts.id NULLABLE | Must be role = 'admin'; Custom Actions additionally require this to be the *authoring* Admin for audit attribution. NULL only for Falcon's own actions (`falcon_key`, migration 055) |
 | `action_kind` | TEXT NOT NULL CHECK (`action_kind` IN ('control','monitoring','custom')) | |
 | `builtin_type` | TEXT NULLABLE | e.g. `'shutdown'`, `'screenshot'` — NULL for `action_kind = 'custom'` |
 | `custom_script` | TEXT NULLABLE | Populated only for `action_kind = 'custom'`; PowerShell or Python source, validated against the standard-library-plus-Windows-native-only constraint before storage |
@@ -659,6 +659,8 @@ Design: `docs/design/detective.md`.
 `pc_days` (one row per machine per day: when it first checked in, and the quarter hours, Engine-local, in which someone used it). `actions` gained
 `output_kind` (text / list / status: what a custom action reports back) and `trial` (migration 043: a script tried once before it is saved; archived
 as it is made).
+
+`actions` gained `falcon_key` (migration 055, 13 Nov 2026): the actions that come with Falcon (`engine/control/starter.py`), made by nobody (`created_by_account_id` NULL, and only for them: `actions_made_by`), one row per key (`actions_falcon_key`). The Engine adds the missing ones at every start, archived ones counting as there; any Admin runs, changes or archives them, and pages say "Falcon" made them.
 
 `conversations`, `conversation_members`, `conversation_messages`, `conversation_reads` (migration 044: an Admin's conversations in version 1: a pair,
 reused by `pair_key`, or the one group of every Admin, whose members are read from the accounts; read times per person). `flow_sync_log` gained

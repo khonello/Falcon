@@ -177,14 +177,6 @@ ApplicationWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 12
 
-                        Segmented {
-                            objectName: "range"
-                            visible: (Nav.boss ? ["machines", "audit"] : ["overview", "machines", "audit"]).indexOf(Nav.page) >= 0
-                            anchors.verticalCenter: parent.verticalCenter
-                            options: ["1h", "6h", "24h", "7d"]
-                            value: Nav.range
-                            onPicked: function (v) { Nav.range = v }
-                        }
                         Row {
                             spacing: 6
                             anchors.verticalCenter: parent.verticalCenter

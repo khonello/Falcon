@@ -42,6 +42,9 @@ python -m engine bootstrap IT-01           # the first IT Admin by hand (setup d
 environ-operator\Scripts\Activate.ps1
 pip install -r requirements-operator.txt    # Operator Client TUI + GUI (PySide6, qasync)
 python scripts/make_org.py                 # once: makes a department + an Admin + a Worker, prints how to run them
+# dev data in every state (the user, 13 Nov 2026): Engine stopped -> environ-engine python scripts/fresh_dev.py (saves the old DB to
+# data/backups/, wipes, ADM-01 + Falcon's own actions), start the Engine, then python scripts/seed_dev.py (real Workers on this PC: the
+# seed only runs actions that look, never ones that change this machine)
 python -m operator_client --gui            # after setup on this machine: connects as the first IT Admin, nothing to type
 python -m operator_client --gui --config data/admin.json   # the Admin's console (own settings file; make_org.py writes it)
 python -m operator_client --engine 127.0.0.1:7400 --client-id <id> --client-key <hex> --ca data/engine.crt   # interactive TUI (TLS)
