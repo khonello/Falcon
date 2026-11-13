@@ -42,6 +42,30 @@ Page {
     Connections { target: falcon; function onPushReceived(type) { if (/^flow/.test(type)) again.restart() } }
     Timer { id: again; interval: 300; onTriggered: page.load() }
 
+    // a machine and the path under it, as Controls draws a place (the user, 13 Nov 2026: a folder's last name alone, "Shared", read like a word)
+    component Place: Item {
+        id: pl
+        property string lead: ""
+        property string host: ""
+        property string path: ""
+        property string note: ""
+        property color dot: "transparent"
+        width: parent ? parent.width : 200
+        height: pc.height + 4
+        Txt { id: pll; width: 34; text: pl.lead; color: Theme.text4; font.pixelSize: 12; elide: Text.ElideNone }
+        Rectangle { x: 36; y: 5; width: 7; height: 7; radius: 3.5; color: pl.dot }
+        Column {
+            id: pc
+            x: 50; width: pl.width - 50
+            Row { width: parent.width; spacing: 6
+                  Txt { id: plh; text: pl.host; mono: true; font.pixelSize: 12; font.weight: Font.DemiBold; color: Theme.text2; elide: Text.ElideNone }
+                  Txt { visible: pl.note !== ""; width: parent.width - plh.width - 6; text: pl.note; font.pixelSize: 12; color: Theme.text3 } }
+            Txt { id: plp; visible: pl.path !== ""; width: parent.width; mono: true; font.pixelSize: 12; color: Theme.text3
+                  text: Theme.fitPath(pl.path, plm, width)
+                  FontMetrics { id: plm; font: plp.font }
+                  Tip { over: plp; text: plp.text !== pl.path ? pl.path : "" } }
+        }
+    }
     function folder(p) { var x = String(p || "").replace(/[\\\/]+$/, "").split(/[\\\/]/); return x[x.length - 1] || p }
     function mine(f) { return f.created_by_account_id === falcon.accountId }
     function who(f) { return mine(f) ? "you" : f.created_by_name || Fleet.adminName(f.created_by_account_id) || "another Admin" }
@@ -77,30 +101,31 @@ Page {
     function gatesOf(f) {
         var out = [], name = page.nameOf(f)
         page.rAsks.filter(function (c) { return c.flow.id === f.id }).forEach(function (c) {
-            out.push({ id: "r" + c.id, hot: true, kind: "Restricted", icon: "stop", title: name + " met " + page.folder(c.sample_path), where: String(c.sample_path).replace(/[^\/\\]+$/, ""), line: "you restricted it; the flow waits for you", wait: page.hours(c.asked_at),
+            out.push({ id: "r" + c.id, hot: true, kind: "Restricted", icon: "stop", title: name + " met " + page.folder(c.sample_path), host: f.source_hostname || "", path: String(c.sample_path), line: "you restricted it; the flow waits for you", wait: page.hours(c.asked_at),
                        acts: [["Allow it for this flow", function () { page.consentR(c, true) }, true, ""], ["Keep it paused", function () { page.consentR(c, false) }, true, ""]] })
         })
         if (f.pause_reason === "restricted:consent" && !out.length)
-            out.push({ id: "rw" + f.id, kind: "Restricted, someone else's", icon: "stop", title: name + " met a restricted file", where: f.source_hostname + " " + f.source_path, line: "it waits for the Admin who marked it to say yes", wait: 0, acts: [] })
+            out.push({ id: "rw" + f.id, kind: "Restricted, someone else's", icon: "stop", title: name + " met a restricted file", host: f.source_hostname || "", path: f.source_path || "", line: "it waits for the Admin who marked it to say yes", wait: 0, acts: [] })
         if (f.pause_reason && f.pause_reason !== "restricted:consent" && f.consent_status !== "pending")
             out.push({ id: "p" + f.id, hot: true, kind: f.pause_reason.indexOf("destination") === 0 ? "A destination is gone" : f.pause_reason.indexOf("source") === 0 ? "A source is gone" : "Held by Falcon",
-                       icon: "disconnect", title: name + (f.pause_reason.indexOf("destination") === 0 ? " cannot reach where it lands" : f.pause_reason.indexOf("source") === 0 ? " cannot read where it starts" : " stopped"), where: f.source_hostname + " " + f.source_path, wait: 0,
+                       icon: "disconnect", title: name + (f.pause_reason.indexOf("destination") === 0 ? " cannot reach where it lands" : f.pause_reason.indexOf("source") === 0 ? " cannot read where it starts" : " stopped"), host: f.pause_reason.indexOf("destination") === 0 && (f.destinations || [])[0] ? f.destinations[0].destination_hostname || "" : f.source_hostname || "",
+                       path: f.pause_reason.indexOf("destination") === 0 && (f.destinations || [])[0] ? f.destinations[0].destination_path || "" : f.source_path || "", wait: 0,
                        line: f.suggestion || "nothing more goes through until it is fixed",
                        acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id }, "Trying it again") }, true, ""],
                               ["Pick another folder", function () { Nav.go("flows", "edit-" + f.id) }, true, ""]] })
         ;(f.destinations || []).filter(function (d) { return !!d.paused_reason }).forEach(function (d) {
-            out.push({ id: "d" + d.id, hot: true, kind: "A destination stopped", icon: "disconnect", title: name + " cannot reach " + page.place(d), where: "files wait in line until it takes them", line: "the folder stopped taking files", wait: 0.3,
+            out.push({ id: "d" + d.id, hot: true, kind: "A destination stopped", icon: "disconnect", title: name + " cannot reach where it lands", host: d.destination_hostname || "storage", path: d.destination_path || "", line: "the folder stopped taking files", wait: 0.3,
                        acts: [["Try it again", function () { page.call("flow.resume", { flow_id: f.id, destination_id: d.id }, "Trying it again") }, true, ""]] })
         })
         var run = page.runs[f.id], beside = run && run.last ? (run.last.items || []).filter(function (i) { return i.outcome === "kept_beside" })[0] : null
         if (beside) {
             var nm = page.folder(beside.path), mod = nm.replace(/(\.[^.]+)?$/, "-modified$1")
-            out.push({ id: "k" + f.id, kind: "Kept beside", icon: "copy", title: nm + " was changed where it landed", where: page.place((f.destinations || [])[0] || {}), line: "the flow kept both: " + mod + " beside the new one", wait: page.hours(run.last.ended_at),
+            out.push({ id: "k" + f.id, kind: "Kept beside", icon: "copy", title: nm + " was changed where it landed", host: ((f.destinations || [])[0] || {}).destination_hostname || "", path: ((f.destinations || [])[0] || {}).destination_path || "", line: "the flow kept both: " + mod + " beside the new one", wait: page.hours(run.last.ended_at),
                        acts: [["Keep the new one", function () { page.call("flow.keep", { flow_id: f.id, path: beside.path, keep: "new" }, "Kept the new one; the other is in the audit log") }, true, ""],
                               ["Keep both", function () { page.call("flow.keep", { flow_id: f.id, path: beside.path, keep: "both" }, "Both kept") }, true, ""]] })
         }
         if (f.consent_status === "pending") {
-            if (page.askedOfMe(f)) out.push({ id: "a" + f.id, ask: true, kind: "Wants to send you files", icon: "inbox", title: page.who(f) + ": " + name, where: f.source_hostname + " " + f.source_path + (Sync.steps(f).length ? " · " + Sync.steps(f).map(function (s) { return s.op }).join(", ") : ""), line: "", wait: page.hours(f.created_at),
+            if (page.askedOfMe(f)) out.push({ id: "a" + f.id, ask: true, kind: "Wants to send you files", icon: "inbox", title: page.who(f) + ": " + name, host: f.source_hostname || "", path: f.source_path || "", line: Sync.steps(f).length ? "along the way: " + Sync.steps(f).map(function (s) { return s.op }).join(", ") : "", wait: page.hours(f.created_at),
                                               acts: [["Pick a folder", function () { page.call("flow.consent", { flow_id: f.id, granted: true, destination_path: page.askPath }, "Accepted · it starts copying") }, true, ""],
                                                      ["Decline", function () { page.call("flow.consent", { flow_id: f.id, granted: false }, "Declined · they are told") }, true, ""]] })
             else {
@@ -113,13 +138,13 @@ Page {
             }
         }
         var g = page.gone(f)
-        if (g) out.push({ id: "g" + f.id, hot: true, kind: "A source is gone", icon: "folderopen", title: g.source_hostname + " " + g.source_path + " is not there any more", where: name + " reads from it", line: "it was moved or renamed; the flow's other sources still go", wait: page.hours(g.paused_at),
+        if (g) out.push({ id: "g" + f.id, hot: true, kind: "A source is gone", icon: "folderopen", title: "The folder " + name + " reads from is not there any more", host: g.source_hostname || "", path: g.source_path || "", line: "it was moved or renamed; the flow's other sources still go", wait: page.hours(g.paused_at),
                           acts: [["Pick another folder", function () { Nav.go("flows", "edit-" + f.id) }, true, ""],
                                  ["Wait for it", function () { Msg.ok("Waiting; you are told when it is back") }, true, ""],
                                  ["Stop the flow", function () { page.call("flow.delete", { flow_id: f.id }, "Stopped · its history is kept") }, true, ""]] })
         var q = f.files_copied && f.files_copied.last_at ? page.hours(f.files_copied.last_at) / 24 : 0
         if (q >= 14 && !page.kept[f.id])
-            out.push({ id: "q" + f.id, kind: "Quiet for a long time", icon: "pausecircle", title: name + " has moved nothing in " + Math.round(q) + " days", where: (f.sources || []).map(function (s) { return s.source_hostname + " " + s.source_path }).join(", "), line: "a suggestion only; nothing stops by itself", wait: q * 24,
+            out.push({ id: "q" + f.id, kind: "Quiet for a long time", icon: "pausecircle", title: name + " has moved nothing in " + Math.round(q) + " days", host: ((f.sources || [])[0] || {}).source_hostname || f.source_hostname || "", path: ((f.sources || [])[0] || {}).source_path || f.source_path || "", line: "a suggestion only; nothing stops by itself", wait: q * 24,
                        acts: [["Keep it", function () { var k = Object.assign({}, page.kept); k[f.id] = true; page.kept = k; Msg.ok(name + " kept") }, true, ""],
                               ["Stop it", function () { page.call("flow.delete", { flow_id: f.id }, "Stopped · its history is kept") }, true, ""]] })
         var off = page.offDest(f)
@@ -331,6 +356,17 @@ Page {
                             Txt { anchors.right: parent.right; text: page.g0 && page.g0.wait ? "waiting " + Time.waitLen(page.g0.wait) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                         }
                         Txt { width: parent.width; text: page.g0 ? Theme.paths(page.g0.title, 2) : ""; font.pixelSize: 14; font.weight: Font.DemiBold; lh: 1.35; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                        // where: the machine, and the path under it (the user, 13 Nov 2026)
+                        Column {
+                            visible: page.g0 !== null && (!!page.g0.host || !!page.g0.path)
+                            width: parent.width
+                            spacing: 1
+                            Txt { visible: page.g0 !== null && !!page.g0.host; text: page.g0 ? page.g0.host || "" : ""; mono: true; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                            Txt { id: gpt; visible: page.g0 !== null && !!page.g0.path; width: parent.width; mono: true; font.pixelSize: 12; color: Theme.text3
+                                  text: page.g0 ? Theme.fitPath(page.g0.path || "", gpm, width) : ""
+                                  FontMetrics { id: gpm; font: gpt.font }
+                                  Tip { over: gpt; text: page.g0 && gpt.text !== page.g0.path ? page.g0.path : "" } }
+                        }
                         Txt { visible: text !== ""; width: parent.width; text: page.g0 ? Theme.paths(page.g0.line, 2) : ""; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone }
                         Field { visible: page.g0 !== null && !!page.g0.ask && (page.gpick[page.g0.id] || 0) === 0; width: parent.width; placeholderText: "The folder on your workstation"; text: page.askPath; onTextEdited: page.askPath = text }
                         Column {
@@ -403,21 +439,19 @@ Page {
                         Column {
                             width: parent.width
                             spacing: 4
-                            Txt { text: "Where it goes"; color: Theme.text3; font.pixelSize: 12 }
-                            Txt { width: parent.width; mono: true; font.pixelSize: 12; color: Theme.text2
-                                  text: runCard.f ? ((runCard.f.sources || [])[0] ? (runCard.f.sources[0].source_hostname || "") + " " + page.folder(runCard.f.sources[0].source_path) : page.folder(runCard.f.source_path)) : "" }
+                            Txt { text: "Where it goes"; color: Theme.text3; font.pixelSize: 12; bottomPadding: 2 }
+                            Place { host: runCard.f ? (((runCard.f.sources || [])[0] || {}).source_hostname || runCard.f.source_hostname || "") : ""
+                                    path: runCard.f ? (((runCard.f.sources || [])[0] || {}).source_path || runCard.f.source_path || "") : ""; dot: "transparent"; lead: "From" }
                             Repeater {
                                 model: runCard.ds.slice(0, 3)
-                                delegate: Row {
+                                delegate: Place {
                                     required property var modelData
                                     readonly property var m: Fleet.byHost[modelData.destination_hostname] || null
-                                    spacing: 6
-                                    Txt { text: "→"; color: Theme.text4; font.pixelSize: 12; elide: Text.ElideNone }
-                                    Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
-                                                color: modelData.paused_reason ? Theme.crit : !parent.m || parent.m.online ? Theme.ok : Theme.text4 }
-                                    Txt { width: rc.width - 40; mono: true; font.pixelSize: 12; color: Theme.text2
-                                          text: (modelData.destination_hostname || "storage") + " " + page.folder(modelData.destination_path || "")
-                                                + (modelData.paused_reason ? " · stopped taking files" : parent.m && !parent.m.online ? " · off, it catches up when it is back" : "") }
+                                    lead: "To"
+                                    host: modelData.destination_hostname || "storage"
+                                    note: modelData.paused_reason ? "stopped taking files" : m && !m.online ? "off; it catches up when it is back" : ""
+                                    path: modelData.destination_path || ""
+                                    dot: modelData.paused_reason ? Theme.crit : !m || m.online ? Theme.ok : Theme.text4
                                 }
                             }
                             Txt { visible: runCard.ds.length > 3; text: "and " + (runCard.ds.length - 3) + " more, on the drawing below"; color: Theme.text3; font.pixelSize: 12 }
