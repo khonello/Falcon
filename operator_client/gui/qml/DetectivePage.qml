@@ -123,6 +123,24 @@ Page {
     function stand(c) { return c.intent === "Copying what is on screen" && c.stage_name === "Taking out" ? "The screen was copied to the clipboard" : stageSaid[c.stage_name] || didSaid[c.intent] || c.intent }
     function ago(c) { var h = (Time.now - Time.ms(c.last_at || c.first_at)) / 3600000; return h < 1 ? Math.max(1, Math.round(h * 60)) + "m ago" : h < 48 ? Math.round(h) + "h ago" : Math.round(h / 24) + " days ago" }
     readonly property var gl: det && det.glance ? det.glance : null
+    readonly property var who: gl && gl.signed_in_then ? gl.signed_in_then : []
+    // the key thing: the heaviest finding, leaving out what the areas add up to (the headline leaves it out too); the latest of equals
+    readonly property var key: {
+        var fs = (det && det.findings ? det.findings : []).filter(function (f) { return !/^coverage_/.test(f.graph || "") })
+        fs.sort(function (x, y) { return y.weight - x.weight || Time.ms(y.at) - Time.ms(x.at) })
+        return fs.length ? fs[0] : null
+    }
+    // what flags it: its reasons, without the areas and what is only shown, then how many more things were noticed
+    readonly property var flags: {
+        if (!key || !det) return []
+        var out = (key.why || []).filter(function (w) { return !/^areas covered/.test(w) && !/not weighed\)$/.test(w) && w.split(" ")[0] !== String(key.summary).split(" ")[0] }).slice(0, 2)
+        if (gl && gl.restricted && !out.some(function (w) { return /restricted/.test(w) })) out.unshift("restricted files involved")
+        var more = (det && det.findings ? det.findings : []).filter(function (f) { return !/^coverage_/.test(f.graph || "") && f.summary !== key.summary })
+                                       .map(function (f) { return f.summary }).filter(function (s, i, a) { return a.indexOf(s) === i }).length
+        if (more) out.push(Theme.fmt(more) + " more noticed")
+        return out
+    }
+    function lasted(s) { return s < 60 ? (s <= 1 ? "a second" : Math.round(s) + " seconds") : Time.dur(s / 3600) }
     property var okRules: []
     function loadRules() { falcon.call("detective.rules", {}, function (ok, r) { page.okRules = ok ? (r.rules || []) : [] }) }
     Timer { running: true; interval: 10; onTriggered: page.loadRules() }
@@ -214,22 +232,25 @@ Page {
             objectName: "casePanel"
             width: (parent.width - 14) * 4 / 12
             title: "At a glance"
-            sub: page.cur ? page.cur.intent + " on <font face='" + Theme.mono + "'>" + page.cur.host + "</font>" : "pick a case on the left"
+            sub: page.cur ? "the case picked" : "pick a case on the left"
             readonly property var m: page.cur ? Fleet.byHost[page.cur.host] || null : null
             Quiet { visible: page.cur === null; text: "Pick a case on the left." }
             Column {
                 visible: page.cur !== null
                 width: parent.width
                 Repeater {
+                    // 1 the kind of thing noticed, 2 the key thing and what flags it, 3 who, 4 the machine, 5 when (the user, 13 Nov 2026)
                     model: !page.cur ? [] : [
-                        ["flag", page.stand(page.cur), page.gl && page.gl.next_stage ? "no further yet; next would be " + (page.nextSaid[page.gl.next_stage] || page.gl.next_stage.toLowerCase()) : page.cur.stage_name ? "it went all the way" : "nothing came of it after that"],
-                        ["lock", page.gl && page.gl.restricted ? "Restricted files are involved" : "No restricted files involved", page.gl && page.gl.restricted ? "they need an Admin's consent to leave" : "what was touched is ordinary"],
-                        ["user", page.gl && page.gl.signed_in_then && page.gl.signed_in_then.length ? page.gl.signed_in_then.map(function (s) { return s.name || "someone" }).join(", ") : glance.m && glance.m.user ? glance.m.user : "Nobody signed in",
-                         (glance.m && glance.m.deptName ? glance.m.deptName + " · " : "") + "signed in on " + page.cur.host + " at the time"],
-                        ["desktop", page.cur.host, glance.m ? (glance.m.online ? "on now" + (glance.m.user ? ", " + glance.m.user + " signed in" : "") : "off, last seen " + (glance.m.seen ? Time.age(glance.m.seen) + " ago" : "a while ago")) : ""],
-                        ["history", page.gl && page.gl.earlier && page.gl.earlier.length ? Theme.many(page.gl.earlier.length, "earlier case") + " on this machine" : "The first case on this machine",
-                         page.gl && page.gl.earlier && page.gl.earlier.length ? Theme.listNames(page.gl.earlier.map(function (e) { return e.intent.toLowerCase() + " (" + e.outcome + ")" }), 2) : "nothing before this"],
-                        ["clock", "Open for " + page.openFor(page.cur), "raised at " + Time.hhmm(page.gl && page.gl.raised_at ? page.gl.raised_at : page.cur.last_at) + (page.cur.status === "open" ? "; nobody has answered yet" : "")]]
+                        ["filesearch", page.cur.intent,
+                         (page.levelWord[page.cur.level] || "Noted") + " · " + (page.gl && page.gl.next_stage ? "next would be " + (page.nextSaid[page.gl.next_stage] || page.gl.next_stage.toLowerCase())
+                                                                                  : page.cur.stage_name ? "went all the way" : "nothing came of it"), false],
+                        ["flag", page.key ? page.key.summary : page.stand(page.cur), page.flags.join(" · "), page.gl !== null && page.gl.restricted],
+                        ["user", page.who.length ? page.who.map(function (s) { return s.name || "someone" }).join(", ") : "Nobody was signed in",
+                         page.who.length ? (page.who.some(function (s) { return s.how === "entered" }) ? "an Admin had entered it" : "signed in at the time") : "a program did it on its own", false],
+                        ["desktop", page.cur.host,
+                         [glance.m && glance.m.deptName ? glance.m.deptName : "", glance.m ? (glance.m.online ? "on now" : "off") : "",
+                          page.gl && page.gl.earlier && page.gl.earlier.length ? Theme.many(page.gl.earlier.length, "earlier case") : "first case here"].filter(function (x) { return x !== "" }).join(" · "), false],
+                        ["clock", Time.date(page.cur.first_at), "lasted " + page.lasted(page.gl && typeof page.gl.lasted_s === "number" ? page.gl.lasted_s : Math.max(0, (Time.ms(page.cur.last_at) - Time.ms(page.cur.first_at)) / 1000) || 0) + " · " + page.ago(page.cur), false]]
                     delegate: Item {
                         required property var modelData
                         required property int index
@@ -238,9 +259,9 @@ Page {
                         Rectangle { y: 8 + (Math.max(28, glc.height) - 28) / 2; width: 28; height: 28; radius: 7; color: Theme.surface2
                                     Icon { anchors.centerIn: parent; name: modelData[0]; size: 13; color: Theme.text3 } }
                         Column { id: glc; x: 40; y: 8 + (Math.max(28, height) - height) / 2; width: parent.width - 40; spacing: 1
-                            Txt { width: parent.width; text: modelData[1]; font.weight: Font.DemiBold }
-                            Txt { width: parent.width; text: modelData[2]; color: Theme.text3; font.pixelSize: 12 } }
-                        Rectangle { visible: index < 5; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
+                            Txt { width: parent.width; text: Theme.paths(modelData[1], 2); font.weight: Font.DemiBold; mono: index === 3; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
+                            Txt { visible: modelData[2] !== ""; width: parent.width; text: modelData[2]; color: modelData[3] ? Theme.crit : Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight } }
+                        Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                     }
                 }
             }

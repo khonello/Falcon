@@ -117,7 +117,7 @@ def built() -> dict[str, Any]:
     """The concept's own cases, dated so each ended as long ago as the concept says."""
     global _BUILT
     if _BUILT is None:
-        from preview_data import NOW
+        from preview_data import HOST, NOW
         c = json.loads(Path(__file__).with_name("preview_concept_detective.json").read_text(encoding="utf-8"))
         cases = c["det"]["cases"]
         detail = {}
@@ -128,7 +128,10 @@ def built() -> dict[str, Any]:
             k = str(x["id"])
             found = c["det"]["detail"].get(k, {}).get("findings", [])
             x["restricted"] = any("restricted" in w for f in found for w in f.get("why", []))
-            x["glance"] = {"restricted": x["restricted"], "next_stage": x["next_stage"], "earlier": [], "raised_at": x["last_at"]}
+            m = HOST.get(x.get("host"))                    # who was at the machine then: the sample's user of it
+            x["glance"] = {"restricted": x["restricted"], "next_stage": x["next_stage"], "earlier": [], "raised_at": x["last_at"],
+                           "signed_in_then": [{"account_id": m[3], "name": m[2], "how": "their own"}] if m and m[2] else [],
+                           "lasted_s": int((last - first).total_seconds())}
             detail[x["id"]] = dict(c["det"]["detail"].get(k, {"findings": [], "graph": {"nodes": [], "edges": []}, "rule_options": [], "board": []}), case=x,
                                    glance=x["glance"], telling=_told(c["tell"].get(k, x["headline"])))
         _BUILT = {"cases": cases, "detail": detail, "rules": c["det"]["rules"], "proposals": c["det"]["proposals"]}
