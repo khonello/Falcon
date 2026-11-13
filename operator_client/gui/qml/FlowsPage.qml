@@ -300,7 +300,7 @@ Page {
                 objectName: "flowControls"
                 width: parent.width
                 title: "Controls"
-                sub: page.cur && page.askedOfMe(page.cur) ? "an ask to send you files" : page.cur ? page.cur.name + ": what waits at its gate, and what you can do with it" : "pick a flow on the left"
+                sub: page.cur && page.askedOfMe(page.cur) ? "an ask to send you files" : page.cur ? page.cur.name + (page.gates.length ? ": what waits at its gate, and what you can do with it" : page.cur.st === "running" ? ": how it is going, and what you can do with it" : ": what you can do with it") : "pick a flow on the left"
                 // several at one gate: one at a time, so the line always carries one action
                 Item {
                     visible: page.gates.length > 1
@@ -351,7 +351,84 @@ Page {
                         }
                     }
                 }
-                Quiet { visible: page.cur !== null && page.gates.length === 0 && page.cur.st !== "stopped"; icon: page.cur && page.cur.status === "paused" && !page.cur.pause_reason ? "pausecircle" : "check"
+                // a flow running with nothing at its gate: how it is going, not an empty box (the user, 13 Nov 2026)
+                Rectangle {
+                    id: runCard
+                    objectName: "flowRunning"
+                    visible: page.cur !== null && page.gates.length === 0 && page.cur.st === "running"
+                    readonly property var f: page.cur
+                    readonly property var ds: f ? f.destinations || [] : []
+                    readonly property int taking: ds.filter(function (d) { return !d.paused_reason }).length
+                    readonly property string mode: !f ? "" : f.run_mode === "hourly" ? "copies every hour" : f.run_mode === "manual" ? "copies only when it is run" : "copies as files change"
+                    width: parent.width
+                    height: rc.height + 24
+                    radius: Theme.radiusLg
+                    color: Theme.surface2
+                    Column {
+                        id: rc
+                        x: 14; y: 12
+                        width: parent.width - 28
+                        spacing: 12
+                        // its state: a dot that breathes while it runs
+                        Row {
+                            spacing: 8
+                            Rectangle {
+                                width: 9; height: 9; radius: 4.5; color: Theme.ok; anchors.verticalCenter: parent.verticalCenter
+                                SequentialAnimation on opacity { running: runCard.visible; loops: Animation.Infinite
+                                    NumberAnimation { from: 1; to: 0.35; duration: Theme.durPulse; easing.type: Easing.InOutQuad }
+                                    NumberAnimation { from: 0.35; to: 1; duration: Theme.durPulse; easing.type: Easing.InOutQuad } }
+                            }
+                            Txt { text: "Running"; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { text: "· " + runCard.mode; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                        }
+                        // three figures
+                        Row {
+                            width: parent.width
+                            Repeater {
+                                model: !runCard.f ? [] : [
+                                    [Theme.fmt(page.today(runCard.f)), page.today(runCard.f) === 1 ? "file copied today" : "files copied today"],
+                                    [page.lastCopy(runCard.f) ? Time.age(page.lastCopy(runCard.f)) : "—", page.lastCopy(runCard.f) ? "since the last copy" : "nothing copied yet"],
+                                    [runCard.taking + " of " + runCard.ds.length, runCard.ds.length === 1 ? "destination taking files" : "destinations taking files"]]
+                                delegate: Column {
+                                    required property var modelData
+                                    width: rc.width / 3
+                                    spacing: 1
+                                    Txt { text: modelData[0]; font.pixelSize: 18; font.weight: Font.DemiBold; elide: Text.ElideNone }
+                                    Txt { width: parent.width - 8; text: modelData[1]; color: Theme.text3; font.pixelSize: 12; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                                }
+                            }
+                        }
+                        Rectangle { width: parent.width; height: 1; color: Theme.border }
+                        // where it goes: the source, then each destination with whether its machine is on
+                        Column {
+                            width: parent.width
+                            spacing: 4
+                            Txt { text: "Where it goes"; color: Theme.text3; font.pixelSize: 12 }
+                            Txt { width: parent.width; mono: true; font.pixelSize: 12; color: Theme.text2
+                                  text: runCard.f ? ((runCard.f.sources || [])[0] ? (runCard.f.sources[0].source_hostname || "") + " " + page.folder(runCard.f.sources[0].source_path) : page.folder(runCard.f.source_path)) : "" }
+                            Repeater {
+                                model: runCard.ds.slice(0, 3)
+                                delegate: Row {
+                                    required property var modelData
+                                    readonly property var m: Fleet.byHost[modelData.destination_hostname] || null
+                                    spacing: 6
+                                    Txt { text: "→"; color: Theme.text4; font.pixelSize: 12; elide: Text.ElideNone }
+                                    Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
+                                                color: modelData.paused_reason ? Theme.crit : !parent.m || parent.m.online ? Theme.ok : Theme.text4 }
+                                    Txt { width: rc.width - 40; mono: true; font.pixelSize: 12; color: Theme.text2
+                                          text: (modelData.destination_hostname || "storage") + " " + page.folder(modelData.destination_path || "")
+                                                + (modelData.paused_reason ? " · stopped taking files" : parent.m && !parent.m.online ? " · off, it catches up when it is back" : "") }
+                                }
+                            }
+                            Txt { visible: runCard.ds.length > 3; text: "and " + (runCard.ds.length - 3) + " more, on the drawing below"; color: Theme.text3; font.pixelSize: 12 }
+                        }
+                        // a flow run by hand or every hour: when it last ran, and when it runs next
+                        Txt { visible: !!runCard.f && runCard.f.run_mode !== undefined && runCard.f.run_mode !== "realtime"; width: parent.width; color: Theme.text3; font.pixelSize: 12
+                              text: !runCard.f ? "" : (runCard.f.last_run_at ? "Last ran " + Time.age(runCard.f.last_run_at) + " ago" : "Not run yet")
+                                    + (runCard.f.run_mode === "hourly" ? "; next on the hour, at " + Time.hhmm(Math.ceil(Time.now / 3600000) * 3600000) : "; Run now copies what changed") }
+                    }
+                }
+                Quiet { visible: page.cur !== null && page.gates.length === 0 && page.cur.st !== "stopped" && page.cur.st !== "running"; icon: page.cur && page.cur.status === "paused" && !page.cur.pause_reason ? "pausecircle" : "check"
                         text: page.cur ? (page.cur.status === "paused" && !page.cur.pause_reason ? "You paused " + page.cur.name + ". Nothing goes through until you resume it." : "Nothing waits at a gate; " + page.cur.name + " runs by itself.") : "" }
                 Quiet { visible: page.cur !== null && page.cur.st === "stopped"; icon: "stop"; text: page.cur ? "You stopped " + page.cur.name + ". Nothing goes through." : "" }
                 Quiet { visible: page.cur === null; text: "Pick a flow on the left." }
