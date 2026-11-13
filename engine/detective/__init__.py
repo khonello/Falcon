@@ -10,8 +10,9 @@ the organisation's alone to see. It runs by itself: nothing triggers it and the 
     detective.review    {case_id, outcome, note?}         explained | accepted | dismissed | escalated  (the review is kept, never silent)
     detective.overview  {}                                what is open, by intent and level, for the page
 
-The matcher runs here for now, over events the Engine already receives; what makes each change attributable to a person's hands or a program (the
-Worker's "witness" signals) arrives as more of the same signals, and the matching can move to the machine without changing what this module keeps.
+The matcher itself runs in its own process (`brain.py`, started by `host.py`; the user, 12 Nov 2026), so however long it thinks the Engine keeps answering.
+This module gathers each event's facts, which need the database, sends the event with what the matcher may ask about that machine (`_ctx`), and keeps
+and raises what comes back. `FALCON_DETECTIVE_PROCESS=0` runs the same matcher inside the Engine.
 """
 
 from __future__ import annotations
@@ -24,12 +25,10 @@ from typing import TYPE_CHECKING, Any
 
 from common.detective import (
     Case,
-    Context,
-    Detective,
     Finding,
+    Memory,
     Rule,
     Sig,
-    Update,
     folder_of,
     graph_of,
     name_of,
@@ -38,6 +37,8 @@ from common.detective import (
     sig_to_dict,
 )
 from engine.detective import labels, telling
+from engine.detective.brain import CaseView, UpdateView, view_of
+from engine.detective.host import LocalMatcher, MatcherGone, ProcessMatcher
 from engine.dispatch import Context as HandlerContext
 from engine.dispatch import handler
 from engine.permissions import int_field, kept, require_role, str_field
@@ -55,8 +56,10 @@ RESUME = timedelta(days=7)
 OUTCOMES = ("explained", "accepted", "dismissed", "escalated")
 OPEN_LEVELS = ["case", "urgent"]
 
-_det: Detective | None = None
-_restored = False
+_matcher: LocalMatcher | ProcessMatcher | None = None
+_restored_for = 0                                   # the matcher's generation the last days were put back into (a new process starts empty)
+_drives: dict[int, bool] = {}                       # machine -> it has a drive attached (the matcher's own memory, as its last answer said)
+_ids: dict[int, int] = {}                           # the matcher's case key -> the case's id in the database
 _devices: dict[tuple[int, str], int] = {}          # (pc, drive's own name) -> how many times this machine had seen it before the last plug-in
 _keys: dict[tuple[int, str], str] = {}             # (pc, where it is mounted now) -> the drive's own name (its serial when the Worker could read one)
 _tasks: dict[int, tuple[float, set[str]]] = {}
@@ -70,8 +73,12 @@ MODEL_QUEUE = 20
 
 
 def reset_state() -> None:
-    global _det, _restored, _queue, _worker
-    _det, _restored = None, False
+    global _matcher, _restored_for, _queue, _worker
+    if _matcher is not None:
+        _matcher.kill()
+    _matcher, _restored_for = None, 0
+    _drives.clear()
+    _ids.clear()
     if _worker is not None:
         _worker.cancel()
     _queue, _worker = None, None
@@ -89,12 +96,44 @@ def tasks_changed() -> None:
     expected.invalidate()
 
 
-def _detector() -> Detective:
-    global _det
-    if _det is None:
-        _det = Detective(Context(task_things=lambda pc: _tasks.get(pc, (0, set()))[1], known_device=lambda pc, dev: _devices.get((pc, _keys.get((pc, dev), dev)), 0),
-                                  rules=lambda pc: _rules.get(pc, [])))
-    return _det
+def _match(engine: Engine | None = None) -> LocalMatcher | ProcessMatcher:
+    global _matcher
+    if _matcher is None:
+        own = engine is None or getattr(engine.settings, "detective_process", True)
+        _matcher = ProcessMatcher() if own else LocalMatcher()
+    return _matcher
+
+
+def device_uses(pc: int, device: str) -> int:
+    """How many times this machine had seen this drive before it was last plugged in, whatever letter it has now (by its own name, its serial)."""
+    return _devices.get((pc, _keys.get((pc, device), device)), 0)
+
+
+def _ctx(pc: int) -> dict[str, Any]:
+    """What the matcher may ask about one machine, sent with each of its events: the files its tasks cover, its drives' familiarity, what was ruled fine."""
+    uses = {key: n for (p, key), n in _devices.items() if p == pc}
+    uses.update({mount: _devices.get((pc, key), 0) for (p, mount), key in _keys.items() if p == pc})
+    return {"tasks": _tasks.get(pc, (0, set()))[1], "uses": uses, "rules": _rules.get(pc, [])}
+
+
+async def _feed(engine: Engine, sig: Sig) -> None:
+    try:
+        updates, drives = await _match(engine).call("feed", sig, _ctx(sig.pc))
+    except MatcherGone:
+        log.warning("detective: an event on machine %s was not read (the matcher had stopped)", sig.pc)
+        return
+    _drives[sig.pc] = drives
+    await _apply(engine, updates)
+
+
+async def memory(pc: int) -> Memory | None:
+    """A copy of what the matcher remembers of one machine (for the tests, and for looking into Detective itself)."""
+    return await _match().call("memory", pc)
+
+
+async def stop() -> None:
+    if _matcher is not None:
+        await _matcher.stop()
 
 
 def install(engine: Engine) -> None:
@@ -181,13 +220,11 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     seen = event.get("witness") or {}
     wrote = facts["flow_wrote"] if "flow_wrote" in facts else (op in ("create", "modify", "move", "copy") and await _flow_wrote(engine, pc_id, path, digest))
     by = "falcon" if wrote else seen.get("by", "unknown")
-    det = _detector()
     if event.get("drive"):
-        det.know_drive(pc_id, str(event["drive"]), time.time())
+        _drives[pc_id] = await _match(engine).call("know_drive", pc_id, str(event["drive"]), time.time())
         if op == "delete":
             return                                      # a file taken off a drive is not erasing anything on this machine
-    mem = det.mem.get(pc_id)
-    if mem is not None and mem.devices and await engine.db.resource.is_allowed(pc_id, path, digest):
+    if _drives.get(pc_id) and await engine.db.resource.is_allowed(pc_id, path, digest):
         tags.add("allowed")
     if facts.get("task_expects"):
         tags.add("task_expected")                           # Task's fact: an open task asks for exactly this
@@ -199,7 +236,7 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
         info["late"] = True                              # found afterwards: when it happened is the file's own time, and who did it cannot be told
     sig = Sig(event.get("at") or time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("program") or (seen.get("front", "") if by == "hand" else ""), by, "",
               frozenset(tags), info)
-    await _apply(engine, det.feed(sig))
+    await _feed(engine, sig)
 
 
 async def _own_scope(engine: Engine, pc_id: int, entry: dict[str, Any]) -> bool:
@@ -251,7 +288,7 @@ async def _on_opened(engine: Engine, pc_id: int, data: dict[str, Any]) -> None:
         if not tags:
             continue
         sig = Sig(now, pc_id, "opened", path, "", digest or "", str((item or {}).get("process") or "")[:120], "unknown", "", frozenset(tags))
-        await _apply(engine, _detector().feed(sig))
+        await _feed(engine, sig)
 
 
 async def on_presence(engine: Engine, pc_id: int, online: bool) -> None:
@@ -259,7 +296,7 @@ async def on_presence(engine: Engine, pc_id: int, online: bool) -> None:
     if not engine.db.connected or online:
         return
     await _ensure(engine)
-    await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "silent", by="alone")))
+    await _feed(engine, Sig(time.time(), pc_id, "silent", by="alone"))
 
 
 async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]) -> None:
@@ -273,7 +310,7 @@ async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]
         if not any(t in process.lower() for t in CAPTURE_TOOLS):
             return
         await _ensure(engine)
-        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "launched", program=process[:120], by="unknown")))
+        await _feed(engine, Sig(time.time(), pc_id, "launched", program=process[:120], by="unknown"))
         return
     if etype == "file.opened":
         await _on_opened(engine, pc_id, data)
@@ -282,17 +319,17 @@ async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]
         await _ensure(engine)
         process = str(data.get("process") or "")[:120]
         info = {"bytes": int(data.get("bytes") or 0), "to": str(data.get("to") or "")[:60], "destinations": int(data.get("destinations") or 1), "seconds": int(data.get("seconds") or 60)}
-        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "uploaded", program=process, by="unknown", info=info)))
+        await _feed(engine, Sig(time.time(), pc_id, "uploaded", program=process, by="unknown", info=info))
         return
     if etype == "screen.captured":
         await _ensure(engine)
         kind = "screen" if data.get("kind") == "screen" else "region"
-        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "captured", program=str(data.get("process") or "")[:120], by="hand", info={"kind": kind})))
+        await _feed(engine, Sig(time.time(), pc_id, "captured", program=str(data.get("process") or "")[:120], by="hand", info={"kind": kind}))
         return
     if etype == "log.cleared":
         await _ensure(engine)
         which = str(data.get("log") or "event")[:40]
-        await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "cleared", by="unknown", info={"what": f"the {which} log", "log": which})))
+        await _feed(engine, Sig(time.time(), pc_id, "cleared", by="unknown", info={"what": f"the {which} log", "log": which}))
         return
     if etype not in ("usb.inserted", "usb.removed"):
         return
@@ -305,15 +342,17 @@ async def on_signal(engine: Engine, pc_id: int, etype: str, data: dict[str, Any]
         key = info.get("serial") or device                  # the same drive in another letter is still the same drive
         _keys[(pc_id, device)] = key
         _devices[(pc_id, key)] = await engine.db.detective.see_device(pc_id, key)
-    await _apply(engine, _detector().feed(Sig(time.time(), pc_id, "attached" if etype == "usb.inserted" else "detached", device, device=device, by="alone", info=info)))
+    await _feed(engine, Sig(time.time(), pc_id, "attached" if etype == "usb.inserted" else "detached", device, device=device, by="alone", info=info))
 
 
 # --- keeping what it concludes ------------------------------------------------------------------------------------
 
-def _row(case: Case, department_id: int | None, raised: bool) -> dict[str, Any]:
+def _row(case: CaseView | Case, department_id: int | None, raised: bool) -> dict[str, Any]:
+    if isinstance(case, Case):
+        case = view_of(case)
     n, latest, nxt = case.stage
     return {"pc_id": case.pc, "department_id": department_id, "intent": case.intent, "level": case.level, "weight": case.weight, "stage_count": n, "stage_name": latest,
-            "next_stage": nxt, "not_yet": case.not_yet(), "behaviours": sorted(case.behaviours), "headline": case.headline(), "story": case.story(),
+            "next_stage": nxt, "not_yet": case.not_yet, "behaviours": case.behaviours, "headline": case.headline, "story": case.story,
             "first_at": datetime.fromtimestamp(case.first_at, timezone.utc), "last_at": datetime.fromtimestamp(case.last_at, timezone.utc),
             "raised_at": datetime.now(timezone.utc) if raised else None}
 
@@ -323,35 +362,39 @@ def _finding_row(f: Finding) -> dict[str, Any]:
             "why": list(dict.fromkeys(f.why)), "things": sorted(f.things)[:50], "evidence": [sig_to_dict(e) for e in f.evidence[-80:]]}
 
 
-async def _apply(engine: Engine, updates: list[Update]) -> None:
+async def _apply(engine: Engine, updates: list[UpdateView]) -> None:
     done: set[int] = set()
     for u in updates:
         case = u.case
+        if case.id is None and case.key in _ids:
+            case.id = _ids[case.key]                     # saved by an earlier event's answer, which the matcher may not have heard of yet
         if u.created or u.raised or case.level != "quiet" or case.id is not None:
-            if id(case) in done and not u.raised:
+            if case.key in done and not u.raised:
                 continue
-            done.add(id(case))
+            done.add(case.key)
             await _save(engine, u)
 
 
-async def _save(engine: Engine, u: Update) -> None:
+async def _save(engine: Engine, u: UpdateView) -> None:
     case = u.case
     if case.level == "quiet" and case.id is None:
         return                                           # not worth a record yet: it is kept in memory and joins one if the next step makes it so
     pc = await engine.db.accounts.pc(case.pc)
     department_id = pc["department_id"] if pc else None
-    fresh = case.findings[_saved.get(id(case), 0):]
+    fresh = case.findings[max(0, _saved.get(case.key, 0) - case.findings_from):]
     case.id = await engine.db.detective.save_case(case.id, _row(case, department_id, u.raised), [_finding_row(f) for f in fresh])
-    _saved[id(case)] = len(case.findings)
+    _ids[case.key] = case.id
+    _saved[case.key] = max(_saved.get(case.key, 0), case.total)
+    _match(engine).post("saved_as", case.key, case.id, case.total)
     if u.raised and engine.llm.available:
-        _ask(engine, "opinion", (case.id, case.story()))
+        _ask(engine, "opinion", (case.id, case.story))
         if telling.smoothing(engine.llm):
             _ask(engine, "telling", case.id)
     if u.raised:
         await engine.audit.record(None, "detective.raised", target_type="detective_cases", target_id=case.id, pc_id=case.pc,
                                   detail={"intent": case.intent, "level": case.level, "weight": round(case.weight, 2), "stage": case.stage[1]})
-        payload = {"case_id": case.id, "intent": case.intent, "level": case.level, "pc_id": case.pc, "host": (pc or {}).get("hostname"), "not_yet": case.not_yet()}
-        await engine.announce("case.raised", {**payload, "behaviours": sorted(case.behaviours), "weight": round(case.weight, 2)}, source="system", pc=case.pc)
+        payload = {"case_id": case.id, "intent": case.intent, "level": case.level, "pc_id": case.pc, "host": (pc or {}).get("hostname"), "not_yet": case.not_yet}
+        await engine.announce("case.raised", {**payload, "behaviours": case.behaviours, "weight": round(case.weight, 2)}, source="system", pc=case.pc)
         await engine.push_to_role("super_user", "detective.raised", payload)
         if pc and pc["pc_type"] == "client_pc" and department_id is not None:                 # an Admin's own machine is the head of the organisation's alone
             await engine.push_to_role("admin", "detective.raised", payload, department_id=department_id)
@@ -423,26 +466,40 @@ async def _tell(engine: Engine, case_id: int | None) -> None:
 
 
 async def _ensure(engine: Engine) -> None:
-    """After a restart: the last hours of activity go back into each machine's memory (without being judged again), and open cases resume."""
-    global _restored
-    if _restored:
+    """After a restart, and whenever the matcher's process is new: the last days of activity go back into each machine's memory (without being judged
+    again), and open cases resume."""
+    global _restored_for
+    m = _match(engine)
+    generation = await m.ready()
+    if _restored_for == generation:
         return
-    _restored = True
-    det = _detector()
-    for r in await engine.db.detective.live_rules():
-        _rules.setdefault(r["pc_id"], []).append(_rule(r))
+    first = _restored_for == 0
+    _restored_for = generation
+    _saved.clear()
+    _ids.clear()
+    _drives.clear()
+    if first:
+        for r in await engine.db.detective.live_rules():
+            _rules.setdefault(r["pc_id"], []).append(_rule(r))
     since = datetime.now(timezone.utc) - REMEMBER
+    batch: list[Sig] = []
     for r in await engine.db.detective.recent_events(since):
         verb = _verb({"op": r["op"], "path": r["path"], "old_path": r["old_path"], "detail": r["detail"] or {}})
         if verb:
-            det.remember(Sig(r["occurred_at"].timestamp(), r["pc_id"], verb, r["path"], r["old_path"] or "", r["content_hash"] or "", by=(r["detail"] or {}).get("by", "unknown")))
+            batch.append(Sig(r["occurred_at"].timestamp(), r["pc_id"], verb, r["path"], r["old_path"] or "", r["content_hash"] or "", by=(r["detail"] or {}).get("by", "unknown")))
+        if len(batch) >= 2000:
+            _drives.update(await m.call("remember", batch))
+            batch = []
+    if batch:
+        _drives.update(await m.call("remember", batch))
     for c in await engine.db.detective.open_since(datetime.now(timezone.utc) - RESUME):
         case = Case(pc=c["pc_id"], id=c["id"], first_at=c["first_at"].timestamp(), last_at=c["last_at"].timestamp())
         for f in await engine.db.detective.findings(c["id"]):
             case.findings.append(Finding(f["behaviour"], f["graph"], f["at"].timestamp(), c["pc_id"], float(f["weight"]), frozenset(f["things"] or []), f["summary"],
                                          [sig_from_dict(e) for e in f["evidence"] or []], f["innocent"] or "", list(f["why"] or [])))
-        det.cases.append(case)
-        _saved[id(case)] = len(case.findings)
+        key = await m.call("restore", case)
+        _saved[key] = len(case.findings)
+        _ids[key] = c["id"]
 
 
 def _rule(r: dict[str, Any]) -> Rule:
@@ -550,7 +607,7 @@ async def review(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, Any]
     if not await ctx.engine.db.detective.review(c["id"], outcome, ident.account_id, note):
         raise ProtocolError(ErrorCode.NOT_FOUND, "no such case")
     if outcome != "escalated":                                       # (escalated: still being worked, and still growing)
-        _detector().close(c["id"])
+        _match(ctx.engine).post("close", c["id"])
     made: list[dict[str, Any]] = []
     if kind:
         made = await _write_rules(ctx, c, kind, ident.account_id)

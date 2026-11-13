@@ -180,6 +180,7 @@ class Engine:
             await asyncio.wait(self._conn_tasks, timeout=5)
         await self.file_index.catchup_settled(timeout=5)      # what machines missed is taken in before the pool goes away
         await self.scheduler.stop()
+        await engine.detective.stop()                         # its own process ends with the Engine
         await self.db.close()
 
     async def run(self) -> None:

@@ -114,8 +114,8 @@ async def test_the_same_drive_in_another_letter_is_still_a_familiar_drive(engine
         await detective.on_signal(engine, pc, "usb.removed", {"device": letter, "path": letter})
     assert await engine.db.detective.device_uses(pc, "ABCD-1234") == 4 and await engine.db.detective.device_uses(pc, "E:\\") == 0
     await detective.on_signal(engine, pc, "usb.inserted", {"device": "H:\\", "path": "H:\\", "serial": "ABCD-1234", "label": "BACKUP"})
-    assert detective._detector().ctx.device_uses(pc, "H:\\") == 4                               # four times before: familiar, whatever its letter
-    story = detective._detector().mem[pc].recent[-1].phrase()
+    assert detective.device_uses(pc, "H:\\") == 4                                             # four times before: familiar, whatever its letter
+    story = (await detective.memory(pc)).recent[-1].phrase()
     assert story == r"plugged in a drive (BACKUP, H:\)"
 
 

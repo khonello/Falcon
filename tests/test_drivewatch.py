@@ -158,7 +158,7 @@ async def test_a_file_put_on_a_drive_that_was_plugged_in_before_the_worker_start
     for i in range(3):
         await fi.ingest_event(org["w1_pc"], {"op": "create", "path": f"K:\\out\\file{i}.zip", "hash": f"h-{i}", "drive": "K:\\", "witness": {"by": "unknown"}})
     await asyncio.sleep(0.2)
-    mem = detective._detector().mem[org["w1_pc"]]
+    mem = await detective.memory(org["w1_pc"])
     assert "K:\\" in mem.devices
     cases = (await a1.ok("detective.cases", {"include_noted": True}))["cases"]
     assert cases
@@ -189,7 +189,7 @@ async def test_taking_a_file_off_a_drive_updates_the_index_and_is_not_read_as_co
     await fi.ingest_event(org["w1_pc"], {"op": "delete", "path": "K:\\out\\pay.txt", "drive": "K:\\"})
     await asyncio.sleep(0.2)
     assert (await engine.db.file_index.by_path(org["w1_pc"], "K:\\out\\pay.txt", present_only=True)) is None
-    assert not any(s.verb == "deleted" for s in detective._detector().mem[org["w1_pc"]].since(0, "deleted"))
+    assert not any(s.verb == "deleted" for s in (await detective.memory(org["w1_pc"])).since(0, "deleted"))
 
 
 async def test_who_was_at_the_keyboard_is_asked_when_the_file_appears_not_when_it_is_told(tmp_path: Path):

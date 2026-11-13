@@ -46,6 +46,8 @@ class Settings:
     flow_settle_seconds: float = 1.0
     # Detective (what a person seems to be trying to do) listens by itself; this turns it off (FALCON_DETECTIVE=0).
     detective: bool = True
+    # ... in its own process (the user, 12 Nov 2026), so its thinking never holds the Engine's loop; FALCON_DETECTIVE_PROCESS=0 runs it inside the Engine.
+    detective_process: bool = True
     # Local LLM (spec 7.2.1). In-process llama.cpp by default (open item 10.3); 'openai' / 'ollama' select a local sidecar process instead.
     # Nothing leaves the machine unless groq_api_key is set: then Groq answers what the local model could not (engine/llm.py).
     llm_backend: str = "llamacpp"
@@ -93,6 +95,7 @@ class Settings:
             control_poll_seconds=int(os.environ.get("FALCON_CONTROL_POLL_SECONDS", cls.control_poll_seconds)),
             flow_settle_seconds=float(os.environ.get("FALCON_FLOW_SETTLE_SECONDS", cls.flow_settle_seconds)),
             detective=os.environ.get("FALCON_DETECTIVE", "1").lower() not in ("0", "false", "no", "off"),
+            detective_process=os.environ.get("FALCON_DETECTIVE_PROCESS", "1").lower() not in ("0", "false", "no", "off"),
             llm_backend=os.environ.get("FALCON_LLM_BACKEND", cls.llm_backend),
             llm_model_path=os.environ.get("FALCON_LLM_MODEL_PATH", cls.llm_model_path) or None,
             llm_endpoint=os.environ.get("FALCON_LLM_ENDPOINT", cls.llm_endpoint),
