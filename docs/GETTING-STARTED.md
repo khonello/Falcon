@@ -44,6 +44,9 @@ Check it: `environ-engine\Scripts\python.exe -m pytest` -- every test should run
 
 ## 2. A real network
 
+**Four Windows test machines (an Engine, an IT Admin, two Workers) on each kind of network** -- a network of its own inside an existing one,
+the existing network as it is, or our own Wi-Fi -- are set up as `docs/NETWORK-TEST-SETUP.md` says. The steps below are the commands it uses.
+
 ### The picture
 
 ```
@@ -65,27 +68,67 @@ machine is registered).
 
 ### Step 1 -- the Engine
 
-On the machine that will run it (Linux or Windows; it is the only machine with a database):
+On the machine that will run it (Linux or Windows; it is the only machine with a database). On Windows, from an **elevated** PowerShell
+in the Falcon folder, so setup can add the firewall rule:
 
-1. Give it a fixed address on the network and a name the others can resolve (e.g. `falcon.internal`, or just its IP).
-2. Install PostgreSQL and make the environment (table above).
-3. Run setup with **every name and address the clients will use**, so the certificate is valid for them:
+1. Give it a fixed address on the network and a name the others can resolve (e.g. `falcon.internal`, or just its IP). On a test network
+   the name is a line in each client's `hosts` file (`docs/NETWORK-TEST-SETUP.md`); a fixed address on Windows:
 
+   ```powershell
+   ipconfig                                                    # this network's adapter name, gateway and prefix
+   New-NetIPAddress -InterfaceAlias "Ethernet" -IPAddress 192.168.50.10 -PrefixLength 24 -DefaultGateway 192.168.50.1
+   Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 192.168.50.1
    ```
-   environ-engine/bin/python -m engine setup --names falcon.internal,192.168.1.20 --admin-url postgresql://postgres:<postgres-password>@localhost:5432/postgres --hostname IT-01 --no-operator-config --download-model
+
+   (or reserve the address for this machine in the router's DHCP settings; `getmac /v` shows its MAC address)
+2. Install PostgreSQL and make the environment (table above):
+
+   ```powershell
+   python -m venv environ-engine
+   environ-engine\Scripts\python.exe -m pip install -r requirements-engine.txt
    ```
+3. Run setup with **every name and address the clients will use**, so the certificate is valid for them (the **first** is the one written
+   into the client bundle):
+
+   ```powershell
+   environ-engine\Scripts\python.exe -m engine setup --names falcon.internal --admin-url postgresql://postgres:<postgres-password>@localhost:5432/postgres --hostname IT-01 --no-operator-config --download-model
+   ```
+
+   The certificate is made once: a later `--names` changes nothing until `data\engine.crt` and `data\engine.key` are deleted, and then
+   every client needs the new `engine.crt`. Choose the names first.
 
    `--hostname` is the **first IT Admin's workstation name** (not the Engine's); `--no-operator-config` because that
    Admin works from their own machine. Save the printed **client id + key** for step 2.
-4. `.env` already listens on every network interface (`FALCON_ENGINE_HOST=0.0.0.0`, port `7400`). `python -m engine setup`
-   opens **TCP 7400** in the Linux host's firewall when `ufw` or `firewalld` is running (as root; otherwise it prints the one
-   command to run). Any other firewall is left alone and setup says so.
-5. Start it: `environ-engine/bin/python -m engine` (as a service in production -- Phase 9 packages this).
+4. `.env` already listens on every network interface (`FALCON_ENGINE_HOST=0.0.0.0`, port `7400`). `python -m engine setup` opens
+   **TCP 7400** in the host firewall:
+   - **Windows:** a Windows Defender Firewall rule, *Falcon Engine (TCP 7400)*, for **private and domain networks only** (from an elevated
+     prompt; otherwise it prints the `netsh` command to run). On a network Windows calls *Public* nothing reaches the Engine, so make this
+     machine's network Private:
+
+     ```powershell
+     Get-NetConnectionProfile                                                    # NetworkCategory: Private or DomainAuthenticated
+     Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private   # if it says Public (the adapter name ipconfig shows)
+     ```
+   - **Linux:** `ufw` or `firewalld`, whichever is running (as root; otherwise it prints the one command to run). Any other firewall is left
+     alone and setup says so.
+
+   With `--names`, setup also writes **`data\falcon-client.json`**: the first name, the port and the certificate (no key), the file every
+   PC's installer is given, and prints the certificate's **fingerprint** to compare on each PC.
+5. Start it: `environ-engine\Scripts\python.exe -m engine` and leave the window open (as a service in production -- Phase 9 packages
+   this). On Windows keep the machine awake while it is the Engine: `powercfg /change standby-timeout-ac 0`.
 6. **Back up `data/master.secret`** somewhere safe and offline. Every client key derives from it; lose it and every
    machine must be registered again.
 
 Copy **`data/engine.crt`** (only the `.crt` -- never `engine.key` or `master.secret`) to a USB stick or share; every
 client needs it.
+
+**From every other machine, check it can reach the Engine** before installing anything there:
+
+```powershell
+Add-Content C:\Windows\System32\drivers\etc\hosts "`n192.168.50.10  falcon.internal"     # elevated; only when the name is not in the network's DNS
+Test-NetConnection falcon.internal -Port 7400                                            # TcpTestSucceeded : True
+environ-engine\Scripts\python.exe -m engine health falcon.internal:7400                 # on the Engine's machine: well, version, uptime, database
+```
 
 ### Step 2 -- the first IT Admin's workstation
 

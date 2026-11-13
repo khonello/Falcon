@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from engine.setup import firewall_steps
+from engine.setup import firewall_steps, windows_firewall_steps
 
 
 def _tools(*names):
@@ -39,3 +39,22 @@ def test_firewalld_is_opened_permanently_and_reloaded_and_nothing_else_is_touche
     assert ["firewall-cmd", "--permanent", "--add-port", "7400/tcp"] in run.calls and ["firewall-cmd", "--reload"] in run.calls
     assert "sudo firewall-cmd --permanent --add-port=7400/tcp" in firewall_steps(7400, _tools("firewall-cmd"), _runner(state), False)[0]
     assert "nothing was changed" in firewall_steps(7400, _tools(), _runner({}), True)[0]           # nftables / iptables only: left alone, said so
+
+
+def test_on_windows_the_engine_s_port_is_opened_for_private_and_domain_networks_only():
+    calls: list[list[str]] = []
+
+    def run(argv):
+        calls.append(argv)
+        return (1, "No rules match") if argv[3] == "show" else (0, "Ok.")
+
+    assert windows_firewall_steps(7400, run) == ["firewall (Windows): opened TCP 7400 for private and domain networks"]
+    assert "profile=private,domain" in calls[-1] and "localport=7400" in calls[-1] and "dir=in" in calls[-1]
+    assert "already there" in windows_firewall_steps(7400, lambda argv: (0, ""))[0]
+
+    def not_elevated(argv):
+        return (1, "No rules match") if argv[3] == "show" else (1, "The requested operation requires elevation (Run as administrator).")
+
+    said = windows_firewall_steps(7400, not_elevated)[0]
+    assert "elevated prompt run" in said and '"name=Falcon Engine (TCP 7400)"' in said
+

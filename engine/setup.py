@@ -12,8 +12,10 @@ Every step is checked first and skipped when already done, so it is safe to run 
   6. first Admin  the first IT Admin (in a department named IT) bootstrapped once; its client id + key printed ONCE, and written into this
                   machine's Operator Client settings so it connects without typing anything
   7. local model  checked; --download-model fetches it (~1.8 GB) from Hugging Face
-  8. firewall     on Linux, the Engine's TCP port opened in the host firewall (ufw or firewalld, whichever is running; as root,
-                  else the exact command is printed). Another firewall is left alone and said so.
+  8. firewall     the Engine's TCP port opened in the host firewall: on Linux in ufw or firewalld, whichever is running (as root, else
+                  the exact command is printed; another firewall is left alone and said so); on Windows a Windows Defender Firewall
+                  rule for private and domain networks (from an elevated prompt, else the exact command is printed)
+  9. bundle       with --names, data/falcon-client.json: the first name and the certificate, no key -- what every PC is given
 
 PostgreSQL itself and the three virtual environments are installed beforehand (the user's rule).
 """
@@ -210,15 +212,29 @@ def firewall_steps(port: int, which: Any, run: Any, is_root: bool) -> list[str]:
     return [f"firewall: no ufw or firewalld is running here, so nothing was changed; make sure {rule} is reachable from the clients"]
 
 
+WINDOWS_RULE = "Falcon Engine (TCP {port})"
+
+
+def windows_firewall_steps(port: int, run: Any) -> list[str]:
+    """The Windows firewall (netsh, which every Windows has): a rule letting the Engine's port in on private and domain networks -- never on public
+    ones, so a laptop on a cafe's Wi-Fi is not reachable. Lines to print; `run(argv)` returns (exit code, output)."""
+    name = WINDOWS_RULE.format(port=port)
+    if run(["netsh", "advfirewall", "firewall", "show", "rule", f"name={name}"])[0] == 0:
+        return [f"firewall (Windows): the rule \"{name}\" is already there"]
+    add = ["netsh", "advfirewall", "firewall", "add", "rule", f"name={name}", "dir=in", "action=allow", "protocol=TCP", f"localport={port}",
+           "profile=private,domain"]
+    code, out = run(add)
+    if code == 0:
+        return [f"firewall (Windows): opened TCP {port} for private and domain networks"]
+    shown = " ".join(f'"{a}"' if " " in a else a for a in add)
+    return [f"firewall (Windows): could not add the rule ({out.strip()[:80] or 'it needs an elevated prompt'}); from an elevated prompt run  {shown}"]
+
+
 def ensure_firewall(settings: Any) -> None:
-    """Open the Engine's port where the Engine runs: Linux. Elsewhere (a Windows development machine) there is nothing to do and it says so."""
+    """Open the Engine's port on the machine it runs on: Linux (ufw / firewalld) or Windows (Windows Defender Firewall)."""
     import os
     import shutil
     import subprocess
-
-    if not sys.platform.startswith("linux"):
-        say("firewall", "the Engine is meant to run on Linux; on this machine open the port by hand if clients on the network must reach it")
-        return
 
     def run(argv: list[str]) -> tuple[int, str]:
         try:
@@ -227,8 +243,36 @@ def ensure_firewall(settings: Any) -> None:
             return 1, str(exc)
         return done.returncode, done.stdout + done.stderr
 
+    if sys.platform == "win32":
+        for line in windows_firewall_steps(settings.port, run):
+            say("firewall", line.split(": ", 1)[-1])
+        return
+    if not sys.platform.startswith("linux"):
+        say("firewall", "not Linux or Windows: open the Engine's port by hand if clients on the network must reach it")
+        return
     for line in firewall_steps(settings.port, shutil.which, run, os.geteuid() == 0):
         say("firewall", line.split(": ", 1)[-1] if line.startswith("firewall") else line)
+
+
+def ensure_bundle(settings: Any, names: list[str]) -> None:
+    """The file every PC's installer (or Worker) is given: the Engine's address -- the first of --names -- and its certificate. No key, no id."""
+    if not names:
+        say("bundle", "no --names given, so no client bundle (the PCs need the name or address they will use)")
+        return
+    cert = settings.tls_cert
+    if settings.dev_plaintext or cert is None:
+        say("bundle", "no certificate (plaintext or not set), so no bundle")
+        return
+    cert = ROOT / cert if not cert.is_absolute() else cert
+    if not cert.exists():
+        say("bundle", f"{cert} is missing, so no bundle")
+        return
+    from installers.bundle import Bundle
+
+    out = ROOT / "data" / "falcon-client.json"
+    b = Bundle.make(names[0], settings.port, cert.read_text(encoding="utf-8"))
+    b.save(out)
+    say("bundle", f"{out} (host {names[0]}:{settings.port}); certificate fingerprint {b.ca_sha256}")
 
 
 def ensure_model(settings: Any, download: bool) -> None:
@@ -276,12 +320,14 @@ def main(argv: list[str]) -> int:
     from engine.config import Settings
 
     settings = Settings.from_env()
-    ensure_certificate(settings, [n.strip() for n in args.names.split(",") if n.strip()])
+    names = [n.strip() for n in args.names.split(",") if n.strip()]
+    ensure_certificate(settings, names)
     ok = asyncio.run(ensure_databases(args.admin_url))
     if ok and settings.database_url:
         asyncio.run(ensure_schema_and_first_account(settings, args.hostname, not args.no_operator_config, args.engine_host))
     ensure_model(settings, args.download_model)
     ensure_firewall(settings)
+    ensure_bundle(settings, names)
     print("\nDone." if ok else "\nNot finished: the databases above come first.")
     if ok:
         print("  Start the Engine:        python -m engine")
