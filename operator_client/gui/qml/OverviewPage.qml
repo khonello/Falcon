@@ -114,7 +114,7 @@ Page {
         for (var r = 0; srcs.some(function (x) { return x.length > r }); r++) srcs.forEach(function (x) { if (x[r]) out.push(x[r]) })
         return out
     }
-    readonly property int show: Math.max(2, Math.round(4 * Theme.viewScale))   // four on the design's 900-high window; follows the screen
+    readonly property int show: 4             // four a page, on every screen (the user, 13 Nov 2026)
     readonly property int dpages: Math.max(1, Math.ceil(items.length / show))
     readonly property int dpi: Math.min(dp, dpages - 1)
 
@@ -219,8 +219,8 @@ Page {
             title: "Your to-dos · " + page.todos.length
             readonly property int late: page.todos.filter(function (t) { return t.overdue }).length
             sub: (late ? Theme.fmt(late) + " past its date; " : "") + "the soonest first; only you see them"
-            Repeater {
-                model: page.todos.slice().sort(function (a, b) { return (Time.ms(a.due_at) || 9e15) - (Time.ms(b.due_at) || 9e15) }).slice(0, 4)
+            PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
+                id: tdp; items: page.todos.slice().sort(function (a, b) { return (Time.ms(a.due_at) || 9e15) - (Time.ms(b.due_at) || 9e15) }); per: 4
                 delegate: SuRow {
                     required property var modelData
                     icon: "square"

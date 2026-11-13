@@ -64,27 +64,26 @@ Page {
                     width: listP.innerW
                     title: modelData[0] + " · " + modelData[2].length
                     sub: modelData[1]
-                    Repeater {
-                        model: ag.modelData[2]
-                        delegate: Card {
-                            id: ac
-                            required property var modelData
-                            width: ag.cardW
-                            midW: 260
-                            padV: 7
-                            actW: 0
-                            icon: page.icons[modelData.alert_type] || "notification"
-                            hot: modelData.alert_type === "emergency"
-                            title: modelData.title || modelData.body
-                            line: "To " + page.toWord(modelData) + " · by " + page.who(modelData)
-                            picked: page.cur !== null && page.cur.id === modelData.id
-                            onOpen: page.sel = modelData.id
-                            mid: Row {
-                                anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
-                                spacing: 18
-                                Txt { text: page.words[ac.modelData.alert_type] || ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
-                                Txt { text: page.whenWord(ac.modelData.deliver_at); mono: true; color: Theme.text3; elide: Text.ElideNone }
-                            }
+                    // four a page, as every growable list (the user, 13 Nov 2026)
+                    items: ag.modelData[2]; per: 4; keep: ag.modelData[2].findIndex(function (a) { return page.cur !== null && a.id === page.cur.id })
+                    delegate: Card {
+                        id: ac
+                        required property var modelData
+                        width: ag.cardW
+                        midW: 260
+                        padV: 7
+                        actW: 0
+                        icon: page.icons[modelData.alert_type] || "notification"
+                        hot: modelData.alert_type === "emergency"
+                        title: modelData.title || modelData.body
+                        line: "To " + page.toWord(modelData) + " · by " + page.who(modelData)
+                        picked: page.cur !== null && page.cur.id === modelData.id
+                        onOpen: page.sel = modelData.id
+                        mid: Row {
+                            anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
+                            spacing: 18
+                            Txt { text: page.words[ac.modelData.alert_type] || ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
+                            Txt { text: page.whenWord(ac.modelData.deliver_at); mono: true; color: Theme.text3; elide: Text.ElideNone }
                         }
                     }
                 }

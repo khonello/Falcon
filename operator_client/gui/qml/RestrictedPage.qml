@@ -237,9 +237,9 @@ Page {
     property int pg: 0
     readonly property var hostOrder: shownMarks.map(function (k) { return k.host }).filter(function (h, i, a) { return a.indexOf(h) === i }).sort(function (a, b) { return (b === page.myHost) - (a === page.myHost) || a.localeCompare(b) })
     readonly property var ordered: hostOrder.reduce(function (o, h) { return o.concat(shownMarks.filter(function (k) { return k.host === h }).sort(function (a, b) { return a.name.localeCompare(b.name) })) }, [])
-    // page sizes follow the screen (Theme.viewScale; the user, 11 Nov 2026): four marks and four copies on the design's 900-high window
-    readonly property int perM: Math.max(2, Math.round(4 * Theme.viewScale))
-    readonly property int perC: Math.max(2, Math.round(4 * Theme.viewScale))
+    // four marks and four copies a page, on every screen (the user, 13 Nov 2026)
+    readonly property int perM: 4
+    readonly property int perC: 4
     readonly property int pages: Math.max(1, Math.ceil(ordered.length / perM))
     readonly property int pi: Math.min(pg, pages - 1)
     readonly property var markPage: ordered.slice(pi * perM, pi * perM + perM)

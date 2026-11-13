@@ -289,9 +289,9 @@ Page {
                     Txt { visible: story.evs.length === 0; text: page.it ? "Nothing recorded on " + page.it.host + " around it yet. What you do here is added as you go." : ""; color: Theme.text3; font.pixelSize: 13 }
                     Column {
                         width: parent.width
-                        Repeater {
-                            model: story.evs
-                            Item {
+                        PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
+                            id: evp; items: story.evs; per: 4
+                            delegate: Item {
                                 required property var modelData
                                 width: parent.width
                                 height: el.height + 13

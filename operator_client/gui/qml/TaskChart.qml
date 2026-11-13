@@ -83,8 +83,8 @@ Column {
             }
         }
     }
-    Repeater {
-        model: root.task ? root.task.items : []
+    PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
+        id: lanes; items: root.task ? root.task.items : []; per: 4
         delegate: Column {
             id: lane
             required property var modelData

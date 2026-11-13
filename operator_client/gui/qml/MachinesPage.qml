@@ -118,105 +118,101 @@ Page {
                     title: modelData[1] + " · " + modelData[3].length
                     sub: modelData[2]
                     // four a page, as every list pages (the user, 12 Nov 2026: in place of "and N more"); the machine picked stays on the page shown
-                    Paged { id: mgp; items: grp.modelData[3]; per: 4; keep: grp.modelData[3].findIndex(function (m) { return m.host === page.sel }) }
-                    paging: mgp
-                    Repeater {
-                        model: mgp.shown
-                        delegate: Card {
-                            id: mc
-                            required property var modelData
-                            readonly property var xi: page.info[modelData.host] || {}
-                            objectName: "machine_" + modelData.host
-                            width: grp.cardW
-                            midW: 200
-                            actW: 150
-                            icon: "desktop"
-                            hot: page.serious(modelData)
-                            title: modelData.host
-                            tag: modelData.deptName || "no department"
-                            line: page.whatOf(modelData)
-                            lineHot: page.serious(modelData)
-                            opacity: modelData.online ? 1 : 0.7
-                            picked: page.sel === modelData.host
-                            expandable: true
-                            expanded: page.exp === modelData.host
-                            onOpen: page.sel = modelData.host
-                            onToggle: { page.exp = expanded ? "" : modelData.host; page.sel = modelData.host }
-                            // am-facts: the day's CPU as a line and its reading now, then the version
-                            mid: Row {
-                                anchors.right: parent.right
+                    items: grp.modelData[3]; per: 4; keep: grp.modelData[3].findIndex(function (m) { return m.host === page.sel })
+                    delegate: Card {
+                        id: mc
+                        required property var modelData
+                        readonly property var xi: page.info[modelData.host] || {}
+                        objectName: "machine_" + modelData.host
+                        width: grp.cardW
+                        midW: 200
+                        actW: 150
+                        icon: "desktop"
+                        hot: page.serious(modelData)
+                        title: modelData.host
+                        tag: modelData.deptName || "no department"
+                        line: page.whatOf(modelData)
+                        lineHot: page.serious(modelData)
+                        opacity: modelData.online ? 1 : 0.7
+                        picked: page.sel === modelData.host
+                        expandable: true
+                        expanded: page.exp === modelData.host
+                        onOpen: page.sel = modelData.host
+                        onToggle: { page.exp = expanded ? "" : modelData.host; page.sel = modelData.host }
+                        // am-facts: the day's CPU as a line and its reading now, then the version
+                        mid: Row {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 14
+                            Txt { visible: !mc.modelData.online; text: "no data since " + (mc.modelData.seen ? Time.age(mc.modelData.seen) + " ago" : "a while"); color: Theme.text4; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                            Row {
+                                visible: mc.modelData.online
+                                spacing: 8
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 14
-                                Txt { visible: !mc.modelData.online; text: "no data since " + (mc.modelData.seen ? Time.age(mc.modelData.seen) + " ago" : "a while"); color: Theme.text4; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
-                                Row {
-                                    visible: mc.modelData.online
-                                    spacing: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    Spark { width: 96; height: 22; max: 100; c: page.serious(mc.modelData) ? Theme.crit : Theme.ser6; values: page.sparks[mc.modelData.host] || []; anchors.verticalCenter: parent.verticalCenter }
-                                    Txt { width: Math.max(30, implicitWidth); horizontalAlignment: Text.AlignRight; text: page.pct(mc.xi.cpu); color: Theme.text2; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
-                                }
-                                Txt { text: mc.modelData.ver || "—"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                                Spark { width: 96; height: 22; max: 100; c: page.serious(mc.modelData) ? Theme.crit : Theme.ser6; values: page.sparks[mc.modelData.host] || []; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { width: Math.max(30, implicitWidth); horizontalAlignment: Text.AlignRight; text: page.pct(mc.xi.cpu); color: Theme.text2; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
                             }
-                            // opened: its facts beside who is at the keyboard and when it was entered, then what to do
-                            Column {
+                            Txt { text: mc.modelData.ver || "—"; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone; anchors.verticalCenter: parent.verticalCenter }
+                        }
+                        // opened: its facts beside who is at the keyboard and when it was entered, then what to do
+                        Column {
+                            width: parent.width
+                            spacing: 10
+                            Row {
                                 width: parent.width
-                                spacing: 10
-                                Row {
-                                    width: parent.width
-                                    spacing: 24
-                                    Column {
-                                        width: Math.min(420, parent.width - 230 - 24)
-                                        y: 2
-                                        Repeater {
-                                            model: [["Signed in", mc.modelData.user || "nobody"], ["Inside", mc.modelData.held ? (page.mine(mc.modelData) ? "you" : mc.modelData.held) : "nobody"],
-                                                    ["Address", mc.xi.ip || "—"], ["Version", mc.modelData.ver + (mc.modelData.behind ? ", one behind" : "")],
-                                                    ["Last seen", mc.modelData.online ? "now" : mc.modelData.seen ? Time.age(mc.modelData.seen) + " ago" : "—"]]
-                                            delegate: Item {
-                                                required property var modelData
-                                                required property int index
-                                                width: parent.width
-                                                height: fv.height + 10
-                                                Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
-                                                Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13 }
-                                                Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                                            }
+                                spacing: 24
+                                Column {
+                                    width: Math.min(420, parent.width - 230 - 24)
+                                    y: 2
+                                    Repeater {
+                                        model: [["Signed in", mc.modelData.user || "nobody"], ["Inside", mc.modelData.held ? (page.mine(mc.modelData) ? "you" : mc.modelData.held) : "nobody"],
+                                                ["Address", mc.xi.ip || "—"], ["Version", mc.modelData.ver + (mc.modelData.behind ? ", one behind" : "")],
+                                                ["Last seen", mc.modelData.online ? "now" : mc.modelData.seen ? Time.age(mc.modelData.seen) + " ago" : "—"]]
+                                        delegate: Item {
+                                            required property var modelData
+                                            required property int index
+                                            width: parent.width
+                                            height: fv.height + 10
+                                            Txt { y: 5; width: 120; text: modelData[0]; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                                            Txt { id: fv; x: 132; y: 5; width: parent.width - 132; text: modelData[1]; font.pixelSize: 13 }
+                                            Rectangle { visible: index < 4; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                         }
                                     }
-                                    Column {
-                                        width: 230
+                                }
+                                Column {
+                                    width: 230
+                                    spacing: 6
+                                    readonly property var use: page.got && page.cur && page.cur.host === mc.modelData.host ? page.got.keyboard || null : null
+                                    Txt { topPadding: 4; text: "At the keyboard"; color: Theme.text3; font.pixelSize: 12 }
+                                    Row {
                                         spacing: 6
-                                        readonly property var use: page.got && page.cur && page.cur.host === mc.modelData.host ? page.got.keyboard || null : null
-                                        Txt { topPadding: 4; text: "At the keyboard"; color: Theme.text3; font.pixelSize: 12 }
-                                        Row {
-                                            spacing: 6
-                                            readonly property bool inUse: !!(parent.use && parent.use.state === "in_use")
-                                            Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: parent.inUse ? Theme.ok : Theme.text4 }
-                                            Txt { font.pixelSize: 13; elide: Text.ElideNone
-                                                  text: !mc.modelData.online ? "offline" : !mc.modelData.user ? "nobody signed in" : parent.inUse ? "in use now" : parent.parent.use && parent.parent.use.idle_s !== null && parent.parent.use.idle_s !== undefined ? "idle for " + Time.dur(parent.parent.use.idle_s / 3600) : "idle" }
-                                        }
-                                        Txt { topPadding: 4; text: "Entered"; color: Theme.text3; font.pixelSize: 12 }
-                                        Repeater {
-                                            model: page.got && page.cur && page.cur.host === mc.modelData.host && page.got.sessions ? page.got.sessions.slice(0, 3) : []
-                                            delegate: Item {
-                                                required property var modelData
-                                                required property int index
-                                                width: 230; height: 27.75
-                                                Txt { anchors.verticalCenter: parent.verticalCenter; text: Time.atDay(modelData.started_at); font.pixelSize: 13; elide: Text.ElideNone }
-                                                Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
-                                                      text: modelData.ended_at ? Time.dur((Time.ms(modelData.ended_at) - Time.ms(modelData.started_at)) / 3600000) : "inside now" }
-                                                Rectangle { visible: index < 2; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
-                                            }
+                                        readonly property bool inUse: !!(parent.use && parent.use.state === "in_use")
+                                        Rectangle { width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter; color: parent.inUse ? Theme.ok : Theme.text4 }
+                                        Txt { font.pixelSize: 13; elide: Text.ElideNone
+                                              text: !mc.modelData.online ? "offline" : !mc.modelData.user ? "nobody signed in" : parent.inUse ? "in use now" : parent.parent.use && parent.parent.use.idle_s !== null && parent.parent.use.idle_s !== undefined ? "idle for " + Time.dur(parent.parent.use.idle_s / 3600) : "idle" }
+                                    }
+                                    Txt { topPadding: 4; text: "Entered"; color: Theme.text3; font.pixelSize: 12 }
+                                    Repeater {
+                                        model: page.got && page.cur && page.cur.host === mc.modelData.host && page.got.sessions ? page.got.sessions.slice(0, 3) : []
+                                        delegate: Item {
+                                            required property var modelData
+                                            required property int index
+                                            width: 230; height: 27.75
+                                            Txt { anchors.verticalCenter: parent.verticalCenter; text: Time.atDay(modelData.started_at); font.pixelSize: 13; elide: Text.ElideNone }
+                                            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
+                                                  text: modelData.ended_at ? Time.dur((Time.ms(modelData.ended_at) - Time.ms(modelData.started_at)) / 3600000) : "inside now" }
+                                            Rectangle { visible: index < 2; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                                         }
                                     }
                                 }
-                                Row {
-                                    anchors.right: parent.right
-                                    spacing: 8
-                                    Btn { visible: mc.modelData.behind && mc.modelData.online; small: true; text: "Update now"; onClicked: falcon.call("update.now", { pc_id: mc.modelData.pc_id }, function (ok, r) { if (ok) Msg.ok("Updating now"); else Msg.failed(r && r.message ? r.message : "Not done") }) }
-                                    Btn { small: true; kind: "primary"; text: page.mine(mc.modelData) ? "You are inside" : "Enter"
-                                          enabled: mc.modelData.online && !page.mine(mc.modelData); onClicked: page.enter(mc.modelData) }
-                                    Btn { small: true; kind: "text"; text: "Run an action"; onClicked: Nav.goAsk("actions", null, "Actions opens with " + mc.modelData.host + " picked.", mc.modelData.host) }
-                                }
+                            }
+                            Row {
+                                anchors.right: parent.right
+                                spacing: 8
+                                Btn { visible: mc.modelData.behind && mc.modelData.online; small: true; text: "Update now"; onClicked: falcon.call("update.now", { pc_id: mc.modelData.pc_id }, function (ok, r) { if (ok) Msg.ok("Updating now"); else Msg.failed(r && r.message ? r.message : "Not done") }) }
+                                Btn { small: true; kind: "primary"; text: page.mine(mc.modelData) ? "You are inside" : "Enter"
+                                      enabled: mc.modelData.online && !page.mine(mc.modelData); onClicked: page.enter(mc.modelData) }
+                                Btn { small: true; kind: "text"; text: "Run an action"; onClicked: Nav.goAsk("actions", null, "Actions opens with " + mc.modelData.host + " picked.", mc.modelData.host) }
                             }
                         }
                     }
@@ -398,8 +394,8 @@ Page {
                                     text: index === wk.days.length - 1 ? "Today" : Time.dayName(modelData); color: Theme.text4; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter }
                 }
             }
-            Repeater {
-                model: page.ms.slice().sort(function (a, b) { return a.host.localeCompare(b.host) })
+            PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
+                id: ckp; items: page.checkRows; per: 4; keep: page.checkRows.findIndex(function (m) { return m.host === page.sel })
                 delegate: Rectangle {
                     required property var modelData
                     required property int index
@@ -429,6 +425,7 @@ Page {
     // --- add a machine: it only registers; its department is set on Departments ----------------------------------
     // installed without a licence code: an Admin lets it in with the code on its screen (one with a code has joined by itself)
     property var asks: []
+    readonly property var checkRows: ms.slice().sort(function (a, b) { return a.host.localeCompare(b.host) })
     property var codes: ({})
     function loadAsks() { falcon.call("enroll.list", {}, function (ok, r) { page.asks = ok ? (r.requests || []) : [] }) }
     Connections { target: falcon; function onPushReceived(type) { if (/^enroll/.test(type)) page.loadAsks() } }

@@ -101,7 +101,7 @@ Page {
     // --- the version 1 concept's layout (docs/design/concepts-admin.html, AdminDetectivePage) ----------------------------------------------------
     property int exp: 0
     property int cp: 0                                   // the cases' page, five at a time
-    readonly property int per: Math.max(2, Math.round(4 * Theme.viewScale))   // four on the design's 900-high window; follows the screen
+    readonly property int per: 4             // four a page, on every screen (the user, 13 Nov 2026)
     property bool loading: false
     property int pickedId: 0
     onSelChanged: { pickedId = cur ? cur.id : 0; loading = true; ldT.restart() }
@@ -296,9 +296,9 @@ Page {
             Column {
                 width: parent.width
                 opacity: page.loading ? 0 : 1
-                Repeater {
-                    model: page.cur ? page.cur.story : []
-                    Item {
+                PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
+                    id: stp; items: page.cur ? page.cur.story : []; per: 4
+                    delegate: Item {
                         required property string modelData
                         required property int index
                         readonly property var m: /^(\d\d:\d\d)\s+(.*)$/.exec(modelData)

@@ -208,10 +208,12 @@ Editor {
             Link { anchors.right: parent.right; font.pixelSize: 13; text: page.hosts.length === Fleet.machines.length ? "Clear" : "All of them"
                    onClicked: page.hosts = page.hosts.length === Fleet.machines.length ? [] : Fleet.machines.map(function (m) { return m.pc_id }) } }
         Column { width: parent.width; spacing: 4
-            Repeater { model: Fleet.machines
-                RnRow { required property var modelData; check: true; mono: true; title: modelData.host; desc: (modelData.user || "nobody signed in") + (modelData.online ? "" : " · offline")
+            PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
+                id: nmp; items: Fleet.machines; per: 4
+                delegate: RnRow { required property var modelData; check: true; mono: true; title: modelData.host; desc: (modelData.user || "nobody signed in") + (modelData.online ? "" : " · offline")
                         on: page.hosts.indexOf(modelData.pc_id) >= 0
-                        onPicked: page.hosts = on ? page.hosts.filter(function (h) { return h !== modelData.pc_id }) : page.hosts.concat([modelData.pc_id]) } } } }
+                        onPicked: page.hosts = on ? page.hosts.filter(function (h) { return h !== modelData.pc_id }) : page.hosts.concat([modelData.pc_id]) }
+            } } }
 
     // --- what it does -------------------------------------------------------------------------------------------------------------------
     NfSec { visible: page.step === 2; first: true; title: "What runs, in this order"; note: "Each action runs on its own; one that runs out of time is stopped and reported."

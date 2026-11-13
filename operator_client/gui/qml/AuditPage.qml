@@ -52,7 +52,7 @@ Page {
     onShowChanged: page.reload()
     property string q: ""
     property int ap: 0
-    readonly property int per: Math.max(2, Math.round(4 * Theme.viewScale))   // four on the design's 900-high window; follows the screen
+    readonly property int per: 4             // four a page, on every screen (the user, 13 Nov 2026)
     function worth(x) { return x.level === "worth" || (!!x.visit && !!x.odd) }
     readonly property var says: ({ session: "someone went into or out of a machine", action: "an action ran", flow: "a flow moved files", rollout: "an update", update: "an update",
                                    deviation: "an Automation rule saw something it did not expect", violation: "a protected file turned up where it may not be, or someone was refused it",

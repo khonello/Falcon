@@ -301,8 +301,8 @@ Page {
                     Txt { id: lh2; y: 13; text: "Its last runs"; font.weight: Font.DemiBold; elide: Text.ElideNone }
                     Txt { x: lh2.implicitWidth + 10; y: lh2.y + lh2.baselineOffset - baselineOffset; text: "from rules and by hand, this week"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                 }
-                Repeater {
-                    model: page.runs.slice(0, 6)
+                PagedList {   // four a page, as every growable list (the user, 13 Nov 2026)
+                    id: lrp; items: page.runs; per: 4
                     delegate: Item {
                         required property var modelData
                         required property int index
