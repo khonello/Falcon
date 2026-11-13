@@ -236,7 +236,7 @@ Page {
                 width: parent.width
                 title: page.cur ? page.cur.host : "No machine picked"
                 sub: !page.cur ? "click a machine on the left to draw it here"
-                     : (page.cur.user ? page.cur.user + " is signed in" : "nobody signed in") + (page.cur.held ? " · " + (page.mine(page.cur) ? "you are" : page.cur.held + " is") + " inside" : "")
+                     : (page.cur.user ? page.cur.user + (page.cur.online ? " is signed in" : " was the last signed in") : "nobody signed in") + (page.cur.held ? " · " + (page.mine(page.cur) ? "you are" : page.cur.held + " is") + " inside" : "")
                 St { visible: page.cur !== null; text: page.cur ? Fleet.words[page.cur.online ? page.cur.status : "offline"] : ""; c: page.cur ? (!page.cur.online ? Theme.text4 : page.serious(page.cur) ? Theme.crit : page.cur.status === "warning" ? Theme.med : Theme.ok) : Theme.text4 }
                 Txt {
                     visible: page.cur !== null && page.got !== null && !!page.got.about
@@ -247,12 +247,13 @@ Page {
                     text: !page.got || !page.got.about ? "" : [page.got.about.os, page.got.about.memory_total_mb ? Math.round(page.got.about.memory_total_mb / 1024) + " GB memory" : "",
                           page.cur && !page.cur.online ? "off" : page.got.about.boot_at ? "up " + Math.floor((Time.now - Time.ms(page.got.about.boot_at)) / 3600000) + "h" : "", page.got.about.registered_at ? "registered " + Time.day(page.got.about.registered_at) + " " + new Date(Time.ms(page.got.about.registered_at)).getFullYear() : ""].filter(function (s) { return s }).join(" · ")
                 }
-                Quiet { visible: page.cur !== null && !page.cur.online; text: page.cur ? page.cur.host + " has not checked in" + (page.cur.seen ? " for " + Time.age(page.cur.seen) : "") + "; there is nothing new to draw." : "" }
+                // off: the graphs stay, faded, with what they show said across them; the panel keeps its size (the user, 13 Nov 2026)
+                readonly property bool off: page.cur !== null && !page.cur.online
+                readonly property string offNote: off ? page.cur.host + " is off" + (page.cur.seen ? " · last seen " + Time.age(page.cur.seen) + " ago" : "") + " · no new readings" : ""
                 Repeater {
                     model: [["CPU", "cpu", Theme.ser6], ["Memory", "memory", Theme.ser3]]
                     delegate: Column {
                         required property var modelData
-                        visible: page.cur === null || page.cur.online
                         width: parent.width
                         spacing: 4
                         readonly property var pts: page.cur && page.got && page.got.series && page.got.series[modelData[1]] ? page.got.series[modelData[1]] : []
@@ -261,12 +262,26 @@ Page {
                             height: hv.height
                             Txt { id: hl; y: hv.baselineOffset - baselineOffset; text: modelData[0]; font.pixelSize: 13; elide: Text.ElideNone }
                             Txt { id: hv; x: hl.implicitWidth + 8; text: parent.parent.pts.length && !page.loading ? Math.round(parent.parent.pts[parent.parent.pts.length - 1].v) + "%" : "—"; font.pixelSize: 15; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                            Txt { x: hv.x + hv.implicitWidth + 8; y: hv.baselineOffset - baselineOffset; text: "last 24 hours"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                            Txt { x: hv.x + hv.implicitWidth + 8; y: hv.baselineOffset - baselineOffset; text: pickP.off ? "the last it read, before it went off" : "last 24 hours"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                         }
-                        TimeChart {
+                        Item {
                             width: parent.width; height: 164
-                            hours: 24; unit: "%"; yMax: 100
-                            series: [{ name: modelData[0], c: modelData[2], pts: parent.pts.map(function (x) { return [Time.ms(x.at), x.v] }) }]
+                            TimeChart {
+                                anchors.fill: parent
+                                opacity: pickP.off ? 0.35 : 1
+                                hours: 24; unit: "%"; yMax: 100
+                                series: [{ name: modelData[0], c: modelData[2], pts: parent.parent.pts.map(function (x) { return [Time.ms(x.at), x.v] }) }]
+                            }
+                            Rectangle {
+                                visible: pickP.off
+                                anchors.centerIn: parent
+                                width: Math.min(parent.width - 24, offT.implicitWidth + 24); height: offT.implicitHeight + 14
+                                radius: Theme.radius
+                                color: Theme.surface2
+                                border.width: 1; border.color: Theme.border
+                                Txt { id: offT; anchors.centerIn: parent; width: parent.width - 24; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                                      text: pickP.offNote; color: Theme.text2; font.pixelSize: 12 }
+                            }
                         }
                     }
                 }
@@ -289,7 +304,7 @@ Page {
                         height: sv.height
                         Txt { id: sl; y: sv.baselineOffset - baselineOffset; text: "Storage"; font.pixelSize: 13; elide: Text.ElideNone }
                         Txt { id: sv; x: sl.implicitWidth + 8; text: page.cur && runP.disk >= 0 && !page.loading ? Math.round(runP.disk) + "%" : "—"; font.pixelSize: 15; font.weight: Font.DemiBold; elide: Text.ElideNone }
-                        Txt { visible: page.cur !== null; x: sv.x + sv.implicitWidth + 8; y: sv.baselineOffset - baselineOffset; text: "used, drive C:"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
+                        Txt { visible: page.cur !== null; x: sv.x + sv.implicitWidth + 8; y: sv.baselineOffset - baselineOffset; text: page.cur && !page.cur.online ? "used, drive C:, last known" : "used, drive C:"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                     }
                     Rectangle {
                         width: parent.width; height: 8; radius: 4; color: Theme.grid
@@ -308,7 +323,6 @@ Page {
                 }
                 // running now: a second section under a rule
                 Column {
-                    visible: page.cur === null || page.cur.online
                     width: parent.width
                     spacing: page.cur ? 8 : 4
                     topPadding: page.cur ? 14 : 0
@@ -320,9 +334,12 @@ Page {
                         Txt { x: rl.implicitWidth + 8; y: rl.y; text: page.cur ? "the busiest programs; point at one to end it" : "the most busy programs"; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone }
                     }
                     Txt { visible: !page.cur; text: "Shown for the machine you pick."; color: Theme.text3; font.pixelSize: 13 }
+                    // room for its seven rows whatever the machine's state, so the panel keeps one size (the user, 13 Nov 2026)
                     Column {
                         visible: page.cur !== null
                         width: parent.width
+                        height: 22 + 7 * 29
+                        readonly property bool off: page.cur !== null && !page.cur.online
                         readonly property var rows: page.got && page.got.processes && page.got.processes.items ? page.got.processes.items.slice().sort(function (a, b) { return (b.cpu || 0) - (a.cpu || 0) }).slice(0, 7) : []
                         Item {
                             width: parent.width; height: 22
@@ -331,7 +348,7 @@ Page {
                             Txt { x: parent.width - 44 - 8 - 60; width: 60; horizontalAlignment: Text.AlignRight; text: "Memory"; color: Theme.text4; font.pixelSize: 12 }
                         }
                         Repeater {
-                            model: parent.rows
+                            model: parent.off ? [] : parent.rows
                             delegate: Item {
                                 required property var modelData
                                 required property int index
@@ -346,7 +363,13 @@ Page {
                                 Rectangle { visible: index < parent.parent.rows.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
                             }
                         }
-                        Txt { visible: parent.rows.length === 0; text: "Nothing reported yet."; color: Theme.text3; font.pixelSize: 13 }
+                        Item {
+                            visible: parent.off || parent.rows.length === 0
+                            width: parent.width; height: 7 * 29
+                            Txt { anchors.centerIn: parent; width: parent.width - 24; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; elide: Text.ElideNone
+                                  color: Theme.text3; font.pixelSize: 13
+                                  text: parent.parent.off ? page.cur.host + " is off; what is running on it is not known until it is back." : "Nothing reported yet." }
+                        }
                     }
                 }
                 Loading { parent: runP; on: page.loading && page.cur !== null; under: 14; text: page.cur ? "Loading " + page.cur.host : "Loading" }
