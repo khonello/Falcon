@@ -23,7 +23,7 @@ Stdlib only: it runs on a Worker or in the Engine, and is tested with scripted s
 
 from __future__ import annotations
 
-import itertools
+import bisect
 import re
 import time
 from collections import deque
@@ -31,7 +31,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from common.anchors import ANCHORS, INCLUDES, coverage
+from common.anchors import ANCHORS, INCLUDES, area_value, coverage_of
 
 BEHAVIOURS = ("concealment", "collection", "exfiltration", "capture", "erasure", "evasion", "sabotage", "reach")
 BEHAVIOUR_WORDS = {"concealment": "Concealment", "collection": "Collection", "exfiltration": "Taking out", "capture": "Capture", "erasure": "Erasure",
@@ -66,6 +66,9 @@ USUAL_MOVERS = ("git.exe", "msbuild", "nuget", "npm", "docker", "curl.exe", "sla
 
 
 HIT_KEEP = 30 * 86400                         # how long what fell in an area stays on the board: a patient person covers it slowly
+HIT_CAP = 4000                                # the most a machine's board holds after a trim ...
+HIT_BATCH = 500                               # ... which is done once it has this many more (or an hour past HIT_KEEP), not on every event: a trim rebuilds the board
+HIT_SLACK = 3600
 THREAD = 30 * 60                              # stages this close together are one piece of work even with no file in common
 ENC_EXT = {"gpg", "pgp", "enc", "aes", "crypt", "kdbx", "vault", "hc"}                  # (ransom endings like .locked are the sabotage graph's)
 BACKUP_EXT = {"bak", "bkf", "vhd", "vhdx", "wbcat", "vss", "tib", "bkp", "rbf"}
@@ -246,6 +249,40 @@ class Hit:
     sig: Sig
 
 
+class _CaseSums:
+    """What a case's findings add up to, kept as findings are added: a finding is final once it joins a case, so each is read once, not on every
+    question asked of the case (a long case of a busy machine asked them of a thousand findings, several times an event, 12 Nov 2026)."""
+
+    __slots__ = ("by_graph", "cover", "firm", "last", "n", "reads", "things")
+
+    def __init__(self) -> None:
+        self.n = 0
+        self.last: Finding | None = None
+        self.reads: set[str] = set()
+        self.things: set[str] = set()
+        self.by_graph: dict[str, list[float]] = {}       # graph -> [heaviest (at most 0.95), how many times it spoke]
+        self.cover = 0.0
+        self.firm: set[str] = set()
+
+    def fold(self, f: Finding) -> None:
+        r = f.reads_as
+        if r:
+            self.reads.add(r)
+            if f.weight >= 0.30:
+                self.firm.add(r)
+        self.things |= f.things
+        if f.graph.startswith("coverage_"):
+            self.cover = max(self.cover, f.weight)
+        else:
+            g = self.by_graph.get(f.graph)
+            if g is None:
+                self.by_graph[f.graph] = [min(0.95, f.weight), 1]
+            else:
+                g[0], g[1] = max(g[0], min(0.95, f.weight)), g[1] + 1
+        self.n += 1
+        self.last = f
+
+
 @dataclass
 class Case:
     pc: int
@@ -253,36 +290,37 @@ class Case:
     id: int | None = None
     first_at: float = 0.0
     last_at: float = 0.0
+    _sums: _CaseSums | None = field(default=None, init=False, repr=False, compare=False)
+
+    def sums(self) -> _CaseSums:
+        s, fs = self._sums, self.findings
+        if s is None or s.n > len(fs) or (s.n and fs[s.n - 1] is not s.last):
+            s = self._sums = _CaseSums()                 # the list was changed other than by adding to it: count again
+        for f in fs[s.n:]:
+            s.fold(f)
+        return s
 
     @property
     def behaviours(self) -> set[str]:
-        return {f.reads_as for f in self.findings} - {""}
+        return set(self.sums().reads)
 
     @property
     def things(self) -> set[str]:
-        out: set[str] = set()
-        for f in self.findings:
-            out |= f.things
-        return out
+        return set(self.sums().things)
 
     @property
     def weight(self) -> float:
         """Several independent hints are stronger together than any one: 1 - the chance every one of them is nothing, plus a little for each further kind of behaviour."""
         # The same reading made again and again (the tenth file copied to the same drive) is a count, and a count only amplifies: a graph speaks at its heaviest,
         # with a little added for each further time it spoke, never a new vote each time.
-        by_graph: dict[str, list[float]] = {}
-        for f in self.findings:
-            if not f.graph.startswith("coverage_"):
-                by_graph.setdefault(f.graph, []).append(min(0.95, f.weight))
+        s = self.sums()
         rest = 1.0
-        for ws in by_graph.values():
-            top = max(ws)
-            rest *= 1.0 - (top + (1.0 - top) * (0.08 if top >= 0.5 else 0.03) * min(len(ws) - 1, 6))      # a count amplifies a heavy reading, and barely a light one
+        for top, n in s.by_graph.values():
+            rest *= 1.0 - (top + (1.0 - top) * (0.08 if top >= 0.5 else 0.03) * min(n - 1, 6))      # a count amplifies a heavy reading, and barely a light one
         # Coverage (what falls in an intent's areas on one piece of work) is a reading of the very same events the other findings are readings of, so it does not stack with
         # them: it is a floor under the case, and what makes a case when no single graph fires.
-        core = max(1.0 - rest, max((f.weight for f in self.findings if f.graph.startswith("coverage_")), default=0.0))
-        firm = {f.reads_as for f in self.findings if f.weight >= 0.30} - {""}          # a second kind of behaviour adds weight only when it is firm in itself
-        return min(0.99, core + 0.06 * max(0, len(firm) - 1))
+        core = max(1.0 - rest, s.cover)
+        return min(0.99, core + 0.06 * max(0, len(s.firm) - 1))     # a second kind of behaviour adds weight only when it is firm in itself
 
     @property
     def level(self) -> str:
@@ -313,7 +351,8 @@ class Case:
     @property
     def stage(self) -> tuple[int, str, str | None]:
         """(how many of the five stages of a taking-out have shown, the latest one's name, what usually comes next)."""
-        seen = [i for i, (_, bs) in enumerate(ARC_STAGES) if self.behaviours & set(bs)]
+        b = self.sums().reads
+        seen = [i for i, (_, bs) in enumerate(ARC_STAGES) if b & set(bs)]
         if not seen:
             return 0, "", None
         top = max(seen)
@@ -568,11 +607,17 @@ class Memory:
 
     def __init__(self) -> None:
         self.recent: deque[Sig] = deque()
+        self.newest = float("-inf")
+        self.late = 0.0
+        self.made: dict[tuple[str, str], deque[float]] = {}  # ("path" | "thing", which) -> when, for what was made, copied or moved here in `recent`
         self.devices: dict[str, float] = {}                   # drive -> when it was plugged in (still attached)
         self.lineage: dict[str, set[str]] = {}                # an archive's thing -> the things that went into it
         self.hidden: set[str] = set()
         self.at_path: dict[str, str] = {}                     # where a thing was last seen -> which thing (a delete carries no hash of its own)
         self.hits: list[Hit] = []                             # the board: the stages reached lately, kept for days
+        self.by_area: dict[tuple[str, str], list[Hit]] = {}   # the same hits by (intent, area), for the steps that look back at one area
+        self.boards: dict[str, _Board] = {b: _Board(b) for b in ANCHORS}
+        self.fresh: dict[str, list[int]] = {}                 # the last event's hits, by intent: their places on that intent's board
 
     def add(self, s: Sig) -> None:
         if s.thing and s.path:
@@ -580,17 +625,324 @@ class Memory:
             if len(self.at_path) > 20000:
                 for k in list(self.at_path)[:5000]:
                     self.at_path.pop(k, None)
+        if self.recent:
+            self.late = max(self.late, self.newest - s.at)    # how far an event has ever come before one already here: what `since` must look past
+        self.newest = max(self.newest, s.at)
         self.recent.append(s)
+        if s.verb in MADE_VERBS:
+            for key in self._made_keys(s):
+                self.made.setdefault(key, deque()).append(s.at)
         while self.recent and self.recent[0].at < s.at - KEEP:
-            self.recent.popleft()
+            gone = self.recent.popleft()
+            if gone.verb in MADE_VERBS:
+                for key in self._made_keys(gone):
+                    q = self.made.get(key)
+                    if q:
+                        q.popleft()                          # the oldest of that key is this one: both are in arrival order
+                        if not q:
+                            del self.made[key]
+
+    @staticmethod
+    def _made_keys(s: Sig) -> list[tuple[str, str]]:
+        return [("path", s.path)] + ([("thing", s.thing)] if s.thing else [])
+
+    def made_before(self, path: str, thing: str, at: float) -> bool:
+        """Was this file (by its place, or by what it is) made, copied or moved here before `at`, in what `recent` still holds?"""
+        return any(a < at for a in self.made.get(("path", path), ())) or bool(thing and any(a < at for a in self.made.get(("thing", thing), ())))
 
     def since(self, at: float, *verbs: str) -> list[Sig]:
-        return [x for x in self.recent if x.at >= at and (not verbs or x.verb in verbs)]
+        """What happened from `at` on, in the order it arrived. Read from the newest back: once an event is older than `at` by more than any event has
+        ever arrived late, nothing before it can be from `at` on (each earlier one is at most the newest before it, which is at most that event + late)."""
+        out: list[Sig] = []
+        stop = at - self.late
+        for x in reversed(self.recent):
+            if x.at < stop:
+                break
+            if x.at >= at and (not verbs or x.verb in verbs):
+                out.append(x)
+        out.reverse()
+        return out
 
     def add_hits(self, hits: list[Hit], now: float) -> None:
         self.hits.extend(hits)
-        if self.hits and (len(self.hits) > 4000 or self.hits[0].at < now - HIT_KEEP):
-            self.hits = [h for h in self.hits if h.at >= now - HIT_KEEP][-4000:]
+        for h in hits:
+            self.by_area.setdefault((h.behaviour, h.anchor), []).append(h)
+        fresh = {b: got for b, board in self.boards.items() if (got := board.add(hits))}
+        if self.hits and (len(self.hits) > HIT_CAP + HIT_BATCH or self.hits[0].at < now - HIT_KEEP - HIT_SLACK):
+            self.hits = [h for h in self.hits if h.at >= now - HIT_KEEP][-HIT_CAP:]
+            self._rebuild()
+            new = {id(h) for h in hits}
+            fresh = {b: got for b, board in self.boards.items() if (got := [i for i, h in enumerate(board.hits) if id(h) in new])}
+        self.fresh = fresh
+
+    def _rebuild(self) -> None:
+        self.by_area = {}
+        for h in self.hits:
+            self.by_area.setdefault((h.behaviour, h.anchor), []).append(h)
+        batches: list[list[Hit]] = []
+        for h in self.hits:                                   # one event's hits share its Sig and were added together
+            if batches and h.sig is batches[-1][-1].sig:
+                batches[-1].append(h)
+            else:
+                batches.append([h])
+        self.boards = {b: _Board.built(b, batches) for b in ANCHORS}
+
+    def area(self, behaviour: str, *anchors: str, since: float | None = None) -> list[Hit]:
+        """The hits in these areas of an intent, from `since` on if given (read from the newest back; see `since` for why stopping early is exact)."""
+        if since is None:
+            if len(anchors) == 1:
+                return self.by_area.get((behaviour, anchors[0]), [])
+            return [h for a in anchors for h in self.by_area.get((behaviour, a), [])]
+        out: list[Hit] = []
+        stop = since - self.late
+        for a in anchors:
+            for h in reversed(self.by_area.get((behaviour, a), ())):
+                if h.at < stop:
+                    break
+                if h.at >= since:
+                    out.append(h)
+        return out
+
+
+MADE_VERBS = ("created", "copied", "moved")
+
+
+def _at(x: Sig) -> float:
+    return x.at
+
+
+def _holds(sigs: list[Sig], s: Sig) -> bool:
+    """`s in sigs` for a list kept in time order: the same object first, then only the events at the same moment are compared field by field."""
+    for x in sigs:
+        if x is s:
+            return True
+    for x in sigs[bisect.bisect_left(sigs, s.at, key=_at):]:
+        if x.at != s.at:
+            return False
+        if x == s:
+            return True
+    return False
+
+
+class _Piece:
+    """One piece of work on one intent's board: the events that share a file or follow within THREAD, kept with what they add up to, so that
+    weighing it never reads its events again. An area is (first place on the board, heaviest weight, product of 1 - weight): see `anchors.area_value`."""
+
+    __slots__ = ("first_at", "kid_hits", "kid_sigs", "kids", "linked", "own", "own_sigs", "sigs", "size", "things")
+
+    def __init__(self) -> None:
+        self.size = 0
+        self.linked = False
+        self.first_at = float("inf")
+        self.own: dict[str, list[float]] = {}
+        self.own_sigs: set[Sig] = set()
+        self.kids: dict[str, list[float]] = {}
+        self.kid_hits: list[tuple[str, int, float, Sig, bool]] = []   # every child hit: (key, place, weight, sig, counted when it came)
+        self.kid_sigs: set[Sig] = set()                                # the sigs of the child hits that count
+        self.things: set[str] = set()
+        self.sigs: list[Sig] = []                                      # the latest 14 events, oldest first
+
+    @staticmethod
+    def _grow(areas: dict[str, list[float]], key: str, at: int, w: float) -> None:
+        a = areas.get(key)
+        if a is None:
+            areas[key] = [at, w, 1.0 - min(0.95, w)]
+        else:
+            a[0] = min(a[0], at)
+            a[1] = max(a[1], w)
+            a[2] *= 1.0 - min(0.95, w)
+
+    def recount_kids(self) -> None:
+        """A child hit stops counting once the same event is found in the intent's own areas (it is not evidence twice)."""
+        self.kids, self.kid_sigs = {}, set()
+        for key, at, w, sig, _ in self.kid_hits:
+            if sig not in self.own_sigs:
+                self._grow(self.kids, key, at, w)
+                self.kid_sigs.add(sig)
+
+    def take(self, o: _Piece) -> None:
+        """Fold a smaller piece into this one."""
+        self.size += o.size
+        self.linked = self.linked or o.linked
+        self.first_at = min(self.first_at, o.first_at)
+        for key, (at, mx, rest) in o.own.items():
+            a = self.own.get(key)
+            if a is None:
+                self.own[key] = [at, mx, rest]
+            else:
+                a[0], a[1], a[2] = min(a[0], at), max(a[1], mx), a[2] * rest
+        mine_lose = bool(self.kid_sigs) and not self.kid_sigs.isdisjoint(o.own_sigs)
+        theirs_lose = bool(o.kid_sigs) and not o.kid_sigs.isdisjoint(self.own_sigs)
+        self.own_sigs |= o.own_sigs
+        self.kid_hits += o.kid_hits
+        if mine_lose:
+            self.recount_kids()                          # rare: an event already counted as a child turns up in the own areas later
+        else:
+            if theirs_lose:
+                o.recount_kids_against(self.own_sigs)
+            for key, (at, mx, rest) in o.kids.items():
+                a = self.kids.get(key)
+                if a is None:
+                    self.kids[key] = [at, mx, rest]
+                else:
+                    a[0], a[1], a[2] = min(a[0], at), max(a[1], mx), a[2] * rest
+            self.kid_sigs |= o.kid_sigs
+        self.things |= o.things
+        for x in o.sigs:                                # nearly always one: keep the latest 14, oldest first
+            if not _holds(self.sigs, x):
+                bisect.insort(self.sigs, x, key=_at)
+        if len(self.sigs) > 14:
+            del self.sigs[:-14]
+
+    def recount_kids_against(self, own_sigs: set[Sig]) -> None:
+        self.kids, self.kid_sigs = {}, set()
+        for key, at, w, sig, _ in self.kid_hits:
+            if sig not in own_sigs and sig not in self.own_sigs:
+                self._grow(self.kids, key, at, w)
+                self.kid_sigs.add(sig)
+
+    def weigh(self, behaviour: str) -> tuple[float, list[str]]:
+        own = [(k, area_value(v[1], v[2])) for k, v in sorted(self.own.items(), key=lambda kv: kv[1][0])]
+        kids = [(k, area_value(v[1], v[2])) for k, v in sorted(self.kids.items(), key=lambda kv: kv[1][0])]
+        return coverage_of(behaviour, own, kids, self.linked or self.size == 1)
+
+
+class _Board:
+    """One intent's board on one machine, as pieces of work (a union-find over its hits). Two hits are one piece when they share a file or are within
+    THREAD of each other: by time, a hit joins the hits just before and after it in time (any two within THREAD have everything between them within THREAD
+    of its neighbour); by file, a hit joins the first one that touched the same file. A piece is never split; the board is rebuilt when trimmed."""
+
+    def __init__(self, behaviour: str) -> None:
+        self.behaviour = behaviour
+        self.family = {behaviour, *INCLUDES.get(behaviour, ())}
+        self.hits: list[Hit] = []
+        self.parent: list[int] = []
+        self.by_time: list[tuple[float, int]] = []
+        self.first_with: dict[str, int] = {}
+        self.piece: dict[int, _Piece] = {}
+
+    @classmethod
+    def built(cls, behaviour: str, batches: list[list[Hit]]) -> _Board:
+        """The board `add` would make from these events, in one pass: the pieces are found first and each is then summed once, instead of being
+        merged step by step (a trim rebuilds every board, and step by step that held a busy machine's events for a third of a second)."""
+        self = cls(behaviour)
+        counted: list[bool] = []
+        for batch in batches:
+            mine = [h for h in batch if h.behaviour in self.family]
+            own_now = {h.sig for h in mine if h.behaviour == behaviour}
+            for h in mine:
+                self.hits.append(h)
+                counted.append(h.behaviour == behaviour or h.sig not in own_now)
+        n = len(self.hits)
+        self.parent = parent = list(range(n))
+
+        def find(i: int) -> int:
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        linked: set[int] = set()
+        self.by_time = sorted((h.at, i) for i, h in enumerate(self.hits))
+        for (a, i), (b, j) in zip(self.by_time, self.by_time[1:]):
+            if b - a <= THREAD:
+                ri, rj = find(i), find(j)
+                if ri != rj:
+                    parent[ri] = rj
+        for i, h in enumerate(self.hits):
+            for t in h.things:
+                first = self.first_with.get(t)
+                if first is None:
+                    self.first_with[t] = i
+                else:
+                    ri, rj = find(i), find(first)
+                    if ri != rj:
+                        parent[ri] = rj
+                    linked.add(i)
+        pieces: dict[int, _Piece] = {}
+        for i, h in enumerate(self.hits):
+            p = pieces.get(r := find(i))
+            if p is None:
+                p = pieces[r] = _Piece()
+            p.size += 1
+            p.first_at = min(p.first_at, h.at)
+            p.things |= h.things
+            if not _holds(p.sigs, h.sig):
+                bisect.insort(p.sigs, h.sig, key=_at)
+                if len(p.sigs) > 14:
+                    del p.sigs[0]
+            if h.behaviour == behaviour:
+                _Piece._grow(p.own, h.anchor, i, h.weight)
+                p.own_sigs.add(h.sig)
+            else:
+                key = f"{h.behaviour}/{h.anchor}"
+                p.kid_hits.append((key, i, h.weight, h.sig, counted[i]))
+                if counted[i]:
+                    _Piece._grow(p.kids, key, i, h.weight)
+                    p.kid_sigs.add(h.sig)
+        for i in linked:
+            pieces[find(i)].linked = True
+        for p in pieces.values():
+            if p.kid_sigs and not p.kid_sigs.isdisjoint(p.own_sigs):
+                p.recount_kids()
+        self.piece = pieces
+        return self
+
+    def find(self, i: int) -> int:
+        parent = self.parent
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def _union(self, i: int, j: int, *, by_file: bool = False) -> None:
+        ri, rj = self.find(i), self.find(j)
+        if ri != rj:
+            if self.piece[ri].size > self.piece[rj].size:
+                ri, rj = rj, ri
+            self.piece[rj].take(self.piece.pop(ri))
+            self.parent[ri] = rj
+        if by_file:
+            self.piece[rj].linked = True                 # two events share a file: the piece is linked, not only close in time
+
+    def add(self, hits: list[Hit]) -> list[int]:
+        """One event's hits. Returns the places of those that are this board's."""
+        mine = [h for h in hits if h.behaviour in self.family]
+        if not mine:
+            return []
+        own_now = {h.sig for h in mine if h.behaviour == self.behaviour}
+        placed: list[int] = []
+        for h in mine:
+            i = len(self.hits)
+            self.hits.append(h)
+            self.parent.append(i)
+            p = _Piece()
+            p.size, p.first_at, p.things, p.sigs = 1, h.at, set(h.things), [h.sig]
+            if h.behaviour == self.behaviour:
+                p.own[h.anchor] = [i, h.weight, 1.0 - min(0.95, h.weight)]
+                p.own_sigs.add(h.sig)
+            else:
+                key = f"{h.behaviour}/{h.anchor}"
+                counted = h.sig not in own_now          # the same event in the intent's own areas: it is in the same piece (same moment), and counts there
+                p.kid_hits.append((key, i, h.weight, h.sig, counted))
+                if counted:
+                    p.kids[key] = [i, h.weight, 1.0 - min(0.95, h.weight)]
+                    p.kid_sigs.add(h.sig)
+            self.piece[i] = p
+            k = bisect.bisect_left(self.by_time, (h.at, i))
+            self.by_time.insert(k, (h.at, i))
+            if k > 0 and h.at - self.by_time[k - 1][0] <= THREAD:
+                self._union(i, self.by_time[k - 1][1])
+            if k + 1 < len(self.by_time) and self.by_time[k + 1][0] - h.at <= THREAD:
+                self._union(i, self.by_time[k + 1][1])
+            for t in h.things:
+                first = self.first_with.get(t)
+                if first is None:
+                    self.first_with[t] = i
+                else:
+                    self._union(i, first, by_file=True)
+            placed.append(i)
+        return placed
 
 
 def _on_external(m: Memory, path: str) -> str:
@@ -690,12 +1042,10 @@ class Detective:
         def add(b: str, a: str, w: float, extra: frozenset[str] = frozenset()) -> None:
             out.append(Hit(b, a, s.at, round(w, 3), base | extra, s))
 
-        recent_exfil = frozenset().union(*(h.things for h in m.hits if h.behaviour == "exfiltration" and h.anchor in ("Gather", "Compress", "Transform") and s.at - h.at <= THREAD)) \
-            if m.hits else frozenset()
         if v in ("copied", "moved", "created") and dev:
             lineage = m.lineage.get(thing, set())
             add("exfiltration", "Transfer", 0.30 * kf + (0.08 if is_archive(s.path) else 0.0) + worth, frozenset(lineage))
-            if any(h.behaviour == "capture" and h.anchor == "Keep" and h.things & (base | frozenset(lineage)) for h in m.hits):
+            if any(h.things & (base | frozenset(lineage)) for h in m.area("capture", "Keep")):
                 add("capture", "Pass on", 0.30 + worth)
         elif v in ("copied", "moved") and s.path.startswith("\\\\"):
             add("exfiltration", "Transfer", 0.26 * kf + worth)             # a share elsewhere on the network: inside, but off this machine
@@ -711,7 +1061,7 @@ class Detective:
             sources = self._sources_of(m, s)
             things = {x.thing or x.path for x in sources}
             here = folder_of(s.path).lower()
-            things |= {t for h in m.hits if h.behaviour == "exfiltration" and h.anchor == "Gather" and folder_of(h.sig.path).lower() == here for t in h.things}
+            things |= {t for h in m.area("exfiltration", "Gather") if folder_of(h.sig.path).lower() == here for t in h.things}
             if things:
                 m.lineage[thing] = things
             # a person zipping their own working files is ordinary: it counts for little until the files are ones that matter (or what the zip is later used for does)
@@ -738,11 +1088,12 @@ class Detective:
         if v == "moved" and is_system_folder(s.path) and ext in DOC_EXT | ARCHIVE_EXT and not (s.old and is_system_folder(s.old)):
             add("concealment", "Relocate", 0.15 + worth)
         if v == "uploaded":
+            recent_exfil = frozenset().union(*(h.things for h in m.area("exfiltration", "Gather", "Compress", "Transform", since=s.at - THREAD)))
             add("exfiltration", "Transfer", 0.25 + worth, recent_exfil)
-            if any(h.behaviour == "capture" and h.anchor == "Keep" and s.at - h.at <= THREAD for h in m.hits):
+            if m.area("capture", "Keep", since=s.at - THREAD):
                 add("capture", "Pass on", 0.30)
         if v == "deleted":
-            own = any(x.verb in ("created", "copied", "moved") and (x.path == s.path or (thing and x.thing == thing)) for x in m.recent if x is not s and x.at < s.at)
+            own = m.made_before(s.path, thing, s.at)
             if ext in VALUABLE_EXT:
                 add("erasure", "Remove", 0.06 + worth)
                 if not own:                                   # taking back what one made a moment ago is tidying, not destroying
@@ -763,14 +1114,14 @@ class Detective:
             working = [x for x in m.since(s.at - 10 * 60) if "restricted" in x.tags and x.verb not in ("attached", "detached", "captured")]
             if working:
                 out.append(Hit("capture", "Open the source", s.at, 0.10, frozenset(x.thing or x.path for x in working), working[-1]))
-        if v == "created" and ext in IMAGE_EXT and any(h.behaviour == "capture" and h.anchor == "Capture" and 0 <= s.at - h.at <= 120 for h in m.hits):
+        if v == "created" and ext in IMAGE_EXT and any(h.at <= s.at for h in m.area("capture", "Capture", since=s.at - 120)):
             add("capture", "Keep", 0.12)
         if v == "silent":
             add("evasion", "Switch off", 0.10)                             # alone it is a laptop lid; beside anything else it is not (see _went_silent)
         if v == "opened":
             add("collection", "Access", 0.03 + worth)
             if "outside_role" in s.tags:
-                outside = [h for h in m.hits if h.behaviour == "reach" and h.anchor in ("Find", "Beyond role")]
+                outside = m.area("reach", "Find", "Beyond role")
                 if outside:
                     add("reach", "Beyond role", 0.10 + worth)
                 else:
@@ -784,74 +1135,32 @@ class Detective:
 
     def _coverage(self, m: Memory, s: Sig, new: list[Hit]) -> list[Finding]:
         """What the events on the board add up to, intent by intent. A piece of work is the events that share a file or happen within half an hour of each other. Each
-        intent weighs what falls in its own areas and, at a discount, in the areas of the intents it contains. Nothing needs to be complete: one heavy event is enough."""
+        intent weighs what falls in its own areas and, at a discount, in the areas of the intents it contains. Nothing needs to be complete: one heavy event is enough.
+        The pieces are kept as the board grows (`_Board`): an event costs what it touches, not the whole board (rebuilding them on every event made one busy
+        machine cost 42 ms an event, 12 Nov 2026)."""
         out: list[Finding] = []
-        touched = {h.behaviour for h in new}
-        targets = [b for b in ANCHORS if b in touched or any(c in touched for c in INCLUDES.get(b, ()))]
-        for behaviour in targets:
-            family = {behaviour, *INCLUDES.get(behaviour, ())}
-            mine = [h for h in m.hits if h.behaviour in family]
-            parent = list(range(len(mine)))
-
-            def find(i: int, parent: list[int] = parent) -> int:
-                while parent[i] != i:
-                    parent[i] = parent[parent[i]]
-                    i = parent[i]
-                return i
-
-            # Two events are one piece of work when they share a file or are within THREAD of each other. Built in O(k log k), not by comparing every
-            # pair (which, run on every event, made a machine deleting a few hundred files hold the Engine for half a minute): by time, joining each
-            # event to the next one in time is enough (any two within THREAD have everything between them within THREAD of its neighbour); by file,
-            # each event joins the first one that touched the same file.
-            def union(i: int, j: int, parent: list[int] = parent) -> None:
-                ri, rj = find(i), find(j)
-                if ri != rj:
-                    parent[ri] = rj
-
-            by_time = sorted(range(len(mine)), key=lambda i: mine[i].at)
-            for a, b in itertools.pairwise(by_time):
-                if mine[b].at - mine[a].at <= THREAD:
-                    union(b, a)
-            first_with: dict[Any, int] = {}
-            holders: dict[Any, int] = {}
-            for i, h in enumerate(mine):
-                for t in h.things:
-                    if t in first_with:
-                        union(i, first_with[t])
-                        holders[t] += 1
-                    else:
-                        first_with[t], holders[t] = i, 1
-            shared = {i for i, h in enumerate(mine) if any(holders[t] > 1 for t in h.things)}
-            groups: dict[int, list[int]] = {}
-            for i in range(len(mine)):
-                groups.setdefault(find(i), []).append(i)
-            fresh = {id(h) for h in new}
-            for root in {find(i) for i, h in enumerate(mine) if id(h) in fresh}:
-                idx = groups[root]
-                comp = [mine[i] for i in idx]
-                own: dict[str, list[float]] = {}
-                kids: dict[str, list[float]] = {}
-                mine_sigs = {h.sig for h in comp if h.behaviour == behaviour}
-                for h in comp:
-                    if h.behaviour == behaviour:
-                        own.setdefault(h.anchor, []).append(h.weight)
-                    elif h.sig not in mine_sigs:              # the same event already counted in the intent's own areas is not evidence twice
-                        kids.setdefault(f"{h.behaviour}/{h.anchor}", []).append(h.weight)
-                linked = any(i in shared for i in idx)
-                w, covered = coverage(behaviour, own, kids, linked or len(comp) == 1)
-                if w < 0.12 or not any(h.behaviour == behaviour for h in comp):
+        for behaviour in ANCHORS:
+            places = m.fresh.get(behaviour)
+            if not places:
+                continue
+            board = m.boards[behaviour]
+            for root in dict.fromkeys(board.find(i) for i in places):
+                p = board.piece[root]
+                if not p.own:
                     continue                               # (a parent is only said when something in its own areas is there: the children speak for themselves)
-                key = (s.pc, behaviour, round(min(h.at for h in comp)))
+                w, covered = p.weigh(behaviour)
+                if w < 0.12:
+                    continue
+                key = (s.pc, behaviour, round(p.first_at))
                 if w <= self._covered.get(key, 0.0) + 0.03:
                     continue                               # nothing new worth saying
                 self._covered[key] = w
-                things = frozenset().union(*(h.things for h in comp))
-                sigs = sorted({h.sig for h in comp}, key=lambda x: x.at)[-14:]
                 names = [c.split("/")[-1] if "/" not in c else c for c in covered]
-                out.append(Finding(behaviour, "coverage_" + behaviour, s.at, s.pc, w, things,
-                                   f"{BEHAVIOUR_LABEL[behaviour]}: {', '.join(c.replace('/', ' · ') for c in covered)}", sigs,
+                linked = p.linked
+                out.append(Finding(behaviour, "coverage_" + behaviour, s.at, s.pc, w, frozenset(p.things),
+                                   f"{BEHAVIOUR_LABEL[behaviour]}: {', '.join(c.replace('/', ' · ') for c in covered)}", list(p.sigs),
                                    "one piece of ordinary work that happens to touch these areas",
-                                   ["areas covered: " + ", ".join(names)] + ([] if linked or len(comp) == 1 else ["the events share no file, only the time"])))
+                                   ["areas covered: " + ", ".join(names)] + ([] if linked or p.size == 1 else ["the events share no file, only the time"])))
         return out
 
     # --- the mini-graphs ----------------------------------------------------------------------------------------
@@ -1249,7 +1558,7 @@ class Detective:
         for c in self.cases:
             if c.pc != f.pc:
                 continue
-            link = 3 if (c.things & f.things) else 2 if f.at - c.last_at <= SESSION else 1 if (f.at - c.last_at <= PATIENT and self._continues(c, f)) else 0
+            link = 3 if (not c.sums().things.isdisjoint(f.things)) else 2 if f.at - c.last_at <= SESSION else 1 if (f.at - c.last_at <= PATIENT and self._continues(c, f)) else 0
             if link > how:
                 best, how = c, link
         created = best is None
@@ -1271,7 +1580,7 @@ class Detective:
     def _continues(c: Case, f: Finding) -> bool:
         """A later step of the same arc: it follows what the case has already shown (hiding, then taking out, then covering up)."""
         order = {b: i for i, (_, bs) in enumerate(ARC_STAGES) for b in bs}
-        have = max((order.get(b, -1) for b in c.behaviours), default=-1)
+        have = max((order.get(b, -1) for b in c.sums().reads), default=-1)
         return order.get(f.behaviour, -2) >= have >= 0
 
     def know_drive(self, pc: int, device: str, at: float) -> None:

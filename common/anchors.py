@@ -97,13 +97,18 @@ def anchor_names(behaviour: str) -> list[str]:
 def coverage(behaviour: str, own: dict[str, list[float]], children: dict[str, list[float]] | None = None, linked: bool = True) -> tuple[float, list[str]]:
     """How strongly an intent is covered, from the weights of the events in each of its areas (`own`: area -> weights) and in its children's areas (`children`:
     "child/Area" -> weights). Returns (weight, the areas covered, own first). No area is required and none comes first."""
-    parts: list[tuple[str, float]] = []
-    for area, ws in own.items():
-        if ws:
-            parts.append((area, _area(ws)))
-    for key, ws in (children or {}).items():
-        if ws:
-            parts.append((key, _area(ws) * CHILD_SHARE))
+    return coverage_of(behaviour, [(a, _area(ws)) for a, ws in own.items() if ws], [(k, _area(ws)) for k, ws in (children or {}).items() if ws], linked)
+
+
+def area_value(heaviest: float, rest: float) -> float:
+    """One area from what it adds up to: its heaviest event and the product of (1 - weight) over its events (see `_area`). Kept as a running pair, an area
+    costs nothing to grow."""
+    return max(heaviest, min(AREA_CAP, 1.0 - rest))
+
+
+def coverage_of(behaviour: str, own: list[tuple[str, float]], children: list[tuple[str, float]], linked: bool = True) -> tuple[float, list[str]]:
+    """`coverage` from each area's value (`area_value`), own areas first, in the order they were first reached."""
+    parts: list[tuple[str, float]] = list(own) + [(k, v * CHILD_SHARE) for k, v in children]
     if not parts:
         return 0.0, []
     # an area with only trivial things in it (a photo on a drive, a zip of one's own working files, a download filed) is covered, but counts for very little: a whole
