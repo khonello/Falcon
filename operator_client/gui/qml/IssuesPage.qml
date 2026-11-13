@@ -2,7 +2,7 @@ import QtQuick
 import "."
 
 // ISSUES, as the version 1 concept draws it (docs/design/concepts-admin.html, AdminIssuesPage). The situation in a sentence;
-// on the left To do (the next step is yours) and Done (you have done your part; each card says what happens next), one card
+// on the left To do (the next step is yours) and Done (addressed), one card
 // per issue, several of one kind under a heading, never inside another card; under them the picked issue's story. On the
 // right the picked issue: the same fields for every issue, then what to do.
 // Every issue reaches every Admin and is any Admin's to act on: nobody owns one (the user, 2 Nov 2026).
@@ -48,7 +48,7 @@ Page {
     readonly property var all: Fleet.issues
     function late(i) { if (i.past !== undefined) return i.past; return i.at && (Time.now - Time.ms(i.at)) / 3600000 > (i.type === "file" ? 1 : i.type === "help" ? 1 : 24) }
     function isDone(i) { return i.state === "waiting" || i.state === "resolved" || !!done[i.id] }
-    // To do: the next step is yours. Done: you have done your part, or it is resolved; once you have acted it is done for
+    // To do: the next step is yours. Done: addressed, or resolved; once you have acted it is done for
     // you, never "waiting" (the user, 1 Nov 2026).
     readonly property var todo: all.filter(function (i) { return !isDone(i) })
     readonly property var later: all.filter(function (i) { return isDone(i) })
@@ -267,7 +267,7 @@ Page {
                 objectName: "issuesDone"
                 width: parent.width
                 title: "Done · " + page.later.length
-                sub: "you have done your part; each says what happens next, and stays here until tomorrow"
+                sub: "addressed"                     // said plainly (the user, 13 Nov 2026): whoever acts next, it was dealt with
                 KindGroups { visible: page.later.length > 0; list: "later"; xs: page.later }
                 Quiet { visible: page.later.length === 0; text: "Nothing done today yet." }
             }
