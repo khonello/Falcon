@@ -331,7 +331,7 @@ Page {
                 labelW: 104
                 rows: !page.it ? [] : [["What", page.it.subject || page.it.title, ((page.types[page.it.type] || { label: "" }).label + " · " + Fleet.sevWord(page.it.sev)).toLowerCase()],
                                         ["Where", page.it.host, page.m ? page.m.deptName + " · " + (page.m.user ? page.m.user + " signed in" : "nobody signed in") : ""],
-                                        ["When", page.whenSay(page.it.at), page.isDone(page.it) ? "done, your part" : "open"]]
+                                        ["When", page.whenSay(page.it.at), page.isDone(page.it) ? "addressed" : "open"]]
                                         .concat(page.play && !page.isDone(page.it) ? page.play.facts.filter(function (f) { return !/^(File|Machine|Found on|Severity|Signed in)$/.test(f[0]) }).map(function (f) { return [f[0], f[1], ""] }) : [])
             }
             // resolved: what was done, and Reopen

@@ -330,8 +330,8 @@ Page {
                                   Txt { text: page.g0 ? page.g0.kind : ""; color: page.g0 && page.g0.hot ? Theme.crit : Theme.text2; font.pixelSize: 12; elide: Text.ElideNone } }
                             Txt { anchors.right: parent.right; text: page.g0 && page.g0.wait ? "waiting " + Time.waitLen(page.g0.wait) : ""; color: Theme.text3; font.pixelSize: 12; elide: Text.ElideNone }
                         }
-                        Txt { width: parent.width; text: page.g0 ? page.g0.title : ""; font.pixelSize: 14; font.weight: Font.DemiBold; lh: 1.35; wrapMode: Text.WordWrap; elide: Text.ElideNone }
-                        Txt { visible: text !== ""; width: parent.width; text: page.g0 ? page.g0.line : ""; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                        Txt { width: parent.width; text: page.g0 ? Theme.paths(page.g0.title, 2) : ""; font.pixelSize: 14; font.weight: Font.DemiBold; lh: 1.35; wrapMode: Text.WordWrap; elide: Text.ElideNone }
+                        Txt { visible: text !== ""; width: parent.width; text: page.g0 ? Theme.paths(page.g0.line, 2) : ""; color: Theme.text2; wrapMode: Text.WordWrap; elide: Text.ElideNone }
                         Field { visible: page.g0 !== null && !!page.g0.ask && (page.gpick[page.g0.id] || 0) === 0; width: parent.width; placeholderText: "The folder on your workstation"; text: page.askPath; onTextEdited: page.askPath = text }
                         Column {
                             visible: page.g0 !== null && page.g0.acts.length > 1

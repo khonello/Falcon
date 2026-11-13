@@ -181,6 +181,20 @@ QtObject {
         if (parts.length <= keep + 2) return s
         return parts.slice(0, 2).join(sep) + sep + "\u2026" + sep + parts.slice(parts.length - keep).join(sep)
     }
+    // every path inside a text (a drive, a share or a long slash path, up to a space, comma, semicolon, quote or bracket), cut in its
+    // middle to its start and last `keep` parts: for text that wraps, where a path has no space to break at and would run out of its box
+    function hasPath(s) { return /(?:[A-Za-z]:[\\\/]|\\\\)[^\s,;"'()<>]+/.test(String(s || "")) }
+    function paths(s, keep) {
+        return String(s || "").replace(/(?:[A-Za-z]:[\\\/]|\\\\)[^\s,;"'()<>]+/g, function (m) { return shortPath(m, keep || 2) })
+    }
+    // a line of text with paths in it, as it fits in `w` pixels (measured with `fm`): whole when it fits, else its paths cut in their middle,
+    // keeping fewer and fewer of their last parts, down to each file's own name
+    function fitPaths(s, fm, w) {
+        var x = String(s || "")
+        if (!fm || w <= 0 || !hasPath(x) || fm.advanceWidth(x) <= w) return x
+        for (var keep = 4; keep >= 1; keep--) { var c = paths(x, keep); if (fm.advanceWidth(c) <= w) return c }
+        return x.replace(/(?:[A-Za-z]:[\\\/]|\\\\)[^\s,;"'()<>]+/g, function (m) { var sep = m.indexOf("\\") >= 0 ? "\\" : "/"; return "\u2026" + sep + m.replace(/[\\\/]+$/, "").split(/[\\\/]/).pop() })
+    }
     // the path as it fits in `w` pixels, measured with `fm` (a FontMetrics of the text's font): whole when it fits, else cut in its middle
     // keeping fewer and fewer of its last parts; the file's own name is always kept
     function fitPath(p, fm, w) {

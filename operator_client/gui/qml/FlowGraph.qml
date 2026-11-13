@@ -91,7 +91,11 @@ Column {
             mono: m
             textFormat: Text.StyledText
             color: Theme.text2
-            text: a + (b ? "<font color='" + Theme.text3 + "'> " + b + "</font>" : "")
+            FontMetrics { id: lm; font: lb.font }
+            id: lb
+            readonly property string bFit: b ? Theme.fitPath(b, lm, Math.max(40, width - lm.advanceWidth(a + " "))) : ""
+            text: a + (b ? "<font color='" + Theme.text3 + "'> " + bFit + "</font>" : "")
+            Tip { over: lb; text: lb.bFit !== lb.b ? lb.a + " " + lb.b : "" }
         }
         Repeater { model: root.srcs; delegate: Label { required property var modelData; required property int index; cx: root.nw / 2; cy: root.ys(index, root.srcs.length); a: modelData.host || ""; b: modelData.gone ? "moved away" : modelData.path || "" } }
         Repeater { model: root.stages; delegate: Label { required property var modelData; required property int index; m: false; w: root.sw; cx: root.stX(index) + root.sw / 2; cy: root.gH / 2; a: modelData.op || ""; b: "" } }

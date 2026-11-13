@@ -216,7 +216,7 @@ Column {
                 spacing: 8
                 Icon { name: modelData.target_type === "program" ? "appstore" : "file"; size: 13; color: Theme.text3 }
                 Txt { width: parent.width - 24; wrapMode: Text.WordWrap; elide: Text.ElideNone; font.pixelSize: 13; textFormat: Text.RichText
-                      text: "<span style='color:" + Theme.text2 + "'>" + (modelData.target_type === "program" ? "Programs" : "Files and folders") + ":</span> <span style='color:" + Theme.text3 + "'>" + root.measure(modelData)[1] + "</span>" }
+                      text: "<span style='color:" + Theme.text2 + "'>" + (modelData.target_type === "program" ? "Programs" : "Files and folders") + ":</span> <span style='color:" + Theme.text3 + "'>" + Theme.paths(root.measure(modelData)[1], 2) + "</span>" }
             }
         }
     }

@@ -23,8 +23,14 @@ Column {
                 x: root.labelW + 12; y: 8
                 width: root.width - x
                 spacing: 1
-                Txt { width: parent.width; text: modelData[1] === undefined || modelData[1] === null ? "" : String(modelData[1]); font.weight: Font.DemiBold; mono: root.mono }
-                Txt { visible: !!modelData[2]; width: parent.width; lh: 1.4375; text: modelData[2] || ""; color: modelData[3] ? Theme.crit : Theme.text3; font.pixelSize: 12 }
+                Txt { id: fval; width: parent.width; font.weight: Font.DemiBold; mono: root.mono
+                      readonly property string full: modelData[1] === undefined || modelData[1] === null ? "" : String(modelData[1])
+                      text: Theme.fitPaths(full, fvm, width)
+                      FontMetrics { id: fvm; font: fval.font }
+                      Tip { over: fval; text: fval.text !== fval.full ? fval.full : "" } }
+                Txt { id: fsub; visible: !!modelData[2]; width: parent.width; lh: 1.4375; text: Theme.fitPaths(modelData[2] || "", fsm, width); color: modelData[3] ? Theme.crit : Theme.text3; font.pixelSize: 12
+                      FontMetrics { id: fsm; font: fsub.font }
+                      Tip { over: fsub; text: fsub.text !== (modelData[2] || "") ? modelData[2] : "" } }
             }
             Rectangle { visible: index < root.rows.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.grid }
         }

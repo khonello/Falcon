@@ -50,7 +50,9 @@ Item {
                 required property var modelData
                 width: lv.width; height: 30; radius: Theme.radiusSm
                 color: ma.containsMouse ? Theme.surface3 : "transparent"
-                Txt { x: 8; width: parent.width - 70; anchors.verticalCenter: parent.verticalCenter; text: modelData.path; mono: true; font.pixelSize: 12 }
+                Txt { id: hp; x: 8; width: parent.width - 70; anchors.verticalCenter: parent.verticalCenter; text: Theme.fitPath(modelData.path, hpm, width); mono: true; font.pixelSize: 12
+                      FontMetrics { id: hpm; font: hp.font }
+                      Tip { over: hp; text: hp.text !== modelData.path ? modelData.path : "" } }
                 Txt { anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; text: Theme.fmt(modelData.files || 0) + " files"; color: Theme.text3; font.pixelSize: 11 }
                 MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: { root.edited(modelData.path); pop.close() } }

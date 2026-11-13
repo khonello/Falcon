@@ -792,7 +792,7 @@ Page {
                                 required property var modelData
                                 small: true; danger: modelData[2]; text: modelData[1]
                                 onClicked: modelData[0] === "allow" ? (page.allowingId = cr.modelData.id, page.why = "")
-                                         : modelData[0] === "delete" ? confirm.ask({ title: "Delete the copy on " + cr.modelData.c.host + "?", text: "Only " + cr.modelData.c.file + " in " + cr.modelData.c.folder + " on " + cr.modelData.c.host + " is deleted. What is restricted is not touched.", ok: "Delete the copy", cancel: "Keep it", danger: true },
+                                         : modelData[0] === "delete" ? confirm.ask({ title: "Delete the copy on " + cr.modelData.c.host + "?", text: "Only " + cr.modelData.c.file + " in " + Theme.paths(cr.modelData.c.folder, 3) + " on " + cr.modelData.c.host + " is deleted. What is restricted is not touched.", ok: "Delete the copy", cancel: "Keep it", danger: true },
                                                                                    function () { page.act(cr.modelData, "delete", "") })
                                          : null
                             }
@@ -865,7 +865,11 @@ Page {
                         spacing: 2
                         Txt { width: parent.width; textFormat: Text.RichText; font.pixelSize: 13
                               text: "<span style='font-weight:600'>" + (modelData.f.flow || modelData.f.name || "flow " + modelData.f.flow_id) + "</span> " + (modelData.held ? "is held at" : "carries") + " <span style='font-weight:600'>" + (modelData.f.what || (modelData.k ? modelData.k.name : "")) + "</span>" }
-                        Txt { width: parent.width; mono: true; color: Theme.text3; font.pixelSize: 12; text: (modelData.f.from || "") + " → " + (modelData.f.to || "") }
+                        Txt { id: ft; width: parent.width; mono: true; color: Theme.text3; font.pixelSize: 12
+                              readonly property string full: (modelData.f.from || "") + " → " + (modelData.f.to || "")
+                              text: Theme.fitPaths(full, ftm, width)
+                              FontMetrics { id: ftm; font: ft.font }
+                              Tip { over: ft; text: ft.text !== ft.full ? ft.full : "" } }
                     }
                     Column {
                         x: parent.width - 150 - 12 - ob.width - 4; width: 150

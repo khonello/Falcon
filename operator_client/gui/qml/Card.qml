@@ -82,7 +82,12 @@ Rectangle {
             Item {
                 width: parent.width
                 height: tt.height
-                Txt { id: tt; text: root.title; font.weight: Font.DemiBold; width: Math.min(implicitWidth, parent.width - (tg.visible ? tg.implicitWidth + 8 : 0) - (root.titleDot.a > 0 ? 15 : 0)) }
+                Txt { id: tt; font.weight: Font.DemiBold
+                      readonly property real room: parent.width - (tg.visible ? tg.implicitWidth + 8 : 0) - (root.titleDot.a > 0 ? 15 : 0)
+                      text: Theme.fitPaths(root.title, ttm, room)
+                      width: Math.min(implicitWidth, room)
+                      FontMetrics { id: ttm; font: tt.font }
+                      Tip { over: tt; text: tt.text !== root.title ? root.title : "" } }
                 Rectangle { visible: root.titleDot.a > 0; x: tt.width + 8; anchors.verticalCenter: tt.verticalCenter; width: 7; height: 7; radius: 3.5; color: root.titleDot
                             Tip { text: root.titleDotTip } }
                 Txt { id: tg; visible: root.tag !== ""; x: tt.width + 8; text: root.tag; color: Theme.text3; font.pixelSize: 13; elide: Text.ElideNone
@@ -90,11 +95,13 @@ Rectangle {
             }
             // a path is cut in its middle to fit, its start and its file kept, the whole of it on hover (the user, 12 Nov 2026)
             Txt { id: ln; visible: root.line !== ""; mono: root.lineMono; color: root.lineHot ? Theme.crit : Theme.text3; font.pixelSize: Theme.fSmall; width: parent.width
-                  readonly property bool isPath: root.lineMono && /^([A-Za-z]:[\\\/]|\\\\|\/)/.test(root.line)
-                  text: isPath ? Theme.fitPath(root.line, lnm, width) : root.line
+                  readonly property bool isPath: Theme.hasPath(root.line) || (root.lineMono && /^\//.test(root.line))
+                  text: !isPath ? root.line : /^([A-Za-z]:[\\\/]|\\\\|\/)[^\s]*$/.test(root.line) ? Theme.fitPath(root.line, lnm, width) : Theme.fitPaths(root.line, lnm, width)
                   FontMetrics { id: lnm; font: ln.font }
                   Tip { over: ln; text: ln.isPath && ln.text !== root.line ? root.line : "" } }
-            Txt { visible: root.line2 !== ""; text: root.line2; color: Theme.text2; font.pixelSize: Theme.fSmall; width: parent.width }
+            Txt { id: l2; visible: root.line2 !== ""; text: Theme.fitPaths(root.line2, l2m, width); color: Theme.text2; font.pixelSize: Theme.fSmall; width: parent.width
+                  FontMetrics { id: l2m; font: l2.font }
+                  Tip { over: l2; text: l2.text !== root.line2 ? root.line2 : "" } }
         }
         // the middle column: the card's own drawing, or its note
         Item {
