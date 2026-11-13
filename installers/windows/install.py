@@ -31,10 +31,27 @@ import shutil
 import sys
 from pathlib import Path
 
+if __package__ in (None, ""):
+    # Run as a script by the uninstaller (falcon.iss): from the program's folder, with the Python Setup installed, so that nothing it removes is
+    # in use while it removes it. The package is two folders up (<target>\app).
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from installers import bundle as bundle_mod
 from installers import payload as payload_mod
 from installers.common import InstallError, Plan, python_ok, run_cmd, write_text
 from installers.roles import Role, role
+
+
+def _ps(value: str) -> str:
+    """A PowerShell string literal: single quotes, a quote inside doubled. Nothing in it is expanded."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def shortcut_script(lnk: Path, target: Path, arguments: str, workdir: Path, description: str) -> str:
+    """The PowerShell that makes a Start-menu shortcut, every value written into it as a literal. (Passed after `-Command`, values never reach
+    `$args`: PowerShell adds them to the command's text, where "Start Menu" broke it -- found installing setup.exe for real, 13 Nov 2026.)"""
+    return (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut({_ps(str(lnk))});$s.TargetPath={_ps(str(target))};"
+            f"$s.Arguments={_ps(arguments)};$s.WorkingDirectory={_ps(str(workdir))};$s.Description={_ps(description)};$s.Save()")
 
 HERE = Path(__file__).resolve().parent.parent.parent
 SYSTEM_SID, ADMINS_SID, USERS_SID = "*S-1-5-18", "*S-1-5-32-544", "*S-1-5-32-545"
@@ -253,9 +270,7 @@ class WindowsInstall:
         if not self.a.no_shortcuts:
             lnk = self.program_shortcut()
             lnk.parent.mkdir(parents=True, exist_ok=True)
-            ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($args[0]);$s.TargetPath=$args[1];$s.Arguments='-m worker_client.program';"
-                  "$s.WorkingDirectory=$args[2];$s.Description='Falcon';$s.Save()")
-            run_cmd(["powershell", "-NoProfile", "-Command", ps, str(lnk), str(exe), str(self.app)])
+            run_cmd(["powershell", "-NoProfile", "-Command", shortcut_script(lnk, exe, "-m worker_client.program", self.app, "Falcon")])
             said.append(f"shortcut {lnk}")
         return "; ".join(said) or "nothing to do"
 
@@ -278,9 +293,8 @@ class WindowsInstall:
         if not self.a.no_shortcuts:
             lnk.parent.mkdir(parents=True, exist_ok=True)
             pythonw = self.runtime_python.with_name("pythonw.exe")
-            ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($args[0]);$s.TargetPath=$args[1];$s.Arguments='-m operator_client --gui';"
-                  "$s.WorkingDirectory=$args[2];$s.Description='Falcon console';$s.Save()")
-            run_cmd(["powershell", "-NoProfile", "-Command", ps, str(lnk), str(pythonw if pythonw.exists() else self.runtime_python), str(self.app)])
+            target = pythonw if pythonw.exists() else self.runtime_python
+            run_cmd(["powershell", "-NoProfile", "-Command", shortcut_script(lnk, target, "-m operator_client --gui", self.app, "Falcon console")])
         said = [f"shortcut {lnk}" if not self.a.no_shortcuts else "no shortcut (--no-shortcuts)"]
         if self.a.client_id:
             said.append(self._own_key_settings())
@@ -350,11 +364,25 @@ class WindowsInstall:
             return "removed"
         return "none"
 
+    # what Setup put there itself, and removes itself after this has run (the Python this may be running in, and Setup's own uninstaller)
+    SETUPS_OWN = ("python", "unins000.exe", "unins000.dat", "unins000.msg")
+
     def remove_program(self) -> str:
-        if self.target.exists():
-            shutil.rmtree(self.target)
+        if not self.target.exists():
+            return "nothing there"
+        left = []
+        for item in self.target.iterdir():
+            if item.name.lower() in self.SETUPS_OWN:
+                left.append(item.name)
+                continue
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+        if not left:
+            self.target.rmdir()
             return f"removed {self.target}"
-        return "nothing there"
+        return f"removed the program from {self.target} (Setup removes its own {', '.join(left)})"
 
     def remove_data(self) -> str:
         if self.a.purge_data and self.data.exists():

@@ -42,15 +42,21 @@ Source: "{#Bundle}"; DestDir: "{tmp}\payload"; DestName: "falcon-client.json"; F
 ; the Python the runtime is made from, kept with the program
 Source: "{#Python}\*"; DestDir: "{app}\python"; Flags: recursesubdirs createallsubdirs ignoreversion
 
-[Run]
-Filename: "{app}\python\python.exe"; \
-  Parameters: "-m installers.windows.install --role {#Role} --bundle ""{tmp}\payload\falcon-client.json"" --source ""{tmp}\payload"" --target ""{app}"" --python ""{app}\python\python.exe"" --code-file ""{tmp}\licence-code.txt"""; \
-  WorkingDir: "{tmp}\payload"; StatusMsg: "Installing Falcon..."; Flags: waituntilterminated runhidden
+; The installer itself (installers/windows/install.py) runs from [Code] below, not from a [Run] entry: a [Run] entry's exit code is not looked
+; at, so a failed install still said "Installation process succeeded" (found installing for real, 13 Nov 2026).
 
 [UninstallRun]
-Filename: "{app}\runtime\Scripts\python.exe"; \
-  Parameters: "-m installers.windows.install --role {#Role} --uninstall"; \
-  WorkingDir: "{app}\app"; RunOnceId: "FalconUninstall"; Flags: runhidden
+; with the Python Setup installed, from the program's folder and not from inside what it removes (from {app}\app with the runtime's Python,
+; it could not delete either: found 13 Nov 2026). Setup then removes its Python and itself.
+Filename: "{app}\python\python.exe"; \
+  Parameters: """{app}\app\installers\windows\install.py"" --role {#Role} --uninstall --target ""{app}"""; \
+  WorkingDir: "{app}"; RunOnceId: "FalconUninstall"; Flags: runhidden waituntilterminated
+
+; Running Setup's Python leaves files it did not install (compiled __pycache__): its folder goes whole, and the program's folder once empty.
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\python"
+Type: filesandordirs; Name: "{app}\install-log.txt"
+Type: dirifempty; Name: "{app}"
 
 [Code]
 { The licence code (the user, 2 Nov 2026): an admin code for the admin installer, a worker code for the worker one. With it the machine joins
@@ -59,6 +65,7 @@ Filename: "{app}\runtime\Scripts\python.exe"; \
   machine's private settings until it is used. }
 var
   CodePage: TInputQueryWizardPage;
+  InstallFailed: Boolean;
 
 procedure InitializeWizard;
 begin
@@ -69,8 +76,49 @@ begin
   CodePage.Add('Licence code:', False);
 end;
 
+// The installer, with what it says kept in the program folder's install-log.txt. If it fails, the person is shown the end of that log (or, installing
+// silently, the exit code is 10), never "succeeded".
+procedure RunInstaller;
+var
+  Py, Log, Args, Said: String;
+  Text: AnsiString;
+  Code: Integer;
+begin
+  Py := ExpandConstant('{app}\python\python.exe');
+  Log := ExpandConstant('{app}\install-log.txt');
+  Args := '-m installers.windows.install --role {#Role} --bundle "' + ExpandConstant('{tmp}\payload\falcon-client.json') + '" --source "' +
+          ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') + '" --python "' + Py + '" --code-file "' +
+          ExpandConstant('{tmp}\licence-code.txt') + '"';
+  WizardForm.StatusLabel.Caption := 'Installing Falcon...';
+  if not Exec(ExpandConstant('{cmd}'), '/C ""' + Py + '" ' + Args + ' > "' + Log + '" 2>&1"', ExpandConstant('{tmp}\payload'), SW_HIDE,
+              ewWaitUntilTerminated, Code) or (Code <> 0) then
+  begin
+    InstallFailed := True;
+    Said := '';
+    if LoadStringFromFile(Log, Text) then
+    begin
+      Said := String(Text);
+      if Length(Said) > 900 then
+        Said := '...' + Copy(Said, Length(Said) - 900, 900);
+    end;
+    SuppressibleMsgBox('Falcon could not finish installing (exit ' + IntToStr(Code) + '). What it said:' + #13#10#13#10 + Said + #13#10#13#10 +
+                       'The whole account is in ' + Log + '. Fix what it says and run this setup again: every step checks what is already done.',
+                       mbCriticalError, MB_OK, IDOK);
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
     SaveStringToFile(ExpandConstant('{tmp}\licence-code.txt'), Trim(CodePage.Values[0]), False);
+  if CurStep = ssPostInstall then
+    RunInstaller;
+end;
+
+function GetCustomSetupExitCode: Integer;
+begin
+  if InstallFailed then
+    Result := 10
+  else
+    Result := 0;
 end;

@@ -419,3 +419,25 @@ def test_the_licence_code_goes_only_into_the_machines_private_settings(tmp_path)
     assert json.loads(inst.worker_json.read_text(encoding="utf-8"))["enroll_code"] == "WRKR-5T8M-3Z6P-2222"
     public = [p for p in inst.data.rglob("*") if p.is_file() and p.parent != inst.private]
     assert public and all("WRKR" not in p.read_text(encoding="utf-8", errors="ignore") for p in public)
+
+
+def test_a_shortcut_s_paths_are_written_into_its_script_so_a_space_in_start_menu_cannot_break_it():
+    """Found installing setup.exe for real (13 Nov 2026): values given after -Command never reached $args."""
+    import subprocess
+    import sys
+    import tempfile
+    from pathlib import Path
+
+    from installers.windows.install import shortcut_script
+
+    ps = shortcut_script(Path(r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Falcon\Falcon.lnk"), Path(r"C:\Program Files\Falcon\runtime\pythonw.exe"),
+                         "-m worker_client.program", Path(r"C:\Program Files\Falcon\app"), "Kofi's Falcon")
+    assert "CreateShortcut('C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Falcon\\Falcon.lnk')" in ps and "'Kofi''s Falcon'" in ps and "$args" not in ps
+    if sys.platform == "win32":                                   # and it really makes the shortcut, in a folder with a space in its name
+        with tempfile.TemporaryDirectory() as tmp:
+            lnk = Path(tmp) / "Start Menu" / "Falcon.lnk"
+            lnk.parent.mkdir()
+            done = subprocess.run(["powershell", "-NoProfile", "-Command", shortcut_script(lnk, Path(sys.executable), "-V", Path(tmp), "Falcon")],
+                                  capture_output=True, text=True, timeout=60, check=False)
+            assert done.returncode == 0, done.stderr
+            assert lnk.is_file()
