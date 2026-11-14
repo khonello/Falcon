@@ -112,12 +112,16 @@ class Engine:
         from engine.control import executions as control_executions
         from engine.control import inventory as control_inventory
         from engine.hierarchy import licences
+        from engine.hierarchy import seats as hierarchy_seats
         from engine.task import expected as task_expected
 
         for mod in (control_events, control_executions, control_inventory, flow_sync, console_screens, console_marks, engine.detective, task_expected,
-                    licences):
+                    licences, hierarchy_seats):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
+        from engine.store import StoreLink
+
+        self.store = StoreLink(self)                   # who this Engine is at the store, and its seat grants (docs/SEATS-AND-SETUP.md)
 
     async def announce(self, kind: str, data: dict[str, Any] | None = None, *, source: str = "human", pc: int | None = None, cause: Any = None) -> Any:
         """Say that something happened to the whole system (engine/bus.py). Never raises: telling the others must not be what makes the thing fail."""
@@ -177,11 +181,17 @@ class Engine:
 
     async def stop(self) -> None:
         if self._server is not None:
-            self._server.close()
-            await self._server.wait_closed()
-        # Let every connection finish its disconnect handling before the pool goes away.
+            self._server.close()                     # no new connections
+        # Close every connection first: since Python 3.12 `wait_closed` waits until each one has gone, so waiting before closing them
+        # hung the Engine's stop for as long as any machine stayed connected (found on Linux, 14 Nov 2026). Then let each finish its
+        # disconnect handling before the pool goes away.
         for conn in list(self.connections):
             conn.writer.close()
+        if self._server is not None:
+            try:
+                await asyncio.wait_for(self._server.wait_closed(), 10)
+            except (TimeoutError, asyncio.TimeoutError):
+                log.warning("some connections did not close within 10 s; stopping anyway")
         if self._conn_tasks:
             await asyncio.wait(self._conn_tasks, timeout=5)
         await self.file_index.catchup_settled(timeout=5)      # what machines missed is taken in before the pool goes away

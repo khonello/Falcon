@@ -679,3 +679,19 @@ used only while the fingerprint matches the case as it is now). `issues.type` al
 past the 90-day window, one open issue at a time (`source_table = 'pc_days'`, `source_id = 0`), deleted only when an Admin picks Delete them.
 `flow_stages.stage_type` names a step's kind, and placing rows became branches (migration 053). `flow_sync_log.outcome` also takes `left_out` (a file a step did not take or could not convert, on the record so it is not sent again), a bundle's row has `source_relative_path = '<bundle>'` with the run's snapshot as `source_hash`, and `pcs.converter` says what a machine converts Office files with (`word`, `libreoffice`, NULL).
 `talk_requests`, `event_skips`, `conversations.title` (kind `group`), `action_executions.started_by_account_id` and `flows.paused_at` (migration 054: what the console's pages call).
+
+## 17. Seats (migration 056, 14 Nov 2026; docs/SEATS-AND-SETUP.md)
+
+How machines join, replacing the code typed from a machine's screen and the licence codes (which stay in their tables, unread):
+
+- `seat_grants`: what the store sold (`grant_id`, `role` admin or worker, `seats`, `valid_from`, `valid_until`), with `envelope`, the
+  document exactly as the store signed it. The signature is checked again each time a grant is read, so a row changed by hand counts for
+  nothing. Never edited or deleted; a renewal is a new grant.
+- `knocks`: one row per installed PC, keyed by its install token (held only as a hash), with what it says about itself on each knock
+  (`hostname`, `os`, `mac`, `hardware_id`, `signed_in_user`, `peer`, `first_seen`, `last_seen`, `knocks`). `status` waiting or seated;
+  `pc_id` once it has been seated; `delivered_at` once its key was handed over (once per seating). Back to waiting when its seat is taken.
+- `seats`: who gave a machine a seat and when (`given_by_account_id` NULL: before seats existed, or from the store), and who took it back,
+  when and why (`taken_by_account_id` NULL with `taken_at` set: the Engine, at the end of a seat period). At most one seat in use per
+  machine (`seats_one_per_pc`). Machines provisioned before this migration were given a seat row by it.
+- `issues.type` also takes `'seats'` (code prefix `SEA`): a seat period ending (30, 7, 1 days before; `source_table = 'seat_grants:<n>d'`)
+  and in its 7 days of grace (`'seat_grants:grace'`), `source_id` the grant.

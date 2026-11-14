@@ -19,5 +19,6 @@ from engine.hierarchy import (  # noqa: F401
     enrollment,
     licences,
     reports,
+    seats,
     traversal,
 )

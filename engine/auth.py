@@ -205,6 +205,12 @@ async def auth_respond(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         else:
             account = await engine.db.accounts.by_client_id(client_id)
             if account is None:
+                from engine.hierarchy import seats
+
+                if await seats.refused_for_no_seat(engine, client_id, nonce, str(payload.get("hmac", ""))):
+                    await engine.db.audit.write({"action": "auth.failed", "target_type": "client", "target_id": client_id,
+                                                 "detail": {"reason": "its seat was taken back", "kind": "no_seat", "claimed_name": payload.get("hostname")}})
+                    raise ProtocolError(ErrorCode.NO_SEAT, "this machine's seat was taken back: it knocks again")
                 await _fail(ctx, client_id, "client_id is not provisioned or its account is not active", kind="unknown", claimed=payload.get("hostname"))
             generation = account.get("key_generation") or 1
             presented = str(payload.get("hmac", ""))

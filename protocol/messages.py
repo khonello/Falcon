@@ -42,6 +42,7 @@ class ErrorCode(str, Enum):
     INTERNAL = "internal"
     NOT_IMPLEMENTED = "not_implemented"
     UNAVAILABLE = "unavailable"        # a required backend (database, LLM) is not connected
+    NO_SEAT = "no_seat"                # this machine's seat was taken back: it drops its key and knocks again (docs/SEATS-AND-SETUP.md)
 
 
 class ProtocolError(Exception):

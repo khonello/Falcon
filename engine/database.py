@@ -37,7 +37,7 @@ DEFAULT_ROUTED = ["resource_violation", "flow_failure", "update_status", "deviat
 # Legal targets for polymorphic references. Extend deliberately, never ad hoc.
 POLYMORPHIC_TABLES = frozenset({
     "accounts", "departments", "pcs", "sessions", "assisted_access_requests", "file_index",
-    "tasks", "department_tasks", "todos", "enrollments", "issues", "resource_marks", "deviations", "rules", "verification_items", "manual_verifications", "flows", "flow_destinations",
+    "tasks", "department_tasks", "todos", "enrollments", "knocks", "seat_grants", "issues", "resource_marks", "deviations", "rules", "verification_items", "manual_verifications", "flows", "flow_destinations",
     "flow_sync_log", "resource_violations", "pings", "message_channels", "messages", "conversations",
     "listeners", "reports", "event_definitions", "actions", "action_executions",
     "deviation_log", "versions", "pc_version_status", "system_alerts", "detective_cases", "detective_rules", "flow_restricted_consents", "proposals",
@@ -146,6 +146,7 @@ class Database:
         self.todos = TodosRepo(self)
         self.enrollments = EnrollmentsRepo(self)
         self.licences = LicencesRepo(self)
+        self.seats = SeatsRepo(self)
         self.issues = IssuesRepo(self)
         self.marks = MarksRepo(self)
         self.rules = RulesRepo(self)
@@ -1333,7 +1334,7 @@ class IssuesRepo(_Repo):
              "i.target_hours, i.state, i.label, i.detail, i.source_table, i.source_id, i.escalated_at, i.resolved_at, "
              "i.resolved_by_account_id, i.resolution, p.hostname, d.name AS department_name")
     _FROM = "FROM issues i LEFT JOIN pcs p ON p.id = i.pc_id LEFT JOIN departments d ON d.id = i.department_id"
-    _PREFIX: ClassVar[dict[str, str]] = {"file": "INC", "update": "UPD", "deviation": "DEV", "flow": "FLW", "offline": "OFF", "component": "CMP", "retention": "RET"}
+    _PREFIX: ClassVar[dict[str, str]] = {"file": "INC", "update": "UPD", "deviation": "DEV", "flow": "FLW", "offline": "OFF", "component": "CMP", "retention": "RET", "seats": "SEA"}
 
     async def raise_(self, issue: dict[str, Any]) -> tuple[int, bool]:
         """(id, created). A cause that already has an open issue returns that one, created False."""
@@ -1478,6 +1479,90 @@ class LicencesRepo(_Repo):
         """The machines that joined with a code: hostname, when, and the account made."""
         return await self._fetch("SELECT e.hostname, e.decided_at, e.account_id, e.pc_id FROM enrollments e WHERE e.licence_code_id = $1 "
                                  "AND e.status = 'confirmed' ORDER BY e.decided_at", code_id)
+
+
+class SeatsRepo(_Repo):
+    """Knocks, seats and seat grants (migration 056; docs/SEATS-AND-SETUP.md). A seat is given and taken back, never deleted."""
+
+    _KNOCK = ("k.id, k.hostname, k.os, k.mac, k.hardware_id, k.signed_in_user, k.peer, k.status, k.pc_id, k.delivered_at, k.first_seen, "
+              "k.last_seen, k.knocks")
+
+    async def knock(self, token_hash: str, facts: dict[str, Any], peer: str | None) -> dict[str, Any]:
+        """One row per installed PC: made on its first knock, brought up to date by each one after. `created` says which."""
+        return await self._one(
+            "INSERT INTO knocks AS k (token_hash, hostname, os, mac, hardware_id, signed_in_user, peer) VALUES ($1, $2, $3, $4, $5, $6, $7) "
+            "ON CONFLICT (token_hash) DO UPDATE SET hostname = EXCLUDED.hostname, os = EXCLUDED.os, mac = EXCLUDED.mac, "
+            "hardware_id = EXCLUDED.hardware_id, signed_in_user = EXCLUDED.signed_in_user, peer = EXCLUDED.peer, last_seen = now(), "
+            f"knocks = k.knocks + 1 RETURNING {self._KNOCK}, (xmax = 0) AS created",
+            token_hash, facts["hostname"], facts.get("os"), facts.get("mac"), facts.get("hardware_id"), facts.get("user"), peer)
+
+    async def knock_by_hash(self, token_hash: str) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._KNOCK} FROM knocks k WHERE k.token_hash = $1", token_hash)
+
+    async def get_knock(self, knock_id: int) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._KNOCK} FROM knocks k WHERE k.id = $1", knock_id)
+
+    async def knock_for_pc(self, pc_id: int) -> dict[str, Any] | None:
+        return await self._one(f"SELECT {self._KNOCK} FROM knocks k WHERE k.pc_id = $1", pc_id)
+
+    async def knocks(self, status: str | None = "waiting") -> list[dict[str, Any]]:
+        return await self._fetch(f"SELECT {self._KNOCK} FROM knocks k WHERE ($1::text IS NULL OR k.status = $1) ORDER BY k.first_seen", status)
+
+    async def count_waiting(self) -> int:
+        return int(await self._val("SELECT count(*) FROM knocks WHERE status = 'waiting'") or 0)
+
+    async def seated(self, knock_id: int, pc_id: int) -> None:
+        await self._exec("UPDATE knocks SET status = 'seated', pc_id = $2, delivered_at = NULL WHERE id = $1", knock_id, pc_id)
+
+    async def deliver(self, knock_id: int) -> bool:
+        """The key goes to the machine once per seating: True the first time only."""
+        return await self._val("UPDATE knocks SET delivered_at = now() WHERE id = $1 AND status = 'seated' AND delivered_at IS NULL RETURNING true",
+                               knock_id) is True
+
+    async def back_to_waiting(self, pc_id: int) -> None:
+        await self._exec("UPDATE knocks SET status = 'waiting', delivered_at = NULL WHERE pc_id = $1", pc_id)
+
+    # --- seats --------------------------------------------------------------------------------------------------------
+
+    async def give(self, pc_id: int, role: str, by_account_id: int | None) -> int:
+        return await self._val("INSERT INTO seats (pc_id, role, given_by_account_id) VALUES ($1, $2, $3) RETURNING id", pc_id, role, by_account_id)
+
+    async def active(self, pc_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT id, pc_id, role, given_by_account_id, given_at FROM seats WHERE pc_id = $1 AND taken_at IS NULL", pc_id)
+
+    async def in_use(self, role: str) -> int:
+        return int(await self._val("SELECT count(*) FROM seats WHERE role = $1 AND taken_at IS NULL", role) or 0)
+
+    async def newest(self, role: str, n: int) -> list[dict[str, Any]]:
+        """The n seats of a kind given most recently: the ones taken back first when a period ends with more in use than bought."""
+        return await self._fetch("SELECT id, pc_id, role, given_at FROM seats WHERE role = $1 AND taken_at IS NULL ORDER BY given_at DESC, id DESC LIMIT $2",
+                                 role, n)
+
+    async def take(self, pc_id: int, by_account_id: int | None, reason: str) -> bool:
+        return await self._val("UPDATE seats SET taken_at = now(), taken_by_account_id = $2, taken_reason = $3 WHERE pc_id = $1 AND taken_at IS NULL "
+                               "RETURNING true", pc_id, by_account_id, reason) is True
+
+    async def taken_from(self, client_id: str) -> dict[str, Any] | None:
+        """The machine with this client id, when its seat was taken back and none was given since (what a sign-in refused as `no_seat` reads)."""
+        return await self._one(
+            "SELECT p.id, p.hostname, p.key_generation FROM pcs p WHERE p.client_id = $1 "
+            "AND NOT EXISTS (SELECT 1 FROM seats s WHERE s.pc_id = p.id AND s.taken_at IS NULL) "
+            "AND EXISTS (SELECT 1 FROM seats s WHERE s.pc_id = p.id AND s.taken_at IS NOT NULL)", client_id)
+
+    async def reactivate(self, pc_id: int) -> int | None:
+        """The account bound to a machine that is seated again (it was offboarded when its seat was taken back)."""
+        return await self._val("UPDATE accounts SET status = 'active', offboarded_at = NULL WHERE bound_pc_id = $1 AND role IN ('admin', 'worker') "
+                               "RETURNING id", pc_id)
+
+    # --- grants -------------------------------------------------------------------------------------------------------
+
+    async def add_grant(self, grant_id: str, role: str, seats: int, valid_from: datetime, valid_until: datetime, envelope: dict[str, Any]) -> bool:
+        return await self._val(
+            "INSERT INTO seat_grants (grant_id, role, seats, valid_from, valid_until, envelope) VALUES ($1, $2, $3, $4, $5, $6) "
+            "ON CONFLICT (grant_id) DO NOTHING RETURNING true", grant_id, role, seats, valid_from, valid_until, envelope) is True
+
+    async def grants(self) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT id, grant_id, role, seats, valid_from, valid_until, envelope, received_at FROM seat_grants ORDER BY valid_until")
 
 
 class EnrollmentsRepo(_Repo):

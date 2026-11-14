@@ -46,8 +46,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-TARGET_HOURS = {"file": 1, "update": 24, "deviation": 8, "flow": 72, "offline": 72, "component": 24, "retention": 168}
-TYPE_LABEL = {"file": "Restricted file", "update": "Stuck update", "deviation": "Deviation", "flow": "Flow blocked", "offline": "Not checking in", "component": "Part of the Worker", "retention": "Old records"}
+TARGET_HOURS = {"file": 1, "update": 24, "deviation": 8, "flow": 72, "offline": 72, "component": 24, "retention": 168, "seats": 168}
+TYPE_LABEL = {"file": "Restricted file", "update": "Stuck update", "deviation": "Deviation", "flow": "Flow blocked", "offline": "Not checking in", "component": "Part of the Worker", "retention": "Old records", "seats": "Seats"}
 SEVERITIES = ("critical", "high", "medium", "low")
 OFFLINE_AFTER = timedelta(minutes=20)           # a machine quiet for this long raises an issue
 OFFLINE_MEDIUM_AFTER = timedelta(hours=24)
@@ -200,7 +200,7 @@ async def _load(ctx: Context, issue_id: int) -> dict[str, Any]:
 # what the audit trail may add to an issue's story: only the kinds of event that belong to its kind. A machine records a great deal besides (a flow
 # syncing, a routine update check, someone signing in), and none of that is part of why a restricted copy was found.
 RELATED_KINDS = {"file": {"violation", "protected", "session"}, "update": {"rollout", "session"}, "deviation": {"deviation", "session"}, "flow": {"flow"},
-                 "offline": {"session", "rollout"}, "component": {"session"}, "retention": {"retention"}}
+                 "offline": {"session", "rollout"}, "component": {"session"}, "retention": {"retention"}, "seats": {"seats"}}
 
 
 async def _timeline(ctx: Context, issue: dict[str, Any]) -> list[dict[str, Any]]:

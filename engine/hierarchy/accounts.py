@@ -128,7 +128,7 @@ async def seat_watch(engine: Any, department_id: int, name: str) -> None:
                                kind="dept", department_id=department_id, label=name)
 
 
-async def provision(engine: Any, role: str, department_id: int | None, hostname: str) -> dict[str, Any]:
+async def provision(engine: Any, role: str, department_id: int | None, hostname: str, *, seat_by: int | None = None) -> dict[str, Any]:
     """An account and its PC together (one account <-> one PC), with a new client id and its key. Shared by
     `hierarchy.account_create` and by confirming an enrollment, so a machine provisioned either way is the same."""
     client_id = secrets.token_urlsafe(16)
@@ -136,6 +136,8 @@ async def provision(engine: Any, role: str, department_id: int | None, hostname:
     async with db.pool.acquire() as conn, conn.transaction():
         pc_id = await db.accounts.create_pc(hostname, department_id, PC_TYPE_FOR_ROLE[role], client_id)
         account_id = await db.accounts.create(role, department_id, pc_id)
+        if role in ("admin", "worker"):                       # every machine in uses a seat, however it came in (docs/SEATS-AND-SETUP.md)
+            await db.seats.give(pc_id, role, seat_by)
     return {"account_id": account_id, "pc_id": pc_id, "client_id": client_id,
             "client_key": engine.client_key(client_id), "role": role}
 

@@ -300,6 +300,16 @@ ENTRIES: dict[str, tuple[str, str, S]] = {
     "enroll.refused": ("admin", "done", lambda w: f"Refused to let {w.d.get('hostname') or 'a machine'} join" + (f": {_q(w.d['reason'], 50)}" if w.d.get("reason") else "")),
     "enroll.cancelled": ("admin", "done", lambda w: f"{w.d.get('hostname') or 'A machine'} stopped asking to join"),
     "enroll.collected": ("admin", "routine", lambda w: "A machine that joined collected its key"),
+    "knock.new": ("admin", "worth", lambda w: f"{w.d.get('hostname') or 'A machine'} is knocking for a seat"
+                  + (f" ({w.d['user']} signed in)" if w.d.get("user") else "")),
+    "knock.flooded": ("admin", "worth", lambda w: f"Too many new machines knocked from {w.d.get('address') or 'one address'}: refused for an hour"),
+    "seat.given": ("admin", "done", lambda w: f"Gave {w.d.get('hostname') or w.host or 'a machine'} a {w.d.get('role') or 'Worker'} seat"),
+    "seat.collected": ("admin", "routine", lambda w: f"{w.host or 'A machine'} collected its key"),
+    "seat.taken": ("admin", "done", lambda w: f"Took back the seat of {w.d.get('hostname') or w.host or 'a machine'}"
+                   + (": the seat period ended" if w.d.get("reason") == "the seat period ended" else "")),
+    "seats.granted": ("admin", "done", lambda w: f"{'Admin' if w.d.get('role') == 'admin' else 'Worker'} seats came from the store"
+                      + (f": {w.d['seats']}" if w.d.get("seats") else "")
+                      + (f", until {str(w.d['valid_until'])[:10]}" if w.d.get("valid_until") else "")),
     "licence.imported": ("admin", "done", lambda w: f"Imported the licence {w.d.get('name') or ''}".rstrip()),
     "licence.revoked": ("admin", "done", lambda w: "Revoked a licence code"),
     "licence.wrong_code": ("admin", "worth", lambda w: "A machine tried a licence code that is not valid"),
@@ -343,7 +353,7 @@ def kind_of(action_type: str) -> str:
     if action_type in ENTRIES:
         return ENTRIES[action_type][0]
     return next((k for p, k in _KIND_PREFIX if action_type.startswith(p)), "admin" if action_type.split(".")[0] in (
-        "account", "pc", "department", "enroll", "alert", "licence", "registry", "audit", "display_name", "retention") else "system")
+        "account", "pc", "department", "enroll", "knock", "seat", "seats", "alert", "licence", "registry", "audit", "display_name", "retention") else "system")
 
 
 def _like_patterns(kinds: list[str]) -> tuple[list[str], list[str]]:

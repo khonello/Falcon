@@ -55,6 +55,8 @@ class Scheduler:
         self.every("control.polled", float(self.engine.settings.control_poll_seconds), self._evaluate_polled)
         self.every("alerts.deliver", 30.0, self._deliver_alerts)
         self.every("enroll.expire", 600.0, self._expire_enrollments)
+        self.every("seats.grants", 24 * 3600, self._fetch_seat_grants)      # new seats bought in the store (never re-checks old ones)
+        self.every("seats.periods", 6 * 3600, self._watch_seat_periods)     # warnings, grace, and seats over the count taken back
         self.every("flow.transfers", 30.0, self._expire_flow_transfers)
         self.every("flow.heal", 1200.0, self._heal_flows)
         self.every("flow.hourly", 3600.0, self._hourly_flows)
@@ -120,6 +122,17 @@ class Scheduler:
         from engine.flow import sync
 
         await sync.expire_transfers(self.engine)
+
+    async def _fetch_seat_grants(self) -> None:
+        if self.engine.db.connected and self.engine.store.registered:
+            if await self.engine.store.fetch_grants():
+                await self.engine.push_to_role("admin", "seats.changed", {})
+            await self.engine.store.report_usage()
+
+    async def _watch_seat_periods(self) -> None:
+        from engine.hierarchy import seats
+
+        await seats.watch_periods(self.engine)
 
     async def _expire_enrollments(self) -> None:
         from engine.hierarchy import enrollment

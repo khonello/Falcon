@@ -34,7 +34,7 @@ log = logging.getLogger(__name__)
 MAX_LINE_BYTES = 4 * 1024 * 1024  # generous: Custom Action scripts and file-sweep batches
 PRE_AUTH_PREFIXES = ("auth.", "system.")
 # The two requests a machine with no key yet may make: asking to be registered, and collecting the answer.
-PRE_AUTH_TYPES = frozenset({"enroll.request", "enroll.wait", "enroll.cancel"})
+PRE_AUTH_TYPES = frozenset({"enroll.request", "enroll.wait", "enroll.cancel", "knock.hello"})
 
 
 class Connection:
@@ -48,6 +48,7 @@ class Connection:
         self.authenticated = False
         self.pending_nonce: str | None = None
         self.enrollment_id: int | None = None      # set when this connection asked to be registered
+        self.knock_id: int | None = None           # set when this connection knocked (it is nudged the moment it is given a seat)
         self._write_lock = asyncio.Lock()
 
     # --- outbound -------------------------------------------------------------------------------

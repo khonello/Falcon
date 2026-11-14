@@ -119,3 +119,52 @@ async def licences(ctx: ShellContext, args: Args) -> str:
 async def licence_revoke(ctx: ShellContext, args: Args) -> str:
     await ctx.call("licence.revoke", {"code_id": args.get_int(0, "code_id")})
     return "withdrawn"
+
+
+# --- seats: machines knock, Admins give seats (docs/SEATS-AND-SETUP.md) -------------------------------------------------
+
+@command("seats", help_="Seats bought and in use, for Admins and for Workers, and until when")
+async def seats(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("seats.summary")
+    if not res["registered"]:
+        head = "This Engine is not registered with the store: seats are not counted."
+    else:
+        head = "Seats (bought in the store):"
+    rows_ = []
+    for role, label in (("admin", "Admin"), ("worker", "Worker")):
+        r = res[role]
+        until = (r["valid_until"] or "")[:10]
+        grace = f"in grace until {r['grace_ends'][:10]}" if r["in_grace"] and r["grace_ends"] else ""
+        rows_.append({"kind": label, "bought": "-" if r["bought"] is None else r["bought"], "in use": r["in_use"],
+                      "free": "-" if r["free"] is None else r["free"], "until": until, "note": grace})
+    return head + "\n" + table(rows_, ["kind", "bought", "in use", "free", "until", "note"])
+
+
+@command("knocks", help_="Machines knocking for a seat, with what they say about themselves (look-alikes flagged)")
+async def knocks(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("knocks.list")
+    rows_ = [{"id": k["id"], "machine": k["hostname"], "signed in": k["signed_in_user"] or "", "address": k["peer"] or "",
+              "hardware": (k["hardware_id"] or "")[:18], "first knocked": (k["first_seen"] or "")[:16], "look-alike": "; ".join(k["look_alike"])}
+             for k in res["knocks"]]
+    return table(rows_, ["id", "machine", "signed in", "address", "hardware", "first knocked", "look-alike"]) if rows_ else "(nobody is knocking)"
+
+
+@command("seat", "give", "<knock_id> [department_id]", "Give a knocking machine a Worker seat, in that department (needed when departments exist)")
+async def seat_give(ctx: ShellContext, args: Args) -> str:
+    payload: dict = {"knock_id": args.get_int(0, "knock_id")}
+    if len(args.positional) > 1:
+        payload["department_id"] = args.get_int(1, "department_id")
+    res = await ctx.call("seat.give", payload)
+    return f"{res['hostname']} has a Worker seat (pc {res['pc_id']}, department {res['department_id']}); it collects its own key"
+
+
+@command("seat", "take", "<pc_id>", "Take a machine's seat back: it is cut off from the Engine and knocks again (never the last Admin seat)")
+async def seat_take(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("seat.take", {"pc_id": args.get_int(0, "pc_id")})
+    return f"pc {res['pc_id']}'s {res['role']} seat is taken back; it knocks again"
+
+
+@command("seats", "refresh", help_="Ask the store now for seats bought since it last asked")
+async def seats_refresh(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("seats.refresh")
+    return f"{res['added']} new grant(s) from the store" if res["added"] else "nothing new from the store"
