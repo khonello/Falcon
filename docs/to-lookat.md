@@ -18,7 +18,10 @@ Every call the console, the TUI and the Worker make has a handler. These are wha
 
 **Unexplained:** a full test run froze on 4 Nov 2026 at 18:32:31 (no CPU, 74 threads waiting, the 180 s limit never fired). Not the Wi-Fi drop: that was 19:07:28. The likeliest cause is the `winnotify` memory fault, fixed at 23:52 after that run. Not seen since in 2 full runs and 4 repeats of the Worker tests, which is not proof.
 
-**Flaky, timing only:** `test_the_screen_streamer...` (the streamer hears stop only on its next send, and an unchanged screen sends nothing) and `test_chain_resource_violation...` (waits 15 s for a process). Each failed once under load and passes alone (6 of 6, 5 of 5).
+**Flaky, timing only:** `test_the_screen_streamer...` (the streamer hears stop only on its next send, and an unchanged screen sends nothing) and `test_chain_resource_violation...` (waits 15 s for a process). Each failed once under load and passes alone (6 of 6, 5 of 5). Also seen under a full run (13-14 Nov 2026), each passing alone and
+in its file twice: `test_flow_live::test_a_flow_never_overwrites_a_file_it_did_not_write`,
+`test_flow_restricted::test_a_restricted_file_met_while_running_holds_the_flow_and_after_consent_it_arrives_and_is_not_reported`,
+`test_detective_board::test_one_busy_machine...` (a timing bound, while setup.exe builds ran beside it).
 
 **Hands-on:** all four scenarios in `docs/HANDS-ON-SCENARIOS.md` were run end to end on 5 Nov 2026 by Claude, with real Notepad and File Explorer by keystroke, and passed, through the TUI. A real USB stick and USB hard disk were tried too (`worker_client/drivewatch.py`): both had been invisible until then. Not covered: the same journeys through the console's pages.
 
