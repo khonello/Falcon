@@ -465,3 +465,14 @@ def test_the_uninstall_stops_what_still_runs_from_the_program_and_not_itself(tmp
     finally:
         if running.poll() is None:
             running.kill()
+
+
+def test_the_first_it_admin_s_pc_is_given_the_engine_s_first_admin_file(tmp_path):
+    """Nobody can confirm the very first Admin's PC by its code, so its setup.exe takes the first-admin.txt the Engine's installer wrote (14 Nov 2026)."""
+    f = tmp_path / "first-admin.txt"
+    f.write_text("The first IT Admin (printed once by the installer; delete this file after it is safely held)\n"
+                 "client_id:  REi1I7KFNDPu3fEKj9UJbg\nclient_key: 04452777ebadd528a42946814f2d4846cb017bf81a3d35b5b5e51827712df84a\n", encoding="utf-8")
+    assert win_install.first_admin(f) == ("REi1I7KFNDPu3fEKj9UJbg", "04452777ebadd528a42946814f2d4846cb017bf81a3d35b5b5e51827712df84a")
+    f.write_text("not that file\n", encoding="utf-8")
+    with pytest.raises(InstallError):
+        win_install.first_admin(f)

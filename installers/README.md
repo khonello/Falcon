@@ -1,11 +1,12 @@
 # Installers
 
-The code behind the four installers (decided in `docs/PACKAGING-PLAN.md`). It is written and tested; it is **not compiled into executables
-yet** (see "Still to do"). Nothing here is run by the Engine or the clients.
+The code behind the installers (decided in `docs/PACKAGING-PLAN.md`). **Deployment is on Windows** (the user, 14 Nov 2026): each machine is
+given one `setup.exe`, built by `installers/windows/build_setup.py` (`engine`, `admin`, `worker`). The Engine's Linux installer (the `.deb`) is
+kept and tested, apart from the Windows one. Nothing here is run by the Engine or the clients.
 
-| Machine | Command | Where |
+| Machine | setup.exe (Windows) | Or by hand |
 |---|---|---|
-| The server | `sudo python3 -m installers.engine.install --names falcon.internal,192.168.1.20 --hostname IT-01` | Linux, once |
+| The server | `falcon-engine-setup.exe` (38 MB): asks the names, the first IT Admin's PC, PostgreSQL's superuser password | `python -m installers.windows.engine_install --names ... --hostname IT-01 --admin-url-file pg.txt`; Linux: `sudo python3 -m installers.engine.install --names ... --hostname IT-01` |
 | A person's PC | `python -m installers.windows.install --role worker --bundle falcon-client.json` | Windows, as administrator |
 | The first IT Admin's workstation | `... --role admin --bundle falcon-client.json --client-id <id> --client-key-file key.txt` | Windows, as administrator |
 | Another IT Admin's workstation | `... --role admin --bundle falcon-client.json` | Windows, as administrator |
@@ -17,7 +18,11 @@ installer checks the manifest first and refuses a payload that was changed or ha
 
 ## The order
 
-1. **The Engine's installer, on the server.** It makes the `falcon` user and folders, the runtime, a PostgreSQL role with a made-up password, the
+1. **The Engine's installer, on the server.** On Windows (`falcon-engine-setup.exe`, PostgreSQL installed first): the program in
+   `C:\Program Files\Falcon Engine`, its settings and secrets in `C:\ProgramData\Falcon Engine` (system and administrators only), a PostgreSQL
+   role with a made-up password, `engine setup`, the firewall rule, the **FalconEngine** service; it writes `falcon-client.json` and
+   `first-admin.txt` in that folder and prints the fingerprint. *Run for real, 14 Nov 2026:* installed silently (`/ANSWERS=`), a console signed in
+   to it as the first IT Admin over TLS pinned to the bundle, `engine health` answered, uninstalled with the data kept. On Linux: it makes the `falcon` user and folders, the runtime, a PostgreSQL role with a made-up password, the
    settings (`/etc/falcon/falcon.env`), runs `python -m engine setup` (certificate for `--names`, schema, master secret, the first IT Admin, the
    firewall), and installs the systemd service. It writes **`falcon-client.json`**, the bundle every PC is given: the Engine's address and its
    certificate, **no key**, and prints the certificate's **fingerprint**. The first IT Admin's id and key are in

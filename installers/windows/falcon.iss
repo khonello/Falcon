@@ -65,6 +65,9 @@ Type: dirifempty; Name: "{app}"
   machine's private settings until it is used. }
 var
   CodePage: TInputQueryWizardPage;
+#if Role == "admin"
+  FirstAdminPage: TInputFileWizardPage;
+#endif
   InstallFailed: Boolean;
 
 procedure InitializeWizard;
@@ -74,6 +77,28 @@ begin
     'Type the {#Role} code from the licence your organisation bought. The machine then joins on its own. ' +
     'Leave it empty to have an IT Admin let it in instead.');
   CodePage.Add('Licence code:', False);
+#if Role == "admin"
+  // The first IT Admin's PC cannot join by a code: nobody is there yet to confirm it. It is given the Engine's first-admin.txt instead.
+  FirstAdminPage := CreateInputFilePage(CodePage.ID, 'The first IT Admin',
+    'Only for the very first IT Admin''s PC',
+    'If this is the first IT Admin''s PC, choose the first-admin.txt the Engine''s installer left in C:\ProgramData\Falcon Engine on the ' +
+    'Engine''s machine (copy it here first). Leave it empty for any other Admin: that PC joins with the code it shows.');
+  FirstAdminPage.Add('first-admin.txt:', 'Text files|*.txt|All files|*.*', '.txt');
+#endif
+end;
+
+function FirstAdminArg: String;
+var
+  Path: String;
+begin
+  Result := '';
+  Path := ExpandConstant('{param:FIRSTADMIN|}');
+#if Role == "admin"
+  if Path = '' then
+    Path := Trim(FirstAdminPage.Values[0]);
+#endif
+  if Path <> '' then
+    Result := ' --first-admin-file "' + Path + '"';
 end;
 
 // The installer, with what it says kept in the program folder's install-log.txt. If it fails, the person is shown the end of that log (or, installing
@@ -88,7 +113,7 @@ begin
   Log := ExpandConstant('{app}\install-log.txt');
   Args := '-m installers.windows.install --role {#Role} --bundle "' + ExpandConstant('{tmp}\payload\falcon-client.json') + '" --source "' +
           ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') + '" --python "' + Py + '" --code-file "' +
-          ExpandConstant('{tmp}\licence-code.txt') + '"';
+          ExpandConstant('{tmp}\licence-code.txt') + '"' + FirstAdminArg;
   WizardForm.StatusLabel.Caption := 'Installing Falcon...';
   if not Exec(ExpandConstant('{cmd}'), '/C ""' + Py + '" ' + Args + ' > "' + Log + '" 2>&1"', ExpandConstant('{tmp}\payload'), SW_HIDE,
               ewWaitUntilTerminated, Code) or (Code <> 0) then

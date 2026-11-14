@@ -26,6 +26,21 @@ will use in `--names` the first time: `--names falcon.internal,192.168.50.10,192
 
 ## Once, on every machine (needs the internet: do it before case 3)
 
+**With the installers (14 Nov 2026), nothing is installed by hand: no Python, no clone.** Three files, built on the development PC with
+`python -m installers.windows.build_setup engine|admin|worker --python <python 3.10 folder> [--bundle falcon-client.json]`:
+
+1. **ENG-01:** install PostgreSQL (postgresql.org), then run `falcon-engine-setup.exe` as an administrator: names `falcon.internal`, first
+   IT Admin's PC `IT-01`, PostgreSQL's superuser password, and yes to the model. It leaves `falcon-client.json` and `first-admin.txt` in
+   `C:\ProgramData\Falcon Engine`. Copy `falcon-client.json` back to the development PC and build the two client setups with it:
+   `build_setup admin --bundle falcon-client.json ...` and `build_setup worker --bundle falcon-client.json ...` (each setup.exe carries
+   this Engine's address and certificate).
+2. **IT-01** (the first IT Admin): copy `first-admin.txt` from ENG-01, run `falcon-admin-setup.exe`, and choose that file on its
+   *The first IT Admin* page (silent: `/FIRSTADMIN=C:\pathirst-admin.txt`). The console then signs in as that Admin; delete the file after.
+   Its service asks to be registered: let it in from that console with the code it shows.
+3. **WS-01, WS-02:** `falcon-worker-setup.exe`. Each shows a code and waits; the IT Admin lets it in with that code (Machines, Asking to join).
+
+**By hand instead** (from a clone, the development way):
+
 1. **ENG-01**, from an elevated PowerShell, in the Falcon folder (full commands in `GETTING-STARTED.md`, section 2, step 1):
    PostgreSQL installed; `environ-engine` made and filled; then
    `environ-engine\Scripts\python.exe -m engine setup --names falcon.internal --hostname IT-01 --no-operator-config --admin-url postgresql://postgres:<password>@localhost:5432/postgres --download-model`.

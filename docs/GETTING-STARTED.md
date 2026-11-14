@@ -68,7 +68,16 @@ machine is registered).
 
 ### Step 1 -- the Engine
 
-On the machine that will run it (Linux or Windows; it is the only machine with a database). On Windows, from an **elevated** PowerShell
+**With the installer (how it ships, on Windows):** install PostgreSQL first (postgresql.org's Windows installer; remember its superuser
+password), then run **`falcon-engine-setup.exe`** as an administrator. It asks the names the PCs will use (keep `falcon.internal`), the first
+IT Admin's PC name and PostgreSQL's superuser password, and does everything below by itself: certificate, database, first IT Admin, firewall,
+the **FalconEngine** service (starts with Windows). It leaves, in `C:\ProgramData\Falcon Engine`: `falcon-client.json` (give it to the PCs'
+setup.exe builds), `first-admin.txt` (the first IT Admin's id and key: keep them, then delete it) and `master.secret` (**back it up offline**).
+Its log is `C:\ProgramData\Falcon Engine\logs\engine.log`; `python -m engine health` on that machine says whether it is well; it is
+stopped and started from Services (`services.msc`) or `python -m engine service stop|start`. Silent: `falcon-engine-setup.exe /VERYSILENT
+/ANSWERS=answers.json`. The steps below are the same by hand, from a clone.
+
+On the machine that will run it (Windows, or Linux if it must be; it is the only machine with a database). On Windows, from an **elevated** PowerShell
 in the Falcon folder, so setup can add the firewall rule:
 
 1. Give it a fixed address on the network and a name the others can resolve (e.g. `falcon.internal`, or just its IP). On a test network

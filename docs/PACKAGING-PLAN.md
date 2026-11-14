@@ -32,7 +32,7 @@ Split by **where the code must run and with what rights**, not by feature.
 | A person's PC | **Worker** | service, indexer, UI helper |
 | An Admin's PC | **Admin** | console + the Worker pieces (an Admin's workstation is a machine the hierarchy can enter or block) |
 | The Super User's PC | **Super User** | console + the Worker pieces (its occupant is unevictable) |
-| The server | **Engine** (Linux) | the Engine, PostgreSQL setup, model, systemd unit; a `.deb` first |
+| The server | **Engine** (Windows; Linux kept) | `falcon-engine-setup.exe`: the Engine, its PostgreSQL role, settings and secrets, the FalconEngine service; on Linux the `.deb` and systemd |
 
 - Each is run once by someone with administrator rights on that machine. Nobody installs pieces one by one; the
   privilege split happens at run time.
@@ -71,6 +71,14 @@ Split by **where the code must run and with what rights**, not by feature.
   the concept's pages are all in the QML.
 - **The bundled interpreter is python.org's full Windows layout** (its NuGet package), installed with the program; the runtime is a venv
   made from it, filled from wheels carried in the setup (`installers/windows/build_setup.py`).
+
+## Decided 14 Nov 2026
+
+- **Deployment is on Windows, every machine** (the user): the Engine gets its own `falcon-engine-setup.exe` and runs as the FalconEngine
+  service. Linux stays possible and tested (the `.deb`), kept apart from the Windows parts so neither bends the other.
+- **The Worker's windows are not frozen into executables.** They run on the Python the setup bundles, which the Worker needs anyway for
+  Custom Actions (spec 7.3): freezing would add a second copy of Qt and Python for nothing it does better.
+- **The console runs on PySide6-Essentials**, as the Worker's windows do: every setup.exe is 38-94 MB.
 
 ## Still to decide when packaging starts
 

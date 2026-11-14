@@ -435,6 +435,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--client-id", help="admin, the first IT Admin only: the client id the Engine's installer printed")
     ap.add_argument("--client-key", help="the key (prefer --client-key-file: a command line is remembered)")
     ap.add_argument("--client-key-file", help="a file holding the key")
+    ap.add_argument("--first-admin-file", help="admin, the first IT Admin only: the first-admin.txt the Engine's installer left (its id and key); "
+                                               "the first Admin's PC cannot join by a code, nobody is there yet to confirm it")
     ap.add_argument("--watch", action="append", help=r"a folder to watch (repeatable; default C:\Users)")
     ap.add_argument("--source", help="the payload folder (default: the one this installer is in)")
     ap.add_argument("--target", help=r"where the program goes (default C:\Program Files\Falcon)")
@@ -455,8 +457,25 @@ def parser() -> argparse.ArgumentParser:
     return ap
 
 
+def first_admin(path: Path) -> tuple[str, str]:
+    """(client id, key) from the first-admin.txt the Engine's installer writes."""
+    import re
+
+    text = path.read_text(encoding="utf-8")
+    cid, key = re.search(r"client_id:\s*(\S+)", text), re.search(r"client_key:\s*([0-9a-fA-F]+)", text)
+    if not cid or not key:
+        raise InstallError(f"{path} does not hold a client_id and a client_key (it is the first-admin.txt the Engine's installer wrote)")
+    return cid.group(1), key.group(1)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    if args.first_admin_file:
+        try:
+            args.client_id, args.client_key = first_admin(Path(args.first_admin_file))
+        except (OSError, InstallError) as exc:
+            print(f"\nNot finished: {exc}", file=sys.stderr)
+            return 1
     inst = WindowsInstall(args)
     try:
         (inst.uninstall_plan() if args.uninstall else inst.plan()).run(dry_run=args.dry_run)

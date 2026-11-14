@@ -244,7 +244,8 @@ What the concept shows and the Engine cannot do yet is drawn disabled, with the 
 > reader running inside the signed-in person's session under a Windows service) are recorded, not started.
 
 - [x] Worker Client: bundled pinned interpreter (python.org 3.10.11) + the service, installed as a Windows service by `falcon-worker-setup.exe` (94 MB); the package carries the Engine's pinned certificate and the machine registers by its code (no key in any package). Installed, repaired, upgraded and uninstalled for real on the development PC, 13-14 Nov 2026 (`installers/README.md`). The service runs on the bundled Python rather than frozen: it needs a real interpreter for Custom Actions anyway (spec 7.3).
-- [ ] Worker Overlay exe + Dialog exe frozen with the same toolchain (designed in Phase 7)
+- [x] Worker Overlay exe + Dialog exe: decided not to freeze (14 Nov 2026, `docs/PACKAGING-PLAN.md`): they run on the Python the setup bundles, which the Worker needs anyway for Custom Actions
+- [x] **Engine on Windows** (deployment is Windows, the user, 14 Nov 2026): the FalconEngine service (`engine/winservice.py`, `common/winsvc.py`) and `falcon-engine-setup.exe` (38 MB, `installers/windows/engine_install.py`), installed for real, a console signed in to it, uninstalled clean; Linux kept apart and passing
 - [ ] Remote mouse/keyboard during traversal (input channel Engine ↔ Worker; deferred from Phase 4)
 - [x] Operator Client installer (GUI primary, TUI included): `falcon-admin-setup.exe` (94 MB, PySide6-Essentials), installed for real and the console loaded from it, 14 Nov 2026
 - [x] Engine on Linux: install script / systemd unit, config file, PostgreSQL setup: the `.deb` built, installed, upgraded and removed for real in WSL, 12 Nov 2026 (log rotation: journald)
