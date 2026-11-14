@@ -23,9 +23,10 @@ engine = [
 tui = [
     "prompt_toolkit>=3.0",
 ]
-# Operator Client GUI + Worker Client helper exes (Qt). Later phase.
+# Operator Client GUI (Qt). Essentials holds every module the console uses (QtQuick, Controls, Dialogs, Shapes, Layouts, Window): the full
+# PySide6 added WebEngine, Pdf and the Addons, ~170 MB of the Admin's setup.exe for nothing it uses (14 Nov 2026).
 gui = [
-    "PySide6>=6.6",
+    "PySide6-Essentials>=6.6",
     "qasync>=0.27",
 ]
 # Worker Client (environ-worker)

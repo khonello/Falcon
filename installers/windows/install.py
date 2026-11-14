@@ -286,6 +286,10 @@ class WindowsInstall:
         lnk = self.program_shortcut()
         if lnk.exists():
             lnk.unlink()
+        try:
+            lnk.parent.rmdir()                               # the Start-menu folder, once nothing else of Falcon is in it
+        except OSError:
+            pass
         return "removed"
 
     def console(self) -> str:

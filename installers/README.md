@@ -83,8 +83,17 @@ first account and issued nothing new. **The `.deb`, run for real (WSL Ubuntu, 12
 python.org's full Windows layout, the `tools` folder of its NuGet package (`https://www.nuget.org/api/v2/package/python/3.10.11`; decided
 by the user, 1 Nov 2026). It is installed under the program (`<target>\python`), because the runtime is a venv made from it. Build into a
 short path (`C:b\dist`): a deep one passes Windows' 260-character limit and Inno Setup says "cannot find the path". One setup.exe is
-made per Engine, since it carries that Engine's bundle. Needs Inno Setup 6. The admin role waits for the console (the user, 1 Nov 2026).
-**Not run for real yet:** installing it (an elevated `falcon-worker-setup.exe /VERYSILENT /DIR=...`), then uninstalling from Apps.
+made per Engine, since it carries that Engine's bundle. Needs Inno Setup 6. `admin` makes `falcon-admin-setup.exe` (94 MB: the console runs
+on PySide6-Essentials, as the Worker's windows do; the full PySide6 made it 259 MB).
+
+**Run for real (13-14 Nov 2026, on the development PC, then removed):** both setup.exe files, silently, as an administrator: all ten steps,
+the service running, the Start-menu shortcuts, the receipt; run again over a half-finished install (the repair path) and over a finished one
+(the upgrade path); the installed console loads with no QML error from the installed runtime; Setup's own uninstaller (what Apps runs) removes
+the service, the program, its Python, the shortcuts and the start-up entry, and keeps the settings. That found and fixed six faults: the
+shortcuts were never made, a failed install said "succeeded" (it now exits 10 and shows the end of `install-log.txt`), the payload check
+refused the bundle setup.exe sets beside it (no setup.exe could install), the receipt read a pyproject.toml a payload does not carry, the
+uninstall could not remove the folders it ran from, and an unregistered Worker whose Engine did not answer ended its service for good.
+**Not run for real yet:** on a clean machine (the four test PCs), and a machine updating itself.
 
 ## Still to do (final packaging; on hold)
 
