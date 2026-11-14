@@ -243,12 +243,12 @@ What the concept shows and the Engine cannot do yet is drawn disabled, with the 
 > carries on first. Items there that only packaging can finish (the Worker's windows, tray, screenshot and foreground
 > reader running inside the signed-in person's session under a Windows service) are recorded, not started.
 
-- [ ] Worker Client: bundled pinned interpreter + frozen service (spec 4.3), installed as a Windows service; the install package carries the derived key + pinned cert from Phase 5
+- [x] Worker Client: bundled pinned interpreter (python.org 3.10.11) + the service, installed as a Windows service by `falcon-worker-setup.exe` (94 MB); the package carries the Engine's pinned certificate and the machine registers by its code (no key in any package). Installed, repaired, upgraded and uninstalled for real on the development PC, 13-14 Nov 2026 (`installers/README.md`). The service runs on the bundled Python rather than frozen: it needs a real interpreter for Custom Actions anyway (spec 7.3).
 - [ ] Worker Overlay exe + Dialog exe frozen with the same toolchain (designed in Phase 7)
 - [ ] Remote mouse/keyboard during traversal (input channel Engine ↔ Worker; deferred from Phase 4)
-- [ ] Operator Client installer (GUI primary, TUI included)
-- [ ] Engine on Linux: install script / systemd unit, config file, PostgreSQL setup, log rotation
-- [ ] Update pipeline: a real `update_command` (download → verify → swap → restart → `updates.report_status`); approval → rollout → escalation exercised end to end with real packages
+- [x] Operator Client installer (GUI primary, TUI included): `falcon-admin-setup.exe` (94 MB, PySide6-Essentials), installed for real and the console loaded from it, 14 Nov 2026
+- [x] Engine on Linux: install script / systemd unit, config file, PostgreSQL setup: the `.deb` built, installed, upgraded and removed for real in WSL, 12 Nov 2026 (log rotation: journald)
+- [x] Update pipeline: download → verify → swap → restart → `updates.report_status`, end to end with a real package on one machine (`scripts/update_drill.py`, 14 Nov 2026: installed with setup.exe, registered by its code, 0.0.2 published and approved, Update now; on 0.0.2 in 18 s). Escalation and a fleet rollout: on the test PCs
 - [ ] CI: lint + full suite on push (Windows clients, Linux Engine), artifact build, signing
 - [ ] UI refinement pass on what packaging changed (paths, first-run, provisioning screens)
 

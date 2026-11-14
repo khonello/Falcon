@@ -356,12 +356,26 @@ class WindowsInstall:
     def uninstall_plan(self) -> Plan:
         p = Plan(f"Falcon uninstall ({self.role.title})", say=self.say)
         p.add("Stop and remove the service", self.remove_service, self.service)
+        p.add("Stop what still runs from the program", self.stop_programs, "the Falcon program in each person's session, and its helpers")
         p.add("Remove the Falcon program's start-up entry and shortcut", self.remove_program_startup, "the Run entry and the Start-menu shortcut",
               skip=None if self.role.service else "this role has no service")
         p.add("Remove the shortcut", self.remove_shortcut, str(self.shortcut()))
         p.add("Remove the program", self.remove_program, str(self.target))
         p.add("Settings and key", self.remove_data, "kept unless --purge-data: without its key this machine must be registered again")
         return p
+
+    def stop_programs(self) -> str:
+        """Every process running from the program's folder but this one (and what started it): the Falcon program a person's session runs holds
+        its files open, so after an update the uninstall left the Python and the runtime behind (found 14 Nov 2026)."""
+        if sys.platform != "win32" or not self.target.exists():
+            return "nothing running"
+        keep = f"@({os.getpid()}, {os.getppid()})"
+        ps = ("$t = [Management.Automation.WildcardPattern]::Escape(" + _ps(str(self.target)) + ") + '\\*'; "
+              "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like $t -and $_.ProcessId -notin " + keep + " } | "
+              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $_.ProcessId }")
+        _rc, out = run_cmd(["powershell", "-NoProfile", "-Command", ps], check=False)
+        stopped = [x for x in out.split() if x.isdigit()]
+        return f"stopped {len(stopped)}" if stopped else "nothing running"
 
     def remove_service(self) -> str:
         if not self.runtime_python.exists() or not self.app.exists():

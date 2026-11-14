@@ -445,3 +445,23 @@ def test_a_shortcut_s_paths_are_written_into_its_script_so_a_space_in_start_menu
                                   capture_output=True, text=True, timeout=60, check=False)
             assert done.returncode == 0, done.stderr
             assert lnk.is_file()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows processes")
+def test_the_uninstall_stops_what_still_runs_from_the_program_and_not_itself(tmp_path):
+    """Found 14 Nov 2026: after an update the Falcon program was running in the person's session, and the uninstall could not remove its files."""
+    import shutil
+    import subprocess
+
+    inst, _ = win_args("worker", tmp_path)
+    inst.target.mkdir(parents=True)
+    ping = inst.target / "ping.exe"
+    shutil.copy2(r"C:\Windows\System32\ping.exe", ping)
+    running = subprocess.Popen([str(ping), "-n", "120", "127.0.0.1"], stdout=subprocess.DEVNULL)
+    try:
+        assert inst.stop_programs() == "stopped 1"
+        assert running.wait(timeout=20) is not None                 # it was stopped; this test (outside the folder) was not
+        assert inst.stop_programs() == "nothing running"
+    finally:
+        if running.poll() is None:
+            running.kill()
