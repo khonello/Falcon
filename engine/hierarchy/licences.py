@@ -1,5 +1,7 @@
 """Licence codes: a machine joins with a code from the licence that was bought (the user, 2 Nov 2026).
 
+SUPERSEDED 14 Nov 2026 by docs/SEATS-AND-SETUP.md (seats from store-signed grants; no codes are typed). Removed in its step 8.
+
 A licence, bought from the licence store, carries codes: admin codes and worker codes. During setup the person installing gives one (the
 installer's `--code`); the machine asks to join with it (`enroll.request {licence_code}`), the Engine checks it, and the machine joins at once
 as what the code is for -- an IT Admin's workstation or a person's PC -- with nobody typing a code shown on its screen. A code covers a number

@@ -77,6 +77,19 @@ when a flow is read in (sent back it was refused); editing a rule keeps its own 
   at a flow's source", one per flow, gathering the files) with two options from `issues.get`: `remove_copies` and `keep_copies`. The Issues
   page draws options from the Engine, so it should need nothing new; check that it reads right.
 
+### Machines: seats and knocking PCs (planned 14 Nov 2026, `docs/SEATS-AND-SETUP.md`; the Engine side comes first)
+Replaces Registry's "Asking to join" with its code and the Licences place. On the **Machines** page:
+- **Seat counters**: "Worker seats: 20 bought, 14 in use, 6 free, until 31 Dec 2027", and the same for Admin seats; the end-of-period warning
+  and the grace ("ended 3 Nov; 4 days of grace left") when there is one. Seats are bought in the store (a link out; nothing is bought here).
+- **Waiting for a seat**: every knocking PC, with its name, who is signed in on it, its network address, its hardware identity and when it first
+  knocked; two PCs with one name, or one hardware identity under two names, flagged. **Give a seat**: asks the department (required; "New
+  machines" when there is no other), needs a free seat (otherwise drawn disabled with the reason).
+- **Take the seat back** on a seated machine (any Admin; never the last Admin seat: drawn disabled with the reason).
+- **Download Worker setup**: one zip, the company file (from the Engine) and the Worker setup (from the store's public download).
+- No code anywhere: nothing is typed to let a machine in.
+Handlers (to be built, step 2): `seats.summary`, `knocks.list`, `seat.give {knock_id, department_id}`, `seat.take {pc_id}`,
+`company.file`; pushes `knock.waiting`, `seat.given`, `seat.taken`, `seats.changed`.
+
 ### Registry / Add a machine (built 2 Nov 2026)
 - **A machine with the console installed is let in as an Admin.** `enroll.confirm` by an IT Admin now accepts a request that asked to be an
   Admin's workstation (the admin installer asks so); the level always follows what the machine asked (`requested_level`). Where Registry's
@@ -87,7 +100,7 @@ when a flow is read in (sent back it was refused); editing a rule keeps its own 
   The Rollout gate can say when an approved version has no package for a role (its machines then cannot update). A machine's failed
   update now carries the installer's last log line in `updates.report_status`' error, as before.
 
-### Licences (built 2 Nov 2026)
+### Licences (built 2 Nov 2026; superseded by seats, above)
 - A machine joins with a licence code given at setup (admin or worker code), and nobody confirms it. The console needs a place for the
   licence: `licence.import {name, reference?, codes}` (taking in the file the licence store hands over), `licence.list` -> `{codes: [{id,
   licence, last4, role, seats, used, left, department, expires_at, revoked_at, machines: [{hostname, decided_at}]}]}`, `licence.revoke

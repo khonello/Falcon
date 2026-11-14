@@ -1,5 +1,8 @@
 """Registering machines by asking, instead of typing their names (ENGINE-GAPS #15, the user's idea of 27 Sep 2026).
 
+SUPERSEDED 14 Nov 2026 by docs/SEATS-AND-SETUP.md: machines knock (`knock.hello`) and Admins give seats; no code is shown or typed.
+Replaced in its step 2, removed in step 8.
+
 A newly installed Worker finds the Engine and ASKS; the Engine does not hunt for machines on the network.
 
     enroll.request  {hostname, os?, mac?, department_id?, level?, licence_code?}   -- before the handshake (the machine has no key yet)

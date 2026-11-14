@@ -44,6 +44,8 @@ Check it: `environ-engine\Scripts\python.exe -m pytest` -- every test should run
 
 ## 2. A real network
 
+**Superseded 14 Nov 2026 by `docs/SEATS-AND-SETUP.md`** (Workers knock and are given seats; Admins sign in to the company account; one setup for everyone plus a signed company file). Kept until each part is replaced.
+
 **Four Windows test machines (an Engine, an IT Admin, two Workers) on each kind of network** -- a network of its own inside an existing one,
 the existing network as it is, or our own Wi-Fi -- are set up as `docs/NETWORK-TEST-SETUP.md` says. The steps below are the commands it uses.
 

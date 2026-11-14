@@ -1,5 +1,7 @@
 # Installers
 
+**Superseded 14 Nov 2026 by `docs/SEATS-AND-SETUP.md`** (Workers knock and are given seats; Admins sign in to the company account; one setup for everyone plus a signed company file). Kept until each part is replaced.
+
 The code behind the installers (decided in `docs/PACKAGING-PLAN.md`). **Deployment is on Windows** (the user, 14 Nov 2026): each machine is
 given one `setup.exe`, built by `installers/windows/build_setup.py` (`engine`, `admin`, `worker`). The Engine's Linux installer (the `.deb`) is
 kept and tested, apart from the Windows one. Nothing here is run by the Engine or the clients.

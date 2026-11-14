@@ -26,6 +26,8 @@ will use in `--names` the first time: `--names falcon.internal,192.168.50.10,192
 
 ## Once, on every machine (needs the internet: do it before case 3)
 
+**Superseded 14 Nov 2026 by `docs/SEATS-AND-SETUP.md`** (Workers knock and are given seats; Admins sign in to the company account; one setup for everyone plus a signed company file). Kept until each part is replaced. The network part of this page (the three cases, `falcon.internal`, the checks) stands.
+
 **With the installers (14 Nov 2026), nothing is installed by hand: no Python, no clone.** Three files, built on the development PC with
 `python -m installers.windows.build_setup engine|admin|worker --python <python 3.10 folder> [--bundle falcon-client.json]`:
 
