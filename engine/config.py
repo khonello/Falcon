@@ -69,6 +69,12 @@ class Settings:
     def from_env(cls) -> Settings:
         from common import dotenv
 
+        if dotenv.find() is None:
+            # an installed Engine on Windows keeps its settings apart from its code (installers/windows/engine_install.py): every
+            # `python -m engine ...` on that machine (health, backup, bootstrap) finds them with nothing to set
+            installed = Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Falcon Engine" / "falcon.env"
+            if installed.is_file():
+                os.environ.setdefault("FALCON_ENV_FILE", str(installed))
         dotenv.load()
         cert = os.environ.get("FALCON_TLS_CERT")
         key = os.environ.get("FALCON_TLS_KEY")

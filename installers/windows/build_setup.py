@@ -1,6 +1,7 @@
 """Build one setup.exe for a role: the payload, its libraries as wheels (so the install needs no network), a Python, and Inno Setup.
 
     python -m installers.windows.build_setup worker --python <folder> --bundle falcon-client.json [--out dist] [--iscc ISCC.exe] [--no-wheels]
+    python -m installers.windows.build_setup engine --python <folder> [--out dist]          (the Engine's own setup.exe: it makes the bundle)
 
 --python is python.org's full Windows layout (the `tools` folder of its NuGet package, https://www.nuget.org/packages/python): it goes
 into the setup and is installed under the program, and the runtime venv is made from it. Its version is the Python the wheels are fetched
@@ -44,11 +45,15 @@ def fetch_wheels(python: Path, requirements: str, dest: Path) -> int:
     return len(list(dest.glob("*.whl")))
 
 
-def build(role: str, python_dir: Path, bundle_path: Path, out: Path, *, iscc: Path = ISCC, wheels: bool = True) -> Path:
+def build(role: str, python_dir: Path, bundle_path: Path | None, out: Path, *, iscc: Path = ISCC, wheels: bool = True) -> Path:
+    """The engine role makes its own bundle when it is installed (it is the Engine), so it is given none; worker and admin carry one Engine's."""
     python = python_dir / "python.exe"
     if not python.is_file():
         raise InstallError(f"{python_dir} has no python.exe: give the tools folder of python.org's NuGet package")
-    bundle_mod.load(bundle_path)                                   # refuses anything that is not a whole bundle
+    if role != "engine":
+        if bundle_path is None:
+            raise InstallError("--bundle falcon-client.json is needed: a PC's setup.exe is made for one Engine")
+        bundle_mod.load(bundle_path)                               # refuses anything that is not a whole bundle
     if not iscc.is_file():
         raise InstallError(f"Inno Setup's compiler is not at {iscc} (--iscc)")
     out.mkdir(parents=True, exist_ok=True)
@@ -65,9 +70,14 @@ def build(role: str, python_dir: Path, bundle_path: Path, out: Path, *, iscc: Pa
     problems = payload_mod.verify(payload)
     if problems:
         raise InstallError("the payload is not whole: " + "; ".join(problems[:5]))
-    subprocess.run([str(iscc), f"/DRole={role}", f"/DPayload={payload}", f"/DBundle={bundle_path.resolve()}", f"/DPython={python_dir.resolve()}",
-                    f"/DVersion={payload_mod.project_version()}", f"/O{out.resolve()}", "/Q", str(REPO / "installers" / "windows" / "falcon.iss")],
-                   check=True)
+    if role == "engine":
+        cmd = [str(iscc), f"/DPayload={payload}", f"/DPython={python_dir.resolve()}", f"/DVersion={payload_mod.project_version()}", f"/O{out.resolve()}",
+               "/Q", str(REPO / "installers" / "windows" / "falcon-engine.iss")]
+    else:
+        assert bundle_path is not None
+        cmd = [str(iscc), f"/DRole={role}", f"/DPayload={payload}", f"/DBundle={bundle_path.resolve()}", f"/DPython={python_dir.resolve()}",
+               f"/DVersion={payload_mod.project_version()}", f"/O{out.resolve()}", "/Q", str(REPO / "installers" / "windows" / "falcon.iss")]
+    subprocess.run(cmd, check=True)
     made = out / f"falcon-{role}-setup.exe"
     print(f"built {made} ({made.stat().st_size >> 20} MB)")
     return made
@@ -75,9 +85,9 @@ def build(role: str, python_dir: Path, bundle_path: Path, out: Path, *, iscc: Pa
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="installers.windows.build_setup", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("role", choices=("worker", "admin"))
+    ap.add_argument("role", choices=("worker", "admin", "engine"))
     ap.add_argument("--python", required=True, type=Path, help="python.org's full Windows layout (the NuGet package's tools folder)")
-    ap.add_argument("--bundle", required=True, type=Path, help="the Engine's falcon-client.json")
+    ap.add_argument("--bundle", type=Path, help="the Engine's falcon-client.json (worker and admin; the engine makes its own)")
     ap.add_argument("--out", type=Path, default=Path("dist"))
     ap.add_argument("--iscc", type=Path, default=ISCC)
     ap.add_argument("--no-wheels", action="store_true", help="the install fetches the libraries itself (needs the network)")

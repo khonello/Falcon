@@ -35,3 +35,17 @@ def test_the_real_environment_wins(tmp_path, monkeypatch):
 
 def test_no_file_is_not_an_error(tmp_path):
     assert dotenv.load(tmp_path / "missing.env") is None
+
+
+def test_an_installed_engine_reads_the_settings_file_it_is_named(tmp_path, monkeypatch):
+    """FALCON_ENV_FILE (the Windows service's settings, kept apart from its code, 14 Nov 2026) comes before any .env."""
+    from common import dotenv
+
+    named = tmp_path / "ProgramData" / "falcon.env"
+    named.parent.mkdir()
+    named.write_text("FALCON_ENGINE_PORT=7499\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("FALCON_ENGINE_PORT=1\n", encoding="utf-8")
+    monkeypatch.setenv("FALCON_ENV_FILE", str(named))
+    assert dotenv.find(tmp_path) == named
+    monkeypatch.setenv("FALCON_ENV_FILE", str(tmp_path / "missing.env"))
+    assert dotenv.find(tmp_path) == tmp_path / ".env"

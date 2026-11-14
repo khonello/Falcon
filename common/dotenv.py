@@ -17,7 +17,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def find(start: Path | None = None) -> Path | None:
-    """The `.env` that applies: the nearest one at or above `start` (default: the cwd), else the repository's."""
+    """The `.env` that applies: the file FALCON_ENV_FILE names (an installed Engine's settings, kept apart from its code), else the nearest
+    `.env` at or above `start` (default: the cwd), else the repository's."""
+    named = os.environ.get("FALCON_ENV_FILE")
+    if named and Path(named).is_file():
+        return Path(named)
     here = (start or Path.cwd()).resolve()
     for d in (here, *here.parents):
         candidate = d / ".env"

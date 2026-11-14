@@ -108,6 +108,10 @@ def main() -> None:
         from engine.setup import main as setup_main
 
         sys.exit(setup_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "service":              # Windows only; on Linux the Engine runs under systemd
+        from engine.winservice import main as service_main
+
+        sys.exit(service_main(sys.argv[2:]))
     settings = Settings.from_env()
     logging.basicConfig(
         level=logging.DEBUG if settings.debug else logging.INFO,

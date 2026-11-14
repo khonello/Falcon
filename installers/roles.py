@@ -29,7 +29,7 @@ ROLES: dict[str, Role] = {
     "admin": Role("admin", "An Admin's workstation", ("common", "protocol", "worker_client", "operator_client"),
                   ("worker", "worker-ui", "tui", "gui"), service=True, console=True, enroll_level="admin",
                   serve_console=True),
-    "engine": Role("engine", "The Engine (Linux)", ("common", "protocol", "engine"), ("engine",), platform="linux"),
+    "engine": Role("engine", "The Engine", ("common", "protocol", "engine"), ("engine",), platform="any"),          # Windows (setup.exe) or Linux (.deb)
 }
 
 # never copied into any payload, whatever a package happens to contain

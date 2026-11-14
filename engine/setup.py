@@ -44,7 +44,10 @@ def say(step: str, text: str) -> None:
 # --- 1. .env ------------------------------------------------------------------------------------------
 
 def ensure_env() -> Path:
-    env = ROOT / ".env"
+    import os
+
+    named = os.environ.get("FALCON_ENV_FILE")                       # an installed Engine: its settings live apart from its code
+    env = Path(named) if named else ROOT / ".env"
     if env.exists():
         say(".env", f"kept ({env})")
     else:
@@ -269,7 +272,9 @@ def ensure_bundle(settings: Any, names: list[str]) -> None:
         return
     from installers.bundle import Bundle
 
-    out = ROOT / "data" / "falcon-client.json"
+    secret = Path(settings.secret_path)
+    out = (secret if secret.is_absolute() else ROOT / secret).parent / "falcon-client.json"      # beside the master secret: data/ here, the
+    out.parent.mkdir(parents=True, exist_ok=True)                                                # installed Engine's own folder there
     b = Bundle.make(names[0], settings.port, cert.read_text(encoding="utf-8"))
     b.save(out)
     say("bundle", f"{out} (host {names[0]}:{settings.port}); certificate fingerprint {b.ca_sha256}")
