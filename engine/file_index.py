@@ -126,6 +126,10 @@ class FileIndex:
         return len(done) == len(tasks)
 
     async def ingest_event(self, pc_id: int, event: dict[str, Any], *, live: bool = True) -> int | None:
+        with self.db.event_reads():                              # every stage looks the same things up: each is read once (engine/database.py)
+            return await self._ingest_event(pc_id, event, live=live)
+
+    async def _ingest_event(self, pc_id: int, event: dict[str, Any], *, live: bool = True) -> int | None:
         entry = _normalize(event)
         if live and self._catchup.get(pc_id) and self._catchup[pc_id].pop(_key(entry["path"]), None) is not None:
             self.catchup_superseded += 1                # what the machine missed about this file is old news now

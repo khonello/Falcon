@@ -15,7 +15,13 @@ Migrations live in `engine/migrations/` and are applied by `Database.migrate()`.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import functools
 import logging
+import os
+from collections.abc import Iterator
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, ClassVar
@@ -65,10 +71,72 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# --- one event's reads ----------------------------------------------------------------------------------------------
+# A file event goes through every stage (engine/bus.py), and each stage looks up what it needs: measured 13 Nov 2026, one event asked the database 44
+# times, 17 of them for the same machine's row and 16 for the same file's. Inside `Database.event_reads()` a plain SELECT asked again with the same
+# arguments is answered from what the first one got, as a copy. Any write through a repo, any query that is not a plain SELECT, and anyone reaching
+# for the pool directly (a transaction, a write of its own) forgets them all, so a stage always reads what an earlier one wrote. It holds only in the
+# task that opened it (a task started inside it reads the database itself), and only for that one event.
+_reads: ContextVar[tuple[Any, dict[Any, Any]] | None] = ContextVar("falcon_event_reads", default=None)
+_MISS = object()
+
+
+@functools.lru_cache(maxsize=8192)
+def _plain_select(sql: str) -> bool:
+    head = sql.lstrip()[:6].upper()
+    if head not in ("SELECT", "WITH  ") and not head.startswith("WITH"):
+        return False
+    up = sql.upper()
+    return "FOR UPDATE" not in up and "RETURNING" not in up and "NEXTVAL" not in up and "INSERT " not in up and "UPDATE " not in up and "DELETE " not in up
+
+
+def _freeze(v: Any) -> Any:
+    if isinstance(v, (list, tuple)):
+        return tuple(_freeze(x) for x in v)
+    if isinstance(v, dict):
+        return tuple(sorted((k, _freeze(x)) for k, x in v.items()))
+    if isinstance(v, set):
+        return frozenset(v)
+    return v
+
+
+def _copy(v: Any) -> Any:
+    """A copy a caller may change without changing what is kept: the rows (a dict, or a list of them), not what is inside them."""
+    if isinstance(v, dict):
+        return dict(v)
+    if isinstance(v, list):
+        return [dict(x) if isinstance(x, dict) else x for x in v]
+    return v
+
+
+def _held() -> dict[Any, Any] | None:
+    got = _reads.get()
+    if got is None:
+        return None
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        return None
+    return got[1] if got[0] is task else None
+
+
+def _forget() -> None:
+    held = _held()
+    if held:
+        held.clear()
+
+
+async def _light_reset(conn: Any) -> None:
+    """What asyncpg does to a connection going back to the pool, without its round trip on every query (it unlocks advisory locks, closes cursors,
+    unlistens and resets settings, none of which this code uses): only a transaction left open is rolled back."""
+    if conn.is_in_transaction():
+        await conn.execute("ROLLBACK")
+
+
 class Database:
     def __init__(self, url: str | None) -> None:
         self.url = url
-        self.pool: Any = None  # asyncpg.Pool once connected
+        self._pool: Any = None
 
         self.accounts = AccountsRepo(self)
         self.sessions = SessionsRepo(self)
@@ -98,9 +166,32 @@ class Database:
         self.proposals = ProposalsRepo(self)
         self.resource = ResourceRepo(self)
 
+
+    @property
+    def pool(self) -> Any:
+        """The pool, for code with SQL of its own (a transaction, a write): reaching for it forgets this event's reads."""
+        _forget()
+        return self._pool
+
+    @pool.setter
+    def pool(self, value: Any) -> None:
+        self._pool = value
+
+    @contextlib.contextmanager
+    def event_reads(self) -> Iterator[None]:
+        """One event's reads, answered once each (see _reads above). Nested: the outer one holds."""
+        if _held() is not None:
+            yield
+            return
+        token = _reads.set((asyncio.current_task(), {}))
+        try:
+            yield
+        finally:
+            _reads.reset(token)
+
     @property
     def connected(self) -> bool:
-        return self.pool is not None
+        return self._pool is not None
 
     async def connect(self) -> None:
         if not self.url:
@@ -108,7 +199,8 @@ class Database:
             return
         import asyncpg  # imported lazily so the protocol/test path has no hard dependency
 
-        self.pool = await asyncpg.create_pool(self.url, min_size=1, max_size=4, init=_init_connection)
+        size = max(2, int(os.environ.get("FALCON_DB_POOL", "10") or 10))      # was 4: every machine's events queued for four connections
+        self.pool = await asyncpg.create_pool(self.url, min_size=1, max_size=size, init=_init_connection, reset=_light_reset)
         log.info("database connected")
 
     async def close(self) -> None:
@@ -184,28 +276,73 @@ class _Repo:
 
     @property
     def pool(self) -> Any:
-        if self.db.pool is None:
+        if self.db._pool is None:
             raise Unavailable("database not connected (FALCON_DATABASE_URL unset)")
-        return self.db.pool
+        return self.db.pool                                 # (forgets this event's reads: whoever asks for it may write)
+
+    @property
+    def _p(self) -> Any:
+        if self.db._pool is None:
+            raise Unavailable("database not connected (FALCON_DATABASE_URL unset)")
+        return self.db._pool
+
+    @staticmethod
+    def _recall(kind: str, sql: str, args: tuple[Any, ...]) -> tuple[Any, Any]:
+        """(key, what was read before or _MISS) for a plain SELECT inside an event's reads; anything else forgets them and is not kept."""
+        held = _held()
+        if held is None:
+            return None, _MISS
+        if not _plain_select(sql):
+            held.clear()
+            return None, _MISS
+        try:
+            key = (kind, sql, _freeze(args))
+            hash(key)
+        except TypeError:
+            return None, _MISS
+        got = held.get(key, _MISS)
+        return key, (_copy(got) if got is not _MISS else _MISS)
+
+    @staticmethod
+    def _keep(key: Any, value: Any) -> None:
+        held = _held()
+        if held is not None and key is not None:
+            held[key] = _copy(value)
 
     async def _fetch(self, sql: str, *args: Any) -> list[dict[str, Any]]:
         """Every list read goes through here, and none can return more than HARD_ROWS rows: a table that has grown past anything a page, a job or a message was
         built for is cut (and said so in the log) instead of exhausting the Engine's memory. Queries that already say LIMIT, and anything that is not a plain SELECT,
         are left exactly as written."""
-        rows = await self.pool.fetch(_capped(sql), *args)
+        key, got = self._recall("fetch", sql, args)
+        if got is not _MISS:
+            return got
+        rows = await self._p.fetch(_capped(sql), *args)
         if len(rows) > HARD_ROWS:
             log.warning("a query returned more than %d rows and was cut: %s", HARD_ROWS, " ".join(sql.split())[:120])
             rows = rows[:HARD_ROWS]
-        return _rows(rows)
+        out = _rows(rows)
+        self._keep(key, out)
+        return out
 
     async def _one(self, sql: str, *args: Any) -> dict[str, Any] | None:
-        return _row(await self.pool.fetchrow(sql, *args))
+        key, got = self._recall("one", sql, args)
+        if got is not _MISS:
+            return got
+        out = _row(await self._p.fetchrow(sql, *args))
+        self._keep(key, out)
+        return out
 
     async def _val(self, sql: str, *args: Any) -> Any:
-        return await self.pool.fetchval(sql, *args)
+        key, got = self._recall("val", sql, args)
+        if got is not _MISS:
+            return got
+        out = await self._p.fetchval(sql, *args)
+        self._keep(key, out)
+        return out
 
     async def _exec(self, sql: str, *args: Any) -> str:
-        return await self.pool.execute(sql, *args)
+        _forget()
+        return await self._p.execute(sql, *args)
 
 
 # ============================================================================================
