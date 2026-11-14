@@ -287,3 +287,25 @@ async def test_only_a_waiting_request_can_be_taken_back_and_only_with_its_token(
             await machine.call("enroll.cancel", {"token": got["token"]})
     finally:
         await machine.close()
+
+
+async def test_a_machine_installed_while_the_engine_is_off_keeps_asking_until_it_answers(tmp_path, monkeypatch):
+    """Found installing setup.exe for real (14 Nov 2026): the first refused connection ended the service, and Windows gave up after three restarts."""
+    from worker_client import enroll as enroll_mod
+    from worker_client import winservice
+    from worker_client.config import WorkerConfig
+
+    monkeypatch.setattr(winservice, "UNREACHABLE_AGAIN", (0.01,))
+    cfg = WorkerConfig(windows=False, engine_host="127.0.0.1", engine_port=1, tls=False, path=tmp_path / "worker.json")
+    tries: list[int] = []
+
+    async def enroll(c, **kw):
+        tries.append(1)
+        if len(tries) < 3:
+            raise ConnectionRefusedError(1225, "The remote computer refused the network connection")
+        c.client_id, c.client_key = "cid-new", "00" * 32
+        return {}
+
+    monkeypatch.setattr(enroll_mod, "enroll", enroll)
+    await asyncio.wait_for(winservice._wait_to_be_registered(cfg, asyncio.Event()), 10)
+    assert len(tries) == 3 and cfg.client_id == "cid-new"

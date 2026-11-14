@@ -324,10 +324,24 @@ class WindowsInstall:
     def operator_json(self) -> Path:
         return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Falcon" / "operator.json"
 
+    def _version(self) -> str:
+        """The version being installed: the payload's manifest says it (a payload carries no pyproject.toml: reading that failed every real install,
+        14 Nov 2026); a checkout's pyproject.toml when run from one."""
+        try:
+            got = json.loads((self.source / "manifest.json").read_text(encoding="utf-8")).get("version")
+            if got:
+                return str(got)
+        except (OSError, ValueError):
+            pass
+        for where in (self.source, HERE):
+            if (where / "pyproject.toml").exists():
+                return payload_mod.project_version(where)
+        return "0.0.0"
+
     def receipt(self) -> str:
         path = self.target / "install.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"role": self.role.name, "version": payload_mod.project_version(self.source if (self.source / "pyproject.toml").exists() else HERE),
+        path.write_text(json.dumps({"role": self.role.name, "version": self._version(),
                                     "service": self.service if self.role.service else None, "data": str(self.data),
                                     "shortcut": str(self.shortcut()) if self.role.console and not self.a.no_shortcuts else None}, indent=2),
                         encoding="utf-8")

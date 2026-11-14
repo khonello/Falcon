@@ -94,6 +94,10 @@ def test_a_payload_that_was_changed_or_half_copied_is_refused(tmp_path):
     cache.mkdir()
     (cache / "x.cpython-312.pyc").write_bytes(b"x")                                             # what running the installer from here leaves behind
     assert not any("__pycache__" in x for x in payload_mod.verify(p))
+    (p / "falcon-client.json").write_text("{}", encoding="utf-8")                                 # setup.exe sets the bundle beside it: checked on its own
+    assert not any("falcon-client.json" in x for x in payload_mod.verify(p))
+    (p / "app" / "falcon-client.json").write_text("{}", encoding="utf-8")                         # ... but only there
+    assert "not in the manifest: app/falcon-client.json" in payload_mod.verify(p)
     assert payload_mod.verify(tmp_path / "nowhere") == ["manifest.json is missing or unreadable"]
 
 

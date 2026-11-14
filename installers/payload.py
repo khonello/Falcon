@@ -118,7 +118,9 @@ def verify(payload: Path) -> list[str]:
         rel = str(f.relative_to(payload)).replace("\\", "/")
         if "__pycache__" in f.parts or f.suffix in (".pyc", ".pyo"):
             continue                                      # Python writes these itself the first time it runs the installer from here
-        if f.is_file() and rel != "manifest.json" and rel not in listed:
+        # (the client bundle is set beside the payload by setup.exe, one per Engine, and checked on its own: whole, and its certificate's
+        # fingerprint -- it is not part of what was built. Refusing it meant no setup.exe could install: found 14 Nov 2026.)
+        if f.is_file() and rel not in ("manifest.json", "falcon-client.json") and rel not in listed:
             problems.append(f"not in the manifest: {rel}")
     return problems
 
