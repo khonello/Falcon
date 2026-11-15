@@ -1,61 +1,31 @@
 # Proposals: the core features (the user, 15 Nov 2026)
 
-Ideas for Tasks, Protected and Detective, each checked against what is built and the rules in `CLAUDE.md`. Flow has no idea of its
-own (a step template was proposed and dropped on 15 Nov 2026: copying steps from another flow would do most of it, and a customer
-with ten flows rarely reuses steps); it gains from the file identity (item 2). Nothing here is built. Branch `proposals/core-features`.
-The questions for the user are at the end.
+Ideas for Protected and Detective, each checked against what is built and the rules in `CLAUDE.md`. **All of it goes into version 1
+(the user, 15 Nov 2026).** Nothing here is built yet. Branch `proposals/core-features`. The questions for the user are at the end.
+
+Dropped on 15 Nov 2026, so they do not come back by another name:
+- **Flow: steps saved as a template.** Copying steps from another flow would do most of it, and a customer with ten flows rarely
+  reuses steps.
+- **Task: chained tasks**, and the smaller "give after" too. The work (a waiting status, release, relative deadlines, send-back,
+  stopping, a new Worker action or a split rule, and the most involved page in the console) was far more than the convenience, with
+  no sign yet that work comes in sequences.
+
+Task and Flow still gain: both follow a renamed file through the file identity (item 1).
 
 | # | Feature | Idea | What exists today | Size |
 |---|---|---|---|---|
-| 1 | Task | Chained tasks | One task per description; no order between tasks | Medium |
-| 2 | Protected (the index) | A file identity that survives rename, move and edit | Index row = one place; copies followed by hash; moves by history | Large, shared |
-| 3 | Detective | Windows' own places (Desktop, Downloads...) | `_same_profile` reads `Users\<name>` out of the path | Small |
-| 4 | Detective | A loose snapshot of the machine and its changes | System-drive percent in Automation; process snapshots | Medium |
-| 5 | Detective | Usual and unusual: habits, learned and taught | Fixed weights; a reviewer's "this is fine" (program / folder / drive) | Large; start narrow |
+| 1 | Protected (the index) | A file identity that survives rename, move and edit | Index row = one place; copies followed by hash; moves by history | Large, shared |
+| 2 | Detective | Windows' own places (Desktop, Downloads...) | `_same_profile` reads `Users\<name>` out of the path | Small |
+| 3 | Detective | A loose snapshot of the machine and its changes | System-drive percent in Automation; process snapshots | Medium |
+| 4 | Detective | Usual and unusual: habits, learned and taught | Fixed weights; a reviewer's "this is fine" (program / folder / drive) | Large; start narrow |
 
-**Order:** Windows' places (3) -> the snapshot (4) -> the exact file identity (2, links 1-4) -> chained tasks (1) -> narrow habits (5)
--> "probably the same file" (2, link 5). 3 is small and the rest of Detective uses it. 4 needs no learning, so it is worth more for
-its cost than 5. The exact part of 2 is cheap and solid; its scoring part is the hard part and comes last.
-
----
-
-## 1. Task: chained tasks
-
-**The idea.** Several tasks in an order, for one person. Only the first is given. When it is done, the next is given, and so on.
-The chain is complete when the last one is.
-
-**Today.** `engine/task/tasks.py`: active -> in_progress (the Worker starts it) -> completed (an Admin verifies it). Only an
-Admin's verification closes a task (any Admin in version 1). The Worker views, starts and watches; it never verifies. Splitting one
-description into several tasks was removed (the user, 4 Nov 2026).
-
-**Proposed shape.**
-- A chain is made of tasks the Admin writes **one by one**: each description goes through the proposal and confirmation it goes
-  through today. The model does not split a description into a chain, so the 4 Nov decision stands.
-- `task_chains` (name, made by, status) and `tasks.chain_id` + `tasks.chain_position`. A task later in the chain is `waiting`: it
-  exists, the Admin sees it, the Worker does not.
-- **What moves the chain on** (question 1). Two ways, and they differ on the Worker's role:
-  - *(a) Checks met and the person presses Done.* The next step is given at once; the step still waits for an Admin's verification,
-    and the chain is complete only when every step is verified. Nobody waits on an Admin. But **Done is a new thing for a Worker to
-    do**: today a Worker views, starts and watches a task and never closes one. Done is not verifying, but it widens that rule.
-  - *(b) Checks met alone.* No new Worker action: the next step is given when the Engine sees the step's checks met. A step with
-    nothing a machine can check ("talk to the supplier") waits for an Admin's verification instead.
-- **If an Admin sends a step back** (not verified), the next step stays with the person (it was already given), and the chain says so:
-  "step 2 was sent back while step 3 was under way". Nothing is taken back from the person's screen without an Admin choosing it.
-- **Deadlines**: each step's deadline can be a date or a span from when it is given ("2 days after it is given"), worked out on
-  release by `common/when.py`. The chain may have its own final deadline.
-- **Stopping**: an Admin can stop a chain; the remaining steps are cancelled (a status, never deleted) and the audit says who.
-- Worker side: the program's Tasks tab shows "Step 2 of 4"; the next step arrives like any task (its window, then the quiet
-  reminders).
-- Built in this order: Engine handlers (`task.chain_create`, `task.chain_get`, `task.chain_stop`, release when a step is done)
-  -> TUI `task chain ...` -> the concept -> QML.
-- **Before building:** one real sequence an Admin would give, to check chains are how the work actually comes.
-
-**Worst case, clamped.** At most 20 steps a chain. The Engine refuses a chain step given to anyone but the chain's person (or see
-question 2).
+**Order:** Windows' places (2) -> the snapshot (3) -> the exact file identity (1, links 1-4) -> narrow habits (4) -> "probably the
+same file" (1, link 5). 2 is small and the rest of Detective uses it. 3 needs no learning, so it is worth more for its cost than 4.
+The exact part of 1 is cheap and solid; its scoring part is the hard part and comes last.
 
 ---
 
-## 2. A file identity that survives rename, move and edit
+## 1. A file identity that survives rename, move and edit
 
 **The idea.** A file keeps who it is when renamed, moved or edited. A hash changes when the content changes, so the identity is built
 from several things together: hash, name and more.
@@ -92,7 +62,7 @@ identity helps Task, Flow and Detective as much as Protected (see "Beyond Protec
     moves only the chunks around it. The score is the share of chunks that match.
   - *PDF, pictures, archives*: whole hash only at first; a PDF compresses its content, so it is no better off than a zip without
     opening its streams.
-- **Propose, never silently resolve** (question 3). A link of kind 5 is a **suggestion**: "This looks like `budget-2026.xlsx`
+- **Propose, never silently resolve** (question 1). A link of kind 5 is a **suggestion**: "This looks like `budget-2026.xlsx`
   (restricted), edited: 87% of its content is the same." A restricted status is never put on a file by a suggestion alone; an Admin
   says yes. Detective may *weigh* a suggestion (it already weighs, never decides).
 - Weaker attributes, which only add to a score: the document's own properties (Office's author, title, created, read from
@@ -111,7 +81,7 @@ suggestion is looked for only for files that are restricted or have a Detective 
 
 ---
 
-## 3. Detective: Windows' own places
+## 2. Detective: Windows' own places
 
 **The idea.** Know Desktop, Documents, Downloads and the other places Windows names.
 
@@ -135,7 +105,7 @@ another drive, is not seen.
 
 ---
 
-## 4. Detective: a loose snapshot of the machine
+## 3. Detective: a loose snapshot of the machine
 
 **The idea.** A rough picture of the whole machine, taken now and then, compared with the last one. A sudden change shows what
 events alone miss. Storage dropping sharply may be a clean-up or sabotage, and the same holds in other areas. Some changes matter
@@ -147,7 +117,7 @@ with itself over time.
 **Proposed shape.**
 - **What the snapshot holds** (cheap, all Windows-native, read when the machine is idle; stops the instant someone types). The Worker
   service has the rights to read all of it:
-  - storage: free and used space of each drive; the size and file count of each known place (from item 3);
+  - storage: free and used space of each drive; the size and file count of each known place (from item 2);
   - programs installed, services and how they start, startup entries, scheduled tasks;
   - local accounts and who is in Administrators; shared folders;
   - Defender and the firewall on or off; BitLocker on each drive;
@@ -169,7 +139,7 @@ where it does not; a machine that is always busy gets its snapshot at connect on
 
 ---
 
-## 5. Detective: usual and unusual, learned and taught
+## 4. Detective: usual and unusual, learned and taught
 
 **The idea.** The system learns what is usual for each person and machine. People can also say what is usual, so their word corrects
 what the system assumed. Usual covers what they do, where they go, when they start and stop.
@@ -216,15 +186,13 @@ customer's setup or terms.
 
 ## Placement
 
-The phase order is fixed (Phase 9 packaging is now the blocker for a sale). These come after, unless the user says one goes into
-version 1 (question 4). Each lands as Engine handler + TUI command first, then the concept, then the QML (the TUI is the scripted test
-surface).
+**Version 1, all of it (the user, 15 Nov 2026).** Each lands as Engine handler + TUI command first, then the concept, then the QML
+(the TUI is the scripted test surface). Engine work and UI work stay in separate sessions. When this branch is merged, `PHASES.md` and
+`START-HERE.md` get these items (question 2 says where).
 
 ## Questions for the user
 
-1. **What moves a chain on?** (a) the step's checks are met and the person presses Done (a new Worker action; the Admin verifies later),
-   or (b) the checks being met alone, with an Admin's verification for a step that has nothing to check.
-2. **One person per chain, or can a step go to someone else** (a hand-off: one prepares, another checks)?
-3. **"Probably the same file"** (edited, then carried away): a suggestion an Admin confirms before it is treated as restricted
+1. **"Probably the same file"** (edited, then carried away): a suggestion an Admin confirms before it is treated as restricted
    (recommended), or applied at once above a score?
-4. **When**: after packaging (Phase 9) as planned, or does any of these go into version 1?
+2. **Before or after packaging?** Phase 9 is the blocker for a sale. These can be built (a) before it, so the installers carry them
+   from the first build, or (b) beside it, the Engine session on these while the packaging work goes on.
