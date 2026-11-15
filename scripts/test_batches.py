@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         text = log.read_text(encoding="utf-8", errors="replace")
         tail = next((ln for ln in reversed(text.splitlines()) if re.search(r"passed|failed|error|no tests ran", ln)), f"exit {rc}")
         print(f"batch {n}/{len(batches)} ({batch[0].name} .. {batch[-1].name}): {tail.strip('= ')}", flush=True)
-        failed += [ln for ln in text.splitlines() if ln.startswith(("FAILED", "ERROR"))]
+        failed += [ln for ln in text.splitlines() if ln.startswith(("FAILED ", "ERROR tests"))]
     print("\n".join(["", f"{len(failed)} failed:", *failed]) if failed else "\nall batches passed")
     return 1 if failed else 0
 
