@@ -16,7 +16,7 @@ Task and Flow still gain: both follow a renamed file through the file identity (
 |---|---|---|---|---|
 | 1 | Protected (the index) | A file identity that survives rename, move and edit | Index row = one place; copies followed by hash; moves by history | Large, shared |
 | 2 | Detective | Windows' own places (Desktop, Downloads...) | `_same_profile` reads `Users\<name>` out of the path | Small |
-| 3 | Detective | A loose snapshot of the machine and its changes | System-drive percent in Automation; process snapshots | Medium |
+| 3 | Detective | A loose snapshot of the machine and its changes | Nothing compares a machine with itself over time | Medium |
 | 4 | Detective | Usual and unusual: habits, learned and taught | Fixed weights; a reviewer's "this is fine" (program / folder / drive) | Large; start narrow |
 
 **Order:** Windows' places (2) -> the snapshot (3) -> the exact file identity (1, links 1-4) -> narrow habits (4) -> mostly the same
