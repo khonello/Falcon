@@ -5,6 +5,20 @@ matters now: **a version a company can buy, install and run.**
 
 Read this file first. It is the whole picture; everything else is reference.
 
+> **PARKED, 15 Nov 2026 (the user).** No development continues unless the user says so. Where it was left:
+> - **Done and tested:** the Engine and both clients; how machines join (`docs/SEATS-AND-SETUP.md`, steps 0-9: Workers knock and are
+>   given seats, Admins sign in to the store and come in with a signed claim, seats from store-signed grants, certificate renewal); the
+>   Engine's installer on **Windows** (`falcon-engine-setup.exe`, its own private PostgreSQL) and on **Linux** (the `.deb`, its own private
+>   PostgreSQL, sign-in by a link and a code), both run for real (`scripts/private_pg_drill.py`, `scripts/linux_engine_drill.py`); the PC
+>   setups (`falcon-worker-setup.exe` + a store-signed company file; `falcon-admin-setup.exe` signs in). Full suite green in batches
+>   (`scripts/test_batches.py`; one process ran out of memory).
+> - **Not built, needed to sell:** the store itself (`store/`, its own session, to `docs/STORE-CONTRACT.md`, including the device sign-in);
+>   a code-signing certificate for the setups; `STORE_URL` and the store's real public key in `common/store_keys.py`.
+> - **For the design session:** the Machines page (seats, waiting PCs, the Worker setup zip) and the two first-run screens, which still
+>   call handlers that are gone: `docs/UI-WORK-FROM-ENGINE.md`, "GONE from the Engine, 15 Nov 2026".
+> - **Not run yet:** the four-machine network test (`docs/NETWORK-TEST-SETUP.md`): it needs the store, or a test-only build against
+>   `scripts/store_stub.py` (to be decided). The "next move" below predates all this.
+
 > **Version 1 scope (the user, 25 Oct 2026):** Admin → Workers. The Admins are IT, serving every department, and
 > departments are IT's way of grouping people and machines. The Super User is set aside for version 1: kept in the
 > code and the docs, not deleted, and reconnected in a later version. The record is
