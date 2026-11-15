@@ -410,25 +410,32 @@ async def watch_periods(engine: Engine, now: datetime | None = None) -> int:
     from engine.store import good_grant
 
     now = now or datetime.now(timezone.utc)
-    for g in await engine.db.seats.grants():
-        if good_grant(engine, g["envelope"]) is None:
+    good = [g for g in await engine.db.seats.grants() if good_grant(engine, g["envelope"]) is not None]
+    # Grants of one kind ending on one day are one warning: a top-up bought mid-year ends with the main grant (docs/STORE-CONTRACT.md).
+    ending: dict[tuple[str, datetime], list[dict[str, Any]]] = {}
+    for g in good:
+        ending.setdefault((g["role"], g["valid_until"]), []).append(g)
+    for (role, end), group in sorted(ending.items(), key=lambda kv: kv[0][1]):
+        n = sum(g["seats"] for g in group)
+        if _carried_on(good, role, end) >= n:                                # renewed already: nothing to warn of
             continue
-        left = g["valid_until"] - now
-        kind = "Admin" if g["role"] == "admin" else "Worker"
-        when = g["valid_until"].strftime("%d %b %Y")
+        kind = "Admin" if role == "admin" else "Worker"
+        when = end.strftime("%d %b %Y")
+        first = min(g["id"] for g in group)
+        detail = {"grant_ids": [g["grant_id"] for g in group], "role": role, "seats": n, "valid_until": end.isoformat()}
+        left = end - now
         for days in WARN_DAYS:
             if timedelta(0) < left <= timedelta(days=days):
                 await issues.raise_issue(engine, type_="seats", severity={30: "low", 7: "medium", 1: "high"}[days],
-                                         title=f"{g['seats']} {kind} seats end on {when}", subject="Renew them in the store",
-                                         source_table=f"seat_grants:{days}d", source_id=g["id"],
-                                         detail={"grant_id": g["grant_id"], "role": g["role"], "seats": g["seats"], "valid_until": g["valid_until"].isoformat()})
+                                         title=f"{n} {kind} seats end on {when}", subject="Renew them in the store",
+                                         source_table=f"seat_grants:{days}d", source_id=first, detail=detail)
                 break
-        if g["valid_until"] <= now < g["valid_until"] + GRACE:
-            ends = (g["valid_until"] + GRACE).strftime("%d %b %Y")
-            await issues.raise_issue(engine, type_="seats", severity="critical", title=f"{g['seats']} {kind} seats ended on {when}",
+        if end <= now < end + GRACE:
+            ends = (end + GRACE).strftime("%d %b %Y")
+            await issues.raise_issue(engine, type_="seats", severity="critical", title=f"{n} {kind} seats ended on {when}",
                                      subject=f"Machines keep working until {ends}; renew in the store before then",
-                                     source_table="seat_grants:grace", source_id=g["id"],
-                                     detail={"grant_id": g["grant_id"], "role": g["role"], "grace_ends": (g["valid_until"] + GRACE).isoformat()})
+                                     source_table="seat_grants:grace", source_id=first,
+                                     detail={**detail, "grace_ends": (end + GRACE).isoformat()})
     taken = 0
     counts = await summary(engine, now)
     for role in ROLES:
@@ -441,6 +448,11 @@ async def watch_periods(engine: Engine, now: datetime | None = None) -> int:
             if await take_back(engine, seat["pc_id"], None, "the seat period ended"):
                 taken += 1
     return taken
+
+
+def _carried_on(grants: list[dict[str, Any]], role: str, end: datetime) -> int:
+    """Seats of this kind that go on past `end` with no gap: a renewal bought ahead starts on (or before) the day the old grant ends."""
+    return sum(g["seats"] for g in grants if g["role"] == role and g["valid_from"] <= end < g["valid_until"])
 
 
 
@@ -465,10 +477,17 @@ async def act(ctx: Context, issue: dict[str, Any], key: str) -> dict[str, Any]:
     from engine.console.plays import _finish
 
     engine = ctx.engine
+    from engine.store import good_grant
+
     added = await engine.store.fetch_grants()
     d = issue["detail"] or {}
-    renewed = any(g["role"] == d.get("role") and g["grant_id"] != d.get("grant_id") and g["valid_until"].isoformat() > str(d.get("valid_until") or d.get("grace_ends") or "")
-                  for g in await valid_grants(engine))
+    good = [g for g in await engine.db.seats.grants() if good_grant(engine, g["envelope"]) is not None]
+    end = d.get("valid_until")
+    if end:                      # renewed when the seats that ended go on, a renewal bought ahead included (it starts the day they end)
+        renewed = _carried_on(good, str(d.get("role")), datetime.fromisoformat(end)) >= int(d.get("seats") or 1)
+    else:                        # (an issue raised before 15 Nov 2026 kept only the grace's end)
+        renewed = any(g["role"] == d.get("role") and g["grant_id"] != d.get("grant_id") and g["valid_until"].isoformat() > str(d.get("grace_ends") or "")
+                      for g in good)
     who = (ctx.viewed_by or ctx.identity).account_id
     await engine.db.issues.log(issue["id"], "acted", f"Asked the store: {added} new grant(s)", who)
     if renewed:

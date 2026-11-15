@@ -105,7 +105,10 @@ Knocks no longer expire; a PC knocks until it is seated or uninstalled.
   makes a new one. The Engine asks the store once a day (and when an Admin asks: TUI `seats refresh`) for grants it has not seen, and adds
   them. It never re-checks one it has.
 - **Free seats** = seats in valid grants of that kind, minus those in use.
-- **The end of a period**: issues are raised for the Admins 30, 7 and 1 days before a grant ends, and during its grace. After the end come
+- **The end of a period**: issues are raised for the Admins 30, 7 and 1 days before a grant ends, and during its grace: one issue for all
+  the grants of a kind ending on one day ("60 Worker seats end on…", a top-up ending with its main grant), and none for seats a renewal
+  bought ahead carries on with no gap; Look now resolves it on such a renewal too. The period itself is the store's (yearly, see
+  `docs/STORE-CONTRACT.md` section 4); the Engine enforces whatever dates a grant has. After the end come
   **7 days of grace**; machines keep working. After the grace, if more seats are in use than valid grants cover, **the most recently given
   seats over the count are taken back**, audited and announced; those PCs knock again.
 - **Admin seats**: any Admin may take back any Admin's seat; **the last Admin seat can never be taken**.
