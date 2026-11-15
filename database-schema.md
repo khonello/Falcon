@@ -646,6 +646,9 @@ drive has been seen on a machine). `file_events.detail` (JSONB) says which attri
 when it was taken back; it only lowers a matching finding).
 `machine_snapshots` (migration 060, 15 Nov 2026: each machine's last loose picture, one row per machine replaced by the next, for Detective alone;
 what changed between two pictures becomes Detective evidence; `docs/design/proposals-core-features.md` item 3).
+`file_lineage` (migration 061, 15 Nov 2026: the FILE, where a `file_index` row is a PLACE: its first name, place and time, and `copy_of` the
+lineage it was copied from); `file_index.lineage_id`, `file_index.file_id` (the Windows file id) and `file_index.linked_by` (how the place joined
+its lineage: new, file_id, move, replaced, copy, hash). Only exact links; nothing about restricted status changes. Proposals item 1.
 Design: `docs/design/detective.md`.
 
 ## 15. Flows and restricted material (migration 038)

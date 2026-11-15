@@ -255,6 +255,10 @@ class Watcher:
         if op not in ("delete", "attrib", "security") and not is_dir:        # the content did not change in the last two
             digest = await asyncio.to_thread(hash_file, Path(path), self.hash_limit)
         event: dict[str, Any] = {"op": op, "path": path, "name": os.path.basename(path), "hash": digest}
+        if op in ("create", "modify", "move", "copy") and not is_dir:
+            fid = fsmeta.file_id_of(path)                   # the file's own Windows id: the Engine follows the file through a rename by it
+            if fid:
+                event["file_id"] = fid
         if old_path:
             event["old_path"] = old_path
         if is_dir:
@@ -341,7 +345,7 @@ class Watcher:
                             loop.call_soon_threadsafe(queue.put_nowait, None)
                             return
                         p = os.path.join(dirpath, name)
-                        batch.append({"op": "modify", "path": p, "name": name, "hash": self._hash_unless_known(p)})
+                        batch.append({"op": "modify", "path": p, "name": name, "hash": self._hash_unless_known(p), "file_id": fsmeta.file_id_of(p)})
                         if self.heat.hot(p) and len(batch) > 1:
                             loop.call_soon_threadsafe(queue.put_nowait, batch)       # a hot file is not left waiting for the batch to fill
                             batch = []
@@ -458,7 +462,8 @@ class Watcher:
                         if known is not None and known[0] == st.st_size and known[1] == st.st_mtime_ns:
                             continue
                         batch.append({"op": "modify" if known else "create", "path": p, "name": name, "late": True, "at": st.st_mtime,
-                                      "hash": hash_file(Path(p), self.hash_limit), "_size": st.st_size, "_mtime": st.st_mtime_ns})
+                                      "hash": hash_file(Path(p), self.hash_limit), "_size": st.st_size, "_mtime": st.st_mtime_ns,
+                                      "file_id": fsmeta.file_id(st)})
                         if len(batch) >= CATCHUP_BATCH:
                             loop.call_soon_threadsafe(queue.put_nowait, batch)
                             batch = []

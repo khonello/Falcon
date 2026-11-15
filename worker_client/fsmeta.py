@@ -87,3 +87,18 @@ def changes(before: Meta, after: Meta) -> list[str]:
     if before.security is not None and after.security is not None and before.security != after.security:
         out.append("security")
     return out
+
+
+def file_id(st: os.stat_result | None) -> str | None:
+    """The file's own id as the Engine keeps it: the volume serial and the file index (Windows; the device and inode elsewhere). It survives a rename
+    and a move on the same drive, and an edit in place; a move to another drive makes a new one. None when the system gives none."""
+    if st is None or not st.st_ino:
+        return None
+    return f"{st.st_dev:x}:{st.st_ino:x}"
+
+
+def file_id_of(path: str) -> str | None:
+    try:
+        return file_id(os.stat(path))
+    except OSError:
+        return None

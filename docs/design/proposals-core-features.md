@@ -125,6 +125,20 @@ real at last (`docs/to-lookat.md`: "Not run for real").
 fingerprints are kept only for restricted files, so the comparison grows with what is restricted, not with the index; only candidates
 named by the events are compared at once, the rest when the machine is idle.
 
+**Built: the exact links (15 Nov 2026).** Migration 061 (`file_lineage`; `file_index.lineage_id`, `file_id`, `linked_by`), the linking in
+`engine/file_index.py` (`_link`), the Worker sending each file's Windows id with its events, catch-up and sweep (`worker_client/fsmeta.py`
+`file_id`), `index.lineage` and TUI `lineage <file_index_id>`, and the journey following the whole family of lineages, so a file carried to
+a drive and edited there is one journey. As built:
+- **Versions are not a table**: a lineage's versions are the hashes in the history of its places (`file_events`), and its places are the rows
+  that carry it. Nothing is kept twice, so "the last 50 versions" needs no clamp of its own; the history's 90-day clock applies.
+- **An editor's save** is read two ways: the place was left and written again within 60 seconds (Word's move-aside, swap-in), or written over
+  while still there (a temp file moved straight onto the document). Both keep the place's file.
+- **A Windows file id** is trusted only on the same machine and only at a place left in the last ten minutes, since Windows may give the id
+  to another file later.
+- **Every place already in the index** began as a file of its own when the migration ran; links are made from then on.
+- Not yet: Task following a renamed file and Flow renaming at the destination (both can now ask the lineage), and link 5, made from
+  restricted content (step 5 of the order).
+
 ---
 
 ## 2. Detective: Windows' own places

@@ -13,6 +13,13 @@ Wire shape of one entry/event (what worker clients send):
     {"op": "create|modify|move|copy|delete|attrib|security", "path": "C:/.../report.docx", "name": "report.docx",
      "hash": "<sha256>"?, "old_path": "..."?, "is_dir": true?, "resource_tag": "common"?, "scope_department_id": 3?}
 
+`file_id` is the file's own Windows id (volume serial and file index, `worker_client/fsmeta.py`), which survives a rename and a move on one drive.
+
+A row is a PLACE; its `lineage_id` is the FILE, whatever it is called and holds now (migration 061; proposals item 1). `_link` puts each place in a
+lineage by the exact links only, strongest first: the place was already the file's (an edit), it was written over moments after the file left it
+(an editor's save by replace), a move from one of the file's places, the same Windows file id elsewhere on the machine, and otherwise a new file,
+a copy of another (a copy event, or the same content) when it is one. Nothing here is guessed, and nothing about restricted status changes.
+
 `move` covers a rename (same folder) and a move; `old_path` is where it was. `attrib` and `security` are a change of
 file attributes (read-only, hidden) and of permissions/owner, with the content untouched. Folders (`is_dir`) are
 history and signals only: they are never rows in the index. Everything is recorded in `file_events`; a place a file has
@@ -49,6 +56,8 @@ OPS = ("create", "modify", "move", "copy", "delete", "attrib", "security")
 # What Flow, Resource compliance and Task verification care about: the content of a file, or where it is. A change of
 # attributes or permissions, or anything to a folder, is for the history and for automations only.
 CONTENT_OPS = frozenset({"create", "modify", "move", "copy", "delete"})
+REPLACED_WITHIN_S = 60.0                         # a place written over this soon after the file left it is the same file (an editor's save by replace)
+FILE_ID_GONE_S = 600.0                           # a Windows file id is trusted at a place left this recently (an id can be given to another file later)
 
 
 def _key(path: str) -> str:
@@ -145,7 +154,10 @@ class FileIndex:
             row = await db.by_path(pc_id, path)              # nothing about the content changed: not re-indexed
             known_id = row["id"] if row else None
         else:
+            before = await db.by_path(pc_id, path)                # what this place was, before this event: the file it belonged to, if any
+            came_from = await db.by_path(pc_id, str(entry["old_path"])) if op in ("move", "copy") and entry.get("old_path") else None
             file_index_id = known_id = await self._upsert(pc_id, entry, "event")
+            await self._link(pc_id, entry, file_index_id, before, came_from)
             if op == "move" and entry.get("old_path"):
                 await db.mark_gone(pc_id, str(entry["old_path"]))    # it left its old place: this used to be forgotten
         await db.record_event(pc_id, op, path, old_path=entry.get("old_path"), is_dir=entry["is_dir"],
@@ -163,14 +175,41 @@ class FileIndex:
             entry = _normalize(raw)
             if entry["op"] == "delete":
                 continue
-            await self._upsert(pc_id, entry, "idle_sweep")
+            got = await self.db.file_index.upsert_full(pc_id, entry["path"], entry["name"], entry.get("hash"), entry.get("resource_tag"),
+                                                       entry.get("scope_department_id"), "idle_sweep", entry.get("file_id"))
+            if got["lineage_id"] is None:                          # a place the index meets for the first time: which file is it?
+                await self._link(pc_id, entry, int(got["id"]), None, None)
             n += 1
         return n
 
     async def _upsert(self, pc_id: int, entry: dict[str, Any], indexed_via: str) -> int:
         return await self.db.file_index.upsert(
             pc_id, entry["path"], entry["name"], entry.get("hash"), entry.get("resource_tag"),
-            entry.get("scope_department_id"), indexed_via)
+            entry.get("scope_department_id"), indexed_via, entry.get("file_id"))
+
+    async def _link(self, pc_id: int, entry: dict[str, Any], row_id: int, before: dict[str, Any] | None, came_from: dict[str, Any] | None) -> int:
+        """Which file this place now holds (see the module's words). Returns the lineage."""
+        db = self.db.file_index
+        op, fid, path = entry["op"], entry.get("file_id"), entry["path"]
+        if before is not None and before.get("lineage_id"):
+            if before.get("gone_at") is None and op in ("create", "modify"):
+                return int(before["lineage_id"])                  # it was already here: an edit, or the same file seen again
+            left = (datetime.now(timezone.utc) - before["gone_at"]).total_seconds() if before.get("gone_at") is not None else 0.0
+            if left <= REPLACED_WITHIN_S or (fid and before.get("file_id") == fid):
+                await db.link(row_id, int(before["lineage_id"]), "replaced", fid)
+                return int(before["lineage_id"])
+        if op == "move" and came_from is not None and came_from.get("lineage_id"):
+            lineage, how = int(came_from["lineage_id"]), "move"
+        elif fid and (other := await db.by_file_id(pc_id, fid, path, FILE_ID_GONE_S)) is not None:
+            lineage, how = int(other["lineage_id"]), "file_id"
+        elif op == "copy" and came_from is not None and came_from.get("lineage_id"):
+            lineage, how = await db.new_lineage(pc_id, path, entry["name"], "copy", int(came_from["lineage_id"])), "copy"
+        elif entry.get("hash") and (same := await db.earliest_with_hash(str(entry["hash"]), row_id)) is not None:
+            lineage, how = await db.new_lineage(pc_id, path, entry["name"], "hash", int(same["lineage_id"])), "hash"
+        else:
+            lineage, how = await db.new_lineage(pc_id, path, entry["name"], "new"), "new"
+        await db.link(row_id, lineage, how, fid)
+        return lineage
 
     # --- consumer queries -----------------------------------------------------------------------
 
@@ -243,6 +282,7 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
         "path": path,
         "name": str(event.get("name") or PurePath(path).name),
         "hash": event.get("hash"),
+        "file_id": str(event["file_id"])[:64] if event.get("file_id") else None,
         "drive": event.get("drive"),
         "old_path": event.get("old_path"),
         "is_dir": bool(event.get("is_dir")),

@@ -44,6 +44,17 @@ async def journey(ctx: ShellContext, args: Args) -> str:
     return "\n".join([head, ""] + lines)
 
 
+@command("lineage", usage="<file_index_id>",
+         help_="The file this place holds: every place it has been, however it was renamed, moved or saved, and its copies")
+async def lineage(ctx: ShellContext, args: Args) -> str:
+    res = await ctx.call("index.lineage", {"file_index_id": args.get_int(0, "file_index_id")})
+    lin = res["lineage"]
+    head = f"{lin['first_name']}: first seen {lin['first_seen_at'][:16].replace('T', ' ')} at {lin['first_path']}" + (f" (a copy of file {lin['copy_of']})" if lin["copy_of"] else "")
+    lines = [f"  {p['first_seen_at'][:16].replace('T', ' ')}  {p['hostname'] or '?'}  {p['path']}  {p['how']}{'  (left)' if p['gone_at'] else ''}" for p in res["places"]]
+    copies = [f"  copy: {c['first_name']} at {c['first_path']} ({c['began_by']})" for c in res["copies"]]
+    return "\n".join([head, *lines, *copies])
+
+
 @command("marks", usage="[all|department]", help_="Protected files: marked where they are, restricted, private or watched")
 async def marks_list(ctx: ShellContext, args: Args) -> str:
     scope = args.positional[0] if args.positional and args.positional[0] in ("all", "department") else "mine"

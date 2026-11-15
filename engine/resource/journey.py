@@ -196,3 +196,42 @@ async def journey(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
                      "tag": entry["resource_tag"]},
             "places": [{**(row(p) or {}), "hostname": (await pc_of(p["pc_id"]) or {}).get("hostname")} for p in places],
             "events": events}
+
+
+LINKED_WORDS = {"new": "first seen here", "file_id": "the same file (its Windows id), renamed or moved", "move": "moved or renamed here",
+                "replaced": "saved over its old place (an editor's save)", "copy": "copied here", "hash": "the same content appeared here"}
+
+
+@handler("index.lineage")
+async def lineage(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """{"file_index_id"} -> the file this place holds: {lineage: {id, first_name, first_path, first_seen_at, began_by, copy_of}, places: [{id, pc_id,
+    hostname, path, gone_at, linked_by, how}], copies: [{id, first_name, first_path, began_by}]}. An Admin sees only the places on machines in their scope."""
+    ident = require_role(ctx, "super_user", "admin")
+    db = ctx.engine.db
+    entry = await db.file_index.get(int_field(payload, "file_index_id"))
+    if entry is None or entry.get("lineage_id") is None:
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such indexed file")
+    pcs: dict[int, dict[str, Any]] = {}
+
+    async def pc_of(pc_id: int) -> dict[str, Any]:
+        if pc_id not in pcs:
+            pcs[pc_id] = await db.accounts.pc(pc_id) or {}
+        return pcs[pc_id]
+
+    def mine(pc: dict[str, Any]) -> bool:
+        return org_wide(ident) or pc.get("department_id") == ident.department_id
+
+    if not mine(await pc_of(entry["pc_id"])):
+        raise ProtocolError(ErrorCode.NOT_FOUND, "no such indexed file")
+    lin = await db.file_index.lineage(int(entry["lineage_id"])) or {}
+    places = []
+    for p in await db.file_index.lineage_places(int(entry["lineage_id"])):
+        pc = await pc_of(p["pc_id"])
+        if mine(pc):
+            places.append({"id": p["id"], "pc_id": p["pc_id"], "hostname": pc.get("hostname"), "path": p["path"], "gone_at": _iso(p["gone_at"]),
+                           "first_seen_at": _iso(p["first_seen_at"]), "linked_by": p["linked_by"], "how": LINKED_WORDS.get(p["linked_by"] or "", "")})
+    copies = [{"id": c["id"], "first_name": c["first_name"], "first_path": c["first_path"], "began_by": c["began_by"]}
+              for c in await db.file_index.lineage_copies(int(entry["lineage_id"])) if mine(await pc_of(c["first_pc_id"]))]
+    return {"lineage": {"id": lin.get("id"), "first_name": lin.get("first_name"), "first_path": lin.get("first_path"),
+                        "first_seen_at": _iso(lin.get("first_seen_at")), "began_by": lin.get("began_by"), "copy_of": lin.get("copy_of")},
+            "places": places, "copies": copies}

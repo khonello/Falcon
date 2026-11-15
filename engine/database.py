@@ -724,7 +724,7 @@ class SessionsRepo(_Repo):
 
 class FileIndexRepo(_Repo):
     _COLS = ("id, pc_id, path, filename, content_hash, resource_tag, resource_tag_scope_department_id, "
-             "indexed_via, last_seen_at, first_seen_at, gone_at")
+             "indexed_via, last_seen_at, first_seen_at, gone_at, lineage_id, file_id, linked_by")
 
     async def events_on_pc(self, pc_id: int, op: str, is_dir: bool, since: datetime, limit: int = 5000) -> list[dict[str, Any]]:
         """One kind of file event on one machine since a moment, newest first, with the file's tier tag: what a rule being tried would have met."""
@@ -734,18 +734,27 @@ class FileIndexRepo(_Repo):
 
     async def upsert(self, pc_id: int, path: str, filename: str, content_hash: str | None,
                      resource_tag: str | None, scope_department_id: int | None,
-                     indexed_via: str) -> int:
-        return await self._val(
+                     indexed_via: str, file_id: str | None = None) -> int:
+        return int((await self.upsert_full(pc_id, path, filename, content_hash, resource_tag, scope_department_id, indexed_via, file_id))["id"])
+
+    async def upsert_full(self, pc_id: int, path: str, filename: str, content_hash: str | None,
+                          resource_tag: str | None, scope_department_id: int | None,
+                          indexed_via: str, file_id: str | None = None) -> dict[str, Any]:
+        """The place written, with its lineage (None for a place new to the index) and its Windows file id."""
+        got = await self._one(
             "INSERT INTO file_index (pc_id, path, filename, content_hash, resource_tag, "
-            "resource_tag_scope_department_id, indexed_via, last_seen_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, now()) "
+            "resource_tag_scope_department_id, indexed_via, last_seen_at, file_id) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $8) "
             "ON CONFLICT (pc_id, path) DO UPDATE SET filename = EXCLUDED.filename, "
             "content_hash = COALESCE(EXCLUDED.content_hash, file_index.content_hash), "
             "resource_tag = COALESCE(EXCLUDED.resource_tag, file_index.resource_tag), "
             "resource_tag_scope_department_id = COALESCE(EXCLUDED.resource_tag_scope_department_id, "
             "                                            file_index.resource_tag_scope_department_id), "
-            "indexed_via = EXCLUDED.indexed_via, last_seen_at = now(), gone_at = NULL RETURNING id",
-            pc_id, path, filename, content_hash, resource_tag, scope_department_id, indexed_via)
+            "file_id = COALESCE(EXCLUDED.file_id, file_index.file_id), "
+            "indexed_via = EXCLUDED.indexed_via, last_seen_at = now(), gone_at = NULL RETURNING id, lineage_id, file_id",
+            pc_id, path, filename, content_hash, resource_tag, scope_department_id, indexed_via, file_id)
+        assert got is not None
+        return got
 
     async def get(self, file_index_id: int) -> dict[str, Any] | None:
         return await self._one(f"SELECT {self._COLS} FROM file_index WHERE id = $1", file_index_id)
@@ -848,11 +857,52 @@ class FileIndexRepo(_Repo):
             "AND pc_id = ANY($1::int[]) ORDER BY occurred_at, id", pc_ids)
 
     async def same_content(self, file_index_id: int) -> list[dict[str, Any]]:
-        """Every place the same content has been indexed (this row included), earliest first -- the places a file's
-        journey is made of. A file with no hash yet is only itself."""
+        """Every place the same file has been (this row included), earliest first -- the places a file's journey is made of: every place of the
+        same content, and every place of its whole family of lineages (the one it was first copied from, and every copy of a copy), so a file
+        edited and then carried away is still one journey. A file with no hash and no lineage is only itself."""
         return await self._fetch(
-            f"SELECT {self._COLS} FROM file_index WHERE id = $1 OR (content_hash IS NOT NULL AND content_hash = "
-            "(SELECT content_hash FROM file_index WHERE id = $1)) ORDER BY first_seen_at, id", file_index_id)
+            "WITH RECURSIVE me AS (SELECT lineage_id, content_hash FROM file_index WHERE id = $1), "
+            "up AS (SELECT l.id, l.copy_of, 0 AS depth FROM file_lineage l WHERE l.id = (SELECT lineage_id FROM me) "
+            "       UNION ALL SELECT l.id, l.copy_of, up.depth + 1 FROM file_lineage l JOIN up ON l.id = up.copy_of WHERE up.depth < 20), "
+            "root AS (SELECT id FROM up ORDER BY depth DESC LIMIT 1), "
+            "fam AS (SELECT id, 0 AS depth FROM root UNION SELECT l.id, fam.depth + 1 FROM file_lineage l JOIN fam ON l.copy_of = fam.id WHERE fam.depth < 20) "
+            f"SELECT {self._COLS} FROM file_index WHERE id = $1 OR (content_hash IS NOT NULL AND content_hash = (SELECT content_hash FROM me)) "
+            "OR lineage_id IN (SELECT id FROM fam) ORDER BY first_seen_at, id LIMIT 2000", file_index_id)
+
+    # --- lineage: one file, whatever its name, place and content (migration 061; engine/file_index.py links) ---
+
+    async def new_lineage(self, pc_id: int, path: str, filename: str, began_by: str, copy_of: int | None = None) -> int:
+        return int(await self._val(
+            "INSERT INTO file_lineage (first_pc_id, first_path, first_name, began_by, copy_of) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            pc_id, path, filename, began_by, copy_of))
+
+    async def link(self, file_index_id: int, lineage_id: int, linked_by: str, file_id: str | None) -> None:
+        await self._exec("UPDATE file_index SET lineage_id = $2, linked_by = $3, file_id = COALESCE($4, file_id) WHERE id = $1",
+                         file_index_id, lineage_id, linked_by, file_id)
+
+    async def set_file_id(self, file_index_id: int, file_id: str) -> None:
+        await self._exec("UPDATE file_index SET file_id = $2 WHERE id = $1 AND file_id IS DISTINCT FROM $2", file_index_id, file_id)
+
+    async def by_file_id(self, pc_id: int, file_id: str, not_path: str, gone_within_s: float) -> dict[str, Any] | None:
+        """Another place of this machine with the same Windows file id: still there, or left only moments ago (an id can be reused later)."""
+        return await self._one(
+            f"SELECT {self._COLS} FROM file_index WHERE pc_id = $1 AND file_id = $2 AND path <> $3 AND lineage_id IS NOT NULL "
+            "AND (gone_at IS NULL OR gone_at > now() - make_interval(secs => $4)) ORDER BY gone_at IS NULL DESC, last_seen_at DESC LIMIT 1",
+            pc_id, file_id, not_path, gone_within_s)
+
+    async def earliest_with_hash(self, content_hash: str, not_id: int) -> dict[str, Any] | None:
+        return await self._one(
+            f"SELECT {self._COLS} FROM file_index WHERE content_hash = $1 AND id <> $2 AND lineage_id IS NOT NULL ORDER BY first_seen_at, id LIMIT 1",
+            content_hash, not_id)
+
+    async def lineage(self, lineage_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT * FROM file_lineage WHERE id = $1", lineage_id)
+
+    async def lineage_places(self, lineage_id: int, limit: int = 500) -> list[dict[str, Any]]:
+        return await self._fetch(f"SELECT {self._COLS} FROM file_index WHERE lineage_id = $1 ORDER BY first_seen_at, id LIMIT $2", lineage_id, limit)
+
+    async def lineage_copies(self, lineage_id: int, limit: int = 200) -> list[dict[str, Any]]:
+        return await self._fetch("SELECT * FROM file_lineage WHERE copy_of = $1 ORDER BY first_seen_at, id LIMIT $2", lineage_id, limit)
 
     async def folders(self, pc_id: int, limit: int = 500) -> list[dict[str, Any]]:
         """The folders the index knows on one machine, each with how many files it holds -- what a person picks from
