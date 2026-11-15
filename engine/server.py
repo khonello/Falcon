@@ -20,6 +20,7 @@ import engine.control
 import engine.detective
 import engine.flow
 import engine.hierarchy
+import engine.places
 import engine.resource
 import engine.task
 import engine.updates
@@ -116,7 +117,7 @@ class Engine:
         from engine.task import expected as task_expected
 
         for mod in (control_events, control_executions, control_inventory, flow_sync, console_screens, console_marks, engine.detective, task_expected,
-                    licences, hierarchy_seats):
+                    licences, hierarchy_seats, engine.places):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
         from engine.store import StoreLink

@@ -36,6 +36,7 @@ from worker_client.isolated import IsolatedSignals, IsolatedWatcher
 from worker_client.localapp import LocalApp
 from worker_client.lockout import Lockout
 from worker_client.ossignals import OsSignals
+from worker_client.places import PlacesReporter
 from worker_client.privacy import Privacy, RefusalReader, signed_in_user
 from worker_client.reminders import TaskReminders
 from worker_client.screenstream import RemoteInput, ScreenStreamer
@@ -91,6 +92,7 @@ class WorkerService:
         self._native_watch = native_watch
         self.signpipe: SignPipeServer | None = None
         self.updater = Updater(self.call, running_version=VERSION, update_command=config.update_command, config=config)
+        self.places = PlacesReporter(self.call)          # each person's real Desktop, Documents, Downloads ... (common/places.py)
         state_path = Path(config.path).parent / "index-state.db" if config.index_state else None
         if config.separate_programs:
             self.watcher: Any = IsolatedWatcher(config.watch_roots, self._relay, poll_seconds=config.poll_seconds,
@@ -182,6 +184,7 @@ class WorkerService:
             await self._clipboard.stop()
         await self.ossignals.stop()
         await self.inventory.stop()
+        self.places.stop()
         await self.updater.stop()
         await self.executor.shutdown()
         if self.conn:
@@ -349,6 +352,7 @@ class WorkerService:
         else:
             self.lockout.release()
         await self.ossignals.refresh()
+        self._spawn(self.places.connected())             # where each person's own folders really are, told before the events that need them
         self._spawn(self._flush_then_reconcile())     # whatever happened while the Engine was not listening is told now (what we saw, then what we missed), in the background
         if self.config.windows:
             self._spawn(self._replay_emergencies())

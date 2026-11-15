@@ -73,6 +73,18 @@ async def machine_end(ctx: ShellContext, args: Args) -> str:
     return f"execution {(await ctx.call('machines.end_program', {'pc_id': args.get_int(0, 'pc_id'), 'name': args.rest(1, 'program')}))['execution_id']}"
 
 
+@command("machine", "places", "<pc_id>", "Where each person's Desktop, Documents, Downloads ... really are, as the machine said")
+async def machine_places(ctx: ShellContext, args: Args) -> str:
+    got = await ctx.call("index.places_get", {"pc_id": args.get_int(0, "pc_id")})
+    if not got["as_of"]:
+        return f"{got['hostname']} has not said where its places are (it is off, or its Worker is older): the usual layout is assumed"
+    lines = [f"{got['hostname']}, as of {got['as_of'][:16].replace('T', ' ')}"]
+    for user in dict.fromkeys(p["user"] for p in got["places"]):
+        lines.append(f"  {user or 'the machine'}")
+        lines += [f"    {p['kind']:<16} {p['path']}{'  (the usual place: Windows did not say)' if p['guessed'] else ''}" for p in got["places"] if p["user"] == user]
+    return "\n".join(lines)
+
+
 @command("event", "again", "<event_id> <at>", "Run a firing again, only where it failed or timed out")
 async def event_again(ctx: ShellContext, args: Args) -> str:
     got = await ctx.call("automation.run_again", {"event_id": args.get_int(0, "event_id"), "at": args.get(1, "at")})

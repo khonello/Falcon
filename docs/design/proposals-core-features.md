@@ -149,6 +149,17 @@ another drive, is not seen.
   erasure.
 - Also useful outside Detective: Task (`@folder:Downloads` for any person), Flow (a source "their Desktop" that follows redirection).
 
+**Built (15 Nov 2026).** `common/places.py` (the kinds, a machine's map, the usual layout as a guess), `worker_client/places.py` (read from each
+profile's hive; told at every connect and when it changes), `engine/places.py` (`index.places`, `index.places_get`; held in memory, told again at every
+connect), TUI `machine places <pc_id>`. Every file event Detective reads carries its place and, for a move, where it was (`info["place"]`,
+`info["was"]`). Detective uses them for "somewhere nobody looks" (buried, hidden, disguised, and what does not count as gathering) and for filing
+between one person's own places; its words name the place ("moved into Temp"). Where a machine has not said, the usual layout gives exactly what
+Detective did before. Measured: no cost per event against `main`. Changed from the plan above:
+- **A file put in Startup** is read by the snapshot (item 3), which covers every way a program starts at sign-in (the Startup folders and the Run
+  keys), not only the folder; no Detective area fits it today.
+- **The Recycle Bin**: the installer watches `C:\Users`, so a file deleted through Explorer reaches the Engine as a delete, never as a move into
+  `$Recycle.Bin`; the place is known, but nothing arrives there to read. Emptying it is the snapshot's to see (storage).
+
 ---
 
 ## 3. Detective: a loose snapshot of the machine

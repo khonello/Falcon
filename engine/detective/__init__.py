@@ -36,6 +36,7 @@ from common.detective import (
     sig_from_dict,
     sig_to_dict,
 )
+from engine import places
 from engine.detective import labels, telling
 from engine.detective.brain import CaseView, UpdateView, view_of
 from engine.detective.host import LocalMatcher, MatcherGone, ProcessMatcher
@@ -234,9 +235,21 @@ async def on_file(engine: Engine, event: dict[str, Any]) -> None:
     info: dict[str, Any] = {"title": seen["title"]} if by == "hand" and seen.get("title") else {}
     if event.get("late"):
         info["late"] = True                              # found afterwards: when it happened is the file's own time, and who did it cannot be told
+    _place_info(info, "place", pc_id, path)               # whose Desktop, Downloads, Temp ... this is, as the machine said (engine/places.py)
+    if event.get("old_path"):
+        _place_info(info, "was", pc_id, str(event["old_path"]))
     sig = Sig(event.get("at") or time.time(), pc_id, verb, path, str(event.get("old_path") or ""), digest or "", seen.get("program") or (seen.get("front", "") if by == "hand" else ""), by, "",
               frozenset(tags), info)
     await _feed(engine, sig)
+
+
+def _place_info(info: dict[str, Any], key: str, pc_id: int, path: str) -> None:
+    place = places.place_of(pc_id, path)
+    info[key] = place.kind if place is not None else ""
+    if place is not None and place.user:
+        info[key + "_user"] = place.user
+    if place is not None and place.guessed:
+        info[key + "_guessed"] = True
 
 
 async def _own_scope(engine: Engine, pc_id: int, entry: dict[str, Any]) -> bool:

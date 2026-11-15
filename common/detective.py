@@ -32,6 +32,8 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from common.anchors import ANCHORS, INCLUDES, area_value, coverage_of
+from common.places import Place
+from common.places import guess as guess_place
 
 BEHAVIOURS = ("concealment", "collection", "exfiltration", "capture", "erasure", "evasion", "sabotage", "reach")
 BEHAVIOUR_WORDS = {"concealment": "Concealment", "collection": "Collection", "exfiltration": "Taking out", "capture": "Capture", "erasure": "Erasure",
@@ -200,6 +202,36 @@ class Sig:
                 "captured": ("took a picture of the whole screen" if self.info.get("kind") == "screen" else "put a picture on the clipboard" if self.info.get("kind") == "region"
                              else f"captured the screen ({self.program or 'a tool'})") + (f" ({self.program})" if self.info.get("kind") and self.program else ""), "cleared": f"cleared {self.info.get('what') or 'a history'}",
                 "silent": "stopped reporting while still switched on"}.get(self.verb, f"{self.verb} {n}")
+
+
+def where(s: Sig, old: bool = False) -> Place | None:
+    """The place the thing is in now (or was in, `old`): as the machine said, which the Engine puts in `info` ("place" / "was"), else the usual layout
+    read out of the path (common/places.py). A Desktop in OneDrive or a Temp on another drive is only known from what the machine said."""
+    key = "was" if old else "place"
+    if key in s.info:
+        kind = str(s.info.get(key) or "")
+        return Place(kind, str(s.info.get(key + "_user") or ""), bool(s.info.get(key + "_guessed"))) if kind else None
+    return guess_place(s.old if old else s.path)
+
+
+def out_of_sight(s: Sig, old: bool = False) -> bool:
+    """Somewhere nobody looks: one of Windows' own places (Temp, AppData, Program Files, ...) wherever this machine keeps it, or a system folder by name."""
+    path = s.old if old else s.path
+    if not path:
+        return False
+    place = where(s, old)
+    return (place is not None and place.out_of_sight) or is_system_folder(path)
+
+
+def filing(s: Sig) -> bool:
+    """Moved or copied between one person's own places (Downloads to Documents, Desktop to OneDrive): housekeeping, wherever those places live."""
+    a, b = where(s), where(s, old=True)
+    return bool(a and b and a.personal and b.personal and a.user == b.user) or _same_profile(s.path, s.old)
+
+
+def _sight_words(s: Sig, word: str = "into") -> str:
+    place = where(s)
+    return f"{word} {place.words()}" if place is not None and place.out_of_sight else f"{word} a system folder"
 
 
 def sig_to_dict(x: Sig) -> dict[str, Any]:
@@ -1049,9 +1081,9 @@ class Detective:
                 add("capture", "Pass on", 0.30 + worth)
         elif v in ("copied", "moved") and s.path.startswith("\\\\"):
             add("exfiltration", "Transfer", 0.26 * kf + worth)             # a share elsewhere on the network: inside, but off this machine
-        elif v in ("copied", "moved") and not is_system_folder(s.path) and not is_system_folder(s.old or "") and ext not in SYSTEMISH_EXT \
+        elif v in ("copied", "moved") and not out_of_sight(s) and not out_of_sight(s, old=True) and ext not in SYSTEMISH_EXT \
                 and folder_of(s.path).lower() != folder_of(s.old or "").lower():
-            mine = 0.01 if _same_profile(s.path, s.old) and not worth else 0.03         # filing a download into one's own documents is housekeeping, not gathering
+            mine = 0.01 if filing(s) and not worth else 0.03         # filing a download into one's own documents is housekeeping, not gathering
             add("exfiltration", "Gather", mine + worth)
             add("collection", "Access", mine + worth)
             same = {x.thing or x.path for x in m.since(s.at - 10 * 60, "copied", "moved") if folder_of(x.path).lower() == folder_of(s.path).lower()}
@@ -1085,7 +1117,7 @@ class Detective:
             if any(name_of(x.path).rsplit(".", 1)[0].lower() == stem and ext_of(x.path) != ext and ext_of(x.path) in DOC_EXT
                    for x in m.since(s.at - 10 * 60, "created", "copied", "modified", "opened") if x is not s):
                 add("exfiltration", "Transform", 0.12 + worth)                       # the same document in another format
-        if v == "moved" and is_system_folder(s.path) and ext in DOC_EXT | ARCHIVE_EXT and not (s.old and is_system_folder(s.old)):
+        if v == "moved" and out_of_sight(s) and ext in DOC_EXT | ARCHIVE_EXT and not out_of_sight(s, old=True):
             add("concealment", "Relocate", 0.15 + worth)
         if v == "uploaded":
             recent_exfil = frozenset().union(*(h.things for h in m.area("exfiltration", "Gather", "Compress", "Transform", since=s.at - THREAD)))
@@ -1203,9 +1235,9 @@ class Detective:
 
     def _hidden(self, m: Memory, s: Sig) -> Finding:
         w, why = 0.30, ["a file was made hidden"]
-        if is_system_folder(s.path):
+        if out_of_sight(s):
             w += 0.20
-            why.append("in a system folder")
+            why.append(_sight_words(s, "in"))
         if self._restricted(s):
             w += 0.20
             why.append("a restricted file")
@@ -1219,9 +1251,9 @@ class Detective:
         old = s.old or ""
         if s.verb == "renamed" and disguised(old, s.path):
             w, why = 0.45, [f"{name_of(old)} was given the look of {name_of(s.path)}"]
-            if is_system_folder(s.path):
+            if out_of_sight(s):
                 w += 0.12
-                why.append("in a system folder")
+                why.append(_sight_words(s, "in"))
             if self._restricted(s):
                 w += 0.15
                 why.append("a restricted file")
@@ -1234,9 +1266,9 @@ class Detective:
         return None
 
     def _buried(self, m: Memory, s: Sig) -> Finding | None:
-        if s.verb != "moved" or ext_of(s.path) not in DOC_EXT | ARCHIVE_EXT or not is_system_folder(s.path) or (s.old and is_system_folder(s.old)):
+        if s.verb != "moved" or ext_of(s.path) not in DOC_EXT | ARCHIVE_EXT or not out_of_sight(s) or out_of_sight(s, old=True):
             return None
-        w, why = 0.30, [f"{s.name} was moved into a system folder"]
+        w, why = 0.30, [f"{s.name} was moved {_sight_words(s)}"]
         if self._restricted(s):
             w += 0.20
             why.append("a restricted file")
