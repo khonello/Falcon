@@ -26,9 +26,13 @@ from installers.common import InstallError
 
 
 def register(store: str, data: Path, names: list[str], port: int, certificate_pem: str, *, company_name: str | None = None,
-             company_id: str | None = None, open_browser: Callable[[str], Any] = webbrowser.open, say: Callable[[str], Any] = print) -> dict[str, Any]:
+             company_id: str | None = None, open_browser: Callable[[str], Any] = webbrowser.open, say: Callable[[str], Any] = print,
+             sign_in: Callable[..., str] | None = None) -> dict[str, Any]:
+    """`sign_in(store)` -> an access token: the browser on this machine by default (Windows); the Linux Engine's setup gives the device
+    sign-in (a link and a code to open on any other device), since a server has no browser."""
     from common import signed
-    from installers.windows.store_signin import SignInError, _http, sign_in
+    from installers.store_signin import SignInError, _http
+    from installers.store_signin import sign_in as browser_sign_in
 
     found = data / "store.json"
     if found.exists():
@@ -39,8 +43,11 @@ def register(store: str, data: Path, names: list[str], port: int, certificate_pe
     if not names:
         raise InstallError("the Engine's names are needed to register it (--names)")
     try:
-        say("Sign in to your company's Falcon account in the browser that opened (the owner, or a member the owner invited).")
-        token = sign_in(store, open_browser=open_browser)
+        if sign_in is None:
+            say("Sign in to your company's Falcon account in the browser that opened (the owner, or a member the owner invited).")
+            token = browser_sign_in(store, open_browser=open_browser)
+        else:
+            token = sign_in(store)
         base = store.rstrip("/")
         companies = list(_http("GET", f"{base}/api/me/companies", token=token).get("companies") or [])
         if company_id is None:

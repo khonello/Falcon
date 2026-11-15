@@ -19,18 +19,23 @@ from __future__ import annotations
 import os
 import secrets
 import shutil
-import socket
 import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from installers.common import InstallError, run_cmd
+from installers.private_pg_common import (
+    CONF_MARK,
+    KEEP_PROGRAMS,
+    conf_text,
+    free_port,
+    hba_text,
+    port_of,
+)
 
 SERVICE = "FalconPostgres"
-FIRST_PORT = 54320
-KEEP_PROGRAMS = ("postgres", "initdb", "pg_ctl", "psql", "pg_isready", "pg_dump", "pg_dumpall", "pg_restore", "pg_upgrade", "pg_controldata",
-                 "pg_resetwal", "pg_amcheck", "pg_checksums", "vacuumdb", "reindexdb")
+__all__ = ["CONF_MARK", "PrivatePostgres", "conf_text", "free_port", "hba_text", "trim"]
 
 
 def trim(src: Path, dest: Path) -> int:
@@ -56,39 +61,6 @@ def trim(src: Path, dest: Path) -> int:
     return total
 
 
-def free_port(start: int = FIRST_PORT, tries: int = 50) -> int:
-    for port in range(start, start + tries):
-        if port == 5432:
-            continue
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(("127.0.0.1", port))
-            except OSError:
-                continue
-            return port
-    raise InstallError(f"no free port from {start} to {start + tries - 1} for Falcon's PostgreSQL")
-
-
-def hba_text(db_name: str, db_role: str, *, superuser: str | None = None) -> str:
-    """Who may log in: the Engine's role to its database from this machine. While setting up, the superuser too (from this machine)."""
-    lines = ["# Falcon's own PostgreSQL: only the Falcon Engine logs in, from this machine. Written by the installer.",
-             "# TYPE  DATABASE  USER  ADDRESS  METHOD",
-             f"host    {db_name}    {db_role}    127.0.0.1/32    scram-sha-256",
-             f"host    {db_name}    {db_role}    ::1/128         scram-sha-256"]
-    if superuser:
-        lines += [f"host    all    {superuser}    127.0.0.1/32    scram-sha-256    # only while the installer sets it up"]
-    return "\n".join(lines) + "\n"
-
-
-CONF_MARK = "# --- Falcon (written by the installer) ---"
-
-
-def conf_text(port: int) -> str:
-    return "\n".join([CONF_MARK, "listen_addresses = 'localhost'", f"port = {port}", "password_encryption = 'scram-sha-256'",
-                      "logging_collector = on", "log_directory = 'log'", "log_rotation_age = '7d'", "log_truncate_on_rotation = on",
-                      "log_filename = 'postgresql-%a.log'", ""])
-
-
 @dataclass
 class PrivatePostgres:
     bin: Path                       # <Falcon Engine>\pgsql\bin
@@ -110,16 +82,7 @@ class PrivatePostgres:
         return f"NT SERVICE\\{self.service}"
 
     def port(self) -> int | None:
-        conf = self.pgdata / "postgresql.conf"
-        if not conf.exists():
-            return None
-        text = conf.read_text(encoding="utf-8", errors="replace")
-        if CONF_MARK not in text:
-            return None
-        for line in text.split(CONF_MARK, 1)[1].splitlines():
-            if line.strip().startswith("port ="):
-                return int(line.split("=", 1)[1].strip())
-        return None
+        return port_of(self.pgdata)
 
     def _superuser_password(self) -> str:
         if self.password_file.exists():

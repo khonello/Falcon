@@ -1,5 +1,5 @@
 """What tells one machine from another (stdlib only): used by a knocking PC (worker_client/knock.py) and by the Admin setup's claim
-(installers/windows/store_signin.py), which must name the PC the same way."""
+(installers/store_signin.py), which must name the PC the same way."""
 
 from __future__ import annotations
 

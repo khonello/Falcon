@@ -8,10 +8,14 @@ case "$1" in
         if [ -f /etc/falcon/falcon.env ]; then
             echo "falcon-engine: upgrading the Engine in place"
             cd /opt/falcon/payload
+            if command -v systemctl >/dev/null 2>&1 && systemctl is-enabled --quiet falcon-postgres 2>/dev/null; then
+                systemctl restart falcon-postgres          # the new PostgreSQL programs
+            fi
             python3 -m installers.engine.install --source /opt/falcon/payload --no-database --no-setup
         else
             echo "falcon-engine: files are in place. To set the Engine up, run once, as root:"
-            echo "    falcon-engine-install --names <name-or-address-the-PCs-use>[,more] --hostname <the first IT Admin's PC>"
+            echo "    falcon-engine-install --names <name-or-address-the-PCs-use>[,more] --store https://<store> [--company-name <name>]"
+            echo "  It signs in to your company's Falcon account (a link and a code to open on any device; internet required)."
         fi
         ;;
 esac

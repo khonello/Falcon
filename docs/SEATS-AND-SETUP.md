@@ -132,6 +132,19 @@ keeps the latest, and the console downloads it from the Engine for the Worker zi
 - The uninstall removes the service and keeps the data unless `--purge-data`.
 - An IT department that insists on its own server can give `--database-url` to the installer, on the command line only.
 
+### On Linux (the user, 15 Nov 2026: most servers run Linux, so the Linux Engine is covered the same way)
+
+The same rules, Linux's own way (`installers/engine/pgsql.py`; Windows' stays apart in `installers/windows/private_pg.py`, what both share
+in `installers/private_pg_common.py`):
+- Programs in `/opt/falcon/pgsql`, copied at build from the build server's PostgreSQL in its own relative layout; never on PATH. The `.deb`
+  depends only on the libraries they need (`dpkg-shlibdeps`), never on a `postgresql` package, so no cluster of the distribution's is made
+  or touched.
+- Data in `/var/lib/falcon-postgres/data`, owned by its own system user `falcon-pg`, 0700; `falcon-postgres.service` (systemd) runs it.
+- Localhost only, its own port (from 54320), **no socket file**; `pg_hba.conf` as on Windows. The superuser's password in
+  `/etc/falcon/pg-superuser`, root only.
+- The setup signs in to the store with a **link and a short code** opened on any phone or computer (OAuth device authorization,
+  `docs/STORE-CONTRACT.md`), since a server has no browser; it registers the Engine and makes no first Admin.
+
 ## 10. Certificate renewal
 
 The Engine's certificate is valid for 10 years; renewal is rare, but a lapse would cut every machine off at once, so it is automatic:
@@ -155,6 +168,7 @@ The Engine's certificate is valid for 10 years; renewal is rare, but a lapse wou
 | 6 | certificate renewal (done 15 Nov 2026; `engine/certs.py`) | 2 |
 | 7 | the Machines page, handed to the design session (done 15 Nov 2026; docs/UI-WORK-FROM-ENGINE.md) | 2 |
 | 8 | the old joining code removed; docs; drills (code and docs done 15 Nov 2026; drills: see section 12) | 2–6 |
+| 9 | the Linux Engine level with Windows: its own PostgreSQL, the store by a link and a code, no first Admin (15 Nov 2026) | 5 |
 
 Outside this session: the store itself (the `store/` session, built to `docs/STORE-CONTRACT.md`); the Paddle account (the user); a
 code-signing certificate for the setups (to buy before shipping).

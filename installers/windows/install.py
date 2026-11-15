@@ -167,7 +167,7 @@ class WindowsInstall:
 
     def sign_in(self) -> None:
         """The Admin setup signs in to the store (docs/SEATS-AND-SETUP.md section 5): the claim and the company file land in the private folder."""
-        from installers.windows.store_signin import SignInError, run
+        from installers.store_signin import SignInError, run
 
         try:
             got = run(self.a.store, self.private, engine_id=self.a.engine)

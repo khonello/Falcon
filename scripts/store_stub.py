@@ -5,7 +5,8 @@ the store exists. NOT the store: no real sign-in, no payments, a test signing ke
 
 Everything signed here is signed with the TEST key (kid "test-1"), which Falcon trusts only when FALCON_STORE_TEST_KEY=1. Sign-in is
 automatic: /oauth/authorize signs in as `login_hint` (default owner@test.local) at once and redirects back, PKCE and all, so the setups'
-real sign-in code runs unchanged against it. Two calls exist only here, for tests and drills: POST /_test/grants (a Paddle purchase) and
+real sign-in code runs unchanged against it. The device sign-in (a server with no browser) is the same: opening the link it gives
+(`/device?user_code=...`) signs in as `login_hint` at once. Two calls exist only here, for tests and drills: POST /_test/grants (a Paddle purchase) and
 POST /_test/members (the owner inviting someone). In the tests it runs in-process: `StoreStub().start()`.
 
 Needs `cryptography` (to sign): environ-engine has it.
@@ -35,6 +36,7 @@ from common.store_keys import TEST_KID
 TEST_SEED = hashlib.sha256(b"falcon store TEST key - trusted only with FALCON_STORE_TEST_KEY=1").digest()
 DEFAULT_MEMBER = "owner@test.local"
 CLAIM_MINUTES = 10
+DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 
 
 def now_iso(offset: float = 0.0) -> str:
@@ -56,7 +58,7 @@ class State:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path
         self.lock = threading.Lock()
-        self.data: dict[str, Any] = {"companies": {}, "engines": {}, "grants": [], "codes": {}, "tokens": {}, "claims": []}
+        self.data: dict[str, Any] = {"companies": {}, "engines": {}, "grants": [], "codes": {}, "tokens": {}, "claims": [], "devices": {}}
         if path and path.is_file():
             self.data.update(json.loads(path.read_text(encoding="utf-8")))
 
@@ -105,7 +107,15 @@ class StoreStub:
                 self.end_headers()
                 self.wfile.write(raw)
 
+            def _peek(self) -> dict[str, Any]:
+                if not hasattr(self, "_kept"):
+                    self._kept = self._read_body()
+                return self._kept
+
             def _body(self) -> dict[str, Any]:
+                return self._peek()
+
+            def _read_body(self) -> dict[str, Any]:
                 n = int(self.headers.get("Content-Length") or 0)
                 if not n:
                     return {}
@@ -140,6 +150,7 @@ class StoreStub:
                     self._route("PUT")
 
             def _route(self, method: str) -> None:
+                self.__dict__.pop("_kept", None)                                # one request's body, never the one before it
                 url = urllib.parse.urlparse(self.path)
                 parts = [p for p in url.path.split("/") if p]
                 q = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
@@ -151,6 +162,27 @@ class StoreStub:
                                             "redirect_uri": q.get("redirect_uri", ""), "expires": time.time() + 300}
                         sep = "&" if "?" in q.get("redirect_uri", "") else "?"
                         return self._send(302, None, {"Location": f"{q['redirect_uri']}{sep}code={code}&state={urllib.parse.quote(q.get('state', ''))}"})
+                    if method == "POST" and url.path == "/oauth/device_authorization":
+                        device, user = secrets.token_urlsafe(24), "-".join(secrets.token_hex(2).upper() for _ in range(2))
+                        d.setdefault("devices", {})[device] = {"user_code": user, "email": None, "expires": time.time() + 600}
+                        base = f"http://{self.headers.get('Host')}"
+                        return self._send(200, {"device_code": device, "user_code": user, "verification_uri": f"{base}/device",
+                                                "verification_uri_complete": f"{base}/device?user_code={user}", "interval": 1, "expires_in": 600})
+                    if method == "GET" and url.path == "/device":
+                        for dev in d.setdefault("devices", {}).values():
+                            if dev["user_code"] == q.get("user_code"):
+                                dev["email"] = q.get("login_hint") or DEFAULT_MEMBER
+                                return self._send(200, {"signed_in": dev["email"]})
+                        return self._send(404, {"error": "no such code"})
+                    if method == "POST" and url.path == "/oauth/token" and self._peek().get("grant_type") == DEVICE_GRANT:
+                        dev = d.setdefault("devices", {}).get(self._body().get("device_code", ""))
+                        if dev is None or dev["expires"] < time.time():
+                            return self._send(400, {"error": "expired_token"})
+                        if dev["email"] is None:
+                            return self._send(400, {"error": "authorization_pending"})
+                        token = secrets.token_urlsafe(24)
+                        d["tokens"][token] = {"email": dev["email"], "expires": time.time() + 600}
+                        return self._send(200, {"access_token": token, "token_type": "Bearer", "expires_in": 600})
                     if method == "POST" and url.path == "/oauth/token":
                         b = self._body()
                         c = d["codes"].pop(b.get("code", ""), None)

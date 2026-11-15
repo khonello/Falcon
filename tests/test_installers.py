@@ -147,6 +147,9 @@ def test_the_engine_settings_name_server_paths_and_no_development_switch():
         assert want in text
     assert "DEV_PLAINTEXT" not in text and "DEV_BYPASS_AUTH" not in text and "falcon_test" not in text
     assert all(line.split("=", 1)[1].startswith("/") for line in text.splitlines() if line.startswith(("FALCON_TLS", "FALCON_SECRET")))
+    assert "FALCON_PG_BIN" not in text
+    own = render.env_file(layout, "postgresql://falcon:s3cret@127.0.0.1:54320/falcon", 7400, Path("/opt/falcon/pgsql/lib/postgresql/16/bin"))
+    assert "FALCON_PG_BIN=/opt/falcon/pgsql/lib/postgresql/16/bin" in own                     # backups use its own tools, never another's
 
 
 def test_the_service_unit_runs_as_the_falcon_user_with_only_what_it_needs():
@@ -154,6 +157,22 @@ def test_the_service_unit_runs_as_the_falcon_user_with_only_what_it_needs():
     for want in ("User=falcon", "ExecStart=/opt/falcon/venv/bin/python -m engine", "EnvironmentFile=/etc/falcon/falcon.env", "Restart=on-failure",
                  "NoNewPrivileges=true", "ProtectSystem=strict", "ReadWritePaths=/var/lib/falcon /var/log/falcon", "WantedBy=multi-user.target"):
         assert want in unit, want
+    assert "After=network-online.target falcon-postgres.service" in unit and "Requires=falcon-postgres.service" in unit   # its database first
+    theirs = render.systemd_unit(render.Layout(), None)                                       # an IT department's own server (--database-url)
+    assert "Requires=" not in theirs and "postgresql.service" in theirs
+
+
+def test_its_own_postgresql_on_linux_runs_as_its_own_user_with_no_socket_and_only_its_data():
+    from installers.engine import pgsql
+    from installers.private_pg_common import conf_text
+
+    unit = pgsql.unit_text(Path("/opt/falcon/pgsql/lib/postgresql/16/bin"), Path("/var/lib/falcon-postgres/data"))
+    for want in ("User=falcon-pg", "ExecStart=/opt/falcon/pgsql/lib/postgresql/16/bin/postgres -D /var/lib/falcon-postgres/data",
+                 "Type=notify", "ProtectSystem=strict", "ReadWritePaths=/var/lib/falcon-postgres/data", "NoNewPrivileges=true"):
+        assert want in unit, want
+    conf = conf_text(54321, unix_socket=False)
+    assert "unix_socket_directories = ''" in conf and "listen_addresses = 'localhost'" in conf and "port = 54321" in conf
+    assert "unix_socket_directories" not in conf_text(54321)                                   # (Windows has no socket to close)
 
 
 def test_the_database_statements_can_be_run_again_without_changing_a_password():
@@ -169,7 +188,7 @@ def test_the_engine_installer_lists_its_steps_and_a_dry_run_touches_nothing(tmp_
     out = capsys.readouterr().out
     steps = re.findall(r"\[\d+/(\d+)\] ([^:]+):", out)
     assert [s for _, s in steps] == ["Check the machine", "The falcon user and folders", "Copy the code", "The runtime", "PostgreSQL", "Settings",
-                                     "Setup", "Ownership", "Client bundle", "Service"]
+                                     "Setup", "The store", "Ownership", "Service"]
     assert not any((tmp_path / d).exists() for d in ("opt", "var", "etc", "log"))
 
 
@@ -188,7 +207,7 @@ def test_the_engine_installer_refuses_a_machine_it_cannot_install_on(tmp_path, m
         inst.check()
 
 
-def test_the_engine_installer_copies_the_engine_and_writes_settings_and_the_bundle(tmp_path):
+def test_the_engine_installer_copies_the_engine_and_writes_its_settings(tmp_path):
     layout = render.Layout(prefix=tmp_path / "opt", state=tmp_path / "var", etc=tmp_path / "etc", log=tmp_path / "log")
     args = engine_install.parser().parse_args(["--names", "falcon.internal,10.0.0.5", "--source", str(built("engine", tmp_path)),
                                                "--database-url", "postgresql://falcon:pw@localhost/falcon"])
@@ -200,11 +219,38 @@ def test_the_engine_installer_copies_the_engine_and_writes_settings_and_the_bund
     assert inst.settings().startswith("written")
     assert "FALCON_DATABASE_URL=postgresql://falcon:pw@localhost/falcon" in layout.env_file.read_text(encoding="utf-8")
     assert inst.settings().startswith("kept")                                                 # run again: nothing is rewritten
-    layout.state.mkdir(parents=True)
-    (layout.state / "engine.crt").write_text(make_cert(tmp_path / "c", "falcon.internal"), encoding="utf-8")
-    said = inst.client_bundle()
-    b = bundle_mod.load(layout.bundle)
-    assert b.engine_host == "falcon.internal" and b.engine_port == 7400 and b.ca_sha256 in said
+    assert "FALCON_PG_BIN" not in layout.env_file.read_text(encoding="utf-8")                # an IT department's own server: its tools are theirs
+    assert not hasattr(layout, "first_admin") and not hasattr(inst, "client_bundle")         # no first Admin, no bundle: the store gives both ways in
+
+
+def test_the_linux_engine_registers_with_the_store_by_a_link_and_a_code(tmp_path, monkeypatch):
+    """A server has no browser: the device sign-in (RFC 8628) prints a link and a code; "the person" opens it here, as the stub allows."""
+    pytest.importorskip("cryptography")
+    from installers.store_register import register
+    from installers.store_signin import sign_in_device
+    from scripts.store_stub import StoreStub
+
+    store = StoreStub(state=tmp_path / "store.json").start()
+    try:
+        said: list[str] = []
+        opened: list[str] = []
+
+        def person(url: str) -> None:
+            opened.append(url)
+            import urllib.request
+
+            urllib.request.urlopen(url, timeout=10).read()
+
+        got = register(store.url, tmp_path / "state", ["falcon.internal"], 7400, make_cert(tmp_path / "c", "falcon.internal"),
+                       company_name="Acme", say=said.append, sign_in=lambda st: sign_in_device(st, say=said.append, open_link=person))
+        assert got["engine_id"].startswith("e_") and (tmp_path / "state" / "store.json").exists() and (tmp_path / "state" / "company.falcon").exists()
+        shown = " ".join(said)
+        assert "/device" in shown and "enter the code" in shown and opened and "user_code=" in opened[0]
+        with pytest.raises(InstallError, match="nobody signed in"):
+            register(store.url, tmp_path / "other", ["falcon.internal"], 7400, "x", company_name="Acme", say=lambda m: None,
+                     sign_in=lambda st: sign_in_device(st, say=lambda m: None, wait=2))      # nobody opens the link: it gives up and says so
+    finally:
+        store.stop()
 
 
 # --- the Windows installers ---------------------------------------------------------------------------------------
@@ -447,7 +493,7 @@ def test_an_admin_install_signs_in_to_the_store_and_leaves_the_claim_for_the_ser
     pytest.importorskip("cryptography")
     import urllib.request
 
-    from installers.windows import store_signin
+    from installers import store_signin
     from scripts.store_stub import StoreStub
 
     store = StoreStub(state=tmp_path / "store.json").start()
@@ -527,3 +573,18 @@ def test_the_uninstall_stops_what_still_runs_from_the_program_and_not_itself(tmp
     finally:
         if running.poll() is None:
             running.kill()
+
+
+@pytest.mark.parametrize("role", ["worker", "admin", "engine"])
+def test_run_from_a_payload_the_installers_reach_the_code_they_use(role, tmp_path):
+    """Found running the Linux .deb for real (15 Nov 2026): run from a payload, `common` (the store's signatures, the machine's identity) was
+    not importable, so registering and checking a company file failed on a clean machine; tests had the checkout on the path and never saw it.
+    -S keeps this development install off the path, as on a clean PC."""
+    import subprocess
+
+    payload = built(role, tmp_path)
+    code = ("import installers, common.signed, common.machine, installers.store_signin, installers.store_register; "
+            "import common; print(common.__file__)")
+    p = subprocess.run([sys.executable, "-S", "-c", code], cwd=payload, capture_output=True, text=True, check=False)
+    assert p.returncode == 0, p.stderr
+    assert Path(p.stdout.strip()).resolve().is_relative_to((payload / "app").resolve())

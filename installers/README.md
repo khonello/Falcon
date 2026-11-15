@@ -2,7 +2,7 @@
 
 **How machines join: `docs/SEATS-AND-SETUP.md` (done 15 Nov 2026).** Workers knock and are given seats; Admins sign in to the company account;
 one setup for everyone plus a store-signed company file. The licence codes, the code typed from a PC's screen, `first-admin.txt` and the
-per-Engine `falcon-client.json` in the PC setups are gone (the Linux `.deb` still makes a first Admin with `first-admin.txt`).
+per-Engine `falcon-client.json` in the PC setups are gone, on Windows and Linux alike.
 
 The code behind the installers (decided in `docs/PACKAGING-PLAN.md`). **Deployment is on Windows** (the user, 14 Nov 2026): each machine is
 given one `setup.exe`, built by `installers/windows/build_setup.py` (`engine`, `admin`, `worker`). The Engine's Linux installer (the `.deb`) is
@@ -10,7 +10,7 @@ kept and tested, apart from the Windows one. Nothing here is run by the Engine o
 
 | Machine | setup.exe (Windows) | Or by hand |
 |---|---|---|
-| The server | `falcon-engine-setup.exe`: asks the names and port; carries Falcon's own PostgreSQL; signs in to the store | `python -m installers.windows.engine_install --names ... --store https://<store> [--company-name ...]`; Linux: `sudo python3 -m installers.engine.install --names ... --hostname IT-01` |
+| The server | `falcon-engine-setup.exe`: asks the names and port; carries Falcon's own PostgreSQL; signs in to the store | `python -m installers.windows.engine_install --names ... --store https://<store> [--company-name ...]`; Linux: `sudo falcon-engine-install --names ... --store https://<store> [--company-name ...]` (the `.deb`; its own PostgreSQL; signs in by a link and a code) |
 | A person's PC | `python -m installers.windows.install --role worker --company acme.falcon` (setup.exe: the `.falcon` beside it, or `/COMPANY=`) | Windows, as administrator |
 | An IT Admin's workstation (the first one too) | `... --role admin --store https://<store>`: signs in, takes a free Admin seat | Windows, as administrator, with the internet |
 
@@ -75,9 +75,15 @@ version. `--uninstall` removes the service, the shortcut and the program, and **
 
 ## The Linux package
 
-`sh installers/engine/build_deb.sh [out] [wheels]` builds `falcon-engine_<version>_all.deb` (needs `dpkg-deb`): the Engine's payload under
-`/opt/falcon/payload` and the command `falcon-engine-install`. A first install says what to run; installing a newer package upgrades in place
-with the same settings. Removing the package never deletes `/var/lib/falcon` (the master secret), `/etc/falcon` or the database.
+`sh installers/engine/build_deb.sh [out] [wheels]` builds `falcon-engine_<version>_<arch>.deb` (needs `dpkg-deb`, `dpkg-shlibdeps` and a
+PostgreSQL installed on the build machine, `PG_VERSION=16` to choose): the Engine's payload under `/opt/falcon/payload`, the command
+`falcon-engine-install`, and Falcon's own PostgreSQL under `/opt/falcon/pgsql` (the build machine's programs in their own relative layout,
+19 MB; the package depends on the libraries they need, never on a `postgresql` package). Build it on the distribution it is for (one
+package per distribution release, as its library names differ). `falcon-engine-install` sets up the private PostgreSQL
+(`installers/engine/pgsql.py`: `falcon-postgres.service` as `falcon-pg`, `/var/lib/falcon-postgres`, localhost only, its own port, no
+socket), signs in to the store by a link and a code, registers the Engine and makes no first Admin. A first install says what to run;
+installing a newer package upgrades in place with the same settings. Removing the package never deletes `/var/lib/falcon` (the master
+secret), `/etc/falcon` or `/var/lib/falcon-postgres` (the database). The drill: `scripts/linux_engine_drill.py` (root, a clean test machine).
 
 ## Tested
 

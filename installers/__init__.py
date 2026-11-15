@@ -9,3 +9,12 @@
 
 See installers/README.md. Named `installers`, not `packaging`: `packaging` is a library the test tools import.
 """
+
+import sys as _sys
+from pathlib import Path as _Path
+
+# Run from a payload (`<payload>/installers` beside `<payload>/app`), the installers reach the code packages they use (`common`: the store's
+# signatures, the machine's identity) from the payload's app folder. Appended, so a checkout's own packages always win.
+_app = _Path(__file__).resolve().parent.parent / "app"
+if (_app / "common").is_dir() and str(_app) not in _sys.path:
+    _sys.path.append(str(_app))

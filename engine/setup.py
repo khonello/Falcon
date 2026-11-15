@@ -337,7 +337,8 @@ def main(argv: list[str]) -> int:
                                                     args.engine_host))
     ensure_model(settings, args.download_model)
     ensure_firewall(settings)
-    ensure_bundle(settings, names)
+    if not args.no_first_admin:                   # (an installed Engine has none: PCs are given the store-signed company file instead)
+        ensure_bundle(settings, names)
     print("\nDone." if ok else "\nNot finished: the databases above come first.")
     if ok:
         print("  Start the Engine:        python -m engine")

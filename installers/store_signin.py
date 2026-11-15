@@ -1,6 +1,6 @@
 """The Admin setup's sign-in to the store (docs/SEATS-AND-SETUP.md section 5; docs/STORE-CONTRACT.md section 3).
 
-    python -m installers.windows.store_signin --store https://<store> --out <private data folder> [--engine <engine_id>]
+    python -m installers.store_signin --store https://<store> --out <private data folder> [--engine <engine_id>]
 
 The person signs in in their browser (Google or email, on the store's own page), the way desktop applications sign in: OAuth 2.0 authorization
 code with PKCE (RFC 7636) and a loopback redirect (RFC 8252). Nothing is typed into the setup. The store lists the company's Engines (chosen at
@@ -113,6 +113,46 @@ def sign_in(store: str, *, open_browser: Callable[[str], Any] = webbrowser.open,
     if not tok.get("access_token"):
         raise SignInError("the store gave no access token")
     return str(tok["access_token"])
+
+
+DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
+
+
+def sign_in_device(store: str, *, say: Callable[[str], Any] = print, open_link: Callable[[str], Any] | None = None,
+                   wait: float = SIGN_IN_MINUTES * 60) -> str:
+    """A server with no browser (the Linux Engine's setup): OAuth 2.0 device authorization (RFC 8628). It prints a link and a short code;
+    the person opens the link on any device, signs in there, and this returns the access token. `open_link` is for tests and drills."""
+    import time
+
+    base = store.rstrip("/")
+    _http("GET", f"{base}/.well-known/falcon-store-keys.json", timeout=15)          # the store answers, before anyone is sent to sign in
+    got = _http("POST", f"{base}/oauth/device_authorization", {"client_id": CLIENT_ID})
+    say(f"Sign in to your company's Falcon account: on any phone or computer, open {got['verification_uri']} and enter the code "
+        f"{got['user_code']} (the owner, or a member the owner invited).")
+    if open_link is not None:
+        open_link(got.get("verification_uri_complete") or got["verification_uri"])
+    interval, end = float(got.get("interval") or 5), time.monotonic() + min(wait, float(got.get("expires_in") or wait))
+    while time.monotonic() < end:
+        time.sleep(interval)
+        req = urllib.request.Request(f"{base}/oauth/token", method="POST", headers={"Content-Type": "application/json"},
+                                     data=json.dumps({"grant_type": DEVICE_GRANT, "device_code": got["device_code"], "client_id": CLIENT_ID}).encode())
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                tok = json.loads(resp.read().decode("utf-8") or "{}")
+            if tok.get("access_token"):
+                return str(tok["access_token"])
+        except urllib.error.HTTPError as exc:
+            try:
+                error = json.loads(exc.read().decode("utf-8")).get("error")
+            except ValueError:
+                error = exc.reason
+            if error == "slow_down":
+                interval += 5
+            elif error != "authorization_pending":
+                raise SignInError(f"the sign-in was not completed ({error})") from exc
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            raise SignInError(f"the store cannot be reached ({exc}): the setup needs the internet") from exc
+    raise SignInError(f"nobody signed in within {int(wait // 60)} minutes")
 
 
 def engines(store: str, token: str) -> list[dict[str, Any]]:

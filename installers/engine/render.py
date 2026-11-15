@@ -32,16 +32,9 @@ class Layout:
     def unit_file(self) -> Path:
         return Path("/etc/systemd/system") / f"{self.unit}.service"
 
-    @property
-    def bundle(self) -> Path:
-        return self.state / "falcon-client.json"
-
-    @property
-    def first_admin(self) -> Path:
-        return self.state / "first-admin.txt"
 
 
-def env_file(layout: Layout, database_url: str, port: int = 7400) -> str:
+def env_file(layout: Layout, database_url: str, port: int = 7400, pg_bin: Path | None = None) -> str:
     """Every setting with its server path. Read by the service (EnvironmentFile) and by `python -m engine setup` (through the .env link)."""
     s = layout.state
     return "\n".join([
@@ -54,16 +47,20 @@ def env_file(layout: Layout, database_url: str, port: int = 7400) -> str:
         f"FALCON_TLS_KEY={(s / 'engine.key').as_posix()}",
         f"FALCON_SECRET_PATH={(s / 'master.secret').as_posix()}",
         f"FALCON_LLM_MODEL_PATH={(s / 'models' / 'Qwen3-1.7B-Q8_0.gguf').as_posix()}",
+        *([f"FALCON_PG_BIN={pg_bin.as_posix()}"] if pg_bin else []),               # backups use Falcon's own PostgreSQL tools, never another's
         "",
     ])
 
 
-def systemd_unit(layout: Layout) -> str:
+def systemd_unit(layout: Layout, database_unit: str | None = "falcon-postgres") -> str:
+    """`database_unit`: the Engine's own PostgreSQL, started first (None: an IT department's own server, given by --database-url)."""
+    after = f"{database_unit}.service" if database_unit else "postgresql.service"
+    needs = f"\nRequires={database_unit}.service" if database_unit else ""
     return f"""[Unit]
 Description=Falcon Engine
 Documentation=file://{layout.app.as_posix()}/docs/GETTING-STARTED.md
-After=network-online.target postgresql.service
-Wants=network-online.target
+After=network-online.target {after}
+Wants=network-online.target{needs}
 
 [Service]
 Type=simple

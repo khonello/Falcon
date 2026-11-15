@@ -1,23 +1,27 @@
-"""The Engine's installer (Linux, run once on the server, as root).
+"""The Engine's installer (Linux, run once on the server, as root). Windows keeps its own: installers/windows/engine_install.py.
 
-    sudo python3 -m installers.engine.install --names falcon.internal,192.168.1.20 --hostname IT-01 [--dry-run]
+    sudo falcon-engine-install --names falcon.internal,192.168.1.20 --store https://<store> [--company-name Acme] [--dry-run]
 
-Run from a payload folder (`python -m installers.payload engine <folder>`) or from a checkout. It:
+Run from a payload folder (`python -m installers.payload engine <folder>`; the .deb puts one in /opt/falcon/payload) or from a checkout. It
+(docs/SEATS-AND-SETUP.md sections 4 and 9, the same as on Windows):
 
      1. checks this is Linux, root, and a new enough Python, and that the payload is intact
      2. makes the `falcon` user (no login), and the folders: /opt/falcon (code), /var/lib/falcon (secret, certificate, model),
         /etc/falcon (settings), /var/log/falcon
      3. copies the code and makes its own Python runtime in /opt/falcon/venv with the libraries from the payload
-     4. PostgreSQL: a `falcon` role with a password made here (never the development one) and the `falcon` database
+     4. PostgreSQL: Falcon's own (installers/engine/pgsql.py), never mixed with one the server has: its programs in /opt/falcon/pgsql,
+        its data in /var/lib/falcon-postgres, its own user and service (falcon-pg, falcon-postgres.service), localhost only on its own port,
+        no socket file, only the Engine's role may log in. --database-url uses a server that exists instead.
      5. writes /etc/falcon/falcon.env and links it as the app's .env
-     6. runs `python -m engine setup`: certificate (valid for --names), schema, master secret, the first IT Admin, the firewall
-     7. hands the folders to the falcon user, with the secrets readable by it alone
-     8. writes the client bundle (falcon-client.json: the address and the certificate -- no key) that every PC's installer is given,
-        and prints the certificate's fingerprint to read out when installing them
-     9. installs and starts the service (systemd: starts with the server, restarts itself)
+     6. runs `python -m engine setup --no-first-admin`: certificate (valid for --names), schema, master secret, the firewall
+     7. registers the Engine with the store (internet required): a server has no browser, so it prints a link and a short code to open
+        on any phone or computer; store.json and the company file land beside the master secret
+     8. hands the folders to the falcon user, with the secrets readable by it alone
+     9. installs and starts the service (systemd: starts with the server after its database, restarts itself)
 
-Every step checks what is there first, so running it again repairs or upgrades and never makes a second first Admin or a new secret.
-The master secret is NEVER replaced: lose it and every machine must be registered again, so it is backed up by a person (printed at the end).
+No Admin is made here: the first IT Admin runs the Admin setup on their own PC and signs in to the same account. Every step checks what is
+there first, so running it again repairs or upgrades. The master secret is NEVER replaced: lose it and every machine must be set up again,
+so it is backed up by a person (printed at the end).
 """
 
 from __future__ import annotations
@@ -31,10 +35,10 @@ import sys
 import time
 from pathlib import Path
 
-from installers import bundle as bundle_mod
 from installers import payload as payload_mod
 from installers.common import InstallError, Plan, python_ok, run_cmd, write_text
 from installers.engine import render
+from installers.engine.pgsql import LinuxPostgres, find_bin
 from installers.engine.render import Layout
 
 HERE = Path(__file__).resolve().parent.parent.parent          # the payload folder (or the checkout)
@@ -47,9 +51,10 @@ class EngineInstall:
         self.say = say
         self.source = Path(args.source).resolve() if args.source else HERE
         self.names = [n.strip() for n in args.names.split(",") if n.strip()]
-        self.first_admin: dict[str, str] = {}
         self._db_password = ""
-        self.fingerprint = ""
+        self.registered: dict = {}
+        pgsql = Path(args.pgsql) if args.pgsql else layout.prefix / "pgsql"
+        self.pg = LinuxPostgres(bin=find_bin(pgsql) or pgsql / "bin")
 
     # --- the plan ------------------------------------------------------------------------------------------------
 
@@ -59,12 +64,13 @@ class EngineInstall:
         p.add("The falcon user and folders", self.users_and_folders, f"user {self.layout.user}; {self.layout.prefix}, {self.layout.state}, {self.layout.etc}, {self.layout.log}")
         p.add("Copy the code", self.copy_code, f"to {self.layout.app}")
         p.add("The runtime", self.runtime, f"{self.layout.prefix}/venv with the payload's libraries", skip="--no-runtime" if a.no_runtime else None)
-        p.add("PostgreSQL", self.database, "the falcon role and database, with a password made here",
+        p.add("PostgreSQL", self.database, f"Falcon's own, in {self.pg.pgdata}: localhost only, only the Engine logs in ({self.pg.unit})",
               skip="--database-url given" if a.database_url else ("--no-database" if a.no_database else None))
         p.add("Settings", self.settings, f"{self.layout.env_file}, linked as the app's .env")
-        p.add("Setup", self.setup, "certificate, schema, master secret, first IT Admin, firewall (python -m engine setup)", skip="--no-setup" if a.no_setup else None)
+        p.add("Setup", self.setup, "certificate, schema, master secret, firewall (python -m engine setup --no-first-admin)", skip="--no-setup" if a.no_setup else None)
+        p.add("The store", self.register, "sign in on any device with the link and code shown; this Engine is registered (internet required)",
+              skip="--no-store (development only: no seats are counted)" if a.no_store else ("--no-setup" if a.no_setup else None))
         p.add("Ownership", self.ownership, "the falcon user owns its folders; secrets readable by it alone")
-        p.add("Client bundle", self.client_bundle, f"{self.layout.bundle}: the address and certificate every PC installer is given")
         p.add("Service", self.service, f"{self.layout.unit_file}: starts with the server, restarts itself",
               skip="--no-service" if a.no_service else None)
         return p
@@ -126,16 +132,14 @@ class EngineInstall:
 
     def database(self) -> str:
         L = self.layout
+        if not (self.pg.bin / "postgres").is_file():
+            raise InstallError(f"Falcon's PostgreSQL is not in {self.pg.bin} (the .deb puts it in /opt/falcon/pgsql; --pgsql)")
+        said = [self.pg.user(), self.pg.init(), self.pg.service()]
         if L.env_file.exists() and "FALCON_DATABASE_URL=" in L.env_file.read_text(encoding="utf-8"):
-            return "settings already name a database: kept (its password is not changed)"
-        rc, _ = run_cmd(["which", "psql"], check=False)
-        if rc != 0:
-            raise InstallError("PostgreSQL is not installed: `apt install postgresql` (or `dnf install postgresql-server`), then run this again; "
-                               "or give --database-url for one that exists")
+            return "; ".join([*said, "the settings already name the database: kept (its password is not changed)"])
         self._db_password = secrets.token_urlsafe(24)
-        for sql in render.postgres_role_sql(self._db_password, self.a.db_name, self.a.db_role):
-            run_cmd(["runuser", "-u", "postgres", "--", "psql", "-v", "ON_ERROR_STOP=1", "-X", "-q"], input_text=sql + "\n")
-        return "the falcon role and database are there"
+        said.append(self.pg.make_role(self.a.db_name, self.a.db_role, render.postgres_role_sql(self._db_password, self.a.db_name, self.a.db_role)))
+        return "; ".join(said)
 
     def settings(self) -> str:
         L = self.layout
@@ -145,10 +149,11 @@ class EngineInstall:
             url = existing[0].split("=", 1)[1] if existing else None
         if not url:
             if self.a.no_database:
-                url = "postgresql://falcon:CHANGE-ME@localhost:5432/falcon"
+                url = "postgresql://falcon:CHANGE-ME@127.0.0.1:5432/falcon"
             else:
-                url = f"postgresql://{self.a.db_role}:{self._db_password}@localhost:5432/{self.a.db_name}"
-        changed = write_text(L.env_file, render.env_file(L, url, self.a.port), 0o640)
+                url = self.pg.url(self.a.db_name, self.a.db_role, self._db_password)
+        own_pg = None if self.a.database_url else self.pg.bin
+        changed = write_text(L.env_file, render.env_file(L, url, self.a.port, own_pg), 0o640)
         link = L.app / ".env"
         if link.is_symlink() or link.exists():
             link.unlink()
@@ -157,7 +162,7 @@ class EngineInstall:
 
     def setup(self) -> str:
         L = self.layout
-        argv = [str(L.python), "-m", "engine", "setup", "--hostname", self.a.hostname, "--no-operator-config"]
+        argv = [str(L.python), "-m", "engine", "setup", "--no-first-admin", "--no-operator-config"]
         if self.names:
             argv += ["--names", ",".join(self.names)]
         if self.a.download_model:
@@ -166,15 +171,28 @@ class EngineInstall:
         self.say(out.rstrip())
         if rc != 0:
             raise InstallError("`engine setup` did not finish (see above); fix that and run the installer again")
-        for key in ("client_id", "client_key"):
-            for line in out.splitlines():
-                if line.strip().startswith(key + ":"):
-                    self.first_admin[key] = line.split(":", 1)[1].strip()
-        if self.first_admin.keys() >= {"client_id", "client_key"}:
-            write_text(L.first_admin, "The first IT Admin (printed once by the installer; delete this file after it is safely held)\n"
-                       f"client_id:  {self.first_admin['client_id']}\nclient_key: {self.first_admin['client_key']}\n", 0o600)
-            return f"set up; the first IT Admin's id and key are in {L.first_admin} (readable by root only)"
-        return "set up (an Admin already existed: no new key was made)"
+        return "set up (certificate, schema, master secret, firewall)"
+
+    def register(self) -> str:
+        from common.store_keys import STORE_URL
+        from installers.store_register import register
+        from installers.store_signin import sign_in_device
+
+        L = self.layout
+        cert = L.state / "engine.crt"
+        if not cert.exists():
+            raise InstallError(f"no certificate at {cert}: the Setup step makes it")
+        opener = None
+        if self.a.test_open_link:                                   # only against scripts/store_stub.py: "the person" opens the link
+            import urllib.request
+
+            opener = lambda url: urllib.request.urlopen(url, timeout=10).read()
+        self.registered = register(self.a.store or STORE_URL, L.state, self.names, self.a.port, cert.read_text(encoding="utf-8"),
+                                   company_name=self.a.company_name, company_id=self.a.company_id, say=self.say,
+                                   sign_in=lambda store: sign_in_device(store, say=self.say, open_link=opener))
+        if self.registered.get("kept"):
+            return f"kept the registration ({self.registered['engine_id']})"
+        return f"registered as {self.registered['engine_id']}; the company file is {L.state / 'company.falcon'}"
 
     def ownership(self) -> str:
         L = self.layout
@@ -185,27 +203,20 @@ class EngineInstall:
             f = L.state / secret
             if f.exists():
                 f.chmod(0o600)
-        if L.first_admin.exists():
-            run_cmd(["chown", "root:root", str(L.first_admin)])
+        for secret in ("store.json",):
+            f = L.state / secret
+            if f.exists():
+                f.chmod(0o600)
+        if self.pg.password_file.exists():
+            run_cmd(["chown", "root:root", str(self.pg.password_file)])               # the database superuser's: root only
+            self.pg.password_file.chmod(0o600)
         L.etc.chmod(0o750)
         L.state.chmod(0o750)
         return "the falcon user owns its folders; the secret and the key are readable by it alone"
 
-    def client_bundle(self) -> str:
-        L = self.layout
-        cert = L.state / "engine.crt"
-        if not cert.exists():
-            raise InstallError(f"{cert} is missing: the setup step makes it")
-        host = self.names[0] if self.names else socket.getfqdn()
-        b = bundle_mod.Bundle.make(host, self.a.port, cert.read_text(encoding="utf-8"))
-        b.save(L.bundle)
-        L.bundle.chmod(0o644)
-        self.fingerprint = b.ca_sha256
-        return f"{L.bundle} (host {host}); certificate fingerprint {b.ca_sha256}"
-
     def service(self) -> str:
         L = self.layout
-        changed = write_text(L.unit_file, render.systemd_unit(L), 0o644)
+        changed = write_text(L.unit_file, render.systemd_unit(L, None if self.a.database_url else self.pg.unit), 0o644)
         run_cmd(["systemctl", "daemon-reload"])
         run_cmd(["systemctl", "enable", L.unit])
         run_cmd(["systemctl", "restart" if changed else "start", L.unit])
@@ -222,23 +233,26 @@ class EngineInstall:
 
     def summary(self) -> str:
         L = self.layout
-        lines = ["", "The Engine is installed.", ""]
-        if self.fingerprint:
-            lines += ["  Certificate fingerprint (read this out when installing a PC, to be sure it is this Engine):", f"    {self.fingerprint}", ""]
-        lines += [f"  Give every PC's installer:  {L.bundle}",
-                  f"  The first IT Admin's id and key:  {L.first_admin}  (root only; keep them, then delete the file)",
-                  f"  BACK UP, offline:  {L.state / 'master.secret'}  (every machine's key derives from it)", ""]
+        lines = ["", "The Engine is installed.", "",
+                 "  Now run the Admin setup (falcon-admin-setup.exe) on your IT Admin's PC: it signs in to the same account.",
+                 "  Workers: the console's Machines page gives the Worker setup, with this company's file.",
+                 f"  BACK UP, offline:  {L.state / 'master.secret'}  (every machine's key derives from it)", ""]
         return "\n".join(lines)
 
 
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="installers.engine.install", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--names", default="", help="every name and address the PCs will use to reach this server, comma-separated (the first is the one in the bundle)")
-    ap.add_argument("--hostname", default="IT-01", help="the first IT Admin's workstation name (not this server's)")
+    ap.add_argument("--names", default="", help="every name and address the PCs will use to reach this server, comma-separated (the first is the one PCs are given)")
+    ap.add_argument("--store", help="the store's address (default: common/store_keys.STORE_URL)")
+    ap.add_argument("--company-name", help="the company's name, when the account signing in has none yet")
+    ap.add_argument("--company-id", help="which company, when the account belongs to several")
+    ap.add_argument("--no-store", action="store_true", help="development only: do not register with the store (no seats are counted)")
+    ap.add_argument("--test-open-link", action="store_true", help="testing against scripts/store_stub.py only: open the sign-in link itself")
+    ap.add_argument("--pgsql", help="Falcon's PostgreSQL programs (default /opt/falcon/pgsql)")
     ap.add_argument("--port", type=int, default=7400)
     ap.add_argument("--source", help="the payload folder (default: the one this installer is in)")
     ap.add_argument("--wheels", help="a folder of wheels, to install with no network")
-    ap.add_argument("--database-url", help="use this PostgreSQL URL instead of making a role and database here")
+    ap.add_argument("--database-url", help="an IT department's own PostgreSQL (a role and database that exist) instead of Falcon's own")
     ap.add_argument("--no-database", action="store_true", help="do not touch PostgreSQL")
     ap.add_argument("--db-name", default="falcon", help="the database to make (default falcon)")
     ap.add_argument("--db-role", default="falcon", help="the PostgreSQL role to make (default falcon)")

@@ -71,6 +71,12 @@ OAuth 2.0 authorization code with PKCE (RFC 7636), loopback redirect (RFC 8252),
 3. The setup exchanges it: `POST /oauth/token {grant_type: authorization_code, code, redirect_uri, code_verifier}` -> `{access_token, expires_in}`
    (short-lived; never stored by the setup after it finishes).
 
+**A server with no browser (the Linux Engine's setup)** signs in with OAuth 2.0 device authorization (RFC 8628): `POST /oauth/device_authorization
+{client_id}` -> `{device_code, user_code, verification_uri, verification_uri_complete, interval, expires_in}`; the setup prints the link and
+the short code, the person opens it on any phone or computer and signs in there; the setup polls `POST /oauth/token {grant_type:
+urn:ietf:params:oauth:grant-type:device_code, device_code, client_id}` (`authorization_pending` until then, `slow_down`, `expired_token`,
+`access_denied`) -> `{access_token, expires_in}`. The store's page at `verification_uri` asks for the code if it is not in the link.
+
 ### For the Engine setup
 
 - `GET /api/me/companies` -> the companies the signed-in member belongs to (a new owner names theirs: `POST /api/companies {name}`).

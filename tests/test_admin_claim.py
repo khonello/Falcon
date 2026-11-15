@@ -1,5 +1,5 @@
 """An Admin's PC comes in with a claim the store signed: the Admin setup signs in, the store issues the claim, the service knocks with it
-and is in at once (docs/SEATS-AND-SETUP.md section 5; installers/windows/store_signin.py, engine/hierarchy/seats.py). Run end to end against
+and is in at once (docs/SEATS-AND-SETUP.md section 5; installers/store_signin.py, engine/hierarchy/seats.py). Run end to end against
 the store stub, with the real sign-in code (PKCE, loopback)."""
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def store(monkeypatch, tmp_path):
 
 async def _registered(engine, store, admin_seats: int) -> dict:
     """The Engine registered with the store (what the Engine setup does, step 5), with Admin seats bought."""
-    from installers.windows.store_signin import sign_in
+    from installers.store_signin import sign_in
 
     token = await asyncio.to_thread(sign_in, store.url, open_browser=_browser)
     cid = (await asyncio.to_thread(_api, store, "POST", "/api/companies", {"name": "Acme"}, token))["company_id"]
@@ -66,7 +66,7 @@ def _worker_cfg(engine, tmp_path, claim):
 
 
 async def test_the_admin_setup_signs_in_claims_a_seat_and_the_pc_is_in_as_an_admin_at_once(engine, org, connect, store, tmp_path):
-    from installers.windows.store_signin import run
+    from installers.store_signin import run
     from worker_client.config import WorkerConfig
     from worker_client.knock import knock
 
@@ -153,7 +153,7 @@ async def test_an_engine_not_registered_with_the_store_takes_no_claim(engine, or
 
 
 async def test_a_claim_that_finds_no_free_seat_asks_the_store_first_for_seats_just_bought(engine, org, store, tmp_path):
-    from installers.windows.store_signin import run
+    from installers.store_signin import run
     from worker_client.knock import knock
 
     reg = await _registered(engine, store, admin_seats=0)                                       # every Admin seat is in use
