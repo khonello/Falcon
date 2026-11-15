@@ -144,7 +144,7 @@ async def ensure_databases(admin_url: str | None) -> bool:
 
 # --- 4-6. schema, secret, first account -----------------------------------------------------------------------------
 
-async def ensure_schema_and_first_account(settings: Any, hostname: str, write_operator: bool, engine_host: str) -> None:
+async def ensure_schema_and_first_account(settings: Any, hostname: str | None, write_operator: bool, engine_host: str) -> None:
     from engine.__main__ import first_account
     from engine.database import Database
     from engine.master_secret import load_or_create
@@ -157,6 +157,9 @@ async def ensure_schema_and_first_account(settings: Any, hostname: str, write_op
         secret = settings.master_secret or load_or_create(ROOT / settings.secret_path
                                                           if not settings.secret_path.is_absolute() else settings.secret_path)
         say("secret", "master secret ready (data/master.secret -- back it up; every key derives from it)")
+        if hostname is None:
+            say("first account", "none made: the first IT Admin signs in to the store from the Admin setup (docs/SEATS-AND-SETUP.md)")
+            return
         made = await first_account(db, secret, settings, hostname)
         if len(made) == 2:
             say("first account", f"{made[0]} already exists (account {made[1]}) -- nothing issued")
@@ -318,6 +321,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--engine-host", default="127.0.0.1", help="where this machine's Operator Client reaches the Engine")
     ap.add_argument("--no-operator-config", action="store_true", help="do not write this machine's Operator Client settings")
     ap.add_argument("--download-model", action="store_true", help="fetch the local LLM model if it is missing")
+    ap.add_argument("--no-first-admin", action="store_true", help="make no first IT Admin: an installed Engine's first Admin signs in to the store")
     args = ap.parse_args(argv)
 
     print("Falcon setup\n")
@@ -329,7 +333,8 @@ def main(argv: list[str]) -> int:
     ensure_certificate(settings, names)
     ok = asyncio.run(ensure_databases(args.admin_url))
     if ok and settings.database_url:
-        asyncio.run(ensure_schema_and_first_account(settings, args.hostname, not args.no_operator_config, args.engine_host))
+        asyncio.run(ensure_schema_and_first_account(settings, None if args.no_first_admin else args.hostname, not args.no_operator_config,
+                                                    args.engine_host))
     ensure_model(settings, args.download_model)
     ensure_firewall(settings)
     ensure_bundle(settings, names)

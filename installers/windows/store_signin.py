@@ -66,6 +66,7 @@ def _http(method: str, url: str, body: dict[str, Any] | None = None, token: str 
 
 def sign_in(store: str, *, open_browser: Callable[[str], Any] = webbrowser.open, wait: float = SIGN_IN_MINUTES * 60) -> str:
     """The person signs in in their browser; returns a short-lived access token (kept in memory only)."""
+    _http("GET", f"{store.rstrip('/')}/.well-known/falcon-store-keys.json", timeout=15)   # the store answers, before anyone is sent to sign in
     verifier, challenge = _pkce()
     state = secrets.token_urlsafe(16)
     got: dict[str, str] = {}

@@ -61,6 +61,23 @@ def _iso(text: str) -> datetime:
     return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 
 
+def trust_next_certificate(ca_file: str | None, pem: str) -> bool:
+    """The Engine's next certificate, given over the connection this machine already trusts, is added to its pinned file, so it keeps
+    working when the Engine switches (docs/SEATS-AND-SETUP.md section 10). True if it was added; nothing is ever removed here."""
+    pem = pem.strip()
+    if not ca_file or not pem.startswith("-----BEGIN CERTIFICATE-----") or not pem.endswith("-----END CERTIFICATE-----"):
+        return False
+    from pathlib import Path
+
+    path = Path(ca_file)
+    have = path.read_text(encoding="ascii") if path.exists() else ""
+    if pem in have:
+        return False
+    path.write_text(have.rstrip() + "\n" + pem + "\n" if have.strip() else pem + "\n", encoding="ascii")
+    log.info("the Engine's next certificate is now trusted too (%s)", path)
+    return True
+
+
 class SeatTaken(RuntimeError):
     """The Engine said no_seat: the service ends, and the machine knocks again."""
 
@@ -465,6 +482,8 @@ class WorkerService:
                 await self.chatfiles.on_read(payload)
             elif type_ == "chat.file_deliver":
                 await self.chatfiles.on_deliver(payload)
+            elif type_ == "engine.next_certificate":
+                await asyncio.to_thread(trust_next_certificate, self.config.ca_cert, str(payload.get("pem") or ""))
             elif type_ in ("task.assigned", "task.completed", "task.incomplete"):
                 await self._refresh_tasks()
                 if type_ == "task.assigned" and self.config.windows:

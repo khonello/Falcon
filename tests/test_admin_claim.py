@@ -51,9 +51,10 @@ async def _registered(engine, store, admin_seats: int) -> dict:
                                   {"names": ["127.0.0.1"], "port": engine.port, "certificate": "-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----"}, token)
     engine.store.identity = {"store_url": store.url, "engine_id": got["engine_id"], "engine_token": got["engine_token"]}
     in_use = await engine.db.seats.in_use("admin")
-    await asyncio.to_thread(_api, store, "POST", "/_test/grants", {"engine_id": got["engine_id"], "role": "admin", "seats": in_use + admin_seats})
+    if in_use + admin_seats:                                                                  # (a grant is never of 0 seats)
+        await asyncio.to_thread(_api, store, "POST", "/_test/grants", {"engine_id": got["engine_id"], "role": "admin", "seats": in_use + admin_seats})
     await asyncio.to_thread(_api, store, "POST", "/_test/grants", {"engine_id": got["engine_id"], "role": "worker", "seats": 50})
-    assert await engine.store.fetch_grants() == 2
+    assert await engine.store.fetch_grants() == (2 if in_use + admin_seats else 1)
     return got
 
 
@@ -149,3 +150,27 @@ async def test_an_engine_not_registered_with_the_store_takes_no_claim(engine, or
             await m.call("knock.hello", {"install_token": secrets.token_urlsafe(24), "hostname": "IT-02", "admin_claim": env})
     finally:
         await m.close()
+
+
+async def test_a_claim_that_finds_no_free_seat_asks_the_store_first_for_seats_just_bought(engine, org, store, tmp_path):
+    from installers.windows.store_signin import run
+    from worker_client.knock import knock
+
+    reg = await _registered(engine, store, admin_seats=0)                                       # every Admin seat is in use
+    await asyncio.to_thread(_api, store, "POST", "/_test/grants", {"engine_id": reg["engine_id"], "role": "admin", "seats": 1})   # bought now
+    got = await asyncio.to_thread(run, store.url, tmp_path / "private", open_browser=_browser, say=lambda m: None)   # the Engine has not asked
+    cfg = _worker_cfg(engine, tmp_path, got["claim"])
+    assert await asyncio.wait_for(knock(cfg, asyncio.Event(), ladder=(0.2,)), 15) is True        # not refused: the Engine asked the store
+
+
+async def test_the_console_is_given_the_company_file_for_the_worker_setup_zip(engine, org, connect, store, tmp_path, monkeypatch):
+    from common import signed
+
+    a1 = await connect("cid-a1")
+    assert await a1.err("company.file") == "conflict"                                         # not registered: there is none
+    reg = await _registered(engine, store, admin_seats=1)
+    monkeypatch.setattr(type(engine.store), "path", property(lambda self: tmp_path / "store.json"))
+    (tmp_path / "company.falcon").write_text(json.dumps(reg["company"]), encoding="utf-8")
+    got = await a1.ok("company.file")
+    assert got["file_name"] == "acme.falcon" and got["port"] == engine.port and got["certificates"] == 1
+    assert signed.check(got["envelope"], "company")["engine_id"] == reg["engine_id"]          # exactly as the store signed it

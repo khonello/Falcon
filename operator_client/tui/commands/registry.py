@@ -168,3 +168,45 @@ async def seat_take(ctx: ShellContext, args: Args) -> str:
 async def seats_refresh(ctx: ShellContext, args: Args) -> str:
     res = await ctx.call("seats.refresh")
     return f"{res['added']} new grant(s) from the store" if res["added"] else "nothing new from the store"
+
+
+@command("company-file", None, "<out folder>", "Save the store-signed company file, to give with the Worker setup (one zip)")
+async def company_file(ctx: ShellContext, args: Args) -> str:
+    import json
+    from pathlib import Path
+
+    res = await ctx.call("company.file")
+    out = Path(args.positional[0]) if args.positional else Path(".")
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / res["file_name"]
+    path.write_text(json.dumps(res["envelope"]), encoding="utf-8")
+    return f"{path}: the Engine at {', '.join(res['names'] or [])}:{res['port']} ({res['certificates']} certificate(s)), signed by the store"
+
+
+# --- the Engine's certificate: it renews itself (docs/SEATS-AND-SETUP.md section 10) -----------------------------------
+
+def _cert_text(res: dict) -> str:
+    lines = []
+    for which in ("current", "next"):
+        c = res.get(which)
+        if c:
+            lines.append(f"{which:8} until {c['not_after'][:10]}  {', '.join(c['names'])}  {c['sha256']}")
+    if not res.get("next"):
+        lines.append("next     (made by itself 60 days before the end, or now with: cert renew)")
+    return "\n".join(lines)
+
+
+@command("cert", "status", help_="The Engine's certificate: until when, its names, and the next one if it is made")
+async def cert_status(ctx: ShellContext, args: Args) -> str:
+    return _cert_text(await ctx.call("cert.status"))
+
+
+@command("cert", "renew", "[name,name...]", "Make the next certificate now (other names if given); every machine is given it")
+async def cert_renew(ctx: ShellContext, args: Args) -> str:
+    payload = {"names": [n.strip() for n in args.positional[0].split(",") if n.strip()]} if args.positional else {}
+    return _cert_text(await ctx.call("cert.renew", payload))
+
+
+@command("cert", "switch", help_="Serve the next certificate from now on (machines that were given it keep working)")
+async def cert_switch(ctx: ShellContext, args: Args) -> str:
+    return _cert_text(await ctx.call("cert.switch"))

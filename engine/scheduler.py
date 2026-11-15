@@ -57,6 +57,7 @@ class Scheduler:
         self.every("enroll.expire", 600.0, self._expire_enrollments)
         self.every("seats.grants", 24 * 3600, self._fetch_seat_grants)      # new seats bought in the store (never re-checks old ones)
         self.every("seats.periods", 6 * 3600, self._watch_seat_periods)     # warnings, grace, and seats over the count taken back
+        self.every("cert.renewal", 24 * 3600, self.engine.certs.daily)      # the next certificate 60 days before the end; the switch at 30
         self.every("flow.transfers", 30.0, self._expire_flow_transfers)
         self.every("flow.heal", 1200.0, self._heal_flows)
         self.every("flow.hourly", 3600.0, self._hourly_flows)
@@ -68,6 +69,7 @@ class Scheduler:
         self.every("accountability.sweep", 60.0, self._sweep_accountability)
         for name, seconds, job in self._periodic:
             self._tasks[name] = asyncio.create_task(self._run_periodic(name, seconds, job))
+        self._tasks["seats.grants.start"] = asyncio.create_task(self._run_once("seats.grants.start", 5.0, self._fetch_seat_grants))   # (proactive: at start too)
         log.info("scheduler started with %d periodic jobs", len(self._periodic))
 
     async def _ask_about_machine_days(self) -> None:

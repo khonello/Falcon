@@ -10,6 +10,7 @@
                                          exist; with none, the default "New machines"), if one is free
     seat.take      {pc_id}               any Admin: the machine's seat is taken back (never the last Admin seat); it knocks again
     seats.refresh  {}                    any Admin: ask the store now for grants it has not been given
+    company.file   {}                    any Admin: the store-signed company file (where this Engine is), given with the Worker setup
 
 Knocking grants nothing: a knocking PC reaches nothing but this. There is no code; look-alike PCs are told apart by their name, who is
 signed in, their address and their hardware identity, and two that look alike are flagged. An Engine not registered with the store has no
@@ -191,6 +192,9 @@ async def _claim_seat(engine: Engine, knock: dict[str, Any], claim: dict[str, An
     if await db.seats.claim_used(str(claim["claim_id"])):
         raise ProtocolError(ErrorCode.FORBIDDEN, "this Admin claim was used already: sign in again from the Admin setup")
     free = await _free(engine, "admin")
+    if free is not None and free <= 0 and engine.store.registered:
+        await engine.store.fetch_grants()                                           # bought a moment ago, perhaps: ask the store first
+        free = await _free(engine, "admin")
     if free is not None and free <= 0:
         raise ProtocolError(ErrorCode.CONFLICT, "no Admin seat is free: more are bought in the store, or an Admin takes a seat back")
     if not await db.seats.use_claim(str(claim["claim_id"]), str(claim.get("member_email") or ""), knock["id"], envelope):
@@ -348,6 +352,28 @@ async def seats_refresh(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     if added:
         await ctx.engine.push_to_role("admin", "seats.changed", {"added": added})
     return {"added": added}
+
+
+@handler("company.file")
+async def company_file(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """What the console puts in the Worker setup zip beside the setup (docs/SEATS-AND-SETUP.md section 6): the file as the store signed it."""
+    import json
+
+    from common import signed
+
+    require_role(ctx, "super_user", "admin")
+    store = ctx.engine.store
+    if not store.registered:
+        raise ProtocolError(ErrorCode.CONFLICT, "this Engine is not registered with the store, so it has no company file")
+    path = store.path.parent / "company.falcon"
+    try:
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        doc = signed.check(envelope, "company")
+    except (OSError, ValueError, signed.SignatureError) as exc:
+        raise ProtocolError(ErrorCode.UNAVAILABLE, f"the company file cannot be read ({exc}): ask the store again with cert renew") from exc
+    slug = "".join(ch for ch in str(doc.get("company_name") or "company").lower() if ch.isalnum()) or "company"
+    return {"file_name": f"{slug}.falcon", "envelope": envelope, "names": doc.get("names"), "port": doc.get("port"),
+            "certificates": len(doc.get("certificates") or [])}
 
 
 # --- at sign-in -------------------------------------------------------------------------------------------------------

@@ -8,7 +8,7 @@ kept and tested, apart from the Windows one. Nothing here is run by the Engine o
 
 | Machine | setup.exe (Windows) | Or by hand |
 |---|---|---|
-| The server | `falcon-engine-setup.exe` (38 MB): asks the names, the first IT Admin's PC, PostgreSQL's superuser password | `python -m installers.windows.engine_install --names ... --hostname IT-01 --admin-url-file pg.txt`; Linux: `sudo python3 -m installers.engine.install --names ... --hostname IT-01` |
+| The server | `falcon-engine-setup.exe`: asks the names and port; carries Falcon's own PostgreSQL; signs in to the store | `python -m installers.windows.engine_install --names ... --store https://<store> [--company-name ...]`; Linux: `sudo python3 -m installers.engine.install --names ... --hostname IT-01` |
 | A person's PC | `python -m installers.windows.install --role worker --bundle falcon-client.json` | Windows, as administrator |
 | The first IT Admin's workstation | `... --role admin --bundle falcon-client.json --client-id <id> --client-key-file key.txt` | Windows, as administrator |
 | Another IT Admin's workstation | `... --role admin --bundle falcon-client.json` | Windows, as administrator |
@@ -20,7 +20,15 @@ installer checks the manifest first and refuses a payload that was changed or ha
 
 ## The order
 
-1. **The Engine's installer, on the server.** On Windows (`falcon-engine-setup.exe`, PostgreSQL installed first): the program in
+1. **The Engine's installer, on the server.** *Since 15 Nov 2026 on Windows (docs/SEATS-AND-SETUP.md section 4):* nothing is installed
+   first. The setup carries Falcon's own PostgreSQL (EDB's binaries, trimmed to 105 MB) and sets it up private to Falcon
+   (`installers/windows/private_pg.py`): programs in `<Falcon Engine>\pgsql`, never on PATH; data in `C:\ProgramData\Falcon Engine\pgdata`,
+   readable only by its own account; localhost only, a port of its own (from 54320); only the Engine's role may log in; the
+   **FalconPostgres** service as `NT SERVICE\FalconPostgres`; a machine's own PostgreSQL is never touched. It makes no first Admin: it
+   signs in to the store and registers the Engine (`store.json`, `company.falcon` in the data folder), and the first IT Admin runs the
+   Admin setup. *Drilled for real, 15 Nov 2026* (`scripts/private_pg_drill.py`): its own port, the Engine's role in, the superuser and
+   every other database refused, localhost only, its own account, nothing on PATH, repaired on a second run, removed cleanly.
+   *Before that (14 Nov 2026), on Windows* (`falcon-engine-setup.exe`, PostgreSQL installed first): the program in
    `C:\Program Files\Falcon Engine`, its settings and secrets in `C:\ProgramData\Falcon Engine` (system and administrators only), a PostgreSQL
    role with a made-up password, `engine setup`, the firewall rule, the **FalconEngine** service; it writes `falcon-client.json` and
    `first-admin.txt` in that folder and prints the fingerprint. *Run for real, 14 Nov 2026:* installed silently (`/ANSWERS=`), a console signed in
