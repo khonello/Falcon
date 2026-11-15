@@ -16,6 +16,9 @@ import os
 # kid -> Ed25519 public key (32 bytes). The store's own keys are added here as the store session makes them.
 STORE_KEYS: dict[str, bytes] = {}
 
+# Where the store is. Empty until it has its address: a setup that signs in (the Admin's, the Engine's) is then built with --store.
+STORE_URL = ""
+
 TEST_KID = "test-1"
 TEST_KEY = bytes.fromhex("3579e520aa01beb1f2b79030d8964da773e00977e8cb49a4be5ab659562490d3")
 

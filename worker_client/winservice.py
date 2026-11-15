@@ -120,6 +120,11 @@ async def _wait_to_be_registered(cfg: Any, stop_event: asyncio.Event) -> None:
 
     if needs_setup(cfg) and cfg.windows:
         await FirstRun(cfg).run(stop_event)         # nobody has said where the Engine is: the Falcon program asks
+    if cfg.enroll_level == "worker" or cfg.admin_claim:
+        from worker_client.knock import knock
+
+        await knock(cfg, stop_event)                # knocks until an Admin gives it a seat (docs/SEATS-AND-SETUP.md); no code, nothing shown
+        return
     tries = 0
     while not cfg.client_id and not stop_event.is_set():
         task = asyncio.create_task(enroll(cfg, department_id=cfg.enroll_department, level=cfg.enroll_level,
@@ -153,20 +158,31 @@ async def _wait_to_be_registered(cfg: Any, stop_event: asyncio.Event) -> None:
 
 async def _run_worker(config: str | None, stop_event: asyncio.Event) -> None:
     from worker_client.config import WorkerConfig
-    from worker_client.service import WorkerService
+    from worker_client.service import SeatTaken, WorkerService
 
     cfg = WorkerConfig.load(Path(config) if config else None)
-    if not cfg.client_id:
-        await _wait_to_be_registered(cfg, stop_event)
+    while not stop_event.is_set():
         if not cfg.client_id:
-            return                                  # stopped while waiting
-    cfg.separate_programs = True            # as a service the indexer and the event tracker are their own supervised programs
-    svc = WorkerService(cfg, native_watch=True, allow_power=False)
-    await svc.start()
-    try:
-        await stop_event.wait()
-    finally:
-        await svc.stop()
+            await _wait_to_be_registered(cfg, stop_event)
+            if not cfg.client_id:
+                return                              # stopped while waiting
+        cfg.separate_programs = True        # as a service the indexer and the event tracker are their own supervised programs
+        svc = WorkerService(cfg, native_watch=True, allow_power=False)
+        try:
+            await svc.start()
+        except SeatTaken:
+            await svc.stop()
+            continue                                # its seat was taken back: knock again
+        stopped = asyncio.ensure_future(stop_event.wait())
+        taken = asyncio.ensure_future(svc.seat_taken.wait())
+        try:
+            await asyncio.wait({stopped, taken}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for w in (stopped, taken):
+                w.cancel()
+            await svc.stop()
+        if not svc.seat_taken.is_set():
+            return
 
 
 class _Run:

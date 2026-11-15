@@ -1,9 +1,11 @@
 ; Inno Setup wrapper: turns a payload folder into one setup.exe for a role. The work is done by installers/windows/install.py; this only
 ; carries the payload and a Python, asks for administrator rights, and runs it. Built by installers/windows/build_setup.py, which runs:
 ;
-;     iscc /DRole=worker /DPayload=out\falcon-worker /DBundle=falcon-client.json /DPython=out\python installers\windows\falcon.iss
+;     iscc /DRole=worker /DPayload=out\falcon-worker /DPython=out\python installers\windows\falcon.iss
+;     iscc /DRole=admin /DStore=https://<store> ...
 ;
-; Roles: worker, admin. The bundle is the Engine's falcon-client.json (address and certificate, no key). The Python is python.org's full
+; Roles: worker, admin. Neither names an Engine: one setup serves every customer (docs/SEATS-AND-SETUP.md). A Worker's is told where its
+; Engine is by the store-signed company file beside it; an Admin's signs in to the store and learns it there. The Python is python.org's full
 ; layout (its NuGet package), installed under the program and not unpacked to a temporary folder: the runtime is a venv made from it, and a
 ; venv needs the Python it was made from for as long as it lives.
 
@@ -13,8 +15,10 @@
 #ifndef Payload
   #define Payload "out\falcon-" + Role
 #endif
-#ifndef Bundle
-  #define Bundle "falcon-client.json"
+#if Role == "admin"
+  #ifndef Store
+    #error the Admin setup signs in to the store: build it with /DStore=https://...
+  #endif
 #endif
 #ifndef Python
   #define Python "python"
@@ -38,7 +42,6 @@ SolidCompression=yes
 
 [Files]
 Source: "{#Payload}\*"; DestDir: "{tmp}\payload"; Flags: recursesubdirs createallsubdirs ignoreversion
-Source: "{#Bundle}"; DestDir: "{tmp}\payload"; DestName: "falcon-client.json"; Flags: ignoreversion
 ; the Python the runtime is made from, kept with the program
 Source: "{#Python}\*"; DestDir: "{app}\python"; Flags: recursesubdirs createallsubdirs ignoreversion
 
@@ -87,6 +90,26 @@ begin
 #endif
 end;
 
+// Where the Engine is. A Worker: the store-signed company file beside this setup (or /COMPANY=), the same setup for every customer.
+// An Admin: it signs in to the store in the browser and learns it there (docs/SEATS-AND-SETUP.md section 5; internet required).
+function PlaceArg: String;
+var
+  Given: String;
+  Found: TFindRec;
+begin
+#if Role == "admin"
+  Result := '--store "{#Store}"';
+#else
+  Given := ExpandConstant('{param:COMPANY|}');
+  if (Given = '') and FindFirst(ExpandConstant('{src}\*.falcon'), Found) then
+  begin
+    Given := ExpandConstant('{src}\') + Found.Name;
+    FindClose(Found);
+  end;
+  Result := '--company "' + Given + '"';
+#endif
+end;
+
 function FirstAdminArg: String;
 var
   Path: String;
@@ -111,7 +134,7 @@ var
 begin
   Py := ExpandConstant('{app}\python\python.exe');
   Log := ExpandConstant('{app}\install-log.txt');
-  Args := '-m installers.windows.install --role {#Role} --bundle "' + ExpandConstant('{tmp}\payload\falcon-client.json') + '" --source "' +
+  Args := '-m installers.windows.install --role {#Role} ' + PlaceArg + ' --source "' +
           ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') + '" --python "' + Py + '" --code-file "' +
           ExpandConstant('{tmp}\licence-code.txt') + '"' + FirstAdminArg;
   WizardForm.StatusLabel.Caption := 'Installing Falcon...';

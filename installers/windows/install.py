@@ -153,11 +153,33 @@ class WindowsInstall:
             manifest = json.loads((self.source / "manifest.json").read_text(encoding="utf-8"))
             if manifest["role"] != self.role.name:
                 raise InstallError(f"this payload is for the {manifest['role']!r} role, not {self.role.name!r}")
+        if self.role.name == "admin" and self.a.store and not self.a.company and not self.a.bundle:
+            self.sign_in()                                # (--bundle with --first-admin-file: the old way in, on the command line, until step 8)
+        if self.role.name == "admin" and self.a.company and not self.a.claim and not self.a.client_id:
+            raise InstallError("an Admin's PC needs its claim from the store: sign in (--store), or give --claim with --company")
+        if self.a.company:
+            self.bundle = company_bundle(Path(self.a.company))
+            if self.a.fingerprint and self.a.fingerprint.upper() != self.bundle.ca_sha256:
+                raise InstallError(f"the company file's certificate is {self.bundle.ca_sha256}, not {self.a.fingerprint}: this is not the Engine you expected")
+            return f"ready: the Engine is {self.bundle.engine_host}:{self.bundle.engine_port}, certificate {self.bundle.ca_sha256} (signed by the store)"
+        if self.role.name == "worker":
+            raise InstallError("the company file is needed (<company>.falcon, beside the setup or --company): it says where this company's "
+                               "Engine is, signed by the store. Download it with the Worker setup from the console's Machines page")
         if not self.a.bundle:
             raise InstallError("--bundle falcon-client.json is needed: the Engine's installer writes it, and every PC is given the same one")
         self.bundle = bundle_mod.load(Path(self.a.bundle), self.a.fingerprint)
         who = f"certificate {self.bundle.ca_sha256}" + ("" if self.a.fingerprint else " (compare it with the one the Engine's installer printed)")
         return f"ready: the Engine is {self.bundle.engine_host}:{self.bundle.engine_port}, {who}"
+
+    def sign_in(self) -> None:
+        """The Admin setup signs in to the store (docs/SEATS-AND-SETUP.md section 5): the claim and the company file land in the private folder."""
+        from installers.windows.store_signin import SignInError, run
+
+        try:
+            got = run(self.a.store, self.private, engine_id=self.a.engine)
+        except SignInError as exc:
+            raise InstallError(str(exc)) from exc
+        self.a.company, self.a.claim = str(got["company"]), str(got["claim"])
 
     def stop_old(self) -> str:
         if not self.runtime_python.exists() or not self.app.exists():
@@ -226,10 +248,17 @@ class WindowsInstall:
             except ValueError:
                 cfg = {}
         kept_key = bool(cfg.get("client_id") and cfg.get("client_key"))
+        claim = ""
+        if self.a.claim and not kept_key:                       # an Admin's PC: the service knocks with it once, and is in
+            claim_path = self.private / "admin-claim.json"
+            if Path(self.a.claim).resolve() != claim_path.resolve():
+                shutil.copyfile(self.a.claim, claim_path)
+            claim = str(claim_path)
         cfg.update({"engine_host": self.bundle.engine_host, "engine_port": self.bundle.engine_port, "tls": True, "ca_cert": str(self.cert),
                     "separate_programs": True, "windows": not self.a.no_windows, "serve_console": self.role.serve_console,
                     "enroll_level": self.role.enroll_level or "worker", "enroll_department": self.a.department,
                     **({"enroll_code": self.licence_code()} if self.licence_code() and not kept_key else {}),
+                    **({"admin_claim": claim} if claim else {}),
                     "watch_roots": cfg.get("watch_roots") or self.a.watch or [r"C:\Users"]})
         cfg.setdefault("client_id", "")
         cfg.setdefault("client_key", "")
@@ -426,7 +455,11 @@ class WindowsInstall:
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="installers.windows.install", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--role", required=True, choices=("worker", "admin"))
-    ap.add_argument("--bundle", help="falcon-client.json from the Engine's installer")
+    ap.add_argument("--bundle", help="falcon-client.json from the Engine's installer (the admin role, until it signs in to the store)")
+    ap.add_argument("--company", help="the company file (<company>.falcon) from the console's Machines page: where the Engine is, signed by the store")
+    ap.add_argument("--store", help="admin: the store's address; the person signs in in the browser and this PC claims a free Admin seat")
+    ap.add_argument("--engine", help="admin, with --store: which Engine, when the company has several")
+    ap.add_argument("--claim", help="admin: an Admin claim the store issued already (admin-claim.json), with --company")
     ap.add_argument("--fingerprint", help="the certificate's fingerprint the Engine's installer printed: refuse any other")
     ap.add_argument("--department", type=int, help="the department this machine asks to join (otherwise the person confirming chooses)")
     ap.add_argument("--code", help="the licence code (an admin code for --role admin, a worker code for --role worker): the machine joins at once, "
@@ -455,6 +488,22 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--purge-data", action="store_true", help="with --uninstall: also remove the settings and this machine's key")
     ap.add_argument("--dry-run", action="store_true", help="list the steps and change nothing")
     return ap
+
+
+def company_bundle(path: Path) -> bundle_mod.Bundle:
+    """Where the company's Engine is, from its store-signed company file (docs/SEATS-AND-SETUP.md section 8): refused if it was changed in
+    any way. During a certificate rollover it holds two certificates; the PC trusts both (one PEM file may hold several)."""
+    from common import signed
+    from installers.common import cert_fingerprint
+
+    try:
+        doc = signed.load(path, "company")
+    except signed.SignatureError as exc:
+        raise InstallError(f"the company file {path} cannot be trusted: {exc}") from exc
+    names, certs = doc.get("names") or [], [str(c).strip() for c in doc.get("certificates") or [] if str(c).strip()]
+    if not names or not certs or not isinstance(doc.get("port"), int):
+        raise InstallError(f"the company file {path} does not say where the Engine is")
+    return bundle_mod.Bundle(str(names[0]), int(doc["port"]), "\n".join(certs) + "\n", cert_fingerprint(certs[0]))
 
 
 def first_admin(path: Path) -> tuple[str, str]:

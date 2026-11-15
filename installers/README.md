@@ -85,12 +85,14 @@ first account and issued nothing new. **The `.deb`, run for real (WSL Ubuntu, 12
 
 ## setup.exe (built 1 Nov 2026)
 
-`python -m installers.windows.build_setup worker --python <folder> --bundle falcon-client.json --out <short folder>` makes
+`python -m installers.windows.build_setup worker --python <folder> --out <short folder>` makes
 `falcon-worker-setup.exe` (93 MB): the payload, the role's libraries as wheels (no network at install), and Python. The Python is
 python.org's full Windows layout, the `tools` folder of its NuGet package (`https://www.nuget.org/api/v2/package/python/3.10.11`; decided
 by the user, 1 Nov 2026). It is installed under the program (`<target>\python`), because the runtime is a venv made from it. Build into a
 short path (`C:b\dist`): a deep one passes Windows' 260-character limit and Inno Setup says "cannot find the path". One setup.exe is
-made per Engine, since it carries that Engine's bundle. Needs Inno Setup 6. `admin` makes `falcon-admin-setup.exe` (94 MB: the console runs
+the same for every customer (15 Nov 2026, docs/SEATS-AND-SETUP.md): a Worker's setup carries no Engine and is told where it is by the
+store-signed company file beside it (`<company>.falcon`, or `/COMPANY=`); the Admin's is built with `--store https://<store>` and signs in
+to the company account at install, which gives it the Engine and this PC's Admin claim. Needs Inno Setup 6. `admin` makes `falcon-admin-setup.exe` (94 MB: the console runs
 on PySide6-Essentials, as the Worker's windows do; the full PySide6 made it 259 MB).
 
 **Run for real (13-14 Nov 2026, on the development PC, then removed):** both setup.exe files, silently, as an administrator: all ten steps,

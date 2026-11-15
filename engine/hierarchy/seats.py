@@ -1,7 +1,9 @@
 """Machines knock; Admins give seats (docs/SEATS-AND-SETUP.md, sections 6 and 7; decided with the user 14 Nov 2026).
 
-    knock.hello    {install_token, hostname, os?, mac?, hardware_id?, user?}   before the handshake: "this installed PC is here"
-                   -> {status: waiting} | {status: seated, client_id, client_key, account_id, pc_id} (the key once per seating) | {status: collected}
+    knock.hello    {install_token, hostname, os?, mac?, hardware_id?, user?, admin_claim?}   before the handshake: "this installed PC is here"
+                   -> {status: waiting} | {status: seated, client_id, client_key, account_id, pc_id, role} (the key once per seating) | {status: collected}
+                   With an Admin claim (signed by the store, for this Engine and this PC, unexpired, never used): in at once as an Admin, if an
+                   Admin seat is free (docs/SEATS-AND-SETUP.md section 5).
     knocks.list    {}                    the knocking PCs, with what they say about themselves; look-alikes flagged
     seats.summary  {}                    per kind (admin, worker): bought, in use, free, until when, in grace
     seat.give      {knock_id, department_id?}   any Admin: the knocking PC gets a Worker seat in that department (required when departments
@@ -132,6 +134,7 @@ async def knock_hello(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             raise ProtocolError(ErrorCode.CONFLICT, "too many new machines are knocking from this address; try again in an hour")
         if await db.seats.count_waiting() >= MAX_WAITING:
             raise ProtocolError(ErrorCode.UNAVAILABLE, "too many machines are waiting for a seat")
+    claim = _check_claim(engine, payload.get("admin_claim"), facts) if payload.get("admin_claim") is not None else None
     row = await db.seats.knock(_hash(token), facts, peer)
     ctx.connection.knock_id = row["id"]
     if row["created"]:
@@ -140,15 +143,66 @@ async def knock_hello(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await engine.audit.record(None, "knock.new", target_type="knocks", target_id=row["id"],
                                   detail={"hostname": facts["hostname"], "user": facts["user"], "address": peer})
         await engine.push_to_role("admin", "knock.waiting", {"knock_id": row["id"], "hostname": facts["hostname"]})
+    if claim is not None and row["status"] == "waiting":
+        await _claim_seat(engine, row, claim, payload["admin_claim"])
+        row = {**row, "status": "seated", "pc_id": (await db.seats.get_knock(row["id"]))["pc_id"]}
     if row["status"] == "seated":
         if await db.seats.deliver(row["id"]):
             pc = await db.accounts.pc(row["pc_id"])
             assert pc is not None
             await engine.audit.record(None, "seat.collected", target_type="pcs", target_id=row["pc_id"], pc_id=row["pc_id"])
+            seat = await db.seats.active(row["pc_id"])
             return {"status": "seated", "client_id": pc["client_id"], "client_key": engine.client_key(pc["client_id"], pc["key_generation"]),
-                    "account_id": pc["bound_account_id"], "pc_id": row["pc_id"]}
+                    "account_id": pc["bound_account_id"], "pc_id": row["pc_id"], "role": seat["role"] if seat else None}
         return {"status": "collected"}                     # its key was handed over already (an Admin takes the seat back and gives it again)
     return {"status": "waiting"}
+
+
+def _check_claim(engine: Engine, envelope: Any, facts: dict[str, Any]) -> dict[str, Any]:
+    """An Admin claim the store signed for this Engine and this PC, still in date. Its single use is checked when it is spent."""
+    from common import signed
+    from engine.store import parse_time
+
+    try:
+        doc = signed.check(envelope, "admin_claim")
+    except signed.SignatureError as exc:
+        raise ProtocolError(ErrorCode.FORBIDDEN, f"the Admin claim cannot be trusted: {exc}") from exc
+    ident = engine.store.identity
+    if ident is None or doc.get("engine_id") != ident.get("engine_id"):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim is for another Engine")
+    try:
+        expires = parse_time(str(doc.get("expires_at")))
+    except ValueError as exc:
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim has no end") from exc
+    if expires <= datetime.now(timezone.utc):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim has expired: sign in again from the Admin setup")
+    if str(doc.get("hostname") or "").lower() != (facts["hostname"] or "").lower() or (doc.get("hardware_id") and doc.get("hardware_id") != facts["hardware_id"]):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim was made for another machine")
+    if not doc.get("claim_id"):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim has no id")
+    return doc
+
+
+async def _claim_seat(engine: Engine, knock: dict[str, Any], claim: dict[str, Any], envelope: dict[str, Any]) -> None:
+    """The claim is spent and the PC is in as an Admin's workstation, if an Admin seat is free."""
+    from engine.hierarchy import licences
+
+    db = engine.db
+    if await db.seats.claim_used(str(claim["claim_id"])):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "this Admin claim was used already: sign in again from the Admin setup")
+    free = await _free(engine, "admin")
+    if free is not None and free <= 0:
+        raise ProtocolError(ErrorCode.CONFLICT, "no Admin seat is free: more are bought in the store, or an Admin takes a seat back")
+    if not await db.seats.use_claim(str(claim["claim_id"]), str(claim.get("member_email") or ""), knock["id"], envelope):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "this Admin claim was used already: sign in again from the Admin setup")
+    department_id = await licences.department_for(engine, {}, None, "admin")
+    pc_id = await _seat(engine, knock, "admin", department_id, None)
+    await db.seats.claim_seated(str(claim["claim_id"]), pc_id)
+    await engine.audit.record(None, "seat.claimed", target_type="pcs", target_id=pc_id, pc_id=pc_id,
+                              detail={"hostname": knock["hostname"], "member_email": claim.get("member_email"), "claim_id": claim["claim_id"],
+                                      "knock_id": knock["id"], "role": "admin"})
+    await engine.push_to_role("admin", "seat.given", {"pc_id": pc_id, "hostname": knock["hostname"], "role": "admin"})
+    await engine.push_to_role("admin", "machines.changed", {"pc_id": pc_id})
 
 
 def _alike(knocks: list[dict[str, Any]], seated: list[dict[str, Any]]) -> dict[int, list[str]]:
@@ -225,6 +279,8 @@ async def seat_give(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def _seat(engine: Engine, knock: dict[str, Any], role: str, department_id: int, by_account_id: int | None) -> int:
     """The knocking PC is in: its account and machine (made, or brought back with a new key), its seat, and a nudge on its open connection."""
     db = engine.db
+    if knock["pc_id"] is not None and await _role_of(engine, knock["pc_id"]) != role:
+        knock = {**knock, "pc_id": None}                                            # a Worker PC become an Admin's (or back): a new account
     if knock["pc_id"] is None:
         from engine.hierarchy.accounts import provision
 
@@ -241,6 +297,10 @@ async def _seat(engine: Engine, knock: dict[str, Any], role: str, department_id:
         if getattr(conn, "knock_id", None) == knock["id"]:
             await conn.push("knock.seated", {"pc_id": pc_id})
     return pc_id
+
+
+async def _role_of(engine: Engine, pc_id: int) -> str | None:
+    return await engine.db.seats.last_role(pc_id)
 
 
 async def take_back(engine: Engine, pc_id: int, by_account_id: int | None, reason: str) -> bool:

@@ -144,10 +144,10 @@ The Engine's certificate is valid for 10 years; renewal is rare, but a lapse wou
 | Step | What | Waits on |
 |---|---|---|
 | 0 | these documents | — |
-| 1 | `docs/STORE-CONTRACT.md`, `common/ed25519.py` (stdlib verify, RFC 8032 vectors), `common/store_keys.py`, `scripts/store_stub.py` | — |
-| 2 | the Engine: knocks, seats, grants, grace (migration 056), TUI commands | 1 |
-| 3 | the Worker: knocking, the company file in the setup | 2 |
-| 4 | the Admin claim, end to end against the store stub | 1, 2 |
+| 1 | `docs/STORE-CONTRACT.md`, `common/ed25519.py` (stdlib verify, RFC 8032 vectors), `common/store_keys.py`, `scripts/store_stub.py` (done 14 Nov 2026) | — |
+| 2 | the Engine: knocks, seats, grants, grace (migration 056), TUI commands (done 14 Nov 2026) | 1 |
+| 3 | the Worker: knocking, the company file in the setup (done 15 Nov 2026) | 2 |
+| 4 | the Admin claim, end to end against the store stub (done 15 Nov 2026; migration 057) | 1, 2 |
 | 5 | the Engine setup: the private PostgreSQL, then store registration | a yes for the PostgreSQL binaries download (~300 MB) |
 | 6 | certificate renewal | 2 |
 | 7 | the Machines page, handed to the design session | 2 |

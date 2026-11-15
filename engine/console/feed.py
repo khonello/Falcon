@@ -305,6 +305,7 @@ ENTRIES: dict[str, tuple[str, str, S]] = {
     "knock.flooded": ("admin", "worth", lambda w: f"Too many new machines knocked from {w.d.get('address') or 'one address'}: refused for an hour"),
     "seat.given": ("admin", "done", lambda w: f"Gave {w.d.get('hostname') or w.host or 'a machine'} a {w.d.get('role') or 'Worker'} seat"),
     "seat.collected": ("admin", "routine", lambda w: f"{w.host or 'A machine'} collected its key"),
+    "seat.claimed": ("admin", "done", lambda w: f"{w.d.get('member_email') or 'An Admin'} took an Admin seat on {w.d.get('hostname') or w.host or 'a machine'}"),
     "seat.taken": ("admin", "done", lambda w: f"Took back the seat of {w.d.get('hostname') or w.host or 'a machine'}"
                    + (": the seat period ended" if w.d.get("reason") == "the seat period ended" else "")),
     "seats.granted": ("admin", "done", lambda w: f"{'Admin' if w.d.get('role') == 'admin' else 'Worker'} seats came from the store"

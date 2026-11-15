@@ -209,12 +209,34 @@ def test_the_engine_installer_copies_the_engine_and_writes_settings_and_the_bund
 
 # --- the Windows installers ---------------------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _store_test_key(monkeypatch):
+    monkeypatch.setenv("FALCON_STORE_TEST_KEY", "1")                     # the company files below are signed with the store's test key
+
+
+def company_file(path: Path, cert_pem: str, names: tuple[str, ...] = ("falcon.internal",), port: int = 7400, certs: list[str] | None = None) -> Path:
+    """A company file as the store issues it (docs/STORE-CONTRACT.md), signed with the test key."""
+    pytest.importorskip("cryptography")
+    from scripts.store_stub import sign
+
+    env = sign({"kind": "company", "company_id": "c_1", "company_name": "Acme", "engine_id": "e_1", "names": list(names), "port": port,
+                "certificates": certs or [cert_pem.strip()], "issued_at": "2026-11-14T00:00:00Z"})
+    path.write_text(json.dumps(env), encoding="utf-8")
+    return path
+
+
 def win_args(role: str, tmp_path: Path, *extra: str) -> tuple[win_install.WindowsInstall, Path]:
     payload = built(role, tmp_path)
     cert_dir = tmp_path / "certs"
-    bundle_path = tmp_path / "falcon-client.json"
-    bundle_mod.Bundle.make("falcon.internal", 7400, make_cert(cert_dir)).save(bundle_path)
-    argv = ["--role", role, "--bundle", str(bundle_path), "--source", str(payload), "--target", str(tmp_path / "Program Files" / "Falcon"),
+    pem = make_cert(cert_dir)
+    if role == "worker":                                                   # a Worker setup is told where its Engine is by the company file
+        bundle_path = company_file(tmp_path / "acme.falcon", pem)
+        where = ["--company", str(bundle_path)]
+    else:
+        bundle_path = tmp_path / "falcon-client.json"
+        bundle_mod.Bundle.make("falcon.internal", 7400, pem).save(bundle_path)
+        where = ["--bundle", str(bundle_path)]
+    argv = ["--role", role, *where, "--source", str(payload), "--target", str(tmp_path / "Program Files" / "Falcon"),
             "--data", str(tmp_path / "ProgramData" / "Falcon"), "--python", sys.executable, "--reuse-python", "--no-acl", "--no-shortcuts",
             "--no-service", "--no-windows", *extra]
     return win_install.WindowsInstall(win_install.parser().parse_args(argv), say=lambda m: None), bundle_path
@@ -286,9 +308,28 @@ def test_a_wrong_payload_a_changed_payload_and_a_wrong_engine_are_each_refused(t
     with pytest.raises(InstallError, match="not the Engine you expected"):
         inst3.check()
     inst4, _ = win_args("worker", tmp_path / "fourth")
-    inst4.a.bundle = None
-    with pytest.raises(InstallError, match="--bundle"):
+    inst4.a.company = None
+    with pytest.raises(InstallError, match="company file is needed"):
         inst4.check()
+
+
+def test_a_worker_setup_trusts_only_a_company_file_the_store_signed(tmp_path, monkeypatch):
+    """docs/SEATS-AND-SETUP.md section 8: the company file says where the Engine is; changed in any way, it is refused."""
+    pem = make_cert(tmp_path / "certs")
+    f = company_file(tmp_path / "acme.falcon", pem, names=("falcon.internal", "ENG-01"), port=7410)
+    b = win_install.company_bundle(f)
+    assert (b.engine_host, b.engine_port, b.ca_sha256) == ("falcon.internal", 7410, cert_fingerprint(pem))
+    env = json.loads(f.read_text(encoding="utf-8"))
+    env["doc"]["names"] = ["rogue.example"]                                 # pointed at another Engine
+    f.write_text(json.dumps(env), encoding="utf-8")
+    with pytest.raises(InstallError, match="cannot be trusted"):
+        win_install.company_bundle(f)
+    two = company_file(tmp_path / "rollover.falcon", pem, certs=[pem.strip(), make_cert(tmp_path / "next").strip()])
+    rolled = win_install.company_bundle(two)
+    assert rolled.ca_pem.count("BEGIN CERTIFICATE") == 2 and rolled.ca_sha256 == cert_fingerprint(pem)   # both trusted during a rollover
+    monkeypatch.delenv("FALCON_STORE_TEST_KEY")
+    with pytest.raises(InstallError, match="cannot be trusted"):
+        win_install.company_bundle(two)                                     # the test key is trusted only when asked
 
 
 @windows_only
@@ -314,14 +355,13 @@ def test_the_windows_installer_lists_its_steps_and_a_dry_run_touches_nothing(tmp
 @windows_only
 def test_the_command_line_installs_and_says_what_is_left_to_do(tmp_path, monkeypatch, capsys):
     payload = built("worker", tmp_path)
-    bundle_path = tmp_path / "falcon-client.json"
-    bundle_mod.Bundle.make("falcon.internal", 7400, make_cert(tmp_path / "c")).save(bundle_path)
-    argv = ["--role", "worker", "--bundle", str(bundle_path), "--source", str(payload), "--target", str(tmp_path / "pf"), "--data", str(tmp_path / "pd"),
+    company = company_file(tmp_path / "acme.falcon", make_cert(tmp_path / "c"))
+    argv = ["--role", "worker", "--company", str(company), "--source", str(payload), "--target", str(tmp_path / "pf"), "--data", str(tmp_path / "pd"),
             "--python", sys.executable, "--reuse-python", "--no-acl", "--no-service", "--no-windows"]
     assert win_install.main(argv) == 0
     out = capsys.readouterr().out
-    assert "[1/10] Check" in out and "this machine has no key yet" in out
-    assert win_install.main([*argv[:2], "--role", "worker", "--bundle", str(tmp_path / "missing.json"), *argv[4:]]) == 1
+    assert "[1/10] Check" in out and "signed by the store" in out and "this machine has no key yet" in out
+    assert win_install.main([*argv[:2], "--company", str(tmp_path / "missing.falcon"), *argv[4:]]) == 1
 
 
 # --- for real: the installed service registers itself with an Engine (elevated prompt only) --------------------------
@@ -395,16 +435,56 @@ async def test_an_installed_admin_workstation_registers_itself_and_its_console_i
         winservice.uninstall(name)
 
 
-def test_a_setup_is_not_built_from_a_folder_with_no_python_or_a_bundle_that_is_not_one(tmp_path):
+def test_a_setup_is_not_built_from_a_folder_with_no_python_or_an_admin_setup_with_no_store(tmp_path):
     from installers.windows import build_setup
 
     with pytest.raises(InstallError, match="no python.exe"):
-        build_setup.build("worker", tmp_path / "nopython", tmp_path / "b.json", tmp_path / "out")
+        build_setup.build("worker", tmp_path / "nopython", tmp_path / "out")
     (tmp_path / "py").mkdir()
     (tmp_path / "py" / "python.exe").write_bytes(b"")
-    (tmp_path / "b.json").write_text("{}", encoding="utf-8")
-    with pytest.raises(InstallError, match="not a Falcon client bundle"):
-        build_setup.build("worker", tmp_path / "py", tmp_path / "b.json", tmp_path / "out")
+    with pytest.raises(InstallError, match="signs in to the store"):
+        build_setup.build("admin", tmp_path / "py", tmp_path / "out")                           # nothing names an Engine: it learns it at sign-in
+    with pytest.raises(InstallError, match="signs in to the store"):
+        build_setup.build("admin", tmp_path / "py", tmp_path / "out", store="http://store.example")   # only https (or this machine, testing)
+
+
+@windows_only
+def test_an_admin_install_signs_in_to_the_store_and_leaves_the_claim_for_the_service(tmp_path, monkeypatch):
+    """docs/SEATS-AND-SETUP.md section 5: no bundle, no first-admin file; the person signs in and the claim waits in the private settings."""
+    pytest.importorskip("cryptography")
+    import urllib.request
+
+    from installers.windows import store_signin
+    from scripts.store_stub import StoreStub
+
+    store = StoreStub(state=tmp_path / "store.json").start()
+    try:
+        d = store.state.data
+        d["companies"]["c_1"] = {"name": "Acme", "owner": "owner@test.local", "members": ["owner@test.local"]}
+        pem = make_cert(tmp_path / "certs")
+        d["engines"]["e_1"] = {"company_id": "c_1", "names": ["falcon.internal"], "port": 7400, "certificates": [pem.strip()], "token": "t",
+                               "usage": {}}
+        store.state.add_grant("e_1", "admin", 2)
+        real_run = store_signin.run
+        monkeypatch.setattr(store_signin, "run", lambda *a, **kw: real_run(*a, **{**kw, "open_browser": lambda u: urllib.request.urlopen(u).read(),
+                                                                                  "say": lambda m: None}))
+        payload = built("admin", tmp_path)
+        argv = ["--role", "admin", "--store", store.url, "--source", str(payload), "--target", str(tmp_path / "pf"), "--data", str(tmp_path / "pd"),
+                "--python", sys.executable, "--reuse-python", "--no-acl", "--no-service", "--no-windows", "--no-shortcuts"]
+        inst = win_install.WindowsInstall(win_install.parser().parse_args(argv), say=lambda m: None)
+        done = dict(inst.plan().run())
+        assert "signed by the store" in done["Check"]
+        cfg = json.loads(inst.worker_json.read_text(encoding="utf-8"))
+        assert cfg["engine_host"] == "falcon.internal" and cfg["serve_console"] is True and cfg["client_id"] == ""
+        claim = json.loads(Path(cfg["admin_claim"]).read_text(encoding="utf-8"))
+        assert Path(cfg["admin_claim"]).parent == inst.private and claim["doc"]["engine_id"] == "e_1"
+        assert claim["doc"]["member_email"] == "owner@test.local"
+        no_claim = win_install.WindowsInstall(win_install.parser().parse_args(
+            ["--role", "admin", "--company", str(inst.private / "company.falcon"), *argv[4:]]), say=lambda m: None)
+        with pytest.raises(InstallError, match="needs its claim"):
+            no_claim.check()
+    finally:
+        store.stop()
 
 
 def test_the_setup_script_installs_python_with_the_program_and_runs_the_installer_from_there():

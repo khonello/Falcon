@@ -61,6 +61,10 @@ def _iso(text: str) -> datetime:
     return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 
 
+class SeatTaken(RuntimeError):
+    """The Engine said no_seat: the service ends, and the machine knocks again."""
+
+
 class WorkerService:
     def __init__(self, config: WorkerConfig, *, native_watch: bool = True, allow_power: bool = False) -> None:
         self.config = config
@@ -107,6 +111,7 @@ class WorkerService:
         self._stopping = False
         self._reconnect_task: asyncio.Task[None] | None = None
         self.pushes_handled = 0
+        self.seat_taken = asyncio.Event()          # the Engine said no_seat: this machine drops its key and knocks again (worker_client/knock.py)
         # the Worker's windows (WR01, TK07): the block overlay follows the lockout; a new task opens its window
         self._overlay: Any = None
         self._viewbar: Any = None
@@ -331,7 +336,17 @@ class WorkerService:
                 self.identity = await conn.connect()
                 self.conn = conn
                 break
-            except (OSError, ConnectionError_, EngineError, asyncio.TimeoutError) as exc:
+            except EngineError as exc:
+                await conn.close()
+                if exc.code == "no_seat":
+                    self._seat_was_taken()
+                    raise SeatTaken("this machine's seat was taken back") from exc
+                if not forever:
+                    raise
+                log.warning("engine refused the sign-in (%s); retrying in %.0fs", exc, delay)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 60)
+            except (OSError, ConnectionError_, asyncio.TimeoutError) as exc:
                 await conn.close()
                 if not forever:
                     raise
@@ -339,6 +354,13 @@ class WorkerService:
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, 60)
         await self._after_connect()
+
+    def _seat_was_taken(self) -> None:
+        """An Admin took this machine's seat back (or its period ended): its key is useless now. It is forgotten, and the machine knocks again."""
+        log.warning("this machine's seat was taken back: it knocks again, until an Admin gives it a seat")
+        self.config.client_id, self.config.client_key = "", ""
+        self.config.save()
+        self.seat_taken.set()
 
     async def _after_connect(self) -> None:
         st = await self.call("hierarchy.session_state")

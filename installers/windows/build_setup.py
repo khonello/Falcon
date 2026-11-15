@@ -1,12 +1,14 @@
 """Build one setup.exe for a role: the payload, its libraries as wheels (so the install needs no network), a Python, and Inno Setup.
 
-    python -m installers.windows.build_setup worker --python <folder> --bundle falcon-client.json [--out dist] [--iscc ISCC.exe] [--no-wheels]
-    python -m installers.windows.build_setup engine --python <folder> [--out dist]          (the Engine's own setup.exe: it makes the bundle)
+    python -m installers.windows.build_setup worker --python <folder> [--out dist] [--iscc ISCC.exe] [--no-wheels]
+    python -m installers.windows.build_setup admin --python <folder> [--store https://<store>] [--out dist]
+    python -m installers.windows.build_setup engine --python <folder> [--out dist]
 
 --python is python.org's full Windows layout (the `tools` folder of its NuGet package, https://www.nuget.org/packages/python): it goes
 into the setup and is installed under the program, and the runtime venv is made from it. Its version is the Python the wheels are fetched
-for, so they match. --bundle is the Engine's falcon-client.json (its address and certificate, no key), written by the Engine's installer:
-a setup.exe is made for one Engine. What it writes: <out>/falcon-<role>-setup.exe, and the payload beside it.
+for, so they match. A setup carries no Engine and is the same for every customer (docs/SEATS-AND-SETUP.md): a Worker's is told where its
+Engine is by the store-signed company file beside it; an Admin's signs in to the store (--store, or common/store_keys.STORE_URL) and learns it
+there. What it writes: <out>/falcon-<role>-setup.exe, and the payload beside it.
 
 Run on Windows from the repository root. The admin role carries the console; build it when the console is ready (the user, 1 Nov 2026).
 """
@@ -20,7 +22,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-from installers import bundle as bundle_mod
 from installers import payload as payload_mod
 from installers.common import InstallError
 
@@ -45,15 +46,16 @@ def fetch_wheels(python: Path, requirements: str, dest: Path) -> int:
     return len(list(dest.glob("*.whl")))
 
 
-def build(role: str, python_dir: Path, bundle_path: Path | None, out: Path, *, iscc: Path = ISCC, wheels: bool = True) -> Path:
-    """The engine role makes its own bundle when it is installed (it is the Engine), so it is given none; worker and admin carry one Engine's."""
+def build(role: str, python_dir: Path, out: Path, *, store: str | None = None, iscc: Path = ISCC, wheels: bool = True) -> Path:
+    """One setup for every customer: nothing in it names an Engine."""
+    from common.store_keys import STORE_URL
+
     python = python_dir / "python.exe"
     if not python.is_file():
         raise InstallError(f"{python_dir} has no python.exe: give the tools folder of python.org's NuGet package")
-    if role != "engine":
-        if bundle_path is None:
-            raise InstallError("--bundle falcon-client.json is needed: a PC's setup.exe is made for one Engine")
-        bundle_mod.load(bundle_path)                               # refuses anything that is not a whole bundle
+    store = store or STORE_URL
+    if role == "admin" and not store.startswith(("https://", "http://127.0.0.1", "http://localhost")):
+        raise InstallError("the Admin setup signs in to the store: give its address (--store https://...)")
     if not iscc.is_file():
         raise InstallError(f"Inno Setup's compiler is not at {iscc} (--iscc)")
     out.mkdir(parents=True, exist_ok=True)
@@ -74,8 +76,8 @@ def build(role: str, python_dir: Path, bundle_path: Path | None, out: Path, *, i
         cmd = [str(iscc), f"/DPayload={payload}", f"/DPython={python_dir.resolve()}", f"/DVersion={payload_mod.project_version()}", f"/O{out.resolve()}",
                "/Q", str(REPO / "installers" / "windows" / "falcon-engine.iss")]
     else:
-        assert bundle_path is not None
-        cmd = [str(iscc), f"/DRole={role}", f"/DPayload={payload}", f"/DBundle={bundle_path.resolve()}", f"/DPython={python_dir.resolve()}",
+        extra = [f"/DStore={store}"] if role == "admin" else []
+        cmd = [str(iscc), f"/DRole={role}", f"/DPayload={payload}", *extra, f"/DPython={python_dir.resolve()}",
                f"/DVersion={payload_mod.project_version()}", f"/O{out.resolve()}", "/Q", str(REPO / "installers" / "windows" / "falcon.iss")]
     subprocess.run(cmd, check=True)
     made = out / f"falcon-{role}-setup.exe"
@@ -87,13 +89,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="installers.windows.build_setup", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("role", choices=("worker", "admin", "engine"))
     ap.add_argument("--python", required=True, type=Path, help="python.org's full Windows layout (the NuGet package's tools folder)")
-    ap.add_argument("--bundle", type=Path, help="the Engine's falcon-client.json (worker and admin; the engine makes its own)")
+    ap.add_argument("--store", help="the store's address, for the admin role (default: common/store_keys.STORE_URL)")
     ap.add_argument("--out", type=Path, default=Path("dist"))
     ap.add_argument("--iscc", type=Path, default=ISCC)
     ap.add_argument("--no-wheels", action="store_true", help="the install fetches the libraries itself (needs the network)")
     a = ap.parse_args(argv)
     try:
-        build(a.role, a.python, a.bundle, a.out, iscc=a.iscc, wheels=not a.no_wheels)
+        build(a.role, a.python, a.out, store=a.store, iscc=a.iscc, wheels=not a.no_wheels)
     except (InstallError, subprocess.CalledProcessError) as exc:
         print(f"Not built: {exc}", file=sys.stderr)
         return 1

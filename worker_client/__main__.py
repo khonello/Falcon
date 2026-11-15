@@ -56,6 +56,13 @@ async def _enroll(cfg: WorkerConfig, department_id: int | None, level: str) -> N
         sys.exit(f"not registered: {exc}")
 
 
+async def _knock(cfg: WorkerConfig) -> None:
+    from worker_client.knock import knock
+
+    print(f"Waiting for a seat: knocking at {cfg.engine_address}. An Admin gives this machine a seat on the Machines page.", flush=True)
+    await knock(cfg, asyncio.Event())
+
+
 async def _first_run(cfg: WorkerConfig, ui: bool) -> None:
     """Not set up: the person is asked, in the terminal with --ui, else in the Falcon program's window."""
     from worker_client import firstrun, windows
@@ -114,10 +121,12 @@ def main() -> None:
         if args.code:
             cfg.enroll_code = args.code
         asyncio.run(_enroll(cfg, args.department, args.level))
+    if not cfg.client_id and cfg.enroll_level == "worker" and cfg.engine_host and (cfg.ca_cert or not cfg.tls):
+        asyncio.run(_knock(cfg))                    # knock until an Admin gives this machine a seat (Ctrl+C stops)
     if not cfg.client_id:
         asyncio.run(_first_run(cfg, args.ui))
     if not cfg.client_id:
-        sys.exit("no client id: pass --client-id once (it is remembered), or register with --enroll")
+        sys.exit("no client id: this machine knocks until an Admin gives it a seat (or pass --client-id once; it is remembered)")
     cfg.save()
     try:
         asyncio.run(_main(cfg, ui=args.ui, native=not args.no_native_watch, allow_power=args.allow_power))

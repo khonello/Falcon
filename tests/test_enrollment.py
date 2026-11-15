@@ -177,52 +177,6 @@ async def test_one_address_cannot_flood_the_waiting_list(engine, org):
             await m.close()
 
 
-async def test_a_service_installed_with_no_key_asks_shows_the_code_and_carries_on_once_confirmed(engine, org, connect, tmp_path, monkeypatch):
-    """What an installed Worker does on first start: no client id, so it asks, puts the code on the signed-in person's screen, waits on
-    probation, and keeps the key it is handed (once)."""
-    from worker_client import winservice
-    from worker_client.config import WorkerConfig
-    from worker_client.windows import spawn
-
-    shown: list[str] = []
-
-    class Handle:
-        def close(self) -> None:
-            shown.append("closed")
-
-        async def answer(self):
-            await asyncio.Event().wait()                                           # nobody answers: the window just stays up
-
-    async def fake_open(kind, spec):
-        shown.append(spec["text"])
-        return Handle()
-
-    monkeypatch.setattr(spawn, "open_window", fake_open)
-    su = await connect("cid-su")
-    cfg = WorkerConfig(windows=True, engine_host="127.0.0.1", engine_port=engine.port, tls=False, enroll_level="worker",
-                       enroll_department=org["fin"], path=tmp_path / "private" / "worker.json")
-    stop = asyncio.Event()
-    task = asyncio.create_task(winservice._wait_to_be_registered(cfg, stop))
-    try:
-        for _ in range(100):
-            if shown:
-                break
-            await asyncio.sleep(0.1)
-        code = "".join(ch for ch in shown[0].split("Code")[1].split("\n")[0] if ch.isdigit())
-        assert len(code) == 4                                                      # the code is on the person's screen
-        waiting = (await su.ok("enroll.list"))["requests"]
-        assert len(waiting) == 1 and not cfg.client_id                              # on probation, with no key yet
-        await su.ok("enroll.confirm", {"enrollment_id": waiting[0]["id"], "code": code})
-        await asyncio.wait_for(task, 20)
-        assert cfg.client_id and cfg.client_key                                     # handed once
-        saved = WorkerConfig.load(cfg.path)
-        assert saved.client_id == cfg.client_id and saved.client_key == cfg.client_key and shown[-1] == "closed"
-    finally:
-        stop.set()
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-
-
 async def test_stopping_a_service_that_is_waiting_on_probation_ends_it_cleanly(engine, org, tmp_path, monkeypatch):
     from worker_client import winservice
     from worker_client.config import WorkerConfig
@@ -287,25 +241,3 @@ async def test_only_a_waiting_request_can_be_taken_back_and_only_with_its_token(
             await machine.call("enroll.cancel", {"token": got["token"]})
     finally:
         await machine.close()
-
-
-async def test_a_machine_installed_while_the_engine_is_off_keeps_asking_until_it_answers(tmp_path, monkeypatch):
-    """Found installing setup.exe for real (14 Nov 2026): the first refused connection ended the service, and Windows gave up after three restarts."""
-    from worker_client import enroll as enroll_mod
-    from worker_client import winservice
-    from worker_client.config import WorkerConfig
-
-    monkeypatch.setattr(winservice, "UNREACHABLE_AGAIN", (0.01,))
-    cfg = WorkerConfig(windows=False, engine_host="127.0.0.1", engine_port=1, tls=False, path=tmp_path / "worker.json")
-    tries: list[int] = []
-
-    async def enroll(c, **kw):
-        tries.append(1)
-        if len(tries) < 3:
-            raise ConnectionRefusedError(1225, "The remote computer refused the network connection")
-        c.client_id, c.client_key = "cid-new", "00" * 32
-        return {}
-
-    monkeypatch.setattr(enroll_mod, "enroll", enroll)
-    await asyncio.wait_for(winservice._wait_to_be_registered(cfg, asyncio.Event()), 10)
-    assert len(tries) == 3 and cfg.client_id == "cid-new"

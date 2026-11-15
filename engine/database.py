@@ -1564,6 +1564,22 @@ class SeatsRepo(_Repo):
     async def grants(self) -> list[dict[str, Any]]:
         return await self._fetch("SELECT id, grant_id, role, seats, valid_from, valid_until, envelope, received_at FROM seat_grants ORDER BY valid_until")
 
+    async def last_role(self, pc_id: int) -> str | None:
+        """What the machine's latest seat was (admin or worker), in use or taken back."""
+        return await self._val("SELECT role FROM seats WHERE pc_id = $1 ORDER BY given_at DESC, id DESC LIMIT 1", pc_id)
+
+    async def use_claim(self, claim_id: str, member_email: str, knock_id: int, envelope: dict[str, Any]) -> bool:
+        """An Admin claim is good once: False if it was used before (migration 057)."""
+        return await self._val(
+            "INSERT INTO admin_claims (claim_id, member_email, knock_id, envelope) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (claim_id) DO NOTHING RETURNING true", claim_id, member_email, knock_id, envelope) is True
+
+    async def claim_used(self, claim_id: str) -> bool:
+        return bool(await self._val("SELECT true FROM admin_claims WHERE claim_id = $1", claim_id))
+
+    async def claim_seated(self, claim_id: str, pc_id: int) -> None:
+        await self._exec("UPDATE admin_claims SET pc_id = $2 WHERE claim_id = $1", claim_id, pc_id)
+
 
 class EnrollmentsRepo(_Repo):
     """Machines asking to be registered (migration 019). Requests, never grants."""
