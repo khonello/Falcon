@@ -104,6 +104,21 @@ OAuth 2.0 authorization code with PKCE (RFC 7636), loopback redirect (RFC 8252),
   Engine (the purchase names it; a company with one Engine has it chosen for it). The webhook's signature is checked with Paddle's secret.
 - Before relying on Paddle: confirm with Paddle that it pays out to Ghana (bank transfer or Payoneer in USD) and accepts the product.
 
+### Periods and prices (the user, 15 Nov 2026)
+
+The period is the store's business alone: the Engine reads `valid_from` / `valid_until` and enforces whatever they say. Nothing about years
+goes into the Engine, so a trial or a two-year deal needs no Engine change.
+
+- **Renewal is yearly.** A purchase and a renewal each make a one-year grant. (A lapse takes seats back after 7 days' grace, so the fewer
+  renewals a company has, the fewer chances to cut its PCs off.)
+- **Seats bought mid-year end with the main grant.** A top-up's `valid_until` is the company's current grant's end for that kind, charged
+  pro rata for the months left (Paddle's proration), so a company keeps one renewal date instead of a scatter of them.
+- **Admin and Worker seats are priced separately.** A company always needs one Admin seat; including it in every purchase is proposed.
+- **A trial is just a short grant** (14 days, say): the grace and take-back rules end it with no special code.
+- Monthly billing, if it is ever offered, is a second Paddle price, at about 20% more; the grant format is the same.
+- **Not settled yet:** the prices, the minimum seats, the volume tiers, a setup fee, the currency and first market. Proposed in discussion:
+  Worker about $40 a year per machine, Admin about $400, a 10-Worker-seat minimum. Ask the user before fixing any of them.
+
 ## 5. What Falcon does with all this
 
 - Checks every signature itself, with the keys built into it, with no internet.
