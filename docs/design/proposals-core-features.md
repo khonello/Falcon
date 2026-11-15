@@ -19,8 +19,8 @@ Task and Flow still gain: both follow a renamed file through the file identity (
 | 3 | Detective | A loose snapshot of the machine and its changes | System-drive percent in Automation; process snapshots | Medium |
 | 4 | Detective | Usual and unusual: habits, learned and taught | Fixed weights; a reviewer's "this is fine" (program / folder / drive) | Large; start narrow |
 
-**Order:** Windows' places (2) -> the snapshot (3) -> the exact file identity (1, links 1-4) -> narrow habits (4) -> "probably the
-same file" (1, link 5). 2 is small and the rest of Detective uses it. 3 needs no learning, so it is worth more for its cost than 4.
+**Order:** Windows' places (2) -> the snapshot (3) -> the exact file identity (1, links 1-4) -> narrow habits (4) -> mostly the same
+content (1, link 5). 2 is small and the rest of Detective uses it. 3 needs no learning, so it is worth more for its cost than 4.
 The exact part of 1 is cheap and solid; its scoring part is the hard part and comes last.
 
 ---
@@ -50,23 +50,36 @@ identity helps Task, Flow and Detective as much as Protected (see "Beyond Protec
      name, replaced within a few seconds -> the same lineage. Windows keeps the created time across this swap, which confirms it.
      The window is clamped.
   4. *Same hash* elsewhere -> a **copy**: a new lineage with `copy_of` the first.
-  5. *Probably the same*: a new file on another drive or machine whose content is mostly that of a known lineage's latest version
-     (edited, then carried out). This one is **scored**, never taken as a fact, and built last.
+  5. *Mostly the same content*: a new file on another drive or machine whose content is mostly that of a restricted lineage's latest
+     version (edited, then carried out). Decided by one fixed rule, below, and built last.
 - **How "mostly the same content" is measured.** Hashing a file in fixed blocks does not work for the files that matter most: a `.docx`
   or `.xlsx` is a zip, so one changed cell changes the compressed bytes all through the file, and a fixed block boundary shifts with
   every insertion. So, by kind (all stdlib, done by the Worker when the machine is idle, hot first):
-  - *Office files* (`.docx`, `.xlsx`, `.pptx` and their kin): open the zip (`zipfile`) and hash each part inside it. An edit usually
-    changes one part (`word/document.xml`, one sheet); the pictures, styles and other sheets stay the same. The score is the share of
-    parts, by size, that match.
-  - *Text, CSV, code*: cut the file where a rolling hash of its content says (content-defined chunks, about 8 KB each), so an insertion
-    moves only the chunks around it. The score is the share of chunks that match.
+  - *Office files* (`.docx`, `.xlsx`, `.pptx` and their kin): open the zip (`zipfile`) and take only the parts that hold what was
+    written (`word/document.xml`, each sheet, each slide, shared strings). Pictures, styles, themes and properties are left out: every
+    letter on the company's letterhead shares its logo and styles, and counting them would make every such letter "mostly the same".
+    From those parts only the **text** is kept (the tags stripped): Word rewrites its XML on every save (revision ids on every
+    paragraph, runs split and joined), so the raw XML of an unchanged sentence differs from one save to the next. The text is cut into
+    chunks as below.
+  - *Text, CSV, code, and the Office content parts*: cut where a rolling hash of the content says (content-defined chunks, about 2 KB
+    each), so an insertion moves only the chunks around it.
   - *PDF, pictures, archives*: whole hash only at first; a PDF compresses its content, so it is no better off than a zip without
     opening its streams.
-- **Propose, never silently resolve** (question 1). A link of kind 5 is a **suggestion**: "This looks like `budget-2026.xlsx`
-  (restricted), edited: 87% of its content is the same." A restricted status is never put on a file by a suggestion alone; an Admin
-  says yes. Detective may *weigh* a suggestion (it already weighs, never decides).
-- Weaker attributes, which only add to a score: the document's own properties (Office's author, title, created, read from
-  `docProps/core.xml`), the folder it came from, its name.
+- **Decided, not suggested (the user, 15 Nov 2026).** If the system cannot be sure, an Admin looking at "87% the same" is no better
+  placed, so there is no suggestion to answer. The rule: **a new file that holds 70% or more of a restricted file's content chunks is a
+  copy of restricted content**, and is treated like any copy of it today (the same-hash rule, applied at once). It is recorded with
+  its reason ("holds 87% of the text of `budget-2026.xlsx`"), and shown in the file's journey. An Admin can let it stay with the
+  allowance that exists today, as for any copy. Below 70%, it is a file of its own. Detective weighs either way, as it does today.
+- **Text every document shares does not count.** A contract made from the same template as a restricted master contract shares most
+  of its text with it, and is not a copy of it. So a chunk that also appears in files that are not restricted (the template's
+  standard clauses, a letterhead's address block) is left out of the 70%; only text that is the restricted file's own counts. This
+  needs the chunk hashes of ordinary documents too (hashes only, never text), counted per chunk.
+- Too small to judge: a restricted file under about 10 chunks (20 KB of text) is followed by its hash only, since one edit to it would
+  move the share by more than 10%.
+- Restricted content only: a file is never compared with every file in the index, only with restricted lineages (and those in an open
+  Detective case), through one table from chunk hash to lineage.
+- **Not tested for real yet:** there is no Office on the dev machine. The rule needs real Word, Excel and PowerPoint files, edited and
+  saved by the real programs, on the VM plan.
 
 **Beyond Protected.**
 - **Task**: "report.docx must be in Shared\Finance" is still met when the person renames it there, or the Admin is told it was
@@ -76,8 +89,8 @@ identity helps Task, Flow and Detective as much as Protected (see "Beyond Protec
   edited, then on a USB drive").
 - **The journey**: one unbroken line from first seen to today, through edits.
 
-**Worst case, clamped.** A lineage keeps its last 50 versions and every place; part and chunk hashes only for files under 200 MB; a
-suggestion is looked for only for files that are restricted or have a Detective case.
+**Worst case, clamped.** A lineage keeps its last 50 versions and every place; chunk hashes only for files under 200 MB; chunks are
+kept only for restricted lineages, so the comparison grows with what is restricted, not with the index.
 
 ---
 
@@ -111,8 +124,11 @@ another drive, is not seen.
 events alone miss. Storage dropping sharply may be a clean-up or sabotage, and the same holds in other areas. Some changes matter
 whoever made them, so this needs no learning at all: yesterday against today.
 
-**Today.** Automation has a threshold on the system drive's percentage; the Worker sends process lists. Nothing compares the machine
-with itself over time.
+**Today.** Nothing compares the machine with itself over time.
+
+**Detective's alone (the user, 15 Nov 2026).** The snapshot is part of Detective, inside it. No page shows it, Automation does not read
+it, and an Admin never sees it as such: only a finding it led to, as evidence in a case ("Documents is 38 GB smaller than this
+morning").
 
 **Proposed shape.**
 - **What the snapshot holds** (cheap, all Windows-native, read when the machine is idle; stops the instant someone types). The Worker
@@ -124,8 +140,6 @@ with itself over time.
   - printers and USB devices known; the size of the event logs.
 - **Every 6 hours and at connect**, plus when a big event batch arrives. The Engine keeps the latest snapshot and a diff per day for 90
   days (the retention clock).
-- **One machine state for Detective and Automation.** Automation's disk threshold reads the same record, and gains new events for rules
-  on the same spine: "a new local Administrator", "Defender off", "a drive below 10% free".
 - **A sudden change becomes a signal**, and like every signal it is read several ways:
   - storage down 40 GB: in the Recycle Bin, Temp or Windows Update's folder -> a clean-up (quiet); in Documents or a share, by hand,
     after gathering -> sabotage or erasure (raised);
@@ -135,7 +149,8 @@ with itself over time.
   were missed. The index sweep is started for that folder. This is "proactive first, reactive second".
 
 **Worst case, clamped.** A snapshot is at most a few hundred KB; the place sizes come from the index where it has them, a walk only
-where it does not; a machine that is always busy gets its snapshot at connect only, and the page says how old it is.
+where it does not; a machine that is always busy gets its snapshot at connect only, and a finding says how old the snapshot it
+compared with was.
 
 ---
 
@@ -186,13 +201,11 @@ customer's setup or terms.
 
 ## Placement
 
-**Version 1, all of it (the user, 15 Nov 2026).** Each lands as Engine handler + TUI command first, then the concept, then the QML
-(the TUI is the scripted test surface). Engine work and UI work stay in separate sessions. When this branch is merged, `PHASES.md` and
-`START-HERE.md` get these items (question 2 says where).
+**Version 1, all of it (the user, 15 Nov 2026).** The packaging work will be redone (the user, 15 Nov 2026), so this work neither
+waits on it nor fits around it. Each lands as Engine handler + TUI command first, then the concept, then the QML (the TUI is the
+scripted test surface); the snapshot has no page of its own. Engine work and UI work stay in separate sessions. When this branch is
+merged, `PHASES.md` and `START-HERE.md` get these items.
 
 ## Questions for the user
 
-1. **"Probably the same file"** (edited, then carried away): a suggestion an Admin confirms before it is treated as restricted
-   (recommended), or applied at once above a score?
-2. **Before or after packaging?** Phase 9 is the blocker for a sale. These can be built (a) before it, so the installers carry them
-   from the first build, or (b) beside it, the Engine session on these while the packaging work goes on.
+None waiting (15 Nov 2026).
