@@ -644,6 +644,8 @@ summary, what would make it innocent, why the weight is what it is, the things (
 drive has been seen on a machine). `file_events.detail` (JSONB) says which attributes an `attrib` change was (hidden, system, read-only, before and after).
 `detective_rules` (migration 037: a reviewer's "this is fine" written down: graph, program/folder/drive, the machine, who and when, and
 when it was taken back; it only lowers a matching finding).
+`machine_snapshots` (migration 060, 15 Nov 2026: each machine's last loose picture, one row per machine replaced by the next, for Detective alone;
+what changed between two pictures becomes Detective evidence; `docs/design/proposals-core-features.md` item 3).
 Design: `docs/design/detective.md`.
 
 ## 15. Flows and restricted material (migration 038)

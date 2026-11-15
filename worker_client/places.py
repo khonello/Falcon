@@ -40,7 +40,7 @@ PEOPLE = ("S-1-5-21-", "S-1-12-1-")         # a local or domain account; an Entr
 class Registry(Protocol):
     """What is read. `root` is "HKLM" or "HKU"; a missing key reads as nothing. Faked in the tests."""
 
-    def values(self, root: str, key: str) -> dict[str, str]: ...
+    def values(self, root: str, key: str) -> dict[str, Any]: ...
 
     def subkeys(self, root: str, key: str) -> list[str]: ...
 
@@ -52,7 +52,7 @@ class WinRegistry:
         self._w = winreg
         self._roots = {"HKLM": winreg.HKEY_LOCAL_MACHINE, "HKU": winreg.HKEY_USERS}
 
-    def values(self, root: str, key: str) -> dict[str, str]:
+    def values(self, root: str, key: str) -> dict[str, Any]:
         w, out = self._w, {}
         try:
             with w.OpenKey(self._roots[root], key) as k:
@@ -62,7 +62,7 @@ class WinRegistry:
                         name, value, _kind = w.EnumValue(k, i)
                     except OSError:
                         break
-                    if isinstance(value, str):
+                    if isinstance(value, (str, int, list)):          # text, a number, or a list of texts (REG_MULTI_SZ)
                         out[name] = value
                     i += 1
         except OSError:
@@ -99,7 +99,7 @@ def _join(base: str, rest: str) -> str:
 
 
 def _take(found: dict[str, str], env: dict[str, str], kind: str, value: str) -> None:
-    path = expand(value, env) if value else ""
+    path = expand(value, env) if value and isinstance(value, str) else ""
     if path and "%" not in path:                          # a name that could not be expanded: the usual place stands in, marked guessed
         found[kind] = path
 

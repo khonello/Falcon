@@ -38,6 +38,7 @@ from common.detective import (
 )
 from engine import places
 from engine.detective import labels, telling
+from engine.detective import snapshot as _snapshot  # noqa: F401  (registers detective.snapshot)
 from engine.detective.brain import CaseView, UpdateView, view_of
 from engine.detective.host import LocalMatcher, MatcherGone, ProcessMatcher
 from engine.dispatch import Context as HandlerContext
@@ -678,4 +679,12 @@ async def overview(ctx: HandlerContext, payload: dict[str, Any]) -> dict[str, An
     return {"by_level": by_level, "by_intent": by_intent, "reviewed": sum(c["n"] for c in counts if c["status"] != "open")}
 
 
-__all__ = ["case", "cases", "install", "name_of", "on_file", "on_signal", "overview", "reset_state", "review", "rule_revoke", "rules"]
+async def feed_signal(engine: Engine, sig: Sig) -> None:
+    """A signal from elsewhere in the Engine (the machine snapshot, engine/detective/snapshot.py), fed like any other when Detective is on."""
+    if not getattr(engine.settings, "detective", True) or not engine.db.connected:
+        return
+    await _ensure(engine)
+    await _feed(engine, sig)
+
+
+__all__ = ["case", "cases", "feed_signal", "install", "name_of", "on_file", "on_signal", "overview", "reset_state", "review", "rule_revoke", "rules"]

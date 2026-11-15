@@ -48,7 +48,7 @@ ANCHORS: dict[str, tuple[Anchor, ...]] = {
         Anchor("Remove", "something was deleted"),
         Anchor("Alter", "something was changed after the fact"),
         Anchor("Clear the trail", "the record of what happened was cleared"),
-        Anchor("Switch off the record", "the thing that records was stopped", seen=False),
+        Anchor("Switch off the record", "the thing that records was stopped, or its record was emptied"),        # (the machine snapshot: an event log that shrank)
     ),
     "capture": (
         Anchor("Open the source", "restricted material was in front of the person"),
@@ -59,7 +59,7 @@ ANCHORS: dict[str, tuple[Anchor, ...]] = {
     "evasion": (
         Anchor("Test", "the watch was probed", seen=False),
         Anchor("Switch off", "the watch was stopped, or the machine went quiet"),
-        Anchor("Dodge", "the work was moved where it is not watched", seen=False),
+        Anchor("Dodge", "something was set to run by itself, when nobody watches (at sign-in, as a service, on a schedule)"),   # (the machine snapshot)
     ),
     "sabotage": (
         Anchor("Reach", "something that matters was touched"),
@@ -71,6 +71,7 @@ ANCHORS: dict[str, tuple[Anchor, ...]] = {
         Anchor("Beyond role", "more files outside this person's work were opened"),
         Anchor("Widen", "it spread over several places"),
         Anchor("Return", "it happened again, another day"),
+        Anchor("Raise", "more power on the machine was taken: an administrator or an account added"),                  # (the machine snapshot)
     ),
 }
 

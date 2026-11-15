@@ -67,7 +67,26 @@ USUAL_MOVERS = ("git.exe", "msbuild", "nuget", "npm", "docker", "curl.exe", "sla
                 "teams", "zoom")
 
 
-HIT_KEEP = 30 * 86400                         # how long what fell in an area stays on the board: a patient person covers it slowly
+# What the machine snapshot found changed between two pictures (engine/detective/snapshot.py; Sig verb "system"): the area each falls in and its weight.
+# Each is light alone (none reaches "noted" by itself but a new administrator); what it adds to is the rest of the case. A snapshot is taken every six hours,
+# so a change is placed at the picture that showed it, not at the moment it was made.
+SYSTEM_CHANGES: dict[str, tuple[str, str, float]] = {
+    "admin_added": ("reach", "Raise", 0.35),            # someone was made an administrator of the machine
+    "account_added": ("reach", "Raise", 0.15),          # a new local account
+    "starts_by_itself": ("evasion", "Dodge", 0.12),     # something new runs at sign-in
+    "service_added": ("evasion", "Dodge", 0.12),        # a new service that starts by itself
+    "task_added": ("evasion", "Dodge", 0.10),           # a new scheduled task
+    "protection_off": ("evasion", "Switch off", 0.35),  # Defender's real-time protection was turned off
+    "firewall_off": ("evasion", "Switch off", 0.25),    # the firewall was turned off for a profile
+    "log_shrank": ("erasure", "Switch off the record", 0.35),   # an event log is much smaller than it was: emptied
+    "wiper_installed": ("erasure", "Clear the trail", 0.12),    # a program that destroys files beyond recovery
+    "encryptor_installed": ("concealment", "Protect", 0.10),    # a program that locks files away
+    "share_added": ("exfiltration", "Transfer", 0.12),  # a folder was shared on the network
+    "documents_shrank": ("sabotage", "Destroy", 0.20),  # a person's own places hold far less than before (scaled by how much)
+    "filled_up": ("collection", "Assemble", 0.10),      # a person's own places hold far more than before
+}
+
+HIT_KEEP = 30 * 86400                        # how long what fell in an area stays on the board: a patient person covers it slowly
 HIT_CAP = 4000                                # the most a machine's board holds after a trim ...
 HIT_BATCH = 500                               # ... which is done once it has this many more (or an hour past HIT_KEEP), not on every event: a trim rebuilds the board
 HIT_SLACK = 3600
@@ -201,7 +220,8 @@ class Sig:
                 "detached": f"removed a drive ({self.device})", "uploaded": f"sent {megabytes(self.info.get('bytes'))} out over the network ({self.program or 'a program'})", "launched": f"started {self.program}", "exited": f"closed {self.program}",
                 "captured": ("took a picture of the whole screen" if self.info.get("kind") == "screen" else "put a picture on the clipboard" if self.info.get("kind") == "region"
                              else f"captured the screen ({self.program or 'a tool'})") + (f" ({self.program})" if self.info.get("kind") and self.program else ""), "cleared": f"cleared {self.info.get('what') or 'a history'}",
-                "silent": "stopped reporting while still switched on"}.get(self.verb, f"{self.verb} {n}")
+                "silent": "stopped reporting while still switched on",
+                "system": str(self.info.get("words") or "the machine changed")}.get(self.verb, f"{self.verb} {n}")
 
 
 def where(s: Sig, old: bool = False) -> Place | None:
@@ -1150,6 +1170,11 @@ class Detective:
             add("capture", "Keep", 0.12)
         if v == "silent":
             add("evasion", "Switch off", 0.10)                             # alone it is a laptop lid; beside anything else it is not (see _went_silent)
+        if v == "system" and str(s.info.get("change")) in SYSTEM_CHANGES:
+            behaviour, area, w = SYSTEM_CHANGES[str(s.info["change"])]
+            if s.info.get("falcon_ran"):
+                w *= 0.5                                                   # Falcon's own actions ran on the machine in that stretch: it may be theirs
+            add(behaviour, area, w * float(s.info.get("scale") or 1.0))
         if v == "opened":
             add("collection", "Access", 0.03 + worth)
             if "outside_role" in s.tags:

@@ -196,6 +196,22 @@ morning").
 where it does not; a machine that is always busy gets its snapshot at connect only, and a finding says how old the snapshot it
 compared with was.
 
+**Built (15 Nov 2026).** `worker_client/machine_snapshot.py` takes the picture (two minutes after connecting, then every six hours);
+`engine/detective/snapshot.py` (`detective.snapshot`) compares it with the last one, kept in `machine_snapshots` (migration 060, one row per
+machine), and feeds each change to Detective as a signal weighed by `common.detective.SYSTEM_CHANGES`; Reach gained the area **Raise**, and
+Evasion's **Dodge** and Erasure's **Switch off the record** are now seen. Tried on the dev machine: 17 KB, every section read. As built:
+- **A person's own places are summed from the watcher's own record** (`index-state.db`), not walked: a real Documents of 151,000 files ran
+  out a 30-second walk. Only Temp, the Recycle Bin, Windows Update's downloads and a place outside the watched folders are walked.
+- **Only what both pictures have is compared**, and a place measured partly says nothing; the first picture is the baseline.
+- **Falcon's own actions** in the same stretch halve what a change weighs, since it may be theirs; Falcon's own service, program and tasks are
+  left out of the picture.
+- **Weights are light**: only a new administrator, Defender turned off or an emptied event log come near "noted" alone; the rest add to a case.
+- **Not in it yet**: BitLocker (no reliable way without WMI or a localised command's output), printers, and the USB devices (the drive
+  watch already reports each drive as it is plugged in). **Healing** (a place that shrank with no deletes heard starts a sweep of it) is not
+  built: the watcher already reconciles on its own timer, so missed events are found anyway, only later.
+- **Six-hour resolution**: a change is placed at the picture that showed it, so it joins a case by the machine and the stretch of days, not by
+  the half hour.
+
 ---
 
 ## 4. Detective: usual and unusual, learned and taught

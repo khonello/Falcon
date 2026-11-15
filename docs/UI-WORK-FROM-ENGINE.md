@@ -236,3 +236,15 @@ All in `test_operator_gui.py`, all in the QML: fix the page, or the test if the 
 ### My machine (built 2 Nov 2026)
 - The view's `machine`: `{name, address, windows, falcon, connected, engine, account, signed_in_at, restarted_at, storage: {total_gb, free_gb,
   used_percent}}` -- what "Copy these details" copies.
+
+## From the proposals branch (15 Nov 2026; `docs/design/proposals-core-features.md`)
+
+### Detective's board has one more area, and two areas now light up
+- **Reach** has a fifth area, **Raise** ("more power on the machine was taken: an administrator or an account added"). The board's areas come
+  from the Engine (`common/anchors.py`), so the page gets it by itself; the Admin concept's Detective board draws four Reach areas and should
+  draw five.
+- **Evasion / Dodge** ("something was set to run by itself") and **Erasure / Switch off the record** were drawn as never seen (`seen: false`);
+  the machine snapshot sees them now, so they are drawn like any other area.
+- A case's story can now hold lines from the machine snapshot ("PC\ama was made an administrator of the machine", "Defender's real-time
+  protection was turned off", "ama's Documents holds 10.0 GB less than it did"). They are ordinary story lines: nothing new to draw. The
+  snapshot itself has no page and must not get one (the user, 15 Nov 2026).

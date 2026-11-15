@@ -329,6 +329,7 @@ ENTRIES: dict[str, tuple[str, str, S]] = {
     "auth.failed": ("system", "worth", lambda w: "Refused a connection without a valid key" + (f" ({_q(w.d['reason'], 40)})" if w.d.get("reason") else "")),
     "index.caught_up": ("system", "routine", lambda w: f"{w.host or 'A machine'} told Falcon about {_n(w.d.get('events'), 'file change')} it had missed"),
     "index.swept": ("system", "routine", lambda w: f"{w.host or 'A machine'} looked through its folders"),
+    "index.places": ("system", "routine", lambda w: f"{w.host or 'A machine'} said where {_n(w.d.get('people'), 'person', 'people')}'s own folders are"),
     "component.unhealthy": ("system", "worth", lambda w: f"{str(w.d.get('component') or 'A part of Falcon').replace('_', ' ').capitalize()} stopped working{w.on}"),
     "llm.fallback": ("system", "done", lambda w: "Asked Groq a question the local model could not answer"),
     "update.approved": ("rollout", "done", lambda w: f"Approved version {w.d.get('version') or ''}".rstrip()),

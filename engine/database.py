@@ -3243,6 +3243,20 @@ class DetectiveRepo(_Repo):
     async def findings(self, case_id: int) -> list[dict[str, Any]]:
         return await self._fetch("SELECT * FROM detective_findings WHERE case_id = $1 ORDER BY at, id", case_id)
 
+    # --- the machine's last picture (engine/detective/snapshot.py) ---
+
+    async def snapshot(self, pc_id: int) -> dict[str, Any] | None:
+        return await self._one("SELECT pc_id, taken_at, received_at, data FROM machine_snapshots WHERE pc_id = $1", pc_id)
+
+    async def put_snapshot(self, pc_id: int, taken_at: datetime, data: dict[str, Any]) -> None:
+        await self._exec(
+            "INSERT INTO machine_snapshots (pc_id, taken_at, data) VALUES ($1, $2, $3) ON CONFLICT (pc_id) DO UPDATE SET "
+            "taken_at = excluded.taken_at, received_at = now(), data = excluded.data", pc_id, taken_at, data)
+
+    async def falcon_ran(self, pc_id: int, since: datetime) -> int:
+        """How many of Falcon's own actions ran on the machine since then: a change in the same stretch may be Falcon's own doing."""
+        return int(await self._val("SELECT count(*) FROM action_executions WHERE target_pc_id = $1 AND started_at >= $2", pc_id, since) or 0)
+
     async def cases(self, *, department_id: int | None = None, levels: list[str] | None = None, status: str | None = None,
                     exclude_pc_types: list[str] | None = None, only_pc_types: list[str] | None = None, limit: int = 200) -> list[dict[str, Any]]:
         return await self._fetch(
