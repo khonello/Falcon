@@ -1,7 +1,23 @@
 # Parking Falcon
 
 Decided by the user, 15 Nov 2026: Falcon is brought to a gentle stop and parked. Work moves to a new product, forked from it, in its own
-repository: Detective as the umbrella, with Restricted under it.
+repository. ~~Detective as the umbrella, with Restricted under it.~~
+
+**Changed by the user, later on 15 Nov 2026: one product, not two features.** Detective and Restricted are not separate features or pages.
+To the IT Admin they are one job ("is anything we care about at risk, and what happened to it?"), and the Engine already treats them as one
+(one event stream, one file index; a mark is a fact that raises the stakes of what happens to a file). What was the split becomes two
+moments of the same product:
+- **Setting up, now and then:** telling it what matters (marking files and folders restricted), done where the file is met: from a case,
+  from a machine's files, or one small "what matters" list. A setting, not a destination.
+- **Every day:** it tells what happened, as cases told in words, in one main view. Cases about marked content come first and weigh more;
+  the restricted tag sits in the case itself. Containment (the ladder an Admin switches on knowingly) is a choice on a case, plus one
+  setting for how far it may go.
+- No "Detective" or "Restricted" in the navigation: "restricted" survives as the tag on a file, "case" as what is opened. If a large
+  company wants one person to set up what matters and another to handle cases, that is permissions inside the one product.
+- The product's name is being chosen (not Detective): it names the whole thing, with no umbrella and features under it.
+
+The proposal document ("The new product: Detective, with Restricted under it", claude.ai/artifact/FuDY3bpPRvB6HRxc5Ai9Tj) still says
+the old shape: update it from a session that has the Claude Docs connector.
 
 Each session working here writes one line below when it reaches a safe stopping point: its current piece finished, tested and committed,
 nothing half-done in the working tree, no test run of its own still going. Start nothing new.
