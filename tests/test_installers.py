@@ -225,17 +225,28 @@ def company_file(path: Path, cert_pem: str, names: tuple[str, ...] = ("falcon.in
     return path
 
 
+def claim_file(path: Path, engine_id: str = "e_1", minutes: int = 10) -> Path:
+    """An Admin claim for this PC, as the store issues it after the Admin setup's sign-in, signed with the test key."""
+    import socket
+    import time
+
+    from common.machine import hardware_id
+    from scripts.store_stub import now_iso, sign
+
+    path.write_text(json.dumps(sign({"kind": "admin_claim", "claim_id": f"a_{time.time_ns()}", "company_id": "c_1", "engine_id": engine_id,
+                                     "member_email": "kofi@acme.test", "hostname": socket.gethostname(), "hardware_id": hardware_id(),
+                                     "issued_at": now_iso(), "expires_at": now_iso(minutes * 60)})), encoding="utf-8")
+    return path
+
+
 def win_args(role: str, tmp_path: Path, *extra: str) -> tuple[win_install.WindowsInstall, Path]:
     payload = built(role, tmp_path)
     cert_dir = tmp_path / "certs"
     pem = make_cert(cert_dir)
-    if role == "worker":                                                   # a Worker setup is told where its Engine is by the company file
-        bundle_path = company_file(tmp_path / "acme.falcon", pem)
-        where = ["--company", str(bundle_path)]
-    else:
-        bundle_path = tmp_path / "falcon-client.json"
-        bundle_mod.Bundle.make("falcon.internal", 7400, pem).save(bundle_path)
-        where = ["--bundle", str(bundle_path)]
+    bundle_path = company_file(tmp_path / "acme.falcon", pem)             # where the Engine is: the company file (a Worker's setup has it beside
+    where = ["--company", str(bundle_path)]                                # it; an Admin's sign-in gives it, with the PC's claim)
+    if role == "admin":
+        where += ["--claim", str(claim_file(tmp_path / "admin-claim.json"))]
     argv = ["--role", role, *where, "--source", str(payload), "--target", str(tmp_path / "Program Files" / "Falcon"),
             "--data", str(tmp_path / "ProgramData" / "Falcon"), "--python", sys.executable, "--reuse-python", "--no-acl", "--no-shortcuts",
             "--no-service", "--no-windows", *extra]
@@ -244,12 +255,12 @@ def win_args(role: str, tmp_path: Path, *extra: str) -> tuple[win_install.Window
 
 @windows_only
 def test_a_worker_install_puts_the_code_the_address_and_the_machines_settings_in_place(tmp_path):
-    inst, _ = win_args("worker", tmp_path, "--department", "3")
+    inst, _ = win_args("worker", tmp_path)
     done = dict(inst.plan().run())
     assert "ready" in done["Check"] and done["Stop the old service"] == "nothing installed yet" or done["Stop the old service"].startswith("skipped")
     assert (inst.app / "worker_client" / "service.py").is_file() and not (inst.app / "operator_client").exists()
     cfg = json.loads(inst.worker_json.read_text(encoding="utf-8"))
-    assert (cfg["engine_host"], cfg["engine_port"], cfg["tls"], cfg["enroll_level"], cfg["enroll_department"]) == ("falcon.internal", 7400, True, "worker", 3)
+    assert (cfg["engine_host"], cfg["engine_port"], cfg["tls"]) == ("falcon.internal", 7400, True) and "admin_claim" not in cfg
     assert cfg["separate_programs"] is True and cfg["serve_console"] is False and cfg["client_id"] == "" and cfg["client_key"] == ""
     assert cfg["ca_cert"] == str(inst.cert) and inst.cert.read_text(encoding="utf-8").startswith("-----BEGIN CERTIFICATE")
     assert not (inst.data / "console.json").exists()                                           # a person's PC has no console
@@ -257,27 +268,14 @@ def test_a_worker_install_puts_the_code_the_address_and_the_machines_settings_in
 
 
 @windows_only
-def test_an_admin_workstation_asks_to_be_an_admin_and_its_console_is_signed_in_by_its_service(tmp_path):
+def test_an_admin_workstation_carries_its_claim_and_its_console_is_signed_in_by_its_service(tmp_path):
     inst, _ = win_args("admin", tmp_path)
     inst.plan().run()
     cfg = json.loads(inst.worker_json.read_text(encoding="utf-8"))
-    assert cfg["enroll_level"] == "admin" and cfg["serve_console"] is True
+    assert cfg["serve_console"] is True and Path(cfg["admin_claim"]) == inst.private / "admin-claim.json"
     console = json.loads((inst.data / "console.json").read_text(encoding="utf-8"))
     assert console["signer"] == "pipe" and console["engine_host"] == "falcon.internal" and "client_key" not in console
     assert (inst.app / "operator_client").is_dir() and (inst.app / "worker_client").is_dir()
-
-
-@windows_only
-def test_the_first_it_admins_console_gets_its_id_and_key_for_the_person_installing(tmp_path, monkeypatch):
-    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
-    key = tmp_path / "key.txt"
-    key.write_text("ab" * 32 + "\n", encoding="utf-8")
-    inst, _ = win_args("admin", tmp_path, "--client-id", "it-1", "--client-key-file", str(key))
-    done = dict(inst.plan().run())
-    assert "first IT Admin" in done["The console"] or "settings are in" in done["The console"]
-    mine = json.loads((tmp_path / "Roaming" / "Falcon" / "operator.json").read_text(encoding="utf-8"))
-    assert (mine["client_id"], mine["client_key"], mine["engine_host"], mine["tls"]) == ("it-1", "ab" * 32, "falcon.internal", True)
-    assert "client_key" not in json.loads((inst.data / "console.json").read_text(encoding="utf-8"))       # the key is not for everyone on the machine
 
 
 @windows_only
@@ -368,10 +366,11 @@ def test_the_command_line_installs_and_says_what_is_left_to_do(tmp_path, monkeyp
 
 @windows_only
 @requires_db
-async def test_an_installed_admin_workstation_registers_itself_and_its_console_is_signed_in_by_its_service(engine, org, connect, tmp_path):
-    """The whole route: the installer lays an Admin workstation down and installs its service; Windows starts it as the system account; with no key
-    it asks the Engine, it is confirmed with the code it logs, it is handed its key (kept where only the system and administrators can read
-    it) and comes online; and a console on the machine, with no key, is signed in by the service through the pipe. Removed afterwards."""
+async def test_an_installed_admin_workstation_comes_in_with_its_claim_and_its_console_is_signed_in_by_its_service(engine, org, connect, tmp_path):
+    """The whole route: the installer lays an Admin workstation down with the claim its sign-in left, and installs its service; Windows starts
+    it as the system account; with no key it knocks with the claim and is let in at once (no code, nobody confirms), is handed its key (kept
+    where only the system and administrators can read it) and comes online; and a console on the machine, with no key, is signed in by the
+    service through the pipe. Removed afterwards."""
     if not win_install.is_admin():
         pytest.skip("needs an elevated prompt")
     from common import signpipe
@@ -379,11 +378,18 @@ async def test_an_installed_admin_workstation_registers_itself_and_its_console_i
     from worker_client import winservice
 
     name = "FalconWorkerTestInstall"
+    engine.store.identity = {"store_url": "http://127.0.0.1:9", "engine_id": "e_1", "engine_token": "t"}   # registered: it takes claims
+    from engine.store import add_grants
+    from scripts.store_stub import now_iso, sign
+
+    seats = await engine.db.seats.in_use("admin") + 1                                         # one Admin seat free, as bought in the store
+    assert await add_grants(engine, [sign({"kind": "grant", "grant_id": "g_install", "company_id": "c_1", "engine_id": "e_1", "role": "admin",
+                                           "seats": seats, "valid_from": now_iso(-60), "valid_until": now_iso(30 * 86400), "paddle_ref": "sub_1",
+                                           "issued_at": now_iso()})]) == 1
     inst, _ = win_args("admin", tmp_path, "--service-name", name)
     inst.a.no_service = False
     inst.a.no_acl = False
     inst.a.no_start = True
-    su = await connect("cid-su")
     try:
         inst.plan().run()
         cfg = json.loads(inst.worker_json.read_text(encoding="utf-8"))
@@ -392,20 +398,6 @@ async def test_an_installed_admin_workstation_registers_itself_and_its_console_i
         acl = (await asyncio.to_thread(subprocess.run, ["icacls", str(inst.private)], capture_output=True, text=True, check=False)).stdout
         assert r"BUILTIN\Users" not in acl and "Everyone" not in acl and r"NT AUTHORITY\SYSTEM" in acl and r"BUILTIN\Administrators" in acl   # closed to people
         assert winservice.start(name).endswith("running")
-
-        log = inst.private / "worker.log"
-        code = None
-        for _ in range(150):
-            if log.exists():
-                found = re.findall(r"Code ((?:\d ?){4})", log.read_text(encoding="utf-8", errors="replace"))
-                if found:
-                    code = found[-1].replace(" ", "")
-                    break
-            await asyncio.sleep(0.2)
-        assert code and len(code) == 4, "the service did not ask to be registered"
-        waiting = (await su.ok("enroll.list"))["requests"]
-        assert len(waiting) == 1 and waiting[0]["requested_level"] == "admin"
-        await su.ok("enroll.confirm", {"enrollment_id": waiting[0]["id"], "code": code, "department_id": org["fin"]})
 
         for _ in range(150):
             saved = json.loads(inst.worker_json.read_text(encoding="utf-8"))
@@ -428,7 +420,8 @@ async def test_an_installed_admin_workstation_registers_itself_and_its_console_i
         assert signpipe.whoami() == saved["client_id"]
         console = EngineConnection("127.0.0.1", engine.port, client_id=saved["client_id"], tls=False, derived_key=None, signer=signpipe.sign)
         ident = await console.connect()
-        assert ident.role == "admin" and ident.department_id == org["fin"]
+        it = next(d["id"] for d in await engine.db.accounts.list_departments() if d["name"] == "IT")
+        assert ident.role == "admin" and ident.department_id == it                               # an Admin's PC that came with its claim goes in IT
         await console.close()
     finally:
         winservice.stop(name)
@@ -494,17 +487,6 @@ def test_the_setup_script_installs_python_with_the_program_and_runs_the_installe
     assert '--target ""{app}""' in iss and "WorkingDirectory" not in iss
 
 
-@windows_only
-def test_the_licence_code_goes_only_into_the_machines_private_settings(tmp_path):
-    code = tmp_path / "code.txt"
-    code.write_text("WRKR-5T8M-3Z6P-2222\n", encoding="utf-8")
-    inst, _ = win_args("worker", tmp_path, "--code-file", str(code))
-    inst.plan().run()
-    assert json.loads(inst.worker_json.read_text(encoding="utf-8"))["enroll_code"] == "WRKR-5T8M-3Z6P-2222"
-    public = [p for p in inst.data.rglob("*") if p.is_file() and p.parent != inst.private]
-    assert public and all("WRKR" not in p.read_text(encoding="utf-8", errors="ignore") for p in public)
-
-
 def test_a_shortcut_s_paths_are_written_into_its_script_so_a_space_in_start_menu_cannot_break_it():
     """Found installing setup.exe for real (13 Nov 2026): values given after -Command never reached $args."""
     import subprocess
@@ -545,14 +527,3 @@ def test_the_uninstall_stops_what_still_runs_from_the_program_and_not_itself(tmp
     finally:
         if running.poll() is None:
             running.kill()
-
-
-def test_the_first_it_admin_s_pc_is_given_the_engine_s_first_admin_file(tmp_path):
-    """Nobody can confirm the very first Admin's PC by its code, so its setup.exe takes the first-admin.txt the Engine's installer wrote (14 Nov 2026)."""
-    f = tmp_path / "first-admin.txt"
-    f.write_text("The first IT Admin (printed once by the installer; delete this file after it is safely held)\n"
-                 "client_id:  REi1I7KFNDPu3fEKj9UJbg\nclient_key: 04452777ebadd528a42946814f2d4846cb017bf81a3d35b5b5e51827712df84a\n", encoding="utf-8")
-    assert win_install.first_admin(f) == ("REi1I7KFNDPu3fEKj9UJbg", "04452777ebadd528a42946814f2d4846cb017bf81a3d35b5b5e51827712df84a")
-    f.write_text("not that file\n", encoding="utf-8")
-    with pytest.raises(InstallError):
-        win_install.first_admin(f)

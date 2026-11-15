@@ -16,8 +16,6 @@ from engine.hierarchy import (  # noqa: F401
     alerts,
     auditing,
     display_names,
-    enrollment,
-    licences,
     reports,
     seats,
     traversal,

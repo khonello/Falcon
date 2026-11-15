@@ -98,7 +98,7 @@ async def test_an_installed_service_with_no_key_knocks_shows_nothing_and_carries
 
     monkeypatch.setattr(spawn, "open_window", no_window)
     a1 = await connect("cid-a1")
-    cfg = WorkerConfig(windows=True, engine_host="127.0.0.1", engine_port=engine.port, tls=False, enroll_level="worker",
+    cfg = WorkerConfig(windows=True, engine_host="127.0.0.1", engine_port=engine.port, tls=False,
                        path=tmp_path / "private" / "worker.json")
     stop = asyncio.Event()
     task = asyncio.create_task(winservice._wait_to_be_registered(cfg, stop))

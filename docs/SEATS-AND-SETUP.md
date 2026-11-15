@@ -151,7 +151,7 @@ The Engine's certificate is valid for 10 years; renewal is rare, but a lapse wou
 | 5 | the Engine setup: the private PostgreSQL, then store registration (done 15 Nov 2026; PostgreSQL 18.3 binaries from EDB, drilled) | a yes for the PostgreSQL binaries download (~300 MB) |
 | 6 | certificate renewal (done 15 Nov 2026; `engine/certs.py`) | 2 |
 | 7 | the Machines page, handed to the design session (done 15 Nov 2026; docs/UI-WORK-FROM-ENGINE.md) | 2 |
-| 8 | the old joining code removed; docs; drills | 2–6 |
+| 8 | the old joining code removed; docs; drills (code and docs done 15 Nov 2026; drills: see section 12) | 2–6 |
 
 Outside this session: the store itself (the `store/` session, built to `docs/STORE-CONTRACT.md`); the Paddle account (the user); a
 code-signing certificate for the setups (to buy before shipping).

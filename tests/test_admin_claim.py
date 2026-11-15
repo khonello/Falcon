@@ -61,7 +61,7 @@ async def _registered(engine, store, admin_seats: int) -> dict:
 def _worker_cfg(engine, tmp_path, claim):
     from worker_client.config import WorkerConfig
 
-    return WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, tls=False, windows=False, enroll_level="admin", serve_console=True,
+    return WorkerConfig(engine_host="127.0.0.1", engine_port=engine.port, tls=False, windows=False, serve_console=True,
                         admin_claim=str(claim), path=tmp_path / "private" / "worker.json")
 
 

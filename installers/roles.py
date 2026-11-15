@@ -18,16 +18,15 @@ class Role:
     extras: tuple[str, ...]                # the pyproject.toml extras whose libraries the runtime needs
     service: bool = False
     console: bool = False
-    enroll_level: str | None = None        # what the machine asks to be registered as (None: it is given its key another way)
     serve_console: bool = False            # the console on this machine is signed in by the service (the key stays with the service)
     platform: str = "windows"
 
 
 ROLES: dict[str, Role] = {
     "worker": Role("worker", "A person's PC", ("common", "protocol", "worker_client"), ("worker", "worker-ui"),
-                   service=True, enroll_level="worker"),
+                   service=True),
     "admin": Role("admin", "An Admin's workstation", ("common", "protocol", "worker_client", "operator_client"),
-                  ("worker", "worker-ui", "tui", "gui"), service=True, console=True, enroll_level="admin",
+                  ("worker", "worker-ui", "tui", "gui"), service=True, console=True,
                   serve_console=True),
     "engine": Role("engine", "The Engine", ("common", "protocol", "engine"), ("engine",), platform="any"),          # Windows (setup.exe) or Linux (.deb)
 }

@@ -15,7 +15,7 @@ from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.completion import NestedCompleter
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.patch_stdout import patch_stdout
-from prompt_toolkit.shortcuts import input_dialog, message_dialog
+from prompt_toolkit.shortcuts import message_dialog
 from prompt_toolkit.styles import Style
 
 import operator_client.tui.commands  # noqa: F401  -- registers commands
@@ -68,25 +68,9 @@ def _toolbar(state: ClientState, tick: list[int]) -> FormattedText:
 
 
 async def _ask_setup(config: LocalConfig) -> bool:
-    """First run: the same questions as the console's modal, as dialogs in the middle of the terminal. Cancel leaves it not set up."""
-    error = ""
-    while True:
-        if error:
-            await message_dialog(title="Set up Falcon", text=error).run_async()
-        address = await input_dialog(title="Set up Falcon", text="The Engine's IP address").run_async()
-        if address is None:
-            return False
-        code = await input_dialog(title="Set up Falcon", text="The licence code").run_async()
-        if code is None:
-            return False
-        cert = ""
-        if firstrun.needs_certificate(config):
-            cert = await input_dialog(title="Set up Falcon", text="Where the Engine's certificate is on this machine (engine.crt)").run_async()
-            if cert is None:
-                return False
-        error = await firstrun.set_up(config, address, code, cert)
-        if not error:
-            return True
+    """First run: nothing joins from here (operator_client/core/firstrun.py); the person is told how this console is set up. Always False."""
+    await message_dialog(title="Set up Falcon", text=firstrun.SET_UP_BY_THE_SETUP).run_async()
+    return False
 
 
 async def run_app(config: LocalConfig, *, initial: list[str] | None = None) -> None:

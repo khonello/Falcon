@@ -110,6 +110,21 @@ Handlers, all built and tested (any Admin; the TUI has each one: `seats`, `knock
 **The Worker's own program**: a PC waiting for a seat shows "Waiting for a seat from your Admin" (tray or its window); no code, no button.
 The service already knocks by itself (`worker_client/knock.py`) and is in the moment it is given one.
 
+### GONE from the Engine, 15 Nov 2026 (step 8 of docs/SEATS-AND-SETUP.md): pages still calling them must change
+The old ways in are removed; these handlers now answer `unknown type`. Nothing is faked; each place below needs its new shape:
+- `enroll.list`, `enroll.confirm`, `enroll.refuse`, `enroll.request`, `enroll.wait`, `enroll.cancel`: **MachinesPage.qml** ("Asking to join",
+  with the code typed from the machine's screen) becomes **Waiting for a seat** (`knocks.list`, `seat.give`), above.
+- `licence.import`, `licence.list`, `licence.revoke`: the Licences place goes; the seat counters (`seats.summary`) replace it.
+- **The console's first run (SetupModal.qml, main.qml, bridge.py `setUp`)**: nothing joins from it any more. `firstrun.set_up` now answers
+  every attempt with one sentence, "This console is set up by the Admin setup (falcon-admin-setup.exe): it signs in to your company's
+  Falcon account and takes a free Admin seat. Run it on this PC." The modal should say that and drop its address, licence code and
+  certificate fields.
+- **The Worker's first run (Program.qml's setup modal)**: the same. `app_setup` answers with "This machine is set up by the Worker setup,
+  run with your company's file beside it (one zip, from the Machines page of your IT Admin's console). Ask your IT Admin for it." The
+  modal should say that, with no fields. A machine set up by its setup never shows it.
+- **Window.qml's join-code message** ("Registering this machine. Code 4 8 2 7 1 9"): never opened any more; it can go.
+- `scripts/preview_data.py`'s `enroll.list` sample: swap for `knocks.list` / `seats.summary` samples.
+
 ### Registry / Add a machine (built 2 Nov 2026)
 - **A machine with the console installed is let in as an Admin.** `enroll.confirm` by an IT Admin now accepts a request that asked to be an
   Admin's workstation (the admin installer asks so); the level always follows what the machine asked (`requested_level`). Where Registry's

@@ -144,8 +144,6 @@ class Database:
         self.tasks = TasksRepo(self)
         self.department_tasks = DepartmentTasksRepo(self)
         self.todos = TodosRepo(self)
-        self.enrollments = EnrollmentsRepo(self)
-        self.licences = LicencesRepo(self)
         self.seats = SeatsRepo(self)
         self.issues = IssuesRepo(self)
         self.marks = MarksRepo(self)
@@ -1434,52 +1432,6 @@ class IssuesRepo(_Repo):
             "resolution = $2 WHERE id = $1 AND state <> 'resolved' RETURNING id", issue_id, resolution, by_account_id) is not None
 
 
-class LicencesRepo(_Repo):
-    """Licence codes (migration 048): a machine joins with one at setup. Codes are only ever held as a hash."""
-
-    async def import_(self, name: str, reference: str | None, codes: list[dict[str, Any]], by_account_id: int | None) -> tuple[int, int, int]:
-        """(licence id, codes added, codes already known). A code already held (from this licence or another) is not added twice."""
-        async with self.pool.acquire() as conn, conn.transaction():
-            licence_id = await conn.fetchval("INSERT INTO licences (name, reference, imported_by_account_id) VALUES ($1, $2, $3) RETURNING id",
-                                             name, reference, by_account_id)
-            added = known = 0
-            for c in codes:
-                got = await conn.fetchval(
-                    "INSERT INTO licence_codes (licence_id, code_hash, last4, role, seats, department, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7) "
-                    "ON CONFLICT (code_hash) DO NOTHING RETURNING id",
-                    licence_id, c["code_hash"], c["last4"], c["role"], c["seats"], c.get("department"), c.get("expires_at"))
-                if got is None:
-                    known += 1
-                else:
-                    added += 1
-            return licence_id, added, known
-
-    async def by_hash(self, code_hash: str) -> dict[str, Any] | None:
-        return await self._one("SELECT * FROM licence_codes WHERE code_hash = $1", code_hash)
-
-    async def take_seat(self, code_id: int) -> bool:
-        """One seat of a code, if it still has one and is neither withdrawn nor past its date. Atomic: two machines cannot take the last one."""
-        return await self._val(
-            "UPDATE licence_codes SET used = used + 1 WHERE id = $1 AND used < seats AND revoked_at IS NULL "
-            "AND (expires_at IS NULL OR expires_at > now()) RETURNING id", code_id) is not None
-
-    async def give_back_seat(self, code_id: int) -> None:
-        await self._exec("UPDATE licence_codes SET used = greatest(used - 1, 0) WHERE id = $1", code_id)
-
-    async def list(self) -> list[dict[str, Any]]:
-        return await self._fetch(
-            "SELECT c.id, c.licence_id, l.name AS licence, l.reference, c.last4, c.role, c.seats, c.used, c.department, c.expires_at, c.revoked_at, "
-            "l.imported_at FROM licence_codes c JOIN licences l ON l.id = c.licence_id ORDER BY l.imported_at DESC, c.role, c.id")
-
-    async def revoke(self, code_id: int, by_account_id: int) -> bool:
-        return await self._val("UPDATE licence_codes SET revoked_at = now(), revoked_by_account_id = $2 WHERE id = $1 AND revoked_at IS NULL "
-                               "RETURNING id", code_id, by_account_id) is not None
-
-    async def joined_with(self, code_id: int) -> list[dict[str, Any]]:
-        """The machines that joined with a code: hostname, when, and the account made."""
-        return await self._fetch("SELECT e.hostname, e.decided_at, e.account_id, e.pc_id FROM enrollments e WHERE e.licence_code_id = $1 "
-                                 "AND e.status = 'confirmed' ORDER BY e.decided_at", code_id)
-
 
 class SeatsRepo(_Repo):
     """Knocks, seats and seat grants (migration 056; docs/SEATS-AND-SETUP.md). A seat is given and taken back, never deleted."""
@@ -1580,64 +1532,6 @@ class SeatsRepo(_Repo):
     async def claim_seated(self, claim_id: str, pc_id: int) -> None:
         await self._exec("UPDATE admin_claims SET pc_id = $2 WHERE claim_id = $1", claim_id, pc_id)
 
-
-class EnrollmentsRepo(_Repo):
-    """Machines asking to be registered (migration 019). Requests, never grants."""
-
-    async def create(self, code: str, token_hash: str, hostname: str, os_name: str | None, mac: str | None,
-                     department_id: int | None, level: str, peer: str | None, expires_at: datetime) -> int:
-        return await self._val(
-            "INSERT INTO enrollments (code, token_hash, hostname, os, mac, requested_department_id, requested_level, "
-            "peer, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
-            code, token_hash, hostname, os_name, mac, department_id, level, peer, expires_at)
-
-    async def get(self, enrollment_id: int) -> dict[str, Any] | None:
-        return await self._one(
-            "SELECT e.*, d.name AS requested_department_name FROM enrollments e "
-            "LEFT JOIN departments d ON d.id = e.requested_department_id WHERE e.id = $1", enrollment_id)
-
-    async def by_token(self, token_hash: str) -> dict[str, Any] | None:
-        return await self._one("SELECT * FROM enrollments WHERE token_hash = $1", token_hash)
-
-    async def pending(self, *, department_id: int | None = None) -> list[dict[str, Any]]:
-        """Waiting requests, oldest first. `department_id` limits to the ones that asked for that department."""
-        return await self._fetch(
-            "SELECT e.id, e.hostname, e.os, e.mac, e.requested_department_id, e.requested_level, e.peer, e.status, "
-            "e.created_at, e.expires_at, d.name AS requested_department_name FROM enrollments e "
-            "LEFT JOIN departments d ON d.id = e.requested_department_id "
-            "WHERE e.status = 'pending' AND ($1::int IS NULL OR e.requested_department_id = $1) "
-            "ORDER BY e.created_at, e.id", department_id)
-
-    async def pending_count(self, peer: str | None = None) -> int:
-        return await self._val(
-            "SELECT count(*) FROM enrollments WHERE status = 'pending' AND ($1::text IS NULL OR peer = $1)", peer)
-
-    async def wrong_code(self, enrollment_id: int) -> int:
-        """One more wrong code; returns how many so far."""
-        return await self._val("UPDATE enrollments SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts",
-                               enrollment_id)
-
-    async def confirm(self, enrollment_id: int, by_account_id: int | None, account_id: int, pc_id: int, *, licence_code_id: int | None = None) -> None:
-        """Confirmed by a person (`by_account_id`), or by a licence code given at setup (`licence_code_id`, nobody)."""
-        await self._exec(
-            "UPDATE enrollments SET status = 'confirmed', decided_by_account_id = $2, decided_at = now(), "
-            "account_id = $3, pc_id = $4, licence_code_id = $5 WHERE id = $1 AND status = 'pending'",
-            enrollment_id, by_account_id, account_id, pc_id, licence_code_id)
-
-    async def refuse(self, enrollment_id: int, by_account_id: int | None, reason: str) -> None:
-        await self._exec(
-            "UPDATE enrollments SET status = 'refused', decided_by_account_id = $2, decided_at = now(), "
-            "refused_reason = $3 WHERE id = $1 AND status = 'pending'", enrollment_id, by_account_id, reason)
-
-    async def expire_old(self) -> int:
-        status = await self._exec("UPDATE enrollments SET status = 'expired' WHERE status = 'pending' AND expires_at < now()")
-        return int(status.split()[-1])
-
-    async def mark_delivered(self, enrollment_id: int) -> bool:
-        """The machine collected its key. True only the first time."""
-        status = await self._exec(
-            "UPDATE enrollments SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL", enrollment_id)
-        return status.endswith("1")
 
 
 class DepartmentTasksRepo(_Repo):

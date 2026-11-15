@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from operator_client.tui.render import table
-from operator_client.tui.shell import Args, ShellContext, UsageError, command
+from operator_client.tui.shell import Args, ShellContext, command
 
 
 @command("accounts", usage="[dept=<id>] [workers]", help_="Accounts: every Admin (add `workers` for them too)")
@@ -90,35 +90,6 @@ async def department(ctx: ShellContext, args: Args) -> str:
 async def admin_demote(ctx: ShellContext, args: Args) -> str:
     r = await ctx.call("hierarchy.admin_demote", {"account_id": args.get_int(0, "account_id")})
     return f"account {r['account_id']} is a Worker again\nclient id {r['client_id']}  key {r['client_key']}  (shown once)"
-
-
-@command("licence", "import", "<file.json>", "Take in a licence's codes (the file the licence store hands over: {name, reference?, codes: [{code, role, seats?, department?, expires_at?}]})")
-async def licence_import(ctx: ShellContext, args: Args) -> str:
-    import json
-    from pathlib import Path
-
-    path = Path(args.get(0, "file"))
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise UsageError(f"cannot read {path}: {exc}") from exc
-    res = await ctx.call("licence.import", data)
-    return f"licence {res['licence_id']}: {res['added']} code(s) added" + (f", {res['already_known']} already known" if res["already_known"] else "")
-
-
-@command("licences", help_="Licence codes: role, seats used, where machines that joined went (a code shows only its last four characters)")
-async def licences(ctx: ShellContext, args: Args) -> str:
-    codes = (await ctx.call("licence.list"))["codes"]
-    rows_ = [{"id": c["id"], "licence": c["licence"], "code": "..." + c["last4"], "role": c["role"], "used": f"{c['used']}/{c['seats']}",
-              "department": c["department"] or "", "expires": (c["expires_at"] or "")[:10], "state": "withdrawn" if c["revoked_at"] else ""}
-             for c in codes]
-    return table(rows_, ["id", "licence", "code", "role", "used", "department", "expires", "state"]) if rows_ else "(no licence codes yet: licence import <file>)"
-
-
-@command("licence", "revoke", "<code_id>", "Withdraw a licence code: no further machine joins with it (the ones that joined stay)")
-async def licence_revoke(ctx: ShellContext, args: Args) -> str:
-    await ctx.call("licence.revoke", {"code_id": args.get_int(0, "code_id")})
-    return "withdrawn"
 
 
 # --- seats: machines knock, Admins give seats (docs/SEATS-AND-SETUP.md) -------------------------------------------------

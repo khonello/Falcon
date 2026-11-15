@@ -2,11 +2,12 @@
 
     environ-engine\\Scripts\\python.exe scripts/update_drill.py C:\\b\\dist\\falcon-worker-setup.exe [--keep]
 
-The setup.exe must be built for 127.0.0.1:7400 with data/engine.crt (build_setup's --bundle). On the TEST database (it is wiped), it:
+The setup.exe is the one Worker setup (build_setup worker); the drill gives it a company file for 127.0.0.1:7400 with data/engine.crt,
+signed with the store's TEST key (trusted for this run only: FALCON_STORE_TEST_KEY=1). On the TEST database (it is wiped), it:
 
   1. starts an Engine on 127.0.0.1:7400 (its own master secret and update folder in data/update-drill/), with one IT Admin;
-  2. installs the Worker with setup.exe, silently; its service asks to be registered, and the drill confirms it with the code the Engine
-     holds (a person would read it off the PC's screen);
+  2. installs the Worker with setup.exe, silently, with the company file; its service knocks, and the drill gives it a seat (as an
+     Admin would on the Machines page);
   3. makes version 0.0.2 of the Worker's package (the same code, saying 0.0.2) and puts it where the Engine serves updates from;
   4. approves 0.0.2 and says "Update now" for the machine, as an Admin would;
   5. waits for the machine to fetch it, check it, upgrade itself, restart and say it is on 0.0.2;
@@ -138,17 +139,25 @@ async def main() -> int:
     try:
         await wait_for("the Engine", lambda: _true(b"Engine listening on" in (OUT / "engine.log").read_bytes()), 60, 0.5)
         say("1. Engine up on 127.0.0.1:7400 (test database)")
-        p = run([str(setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
+        from scripts.store_stub import sign
+
+        company = OUT / "drill.falcon"
+        company.write_text(json.dumps(sign({"kind": "company", "company_id": "c_drill", "company_name": "Drill", "engine_id": "e_drill",
+                                            "names": ["127.0.0.1"], "port": 7400,
+                                            "certificates": [(ROOT / "data" / "engine.crt").read_text(encoding="ascii").strip()],
+                                            "issued_at": "2026-11-15T00:00:00Z"})), encoding="utf-8")
+        p = run([str(setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/COMPANY={company}"],
+                env={**os.environ, "FALCON_STORE_TEST_KEY": "1"})
         say(f"2. setup.exe exit {p.returncode}; service {service_state()}")
         db = Database(url)
         await db.connect()
-        enr = await wait_for("the request to be registered", lambda: db.pool.fetchrow("SELECT id, code, hostname FROM enrollments WHERE status = 'pending'"), 120)
+        knock = await wait_for("the machine to knock", lambda: db.pool.fetchrow("SELECT id, hostname FROM knocks WHERE status = 'waiting'"), 120)
         admin = EngineConnection("127.0.0.1", 7400, client_id="drill-admin", ca_cert=str(ROOT / "data" / "engine.crt"),
                                  derived_key=derive_client_key(secret, "drill-admin"), hostname="IT-01")
         await admin.connect()
         it = (await db.pool.fetchrow("SELECT id FROM departments WHERE name = 'IT'"))["id"]
-        await admin.call("enroll.confirm", {"enrollment_id": enr["id"], "code": enr["code"], "department_id": it})
-        say(f"   registered {enr['hostname']} with its code {enr['code']}")
+        await admin.call("seat.give", {"knock_id": knock["id"], "department_id": it})
+        say(f"   gave {knock['hostname']} a seat")
         pc = await wait_for("the machine to come online", lambda: db.pool.fetchrow(
             "SELECT id, hostname, agent_version FROM pcs WHERE pc_type = 'client_pc' AND agent_version IS NOT NULL"), 120)
         say(f"   online: {pc['hostname']} (pc {pc['id']}) on {pc['agent_version']}")

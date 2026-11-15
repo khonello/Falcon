@@ -1,30 +1,28 @@
 """The Windows installers: a person's PC (worker), an IT Admin's workstation (admin).
 
-    python -m installers.windows.install --role worker --bundle falcon-client.json [--fingerprint AB:CD:..] [--department 3]
-    python -m installers.windows.install --role admin  --bundle falcon-client.json [--department 3]
-    python -m installers.windows.install --role admin  --bundle falcon-client.json --client-id <id> --client-key-file key.txt   (the first IT Admin)
+    python -m installers.windows.install --role worker --company acme.falcon [--fingerprint AB:CD:..]
+    python -m installers.windows.install --role admin  --store https://<store> [--engine <engine_id>]
     python -m installers.windows.install --role worker --uninstall [--purge-data]
 
 Run from a payload folder (`python -m installers.payload <role> <folder>`), as an administrator. Each run lists what it does as it goes, checks
 what is already there before changing it, and can be run again to repair or upgrade. `--dry-run` lists the steps and changes nothing.
 
 What it does:
-  1. checks Windows, administrator rights, the payload (every file against its hash) and the bundle (and its certificate against --fingerprint)
+  1. checks Windows, administrator rights, the payload (every file against its hash), and learns where the Engine is: a Worker from the
+     store-signed company file beside the setup, an Admin by signing in to the store (docs/SEATS-AND-SETUP.md sections 5 and 6)
   2. stops an earlier Worker service, if there is one
   3. copies the code into <target>\\app and makes the runtime (<target>\\runtime) with the libraries the payload names
   4. writes what everyone on the machine may read (<data>\\engine.crt, console.json: the Engine's address and certificate, no key) and what only
      the system and administrators may read (<data>\\private\\worker.json: this machine's settings and, once it is registered, its key)
-  5. installs the Worker service (starts with Windows, restarts itself) and starts it. With no key of its own it asks the Engine to register
-     it: a code appears on the screen, and an Admin confirms it. Nothing is typed or copied by hand.
-  6. Start-menu shortcut for the console. On an Admin's workstation the console is signed in by the service; the first IT Admin's console
-     takes the id and key the Engine's installer printed (`--client-id`, `--client-key-file`), written for the person who ran this
+  5. installs the Worker service (starts with Windows, restarts itself) and starts it. With no key of its own it knocks at the Engine: a
+     Worker until an Admin gives it a seat, an Admin's PC in at once with the claim its sign-in left. Nothing is typed or copied by hand.
+  6. Start-menu shortcut for the console. On an Admin's workstation the console is signed in by the service
   7. writes a receipt (<target>\\install.json) so the uninstall knows what to remove
 """
 
 from __future__ import annotations
 
 import argparse
-import getpass
 import json
 import os
 import shutil
@@ -120,7 +118,7 @@ class WindowsInstall:
     def plan(self) -> Plan:
         a, r = self.a, self.role
         p = Plan(f"Falcon installer: {r.title}", say=self.say)
-        p.add("Check", self.check, "Windows, administrator, the payload's hashes, the bundle")
+        p.add("Check", self.check, "Windows, administrator, the payload's hashes, where the Engine is (company file, or the store's sign-in)")
         p.add("Stop the old service", self.stop_old, f"{self.service}, if it is there", skip=None if r.service else "this role has no service")
         p.add("Copy the code", self.copy_code, f"{', '.join(r.packages)} into {self.app}")
         p.add("The runtime", self.runtime, f"{self.target / 'runtime'} with the payload's libraries",
@@ -132,7 +130,7 @@ class WindowsInstall:
               skip=None if r.service and not a.no_service else ("--no-service" if r.service else "this role has no service"))
         p.add("The Falcon program", self.program, "starts when anyone signs in (tray icon, nothing on screen); a Start-menu shortcut opens it",
               skip=None if r.service and not a.no_windows and not a.no_service else "this role has no service, or no windows")
-        p.add("The console", self.console, "Start-menu shortcut" + ("; the first IT Admin's id and key for the person installing" if a.client_id else ""),
+        p.add("The console", self.console, "Start-menu shortcut",
               skip=None if r.console else "this role has no console")
         p.add("Receipt", self.receipt, f"{self.target / 'install.json'}")
         return p
@@ -153,9 +151,9 @@ class WindowsInstall:
             manifest = json.loads((self.source / "manifest.json").read_text(encoding="utf-8"))
             if manifest["role"] != self.role.name:
                 raise InstallError(f"this payload is for the {manifest['role']!r} role, not {self.role.name!r}")
-        if self.role.name == "admin" and self.a.store and not self.a.company and not self.a.bundle:
-            self.sign_in()                                # (--bundle with --first-admin-file: the old way in, on the command line, until step 8)
-        if self.role.name == "admin" and self.a.company and not self.a.claim and not self.a.client_id:
+        if self.role.name == "admin" and self.a.store and not self.a.company:
+            self.sign_in()
+        if self.role.name == "admin" and self.a.company and not self.a.claim:
             raise InstallError("an Admin's PC needs its claim from the store: sign in (--store), or give --claim with --company")
         if self.a.company:
             self.bundle = company_bundle(Path(self.a.company))
@@ -165,11 +163,7 @@ class WindowsInstall:
         if self.role.name == "worker":
             raise InstallError("the company file is needed (<company>.falcon, beside the setup or --company): it says where this company's "
                                "Engine is, signed by the store. Download it with the Worker setup from the console's Machines page")
-        if not self.a.bundle:
-            raise InstallError("--bundle falcon-client.json is needed: the Engine's installer writes it, and every PC is given the same one")
-        self.bundle = bundle_mod.load(Path(self.a.bundle), self.a.fingerprint)
-        who = f"certificate {self.bundle.ca_sha256}" + ("" if self.a.fingerprint else " (compare it with the one the Engine's installer printed)")
-        return f"ready: the Engine is {self.bundle.engine_host}:{self.bundle.engine_port}, {who}"
+        raise InstallError("an Admin's PC signs in to the store (--store): the Admin setup does it, and needs the internet")
 
     def sign_in(self) -> None:
         """The Admin setup signs in to the store (docs/SEATS-AND-SETUP.md section 5): the claim and the company file land in the private folder."""
@@ -256,8 +250,6 @@ class WindowsInstall:
             claim = str(claim_path)
         cfg.update({"engine_host": self.bundle.engine_host, "engine_port": self.bundle.engine_port, "tls": True, "ca_cert": str(self.cert),
                     "separate_programs": True, "windows": not self.a.no_windows, "serve_console": self.role.serve_console,
-                    "enroll_level": self.role.enroll_level or "worker", "enroll_department": self.a.department,
-                    **({"enroll_code": self.licence_code()} if self.licence_code() and not kept_key else {}),
                     **({"admin_claim": claim} if claim else {}),
                     "watch_roots": cfg.get("watch_roots") or self.a.watch or [r"C:\Users"]})
         cfg.setdefault("client_id", "")
@@ -265,14 +257,6 @@ class WindowsInstall:
         self.worker_json.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
         return ("settings updated; this machine keeps the key it already has" if kept_key
                 else "settings written; this machine has no key yet: it will ask the Engine to register it when the service starts")
-
-    def licence_code(self) -> str:
-        """The licence code given at setup (--code or --code-file), as typed; the Engine reads it the same with or without spaces and dashes."""
-        if self.a.code:
-            return str(self.a.code).strip()
-        if self.a.code_file:
-            return Path(self.a.code_file).read_text(encoding="utf-8").strip()
-        return ""
 
     def install_service(self) -> str:
         cfg = ["--name", self.service, "--config", str(self.worker_json)]
@@ -329,33 +313,9 @@ class WindowsInstall:
             target = pythonw if pythonw.exists() else self.runtime_python
             run_cmd(["powershell", "-NoProfile", "-Command", shortcut_script(lnk, target, "-m operator_client --gui", self.app, "Falcon console")])
         said = [f"shortcut {lnk}" if not self.a.no_shortcuts else "no shortcut (--no-shortcuts)"]
-        if self.a.client_id:
-            said.append(self._own_key_settings())
-        elif self.role.serve_console:
-            said.append("signed in by this machine's service once it is registered")
+        if self.role.serve_console:
+            said.append("signed in by this machine's service once it is in")
         return "; ".join(said)
-
-    def _own_key_settings(self) -> str:
-        """The first IT Admin's console needs the id and key the Engine's installer printed. They go into the settings of the person running this."""
-        assert self.bundle is not None
-        key = self.a.client_key or (Path(self.a.client_key_file).read_text(encoding="utf-8").strip() if self.a.client_key_file else "")
-        if not key and sys.stdin.isatty():
-            key = getpass.getpass("The client key (typed here, not shown): ").strip()
-        if not key:
-            raise InstallError("--client-id needs the key: --client-key-file <file> (or type it when asked)")
-        return self._write_own_settings(self.a.client_id, key)
-
-    def _write_own_settings(self, client_id: str, key: str) -> str:
-        assert self.bundle is not None
-        path = self.operator_json()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        cfg = {"engine_host": self.bundle.engine_host, "engine_port": self.bundle.engine_port, "client_id": client_id, "client_key": key,
-               "tls": True, "ca_cert": str(self.cert), "prefs": {}, "cache": {}}
-        path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-        return f"the console's settings are in {path} (readable by this person only)"
-
-    def operator_json(self) -> Path:
-        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Falcon" / "operator.json"
 
     def _version(self) -> str:
         """The version being installed: the payload's manifest says it (a payload carries no pyproject.toml: reading that failed every real install,
@@ -455,21 +415,11 @@ class WindowsInstall:
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="installers.windows.install", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--role", required=True, choices=("worker", "admin"))
-    ap.add_argument("--bundle", help="falcon-client.json from the Engine's installer (the admin role, until it signs in to the store)")
     ap.add_argument("--company", help="the company file (<company>.falcon) from the console's Machines page: where the Engine is, signed by the store")
     ap.add_argument("--store", help="admin: the store's address; the person signs in in the browser and this PC claims a free Admin seat")
     ap.add_argument("--engine", help="admin, with --store: which Engine, when the company has several")
     ap.add_argument("--claim", help="admin: an Admin claim the store issued already (admin-claim.json), with --company")
     ap.add_argument("--fingerprint", help="the certificate's fingerprint the Engine's installer printed: refuse any other")
-    ap.add_argument("--department", type=int, help="the department this machine asks to join (otherwise the person confirming chooses)")
-    ap.add_argument("--code", help="the licence code (an admin code for --role admin, a worker code for --role worker): the machine joins at once, "
-                                   "nobody confirms it. Kept only in the private settings until it is used")
-    ap.add_argument("--code-file", help="a file holding the licence code (a command line is remembered; a file need not be)")
-    ap.add_argument("--client-id", help="admin, the first IT Admin only: the client id the Engine's installer printed")
-    ap.add_argument("--client-key", help="the key (prefer --client-key-file: a command line is remembered)")
-    ap.add_argument("--client-key-file", help="a file holding the key")
-    ap.add_argument("--first-admin-file", help="admin, the first IT Admin only: the first-admin.txt the Engine's installer left (its id and key); "
-                                               "the first Admin's PC cannot join by a code, nobody is there yet to confirm it")
     ap.add_argument("--watch", action="append", help=r"a folder to watch (repeatable; default C:\Users)")
     ap.add_argument("--source", help="the payload folder (default: the one this installer is in)")
     ap.add_argument("--target", help=r"where the program goes (default C:\Program Files\Falcon)")
@@ -506,25 +456,8 @@ def company_bundle(path: Path) -> bundle_mod.Bundle:
     return bundle_mod.Bundle(str(names[0]), int(doc["port"]), "\n".join(certs) + "\n", cert_fingerprint(certs[0]))
 
 
-def first_admin(path: Path) -> tuple[str, str]:
-    """(client id, key) from the first-admin.txt the Engine's installer writes."""
-    import re
-
-    text = path.read_text(encoding="utf-8")
-    cid, key = re.search(r"client_id:\s*(\S+)", text), re.search(r"client_key:\s*([0-9a-fA-F]+)", text)
-    if not cid or not key:
-        raise InstallError(f"{path} does not hold a client_id and a client_key (it is the first-admin.txt the Engine's installer wrote)")
-    return cid.group(1), key.group(1)
-
-
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
-    if args.first_admin_file:
-        try:
-            args.client_id, args.client_key = first_admin(Path(args.first_admin_file))
-        except (OSError, InstallError) as exc:
-            print(f"\nNot finished: {exc}", file=sys.stderr)
-            return 1
     inst = WindowsInstall(args)
     try:
         (inst.uninstall_plan() if args.uninstall else inst.plan()).run(dry_run=args.dry_run)
@@ -532,8 +465,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nNot finished: {exc}\nFix that and run the installer again: every step checks what is already done.", file=sys.stderr)
         return 1
     if not args.dry_run and not args.uninstall and inst.role.service:
-        print("\nInstalled. This machine now asks the Engine to register it: a code appears on its screen; give it to an Admin"
- + " to confirm.")
+        print("\nInstalled. " + ("This PC is in as soon as its service starts: the claim from the sign-in lets it in." if inst.role.name == "admin"
+                                 else "This machine now knocks at the Engine: an Admin gives it a seat on the Machines page."))
     return 0
 
 

@@ -62,33 +62,10 @@ Type: filesandordirs; Name: "{app}\install-log.txt"
 Type: dirifempty; Name: "{app}"
 
 [Code]
-{ The licence code (the user, 2 Nov 2026): an admin code for the admin installer, a worker code for the worker one. With it the machine joins
-  the Engine at once and nobody has to confirm it; left empty, the machine asks and an IT Admin lets it in with the code shown on its screen.
-  It reaches the installer in a file in Setup's own temporary folder, never on a command line, and the installer keeps it only in the
-  machine's private settings until it is used. }
+{ Nothing is typed (docs/SEATS-AND-SETUP.md): a Worker learns where its Engine is from the company file beside this setup and knocks until
+  an Admin gives it a seat; an Admin's PC signs in to the company's account in the browser and comes in with the claim that sign-in gives. }
 var
-  CodePage: TInputQueryWizardPage;
-#if Role == "admin"
-  FirstAdminPage: TInputFileWizardPage;
-#endif
   InstallFailed: Boolean;
-
-procedure InitializeWizard;
-begin
-  CodePage := CreateInputQueryPage(wpSelectDir, 'Licence code',
-    'The code from your Falcon licence',
-    'Type the {#Role} code from the licence your organisation bought. The machine then joins on its own. ' +
-    'Leave it empty to have an IT Admin let it in instead.');
-  CodePage.Add('Licence code:', False);
-#if Role == "admin"
-  // The first IT Admin's PC cannot join by a code: nobody is there yet to confirm it. It is given the Engine's first-admin.txt instead.
-  FirstAdminPage := CreateInputFilePage(CodePage.ID, 'The first IT Admin',
-    'Only for the very first IT Admin''s PC',
-    'If this is the first IT Admin''s PC, choose the first-admin.txt the Engine''s installer left in C:\ProgramData\Falcon Engine on the ' +
-    'Engine''s machine (copy it here first). Leave it empty for any other Admin: that PC joins with the code it shows.');
-  FirstAdminPage.Add('first-admin.txt:', 'Text files|*.txt|All files|*.*', '.txt');
-#endif
-end;
 
 // Where the Engine is. A Worker: the store-signed company file beside this setup (or /COMPANY=), the same setup for every customer.
 // An Admin: it signs in to the store in the browser and learns it there (docs/SEATS-AND-SETUP.md section 5; internet required).
@@ -110,20 +87,6 @@ begin
 #endif
 end;
 
-function FirstAdminArg: String;
-var
-  Path: String;
-begin
-  Result := '';
-  Path := ExpandConstant('{param:FIRSTADMIN|}');
-#if Role == "admin"
-  if Path = '' then
-    Path := Trim(FirstAdminPage.Values[0]);
-#endif
-  if Path <> '' then
-    Result := ' --first-admin-file "' + Path + '"';
-end;
-
 // The installer, with what it says kept in the program folder's install-log.txt. If it fails, the person is shown the end of that log (or, installing
 // silently, the exit code is 10), never "succeeded".
 procedure RunInstaller;
@@ -135,9 +98,12 @@ begin
   Py := ExpandConstant('{app}\python\python.exe');
   Log := ExpandConstant('{app}\install-log.txt');
   Args := '-m installers.windows.install --role {#Role} ' + PlaceArg + ' --source "' +
-          ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') + '" --python "' + Py + '" --code-file "' +
-          ExpandConstant('{tmp}\licence-code.txt') + '"' + FirstAdminArg;
+          ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') + '" --python "' + Py + '"';
+#if Role == "admin"
+  WizardForm.StatusLabel.Caption := 'Installing Falcon. Sign in to your company''s Falcon account in the browser when it opens.';
+#else
   WizardForm.StatusLabel.Caption := 'Installing Falcon...';
+#endif
   if not Exec(ExpandConstant('{cmd}'), '/C ""' + Py + '" ' + Args + ' > "' + Log + '" 2>&1"', ExpandConstant('{tmp}\payload'), SW_HIDE,
               ewWaitUntilTerminated, Code) or (Code <> 0) then
   begin
@@ -157,8 +123,6 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if CurStep = ssInstall then
-    SaveStringToFile(ExpandConstant('{tmp}\licence-code.txt'), Trim(CodePage.Values[0]), False);
   if CurStep = ssPostInstall then
     RunInstaller;
 end;

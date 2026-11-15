@@ -44,7 +44,7 @@ Check it: `environ-engine\Scripts\python.exe -m pytest` -- every test should run
 
 ## 2. A real network
 
-**Superseded 14 Nov 2026 by `docs/SEATS-AND-SETUP.md`** (Workers knock and are given seats; Admins sign in to the company account; one setup for everyone plus a signed company file). Kept until each part is replaced.
+**How machines join (since 15 Nov 2026, `docs/SEATS-AND-SETUP.md`):** nothing is typed and no key is copied. The Engine's setup signs in to the company's account in the store and registers the Engine; the first IT Admin runs the Admin setup on their own PC, which signs in to the same account and takes a free Admin seat; every Worker gets one zip (the Worker setup and the company's signed file) from the console's Machines page, installs, and knocks until an Admin gives it a seat. From a clone (development) an unregistered Engine counts no seats, and `engine setup` / `bootstrap` still make the first IT Admin by hand.
 
 **Four Windows test machines (an Engine, an IT Admin, two Workers) on each kind of network** -- a network of its own inside an existing one,
 the existing network as it is, or our own Wi-Fi -- are set up as `docs/NETWORK-TEST-SETUP.md` says. The steps below are the commands it uses.
@@ -70,11 +70,13 @@ machine is registered).
 
 ### Step 1 -- the Engine
 
-**With the installer (how it ships, on Windows):** install PostgreSQL first (postgresql.org's Windows installer; remember its superuser
-password), then run **`falcon-engine-setup.exe`** as an administrator. It asks the names the PCs will use (keep `falcon.internal`), the first
-IT Admin's PC name and PostgreSQL's superuser password, and does everything below by itself: certificate, database, first IT Admin, firewall,
-the **FalconEngine** service (starts with Windows). It leaves, in `C:\ProgramData\Falcon Engine`: `falcon-client.json` (give it to the PCs'
-setup.exe builds), `first-admin.txt` (the first IT Admin's id and key: keep them, then delete it) and `master.secret` (**back it up offline**).
+**With the installer (how it ships, on Windows):** nothing is installed first. Run **`falcon-engine-setup.exe`** as an administrator, with
+the internet. It asks the names the PCs will use (keep `falcon.internal`), the port, and the company's name (only if the account has none
+yet); it opens the browser to sign in to the company's Falcon account; and it does everything below by itself: its own private PostgreSQL
+(the **FalconPostgres** service: localhost only, its own port, never mixed with one the machine has), certificate, schema, firewall, the
+registration with the store, the **FalconEngine** service (starts with Windows). It makes no Admin. It leaves, in
+`C:\ProgramData\Falcon Engine`: `store.json` and `company.falcon` (the registration, and the company file Worker setups are given) and
+`master.secret` (**back it up offline**). Then run the Admin setup on the first IT Admin's PC.
 Its log is `C:\ProgramData\Falcon Engine\logs\engine.log`; `python -m engine health` on that machine says whether it is well; it is
 stopped and started from Services (`services.msc`) or `python -m engine service stop|start`. Silent: `falcon-engine-setup.exe /VERYSILENT
 /ANSWERS=answers.json`. The steps below are the same by hand, from a clone.
@@ -152,12 +154,13 @@ environ-operator\Scripts\python.exe -m operator_client --gui
 On the connect screen: **Engine address** `falcon.internal : 7400`, **your client id** and **your key** from step 1,
 and **Choose…** the `engine.crt` you copied. It is remembered on this machine.
 
-### With licence codes
+### Seats, with the installers
 
-A licence comes with codes: admin codes and worker codes. Take them in once, in the TUI: `licence import <file.json>` (the file the licence
-store hands over); `licences` lists them with how many machines each has let in. Then install each PC with its code (`setup.exe` asks for it,
-or `--code`): it joins at once, as an IT Admin's workstation or a person's PC, and nobody confirms it. A worker joins the department its
-code names, else "New machines"; an Admin joins IT. `licence revoke <id>` withdraws a code.
+An IT Admin's PC: **`falcon-admin-setup.exe`**, with the internet. It signs in to the company's account in the browser, takes a free Admin
+seat (seats are bought in the store), and the PC is in at once; its console is signed in by its service. A person's PC: the **Worker
+setup zip** from the console's Machines page (`company-file <folder>` in the TUI saves the company file), run as an administrator. The PC
+knocks; it is listed under **Waiting for a seat** (TUI `knocks`), and an Admin gives it a seat, choosing its department (`seat give <knock>
+<department>`). `seats` shows what is bought and in use; `seat take <pc>` takes a seat back (never the last Admin's), and that PC knocks again.
 
 ### Step 3 -- departments, and more IT Admins
 
@@ -213,9 +216,8 @@ Open the machine (double-click it) → **Issue a new key**. The old key stops at
 
 ## Registering machines from the network
 
-A Worker installed with the installer (`installers/README.md`) needs no key typed by hand: it asks the Engine to be registered, the
-request waits under **Machines → Registry → Asking to join**, and an Admin lets it in by typing the short code shown on that PC's screen.
-The key then goes to the PC by itself. Step 4 above is the by-hand way.
+A Worker installed with its setup and the company file needs no key typed by hand: it knocks, waits under **Machines → Waiting for a seat**,
+and an Admin gives it a seat. The key then goes to the PC by itself. Step 4 above is the by-hand way (development).
 
 ---
 

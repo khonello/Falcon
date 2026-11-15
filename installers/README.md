@@ -1,6 +1,8 @@
 # Installers
 
-**Superseded 14 Nov 2026 by `docs/SEATS-AND-SETUP.md`** (Workers knock and are given seats; Admins sign in to the company account; one setup for everyone plus a signed company file). Kept until each part is replaced.
+**How machines join: `docs/SEATS-AND-SETUP.md` (done 15 Nov 2026).** Workers knock and are given seats; Admins sign in to the company account;
+one setup for everyone plus a store-signed company file. The licence codes, the code typed from a PC's screen, `first-admin.txt` and the
+per-Engine `falcon-client.json` in the PC setups are gone (the Linux `.deb` still makes a first Admin with `first-admin.txt`).
 
 The code behind the installers (decided in `docs/PACKAGING-PLAN.md`). **Deployment is on Windows** (the user, 14 Nov 2026): each machine is
 given one `setup.exe`, built by `installers/windows/build_setup.py` (`engine`, `admin`, `worker`). The Engine's Linux installer (the `.deb`) is
@@ -9,9 +11,8 @@ kept and tested, apart from the Windows one. Nothing here is run by the Engine o
 | Machine | setup.exe (Windows) | Or by hand |
 |---|---|---|
 | The server | `falcon-engine-setup.exe`: asks the names and port; carries Falcon's own PostgreSQL; signs in to the store | `python -m installers.windows.engine_install --names ... --store https://<store> [--company-name ...]`; Linux: `sudo python3 -m installers.engine.install --names ... --hostname IT-01` |
-| A person's PC | `python -m installers.windows.install --role worker --bundle falcon-client.json` | Windows, as administrator |
-| The first IT Admin's workstation | `... --role admin --bundle falcon-client.json --client-id <id> --client-key-file key.txt` | Windows, as administrator |
-| Another IT Admin's workstation | `... --role admin --bundle falcon-client.json` | Windows, as administrator |
+| A person's PC | `python -m installers.windows.install --role worker --company acme.falcon` (setup.exe: the `.falcon` beside it, or `/COMPANY=`) | Windows, as administrator |
+| An IT Admin's workstation (the first one too) | `... --role admin --store https://<store>`: signs in, takes a free Admin seat | Windows, as administrator, with the internet |
 
 Each is run from a **payload folder**: `python -m installers.payload <role> <folder> [--wheels <folder>]` assembles the role's packages (and
 only those), the libraries it needs (read from `pyproject.toml`), this installer, and a `manifest.json` of the SHA-256 of every file. Every
@@ -38,7 +39,7 @@ installer checks the manifest first and refuses a payload that was changed or ha
    certificate, **no key**, and prints the certificate's **fingerprint**. The first IT Admin's id and key are in
    `/var/lib/falcon/first-admin.txt` (root only). Back up `/var/lib/falcon/master.secret` offline.
 2. **The first IT Admin's workstation.** `--role admin` with the id and key from step 1: the console, and the person's own settings.
-**With a licence code (2 Nov 2026):** every installer takes `--code` (or `--code-file`; `setup.exe` asks for it on a page of its own). An admin
+**Gone 15 Nov 2026 -- with a licence code (2 Nov 2026):** every installer takes `--code` (or `--code-file`; `setup.exe` asks for it on a page of its own). An admin
 code with the admin installer, a worker code with the worker one: the machine joins the Engine at once, as what the code is for, and nobody
 confirms it. The code is kept only in the machine's private settings until it is used, then dropped. Without one, the steps below.
 

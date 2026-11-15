@@ -54,7 +54,6 @@ class Scheduler:
         self.every("sessions.expire", 5.0, self._expire_sessions)
         self.every("control.polled", float(self.engine.settings.control_poll_seconds), self._evaluate_polled)
         self.every("alerts.deliver", 30.0, self._deliver_alerts)
-        self.every("enroll.expire", 600.0, self._expire_enrollments)
         self.every("seats.grants", 24 * 3600, self._fetch_seat_grants)      # new seats bought in the store (never re-checks old ones)
         self.every("seats.periods", 6 * 3600, self._watch_seat_periods)     # warnings, grace, and seats over the count taken back
         self.every("cert.renewal", 24 * 3600, self.engine.certs.daily)      # the next certificate 60 days before the end; the switch at 30
@@ -135,11 +134,6 @@ class Scheduler:
         from engine.hierarchy import seats
 
         await seats.watch_periods(self.engine)
-
-    async def _expire_enrollments(self) -> None:
-        from engine.hierarchy import enrollment
-
-        await enrollment.expire(self.engine)
 
     async def _run_once(self, name: str, delay: float, job: Job) -> None:
         await asyncio.sleep(delay)

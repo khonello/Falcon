@@ -40,6 +40,7 @@ ROLES = ("admin", "worker")
 GRACE = timedelta(days=7)
 WARN_DAYS = (30, 7, 1)
 DEFAULT_DEPARTMENT = "New machines"
+ADMIN_DEPARTMENT = "IT"                    # where an Admin's PC that came in with its store claim is put
 NEW_PER_ADDRESS = 20                       # new knocking PCs from one address an hour: more is refused for the hour, and flagged
 NEW_WINDOW = 3600.0
 MAX_WAITING = 5000
@@ -186,8 +187,6 @@ def _check_claim(engine: Engine, envelope: Any, facts: dict[str, Any]) -> dict[s
 
 async def _claim_seat(engine: Engine, knock: dict[str, Any], claim: dict[str, Any], envelope: dict[str, Any]) -> None:
     """The claim is spent and the PC is in as an Admin's workstation, if an Admin seat is free."""
-    from engine.hierarchy import licences
-
     db = engine.db
     if await db.seats.claim_used(str(claim["claim_id"])):
         raise ProtocolError(ErrorCode.FORBIDDEN, "this Admin claim was used already: sign in again from the Admin setup")
@@ -199,7 +198,7 @@ async def _claim_seat(engine: Engine, knock: dict[str, Any], claim: dict[str, An
         raise ProtocolError(ErrorCode.CONFLICT, "no Admin seat is free: more are bought in the store, or an Admin takes a seat back")
     if not await db.seats.use_claim(str(claim["claim_id"]), str(claim.get("member_email") or ""), knock["id"], envelope):
         raise ProtocolError(ErrorCode.FORBIDDEN, "this Admin claim was used already: sign in again from the Admin setup")
-    department_id = await licences.department_for(engine, {}, None, "admin")
+    department_id = await named_department(engine, ADMIN_DEPARTMENT)
     pc_id = await _seat(engine, knock, "admin", department_id, None)
     await db.seats.claim_seated(str(claim["claim_id"]), pc_id)
     await engine.audit.record(None, "seat.claimed", target_type="pcs", target_id=pc_id, pc_id=pc_id,
@@ -254,9 +253,20 @@ async def _department(engine: Engine, asked: int | None) -> int:
         return asked
     if departments:
         raise ProtocolError(ErrorCode.INVALID, "say which department this machine goes into")
-    from engine.hierarchy import licences
+    return await named_department(engine, DEFAULT_DEPARTMENT)
 
-    return await licences.department_for(engine, {"department": DEFAULT_DEPARTMENT}, None, "worker")
+
+async def named_department(engine: Engine, name: str) -> int:
+    """The department of that name, made if it is not there yet (a department is a label in version 1: an Admin moves a machine whenever)."""
+    import asyncpg
+
+    found = next((d for d in await engine.db.accounts.list_departments() if d["name"].lower() == name.lower()), None)
+    if found is not None:
+        return int(found["id"])
+    try:
+        return await engine.db.accounts.create_department(name, None)
+    except asyncpg.UniqueViolationError:                                            # made by another machine at the same moment
+        return int(next(d["id"] for d in await engine.db.accounts.list_departments() if d["name"].lower() == name.lower()))
 
 
 @handler("seat.give")

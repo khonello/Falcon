@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 # Pushes that only say "look again": a page refreshes on them, and there is nothing in them for a person to read.
-QUIET = frozenset({"pc.presence", "control.interest_changed", "chat.read", "chat.request_gone", "machines.changed", "enroll.cancelled"})
+QUIET = frozenset({"pc.presence", "control.interest_changed", "chat.read", "chat.request_gone", "machines.changed"})
 
 
 def _audit_line(p: dict[str, Any]) -> str:
