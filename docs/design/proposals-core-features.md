@@ -50,36 +50,67 @@ identity helps Task, Flow and Detective as much as Protected (see "Beyond Protec
      name, replaced within a few seconds -> the same lineage. Windows keeps the created time across this swap, which confirms it.
      The window is clamped.
   4. *Same hash* elsewhere -> a **copy**: a new lineage with `copy_of` the first.
-  5. *Mostly the same content*: a new file on another drive or machine whose content is mostly that of a restricted lineage's latest
-     version (edited, then carried out). Decided by one fixed rule, below, and built last.
-- **How "mostly the same content" is measured.** Hashing a file in fixed blocks does not work for the files that matter most: a `.docx`
-  or `.xlsx` is a zip, so one changed cell changes the compressed bytes all through the file, and a fixed block boundary shifts with
-  every insertion. So, by kind (all stdlib, done by the Worker when the machine is idle, hot first):
-  - *Office files* (`.docx`, `.xlsx`, `.pptx` and their kin): open the zip (`zipfile`) and take only the parts that hold what was
-    written (`word/document.xml`, each sheet, each slide, shared strings). Pictures, styles, themes and properties are left out: every
-    letter on the company's letterhead shares its logo and styles, and counting them would make every such letter "mostly the same".
-    From those parts only the **text** is kept (the tags stripped): Word rewrites its XML on every save (revision ids on every
-    paragraph, runs split and joined), so the raw XML of an unchanged sentence differs from one save to the next. The text is cut into
-    chunks as below.
-  - *Text, CSV, code, and the Office content parts*: cut where a rolling hash of the content says (content-defined chunks, about 2 KB
-    each), so an insertion moves only the chunks around it.
-  - *PDF, pictures, archives*: whole hash only at first; a PDF compresses its content, so it is no better off than a zip without
-    opening its streams.
-- **Decided, not suggested (the user, 15 Nov 2026).** If the system cannot be sure, an Admin looking at "87% the same" is no better
-  placed, so there is no suggestion to answer. The rule: **a new file that holds 70% or more of a restricted file's content chunks is a
-  copy of restricted content**, and is treated like any copy of it today (the same-hash rule, applied at once). It is recorded with
-  its reason ("holds 87% of the text of `budget-2026.xlsx`"), and shown in the file's journey. An Admin can let it stay with the
-  allowance that exists today, as for any copy. Below 70%, it is a file of its own. Detective weighs either way, as it does today.
-- **Text every document shares does not count.** A contract made from the same template as a restricted master contract shares most
-  of its text with it, and is not a copy of it. So a chunk that also appears in files that are not restricted (the template's
-  standard clauses, a letterhead's address block) is left out of the 70%; only text that is the restricted file's own counts. This
-  needs the chunk hashes of ordinary documents too (hashes only, never text), counted per chunk.
-- Too small to judge: a restricted file under about 10 chunks (20 KB of text) is followed by its hash only, since one edit to it would
-  move the share by more than 10%.
-- Restricted content only: a file is never compared with every file in the index, only with restricted lineages (and those in an open
-  Detective case), through one table from chunk hash to lineage.
-- **Not tested for real yet:** there is no Office on the dev machine. The rule needs real Word, Excel and PowerPoint files, edited and
-  saved by the real programs, on the VM plan.
+  5. *Made from restricted content*: a new file that holds a restricted file's text (copied out and pasted, edited, then carried
+     out). **Found by events first, confirmed by content** (the user, 15 Nov 2026), below, and built last.
+
+### Made from restricted content: events find it, content confirms it
+
+**1. Events find it.** What the Worker already sees, in order, is most of the story:
+- a restricted file is **opened**, and by which program (Windows' own file trace, `worker_client/etw.py`; file opens need the elevated
+  service, and were confirmed delivered on 4 Nov 2026);
+- the same program **creates or saves a new file** in the same sitting (the witness stamp on every file change says which program made
+  it, and whether by hand);
+- **a copy to the clipboard** in that program, between the two. This one is not seen today (Detective's "clipboard" is still open).
+  The helper on the person's desktop can hear the clipboard change and which program owns it (Windows' clipboard listener; a service
+  in session 0 cannot). It may also fingerprint the copied text there, the same way as below, and compare it with the restricted
+  fingerprints the Worker holds: **the copied text never leaves the desktop, only "it matched `budget-2026.xlsx`"**.
+
+These do not decide anything on their own: Word or Excel has many files open at once, so "the same program saved a new file" is broad.
+What they do is **name the candidate**: this new file, possibly made from that restricted file. Only candidates are compared, which
+keeps the comparison small.
+
+**2. Content confirms it**, the same way whatever program wrote the file:
+- **Text, not bytes.** The comparison never looks at a file's bytes, so no program's way of writing a file can upset it (Word
+  rewrites its XML on every save; others re-encode, re-zip, re-wrap, and nobody knows them all). From each file only its **text** is
+  taken, and normalised: lower case, every run of spaces and line breaks made one space, punctuation and formatting dropped. Readers:
+  plain text, CSV and code as they are; Word, Excel and PowerPoint (and the OpenDocument kin) by opening the zip (`zipfile`) and
+  taking the text out of the parts that hold what was written (the document, each sheet, each slide, shared strings), never the
+  pictures, styles, themes or properties; RTF by its text. PDFs, pictures and other formats have no reader at first, so they are
+  followed by their hash only.
+- **Fingerprints of the words** (winnowing, as plagiarism checkers do): every run of 8 words is hashed, and from each window of
+  them the smallest hash is kept. A sentence gives the same fingerprints wherever it lands: in a Word file, pasted into a spreadsheet
+  cell, in a text file. Reformatting, moving paragraphs, inserting and deleting text change only the fingerprints around the change.
+  All stdlib (`hashlib`, `re`, `zipfile`, `xml.etree`), done by the Worker when the machine is idle, hot first.
+- **Text every document shares does not count.** A contract made from the same template as a restricted master contract shares its
+  standard clauses with it and is not a copy. So a fingerprint that also appears in documents that are not restricted is left out;
+  only text that is the restricted file's own counts. The Engine counts fingerprints across ordinary documents too: hashes only, never
+  text.
+
+**3. The rule, decided, not suggested** (the user, 15 Nov 2026: if the system cannot be sure, an Admin looking at "87% the same" is
+no better placed). Two cases, both applied at once and recorded with the reason:
+- **With the events** (the new file is a candidate of a restricted file): it is restricted if it holds a **passage** of that file's
+  own text, at least 40 fingerprints (about a paragraph). Otherwise copying 69% of a file would be a way round a 70% rule. One figure
+  or a sentence quoted in a report does not make the report restricted.
+- **Without the events** (it turned up on a drive or another machine, or its events were missed): it is restricted if it holds
+  **70% or more** of a restricted file's own text, the "copy, then edited" case.
+- Either way it is treated like any copy of restricted content today: shown on the Protected page as a copy caught, with its reason
+  ("holds a passage of `budget-2026.xlsx`, pasted at 10:05"), in the file's journey, and an Admin can let it stay with the allowance
+  that exists today.
+- Too small to judge: a restricted file with under about 40 fingerprints of its own is followed by its hash only.
+- Restricted content only: fingerprints are kept only for restricted files (and the counts for ordinary ones), through one table from
+  fingerprint to lineage.
+
+**Where it is recorded: two readings of the same events, on the one spine.**
+- **Protected** decides the *status*: the file holds restricted content. That is recorded as Protected records a copy caught today
+  (the `resource.*` audit, the Protected page, the journey), and it is a fact about the file, not about a person.
+- **Detective** reads the *behaviour*: "restricted text gathered into a new file" is a finding under collection, weighed low on its own,
+  since quoting a budget in a report is ordinary work. It joins a case only when it adds up: the new file then hidden, renamed to look
+  like something else, or taken to a drive.
+- So the person is not reported twice: a copy caught is a status, never an accusation; a Detective case is raised only by what follows.
+
+**Testing:** Word, Excel and PowerPoint are being installed on the dev machine (the user, 15 Nov 2026), so the readers and the rule are
+tested against files really edited and saved by the real programs. The same install lets the flow's Office conversion steps be run for
+real at last (`docs/to-lookat.md`: "Not run for real").
 
 **Beyond Protected.**
 - **Task**: "report.docx must be in Shared\Finance" is still met when the person renames it there, or the Admin is told it was
@@ -89,8 +120,9 @@ identity helps Task, Flow and Detective as much as Protected (see "Beyond Protec
   edited, then on a USB drive").
 - **The journey**: one unbroken line from first seen to today, through edits.
 
-**Worst case, clamped.** A lineage keeps its last 50 versions and every place; chunk hashes only for files under 200 MB; chunks are
-kept only for restricted lineages, so the comparison grows with what is restricted, not with the index.
+**Worst case, clamped.** A lineage keeps its last 50 versions and every place; text is read only from files under 200 MB;
+fingerprints are kept only for restricted files, so the comparison grows with what is restricted, not with the index; only candidates
+named by the events are compared at once, the rest when the machine is idle.
 
 ---
 
