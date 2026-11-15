@@ -63,7 +63,8 @@ identity helps Task, Flow and Detective as much as Protected (see "Beyond Protec
 - **a copy to the clipboard** in that program, between the two. This one is not seen today (Detective's "clipboard" is still open).
   The helper on the person's desktop can hear the clipboard change and which program owns it (Windows' clipboard listener; a service
   in session 0 cannot). It may also fingerprint the copied text there, the same way as below, and compare it with the restricted
-  fingerprints the Worker holds: **the copied text never leaves the desktop, only "it matched `budget-2026.xlsx`"**.
+  fingerprints the Worker holds: **the copied text never leaves the desktop, only "it matched `budget-2026.xlsx`"**. Watching the
+  clipboard this way is agreed (the user, 15 Nov 2026), and so is a passage being enough when the events point at the file (below).
 
 These do not decide anything on their own: Word or Excel has many files open at once, so "the same program saved a new file" is broad.
 What they do is **name the candidate**: this new file, possibly made from that restricted file. Only candidates are compared, which
