@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Falcon is PARKED (15 Nov 2026, `PARKED.md`): do not build here.** Work moved to a new product, forked from this repository. **If this
+> folder is that fork** (it is not github.com/khonello/Falcon, or the user says so), **start at `docs/next-product/START-HERE.md`** and
+> follow its forking steps: the first is to replace this file with `docs/next-product/CLAUDE.md`. Everything below describes Falcon.
+
 ## Repository state
 
 Design docs, a working **Engine** (Phase 1), the **Operator Client TUI** (Phase 2), the **Worker Client** service + narrow TUI (Phase 3), **full integration** (Phase 4: the three Hierarchy scenarios and the cross-combo chains, `tests/test_integration.py`), and the **Operator Client GUI** (Phase 6, pulled ahead: PySide6/QML on the same core layer, `python -m operator_client --gui`). **The order from here is fixed and sequential** (see `START-HERE.md`, then `PHASES.md`): Phase 5 authentication (done) → Phase 7 UI/UX (**done 28 Sep 2026**: the design was approved and every page is built to it) → Phase 9 packaging/deployment, which is now the blocker for a sale → Phase 8 human passes on the installed thing → Phase 10 hardening. Each phase leaves its area usable, not perfect; UI refinement continues through 8–10. Progress is tracked in `PHASES.md` — update it as items land; mark done items `[x]`.
